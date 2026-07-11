@@ -36,6 +36,7 @@ import { TrainingMixTab } from './TrainingScreen_parts/TrainingMixTab';
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { StrengthAnalysisHub } from './TrainingScreen_parts/StrengthAnalysisHub';
 import { LoadManagementHub } from './TrainingScreen_parts/LoadManagementHub';
+import TrainingIntelligenceDashboard from './TrainingScreen_parts/TrainingIntelligenceDashboard';
 import { DiagnosticsHub } from './TrainingScreen_parts/DiagnosticsHub';
 import { PeriodizationHub } from './TrainingScreen_parts/PeriodizationHub';
 import { TaperPlannerTab } from './TrainingScreen_parts/TaperPlannerTab';
@@ -443,7 +444,7 @@ export const TrainingScreen: React.FC = () => {
               {ZONE_ORDER.map(z => {
                 const group = ZONES[z];
                 return (
-                <button key={z} onClick={() => { hapticImpact('light'); setPage('tabs'); setZone(z); if (z !== 'planner') setTab(group.tabs[0]); }} style={{
+                <button key={z} onClick={() => { hapticImpact('light'); setPage('tabs'); setZone(z); if (z !== 'planner' && z !== 'calculators') setTab(group.tabs[0]); }} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
                   background: 'rgba(20,22,30,0.35)', border: '1px solid var(--glass-border)', color: 'var(--text)',
                   transition: 'all 0.2s',
@@ -488,7 +489,7 @@ export const TrainingScreen: React.FC = () => {
         <h2 style={{ margin: '0 0 8px', fontSize: 16, color: ZONES[zone].color }}>{ZONES[zone].title}</h2>
       )}
 
-      {zone && zone !== 'planner' && (() => {
+      {zone && zone !== 'planner' && zone !== 'calculators' && (() => {
         const cats = ZONES[zone].categories;
         if (cats) {
           return (
@@ -646,21 +647,39 @@ export const TrainingScreen: React.FC = () => {
       )}
 
 
-        {tab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub /></InfoErrorBoundary>}
-      {tab === 'load_management' && <InfoErrorBoundary label="Управление нагрузкой"><LoadManagementHub sessions={historyWorkouts} baseRisk={linked.risk?.overallRaw ?? 20} baseReadiness={readiness?.recovery ?? 75} /></InfoErrorBoundary>}
-      {tab === 'diagnostics' && <InfoErrorBoundary label="Диагностика"><DiagnosticsHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={0} currentVolume={manualResult?.days?.reduce((s: number, d: any) => s + d.exercises.length, 0) ?? 18} currentRir={2} /></InfoErrorBoundary>}
-      {tab === 'periodization_hub' && <InfoErrorBoundary label="Периодизация"><PeriodizationHub /></InfoErrorBoundary>}
-      {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLabMerged /></InfoErrorBoundary>}
-      {tab === 'calc_plates' && <InfoErrorBoundary label="Калькулятор блинов"><PlateCalcTab /></InfoErrorBoundary>}
-
-      {tab === 'volume' && <InfoErrorBoundary label="Расчёт объёма"><VolumeOptimizerTab /></InfoErrorBoundary>}
-      {tab === 'load_safety' && <InfoErrorBoundary label="Нагрузка/авторег"><LoadSafetyCard /></InfoErrorBoundary>}
-      {tab === 'split_gen' && <InfoErrorBoundary label="Генератор сплитов"><SplitGenCard /></InfoErrorBoundary>}
-      {tab === 'pri_reppat' && <InfoErrorBoundary label="PRI/схема повт"><PriRepPatternCard /></InfoErrorBoundary>}
-      {tab === 'tonnage' && <InfoErrorBoundary label="Тоннаж"><TonnageCalcTab /></InfoErrorBoundary>}
-
-      {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
-      {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixTab /></InfoErrorBoundary>}
+      {/* ═══════════ ⚡ ИНТЕЛЛЕКТ ТРЕНИРОВКИ (дашборд вместо пилюль) ═══════════ */}
+      {zone === 'calculators' && (() => {
+        const CALC_TABS = new Set(['strength_analysis','load_management','diagnostics','periodization_hub','exercise_lab','calc_plates','volume','load_safety','split_gen','pri_reppat','tonnage','calc_quality','training_mix_hub']);
+        const isCalcTab = CALC_TABS.has(tab);
+        if (isCalcTab) {
+          // Показываем конкретный инструмент с кнопкой назад
+          const backBtnStyle: React.CSSProperties = { padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)', cursor: 'pointer', marginBottom: 6 };
+          return (<>
+            <button style={backBtnStyle} onClick={() => { setTab('runtime'); }}>← К дашборду</button>
+            {tab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub /></InfoErrorBoundary>}
+            {tab === 'load_management' && <InfoErrorBoundary label="Управление нагрузкой"><LoadManagementHub sessions={historyWorkouts} baseRisk={linked.risk?.overallRaw ?? 20} baseReadiness={readiness?.recovery ?? 75} /></InfoErrorBoundary>}
+            {tab === 'diagnostics' && <InfoErrorBoundary label="Диагностика"><DiagnosticsHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={0} currentVolume={manualResult?.days?.reduce((s: number, d: any) => s + d.exercises.length, 0) ?? 18} currentRir={2} /></InfoErrorBoundary>}
+            {tab === 'periodization_hub' && <InfoErrorBoundary label="Периодизация"><PeriodizationHub /></InfoErrorBoundary>}
+            {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLabMerged /></InfoErrorBoundary>}
+            {tab === 'calc_plates' && <InfoErrorBoundary label="Калькулятор блинов"><PlateCalcTab /></InfoErrorBoundary>}
+            {tab === 'volume' && <InfoErrorBoundary label="Расчёт объёма"><VolumeOptimizerTab /></InfoErrorBoundary>}
+            {tab === 'load_safety' && <InfoErrorBoundary label="Нагрузка/авторег"><LoadSafetyCard /></InfoErrorBoundary>}
+            {tab === 'split_gen' && <InfoErrorBoundary label="Генератор сплитов"><SplitGenCard /></InfoErrorBoundary>}
+            {tab === 'pri_reppat' && <InfoErrorBoundary label="PRI/схема повт"><PriRepPatternCard /></InfoErrorBoundary>}
+            {tab === 'tonnage' && <InfoErrorBoundary label="Тоннаж"><TonnageCalcTab /></InfoErrorBoundary>}
+            {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
+            {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixTab /></InfoErrorBoundary>}
+          </>);
+        }
+        return <TrainingIntelligenceDashboard
+          manualResult={manualResult} level={level}
+          historyWorkouts={historyWorkouts} tprofile={tprofile}
+          readinessRecovery={readiness?.recovery ?? 70}
+          readinessFatigue={readiness?.fatigue ?? 30}
+          mesoLength={mesoLength}
+          onBuildPlan={() => goPlannerManual()}
+        />;
+      })()}
       {/* ═══════════ MY TRAINING TAB ═══════════ */}
 
       {/* reports tab moved to TrainingDiaryHub (diary tab sub-mode) */}

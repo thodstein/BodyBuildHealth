@@ -13,6 +13,7 @@ export const GOALS = [
   { value: 'maintenance', label: '⚖ Поддержание' },
   { value: 'recomp', label: '🔁 Рекомпозиция' },
   { value: 'rehab', label: '🩹 Реабилитация' },
+  { value: 'powerlifting', label: '🏆 Пауэрлифтинг' },
 ];
 
 export const LEVELS = [
@@ -24,13 +25,86 @@ export const LEVELS = [
 
 export const PCT_FOR_RIR: Record<number, number> = { 0: 1.0, 1: 0.96, 2: 0.92, 3: 0.88, 4: 0.84, 5: 0.80 };
 
+/* ─── Расширенные группы мышц (15 групп) ─── */
+export const ALL_GROUPS = [
+  'chest', 'back', 'quads', 'hamstrings', 'glutes', 'calves',
+  'shoulders', 'delt_front', 'delt_mid', 'delt_rear',
+  'biceps', 'triceps', 'abs', 'traps', 'forearms',
+];
+
 export const GROUP_RU: Record<string, string> = {
-  chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор', full: 'Общее',
+  chest: 'Грудь', back: 'Спина', legs: 'Ноги', quads: 'Квадрицепсы',
+  hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры',
+  shoulders: 'Плечи', delt_front: 'Передняя дельта', delt_mid: 'Средняя дельта',
+  delt_rear: 'Задняя дельта', biceps: 'Бицепс', triceps: 'Трицепс',
+  arms: 'Руки', core: 'Кор', abs: 'Пресс', traps: 'Трапеции',
+  forearms: 'Предплечья', full: 'Общее',
 };
 
-export const LEVEL_VOLUMES: Record<string, { mrv: number }> = {
-  beginner: { mrv: 15 }, intermediate: { mrv: 20 }, advanced: { mrv: 24 }, enhanced: { mrv: 28 },
+/* ─── Per-muscle volume (fallback, канон — volume-landmarks.engine) ─── */
+export const LEVEL_VOLUMES: Record<string, Record<string, { mev: number; mav: number; mrv: number }>> = {
+  beginner: {
+    chest: { mev: 6, mav: 10, mrv: 15 }, back: { mev: 8, mav: 12, mrv: 18 },
+    quads: { mev: 6, mav: 10, mrv: 15 }, hamstrings: { mev: 4, mav: 8, mrv: 12 },
+    shoulders: { mev: 4, mav: 8, mrv: 12 }, biceps: { mev: 2, mav: 6, mrv: 10 },
+    triceps: { mev: 2, mav: 6, mrv: 10 }, calves: { mev: 4, mav: 8, mrv: 14 },
+    glutes: { mev: 4, mav: 8, mrv: 12 }, abs: { mev: 4, mav: 8, mrv: 12 },
+    traps: { mev: 2, mav: 4, mrv: 8 }, forearms: { mev: 2, mav: 4, mrv: 8 },
+  },
+  intermediate: {
+    chest: { mev: 8, mav: 14, mrv: 20 }, back: { mev: 10, mav: 16, mrv: 24 },
+    quads: { mev: 8, mav: 14, mrv: 20 }, hamstrings: { mev: 6, mav: 10, mrv: 16 },
+    shoulders: { mev: 6, mav: 10, mrv: 16 }, biceps: { mev: 4, mav: 8, mrv: 14 },
+    triceps: { mev: 4, mav: 8, mrv: 14 }, calves: { mev: 6, mav: 10, mrv: 18 },
+    glutes: { mev: 6, mav: 10, mrv: 16 }, abs: { mev: 4, mav: 10, mrv: 14 },
+    traps: { mev: 4, mav: 6, mrv: 10 }, forearms: { mev: 4, mav: 6, mrv: 10 },
+  },
+  advanced: {
+    chest: { mev: 10, mav: 16, mrv: 24 }, back: { mev: 12, mav: 18, mrv: 28 },
+    quads: { mev: 10, mav: 16, mrv: 24 }, hamstrings: { mev: 8, mav: 12, mrv: 18 },
+    shoulders: { mev: 8, mav: 12, mrv: 20 }, biceps: { mev: 6, mav: 12, mrv: 18 },
+    triceps: { mev: 6, mav: 12, mrv: 18 }, calves: { mev: 8, mav: 16, mrv: 22 },
+    glutes: { mev: 8, mav: 12, mrv: 20 }, abs: { mev: 6, mav: 12, mrv: 16 },
+    traps: { mev: 4, mav: 8, mrv: 14 }, forearms: { mev: 4, mav: 8, mrv: 14 },
+  },
+  enhanced: {
+    chest: { mev: 12, mav: 18, mrv: 28 }, back: { mev: 14, mav: 20, mrv: 32 },
+    quads: { mev: 12, mav: 18, mrv: 28 }, hamstrings: { mev: 10, mav: 14, mrv: 22 },
+    shoulders: { mev: 10, mav: 14, mrv: 24 }, biceps: { mev: 8, mav: 14, mrv: 22 },
+    triceps: { mev: 8, mav: 14, mrv: 22 }, calves: { mev: 10, mav: 18, mrv: 26 },
+    glutes: { mev: 10, mav: 14, mrv: 24 }, abs: { mev: 8, mav: 14, mrv: 20 },
+    traps: { mev: 6, mav: 10, mrv: 18 }, forearms: { mev: 6, mav: 10, mrv: 18 },
+  },
 };
+
+export const LEVEL_MRV_FLAT: Record<string, number> = {
+  beginner: 15, intermediate: 20, advanced: 24, enhanced: 28,
+};
+
+export function getMrv(level: string, onCourse: boolean, courseIntensity: string, labMultiplier: number): number {
+  const baseMrv = LEVEL_MRV_FLAT[level] ?? 20;
+  const courseMult = onCourse ? (courseIntensity === 'heavy' ? 1.3 : courseIntensity === 'mild' ? 1.15 : 1.2) : 1;
+  return baseMrv * courseMult * labMultiplier;
+}
+
+export function getPerMuscleMrvFromLevel(level: string, muscle: string, onCourse: boolean, courseIntensity: string, labMultiplier: number): { mev: number; mav: number; mrv: number } {
+  const lv = LEVEL_VOLUMES[level] ?? LEVEL_VOLUMES.intermediate;
+  const mMap: Record<string, string> = {
+    chest: 'chest', back: 'back', legs: 'quads', shoulders: 'shoulders',
+    arms: 'biceps', core: 'abs', quads: 'quads', hamstrings: 'hamstrings',
+    glutes: 'glutes', calves: 'calves', biceps: 'biceps', triceps: 'triceps',
+    delt_front: 'delt_front', delt_mid: 'delt_mid', delt_rear: 'delt_rear',
+    abs: 'abs', traps: 'traps', forearms: 'forearms',
+  };
+  const canon = mMap[muscle] || muscle;
+  const landmarks = lv[canon] ?? { mev: 6, mav: 10, mrv: 15 };
+  const courseMult = onCourse ? (courseIntensity === 'heavy' ? 1.3 : courseIntensity === 'mild' ? 1.15 : 1.2) : 1;
+  return {
+    mev: landmarks.mev,
+    mav: landmarks.mav,
+    mrv: Math.round(landmarks.mrv * courseMult * labMultiplier),
+  };
+}
 
 export const SET_TEMPLATES: Record<string, { sets: number; reps: string; rir: number; rest: number }> = {
   '5×5': { sets: 5, reps: '5', rir: 1, rest: 180 },
@@ -68,28 +142,57 @@ export interface ManualExercise {
   pattern?: string;
   loadMode?: 'weight' | 'velocity';
   targetVelocity?: number;
+  note?: string;
+  tempo?: string;
+}
+
+export interface ManualWeek {
+  weekNumber: number;
+  phase: string;
+  phaseLabel: string;
+  rir: number;
+  days: ManualDay[];
+  corrections: string[];
 }
 
 export interface ManualResult {
   splitName: string;
   corrections: string[];
   days: ManualDay[];
+  weeks?: ManualWeek[];
+  currentWeek?: number;
+  mesoLength?: number;
 }
+
+export const DELOAD_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: 'Нет делода' },
+  { value: 3, label: 'Каждые 3 нед (продвинутый)' },
+  { value: 4, label: 'Каждые 4 нед (стандарт)' },
+  { value: 5, label: 'Каждые 5 нед' },
+  { value: 6, label: 'Каждые 6 нед (новичок)' },
+];
+
+export const RIR_WAVE_PATTERNS: Record<string, { label: string; desc: string; rirByQuarter: [number, number, number, number] }> = {
+  standard: { label: 'Стандартная волна', desc: '3→2→1→2 RIR по четвертям мезоцикла', rirByQuarter: [3, 2, 1, 2] },
+  aggressive: { label: 'Агрессивная волна', desc: '2→1→0→1 RIR — для опытных, быстрый прогресс', rirByQuarter: [2, 1, 0, 1] },
+  conservative: { label: 'Консервативная волна', desc: '4→3→2→3 RIR — для новичков, запас восстановления', rirByQuarter: [4, 3, 2, 3] },
+};
 
 export type ConstructorMode = 'macro' | 'manual';
 
 export function detectGroup(name: string): string {
   const n = name.toLowerCase();
-  if (/squat|присед|leg|quad|ножн|выпад|lunge/i.test(n)) return 'legs';
-  if (/bench|жим|chest|груд|press/.test(n)) return /shoulder|плеч|delt/i.test(n) ? 'shoulders' : 'chest';
+  if (/squat|присед|quad|ножн|выпад|lunge|leg press|жим ног/i.test(n)) return 'quads';
+  if (/bench|жим.*леж|chest|груд|pec|push.*up/i.test(n)) return /shoulder|плеч|delt|армей|воен/i.test(n) ? 'shoulders' : 'chest';
   if (/deadlift|станов|тяга|row|pull|спин|back|chin|lat/i.test(n)) return 'back';
-  if (/curl|бицеп|bicep/i.test(n)) return 'arms';
-  if (/tricep|трицеп|extension/i.test(n)) return /пресс|ab|core/i.test(n) ? 'core' : 'arms';
+  if (/curl|бицеп|bicep|молот/i.test(n)) return 'biceps';
+  if (/tricep|трицеп|extension.*бл|kick\s*back/i.test(n)) return 'triceps';
+  if (/hamstring|сгиб.*ног|бицеп.*бедр|рум.*dead/i.test(n)) return 'hamstrings';
+  if (/glute|ягод|hip.*thrust|таз/i.test(n)) return 'glutes';
+  if (/calf|икр|носоч|подъем.*нос/i.test(n)) return 'calves';
+  if (/trap|шраг|трап/i.test(n)) return 'traps';
+  if (/forearm|предплеч|запясть|кистев/i.test(n)) return 'forearms';
+  if (/ohp|shoulder|плеч|армей|жим.*сид|дельт|delt.*raise|махи.*сторон/i.test(n)) return 'shoulders';
+  if (/pres|пресс|ab|кранч|скруч|планк|side.*bend|подъем.*ног|corp|core/i.test(n)) return 'abs';
   return 'full';
-}
-
-export function getMrv(level: string, onCourse: boolean, courseIntensity: string, labMultiplier: number): number {
-  const baseMrv = LEVEL_VOLUMES[level]?.mrv ?? 20;
-  const courseMult = onCourse ? (courseIntensity === 'heavy' ? 1.3 : courseIntensity === 'mild' ? 1.15 : 1.2) : 1;
-  return baseMrv * courseMult * labMultiplier;
 }

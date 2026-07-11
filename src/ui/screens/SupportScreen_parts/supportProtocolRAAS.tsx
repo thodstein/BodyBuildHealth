@@ -1,0 +1,71 @@
+// @ts-nocheck
+import React, { useState } from 'react';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { InfoErrorBoundary } from './SupportScreenData';
+
+export const SupportProtocolRAAS: React.FC<{ s: Record<string, any> }> = ({ s }) => {
+  const [raasTab, setRaasTab] = useState('protocol');
+  return (
+          <InfoErrorBoundary label="RAAS">
+            <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#3b82f6', marginBottom:2 }}>🫀 RAAS (АД/почки/фиброз)</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Ренин-ангиотензин-альдостероновая система — ключевая мишень для контроля АД, протеинурии и фиброза на курсе ААС.</p>
+              </div>
+              <div style={{ display:'flex', gap:4, overflowX:'auto' }}>
+                {[{id:'protocol',label:'Протокол'},{id:'timing',label:'⏰ Тайминг'},{id:'monitoring',label:'🧪 Мониторинг'}].map((t:any)=>(
+                  <button key={t.id} onClick={()=>setRaasTab(t.id)} style={raasTab===t.id?pillActive('#3b82f6'):pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+              {raasTab==='protocol'&&(
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    {phase:'ФАЗА 1 · ПРОФИЛАКТИКА (АД <130/80, нет протеинурии)', label:'RAAS-модуляция + натрий-контроль', color:'#22c55e', condition:'АД <130/80, UACR <30 мг/г, СКФ >90', desc:'Профилактика АГ и нефропатии на ААС',
+                      items:[
+                        {name:'Натрий — контроль (<3 г/день)', dose:'<3 г', timing:'Постоянно', note:triageBadge('ess')+' ↓ натрия — первая линия. ААС ↑ Na⁺-реабсорбцию через RAAS'},
+                        {name:'Магний (цитрат/глицинат) 400 мг', dose:'400 мг', timing:'Вечер', note:triageBadge('rec')+' ↓ тонус сосудов. ↑ NO. ↓ АД на 3-5 мм рт.ст.'},
+                        {name:'Омега-3 2-4 г', dose:'2-4 г', timing:'С едой', note:triageBadge('rec')+' ↓ АД на 2-4 мм рт.ст. + ↓ воспаления сосудистой стенки'},
+                        {name:'Коэнзим Q10 100-200 мг', dose:'100-200 мг', timing:'Утро', note:triageBadge('opt')+' ↓ АД на 10-17 мм рт.ст. (при дефиците). Эндотелиальная функция'},
+                      ]},
+                    {phase:'ФАЗА 2 · АГ 1 СТЕПЕНИ (АД 130-139/80-89)', label:'Монотерапия телмисартаном', color:'#f59e0b', condition:'АД 130-139/80-89, UACR 30-300, СКФ 60-90', desc:'Старт RAAS-блокады',
+                      items:[
+                        {name:'Телмисартан 20-40 мг 💊', dose:'20-40 мг', timing:'Утро/вечер', note:triageBadge('ess')+' ARB. ↓ АД на 10-15/5-10. ↓ протеинурия. PPARγ-агонист (метаболические плюсы). Старт 20 мг'},
+                        {name:'Калий-контроль при телмисартане', target:'K⁺ <5.0', when:'Через 2 нед после старта', action:'↑ K⁺ риск при СКФ <60. При K⁺ >5.0 — ↓ дозу или отменить'},
+                        {name:'Натрий <2 г/день + DASH-диета', dose:'<2 г', timing:'Постоянно', note:triageBadge('rec')+' DASH-диета ↓ АД на 8-14 мм рт.ст. Синергия с телмисартаном'},
+                        {name:'Магний 400-600 мг + калий 400 мг', dose:'400-600+400', timing:'Магний вечер, калий с едой', note:triageBadge('rec')+' Добавить калий при K⁺ <4.0. Магний ↓ тонус сосудов'},
+                      ]},
+                    {phase:'ФАЗА 3 · АГ 2 СТЕПЕНИ / РЕФРАКТЕРНАЯ (АД >140/90)', label:'Комбинированная терапия', color:'#f97316', condition:'АД >140/90 на телмисартане 40 мг / иАПФ ранее', desc:'Add-on терапия',
+                      items:[
+                        {name:'Телмисартан 40-80 мг 💊', dose:'40-80 мг', timing:'Утро', note:triageBadge('ess')+' Максимальная доза. Добавить второй препарат'},
+                        {name:'+ Амлодипин 2.5-5 мг 💊', dose:'2.5-5 мг', timing:'Утро/вечер', note:triageBadge('ess')+' БКК. ↓ АД +10/5. Старт 2.5 мг. Отёки лодыжек — дозозависимый побочный эффект'},
+                        {name:'+ Спиронолактон 12.5-25 мг 💊', dose:'12.5-25 мг', timing:'Утро', note:triageBadge('rec')+' Антагонист альдостерона. ↓ АД +5-10. Антифибротический. Контроль K⁺+'},
+                        {name:'Петлевой диуретик (фуросемид/торасемид) 💊', dose:'20-40 мг', timing:'Утро при отёках', note:triageBadge('rec')+' При задержке жидкости. Контроль K⁺, Mg, Na⁺. Не >2×/нед'},
+                        {name:'Контроль K⁺, креатинина, СКФ каждые 2 нед', target:'K⁺ <5.0, СКФ >60', when:'Каждые 2 нед', action:'↑ K⁺ или ↓ СКФ >25% — ↓/отмена RAAS-блокады'},
+                      ]},
+                    {phase:'ФАЗА 4 · ПРОТЕИНУРИЯ / ХБП (UACR >300 / СКФ <60)', label:'Нефропротекция', color:'#ef4444', condition:'UACR >300 мг/г / СКФ <60 / микроальбуминурия', desc:'Максимальная нефропротекция',
+                      items:[
+                        {name:'Телмисартан 80 мг (макс. доза ARB) 💊', dose:'80 мг', timing:'Утро', note:triageBadge('ess')+' Монотерапия ARB в максимальной дозе. ↓ протеинурии на 40-60%. Двойная RAAS-блокада (ARB+иАПФ) НЕ рекомендована — повышает риск гиперкалиемии и ОПП без дополнительной пользы (ONTARGET, ALTITUDE). Контроль K⁺ 1×/нед!'},
+                        {name:'+ Эплеренон 25-50 мг 💊', dose:'25-50 мг', timing:'Утро', note:triageBadge('ess')+' Селективный антагонист минералокортикоидных рецепторов. Антифибротический + ↓ протеинурии. БЕЗ антиандрогенных эффектов (в отличие от спиронолактона). ГиперK⁺ риск — мониторинг K⁺ 1×/нед'},
+                        {name:'+ Амлодипин 5-10 мг 💊', dose:'5-10 мг', timing:'Утро/вечер', note:triageBadge('rec')+' Контроль АД. Дозировка по АД'},
+                        {name:'Петлевой диуретик (фуросемид 20-40 мг)', dose:'20-40 мг', timing:'Утро при отёках', note:triageBadge('rec')+' При задержке жидкости/ХБП. Контроль K⁺, Mg, Na⁺'},
+                        {name:'Исключить: НПВС, аминогликозиды, контраст', dose:'—', timing:'—', note:triageBadge('ess')+' Нефротоксичные препараты противопоказаны. НПВС ↓ почечный кровоток'},
+                        {name:'Кетостерил (аналог кетоаналогов) 💊', dose:'1 таб/5 кг', timing:'С едой', note:triageBadge('opt')+' ↓ азотемии при ХБП 3-4 ст. Кетоаналоги незаменимых аминокислот'},
+                      ]},
+                  ].map((p:any,i:any)=>renderPhase(p,i))}
+                </div>
+              )}
+              {raasTab==='timing' && timingBlock('raas', [
+                {time:'🌅 Утро', items:[{n:'Телмисартан 20-80 мг',why:'Фиксированное время'},{n:'Амлодипин 2.5-10 мг',why:'Отдельно от телмисартана'},{n:'Эплеренон 25-50 мг',why:'С едой ↓ ЖКТ-побочки'},{n:'Торасемид/фуросемид',why:'Утро — не вечер (↓ ночного диуреза)'}]},
+                {time:'🍽 День/Вечер', items:[{n:'Кетостерил',why:'С каждым приёмом еды'},{n:'Магний 400 мг',why:'Вечер. ↓ АД, ↑ NO'}]},
+              ])}
+              {raasTab==='monitoring' && monitoringBlock([
+                {marker:'АД (сист/диаст)', target:'<130/80 (протеинурия <125/75)', when:'Ежедневно × 2 нед после старта, затем 2-3×/нед', action:'>140/90 → ↑ терапию. <100/60 — ↓ дозу'},
+                {marker:'K⁺ (калий)', target:'3.5-5.0 ммоль/л', when:'Через 2 нед после старта/↑ дозы, затем 1×/мес', action:'>5.0 → ↓ RAAS-блокаду. <3.5 → ↓ диуретики'},
+                {marker:'Креатинин / СКФ', target:'СКФ >90 мл/мин', when:'Через 2 нед, затем 1×/3 мес', action:'↓ СКФ >25% после старта RAAS-блокады — отмена'},
+                {marker:'UACR (альбумин/креатинин мочи)', target:'<30 мг/г', when:'Каждые 3-6 мес', action:'>300 → протеинурия. RAAS-блокада обязательна'},
+                {marker:'ЭКГ', target:'Без изменений', when:'При старте терапии', action:'Гипертрофия ЛЖ → АГ-ремоделирование. контроль АД на фоне терапии'},
+              ])}
+            </div>
+          </InfoErrorBoundary>
+  );
+};

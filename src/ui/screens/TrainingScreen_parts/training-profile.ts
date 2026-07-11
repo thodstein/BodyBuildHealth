@@ -24,6 +24,7 @@ export interface TrainingProfile {
   pmBench: number;
   pmDead: number;
   workMax: Record<string, number>;
+  loadStrategy: string;
   onCourse: boolean;
   courseIntensity: 'mild' | 'moderate' | 'heavy';
   pharmaCoursesCount: number;
@@ -49,6 +50,7 @@ export const DEFAULT_PROFILE: TrainingProfile = {
   pmDead: 140,
   workMax: { chest: 100, back: 110, legs: 140, shoulders: 60, arms: 50, core: 60,
     quads: 140, hamstrings: 90, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60 },
+  loadStrategy: 'double_progression',
   onCourse: false,
   courseIntensity: 'moderate',
   pharmaCoursesCount: 0,
@@ -86,6 +88,7 @@ export function saveTrainingProfile(p: TrainingProfile): void {
       if (p.stressLevel) ls.stressLevel = p.stressLevel;
       if (p.weakPoints?.length) tr.weakPoints = p.weakPoints;
       if (p.equipment?.length) tr.equipment = p.equipment;
+      if (p.loadStrategy) tr.loadStrategy = p.loadStrategy;
       if (p.pmSquat) tr.pmSquat = p.pmSquat;
       if (p.pmBench) tr.pmBench = p.pmBench;
       if (p.pmDead) tr.pmDeadlift = p.pmDead;

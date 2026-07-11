@@ -1,0 +1,186 @@
+// @ts-nocheck
+import React, { useState } from 'react';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { InfoErrorBoundary } from './SupportScreenData';
+
+export const SupportProtocolCardio: React.FC<{ s: Record<string, any> }> = ({ s }) => {
+  const [cardioTab, setCardioTab] = useState('protocol');
+  return (
+          <InfoErrorBoundary label="Кардио">
+            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#ef4444', marginBottom:2 }}>❤️ Кардиопротекция на курсе ААС</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Протокол защиты сердечно-сосудистой системы: АД, липидный профиль, ремоделирование миокарда, тромбоз. Фазовый подход.</p>
+              </div>
+
+              {/* Sub-tabs */}
+              <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
+                {[
+                  { id:'mechanisms', label:'🔬 Механизмы' },
+                  { id:'protocol', label:'💊 Фазы протокола' },
+                  { id:'timing', label:'⏰ Тайминг приёма' },
+                  { id:'monitoring', label:'🧪 Мониторинг' },
+                ].map((t: any) => (
+                  <button key={t.id} onClick={() => setCardioTab(t.id)}
+                    style={cardioTab === t.id ? pillActive('#ef4444') : pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+
+              {/* Mechanisms */}
+              {cardioTab === 'mechanisms' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:6 }}>🫀 Кардиотоксичность ААС — ключевые пути (6 механизмов)</div>
+                  {[
+                    { title:'Дислипидемия', desc:'ААС (особенно оральные 17α-алкилированные) снижают ЛПВП на 40-70% через активацию печёночной липазы (HL) и подавление apoA-I. ЛПНП может расти. Атерогенный индекс резко ухудшается.' },
+                    { title:'Артериальная гипертензия', desc:'Задержка Na⁺/H₂O (минералокортикоидный эффект), активация РААС, повышение эндотелина-1, эритроцитоз → ↑ вязкости → ↑ ОПСС.' },
+                    { title:'Ремоделирование миокарда', desc:'Гипертрофия ЛЖ — прямая AR-стимуляция кардиомиоцитов + гемодинамическая перегрузка. Фиброз через TGF-β. Диастолическая дисфункция.' },
+                    { title:'Протромботическое состояние', desc:'↑ гематокрита, ↑ фибриногена, ↑ фактора VII, ↓ антитромбина III, ↑ агрегации тромбоцитов через тромбоксан A2.' },
+                    { title:'Эндотелиальная дисфункция', desc:'↓ eNOS → ↓ NO, ↓ FMD (поток-зависимой вазодилатации). Окислительный стресс эндотелия. Ускоренное старение сосудов.' },
+                    { title:'Аритмогенный потенциал', desc:'Удлинение QT, гипертрофия → re-entry. Электролитные сдвиги (↓ K⁺, ↓ Mg). Изменение экспрессии ионных каналов (Kv4.3, Cav1.2).' },
+                  ].map((m: any, i: any) =>(
+                    <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:4, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#fca5a5', marginBottom:2 }}>{m.title}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>{m.desc}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Protocol phases */}
+              {cardioTab === 'protocol' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    {
+                      phase:'ФАЗА 1 · ЯДРО', label:'Обязательный минимум (любой курс)', color:'#22c55e',
+                      condition:'Условие: любой курс ААС',
+                      desc:'Фундамент кардиопротекции. Защита эндотелия и нормализация липидного профиля. Начинайте за 2 недели ДО курса.',
+                      items:[
+                        { name:'Omega-3 (EPA+DHA)', dose:'3-5 г', timing:'С едой 2×/день', note:'EPA >2 г: ↓ ТГ на 25-30%, ↓ агрегации тромбоцитов, ↑ ЛПВП на 5-10%. Доказано в JELIS, REDUCE-IT' },
+                        { name:'CoQ10 (убихинол)', dose:'200-400 мг', timing:'С жирной едой', note:'Митохондриальная защита кардиомиоцитов. Антиоксидант ЛПНП. Особенно важно при статинах' },
+                        { name:'Магний (глицинат/L-треонат)', dose:'400-600 мг', timing:'Вечер', note:'Вазодилатация (антагонист Ca²⁺), ↓ АД на 2-5 мм рт.ст., антиаритмический. L-треонат — ЦНС-пенетрация. Глицинат — без слабительного эффекта. 80% населения в дефиците' },
+                        { name:'Таурин', dose:'2-3 г', timing:'Утро + Вечер', note:'Осморегуляция миокарда, ↓ АД через ↓ ангиотензина II, ↑ NO. Антиаритмический эффект' },
+                        { name:'Витамин D3 + K2', dose:'5000 МЕ + 100 мкг', timing:'С жирной едой', note:'K2 → MGP-активация → предотвращение кальцификации сосудов. D3 → ↓ РААС, ↓ АД' },
+                      ]
+                    },
+                    {
+                      phase:'ФАЗА 2 · БАЗА', label:'При АД >130/85 или курсе >500 мг/нед', color:'#f59e0b',
+                      condition:'Условие: АД 130-140/85-90 ИЛИ кумулятивная доза >500 мг/нед',
+                      desc:'Медикаментозная коррекция АД и липидов. Подключается при повышении давления или высоких дозировках.',
+                      items:[
+                        { name:'Телмисартан 💊', dose:'40 мг → 80 мг', timing:'Утро', note:'Старт 40 мг. Титровать до 80 мг через 2 нед при АД >130/80. ARB. По назначению врача. Альтернатива: периндоприл' },
+                        { name:'Небиволол 💊', dose:'2.5-5 мг', timing:'Утро', note:'β1-блокатор + NO-модулятор. ↓ ЧСС + вазодилатация. По назначению врача' },
+                        { name:'Красный дрожжевой рис (монаколин К)', dose:'1200-2400 мг', timing:'Вечер', note:'Природный статин (монаколин К = ловастатин). ↓ ЛПНП на 20-30%. Контроль АЛТ/АСТ и КФК' },
+                        { name:'Бергамот (цитрусовый экстракт)', dose:'500-1000 мг', timing:'Утро + Вечер', note:'↓ ЛПНП через HMG-CoA-редуктазу + ↑ ЛПВП. Полифенолы — двойной механизм. Синергия со статинами' },
+                        { name:'Чеснок экстракт (аллицин ст.)', dose:'600-1200 мг', timing:'С едой', note:'↓ АД на 5-10 мм рт.ст., ↓ агрегации тромбоцитов, ↑ NO. Мета-анализ Ried 2013 — доказанный эффект' },
+                      ]
+                    },
+                    {
+                      phase:'ФАЗА 3 · УСИЛЕНИЕ', label:'При АД >140/90 или ЛПВП <30 мг/дл', color:'#f97316',
+                      condition:'Условие: АД >140/90 ИЛИ ЛПВП <30 мг/дл на фоне курса',
+                      desc:'Активная кардиопротекция. Подключение рецептурных препаратов. Регулярный самоконтроль АД обязателен.',
+                      items:[
+                        { name:'Амлодипин 💊', dose:'5-10 мг', timing:'Утро (добавить к сартану)', note:'⚠ Контроль АД на 3-5 день после добавления — риск ортостатической гипотензии. БКК + телмисартан. По назначению врача' },
+                        { name:'Эзетимиб 💊', dose:'10 мг', timing:'Вечер', note:'Ингибитор NPC1L1 → ↓ всасывания холестерина. Эффективен в комбинации с розувастатином 5-10 мг (синергия +20%). Монотерапия — лишь −15-18% ЛПНП. По назначению врача' },
+                        { name:'NAC', dose:'1200-2400 мг', timing:'Утро + Вечер', note:'Антиоксидант эндотелия. ↑ NO биодоступность. ↓ окисленных ЛПНП. ↓ гомоцистеина' },
+                        { name:'L-Карнитин', dose:'2-3 г', timing:'Утро натощак', note:'Энергия миокарда (β-окисление ЖК). Перорально — общеукрепляющее, поддержка метаболизма. В/в форма изучалась при ИМ (CEDIM), перорально — доказательная база ниже' },
+                        { name:'Ресвератрол', dose:'250-500 мг', timing:'Утро', note:'SIRT1-активатор. ↓ окисленных ЛПНП. ↑ NO. При приёме >3 мес — контроль креатинина (риск нефротоксичности при >500 мг/сут)' },
+                      ]
+                    },
+                    {
+                      phase:'ФАЗА 4 · МАКСИМУМ', label:'При АД >160/100 или ЛПВП <20', color:'#ef4444',
+                      condition:'Условие: АД >160/100 ИЛИ ЛПВП <20 ИЛИ гематокрит >54%',
+                      desc:'КРИТИЧЕСКАЯ кардиопротекция. Выход за эти пороги — прямое показание к прекращению курса ААС.',
+                      items:[
+                        { name:'Аспирин кардио 💊', dose:'100 мг', timing:'После еды', note:'↓ тромбоксана A2 → ↓ агрегации тромбоцитов. ТОЛЬКО при ≥2 факторов риска: возраст >50, Hct >50%, АГ, курение, дислипидемия, тромбоанамнез. При Hct >54% аспирин НЕ заменяет флеботомию — снижение вязкости крови первично. Обязательно + ИПП для гастропротекции' },
+                        { name:'Витамин E (d-альфа-токоферол)', dose:'400 МЕ', timing:'С жирной едой', note:'Антиоксидантная защита сосудистой стенки. Синергия с CoQ10 (регенерация убихинола). Не превышать 400 МЕ/сут (риск геморрагий при >800 МЕ)' },
+                        { name:'Пентоксифиллин 💊', dose:'400 мг 2-3×/день', timing:'С едой', note:'↓ вязкости крови, ↑ эластичности эритроцитов, ↓ фибриногена. По назначению врача' },
+                        { name:'Донация крови', dose:'450 мл', timing:'1×/2-3 мес', note:'Снижение Hct на 3-5%. При Hct >54% — обязательно. Риск тромбоза растёт экспоненциально с Hct >52%' },
+                        { name:'Икозапент (рецепт. омега-3) 💊', dose:'4 г/день', timing:'С едой', note:'Высокоочищенный EPA-этил. ↓ ТГ на 30-40%. REDUCE-IT: ↓ MACE на 25%. По назначению врача' },
+                      ]
+                    },
+                  ].map((phase: any, pi: any) =>(
+                    <div key={pi} style={{ ...cardBg, background:phase.color+'08', border:'1px solid '+phase.color+'22' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:6 }}>
+                        <span style={{ fontSize:9, fontWeight:800, padding:'2px 8px', borderRadius:4, background:phase.color+'22', color:phase.color }}>{phase.phase}</span>
+                        <span style={{ fontSize:10, fontWeight:600, color:phase.color, flex:1 }}>{phase.label}</span>
+                      </div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6, lineHeight:1.4, padding:'6px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)' }}>
+                        <b style={{color:phase.color}}>{phase.condition}</b> — {phase.desc}
+                      </div>
+                      {phase.items.map((item: any, ii: any) =>(
+                        <ItemRow key={ii} name={item.name} dose={item.dose} timing={item.timing} note={item.note} color={phase.color} />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Timing */}
+              {cardioTab === 'timing' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:6 }}>⏰ Суточный тайминг кардиопротекции</div>
+                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Ключевое правило: гипотензивные утром, липид-снижающие на ночь, антиоксиданты утром.</p>
+                  {[
+                    { time:'🌅 Утро (06:00–09:00)', color:'#f59e0b', items:[
+                      { n:'Телмисартан 40-80 мг', why:'Утренний пик АД (циркадный ритм кортизола). Натощак — быстрая абсорбция' },
+                      { n:'Небиволол 2.5-5 мг', why:'Синхронизация с циркадным подъёмом АД и ЧСС. Не на ночь — брадикардия во сне' },
+                      { n:'CoQ10 200 мг', why:'С жирным завтраком. Убихинол — активная форма. Биодоступность +3x с жирами' },
+                      { n:'L-Карнитин 2 г', why:'Натощак за 30 мин до еды. Пик концентрации через 3-4 ч. Энергия миокарда на день' },
+                    ]},
+                    { time:'☀️ День (12:00–14:00)', color:'#f97316', items:[
+                      { n:'Чеснок экстракт 600 мг', why:'С обедом (снижение раздражения ЖКТ). Пик аллицина через 2-4 ч. Не натощак!' },
+                      { n:'Ресвератрол 250 мг', why:'С жирной пищей (жирорастворимый). SIRT1-активация в дневной метаболизм' },
+                      { n:'Таурин 1 г', why:'До/после тренировки. Осморегуляция → снижение постнагрузочного подъёма АД' },
+                    ]},
+                    { time:'🌙 Вечер/Ночь (19:00–22:00)', color:'#6366f1', items:[
+                      { n:'Красный дрожжевой рис 1200 мг', why:'Синтез холестерина — ночью (пик ГМГ-КоА-редуктазы в 24:00-02:00)' },
+                      { n:'Бергамот 500 мг', why:'Вечерний приём синхронизирован с суточным ритмом липидного обмена' },
+                      { n:'Эзетимиб 10 мг', why:'Вечером — совпадает с максимумом всасывания холестерина из пищи (ужин)' },
+                      { n:'Аспирин 100 мг', why:'После ужина. Снижение ночного тромбообразования. Не натощак!' },
+                      { n:'Магний 400-600 мг', why:'Вазодилатация, снижение ночного АД. NMDA-блокада → глубокий сон. L-треонат/глицинат — предпочтительные формы' },
+                    ]},
+                  ].map((slot: any, si: any) =>(
+                    <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:slot.color+'0a', border:'1px solid '+slot.color+'22' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:slot.color, marginBottom:4 }}>{slot.time}</div>
+                      {slot.items.map((x: any, xi: any) =>(
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{x.n}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:6 }}>— {x.why}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Monitoring */}
+              {cardioTab === 'monitoring' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={cardBg}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:6 }}>🧪 Лабораторный мониторинг ССС</div>
+                    {[
+                      { marker:'Липидограмма', target:'ЛПВП >40, ЛПНП <100, ТГ <150', when:'Каждые 4-6 нед', action:'При ЛПВП <30 — фаза 3. При ЛПВП <20 — немедленная остановка курса' },
+                      { marker:'АД (самоконтроль)', target:'<130/85 мм рт.ст.', when:'Ежедневно утром и вечером', action:'При >140/90 на телмисартане 80 мг — фаза 3. При >160/100 — остановка курса' },
+                      { marker:'Гематокрит (Hct)', target:'42-50%', when:'Каждые 4 нед', action:'При >52% — донация. При >54% — экстренное кровопускание (риск тромбоза)' },
+                      { marker:'hs-CRP', target:'<1 мг/л', when:'Каждые 8 нед', action:'При >3 — повышение кардиориска в 2x. Усиление противовоспалительной терапии' },
+                      { marker:'Гомоцистеин', target:'<10 мкмоль/л', when:'Каждые 8 нед', action:'При >12 — метилфолат 400-800 мкг + B12 + TMG 2-3 г' },
+                      { marker:'Фибриноген', target:'2-4 г/л', when:'Каждые 12 нед', action:'При >4.5 — повышение риска тромбоза. Рассмотреть аспирин + омега-3 высокодозно' },
+                      { marker:'ЭКГ (12 отведений)', target:'QTc <450 мс (м) / <460 мс (ж)', when:'До курса + каждые 12 нед', action:'При QTc >450 — ЭХО-КГ + консультация кардиолога' },
+                      { marker:'ЭХО-КГ', target:'ФВ >55%, ГЛЖ <12 мм', when:'До курса + каждые 6-12 мес', action:'При ГЛЖ >12 мм или ФВ <50% — прекращение курса, кардиолог' },
+                    ].map((m: any, i: any) =>(
+                      <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <span style={{ fontSize:9, fontWeight:700, color:'#fca5a5' }}>{m.marker}</span>
+                          <span style={{ fontSize:8, fontWeight:600, color:'#ef4444' }}>{m.when}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}><b style={{color:'#fca5a5'}}>Цель: {m.target}</b></div>
+                        <div style={{ fontSize:7, color:'#fda4af', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(239,68,68,0.06)' }}>⚠ {m.action}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </InfoErrorBoundary>
+  );
+};

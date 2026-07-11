@@ -1,0 +1,195 @@
+// @ts-nocheck
+import React, { useState } from 'react';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { InfoErrorBoundary } from './SupportScreenData';
+
+export const SupportProtocolRenal: React.FC<{ s: Record<string, any> }> = ({ s }) => {
+  const [renalTab, setRenalTab] = useState('protocol');
+  return (
+          <InfoErrorBoundary label="Почки">
+            <div style={{ paddingBottom: 30, display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={cardBg}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#3b82f6', marginBottom:2 }}>💧 Нефропротекция на курсе ААС</div>
+                <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Защита почек: гемодинамика, гиперфильтрация, протеинурия, электролитный баланс. Фазовый подход.</p>
+              </div>
+
+              {/* Sub-tabs */}
+              <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
+                {[
+                  { id:'mechanisms', label:'🔬 Механизмы' },
+                  { id:'protocol', label:'💊 Фазы протокола' },
+                  { id:'timing', label:'⏰ Тайминг приёма' },
+                  { id:'monitoring', label:'🧪 Мониторинг' },
+                ].map((t: any) => (
+                  <button key={t.id} onClick={() => setRenalTab(t.id)}
+                    style={renalTab === t.id ? pillActive('#3b82f6') : pillInactive()}>{t.label}</button>
+                ))}
+              </div>
+
+              {/* Mechanisms */}
+              {renalTab === 'mechanisms' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>💧 Нефротоксичность ААС — ключевые пути (6 механизмов)</div>
+                  {[
+                    { title:'Гемодинамические нарушения', desc:'ААС → задержка Na⁺/H₂O → повышение ОЦК → повышение АД → гипертензивная нефропатия. Повышенное внутриклубочковое давление → гиперфильтрация → повреждение подоцитов.' },
+                    { title:'Гиперфильтрация', desc:'Увеличение СКФ на 10-20% на фоне высокобелковой диеты и ААС. Хроническая гиперфильтрация → гломерулосклероз (фокально-сегментарный — ФСГС).' },
+                    { title:'Протеинурия', desc:'Повреждение подоцитов → нарушение фильтрационного барьера → потеря белка с мочой. Микроальбуминурия — ранний маркер. При ААС может появляться через 8-12 нед.' },
+                    { title:'Водно-электролитный дисбаланс', desc:'Задержка Na⁺ → отёки. Повышение K⁺ при подавлении альдостерона. Снижение Mg при гиперфильтрации. Нарушение Ca²⁺/PO₄³⁻ → риск нефролитиаза.' },
+                    { title:'Рабдомиолиз-ассоциированное ОПП', desc:'Интенсивные тренировки + дегидратация → рабдомиолиз → миоглобин → острое повреждение почек. Миоглобин — прямой нефротоксин. Редкое, но жизнеугрожающее.' },
+                    { title:'Тубулоинтерстициальное повреждение', desc:'Оксидативный стресс в канальцах. Апоптоз тубулярных клеток. Хроническое воспаление интерстиция. Нарушение концентрационной функции.' },
+                  ].map((m: any, i: any) =>(
+                    <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:4, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.08)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#60a5fa', marginBottom:2 }}>{m.title}</div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>{m.desc}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Protocol phases */}
+              {renalTab === 'protocol' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {[
+                    {
+                      phase:'ФАЗА 1 · ЯДРО', label:'Обязательный минимум (любой курс)', color:'#22c55e',
+                      condition:'Условие: любой курс ААС',
+                      desc:'Фундамент защиты почек. Гидратация, электролитный баланс, антиоксидантная защита канальцев.',
+                      items:[
+                        { name:'Вода (гидратация)', dose:'35-40 мл/кг/день', timing:'Равномерно в течение дня', note:'Основа нефропротекции. Контроль по цвету мочи: светло-соломенный. При белке >2 г/кг → +500 мл' },
+                        { name:'Магний (L-треонат/глицинат)', dose:'400-600 мг', timing:'Вечер', note:'Снижение оксалатных камней. Вазодилатация почечных артериол. L-треонат — лучшая пенетрация ЦНС. Глицинат — минимальный слабительный эффект' },
+                        { name:'Omega-3 (EPA+DHA)', dose:'3-5 г', timing:'С едой', note:'Снижение почечного воспаления и протеинурии. EPA → резолвины → защита подоцитов. Доказано при IgA-нефропатии' },
+                        { name:'Витамин D3', dose:'5000-10000 МЕ', timing:'С жирной едой', note:'VDR в подоцитах → защита фильтрационного барьера. Снижение протеинурии и РААС' },
+                        { name:'Калий (из пищи)', dose:'3500-4700 мг/день', timing:'С едой', note:'Из картофеля, бананов, авокадо. ⚠ Только при контроле K⁺ сыворотки (3.5-5.0 ммоль/л). Запрещено при ХБП 3+ или приёме АПФ/сартанов + K⁺-сберегающих диуретиков' },
+                      ]
+                    },
+                    {
+                      phase:'ФАЗА 2 · БАЗА', label:'При АД >130/85 или высоком белке (>2.5 г/кг)', color:'#f59e0b',
+                      condition:'Условие: АД >130/85 ИЛИ белок в диете >2.5 г/кг/день',
+                      desc:'Контроль внутриклубочкового давления и гиперфильтрации. Антипротеинурическая терапия.',
+                      items:[
+                        { name:'Телмисартан (или периндоприл) 💊', dose:'40-80 мг', timing:'Утро', note:'ARB/иАПФ → снижение внутриклубочкового давления. Снижение протеинурии на 40-60%. Старт 40 мг, титрация до 80 мг через 2 нед. По назначению врача' },
+                        { name:'Астрагал', dose:'1-3 г', timing:'С едой', note:'Снижение протеинурии и креатинина (мета-анализ Zhang 2014). Снижение TGF-β → антифибротический' },
+                        { name:'NAC', dose:'1200-2400 мг', timing:'Утро + Вечер', note:'Антиоксидант почечных канальцев. Защита от контраст-индуцированной нефропатии (доказано)' },
+                        { name:'CoQ10', dose:'200-400 мг', timing:'С жирной едой', note:'Митохондриальная защита тубулярных клеток. Повышение СКФ. Снижение перекисного окисления в почках' },
+                      ]
+                    },
+                    {
+                      phase:'ФАЗА 3 · УСИЛЕНИЕ', label:'При микроальбуминурии или СКФ <90', color:'#f97316',
+                      condition:'Условие: микроальбуминурия >30 мг/сут ИЛИ СКФ <90 мл/мин (CKD-EPI)',
+                      desc:'Активная ренопротекция при первых признаках повреждения. Замедление прогрессирования.',
+                      items:[
+                        { name:'Кордицепс', dose:'1-3 г', timing:'Утро', note:'Снижение креатинина и мочевины. Повышение СКФ на 10-15%. Антифибротический. Иммуномодуляция' },
+                        { name:'Куркумин + пиперин', dose:'500-1000 мг', timing:'С едой', note:'Снижение NF-κB в мезангии. Антифибротический (TGF-β). Снижение протеинурии' },
+                        { name:'Пикногенол (кора сосны)', dose:'100-200 мг', timing:'Утро', note:'Снижение протеинурии и АД. Антивоспалительное. Улучшение эндотелиальной функции почечных сосудов' },
+                        { name:'Ресвератрол', dose:'250-500 мг', timing:'Утро', note:'SIRT1-активация → снижение апоптоза подоцитов. Антиоксидант. Снижение фиброза интерстиция' },
+                      ]
+                    },
+                    {
+                      phase:'ФАЗА 4 · МАКСИМУМ', label:'При протеинурии >0.5 г/сут или креатинине >1.3x ВГН', color:'#ef4444',
+                      condition:'Условие: протеинурия >0.5 г/сут ИЛИ креатинин >1.3x ВГН',
+                      desc:'КРИТИЧЕСКАЯ ренопротекция. Требуется консультация нефролога и решение о продолжении курса.',
+                      items:[
+                        { name:'Кетостерил (кетоаналоги АК) 💊', dose:'1 таб/5 кг/день', timing:'С едой', note:'Снижение азотистой нагрузки. Замедление прогрессирования ХБП. По назначению нефролога' },
+                        { name:'Бикарбонат натрия', dose:'0.5-1 г 2-3×/день', timing:'С едой', note:'Коррекция метаболического ацидоза. Замедляет прогрессирование ХБП. Контроль pH' },
+                        { name:'Гипонатриевая диета', dose:'<2 г Na⁺/день', timing:'—', note:'Ограничение соли. Снижение АД и протеинурии. Отказ от переработанных продуктов' },
+                        { name:'Ограничение белка', dose:'<1 г/кг/день', timing:'При ХБП 3+ стадии', note:'Снижение гиперфильтрации. Кетоаналоги + низкобелковая диета = стандарт нефропротекции' },
+                        { name:'Нефролог + биопсия', dose:'По назначению', timing:'При протеинурии >1 г/сут', note:'Исключение гломерулонефрита, ФСГС. Морфологический диагноз обязателен' },
+                      ]
+                    },
+                  ].map((phase: any, pi: any) =>(
+                    <div key={pi} style={{ ...cardBg, background:phase.color+'08', border:'1px solid '+phase.color+'22' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:6 }}>
+                        <span style={{ fontSize:9, fontWeight:800, padding:'2px 8px', borderRadius:4, background:phase.color+'22', color:phase.color }}>{phase.phase}</span>
+                        <span style={{ fontSize:10, fontWeight:600, color:phase.color, flex:1 }}>{phase.label}</span>
+                      </div>
+                      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6, lineHeight:1.4, padding:'6px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)' }}>
+                        <b style={{color:phase.color}}>{phase.condition}</b> — {phase.desc}
+                      </div>
+                      {phase.items.map((item: any, ii: any) =>(
+                        <ItemRow key={ii} name={item.name} dose={item.dose} timing={item.timing} note={item.note} color={phase.color} />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Timing */}
+              {renalTab === 'timing' && (
+                <div style={cardBg}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>⏰ Суточный тайминг нефропротекции</div>
+                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Равномерная гидратация в течение дня — ключевой принцип. Антигипертензивные утром.</p>
+                  {[
+                    { time:'🌅 Утро (06:00–09:00)', color:'#f59e0b', items:[
+                      { n:'Телмисартан 40-80 мг', why:'Утренний приём — подавление пика АД. Cardio-renal protection. Натощак' },
+                      { n:'NAC 600-1200 мг', why:'Антиоксидант канальцев на весь день. Натощак → быстрая абсорбция' },
+                      { n:'Кордицепс 1 г', why:'Утренний приём. Адаптоген + ренопротектор. Повышение энергии и СКФ' },
+                      { n:'Вода 500 мл', why:'Утренний болюс → запуск диуреза. Компенсация ночной дегидратации' },
+                    ]},
+                    { time:'☀️ День (12:00–16:00)', color:'#f97316', items:[
+                      { n:'CoQ10 200 мг с обедом', why:'С жирной пищей. Митохондриальная защита тубулярных клеток' },
+                      { n:'Астрагал 1-2 г с едой', why:'С едой. Снижение протеинурии. Вода 300-500 мл' },
+                      { n:'Куркумин 500 мг с едой', why:'Противовоспалительное. С жирами и пиперином для биодоступности' },
+                      { n:'Вода 500-750 мл', why:'Поддержание гидратации. При тренировке — дополнительно 500-1000 мл' },
+                    ]},
+                    { time:'🌙 Вечер (19:00–22:00)', color:'#6366f1', items:[
+                      { n:'Магний 400-600 мг', why:'Ночная вазодилатация почечных артериол. Снижение ночного АД. L-треонат/глицинат' },
+                      { n:'Ресвератрол 250 мг', why:'SIRT1-активация → защита подоцитов. Вечерний приём улучшает циркадный ритм' },
+                      { n:'Пикногенол 100 мг', why:'Вечерний приём. Антиоксидант + снижение АД. Улучшение микроциркуляции' },
+                      { n:'Вода 300-500 мл', why:'Умеренная гидратация. Не переусердствовать (никтурия нарушает сон)' },
+                    ]},
+                  ].map((slot: any, si: any) =>(
+                    <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:slot.color+'0a', border:'1px solid '+slot.color+'22' }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:slot.color, marginBottom:4 }}>{slot.time}</div>
+                      {slot.items.map((x: any, xi: any) =>(
+                        <div key={xi} style={{ padding:'5px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
+                          <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{x.n}</span>
+                          <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:6 }}>— {x.why}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Monitoring */}
+              {renalTab === 'monitoring' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={cardBg}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🧪 Лабораторный мониторинг почек</div>
+                    {[
+                      { marker:'Креатинин + СКФ (CKD-EPI)', target:'СКФ >90 мл/мин', when:'Каждые 4 нед', action:'СКФ <90 → фаза 3. СКФ <60 → ХБП 3 ст., нефролог. Использовать CKD-EPI, не только креатинин' },
+                      { marker:'Микроальбуминурия (утр. порция)', target:'<30 мг/г креатинина', when:'Каждые 4-8 нед', action:'30-300 — фаза 3 (раннее). >300 — фаза 4 (явная протеинурия, нефролог)' },
+                      { marker:'Общий белок мочи (суточный)', target:'<150 мг/сут', when:'При альбуминурии >100', action:'>500 мг/сут — нефротический уровень. Рассмотреть биопсию' },
+                      { marker:'Мочевина', target:'2.5-8.3 ммоль/л', when:'Каждые 4 нед', action:'Повышение при высокобелковой диете (до 10-12 нормально). >15 — снижать белок' },
+                      { marker:'K⁺, Na⁺ (электролиты)', target:'K⁺ 3.5-5.1, Na⁺ 135-145', when:'Каждые 4 нед', action:'K⁺ >5.5 — опасно (аритмия). Исключить добавки калия. Na⁺ — при гипергидратации' },
+                      { marker:'Мочевая кислота', target:'<420 мкмоль/л', when:'Каждые 4-8 нед', action:'>480 — риск уратного нефролитиаза. Аллопуринол при повторных камнях' },
+                      { marker:'УЗИ почек + допплер', target:'Норм. размеры, RI <0.70', when:'До курса + каждые 6-12 мес', action:'RI >0.70 — нарушение внутрипочечной гемодинамики. Консультация нефролога' },
+                    ].map((m: any, i: any) =>(
+                      <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.08)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                          <span style={{ fontSize:9, fontWeight:700, color:'#60a5fa' }}>{m.marker}</span>
+                          <span style={{ fontSize:8, fontWeight:600, color:'#3b82f6' }}>{m.when}</span>
+                        </div>
+                        <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}><b style={{color:'#60a5fa'}}>Цель: {m.target}</b></div>
+                        <div style={{ fontSize:7, color:'#93c5fd', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(59,130,246,0.06)' }}>💡 {m.action}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            {/* Cross-protocol warnings */}
+            <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
+              <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
+                • ❤️ <b>Кардио:</b> Телмисартан + НПВС = {'\u2193'} эффекта + риск ОПП. НПВС — с осторожностью при АД {'>'}140/90<br/>
+                • 🫁 <b>Печень:</b> НПВС (диклофенак, ибупрофен) + 17α-алкилы = аддитивная гепатотоксичность. Парацетамол ≤2 г/день<br/>
+                • 💧 <b>Почки:</b> НПВС → {'\u2193'} простагландинов → {'\u2193'} почечного кровотока. Риск ОПП при дегидратации + НПВС<br/>
+                • 🫀 <b>ЖКТ:</b> НПВС + оральные ААС = гастропатия. Цинк-карнозин + DGL — гастропротекция<br/>
+                • 🩸 <b>Гематология:</b> НПВС + антикоагулянты/аспирин = риск ЖКТ-кровотечения. Контроль свёртываемости
+              </div>
+            </div>
+
+            </div>
+          </InfoErrorBoundary>
+  );
+};

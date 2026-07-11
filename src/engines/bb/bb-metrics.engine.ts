@@ -31,7 +31,14 @@ export interface BBPlanMetrics {
 export function calcBBPlanMetrics(plan: BBPlan): BBPlanMetrics {
   const level = normLevel((plan as any).level || 'intermediate');
   const agg: Record<string, { total: number; тяж: number; памп: number; лёг: number; rirSum: number; rirN: number; freq: number }> = {};
-  const sessions = plan.weeks[0]?.sessions || [];
+  // Use first non-deload week; fall back to week 0 if all are deload
+  const weekIdx = plan.weeks.findIndex(w => {
+    const exs = w.sessions.flatMap(s => s.exercises);
+    const totalSets = exs.reduce((s, e) => s + e.sets, 0);
+    const avgRir = totalSets > 0 ? exs.reduce((s, e) => s + e.rir * e.sets, 0) / totalSets : 10;
+    return avgRir < 3.5 && totalSets > 0;
+  });
+  const sessions = (weekIdx >= 0 ? plan.weeks[weekIdx] : plan.weeks[0])?.sessions || [];
   for (const s of sessions) {
     for (const ex of s.exercises) {
       const m = ex.muscle;

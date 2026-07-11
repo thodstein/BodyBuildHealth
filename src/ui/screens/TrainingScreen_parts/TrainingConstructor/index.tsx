@@ -1,26 +1,31 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { selectSplit } from '../../../../engines/split-selector.engine';
 import { TRAINING_SPLITS, calcTraining, LEVEL_VOLUMES } from '../../../../engines/training.engine';
+import { LMS_CYCLES } from '../../../../data/lms-cycles/lms-cycle-index';
 import { FULL_PROGRAM_LIBRARY } from '../../../../engines/complete-program-library.engine';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from '../programs-data';
 import type { FullProgram, ProgramDay } from '../../../../engines/complete-program-library.engine';
 import { labTrainingAdjust } from '../lab-training-adjust';
-import { loadReadinessHistory } from '../readiness-history';
+import { PopupSelect } from '../../SRCBBScreen_parts/TrainingPopups';
 import { usePlanGeneration } from '../../../hooks/usePlanGeneration';
 import { generateMacrocycle, getCurrentWeekPlan, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../../../engines/training-periodization.engine';
 import { EXERCISE_CATALOG } from '../../../../core/exercise-catalog';
 import { TrainingProfileCard } from '../TrainingProfileCard';
 import type { TrainingProfile } from '../training-profile';
-import { PCT_FOR_RIR, ACCENT, DIM, detectGroup, getMrv, type ManualResult, type ManualDay, type ManualExercise } from './types';
+import { PCT_FOR_RIR, ACCENT, DIM, detectGroup, getMrv, getPerMuscleMrvFromLevel, CONFIG_LABELS, DELOAD_OPTIONS, RIR_WAVE_PATTERNS, GROUP_RU, type ManualResult, type ManualDay, type ManualWeek, type ManualExercise } from './types';
+import { buildPhasePlan, PHASE_CONFIGS, PHASE_LABELS, distributePhases, getRirForWeek, calcPhaseWeight, type BBPhase } from './phase-periodization';
 const PHASE_LABELS_MAP: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', peaking: 'Пик', deload: 'Разгрузка', gpp: 'GPP', spp: 'SPP' };
 import { ConstructorProfile } from './ConstructorProfile';
-import { ConfigPanel } from './ConfigPanel';
 import { PlanDisplay } from './PlanDisplay';
 import { ToolsPanel } from './ToolsPanel';
 import { PlannerToolsPanel } from '../PlannerToolsPanel';
-import { getMethodsByCategory } from '../../../../engines/training-methodology.engine';
+import { getMethodsByCategory, type TrainingMethod } from '../../../../engines/training-methodology.engine';
 import { MacrocyclePanel } from './MacrocyclePanel';
 import { subscribePlannerApply, getPlannerApply, clearPlannerApply, type PlannerApply } from '../planner-bridge';
+import { SplitSelectorCards } from './SplitSelectorCards';
+import { MethodSelector } from './MethodSelector';
+import { WizardProgressBar } from './WizardProgressBar';
+import { PlanPreviewStep5 } from './PlanPreviewStep5';
 
 interface Props {
   tprofile: TrainingProfile;
@@ -39,6 +44,14 @@ interface Props {
   setTab: (t: any) => void;
 }
 
+/* ─── Вспомогательные PopupSelect-обёртки ─── */
+const Sel: React.FC<{ label: string; value: string; onChange: (v: string) => void; options: { id: string; label: string; desc?: string }[]; hint?: string }> =
+  ({ label, value, onChange, options, hint }) => (
+    <PopupSelect label={label} value={value} onChange={onChange} options={options} hint={hint} />
+  );
+
+
+
 export const TrainingConstructor: React.FC<Props> = ({
   tprofile, updateTProfile,
   goal, setGoal, level, setLevel,
@@ -51,11 +64,7 @@ export const TrainingConstructor: React.FC<Props> = ({
   mesoLength, setMesoLength,
   labAnalysis, setTab,
 }) => {
-  const [constTab, setConstTab] = useState<'params' | 'editor' | 'tools'>(() => {
-    try { return (localStorage.getItem('he_constructor_tab') as 'params' | 'editor' | 'tools') || 'params'; } catch { return 'params'; }
-  });
-  useEffect(() => { try { localStorage.setItem('he_constructor_tab', constTab); } catch {} }, [constTab]);
-
+  const [wizardStep, setWizardStep] = useState(1);
   const [readinessSlider, setReadinessSlider] = useState(tprofile.recovery || 70);
   const [targetTonnage, setTargetTonnage] = useState<Record<string, number>>({});
 
@@ -76,7 +85,6 @@ export const TrainingConstructor: React.FC<Props> = ({
   const [selectedWeek, setSelectedWeek] = useState(1);
   const [currentMicrocycle, setCurrentMicrocycle] = useState<Microcycle | null>(null);
 
-  // 🔗 Адаптер: конвертация микроцикла макроцикла → ManualResult для редактора PlanDisplay
   const microcycleToManualResult = useCallback((mc: Microcycle, weekNum: number): ManualResult => {
     const wm: Record<string, number> = { chest: 100, back: 110, legs: 140, shoulders: 60, arms: 50, core: 60, full: 80, ...tprofile.workMax, ...manualWorkMax };
     const days = mc.days.filter((d: any) => d.isTraining).map((d: any, di: number) => ({
@@ -92,13 +100,12 @@ export const TrainingConstructor: React.FC<Props> = ({
     return { splitName: `${PHASE_LABELS_MAP[mc.mesocycleType] || mc.mesocycleType} — Неделя ${weekNum}`, corrections: [`🔗 Неделя ${weekNum} из макроцикла (${mc.mesocycleType}). Объём ×${mc.volumeMultiplier}, RIR ${mc.rirRange?.[0] ?? 2}.`], days };
   }, [tprofile.workMax, manualWorkMax]);
 
-  // При смене недели макроцикла → конвертировать в ManualResult для редактора (только при смене недели, не при смене workMax)
   const lastSyncedWeekRef = useRef<number>(-1);
   useEffect(() => {
     if (currentMicrocycle && macrocycle && selectedWeek !== lastSyncedWeekRef.current) {
       lastSyncedWeekRef.current = selectedWeek;
       setManualResult(microcycleToManualResult(currentMicrocycle, selectedWeek));
-      setConstTab('editor'); // показать неделю в редакторе
+      setWizardStep(6);
     }
   }, [currentMicrocycle, selectedWeek, macrocycle, microcycleToManualResult]);
 
@@ -112,12 +119,14 @@ export const TrainingConstructor: React.FC<Props> = ({
   const [mrvOverride, setMrvOverride] = useState<number | null>(null);
   const globalTempoStr = tempoAdjust ? `${tempoAdjust.eccentric}-${tempoAdjust.bottomPause}-${tempoAdjust.concentric}-${tempoAdjust.topPause}` : undefined;
 
-  // Применение выбранных методик к плану: каждая модифицирует сеты/RIR/темп/объём
+  const [sequenceStrategy, setSequenceStrategy] = useState<'classic' | 'preexhaust' | 'antagonist'>('classic');
+  const [deloadFreq, setDeloadFreq] = useState(4);
+  const [rirWave, setRirWave] = useState('standard');
+
   const applyMethodsToPlan = useCallback((days: ManualDay[], cfg: Record<string, string>, wm: Record<string, number>, gl: string, mrvVal: number) => {
     const log: string[] = [];
     let modified = days.map((d: ManualDay) => ({ ...d, exercises: d.exercises.map((e: ManualExercise) => ({ ...e })) }));
 
-    // ─── Вспомогательные: определить первое compound-упражнение для каждой группы ───
     const getFirstCompound = (exs: ManualExercise[], grp: string) => {
       const idx = exs.findIndex(e => e.group === grp);
       return idx >= 0 ? idx : -1;
@@ -133,10 +142,8 @@ export const TrainingConstructor: React.FC<Props> = ({
       const allM = getMethodsByCategory(cat);
       if (!allM.some((m: any) => m.name === name)) { log.push(`Метод «${name}» не найден в категории ${cat}.`); continue; }
 
-      // ── Прогрессия ── (применяется выборочно: compounds → сила, изоляция → гипертрофия)
       if (cat === 'progression') {
         if (name.includes('Max Effort') || name.includes('Максимальных усилий')) {
-          // Только первое compound каждой группы — силовой режим, остальное — гипертрофия добора
           modified = modified.map((d: ManualDay) => {
             const doneGroups = new Set<string>();
             return {
@@ -187,10 +194,8 @@ export const TrainingConstructor: React.FC<Props> = ({
         }
       }
 
-      // ── Интенсивность ── (только на 1-2 упражнения в день, не на всё)
       if (cat === 'intensity') {
         if (name.includes('Cluster') || name.includes('Кластер')) {
-          // Только первое compound дня
           modified = modified.map((d: ManualDay) => ({
             ...d, exercises: d.exercises.map((e: ManualExercise, ei: number) =>
               ei === 0 ? { ...e, sets: 5, reps: '5 (2+2+1)', rir: 1, rest: 180 } : e
@@ -198,7 +203,6 @@ export const TrainingConstructor: React.FC<Props> = ({
           }));
           log.push('Кластеры: первое упражнение дня → 5×5 (2+20с+2+20с+1), отдых 3 мин.');
         } else if (name.includes('Drop-Set') || name.includes('Дроп-сет')) {
-          // Только последняя изоляция каждой группы
           modified = modified.map((d: ManualDay) => {
             const lastIsoIdx: Record<string, number> = {};
             d.exercises.forEach((e, i) => { if (e.rest < 120) lastIsoIdx[e.group] = i; });
@@ -212,7 +216,6 @@ export const TrainingConstructor: React.FC<Props> = ({
           });
           log.push('Drop-Set: последняя изоляция каждой группы → 3×8-10, последний подход до отказа +2 дропа −20%.');
         } else if (name.includes('Rest-Pause') || name.includes('Rest Pause')) {
-          // Первое compound каждой группы
           modified = modified.map((d: ManualDay) => {
             const doneGrp = new Set<string>();
             return {
@@ -227,7 +230,6 @@ export const TrainingConstructor: React.FC<Props> = ({
           });
           log.push('Rest-Pause: первое упражнение каждой группы → 1 подход до отказа, 15с, 2-4П, 15с, 1-3П.');
         } else if (name.includes('Myo-Reps') || name.includes('Myo Reps')) {
-          // Первая изоляция каждой группы
           modified = modified.map((d: ManualDay) => {
             const visGrp = new Set<string>();
             return {
@@ -244,7 +246,6 @@ export const TrainingConstructor: React.FC<Props> = ({
         } else if (name.includes('Суперсет') || name.includes('Antagonist Superset')) {
           log.push('Суперсеты антагонистов: пары (грудь↔спина, бицепс↔трицепс) без отдыха. Отдых после пары.');
         } else if (name.includes('Негатив') || name.includes('Эксцентрический')) {
-          // Первое compound каждой группы (безопасно)
           modified = modified.map((d: ManualDay) => {
             const doneGrp = new Set<string>();
             return {
@@ -259,7 +260,6 @@ export const TrainingConstructor: React.FC<Props> = ({
           });
           log.push('Негативы: первое compound каждой группы → 3-5П, эксцентрика 4-6с, вес 105-120%.');
         } else if (name.includes('Метаболический') || name.includes('Giant')) {
-          // Все изоляции — высокий объём, короткий отдых
           modified = modified.map((d: ManualDay) => ({
             ...d, exercises: d.exercises.map((e: ManualExercise) =>
               e.rest < 120 ? { ...e, sets: Math.max(3, e.sets), reps: '10-15', rir: 1, rest: 45 } : e
@@ -267,7 +267,6 @@ export const TrainingConstructor: React.FC<Props> = ({
           }));
           log.push('Метаболический тренинг: изоляция → 3-4×10-15, отдых 45с.');
         } else if (name.includes('Форсированные') || name.includes('Forced Reps')) {
-          // Только последний подход каждого compound
           log.push('Форсированные повторения: последний подход каждого compound — RIR 0, партнёр +2-3.');
         } else if (name.includes('Трисет') || name.includes('Гигантские')) {
           modified = modified.map((d: ManualDay) => ({
@@ -281,7 +280,6 @@ export const TrainingConstructor: React.FC<Props> = ({
         }
       }
 
-      // ── Техника ── (без изменений — задаёт глобальный темп)
       if (cat === 'technique') {
         if (name.includes('Tempo') || name.includes('Темповые')) {
           const t = name.includes('3-1-1-0') ? '3-1-1-0' : name.includes('гипертроф') ? '3-1-1-0' : '4-1-1-0';
@@ -301,10 +299,8 @@ export const TrainingConstructor: React.FC<Props> = ({
         }
       }
 
-      // ── Объём ── (меняет сеты выборочно: GVT→compounds, FST-7→последнее упр, Gironda→изоляция)
       if (cat === 'volume') {
         if (name.includes('GVT') || name.includes('German Volume') || name.includes('10×10')) {
-          // Только compounds
           modified = modified.map((d: ManualDay) => ({
             ...d, exercises: d.exercises.map((e: ManualExercise) =>
               e.rest >= 150 ? { ...e, sets: 10, reps: '10', rir: 3, rest: 60 } : e
@@ -312,7 +308,6 @@ export const TrainingConstructor: React.FC<Props> = ({
           }));
           log.push('GVT 10×10: compounds → 10×10 @60% 1ПМ, отдых 60с. Изоляция без изменений.');
         } else if (name.includes('FST-7') || name.includes('Fascia')) {
-          // Последнее упражнение каждой группы
           modified = modified.map((d: ManualDay) => {
             const lastOfGroup: Record<string, number> = {};
             d.exercises.forEach((e, i) => { lastOfGroup[e.group] = i; });
@@ -326,7 +321,6 @@ export const TrainingConstructor: React.FC<Props> = ({
           });
           log.push('FST-7: последнее упражнение каждой группы → 7×8-12, отдых 30-45с. Памп и фасция.');
         } else if (name.includes('Gironda') || name.includes('8×8')) {
-          // Только изоляция
           modified = modified.map((d: ManualDay) => ({
             ...d, exercises: d.exercises.map((e: ManualExercise) =>
               e.rest < 120 ? { ...e, sets: 8, reps: '8', rir: 2, rest: 15 } : e
@@ -340,7 +334,6 @@ export const TrainingConstructor: React.FC<Props> = ({
         }
       }
 
-      // ── Специализация ── (без изменений)
       if (cat === 'specialization') {
         const allRest = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
         const findSpec = (subs: string[], main: string, mt: number, rt: number, lb: string) => {
@@ -385,10 +378,39 @@ export const TrainingConstructor: React.FC<Props> = ({
         }
       }
     }
-    return { days: modified, log };
-  }, []);
 
-  // ─── LIVE-GENERATION: План пересчитывается автоматически при изменении параметров ───
+    /* ─── Переупорядочивание по стратегии последовательности ─── */
+    modified = modified.map(d => {
+      const exs = [...d.exercises];
+      const main = exs.filter(e => (e.role === 'main' || e.rest >= 150));
+      const iso = exs.filter(e => e.role !== 'main' && e.rest < 150);
+      if (sequenceStrategy === 'preexhaust') {
+        return { ...d, exercises: [...iso, ...main] };
+      }
+      if (sequenceStrategy === 'antagonist') {
+        const paired: ManualExercise[] = [];
+        const used = new Set<number>();
+        const groups = [...new Set(exs.map(e => e.group))];
+        for (let i = 0; i < groups.length - 1; i += 2) {
+          const a = exs.filter((e, idx) => e.group === groups[i] && !used.has(idx));
+          const b = exs.filter((e, idx) => e.group === groups[i + 1] && !used.has(idx));
+          const pairLen = Math.min(a.length, b.length);
+          for (let p = 0; p < pairLen; p++) {
+            paired.push(a[p]); used.add(exs.indexOf(a[p]));
+            paired.push(b[p]); used.add(exs.indexOf(b[p]));
+          }
+        }
+        exs.forEach((e, idx) => { if (!used.has(idx)) paired.push(e); });
+        return { ...d, exercises: paired };
+      }
+      return d;
+    });
+
+    log.push(`Последовательность: ${sequenceStrategy === 'classic' ? 'compounds → изоляция' : sequenceStrategy === 'preexhaust' ? 'изоляция → compounds (pre-exhaust)' : 'антагонистические пары (суперсеты)'}.`);
+
+    return { days: modified, log };
+  }, [sequenceStrategy]);
+
   const { days: generatedDays, weeklySets: generatedWeeklySets, groupCorrections: generatedCorrections, patternBalance: generatedBalance } = useMemo(() => {
     const auto = selectSplit({ goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as any);
     const manualSp = manualCfg.split ? TRAINING_SPLITS[manualCfg.split] : null;
@@ -401,13 +423,12 @@ export const TrainingConstructor: React.FC<Props> = ({
     const labAdj = labTrainingAdjust(labAnalysis);
     const mrv = mrvOverride ?? getMrv(level, tprofile.onCourse, tprofile.courseIntensity, labAdj.mrvMultiplier);
     
-    const built = buildPlan(cycle, mrv, { currentReadiness: readinessSlider, targetTonnage, sequenceStrategy: (manualCfg.sequence || 'classic') as 'classic' | 'preexhaust' | 'antagonist' });
+    const built = buildPlan(cycle, mrv, { currentReadiness: readinessSlider, targetTonnage, sequenceStrategy });
     
     const methodResult = applyMethodsToPlan(built.days as ManualDay[], manualCfg, manualWorkMax, goal, mrv);
     
     const finalCorrections = [...built.groupCorrections, ...methodResult.log];
     
-    // ─── Детектор конфликтов: Слишком много тяжёлых базовых в один день ───
     methodResult.days.forEach((d, di) => {
       const heavyCount = d.exercises.filter(e => {
         const cat = EXERCISE_CATALOG.find(c => c.name === e.name);
@@ -424,19 +445,50 @@ export const TrainingConstructor: React.FC<Props> = ({
       groupCorrections: finalCorrections, 
       patternBalance: built.patternBalance 
     };
-  }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, manualCfg, tprofile, labAnalysis, buildPlan, mrvOverride, manualWorkMax, applyMethodsToPlan, readinessSlider, targetTonnage]);
+  }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, manualCfg, tprofile, labAnalysis, buildPlan, mrvOverride, manualWorkMax, applyMethodsToPlan, readinessSlider, targetTonnage, sequenceStrategy]);
 
   const generateManualPlan = useCallback(() => {
     const sp = manualCfg.split ? TRAINING_SPLITS[manualCfg.split] : null;
     const splitName = (manualCfg.split ? TRAINING_SPLITS[manualCfg.split] : null)?.name || 'Авто-сплит';
-    
-    setManualResult({ 
-      splitName: splitName, 
-      corrections: generatedCorrections, 
-      days: generatedDays 
+    const labAdj2 = labTrainingAdjust(labAnalysis);
+    const workMaxMerged = { chest: 100, back: 110, legs: 140, quads: 130, hamstrings: 80, glutes: 80, calves: 60, shoulders: 60, arms: 50, biceps: 40, triceps: 40, core: 60, abs: 60, traps: 50, forearms: 30, ...tprofile.workMax, ...manualWorkMax };
+
+    // Строим фазы на весь мезоцикл
+    const weeks = buildPhasePlan(
+      generatedDays,
+      mesoLength,
+      deloadFreq,
+      goal,
+      rirWave,
+      level,
+      tprofile.onCourse,
+      tprofile.courseIntensity,
+      labAdj2.mrvMultiplier,
+      workMaxMerged,
+      tprofile.weakPoints || [],
+      globalTempoStr,
+    );
+
+    // Неделя 1 — активная по умолчанию
+    const firstWeek = weeks[0];
+    const corrections = [
+      ...generatedCorrections,
+      `📅 Мезоцикл ${mesoLength} нед: ${weeks.map(w => w.phaseLabel).filter((v, i, a) => a.indexOf(v) === i).join(' → ')}`,
+      `🌊 Волна RIR: ${RIR_WAVE_PATTERNS[rirWave]?.label || 'стандартная'}`,
+      `🔄 Делод: ${deloadFreq > 0 ? `каждые ${deloadFreq} нед (${weeks.filter(w => w.phase === 'deload').length} раз)` : 'нет'}`,
+      ...firstWeek.corrections,
+    ];
+
+    setManualResult({
+      splitName,
+      corrections,
+      days: firstWeek.days,
+      weeks,
+      currentWeek: firstWeek.weekNumber,
+      mesoLength,
     });
-    setConstTab('editor');
-  }, [generatedDays, generatedCorrections, manualCfg]);
+    setWizardStep(6);
+  }, [generatedDays, generatedCorrections, manualCfg, mesoLength, deloadFreq, goal, rirWave, level, tprofile, labAnalysis, manualWorkMax]);
 
   const loadProgramToConstructor = useCallback((programId: string) => {
     const lib: FullProgram[] = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS];
@@ -459,9 +511,9 @@ export const TrainingConstructor: React.FC<Props> = ({
       'Программа доступна для редактирования, применения методик и выполнения.',
     ];
     if (prog.warnings?.length) corrections.push('Предупреждения: ' + prog.warnings.join('; '));
-    lastSyncedWeekRef.current = -1; // разрыв синхронизации с макроциклом
+    lastSyncedWeekRef.current = -1;
     setManualResult({ splitName: prog.name + ' (неделя 1)', corrections, days });
-    setConstTab('editor'); // показать загруженную программу
+    setWizardStep(6);
   }, [tprofile]);
 
   const manualToRuntime = useCallback(() => {
@@ -495,11 +547,8 @@ export const TrainingConstructor: React.FC<Props> = ({
 
   const labAdj = labTrainingAdjust(labAnalysis);
 
-  // 🔗 приём корректировок из калькуляторов (planner-bridge): сплит/PRI/слабые точки/ПМ.
   const [applyPayload, setApplyPayload] = useState<PlannerApply | null>(() => getPlannerApply());
   useEffect(() => subscribePlannerApply(p => setApplyPayload(p)), []);
-  // Очистка stale bridge-данных — внутри mountedRef useEffect ниже
-  // Авто-применение: см. после applyExternal (перемещено ниже для корректного порядка)
   const pendingApplyRef = useRef<PlannerApply | null>(null);
   const applyExternal = useCallback(() => {
     const p = getPlannerApply();
@@ -569,17 +618,15 @@ export const TrainingConstructor: React.FC<Props> = ({
       if (manualResult) setManualResult({ ...manualResult, corrections: [...manualResult.corrections, `🔗 Целевой объём по группам: ${Object.entries(sets).map(([g, s]) => g + '=' + s).join(', ')} сет/нед.`] });
     }
     clearPlannerApply(); setApplyPayload(null);
-    setConstTab('editor');
+    setWizardStep(6);
   }, [buildPlan, level, tprofile, labAdj, manualResult, mrvOverride, manualCfg, manualWorkMax, goal, applyMethodsToPlan]);
 
-  // Авто-применение bridge: только НОВЫЕ события (не stale данные при монтировании)
   const mountedRef = useRef(false);
   useEffect(() => {
     if (!mountedRef.current) { mountedRef.current = true; clearPlannerApply(); setApplyPayload(null); return; }
     if (applyPayload) applyExternal();
   }, [applyPayload]);
 
-  // достроить план после того, как weakPoints/ManualWorkMax обновились (buildPlan пересоздастся)
   useEffect(() => {
     const p = pendingApplyRef.current;
     if (!p) return;
@@ -597,7 +644,6 @@ export const TrainingConstructor: React.FC<Props> = ({
     setManualResult({ splitName: manualResult.splitName, corrections, days: built.days });
   }, [buildPlan, manualResult, weakPoints, manualWorkMax, level, tprofile, labAdj, mrvOverride]);
 
-  // ─── Превью перед сборкой ───
   const buildPreview = useMemo(() => {
     const selSplit = manualCfg.split || 'авто';
     const selDays = daysPerWeek + 'дн';
@@ -606,21 +652,98 @@ export const TrainingConstructor: React.FC<Props> = ({
     return `${selSplit} · ${selDays} · ${selGoal} · ${selLevel}${manualCfg.specialization ? ' · спец: ' + manualCfg.specialization.slice(0, 25) : ''}`;
   }, [manualCfg.split, manualCfg.specialization, daysPerWeek, goal, level]);
 
+  /* ─── Quality Score для step 5 (анализ) ─── */
+  const analysisQuality = useMemo(() => {
+    const MRV_MAP: Record<string, number> = { beginner: 15, intermediate: 20, advanced: 24, enhanced: 28 };
+    const mrv = mrvOverride ?? MRV_MAP[level] ?? 20;
+    const wk = generatedWeeklySets;
+    let score = 100;
+    const items: { label: string; ok: boolean; detail: string; group?: string }[] = [];
+    for (const [g, sets] of Object.entries(wk)) {
+      if (sets > mrv * 1.15) {
+        score -= 8;
+        items.push({ label: g, ok: false, detail: `${sets} сетов > MRV×1.15=${Math.round(mrv * 1.15)} ⚠ перегруз`, group: g });
+      } else if (sets < mrv * 0.4) {
+        score -= 6;
+        items.push({ label: g, ok: false, detail: `${sets} сетов < MEV=${Math.round(mrv * 0.4)} — недотрен`, group: g });
+      } else {
+        items.push({ label: g, ok: true, detail: `${sets} сетов (MEV→MRV)`, group: g });
+      }
+    }
+    const groupsPresent = Object.keys(wk).length;
+    if (groupsPresent < 4) { score -= 10; items.push({ label: 'Охват', ok: false, detail: `Всего ${groupsPresent} групп (мин. 4)` }); }
+    else { items.push({ label: 'Охват', ok: true, detail: `${groupsPresent} групп` }); }
+    const totalEx = generatedDays.reduce((s: number, d: any) => s + d.exercises.length, 0);
+    const avgEx = Math.round(totalEx / Math.max(1, generatedDays.length));
+    if (avgEx < 3) { score -= 15; items.push({ label: 'Плотность', ok: false, detail: `${avgEx} упр/день — слишком мало` }); }
+    else if (avgEx > 14) { score -= 5; items.push({ label: 'Плотность', ok: false, detail: `${avgEx} упр/день — слишком много` }); }
+    else { items.push({ label: 'Плотность', ok: true, detail: `${avgEx} упр/день — оптимально` }); }
+    const hasMain = generatedDays.some((d: any) => d.exercises.some((e: any) => e.role === 'main'));
+    if (!hasMain) { score -= 20; items.push({ label: 'Базовые', ok: false, detail: 'Нет базовых упражнений' }); }
+    else { items.push({ label: 'Базовые', ok: true, detail: 'Есть compound-упражнения' }); }
+    score = Math.max(0, Math.min(100, score));
+    const color = score >= 80 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
+    return { score, color, items, wk, mrv };
+  }, [generatedWeeklySets, generatedDays, level, mrvOverride]);
+
+  /* ─── Группы для целевого тоннажа ─── */
+  const tonnageGroups = [
+    { id: 'chest', label: 'Грудь' }, { id: 'back', label: 'Спина' }, { id: 'legs', label: 'Ноги' },
+    { id: 'shoulders', label: 'Плечи' }, { id: 'arms', label: 'Руки' }, { id: 'core', label: 'Кор' },
+  ];
+  const allPrograms = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS];
+  const selectedList = Object.entries(manualCfg).filter(([, v]) => v);
+
+  /* ─── Шаг 5: коррекция → переход ─── */
+  const [correctionLog, setCorrectionLog] = useState<string[]>([]);
+
+  const applyCorrection = useCallback((tag: string) => {
+    const log: string[] = [];
+    if (tag === 'mrv') { setWizardStep(4); log.push('↩ Переход к шагу 4: скорректируйте MRV.'); }
+    else if (tag === 'weakpoints') { setWizardStep(1); log.push('↩ Переход к шагу 1: добавьте слабые группы.'); }
+    else if (tag === 'split') { setWizardStep(2); log.push('↩ Переход к шагу 2: измените сплит.'); }
+    else if (tag === 'methods') { setWizardStep(3); log.push('↩ Переход к шагу 3: измените методики.'); }
+    setCorrectionLog(prev => [...prev, ...log]);
+  }, []);
+
+  const renderProgressBar = () => (
+    <WizardProgressBar currentStep={wizardStep} onStepClick={setWizardStep} hasResult={!!manualResult} />
+  );
+
+  const renderStepNav = (nextLabel = 'Далее →', onNext?: () => void) => (
+    <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+      {wizardStep > 1 && wizardStep < 6 && (
+        <button onClick={() => setWizardStep(s => s - 1)}
+          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: DIM, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+          ← Назад
+        </button>
+      )}
+      {wizardStep < 5 && (
+        <button onClick={onNext || (() => setWizardStep(s => s + 1))}
+          style={{ flex: 1, padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, cursor: 'pointer', fontSize: 11 }}>
+          {nextLabel}
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-
+      <style>{`@keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>
       {/* ─── ШАПКА ─── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
         <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: ACCENT }}>🛠 Конструктор тренировок</h2>
         {manualResult && (
-          <button onClick={() => { setManualResult(null); setConstTab('params'); }}
+          <button onClick={() => { setManualResult(null); setWizardStep(1); }}
             style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: 'rgba(239,68,68,0.15)', color: '#ef4444', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>
             ✕ Сбросить
           </button>
         )}
       </div>
 
-      {/* ─── ПРЕВЬЮ ТЕКУЩЕЙ КОНФИГУРАЦИИ ─── */}
+      {renderProgressBar()}
+
+      {/* ─── ПРЕВЬЮ ─── */}
       <div style={{
         padding: '6px 10px', borderRadius: 8,
         background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.12)',
@@ -636,88 +759,445 @@ export const TrainingConstructor: React.FC<Props> = ({
         </div>
       )}
 
-      {/* ─── ТАБЫ ─── */}
-      <div style={{
-        display: 'flex', gap: 3, padding: 5, borderRadius: 11,
-        background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)',
-      }}>
-        {([
-          ['params','📋 Параметры и сборка'],
-          ['editor','✏️ Редактор упражнений'],
-          ['tools','🛠 Инструменты тренера'],
-        ] as const).map(([id, label]) => (
-          <button key={id} onClick={() => setConstTab(id)} style={{
-            flex: 1, padding: '9px 4px', borderRadius: 8,
-            fontSize: 11, fontWeight: 700, cursor: 'pointer', lineHeight: 1.2,
-            border: constTab === id ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.06)',
-            background: constTab === id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)',
-            color: constTab === id ? ACCENT : DIM,
-            position: 'relative' as const,
-          }}>{label}{id === 'editor' && manualResult && <span style={{ position: 'absolute', top: 3, right: 6, width: 6, height: 6, borderRadius: 3, background: ACCENT }} />}{id === 'params' && macrocycle && <span style={{ position: 'absolute', top: 3, right: 6, width: 6, height: 6, borderRadius: 3, background: '#60a5fa' }} />}</button>
-        ))}
-      </div>
-
-      {/* ─── ВСЕГДА: ПРОФИЛЬ И ЛАБ. КОРРЕКЦИЯ ─── */}
-      <ConstructorProfile
-        tprofile={tprofile} updateTProfile={updateTProfile}
-        goal={goal} setGoal={setGoal}
-        level={level} setLevel={setLevel}
-        daysPerWeek={daysPerWeek} setDaysPerWeek={setDaysPerWeek}
-        mesoLength={mesoLength} setMesoLength={setMesoLength}
-        recovery={recovery} setRecovery={setRecovery}
-        fatigue={fatigue} setFatigue={setFatigue}
-        weakPoints={weakPoints} setWeakPoints={setWeakPoints}
-        bodyWeight={bodyWeight} setBodyWeight={setBodyWeight}
-        sleepHours={sleepHours} setSleepHours={setSleepHours}
-        stressLevel={stressLevel} setStressLevel={setStressLevel}
-      />
-
-      {labAdj.warnings.length > 0 && (
-        <div style={{
-          padding: 8, borderRadius: 9,
-          background: labAdj.deloadRecommended ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)',
-          border: '1px solid ' + (labAdj.deloadRecommended ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.2)'),
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: labAdj.deloadRecommended ? '#ef4444' : '#f59e0b', marginBottom: 3 }}>
-            🧪 Лабораторная коррекция (MRV ×{labAdj.mrvMultiplier.toFixed(2)})
-          </div>
-          {labAdj.warnings.map((w: string, i: number) => (
-            <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', lineHeight: 1.4, marginBottom: 1 }}>• {w}</div>
-          ))}
-          {labAdj.intensityNote && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{labAdj.intensityNote}</div>}
+      {correctionLog.length > 0 && (
+        <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)', fontSize: 9, color: '#f59e0b', lineHeight: 1.5 }}>
+          {correctionLog.map((c, i) => <div key={i}>• {c}</div>)}
         </div>
       )}
 
-      {/* ─── ВКЛАДКА EDITOR: конфиг + сборка + результат ─── */}
-      {constTab === 'editor' && (
+      {/* ════════════════════════════════════════════════ */}
+      {/* ШАГ 1: ПРОФИЛЬ */}
+      {/* ════════════════════════════════════════════════ */}
+      {wizardStep === 1 && (
+        <div key="step1" style={{ animation: 'fadeSlideIn 0.3s ease' }}>
+          <ConstructorProfile
+            tprofile={tprofile} updateTProfile={updateTProfile}
+            goal={goal} setGoal={setGoal}
+            level={level} setLevel={setLevel}
+            daysPerWeek={daysPerWeek} setDaysPerWeek={setDaysPerWeek}
+            mesoLength={mesoLength} setMesoLength={setMesoLength}
+            recovery={recovery} setRecovery={setRecovery}
+            fatigue={fatigue} setFatigue={setFatigue}
+            weakPoints={weakPoints} setWeakPoints={setWeakPoints}
+            bodyWeight={bodyWeight} setBodyWeight={setBodyWeight}
+            sleepHours={sleepHours} setSleepHours={setSleepHours}
+            stressLevel={stressLevel} setStressLevel={setStressLevel}
+          />
+
+          {labAdj.warnings.length > 0 && (
+            <div style={{
+              padding: 8, borderRadius: 9,
+              background: labAdj.deloadRecommended ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)',
+              border: '1px solid ' + (labAdj.deloadRecommended ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.2)'),
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: labAdj.deloadRecommended ? '#ef4444' : '#f59e0b', marginBottom: 3 }}>
+                🧪 Лабораторная коррекция (MRV ×{labAdj.mrvMultiplier.toFixed(2)})
+              </div>
+              {labAdj.warnings.map((w: string, i: number) => (
+                <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', lineHeight: 1.4, marginBottom: 1 }}>• {w}</div>
+              ))}
+              {labAdj.intensityNote && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{labAdj.intensityNote}</div>}
+            </div>
+          )}
+
+          {/* Частота делода — тренерское решение */}
+          <div style={{ padding: '8px 10px', borderRadius: 10, marginTop: 4, background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.12)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>🔄 ДЕЛОД — ЧАСТОТА РАЗГРУЗКИ</div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {DELOAD_OPTIONS.map(opt => (
+                <button key={opt.value} onClick={() => setDeloadFreq(opt.value)}
+                  style={{
+                    padding: '5px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 700,
+                    border: deloadFreq === opt.value ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.08)',
+                    background: deloadFreq === opt.value ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)',
+                    color: deloadFreq === opt.value ? ACCENT : DIM,
+                  }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {deloadFreq > 0 && (
+              <div style={{ fontSize: 9, color: '#93c5fd', marginTop: 4 }}>
+                Делод {Math.ceil(mesoLength / deloadFreq)} раз(а) за {mesoLength} нед: нед {Array.from({ length: Math.floor(mesoLength / deloadFreq) }, (_, i) => (i + 1) * deloadFreq).join(', ')}
+              </div>
+            )}
+            {deloadFreq === 0 && <div style={{ fontSize: 9, color: DIM, marginTop: 4 }}>Без делода — риск перетренированности выше. Рекомендуется хотя бы раз в 4-6 нед.</div>}
+          </div>
+
+          <details style={{ marginTop: 4 }}>
+            <summary style={{ fontSize: 10, fontWeight: 600, color: DIM, cursor: 'pointer', padding: '4px 0' }}>
+              🗓️ Макроцикл (расширенное планирование)
+            </summary>
+            <div style={{ marginTop: 6 }}>
+              <MacrocyclePanel
+                goal={goal} level={level} daysPerWeek={daysPerWeek}
+                recovery={recovery} fatigue={fatigue} weakPoints={weakPoints}
+                bodyWeight={bodyWeight} sleepHours={sleepHours} stressLevel={stressLevel}
+                tprofile={tprofile} labAnalysis={labAnalysis}
+                macrocycle={macrocycle} setMacrocycle={setMacrocycle}
+                selectedWeek={selectedWeek} setSelectedWeek={setSelectedWeek}
+                currentMicrocycle={currentMicrocycle} setCurrentMicrocycle={setCurrentMicrocycle}
+                onToRuntime={macroToRuntime} setTab={setTab}
+              />
+            </div>
+          </details>
+
+          {renderStepNav('Далее: Сплит →')}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════ */}
+      {/* ШАГ 2: СПЛИТ */}
+      {/* ════════════════════════════════════════════════ */}
+      {wizardStep === 2 && (
         <>
-       <ConfigPanel 
-         manualCfg={manualCfg} setManual={setManual} onLoadProgram={loadProgramToConstructor} 
-         targetTonnage={targetTonnage} setTargetTonnage={(g: string, v: number) => setTargetTonnage(prev => ({ ...prev, [g]: v }))}
-       />
+          <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, marginBottom: 6, border: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>🏗️ БАЗОВАЯ СТРУКТУРА</div>
+            <div style={{ marginBottom: 6 }}>
+              <SplitSelectorCards value={manualCfg.split || ''} onChange={v => setManual('split', v)} daysPerWeek={daysPerWeek} />
+            </div>
+              <Sel label="Тип цикла" value={manualCfg.cycle || ''} onChange={v => setManual('cycle', v)}
+                options={LMS_CYCLES.map((c: any) => ({ id: c.meta.id, label: c.meta.title, desc: (c.meta.id.startsWith('block') ? 'Блок' : c.meta.id.startsWith('embed') ? 'Встроенная' : 'СРЦ') + ' · ' + c.meta.level }))}
+                hint="Силовые циклы / блоки / встроенные" />
+              <Sel label="Программа тренировок" value={manualCfg.program || ''} onChange={v => setManual('program', v)}
+                options={allPrograms.map((p: any) => ({ id: p.id, label: p.name, desc: p.type + ' · ' + p.goal + ' · ' + p.level }))}
+                hint="Готовые программы из библиотеки" />
+              <MethodSelector label="Частота" value={manualCfg.frequency || ''} onChange={v => setManual('frequency', v)} category="frequency" />
+            </div>
+            {manualCfg.program && (
+              <button onClick={() => { loadProgramToConstructor(manualCfg.program); }}
+                style={{ width: '100%', marginTop: 6, padding: 10, borderRadius: 8, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                📥 Загрузить программу в конструктор
+              </button>
+            )}
 
+          <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, marginBottom: 6, border: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#00e68a', marginBottom: 6 }}>⚖️ ЦЕЛЕВОЙ ТОННАЖ (кг/нед)</div>
+            {tonnageGroups.map(g => (
+              <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
+                <span style={{ fontSize: 9, fontWeight: 600, color: DIM, flex: 1 }}>{g.label}</span>
+                <input 
+                  type="number" value={targetTonnage[g.id] || ''} 
+                  onChange={e => setTargetTonnage(prev => ({ ...prev, [g.id]: parseInt(e.target.value) || 0 }))}
+                  style={{ width: 60, background: '#000', border: '1px solid rgba(255,255,255,0.1)', color: ACCENT, borderRadius: 4, fontSize: 10, textAlign: 'center', padding: '2px 0' }}
+                />
+              </div>
+            ))}
+          </div>
 
-          {/* Кнопка сборки с превью */}
-          <div style={{
-            background: 'rgba(0,230,138,0.04)', borderRadius: 10,
-            border: '1px solid rgba(0,230,138,0.15)', padding: 10,
-            display: 'flex', flexDirection: 'column', gap: 6,
-          }}>
+          {selectedList.filter(([k]) => k === 'split' || k === 'cycle' || k === 'program' || k === 'frequency').length > 0 && (
+            <div style={{ marginTop: 4, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.12)', fontSize: 10, color: ACCENT, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {selectedList.filter(([k]) => k === 'split' || k === 'cycle' || k === 'program' || k === 'frequency').map(([k, v]) => (
+                <span key={k} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.1)', fontSize: 9 }}>
+                  {(CONFIG_LABELS[k] || k)}: {v.length > 30 ? v.slice(0, 30) + '…' : v}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {renderStepNav('Далее: Методы →')}
+        </>
+      )}
+
+      {/* ════════════════════════════════════════════════ */}
+      {/* ШАГ 3: МЕТОДЫ */}
+      {/* ════════════════════════════════════════════════ */}
+      {wizardStep === 3 && (
+        <div key="step3" style={{ animation: 'fadeSlideIn 0.3s ease' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', marginBottom: 6 }}>📈 ПРОГРЕССИЯ</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <MethodSelector label="Периодизация" value={manualCfg.periodization || ''} onChange={v => setManual('periodization', v)} category="periodization" />
+                <MethodSelector label="Прогрессия" value={manualCfg.progression || ''} onChange={v => setManual('progression', v)} category="progression" />
+              </div>
+            </div>
+            <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>🎯 ИНТЕНСИВНОСТЬ</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <MethodSelector label="Интенсивность" value={manualCfg.intensity || ''} onChange={v => setManual('intensity', v)} category="intensity" />
+                <MethodSelector label="Техника" value={manualCfg.technique || ''} onChange={v => setManual('technique', v)} category="technique" />
+                <MethodSelector label="Объём" value={manualCfg.volume || ''} onChange={v => setManual('volume', v)} category="volume" />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#ec4899', marginBottom: 6 }}>🎯 СПЕЦИАЛИЗАЦИЯ</div>
+            <MethodSelector label="Метод специализации" value={manualCfg.specialization || ''} onChange={v => setManual('specialization', v)} category="specialization" />
+          </div>
+
+          {selectedList.filter(([k]) => !['split','cycle','program','frequency'].includes(k)).length > 0 && (
+            <div style={{ marginTop: 4, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.12)', fontSize: 10, color: ACCENT, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {selectedList.filter(([k]) => !['split','cycle','program','frequency'].includes(k)).map(([k, v]) => (
+                <span key={k} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.1)', fontSize: 9 }}>
+                  {(CONFIG_LABELS[k] || k)}: {v.length > 30 ? v.slice(0, 30) + '…' : v}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {renderStepNav('Далее: Настройка →')}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════ */}
+      {/* ШАГ 4: НАСТРОЙКА (темп, последовательность, MRV, готовность) */}
+      {/* ════════════════════════════════════════════════ */}
+      {wizardStep === 4 && (
+        <div key="step4" style={{ animation: 'fadeSlideIn 0.3s ease' }}>
+          <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, marginBottom: 6, border: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>🎵 ГЛОБАЛЬНЫЙ ТЕМП</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4 }}>
+              {[
+                { l: 'Стандарт 2-0-1-0', v: '2-0-1-0' },
+                { l: 'Гипертрофия 3-1-1-0', v: '3-1-1-0' },
+                { l: 'Сила 2-1-1-0', v: '2-1-1-0' },
+                { l: 'Взрывной 1-0-0-0', v: '1-0-0-0' },
+                { l: 'Технический 4-2-2-1', v: '4-2-2-1' },
+                { l: 'Реабилитация 5-2-2-1', v: '5-2-2-1' },
+                { l: 'TUL-max 4-2-1-1', v: '4-2-1-1' },
+                { l: 'Изо-растяжка 2-3-1-0', v: '2-3-1-0' },
+              ].map(t => {
+                const active = `${tempoAdjust?.eccentric}-${tempoAdjust?.bottomPause}-${tempoAdjust?.concentric}-${tempoAdjust?.topPause}` === t.v;
+                return (
+                  <button key={t.v} onClick={() => {
+                    const pts = t.v.split('-').map(Number);
+                    setTempoAdjust(active ? null : { eccentric: pts[0], bottomPause: pts[1], concentric: pts[2], topPause: pts[3], label: t.l });
+                  }} style={{
+                    padding: '6px 4px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 700,
+                    border: active ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.08)',
+                    background: active ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)',
+                    color: active ? ACCENT : DIM,
+                  }}>{t.l}</button>
+                );
+              })}
+            </div>
+            {tempoAdjust && <div style={{ fontSize: 9, color: ACCENT, marginTop: 4 }}>Темп: {tempoAdjust.eccentric}с эксцентрика / {tempoAdjust.bottomPause}с пауза / {tempoAdjust.concentric}с концентрика / {tempoAdjust.topPause}с пауза</div>}
+          </div>
+
+          {/* RIR-волна по четвертям мезоцикла */}
+          <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, marginBottom: 6, border: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', marginBottom: 6 }}>🌊 ВОЛНА ИНТЕНСИВНОСТИ (RIR ПО НЕДЕЛЯМ)</div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {Object.entries(RIR_WAVE_PATTERNS).map(([key, wave]) => (
+                <button key={key} onClick={() => setRirWave(key)}
+                  style={{
+                    textAlign: 'left', flex: 1, minWidth: 100,
+                    padding: '6px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 700, lineHeight: 1.3,
+                    border: rirWave === key ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.08)',
+                    background: rirWave === key ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)',
+                    color: rirWave === key ? ACCENT : DIM,
+                  }}>
+                  <div>{wave.label}</div>
+                  <div style={{ fontSize: 8, fontWeight: 400, opacity: 0.6, marginTop: 2 }}>{wave.desc}</div>
+                  <div style={{ display: 'flex', gap: 2, marginTop: 3 }}>
+                    {wave.rirByQuarter.map((rir, qi) => (
+                      <span key={qi} style={{
+                        padding: '1px 4px', borderRadius: 3, fontSize: 7, fontWeight: 800,
+                        background: rir <= 1 ? 'rgba(239,68,68,0.2)' : rir <= 2 ? 'rgba(245,158,11,0.2)' : 'rgba(34,197,94,0.2)',
+                        color: rir <= 1 ? '#ef4444' : rir <= 2 ? '#f59e0b' : '#22c55e',
+                      }}>Q{qi + 1}:RIR{rir}</span>
+                    ))}
+                  </div>
+                </button>
+              ))}
+            </div>
+            {rirWave && (
+              <div style={{ fontSize: 9, color: '#93c5fd', marginTop: 4 }}>
+                Прогрессия RIR: {RIR_WAVE_PATTERNS[rirWave].rirByQuarter.join(' → ')} по четвертям {mesoLength}-нед мезоцикла
+              </div>
+            )}
+          </div>
+
+          <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, marginBottom: 6, border: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>🔀 СТРАТЕГИЯ ПОСЛЕДОВАТЕЛЬНОСТИ</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
+              {([
+                { l: 'Классическая', v: 'classic' as const, d: 'Compounds → изоляция' },
+                { l: 'Pre-Exhaust', v: 'preexhaust' as const, d: 'Изоляция → compounds' },
+                { l: 'Антагонисты', v: 'antagonist' as const, d: 'Суперсеты пар' },
+              ]).map(s => (
+                <button key={s.v} onClick={() => setSequenceStrategy(s.v)} style={{
+                  padding: '6px 4px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 700, lineHeight: 1.3,
+                  border: sequenceStrategy === s.v ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.08)',
+                  background: sequenceStrategy === s.v ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)',
+                  color: sequenceStrategy === s.v ? ACCENT : DIM,
+                }}>{s.l}<div style={{ fontSize: 8, fontWeight: 400, opacity: 0.6 }}>{s.d}</div></button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, marginBottom: 6, border: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>⚙️ ДОПОЛНИТЕЛЬНО</div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ flex: 1, minWidth: 120 }}>
+                <div style={{ fontSize: 9, color: DIM, marginBottom: 2 }}>MRV (переопределение)</div>
+                <input type="number" value={mrvOverride ?? ''} onChange={e => setMrvOverride(e.target.value ? parseInt(e.target.value) : null)}
+                  placeholder="Авто" style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: '#000', border: '1px solid rgba(255,255,255,0.1)', color: '#f59e0b', fontSize: 11, fontWeight: 700 }} />
+              </div>
+              <div style={{ flex: 1, minWidth: 120 }}>
+                <div style={{ fontSize: 9, color: DIM, marginBottom: 2 }}>Готовность: {readinessSlider}%</div>
+                <input type="range" min={0} max={100} value={readinessSlider} onChange={e => setReadinessSlider(+e.target.value)}
+                  style={{ width: '100%' }} />
+              </div>
+            </div>
+          </div>
+
+          {renderStepNav('Далее: Анализ →')}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════ */}
+      {/* ШАГ 5: АНАЛИЗ */}
+      {/* ════════════════════════════════════════════════ */}
+      {wizardStep === 5 && (
+        <div key="step5" style={{ animation: 'fadeSlideIn 0.3s ease' }}>
+          <div style={{ padding: 10, borderRadius: 10, border: `1px solid ${analysisQuality.color}40`, background: `${analysisQuality.color}08` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: analysisQuality.color }}>📊 Предпросмотр качества</span>
+              <span style={{ fontSize: 20, fontWeight: 900, color: analysisQuality.color }}>{analysisQuality.score}<span style={{ fontSize: 11, fontWeight: 600, opacity: 0.6 }}>/100</span></span>
+            </div>
+            <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', marginBottom: 8 }}>
+              <div style={{ height: '100%', width: analysisQuality.score + '%', borderRadius: 2, background: analysisQuality.color, transition: 'width 1s' }} />
+            </div>
+            {analysisQuality.items.map((b, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontSize: 10, color: b.ok ? 'rgba(255,255,255,0.7)' : analysisQuality.color }}>
+                <span style={{ fontSize: 9 }}>{b.ok ? '✅' : '❌'}</span>
+                <span style={{ fontWeight: 700, minWidth: 80 }}>{b.label}</span>
+                <span style={{ opacity: 0.8, flex: 1 }}>{b.detail}</span>
+              </div>
+            ))}
+          </div>
+
+          <PlanPreviewStep5
+            generatedDays={generatedDays}
+            weeklySets={generatedWeeklySets}
+            mrvOverride={mrvOverride}
+            level={level}
+            corrections={generatedCorrections}
+          />
+
+          {/* Анализ слабых групп — тренерская рекомендация */}
+          {weakPoints.length > 0 && (
+            <div style={{ padding: 10, borderRadius: 10, marginBottom: 8, background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.12)' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 6 }}>🎯 ФОКУС НА СЛАБЫЕ ГРУППЫ</div>
+              {weakPoints.map(wp => {
+                const wpExCount = generatedDays.reduce((s, d) => s + d.exercises.filter(e => e.group === wp).length, 0);
+                const wpSets = generatedDays.reduce((s, d) => s + d.exercises.filter(e => e.group === wp).reduce((ss, e) => ss + e.sets, 0), 0);
+                const WEAK_EX_SUGGESTIONS: Record<string, string[]> = {
+                  chest: ['Жим гантелей на наклонной скамье', 'Сведение рук в кроссовере (верхние блоки)', 'Разведение гантелей лёжа'],
+                  back: ['Тяга гантели одной рукой в наклоне', 'Тяга верхнего блока широким хватом', 'Шраги с гантелями'],
+                  legs: ['Болгарские выпады', 'Жим ногами в тренажёре', 'Сгибание ног лёжа'],
+                  shoulders: ['Махи гантелями в стороны', 'Тяга штанги к подбородку', 'Жим гантелей сидя'],
+                  arms: ['Сгибание рук с гантелями (молот)', 'Разгибание рук на блоке (канат)', 'Сгибание рук со штангой стоя'],
+                  core: ['Подъём ног в висе', 'Планка с отягощением', 'Косые скручивания на блоке'],
+                };
+                const suggestions = WEAK_EX_SUGGESTIONS[wp] || [];
+                return (
+                  <div key={wp} style={{ padding: '8px', marginBottom: 4, borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>
+                        {GROUP_RU[wp] || wp} — отстающая группа
+                      </span>
+                      <span style={{ fontSize: 9, color: DIM }}>{wpExCount} упр · {wpSets} сетов</span>
+                    </div>
+                    <div style={{ fontSize: 9, color: DIM, marginBottom: 2 }}>
+                      Рекомендуемые упражнения (акцент + изоляция):
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {suggestions.map(s => (
+                        <span key={s} style={{
+                          fontSize: 8, padding: '2px 6px', borderRadius: 4,
+                          background: 'rgba(245,158,11,0.1)', color: '#f59e0b',
+                          border: '0.5px solid rgba(245,158,11,0.2)', fontWeight: 600,
+                        }}>{s}</span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Волна RIR */}
+          {rirWave && (
+            <div style={{ padding: '8px 10px', borderRadius: 10, marginBottom: 8, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', marginBottom: 4 }}>🌊 Периодизация RIR по четвертям</div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {RIR_WAVE_PATTERNS[rirWave].rirByQuarter.map((rir, qi) => {
+                  const qLen = Math.ceil(mesoLength / 4);
+                  const weeks = Array.from({ length: qLen }, (_, i) => qi * qLen + i + 1).filter(w => w <= mesoLength);
+                  return (
+                    <div key={qi} style={{
+                      padding: '6px 10px', borderRadius: 6, flex: 1, minWidth: 60, textAlign: 'center',
+                      background: rir <= 1 ? 'rgba(239,68,68,0.06)' : rir <= 2 ? 'rgba(245,158,11,0.06)' : 'rgba(34,197,94,0.06)',
+                      border: `1px solid ${rir <= 1 ? 'rgba(239,68,68,0.2)' : rir <= 2 ? 'rgba(245,158,11,0.2)' : 'rgba(34,197,94,0.2)'}`,
+                    }}>
+                      <div style={{ fontSize: 8, fontWeight: 700, color: DIM }}>Нед {weeks[0]}–{weeks[weeks.length - 1]}</div>
+                      <div style={{
+                        fontSize: 14, fontWeight: 900,
+                        color: rir <= 1 ? '#ef4444' : rir <= 2 ? '#f59e0b' : '#22c55e',
+                      }}>RIR {rir}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div style={{ padding: 10, borderRadius: 10, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>📋 Коррекции по анализу</div>
+            {analysisQuality.items.filter(b => !b.ok).length === 0 && <div style={{ fontSize: 10, color: '#22c55e' }}>✅ План сбалансирован — все показатели в норме.</div>}
+            {analysisQuality.items.filter(b => !b.ok).map((b, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', marginBottom: 4, borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
+                <span style={{ fontSize: 9, color: b.ok ? 'inherit' : '#f59e0b', flex: 1 }}>{b.detail}</span>
+                {b.group && analysisQuality.wk[b.group] > analysisQuality.mrv && (
+                  <button onClick={() => applyCorrection('mrv')} style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.06)', color: '#f59e0b', cursor: 'pointer', fontSize: 9, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    ↑ MRV
+                  </button>
+                )}
+                {!b.ok && b.label === 'Охват' && (
+                  <button onClick={() => applyCorrection('split')} style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(96,165,250,0.3)', background: 'rgba(96,165,250,0.06)', color: '#60a5fa', cursor: 'pointer', fontSize: 9, fontWeight: 700, whiteSpace: 'nowrap', marginLeft: 4 }}>
+                    Сплит
+                  </button>
+                )}
+                {!b.ok && b.label === 'Базовые' && (
+                  <button onClick={() => applyCorrection('methods')} style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.06)', color: '#a855f7', cursor: 'pointer', fontSize: 9, fontWeight: 700, whiteSpace: 'nowrap', marginLeft: 4 }}>
+                    Методы
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginTop: 4, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.15)' }}>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>
+              План будет автоматически сгенерирован с учётом вашего профиля, сплита, методик и настроек. После сборки вы сможете редактировать каждое упражнение.
+            </div>
             <button onClick={generateManualPlan} style={{
               width: '100%', padding: 12, borderRadius: 9, border: 'none', cursor: 'pointer',
               background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13,
               boxShadow: '0 4px 16px rgba(0,230,138,0.25)',
-              transition: 'transform 0.15s',
-            }}
-              onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.97)')}
-              onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}>
+            }}>
               🔧 Собрать программу
             </button>
-            <div style={{ fontSize: 9, color: DIM, textAlign: 'center' }}>
-              {buildPreview}. Будет построено ~{daysPerWeek} дней, MRV по профилю и лаборатории.
-            </div>
           </div>
 
+          {wizardStep > 1 && (
+            <button onClick={() => setWizardStep(s => s - 1)}
+              style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: DIM, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+              ← Назад
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════ */}
+      {/* ШАГ 6: ПРОГРАММА */}
+      {/* ════════════════════════════════════════════════ */}
+      {wizardStep === 6 && (
+        <div key="step6" style={{ animation: 'fadeSlideIn 0.3s ease' }}>
           <PlanDisplay
             result={manualResult}
             manualWorkMax={manualWorkMax}
@@ -728,44 +1208,26 @@ export const TrainingConstructor: React.FC<Props> = ({
             onToRuntime={manualToRuntime}
             globalTempoStr={globalTempoStr}
           />
-        </>
-      )}
 
-      {constTab === 'params' && (
-        <MacrocyclePanel
-          goal={goal} level={level}
-          daysPerWeek={daysPerWeek}
-          recovery={recovery} fatigue={fatigue}
-          weakPoints={weakPoints}
-          bodyWeight={bodyWeight}
-          sleepHours={sleepHours} stressLevel={stressLevel}
-          tprofile={tprofile} labAnalysis={labAnalysis}
-          macrocycle={macrocycle}
-          setMacrocycle={setMacrocycle}
-          selectedWeek={selectedWeek}
-          setSelectedWeek={setSelectedWeek}
-          currentMicrocycle={currentMicrocycle}
-          setCurrentMicrocycle={setCurrentMicrocycle}
-          onToRuntime={macroToRuntime}
-          setTab={setTab}
-        />
-      )}
+          {manualResult && (
+            <>
+              <ToolsPanel
+                result={manualResult} setResult={setManualResult}
+                manualCfg={manualCfg} tprofile={tprofile}
+                goal={goal} level={level}
+                mesoLength={mesoLength} daysPerWeek={daysPerWeek}
+                manualWorkMax={manualWorkMax} labAnalysis={labAnalysis}
+                onToRuntime={manualToRuntime}
+              />
+              <PlannerToolsPanel mode="manual" />
+            </>
+          )}
 
-      {constTab === 'tools' && (
-        <>
-        <ToolsPanel
-          result={manualResult}
-          setResult={setManualResult}
-          manualCfg={manualCfg}
-          tprofile={tprofile}
-          goal={goal} level={level}
-          mesoLength={mesoLength} daysPerWeek={daysPerWeek}
-          manualWorkMax={manualWorkMax}
-          labAnalysis={labAnalysis}
-          onToRuntime={manualToRuntime}
-        />
-        <PlannerToolsPanel mode="manual" />
-        </>
+          <button onClick={() => setWizardStep(5)}
+            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: DIM, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+            ← Назад к анализу
+          </button>
+        </div>
       )}
     </div>
   );

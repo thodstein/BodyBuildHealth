@@ -34,6 +34,10 @@ import { EMBED_MP_EXP } from './embed-mp-exp';
 import { EMBED_BIC_BEG } from './embed-bic-beg';
 import { EMBED_BIC_INT } from './embed-bic-int';
 import { EMBED_BIC_EXP } from './embed-bic-exp';
+import { CYCLE_BB_01 } from './cycle-bb-01';
+import { CYCLE_BB_02 } from './cycle-bb-02';
+import { CYCLE_BB_03 } from './cycle-bb-03';
+import { CYCLE_BB_04 } from './cycle-bb-04';
 
 export const LMS_CYCLES: SRCycleTemplate[] = [
  CYCLE_01,
@@ -63,9 +67,13 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
  EMBED_MP_BEG,
  EMBED_MP_INT,
  EMBED_MP_EXP,
- EMBED_BIC_BEG,
- EMBED_BIC_INT,
- EMBED_BIC_EXP,
+  EMBED_BIC_BEG,
+  EMBED_BIC_INT,
+  EMBED_BIC_EXP,
+  CYCLE_BB_01,
+  CYCLE_BB_02,
+  CYCLE_BB_03,
+  CYCLE_BB_04,
 ];
 
 export function getCycleById(id: string): SRCycleTemplate | undefined {

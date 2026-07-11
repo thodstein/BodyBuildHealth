@@ -717,6 +717,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           dayOffset: offset, cyclePhase: phase as any,
           randomSalt: planRandomSalt,
           variety,
+          wakeTime, lunchTime, dinnerTime, bedTime,
         };
         const v2 = buildDayPlanV2(input);
         // Преобразуем DayPlanV2 → совместимый формат старого dayPlan
@@ -2049,14 +2050,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
               <div style={{flex:1}}><div style={{fontSize:12,fontWeight:800,color:d.isTrainingDay?'#00e68a':'rgba(255,255,255,0.85)'}}>{d.isTrainingDay?'🏆 ТРЕНИРОВОЧНЫЙ ДЕНЬ':'😴 ДЕНЬ ОТДЫХА'}</div>
               {weightLogEntries.length >= 3 && (() => { const vals = weightLogEntries.map(e => e.weight); const min = Math.min(...vals); const max = Math.max(...vals); const range = max - min || 1; const h = 24; const w = 80; const pts = vals.map((v,i) => `${Math.round(i/(vals.length-1)*w)},${Math.round(h-(v-min)/range*h)}`).join(' '); const trend = vals.length >= 2 && vals[vals.length-1] < vals[0]; return (<div style={{display:'inline-flex',alignItems:'center',gap:3,marginLeft:6}}><svg width={w} height={h} style={{verticalAlign:'middle'}}><polyline points={pts} fill="none" stroke={trend?'#22c55e':'#ef4444'} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/></svg><span style={{fontSize:7,color:trend?'#22c55e':'#ef4444',fontWeight:600}}>{trend?'↓':'↑'} {Math.abs(vals[vals.length-1]-vals[0]).toFixed(1)} кг</span></div>); })()}</div>
               <div style={{padding:'4px 10px',borderRadius:8,background:d.isTrainingDay?'rgba(0,230,138,0.1)':'rgba(255,255,255,0.03)',border:d.isTrainingDay?'1px solid rgba(0,230,138,0.2)':'1px solid rgba(255,255,255,0.06)'}}>
-                <div style={{fontSize:16,fontWeight:900,color:'#00e68a',lineHeight:1}}>{totalKcal}</div>
+                <div style={{fontSize:16,fontWeight:900,color:Math.abs(totalKcal-(effectiveKcal||0))<=Math.max(50,(effectiveKcal||0)*0.08)?'#00e68a':'#f59e0b',lineHeight:1}}>{totalKcal}<span style={{fontSize:8,fontWeight:400,color:'rgba(255,255,255,0.5)'}}>/{effectiveKcal||'---'}</span></div>
                 <div style={{fontSize:7,color:'rgba(255,255,255,0.85)',textAlign:'center'}}>ккал</div>
               </div>
             </div>
             <div style={{display:'flex',gap:8,fontSize:9}}>
-              <span style={{color:'#3b82f6',fontWeight:600}}>💪 {totalP}г Б</span>
-              <span style={{color:'#f59e0b',fontWeight:600}}>🧈 {totalF}г Ж</span>
-              <span style={{color:'#f97316',fontWeight:600}}>🌾 {totalC}г У</span>
+              <span style={{color:'#3b82f6',fontWeight:600}}>💪 {totalP}г/{effectiveP||'—'} <span style={{fontSize:7,color:effectiveP?Math.abs(totalP-(effectiveP||0))<=5?'#22c55e':'#f59e0b':'rgba(255,255,255,0.5)'}}>{effectiveP>0?'('+Math.round(totalP/(effectiveP||1)*100)+'%)':''}</span></span>
+              <span style={{color:'#f59e0b',fontWeight:600}}>🧈 {totalF}г/{effectiveF||'—'}</span>
+              <span style={{color:'#f97316',fontWeight:600}}>🌾 {totalC}г/{effectiveC||'—'}</span>
               <span style={{marginLeft:'auto',color:'rgba(255,255,255,0.85)'}}>{weight>0?`${Math.round(totalP/weight)}г/кг`:''}</span>
             </div>
           </div>

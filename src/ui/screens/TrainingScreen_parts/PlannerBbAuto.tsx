@@ -1,16 +1,16 @@
-/** PlannerBbAuto.tsx — dedicated цельная ББ-панель (авто-планировщик бодибилдинга).
- * Обёртывает SRCBBScreen track="bb": подбор сплита, объём по группам, прогрессия,
- * мост план→сессия, методики, аналитика, PRO-метрики, графики. */
+/** PlannerBbAuto.tsx — dedicated ББ-панель с пошаговым конструктором BbAutoConstructor.
+ *  Полный поток: Параметры → PED+WorkMax → Сплит → План с комментариями → Качество → Коррекция.
+ *  Все PRO-фичи: PED-адаптация, MRV-guard, auto-reg, ACWR, inline editing. */
 import React from 'react';
-import { SRCBBScreen } from '../SRCBBScreen';
+import { BbAutoConstructor } from './BbAutoConstructor';
 
 export const PlannerBbAuto: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: '#00e68a' }}>
-        💪 Бодибилдинг — авто-планировщик
+        💪 Бодибилдинг — авто-конструктор
       </div>
-      <SRCBBScreen track="bb" />
+      <BbAutoConstructor />
     </div>
   );
 };

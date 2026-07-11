@@ -13,6 +13,40 @@ import { usePlanCtx } from "./IndividualPlanContext";
 import { PopupNumber, PopupSelect, PopupText } from '../../../components/PopupXxx';
 import { getRecipes, type Recipe } from '../../../../engines/nutrition-periodization.engine';
 
+// P3.2: Collapsible section for compact settings
+const SETTINGS_SECTIONS_KEY = 'he_plan_settings_collapsed';
+const useCollapsedSections = () => {
+  const [collapsed, setCollapsed] = React.useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(SETTINGS_SECTIONS_KEY) || '[]')); } catch { return new Set(); }
+  });
+  const toggle = (id: string) => setCollapsed(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    try { localStorage.setItem(SETTINGS_SECTIONS_KEY, JSON.stringify([...next])); } catch {}
+    return next;
+  });
+  return { collapsed, toggle };
+};
+const CollapsibleSection: React.FC<{ id: string; title: string; icon: string; color: string; children: React.ReactNode }> = ({ id, title, icon, color, children }) => {
+  const { collapsed, toggle } = useCollapsedSections();
+  const isCollapsed = collapsed.has(id);
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <div onClick={() => toggle(id)} style={{
+        display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', cursor: 'pointer',
+        fontSize: 10, fontWeight: 700, color, letterSpacing: 0.3,
+        background: color + '08', borderRadius: 8, marginBottom: isCollapsed ? 0 : 4,
+        userSelect: 'none',
+      }}>
+        <span style={{ fontSize: 7, transition: 'transform 0.2s', display: 'inline-block', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▼</span>
+        <span style={{ fontSize: 12 }}>{icon}</span>
+        <span>{title}</span>
+      </div>
+      {!isCollapsed && <div style={{ animation: 'fadeSlideIn 0.2s ease' }}>{children}</div>}
+    </div>
+  );
+};
+
 export const IndividualPlanSettings: React.FC = () => {
   const {
     weight, setWeight, height, setHeight, age, setAge, sex, setSex,

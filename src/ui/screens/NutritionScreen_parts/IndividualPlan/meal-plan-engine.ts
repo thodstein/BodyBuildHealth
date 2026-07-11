@@ -79,6 +79,11 @@ export interface MealPlanInput {
   lockedIds?: Set<string>;
   // P1.3: Foods used in recent days — deprioritized to avoid repetition
   recentFoodIds?: Set<string>;
+  // FIX 1: User-set meal times (overrides hardcoded defaults)
+  wakeTime?: string;   // e.g. "07:00"
+  lunchTime?: string;  // e.g. "13:00"
+  dinnerTime?: string; // e.g. "19:00"
+  bedTime?: string;    // e.g. "23:00"
 }
 
 // ─── Константы (клинические ориентиры) ─────────────────────────────────
@@ -135,6 +140,24 @@ function pick<T>(arr: T[], seed: number): T | undefined {
   return arr[Math.floor(seededRandom(seed) * arr.length)];
 }
 
+// FIX 2: Quality-weighted pick — foods with higher bb_quality_score get proportionally higher selection probability
+function pickWeighted(arr: FoodItem[], seed: number): FoodItem | undefined {
+  if (arr.length === 0) return undefined;
+  if (arr.length === 1) return arr[0];
+  const weights = arr.map(f => {
+    const score = (f as any).bb_quality_score ?? 5;
+    // Weight = score^1.5 so score 9 is ~3x more likely than score 5
+    return Math.max(0.5, Math.pow(score, 1.5));
+  });
+  const total = weights.reduce((s, w) => s + w, 0);
+  let r = seededRandom(seed) * total;
+  for (let i = 0; i < arr.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return arr[i];
+  }
+  return arr[arr.length - 1];
+}
+
 // P1.2: Pick from pool, but prefer locked foods, then preferred, then deprioritize recent
 function pickPriority<T extends { id: string }>(arr: T[], seed: number, opts?: { lockedIds?: Set<string>; preferredIds?: Set<string>; recentIds?: Set<string> }): T | undefined {
   if (arr.length === 0) return undefined;
@@ -158,8 +181,8 @@ function pickPriority<T extends { id: string }>(arr: T[], seed: number, opts?: {
       return freshPool[Math.floor(seededRandom(seed) * freshPool.length)];
     }
   }
-  // 4. Normal pick
-  return arr[Math.floor(seededRandom(seed) * arr.length)];
+  // 4. Quality-weighted pick (higher bb_quality_score = higher chance)
+  return pickWeighted(arr as any as FoodItem[], seed) as any as T;
 }
 
 // ─── Дескриптор лейцина в продукте (мг/100 г) ──────────────────────────
@@ -510,6 +533,14 @@ function pickRotationsForDay(dayOffset: number, randomSalt: number, count: numbe
 // ─── ОСНОВНОЙ ВХОД: построить дневной план ───────────────────────────
 export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const randomSalt = input.randomSalt ?? 0;
+  // FIX 4: Use user-set times (fallback to defaults)
+  const tBreakfast = input.wakeTime || '07:30';
+  const tLunch = input.lunchTime || '12:30';
+  const tDinner = input.dinnerTime || '19:00';
+  const tBed = input.bedTime || '22:00';
+  // Pre-sleep 30 min before bed
+  const tPreSleep = (() => { const [h, m] = tBed.split(':').map(Number); const min = (h * 60 + m - 30 + 1440) % 1440; return String(Math.floor(min/60)).padStart(2,'0') + ':' + String(min%60).padStart(2,'0'); })();
+  const wantPreSleep = input.mealsCount >= 4; // only if user wants 4+ meals
   const variety = input.variety ?? 'max';
   const varietyPoolSize = variety === 'max' ? 20 : variety === 'medium' ? 10 : 5;
   const pool = buildFoodPools(input.excludedIds || new Set(), !!input.isVegetarian, input.budget, varietyPoolSize);
@@ -563,7 +594,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // 1. Завтрак — белок + медленные углеводы + жиры + ягоды ─────────────
   const breakfastRot = rotationForMeal(0);
   const breakfast = buildWholeMeal({
-    label: 'Завтрак', time: '07:30', type: 'breakfast',
+    label: 'Завтрак', time: tBreakfast, type: 'breakfast',
     proteinG: mealBudget.breakfast.p,
     carbG: mealBudget.breakfast.c,
     fatG: mealBudget.breakfast.f,
@@ -583,7 +614,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // 2. Обед — основной цельный приём ─────────────────────────────────────
   const lunchRot = rotationForMeal(1);
   const lunch = buildWholeMeal({
-    label: 'Обед', time: '12:30', type: 'lunch',
+    label: 'Обед', time: tLunch, type: 'lunch',
     proteinG: mealBudget.lunch.p,
     carbG: mealBudget.lunch.c,
     fatG: mealBudget.lunch.f,
@@ -650,7 +681,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // 6. Ужин — основная порция жиров и белковый ротационный ─────────────
   const dinnerRot = rotationForMeal(2);
   const dinner = buildWholeMeal({
-    label: 'Ужин', time: '19:00', type: 'dinner',
+    label: 'Ужин', time: tDinner, type: 'dinner',
     proteinG: mealBudget.dinner.p,
     carbG: mealBudget.dinner.c + (residualC > 0 ? Math.min(30, residualC) : 0),
     fatG: mealBudget.dinner.f,
@@ -669,10 +700,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // 7. Pre-sleep — казеин + Mg + мелатонин ───────────────────────────────
   const preSleepSeed = seedBase + 7 + randomSalt * 13;
-  const preSleep = buildPreSleep('22:00', preSleepSeed, pool, residualP);
-  meals.push(preSleep);
-  preSleep.items.forEach(i => allFoodsUsed.push(i.id));
-  notes.push('Pre-sleep: казеин + Mg + мелатонин-источник для ночного восстановления');
+  const preSleep = wantPreSleep ? buildPreSleep(tPreSleep, preSleepSeed, pool, residualP) : null;
+  if (preSleep) { meals.push(preSleep); preSleep.items.forEach(i => allFoodsUsed.push(i.id)); notes.push('Pre-sleep: казеин + Mg + мелатонин-источник для ночного восстановления'); }
 
   // ─── Дневные итоговые ────────────────────────────────────────────────
   const totals = meals.reduce((acc, m) => ({
@@ -701,39 +730,46 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     categories[cat] = (categories[cat] || 0) + 1;
   });
 
-  // ─── Коррекция дефицита (KBJU matching ≤2%) ─────────────────────────
-  const TOL = 0.05;
+  // ─── Коррекция KBJU: сохраняем белок, корректируем углеводы/жиры ───
+  const TOL = 0.08; // 8% tolerance — real-world meal assembly varies 8-12%
   const devK = Math.abs(totals.kcal - input.goalKcal) / Math.max(1, input.goalKcal);
-  const devP = Math.abs(totals.p - input.goalProteinG) / Math.max(1, input.goalProteinG);
-  if (devK > TOL || devP > TOL) {
-    const scaleK = input.goalKcal / Math.max(1, totals.kcal);
-    const scaleP = input.goalProteinG / Math.max(1, totals.p);
-    const scale = Math.min(1.3, Math.max(0.7, (scaleK + scaleP) / 2));
-    meals.forEach(m => {
-      m.items.forEach(it => {
-        const supCap = SUPPLEMENT_MAX_G[it.id];
-        let newAmount = Math.round(it.amount * scale);
-        if (supCap) newAmount = Math.min(supCap, newAmount);
-        const factor = newAmount / (it.amount || 1);
-        it.amount = newAmount;
-        it.kcal = Math.round(it.kcal * factor);
-        it.p = Math.round(it.p * factor);
-        it.f = Math.round(it.f * factor);
-        it.c = Math.round(it.c * factor);
-        it.fiber = Math.round(it.fiber * factor);
-        it.leucine_mg = Math.round((it.leucine_mg || 0) * factor);
+  if (devK > TOL) {
+    const kcalDiff = input.goalKcal - totals.kcal; // positive = need more, negative = need less
+    // Strategy: adjust carb/fat portions (NOT protein — it's MPS-optimized per meal)
+    // Find all non-protein items (carbs + fats), sorted by amount descending (adjust biggest first)
+    const adjustableItems = meals.flatMap(m => m.items.filter(it => it.role === 'carb_slow' || it.role === 'carb_fast' || it.role === 'fat' || it.role === 'fruit').map(it => ({ meal: m, item: it })));
+    if (adjustableItems.length > 0) {
+      const kcalPerItem = Math.round(kcalDiff / adjustableItems.length);
+      adjustableItems.forEach(({ meal, item }) => {
+        const food = FOOD_DB.find(f => f.id === item.id);
+        if (!food) return;
+        const kcalPer100g = food.kcal || 0;
+        if (kcalPer100g <= 0) return;
+        const deltaGrams = Math.round(kcalPerItem / kcalPer100g * 100);
+        const newAmount = Math.max(15, Math.min(MAX_GRAM_PER_ITEM, item.amount + deltaGrams));
+        const factor = newAmount / (item.amount || 1);
+        item.amount = newAmount;
+        item.kcal = Math.round(item.kcal * factor);
+        item.p = Math.round(item.p * factor);
+        item.f = Math.round(item.f * factor);
+        item.c = Math.round(item.c * factor);
+        item.fiber = Math.round(item.fiber * factor);
+        item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
       });
-      m.totals = m.items.reduce((acc, it) => ({
-        kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
-        fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
-      }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
-    });
-    totals.kcal = Math.round(totals.kcal * scale);
-    totals.p = Math.round(totals.p * scale);
-    totals.f = Math.round(totals.f * scale);
-    totals.c = Math.round(totals.c * scale);
-    totals.fiber = Math.round(totals.fiber * scale);
-    totals.leucine_mg = Math.round(totals.leucine_mg * scale);
+      // Recalculate all meal totals
+      meals.forEach(m => {
+        m.totals = m.items.reduce((acc, it) => ({
+          kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
+          fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
+        }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+      });
+      totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0);
+      totals.p = meals.reduce((s, m) => s + m.totals.p, 0);
+      totals.f = meals.reduce((s, m) => s + m.totals.f, 0);
+      totals.c = meals.reduce((s, m) => s + m.totals.c, 0);
+      totals.fiber = meals.reduce((s, m) => s + m.totals.fiber, 0);
+      totals.leucine_mg = meals.reduce((s, m) => s + m.totals.leucine_mg, 0);
+    }
   }
 
   notes.push(`Сводка MPS: ${feedings} feedings × ${mpsSummary.avg_protein_per_meal_g} г/meal, ${mpsSummary.avg_leucine_g} г лейцина (порог ${LEU_THRESHOLD_MG / 1000} г)`);

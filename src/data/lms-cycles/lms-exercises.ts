@@ -62,7 +62,18 @@ export const LMS_EXERCISES: LMSExercise[] = [
  { name: "Тяжелая", groups: ["Жим гантелей на наклонной"], coef: 0.8, mnosz: 2, uses: 1 },
  { name: "Упражнение комплекса", groups: [], coef: 1, mnosz: 2, uses: 3 },
  { name: "Французский жим", groups: ["ТГ","ПР","ЖМ"], coef: 0.3, mnosz: 2, uses: 7 },
- { name: "Французский жим лежа", groups: ["ЖИМ"], coef: 0.4, mnosz: 1, uses: 3 },
+  { name: "Французский жим лежа", groups: ["ЖИМ"], coef: 0.4, mnosz: 1, uses: 3 },
+  { name: "Тяга верхнего блока", groups: ["ТЯГА","Спина"], coef: 0.5, mnosz: 1, uses: 6 },
+  { name: "Разгибания ног", groups: ["Ноги"], coef: 0.3, mnosz: 2, uses: 6 },
+  { name: "Трицепс на блоке", groups: ["Руки"], coef: 0.3, mnosz: 2, uses: 4 },
+  { name: "Разгибания из-за головы", groups: ["Руки"], coef: 0.3, mnosz: 2, uses: 4 },
+  { name: "Кроссовер", groups: ["Грудь"], coef: 0.3, mnosz: 2, uses: 4 },
+  { name: "Подъем гантели перед собой", groups: ["Плечи"], coef: 0.3, mnosz: 2, uses: 2 },
+  { name: "Подъем гантелей в стороны", groups: ["Плечи"], coef: 0.3, mnosz: 2, uses: 2 },
+  { name: "Тяга гантели в наклоне", groups: ["ТЯГА","Спина"], coef: 1.0, mnosz: 1, uses: 6 },
+  { name: "Наклоны стоя", groups: ["Спина"], coef: 0.5, mnosz: 1, uses: 4 },
+  { name: "Присед в широкой постановке", groups: ["ПР","Ноги"], coef: 1.2, mnosz: 1, uses: 6 },
+  { name: "Концентрированный подъем", groups: ["Руки"], coef: 0.3, mnosz: 2, uses: 4 },
 ];
 
 export function getLMSExercise(name: string): LMSExercise | undefined {

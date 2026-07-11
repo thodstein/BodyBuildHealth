@@ -54,17 +54,6 @@ const TAB_LABELS: Record<string, string> = {
   peri: '🥤 Пери-воркаут',
 };
 
-// U1: Group tabs into 4 collapsible sections
-const TAB_GROUPS: { id: string; title: string; icon: string; tabs: string[] }[] = [
-  { id: 'main',      title: 'Основное',              icon: '📋', tabs: ['diary', 'mealplan', 'reports', 'charts'] },
-  { id: 'products',  title: 'Продукты и планирование', icon: '🛒', tabs: ['catalog', 'cart', 'favorites', 'reference', 'recipes', 'restaurant', 'customfood', 'usefulness'] },
-  { id: 'analytics', title: 'Аналитика',             icon: '📊', tabs: ['overview', 'progress', 'peri', 'visualize'] },
-  { id: 'info',      title: 'Инфо и геймификация',    icon: '🧑\u200d\u2695\ufe0f', tabs: ['nutria', 'info', 'achievements', 'quests'] },
-];
-
-// Flatten for backward compat
-const ALL_GROUPED_TABS = TAB_GROUPS.flatMap(g => g.tabs);
-
 const cardBg = { background: '#18181b', borderRadius: 18, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 16px rgba(0,0,0,0.2)' };
 const pillActive = { background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700 as const, border: 'none', boxShadow: '0 2px 12px rgba(0,230,138,0.25)' };
 const pillInactive = { background: '#202023', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.06)' };
@@ -1405,8 +1394,6 @@ export const NutritionScreen: React.FC = () => {
   const [tab, setTab] = useState<ActiveTab>('mealplan');
   const [page, setPage] = useState<NutritionPage>('hero');
   const [nutritionSection, setNutritionSection] = useState<NutritionSection>('all');
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => { try { const s = localStorage.getItem('he_nutrition_collapsed_groups'); return s ? new Set(JSON.parse(s)) : new Set(); } catch { return new Set(); } });
-  const toggleGroup = (gid: string) => setCollapsedGroups(prev => { const next = new Set(prev); if (next.has(gid)) next.delete(gid); else next.add(gid); try { localStorage.setItem('he_nutrition_collapsed_groups', JSON.stringify([...next])); } catch {} return next; });
   const [foodEntries, setFoodEntries] = useState<DiaryEntry[]>([]);
   const [dailyLogs, setDailyLogs] = useState<Record<string, DiaryEntry[]>>({});
 
@@ -1669,59 +1656,31 @@ export const NutritionScreen: React.FC = () => {
       })()}
 
       <div style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0 8px 80px' }}>
-        {/* U1: Grouped collapsible tabs */}
-        {TAB_GROUPS.map(group => {
-          const isCollapsed = collapsedGroups.has(group.id);
-          const hasActive = group.tabs.includes(tab);
-          // When navigated from hero, section may filter; for 'all' show all groups
-          const sectionTabs = SECTION_TABS[nutritionSection] || SECTION_TABS.all;
-          const visibleTabs = nutritionSection === 'all' ? group.tabs : group.tabs.filter(t => sectionTabs.includes(t));
-          if (visibleTabs.length === 0) return null;
-          return (
-            <div key={group.id} style={{ marginBottom: 4 }}>
-              <div
-                onClick={() => toggleGroup(group.id)}
-                style={{
-                  display:'flex', alignItems:'center', gap:6, padding:'8px 10px 6px', cursor:'pointer',
-                  fontSize:9, fontWeight:700, color: hasActive ? '#00e68a' : 'rgba(255,255,255,0.5)',
-                  letterSpacing:0.3, textTransform:'uppercase', userSelect:'none',
-                }}
-              >
-                <span style={{ fontSize:7, transition:'transform 0.2s', display:'inline-block', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▼</span>
-                <span style={{ fontSize:10 }}>{group.icon}</span>
-                <span>{group.title}</span>
-                {hasActive && <span style={{ width:5, height:5, borderRadius:'50%', background:'#00e68a', marginLeft:2 }} />}
-              </div>
-              {!isCollapsed && (
-                <div style={{
-                  display:'flex', gap:3, flexWrap:'nowrap', overflowX:'auto', overflowY:'hidden',
-                  padding:'2px 4px 8px',
-                  scrollbarWidth:'none', msOverflowStyle:'none',
-                  WebkitOverflowScrolling:'touch', whiteSpace:'nowrap',
-                }}>
-                  {visibleTabs.map(t => {
-                    const isActive = tab === t;
-                    return (
-                      <button key={t} onClick={() => setTab(t as ActiveTab)} style={{
-                        flexShrink:0, padding:'6px 14px', borderRadius:20, cursor:'pointer',
-                        fontSize:10, fontWeight: isActive ? 700 : 500, letterSpacing:0.2,
-                        border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-                        background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#18181b',
-                        color: isActive ? '#000' : '#fff',
-                        transition:'all 0.2s cubic-bezier(0.22,1,0.36,1)',
-                      }}>
-                        {TAB_LABELS[t] || t}
-                        {t === 'cart' && cartCount > 0 && (
-                          <span style={{ marginLeft:3, background:'rgba(0,0,0,0.2)', borderRadius:8, padding:'1px 5px', fontSize:8, fontWeight:700 }}>{cartCount}</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        <div style={{
+          display:'flex', gap:3, flexWrap:'nowrap', overflowX:'auto', overflowY:'hidden',
+          padding:'8px 4px 10px',
+          scrollbarWidth:'none', msOverflowStyle:'none',
+          WebkitOverflowScrolling:'touch', whiteSpace:'nowrap',
+        }}>
+          {(SECTION_TABS[nutritionSection] || SECTION_TABS.all).map(t => {
+            const isActive = tab === t;
+            return (
+              <button key={t} onClick={() => setTab(t as ActiveTab)} style={{
+                flexShrink:0, padding:'6px 14px', borderRadius:20, cursor:'pointer',
+                fontSize:10, fontWeight: isActive ? 700 : 500, letterSpacing:0.2,
+                border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+                background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#18181b',
+                color: isActive ? '#000' : '#fff',
+                transition:'all 0.2s cubic-bezier(0.22,1,0.36,1)',
+              }}>
+                {TAB_LABELS[t] || t}
+                {t === 'cart' && cartCount > 0 && (
+                  <span style={{ marginLeft:3, background:'rgba(0,0,0,0.2)', borderRadius:8, padding:'1px 5px', fontSize:8, fontWeight:700 }}>{cartCount}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
         <div style={{ animation:'fadeSlideIn 0.3s ease' }}>
           {renderContent()}
         </div>

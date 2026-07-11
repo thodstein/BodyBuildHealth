@@ -4,7 +4,7 @@
  * Strength Standards: elite/advanced/intermediate/novice by bodyweight
  * Performance Ratios: squat:deadlift, bench:squat, push:pull, symmetry
  * Training Age Calculator: expected progress by experience level
- * Volume Landmarks: MEV, MAV, MRV per muscle group by level
+ * Volume Landmarks: MEV, MAV, MRV per muscle group by level (делегируется volume-landmarks.engine.ts)
  * Recovery Metrics: HRV-based readiness, training stress balance
  *
  * @module performance-analytics-engine
@@ -31,12 +31,9 @@ export interface PerformanceRatios {
   leftRightSymmetry: number;
 }
 
-export interface VolumeLandmarks {
-  muscle: string;
-  mev: number;  // minimum effective volume (sets/week)
-  mav: number;  // maximum adaptive volume
-  mrv: number;  // maximum recoverable volume
-}
+import { getAllVolumeLandmarks as getVL, getVolumeLandmarks as getVLOne, checkVolumeStatus as checkVS, type MuscleVolumeLandmarks } from './volume-landmarks.engine';
+/** @deprecated Используйте MuscleVolumeLandmarks из volume-landmarks.engine.ts */
+export type VolumeLandmarks = { muscle: string; mev: number; mav: number; mrv: number };
 
 export interface RecoveryMetrics {
   hrvReadiness: number;
@@ -181,66 +178,24 @@ export function analyzeRatios(ratios: PerformanceRatios): { issue: string; recom
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 3. Volume Landmarks (MEV/MAV/MRV)
+// 3. Volume Landmarks (MEV/MAV/MRV) — делегировано volume-landmarks.engine.ts
 // ═══════════════════════════════════════════════════════════════════════════
 
-const VOLUME_LANDMARKS_DB: Record<string, Record<string, { mev: number; mav: number; mrv: number }>> = {
-  beginner: {
-    chest: { mev: 6, mav: 10, mrv: 15 },
-    back: { mev: 8, mav: 12, mrv: 18 },
-    quads: { mev: 6, mav: 10, mrv: 15 },
-    hamstrings: { mev: 4, mav: 8, mrv: 12 },
-    shoulders: { mev: 4, mav: 8, mrv: 12 },
-    biceps: { mev: 2, mav: 6, mrv: 10 },
-    triceps: { mev: 2, mav: 6, mrv: 10 },
-    calves: { mev: 4, mav: 8, mrv: 12 },
-    glutes: { mev: 4, mav: 8, mrv: 12 },
-    abs: { mev: 4, mav: 8, mrv: 12 },
-  },
-  intermediate: {
-    chest: { mev: 8, mav: 14, mrv: 20 },
-    back: { mev: 10, mav: 16, mrv: 24 },
-    quads: { mev: 8, mav: 14, mrv: 20 },
-    hamstrings: { mev: 6, mav: 10, mrv: 16 },
-    shoulders: { mev: 6, mav: 10, mrv: 16 },
-    biceps: { mev: 4, mav: 8, mrv: 14 },
-    triceps: { mev: 4, mav: 8, mrv: 14 },
-    calves: { mev: 6, mav: 10, mrv: 16 },
-    glutes: { mev: 6, mav: 10, mrv: 16 },
-    abs: { mev: 4, mav: 10, mrv: 14 },
-  },
-  advanced: {
-    chest: { mev: 10, mav: 16, mrv: 24 },
-    back: { mev: 12, mav: 18, mrv: 28 },
-    quads: { mev: 10, mav: 16, mrv: 24 },
-    hamstrings: { mev: 8, mav: 12, mrv: 18 },
-    shoulders: { mev: 8, mav: 12, mrv: 20 },
-    biceps: { mev: 6, mav: 12, mrv: 18 },
-    triceps: { mev: 6, mav: 12, mrv: 18 },
-    calves: { mev: 8, mav: 12, mrv: 18 },
-    glutes: { mev: 8, mav: 12, mrv: 20 },
-    abs: { mev: 6, mav: 12, mrv: 16 },
-  },
-};
-
+/** @deprecated Используйте getVolumeLandmarks из volume-landmarks.engine.ts */
 export function getVolumeLandmarks(level: string, muscle: string): VolumeLandmarks | null {
-  const lvlData = VOLUME_LANDMARKS_DB[level];
-  if (!lvlData) return null;
-  const m = lvlData[muscle];
-  if (!m) return null;
-  return { muscle, ...m };
+  const v = getVLOne(level, muscle);
+  return v ? { muscle, mev: v.mev, mav: v.mav, mrv: v.mrv } : null;
 }
 
+/** @deprecated Используйте getAllVolumeLandmarks из volume-landmarks.engine.ts */
 export function getAllVolumeLandmarks(level: string): VolumeLandmarks[] {
-  const lvlData = VOLUME_LANDMARKS_DB[level] || VOLUME_LANDMARKS_DB.intermediate;
-  return Object.entries(lvlData).map(([muscle, data]) => ({ muscle, ...data }));
+  const all = getVL(level);
+  return Object.entries(all).map(([muscle, v]) => ({ muscle, mev: v.mev, mav: v.mav, mrv: v.mrv }));
 }
 
+/** @deprecated Используйте checkVolumeStatus из volume-landmarks.engine.ts */
 export function checkVolumeStatus(currentSets: number, landmarks: VolumeLandmarks): 'below_mev' | 'optimal' | 'approaching_mrv' | 'exceeding_mrv' {
-  if (currentSets < landmarks.mev) return 'below_mev';
-  if (currentSets <= landmarks.mav) return 'optimal';
-  if (currentSets <= landmarks.mrv) return 'approaching_mrv';
-  return 'exceeding_mrv';
+  return checkVS(currentSets, landmarks as MuscleVolumeLandmarks);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

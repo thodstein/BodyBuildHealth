@@ -43,20 +43,15 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     tabs: ['diary', 'insights', 'strength', 'calendar', 'checkin', 'mmc_tracking', 'import_data'],
   },
   calculators: {
-    title: '🧮 Калькуляторы',
-    icon: '🧮',
+    title: '⚡ Интеллект тренировки',
+    icon: '⚡',
     color: '#3b82f6',
-    subtitle: 'Все калькуляторы в одном месте: сила, нагрузка, периодизация, инвентарь',
-      tabs: [
+    subtitle: 'Персональный пульс-контроль: показатели, качество плана, инструменты сборки, периодизация',
+    tabs: [
       'strength_analysis', 'load_management', 'diagnostics', 'periodization_hub',
       'exercise_lab', 'load_safety', 'split_gen', 'pri_reppat',
       'calc_plates', 'calc_quality', 'volume',
       'training_mix_hub', 'tonnage',
-    ],
-    categories: [
-      { label: 'Унифицированные', icon: '🧠', tabs: ['strength_analysis', 'load_management', 'diagnostics', 'periodization_hub', 'exercise_lab'] },
-      { label: 'Инструменты', icon: '🛠️', tabs: ['load_safety', 'split_gen', 'pri_reppat', 'calc_plates', 'calc_quality', 'volume', 'tonnage'] },
-      { label: 'Прочее', icon: '📋', tabs: ['training_mix_hub'] },
     ],
   },
   library: {

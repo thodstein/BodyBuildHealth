@@ -28,14 +28,17 @@ export interface BBDay {
 }
 
 /** Per-group блокировка: группа всегда только тяж (ноги), никогда чистый памп. */
-export const FORCE_HEAVY_GROUPS: ReadonlySet<string> = new Set(['quads', 'hamstrings', 'glutes', 'calves']);
+export const FORCE_HEAVY_GROUPS: ReadonlySet<string> = new Set(['quads', 'hamstrings', 'glutes', 'calves', 'forearms', 'traps']);
 
 /** Пары ротации первичная/добивочная: (A тяж + B добивка) / (B тяж + A добивка). */
 export const ROTATION_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['quads', 'hamstrings'],
-  ['chest', 'shoulders'],
-  ['back', 'shoulders'],
+  ['chest', 'delt_front'],
+  ['back', 'delt_rear'],
+  ['shoulders', 'delt_mid'],
   ['biceps', 'triceps'],
+  ['delt_front', 'delt_mid'],
+  ['delt_rear', 'traps'],
 ];
 
 /** Получить пару для мышцы (если есть). */
