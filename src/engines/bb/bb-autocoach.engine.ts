@@ -301,7 +301,7 @@ export interface OverloadTarget {
   nextTarget: string;
 }
 
-export function computeOverloadTargets(week: BBWeek, strategy: LoadStrategy, workMax: Record<string, number>, totalWeeks: number): OverloadTarget[] {
+export function computeOverloadTargets(week: BBWeek, strategy: LoadStrategy, workMax: Record<string, number>, totalWeeks: number, phase: string = ''): OverloadTarget[] {
   const targets: OverloadTarget[] = [];
   for (const s of week.sessions) {
     for (const e of s.exercises) {
@@ -309,7 +309,7 @@ export function computeOverloadTargets(week: BBWeek, strategy: LoadStrategy, wor
       const currentReps = e.workSets[0]?.reps || 10;
       const currentRIR = e.rir;
       const maxW = workMax[e.muscle] || 80;
-      const prescr = prescribeLoad(strategy, currentWeight, currentReps, currentRIR, maxW, week.week, totalWeeks, '');
+      const prescr = prescribeLoad(strategy, currentWeight, currentReps, currentRIR, maxW, week.week, totalWeeks, phase);
       targets.push({
         exerciseName: e.name,
         currentSets: e.sets,

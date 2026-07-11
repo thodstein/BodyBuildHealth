@@ -38,6 +38,14 @@ import { CYCLE_BB_01 } from './cycle-bb-01';
 import { CYCLE_BB_02 } from './cycle-bb-02';
 import { CYCLE_BB_03 } from './cycle-bb-03';
 import { CYCLE_BB_04 } from './cycle-bb-04';
+import { CYCLE_BB_05 } from './cycle-bb-05';
+import { CYCLE_BB_06 } from './cycle-bb-06';
+import { CYCLE_BB_07 } from './cycle-bb-07';
+import { CYCLE_BB_08 } from './cycle-bb-08';
+import { CYCLE_BB_09 } from './cycle-bb-09';
+import { CYCLE_BB_10 } from './cycle-bb-10';
+import { CYCLE_BB_11 } from './cycle-bb-11';
+import { CYCLE_BB_12 } from './cycle-bb-12';
 
 export const LMS_CYCLES: SRCycleTemplate[] = [
  CYCLE_01,
@@ -74,6 +82,14 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
   CYCLE_BB_02,
   CYCLE_BB_03,
   CYCLE_BB_04,
+  CYCLE_BB_05,
+  CYCLE_BB_06,
+  CYCLE_BB_07,
+  CYCLE_BB_08,
+  CYCLE_BB_09,
+  CYCLE_BB_10,
+  CYCLE_BB_11,
+  CYCLE_BB_12,
 ];
 
 export function getCycleById(id: string): SRCycleTemplate | undefined {

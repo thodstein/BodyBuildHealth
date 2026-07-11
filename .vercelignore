@@ -23,3 +23,5 @@ pnpm-debug.log*
 *.env
 *.env.local
 .DS_Store
+# Exclude sourcemaps from deployment
+**/*.map

@@ -17,6 +17,7 @@ import { getAllVolumeLandmarks, landmarksForRotation, normLevel, type TrainingLe
 import { tempoFor, REST_BY_CHARACTER, type TempoSpec } from './bb-tempo-rest';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
 import { selectExercisesSmart } from '../exercise-selector.engine';
+import { PCT_FOR_RIR } from '../rir-table';
 import type { PEDAdaptation } from './bb-ped-adaptation.engine';
 
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
@@ -81,6 +82,8 @@ export interface BBPlan {
 // PRO-расширение: дельта разделена на пучки (Push: передняя+средняя, Pull: задняя)
 // Для Upper/FullBody оставлен aggregate shoulders (одно упр на все пучки)
 // traps/forearms добавлены в Pull (трен. спины)
+// Новые теги: ChestBack, ShouldersArms, Chest, Back, Shoulders, Arms,
+// Torso, Limbs, UpperPower, LowerPower, UpperHyp, LowerHyp
 const TAG_MUSCLES: Record<string, string[]> = {
   Push: ['chest', 'delt_front', 'delt_mid', 'triceps'],
   Pull: ['back', 'biceps', 'delt_rear', 'traps'],
@@ -88,6 +91,19 @@ const TAG_MUSCLES: Record<string, string[]> = {
   Upper: ['chest', 'back', 'shoulders', 'biceps', 'triceps'],
   Lower: ['quads', 'hamstrings', 'glutes', 'calves', 'abs'],
   FullBody: ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'arms'],
+  // PRO-расширенные сплиты:
+  Chest: ['chest', 'delt_front', 'triceps'],
+  Back: ['back', 'biceps', 'delt_rear', 'traps'],
+  Shoulders: ['delt_front', 'delt_mid', 'delt_rear', 'traps'],
+  Arms: ['biceps', 'triceps', 'forearms'],
+  ChestBack: ['chest', 'back', 'delt_front', 'delt_rear', 'traps', 'forearms'],
+  ShouldersArms: ['delt_front', 'delt_mid', 'delt_rear', 'biceps', 'triceps', 'traps', 'forearms'],
+  Torso: ['chest', 'back', 'shoulders', 'traps', 'abs'],
+  Limbs: ['quads', 'hamstrings', 'glutes', 'biceps', 'triceps', 'calves', 'forearms'],
+  UpperPower: ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'traps'],
+  LowerPower: ['quads', 'hamstrings', 'glutes', 'calves', 'abs', 'lower_back'],
+  UpperHyp: ['chest', 'back', 'delt_front', 'delt_mid', 'delt_rear', 'biceps', 'triceps'],
+  LowerHyp: ['quads', 'hamstrings', 'glutes', 'calves', 'abs'],
 };
 /** Маппинг PRO-мышц в group каталога для getExercisesByGroup(). */
 const PRO_MUSCLE_TO_GROUP: Record<string, string> = {
@@ -116,8 +132,15 @@ function musclesForTag(tag?: string): string[] {
   return [];
 }
 
-// %1RM по RIR (приближённо, для гипертрофийного диапазона 6-12 повт)
-const PCT_FOR_RIR: Record<number, number> = { 0: 1.0, 1: 0.96, 2: 0.92, 3: 0.88, 4: 0.84, 5: 0.80 };
+// Коэффициенты workMax для PRO-мышц (% от родительской группы)
+const PRO_WORKMAX_RATIO: Record<string, (wm: Record<string, number>) => number> = {
+  delt_front: wm => (wm['shoulders'] || 80) * 0.50,
+  delt_mid:   wm => (wm['shoulders'] || 80) * 0.45,
+  delt_rear:  wm => (wm['shoulders'] || 80) * 0.35,
+  traps:      wm => (wm['back'] || 100) * 0.55,
+  forearms:   wm => (wm['arms'] || wm['biceps'] || 60) * 0.45,
+  abs:        wm => wm['core'] || 40,
+};
 
 function charReps(c: DayCharacter): [number, number] {
   if (c === 'тяж') return [5, 8];
@@ -133,17 +156,19 @@ function charRir(c: DayCharacter, week: number): number {
 function buildSession(
   sched: ScheduleDay, dayInRotation: number, week: number,
   muscleVolumeRotation: Record<string, number>,
-  muscleSessionCount: Record<string, number>,   // сколько сессий в ротации тренируют мышцу
-  musclePrimaryAssigned: Set<string>,            // мышцы, которым уже назначена primary в этой ротации
+  muscleSessionCount: Record<string, number>,
+  musclePrimaryAssigned: Set<string>,
   workMax: Record<string, number>, weakPoints: string[], focusGroup?: string,
   pedAdapt?: PEDAdaptation,
+  dailyCap: number = 12,
 ): BBSession {
   const character = sched.character as DayCharacter;
   const muscles = musclesForTag(sched.sessionTag);
   const exercises: BBExercise[] = [];
   
-  // S-MRV: Дневной бюджет утомления (база 40-60) — масштабируется под PED
-  let dayFatigueBudget = Math.round(50 * (pedAdapt?.combinedRecoveryMultiplier ?? 1));
+  // S-MRV: Системный бюджет утомления на день.
+  // Формула: dailyCap × S_MRV_FACTOR × pedMultiplier  (S_MRV_FACTOR = 4, см. engines/rir-table.ts)
+  let dayFatigueBudget = Math.round(dailyCap * 4 * (pedAdapt?.combinedRecoveryMultiplier ?? 1));
   
   for (const muscle of muscles) {
     const resolved = resolveCharacter(muscle, character);
@@ -164,7 +189,7 @@ function buildSession(
     
     const [rmin, rmax] = charReps(resolved);
     const rir = charRir(resolved, week);
-    const wm = workMax[muscle] || 80;
+    const wm = workMax[muscle] || PRO_WORKMAX_RATIO[muscle]?.(workMax) || 80;
     const pct = PCT_FOR_RIR[rir] ?? 0.9;
     const reps = Math.round((rmin + rmax) / 2);
     const weight = Math.round(wm * pct * 10) / 10;
@@ -220,6 +245,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const focusGroup = input.focusGroup;
   const sessions = sessionsOf(pattern);
 
+  // Вычисляем dailyCap (max групп в день) для S-MRV-бюджета
+  const maxGroupsPerSession = Math.max(1, ...sessions.map(s => musclesForTag(s.sessionTag).length));
+  const dailyCap = Math.max(10, Math.min(16, Math.round(8 + maxGroupsPerSession * 2)));
+
   const muscleSessionCount: Record<string, number> = {};
   for (const s of sessions) for (const m of musclesForTag(s.sessionTag)) muscleSessionCount[m] = (muscleSessionCount[m] || 0) + 1;
 
@@ -243,13 +272,13 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     }
   }
 
-  const musclePrimaryAssigned = new Set<string>();
   const weeks: BBWeek[] = [];
   for (let w = 1; w <= input.weeks; w++) {
+    const musclePrimaryAssigned = new Set<string>(); // ← сбрасывается КАЖДУЮ неделю
     const weekSessions: BBSession[] = [];
     for (let i = 0; i < sessions.length; i++) {
       const s = sessions[i];
-      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt);
+      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, dailyCap);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       weekSessions.push(sess);
     }

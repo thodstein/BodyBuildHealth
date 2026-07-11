@@ -39,6 +39,14 @@ export const ROTATION_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['biceps', 'triceps'],
   ['delt_front', 'delt_mid'],
   ['delt_rear', 'traps'],
+  // PRO-расширение: дополнительные пары для специализированных сплитов
+  ['chest', 'triceps'],           // грудь+трицепс (жимовые дни)
+  ['back', 'biceps'],             // спина+бицепс (тяговые дни)
+  ['quads', 'calves'],            // квадрицепс+икры (передняя поверхность)
+  ['hamstrings', 'glutes'],       // бицепс бедра+ягодицы (задняя цепь)
+  ['delt_mid', 'traps'],          // средняя дельта+трапеции (ширина плеч)
+  ['abs', 'lower_back'],          // пресс+поясница (кор)
+  ['forearms', 'biceps'],         // предплечья+бицепс (хват+сгибание)
 ];
 
 /** Получить пару для мышцы (если есть). */

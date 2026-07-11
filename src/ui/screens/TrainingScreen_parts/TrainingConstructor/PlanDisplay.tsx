@@ -126,6 +126,7 @@ export const PlanDisplay: React.FC<Props> = ({
   const [showMacroPreview, setShowMacroPreview] = useState(false);
   const [exerciseTempos, setExerciseTempos] = useState<Record<string, string>>({});
   const [tempoPicker, setTempoPicker] = useState<{ dayIdx: number; exIdx: number } | null>(null);
+  const [expandedEx, setExpandedEx] = useState<Set<string>>(new Set());
   const inlineRef = useRef<HTMLInputElement | null>(null);
 
   const startInline = useCallback((di: number, ei: number, field: string, val: string | number) => {
@@ -384,6 +385,64 @@ export const PlanDisplay: React.FC<Props> = ({
 
       {showMacroPreview && <MacroPreview result={result} mesoLength={mesoLength} level={level} />}
 
+  {hasWeeks && (
+    <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.15)' }}>
+      <div style={{ fontSize: 11, fontWeight: 800, color: '#22c55e', marginBottom: 8 }}>📈 ПРОГРЕССИЯ ПО НЕДЕЛЯМ: RIR / ОБЪЁМ / ТОННАЖ</div>
+      {(() => {
+        const wks = result.weeks || [];
+        if (wks.length === 0) return null;
+        const maxSets = Math.max(...wks.map(w => w.days.reduce((s: number, d: any) => s + d.exercises.reduce((ss: number, e: any) => ss + e.sets, 0), 0)));
+        const maxTonnage = Math.max(...wks.map(w => w.days.reduce((s: number, d: any) => s + d.exercises.reduce((ss: number, e: any) => ss + e.sets * e.weight, 0), 0)));
+        const barMaxW = 240;
+        const isMulti = wks.length > 1 && new Set(wks.map(w => w.rir)).size > 1;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {wks.map(w => {
+              const totalSets = w.days.reduce((s: number, d: any) => s + d.exercises.reduce((ss: number, e: any) => ss + e.sets, 0), 0);
+              const totalTonnage = w.days.reduce((s: number, d: any) => s + d.exercises.reduce((ss: number, e: any) => ss + e.sets * e.weight, 0), 0);
+              const pc = PHASE_COLORS[w.phase] || '#a855f7';
+              return (
+                <div key={w.weekNumber} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0' }}>
+                  <button onClick={() => goToWeek(w.weekNumber)} style={{
+                    minWidth: 36, padding: '2px 4px', borderRadius: 4, cursor: 'pointer',
+                    border: w.weekNumber === currentWeekNum ? '1px solid ' + pc : '1px solid transparent',
+                    background: w.weekNumber === currentWeekNum ? pc + '20' : 'transparent',
+                    color: w.weekNumber === currentWeekNum ? '#fff' : 'rgba(255,255,255,0.6)',
+                    fontSize: 9, fontWeight: 700, textAlign: 'center',
+                  }}>{w.weekNumber}</button>
+                  <div style={{ fontSize: 8, fontWeight: 600, minWidth: 72, color: pc }}>{w.phaseLabel}</div>
+                  <div style={{ fontSize: 9, fontWeight: 700, minWidth: 22, textAlign: 'center', color: w.rir <= 1 ? '#ef4444' : w.rir <= 2 ? '#f59e0b' : '#22c55e' }}>RIR{w.rir}</div>
+                  <div style={{ flex: 1, display: 'flex', gap: 2, alignItems: 'center' }}>
+                    <div style={{
+                      height: 10, width: Math.round((totalSets / Math.max(1, maxSets)) * barMaxW), borderRadius: 4,
+                      background: totalSets > 0 ? pc : 'transparent', opacity: 0.7, minWidth: totalSets > 0 ? 4 : 0,
+                      transition: 'width 0.5s',
+                    }} />
+                    <span style={{ fontSize: 7, fontWeight: 600, color: 'rgba(255,255,255,0.5)', minWidth: 20 }}>{totalSets}</span>
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', gap: 2, alignItems: 'center' }}>
+                    <div style={{
+                      height: 8, width: Math.round((totalTonnage / Math.max(1, maxTonnage)) * barMaxW), borderRadius: 4,
+                      background: totalTonnage > 0 ? '#60a5fa' : 'transparent', opacity: 0.6, minWidth: totalTonnage > 0 ? 4 : 0,
+                      transition: 'width 0.5s',
+                    }} />
+                    <span style={{ fontSize: 7, fontWeight: 600, color: 'rgba(255,255,255,0.5)', minWidth: 30 }}>{(totalTonnage / 1000).toFixed(1)}k</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+      <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 8, color: 'rgba(255,255,255,0.35)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 4 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: '#22c55e' }} /> сеты/нед</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: '#60a5fa' }} /> тоннаж (кг)</span>
+        <span>RIR: 🟢3+ · 🟡1-2 · 🔴0</span>
+        {(result.weeks?.length ?? 0) > 1 && new Set(result.weeks?.map(w => w.rir) ?? []).size > 1 && <span style={{ color: '#f59e0b' }}>⏳ волна RIR активна</span>}
+      </div>
+    </div>
+  )}
+
       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {result.days.map((d, di) => (
           <div key={d.day} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
@@ -460,6 +519,40 @@ export const PlanDisplay: React.FC<Props> = ({
                       💡 {note}
                     </div>
                   )}
+                  {/* Раскрываемые детали */}
+                  <div style={{ padding: '1px 10px' }}>
+                    {(() => {
+                      const key = `${di}-${ei}`;
+                      const isExp = expandedEx.has(key);
+                      const exData = e as any;
+                      const hasDetails = exData.technique || exData.rationale || (exData.substitutions?.length > 0) || (exData.warmupScheme?.length > 0) || exData.backoffWeight || exData.comments || exData.fatigueCost;
+                      if (!hasDetails) return null;
+                      return (
+                        <>
+                          <span onClick={() => {
+                            const next = new Set(expandedEx);
+                            isExp ? next.delete(key) : next.add(key);
+                            setExpandedEx(next);
+                          }} style={{ fontSize: 9, color: ACCENT, cursor: 'pointer', userSelect: 'none' }}>
+                            {isExp ? '▲ Скрыть детали' : '▼ Подробнее'}
+                          </span>
+                          {isExp && (
+                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, padding: '4px 0 6px 4px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
+                              {exData.rationale && <div>🎯 <b>Выбрано:</b> {exData.rationale}</div>}
+                              {exData.technique && <div>📐 <b>Техника:</b> {exData.technique}</div>}
+                              {exData.comments && <div>💬 {exData.comments}</div>}
+                              {exData.substitutions?.length > 0 && <div>🔄 <b>Замены:</b> {exData.substitutions.join(', ')}</div>}
+                              {exData.warmupScheme?.length > 0 && (
+                                <div>🔥 <b>Разминка:</b> {exData.warmupScheme.map((w: any) => `${w.weight}кг×${w.reps} (${Math.round(w.pct*100)}%)`).join(' → ')}</div>
+                              )}
+                              {exData.backoffWeight && <div>⬇ <b>Добивка:</b> {exData.backoffWeight} кг (−20%)</div>}
+                              {exData.fatigueCost && <div>⚡ <b>Утомление:</b> {exData.fatigueCost}/10</div>}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
                 </Fragment>
               );
             })}

@@ -7,6 +7,7 @@ import { toDailyLoads, weeklyMonotony } from '../../../../engines/pro/training-l
 import { loadReadinessHistory } from '../readiness-history';
 import { PCT_FOR_RIR, GROUP_RU, ACCENT, DIM, type ManualResult } from './types';
 import type { TrainingProfile } from '../training-profile';
+import { prescribeLoad, suggestFeeders } from '../../../../engines/bb/bb-autocoach.engine';
 
 interface Props {
   result: ManualResult | null;
@@ -34,6 +35,8 @@ export const ToolsPanel: React.FC<Props> = ({
     try { return JSON.parse(localStorage.getItem('myTrainingTemplates') || '[]'); } catch { return []; }
   });
   const [comparePlan, setComparePlan] = useState<any | null>(null);
+  const [showFeederSets, setShowFeederSets] = useState(false);
+  const [showLoadStrategy, setShowLoadStrategy] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
 
   const refreshSaved = useCallback(() => {
@@ -84,29 +87,20 @@ export const ToolsPanel: React.FC<Props> = ({
     setImproveModal({ notes, apply: () => { setResult({ ...result!, days, corrections: [...result!.corrections, '🎯 Улучшение программы:', ...notes] }); setImproveModal(null); } });
   }, [result, labAnalysis, tprofile, level, goal, mesoLength, manualWorkMax, setResult]);
 
-  const applyMethodicToPlan = useCallback(() => {
-    if (!result) return;
-    const corr: string[] = [];
-    const name = manualCfg.intensity || manualCfg.technique || manualCfg.volume || '';
-    if (!name) {
-      corr.push('Выберите методику (Интенсивность/Техника/Объём) в конфигурации.');
-      setResult({ ...result, corrections: [...result.corrections, ...corr] });
-      return;
-    }
-    const days = result.days.map(d => ({ ...d, exercises: d.exercises.map(e => {
-      const wm = tprofile.workMax[e.group] || 80;
-      let ne = { ...e };
-      if (/10×10|GVT|German Volume/i.test(name)) { ne = { ...e, sets: 10, reps: '10', weight: Math.round(wm * 0.6), rir: 3, rest: 90 }; corr.push(e.name + ': → 10×10 GVT'); }
-      else if (/Cluster 5×5|Кластер/i.test(name)) { ne = { ...e, sets: 5, reps: '5', weight: Math.round(wm * 0.85), rir: 1, rest: 180 }; corr.push(e.name + ': → 5×5 кластерами'); }
-      else if (/Rest-Pause/i.test(name)) { ne = { ...e, sets: 1, reps: 'до отказа +3-5', weight: Math.round(wm * 0.8), rir: 0, rest: 180 }; corr.push(e.name + ': → rest-pause'); }
-      else if (/Tempo|Темп/i.test(name)) { ne = { ...e, weight: Math.round(wm * 0.7), rir: 2, rest: 60 }; corr.push(e.name + ': → темп 3-1-1-0'); }
-      else if (/Drop|Дроп/i.test(name)) { ne = { ...e, rir: 0, rest: 90 }; corr.push(e.name + ': → drop-set'); }
-      else { corr.push(e.name + ': методика «' + name + '» применена концептуально'); }
-      return ne;
-    }) }));
-    corr.unshift('Применена методика: «' + name + '» к ' + days.reduce((s, d) => s + d.exercises.length, 0) + ' упражнениям.');
-    setResult({ ...result, days, corrections: [...result.corrections, ...corr] });
-  }, [result, manualCfg, tprofile, setResult]);
+  const exportWeeksText = useCallback(() => {
+    if (!result || !result.weeks) return;
+    const lines: string[] = ['Тренировочный план (ВСЕ НЕДЕЛИ): ' + result.splitName];
+    lines.push('Уровень: ' + level + ' · Цель: ' + goal + ' · ' + daysPerWeek + ' дн/нед · ' + mesoLength + ' нед');
+    result.weeks.forEach(w => {
+      lines.push(''); lines.push(`═ НЕДЕЛЯ ${w.weekNumber} — ${w.phaseLabel} · RIR ${w.rir} ═`);
+      w.days.forEach(d => {
+        lines.push(''); lines.push(`  День ${d.day} (${d.groups.map(g => GROUP_RU[g] || g).join(', ')})`);
+        d.exercises.forEach(e => lines.push(`    ${e.name} — ${e.sets}×${e.reps} @ RIR${e.rir} · ${e.weight} кг · ${e.rest}с`));
+      });
+    });
+    try { navigator.clipboard?.writeText(lines.join('\n')); } catch {}
+    setPlanCopied(true); setTimeout(() => setPlanCopied(false), 1800);
+  }, [result, level, goal, daysPerWeek, mesoLength]);
 
   const recalcWeights = useCallback(() => {
     if (!result) return;
@@ -197,10 +191,12 @@ export const ToolsPanel: React.FC<Props> = ({
     <>
       <div style={{ marginTop: 8, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
         <button onClick={improveProgram} style={toolBtn(ACCENT)}>🎯 Улучшить</button>
-        <button onClick={applyMethodicToPlan} style={toolBtn('#a855f7')}>🔧 Применить методику</button>
         <button onClick={recalcWeights} style={toolBtn('#60a5fa')}>🔄 Пересчёт весов</button>
-        <button onClick={exportText} style={toolBtn(ACCENT)}>{planCopied ? '✓ Скопировано' : '📋 Копировать'}</button>
+        <button onClick={exportText} style={toolBtn(ACCENT)}>{planCopied ? '✓ Скопировано' : '📋 Копировать (текст)'}</button>
         <button onClick={printPlan} style={toolBtn('#60a5fa')}>🖨 Печать/PDF</button>
+        {result?.weeks && result.weeks.length > 1 && (
+          <button onClick={exportWeeksText} style={toolBtn('#a855f7')}>📅 Все недели (копировать)</button>
+        )}
         <button onClick={savePlan} style={toolBtn(ACCENT)}>💾 Сохранить</button>
         <button onClick={saveAsTemplate} style={toolBtn('#a855f7')}>⭐ Шаблон</button>
         <button onClick={() => setShowCompare(v => !v)} style={toolBtn('#f59e0b')}>⚖ Сравнить</button>
@@ -220,6 +216,54 @@ export const ToolsPanel: React.FC<Props> = ({
             {quality.monotonyNote && <div style={{ marginTop: 2 }}>{quality.monotonyNote}</div>}
             {quality.over.length === 0 && quality.weakMissed.length === 0 && <div style={{ color: ACCENT }}>✅ Объём в норме, слабые группы покрыты</div>}
           </div>
+        </div>
+      )}
+
+      {/* Feeder sets for weak points */}
+      {result && tprofile.weakPoints.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <button onClick={() => setShowFeederSets(v => !v)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.15)', color:'#ef4444', cursor:'pointer', fontSize:10, fontWeight:700, textAlign:'left' }}>
+            🔥 Feeder-сеты (ежедневно для слабых групп) {showFeederSets ? '▲' : '▼'}
+          </button>
+          {showFeederSets && (() => {
+            const feeders = suggestFeeders(tprofile.weakPoints, tprofile.equipment);
+            if (feeders.length === 0) return <div style={{ padding:'6px 10px', fontSize:9, color:DIM }}>Нет feeder-сетов для выбранных групп.</div>;
+            return <div style={{ padding:'6px 10px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.1)', marginTop:4 }}>
+              {feeders.map((f, i) => <div key={i} style={{ marginBottom:6, fontSize:9, color:'rgba(255,255,255,0.8)' }}>
+                <b>{f.exercise}</b> — {f.sets}×{f.reps} · {f.notes}
+              </div>)}
+            </div>;
+          })()}
+        </div>
+      )}
+
+      {/* Load strategy application */}
+      {result && (
+        <div style={{ marginTop: 8 }}>
+          <button onClick={() => setShowLoadStrategy(v => !v)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.15)', color:'#a855f7', cursor:'pointer', fontSize:10, fontWeight:700, textAlign:'left' }}>
+            📈 Стратегии прогрессии нагрузки {showLoadStrategy ? '▲' : '▼'}
+          </button>
+          {showLoadStrategy && (
+            <div style={{ marginTop:4, display:'flex', flexDirection:'column', gap:4 }}>
+              {(['double_progression','linear','wave','rpe_based'] as const).map(strat => {
+                const label = { double_progression:'🔄 Двойная прогрессия', linear:'📈 Линейная', wave:'🌊 Волновая', rpe_based:'🎯 RPE' }[strat];
+                return <button key={strat} onClick={() => {
+                  if (!result) return;
+                  const days = result.days.map(d => ({
+                    ...d, exercises: d.exercises.map(e => {
+                      const wm = tprofile.workMax[e.group] || manualWorkMax[e.group] || 80;
+                      const prescr = prescribeLoad(strat, e.weight, parseInt(e.reps) || 10, e.rir, wm, 1, mesoLength, '');
+                      return { ...e, weight: prescr.nextWeight, rir: prescr.nextRIR, reps: String(prescr.nextReps) };
+                    }),
+                  }));
+                  setResult({ ...result, days, corrections: [...result.corrections, `📈 Применена стратегия: ${strat}`] });
+                  setShowLoadStrategy(false);
+                }} style={{ padding:'6px 10px', borderRadius:6, fontSize:10, fontWeight:600, cursor:'pointer', border:'1px solid rgba(168,85,247,0.15)', background:'rgba(168,85,247,0.04)', color:'rgba(255,255,255,0.8)', textAlign:'left' }}>
+                  {label}
+                </button>;
+              })}
+            </div>
+          )}
         </div>
       )}
 

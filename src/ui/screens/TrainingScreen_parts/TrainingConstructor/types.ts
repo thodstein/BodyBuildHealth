@@ -1,4 +1,5 @@
 import type React from 'react';
+import { getVolumeLandmarks } from '../../../../engines/volume-landmarks.engine';
 
 export const ACCENT = '#00e68a';
 export const DIM = 'rgba(255,255,255,0.5)';
@@ -23,7 +24,7 @@ export const LEVELS = [
   { value: 'enhanced', label: '⚡ Enhanced' },
 ];
 
-export const PCT_FOR_RIR: Record<number, number> = { 0: 1.0, 1: 0.96, 2: 0.92, 3: 0.88, 4: 0.84, 5: 0.80 };
+export { PCT_FOR_RIR } from '../../../../engines/rir-table';
 
 /* ─── Расширенные группы мышц (15 групп) ─── */
 export const ALL_GROUPS = [
@@ -41,42 +42,7 @@ export const GROUP_RU: Record<string, string> = {
   forearms: 'Предплечья', full: 'Общее',
 };
 
-/* ─── Per-muscle volume (fallback, канон — volume-landmarks.engine) ─── */
-export const LEVEL_VOLUMES: Record<string, Record<string, { mev: number; mav: number; mrv: number }>> = {
-  beginner: {
-    chest: { mev: 6, mav: 10, mrv: 15 }, back: { mev: 8, mav: 12, mrv: 18 },
-    quads: { mev: 6, mav: 10, mrv: 15 }, hamstrings: { mev: 4, mav: 8, mrv: 12 },
-    shoulders: { mev: 4, mav: 8, mrv: 12 }, biceps: { mev: 2, mav: 6, mrv: 10 },
-    triceps: { mev: 2, mav: 6, mrv: 10 }, calves: { mev: 4, mav: 8, mrv: 14 },
-    glutes: { mev: 4, mav: 8, mrv: 12 }, abs: { mev: 4, mav: 8, mrv: 12 },
-    traps: { mev: 2, mav: 4, mrv: 8 }, forearms: { mev: 2, mav: 4, mrv: 8 },
-  },
-  intermediate: {
-    chest: { mev: 8, mav: 14, mrv: 20 }, back: { mev: 10, mav: 16, mrv: 24 },
-    quads: { mev: 8, mav: 14, mrv: 20 }, hamstrings: { mev: 6, mav: 10, mrv: 16 },
-    shoulders: { mev: 6, mav: 10, mrv: 16 }, biceps: { mev: 4, mav: 8, mrv: 14 },
-    triceps: { mev: 4, mav: 8, mrv: 14 }, calves: { mev: 6, mav: 10, mrv: 18 },
-    glutes: { mev: 6, mav: 10, mrv: 16 }, abs: { mev: 4, mav: 10, mrv: 14 },
-    traps: { mev: 4, mav: 6, mrv: 10 }, forearms: { mev: 4, mav: 6, mrv: 10 },
-  },
-  advanced: {
-    chest: { mev: 10, mav: 16, mrv: 24 }, back: { mev: 12, mav: 18, mrv: 28 },
-    quads: { mev: 10, mav: 16, mrv: 24 }, hamstrings: { mev: 8, mav: 12, mrv: 18 },
-    shoulders: { mev: 8, mav: 12, mrv: 20 }, biceps: { mev: 6, mav: 12, mrv: 18 },
-    triceps: { mev: 6, mav: 12, mrv: 18 }, calves: { mev: 8, mav: 16, mrv: 22 },
-    glutes: { mev: 8, mav: 12, mrv: 20 }, abs: { mev: 6, mav: 12, mrv: 16 },
-    traps: { mev: 4, mav: 8, mrv: 14 }, forearms: { mev: 4, mav: 8, mrv: 14 },
-  },
-  enhanced: {
-    chest: { mev: 12, mav: 18, mrv: 28 }, back: { mev: 14, mav: 20, mrv: 32 },
-    quads: { mev: 12, mav: 18, mrv: 28 }, hamstrings: { mev: 10, mav: 14, mrv: 22 },
-    shoulders: { mev: 10, mav: 14, mrv: 24 }, biceps: { mev: 8, mav: 14, mrv: 22 },
-    triceps: { mev: 8, mav: 14, mrv: 22 }, calves: { mev: 10, mav: 18, mrv: 26 },
-    glutes: { mev: 10, mav: 14, mrv: 24 }, abs: { mev: 8, mav: 14, mrv: 20 },
-    traps: { mev: 6, mav: 10, mrv: 18 }, forearms: { mev: 6, mav: 10, mrv: 18 },
-  },
-};
-
+/* ─── Per-muscle volume — делегирует в volume-landmarks.engine (канон) ─── */
 export const LEVEL_MRV_FLAT: Record<string, number> = {
   beginner: 15, intermediate: 20, advanced: 24, enhanced: 28,
 };
@@ -88,21 +54,13 @@ export function getMrv(level: string, onCourse: boolean, courseIntensity: string
 }
 
 export function getPerMuscleMrvFromLevel(level: string, muscle: string, onCourse: boolean, courseIntensity: string, labMultiplier: number): { mev: number; mav: number; mrv: number } {
-  const lv = LEVEL_VOLUMES[level] ?? LEVEL_VOLUMES.intermediate;
-  const mMap: Record<string, string> = {
-    chest: 'chest', back: 'back', legs: 'quads', shoulders: 'shoulders',
-    arms: 'biceps', core: 'abs', quads: 'quads', hamstrings: 'hamstrings',
-    glutes: 'glutes', calves: 'calves', biceps: 'biceps', triceps: 'triceps',
-    delt_front: 'delt_front', delt_mid: 'delt_mid', delt_rear: 'delt_rear',
-    abs: 'abs', traps: 'traps', forearms: 'forearms',
-  };
-  const canon = mMap[muscle] || muscle;
-  const landmarks = lv[canon] ?? { mev: 6, mav: 10, mrv: 15 };
+  const lm = getVolumeLandmarks(level, muscle);
+  if (!lm) return { mev: 6, mav: 10, mrv: 15 };
   const courseMult = onCourse ? (courseIntensity === 'heavy' ? 1.3 : courseIntensity === 'mild' ? 1.15 : 1.2) : 1;
   return {
-    mev: landmarks.mev,
-    mav: landmarks.mav,
-    mrv: Math.round(landmarks.mrv * courseMult * labMultiplier),
+    mev: lm.mev,
+    mav: lm.mav,
+    mrv: Math.round(lm.mrv * courseMult * labMultiplier),
   };
 }
 
@@ -128,6 +86,10 @@ export interface ManualDay {
   day: number;
   groups: string[];
   exercises: ManualExercise[];
+  /** Целевой session RPE (1-10) — ориентир для авторегуляции */
+  sRPE?: { rpe: number; label: string };
+  /** Оценка длительности сессии в минутах */
+  estimatedMin?: number;
 }
 
 export interface ManualExercise {
@@ -144,6 +106,20 @@ export interface ManualExercise {
   targetVelocity?: number;
   note?: string;
   tempo?: string;
+  warmupSets?: number;
+  backoffSets?: number;
+  equipment?: string;
+  substitutionGroup?: string;
+  jointStress?: string;
+  fatigueCost?: number;
+  /** Обоснование выбора (почему это упражнение попало в план) */
+  rationale?: string;
+  /** Возможные замены (имена упражнений из canReplace) */
+  substitutions?: string[];
+  /** Детальная схема разминки */
+  warmupScheme?: { pct: number; reps: number; weight: number }[];
+  /** Вес добивочного подхода (-20%) */
+  backoffWeight?: number;
 }
 
 export interface ManualWeek {
@@ -153,6 +129,8 @@ export interface ManualWeek {
   rir: number;
   days: ManualDay[];
   corrections: string[];
+  /** Общий тоннаж недели (кг) */
+  totalTonnage?: number;
 }
 
 export interface ManualResult {

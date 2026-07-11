@@ -560,7 +560,7 @@ export const BbAutoConstructor: React.FC = () => {
 
         {/* Overload targets for this week */}
         {(() => {
-          const targets = computeOverloadTargets(wk, loadStrategy, bbWorkMax, bbWeeks).slice(0, 6);
+          const targets = computeOverloadTargets(wk, loadStrategy, bbWorkMax, bbWeeks, currentPhase).slice(0, 6);
           if (targets.length === 0) return null;
           return (
             <ExpandableCard title={'🎯 Цели прогрессии на эту неделю (' + loadStrategy.replace('_', ' ') + ')'} icon="🎯" short={targets[0].nextTarget + (targets.length > 1 ? (' + ещё ' + (targets.length - 1)) : '')} full={
@@ -610,6 +610,55 @@ export const BbAutoConstructor: React.FC = () => {
             })}
           </div>
         </div>
+
+        {/* Progression chart across all weeks */}
+        {(() => {
+          const wkStats = W.map(w => {
+            const ph = phaseForWeek(w.week, bbWeeks);
+            const exs = w.sessions.flatMap(s => s.exercises);
+            const sets = exs.reduce((s, e) => s + e.sets, 0);
+            const rir = sets > 0 ? exs.reduce((s, e) => s + e.rir * e.sets, 0) / sets : 0;
+            const totalWt = exs.reduce((s, e) => s + (e.workSets[0]?.weight || 80) * e.sets, 0);
+            return { week: w.week, phase: ph, sets, rir, tonnage: totalWt };
+          });
+          const maxSets = Math.max(1, ...wkStats.map(x => x.sets));
+          const maxTon = Math.max(1, ...wkStats.map(x => x.tonnage));
+          return (
+            <div style={{ marginTop:10, padding:'8px 10px', borderRadius:10, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.15)' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:'#22c55e', marginBottom:6 }}>📈 ПРОГРЕССИЯ ПО НЕДЕЛЯМ: RIR / ОБЪЁМ / ТОННАЖ</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                {wkStats.map(x => {
+                  const barW = 220;
+                  return (
+                    <div key={x.week} style={{ display:'flex', alignItems:'center', gap:4, padding:'2px 0' }}>
+                      <button onClick={() => setBbWeekSel(x.week)} style={{
+                        minWidth:32, padding:'2px 4px', borderRadius:4, cursor:'pointer', fontSize:8, fontWeight:700,
+                        border: x.week === bbWeekSel ? '1px solid ' + PHASE_COLORS[x.phase] : '1px solid transparent',
+                        background: x.week === bbWeekSel ? PHASE_COLORS[x.phase] + '20' : 'transparent',
+                        color: x.week === bbWeekSel ? PHASE_COLORS[x.phase] : 'rgba(255,255,255,0.5)',
+                      }}>{x.week}</button>
+                      <div style={{ fontSize:7, fontWeight:600, minWidth:56, color: PHASE_COLORS[x.phase] }}>{PHASE_LABELS[x.phase]}</div>
+                      <div style={{ fontSize:8, fontWeight:700, minWidth:20, textAlign:'center', color:x.rir <= 1 ? '#ef4444' : x.rir <= 2 ? '#f59e0b' : '#22c55e' }}>RIR{x.rir.toFixed(0)}</div>
+                      <div style={{ flex: 1, display:'flex', gap:2, alignItems:'center' }}>
+                        <div style={{ height:8, width: Math.round((x.sets / maxSets) * barW), borderRadius:3, background: PHASE_COLORS[x.phase], opacity:0.6, transition:'width 0.5s', minWidth: x.sets > 0 ? 4 : 0 }} />
+                        <span style={{ fontSize:7, fontWeight:600, color:'rgba(255,255,255,0.4)', minWidth:16 }}>{x.sets}</span>
+                      </div>
+                      <div style={{ flex: 1, display:'flex', gap:2, alignItems:'center' }}>
+                        <div style={{ height:6, width: Math.round((x.tonnage / maxTon) * barW), borderRadius:2, background:'#60a5fa', opacity:0.5, transition:'width 0.5s', minWidth: x.tonnage > 0 ? 4 : 0 }} />
+                        <span style={{ fontSize:7, fontWeight:600, color:'rgba(255,255,255,0.4)', minWidth:24 }}>{(x.tonnage / 1000).toFixed(1)}k</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display:'flex', gap:12, marginTop:4, fontSize:7, color:'rgba(255,255,255,0.3)', borderTop:'1px solid rgba(255,255,255,0.05)', paddingTop:3 }}>
+                <span><span style={{ width:8, height:8, borderRadius:2, background:'#22c55e', display:'inline-block', marginRight:2 }} /> сеты/нед</span>
+                <span><span style={{ width:8, height:8, borderRadius:2, background:'#60a5fa', display:'inline-block', marginRight:2 }} /> тоннаж</span>
+                <span>RIR: 🟢3+ 🟡1-2 🔴0</span>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Daily session tables with phase-aware comments */}
         <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:8 }}>

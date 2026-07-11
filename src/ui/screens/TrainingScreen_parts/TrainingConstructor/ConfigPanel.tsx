@@ -5,6 +5,7 @@ import { LMS_CYCLES } from '../../../../data/lms-cycles/lms-cycle-index';
 import { FULL_PROGRAM_LIBRARY } from '../../../../engines/complete-program-library.engine';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from '../programs-data';
 import { getMethodsByCategory, type TrainingMethod } from '../../../../engines/training-methodology.engine';
+import { SPLIT_PATTERNS } from '../../../../engines/bb/bb-split-patterns';
 import { ACCENT, DIM, CONFIG_LABELS } from './types';
 
 interface Props {
@@ -102,6 +103,28 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
           <Sel label="Метод специализации" value={manualCfg.specialization || ''} onChange={v => setManual('specialization', v)}
             options={getMethodsByCategory('specialization').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
         </div>
+      </ConfigSection>
+
+      {/* ─── BB-АВТО ДВИЖОК ─── */}
+      <ConfigSection title="🏋️ BB-АВТО ДВИЖОК" color="#f97316">
+        <Sel label="Режим генерации" value={manualCfg.generator || ''} onChange={v => setManual('generator', v)}
+          options={[
+            { id: '', label: '🔨 Ручная сборка (по группам)' },
+            { id: 'bb', label: '🤖 BB-авто (движок бодибилдинга)' },
+          ]} hint="BB-авто использует bb-builder.engine с фазовой периодизацией" />
+        {manualCfg.generator === 'bb' && (
+          <>
+            <Sel label="BB-сплит (ротация)" value={manualCfg.bbSplit || ''} onChange={v => setManual('bbSplit', v)}
+              options={SPLIT_PATTERNS.map(p => ({ id: p.id, label: p.name, desc: p.description + ' · ' + p.rotationDays + 'дн ротация' }))} />
+            <Sel label="Стратегия нагрузки" value={manualCfg.bbLoad || ''} onChange={v => setManual('bbLoad', v)}
+              options={[
+                { id: 'double_progression', label: '🔄 Двойная прогрессия (рекоменд.)' },
+                { id: 'linear', label: '📈 Линейная +2.5кг/нед' },
+                { id: 'wave', label: '🌊 Волновая 3-нед циклы' },
+                { id: 'rpe_based', label: '🎯 RPE-базированная' },
+              ]} />
+          </>
+        )}
       </ConfigSection>
 
       {/* ─── ВЫБРАННЫЕ ПАРАМЕТРЫ ─── */}

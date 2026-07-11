@@ -9,24 +9,17 @@ import type { Exercise } from '../core/types';
 import { getExerciseById } from '../core/exercise-catalog';
 
 export interface SelectorInput {
-  /** Доступные упражнения (уже отфильтрованные по группе мышц) */
   candidates: Exercise[];
-  /** Целевая группа мышц */
   muscleGroup: string;
-  /** Сколько упражнений нужно выбрать */
   count: number;
-  /** Уже выбранные упражнения (для избегания конфликтов) */
   selectedIds: string[];
-  /** Доступное оборудование */
   equipment: string[];
-  /** Слабые зоны (пауза внизу, замок и т.д.) */
   weakZones?: string[];
-  /** Уровень */
   level: string;
-  /** Профиль травм (плечо, колено, спина) */
   injuryProfile?: string[];
-  /** Тип: compound, isolation, или any */
   type?: 'compound' | 'isolation' | 'any';
+  /** Предпочитаемое оборудование — упражнения с ним получают +8 к скору */
+  preferEquipment?: string[];
 }
 
 export interface SelectedExercise extends Exercise {
@@ -47,8 +40,15 @@ function getWeakZonesForGroup(group: string, weakZones: string[]): string[] {
     arms:   ['stretch', 'contraction'],
     biceps: ['stretch', 'contraction'],
     triceps: ['stretch', 'lockout'],
+    core:   ['mid_range'],
+    abs:    ['mid_range'],
   };
-  return (zoneMap[group] || ['mid_range']).filter(z => weakZones.includes(z));
+  const allZones = zoneMap[group] || ['mid_range'];
+  // Если weakZones содержит имена групп (не зон), вернуть ВСЕ зоны для группы
+  const validZones = new Set(['stretch', 'mid_range', 'lockout', 'bottom', 'contraction']);
+  const hasGroupNames = weakZones.length > 0 && weakZones.some(z => !validZones.has(z));
+  if (hasGroupNames && weakZones.includes(group)) return allZones;
+  return allZones.filter(z => weakZones.includes(z));
 }
 
 /** Плоскость движения упражнения */
@@ -182,7 +182,7 @@ function pushPullScore(ex: Exercise, selected: Exercise[]): number {
 
 /** Главная функция: интеллектуальный отбор N упражнений */
 export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
-  const { candidates, muscleGroup, count, selectedIds, equipment, weakZones, level, injuryProfile, type } = input;
+  const { candidates, muscleGroup, count, selectedIds, equipment, weakZones, level, injuryProfile, type, preferEquipment } = input;
 
   let pool = candidates.filter(ex => {
     if (!ex || !ex.id) return false;
@@ -240,6 +240,16 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
       }
     }
 
+    // Бонус за предпочитаемое оборудование (фазовая фильтрация)
+    if (preferEquipment && preferEquipment.length > 0) {
+      const rawEq = (ex as any).equipment;
+      const exEq: string = Array.isArray(rawEq) ? rawEq[0] || '' : String(rawEq || '');
+      if (preferEquipment.includes(exEq)) {
+        score += 8;
+        rationales.push(`Приоритетное оборудование +8`);
+      }
+    }
+
     // Бонус для compound (базовые)
     if (ex.type === 'compound') score += 5;
 
@@ -256,17 +266,24 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
   // Жадный отбор: берём лучшее, исключая конфликтующие
   const result: SelectedExercise[] = [];
   const usedIds = new Set<string>();
+  const usedSubGroups = new Map<string, number>();
 
   for (const ex of scored) {
     if (result.length >= count) break;
     if (usedIds.has(ex.id)) continue;
 
+    // Разнообразие: не больше 2 упражнений из одной substitutionGroup
+    const sg = (ex as any).substitutionGroup || '';
+    const sgCount = usedSubGroups.get(sg) || 0;
+    if (sg && sgCount >= 2) continue;
+
     // Проверяем конфликт с уже выбранными
     const conflict = result.some(r => patternConflictScore(ex, [r]) < -20);
-    if (conflict && result.length >= count - 1) continue; // берём только если место есть
+    if (conflict && result.length >= count - 1) continue;
 
     result.push(ex);
     usedIds.add(ex.id);
+    if (sg) usedSubGroups.set(sg, sgCount + 1);
   }
 
   // Если не набрали нужное количество — добираем по скору

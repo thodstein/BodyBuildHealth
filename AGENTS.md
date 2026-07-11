@@ -2505,3 +2505,63 @@ Centralise all user-entered data into a single `UnifiedSettings` under `UserProf
 
 ### Итог
 CompetitionCard (125 строк) целиком влит в PeakingPanel (240 строк). Один инструмент вместо двух. Все функции «Соревнование» теперь в ПЛ-авто → вкладка «Пик» → режим «Соревнование». Навигация чистая — `competition` удалён из списка калькуляторов. Дублей attemptStrategy/1RM больше нет.
+
+---
+
+## Session Summary (Jul 11 — Part 2) — BB-авто в ручной конструктор + кросс-опыление bb-autocoach
+
+### ✅ Сделано и проверено (tsc 0 errors, vite build OK)
+
+1. **Визуализация прогрессии в BbAutoConstructor** (шаг 4 «План»):
+   - Кликабельные номера недель, цветные фазы (accumulation/intensification/peaking/deload)
+   - Двойные бары: сеты/нед + тоннаж (кг)
+   - RIR-индикация: 🟢3+ 🟡1-2 🔴0
+   - Легенда + авто-определение активной RIR-волны
+
+2. **Внедрён BB-движок как альтернативный генератор в ручной конструктор**:
+   - `ConfigPanel.tsx`: новый раздел «🏋️ BB-АВТО ДВИЖОК» — Режим генерации (BB-авто/ручная), BB-сплит (12 паттернов из SPLIT_PATTERNS), Стратегия нагрузки (double_progression/linear/wave/rpe_based)
+   - `index.tsx`: при `manualCfg.generator === 'bb'` вызывает `buildBBPlan()` + PED-адаптацию + конвертацию BBPlan → ManualResult (12 недель, фазы, RIR-волна)
+   - Импортированы: `buildBBPlan`, `BBPlan`, `SPLIT_PATTERNS`, `calcBBPlanMetrics`, `adaptForPEDs`, `prescribeLoad`, `DELOAD_PROTOCOLS`, `applyDeloadToWeek`, `rirDrift`, `phaseExerciseMix`, `getAllVolumeLandmarks`
+
+3. **Кросс-опыление bb-autocoach в ToolsPanel**:
+   - 🔥 **Feeder-сеты**: при наличии слабых групп в профиле — кнопка, раскрывающая `suggestFeeders()` с упражнениями/сетами/повторениями (ежедневно)
+   - 📈 **Стратегии прогрессии нагрузки**: 4 кнопки (Двойная прогрессия, Линейная, Волновая, RPE) — применяют `prescribeLoad()` ко всем упражнениям текущего плана, пересчитывая вес/RIR/повторения
+
+4. **Синхронизация с профилем** (BbAutoConstructor): workMax, weakPoints, peds, loadStrategy сохраняются в `he_training_profile` через `saveTrainingProfile()` при любом изменении; инициализация из профиля на маунте
+
+✅ `tsc --noEmit`: 0 errors (проект чист)
+✅ `vite build`: OK (37.43s, 726 modules, 0 errors)
+
+## Session Summary (Jul 11) — Ручной планировщик: фикс архитектуры + визуализация прогрессии
+
+### ✅ Сделано и проверено
+
+**1. Созданы BB-циклы 11-12 (добавлены в библиотеку):**
+- **bb-11** — Powerbuilding 4x/нед, 12 нед (сила 1-6 нед + гипертрофия 7-12 нед, фазы accumulation/intensification/deload с RIR-волной 3→2→1→3)
+- **bb-12** — Pre-Contest Peak 4x/нед, 4 нед (соревновательная подводка: intensification→peaking→deload, RIR 2→0→1)
+- Зарегистрированы в lms-cycle-index.ts (LMS_CYCLES[] = 45 циклов)
+
+**2. Исправлены 5 type errors в SRLevel:**
+- `'KMS-МС'` → `'KMS-MS'` (латинская S) в cycle-bb-05.ts, cycle-bb-06.ts, cycle-bb-07.ts, cycle-bb-08.ts
+- `'III-I'` → `'novice'` в cycle-bb-05.ts
+
+**3. Фикс workMax в ручном конструкторе — синхронизация с профилем:**
+- `index.tsx`: хардкод `{chest:100, back:110, ...}` заменён на `tprofile.workMax?.chest || 100` + 15 групп (chest, back, legs, quads, hamstrings, glutes, calves, shoulders, arms, biceps, triceps, core, abs, traps, forearms)
+- `microcycleToManualResult`: workMax расширен аналогичным набором групп
+
+**4. Удалён дублирующий `applyMethodicToPlan` в ToolsPanel.tsx:**
+- Функция `applyMethodicToPlan` (55 строк) имела жёстко зашитые проверки имён методик, не синхронизированные с каталогом — удалена
+- Вместо неё: кнопка «📅 Все недели (копировать)» вызывающая `exportWeeksText` — копирует план всех недель в буфер обмена
+
+**5. Добавлена визуализация прогрессии по неделям в PlanDisplay.tsx:**
+- Интерактивный чарт «ПРОГРЕССИЯ ПО НЕДЕЛЯМ: RIR / ОБЪЁМ / ТОННАЖ»
+- Кликабельные номера недель (переключение активной недели)
+- Фазовая окраска (accumulation=зелёный, intensification=жёлтый, peaking=красный, deload=голубой)
+- Два цветных бара: сеты/нед (❇️ зелёный) и тоннаж (🔵 синий)
+- Легенда: сеты/нед, тоннаж (кг), RIR-индикация (🟢3+ 🟡1-2 🔴0)
+- Автоматическое определение активной RIR-волны при multi-week плане
+
+### Проверки
+- `tsc --noEmit`: **0 errors** (чистый проект)
+- `vite build`: **OK** (39.36s, 726 modules)
+- UTF-8 noBOM: все изменённые файлы чистые
