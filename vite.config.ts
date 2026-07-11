@@ -61,16 +61,34 @@ export default defineConfig(({ command }) => ({
     open: true
   },
   build: {
-    sourcemap: true,
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks(id: string) {
           if (id.includes('chart.js') || id.includes('react-chartjs-2')) return 'chart-js';
-          if (id.includes('pharma-database')) return 'pharma-db';
-          if (id.includes('support-database')) return 'support-db';
-          if (id.includes('nutrition-database')) return 'nutrition-db';
-          if (id.includes('pdf-lib')) return 'pdf-lib';
+          if (id.includes('pdf-lib')) return 'pdf';
           if (id.includes('Risk3DModel')) return 'risk-3d';
+          if (id.includes('usda-foods')) return 'usda-foods';
+          if (id.includes('pharma-database')) return 'pharma-db';
+          if (id.includes('nutrition-database') || id.includes('nutrition-v2-data')) return 'nutrition-db';
+          if (id.includes('support-database') ||
+              id.includes('support-catalog-data') ||
+              id.includes('support-catalog-supplement') ||
+              id.includes('support-stacks') ||
+              id.includes('support-enrichment') ||
+              id.includes('support-meta') ||
+              id.includes('support-synergy-network') ||
+              id.includes('support-interactions-db') ||
+              id.includes('support-category-data') ||
+              id.includes('risk-engine-tz-db')) return 'support-db';
+          if (id.includes('recipe-db')) return 'recipe-db';
+          if (id.includes('symptom-solver.data')) return 'symptom-solver';
+          if (id.includes('programs-data') || id.includes('training-methodology') || id.includes('lms-cycles')) return 'training-data';
+          if (id.includes('IndividualPlan')) return 'nutrition-plan';
+          if (id.includes('FertilityPCTScreen')) return 'fertility';
+          if (id.includes('SupportScreen')) return 'support-ui';
+          if (id.includes('NutritionScreen')) return 'nutrition-ui';
+          if (id.includes('LabsScreen')) return 'labs-ui';
         },
       },
     },
