@@ -25,6 +25,8 @@ export interface TrainingProfile {
   pmDead: number;
   workMax: Record<string, number>;
   loadStrategy: string;
+  planMode: 'generic_split' | 'bb_cycle';
+  bbCycleId: string;
   onCourse: boolean;
   courseIntensity: 'mild' | 'moderate' | 'heavy';
   pharmaCoursesCount: number;
@@ -51,6 +53,8 @@ export const DEFAULT_PROFILE: TrainingProfile = {
   workMax: { chest: 100, back: 110, legs: 140, shoulders: 60, arms: 50, core: 60,
     quads: 140, hamstrings: 90, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60 },
   loadStrategy: 'double_progression',
+  planMode: 'generic_split' as const,
+  bbCycleId: '',
   onCourse: false,
   courseIntensity: 'moderate',
   pharmaCoursesCount: 0,

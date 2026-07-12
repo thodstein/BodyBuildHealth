@@ -235,11 +235,12 @@ export const PlanDisplay: React.FC<Props> = ({
     if (!result || !result.weeks) return;
     const week = result.weeks.find(w => w.weekNumber === weekNum);
     if (!week) return;
+    const switchNote = '📅 Неделя ' + weekNum + ' (' + week.phaseLabel + ', RIR ' + week.rir + (week.totalTonnage ? ', ~' + (week.totalTonnage / 1000).toFixed(1) + ' т' : '') + ')';
     setResult({
       ...result,
       currentWeek: weekNum,
       days: week.days,
-      corrections: [...result.corrections, '📅 Переключено на неделю ' + weekNum + ' (' + week.phaseLabel + ', RIR ' + week.rir + ').'],
+      corrections: [...result.corrections, switchNote, ...(week.corrections?.length ? [''] : []), ...(week.corrections || [])],
     });
   }, [result, setResult]);
 

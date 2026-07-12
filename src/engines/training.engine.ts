@@ -32,19 +32,26 @@ export const TRAINING_GOAL_CONFIGS: Record<string, { volumeMod: number; intensit
 };
 
 // унифицированный каталог сплитов (EXTENDED_SPLITS)
-export const TRAINING_SPLITS: Record<string, { name: string; desc: string; groupsPerDay: string[][]; minDays: number; maxDays: number; level: string[] }> = {
-  fullbody_3: { name: 'Фулбоди 3 дня', desc: 'Все группы на каждой тренировке. Частота 3×/нед на каждую группу.', groupsPerDay: [['chest','back','legs','shoulders','arms','core']], minDays: 3, maxDays: 3, level: ['beginner'] },
-  fullbody_3alt: { name: 'Фулбоди Альтернативная', desc: '3 дня с чередованием акцентов: A — грудь/спина/квадрицепс, B — плечи/руки/задняя поверхность.', groupsPerDay: [['chest','back','legs'],['shoulders','arms','core']], minDays: 3, maxDays: 3, level: ['beginner','intermediate'] },
-  upper_lower_4: { name: 'Верх/Низ 4 дня', desc: 'Чередование верхних и нижних дней. Каждая группа 2×/нед, оптимальный баланс.', groupsPerDay: [['chest','back','shoulders','arms'],['legs','core']], minDays: 4, maxDays: 4, level: ['beginner','intermediate'] },
-  push_pull_legs_5: { name: 'PPL 5 дней', desc: 'Жим/тяга/Ноги с одним повторным днём. Популярный сплит.', groupsPerDay: [['chest','shoulders','arms'],['back','arms'],['legs','core']], minDays: 5, maxDays: 5, level: ['intermediate','advanced'] },
-  push_pull_legs_6: { name: 'Push/Pull/Legs 6x', desc: 'PPL × 2 с вариациями упражнений. Максимальный объём.', groupsPerDay: [['chest','shoulders'],['back','arms'],['legs','core']], minDays: 6, maxDays: 6, level: ['advanced','enhanced'] },
-  bro_5: { name: 'Бро-сплит 5 дней', desc: 'Одна группа в день. Максимальный объём на группу, но частота 1×/нед.', groupsPerDay: [['chest'],['back'],['legs'],['shoulders','arms'],['arms','core']], minDays: 5, maxDays: 5, level: ['intermediate','advanced'] },
-  strength_4: { name: 'Силовой 4 дня', desc: 'Compound фокус, RIR 2-3, длинный отдых. Присед/Жим/Тяга/ОФП.', groupsPerDay: [['legs','core'],['chest','shoulders'],['back','arms'],['legs','shoulders']], minDays: 4, maxDays: 4, level: ['intermediate','advanced','enhanced'] },
-  hypertrophy_5: { name: 'Гипертрофия 5 дней', desc: 'Грудь+трицепс/Спина+бицепс/Ноги/Плечи+руки/Повтор ног. Макс. объём.', groupsPerDay: [['chest','arms'],['back','arms'],['legs','core'],['shoulders','arms'],['legs','core']], minDays: 5, maxDays: 5, level: ['advanced','enhanced'] },
-  torso_limbs_4: { name: 'Торс/Конечности 4 дня', desc: 'Для травм поясницы и коленей. Минимум нагрузки на суставы.', groupsPerDay: [['chest','back','shoulders'],['legs','core'],['chest','shoulders','arms'],['legs','core']], minDays: 4, maxDays: 4, level: ['intermediate'] },
-  powerbuilding_4: { name: 'Пауэрбилдинг 4 дня', desc: 'Силовое + гипертрофийное. День 1,3: сила. День 2,4: объём.', groupsPerDay: [['chest','shoulders','arms'],['legs','core'],['back','arms'],['legs','shoulders','core']], minDays: 4, maxDays: 4, level: ['intermediate','advanced'] },
-  recovery_3: { name: 'Восстановительный 3x', desc: '50% объёма, RIR 4, безопасные движения. Для делеода и реабилитации.', groupsPerDay: [['chest','back','shoulders'],['legs','core'],['full_body_light']], minDays: 3, maxDays: 3, level: ['beginner'] },
-  arnold_6: { name: 'Сплит Арнольда 6x', desc: 'Грудь+Спина / Плечи+Руки / Ноги × 2. Высокочастотный для продвинутых.', groupsPerDay: [['chest','back'],['shoulders','arms'],['legs','core']], minDays: 6, maxDays: 6, level: ['advanced','enhanced'] },
+export type SplitDirection = 'strength' | 'bodybuilding' | 'both';
+
+export interface TrainingSplitEntry {
+  name: string; desc: string; groupsPerDay: string[][]; minDays: number; maxDays: number; level: string[];
+  direction?: SplitDirection;
+}
+
+export const TRAINING_SPLITS: Record<string, TrainingSplitEntry> = {
+  fullbody_3: { name: 'Фулбоди 3 дня', desc: 'Все группы на каждой тренировке. Частота 3×/нед на каждую группу.', groupsPerDay: [['chest','back','legs','shoulders','arms','core']], minDays: 3, maxDays: 3, level: ['beginner'], direction: 'both' },
+  fullbody_3alt: { name: 'Фулбоди Альтернативная', desc: '3 дня с чередованием акцентов: A — грудь/спина/квадрицепс, B — плечи/руки/задняя поверхность.', groupsPerDay: [['chest','back','legs'],['shoulders','arms','core']], minDays: 3, maxDays: 3, level: ['beginner','intermediate'], direction: 'both' },
+  upper_lower_4: { name: 'Верх/Низ 4 дня', desc: 'Чередование верхних и нижних дней. Каждая группа 2×/нед, оптимальный баланс.', groupsPerDay: [['chest','back','shoulders','arms'],['legs','core']], minDays: 4, maxDays: 4, level: ['beginner','intermediate'], direction: 'both' },
+  push_pull_legs_5: { name: 'PPL 5 дней', desc: 'Жим/тяга/Ноги с одним повторным днём. Популярный сплит.', groupsPerDay: [['chest','shoulders','arms'],['back','arms'],['legs','core']], minDays: 5, maxDays: 5, level: ['intermediate','advanced'], direction: 'bodybuilding' },
+  push_pull_legs_6: { name: 'Push/Pull/Legs 6x', desc: 'PPL × 2 с вариациями упражнений. Максимальный объём.', groupsPerDay: [['chest','shoulders'],['back','arms'],['legs','core']], minDays: 6, maxDays: 6, level: ['advanced','enhanced'], direction: 'bodybuilding' },
+  bro_5: { name: 'Бро-сплит 5 дней', desc: 'Одна группа в день. Максимальный объём на группу, но частота 1×/нед.', groupsPerDay: [['chest'],['back'],['legs'],['shoulders','arms'],['arms','core']], minDays: 5, maxDays: 5, level: ['intermediate','advanced'], direction: 'bodybuilding' },
+  strength_4: { name: 'Силовой 4 дня', desc: 'Compound фокус, RIR 2-3, длинный отдых. Присед/Жим/Тяга/ОФП.', groupsPerDay: [['legs','core'],['chest','shoulders'],['back','arms'],['legs','shoulders']], minDays: 4, maxDays: 4, level: ['intermediate','advanced','enhanced'], direction: 'strength' },
+  hypertrophy_5: { name: 'Гипертрофия 5 дней', desc: 'Грудь+трицепс/Спина+бицепс/Ноги/Плечи+руки/Повтор ног. Макс. объём.', groupsPerDay: [['chest','arms'],['back','arms'],['legs','core'],['shoulders','arms'],['legs','core']], minDays: 5, maxDays: 5, level: ['advanced','enhanced'], direction: 'bodybuilding' },
+  torso_limbs_4: { name: 'Торс/Конечности 4 дня', desc: 'Для травм поясницы и коленей. Минимум нагрузки на суставы.', groupsPerDay: [['chest','back','shoulders'],['legs','core'],['chest','shoulders','arms'],['legs','core']], minDays: 4, maxDays: 4, level: ['intermediate'], direction: 'bodybuilding' },
+  powerbuilding_4: { name: 'Пауэрбилдинг 4 дня', desc: 'Силовое + гипертрофийное. День 1,3: сила. День 2,4: объём.', groupsPerDay: [['chest','shoulders','arms'],['legs','core'],['back','arms'],['legs','shoulders','core']], minDays: 4, maxDays: 4, level: ['intermediate','advanced'], direction: 'both' },
+  recovery_3: { name: 'Восстановительный 3x', desc: '50% объёма, RIR 4, безопасные движения. Для делеода и реабилитации.', groupsPerDay: [['chest','back','shoulders'],['legs','core'],['full_body_light']], minDays: 3, maxDays: 3, level: ['beginner'], direction: 'both' },
+  arnold_6: { name: 'Сплит Арнольда 6x', desc: 'Грудь+Спина / Плечи+Руки / Ноги × 2. Высокочастотный для продвинутых.', groupsPerDay: [['chest','back'],['shoulders','arms'],['legs','core']], minDays: 6, maxDays: 6, level: ['advanced','enhanced'], direction: 'bodybuilding' },
 };
 
 // вЧ §5.5: RIR по целям

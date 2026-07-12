@@ -17,7 +17,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useDataLink } from '../../../core/data-link';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../../core/exercise-catalog';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
-import { rankBBSplits, explainBBSelection, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
+import { rankBBSplits, explainBBSelection, getMuscleFrequencies, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
 import { buildBBPlan, type BBPlan, type BBExercise, type BBSession, type BBSet } from '../../../engines/bb/bb-builder.engine';
 import { calcBBPlanMetrics, explainBBMetrics, type BBPlanMetrics, type BBMuscleVolume } from '../../../engines/bb/bb-metrics.engine';
 import { adaptForPEDs, explainPEDAdaptation, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
@@ -30,14 +30,25 @@ import { applyToPlanner } from './planner-bridge';
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
 import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, type LoadStrategy, type DeloadType } from '../../../engines/bb/bb-autocoach.engine';
+import { PCT_FOR_RIR } from '../../../engines/rir-table';
+import { getCyclesByDirection, getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
+import { convertCycleToBBPlan } from '../../../engines/bb/cycle-to-plan';
+import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 
 type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
+type PlanMode = 'generic_split' | 'bb_cycle';
 
 const WEAK_GROUPS = [['chest','Грудь'],['back','Спина'],['legs','Ноги'],['shoulders','Плечи'],['arms','Руки'],['core','Кор']] as const;
 const BB_WM_KEYS = ['chest','back','quads','hamstrings','shoulders','biceps','triceps','glutes','calves','abs'] as const;
 const BB_WM_RU: Record<string,string> = { chest:'Грудь', back:'Спина', quads:'Квадрицепсы', hamstrings:'Бицепс бедра', shoulders:'Плечи', biceps:'Бицепс', triceps:'Трицепс', glutes:'Ягодичные', calves:'Икры', abs:'Пресс' };
 const ACCENT = '#00e68a';
+const TAG_LABELS_RU: Record<string, string> = {
+  Push: 'Толкающие', Pull: 'Тянущие', Legs: 'Ноги', Upper: 'Верх', Lower: 'Низ',
+  FullBody: 'Всё тело', Chest: 'Грудь', Back: 'Спина', Shoulders: 'Плечи', Arms: 'Руки',
+  ChestBack: 'Грудь+Спина', ShouldersArms: 'Плечи+Руки', Torso: 'Торс', Limbs: 'Конечности',
+  UpperPower: 'Верх(сила)', LowerPower: 'Низ(сила)', UpperHyp: 'Верх(гиперт)', LowerHyp: 'Низ(гиперт)',
+};
 const PHASE_COLORS: Record<BBPhase, string> = { accumulation: '#60a5fa', intensification: '#ef4444', deload: '#22c55e', peaking: '#a855f7' };
 const PHASE_LABELS: Record<BBPhase, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
 const PHASE_RIR: Record<BBPhase, [number, number]> = { accumulation: [3, 2], intensification: [2, 0], deload: [4, 3], peaking: [1, 0] };
@@ -165,6 +176,8 @@ export const BbAutoConstructor: React.FC = () => {
   const [bbWeeks, setBbWeeks] = useState<number>(8);
   const [bbVolGoal, setBbVolGoal] = useState<string>('mav');
   const [bbFocus, setBbFocus] = useState<string>('');
+  const [planMode, setPlanMode] = useState<PlanMode>(prof.planMode === 'bb_cycle' ? 'bb_cycle' : 'generic_split');
+  const [selectedCycleId, setSelectedCycleId] = useState<string>(prof.bbCycleId || '');
   const [loadStrategy, setLoadStrategy] = useState<LoadStrategy>((prof.loadStrategy as LoadStrategy) || 'double_progression');
   const [autoDeload, setAutoDeload] = useState<boolean>(true);
   const [deloadType, setDeloadType] = useState<DeloadType>('pump');
@@ -198,7 +211,7 @@ export const BbAutoConstructor: React.FC = () => {
     return autoRegulate({ readiness: rec, acwr: { ratio: acwr.ratio, zone: acwr.zone }, fatigue: fat, hrvRatio: hrv, sleepScore: sleep, plannedTopSetPct: 0.8, plannedRIR: 2 });
   }, [linked.readiness, linked.profile?.settings]);
 
-  const ranked = useMemo(() => rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays }), [bbLevel, bbGoal, bbDays]);
+  const ranked = useMemo(() => rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays, weakPoints: weakPoints.length > 0 ? weakPoints : undefined }), [bbLevel, bbGoal, bbDays, weakPoints]);
   const bestSplit = ranked[0];
   useEffect(() => { if (bestSplit && !selectedSplitId) setSelectedSplitId(bestSplit.pattern.id); }, [bestSplit]);
 
@@ -209,8 +222,8 @@ export const BbAutoConstructor: React.FC = () => {
   const quality = useMemo(() => metrics ? calcQualityScore(metrics, weakPoints, phases) : null, [metrics, weakPoints, phases]);
 
   useEffect(() => {
-    try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, onCourse: peds.length > 0, loadStrategy }); } catch {}
-  }, [bbWorkMax, weakPoints, peds, loadStrategy]);
+    try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, onCourse: peds.length > 0, loadStrategy, planMode, bbCycleId: selectedCycleId }); } catch {}
+  }, [bbWorkMax, weakPoints, peds, loadStrategy, planMode, selectedCycleId]);
 
   const adjustVolume = (mult: number) => {
     if (!builtPlan) return;
@@ -229,14 +242,33 @@ export const BbAutoConstructor: React.FC = () => {
     setBuiltPlan({ ...builtPlan, weeks: w2 });
   };
 
+  const bbCyclesList = useMemo(() => getCyclesByDirection('bodybuilding'), []);
+
   const buildBb = () => {
-    const pattern = SPLIT_PATTERNS.find(p => p.id === selectedSplitId);
-    if (!pattern) return;
-    const plan = buildBBPlan({
-      patternId: selectedSplitId, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks,
-      workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any,
-      specialization: specializationMode,
-    }, pedAdapt);
+    let plan: BBPlan;
+
+    if (planMode === 'bb_cycle' && selectedCycleId) {
+      const cycle = getCycleById(selectedCycleId) as SRCycleTemplate | undefined;
+      if (!cycle) { alert('Цикл не найден'); return; }
+      plan = convertCycleToBBPlan({
+        cycle,
+        workMax: bbWorkMax,
+        weakPoints,
+        peds,
+        loadStrategy: loadStrategy as string,
+      });
+      const cycleWeeks = cycle.meta.sessionsPerWeek;
+      if (bbDays !== cycleWeeks) setBbDays(cycleWeeks);
+      if (bbWeeks !== cycle.meta.weeks) setBbWeeks(cycle.meta.weeks);
+    } else {
+      const pattern = SPLIT_PATTERNS.find(p => p.id === selectedSplitId);
+      if (!pattern) return;
+      plan = buildBBPlan({
+        patternId: selectedSplitId, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks,
+        workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any,
+        specialization: specializationMode,
+      }, pedAdapt);
+    }
 
     const srpe = loadSRPESessions();
     const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : null;
@@ -268,15 +300,18 @@ export const BbAutoConstructor: React.FC = () => {
         // Apply structured deload protocol
         for (const s of w.sessions) {
           for (const e of s.exercises) {
-            e.sets = Math.max(1, Math.round(e.sets * deloadProtocol.volumeMultiplier));
             e.rir = deloadProtocol.rirTarget;
             e.repsRange = [deloadProtocol.repRange[0], deloadProtocol.repRange[1]];
             for (const ws of e.workSets) {
+              const maxW = bbWorkMax[e.muscle] || 80;
+              const basePct = PCT_FOR_RIR[deloadProtocol.rirTarget] ?? 0.85;
+              const baseWeight = Math.round(maxW * basePct * 10) / 10;
               ws.reps = Math.round((deloadProtocol.repRange[0] + deloadProtocol.repRange[1]) / 2);
               ws.rir = deloadProtocol.rirTarget;
               ws.tempo = tempoStr;
-              ws.weight = Math.round(ws.weight * deloadProtocol.intensityMultiplier * 10) / 10;
+              ws.weight = Math.round(baseWeight * deloadProtocol.intensityMultiplier * 10) / 10;
               ws.restSeconds = deloadProtocol.restSeconds;
+              e.sets = Math.max(1, Math.round(e.sets * deloadProtocol.volumeMultiplier));
             }
           }
         }
@@ -299,12 +334,16 @@ export const BbAutoConstructor: React.FC = () => {
               e.repsRange = e.character === 'тяж' ? [10, 15] : [12, 20];
             }
             for (const ws of e.workSets) {
+              const rirForWeight = e.rir; // phase-appropriate RIR (already drifted)
+              const basePct = PCT_FOR_RIR[rirForWeight] ?? 0.9;
+              const maxW = bbWorkMax[e.muscle] || 80;
+              const baseWeight = Math.round(maxW * basePct * 10) / 10;
+
               ws.reps = Math.round((e.repsRange[0] + e.repsRange[1]) / 2);
               ws.rir = e.rir;
               ws.tempo = tempoStr;
-              // Apply load strategy to weight
-              const maxW = bbWorkMax[e.muscle] || 80;
-              const prescr = prescribeLoad(loadStrategy as LoadStrategy, ws.weight, ws.reps, e.rir, maxW, w.week, bbWeeks, ph);
+              // Apply load strategy to weight from phase-appropriate baseline
+              const prescr = prescribeLoad(loadStrategy as LoadStrategy, baseWeight, ws.reps, e.rir, maxW, w.week, bbWeeks, ph);
               ws.weight = Math.round(prescr.nextWeight * 10) / 10;
               ws.restSeconds = restByPhase;
             }
@@ -329,7 +368,8 @@ export const BbAutoConstructor: React.FC = () => {
       }
     }
 
-    setBuiltPlan({ ...plan, weeks: w2, rationale: [...plan.rationale, `Стратегия: ${loadStrategy}`, `Делод-протокол: ${needsDeload ? DELOAD_PROTOCOLS[deloadType].description : 'нет'}`] });
+    const modeLabel = planMode === 'bb_cycle' ? `BB-цикл: ${getCycleById(selectedCycleId)?.meta.title || selectedCycleId}` : 'Generic-сплит';
+    setBuiltPlan({ ...plan, weeks: w2, rationale: [...plan.rationale, `📌 Источник: ${modeLabel}`, `📈 Стратегия: ${loadStrategy}`, `🔄 Делод-протокол: ${needsDeload ? DELOAD_PROTOCOLS[deloadType].description : 'нет'}`, `💪 Слабые группы: ${weakPoints.length > 0 ? weakPoints.join(', ') : 'нет'}`] });
     setBbWeekSel(1);
     setStep('plan');
     try {
@@ -370,11 +410,12 @@ export const BbAutoConstructor: React.FC = () => {
     } catch { alert('Ошибка'); }
   };
 
+  const stepList: Step[] = planMode === 'bb_cycle' ? ['params','ped','plan','quality','adjust'] : ['params','ped','split','plan','quality','adjust'];
+  const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'bb_cycle' ? '3 План' : '4 План', quality: planMode === 'bb_cycle' ? '4 Качество' : '5 Качество', adjust: planMode === 'bb_cycle' ? '5 Коррекция' : '6 Коррекция' };
   const renderStepNav = () => (
     <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
-      {(['params','ped','split','plan','quality','adjust'] as Step[]).map(s => {
-        const labels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan:'4 План', quality:'5 Качество', adjust:'6 Коррекция' };
-        return <button key={s} onClick={() => { if ((s === 'plan' || s === 'quality' || s === 'adjust') && !builtPlan) return; setStep(s); }} style={STEP_PILL(step === s)}>{labels[s]}</button>;
+      {stepList.map(s => {
+        return <button key={s} onClick={() => { if ((s === 'plan' || s === 'quality' || s === 'adjust') && !builtPlan) return; setStep(s); }} style={STEP_PILL(step === s)}>{stepLabels[s]}</button>;
       })}
     </div>
   );
@@ -382,6 +423,54 @@ export const BbAutoConstructor: React.FC = () => {
   const renderParams = () => (
     <div>
       <div style={H}>📋 Шаг 1: Базовые параметры</div>
+
+      {/* Plan mode: cycle vs generic split */}
+      <div style={{ marginBottom:10, padding:'8px 10px', borderRadius:10, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
+        <div style={{ fontSize:10, fontWeight:700, color:'#a855f7', marginBottom:6 }}>📌 Источник программы</div>
+        <div style={{ display:'flex', gap:6 }}>
+          <button onClick={() => setPlanMode('generic_split')} style={{
+            flex:1, padding:'8px 10px', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:11,
+            border: planMode === 'generic_split' ? '2px solid #a855f7' : '1px solid rgba(255,255,255,0.08)',
+            background: planMode === 'generic_split' ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.02)',
+            color: planMode === 'generic_split' ? '#a855f7' : 'rgba(255,255,255,0.6)',
+          }}>🧩 Generic-сплит (авто-генерация)</button>
+          <button onClick={() => setPlanMode('bb_cycle')} style={{
+            flex:1, padding:'8px 10px', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:11,
+            border: planMode === 'bb_cycle' ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+            background: planMode === 'bb_cycle' ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)',
+            color: planMode === 'bb_cycle' ? '#00e68a' : 'rgba(255,255,255,0.6)',
+          }}>📋 ПРОФ-цикл (12 готовых программ)</button>
+        </div>
+      </div>
+
+      {planMode === 'bb_cycle' && (
+        <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'#00e68a', marginBottom:6 }}>📚 Выберите BB-цикл</div>
+          <PopupSelect label="BB-цикл" value={selectedCycleId} onChange={v => { setSelectedCycleId(v); const c = getCycleById(v); if (c) { setBbDays(c.meta.sessionsPerWeek); setBbWeeks(c.meta.weeks); } }} options={[
+            ...bbCyclesList.map(c => ({
+              id: c.meta.id,
+              label: `${c.meta.title} (${c.meta.weeks} нед, ${c.meta.sessionsPerWeek}×/нед)`,
+              description: c.meta.description?.slice(0, 120),
+            })),
+          ]} />
+          {selectedCycleId && (() => {
+            const c = getCycleById(selectedCycleId);
+            if (!c) return null;
+            return (
+              <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Уровень:</span> {c.meta.level}</div>
+                <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Фокус:</span> {c.meta.targetFocus || '—'}</div>
+                {c.meta.deloadWeeks && c.meta.deloadWeeks.length > 0 && <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Разгрузка:</span> нед {c.meta.deloadWeeks.join(', ')}</div>}
+                {c.meta.rirProgression && <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>RIR:</span> {c.meta.rirProgression.start}→{c.meta.rirProgression.end}</div>}
+                {c.meta.phases && c.meta.phases.length > 0 && <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Фазы:</span> {c.meta.phases.map(ph => ph.title || `нед ${ph.weekStart}-${ph.weekEnd}`).join(', ')}</div>}
+                <div style={{ marginTop:4, padding:'4px 8px', borderRadius:6, background:'rgba(0,230,138,0.06)', fontSize:9, color:'rgba(255,255,255,0.7)' }}>{c.meta.description?.slice(0, 200)}</div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {planMode === 'generic_split' && (
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
         <PopupSelect label="Уровень" value={bbLevel} onChange={setBbLevel} options={[['beginner','Новичок'],['intermediate','Средний'],['advanced','Опытный'],['enhanced','Enhanced (PED)']].map(([id,label]) => ({ id, label }))} />
         <PopupSelect label="Цель" value={bbGoal} onChange={setBbGoal} options={[['mass','Мышечная масса'],['cut','Сушка'],['recomp','Рекомпозиция'],['maintenance','Поддержание'],['strength_mass','Сила + Масса']].map(([id,label]) => ({ id, label }))} />
@@ -390,6 +479,7 @@ export const BbAutoConstructor: React.FC = () => {
         <PopupSelect label="Цель объёма" value={bbVolGoal} onChange={setBbVolGoal} options={[['mev','Минимум (MEV)'],['mav','Оптимум (MAV)'],['mrv','Максимум (MRV)']].map(([id,label]) => ({ id, label }))} />
         <PopupSelect label="Фокус-группа" value={bbFocus} onChange={setBbFocus} options={[{ id:'', label:'Нет' }, ...WEAK_GROUPS.map(([id,l]) => ({ id, label: l }))]} />
       </div>
+      )}
       <div style={{ marginTop:12, padding:10, borderRadius:10, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
         <div style={{ fontSize:10, fontWeight:700, color:'#a855f7', marginBottom:6 }}>📈 Стратегия прогрессии</div>
         <PopupSelect label="" value={loadStrategy} onChange={v => setLoadStrategy(v as LoadStrategy)} options={[
@@ -466,7 +556,9 @@ export const BbAutoConstructor: React.FC = () => {
       {specializationMode && <div style={{ marginBottom:10, padding:'6px 10px', borderRadius:8, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)', fontSize:10, color:'rgba(255,255,255,0.7)' }}>
         🔴 Режим специализации: топ-2 слабые группы на MAV+10%, остальные на MEV (поддерживающий объём).
       </div>}
-      <button style={{ ...BTN, width:'100%' }} onClick={() => setStep('split')}>Далее: выбрать сплит →</button>
+      <button style={{ ...BTN, width:'100%' }} onClick={() => planMode === 'bb_cycle' ? buildBb() : setStep('split')}>
+        {planMode === 'bb_cycle' ? '⚡ Собрать план по циклу →' : 'Далее: выбрать сплит →'}
+      </button>
     </div>
   );
 
@@ -476,25 +568,28 @@ export const BbAutoConstructor: React.FC = () => {
       <div style={{ marginBottom:8, padding:'6px 10px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.12)', fontSize:10, color:'rgba(255,255,255,0.7)' }}>
         📅 Фазы: {phases.filter((p,i,a) => p.phase !== a[i-1]?.phase).map((p,i) => <span key={i} style={{ color:PHASE_COLORS[p.phase], fontWeight:700 }}>{PHASE_LABELS[p.phase]}{i < phases.length - 1 ? ' → ' : ''}</span>)}
       </div>
+      <div style={{ marginBottom:10, padding:'6px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.1)', fontSize:9, color:'rgba(255,255,255,0.55)' }}>
+        💡 Частота каждой группы — ключевой фактор роста. 2×/нед = оптимум для синтеза белка (Schoenfeld 2016, JSF 2019).
+        Чипсы <span style={{ color:'#00e68a' }}>зелёные</span> = 2+×/нед (рекомендуемая частота), <span style={{ color:'rgba(255,255,255,0.4)' }}>серые</span> = 1×/нед.
+      </div>
       {bestSplit && (
-        <ExpandableCard
-          title={'🏆 Рекомендован: ' + bestSplit.pattern.name + ' (скор ' + bestSplit.score + ')'}
-          icon="🏆"
-          short={bestSplit.pattern.description}
-          full={
-            <div>
-              <div style={{ marginBottom:8, ...SMALL }}><b>Почему:</b> {explainBBSelection(bestSplit)}</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
-                <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:6, borderRadius:6 }}>Ротация: {bestSplit.pattern.rotationDays} дн</div>
-                <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:6, borderRadius:6 }}>Сессий: {bestSplit.pattern.sessionsPerRotation}</div>
-              </div>
-            </div>
-          }
-        />
+        <div style={{ marginBottom:10, padding:12, borderRadius:12, background:'linear-gradient(135deg,rgba(250,204,21,0.08),rgba(250,204,21,0.02))', border:'1px solid rgba(250,204,21,0.25)' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+            <span style={{ fontWeight:800, fontSize:13, color:'#facc15' }}>🏆 Рекомендованный сплит: {bestSplit.pattern.name}</span>
+            <span style={{ fontSize:12, color:'#facc15', fontWeight:700, background:'rgba(250,204,21,0.15)', padding:'2px 10px', borderRadius:6 }}>скор {bestSplit.score}</span>
+          </div>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', marginBottom:6 }}>{bestSplit.pattern.description}</div>
+          {bestSplit.rationale.slice(0, 3).map((x,i) => <div key={i} style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>✓ {x}</div>)}
+          <div style={{ display:'flex', gap:8, marginTop:8 }}>
+            <button onClick={() => { setSelectedSplitId(bestSplit.pattern.id); }} style={{ padding:'6px 16px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', background:'rgba(250,204,21,0.15)', border:'1px solid rgba(250,204,21,0.3)', color:'#facc15' }}>✅ Применить</button>
+            <button onClick={buildBb} style={{ padding:'6px 16px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.15)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a' }}>⚡ Собрать план</button>
+          </div>
+        </div>
       )}
       <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:8 }}>
-        {ranked.slice(0, 4).map(r => {
+        {ranked.map(r => {
           const sel = selectedSplitId === r.pattern.id;
+          const mf = getMuscleFrequencies(r.pattern);
           return <div key={r.pattern.id} onClick={() => setSelectedSplitId(r.pattern.id)}
             style={{ padding:'10px 12px', borderRadius:10, cursor:'pointer', border:sel?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background:sel?'rgba(0,230,138,0.08)':'rgba(255,255,255,0.02)' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -503,6 +598,11 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
             <div style={{ ...SMALL, marginTop:4 }}>{r.pattern.description}</div>
             {sel && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.7)' }}>{r.rationale.map((x,i) => <div key={i}>✓ {x}</div>)}</div>}
+            <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:4 }}>
+              {mf.map(f => (
+                <span key={f.tag} style={{ fontSize:8, padding:'1px 6px', borderRadius:4, background:f.freq >= 2 ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)', color:f.freq >= 2 ? '#00e68a' : 'rgba(255,255,255,0.4)' }}>{TAG_LABELS_RU[f.tag] || f.tag} ~ {f.freq}×/нед</span>
+              ))}
+            </div>
           </div>;
         })}
       </div>
@@ -767,6 +867,21 @@ export const BbAutoConstructor: React.FC = () => {
     return (
       <div>
         <div style={H}>📊 Шаг 5: Качество и нагрузка плана</div>
+        {/* Cycle info if in cycle mode */}
+        {planMode === 'bb_cycle' && selectedCycleId && (() => {
+          const c = getCycleById(selectedCycleId);
+          if (!c) return null;
+          return (
+            <div style={{ ...CARD, marginBottom:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#00e68a', marginBottom:4 }}>📋 ПРОФ-цикл: {c.meta.title}</div>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>
+                <div>Упражнения: заданы циклом ({c.week1.reduce((s, d) => s + d.exercises.length, 0)} упр/день)</div>
+                <div>Фазы: {c.meta.phases && c.meta.phases.length > 0 ? c.meta.phases.map(ph => ph.title || `нед ${ph.weekStart}-${ph.weekEnd}`).join(', ') : 'RIR-прогрессия'}</div>
+                <div>{c.meta.conditions.slice(0, 2).map((cond, i) => <div key={i}>• {cond}</div>)}</div>
+              </div>
+            </div>
+          );
+        })()}
         {/* Score gauge */}
         <div style={{ ...CARD, textAlign:'center', borderLeft:'3px solid ' + (quality.score >= 85 ? '#22c55e' : quality.score >= 65 ? '#eab308' : '#ef4444') }}>
           <div style={{ fontSize:36, fontWeight:800, color:quality.score >=85?'#22c55e':quality.score >=65?'#eab308':'#ef4444' }}>{quality.score}/100</div>

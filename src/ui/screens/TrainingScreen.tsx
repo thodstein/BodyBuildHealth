@@ -298,6 +298,7 @@ export const TrainingScreen: React.FC = () => {
   useEffect(() => {
     if (!zone) return;
     if (zone === 'planner') { if (tab !== 'history') setTab('history'); return; }
+    if (zone === 'calculators') return; // Не переключаем — дашборд рендерится при tab вне CALC_TABS
     const visible = ZONES[zone].tabs;
     if (!visible.includes(tab)) setTab(visible[0]);
   }, [zone]);
@@ -432,36 +433,38 @@ export const TrainingScreen: React.FC = () => {
 
       {/* ─── HERO PAGE ─── */}
       {page === 'hero' && (
-        <div style={{ position:'relative', width:'100%', display:'flex', flexDirection:'column', overflow:'auto', minHeight:'calc(100vh - 68px)' }}>
-          <div style={{ position:'relative', width:'100%', minHeight:200, display:'flex', flexDirection:'column', justifyContent:'flex-end', background:'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.85) 100%)', padding:'16px 16px 20px' }}>
-            <h1 style={{ fontSize: 20, fontWeight: 800, margin:'0 0 2px', color:'#fff' }}>Тренировки</h1>
-            <p style={{ fontSize: 11, color:'rgba(255,255,255,0.85)', margin:'0 0 0', lineHeight:1.35 }}>
+        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
+          <img src="/training-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
+          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Тренировки</h1>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', margin: '0 0 16px', lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
               План, дневник, упражнения, калькуляторы и аналитика
             </p>
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:6, padding:'10px 12px 24px' }}>
-            {ZONE_ORDER.map(z => {
-              const group = ZONES[z];
-              return (
-              <button key={z} onClick={() => { hapticImpact('light'); setPage('tabs'); setZone(z); if (z !== 'planner' && z !== 'calculators') setTab(group.tabs[0]); }} style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
-                background: 'rgba(20,22,30,0.35)', border: '1px solid var(--glass-border)', color: 'var(--text)',
-                transition: 'all 0.2s',
-              }}>
-                <div style={{
-                  width: 34, height: 34, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  background: group.color + '18', fontSize: 17,
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {ZONE_ORDER.map(z => {
+                const group = ZONES[z];
+                return (
+                <button key={z} onClick={() => { hapticImpact('light'); setPage('tabs'); setZone(z); if (z !== 'planner' && z !== 'calculators') setTab(group.tabs[0]); }} style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
+                  background: 'rgba(20,22,30,0.35)', border: '1px solid var(--glass-border)', color: 'var(--text)',
+                  transition: 'all 0.2s',
                 }}>
-                  {group.icon}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2, color: group.color }}>{group.title}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3, wordBreak:'break-word' }}>{group.subtitle}</div>
-                </div>
-                <span style={{ color: group.color, fontSize: 14, opacity: 0.6, flexShrink:0 }}>→</span>
-              </button>
-              );
-            })}
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    background: group.color + '18', fontSize: 20,
+                  }}>
+                    {group.icon}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: group.color }}>{group.title}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3 }}>{group.subtitle}</div>
+                  </div>
+                  <span style={{ color: group.color, fontSize: 16, opacity: 0.6 }}>→</span>
+                </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
@@ -595,7 +598,7 @@ export const TrainingScreen: React.FC = () => {
       )}
 
       {/* ═══════════ Тренировка / выполнение (зона) ═══════════ */}
-      {(tab === 'runtime' || tab === 'timers') && (
+      {zone === 'training' && (tab === 'runtime' || tab === 'timers') && (
         <ExecutionZone
           tab={tab}
           goal={goal} level={level} recovery={recovery}

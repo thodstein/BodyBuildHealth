@@ -40,6 +40,7 @@ export interface FullProgram {
   author: string;
   type: string;
   goal: 'strength' | 'hypertrophy' | 'powerlifting' | 'bodybuilding' | 'athletic' | 'rehab' | 'peaking';
+  direction?: 'strength' | 'bodybuilding' | 'both';
   level: 'beginner' | 'intermediate' | 'advanced';
   durationWeeks: number;
   daysPerWeek: number;
@@ -60,8 +61,8 @@ export interface FullProgram {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const STARTING_STRENGTH: FullProgram = {
-  id: 'starting_strength', name: 'Starting Strength (Novice LP)', author: 'Mark Rippetoe',
-  type: 'Full Body 3x/week', goal: 'strength', level: 'beginner',
+  id: 'starting_strength', name: 'Starting Strength', author: 'Mark Rippetoe',
+  type: 'Full Body 3x/week', goal: 'strength', direction: 'strength', level: 'beginner',
   durationWeeks: 12, daysPerWeek: 3, sessionTimeMin: '45-60',
   description: 'Классическая программа для начинающих. 3 базовых упражнения в день, линейная прогрессия каждого упражнения на каждой тренировке. Простая, эффективная, проверенная десятилетиями.',
   targetAudience: 'Начинающие (0-6 месяцев тренировок). Худые новички, которым нужно быстро набрать силу и массу.',
@@ -105,7 +106,7 @@ const STARTING_STRENGTH: FullProgram = {
 
 const FIVE_THREE_ONE_BBB: FullProgram = {
   id: '531_bbb', name: '5/3/1 Boring But Big', author: 'Jim Wendler',
-  type: 'Upper/Lower 4x/week', goal: 'strength', level: 'intermediate',
+  type: 'Upper/Lower 4x/week', goal: 'strength', direction: 'strength', level: 'intermediate',
   durationWeeks: 4, daysPerWeek: 4, sessionTimeMin: '50-65',
   description: '4-недельный волновой цикл с основным движением 5/3/1 и 5×10 подсобки на 50-60% TM. Простая, устойчивая прогрессия. Встроенный deload.',
   targetAudience: 'Средний уровень (1-3 года тренировок). Те, кто перерос Starting Strength.',
@@ -209,7 +210,7 @@ const FIVE_THREE_ONE_BBB: FullProgram = {
 
 const PPL_HYPERTROPHY: FullProgram = {
   id: 'ppl_hypertrophy', name: 'Push/Pull/Legs 6-Day Hypertrophy', author: 'Classic Bodybuilding',
-  type: 'PPL 6x/week', goal: 'hypertrophy', level: 'intermediate',
+  type: 'PPL 6x/week', goal: 'hypertrophy', direction: 'bodybuilding', level: 'intermediate',
   durationWeeks: 8, daysPerWeek: 6, sessionTimeMin: '60-75',
   description: 'Классический бодибилдерский сплит. 2× частота на группу мышц в неделю. Push A/Pull A/Legs A — сила, Push B/Pull B/Legs B — гипертрофия/памп.',
   targetAudience: 'Средний уровень. Цель — мышечная масса. 6 дней в неделю.',
@@ -274,7 +275,7 @@ const PPL_HYPERTROPHY: FullProgram = {
 
 const SMOLOV_JR: FullProgram = {
   id: 'smolov_jr', name: 'Smolov Jr. (Bench Press Specialization)', author: 'Sergey Smolov',
-  type: 'Specialization 4x/week', goal: 'peaking', level: 'advanced',
+  type: 'Specialization 4x/week', goal: 'peaking', direction: 'strength', level: 'advanced',
   durationWeeks: 3, daysPerWeek: 4, sessionTimeMin: '45-60',
   description: 'Экстремальный 3-недельный цикл специализации для одного упражнения (жим лёжа или присед). +5-15 кг к 1RM за 3 недели. ТОЛЬКО для продвинутых.',
   targetAudience: 'Продвинутые атлеты (3+ года). PL-специализация. Только когда другие методы не работают.',

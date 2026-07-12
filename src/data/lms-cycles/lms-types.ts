@@ -11,27 +11,44 @@ export type SRLevel = 'novice' | 'II-KMS' | 'KMS-MS' | 'MS-MSMK' | 'II-MS' | 'KM
 export type SRPeriod = 'strength' | 'endurance' | 'peak' | 'mass' | 'mixed';
 
 export interface SRCycleMeta {
- id: string; // 'cycle-01'
- title: string; // 'Силовой цикл 1'
+ id: string;
+ title: string;
  direction: SRDirection;
  level: SRLevel;
  period: SRPeriod;
- minBodyWeight?: number; // кг
+ minBodyWeight?: number;
  sessionsPerWeek: number;
- weeks: number; // длительность (12 или 4)
+ weeks: number;
  correctionPct: number; // недельный % корректировки PM (0.005 = +0.5%)
  weightRatio?: 'normal' | 'any';
- description: string; // краткое описание
- howItWorks: string; // ОБЯЗАТЕЛЬНО: как работает цикл (метод, нагрузка, прогрессия, акценты)
- conditions: string[]; // условия соответствия (вес/уровень/техника/восстановление)
- notes?: string;
+ description: string;
+ howItWorks: string;
+  conditions: string[];
+  notes?: string;
+  tags?: string[];
+  // ПРОФ-поля для бодибилдинга
+  targetFocus?: 'push' | 'pull' | 'legs' | 'upper' | 'lower' | 'fullbody' | 'arms' | 'shoulders' | 'back' | 'chest' | 'mixed' | 'specialization' | 'contest';
+  deloadWeeks?: number[]; // номера недель с разгрузкой
+  rirProgression?: { start: number; end: number }; // RIR первой/последней недели
+  phases?: SRPhaseBlock[]; // фазы макропериодизации (сила→гипертрофия и т.д.)
 }
 
-/** Один подход в раскладке: % от PM, повторения, количество подходов. */
+/** Один подход в раскладке: % от PM, повторения, количество подходов, RIR. */
 export interface SRSetSpec {
  pct: number; // доля от PM (0.68 = 68%)
  reps: number;
  sets: number;
+ rir?: number; // repetitions in reserve (ПРОФ-поля: 0-4)
+}
+
+/** Фаза цикла — для макропериодизации (блок сила/гипертрофия/пик). */
+export interface SRPhaseBlock {
+ weekStart: number;
+ weekEnd: number;
+ title?: string;
+ correctionPct?: number; // свой темп прогрессии в этой фазе
+ rirProgression?: { start: number; end: number }; // RIR первой/последней недели фазы
+ repRange?: [number, number]; // [minReps, maxReps]
 }
 
 /** Упражнение в дне. */

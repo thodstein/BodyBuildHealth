@@ -15,10 +15,21 @@ import type { TrainingProfile } from '../training-profile';
 import { PCT_FOR_RIR, ACCENT, DIM, detectGroup, getMrv, getPerMuscleMrvFromLevel, CONFIG_LABELS, DELOAD_OPTIONS, RIR_WAVE_PATTERNS, GROUP_RU, type ManualResult, type ManualDay, type ManualWeek, type ManualExercise } from './types';
 import { buildPhasePlan, PHASE_CONFIGS, PHASE_LABELS, distributePhases, getRirForWeek, calcPhaseWeight, type BBPhase } from './phase-periodization';
 const PHASE_LABELS_MAP: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', peaking: 'Пик', deload: 'Разгрузка', gpp: 'GPP', spp: 'SPP' };
+function phaseForCycleWeek(week: number, cycle: import('../../../../data/lms-cycles/lms-types').SRCycleTemplate): string {
+  const ph = cycle.meta.phases;
+  if (ph && ph.length > 0) {
+    const p = ph.find(p => week >= p.weekStart && week <= p.weekEnd);
+    if (p?.title) return p.title.toLowerCase().includes('накоп') ? 'accumulation' : p.title.toLowerCase().includes('интен') ? 'intensification' : p.title.toLowerCase().includes('пик') ? 'peaking' : p.title.toLowerCase().includes('загруз') ? 'intensification' : p.title.toLowerCase().includes('втяг') ? 'accumulation' : p.title.toLowerCase().includes('памп') ? 'peaking' : p.title?.toLowerCase().includes('разгр') ? 'deload' : 'intensification';
+  }
+  if (cycle.meta.deloadWeeks?.includes(week)) return 'deload';
+  const total = cycle.meta.weeks;
+  if (total <= 6) return week <= Math.ceil(total * 0.5) ? 'accumulation' : 'intensification';
+  const prePeak = cycle.meta.deloadWeeks && cycle.meta.deloadWeeks.length > 0 ? Math.min(...cycle.meta.deloadWeeks) : Math.ceil(total * 0.7);
+  return week < prePeak ? 'accumulation' : 'intensification';
+}
 import { ConstructorProfile } from './ConstructorProfile';
 import { PlanDisplay } from './PlanDisplay';
 import { ToolsPanel } from './ToolsPanel';
-import { PlannerToolsPanel } from '../PlannerToolsPanel';
 import { getMethodsByCategory, type TrainingMethod } from '../../../../engines/training-methodology.engine';
 import { MacrocyclePanel } from './MacrocyclePanel';
 import { subscribePlannerApply, getPlannerApply, clearPlannerApply, type PlannerApply } from '../planner-bridge';
@@ -32,6 +43,8 @@ import { calcBBPlanMetrics } from '../../../../engines/bb/bb-metrics.engine';
 import { adaptForPEDs, type PED } from '../../../../engines/bb/bb-ped-adaptation.engine';
 import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, phaseExerciseMix, type LoadStrategy, type DeloadType } from '../../../../engines/bb/bb-autocoach.engine';
 import { getAllVolumeLandmarks } from '../../../../engines/volume-landmarks.engine';
+import { convertCycleToBBPlan } from '../../../../engines/bb/cycle-to-plan';
+import { getCycleById } from '../../../../data/lms-cycles/lms-cycle-index';
 
 interface Props {
   tprofile: TrainingProfile;
@@ -90,6 +103,9 @@ export const TrainingConstructor: React.FC<Props> = ({
     try { return JSON.parse(localStorage.getItem('he_manual_session') || 'null'); } catch { return null; }
   });
   useEffect(() => { try { localStorage.setItem('he_manual_session', JSON.stringify(manualResult)); } catch {} }, [manualResult]);
+
+  const [programData, setProgramData] = useState<FullProgram | null>(null);
+  const [programWeeks, setProgramWeeks] = useState<ManualWeek[] | null>(null);
 
   const [macrocycle, setMacrocycle] = useState<MacrocyclePlan | null>(() => {
     try { return JSON.parse(localStorage.getItem('he_macro_session') || 'null'); } catch { return null; }
@@ -425,6 +441,14 @@ export const TrainingConstructor: React.FC<Props> = ({
   }, [sequenceStrategy]);
 
   const { days: generatedDays, weeklySets: generatedWeeklySets, groupCorrections: generatedCorrections, patternBalance: generatedBalance } = useMemo(() => {
+    // ─── Если загружена готовая программа — используем её дни ───
+    if (programData && programWeeks && programWeeks.length > 0) {
+      const w0 = programWeeks[0];
+      const ws: Record<string, number> = {};
+      w0.days.forEach(d => d.exercises.forEach(e => { ws[e.group] = (ws[e.group] || 0) + e.sets; }));
+      return { days: w0.days, weeklySets: ws, groupCorrections: ['📥 Загружена программа: ' + programData.name], patternBalance: {} };
+    }
+
     const auto = selectSplit({ goal, level, daysPerWeek, recovery, fatigue, nutrition: 7, weakPoints, sessionDuration: 60, exercises: [] } as any);
     const manualSp = manualCfg.split ? TRAINING_SPLITS[manualCfg.split] : null;
     const sp = manualSp ? { id: manualCfg.split!, name: manualSp.name, desc: manualSp.desc, groupsPerDay: manualSp.groupsPerDay, score: 100, rationale: ['Ручной выбор'] } as any : auto[0];
@@ -458,13 +482,13 @@ export const TrainingConstructor: React.FC<Props> = ({
       groupCorrections: finalCorrections, 
       patternBalance: built.patternBalance 
     };
-  }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, manualCfg, tprofile, labAnalysis, buildPlan, mrvOverride, manualWorkMax, applyMethodsToPlan, readinessSlider, targetTonnage, sequenceStrategy]);
+  }, [goal, level, daysPerWeek, recovery, fatigue, weakPoints, manualCfg, tprofile, labAnalysis, buildPlan, mrvOverride, manualWorkMax, applyMethodsToPlan, readinessSlider, targetTonnage, sequenceStrategy, programData, programWeeks]);
 
   const generateManualPlan = useCallback(() => {
     const workMaxMerged = { chest: 100, back: 110, legs: 140, quads: 130, hamstrings: 80, glutes: 80, calves: 60, shoulders: 60, arms: 50, biceps: 40, triceps: 40, core: 60, abs: 60, traps: 50, forearms: 30, ...tprofile.workMax, ...manualWorkMax };
 
     // ─── BB-авто режим ───
-    if (manualCfg.generator === 'bb') {
+    if (manualCfg.generator === 'bb' || manualCfg.generator === 'bb_split') {
       const bbSplitId = manualCfg.bbSplit || SPLIT_PATTERNS[0]?.id || 'upper_lower_4';
       const bbLoadStrategy = (manualCfg.bbLoad || 'double_progression') as LoadStrategy;
       const bbPeds: PED[] = tprofile.onCourse ? ['AAS'] : [];
@@ -512,6 +536,87 @@ export const TrainingConstructor: React.FC<Props> = ({
         weeks: bbWeeks,
         currentWeek: firstW?.weekNumber || 1,
         mesoLength,
+      });
+      setWizardStep(6);
+      return;
+    }
+
+    // ─── BB ПРОФ-цикл (готовые упражнения) ───
+    if (manualCfg.generator === 'bb_cycle') {
+      const bbCycleId = manualCfg.bbCycle || '';
+      const cycle = getCycleById(bbCycleId);
+      if (!cycle) { alert('BB-цикл не выбран'); return; }
+      const bbLoadStrategy = (manualCfg.bbLoad || 'double_progression') as LoadStrategy;
+      const bbPeds: PED[] = tprofile.onCourse ? ['AAS'] : [];
+      const cycleWeeks = cycle.meta.weeks;
+      if (cycleWeeks !== mesoLength) setMesoLength(cycleWeeks);
+      const plan = convertCycleToBBPlan({
+        cycle,
+        workMax: workMaxMerged,
+        weakPoints: tprofile.weakPoints || [],
+        peds: bbPeds,
+        loadStrategy: bbLoadStrategy,
+      });
+
+      // Convert Cycle → ManualResult
+      const bbWeeks: ManualWeek[] = plan.weeks.map(w => {
+        const phase = phaseForCycleWeek(w.week, cycle);
+        const phaseLabel = PHASE_LABELS_MAP[phase] || phase;
+        const days: ManualDay[] = w.sessions.map((s, si) => ({
+          day: si + 1,
+          groups: [...new Set(s.exercises.map(e => e.muscle))],
+          exercises: s.exercises.map(e => ({
+            name: e.name, sets: e.sets, reps: String(e.workSets[0]?.reps || 10),
+            rir: e.rir, rest: e.workSets[0]?.restSeconds || 90,
+            weight: Math.round(e.workSets[0]?.weight || 80),
+            group: e.muscle, role: e.role === 'primary' ? 'main' : 'accessory',
+            pattern: e.workSets[0]?.technique || '',
+          })),
+          corrections: [s.character + ' · ' + (s.sessionTag || '')],
+        }));
+        const avgRir = days.length > 0 ? days.reduce((s, d) => s + d.exercises.reduce((ss, e) => ss + e.rir, 0) / d.exercises.length, 0) / days.length : 2;
+        return { weekNumber: w.week, phase, phaseLabel, rir: Math.round(avgRir), days, corrections: [] };
+      });
+
+      const corrections = [
+        `📋 ПРОФ-цикл: ${cycle.meta.title}`,
+        `🎯 Фокус: ${cycle.meta.targetFocus || '—'}`,
+        `📐 Тип: BB-цикл с фиксированными упражнениями (${cycle.week1.reduce((s, d) => s + d.exercises.length, 0)} упр/день)`,
+        `📈 Стратегия: ${bbLoadStrategy.replace(/_/g, ' ')}`,
+        `📅 ${cycleWeeks} нед · ${tprofile.weakPoints?.length ? 'слабые: ' + tprofile.weakPoints.join(', ') : 'без слабых групп'}`,
+        `🔥 RIR-прогрессия: ${cycle.meta.rirProgression ? cycle.meta.rirProgression.start + '→' + cycle.meta.rirProgression.end : 'по фазам'}`,
+        ...(cycle.meta.deloadWeeks?.length ? [`🔄 Разгрузка: нед ${cycle.meta.deloadWeeks.join(', ')}`] : []),
+        ...(bbPeds.length > 0 ? ['💉 PED-адаптация активна'] : []),
+        ...plan.rationale.slice(0, 3),
+      ];
+
+      const firstW = bbWeeks[0];
+      setManualResult({
+        splitName: cycle.meta.title,
+        corrections,
+        days: firstW?.days || [],
+        weeks: bbWeeks,
+        currentWeek: firstW?.weekNumber || 1,
+        mesoLength: cycleWeeks,
+      });
+      setWizardStep(6);
+      return;
+    }
+
+    // ─── Загруженная готовая программа ───
+    if (programData && programWeeks && programWeeks.length > 0) {
+      const firstWeek = programWeeks[0];
+      const corrections = [
+        `📥 Программа: ${programData.name} (${programData.author || ''}) — ${programData.durationWeeks} нед, цели: ${programData.goal}, уровень: ${programData.level}.`,
+        ...(programData.warnings?.length ? ['⚠ ' + programData.warnings.join('; ')] : []),
+      ];
+      setManualResult({
+        splitName: programData.name,
+        corrections,
+        days: firstWeek.days,
+        weeks: programWeeks,
+        currentWeek: 1,
+        mesoLength: programData.durationWeeks,
       });
       setWizardStep(6);
       return;
@@ -567,33 +672,71 @@ export const TrainingConstructor: React.FC<Props> = ({
       mesoLength,
     });
     setWizardStep(6);
-  }, [generatedDays, generatedCorrections, manualCfg, mesoLength, deloadFreq, goal, rirWave, level, tprofile, labAnalysis, manualWorkMax]);
+  }, [generatedDays, generatedCorrections, manualCfg, mesoLength, deloadFreq, goal, rirWave, level, tprofile, labAnalysis, manualWorkMax, programData, programWeeks]);
+
+  const buildProgramWeeks = useCallback((prog: FullProgram): ManualWeek[] => {
+    const wm: Record<string, number> = { chest: 100, back: 110, legs: 140, quads: 130, hamstrings: 80, glutes: 80, calves: 60, shoulders: 60, arms: 50, biceps: 40, triceps: 40, core: 60, abs: 60, traps: 50, forearms: 30, full: 80, ...tprofile.workMax, ...manualWorkMax };
+    return prog.weeks.map((pw) => {
+      const days: ManualDay[] = pw.days.map((d: ProgramDay, di: number) => ({
+        day: di + 1,
+        groups: Array.from(new Set((d.exercises || []).map((e: ProgramDay['exercises'][number]) => detectGroup(e.name)))),
+        exercises: (d.exercises || []).map((e: ProgramDay['exercises'][number]) => {
+          const g = detectGroup(e.name);
+          const rir = e.rir ?? (e.rpe ? Math.max(0, 10 - e.rpe) : 2);
+          const pct = PCT_FOR_RIR[Math.max(0, Math.min(5, rir))] ?? 0.9;
+          const weight = Math.round((wm[g] || 80) * pct);
+          return { name: e.name, sets: e.sets, reps: String(e.reps), rir, rest: e.restSec || 120, group: g, weight };
+        }),
+      }));
+      const allRirs = days.flatMap(d => d.exercises.map(e => e.rir));
+      const avgRir = allRirs.length > 0 ? Math.round(allRirs.reduce((s, v) => s + v, 0) / allRirs.length * 10) / 10 : 2;
+      const minRir = allRirs.length > 0 ? Math.min(...allRirs) : 2;
+      const maxRir = allRirs.length > 0 ? Math.max(...allRirs) : 2;
+      const weekTonnage = Math.round(days.reduce((sum, d) => sum + d.exercises.reduce((s, ex) => {
+        const repAvg = ex.reps.includes('-') ? (parseInt(ex.reps) + parseInt(ex.reps.split('-')[1] || ex.reps)) / 2 : parseInt(ex.reps) || 10;
+        return s + ex.sets * ex.weight * repAvg;
+      }, 0), 0));
+      const totalWeeklySets = days.reduce((s, d) => s + d.exercises.reduce((ss, e) => ss + e.sets, 0), 0);
+      const phase = pw.deload ? 'deload' : pw.phase === 'peaking' ? 'peaking' : pw.phase === 'intensification' ? 'intensification' : 'accumulation';
+      const corrections: string[] = [];
+      corrections.push(`Неделя ${pw.week} — ${PHASE_LABELS_MAP[phase] || phase}: ${days.length} дн, ${totalWeeklySets} сетов, ~${(weekTonnage / 1000).toFixed(1)} т, RIR ${avgRir} (${minRir}-${maxRir})`);
+      if (avgRir <= 1) corrections.push('⚠ Высокая интенсивность: RIR≤1 на большинстве подходов. Контролируй технику.');
+      if (avgRir >= 3) corrections.push('Низкая интенсивность RIR 3+ — фаза накопления, без отказа.');
+      if (minRir === 0) corrections.push('🔴 Есть подходы до отказа (RIR 0). Страховка обязательна.');
+      if (phase === 'peaking') corrections.push('Пиковая фаза: основные движения, изоляция минимизирована. Цель — свежесть ЦНС.');
+      if (phase === 'deload') corrections.push('Разгрузка: снизь объём и вес на 40-50%, сохрани частоту движений.');
+      if (totalWeeklySets > 40) corrections.push('⚠ Объём >40 сетов/нед — высокий риск перетренированности.');
+      if (pw.week === 1) corrections.push('Старт программы — адаптация к нагрузкам, не форсируй вес.');
+      if (pw.week === prog.durationWeeks) corrections.push('Финальная неделя — оцени прогресс, запланируй разгрузку.');
+      if (pw.week === Math.ceil(prog.durationWeeks / 2)) corrections.push('Экватор программы — подведи промежуточные итоги по ПМ и объёму.');
+      return { weekNumber: pw.week, phase, phaseLabel: PHASE_LABELS_MAP[phase] || phase, rir: avgRir, days, corrections, totalTonnage: weekTonnage };
+    });
+  }, [tprofile, manualWorkMax]);
 
   const loadProgramToConstructor = useCallback((programId: string) => {
     const lib: FullProgram[] = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS];
     const prog = lib.find(p => p.id === programId);
     if (!prog || !prog.weeks?.length) return;
-    const wk = prog.weeks[0];
-    const days = wk.days.map((d: ProgramDay, di: number) => ({
-      day: di + 1,
-      groups: Array.from(new Set((d.exercises || []).map((e: ProgramDay['exercises'][number]) => detectGroup(e.name)))),
-      exercises: (d.exercises || []).map((e: ProgramDay['exercises'][number]) => {
-        const g = detectGroup(e.name);
-        const rir = e.rir ?? (e.rpe ? Math.max(0, 10 - e.rpe) : 2);
-        const pct = PCT_FOR_RIR[Math.max(0, Math.min(5, rir))] ?? 0.9;
-        const weight = Math.round((tprofile.workMax[g] || 80) * pct);
-        return { name: e.name, sets: e.sets, reps: String(e.reps), rir, rest: e.restSec || 120, group: g, weight };
-      }),
-    }));
+    const pWeeks = buildProgramWeeks(prog);
+    setProgramData(prog);
+    setProgramWeeks(pWeeks);
+    const first = pWeeks[0];
     const corrections: string[] = [
-      `Загружена программа «${prog.name}» (${prog.author || ''}, ${prog.goal}, ${prog.level}) — неделя 1, ${days.length} дн.`,
+      `Загружена программа «${prog.name}» (${prog.author || ''}, ${prog.goal}, ${prog.level}) — ${prog.durationWeeks} нед, ${prog.daysPerWeek} дн/нед.`,
       'Программа доступна для редактирования, применения методик и выполнения.',
     ];
-    if (prog.warnings?.length) corrections.push('Предупреждения: ' + prog.warnings.join('; '));
+    if (prog.warnings?.length) corrections.push('⚠ ' + prog.warnings.join('; '));
     lastSyncedWeekRef.current = -1;
-    setManualResult({ splitName: prog.name + ' (неделя 1)', corrections, days });
+    setManualResult({
+      splitName: prog.name + ' (неделя 1)',
+      corrections,
+      days: first?.days || [],
+      weeks: pWeeks,
+      currentWeek: 1,
+      mesoLength: prog.durationWeeks,
+    });
     setWizardStep(6);
-  }, [tprofile]);
+  }, [buildProgramWeeks]);
 
   const manualToRuntime = useCallback(() => {
     if (!manualResult) return;
@@ -1289,17 +1432,14 @@ export const TrainingConstructor: React.FC<Props> = ({
           />
 
           {manualResult && (
-            <>
-              <ToolsPanel
-                result={manualResult} setResult={setManualResult}
-                manualCfg={manualCfg} tprofile={tprofile}
-                goal={goal} level={level}
-                mesoLength={mesoLength} daysPerWeek={daysPerWeek}
-                manualWorkMax={manualWorkMax} labAnalysis={labAnalysis}
-                onToRuntime={manualToRuntime}
-              />
-              <PlannerToolsPanel mode="manual" />
-            </>
+            <ToolsPanel
+              result={manualResult} setResult={setManualResult}
+              manualCfg={manualCfg} tprofile={tprofile}
+              goal={goal} level={level}
+              mesoLength={mesoLength} daysPerWeek={daysPerWeek}
+              manualWorkMax={manualWorkMax} labAnalysis={labAnalysis}
+              onToRuntime={manualToRuntime}
+            />
           )}
 
           <button onClick={() => setWizardStep(5)}

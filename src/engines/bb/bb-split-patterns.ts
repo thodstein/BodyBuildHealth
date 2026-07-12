@@ -14,6 +14,8 @@ export interface ScheduleDay {
   sessionTag?: string;                      // Push/Pull/Legs/Upper/Lower/FullBody...
 }
 
+export type SplitPatternDirection = 'strength' | 'bodybuilding' | 'both';
+
 export interface SplitPattern {
   id: string;
   name: string;
@@ -22,6 +24,7 @@ export interface SplitPattern {
   schedule: ScheduleDay[];     // последовательность дней ротации
   level: string[];             // подходящие уровни
   description: string;
+  direction?: SplitPatternDirection;
 }
 
 export const SPLIT_PATTERNS: SplitPattern[] = [
@@ -38,8 +41,9 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
       { kind: 'отдых', character: null },
       { kind: 'отдых', character: null },
     ],
-    level: ['novice'],
-    description: 'Все группы 3×/нед, одна сессия — фулбоди. Для новичков.',
+    level: ['novice', 'intermediate'],
+    description: 'Все группы 3×/нед. Максимальная частота стимуляции белка, лучший синтез для натуралов.',
+    direction: 'both',
   },
   {
     id: 'upper_lower_4',
@@ -54,8 +58,9 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
       { kind: 'отдых', character: null },
       { kind: 'отдых', character: null },
     ],
-    level: ['II-KMS', 'intermediate'],
-    description: 'Верх/Низ 2×/нед; второй верх — памп, низ всегда тяж.',
+    level: ['beginner', 'II-KMS', 'intermediate'],
+    description: 'Верх/Низ 2×/нед; второй верх — памп, низ всегда тяж. Каждая мышца 2×/нед.',
+    direction: 'both',
   },
   {
     id: 'ppl_6',
@@ -72,6 +77,7 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
     ],
     level: ['KMS-MS', 'advanced', 'enhanced'],
     description: 'PPL×2; второй Push/Pull — памп, Legs всегда тяж (памп-слот заменён на тяж).',
+    direction: 'bodybuilding',
   },
   {
     id: 'rolling_3_1_3_1',
@@ -89,6 +95,7 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
     ],
     level: ['KMS-MS', 'advanced', 'enhanced'],
     description: '8-дневная ротация: 3 тяж / отдых / 2 памп+1 тяж-ноги / отдых. Высокая частота.',
+    direction: 'bodybuilding',
   },
   {
     id: 'rolling_4_1',
@@ -103,6 +110,7 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
     ],
     level: ['II-KMS', 'intermediate'],
     description: '5-дневная ротация: 3 тяж + 1 памп-верх / отдых. Ноги всегда тяж.',
+    direction: 'bodybuilding',
   },
   {
     id: 'tpt_o_ttp',
@@ -119,6 +127,7 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
     ],
     level: ['KMS-MS', 'advanced', 'enhanced'],
     description: 'тяж/памп/тяж/отдых/тяж/тяж/памп. Ноги всегда тяж (памп-дни — только верх).',
+    direction: 'bodybuilding',
   },
   // ── 4 новых ПРОФ-сплита ──
   {
@@ -136,6 +145,7 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
     ],
     level: ['II-KMS', 'advanced', 'enhanced'],
     description: 'Arnold-сплит: грудь+спина → плечи+руки → ноги ×2. Плечи/руки второй раз — памп. Ноги всегда тяж.',
+    direction: 'bodybuilding',
   },
   {
     id: 'torso_limb_4',
@@ -152,6 +162,7 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
     ],
     level: ['intermediate', 'advanced'],
     description: 'Торс (грудь+спина+плечи) → Конечности (ноги+руки+икры). Второй проход — памп. Специализация слабых групп.',
+    direction: 'bodybuilding',
   },
   {
     id: 'bro_5',
@@ -168,6 +179,7 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
     ],
     level: ['intermediate', 'advanced'],
     description: 'Классический Bro Split: грудь/спина/плечи/руки/ноги — 5 тренировок, 2 дня отдых. Высокий объём на группу 1×/нед.',
+    direction: 'bodybuilding',
   },
   {
     id: 'phul_4',
@@ -184,6 +196,75 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
     ],
     level: ['intermediate', 'advanced', 'enhanced'],
     description: 'PHUL: верх сила (1-5 повт) + низ сила + верх гипертрофия (8-15) + низ гипертрофия. Баланс силы и массы.',
+    direction: 'both',
+  },
+  // ════════════════════════════════════════════════════════════
+  // НОВЫЕ: частотные сплиты 2-3×/нед на группу
+  // ════════════════════════════════════════════════════════════
+  {
+    id: 'fullbody_2',
+    name: 'Фулбоди 2×/нед',
+    rotationDays: 4, sessionsPerRotation: 2,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'FullBody' },
+      { kind: 'отдых', character: null },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'FullBody' },
+      { kind: 'отдых', character: null },
+    ],
+    level: ['beginner', 'intermediate', 'advanced'],
+    description: 'Все группы 2×/нед. 2 тренировки на 4 дня. Оптимальная частота для натуралов и восстановления.',
+    direction: 'both',
+  },
+  {
+    id: 'push_pull_2',
+    name: 'Push/Pull 4×/нед (каждая мышца 2×)',
+    rotationDays: 7, sessionsPerRotation: 4,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Push' },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'Pull' },
+      { kind: 'отдых', character: null },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'Push' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Pull' },
+      { kind: 'отдых', character: null },
+      { kind: 'отдых', character: null },
+    ],
+    level: ['intermediate', 'advanced', 'enhanced'],
+    description: 'Push/Pull 2×/нед: один тяж, один памп. Каждая мышца 2×/нед. Сбалансированный объём без перетрена.',
+    direction: 'both',
+  },
+  {
+    id: 'upper_lower_3',
+    name: 'Верх/Низ 3×/нед (чередование)',
+    rotationDays: 7, sessionsPerRotation: 3,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Upper' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Lower' },
+      { kind: 'отдых', character: null },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'Upper' },
+      { kind: 'отдых', character: null },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'Lower' },
+      { kind: 'отдых', character: null },
+    ],
+    level: ['intermediate', 'advanced'],
+    description: 'Верх 1.5×/нед, низ 1.5×/нед — средняя частота с акцентом на восстановление. Подходит под дефицит калорий.',
+    direction: 'both',
+  },
+  {
+    id: 'fullbody_4',
+    name: 'Фулбоди 4×/нед (продвинутая частота)',
+    rotationDays: 7, sessionsPerRotation: 4,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'FullBody' },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'FullBody' },
+      { kind: 'отдых', character: null },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'FullBody' },
+      { kind: 'отдых', character: null },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'FullBody' },
+      { kind: 'отдых', character: null },
+    ],
+    level: ['advanced', 'enhanced'],
+    description: 'FB 4×/нед: тяж/памп/тяж/памп. Максимальная частота для продвинутых с PED или отличным восстановлением.',
+    direction: 'both',
   },
 ];
 

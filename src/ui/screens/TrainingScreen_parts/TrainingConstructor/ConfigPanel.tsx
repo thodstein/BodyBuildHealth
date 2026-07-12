@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { PopupSelect } from '../../SRCBBScreen_parts/TrainingPopups';
 import { TRAINING_SPLITS } from '../../../../engines/training.engine';
-import { LMS_CYCLES } from '../../../../data/lms-cycles/lms-cycle-index';
+import { LMS_CYCLES, normalizeCycleDirection } from '../../../../data/lms-cycles/lms-cycle-index';
 import { FULL_PROGRAM_LIBRARY } from '../../../../engines/complete-program-library.engine';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from '../programs-data';
 import { getMethodsByCategory, type TrainingMethod } from '../../../../engines/training-methodology.engine';
 import { SPLIT_PATTERNS } from '../../../../engines/bb/bb-split-patterns';
 import { ACCENT, DIM, CONFIG_LABELS } from './types';
+import { DIRECTION_METHOD_MAP, getRecommendedMethods, getRecommendedMethodsForSplit } from '../../../../engines/cycle-method-map';
+
+type DirFilter = 'all' | 'strength' | 'bodybuilding';
 
 interface Props {
   manualCfg: Record<string, string>;
@@ -16,7 +19,6 @@ interface Props {
   setTargetTonnage: (g: string, v: number) => void;
 }
 
-/* ─── Вспомогательный компонент секции конфигурации ─── */
 const ConfigSection: React.FC<{ title: string; color: string; children: React.ReactNode }> = ({ title, color, children }) => (
   <div style={{
     background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, marginBottom: 6,
@@ -27,41 +29,142 @@ const ConfigSection: React.FC<{ title: string; color: string; children: React.Re
   </div>
 );
 
-/* ─── Групповые PopupSelect обёртки ─── */
-const Sel: React.FC<{ label: string; value: string; onChange: (v: string) => void; options: { id: string; label: string; desc?: string }[]; hint?: string }> =
-  ({ label, value, onChange, options, hint }) => (
-    <PopupSelect label={label} value={value} onChange={onChange} options={options} hint={hint} />
-  );
+/** PopupSelect-обёртка с возможностью подсветки рекомендованных */
+const Sel: React.FC<{
+  label: string; value: string; onChange: (v: string) => void;
+  options: { id: string; label: string; desc?: string }[];
+  hint?: string;
+  recommendedSet?: Set<string>; // имена методов для подсветки
+}> = ({ label, value, onChange, options, hint, recommendedSet }) => {
+  const markedOptions = useMemo(() => options.map(o => {
+    const isRec = recommendedSet && recommendedSet.has(o.label);
+    return {
+      ...o,
+      label: isRec ? '★ ' + o.label : o.label,
+      desc: isRec ? (o.desc ? o.desc + ' · ★ Рекомендовано' : '★ Рекомендовано') : o.desc,
+    };
+  }), [options, recommendedSet]);
+  return <PopupSelect label={label} value={value} onChange={onChange} options={markedOptions} hint={hint} />;
+};
 
 export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgram, targetTonnage, setTargetTonnage }) => {
   const allPrograms = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS];
   const selectedList = Object.entries(manualCfg).filter(([, v]) => v);
-  
+
+  const [directionFilter, setDirectionFilter] = useState<DirFilter>('all');
+
+  const selectedSplitId = manualCfg.split || '';
+  const selectedCycleId = manualCfg.cycle || '';
+
+  // Рекомендованные методы для выбранного сплита
+  const splitRecommended = useMemo(() => {
+    const names = getRecommendedMethodsForSplit(selectedSplitId);
+    return new Set(names);
+  }, [selectedSplitId]);
+
+  // Рекомендованные методы по направлению (из выбранных сплита/цикла)
+  const dirRecommended = useMemo(() => {
+    const selSplit = TRAINING_SPLITS[selectedSplitId];
+    const selCycle = LMS_CYCLES.find(c => c.meta.id === selectedCycleId);
+    const splitDir = selSplit?.direction || null;
+    const cycleDir = selCycle ? normalizeCycleDirection(selCycle.meta.direction) : null;
+    const effectiveDir = cycleDir || splitDir;
+    if (effectiveDir) return new Set(getRecommendedMethods(effectiveDir));
+    return new Set<string>();
+  }, [selectedSplitId, selectedCycleId]);
+
+  // Объединённые рекомендации
+  const combinedRecommended = useMemo(() => {
+    const s = new Set<string>();
+    dirRecommended.forEach(v => s.add(v));
+    splitRecommended.forEach(v => s.add(v));
+    return s;
+  }, [dirRecommended, splitRecommended]);
+
+  // Фильтрация сплитов по направлению
+  const filteredSplits = useMemo(() => {
+    return Object.entries(TRAINING_SPLITS).filter(([, s]: [string, any]) => {
+      if (directionFilter === 'all') return true;
+      if (!s.direction) return true;
+      return s.direction === directionFilter || s.direction === 'both';
+    });
+  }, [directionFilter]);
+
+  // Фильтрация циклов по направлению
+  const filteredCycles = useMemo(() => {
+    return LMS_CYCLES.filter(c => {
+      if (directionFilter === 'all') return true;
+      const nd = normalizeCycleDirection(c.meta.direction);
+      return nd === directionFilter || nd === 'both';
+    });
+  }, [directionFilter]);
+
+  // Фильтрация программ по направлению
+  const filteredPrograms = useMemo(() => {
+    return allPrograms.filter(p => {
+      if (directionFilter === 'all') return true;
+      if (!p.direction) return true;
+      return p.direction === directionFilter || p.direction === 'both';
+    });
+  }, [directionFilter]);
+
+  const dirTabs: { id: DirFilter; label: string }[] = [
+    { id: 'all', label: 'Все направления' },
+    { id: 'strength', label: '🏋️ Сила' },
+    { id: 'bodybuilding', label: '💪 Бодибилдинг' },
+  ];
+
   const groups = [
     { id: 'chest', label: 'Грудь' }, { id: 'back', label: 'Спина' }, { id: 'legs', label: 'Ноги' },
     { id: 'shoulders', label: 'Плечи' }, { id: 'arms', label: 'Руки' }, { id: 'core', label: 'Кор' },
   ];
 
+  const methodSel = (cat: string, key: string, hint?: string) => (
+    <Sel label={CONFIG_LABELS[key] || key} value={manualCfg[key] || ''} onChange={v => setManual(key, v)}
+      options={getMethodsByCategory(cat).map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))}
+      hint={hint}
+      recommendedSet={combinedRecommended} />
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* ─── БАЗОВАЯ СТРУКТУРА (Primary) ─── */}
+      {/* ─── ФИЛЬТР ПО НАПРАВЛЕНИЮ ─── */}
+      <div style={{
+        display: 'flex', borderRadius: 10, overflow: 'hidden',
+        border: '1px solid rgba(255,255,255,0.08)', marginBottom: 2,
+      }}>
+        {dirTabs.map(t => (
+          <button key={t.id} onClick={() => setDirectionFilter(t.id)}
+            style={{
+              flex: 1, padding: '8px 4px', fontSize: 10, fontWeight: 700, cursor: 'pointer',
+              background: directionFilter === t.id ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)',
+              border: 'none', borderRight: '1px solid rgba(255,255,255,0.06)',
+              color: directionFilter === t.id ? ACCENT : 'rgba(255,255,255,0.6)',
+              transition: 'background 0.2s',
+            }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ─── БАЗОВАЯ СТРУКТУРА ─── */}
       <ConfigSection title="🏗️ БАЗОВАЯ СТРУКТУРА" color="#60a5fa">
         <Sel label="Тип сплита" value={manualCfg.split || ''} onChange={v => setManual('split', v)}
-          options={Object.entries(TRAINING_SPLITS).map(([id, s]: [string, any]) => ({ id, label: s.name, desc: s.desc }))}
+          options={filteredSplits.map(([id, s]: [string, any]) => ({ id, label: s.name, desc: s.desc }))}
           hint="Набор групп по дням" />
         <Sel label="Тип цикла" value={manualCfg.cycle || ''} onChange={v => setManual('cycle', v)}
-          options={LMS_CYCLES.map((c: any) => ({
+          options={filteredCycles.map((c: any) => ({
             id: c.meta.id, label: c.meta.title,
-            desc: (c.meta.id.startsWith('block') ? 'Блок' : c.meta.id.startsWith('embed') ? 'Встроенная' : 'СРЦ') + ' · ' + c.meta.level,
+            desc: (c.meta.id.startsWith('block') ? 'Блок' : c.meta.id.startsWith('embed') ? 'Встроенная' : 'СРЦ') + ' · ' + c.meta.level +
+              ' · ' + normalizeCycleDirection(c.meta.direction),
           }))} hint="Силовые циклы / блоки / встроенные" />
         <Sel label="Программа тренировок" value={manualCfg.program || ''} onChange={v => setManual('program', v)}
-          options={allPrograms.map((p: any) => ({ id: p.id, label: p.name, desc: p.type + ' · ' + p.goal + ' · ' + p.level }))}
+          options={filteredPrograms.map((p: any) => ({ id: p.id, label: p.name, desc: p.type + ' · ' + p.goal + ' · ' + p.level }))}
           hint="Готовые программы из библиотеки" />
-        <Sel label="Частота" value={manualCfg.frequency || ''} onChange={v => setManual('frequency', v)}
-          options={getMethodsByCategory('frequency').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+        {methodSel('frequency', 'frequency', 'Количество и частота тренировок')}
       </ConfigSection>
 
-      {/* ─── ЦЕЛЕВОЙ ТОННАЖ (Tonnage) ─── */}
+      {/* ─── ЦЕЛЕВОЙ ТОННАЖ ─── */}
       <ConfigSection title="⚖️ ЦЕЛЕВОЙ ТОННАЖ (кг/нед)" color="#00e68a">
         {groups.map(g => (
           <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
@@ -75,33 +178,27 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
         ))}
       </ConfigSection>
 
-      {/* ─── МЕТОДОЛОГИЯ (Secondary) ─── */}
+      {/* ─── МЕТОДОЛОГИЯ ─── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <ConfigSection title="📈 ПРОГРЕССИЯ" color="#a78bfa">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <Sel label="Периодизация" value={manualCfg.periodization || ''} onChange={v => setManual('periodization', v)}
-              options={getMethodsByCategory('periodization').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
-            <Sel label="Прогрессия" value={manualCfg.progression || ''} onChange={v => setManual('progression', v)}
-              options={getMethodsByCategory('progression').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+            {methodSel('periodization', 'periodization')}
+            {methodSel('progression', 'progression')}
           </div>
         </ConfigSection>
 
         <ConfigSection title="🎯 ИНТЕНСИВНОСТЬ" color="#f59e0b">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <Sel label="Интенсивность" value={manualCfg.intensity || ''} onChange={v => setManual('intensity', v)}
-              options={getMethodsByCategory('intensity').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
-            <Sel label="Техника" value={manualCfg.technique || ''} onChange={v => setManual('technique', v)}
-              options={getMethodsByCategory('technique').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
-            <Sel label="Объём" value={manualCfg.volume || ''} onChange={v => setManual('volume', v)}
-              options={getMethodsByCategory('volume').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+            {methodSel('intensity', 'intensity')}
+            {methodSel('technique', 'technique')}
+            {methodSel('volume', 'volume')}
           </div>
         </ConfigSection>
       </div>
 
       <ConfigSection title="🎯 СПЕЦИАЛИЗАЦИЯ" color="#ec4899">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          <Sel label="Метод специализации" value={manualCfg.specialization || ''} onChange={v => setManual('specialization', v)}
-            options={getMethodsByCategory('specialization').map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+          {methodSel('specialization', 'specialization')}
         </div>
       </ConfigSection>
 
@@ -110,12 +207,29 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
         <Sel label="Режим генерации" value={manualCfg.generator || ''} onChange={v => setManual('generator', v)}
           options={[
             { id: '', label: '🔨 Ручная сборка (по группам)' },
-            { id: 'bb', label: '🤖 BB-авто (движок бодибилдинга)' },
-          ]} hint="BB-авто использует bb-builder.engine с фазовой периодизацией" />
-        {manualCfg.generator === 'bb' && (
+            { id: 'bb_split', label: '🧩 BB Generic-сплит (авто-упражнения)' },
+            { id: 'bb_cycle', label: '📋 BB ПРОФ-цикл (готовые упражнения)' },
+          ]} hint={manualCfg.generator === 'bb_cycle' ? 'Использует 12 ПРОФ-циклов с конкретными упражнениями' : 'BB-авто использует bb-builder.engine с фазовой периодизацией'} />
+        {manualCfg.generator === 'bb_split' && (
           <>
             <Sel label="BB-сплит (ротация)" value={manualCfg.bbSplit || ''} onChange={v => setManual('bbSplit', v)}
               options={SPLIT_PATTERNS.map(p => ({ id: p.id, label: p.name, desc: p.description + ' · ' + p.rotationDays + 'дн ротация' }))} />
+            <Sel label="Стратегия нагрузки" value={manualCfg.bbLoad || ''} onChange={v => setManual('bbLoad', v)}
+              options={[
+                { id: 'double_progression', label: '🔄 Двойная прогрессия (рекоменд.)' },
+                { id: 'linear', label: '📈 Линейная +2.5кг/нед' },
+                { id: 'wave', label: '🌊 Волновая 3-нед циклы' },
+                { id: 'rpe_based', label: '🎯 RPE-базированная' },
+              ]} />
+          </>
+        )}
+        {manualCfg.generator === 'bb_cycle' && (
+          <>
+            <Sel label="BB-цикл (программа)" value={manualCfg.bbCycle || ''} onChange={v => setManual('bbCycle', v)}
+              options={(() => {
+                const bbCycles = LMS_CYCLES.filter(c => c.meta.direction === 'bodybuilding' || c.meta.tags?.includes('bodybuilding'));
+                return bbCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: (c.meta.targetFocus || c.meta.level) + ' · ' + c.meta.weeks + 'нед ' + c.meta.sessionsPerWeek + '×' }));
+              })()} hint="12 ПРОФ-циклов с фиксированными упражнениями, RIR-прогрессией и фазами" />
             <Sel label="Стратегия нагрузки" value={manualCfg.bbLoad || ''} onChange={v => setManual('bbLoad', v)}
               options={[
                 { id: 'double_progression', label: '🔄 Двойная прогрессия (рекоменд.)' },

@@ -4,6 +4,7 @@ import { calcExercisePrescription } from './training.engine';
 import { prescribeExercises, forceVector, lengthenedPartials } from './pro/exercise-prescription.engine';
 import { generateRepTempo } from './rep-tempo-engine';
 import { selectExercisesSmart } from './exercise-selector.engine';
+import { S_MRV_FACTOR } from './rir-table';
 
 /** Множители веса для PRO-мышц (деривация от родительской группы).
  *  Источник: Israetel M., "Hypertrophy Training Guide", RP Strength, 2021.
@@ -131,9 +132,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
     
     // S-MRV: Системный бюджет утомления на день.
     // Формула: dailyCap × S_MRV_FACTOR × (readiness/100)
-    // dailyCap = max(10, min(16, 8 + groups × 2)) — см. строку 68
-    // S_MRV_FACTOR = 4 (см. engines/rir-table.ts)
-    let dayFatigueBudget = dailyCap * 4 * (currentReadiness / 100); 
+    let dayFatigueBudget = Math.round(dailyCap * S_MRV_FACTOR * (currentReadiness / 100));
 
     groups.forEach(g => {
       const injActive = injuries.some(inj => inj.muscle === g && (inj.from || '') <= today && (!inj.to || inj.to >= today));

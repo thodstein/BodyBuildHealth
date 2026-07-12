@@ -17,7 +17,7 @@ import { getAllVolumeLandmarks, landmarksForRotation, normLevel, type TrainingLe
 import { tempoFor, REST_BY_CHARACTER, type TempoSpec } from './bb-tempo-rest';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
 import { selectExercisesSmart } from '../exercise-selector.engine';
-import { PCT_FOR_RIR } from '../rir-table';
+import { PCT_FOR_RIR, S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation } from './bb-ped-adaptation.engine';
 
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
@@ -105,9 +105,12 @@ const TAG_MUSCLES: Record<string, string[]> = {
   UpperHyp: ['chest', 'back', 'delt_front', 'delt_mid', 'delt_rear', 'biceps', 'triceps'],
   LowerHyp: ['quads', 'hamstrings', 'glutes', 'calves', 'abs'],
 };
+/** Для каких мышц в BB-контексте ВСЕГДА брать только изоляцию (нет compound аналогов). */
+const ALWAYS_ISOLATION: Set<string> = new Set(['calves', 'forearms', 'abs']);
 /** Маппинг PRO-мышц в group каталога для getExercisesByGroup(). */
 const PRO_MUSCLE_TO_GROUP: Record<string, string> = {
-  delt_front: 'shoulders', delt_mid: 'shoulders', delt_rear: 'shoulders', traps: 'back',
+  delt_front: 'shoulders', delt_mid: 'shoulders', delt_rear: 'shoulders',
+  traps: 'back', calves: 'legs', glutes: 'legs', abs: 'core', forearms: 'arms',
 };
 function catalogGroupFor(muscle: string): string {
   return PRO_MUSCLE_TO_GROUP[muscle] || muscle;
@@ -161,14 +164,14 @@ function buildSession(
   workMax: Record<string, number>, weakPoints: string[], focusGroup?: string,
   pedAdapt?: PEDAdaptation,
   dailyCap: number = 12,
+  level: string = 'intermediate',
 ): BBSession {
   const character = sched.character as DayCharacter;
   const muscles = musclesForTag(sched.sessionTag);
   const exercises: BBExercise[] = [];
   
   // S-MRV: Системный бюджет утомления на день.
-  // Формула: dailyCap × S_MRV_FACTOR × pedMultiplier  (S_MRV_FACTOR = 4, см. engines/rir-table.ts)
-  let dayFatigueBudget = Math.round(dailyCap * 4 * (pedAdapt?.combinedRecoveryMultiplier ?? 1));
+  let dayFatigueBudget = Math.round(dailyCap * S_MRV_FACTOR * (pedAdapt?.combinedRecoveryMultiplier ?? 1));
   
   for (const muscle of muscles) {
     const resolved = resolveCharacter(muscle, character);
@@ -194,13 +197,15 @@ function buildSession(
     const reps = Math.round((rmin + rmax) / 2);
     const weight = Math.round(wm * pct * 10) / 10;
     
-    // SMART SELECTION: выбор 1-3 упражнений (PRO: больше для primary/крупных)
+    // SMART SELECTION: выбор 1-3 упражнений
     const pool = getExercisesByGroup(catalogGroupFor(muscle));
     const exerciseCount = role === 'primary' ? (['back', 'quads', 'chest'].includes(muscle) ? 3 : 2) : 1;
+    // Мышечно-специфичный тип: calves/abs/forearms не имеют compound → всегда isolation
+    const selType = ALWAYS_ISOLATION.has(muscle) ? 'isolation' : (role === 'primary' ? 'compound' : 'isolation');
     const selected = selectExercisesSmart({
       candidates: pool, muscleGroup: muscle, count: exerciseCount,
       selectedIds: exercises.map(e => e.name).map(n => EXERCISE_CATALOG.find(ex => ex.name === n)?.id).filter(Boolean) as string[],
-      equipment: [], weakZones: weakPoints, level: 'intermediate', injuryProfile: [], type: role === 'primary' ? 'compound' : 'isolation',
+      equipment: [], weakZones: weakPoints, level, injuryProfile: [], type: selType,
     });
     const exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5 }];
     
@@ -278,7 +283,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const weekSessions: BBSession[] = [];
     for (let i = 0; i < sessions.length; i++) {
       const s = sessions[i];
-      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, dailyCap);
+      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, dailyCap, level);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       weekSessions.push(sess);
     }
