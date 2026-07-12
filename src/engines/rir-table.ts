@@ -22,4 +22,4 @@ export const PCT_FOR_RIR: Record<number, number> = { 0: 1.0, 1: 0.96, 2: 0.92, 3
  *
  * Источник: Israetel M., "Training Volume Landmarks", RP Strength, 2021.
  */
-export const S_MRV_FACTOR = 6;
+export const S_MRV_FACTOR = 12;

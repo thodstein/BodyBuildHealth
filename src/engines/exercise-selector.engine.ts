@@ -20,6 +20,8 @@ export interface SelectorInput {
   type?: 'compound' | 'isolation' | 'any';
   /** Предпочитаемое оборудование — упражнения с ним получают +8 к скору */
   preferEquipment?: string[];
+  /** Целевой RIR для фазы (0-4) — упражнения с подходящей сложностью получают бонус */
+  targetRir?: number;
 }
 
 export interface SelectedExercise extends Exercise {
@@ -182,7 +184,7 @@ function pushPullScore(ex: Exercise, selected: Exercise[]): number {
 
 /** Главная функция: интеллектуальный отбор N упражнений */
 export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
-  const { candidates, muscleGroup, count, selectedIds, equipment, weakZones, level, injuryProfile, type, preferEquipment } = input;
+  const { candidates, muscleGroup, count, selectedIds, equipment, weakZones, level, injuryProfile, type, preferEquipment, targetRir } = input;
 
   let pool = candidates.filter(ex => {
     if (!ex || !ex.id) return false;
@@ -256,6 +258,22 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     // Бонус для уровня
     if (level === 'beginner' && ex.difficulty && ex.difficulty === 'advanced') score -= 10;
     if (level === 'advanced' && ex.difficulty && ex.difficulty === 'beginner') score -= 3;
+
+    // 7. Техника/образовательная ценность
+    const hasTechnique = !!(ex as any).technique;
+    if (hasTechnique) { score += 5; rationales.push('Есть техника +5'); }
+    const hasComments = !!(ex as any).comments || !!(ex as any).description;
+    if (hasComments) { score += 3; rationales.push('Есть описание +3'); }
+
+    // 8. Уровень-сложность: совпадение даёт +5
+    if (ex.difficulty === level) { score += 5; rationales.push('Сложность~уровню +5'); }
+    else if (level === 'advanced' && ex.difficulty === 'intermediate') { score += 2; rationales.push('Подходит для advanced +2'); }
+
+    // 9. Целевой RIR: compound с низким RIR (0-1) для тяжёлой фазы, изоляция с высоким (3-4) для накопления
+    if (targetRir !== undefined) {
+      if (ex.type === 'compound' && targetRir <= 1) { score += 8; rationales.push('Рекомендован для тяжёлой фазы (RIR ' + targetRir + ') +8'); }
+      else if (ex.type === 'isolation' && targetRir >= 3) { score += 6; rationales.push('Рекомендован для накопления (RIR ' + targetRir + ') +6'); }
+    }
 
     return { ...ex, selectionScore: Math.max(0, score), selectionRationale: rationales };
   });

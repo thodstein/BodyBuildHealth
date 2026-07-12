@@ -1,10 +1,15 @@
 import React, { useRef, useState, useCallback, Fragment, useMemo } from 'react';
 import { EXERCISE_CATALOG, getSubstitutes, canReplace, getExerciseById } from '../../../../core/exercise-catalog';
 import { calcExercisePrescription } from '../../../../engines/training.engine';
+import { SubstitutionPopup } from '../SubstitutionPopup';
+import { getAllVolumeLandmarks } from '../../../../engines/volume-landmarks.engine';
 import { generateRepTempo } from '../../../../engines/rep-tempo-engine';
 import { PCT_FOR_RIR, GROUP_RU, ACCENT, DIM, SET_TEMPLATES, type ManualResult, type ManualWeek } from './types';
 import type { TrainingProfile } from '../training-profile';
 import { PHASE_LABELS, type BBPhase } from './phase-periodization';
+import { getPlanFeedback } from '../../../../engines/plan-execution-feedback.engine';
+import { validatePlan, weeklySetsFromManualResult } from '../../../../engines/plan-validator';
+import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } from '../PlanCharts';
 
 interface Props {
   result: ManualResult | null;
@@ -56,30 +61,78 @@ function getExerciseNote(ex: { name: string; role?: string; rir: number; sets: n
   return notes.join(' | ');
 }
 
-function calcQualityScore(days: any[], weeklySets: Record<string, number>, level: string, goal: string): { score: number; color: string; breakdown: { label: string; ok: boolean; detail: string }[] } {
+function calcQualityScore(days: any[], weeklySets: Record<string, number>, level: string, goal: string): {
+  score: number; color: string;
+  breakdown: { label: string; ok: boolean; detail: string }[];
+  recommendations: string[];
+  perMuscle: { muscle: string; sets: number; mev: number; mav: number; mrv: number; status: string; pct: number }[];
+} {
+  const vl = getAllVolumeLandmarks(level);
   const breakdown: { label: string; ok: boolean; detail: string }[] = [];
-  const MRV_MAP: Record<string, number> = { beginner: 15, intermediate: 20, advanced: 24, enhanced: 28 };
-  const mrv = MRV_MAP[level] || 20;
+  const recommendations: string[] = [];
+  const perMuscle: { muscle: string; sets: number; mev: number; mav: number; mrv: number; status: 'недотрен' | 'оптимум' | 'перегруз'; pct: number }[] = [];
   let score = 100;
+
+  // Per-muscle analysis using volume landmarks
   for (const [g, sets] of Object.entries(weeklySets)) {
-    if (sets > mrv * 1.15) { score -= 8; breakdown.push({ label: 'Объём ' + g, ok: false, detail: g + ': ' + sets + ' сетов > MRV×1.15=' + Math.round(mrv * 1.15) + ' ⚠ перегруз' }); }
-    else if (sets < mrv * 0.4) { score -= 6; breakdown.push({ label: 'Объём ' + g, ok: false, detail: g + ': ' + sets + ' сетов < MEV=' + Math.round(mrv * 0.4) + ' — недотрен' }); }
-    else { breakdown.push({ label: 'Объём ' + g, ok: true, detail: g + ': ' + sets + ' сетов (MEV→MRV)' }); }
+    const key = Object.keys(vl).find(k => k === g || k === g.replace(/s$/, ''));
+    if (!key || !vl[key]) continue;
+    const { mev, mav, mrv } = vl[key];
+    let status: 'недотрен' | 'оптимум' | 'перегруз' = 'оптимум';
+    const pct = mrv > 0 ? (sets / mrv) * 100 : 0;
+    if (sets < mev) { status = 'недотрен'; score -= 8; }
+    else if (sets > mrv) { status = 'перегруз'; score -= 6; }
+    perMuscle.push({ muscle: g, sets, mev, mav, mrv, status, pct: Math.round(pct) });
   }
-  const groupsPresent = Object.keys(weeklySets).length;
+
+  // Build detailed breakdown from perMuscle
+  for (const pm of perMuscle) {
+    if (pm.status === 'недотрен') {
+      breakdown.push({ label: 'Недотрен ' + pm.muscle, ok: false, detail: pm.muscle + ': ' + pm.sets + ' сетов < MEV=' + pm.mev + '. Добавьте ' + (pm.mev - pm.sets) + ' сетов. ' });
+      recommendations.push('➕ ' + pm.muscle + ': +' + (pm.mev - pm.sets) + ' сетов/нед (MEV=' + pm.mev + ')');
+    } else if (pm.status === 'перегруз') {
+      breakdown.push({ label: 'Перегруз ' + pm.muscle, ok: false, detail: pm.muscle + ': ' + pm.sets + ' сетов > MRV=' + pm.mrv + '. Убавьте ' + (pm.sets - pm.mrv) + ' сетов.' });
+      recommendations.push('➖ ' + pm.muscle + ': −' + (pm.sets - pm.mrv) + ' сетов/нед (MRV=' + pm.mrv + ')');
+    } else {
+      breakdown.push({ label: pm.muscle, ok: true, detail: pm.muscle + ': ' + pm.sets + ' сетов (MEV=' + pm.mev + '–MRV=' + pm.mrv + ') — в зоне' });
+    }
+  }
+
+  const groupsPresent = perMuscle.length;
   if (groupsPresent < 4) { score -= 10; breakdown.push({ label: 'Охват групп', ok: false, detail: groupsPresent + ' групп (мин. 4)' }); }
   else { breakdown.push({ label: 'Охват групп', ok: true, detail: groupsPresent + ' групп' }); }
+
   const totalEx = days.reduce((s: number, d: any) => s + d.exercises.length, 0);
   const avgEx = Math.round(totalEx / Math.max(1, days.length));
   if (avgEx < 3) { score -= 15; breakdown.push({ label: 'Плотность', ok: false, detail: avgEx + ' упр/день — слишком мало' }); }
   else if (avgEx > 14) { score -= 5; breakdown.push({ label: 'Плотность', ok: false, detail: avgEx + ' упр/день — слишком много' }); }
   else { breakdown.push({ label: 'Плотность', ok: true, detail: avgEx + ' упр/день — оптимально' }); }
+
   const hasMain = days.some((d: any) => d.exercises.some((e: any) => e.role === 'main'));
   if (!hasMain) { score -= 20; breakdown.push({ label: 'Базовые', ok: false, detail: 'Нет базовых упражнений' }); }
   else { breakdown.push({ label: 'Базовые', ok: true, detail: 'Есть compound-упражнения' }); }
+
+  // Balance: detect если какая-то группа сильно отстаёт по % от MRV
+  if (perMuscle.length >= 2) {
+    const pcts = perMuscle.filter(p => p.mrv > 0).map(p => p.pct);
+    const maxPct = Math.max(...pcts);
+    const minPct = Math.min(...pcts);
+    if (maxPct - minPct > 40) {
+      score -= 5;
+      const minGroup = perMuscle.find(p => p.pct === minPct);
+      const maxGroup = perMuscle.find(p => p.pct === maxPct);
+      if (minGroup && maxGroup) {
+        breakdown.push({ label: 'Дисбаланс', ok: false, detail: minGroup.muscle + ' (' + minGroup.pct + '%) vs ' + maxGroup.muscle + ' (' + maxGroup.pct + '%) — разрыв >40%' });
+        recommendations.push('⚖ ' + minGroup.muscle + ' отстаёт от ' + maxGroup.muscle + '. Увеличьте объём для ' + minGroup.muscle + '.');
+      }
+    } else {
+      breakdown.push({ label: 'Баланс', ok: true, detail: 'Разрыв между группами ≤40% — сбалансировано' });
+    }
+  }
+
   score = Math.max(0, Math.min(100, score));
   const color = score >= 80 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
-  return { score, color, breakdown };
+  return { score, color, breakdown, recommendations, perMuscle };
 }
 
 function calcLoadAnalysis(days: any[]): { monotony: number; avgDaily: number; totalWeekly: number; dailyLoads: number[]; strain: number } {
@@ -120,7 +173,7 @@ export const PlanDisplay: React.FC<Props> = ({
   result, manualWorkMax, tprofile, goal, level, mesoLength, daysPerWeek,
   setResult, onToRuntime, globalTempoStr,
 }) => {
-  const [subModal, setSubModal] = useState<{ dayIdx: number; exIdx: number; options: { id: string; name: string; reason: string }[] } | null>(null);
+  const [subTarget, setSubTarget] = useState<{ dayIdx: number; exIdx: number } | null>(null);
   const [inlineEdit, setInlineEdit] = useState<{ dayIdx: number; exIdx: number; field: string; value: string } | null>(null);
   const [dragFrom, setDragFrom] = useState<{ dayIdx: number; exIdx: number } | null>(null);
   const [showMacroPreview, setShowMacroPreview] = useState(false);
@@ -158,31 +211,21 @@ export const PlanDisplay: React.FC<Props> = ({
   const openSubstitute = useCallback((di: number, ei: number) => {
     if (!result) return;
     const e = result.days[di]?.exercises[ei]; if (!e) return;
-    const cat = EXERCISE_CATALOG.find(c => c.name === e.name) || getExerciseById(e.name);
-    if (!cat) { setSubModal({ dayIdx: di, exIdx: ei, options: [] }); return; }
-    const opts: { id: string; name: string; reason: string }[] = [];
-    const pattern = cat.movementPattern || 'unknown';
-    const patternMatches = EXERCISE_CATALOG.filter(ex => ex.group === cat.group && ex.movementPattern === pattern && ex.id !== cat.id);
-    patternMatches.forEach(ex => opts.push({ id: ex.id, name: ex.name, reason: 'Идеальная замена (Паттерн: ' + pattern + ')' }));
-    const sub = getSubstitutes(cat.id);
-    if (sub) { for (const s of sub.substitutes) { if (opts.find(o => o.id === s.id)) continue; const rep = getExerciseById(s.id); opts.push({ id: s.id, name: rep?.name || s.id, reason: s.reason }); } }
-    if (opts.length === 0) { EXERCISE_CATALOG.filter(c => c.group === cat.group && c.id !== cat.id).slice(0, 6).forEach(c => opts.push({ id: c.id, name: c.name, reason: 'Альтернатива той же группы' })); }
-    setSubModal({ dayIdx: di, exIdx: ei, options: opts });
+    setSubTarget({ dayIdx: di, exIdx: ei });
   }, [result]);
 
   const applySubstitute = useCallback((newId: string) => {
-    if (!subModal || !result) return;
-    const rep = getExerciseById(newId); if (!rep) { setSubModal(null); return; }
-    const { dayIdx, exIdx } = subModal;
+    if (!subTarget || !result) return;
+    const rep = getExerciseById(newId); if (!rep) { setSubTarget(null); return; }
+    const { dayIdx, exIdx } = subTarget;
     const old = result.days[dayIdx].exercises[exIdx];
-    const reason = subModal.options.find(o => o.id === newId)?.reason || '';
     const wm = (tprofile.workMax[rep.group] || manualWorkMax[rep.group] || 80);
     const pct = PCT_FOR_RIR[Math.max(0, Math.min(5, old.rir))] ?? 0.9;
     const weight = Math.round(wm * pct);
     const days = result.days.map((d, di) => di === dayIdx ? { ...d, exercises: d.exercises.map((ex, ei) => ei === exIdx ? { ...ex, name: rep.name, group: rep.group, weight } : ex) } : d);
-    setResult({ ...result, days, corrections: [...result.corrections, '🔄 Замена: "' + old.name + '" → "' + rep.name + '" (' + reason + '). Вес ' + weight + ' кг.'] });
-    setSubModal(null);
-  }, [subModal, result, tprofile, manualWorkMax, setResult]);
+    setResult({ ...result, days, corrections: [...result.corrections, '🔄 Замена: "' + old.name + '" → "' + rep.name + '". Вес ' + weight + ' кг.'] });
+    setSubTarget(null);
+  }, [subTarget, result, tprofile, manualWorkMax, setResult]);
 
   const handleDragStart = useCallback((e: React.DragEvent, di: number, ei: number) => {
     setDragFrom({ dayIdx: di, exIdx: ei }); e.dataTransfer.effectAllowed = 'move';
@@ -333,6 +376,39 @@ export const PlanDisplay: React.FC<Props> = ({
         </div>
       )}
 
+      {(() => {
+        const fb = getPlanFeedback();
+        return fb.avgRpe > 0 ? (
+          <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', marginBottom: 6 }}>📊 Фидбэк план→выполнение</div>
+            {fb.deloadRecommended && <div style={{ padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontSize: 9, fontWeight: 700, marginBottom: 6 }}>⛔ РЕКОМЕНДОВАНА РАЗГРУЗКА</div>}
+            {fb.reasons.map((r, i) => <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginBottom: 2, paddingLeft: 4 }}>{r}</div>)}
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              {fb.weightMultiplier !== 1 && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(96,165,250,0.1)', color: '#60a5fa' }}>Вес x{fb.weightMultiplier}</span>}
+              {fb.rirShift !== 0 && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>RIR {fb.rirShift > 0 ? '+' : ''}{fb.rirShift}</span>}
+              {fb.volumeMultiplier !== 1 && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>Объём x{fb.volumeMultiplier}</span>}
+            </div>
+          </div>
+        ) : null;
+      })()}
+
+      {result && (() => {
+        const ws = weeklySetsFromManualResult(result);
+        const banners = validatePlan({ weeklySets: ws, level, goal, daysPerWeek, weakPoints: tprofile.weakPoints || [], readiness: tprofile.recovery });
+        if (banners.length === 0) return null;
+        return (
+          <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(220,38,38,0.04)', border: '1px solid rgba(220,38,38,0.15)' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#f87171', marginBottom: 6 }}>🛡 Валидация плана</div>
+            {banners.map((b, i) => (
+              <div key={i} style={{ fontSize: 9, color: b.level === 'error' ? '#f87171' : b.level === 'warning' ? '#fbbf24' : 'rgba(255,255,255,0.6)', marginBottom: 4, padding: '4px 6px', borderRadius: 4, background: b.level === 'error' ? 'rgba(248,113,113,0.08)' : b.level === 'warning' ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.03)', borderLeft: '2px solid ' + (b.level === 'error' ? '#f87171' : b.level === 'warning' ? '#fbbf24' : 'rgba(255,255,255,0.2)'), lineHeight: 1.4 }}>
+                <div style={{ fontWeight: 700 }}>{b.level === 'error' ? '⛔' : b.level === 'warning' ? '⚠' : 'ℹ'} {b.title}</div>
+                <div style={{ opacity: 0.7, marginTop: 1 }}>{b.detail}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       <div style={{ marginTop: 8, padding: 10, borderRadius: 10, border: '1px solid ' + quality.color + '40', background: quality.color + '08' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <span style={{ fontSize: 12, fontWeight: 800, color: quality.color }}>🎯 Качество плана</span>
@@ -348,6 +424,33 @@ export const PlanDisplay: React.FC<Props> = ({
             <span style={{ opacity: 0.8 }}>{b.detail}</span>
           </div>
         ))}
+        {/* Per-muscle table */}
+        {quality.perMuscle && quality.perMuscle.length > 0 && (
+          <div style={{ marginTop: 8, overflowX: 'auto' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: 4 }}>Мышца · Сеты · MEV · MAV · MRV · %</div>
+            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+              {quality.perMuscle.map(pm => {
+                const st = pm.status === 'недотрен' ? '#ef4444' : pm.status === 'перегруз' ? '#f59e0b' : '#22c55e';
+                return (
+                  <div key={pm.muscle} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 6, background: st + '10', border: '1px solid ' + st + '30', fontSize: 9 }}>
+                    <span style={{ fontWeight: 700, color: '#fff' }}>{pm.muscle}</span>
+                    <span style={{ color: st, fontWeight: 700 }}>{pm.sets}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.4)' }}>· MEV {pm.mev} · MAV {pm.mav} · MRV {pm.mrv} · {pm.pct}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {/* Recommendations */}
+        {(quality as any).recommendations && (quality as any).recommendations.length > 0 && (
+          <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>💡 Рекомендации</div>
+            {(quality as any).recommendations.map((r: string, i: number) => (
+              <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 2, paddingLeft: 4, borderLeft: '2px solid #f59e0b' }}>{r}</div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)' }}>
@@ -385,6 +488,34 @@ export const PlanDisplay: React.FC<Props> = ({
       </div>
 
       {showMacroPreview && <MacroPreview result={result} mesoLength={mesoLength} level={level} />}
+
+      {/* SVG Charts (when multi-week data available) */}
+      {hasWeeks && (() => {
+        const wks = result.weeks || [];
+        const vdata: WeekVolume[] = wks.map(w => {
+          const muscles: Record<string, number> = {};
+          w.days.forEach(d => d.exercises.forEach(e => { const g = e.group || 'other'; muscles[g] = (muscles[g] || 0) + e.sets; }));
+          return { week: w.weekNumber, totalSets: w.days.reduce((s, d) => s + d.exercises.reduce((ss, e) => ss + e.sets, 0), 0), muscles };
+        });
+        const rdata: RirRecord[] = [];
+        wks.forEach(w => w.days.forEach(d => d.exercises.forEach(e => rdata.push({ week: w.weekNumber, exercise: e.name, rir: e.rir || 0 }))));
+        return (
+          <>
+            {vdata.length >= 2 && (
+              <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>📊 Объём по неделям (сетов)</div>
+                <VolumeByWeekChart data={vdata} />
+              </div>
+            )}
+            {rdata.length >= 2 && (
+              <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.15)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#a855f7', marginBottom: 6 }}>📉 RIR-drift по неделям</div>
+                <RirDriftChart data={rdata} />
+              </div>
+            )}
+          </>
+        );
+      })()}
 
   {hasWeeks && (
     <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.15)' }}>
@@ -566,20 +697,17 @@ export const PlanDisplay: React.FC<Props> = ({
         ▶ К выполнению (SessionPlayer)
       </button>
 
-      {subModal && (
-        <div onClick={() => setSubModal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#18181b', borderRadius: 14, padding: 16, maxWidth: 400, width: '100%', maxHeight: '70vh', overflowY: 'auto' }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT, marginBottom: 10 }}>🔄 Замена упражнения</div>
-            {subModal.options.length === 0 ? <div style={{ fontSize: 11, color: DIM }}>Нет доступных замен.</div> : subModal.options.map(o => (
-              <button key={o.id} onClick={() => applySubstitute(o.id)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)', color: '#fff', cursor: 'pointer', marginBottom: 4, fontSize: 11 }}>
-                <div style={{ fontWeight: 700 }}>{o.name}</div>
-                <div style={{ fontSize: 9, color: DIM }}>{o.reason}</div>
-              </button>
-            ))}
-            <button onClick={() => setSubModal(null)} style={{ width: '100%', marginTop: 8, padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: DIM, cursor: 'pointer' }}>Отмена</button>
-          </div>
-        </div>
-      )}
+      {subTarget && (() => {
+        const e = result?.days[subTarget.dayIdx]?.exercises[subTarget.exIdx];
+        return e ? (
+          <SubstitutionPopup
+            exerciseName={e.name}
+            group={e.group}
+            onSelect={applySubstitute}
+            onClose={() => setSubTarget(null)}
+          />
+        ) : null;
+      })()}
 
       {inlineEdit && (
         <div onClick={() => setInlineEdit(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>

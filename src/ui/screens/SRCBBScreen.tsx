@@ -358,7 +358,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     const plan = buildBBPlan({ 
       patternId: bbBest.pattern.id, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks, 
       workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any 
-    });
+    }, pedAdapt);
     setBuiltBb(plan); setBbWeekSel(1);
     // TRAINING INTEGRATION: конвертировать BB план в сессии
     try { const sessions = bbPlanToSessions(plan); saveBridgeSessions(sessions); } catch { /* ignore */ }

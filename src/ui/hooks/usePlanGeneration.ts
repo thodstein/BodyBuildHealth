@@ -11,6 +11,7 @@ export interface PlanGenDeps {
   manualWorkMax: Record<string, number>;
   injuries: BuildPlanInput['injuries'];
   pctForRir: Record<number, number>;
+  courseIntensity?: 'none' | 'mild' | 'moderate' | 'heavy';
 }
 
 export interface PlanGenResult {
@@ -31,7 +32,7 @@ export interface PlanGenOpts {
  * генерирующую дни плана ручного конструктора. Чистое ядро — в engine buildPlanDays (тестируется).
  */
 export function usePlanGeneration(deps: PlanGenDeps) {
-  const { goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir } = deps;
+  const { goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, courseIntensity } = deps;
   return useCallback(
     (cycle: string[][], mrv: number, opts?: PlanGenOpts): PlanGenResult =>
       buildPlanDays({
@@ -40,7 +41,8 @@ export function usePlanGeneration(deps: PlanGenDeps) {
         currentReadiness: opts?.currentReadiness ?? 100,
         targetTonnage: opts?.targetTonnage,
         sequenceStrategy: opts?.sequenceStrategy ?? 'classic',
+        courseIntensity,
       }),
-    [goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir]
+    [goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, courseIntensity]
   );
 }

@@ -142,6 +142,7 @@ export const TrainingConstructor: React.FC<Props> = ({
     goal, level, mesoLength, weakPoints,
     equipment: tprofile.equipment, workMax: tprofile.workMax,
     manualWorkMax, injuries: tprofile.injuries || [], pctForRir: PCT_FOR_RIR,
+    courseIntensity: tprofile.onCourse ? (tprofile.courseIntensity || 'mild') : 'none',
   });
 
   const [tempoAdjust, setTempoAdjust] = useState<{ eccentric: number; bottomPause: number; concentric: number; topPause: number; label?: string } | null>(null);
@@ -498,6 +499,7 @@ export const TrainingConstructor: React.FC<Props> = ({
         patternId: bbSplitId, level, goal: (goal || 'mass') as any, weeks: mesoLength,
         workMax: workMaxMerged, weakPoints: tprofile.weakPoints || [],
         volumeGoal: 'mav',
+        injuries: (tprofile.injuries || []) as any,
       }, pedAdapt);
 
       // Convert BBPlan → ManualResult

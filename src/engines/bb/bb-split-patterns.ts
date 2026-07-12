@@ -266,6 +266,24 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
     description: 'FB 4×/нед: тяж/памп/тяж/памп. Максимальная частота для продвинутых с PED или отличным восстановлением.',
     direction: 'both',
   },
+  {
+    id: 'pro_8_day',
+    name: 'PRO 8-дневный сплит (специализация)',
+    rotationDays: 8, sessionsPerRotation: 6,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'LegsBiceps' },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'Push' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Pull' },
+      { kind: 'отдых', character: null },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Legs' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Push' },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'Pull' },
+      { kind: 'отдых', character: null },
+    ],
+    level: ['advanced', 'enhanced'],
+    description: '8-дн ротация: квадрицепс тяж+бицепс / грудь памп+плечи+трицепс / спина тяж+задняя дельта+трапеции / отдых / ноги тяж (бицепс бедра+ягодицы) / грудь тяж+трицепс / спина памп+бицепс+задняя дельта / отдых. Специализация слабых групп. Только для продвинутых (KMS-MS).',
+    direction: 'bodybuilding',
+  },
 ];
 
 export function getPattern(id: string): SplitPattern | undefined {

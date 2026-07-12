@@ -19,6 +19,9 @@ import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catal
 import { selectExercisesSmart } from '../exercise-selector.engine';
 import { PCT_FOR_RIR, S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation } from './bb-ped-adaptation.engine';
+import type { Injury } from '../manual-plan-builder';
+import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
+import { findSubstitutions } from '../exercise-substitution.engine';
 
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
 export type BBVolumeGoal = 'mev' | 'mav' | 'mrv';
@@ -33,6 +36,7 @@ export interface BBBuilderInput {
   focusGroup?: string;           // группа специализации → MAV↑↑
   volumeGoal?: BBVolumeGoal;     // цель по объёму: MEV | MAV | MRV
   specialization?: boolean;      // true = слабые на MAV+10%, остальные на MEV
+  injuries?: Injury[];           // травмы — группы с активной травмой исключаются из плана
 }
 
 export interface BBSet {
@@ -104,6 +108,8 @@ const TAG_MUSCLES: Record<string, string[]> = {
   LowerPower: ['quads', 'hamstrings', 'glutes', 'calves', 'abs', 'lower_back'],
   UpperHyp: ['chest', 'back', 'delt_front', 'delt_mid', 'delt_rear', 'biceps', 'triceps'],
   LowerHyp: ['quads', 'hamstrings', 'glutes', 'calves', 'abs'],
+  // Специализированные теги для 8-дневного PRO-сплита
+  LegsBiceps: ['quads', 'hamstrings', 'calves', 'biceps'],
 };
 /** Для каких мышц в BB-контексте ВСЕГДА брать только изоляцию (нет compound аналогов). */
 const ALWAYS_ISOLATION: Set<string> = new Set(['calves', 'forearms', 'abs']);
@@ -165,13 +171,21 @@ function buildSession(
   pedAdapt?: PEDAdaptation,
   dailyCap: number = 12,
   level: string = 'intermediate',
+  injuryProfile: string[] = [],
+  injuredMuscles: Set<string> = new Set(),
+  excludedMuscles: Set<string> = new Set(),
+  gradedInjuries: Injury[] = [],
+  today: string = '',
 ): BBSession {
   const character = sched.character as DayCharacter;
   const muscles = musclesForTag(sched.sessionTag);
   const exercises: BBExercise[] = [];
   
   // S-MRV: Системный бюджет утомления на день.
-  const dayFatigueBudget = Math.round(dailyCap * S_MRV_FACTOR * (pedAdapt?.combinedRecoveryMultiplier ?? 1));
+  // Формула: dailyCap × S_MRV_FACTOR × pedMult × levelMult
+  const levelMultMap: Record<string, number> = { beginner: 0.9, intermediate: 1.0, advanced: 1.15, enhanced: 1.3 };
+  const levelMult = levelMultMap[level] ?? 1.0;
+  const dayFatigueBudget = Math.round(dailyCap * S_MRV_FACTOR * (pedAdapt?.combinedRecoveryMultiplier ?? 1) * levelMult);
   
   // Pre-calculate each muscle's expected volume to allocate budget proportionally
   interface MusclePlan {
@@ -183,6 +197,12 @@ function buildSession(
   let totalExpectedFatigue = 0;
   
   for (const muscle of muscles) {
+    // Полностью исключённые группы пропускаем
+    if (excludedMuscles.has(muscle)) continue;
+    // Градированные травмы: не пропускаем, но применим замену ниже
+    const isGraded = gradedInjuries.some(inj => inj.muscle === muscle);
+    const injuryFactor = gradedInjuries.find(inj => inj.muscle === muscle);
+
     const resolved = resolveCharacter(muscle, character);
     let role: 'primary' | 'accessory' = 'accessory';
     if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж')) {
@@ -203,12 +223,43 @@ function buildSession(
     const pool = getExercisesByGroup(catalogGroupFor(muscle));
     const selected = selectExercisesSmart({
       candidates: pool, muscleGroup: muscle, count: exerciseCount,
-      selectedIds: [], equipment: [], weakZones: weakPoints, level, injuryProfile: [], type: selType,
+      selectedIds: [], equipment: [], weakZones: weakPoints, level, injuryProfile, type: selType,
+      targetRir: rir,
     });
     const exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5 }];
     const expectedFatigue = exerciseCount * (sets / exerciseCount) * (((exDatas[0] as any)?.fatigueCost || 5));
     totalExpectedFatigue += expectedFatigue;
     plans.push({ muscle, resolved, role, sets, exerciseCount, rir, reps, weight, pool, exDatas, selType });
+  }
+
+  // Apply substitution for graded injuries: replace exercises and adjust loads
+  for (const pl of plans) {
+    const isGraded = gradedInjuries.some(inj => inj.muscle === pl.muscle);
+    const injuryFactor = gradedInjuries.find(inj => inj.muscle === pl.muscle);
+    if (isGraded && injuryFactor) {
+      const postInjuryVolPct = getInjuryVolumeFactor(injuryFactor, today || todayStr());
+      const postInjuryWtPct = injuryFactor.weightPct ?? 1.0;
+      const newExDatas: any[] = [];
+      for (const exData of pl.exDatas) {
+        const subs = findSubstitutions((exData as any).name || exData.id, pl.muscle, new Set([pl.muscle]));
+        if (subs.length > 0) {
+          const sub = subs[0];
+          const subEx = sub.exercise;
+          // Keep most plan data, overwrite weight/sets/reps
+          newExDatas.push({
+            ...(subEx as any),
+            substitutionWeightPct: sub.weightPct * postInjuryWtPct,
+            substitutionVolumePct: sub.volumePct * postInjuryVolPct,
+            originalName: (exData as any).name,
+            substitutionReason: sub.reason,
+            substituted: sub.exercise.name !== ((exData as any).name || exData.id),
+          });
+        } else {
+          newExDatas.push(exData);
+        }
+      }
+      pl.exDatas = newExDatas;
+    }
   }
 
   // Process each muscle with proportional budget
@@ -219,7 +270,11 @@ function buildSession(
     let remainingBudget = Math.max(1, Math.min(muscleBudget, Math.floor(dayFatigueBudget * 0.5))); // cap at 50% total to avoid one group hogging
     
     for (const exData of pl.exDatas) {
-      const exSets = Math.max(1, Math.round(pl.sets / pl.exDatas.length));
+      const wPct = (exData as any).substitutionWeightPct ?? 1.0;
+      const vPct = (exData as any).substitutionVolumePct ?? 1.0;
+      const isSubstituted = (exData as any).substituted === true;
+      const repsCap = (exData as any).repsCap ?? 20;
+      const exSets = Math.max(1, Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct));
       const cost = ((exData as any)?.fatigueCost || 5) * exSets;
       if (remainingBudget < cost) {
         const reduced = Math.floor(remainingBudget / ((exData as any)?.fatigueCost || 5));
@@ -230,13 +285,16 @@ function buildSession(
         const tempoSpec = tempoFor(pl.resolved as DayCharacter);
         const restSeconds = REST_BY_CHARACTER[pl.resolved as DayCharacter];
         const workSets: BBSet[] = Array.from({ length: adjustedSets }, () => ({
-          reps: pl.reps, rir: pl.rir, weight: pl.weight,
+          reps: Math.round(Math.min(pl.reps, repsCap)), rir: isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir,
+          weight: Math.round(pl.weight * wPct * 10) / 10,
           tempo: tempoSpec.notation, restSeconds,
         }));
         exercises.push({
-          muscle: pl.muscle, name: (exData as any).name, role: pl.role, character: pl.resolved as DayCharacter,
-          sets: adjustedSets, repsRange: [pl.reps - 2, pl.reps + 2], rir: pl.rir, workSets,
-          exerciseName: (exData as any).name, tempoSpec: tempoSpec.notation, restSeconds,
+          muscle: pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: pl.resolved as DayCharacter,
+          sets: adjustedSets, repsRange: [Math.round(Math.min(pl.reps - 2, repsCap)), Math.round(Math.min(pl.reps + 2, repsCap))],
+          rir: isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir,
+          workSets, exerciseName: (exData as any).name || (exData as any).id,
+          tempoSpec: tempoSpec.notation, restSeconds,
         });
         continue;
       }
@@ -244,17 +302,25 @@ function buildSession(
       const tempoSpec = tempoFor(pl.resolved as DayCharacter);
       const restSeconds = REST_BY_CHARACTER[pl.resolved as DayCharacter];
       const workSets: BBSet[] = Array.from({ length: exSets }, () => ({
-        reps: pl.reps, rir: pl.rir, weight: pl.weight,
+        reps: Math.round(Math.min(pl.reps, repsCap)), rir: isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir,
+        weight: Math.round(pl.weight * wPct * 10) / 10,
         tempo: tempoSpec.notation, restSeconds,
       }));
       exercises.push({
-        muscle: pl.muscle, name: (exData as any).name, role: pl.role, character: pl.resolved as DayCharacter,
-        sets: exSets, repsRange: [pl.reps - 2, pl.reps + 2], rir: pl.rir, workSets,
-        exerciseName: (exData as any).name, tempoSpec: tempoSpec.notation, restSeconds,
+        muscle: pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: pl.resolved as DayCharacter,
+        sets: exSets, repsRange: [Math.round(Math.min(pl.reps - 2, repsCap)), Math.round(Math.min(pl.reps + 2, repsCap))],
+        rir: isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir,
+        workSets, exerciseName: (exData as any).name || (exData as any).id,
+        tempoSpec: tempoSpec.notation, restSeconds,
       });
     }
   }
   return { day: dayInRotation, weekOffset: 0, character, sessionTag: sched.sessionTag, exercises };
+}
+
+function todayStr(): string {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
 export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BBPlan {
@@ -264,13 +330,23 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const weakPoints = input.weakPoints || [];
   const focusGroup = input.focusGroup;
   const sessions = sessionsOf(pattern);
+  const injuries = input.injuries || [];
+
+  const today = todayStr();
+  const excludedMuscles = getExcludedMuscles(injuries, today);
+  const gradedInjuries = getGradedInjuries(injuries, today);
+  // Общий пул травмированных мышц (для injuryProfile — передаётся в selectExercisesSmart)
+  const injuredMuscles = new Set([...excludedMuscles, ...gradedInjuries.map(inj => inj.muscle)]);
+  const injuryProfile = [...injuredMuscles];
 
   // Вычисляем dailyCap (max групп в день) для S-MRV-бюджета
-  const maxGroupsPerSession = Math.max(1, ...sessions.map(s => musclesForTag(s.sessionTag).length));
+  const maxGroupsPerSession = Math.max(1, ...sessions.map(s => musclesForTag(s.sessionTag).filter(m => !excludedMuscles.has(m) && !gradedInjuries.some(g => g.muscle === m)).length));
   const dailyCap = Math.max(10, Math.min(16, Math.round(8 + maxGroupsPerSession * 2)));
 
   const muscleSessionCount: Record<string, number> = {};
-  for (const s of sessions) for (const m of musclesForTag(s.sessionTag)) muscleSessionCount[m] = (muscleSessionCount[m] || 0) + 1;
+  for (const s of sessions) for (const m of musclesForTag(s.sessionTag)) {
+    if (!excludedMuscles.has(m)) muscleSessionCount[m] = (muscleSessionCount[m] || 0) + 1;
+  }
 
   const muscleVolumeRotation: Record<string, number> = {};
   const specWeak = input.specialization ? expandWeakForSpecialization(input.weakPoints || []).slice(0, 2) : [];
@@ -298,7 +374,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const weekSessions: BBSession[] = [];
     for (let i = 0; i < sessions.length; i++) {
       const s = sessions[i];
-      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, dailyCap, level);
+      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, dailyCap, level, injuryProfile, new Set(injuryProfile), excludedMuscles, gradedInjuries, today);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       weekSessions.push(sess);
     }
@@ -313,6 +389,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     `RIR-прогрессия: тяж 2→0, памп 3→2 к пику; вес = workMax×%1RM(RIR)`,
     `S-MRV: автоматический кап объёма на основе бюджета утомления сессии.`,
     ...(pedAdapt ? [`PED-адаптация: MRV×${pedAdapt.combinedMrvMultiplier.toFixed(2)}, восстановление×${pedAdapt.combinedRecoveryMultiplier.toFixed(2)}`] : []),
+    ...(excludedMuscles.size > 0 ? [`Травмы: исключены ${[...excludedMuscles].join(', ')} — упражнения на эти группы не назначаются.`] : []),
+    ...(gradedInjuries.length > 0 ? [`Градированные травмы: ${gradedInjuries.map(i => i.muscle).join(', ')} — упражнения заменены на безопасные альтернативы с пониженным весом/объёмом.`] : []),
   ];
 
   return { pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale };

@@ -1,6 +1,7 @@
 import React from 'react';
 import { PopupSelect } from '../../SRCBBScreen_parts/TrainingPopups';
 import { TrainingProfileCard } from '../TrainingProfileCard';
+import { InjurySelectCard } from '../InjurySelectCard';
 import type { TrainingProfile } from '../training-profile';
 import { ACCENT, DIM } from './types';
 
@@ -40,6 +41,15 @@ export const ConstructorProfile: React.FC<Props> = ({
         <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>
           Длина мезоцикла — единственный параметр, которого нет в профиле. Цель, уровень, дни, восстановление, усталость, слабые группы и оборудование задаются в карточке профиля выше (единый источник).
         </div>
+
+        {/* Карточка травм — добавляем перед длиной мезоцикла */}
+        <div style={{ marginBottom: 8 }}>
+          <InjurySelectCard
+            injuries={tprofile.injuries || []}
+            onChange={inj => updateTProfile({ injuries: inj })}
+          />
+        </div>
+
         <PopupSelect label="Длина мезоцикла" value={String(mesoLength)}
           onChange={v => setMesoLength(+v)}
           options={[

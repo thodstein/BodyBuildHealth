@@ -13,9 +13,10 @@
  *  - 3D эволюция объёма/интенсивности/частоты по неделям
  *  - Цветная индикация фазы в календаре и плане
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDataLink } from '../../../core/data-link';
-import { EXERCISE_CATALOG, getExercisesByGroup } from '../../../core/exercise-catalog';
+import { EXERCISE_CATALOG, getExercisesByGroup, getSubstitutes, getExerciseById } from '../../../core/exercise-catalog';
+import { SubstitutionPopup } from './SubstitutionPopup';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { rankBBSplits, explainBBSelection, getMuscleFrequencies, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
 import { buildBBPlan, type BBPlan, type BBExercise, type BBSession, type BBSet } from '../../../engines/bb/bb-builder.engine';
@@ -29,11 +30,16 @@ import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
 import { applyToPlanner } from './planner-bridge';
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
+import { InjurySelectCard } from './InjurySelectCard';
+import type { InjurySelectEntry } from './InjurySelectCard';
 import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, type LoadStrategy, type DeloadType } from '../../../engines/bb/bb-autocoach.engine';
 import { PCT_FOR_RIR } from '../../../engines/rir-table';
 import { getCyclesByDirection, getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 import { convertCycleToBBPlan } from '../../../engines/bb/cycle-to-plan';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
+import { getPlanFeedback } from '../../../engines/plan-execution-feedback.engine';
+import { validatePlan, weeklySetsFromBBPlan } from '../../../engines/plan-validator';
+import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } from './PlanCharts';
 
 type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -119,20 +125,57 @@ function exerciseComment(ex: BBExercise, weakPoints: string[], focusGroup: strin
   return parts.join(' · ');
 }
 
-function calcQualityScore(metrics: BBPlanMetrics, weakPoints: string[], phases: { week: number; phase: BBPhase }[]): { score: number; label: string; details: string[] } {
+function calcQualityScore(metrics: BBPlanMetrics, weakPoints: string[], phases: { week: number; phase: BBPhase }[]): {
+  score: number; label: string; details: string[];
+  perMuscle: { muscle: string; sets: number; mev: number; mav: number; mrv: number; pct: number; status: string }[];
+  recommendations: string[];
+} {
   const details: string[] = [];
+  const recommendations: string[] = [];
+  const perMuscle: { muscle: string; sets: number; mev: number; mav: number; mrv: number; pct: number; status: string }[] = [];
   let score = 100;
   let mrvPenalty = 0;
   let weakCoverageBonus = 0;
   for (const m of metrics.perMuscle) {
-    if (m.status === 'exceeding_mrv') { mrvPenalty += 15; details.push('⚠ ' + m.muscle + ': превышение MRV (' + m.totalSets + ' > ' + m.mrv + ')'); }
-    else if (m.status === 'approaching_mrv') { mrvPenalty += 5; details.push('📈 ' + m.muscle + ': близко к MRV (' + m.totalSets + '/' + m.mrv + ')'); }
-    else if (m.status === 'below_mev') { mrvPenalty += 10; details.push('⚠ ' + m.muscle + ': недогруз (' + m.totalSets + ' < MEV ' + m.mev + ')'); }
+    const pct = m.mrv > 0 ? Math.round((m.totalSets / m.mrv) * 100) : 0;
+    let status = 'optimal';
+    if (m.status === 'exceeding_mrv') {
+      mrvPenalty += 15;
+      details.push('⚠ ' + m.muscle + ': превышение MRV (' + m.totalSets + ' > ' + m.mrv + ')');
+      recommendations.push('➖ ' + m.muscle + ': −' + (m.totalSets - m.mrv) + ' сетов/нед (MRV=' + m.mrv + ')');
+      status = 'overload';
+    } else if (m.status === 'approaching_mrv') {
+      mrvPenalty += 5;
+      details.push('📈 ' + m.muscle + ': близко к MRV (' + m.totalSets + '/' + m.mrv + ')');
+      status = 'near_max';
+    } else if (m.status === 'below_mev') {
+      mrvPenalty += 10;
+      details.push('⚠ ' + m.muscle + ': недогруз (' + m.totalSets + ' < MEV ' + m.mev + ')');
+      recommendations.push('➕ ' + m.muscle + ': +' + (m.mev - m.totalSets) + ' сетов/нед (MEV=' + m.mev + ')');
+      status = 'undertrained';
+    }
     if (weakPoints.includes(m.muscle) && m.totalSets >= m.mev) weakCoverageBonus += 10;
-    if (weakPoints.includes(m.muscle) && m.status === 'below_mev') details.push('❌ Слабая группа «' + m.muscle + '» недогружена (' + m.totalSets + '/' + m.mev + ')');
+    if (weakPoints.includes(m.muscle) && m.status === 'below_mev') {
+      details.push('❌ Слабая группа «' + m.muscle + '» недогружена (' + m.totalSets + '/' + m.mev + ')');
+      recommendations.push('🔴 ' + m.muscle + ' (слабая группа): +' + (m.mev - m.totalSets) + ' сетов/нед');
+    }
+    perMuscle.push({ muscle: m.muscle, sets: m.totalSets, mev: m.mev, mav: m.mav, mrv: m.mrv, pct, status });
   }
   score -= mrvPenalty;
   score += Math.min(weakCoverageBonus, 30);
+
+  // Balance detection
+  if (perMuscle.length >= 2) {
+    const sorted = [...perMuscle].filter(p => p.mrv > 0).sort((a, b) => b.pct - a.pct);
+    const maxPct = sorted[0]?.pct || 0;
+    const minPct = sorted[sorted.length - 1]?.pct || 0;
+    if (maxPct - minPct > 40) {
+      score -= 5;
+      details.push('⚖ Дисбаланс объёма: ' + sorted[0].muscle + ' (' + maxPct + '%) vs ' + sorted[sorted.length - 1].muscle + ' (' + minPct + '%)');
+      recommendations.push('⚖ Увеличьте объём для ' + sorted[sorted.length - 1].muscle + ' (отстаёт от ' + sorted[0].muscle + ')');
+    }
+  }
+
   const hasDeload = phases.some(p => p.phase === 'deload');
   if (!hasDeload && phases.length >= 6) { score -= 10; details.push('❌ Нет фазы разгрузки при мезо ' + phases.length + ' нед — риск перетрена'); }
   const hpRatio = metrics.тяжPct > 0 && metrics.пампPct > 0 ? metrics.тяжPct / metrics.пампPct : 0;
@@ -143,7 +186,7 @@ function calcQualityScore(metrics: BBPlanMetrics, weakPoints: string[], phases: 
   }
   score = Math.max(0, Math.min(100, score));
   const label = score >= 85 ? '🟢 Профессионально' : score >= 65 ? '🟡 Хорошо' : score >= 45 ? '🟠 Удовлетворительно' : '🔴 Требует доработки';
-  return { score, label, details };
+  return { score, label, details, perMuscle, recommendations };
 }
 
 function generateWarmupSets(workSetWeight: number, targetSets: number, isCompound: boolean): { load: number; reps: number }[] {
@@ -188,6 +231,7 @@ export const BbAutoConstructor: React.FC = () => {
     ...(prof.workMax || {}),
   }));
   const [weakPoints, setWeakPoints] = useState<string[]>(prof.weakPoints || []);
+  const [injuries, setInjuries] = useState<InjurySelectEntry[]>(prof.injuries || []);
 
   const [selectedSplitId, setSelectedSplitId] = useState<string>('');
   const [builtPlan, setBuiltPlan] = useState<BBPlan | null>(null);
@@ -196,6 +240,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [specializationMode, setSpecializationMode] = useState(false);
   const [editMode, setEditMode] = useState<{ dayIdx: number; exIdx: number } | null>(null);
   const [exerciseEdits, setExerciseEdits] = useState<Record<string, { sets: number; reps: number; weight: number }>>({});
+  const [subTarget, setSubTarget] = useState<{ dayIdx: number; exIdx: number; sessionIdx: number } | null>(null);
   const [exSwapModal, setExSwapModal] = useState<{ si: number; ei: number; muscle: string; currentName: string } | null>(null);
   const [exSwapSearch, setExSwapSearch] = useState('');
 
@@ -222,7 +267,7 @@ export const BbAutoConstructor: React.FC = () => {
   const quality = useMemo(() => metrics ? calcQualityScore(metrics, weakPoints, phases) : null, [metrics, weakPoints, phases]);
 
   useEffect(() => {
-    try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, onCourse: peds.length > 0, loadStrategy, planMode, bbCycleId: selectedCycleId }); } catch {}
+    try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, injuries, onCourse: peds.length > 0, loadStrategy, planMode, bbCycleId: selectedCycleId }); } catch {}
   }, [bbWorkMax, weakPoints, peds, loadStrategy, planMode, selectedCycleId]);
 
   const adjustVolume = (mult: number) => {
@@ -243,6 +288,26 @@ export const BbAutoConstructor: React.FC = () => {
   };
 
   const bbCyclesList = useMemo(() => getCyclesByDirection('bodybuilding'), []);
+
+  const applyBbSubstitution = useCallback((newId: string) => {
+    if (!subTarget || !builtPlan) return;
+    const rep = getExerciseById(newId); if (!rep) { setSubTarget(null); return; }
+    const { dayIdx: si, exIdx: ei } = subTarget;
+    const wk = builtPlan.weeks[bbWeekSel - 1];
+    if (!wk) { setSubTarget(null); return; }
+    const ses = wk.sessions[si];
+    if (!ses) { setSubTarget(null); return; }
+    const oldEx = ses.exercises[ei];
+    if (!oldEx) { setSubTarget(null); return; }
+    const wm = bbWorkMax[(rep as any).group || oldEx.muscle || 'chest'] || 80;
+    const pct = PCT_FOR_RIR[Math.max(0, Math.min(5, oldEx.rir))] ?? 0.9;
+    const weight = Math.round(wm * pct);
+    const w2 = structuredClone(builtPlan.weeks);
+    const targetSession = w2[bbWeekSel - 1].sessions[si];
+    targetSession.exercises[ei] = { ...oldEx, name: rep.name, muscle: (rep as any).group || oldEx.muscle || 'chest', workSets: [{ ...oldEx.workSets[0], weight }] };
+    setBuiltPlan({ ...builtPlan, weeks: w2 });
+    setSubTarget(null);
+  }, [subTarget, builtPlan, bbWeekSel, bbWorkMax]);
 
   const buildBb = () => {
     let plan: BBPlan;
@@ -267,6 +332,7 @@ export const BbAutoConstructor: React.FC = () => {
         patternId: selectedSplitId, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks,
         workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any,
         specialization: specializationMode,
+        injuries,
       }, pedAdapt);
     }
 
@@ -513,6 +579,14 @@ export const BbAutoConstructor: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Карточка травм */}
+      <div style={{ marginTop:8 }}>
+        <InjurySelectCard
+          injuries={injuries}
+          onChange={setInjuries}
+        />
+      </div>
+
       <button style={{ ...BTN, width:'100%', marginTop:12 }} onClick={() => setStep('ped')}>Далее: PED и рабочие веса →</button>
     </div>
   );
@@ -783,10 +857,16 @@ export const BbAutoConstructor: React.FC = () => {
                     <div key={ei} style={{ padding:'6px 10px', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                         <div style={{ fontWeight:700, fontSize:11, color:'#fff' }}>{e.name}</div>
-                        <button onClick={() => setEditMode(isEditing ? null : { dayIdx: si, exIdx: ei })}
-                          style={{ padding:'3px 8px', borderRadius:6, fontSize:9, fontWeight:600, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.7)' }}>
-                          {isEditing ? '✕ Готово' : '✎ Править'}
-                        </button>
+                        <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                          <button onClick={() => setSubTarget({ dayIdx: si, exIdx: ei, sessionIdx: si })}
+                            style={{ padding:'3px 8px', borderRadius:6, fontSize:9, fontWeight:600, cursor:'pointer', border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.06)', color:'#00e68a' }}>
+                            🔄
+                          </button>
+                          <button onClick={() => setEditMode(isEditing ? null : { dayIdx: si, exIdx: ei })}
+                            style={{ padding:'3px 8px', borderRadius:6, fontSize:9, fontWeight:600, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.7)' }}>
+                            {isEditing ? '✕ Готово' : '✎ Править'}
+                          </button>
+                        </div>
                       </div>
                       {isEditing ? (
                         <div style={{ display:'flex', gap:8, marginTop:6, alignItems:'center' }}>
@@ -867,6 +947,23 @@ export const BbAutoConstructor: React.FC = () => {
     return (
       <div>
         <div style={H}>📊 Шаг 5: Качество и нагрузка плана</div>
+        {/* Validation banners */}
+        {(() => {
+          const ws = weeklySetsFromBBPlan(W);
+          const b = validatePlan({ weeklySets: ws, level: bbLevel, goal: bbGoal, daysPerWeek: bbDays, weakPoints, readiness: prof.recovery });
+          if (b.length === 0) return null;
+          return (
+            <div style={{ ...CARD, marginBottom:8, background:'rgba(220,38,38,0.04)', border:'1px solid rgba(220,38,38,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f87171', marginBottom:6 }}>🛡 Валидация плана</div>
+              {b.map((bn, i) => (
+                <div key={i} style={{ fontSize:9, color:bn.level==='error'?'#f87171':bn.level==='warning'?'#fbbf24':'rgba(255,255,255,0.6)', marginBottom:4, padding:'4px 6px', borderRadius:4, background:bn.level==='error'?'rgba(248,113,113,0.08)':bn.level==='warning'?'rgba(251,191,36,0.08)':'rgba(255,255,255,0.03)', borderLeft:'2px solid '+(bn.level==='error'?'#f87171':bn.level==='warning'?'#fbbf24':'rgba(255,255,255,0.2)'), lineHeight:1.4 }}>
+                  <div style={{ fontWeight:700 }}>{bn.level==='error'?'⛔':bn.level==='warning'?'⚠':'ℹ'} {bn.title}</div>
+                  <div style={{ opacity:0.7, marginTop:1 }}>{bn.detail}</div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
         {/* Cycle info if in cycle mode */}
         {planMode === 'bb_cycle' && selectedCycleId && (() => {
           const c = getCycleById(selectedCycleId);
@@ -1026,11 +1123,65 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           );
         })()}
+        {/* Per-muscle chip table */}
+        {quality.perMuscle && quality.perMuscle.length > 0 && (
+          <div style={{ ...CARD, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.1)' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:6 }}>🏋️ Мышцы · сеты · MEV · MAV · MRV · %</div>
+            <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+              {quality.perMuscle.map(pm => {
+                const color = pm.status === 'overload' ? '#ef4444' : pm.status === 'undertrained' ? '#f59e0b' : '#22c55e';
+                return (
+                  <div key={pm.muscle} style={{ padding:'4px 8px', borderRadius:6, background:color+'10', border:'1px solid '+color+'30', fontSize:9, display:'flex', alignItems:'center', gap:4 }}>
+                    <span style={{ fontWeight:700, color:'#fff' }}>{pm.muscle}</span>
+                    <span style={{ fontWeight:700, color }}>{pm.sets}</span>
+                    <span style={{ color:'rgba(255,255,255,0.35)' }}>· {pm.mev} · {pm.mav} · {pm.mrv} · {pm.pct}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {/* Recommendations */}
+        {quality.recommendations && quality.recommendations.length > 0 && (
+          <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>💡 Рекомендации</div>
+            {quality.recommendations.map((r, i) => (
+              <div key={i} style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3, paddingLeft:4, borderLeft:'2px solid #f59e0b' }}>{r}</div>
+            ))}
+          </div>
+        )}
         {/* Details */}
         <div style={{ ...CARD }}>
           <div style={{ fontSize:11, fontWeight:700, color:ACCENT, marginBottom:6 }}>🔍 Детали оценки</div>
           {quality.details.map((d,i) => <div key={i} style={{ ...SMALL, marginBottom:3, padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)' }}>{d}</div>)}
         </div>
+        {/* Volume chart */}
+        {(() => {
+          const vdata: WeekVolume[] = W.map(w => {
+            const muscles: Record<string, number> = {};
+            w.sessions.forEach(s => s.exercises.forEach(e => { const m = e.muscle || 'other'; muscles[m] = (muscles[m] || 0) + e.sets; }));
+            return { week: w.week, totalSets: Object.values(muscles).reduce((a, b) => a + b, 0), muscles };
+          });
+          if (vdata.length < 2) return null;
+          return (
+            <div style={{ ...CARD }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📊 Объём по неделям (сетов)</div>
+              <VolumeByWeekChart data={vdata} />
+            </div>
+          );
+        })()}
+        {/* RIR drift chart */}
+        {(() => {
+          const rdata: RirRecord[] = [];
+          W.forEach(w => w.sessions.forEach(s => s.exercises.forEach(e => rdata.push({ week: w.week, exercise: e.name || e.muscle || '', rir: e.rir || 0 }))));
+          if (rdata.length < 2) return null;
+          return (
+            <div style={{ ...CARD, marginTop:8 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>📉 RIR-drift по неделям</div>
+              <RirDriftChart data={rdata} />
+            </div>
+          );
+        })()}
         {/* Load assessment */}
         <div style={{ ...CARD, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
           <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📈 Оценка тренировочной нагрузки</div>
@@ -1064,6 +1215,21 @@ export const BbAutoConstructor: React.FC = () => {
     return (
       <div>
         <div style={H}>🛠 Шаг 6: Ручная коррекция</div>
+        {(() => {
+          const fb = getPlanFeedback();
+          return fb.reasons.length > 0 && fb.avgRpe > 0 ? (
+            <div style={{ ...CARD, marginBottom:10, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.2)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa', marginBottom:6 }}>📊 Фидбэк план→выполнение</div>
+              {fb.deloadRecommended && <div style={{ padding:'4px 8px', borderRadius:6, background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:10, fontWeight:700, marginBottom:6 }}>⛔ РЕКОМЕНДОВАНА РАЗГРУЗКА</div>}
+              {fb.reasons.map((r,i) => <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.7)', marginBottom:3, padding:'3px 0' }}>{r}</div>)}
+              <div style={{ display:'flex', gap:8, marginTop:6 }}>
+                {fb.weightMultiplier !== 1 && <span style={{ padding:'2px 6px', borderRadius:4, fontSize:9, background:'rgba(96,165,250,0.1)', color:'#60a5fa' }}>Вес ×{fb.weightMultiplier}</span>}
+                {fb.rirShift !== 0 && <span style={{ padding:'2px 6px', borderRadius:4, fontSize:9, background:'rgba(245,158,11,0.1)', color:'#f59e0b' }}>RIR {fb.rirShift > 0 ? '+':''}{fb.rirShift}</span>}
+                {fb.volumeMultiplier !== 1 && <span style={{ padding:'2px 6px', borderRadius:4, fontSize:9, background:'rgba(34,197,94,0.1)', color:'#22c55e' }}>Объём ×{fb.volumeMultiplier}</span>}
+              </div>
+            </div>
+          ) : null;
+        })()}
         <div style={{ ...CARD, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)', marginBottom:10 }}>
           <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>🔧 Инструменты коррекции</div>
           <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
@@ -1163,6 +1329,19 @@ export const BbAutoConstructor: React.FC = () => {
       {step === 'quality' && renderQuality()}
       {step === 'adjust' && renderAdjust()}
       {renderExSwapModal()}
+      {subTarget && (() => {
+        const wk = builtPlan?.weeks[bbWeekSel - 1];
+        const ses = wk?.sessions[subTarget.sessionIdx];
+        const ex = ses?.exercises[subTarget.exIdx];
+        return ex ? (
+          <SubstitutionPopup
+            exerciseName={ex.name}
+            group={ex.muscle || ''}
+            onSelect={applyBbSubstitution}
+            onClose={() => setSubTarget(null)}
+          />
+        ) : null;
+      })()}
     </div>
   );
 };

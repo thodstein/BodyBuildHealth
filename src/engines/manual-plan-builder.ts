@@ -5,6 +5,7 @@ import { prescribeExercises, forceVector, lengthenedPartials } from './pro/exerc
 import { generateRepTempo } from './rep-tempo-engine';
 import { selectExercisesSmart } from './exercise-selector.engine';
 import { S_MRV_FACTOR } from './rir-table';
+import { findSubstitutions } from './exercise-substitution.engine';
 
 /** Множители веса для PRO-мышц (деривация от родительской группы).
  *  Источник: Israetel M., "Hypertrophy Training Guide", RP Strength, 2021.
@@ -69,7 +70,46 @@ export type PlanEx = {
   substitutions?: string[];
 };
 export type PlanDay = { day: number; groups: string[]; exercises: PlanEx[] };
-export interface Injury { muscle: string; from: string; to?: string }
+export interface Injury { muscle: string; from: string; to?: string; weightPct?: number; volumePct?: number; repsCap?: number; exclude?: boolean }
+
+/** Рассчитать коэффициент объёма для травмы с учётом постинсультной реабилитации.
+ *  Если дата `to` прошла — объём растёт 50%→75%→100% за 3 недели после `to`.
+ *  Если травма активна — возвращается volumePct (или 0.6 по умолчанию).
+ */
+export function getInjuryVolumeFactor(inj: Injury, today: string): number {
+  if (inj.to && inj.to < today) {
+    const weeksPast = Math.max(0, Math.floor((new Date(today).getTime() - new Date(inj.to).getTime()) / (7 * 86400000)));
+    if (weeksPast >= 3) return 1.0;
+    if (weeksPast >= 1) return 0.75;
+    return 0.5;
+  }
+  return inj.volumePct ?? (inj.exclude ? 0 : 0.6);
+}
+
+/** Получить список активных травм на сегодня с градацией. */
+export function getActiveInjuries(injuries: Injury[], today: string): Injury[] {
+  return injuries.filter(inj =>
+    (!inj.from || inj.from <= today) &&
+    (!inj.to || inj.to > today)  // active = to ещё не прошло или не указано
+  );
+}
+
+/** Получить список мышц, которые нужно полностью исключить (exclude=true или без градации). */
+export function getExcludedMuscles(injuries: Injury[], today: string): Set<string> {
+  return new Set(
+    injuries
+      .filter(inj => (!inj.from || inj.from <= today) && (!inj.to || inj.to >= today))
+      .filter(inj => inj.exclude !== false) // default true for backward compat
+      .map(inj => inj.muscle)
+  );
+}
+
+/** Травмированные мышцы, которые можно нагружать с градацией (exclude=false + gradation fields). */
+export function getGradedInjuries(injuries: Injury[], today: string): Injury[] {
+  return injuries
+    .filter(inj => (!inj.from || inj.from <= today) && (!inj.to || inj.to >= today))
+    .filter(inj => inj.exclude === false);
+}
 export interface BuildPlanInput {
   cycle: string[][];
   mrv: number;
@@ -86,6 +126,7 @@ export interface BuildPlanInput {
   currentReadiness: number; // 0-100
   sequenceStrategy: 'classic' | 'preexhaust' | 'antagonist';
   preferEquipment?: string[];
+  courseIntensity?: 'none' | 'mild' | 'moderate' | 'heavy'; // ААС-интенсивность для ПЕД-коррекции объёма
 }
 
 /**
@@ -97,7 +138,7 @@ export interface BuildPlanInput {
  * Возвращает дни, недельные сеты по группам и список правок-комментариев.
  */
 export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklySets: Record<string, number>; groupCorrections: string[]; patternBalance: Record<string, number> } {
-  const { cycle, mrv, goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, currentReadiness = 100, targetTonnage, sequenceStrategy = 'classic', preferEquipment: prefEqOverride } = input;
+  const { cycle, mrv, goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, currentReadiness = 100, targetTonnage, sequenceStrategy = 'classic', preferEquipment: prefEqOverride, courseIntensity } = input;
 
   // Фазово-зависимое предпочтение оборудования (если не задано явно)
   const preferEquipment = prefEqOverride ?? (
@@ -131,12 +172,46 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
     const daySets: Record<string, number> = {};
     
     // S-MRV: Системный бюджет утомления на день.
-    // Формула: dailyCap × S_MRV_FACTOR × (readiness/100)
-    let dayFatigueBudget = Math.round(dailyCap * S_MRV_FACTOR * (currentReadiness / 100));
+    // Формула: dailyCap × S_MRV_FACTOR × (readiness/100) × levelMult × pedMult
+    const levelMult = levelVolMap[level] ?? 1.0;
+    const pedMult = courseIntensity === 'heavy' ? 1.5 : courseIntensity === 'moderate' ? 1.3 : courseIntensity === 'mild' ? 1.15 : 1.0;
+    const totalFatigueBudget = Math.round(dailyCap * S_MRV_FACTOR * (currentReadiness / 100) * levelMult * pedMult);
+    // 75% бюджета на compounds, 25% на isolations
+    const compoundBudget = Math.floor(totalFatigueBudget * 0.75);
+    const isoBudget = totalFatigueBudget - compoundBudget;
+
+    // Распределяем compoundBudget пропорционально ожидаемым затратам групп
+    const groupExpected: Record<string, number> = {};
+    const groupCompoundBudget: Record<string, number> = {};
+    let totalExpected = 0;
+    for (const g of groups) {
+      const isPrimary = groups.indexOf(g) === 0;
+      const cc = isPrimary ? 3 + (isWeak(g) ? 1 : 0) : 2 + (isWeak(g) ? 1 : 0);
+      const poolLen = getExercisesByGroup(g).filter(e => equipment.length === 0 || equipment.includes(e.equipment)).length;
+      const cCount = Math.min(cc, poolLen);
+      const maxSets = Math.min(4, Math.max(13, Math.ceil(mrv / (freqMap[g] || 1))));
+      const expected = cCount * maxSets * 5;
+      groupExpected[g] = expected;
+      totalExpected += expected;
+    }
+    for (const g of groups) {
+      groupCompoundBudget[g] = totalExpected > 0 ? Math.floor(compoundBudget * (groupExpected[g] / totalExpected)) : Math.floor(compoundBudget / groups.length);
+    }
+    let remainingCompoundFatigue = compoundBudget;
+
+    const gradedInjuries = getGradedInjuries(injuries, today);
+    const excludedMuscles = getExcludedMuscles(injuries, today);
 
     groups.forEach(g => {
-      const injActive = injuries.some(inj => inj.muscle === g && (inj.from || '') <= today && (!inj.to || inj.to >= today));
-      if (injActive) return;
+      const isExcluded = excludedMuscles.has(g);
+      if (isExcluded) return;
+      const isGraded = gradedInjuries.some(inj => inj.muscle === g);
+      const injuryFactor = gradedInjuries.find(inj => inj.muscle === g);
+
+      // Для градированных травм: проверить постинсультный период восстановления
+      const todayObj = new Date(today);
+      const postInjuryVolPct = injuryFactor ? getInjuryVolumeFactor(injuryFactor, today) : 1.0;
+      const postInjuryWtPct = injuryFactor?.weightPct ?? 1.0;
 
       const allPool = getExercisesByGroup(g);
       const eqFilter = (e: any) => equipment.length === 0 || equipment.includes(e.equipment);
@@ -162,18 +237,42 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
       });
       const compsSafe = compounds.length === 0 ? poolFinal.slice(0, Math.min(compoundCount, poolFinal.length)) : compounds;
 
+      let groupFatigue = groupCompoundBudget[g] || Math.floor(remainingCompoundFatigue / (groups.length - groups.indexOf(g)));
+
        for (const ex of compsSafe) {
          const ds = daySets[g] || 0;
          const remainingDaily = Math.max(0, dailyMrv(g) - ds);
          if (remainingDaily < 3) break;
-         if (dayFatigueBudget < (ex.fatigueCost || 5)) break;
- 
-         const pr = calcExercisePrescription(ex, goal, level, isWeak(g), false, volMult, 1, mesoLength);
-          const wm = resolveWorkMax(ex, g, workMax, manualWorkMax);
+         if (groupFatigue < (ex.fatigueCost || 5)) break;
+
+         // Подстановка для градированной травмы
+         let exSub = ex;
+         let exSets = Math.min(calcExercisePrescription(ex, goal, level, isWeak(g), false, volMult, 1, mesoLength).sets, 4);
+         let exWeightMult = 1.0;
+         let exVolMult = 1.0;
+
+         if (isGraded) {
+           const subs = findSubstitutions(ex.name, g, new Set([g]));
+           if (subs.length > 0) {
+             exSub = subs[0].exercise;
+             exWeightMult = subs[0].weightPct;
+             exVolMult = subs[0].volumePct;
+             groupCorrections.push(`Группа «${g}» (травма): ${subs[0].confidence === 'high' ? '✔' : '⚠'} ${subs[0].reason}`);
+             if (subs[0].exercise.name !== ex.name) {
+               groupCorrections.push(`  → ${ex.name} заменён на ${subs[0].exercise.name}`);
+             }
+           }
+           // Применить градацию травмы поверх замены
+           exWeightMult *= postInjuryWtPct;
+           exVolMult *= postInjuryVolPct;
+         }
+
+         const pr = calcExercisePrescription(exSub, goal, level, isWeak(g), false, volMult, 1, mesoLength);
+          const wm = resolveWorkMax(exSub, g, workMax, manualWorkMax);
           const pct = pctForRir[Math.max(0, Math.min(5, pr.rir))] ?? 0.9;
-          let weight = Math.round(wm * pct);
+          let weight = Math.round(wm * pct * exWeightMult);
           
-           let sets = pr.sets;
+           let sets = Math.max(1, Math.min(Math.round(exSets * exVolMult), 4));
           if (targetTonnage && targetTonnage[g]) {
             const repVal = pr.reps.includes('-') ? (parseInt(pr.reps) + parseInt(pr.reps.split('-')[1]))/2 : parseInt(pr.reps);
             const totalWeightPerSet = weight * repVal;
@@ -184,39 +283,68 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
               if (reqSetsPerSession > MAX_SETS_PER_SESSION) {
                 groupCorrections.push(`Группа «${g}»: целевой тоннаж ${targetTonnage[g]} кг/нед даёт ${reqSetsPerSession} сетов/сессию — ограничено до ${MAX_SETS_PER_SESSION}.`);
               }
-              sets = Math.max(3, Math.min(pr.sets + 2, reqSetsPerSession, MAX_SETS_PER_SESSION));
+              sets = Math.max(3, Math.min(pr.sets, reqSetsPerSession, MAX_SETS_PER_SESSION));
             }
           }
 
+          const repsCap = injuryFactor?.repsCap ?? 15;
+          const repsVal = parseInt(pr.reps) || 10;
           const tGoal = goal === 'mass' || goal === 'bulk' ? 'hypertrophy' : goal === 'strength_mass' ? 'strength' : goal;
           const tempoRes = generateRepTempo({ goal: tGoal as any, riskLevel: level === 'beginner' ? 'high' : level === 'advanced' ? 'low' : 'medium', difficultyLevel: level === 'beginner' ? 'low' : level === 'advanced' ? 'high' : 'medium', techniqueIssues: [], isMainLift: true });
           const cappedSets = Math.min(sets, remainingDaily);
-          if (cappedSets < 3) break;
- 
+          if (cappedSets < 1) break;
+
+          const fatigueCost = (exSub.fatigueCost || 5) * (isGraded ? 0.75 : 1.0);
+          const exFatigue = fatigueCost * cappedSets;
+          if (exFatigue > groupFatigue) break;
+
           exs.push({
-            name: ex.name, sets: cappedSets, reps: pr.reps, rir: pr.rir, rest: pr.rest, group: g, weight,
+            name: exSub.name, sets: cappedSets, reps: `${Math.min(repsVal, repsCap)}`, rir: isGraded ? Math.min(pr.rir + 1, 4) : pr.rir, rest: pr.rest, group: g, weight,
             role: isPrimaryGroup ? 'main' : 'secondary',
-            pattern: ex.movementPattern || 'unknown',
+            pattern: exSub.movementPattern || 'unknown',
             tempo: tempoRes.tempo.toString,
-            forceVec: forceVector(ex.group, ex.type, ex.name),
-            jointStress: ex.jointStress,
-            technique: (ex as any).technique,
-            comments: (ex as any).comments,
-            rationale: (ex as any).selectionRationale?.join('; '),
-            fatigueCost: (ex as any).fatigueCost,
-            substitutions: (ex as any).canReplace?.map((id: string) => EXERCISE_CATALOG.find(e => e.id === id)?.name).filter(Boolean),
+            forceVec: forceVector(exSub.group, exSub.type, exSub.name),
+            jointStress: exSub.jointStress,
+            technique: (exSub as any).technique,
+            comments: (exSub as any).comments,
+            rationale: (exSub as any).selectionRationale?.join('; '),
+            fatigueCost: exSub.fatigueCost,
+            substitutions: (exSub as any).canReplace?.map((id: string) => EXERCISE_CATALOG.find(e => e.id === id)?.name).filter(Boolean),
           });
           weeklySets[g] = (weeklySets[g] || 0) + cappedSets;
           daySets[g] = ds + cappedSets;
-          dayFatigueBudget -= (ex.fatigueCost || 5) * cappedSets;
-          patternBalance[ex.movementPattern || 'unknown'] = (patternBalance[ex.movementPattern || 'unknown'] || 0) + 1;
+          groupFatigue -= exFatigue;
+          remainingCompoundFatigue -= exFatigue;
+          patternBalance[exSub.movementPattern || 'unknown'] = (patternBalance[exSub.movementPattern || 'unknown'] || 0) + 1;
         }
 
     });
 
+    // Isolation фаза: пропорциональный остаток isoBudget
+    const groupIsoBudget: Record<string, number> = {};
+    const groupIsoExpected: Record<string, number> = {};
+    let totalIsoExpected = 0;
+    for (const g of groups) {
+      const isoCount = (groups.indexOf(g) === 0 ? 2 + levelBoost + (isWeak(g) ? 1 : 0) : 2 + (level === 'advanced' || level === 'enhanced' ? (isWeak(g) ? 2 : 1) : 0));
+      const poolLen = getExercisesByGroup(g).filter(e => (equipment.length === 0 || equipment.includes(e.equipment)) && e.type === 'isolation').length;
+      const iCount = Math.min(isoCount, poolLen);
+      const expected = iCount * 3 * 3;
+      groupIsoExpected[g] = expected;
+      totalIsoExpected += expected;
+    }
+    for (const g of groups) {
+      groupIsoBudget[g] = totalIsoExpected > 0 ? Math.floor(isoBudget * (groupIsoExpected[g] / totalIsoExpected)) : Math.floor(isoBudget / groups.length);
+    }
+    let remainingIsoFatigue = isoBudget;
+
     groups.forEach(g => {
-      const injActive = injuries.some(inj => inj.muscle === g && (inj.from || '') <= today && (!inj.to || inj.to >= today));
-      if (injActive) return;
+      const isExcluded = excludedMuscles.has(g);
+      if (isExcluded) return;
+      const isGraded = gradedInjuries.some(inj => inj.muscle === g);
+      const injuryFactor = gradedInjuries.find(inj => inj.muscle === g);
+      const postInjuryVolPct = injuryFactor ? getInjuryVolumeFactor(injuryFactor, today) : 1.0;
+      const postInjuryWtPct = injuryFactor?.weightPct ?? 1.0;
+
       const allPool = getExercisesByGroup(g);
       const eqFilter = (e: any) => equipment.length === 0 || equipment.includes(e.equipment);
       const pool = allPool.filter(eqFilter);
@@ -237,18 +365,39 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
       });
       const isosSafe = isolations.length === 0 ? poolFinal.filter(e => e.type === 'isolation').slice(0, Math.min(isoCount, poolFinal.length)) : isolations;
 
+      let groupIsoFatigue = groupIsoBudget[g] || Math.floor(remainingIsoFatigue / (groups.length - groups.indexOf(g)));
+
        for (const ex of isosSafe) {
          const ds = daySets[g] || 0;
          const remainingDaily = Math.max(0, dailyMrv(g) - ds);
          if (remainingDaily < 3) break;
-         if (dayFatigueBudget < (ex.fatigueCost || 3)) break;
- 
-          const pr = calcExercisePrescription(ex, goal, level, isWeak(g), false, volMult * 0.85, 1, mesoLength);
-          const wm = resolveWorkMax(ex, g, workMax, manualWorkMax);
-          const pct = pctForRir[Math.max(0, Math.min(5, pr.rir))] ?? 0.9;
-          const weight = Math.round(wm * pct);
+         if (groupIsoFatigue < (ex.fatigueCost || 3)) break;
 
-          let sets = pr.sets;
+         // Подстановка для градированной травмы
+         let exSub = ex;
+         let exWeightMult = 1.0;
+         let exVolMult = 1.0;
+
+         if (isGraded) {
+           const subs = findSubstitutions(ex.name, g, new Set([g]));
+           if (subs.length > 0) {
+             exSub = subs[0].exercise;
+             exWeightMult = subs[0].weightPct;
+             exVolMult = subs[0].volumePct;
+             if (subs[0].exercise.name !== ex.name && !groupCorrections.some(c => c.includes(subs[0].exercise.name))) {
+               groupCorrections.push(`  → изоляция: ${ex.name} → ${subs[0].exercise.name}`);
+             }
+           }
+           exWeightMult *= postInjuryWtPct;
+           exVolMult *= postInjuryVolPct;
+         }
+
+          const pr = calcExercisePrescription(exSub, goal, level, isWeak(g), false, volMult * 0.85, 1, mesoLength);
+          const wm = resolveWorkMax(exSub, g, workMax, manualWorkMax);
+          const pct = pctForRir[Math.max(0, Math.min(5, pr.rir))] ?? 0.9;
+          const weight = Math.round(wm * pct * exWeightMult);
+
+          let sets = Math.max(1, Math.min(Math.round(pr.sets * exVolMult), 3));
           if (targetTonnage && targetTonnage[g]) {
             const repVal = pr.reps.includes('-') ? (parseInt(pr.reps) + parseInt(pr.reps.split('-')[1]))/2 : parseInt(pr.reps);
             const totalWeightPerSet = weight * repVal;
@@ -259,32 +408,39 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
               if (reqSetsPerSession > MAX_SETS_PER_SESSION) {
                 groupCorrections.push(`Группа «${g}»: целевой тоннаж ${targetTonnage[g]} кг/нед даёт ${reqSetsPerSession} сетов/сессию — ограничено до ${MAX_SETS_PER_SESSION}.`);
               }
-              sets = Math.max(3, Math.min(pr.sets + 2, reqSetsPerSession, MAX_SETS_PER_SESSION));
+              sets = Math.max(3, Math.min(pr.sets, reqSetsPerSession, MAX_SETS_PER_SESSION));
             }
           }
 
+          const repsCap = injuryFactor?.repsCap ?? 15;
+          const repsVal = parseInt(pr.reps) || 10;
           const tGoal = goal === 'mass' || goal === 'bulk' ? 'hypertrophy' : goal;
           const tempoRes = generateRepTempo({ goal: tGoal as any, riskLevel: level === 'beginner' ? 'high' : 'medium', difficultyLevel: level === 'beginner' ? 'low' : 'medium', techniqueIssues: [], isMainLift: false });
          const cappedSets = Math.min(sets, remainingDaily);
-         if (cappedSets < 3) break;
- 
+         if (cappedSets < 1) break;
+
+          const fatigueCost = (exSub.fatigueCost || 3) * (isGraded ? 0.75 : 1.0);
+          const exFatigue = fatigueCost * cappedSets;
+          if (exFatigue > groupIsoFatigue) break;
+
           exs.push({
-            name: ex.name, sets: cappedSets, reps: pr.reps, rir: pr.rir, rest: pr.rest, group: g, weight,
+            name: exSub.name, sets: cappedSets, reps: `${Math.min(repsVal, repsCap)}`, rir: isGraded ? 3 : pr.rir, rest: pr.rest, group: g, weight,
             role: 'accessory',
-            pattern: ex.movementPattern || 'unknown',
+            pattern: exSub.movementPattern || 'unknown',
             tempo: tempoRes.tempo.toString,
-            forceVec: forceVector(ex.group, ex.type, ex.name),
-            jointStress: ex.jointStress,
-            technique: (ex as any).technique,
-            comments: (ex as any).comments,
-            rationale: (ex as any).selectionRationale?.join('; '),
-            fatigueCost: (ex as any).fatigueCost,
-            substitutions: (ex as any).canReplace?.map((id: string) => EXERCISE_CATALOG.find(e => e.id === id)?.name).filter(Boolean),
+            forceVec: forceVector(exSub.group, exSub.type, exSub.name),
+            jointStress: exSub.jointStress,
+            technique: (exSub as any).technique,
+            comments: (exSub as any).comments,
+            rationale: (exSub as any).selectionRationale?.join('; '),
+            fatigueCost: exSub.fatigueCost,
+            substitutions: (exSub as any).canReplace?.map((id: string) => EXERCISE_CATALOG.find(e => e.id === id)?.name).filter(Boolean),
           });
           weeklySets[g] = (weeklySets[g] || 0) + cappedSets;
           daySets[g] = ds + cappedSets;
-          dayFatigueBudget -= (ex.fatigueCost || 3) * cappedSets;
-          patternBalance[ex.movementPattern || 'unknown'] = (patternBalance[ex.movementPattern || 'unknown'] || 0) + 1;
+          groupIsoFatigue -= exFatigue;
+          remainingIsoFatigue -= exFatigue;
+          patternBalance[exSub.movementPattern || 'unknown'] = (patternBalance[exSub.movementPattern || 'unknown'] || 0) + 1;
         }
 
     });
