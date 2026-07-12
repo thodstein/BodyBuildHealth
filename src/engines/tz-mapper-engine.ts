@@ -157,7 +157,6 @@ export interface MapperCtx {
   // clinical context for guardrails
   onCourse?: boolean;
   e2Level?: number;
-  e2Sensitivity?: number;
   hemoglobin?: number;
   hematocrit?: number;
   hasHCG?: boolean;
@@ -198,7 +197,6 @@ function buildGuardrailCtx(ctx: MapperCtx): GuardrailContext {
     onCourse: ctx.onCourse ?? (phase === 'course' || phase === 'bridge' || phase === 'trt'),
     inPCT: phase === 'pct',
     e2Level: ctx.e2Level,
-    e2Sensitivity: ctx.e2Sensitivity,
     hemoglobin: ctx.hemoglobin,
     hematocrit: ctx.hematocrit,
     hasHCG: ctx.hasHCG,
@@ -388,7 +386,7 @@ function selectSubstances(
       subs.push({
         substanceId: cand.substanceId,
         category: cat,
-        k: 0,
+        k: 0.3,
         q: 'C',
         reason: `Расширение broad-spectrum (покрывает ${cand.breadth} мехов)`,
         mechsCovered,
@@ -512,14 +510,22 @@ function getMechs(substanceId: string, activated: ActivatedMech[]): TzMechId[] {
   return result;
 }
 
+// Получить k вещества для мех-ма из TZ_MECH_TO_SUBS (0 если не найден)
+function getSubKForMech(substanceId: string, mechId: TzMechId): number {
+  const found = TZ_MECH_TO_SUBS[mechId].substances.find(s => s.substanceId.toLowerCase() === substanceId.toLowerCase());
+  return found ? found.k : 0;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 //  ПОКРЫТИЕ МАТРИЦЫ (28 мех × 6 органов)
 // ════════════════════════════════════════════════════════════════════════════
 function buildCoverageMatrix(
-  subs: RecommendedSub[]
+  subs: RecommendedSub[],
+  activated?: ActivatedMech[],
 ): { coverage: OrganCoverage[]; gaps: { organId: TzOrganId; organLabel: string; mechId: TzMechId; mechLabel: string; suggestions: string[] }[] } {
   const organCoverage: OrganCoverage[] = [];
   const gaps: { organId: TzOrganId; organLabel: string; mechId: TzMechId; mechLabel: string; suggestions: string[] }[] = [];
+  const activatedSet = activated ? new Set(activated.map(m => m.mechId)) : null;
 
   for (const organId of ALL_TZ_ORGANS) {
     const mechs: OrganMechCoverage[] = [];
@@ -528,15 +534,18 @@ function buildCoverageMatrix(
     for (const mechId of ALL_TZ_MECH_IDS) {
       const { organId: o } = mechOrganLabel(mechId);
       if (o !== organId) continue;
+      // Если передан activated — считаем только активированные мехи в totalN
+      if (activatedSet && !activatedSet.has(mechId)) continue;
       totalN++;
       // найти лучшую субстанцию для этого мех-ма из списка subs
       let bestK = 0; let bestSub = ''; let covered = false;
       for (const rs of subs) {
-        if (!rs.mechsCovered.includes(mechId)) continue;
-        // Найти k этого вещества для этого мех из TZ_MECH_TO_SUBS
-        const found = TZ_MECH_TO_SUBS[mechId].substances.find(s => s.substanceId.toLowerCase() === rs.substanceId.toLowerCase());
-        if (found && found.k > bestK) {
-          bestK = found.k; bestSub = rs.substanceId; covered = true;
+        const inCovered = rs.mechsCovered.includes(mechId);
+        const k = getSubKForMech(rs.substanceId, mechId);
+        if (!inCovered && k <= 0) continue;
+        const effectiveK = k > 0 ? k : (rs.k > 0 ? rs.k * 0.4 : 0);
+        if (effectiveK > bestK) {
+          bestK = effectiveK; bestSub = rs.substanceId; covered = true;
         }
       }
       mechs.push({ mechId, covered, bestK, bestSub });
@@ -588,7 +597,7 @@ const RAAS_ALL = new Set([
 ]);
 const STATIN_ALL = new Set([
   'atorvastatin', 'rosuvastatin', 'simvastatin', 'pravastatin', 'pitavastatin',
-  'red_yeast', 'red_yeast_rice', 'bergamot',
+  'red_yeast', 'red_yeast_rice',
 ]);
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -846,6 +855,34 @@ function computeSymptomDrugs(ctx: MapperCtx): PhaseAssignedDrug[] {
     add('dandelion', 'Dandelion 500 мг 2р/день — натуральный диуретик (↓задержка воды, ↑Na+ экскреция)', 'Симптом: отёки (натур.)', 'other');
     add('hesperidin', 'Hesperidin 500 + Diosmin 450 — венотоник (↓капиллярная проницаемость, отёки ног)', 'Симптом: отёки (венотоник)', 'cardioprotector');
   }
+  // ── Суставные боли ──
+  if (symptoms.includes('joint_pain')) {
+    add('glucosamine', 'Glucosamine 1500 мг + Chondroitin 800 мг — хондропротекция (симптом: боль в суставах)', 'Симптом: суставы', 'other');
+    add('omega3', 'Omega-3 2-3 г — ↓ воспаление суставов (симптом: боль в суставах)', 'Симптом: суставы', 'cardioprotector');
+    add('curcumin', 'Curcumin 1000 мг + Piperine 10 мг — ↓ воспаление (симптом: боль в суставах)', 'Симптом: суставы', 'antiinflam');
+  }
+  // ── Головная боль ──
+  if (symptoms.includes('headache')) {
+    add('magnesium', 'Magnesium 400-600 мг — ↓ головная боль (симптом: головная боль, спазм сосудов)', 'Симптом: головная боль', 'mineral');
+    add('coq10', 'CoQ10 100 мг — ↓ мигрень (симптом: головная боль)', 'Симптом: головная боль', 'cardioprotector');
+  }
+  // ── Сердцебиение ──
+  if (symptoms.includes('palpitations')) {
+    add('magnesium', 'Magnesium 600 мг — ↓ аритмия (симптом: сердцебиение)', 'Симптом: сердцебиение', 'mineral');
+    add('potassium', 'Kалий 200 мг — ↓ аритмия (симптом: сердцебиение, мониторинг K+)', 'Симптом: сердцебиение', 'mineral');
+    add('taurine', 'Taurine 3 г — стабилизация мембран кардиомиоцитов (симптом: сердцебиение)', 'Симптом: сердцебиение', 'amino');
+  }
+  // ── Акне ──
+  if (symptoms.includes('acne')) {
+    add('zinc', 'Zinc 30 мг — ↓ себорегуляция (симптом: акне)', 'Симптом: акне', 'mineral');
+    add('saw_palmetto', 'Saw Palmetto 320 мг — 5α-редуктаза (симптом: акне, DHT-зависимое)', 'Симптом: акне', 'pharma');
+  }
+  // ── Перепады настроения ──
+  if (symptoms.includes('mood_swings')) {
+    add('theanine', 'L-Theanine 200 мг — ↓ тревожность (симптом: перепады настроения)', 'Симптом: настроение', 'amino');
+    add('ashwagandha', 'Ashwagandha 300-600 мг — ↓ кортизол (симптом: перепады настроения, стресс)', 'Симптом: настроение', 'adaptogen');
+    add('omega3', 'Omega-3 2-3 г — ↓ нейровоспаление (симптом: перепады настроения)', 'Симптом: настроение', 'cardioprotector');
+  }
   return result;
 }
 
@@ -883,6 +920,41 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     const { subs: mechSubs, suppression: supp } = selectSubstances(activated, phase, ctx.level, ctx.manualChoices);
     for (const s of mechSubs) { if (!subs.some(x => canonId(x.substanceId) === canonId(s.substanceId))) subs.push(s); }
     suppression = supp;
+  }
+  // ── 4a. BUGFIX: manual subs — добавить даже при непустом протоколе (AAS) ─
+  // selectSubstances (шаг 4) вызывается только если protocolAll пуст. При наличии
+  // AAS protocolAll непустой → manualChoices.addSubs никогда не доходили. Добавляем отдельно.
+  if (ctx.level === 'manual' && ctx.manualChoices?.addSubs && protocolAll.length > 0) {
+    for (const sid of ctx.manualChoices.addSubs) {
+      const canon = canonId(sid);
+      if (subs.some(s => canonId(s.substanceId) === canon)) continue;
+      const mechsCovered: TzMechId[] = [];
+      let bestK = 0;
+      let bestQ: 'A'|'B'|'C' = 'C';
+      let bestCat: TzCategory = 'other';
+      let triggeredBy: TzMechId | undefined = undefined;
+      for (const mechId of ALL_TZ_MECH_IDS) {
+        const found = TZ_MECH_TO_SUBS[mechId].substances.find(s => s.substanceId.toLowerCase() === sid.toLowerCase());
+        if (found) {
+          mechsCovered.push(mechId);
+          if (found.k > bestK) {
+            bestK = found.k;
+            bestQ = found.q;
+            bestCat = found.category;
+            triggeredBy = mechId;
+          }
+        }
+      }
+      subs.push({
+        substanceId: sid,
+        category: bestCat,
+        k: bestK,
+        q: bestQ,
+        reason: 'Ручное добавление пользователем',
+        mechsCovered,
+        triggeredByMech: triggeredBy,
+      });
+    }
   }
   // ── 5. базовые витамины (D3+K2, Mg, B6, B12, Folate, VitC) ─
   const BASE_VITS: Array<{ id: string; category: TzCategory; reason: string }> = [
@@ -1051,19 +1123,45 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
       priority: 2,
     });
   }
-  // ── 4. guardrails ─
+  // ── 4. бустеры (ДО guardrails — чтобы guardrails/interactions покрывали booster subs) ─
+  let boosters: AppliedBooster[] = [];
+  if (areBoostersAllowed(phase) && ctx.boosterCtx) {
+    boosters = applyBoosters(subs.map(s => s.substanceId), ctx.boosterCtx, subs.map(s => s.substanceId));
+    // BUGFIX: merge booster subs into main subs list (раньше были только в boosters field, невидимы в UI)
+    for (const ab of boosters) {
+      for (const bs of ab.subs) {
+        if (subs.some(s => s.substanceId.toLowerCase() === bs.substanceId.toLowerCase())) continue;
+        subs.push({
+          substanceId: bs.substanceId,
+          category: 'other' as TzCategory,
+          k: 0.5,
+          q: 'B',
+          reason: `[БУСТЕР ${ab.label}] ${bs.reason}`,
+          mechsCovered: [],
+          priority: 3,
+        });
+      }
+    }
+  }
+  // ── 5. guardrails (теперь покрывают ВСЕ subs, включая booster и manual) ─
   const gCtx = buildGuardrailCtx(ctx);
   gCtx.hasTBooster = subs.some(s => isTBoosterById(s.substanceId));
   const guardrails = screenGuardrails(subs.map(s => s.substanceId), gCtx);
-  // ── 5. pair conflicts ─
+  // ── 6. pair conflicts ─
   const conflicts = screenPairConflicts(subs.map(s => s.substanceId));
-  // ── 6. coverage ─
-  const { coverage, gaps } = buildCoverageMatrix(subs);
-  // ── 7. бустеры ─
-  let boosters: AppliedBooster[] = [];
-  if (areBoostersAllowed(phase) && ctx.boosterCtx && ctx.level !== 'manual') {
-    boosters = applyBoosters(subs.map(s => s.substanceId), ctx.boosterCtx, subs.map(s => s.substanceId));
+  // ── 6a. Guardrail block: удалить subs с level='block' из плана ─
+  const blockGuardrailIds = new Set(
+    guardrails.filter(g => g.level === 'block' && g.substanceId).map(g => g.substanceId!.toLowerCase())
+  );
+  if (blockGuardrailIds.size > 0) {
+    for (let i = subs.length - 1; i >= 0; i--) {
+      if (blockGuardrailIds.has(subs[i].substanceId.toLowerCase())) {
+        subs.splice(i, 1);
+      }
+    }
   }
+  // ── 7. coverage (передаём activated для фильтрации gaps) ─
+  const { coverage, gaps } = buildCoverageMatrix(subs, activated);
   // ── 8. summary ─
   const summary = buildSummary(subs, activated, phase, phaseProto, ctx.level, coverage, gaps, guardrails, boosters, suppression);
   const rationale = phaseProto.algorithm;
@@ -1080,6 +1178,16 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
         if (aPrio <= bPrio) { subs.splice(aIdx, 1); }
         else { subs.splice(bIdx, 1); }
       }
+    }
+  }
+
+  // ── TOTAL_LIMIT: trim по priority для non-manual уровней ─
+  // Протокол (priority 1) всегда остаётся; base vits (2), boosters (3), manual (4) — обрезаются
+  if (ctx.level !== 'manual') {
+    const limit = TOTAL_LIMIT[ctx.level];
+    if (subs.length > limit) {
+      subs.sort((a, b) => (a.priority ?? 3) - (b.priority ?? 3));
+      subs.length = limit;
     }
   }
 

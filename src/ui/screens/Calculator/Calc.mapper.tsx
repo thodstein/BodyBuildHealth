@@ -9,6 +9,7 @@ import type { BoosterTriggerCtx } from '../../../engines/tz-bridge-boosters';
 import { PHASE_PROTOCOL } from '../../../engines/tz-bridge-phase';
 import { STACK_BOOSTER_TRIGGERS } from '../../../engines/tz-bridge-boosters';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
+import { CalcSafetyLayer } from './CalcSafetyLayer';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
 import { classifyPed } from '../../../data/ped-potency-table';
 import { getSubstanceForm, type SubstanceForm } from '../../../data/substance-forms';
@@ -257,7 +258,7 @@ export function buildMapperCtx(
     hasHCG: state.pharma.hasHCG, hasAI: state.pharma.hasAI,
     hasCabergoline: (state.pharma as any).hasCaber || false,
     aasIds: (state.pharma.aas || []).map((a: any) => a.id || '').filter(Boolean),
-    pedDoses, libidoLow: false,
+    pedDoses, libidoLow: ((state as any).symptoms || []).includes('low_libido'),
     bpSystolic: state.cardio.bpStage === 'high' ? 150 : state.cardio.bpStage === 'normal' ? 120 : 135,
     lipidLdl: labs['LDL'],
     symptoms: (state as any).symptoms || [],
@@ -382,15 +383,18 @@ export interface CalcMapperProps {
   onApply?: (rec: SupportRecommendation) => void;
   onOpenManualPicker?: () => void;
   onOpenLabs?: () => void;
+  planResult?: import('../../../engines/support-plan').PlanResult;
 }
 
-export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange, onApply, onOpenManualPicker, onOpenLabs }) => {
+export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange, onApply, onOpenManualPicker, onOpenLabs, planResult }) => {
   const [level, setLevel] = useState<SupportLevel>('medium');
   const [manualSubs, setManualSubs] = useState<string[]>([]);
   const [selectedStacks, setSelectedStacks] = useState<string[]>([]);
   const [showIntellPopup, setShowIntellPopup] = useState(false);
   const [showManualPopup, setShowManualPopup] = useState(false);
-  const [manualSubInput, setManualSubInput] = useState('');
+  const [manualSubInput] = useState('');
+  const [manualStackSearch, setManualStackSearch] = useState('');
+  const catalogSubsCount = useMemo(() => Object.keys(SUPPORT_CATALOG_DATA).length, []);
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [showPrescription, setShowPrescription] = useState(true);
   const [showSynergy, setShowSynergy] = useState(true);
@@ -410,10 +414,13 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [showSymptoms, setShowSymptoms] = useState(true);
   const [showNutrition, setShowNutrition] = useState(false);
   const [showInteractions, setShowInteractions] = useState(false);
+  const [showEnhancementPopup, setShowEnhancementPopup] = useState(false);
+  const [enhancementSearch, setEnhancementSearch] = useState('');
 
   const ctx = useMemo(() => {
     const base = buildMapperCtx(state, level, level === 'manual' ? { addSubs: manualSubs } : undefined, selectedStacks);
     if (symptoms.length > 0) base.symptoms = symptoms;
+    base.libidoLow = symptoms.includes('low_libido');
     return base;
   }, [state, level, manualSubs, selectedStacks, symptoms]);
 
@@ -511,46 +518,61 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {/* ── Попап ручного режима ── */}
       {showManualPopup && (
         <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setShowManualPopup(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'88%', maxWidth:340, borderRadius:18, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'88vh', display:'flex', flexDirection:'column' }}>
             <div style={{ height:3, background:'linear-gradient(90deg,#818cf8,#6366f1)' }} />
-            <div style={{ padding:'16px 14px 12px', overflowY:'auto' }}>
-              <div style={{ fontSize:13, fontWeight:800, color:'#818cf8', marginBottom:10 }}>⚙️ Ручной режим</div>
+            <div style={{ flex:1, overflowY:'auto', padding:'16px 14px 12px' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                <span style={{ fontSize:13, fontWeight:800, color:'#818cf8' }}>⚙️ Ручной режим</span>
+                <button onClick={() => setShowManualPopup(false)} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10, fontWeight:600 }}>✕</button>
+              </div>
               {onOpenManualPicker && (
-                <button onClick={() => { setShowManualPopup(false); setTimeout(onOpenManualPicker, 200); }} style={{ width:'100%', marginBottom:8, padding:'8px', borderRadius:8, background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.25)', color:'#a78bfa', fontWeight:700, fontSize:10, cursor:'pointer' }}>
-                  📂 Выбрать из каталога / стеков / избранного
+                <button onClick={() => { setShowManualPopup(false); setTimeout(onOpenManualPicker, 200); }} style={{ width:'100%', marginBottom:8, padding:'10px', borderRadius:10, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.25)', color:'#00e68a', fontWeight:700, fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                  📂 Открыть полный каталог ({catalogSubsCount} препаратов и {ALL_STACKS.length} стеков)
                 </button>
               )}
-              <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4 }}>📦 Добавить стек</div>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:10 }}>
-                {STACK_BOOSTER_TRIGGERS.slice(0,14).map(st => {
-                  const active = selectedStacks.includes(st.stackId);
-                  return (
-                    <button key={st.stackId} onClick={() => setSelectedStacks(prev => active ? prev.filter(s => s !== st.stackId) : [...prev, st.stackId])}
-                      style={{ padding:'5px 8px', borderRadius:8, fontSize:7, fontWeight:600, cursor:'pointer',
-                        background: active ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.03)',
-                        border: active ? '1px solid rgba(168,85,247,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                        color: active ? '#c084fc' : 'rgba(255,255,255,0.5)' }}>
-                      {st.stackId.replace(/_stack|_support|_35/g,'').replace(/_/g,' ')} {active && '✓'}
-                    </button>
-                  );
-                })}
-              </div>
-              <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4 }}>💊 Добавить препарат (ID)</div>
-              <div style={{ display:'flex', gap:4, marginBottom:8 }}>
-                <input value={manualSubInput} onChange={e => setManualSubInput(e.target.value)} placeholder="NAC, TUDCA, omega3..."
-                  style={{ flex:1, padding:'6px 8px', borderRadius:8, fontSize:9, background:'rgba(0,0,0,0.3)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', outline:'none' }} />
-                <button onClick={() => { if(!manualSubInput.trim())return; const ids=manualSubInput.split(',').map(s=>s.trim()).filter(Boolean); setManualSubs(prev=>[...new Set([...prev,...ids])]); setManualSubInput(''); }} style={{ padding:'6px 10px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer', background:'#818cf8', border:'none', color:'#000' }}>+</button>
-              </div>
               {manualSubs.length > 0 && (
                 <div style={{ marginBottom:8 }}>
-                  {manualSubs.map((sid, i) => (
-                    <span key={sid+i} style={{ fontSize:8, padding:'2px 6px', borderRadius:6, fontWeight:600, background:'rgba(99,102,241,0.12)', color:'#818cf8', display:'inline-flex', alignItems:'center', gap:3, margin:1 }}>
-                      {sid}
-                      <span onClick={() => setManualSubs(prev => prev.filter((_, j) => j !== i))} style={{ cursor:'pointer', color:'rgba(255,255,255,0.3)', fontSize:9 }}>✕</span>
-                    </span>
-                  ))}
+                  <div style={{ fontSize:9, fontWeight:700, color:'var(--text-dim)', marginBottom:4 }}>💊 Препараты из ручного ввода ({manualSubs.length}) — откройте каталог для выбора</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                    {manualSubs.map((sid, i) => (
+                      <span key={sid+i} style={{ fontSize:8, padding:'2px 6px', borderRadius:6, fontWeight:600, background:'rgba(99,102,241,0.12)', color:'#818cf8', display:'inline-flex', alignItems:'center', gap:3, margin:1 }}>
+                        {sid}
+                        <span onClick={() => setManualSubs(prev => prev.filter((_, j) => j !== i))} style={{ cursor:'pointer', color:'rgba(255,255,255,0.3)', fontSize:9 }}>✕</span>
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
+              <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4, marginTop:4 }}>📦 Добавить стек из {ALL_STACKS.length} готовых</div>
+              <input value={manualStackSearch} onChange={e => setManualStackSearch(e.target.value)} placeholder="🔍 Поиск стека..." style={{
+                width:'100%', padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:10, boxSizing:'border-box', marginBottom:6, outline:'none',
+              }} />
+              <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'40vh', overflowY:'auto', marginBottom:10 }}>
+                {(ALL_STACKS as any[])
+                  .filter((st: any) => {
+                    if (!manualStackSearch) return true;
+                    const q = manualStackSearch.toLowerCase();
+                    return (st.name||'').toLowerCase().includes(q) || (st.id||'').toLowerCase().includes(q) || (st.system||'').toLowerCase().includes(q) || (st.problem||'').toLowerCase().includes(q);
+                  })
+                  .map((st: any) => {
+                    const active = selectedStacks.includes(st.id);
+                    const subCount = (st.substances||[]).length;
+                    return (
+                      <div key={st.id} onClick={() => setSelectedStacks(prev => active ? prev.filter(s => s !== st.id) : [...prev, st.id])}
+                        style={{ padding:'6px 8px', borderRadius:7, cursor:'pointer',
+                          background: active ? 'rgba(168,85,247,0.1)' : 'rgba(255,255,255,0.02)',
+                          border: active ? '1px solid rgba(168,85,247,0.25)' : '1px solid rgba(255,255,255,0.04)' }}>
+                        <div style={{ display:'flex', alignItems:'flex-start', gap:5 }}>
+                          <span style={{ fontSize:9, minWidth:12, color: active ? '#c084fc' : 'var(--text-dim)', marginTop:1 }}>{active ? '✓' : '○'}</span>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:9, fontWeight:700, color: active ? '#c084fc' : 'var(--text-light)', lineHeight:1.2 }}>{st.name || st.id.replace(/_stack|_support|_35/g,'').replace(/_/g,' ')}</div>
+                            <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1, lineHeight:1.3 }}>{st.system || ''} · {subCount} веществ{st.synergyScore ? ` · син: ${st.synergyScore}` : ''}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
               <button onClick={() => { setLevel('manual'); setShowManualPopup(false); }} style={{ width:'100%', padding:'10px', borderRadius:10, background:'linear-gradient(135deg,#818cf8,#6366f1)', border:'none', color:'#000', fontWeight:700, fontSize:11, cursor:'pointer' }}>
                 ✅ Применить ручной выбор
               </button>
@@ -559,15 +581,18 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         </div>
       )}
 
-      {/* ===== ДОПОЛНИТЕЛЬНЫЕ МОДУЛИ (анализ контекста → popup) ===== */}
+      {/* ===== УСИЛЕНИЕ: все стеки каталога ===== */}
       {level !== 'manual' && (
         <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:12, background:'rgba(24,24,27,0.3)', border:'1px solid rgba(255,255,255,0.04)' }}>
-          <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.3)', marginBottom:5, textTransform:'uppercase', letterSpacing:'0.3px' }}>Доп. модули (анализ контекста)</div>
-          <div style={{ display:'flex', gap:4 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
+            <span style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:'0.3px' }}>Усиление ({ALL_STACKS.length} стеков)</span>
+            <button onClick={() => setShowEnhancementPopup(true)} style={{ fontSize:8, fontWeight:700, cursor:'pointer', padding:'3px 8px', borderRadius:6, background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.2)', color:'#f87171' }}>📋 Все стеки</button>
+          </div>
+          <div style={{ display:'flex', gap:4, marginBottom:4 }}>
             {([
-              ['articular_stack', '🦴', 'Суставы/Связки', '#4ade80'],
-              ['neuroprotection_stack', '🧠', 'Нейропротекция', '#818cf8'],
-              ['mega_total_support_35', '🚀', 'Усиление', '#f87171'],
+              ['articular_stack', '🦴', 'Суставы', '#4ade80'],
+              ['neuroprotection_stack', '🧠', 'Нейро', '#818cf8'],
+              ['mega_total_support_35', '🚀', 'Мега', '#f87171'],
             ] as const).map(([id, icon, label, col]) => {
               const active = selectedStacks.includes(id);
               return (
@@ -582,10 +607,76 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     color: active ? col : 'rgba(255,255,255,0.5)' }}>
                   <span style={{fontSize:13}}>{icon}</span>
                   <span>{label}</span>
-                  {active && <span style={{fontSize:6,fontWeight:700,color:col,marginTop:1}}>✓ доб.</span>}
+                  {active && <span style={{fontSize:6,fontWeight:700,color:col,marginTop:1}}>✓</span>}
                 </button>
               );
             })}
+          </div>
+          {selectedStacks.filter(id => !['articular_stack','neuroprotection_stack','mega_total_support_35'].includes(id)).length > 0 && (
+            <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4 }}>
+              {selectedStacks.filter(id => !['articular_stack','neuroprotection_stack','mega_total_support_35'].includes(id)).map(sid => (
+                <span key={sid} style={{ fontSize:7, padding:'2px 6px', borderRadius:6, fontWeight:600, background:'rgba(168,85,247,0.1)', color:'#c084fc', display:'inline-flex', alignItems:'center', gap:3 }}>
+                  {sid.replace(/_stack|_support|_35/g,'').replace(/_/g,' ')}
+                  <span onClick={() => setSelectedStacks(prev => prev.filter(s => s !== sid))} style={{ cursor:'pointer', color:'rgba(255,255,255,0.3)', fontSize:9 }}>✕</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Попап полного каталога стеков (Усиление) — ВСЕ 55 стеков из ALL_STACKS ── */}
+      {showEnhancementPopup && (
+        <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setShowEnhancementPopup(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
+            <div style={{ height:3, background:'linear-gradient(90deg,#f87171,#ef4444)' }} />
+            <div style={{ padding:'14px 14px 10px' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <span style={{ fontSize:13, fontWeight:800, color:'#f87171' }}>🚀 Усиление: все стеки ({ALL_STACKS.length})</span>
+                <button onClick={() => setShowEnhancementPopup(false)} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10, fontWeight:600 }}>✕</button>
+              </div>
+              <input value={enhancementSearch} onChange={e => setEnhancementSearch(e.target.value)} placeholder="🔍 Поиск стека по названию, системе или проблеме..." style={{
+                width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box', marginBottom:8,
+              }} />
+            </div>
+            <div style={{ flex:1, overflowY:'auto', padding:'0 14px 14px' }}>
+              {(ALL_STACKS as any[])
+                .filter((st: any) => {
+                  if (!enhancementSearch) return true;
+                  const q = enhancementSearch.toLowerCase();
+                  const name = (st.name||'').toLowerCase();
+                  const sys = (st.system||'').toLowerCase();
+                  const prob = (st.problem||'').toLowerCase();
+                  const sid = (st.id||'').toLowerCase();
+                  return name.includes(q) || sys.includes(q) || prob.includes(q) || sid.includes(q);
+                })
+                .map((st: any) => {
+                  const active = selectedStacks.includes(st.id);
+                  const subCount = (st.substances||[]).length;
+                  const trigger = STACK_BOOSTER_TRIGGERS.find(t => t.stackId === st.id);
+                  return (
+                    <div key={st.id} onClick={() => setSelectedStacks(prev => active ? prev.filter(s => s !== st.id) : [...prev, st.id])}
+                      style={{ padding:'8px 10px', borderRadius:8, marginBottom:4, cursor:'pointer',
+                        background: active ? 'rgba(168,85,247,0.12)' : 'rgba(255,255,255,0.02)',
+                        border: active ? '1px solid rgba(168,85,247,0.3)' : '1px solid transparent',
+                      }}>
+                      <div style={{ display:'flex', alignItems:'flex-start', gap:6 }}>
+                        <span style={{ fontSize:10, minWidth:14, color: active ? '#c084fc' : 'var(--text-dim)', marginTop:1 }}>{active ? '✓' : '○'}</span>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:10, fontWeight:700, color: active ? '#c084fc' : 'var(--text-light)', lineHeight:1.2 }}>{st.name || st.id.replace(/_stack|_support|_35/g,'').replace(/_/g,' ')}</div>
+                          <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3, marginTop:1 }}>{st.problem || st.system || ''}</div>
+                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', marginTop:2, display:'flex', gap:4, flexWrap:'wrap' }}>
+                            <span>{subCount} веществ</span>
+                            {st.synergyScore ? <span>· синергия: {st.synergyScore}</span> : null}
+                            {st.system ? <span>· {st.system}</span> : null}
+                            {trigger ? <span style={{color:'#f87171',fontWeight:700}}>· авто-триггер</span> : null}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
           </div>
         </div>
       )}
@@ -975,7 +1066,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               ['gynecomastia','Гино'],['edema_severe','Отёки'],['joint_pain','Суставы'],
               ['insomnia','Бессонница'],['anxiety','Тревога'],['low_libido','Либидо↓'],
               ['hair_loss','Выпадение волос'],['prostate_symptoms','Простата'],
-            ] as const).map(([sym, label]) => {
+              ['headache','Головная боль'],['palpitations','Сердцебиение'],
+              ['acne','Акне'],['mood_swings','Настроение'],
+              ] as const).map(([sym, label]) => {
               const active = symptoms.includes(sym);
               return (
                 <button key={sym} onClick={() => setSymptoms(prev => active ? prev.filter(s => s !== sym) : [...prev, sym])}
@@ -1507,6 +1600,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     • Температура &gt;38.5°C + боль в месте инъекции (абсцесс)
                   </div>
                 </div>
+
+                {/* ===== ДИНАМИЧЕСКИЙ СЛОЙ БЕЗОПАСНОСТИ (з движка) ===== */}
+                <CalcSafetyLayer rec={finalRec} planResult={planResult} />
+
               </div>
             )}
           </div>

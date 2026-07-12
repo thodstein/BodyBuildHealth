@@ -10,6 +10,9 @@ import { SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX } from '../../data/support
 import { GlassCard, PillBtn, StatBox, ORGANS, SYSTEMS, PURE_GOALS, TARGET_SYSTEMS, toFinderProfile, showToast, estCost } from './BioStackAIConstants';
 import { buildSmartStackMulti, type BuildVariant } from '../../engines/biostack-recommender.engine';
 import { getSafeStackRecommendations } from '../../engines/biostack-safety.engine';
+import {
+  selectStack, getEvidenceGrade,
+} from '../../engines/biostack-clinical-v2.engine';
 import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
 import type { LinkedData } from '../../core/data-link';
 
@@ -308,6 +311,7 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
   const [replaceOpen, setReplaceOpen] = useState(true);
   const [buildLoading, setBuildLoading] = useState(false);
   const [multiLoading, setMultiLoading] = useState(false);
+  const [gates, setGates] = useState<ReturnType<typeof selectStack> | null>(null);
 
   const mergedStacks = useMemo(() => {
     const templates: ExtStackItem[] = STACK_TEMPLATES.map(t => ({
@@ -411,11 +415,26 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
         filteredStack = safe;
       }
     }
+    // Clinical gate (v2): absolute contraindictions, UL, lab dose-correction,
+    // pathway redundancy, daily schedule, cycling advice, hard stops.
+    const gate = selectStack(
+      filteredStack,
+      profile,
+      'comprehensive',
+      (labAnalysis as LabCompositeResult) || null,
+    );
+    filteredStack = gate.ids;
+    let gateNote = '';
+    if (gate.hardStops.length > 0) {
+      const st = gate.hardStops.map(h => `${h.substanceName}: ${h.reason}`).slice(0, 4).join('; ');
+      gateNote += `\n🛑 Абсолютные противопоказания (исключены): ${st}`;
+    }
     const exp = explainStack(filteredStack, fp);
-    setResult({ stack: filteredStack, explanation: exp, budgetNote: budgetNote + (drugSafetyNote ? '\n' + drugSafetyNote : '') });
+    setGates(gate);
+    setResult({ stack: filteredStack, explanation: exp, budgetNote: budgetNote + (drugSafetyNote ? '\n' + drugSafetyNote : '') + gateNote });
     setBuildLoading(false);
     }, 100);
-  }, [goals, selTargets, selOrgans, selSystems, targetSize, lmState, stackIds, profile, avoidConflicts]);
+  }, [goals, selTargets, selOrgans, selSystems, targetSize, lmState, stackIds, profile, avoidConflicts, labAnalysis]);
 
   const handleSaveStack = useCallback(() => {
     if (!result) return;
@@ -576,6 +595,92 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
         </button>
       </div>
 
+      {(() => {
+        if (!result) return null;
+        const totalCost = result.stack.reduce((s, id) => s + estCost(id), 0);
+        const priceScore = totalCost > 10000 ? 20 : totalCost > 5000 ? 50 : totalCost > 2000 ? 75 : 90;
+        const priceLabel = totalCost > 10000 ? '💰💰💰' : totalCost > 5000 ? '💰💰' : totalCost > 2000 ? '💰' : '🟢';
+        return (
+          <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.08)', marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)' }}>💰 Ориентир. стоимость/мес</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#00e68a' }}>{totalCost.toLocaleString()} ₽ {priceLabel}</span>
+            </div>
+            <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.05)' }}>
+              <div style={{ width: priceScore + '%', height: '100%', borderRadius: 2,
+                background: priceScore >= 70 ? '#22c55e' : priceScore >= 40 ? '#f59e0b' : '#ef4444' }} />
+            </div>
+          </div>
+        );
+      })()}
+
+      {(() => {
+        if (!gates) return null;
+        const g = gates;
+        const slots = g.schedule || [];
+        const hasHard = g.hardStops.length > 0;
+        const ulWarn = (g.ulWarnings || []).map(w => w.message).filter((w: string) => /верх|превыш|избыт/i.test(w));
+        return (
+          <div style={{ padding: '8px 10px', borderRadius: 8, marginBottom: 6,
+            background: hasHard ? 'rgba(239,68,68,0.07)' : 'rgba(0,230,138,0.05)',
+            border: `1px solid ${hasHard ? 'rgba(239,68,68,0.14)' : 'rgba(0,230,138,0.1)'}` }}>
+            <div style={{ fontSize: 8, fontWeight: 700, color: hasHard ? '#ef4444' : '#00e68a', marginBottom: 4 }}>
+              🩺 Клинический контроль (доказательность × безопасность)
+            </div>
+            {hasHard && (
+              <div style={{ fontSize: 8, color: '#f87171', lineHeight: 1.3, marginBottom: 4 }}>
+                🛑 Блокировано по абсолютным противопоказаниям:
+                {g.hardStops.map((h, i) => (
+                  <div key={i}>• {h.substanceName}: {h.reason}</div>
+                ))}
+              </div>
+            )}
+            {ulWarn.length > 0 && (
+              <div style={{ fontSize: 8, color: '#f59e0b', lineHeight: 1.3, marginBottom: 4 }}>
+                ⚠ Превышение верхних безопасных доз (UL):
+                {ulWarn.map((w, i) => (
+                  <div key={i}>• {w}</div>
+                ))}
+              </div>
+            )}
+            {g.labAdjustments.length > 0 && (
+              <div style={{ fontSize: 8, color: '#60a5fa', lineHeight: 1.3, marginBottom: 4 }}>
+                🧪 Коррекция по анализам:
+                {g.labAdjustments.map((a, i) => (
+                  <div key={i}>• {a.name}: {a.reason}</div>
+                ))}
+              </div>
+            )}
+            {g.redundancy.length > 0 && (
+              <div style={{ fontSize: 8, color: '#f59e0b', lineHeight: 1.3, marginBottom: 4 }}>
+                🔁 Избыточное дублирование путей:
+                {g.redundancy.map((r, i) => (
+                  <div key={i}>• {r.pathway}: {r.names.join(', ')} — {r.message}</div>
+                ))}
+              </div>
+            )}
+            {slots.length > 0 && (
+              <div style={{ marginBottom: 4 }}>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', marginBottom: 2 }}>🕐 Расписание приёма:</div>
+                {slots.map((sl, i) => (
+                  <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>
+                    <b style={{ color: '#00e68a' }}>{sl.time === 'morning' ? 'Утро' : sl.time === 'afternoon' ? 'День' : sl.time === 'evening' ? 'Вечер' : 'Ночь'}:</b> {sl.names.join(', ')}
+                  </div>
+                ))}
+              </div>
+            )}
+            {g.cycling.length > 0 && (
+              <div style={{ fontSize: 8, color: '#8b5cf6', lineHeight: 1.3 }}>
+                🔄 Циклирование:
+                {g.cycling.map((c, i) => (
+                  <div key={i}>• {c.name}: {c.cycleNote}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* ─── Result ─── */}
       {result && (
         <GlassCard title="📋 Результат сборки" icon="📋" color="#00e68a">
@@ -590,35 +695,25 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
             <StatBox label="Компонентов" value={result.stack.length} color="#00e68a" />
             <StatBox label="С дозировкой" value={`${result.explanation.totalDoseCount}/${result.stack.length}`} color="#60a5fa" />
           </div>
-          {(() => {
-            const totalCost = result.stack.reduce((s, id) => s + estCost(id), 0);
-            const priceScore = totalCost > 10000 ? 20 : totalCost > 5000 ? 50 : totalCost > 2000 ? 75 : 90;
-            const priceLabel = totalCost > 10000 ? '💰💰💰' : totalCost > 5000 ? '💰💰' : totalCost > 2000 ? '💰' : '🟢';
-            return <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.08)', marginBottom: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)' }}>💰 Ориентир. стоимость/мес</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#00e68a' }}>{totalCost.toLocaleString()} ₽ {priceLabel}</span>
-              </div>
-              <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.05)' }}>
-                <div style={{ width: priceScore + '%', height: '100%', borderRadius: 2,
-                  background: priceScore >= 70 ? '#22c55e' : priceScore >= 40 ? '#f59e0b' : '#ef4444' }} />
-              </div>
-            </div>;
-          })()}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 6 }}>
-            {result.explanation.substances.map(s => (
+            {result.explanation.substances.map(s => {
+              const ev = getEvidenceGrade(s.id);
+              const evColor = ev === 'A' ? '#22c55e' : ev === 'B' ? '#f59e0b' : '#9ca3af';
+              return (
               <div key={s.id} style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{s.name}</span>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                     <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>~{estCost(s.id).toLocaleString()} ₽</span>
+                    <span title={`Доказательность: ${ev}`} style={{ fontSize: 7, fontWeight: 700, padding: '1px 4px', borderRadius: 4, background: evColor + '22', color: evColor }}>{ev}</span>
                     <span style={{ fontSize: 8, color: '#00e68a' }}>{s.role}</span>
                   </div>
                 </div>
                 <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3 }}>🧬 {s.mechanism}</div>
                 {s.dose && <div style={{ fontSize: 8, color: '#60a5fa' }}>💊 {s.dose}</div>}
               </div>
-            ))}
+              );
+            })}
           </div>
           {result.explanation.warnings.length > 0 && (
             <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)', marginBottom: 6 }}>
@@ -629,13 +724,18 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
             </div>
           )}
           <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => { setStackIds(result.stack); handleSaveStack(); }} style={{
-              flex: 1, padding: '12px 0', borderRadius: 12, fontSize: 11, fontWeight: 800, cursor: 'pointer',
-              background: 'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(0,198,83,0.05))', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a',
+            <button onClick={() => { setStackIds(result.stack); handleSaveStack(); }}
+              disabled={(gates?.hardStops.length ?? 0) > 0}
+              style={{
+              flex: 1, padding: '12px 0', borderRadius: 12, fontSize: 11, fontWeight: 800,
+              cursor: (gates?.hardStops.length ?? 0) > 0 ? 'not-allowed' : 'pointer',
+              background: (gates?.hardStops.length ?? 0) > 0 ? 'rgba(239,68,68,0.08)' : 'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(0,198,83,0.05))',
+              border: '1px solid ' + ((gates?.hardStops.length ?? 0) > 0 ? 'rgba(239,68,68,0.25)' : 'rgba(0,230,138,0.2)'),
+              color: (gates?.hardStops.length ?? 0) > 0 ? '#f87171' : '#00e68a',
               letterSpacing: 0.3,
-            }}>💾 Сохранить стек</button>
+            }}>{(gates?.hardStops.length ?? 0) > 0 ? '🛑 Есть противопоказания' : '💾 Сохранить стек'}</button>
             <button onClick={() => {
-              const txt = result.explanation.substances.map(s => `${s.name} — ${s.dose || s.role}`).join('\n');
+              const txt = result.explanation.substances.map(s => s.name + ' — ' + (s.dose || s.role)).join('\n');
               navigator.clipboard.writeText(txt);
             }} style={{
               padding: '12px 16px', borderRadius: 12, fontSize: 10, fontWeight: 700, cursor: 'pointer',
@@ -660,9 +760,12 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
                   localStorage.setItem('he_my_stacks', JSON.stringify(arr));
                 }
               } catch {}
-            }} style={{
-              padding: '12px 16px', borderRadius: 12, fontSize: 10, fontWeight: 700, cursor: 'pointer',
-              background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', color: '#818cf8',
+            }} disabled={(gates?.hardStops.length ?? 0) > 0} style={{
+              padding: '12px 16px', borderRadius: 12, fontSize: 10, fontWeight: 700,
+              cursor: (gates?.hardStops.length ?? 0) > 0 ? 'not-allowed' : 'pointer',
+              background: (gates?.hardStops.length ?? 0) > 0 ? 'rgba(239,68,68,0.08)' : 'rgba(99,102,241,0.1)',
+              border: '1px solid ' + ((gates?.hardStops.length ?? 0) > 0 ? 'rgba(239,68,68,0.25)' : 'rgba(99,102,241,0.2)'),
+              color: (gates?.hardStops.length ?? 0) > 0 ? '#f87171' : '#818cf8',
             }}>📦 В стеки</button>
           </div>
         </GlassCard>
@@ -684,7 +787,7 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
               return (
                 <div key={vr.variant} style={{
                   padding: '10px 12px', borderRadius: 12,
-                  background: `${l.color}08`, border: `1px solid ${l.color}15`,
+                  background: (l.color || '#60a5fa') + '08', border: '1px solid ' + (l.color || '#60a5fa') + '15',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

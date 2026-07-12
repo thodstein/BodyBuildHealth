@@ -63,6 +63,7 @@ type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'calc_tools' | 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { PopupBool, PopupNumber, PopupSelect } from '../components/PopupXxx';
 import { BioStackAIScreen } from '../components/BioStackAIScreen';
+import { SupplementClinicScreen } from './SupplementClinicScreen';
 import { SupportPeptideCalc } from './SupportScreen_parts/SupportPeptideCalc';
 import { SupportResearch } from './SupportScreen_parts/SupportResearch';
 import { SupportGeneratorInfo } from './SupportScreen_parts/SupportGeneratorInfo';
@@ -490,6 +491,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
     // ── ОДИН ВЫЗОВ ──
     const planRes = runSupportUnified(state);
     setPlanResult(planRes);
+    // C23: уведомления о режимах усиления / суставной поддержке
+    try {
+      const boostSubs = planRes.substances.filter((p: any) => p.fromBoost);
+      const jointSubs = planRes.substances.filter((p: any) => p.fromJoint);
+      if (boostSubs.length > 0) showToast(`🚀 Режим «Усиление»: добавлено ${boostSubs.length} веществ (гонадотропины, пептиды, ноотропы)`, 'warning');
+      if (jointSubs.length > 0) showToast(`🦴 Суставная поддержка: добавлено ${jointSubs.length} веществ (глюкозамин, коллаген, куркумин)`, 'warning');
+    } catch {}
     // Сохраняем ID веществ в localStorage для импорта в план питания
     try { localStorage.setItem('he_support_plan_result', JSON.stringify(planRes.substances.map(p => p.id))); } catch {}
     // subs + dosages из единого результата (с dedup)
@@ -541,7 +549,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       pharma: {
         ...defaults.pharma,
         ...(h.pharma || {}),
-        aas: [...(defaults.pharma?.aas || []), ...((h.pharma?.aas || []) as any[]).filter((a: any) => !defaults.pharma?.aas?.some((d: any) => d.id === a.id))],
+        aas: (() => {
+          const base = (defaults.pharma?.aas || []) as any[];
+          const extra = (h.pharma?.aas || []) as any[];
+          const m = new Map<string, any>();
+          base.forEach((a: any) => m.set(a.id, a));
+          extra.forEach((a: any) => m.set(a.id, a)); // C19: редактированные недели из AutoCalculator (hydrate) побеждают
+          return Array.from(m.values());
+        })(),
         hasHCG: defaults.pharma?.hasHCG || h.pharma?.hasHCG || false,
       },
       powerLevel: level,
@@ -3167,7 +3182,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       )}
             {renderView(infoView, 'biostack', () =>
               <div style={{ padding: '0 4px' }}>
-                <BioStackAIScreen />
+                <SupplementClinicScreen />
               </div>
             )}
             {renderView(infoView, 'calc_tools', () =>
@@ -3398,9 +3413,24 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
           onApply={(r) => {
             setAutoCalcResult(r);
             setCalcDone(true);
+            // C20: Применить результат AutoCalculator к основному плану поддержки
+            const lvl = r.level === 'manual' ? 'max' : (r.level === 'base' ? 'basic' : r.level === 'medium' ? 'mid' : r.level === 'max' ? 'max' : 'boost') as 'basic' | 'mid' | 'max' | 'boost';
+            if (r.subs && r.subs.length > 0) {
+              calcSupport(lvl, r.subs);
+            }
           }}
           onOpenManualPicker={() => setShowManualPicker(true)}
+          planResult={planResult ?? undefined}
         />
+      )}
+
+      {/* ===== WEEK CHANGE TOAST (C22) ===== */}
+      {weekChangeMsg && (
+        <div style={{ position:'fixed', left:0, right:0, bottom:70, zIndex:200, display:'flex', justifyContent:'center', padding:'0 12px', pointerEvents:'none' }}>
+          <div style={{ background:'rgba(0,230,138,0.95)', color:'#000', fontSize:11, fontWeight:700, padding:'8px 16px', borderRadius:20, boxShadow:'0 4px 20px rgba(0,0,0,0.4)' }}>
+            {weekChangeMsg}
+          </div>
+        </div>
       )}
 
       {/* ===== PEPTIDE CALCULATOR ===== */}

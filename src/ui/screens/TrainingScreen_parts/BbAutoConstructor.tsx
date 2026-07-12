@@ -40,6 +40,9 @@ import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { getPlanFeedback } from '../../../engines/plan-execution-feedback.engine';
 import { validatePlan, weeklySetsFromBBPlan } from '../../../engines/plan-validator';
 import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } from './PlanCharts';
+import { distributePhases as distributePhasesUnified, type PhaseDistribution } from './TrainingConstructor/phase-periodization';
+import { validatePlanQuality, bbPlanToQualityInput, type PlanQualityResult } from '../../../engines/plan-quality.engine';
+import { PlanExportCard } from './PlanExportCard';
 
 type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -76,19 +79,26 @@ const H: React.CSSProperties = { fontSize:13, fontWeight:700, color:ACCENT, marg
 const STEP_PILL = (active:boolean) => ({ padding:'5px 12px', borderRadius:16, fontSize:10, fontWeight:active?700:500, cursor:'pointer', border:active?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background:active?'linear-gradient(135deg,#00e68a,#00c8a0)':'#18181b', color:active?'#000':'#fff', flexShrink:0 } as React.CSSProperties);
 const IN: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.08)', borderRadius:6, padding:'4px 8px', fontSize:11, outline:'none', boxSizing:'border-box', minHeight:30 };
 
+const _phaseMapCache = new Map<string, Map<number, BBPhase>>();
+function getPhaseMap(totalWeeks: number): Map<number, BBPhase> {
+  const cacheKey = String(totalWeeks);
+  if (_phaseMapCache.has(cacheKey)) return _phaseMapCache.get(cacheKey)!;
+  const dist: PhaseDistribution[] = distributePhasesUnified(totalWeeks, 0, 'bulk');
+  const map = new Map<number, BBPhase>();
+  for (const d of dist) {
+    for (const w of d.weeks) {
+      map.set(w, d.phase as BBPhase);
+    }
+  }
+  for (let w = 1; w <= totalWeeks; w++) {
+    if (!map.has(w)) map.set(w, 'accumulation' as BBPhase);
+  }
+  _phaseMapCache.set(cacheKey, map);
+  return map;
+}
+
 function phaseForWeek(week: number, totalWeeks: number): BBPhase {
-  if (totalWeeks <= 4) return week <= Math.ceil(totalWeeks * 0.75) ? 'accumulation' : 'intensification';
-  const peakingWeeks = totalWeeks >= 8 ? 2 : (totalWeeks >= 6 ? 1 : 0);
-  if (peakingWeeks > 0 && week > totalWeeks - peakingWeeks) return 'peaking';
-  const prePeak = totalWeeks - peakingWeeks;
-  const midDeload = totalWeeks >= 10 ? Math.round(totalWeeks * 0.45) : -1;
-  if (week === prePeak && totalWeeks >= 6) return 'deload';
-  if (week === midDeload) return 'deload';
-  if (midDeload > 0 && week < midDeload) return 'accumulation';
-  if (midDeload > 0 && week > midDeload && week < prePeak) return 'intensification';
-  const totalBeforePrePeak = prePeak - 1;
-  const accumWeeks = Math.round(totalBeforePrePeak * 0.6);
-  return week <= accumWeeks ? 'accumulation' : 'intensification';
+  return getPhaseMap(totalWeeks).get(week) || 'accumulation';
 }
 
 function computePhases(totalWeeks: number): { week: number; phase: BBPhase }[] {
@@ -265,6 +275,11 @@ export const BbAutoConstructor: React.FC = () => {
 
   const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan) : null, [builtPlan]);
   const quality = useMemo(() => metrics ? calcQualityScore(metrics, weakPoints, phases) : null, [metrics, weakPoints, phases]);
+  const unifiedQuality = useMemo(() => {
+    if (!builtPlan) return null;
+    const input = bbPlanToQualityInput(builtPlan, { level: bbLevel, weakPoints, hasDeload: autoDeload, onCourse: peds.length > 0 });
+    return validatePlanQuality(input);
+  }, [builtPlan, bbLevel, weakPoints, autoDeload, peds]);
 
   useEffect(() => {
     try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, injuries, onCourse: peds.length > 0, loadStrategy, planMode, bbCycleId: selectedCycleId }); } catch {}
@@ -1199,6 +1214,29 @@ export const BbAutoConstructor: React.FC = () => {
         <div style={{ ...CARD, marginTop:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
           <div style={{ ...SMALL, whiteSpace:'pre-wrap' }}>{explainBBMetrics(metrics)}</div>
         </div>
+        {/* Export plan card */}
+        {unifiedQuality && (
+          <div style={{ marginTop:8 }}>
+            <PlanExportCard
+              bbPlan={builtPlan}
+              profile={{
+                level: bbLevel,
+                goal: bbGoal,
+                daysPerWeek: bbDays,
+                bodyWeight: prof.bodyWeight,
+                pmSquat: prof.pmSquat,
+                pmBench: prof.pmBench,
+                pmDead: prof.pmDead,
+                weakPoints,
+                onCourse: peds.length > 0,
+              }}
+              level={bbLevel}
+              weakPoints={weakPoints}
+              hasDeload={autoDeload}
+              meta={{ splitName: builtPlan.pattern.name, weeks: bbWeeks, corrections: builtPlan.rationale }}
+            />
+          </div>
+        )}
         <div style={{ display:'flex', gap:8, marginTop:10 }}>
           <button style={{ ...BTN, flex:1 }} onClick={() => setStep('adjust')}>Далее: ручная коррекция →</button>
           <button style={BTN_GHOST} onClick={() => setStep('plan')}>← Назад</button>

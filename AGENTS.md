@@ -2532,8 +2532,62 @@ CompetitionCard (125 строк) целиком влит в PeakingPanel (240 с
 ✅ `tsc --noEmit`: 0 errors (проект чист)
 ✅ `vite build`: OK (37.43s, 726 modules, 0 errors)
 
-## Session Summary (Jul 11) — Ручной планировщик: фикс архитектуры + визуализация прогрессии
+## Session Summary (Jul 12) — Ручной планировщик: слияние BB-фич + оживление MyTrainingTab (финал)
 
+### Goal
+Доработать недостающие функции TrainingConstructor / BbAutoConstructor / MyTrainingTab: расширение типов, перенос ВСЕХ BB-фич в ручной конструктор, оживление MyTrainingTab, устранение дублей фазовой периодизации, объединение параметров ConfigPanel/BbAutoConstructor.
+
+### Constraints & Preferences
+- ПЛ Циклы НЕ трогаем — только ручной планировщик, Авто ББ и Библиотека
+- Анализ с позиции профессионального тренера по бодибилдингу и главного инженера проекта
+- Сначала качественный анализ, затем конкретные предложения, затем реализация
+
+### Progress
+**Done:**
+- **P5:** `ManualExercise` расширен BB-полями (`restSeconds`, `character`, `muscleTarget`, `technique`, `tempo`); конвертация BBPlan→ManualResult в `index.tsx` (ветки bb_split и bb_cycle) сохраняет все BB-поля + `bbMeta`
+- **P2:** BB-метрики (`calcBBPlanMetrics`) в PlanDisplay; auto-deload баннер по ACWR; колонки character/tempo; PED-чекбоксы в ConstructorProfile; `bbFocusGroup`+`bbAutoDeload` в ConfigPanel
+- **P4:** MyTrainingTab полностью оживлён — 4 подвкладки (exercises/plans/cycles/progress), прогресс-таб из StrengthDiary (e1rm графики, тоннаж по неделям), кнопка «📥 В конструктор» через `applyToPlanner` + `onLoadToConstructor` prop, `useEffect` с `new StrengthDiary()` + `await getWorkoutLogs()`
+- **P1:** `phaseForWeek` в BbAutoConstructor заменён на `distributePhases()` из `phase-periodization.ts` (через кешированную map `getPhaseMap`), импорт `distributePhases as distributePhasesUnified, type PhaseDistribution` из `./TrainingConstructor/phase-periodization`
+- **P6:** ConfigPanel BB-АВТО ДВИЖОК дополнен `bbVolGoal` (MEV/MAV/MRV) и `bbDeloadType` (pump/strength/rest); добавлены в `CONFIG_LABELS`; `buildBBPlan` использует `manualCfg.bbVolGoal || 'mav'`; коррекция auto-deload использует `manualCfg.bbDeloadType || 'pump'`
+- **P7:** `bbSpecialization` (Блок специализации) слит из BbAutoConstructor в ConfigPanel + index.tsx: toggle в BB-АВТО ДВИЖОК секции, `specialization: manualCfg.bbSpecialization === 'on'` → `buildBBPlan` (слабые на MAV+10%, остальные на MEV), коррекция + превью показывают спец-режим. `focusGroup` теперь передаётся в `buildBBPlan` отдельно (как в BbAutoConstructor), а не сливается в weakPoints.
+- **P8:** `onLoadToConstructor` проведён сквозь LibraryZone → MyTrainingTab: TrainingScreen передаёт `onLoadToConstructor={() => goPlannerManual()}`, так что клик «📥 В конструктор» в Моих тренировках шлёт план в bridge (баннер в конструкторе) И переключает на зону Планировщик (ручной), где баннер виден.
+- **Verify:** `tsc --noEmit` — 0 ошибок; `vite build` — OK (29s); UTF-8 — все файлы OK
+
+### Key Decisions
+- 8 приоритетов реализованы в порядке P5 → P2 → P4 → P1 → P6 → P7 → P8 (все завершены)
+- `BBPlanMetrics` использует кириллические имена полей: `тяжPct`, `пампPct`
+- `loadSRPESessions` в `engines/pro/srpe-store`; `acuteChronicRatio`/`toDailyLoads` в `engines/pro/training-load.engine`
+- Единый источник фазовой периодизации — `distributePhases()` из `phase-periodization.ts`; BbAutoConstructor больше не имеет своей примитивной логики
+- `buildBBPlan` (bb-builder.engine.ts) принимает: `focusGroup?: string` (отдельно от `weakPoints[]`), `specialization?: boolean`, `volumeGoal`, `injuries` — все теперь задействованы в ручном конструкторе
+
+### Next Steps
+- (none) — все приоритеты завершены, сборка зелёная
+
+### Critical Context
+- **planner-bridge:** функция называется `applyToPlanner` (НЕ `publishPlannerApply`); путь из MyTrainingTab — `./planner-bridge` (тот же каталог, не `../planner-bridge`)
+- **StrengthDiary:** `getWorkoutLogs()` — async метод экземпляра (`new StrengthDiary()` затем `await d.getWorkoutLogs()`), не статический
+- **WorkoutLog:** прогресс-данные берутся из `log.exercises[]` с полями `ex.totalVolume`, `ex.bestWeight`, `ex.bestReps` (НЕ `log.sets`)
+- MyTrainingTab `onLoadToConstructor` prop вызывается вместе с `applyToPlanner` при клике «📥 В конструктор»; в LibraryZone/TrainingScreen маппится на `goPlannerManual()`
+- `getPhaseMap(totalWeeks)` в BbAutoConstructor кеширует `Map<number, BBPhase>` через `_phaseMapCache`, вызывает `distributePhasesUnified(totalWeeks, 0, 'bulk')`
+- `manualCfg` ключи для BB: `generator`, `bbSplit`, `bbLoad`, `bbCycle`, `bbFocusGroup`, `bbAutoDeload`, `bbVolGoal`, `bbDeloadType`, `bbSpecialization`
+- `tprofile.bbPeds` — массив PED-идентификаторов (AAS/GH/INSULIN/IGF/CLEN/T3), используется в `buildBBPlan`
+- `CONFIG_LABELS` (types.ts) содержит: `bbSplit`, `bbLoad`, `bbCycle`, `bbFocusGroup`, `bbAutoDeload`, `bbVolGoal`, `bbDeloadType`, `bbSpecialization`
+
+### Relevant Files
+- `src/ui/screens/TrainingScreen_parts/TrainingConstructor/types.ts` — ManualExercise BB-поля, ManualResultBBMeta, CONFIG_LABELS (bbSpecialization добавлен)
+- `src/ui/screens/TrainingScreen_parts/TrainingConstructor/index.tsx` — BBPlan→ManualResult конвертация, buildBBPlan с bbVolGoal/focusGroup/specialization/bbFocusGroup/bbAutoDeload/bbPeds, auto-deload коррекция с bbDeloadType, buildPreview BB-теги
+- `src/ui/screens/TrainingScreen_parts/TrainingConstructor/ConfigPanel.tsx` — BB-АВТО ДВИЖОК: bbFocusGroup, bbVolGoal, bbAutoDeload toggle, bbDeloadType (условно), bbSpecialization toggle
+- `src/ui/screens/TrainingScreen_parts/TrainingConstructor/PlanDisplay.tsx` — BB-метрики, auto-deload баннер, BB character/tempo колонки
+- `src/ui/screens/TrainingScreen_parts/TrainingConstructor/ConstructorProfile.tsx` — PED-чекбоксы
+- `src/ui/screens/TrainingScreen_parts/TrainingConstructor/phase-periodization.ts` — distributePhases, PHASE_CONFIGS (единый источник фаз)
+- `src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx` — импорт distributePhasesUnified; getPhaseMap заменяет локальный phaseForWeek
+- `src/ui/screens/TrainingScreen_parts/MyTrainingTab.tsx` — 4 подвкладки, progress tab, applyToPlanner + onLoadToConstructor, StrengthDiary async load
+- `src/ui/screens/TrainingScreen_parts/LibraryZone.tsx` — добавлен onLoadToConstructor prop, проброшен в MyTrainingTab
+- `src/ui/screens/TrainingScreen.tsx` — LibraryZone получает onLoadToConstructor={() => goPlannerManual()}
+- `src/engines/bb/bb-builder.engine.ts` — buildBBPlan, BBPlan/BBSession/BBExercise/BBSet
+- `src/engines/bb/bb-metrics.engine.ts` — calcBBPlanMetrics (тяжPct/пампPct), explainBBMetrics
+- `src/engines/pro/training-load.engine.ts` — acuteChronicRatio, toDailyLoads
+- `src/engines/pro/srpe-store.ts` — loadSRPESessions
 
 ## Session Summary (Jul 12) — СРЦ2: 12 авторских циклов добавлены в реестр
 

@@ -4,7 +4,7 @@ import { SUPPORT_CATALOG_DATA } from '../data/support-database';
 import { PRICE_RUB, estCost } from '../ui/components/BioStackAIConstants';
 
 /* ─── Cost per substance ─── */
-function getCost(id: string): number {
+export function getCost(id: string): number {
   return PRICE_RUB[id] || estCost(id);
 }
 

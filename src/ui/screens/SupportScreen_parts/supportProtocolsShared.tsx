@@ -116,6 +116,17 @@ export const monitoringBlock = (markers: Array<{marker:string;target:string;when
   </div>
 );
 
+export const RX_NOTE = ' 💊 рецептурно — только по назначению врача';
+
+export const StopBanner: React.FC<{ title: string; thresholds: string[] }> = ({ title, thresholds }) => (
+  <div style={{ borderRadius:10, padding:'10px 12px', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)' }}>
+    <div style={{ fontSize:9, fontWeight:800, color:'#ef4444', marginBottom:4 }}>🛑 {title}</div>
+    {thresholds.map((t: string, i: number) => (
+      <div key={i} style={{ fontSize:8, color:'#fca5a5', lineHeight:1.4, marginBottom:2 }}>• {t}</div>
+    ))}
+  </div>
+);
+
 export const PROTOCOL_CARDS = [
   { id:'symptoms', icon:'🩺', label:'Симптомы', desc:'Поиск и коррекция симптомов: база решений, дневник, приверженность', color:'#ef4444', system:'Общее', tags:['Симптомы','Решения','Дневник','Лабы'] },
   { id:'neuro', icon:'🧠', label:'Нейропротекция', desc:'Нейротоксичность ААС: механизмы, калькулятор риска, протокол', color:'#06b6d4', system:'ЦНС', tags:['Нейротоксичность','BDNF','ГАМК','Глутамат'] },

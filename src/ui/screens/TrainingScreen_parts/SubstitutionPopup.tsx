@@ -1,5 +1,6 @@
 import React from 'react';
 import { EXERCISE_CATALOG, getSubstitutes, getExerciseById } from '../../../core/exercise-catalog';
+import { getExerciseBio, type ExerciseBio } from '../../../data/exercise-biomechanics-db';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.4)';
@@ -42,6 +43,23 @@ const DIFF_COLORS: Record<string, string> = {
 
 const STRESS_ICONS: Record<string, string> = {
   low: '🟢', med: '🟡', high: '🔴',
+};
+
+const STRESS_KEYS_RU: Record<string, string> = {
+  knee: 'колено', hip: 'таз', spine: 'позвоночник', shoulder: 'плечо', elbow: 'локоть', ankle: 'голеностоп',
+};
+
+// Биомеханическая карточка упражнения (как в Exercise Lab)
+const BioLine: React.FC<{ bio?: ExerciseBio }> = ({ bio }) => {
+  if (!bio) return null;
+  const js = bio.jointStress;
+  const strs = Object.entries(js || {}).map(([k, v]) => `${STRESS_KEYS_RU[k] || k} ${v}/10`);
+  return (
+    <div style={{ marginBottom: 4, background: 'rgba(59,130,246,0.04)', borderRadius: 8, padding: '5px 8px', fontSize: 8, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4 }}>
+      🔬 Биомеханика: {strs.join(', ')} | Сложность: {bio.difficulty}/10 | ЦНС: {bio.cnsDemand}/5
+      {bio.primaryMuscles?.length > 0 && <div style={{ marginTop: 2 }}>🎯 Цель: {bio.primaryMuscles.join(', ')}{bio.secondaryMuscles?.length ? ' + ' + bio.secondaryMuscles.join(', ') : ''}</div>}
+    </div>
+  );
 };
 
 export const SubstitutionPopup: React.FC<Props> = ({ exerciseName, group, onSelect, onClose }) => {
@@ -132,6 +150,8 @@ export const SubstitutionPopup: React.FC<Props> = ({ exerciseName, group, onSele
             {(cat as any).technique && <span> · { (cat as any).technique }</span>}
           </div>
 
+          {BioLine({ bio: getExerciseBio(cat.id) })}
+
           {opts.length === 0 && (
             <div style={{ fontSize: 11, color: DIM, padding: 12, textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
               Нет альтернатив для замены. Вы можете отредактировать упражнение вручную.
@@ -139,7 +159,9 @@ export const SubstitutionPopup: React.FC<Props> = ({ exerciseName, group, onSele
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {opts.map((opt, i) => (
+            {opts.map((opt, i) => {
+              const obio = getExerciseBio(opt.id);
+              return (
               <button key={opt.id} onClick={() => onSelect(opt.id)}
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'stretch',
@@ -183,8 +205,14 @@ export const SubstitutionPopup: React.FC<Props> = ({ exerciseName, group, onSele
                     🎯 {opt.technique}
                   </div>
                 )}
+                {opt.description && (
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 1, lineHeight: 1.4 }}>
+                    📝 {opt.description}
+                  </div>
+                )}
+                {BioLine({ bio: obio })}
               </button>
-            ))}
+            ); })}
           </div>
         </div>
       </div>

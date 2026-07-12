@@ -4,13 +4,14 @@ import { loadBioStackProfile, autoFillFromMainProfile } from '../../engines/bios
 import { SUB_TABS, BIO_ANIM_CSS, type BSTab, initBioToast, SkeletonLoader, showToast } from './BioStackAIConstants';
 import { useDataLink, type LinkedData } from '../../core/data-link';
 import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
-import { ProfileTab } from './BioStackAIProfile';
-import { SearchTab } from './BioStackAISearch';
-import { BuildTab } from './BioStackAIBuild';
-import { StackTab } from './BioStackAIStack';
-import { RisksTab } from './BioStackAIRisks';
-import { CompareTab } from './BioStackAICompare';
-import { ReportsTab } from './BioStackAIReports';
+  import { ProfileTab } from './BioStackAIProfile';
+  import { SearchTab } from './BioStackAISearch';
+  import { BuildTab } from './BioStackAIBuild';
+  import { StackTab } from './BioStackAIStack';
+  import { RisksTab } from './BioStackAIRisks';
+  import { CompareTab } from './BioStackAICompare';
+  import { ReportsTab } from './BioStackAIReports';
+  import BioStackAIData from './BioStackAIData';
 
 const BIO_TAB_KEY = 'he_biostack_tab';
 
@@ -107,6 +108,7 @@ export const BioStackAIScreen: React.FC = () => {
     risks: <RisksTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} activeAAS={activeAAS} />,
     compare: <CompareTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} />,
     reports: <ReportsTab profile={profile} stackIds={stackIds} linked={linked} />,
+    data: <BioStackAIData profile={profile} onChange={setProfile} />,
   };
 
   return (

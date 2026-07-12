@@ -5,14 +5,14 @@ import { PHARMA_DB, PHARMA_CLASSES } from '../../../core/pharma-database';
 import { getProfile } from '../../../core/profile-manager';
 import { GLASS, BADGE, DEFAULT_STATE } from './Calc.types';
 import type { AutoCalculatorProps } from './Calc.types';
-import { Card, PopupPEDInput } from './Calc.parts';
+import { Card, PopupPEDInput, PopupNumber } from './Calc.parts';
 import { TzRiskCard } from './TzRiskCard';
 import { MechanismView } from './Calc.result';
 import { deriveStateFromLabs, labPointsToSlice } from './Calc.labs-derived';
 import { db } from '../../../core/db';
 import { CalcMapperCard } from './Calc.mapper';
 
-export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked, labsLinked, onOpenManualPicker }) => {
+export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked, labsLinked, onOpenManualPicker, planResult }) => {
   const [state, setState] = useState<CalculatorState>(() => {
     const h = hydrateState();
     return { ...DEFAULT_STATE, ...h, profile: { ...DEFAULT_STATE.profile, ...(h.profile || {}) }, pharma: { ...DEFAULT_STATE.pharma, ...(h.pharma || {}) }, labs: { ...DEFAULT_STATE.labs, ...(h.labs || {}), fullPanel: h.labs?.fullPanel || DEFAULT_STATE.labs.fullPanel } };
@@ -420,6 +420,29 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
                       {phClass === 'oral_17aa' ? 'орал' : phClass.slice(0,6)}
                     </span>
                   )}
+                  {/* C19: редактор недель старта/конца для ААС */}
+                  <div style={{ display:'flex', gap:4, marginTop:4 }}>
+                    <PopupNumber
+                      label={`${phName} · старт нед`}
+                      value={a.startWeek || 1}
+                      min={1} max={Math.max(2, (a.endWeek || 12) - 1)} step={1}
+                      suffix="нед"
+                      onChange={(v: number) => {
+                        const sw = Math.max(1, Math.min(v, (a.endWeek || 12) - 1));
+                        uPharm({ aas: state.pharma.aas.map((x, xi) => xi === i ? { ...x, startWeek: sw } : x) as any });
+                      }}
+                    />
+                    <PopupNumber
+                      label={`${phName} · конец нед`}
+                      value={a.endWeek || 12}
+                      min={Math.min((a.startWeek || 1) + 1, 2)} max={52} step={1}
+                      suffix="нед"
+                      onChange={(v: number) => {
+                        const ew = Math.max((a.startWeek || 1) + 1, Math.min(v, 52));
+                        uPharm({ aas: state.pharma.aas.map((x, xi) => xi === i ? { ...x, endWeek: ew } : x) as any });
+                      }}
+                    />
+                  </div>
                 </div>
               );
             })}
@@ -499,7 +522,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       <CalcMapperCard state={state} onStateChange={(n) => setState(n)} onApply={(rec) => {
         const subIds = rec.subs.map(s => s.substanceId);
         onApply({ level: rec.level, subs: subIds, tzRec: rec });
-      }} onOpenManualPicker={onOpenManualPicker} />
+      }} onOpenManualPicker={onOpenManualPicker} planResult={planResult} />
 
       {result.contraindicationAlerts.length > 0 && (
         <div style={{ ...GLASS, padding: 8, marginTop: 6 }}>

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolE2: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -12,6 +12,13 @@ export const SupportProtocolE2: React.FC<{ s: Record<string, any> }> = ({ s }) =
                 <div style={{ fontSize:13, fontWeight:800, color:'#f472b6', marginBottom:2 }}>🔬 Контроль эстрадиола на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Поддержание оптимального уровня эстрадиола (E2). Профилактика гинекомастии, контроль ароматизации, управление эстроген-зависимыми побочными эффектами.</p>
               </div>
+
+              <StopBanner title="Критические пороги по эстрадиолу" thresholds={[
+                'E2 >120 пг/мл при симптомах — активная терапия ингибитором ароматазы',
+                'E2 <20 пг/мл — симптомы гипоэстрогении (суставы/либидо/настроение): снизить или отменить AI',
+                'Болезненная гинекомастия, не отвечающая на SERM/AI за 4-6 нед — консультация хирурга',
+                'AI титруется ступенчато: старт 0.5 мг 2×/нед, контроль E2 через 14 дней (не выше и не ниже 20-40 пг/мл)',
+              ]} />
 
               <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
                 {[
@@ -53,7 +60,7 @@ export const SupportProtocolE2: React.FC<{ s: Record<string, any> }> = ({ s }) =
                       ]},
                     { phase:'ФАЗА 2 · ПОВЫШЕННЫЙ E2', label:'E2 60-120 пг/мл', color:'#f59e0b', condition:'E2 {'>'}60, лёгкие симптомы', desc:'Коррекция ароматизации',
                       items:[
-                        { name:'Анастрозол 0.5-1 мг 💊', dose:'0.5-1 мг', timing:'1-2×/нед', note:'Ингибитор ароматазы. ↓ E2 на 50-80%. Старт с 0.5 мг × 1/нед. Титрация по E2. ⚠ ↓ ЛПВП, ↑ риск атеросклероза' },
+                        { name:'Анастрозол 0.5-1 мг 💊', dose:'0.5-1 мг', timing:'1-2×/нед', note:'Ингибитор ароматазы. ↓ E2 на 50-80%. Старт с 0.5 мг × 1/нед, контроль E2 через 14 дней, титрация вверх только при сохранённых симптомах и E2 >60. ⚠ ↓ ЛПВП, ↑ риск атеросклероза' },
                         { name:'Тамоксифен 10-20 мг 💊', dose:'10-20 мг', timing:'Ежедневно', note:'Селективный модулятор ER. Блокирует ERα в груди → профилактика гинекомастии. Не снижает E2 — только блокирует рецепторы' },
                         { name:'DIM 400 мг', dose:'400 мг', timing:'2×/день', note:'Продолжить. ↓ 16α-OH метаболита' },
                         { name:'Контроль E2', dose:'—', timing:'Каждые 2-4 нед', note:'Целевой E2 20-40 пг/мл на терапии. Не снижать {'<'}20!' },

@@ -28,9 +28,10 @@ import {
   PHASE_LABELS, PHASE_HINTS, TAB_LABELS,
   type TrainingTab, type TrainingPage,
 } from './shared';
+import { applyToPlanner } from './planner-bridge';
 
 
-export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: number; reps: number; rir: number }[]; setCustomExercises: React.Dispatch<React.SetStateAction<{ name: string; sets: number; reps: number; rir: number }[]>>; goal?: string; level?: string; daysPerWeek?: number; mesoLength?: number }> = ({ customExercises, setCustomExercises, goal = 'bulk', level = 'intermediate', daysPerWeek = 4, mesoLength = 6 }) => {
+export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: number; reps: number; rir: number }[]; setCustomExercises: React.Dispatch<React.SetStateAction<{ name: string; sets: number; reps: number; rir: number }[]>>; goal?: string; level?: string; daysPerWeek?: number; mesoLength?: number; onLoadToConstructor?: (plan: { name: string; exercises: { name: string; sets: number; reps: number; rir: number }[] }) => void }> = ({ customExercises, setCustomExercises, goal = 'bulk', level = 'intermediate', daysPerWeek = 4, mesoLength = 6, onLoadToConstructor }) => {
   const [newExName, setNewExName] = useState('');
   const [newExSets, setNewExSets] = useState(3);
   const [newExReps, setNewExReps] = useState(10);
@@ -39,7 +40,46 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
   const [planName, setPlanName] = useState('');
   const [savedCycles, setSavedCycles] = useState<{ id: string; name: string; date: string; weeks: number; goal: string; level: string; days: number }[]>(() => { try { return JSON.parse(localStorage.getItem('myTrainingCycles') || '[]'); } catch { return []; } });
   const [cycleName, setCycleName] = useState('');
-  const [subTab, setSubTab] = useState<'exercises'|'plans'|'cycles'>('exercises');
+  const [subTab, setSubTab] = useState<'exercises'|'plans'|'cycles'|'progress'>('exercises');
+
+  const [progressData, setProgressData] = useState<any>(null);
+  useEffect(() => {
+    if (subTab !== 'progress') return;
+    (async () => {
+      try {
+        const d = new StrengthDiary();
+        const logs = await d.getWorkoutLogs();
+        if (!logs || logs.length === 0) { setProgressData({ noData: true }); return; }
+        const sorted = [...logs].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        const e1rmByExercise: Record<string, { date: string; e1rm: number }[]> = {};
+        const tonnageByWeek: Record<string, number> = {};
+        let totalTonnageAll = 0;
+        for (const log of sorted) {
+          for (const ex of (log as any).exercises || []) {
+            const e = ex.exercise || ex.name || '';
+            const weight = parseFloat(ex.bestWeight || ex.weight || 0) || 0;
+            const reps = parseInt(ex.bestReps || ex.reps || 10) || 10;
+            if (e && weight > 0) {
+              const e1rm = Math.round(weight / (1 - reps / 30));
+              if (!e1rmByExercise[e]) e1rmByExercise[e] = [];
+              e1rmByExercise[e].push({ date: log.date, e1rm });
+            }
+          }
+          const dt = (log.date || '').slice(0, 10);
+          const wk = dt.slice(0, 7) + '-W' + Math.ceil(parseInt(dt.slice(8, 10)) / 7);
+          const vol = ((log as any).exercises || []).reduce((s: number, ex: any) => s + (ex.totalVolume || 0), 0);
+          tonnageByWeek[wk] = (tonnageByWeek[wk] || 0) + vol;
+          totalTonnageAll += vol;
+        }
+        const topExercises = Object.entries(e1rmByExercise)
+          .map(([ex, data]) => ({ exercise: ex, count: data.length, best: Math.max(...data.map(d => d.e1rm)), history: data.slice(-12) }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 3);
+        const weeks = Object.entries(tonnageByWeek).sort().slice(-8);
+        setProgressData({ topExercises, weeks, total: sorted.length, totalTonnageAll });
+      } catch { setProgressData({ noData: true }); }
+    })();
+  }, [subTab]);
 
   const addExercise = () => {
     if (!newExName.trim()) return;
@@ -87,10 +127,10 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
       <div style={{fontSize:14,fontWeight:700,color:'var(--accent)',marginBottom:4}}>⭐ Моя тренировка</div>
       <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:8}}>Пользовательские упражнения, планы и циклы</div>
 
-      <div style={{display:'flex',gap:4,marginBottom:8}}>
-        {(['exercises','plans','cycles'] as const).map(t => (
+      <div style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
+        {(['exercises','plans','cycles','progress'] as const).map(t => (
           <button key={t} onClick={()=>setSubTab(t)} style={{padding:'6px 12px',borderRadius:8,fontSize:10,fontWeight:600,cursor:'pointer',background:subTab===t?'var(--accent)':'var(--bg-secondary)',color:subTab===t?'#000':'var(--text-dim)',border:subTab===t?'1px solid var(--accent)':'1px solid var(--border)'}}>
-            {t==='exercises'?'🏋️ Упражнения':t==='plans'?'📋 Планы':'🔄 Циклы'}
+            {t==='exercises'?'🏋️ Упражнения':t==='plans'?'📋 Планы':t==='cycles'?'🔄 Циклы':'📊 Прогресс'}
           </button>
         ))}
       </div>
@@ -150,9 +190,10 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
                   <div style={{fontSize:11,fontWeight:700,color:'var(--text-light)'}}>{plan.name}</div>
                   <div style={{fontSize:8,color:'var(--text-dim)'}}>{new Date(plan.date).toLocaleDateString('ru')} · {plan.exercises.length} упр.</div>
                 </div>
-                <div style={{display:'flex',gap:4}}>
+                <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
                   <button onClick={()=>loadPlan(plan)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(0,230,138,0.2)',background:'rgba(0,230,138,0.08)',color:'var(--accent)',fontSize:8,cursor:'pointer'}}>Загрузить</button>
                   <button onClick={()=>setCustomExercises(prev=>[...prev, ...plan.exercises])} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(139,92,246,0.2)',background:'rgba(139,92,246,0.08)',color:'#8b5cf6',fontSize:8,cursor:'pointer'}}>➕ В мою</button>
+                  <button onClick={() => { applyToPlanner({ kind: 'split', label: plan.name, data: plan.exercises.map(e => ({ name: e.name, sets: e.sets, reps: e.reps, rir: e.rir })) }); if (onLoadToConstructor) onLoadToConstructor({ name: plan.name, exercises: plan.exercises }); }} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(168,85,247,0.2)',background:'rgba(168,85,247,0.08)',color:'#a855f7',fontSize:8,cursor:'pointer',fontWeight:700}}>📥 В конструктор</button>
                   <button onClick={()=>deletePlan(plan.id)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:8,cursor:'pointer'}}>Удалить</button>
                 </div>
               </div>
@@ -164,7 +205,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
             </div>
           ))}
         </div>
-      ) : (
+      ) : subTab === 'cycles' ? (
         <div>
           <div className="card" style={{padding:10,marginBottom:8}}>
             <h4 style={{margin:'0 0 6px',fontSize:12}}>🔄 Новый цикл</h4>
@@ -186,6 +227,101 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
               </div>
             </div>
           ))}
+        </div>
+      ) : (
+        <div>
+          <div style={{fontSize:12,fontWeight:700,color:'rgba(96,165,250,0.9)',marginBottom:6}}>📊 Прогресс из дневника</div>
+          {!progressData || progressData.noData ? (
+            <div className="card" style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>
+              Нет данных. Запишите тренировку во вкладке «Тренировка → Дневник», чтобы увидеть прогресс.
+            </div>
+          ) : (
+            <>
+              <div className="card" style={{padding:10,marginBottom:6}}>
+                <div style={{fontSize:9,fontWeight:700,color:'var(--text-dim)',marginBottom:4,textTransform:'uppercase'}}>Сводка</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                  <div style={{padding:6,borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
+                    <div style={{fontSize:8,color:'var(--text-dim)'}}>Тренировок</div>
+                    <div style={{fontSize:14,fontWeight:700,color:'rgba(96,165,250,0.9)'}}>{progressData.total}</div>
+                  </div>
+                  <div style={{padding:6,borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
+                    <div style={{fontSize:8,color:'var(--text-dim)'}}>Тоннаж</div>
+                    <div style={{fontSize:14,fontWeight:700,color:'rgba(96,165,250,0.9)'}}>{Math.round(progressData.totalTonnageAll / 1000).toFixed(1)}k кг</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card" style={{padding:10,marginBottom:6}}>
+                <div style={{fontSize:9,fontWeight:700,color:'var(--text-dim)',marginBottom:6,textTransform:'uppercase'}}>Топ-3 упражнения: расчётный 1ПМ</div>
+                {progressData.topExercises.length === 0 ? (
+                  <div style={{fontSize:10,color:'var(--text-dim)'}}>Недостаточно данных</div>
+                ) : (
+                  progressData.topExercises.map((ex: any, i: number) => {
+                    const max = Math.max(...ex.history.map((d: any) => d.e1rm));
+                    const low = Math.min(...ex.history.map((d: any) => d.e1rm));
+                    const spread = max - low;
+                    const SHOWchied = ex.history.length > 1 ? Math.round(((max - ex.history[0].e1rm) / Math.max(1, ex.history[0].e1rm)) * 100) : 0;
+                    return (
+                      <div key={i} style={{marginBottom:6,padding:8,borderRadius:6,background:'var(--bg-secondary)',border:'1px solid rgba(255,255,255,0.04)'}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                          <div style={{fontSize:10,fontWeight:600,color:'var(--text-light)'}}>{i+1}. {ex.exercise}</div>
+                          <div style={{fontSize:9,fontWeight:700,color:SHOWchied>0?'var(--accent)':'var(--text-dim)'}}>
+                            {SHOWchied > 0 ? '+':''}{SHOWchied}% · лучший {ex.best}кг ({ex.count} тренировок)
+                          </div>
+                        </div>
+                        <div style={{height:24,position:'relative',background:'rgba(255,255,255,0.03)',borderRadius:4,overflow:'hidden'}}>
+                          <svg viewBox={`0 0 ${ex.history.length * 20} 24`} preserveAspectRatio="none" style={{width:'100%',height:'100%'}}>
+                            {(() => {
+                              if (ex.history.length < 2) return null;
+                              const allVals = ex.history.map((d: any) => d.e1rm);
+                              const maxV = Math.max(...allVals, 1);
+                              const minV = Math.min(...allVals, 0);
+                              const range = Math.max(maxV - minV, 1);
+                              const pts = ex.history.map((d: any, idx: number) => {
+                                const x = idx * 20 + 10;
+                                const y = 22 - ((d.e1rm - minV) / range) * 18;
+                                return `${x},${y}`;
+                              }).join(' ');
+                              return <polyline points={pts} fill="none" stroke="#22c55e" strokeWidth="1.5" />;
+                            })()}
+                          </svg>
+                        </div>
+                        {ex.history.length > 1 ? (
+                          <div style={{fontSize:7,color:'var(--text-dim)',marginTop:2,display:'flex',justifyContent:'space-between'}}>
+                            <span>{ex.history[0].date.slice(5)}</span>
+                            <span>Спред: {spread}кг</span>
+                            <span>{ex.history[ex.history.length-1].date.slice(5)}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="card" style={{padding:10,marginBottom:6}}>
+                <div style={{fontSize:9,fontWeight:700,color:'var(--text-dim)',marginBottom:6,textTransform:'uppercase'}}>Тоннаж по неделям (8 нед)</div>
+                {progressData.weeks.length === 0 ? (
+                  <div style={{fontSize:10,color:'var(--text-dim)'}}>Нет данных</div>
+                ) : (
+                  (() => {
+                    const maxT = Math.max(...progressData.weeks.map((w: any) => w[1]), 1);
+                    return (
+                      <div style={{display:'flex',flexDirection:'column',gap:3}}>
+                        {progressData.weeks.map((w: any, i: number) => (
+                          <div key={i} style={{display:'flex',alignItems:'center',gap:4,fontSize:8,color:'var(--text-dim)'}}>
+                            <span style={{minWidth:72}}>{w[0]}</span>
+                            <div style={{height:8,background:'rgba(96,165,250,0.3)',borderRadius:2,width:Math.round((w[1] / maxT) * 150)+'px',minWidth:4}}></div>
+                            <span style={{minWidth:50}}>{Math.round(w[1]).toLocaleString()} кг</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

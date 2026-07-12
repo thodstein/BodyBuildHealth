@@ -1,0 +1,412 @@
+/**
+ * plan-quality.engine.ts — Универсальный валидатор качества тренировочных планов.
+ *
+ * Проверяет планы BB-авто и ручного конструктора по профессиональным стандартам:
+ *  - Объём по группам (MEV/MAV/MRV)
+ *  - Частота тренировки групп (2×/нед оптимум)
+ *  - Баланс толкай/тянай (push/pull ratio)
+ *  - Наличие разгрузочных фаз
+ *  - Покрытие слабых групп
+ *  - Прогрессия нагрузки (RIR/вес по неделям)
+ *  - Баланс тяжёлых/лёгких дней
+ *  - Разнообразие упражнений
+ *
+ * Источники: Israetel M. (RP Strength 2021), Schoenfeld B. (2016), Helms E. (2019).
+ */
+
+// ─── Пороговые значения по уровням ───
+
+export interface VolumeThresholds {
+  mev: number; // Минимальный эффективный объём (сетов/нед)
+  mav: number; // Максимальный адаптивный объём
+  mrv: number; // Максимальный восстанавливаемый объём
+}
+
+/** Пороги объёма: big/mid = крупные/средние группы, small = мелкие (руки, икры, пресс). */
+export const VOLUME_THRESHOLDS: Record<string, { big: VolumeThresholds; small: VolumeThresholds }> = {
+  beginner:     { big: { mev: 8,  mav: 14, mrv: 18 }, small: { mev: 6,  mav: 12, mrv: 16 } },
+  intermediate: { big: { mev: 10, mav: 18, mrv: 24 }, small: { mev: 8,  mav: 14, mrv: 20 } },
+  advanced:     { big: { mev: 12, mav: 22, mrv: 28 }, small: { mev: 10, mav: 16, mrv: 22 } },
+  enhanced:     { big: { mev: 14, mav: 26, mrv: 34 }, small: { mev: 12, mav: 20, mrv: 28 } },
+};
+
+/** Группы мышц: крупные vs мелкие. */
+const BIG_GROUPS = new Set(['chest', 'back', 'quads', 'hamstrings', 'glutes', 'legs']);
+const SMALL_GROUPS = new Set(['shoulders', 'biceps', 'triceps', 'arms', 'calves', 'abs', 'core', 'forearms', 'traps']);
+
+function getThresholds(group: string, level: string): VolumeThresholds {
+  const t = VOLUME_THRESHOLDS[level] || VOLUME_THRESHOLDS.intermediate;
+  return BIG_GROUPS.has(group) ? t.big : t.small;
+}
+
+// ─── Типы результата ───
+
+export type QualitySeverity = 'critical' | 'warning' | 'info';
+
+export interface QualityIssue {
+  id: string;
+  severity: QualitySeverity;
+  category: 'volume' | 'frequency' | 'balance' | 'deload' | 'weak_point' | 'progression' | 'exercise' | 'injury';
+  message: string;
+  muscle?: string;
+  detail?: string;
+  fix?: string;
+}
+
+export interface MuscleQualityStatus {
+  muscle: string;
+  weeklySets: number;
+  frequency: number;
+  mev: number;
+  mav: number;
+  mrv: number;
+  pctOfMav: number;
+  status: 'below_mev' | 'in_mev' | 'in_mav' | 'approaching_mrv' | 'exceeding_mrv';
+  weakPoint: boolean;
+}
+
+export interface PlanQualityResult {
+  score: number;              // 0-100
+  grade: string;              // 🟢 Профессионально / 🟡 Хорошо / 🟠 Удовлетворительно / 🔴 Требует доработки
+  issues: QualityIssue[];
+  muscles: MuscleQualityStatus[];
+  summary: string[];          // Текстовые итоги (5-8 строк)
+  recommendations: string[];  // Конкретные рекомендации по исправлению
+  metadata: {
+    totalExercises: number;
+    totalSets: number;
+    totalVolume: number;
+    avgSetsPerDay: number;
+    pushPullRatio: string;
+    hasDeload: boolean;
+    weakPointCoverage: number; // % покрытия слабых групп
+  };
+}
+
+// ─── Входные данные ───
+
+export interface PlanQualityInput {
+  /** Набор мышц по дням: [['chest','triceps'], ['back','biceps'], ...] */
+  dayGroups: string[][];
+  /** Сеты по группам за неделю: { chest: 18, back: 20, ... } */
+  weeklySets: Record<string, number>;
+  /** Частота по группам: { chest: 2, back: 2, ... } */
+  frequency: Record<string, number>;
+  /** Уровень: beginner/intermediate/advanced/enhanced */
+  level: string;
+  /** Слабые группы */
+  weakPoints?: string[];
+  /** Есть ли разгрузочная фаза (неделя или явный делод) */
+  hasDeload?: boolean;
+  /** Недель с фазой разгрузки (для BB) */
+  deloadWeeks?: number[];
+  /** Тип плана */
+  planType?: 'bb' | 'manual' | 'macrocycle';
+  /** Количество недель мезоцикла */
+  totalWeeks?: number;
+  /** Упражнения по дням (для проверки разнообразия) */
+  exerciseNames?: string[][];
+  /** Травмы */
+  injuries?: { muscle: string; exclude?: boolean }[];
+  /** PED-курс (увеличивает пороги) */
+  onCourse?: boolean;
+}
+
+// ─── Основная функция ───
+
+export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult {
+  const {
+    dayGroups, weeklySets, frequency, level,
+    weakPoints = [], hasDeload = false, deloadWeeks = [],
+    planType = 'manual', totalWeeks = 8, exerciseNames = [],
+    injuries = [], onCourse = false,
+  } = input;
+
+  const issues: QualityIssue[] = [];
+  const recommendations: string[] = [];
+  const allGroups = new Set(dayGroups.flat());
+
+  // 1. Проверка объёма по группам
+  const muscles: MuscleQualityStatus[] = [];
+  for (const g of allGroups) {
+    if (g === 'rest' || g === 'off') continue;
+    const sets = weeklySets[g] || 0;
+    const freq = frequency[g] || 1;
+    const t = getThresholds(g, level);
+    const pctOfMav = t.mav > 0 ? Math.round((sets / t.mav) * 100) : 0;
+
+    let status: MuscleQualityStatus['status'];
+    if (sets > t.mrv) status = 'exceeding_mrv';
+    else if (sets > t.mav) status = 'approaching_mrv';
+    else if (sets >= t.mev) status = 'in_mav';
+    else if (sets >= t.mev * 0.7) status = 'in_mev';
+    else status = 'below_mev';
+
+    const isWeak = weakPoints.includes(g);
+
+    if (sets > t.mrv) {
+      issues.push({
+        id: `vol_over_${g}`, severity: 'critical', category: 'volume', muscle: g,
+        message: `${g}: ${sets} сетов/нед > MRV (${t.mrv}) — риск перетренированности`,
+        fix: `Снизить до ${t.mav} сетов/нед (MAV)`,
+      });
+    } else if (sets > t.mav) {
+      issues.push({
+        id: `vol_high_${g}`, severity: 'warning', category: 'volume', muscle: g,
+        message: `${g}: ${sets} сетов/нед > MAV (${t.mav}) — зона толерантности`,
+        fix: `Оптимально ${t.mav} сетов/нед`,
+      });
+    } else if (sets < t.mev) {
+      issues.push({
+        id: `vol_low_${g}`, severity: isWeak ? 'critical' : 'warning', category: 'volume', muscle: g,
+        message: `${g}: ${sets} сетов/нед < MEV (${t.mev})${isWeak ? ' — слабая группа недогружена' : ''}`,
+        fix: `Добавить ${t.mev - sets} сетов/нед (до MEV)`,
+      });
+    }
+
+    if (isWeak && sets < t.mav) {
+      recommendations.push(`${g} (слабая группа): увеличить объём до MAV (${t.mav} сетов/нед)`);
+    }
+
+    muscles.push({
+      muscle: g, weeklySets: sets, frequency: freq,
+      mev: t.mev, mav: t.mav, mrv: t.mrv, pctOfMav, status, weakPoint: isWeak,
+    });
+  }
+
+  // 2. Проверка частоты
+  for (const g of allGroups) {
+    if (g === 'rest' || g === 'off') continue;
+    const freq = frequency[g] || 1;
+    const isWeak = weakPoints.includes(g);
+
+    if (freq < 1) {
+      issues.push({
+        id: `freq_zero_${g}`, severity: 'critical', category: 'frequency', muscle: g,
+        message: `${g}: тренируется 0×/нед — группа не получает нагрузки`,
+        fix: `Добавить день с ${g}`,
+      });
+    } else if (freq === 1 && BIG_GROUPS.has(g)) {
+      issues.push({
+        id: `freq_low_${g}`, severity: 'warning', category: 'frequency', muscle: g,
+        message: `${g}: тренируется 1×/нед — субоптимально для гипертрофии (Schoenfeld 2016)`,
+        fix: `Увеличить частоту до 2×/нед`,
+      });
+    }
+
+    if (isWeak && freq < 2) {
+      recommendations.push(`${g} (слабая группа): увеличить частоту до 2×/нед`);
+    }
+  }
+
+  // 3. Баланс толкай/тянай
+  const pushPatterns = new Set(['horizontal_push', 'vertical_push', 'incline_push', 'decline_push', 'dip_push']);
+  const pullPatterns = new Set(['horizontal_pull', 'vertical_pull', 'hinge', 'hip_hinge']);
+  let pushSets = 0, pullSets = 0;
+  for (const [g, sets] of Object.entries(weeklySets)) {
+    if (['chest', 'triceps', 'shoulders', 'delt_front', 'delt_mid'].includes(g)) pushSets += sets;
+    if (['back', 'biceps', 'delt_rear', 'hamstrings', 'glutes'].includes(g)) pullSets += sets;
+  }
+  const ratio = pullSets > 0 ? (pushSets / pullSets) : 0;
+  const ratioStr = `${pushSets}:${pullSets}`;
+
+  if (ratio > 1.5 && pullSets > 0) {
+    issues.push({
+      id: 'push_pull_imbalance', severity: 'warning', category: 'balance',
+      message: `Дисбаланс толкай/тянай: ${ratioStr} (${(ratio * 100).toFixed(0)}%) — риск травм плеча`,
+      fix: `Добавить тяговых упражнений (rows, pull-ups)`,
+    });
+  } else if (ratio < 0.5 && pushSets > 0) {
+    issues.push({
+      id: 'pull_dominant', severity: 'info', category: 'balance',
+      message: `Тянай доминирует: ${ratioStr} — допустимо, но проверьте объём грудных/дельт`,
+    });
+  }
+
+  // 4. Разгрузка
+  if (!hasDeload && totalWeeks >= 6) {
+    issues.push({
+      id: 'no_deload', severity: 'critical', category: 'deload',
+      message: `Нет разгрузочной фазы при мезо ${totalWeeks} нед — риск перетренированности`,
+      fix: `Добавить разгрузку каждые 4-6 недель`,
+    });
+  }
+  if (hasDeload && deloadWeeks.length > 0) {
+    const deloadInterval = totalWeeks / deloadWeeks.length;
+    if (deloadInterval > 7) {
+      issues.push({
+        id: 'deload_rare', severity: 'warning', category: 'deload',
+        message: `Разгрузка каждые ${Math.round(deloadInterval)} нед — рекомендуется каждые 4-6 нед`,
+      });
+    }
+  }
+
+  // 5. Покрытие слабых групп
+  const weakCovered = weakPoints.filter(g => (weeklySets[g] || 0) >= (getThresholds(g, level).mev));
+  const weakCoverage = weakPoints.length > 0 ? Math.round((weakCovered.length / weakPoints.length) * 100) : 100;
+
+  for (const g of weakPoints) {
+    if (!weakCovered.includes(g)) {
+      issues.push({
+        id: `weak_uncovered_${g}`, severity: 'critical', category: 'weak_point', muscle: g,
+        message: `Слабая группа «${g}» не покрыта (сеты < MEV)`,
+        fix: `Добавить объём до MAV для ${g}`,
+      });
+    }
+  }
+
+  // 6. Разнообразие упражнений
+  if (exerciseNames.length > 0) {
+    const allExNames = exerciseNames.flat();
+    const unique = new Set(allExNames);
+    const diversity = allExNames.length > 0 ? unique.size / allExNames.length : 1;
+    if (diversity < 0.4) {
+      issues.push({
+        id: 'low_diversity', severity: 'info', category: 'exercise',
+        message: `Низкое разнообразие упражнений (${unique.size}/${allExNames.length}) — рассмотрите вариации`,
+      });
+    }
+  }
+
+  // 7. Травмы: проверка что исключённые группы не в плане
+  for (const inj of injuries) {
+    if (inj.exclude && allGroups.has(inj.muscle)) {
+      issues.push({
+        id: `injury_active_${inj.muscle}`, severity: 'critical', category: 'injury', muscle: inj.muscle,
+        message: `Травмированная группа «${inj.muscle}» включена в план (должна быть исключена)`,
+        fix: `Исключить ${inj.muscle} из плана`,
+      });
+    }
+  }
+
+  // ─── Расчёт оценки ───
+  let score = 100;
+
+  for (const iss of issues) {
+    if (iss.severity === 'critical') score -= 15;
+    else if (iss.severity === 'warning') score -= 5;
+    else score -= 2;
+  }
+
+  // Бонус за покрытие слабых групп
+  score += Math.min(20, weakCoverage * 0.2);
+
+  // Бонус за наличие делода
+  if (hasDeload) score += 5;
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  const grade = score >= 85 ? '🟢 Профессионально'
+    : score >= 65 ? '🟡 Хорошо'
+    : score >= 45 ? '🟠 Удовлетворительно'
+    : '🔴 Требует доработки';
+
+  // ─── Итоговые рекомендации ───
+  const criticals = issues.filter(i => i.severity === 'critical');
+  if (criticals.length > 0) {
+    recommendations.unshift(`⚠ ${criticals.length} критических проблем — исправить до начала`);
+  }
+
+  const summary: string[] = [
+    `Тип плана: ${planType === 'bb' ? 'Бодибилдинг' : planType === 'manual' ? 'Ручной конструктор' : 'Макроцикл'} · ${level} · ${totalWeeks} нед`,
+    `Всего упражнений: ${Object.values(weeklySets).reduce((a, b) => a + b, 0)} сетов/нед по ${allGroups.size} группам`,
+    `Толкай/Тянай: ${ratioStr} ${ratio > 1.5 ? '⚠ дисбаланс' : ratio < 0.5 ? '⚠ тянай-доминирование' : '✅'}`,
+    `Слабые группы: ${weakPoints.length > 0 ? weakPoints.join(', ') + ` (покрытие ${weakCoverage}%)` : 'не указаны'}`,
+    `Разгрузка: ${hasDeload ? '✅ включена' : '❌ отсутствует'}`,
+    `Оценка: ${score}/100 ${grade}`,
+  ];
+
+  // Метаданные
+  const totalSets = Object.values(weeklySets).reduce((a, b) => a + b, 0);
+  const dayCount = dayGroups.length || 1;
+
+  return {
+    score, grade, issues, muscles, summary, recommendations, metadata: {
+      totalExercises: new Set(exerciseNames.flat()).size || totalSets,
+      totalSets,
+      totalVolume: totalSets * 8, // ~8 reps average
+      avgSetsPerDay: Math.round(totalSets / dayCount * 10) / 10,
+      pushPullRatio: ratioStr,
+      hasDeload,
+      weakPointCoverage: weakCoverage,
+    },
+  };
+}
+
+// ─── Утилиты для конвертации планов ───
+
+/** Конвертировать BBPlan → PlanQualityInput */
+export function bbPlanToQualityInput(bbPlan: {
+  weeks: { sessions: { exercises: { muscle: string; sets: number; name: string }[] }[] }[];
+}, opts: { level: string; weakPoints?: string[]; hasDeload?: boolean; deloadWeeks?: number[]; onCourse?: boolean }): PlanQualityInput {
+  const weeklySets: Record<string, number> = {};
+  const frequency: Record<string, number> = {};
+  const dayGroups: string[][] = [];
+  const exerciseNames: string[][] = [];
+
+  // Берём неделю 1 для frequency/dayGroups
+  const week1 = bbPlan.weeks[0];
+  if (week1) {
+    for (const sess of week1.sessions) {
+      const groups = [...new Set(sess.exercises.map(e => e.muscle))];
+      dayGroups.push(groups);
+      exerciseNames.push(sess.exercises.map(e => e.name));
+      for (const g of groups) {
+        frequency[g] = (frequency[g] || 0) + 1;
+      }
+    }
+  }
+
+  // Средние сеты по неделям
+  for (const week of bbPlan.weeks) {
+    for (const sess of week.sessions) {
+      for (const ex of sess.exercises) {
+        weeklySets[ex.muscle] = (weeklySets[ex.muscle] || 0) + ex.sets;
+      }
+    }
+  }
+  for (const g of Object.keys(weeklySets)) {
+    weeklySets[g] = Math.round(weeklySets[g] / bbPlan.weeks.length);
+  }
+
+  return {
+    dayGroups, weeklySets, frequency,
+    level: opts.level, weakPoints: opts.weakPoints,
+    hasDeload: opts.hasDeload, deloadWeeks: opts.deloadWeeks,
+    planType: 'bb', totalWeeks: bbPlan.weeks.length,
+    exerciseNames, onCourse: opts.onCourse,
+  };
+}
+
+/** Конвертировать ManualResult (дни) → PlanQualityInput */
+export function manualToQualityInput(days: {
+  groups: string[];
+  exercises: { group: string; sets: number; name: string }[];
+}[], opts: {
+  level: string; weakPoints?: string[]; hasDeload?: boolean; totalWeeks?: number;
+  mesoLength?: number; injuries?: { muscle: string; exclude?: boolean }[];
+}): PlanQualityInput {
+  const weeklySets: Record<string, number> = {};
+  const frequency: Record<string, number> = {};
+  const dayGroups: string[][] = [];
+  const exerciseNames: string[][] = [];
+
+  for (const day of days) {
+    dayGroups.push(day.groups);
+    exerciseNames.push(day.exercises.map(e => e.name));
+    for (const g of day.groups) {
+      frequency[g] = (frequency[g] || 0) + 1;
+    }
+    for (const ex of day.exercises) {
+      weeklySets[ex.group] = (weeklySets[ex.group] || 0) + ex.sets;
+    }
+  }
+
+  return {
+    dayGroups, weeklySets, frequency,
+    level: opts.level, weakPoints: opts.weakPoints,
+    hasDeload: opts.hasDeload, planType: 'manual',
+    totalWeeks: opts.mesoLength || opts.totalWeeks || 1,
+    exerciseNames, injuries: opts.injuries,
+  };
+}

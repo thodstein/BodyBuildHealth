@@ -10,6 +10,12 @@ import { PHASE_LABELS, type BBPhase } from './phase-periodization';
 import { getPlanFeedback } from '../../../../engines/plan-execution-feedback.engine';
 import { validatePlan, weeklySetsFromManualResult } from '../../../../engines/plan-validator';
 import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } from '../PlanCharts';
+import { calcBBPlanMetrics, explainBBMetrics } from '../../../../engines/bb/bb-metrics.engine';
+import type { BBPlan } from '../../../../engines/bb/bb-builder.engine';
+import { acuteChronicRatio, toDailyLoads } from '../../../../engines/pro/training-load.engine';
+import { loadSRPESessions } from '../../../../engines/pro/srpe-store';
+import { validatePlanQuality, manualToQualityInput } from '../../../../engines/plan-quality.engine';
+import { PlanExportCard } from '../PlanExportCard';
 
 interface Props {
   result: ManualResult | null;
@@ -61,7 +67,7 @@ function getExerciseNote(ex: { name: string; role?: string; rir: number; sets: n
   return notes.join(' | ');
 }
 
-function calcQualityScore(days: any[], weeklySets: Record<string, number>, level: string, goal: string): {
+export function calcQualityScore(days: any[], weeklySets: Record<string, number>, level: string, goal: string): {
   score: number; color: string;
   breakdown: { label: string; ok: boolean; detail: string }[];
   recommendations: string[];
@@ -453,6 +459,29 @@ export const PlanDisplay: React.FC<Props> = ({
         )}
       </div>
 
+      {/* ═══ Экспорт плана ═══ */}
+      {result && (
+        <div style={{ marginTop: 8 }}>
+          <PlanExportCard
+            manualResult={result}
+            profile={{
+              level,
+              goal,
+              daysPerWeek,
+              bodyWeight: tprofile.bodyWeight,
+              pmSquat: tprofile.pmSquat,
+              pmBench: tprofile.pmBench,
+              pmDead: tprofile.pmDead,
+              weakPoints: tprofile.weakPoints,
+            }}
+            level={level}
+            weakPoints={tprofile.weakPoints || []}
+            hasDeload={false}
+            meta={{ splitName: result.splitName, corrections: result.corrections, weeks: mesoLength }}
+          />
+        </div>
+      )}
+
       <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)' }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>📊 Анализ нагрузки</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
@@ -473,6 +502,79 @@ export const PlanDisplay: React.FC<Props> = ({
         {load.monotony > 0.9 && load.monotony <= 1.5 && <div style={{ fontSize: 9, color: '#f59e0b', marginTop: 6 }}>Монотонность в норме</div>}
         {load.monotony <= 0.9 && <div style={{ fontSize: 9, color: '#22c55e', marginTop: 6 }}>✅ Монотонность низкая — разнообразие отличное</div>}
       </div>
+
+      {/* ═══ BB-метрики (если план сгенерирован BB-движком) ═══ */}
+      {result.bbMeta?.generator === 'bb_cycle' && result.weeks && (() => {
+        const allSessions: any[] = [];
+        result.weeks.forEach(w => w.days.forEach(d => {
+          (d as any).bbSession = true;
+          allSessions.push({ exercises: d.exercises.map(e => ({ muscle: e.group, sets: e.sets, rir: e.rir, workSets: [{ weight: e.weight, reps: parseInt(e.reps) || 10 }] })) });
+        }));
+        const mockPlan = { weeks: result.weeks.map(w => ({ week: w.weekNumber, sessions: w.days.map(d => ({ exercises: d.exercises.map(e => ({ muscle: e.group, sets: e.sets, rir: e.rir, role: e.role === 'main' ? 'primary' : 'secondary', workSets: [{ weight: e.weight, reps: parseInt(e.reps) || 10 }] })) })), phase: w.phase })), pattern: { id: result.bbMeta?.bbPatternId || '', name: result.splitName } } as unknown as BBPlan;
+        const metrics = calcBBPlanMetrics(mockPlan);
+        const explanation = explainBBMetrics(metrics);
+        return (
+          <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(236,72,153,0.04)', border: '1px solid rgba(236,72,153,0.15)' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#ec4899', marginBottom: 6 }}>🏋️ BB-метрики плана</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+              <div style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
+                <div style={{ fontSize: 8, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Сетов/нед</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#ec4899' }}>{metrics.totalSets}</div>
+              </div>
+              <div style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
+                <div style={{ fontSize: 8, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Тяж %</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#ef4444' }}>{(metrics.тяжPct * 100).toFixed(0)}%</div>
+              </div>
+              <div style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
+                <div style={{ fontSize: 8, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Памп %</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#f59e0b' }}>{(metrics.пампPct * 100).toFixed(0)}%</div>
+              </div>
+              <div style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
+                <div style={{ fontSize: 8, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Ср RIR</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#22c55e' }}>{metrics.avgRir.toFixed(1)}</div>
+              </div>
+            </div>
+            {explanation && (
+              <div style={{ marginTop: 6 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 4 }}>Объём на мышцу</div>
+                {metrics.perMuscle.map((pm) => {
+                  const stColor = pm.status === 'exceeding_mrv' ? '#ef4444' : pm.status === 'approaching_mrv' ? '#f59e0b' : pm.status === 'below_mev' ? '#3b82f6' : '#22c55e';
+                  const stLabel = pm.status === 'exceeding_mrv' ? '⚠ перегруз' : pm.status === 'approaching_mrv' ? '⚠ у MRV' : pm.status === 'below_mev' ? 'недотрен' : '✅ оптимо';
+                  return (
+                    <div key={pm.muscle} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>
+                      <span style={{ fontWeight: 700, color: '#fff', minWidth: 60 }}>{GROUP_RU[pm.muscle] || pm.muscle}</span>
+                      <span style={{ color: '#ec4899', fontWeight: 700 }}>{pm.totalSets}</span>
+                      <span style={{ color: '#ef4444' }}>т{pm.тяжSets}</span>
+                      <span style={{ color: '#f59e0b' }}>п{pm.пампSets}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.4)' }}>RIR{pm.avgRir.toFixed(1)}</span>
+                      <span style={{ color: stColor, fontWeight: 700, marginLeft: 'auto' }}>{stLabel}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ═══ Auto-deload по ACWR (из sRPE-дневника) ═══ */}
+      {(() => {
+        const srpeSessions = loadSRPESessions();
+        if (srpeSessions.length < 4) return null;
+        const acwr = acuteChronicRatio(toDailyLoads(srpeSessions));
+        if (!acwr || acwr.ratio < 1.3) return null;
+        const isDanger = acwr.ratio > 1.5;
+        return (
+          <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: isDanger ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border: '1px solid ' + (isDanger ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.2)') }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: isDanger ? '#ef4444' : '#f59e0b', marginBottom: 4 }}>
+              {isDanger ? '🚨 ACWR ' + acwr.ratio.toFixed(2) + ' — опасная зона!' : '⚠ ACWR ' + acwr.ratio.toFixed(2) + ' — осторожно'}
+            </div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>
+              Острая нагрузка {Math.round(acwr.acute)} vs хроническая {Math.round(acwr.chronic)}. Рекомендуется разгрузочная неделя: объём −40%, RIR 4→5, убрать подходы до отказа.
+            </div>
+          </div>
+        );
+      })()}
 
       <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.03em', textTransform: 'uppercase', minWidth: 40 }}>⚖️ Вес</span>
@@ -605,9 +707,9 @@ export const PlanDisplay: React.FC<Props> = ({
               </div>
             </details>
             <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', margin: '0 -4px', padding: '0 2px', scrollbarWidth: 'none' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '14px 3fr 0.8fr 0.6fr 0.6fr 0.7fr 0.6fr 0.8fr', gap: 2, padding: '4px 10px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', minWidth: 380 }}>
-              <span></span><span>Упражнение</span><span>С×П</span><span>RIR</span><span>Вес</span><span>Группа</span><span>Отдых</span><span>Действия</span>
-            </div>
+<div style={{ display: 'grid', gridTemplateColumns: '14px 3fr 0.8fr 0.5fr 0.5fr 0.6fr 0.7fr 0.5fr 0.5fr 0.8fr', gap: 2, padding: '4px 10px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', minWidth: 420 }}>
+               <span></span><span>Упражнение</span><span>С×П</span><span>RIR</span><span>Хар.</span><span>Вес</span><span>Группа</span><span>Темп</span><span>Отдых</span><span>Действия</span>
+             </div>
              {d.exercises.map((e, ei) => {
               const tempoKey = di + '-' + ei;
               const overrideTempo = exerciseTempos[tempoKey];
@@ -615,7 +717,7 @@ export const PlanDisplay: React.FC<Props> = ({
               const note = getExerciseNote(e, ei, d.exercises, weeklySetsMap, result.corrections);
               return (
                 <Fragment key={ei}>
-                  <div draggable onDragStart={ev => handleDragStart(ev, di, ei)} onDragOver={handleDragOver} onDrop={ev => handleDrop(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'grid', gridTemplateColumns: '14px 3fr 0.8fr 0.6fr 0.6fr 0.7fr 0.6fr 0.8fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab', alignItems: 'center', minWidth: 380 }}>
+                  <div draggable onDragStart={ev => handleDragStart(ev, di, ei)} onDragOver={handleDragOver} onDrop={ev => handleDrop(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'grid', gridTemplateColumns: '14px 3fr 0.8fr 0.5fr 0.5fr 0.6fr 0.7fr 0.5fr 0.5fr 0.8fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab', alignItems: 'center', minWidth: 420 }}>
                     <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', cursor: 'grab', userSelect: 'none' }}>⠿</span>
                     <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 4, fontWeight: 800, textTransform: 'uppercase',
@@ -624,12 +726,12 @@ export const PlanDisplay: React.FC<Props> = ({
                         border: '0.5px solid ' + (e.role === 'main' ? ACCENT : e.role === 'secondary' ? '#60a5fa' : 'rgba(255,255,255,0.2)')
                       }}>{e.role === 'main' ? 'База' : e.role === 'secondary' ? 'Доп' : 'Изо'}</span>
                       {e.name}
-                      <span onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); setTempoPicker({ dayIdx: di, exIdx: ei }); }} title="Сменить темп" style={{ fontSize: 9, color: '#a855f7', fontWeight: 700, background: 'rgba(168,85,247,0.1)', padding: '2px 6px', borderRadius: 4, cursor: 'pointer', border: overrideTempo ? '1px solid #a855f7' : '1px solid transparent' }}>
-                        {overrideTempo || (tmpo as any).tempo?.toString?.()}{overrideTempo ? ' *' : ''}
-                      </span>
                     </span>
                     <span onClick={() => startInline(di, ei, 'sets', e.sets)} style={{ cursor: 'text', color: ACCENT, fontWeight: 700 }}>{e.sets}×{e.reps}</span>
                     <span onClick={() => startInline(di, ei, 'rir', e.rir)} style={{ cursor: 'text', color: '#f59e0b' }}>{e.rir}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: (e as any).character === 'тяж' ? '#ef4444' : (e as any).character === 'памп' ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>
+                      {(e as any).character ? ((e as any).character === 'тяж' ? '💪' : (e as any).character === 'памп' ? '🔥' : '🌿') : '—'}
+                    </span>
                     <span onClick={() => startInline(di, ei, 'weight', e.weight)} style={{ cursor: 'text', color: '#60a5fa', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
                       {e.loadMode === 'velocity' ? (
                         <><span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'targetVelocity', value: String(e.targetVelocity || 0.5) }); }} style={{ color: '#a855f7' }}>{e.targetVelocity || 0.5} m/s</span>
@@ -640,6 +742,9 @@ export const PlanDisplay: React.FC<Props> = ({
                       )}
                     </span>
                     <span style={{ color: 'rgba(255,255,255,0.6)' }}>{GROUP_RU[e.group] || e.group}</span>
+                    <span onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); setTempoPicker({ dayIdx: di, exIdx: ei }); }} title="Сменить темп" style={{ fontSize: 9, color: '#a855f7', fontWeight: 700, background: 'rgba(168,85,247,0.1)', padding: '2px 4px', borderRadius: 4, cursor: 'pointer', border: overrideTempo ? '1px solid #a855f7' : '1px solid transparent', textAlign: 'center' }}>
+                      {(e as any).tempo ? (e as any).tempo : (overrideTempo || (tmpo as any).tempo?.toString?.() || '—')}{overrideTempo ? ' *' : ''}
+                    </span>
                     <span onClick={() => startInline(di, ei, 'rest', e.rest)} style={{ cursor: 'text', color: 'rgba(255,255,255,0.6)' }}>{e.rest}с</span>
                     <span style={{ display: 'flex', gap: 2 }}>
                       <button onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); openSubstitute(di, ei); }} title="Замена" style={actionBtnStyle(ACCENT)}>🔄</button>

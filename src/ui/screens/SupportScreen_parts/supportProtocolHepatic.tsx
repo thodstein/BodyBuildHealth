@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolHepatic: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -12,6 +12,13 @@ export const SupportProtocolHepatic: React.FC<{ s: Record<string, any> }> = ({ s
                 <div style={{ fontSize:13, fontWeight:800, color:'#84cc16', marginBottom:2 }}>🫁 Гепатопротекция на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Защита печени от токсического повреждения, холестаза и стеатоза. Особенно важно для оральных (17α-алкилированных) ААС.</p>
               </div>
+
+              <StopBanner title="Критические печёночные пороги — показание к остановке курса" thresholds={[
+                'АЛТ/АСТ >5×ВГН — остановка курса, УЗИ печени, исключение ОПП',
+                'Билирубин >34 мкмоль/л — холестаз/цитолиз, отмена гепатотоксичных ААС',
+                'Метионин противопоказан при цитолизе >3×ВГН — замена на SAMe/таурин',
+                'Приём 17α-алкилированных пероральных ААС под строгим лаб-контролем каждые 2 нед',
+              ]} />
 
               {/* Sub-tabs */}
               <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>

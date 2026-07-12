@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS } from '../../data/support-database';
 import { getStackInteractions, getStackCoverageStats, RISK_SYSTEM_LABELS, getStackTzMechanismCoverage, type TzCoverageResult } from '../../engines/biostack-bridge';
+import { selectStack, getEvidenceGrade } from '../../engines/biostack-clinical-v2.engine';
 import { GlassCard, PillBtn, showToast } from './BioStackAIConstants';
 import type { LinkedData } from '../../core/data-link';
 import { LAB_MARKER_MAP, LAB_MARKER_MAP_BY_NAME } from '../../data/lab-marker-map';
@@ -92,6 +93,12 @@ export function RisksTab({ profile, stackIds, setStackIds, linked, activeAAS }: 
 
     return { pairs, critical, moderate, safe, total: pairs.length, sortedSubs, coverageStats, riskyIds, moderateIds, tzCoverage };
   }, [stackIds, profile, syncWithEngine]);
+
+  /* ── Clinical gate (v2 engine: absolute stops, UL, lab dose-correction, cycling) ── */
+  const clinical = useMemo(() => {
+    if (stackIds.length < 2) return null;
+    return selectStack(stackIds, (profile || {} as any), 'comprehensive', (linked?.labAnalysis as any) || null);
+  }, [stackIds, profile, linked]);
 
   const [expandedPair, setExpandedPair] = useState<Record<string, boolean>>({});
   const [graphTab, setGraphTab] = useState<'graph' | 'list'>('list');
@@ -304,6 +311,70 @@ export function RisksTab({ profile, stackIds, setStackIds, linked, activeAAS }: 
   return (
     <div style={{ paddingBottom: 80 }}>
       {renderLabSection()}
+
+      {/* Clinical gate panel (v2 engine) */}
+      {clinical && (clinical.hardStops.length > 0 || clinical.ulWarnings.length > 0 || clinical.drugExclusions.length > 0 || (clinical.labAdjustments && clinical.labAdjustments.length > 0) || clinical.redundancy.length > 0 || clinical.cycling.length > 0 || clinical.schedule.length > 0) && (
+        <GlassCard title="🩺 Клинический контроль стека" icon="🩺" color={clinical.hardStops.length > 0 ? '#ef4444' : '#22c55e'} style={{ marginBottom: 6 }}>
+          {clinical.hardStops.length > 0 && (
+            <div style={{ padding: '7px 9px', borderRadius: 8, marginBottom: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)' }}>
+              <div style={{ fontSize: 8, fontWeight: 700, color: '#ef4444', marginBottom: 3 }}>🛑 Абсолютные противопоказания — стек ЗАБЛОКИРОВАН</div>
+              {clinical.hardStops.map((h: any, hi: number) => (
+                <div key={hi} style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', lineHeight: 1.35 }}>
+                  ⛔ <b>{h.substanceName}</b> — {h.reason} <span style={{ opacity: 0.5 }}>({h.category})</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {clinical.drugExclusions.length > 0 && (
+            <div style={{ padding: '6px 9px', borderRadius: 8, marginBottom: 6, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.1)' }}>
+              <div style={{ fontSize: 7, fontWeight: 700, color: '#f59e0b', marginBottom: 2 }}>💊 Исключения из-за лекарств</div>
+              {clinical.drugExclusions.map((d: any, di: number) => (
+                <div key={di} style={{ fontSize: 7, color: 'rgba(255,255,255,0.65)', lineHeight: 1.3 }}>⚠ <b>{d.substanceName}</b> — {d.reason}</div>
+              ))}
+            </div>
+          )}
+          {clinical.ulWarnings.length > 0 && (
+            <div style={{ padding: '6px 9px', borderRadius: 8, marginBottom: 6, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.1)' }}>
+              <div style={{ fontSize: 7, fontWeight: 700, color: '#f59e0b', marginBottom: 2 }}>⚠ Превышение верхних допустимых доз (UL)</div>
+              {clinical.ulWarnings.map((u: any, ui: number) => (
+                <div key={ui} style={{ fontSize: 7, color: 'rgba(255,255,255,0.65)', lineHeight: 1.3 }}>🔺 <b>{u.name}</b> {u.totalDose} — {u.message}</div>
+              ))}
+            </div>
+          )}
+          {clinical.labAdjustments && clinical.labAdjustments.length > 0 && (
+            <div style={{ padding: '6px 9px', borderRadius: 8, marginBottom: 6, background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.1)' }}>
+              <div style={{ fontSize: 7, fontWeight: 700, color: '#60a5fa', marginBottom: 2 }}>🧪 Коррекция доз по анализам</div>
+              {clinical.labAdjustments.map((a: any, ai: number) => (
+                <div key={ai} style={{ fontSize: 7, color: 'rgba(255,255,255,0.65)', lineHeight: 1.3 }}>➖ <b>{a.name}</b>: {a.originalDose} → <b style={{ color: '#60a5fa' }}>{a.adjustedDose}</b> — {a.reason}</div>
+              ))}
+            </div>
+          )}
+          {clinical.redundancy.length > 0 && (
+            <div style={{ padding: '6px 9px', borderRadius: 8, marginBottom: 6, background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.1)' }}>
+              <div style={{ fontSize: 7, fontWeight: 700, color: '#a78bfa', marginBottom: 2 }}>🔁 Избыточное дублирование путей</div>
+              {clinical.redundancy.map((r: any, ri: number) => (
+                <div key={ri} style={{ fontSize: 7, color: 'rgba(255,255,255,0.65)', lineHeight: 1.3 }}>↔ {r.names.join(', ')} — {r.message}</div>
+              ))}
+            </div>
+          )}
+          {clinical.schedule.length > 0 && (
+            <div style={{ padding: '6px 9px', borderRadius: 8, marginBottom: 6, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.1)' }}>
+              <div style={{ fontSize: 7, fontWeight: 700, color: '#00e68a', marginBottom: 2 }}>⏰ Расписание приёма по времени суток</div>
+              {clinical.schedule.map((s: any, si: number) => (
+                <div key={si} style={{ fontSize: 7, color: 'rgba(255,255,255,0.65)', lineHeight: 1.3 }}>🕐 {s.time === 'morning' ? 'Утро' : s.time === 'afternoon' ? 'День' : s.time === 'evening' ? 'Вечер' : 'Ночь'}: {s.names.join(', ')}</div>
+              ))}
+            </div>
+          )}
+          {clinical.cycling.length > 0 && (
+            <div style={{ padding: '6px 9px', borderRadius: 8, background: 'rgba(236,72,153,0.05)', border: '1px solid rgba(236,72,153,0.1)' }}>
+              <div style={{ fontSize: 7, fontWeight: 700, color: '#ec4899', marginBottom: 2 }}>🔄 Циклирование (длительность курса)</div>
+              {clinical.cycling.map((c: any, ci: number) => (
+                <div key={ci} style={{ fontSize: 7, color: 'rgba(255,255,255,0.65)', lineHeight: 1.3 }}>⏳ <b>{c.name}</b> — {c.durationWeeks} нед: {c.cycleNote}</div>
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      )}
 
       {/* Coverage overview (replaces heuristic risk score) */}
       <GlassCard title="🛡️ Покрытие систем" icon="📊" color="#60a5fa">

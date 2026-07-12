@@ -1,44 +1,21 @@
 import React, { useMemo } from 'react';
-import { getVolumeByMuscle } from '../../../engines/training-methodology.engine';
-import { LEVEL_VOLUMES } from '../../../engines/training.engine';
+import { calcQualityScore } from './TrainingConstructor/PlanDisplay';
+import { GROUP_RU } from './TrainingConstructor/types';
 
 const ACCENT = '#00e68a';
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
-const GRP_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор' };
-const ru = (g: string) => GRP_RU[g] || g;
+const ru = (g: string) => GROUP_RU[g] || g;
 
 type PlanEx = { name: string; sets: number; reps: string; rir: number; rest: number; group: string; weight: number };
 type PlanDay = { day: number; groups: string[]; exercises: PlanEx[] };
 type Plan = { splitName: string; corrections: string[]; days: PlanDay[] } | null;
 
-export const CalcQualityTab: React.FC<{ plan: Plan; level: string; onBuildPlan: () => void }> = ({ plan, level, onBuildPlan }) => {
+export const CalcQualityTab: React.FC<{ plan: Plan; level: string; goal?: string; onBuildPlan: () => void }> = ({ plan, level, goal = 'hypertrophy', onBuildPlan }) => {
   const analysis = useMemo(() => {
     if (!plan) return null;
-    const wk: Record<string, number> = {};
-    plan.days.forEach(d => d.exercises.forEach(e => { wk[e.group] = (wk[e.group] || 0) + e.sets; }));
-    const mrv = ((LEVEL_VOLUMES as Record<string, { mrv: number }>)[level]?.mrv ?? 20);
-    const groups = Object.keys(wk);
-    let score = 100;
-    const rows = groups.map(g => {
-      const v = getVolumeByMuscle(g);
-      const lvlKey = (level === 'enhanced' ? 'advanced' : level) as 'beginner' | 'intermediate' | 'advanced';
-      const ld = v ? v[lvlKey] : undefined;
-      const sets = wk[g];
-      const mev = ld?.mev ?? 0;
-      const mav = ld?.mav ?? 0;
-      const gmrv = ld?.mrv ?? Math.round(mrv);
-      const color = sets === 0 ? '#ef4444' : sets < mev ? '#f59e0b' : sets <= mav ? '#22c55e' : sets <= gmrv ? '#eab308' : '#ef4444';
-      const label = sets === 0 ? 'нет объёма' : sets < mev ? 'ниже MEV' : sets <= mav ? 'зона MAV' : sets <= gmrv ? 'выше MAV' : '>MRV!';
-      if (sets > gmrv) score -= 12;
-      if (sets > 0 && sets < Math.max(4, mrv * 0.4)) score -= 4;
-      return { g, sets, mev, mav, gmrv, color, label };
-    });
-    score = Math.max(0, Math.min(100, score));
-    const total = Object.values(wk).reduce((a, b) => a + b, 0);
-    const over = rows.filter(r => r.sets > r.gmrv);
-    const low = rows.filter(r => r.sets > 0 && r.sets < r.mev);
-    return { rows, score, total, mrv: Math.round(mrv), over, low };
-  }, [plan, level]);
+    const ws: Record<string, number> = {};
+    plan.days.forEach(d => d.exercises.forEach(e => { ws[e.group] = (ws[e.group] || 0) + e.sets; }));
+    return calcQualityScore(plan.days, ws, level, goal);
+  }, [plan, level, goal]);
 
   if (!plan || !analysis) {
     return (
@@ -53,51 +30,51 @@ export const CalcQualityTab: React.FC<{ plan: Plan; level: string; onBuildPlan: 
     );
   }
 
-  const sc = analysis.score >= 85 ? '#22c55e' : analysis.score >= 65 ? '#eab308' : '#ef4444';
+  const sc = analysis.score >= 80 ? '#22c55e' : analysis.score >= 50 ? '#f59e0b' : '#ef4444';
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>🎯 Калькулятор качества программы</div>
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>Оценка текущего плана «{plan.splitName}» по объёмным ориентирам (MEV/MAV/MRV) и балансу.</div>
+      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>Оценка текущего плана «{plan.splitName}» по объёмным ориентирам (MEV/MAV/MRV), балансу и плотности.</div>
 
-      <div style={{ padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.05)', border: '1px solid ' + sc + '33', marginBottom: 10 }}>
+      <div style={{ padding: 12, borderRadius: 12, background: analysis.color + '08', border: '1px solid ' + analysis.color + '40', marginBottom: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 800, color: sc }}>Оценка качества</span>
-          <span style={{ fontSize: 22, fontWeight: 800, color: sc }}>{analysis.score}/100</span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: analysis.color }}>Оценка качества</span>
+          <span style={{ fontSize: 22, fontWeight: 800, color: analysis.color }}>{analysis.score}<span style={{ fontSize: 11, fontWeight: 600, opacity: 0.6 }}>/100</span></span>
         </div>
         <div style={{ height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 8 }}>
-          <div style={{ height: '100%', width: analysis.score + '%', background: sc }} />
+          <div style={{ height: '100%', width: analysis.score + '%', background: analysis.color }} />
         </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
-          Всего сетов/нед: <b>{analysis.total}</b>. MRV (по уровню «{level}»): <b>{analysis.mrv}</b> сетов/группу.
-          {analysis.over.length > 0 && <div style={{ color: '#ef4444', marginTop: 4 }}>⚠ Превышение MRV: {analysis.over.map(r => ru(r.g) + ' (' + r.sets + ')').join(', ')}.</div>}
-          {analysis.low.length > 0 && <div style={{ color: '#f59e0b', marginTop: 4 }}>⚠ Ниже MEV: {analysis.low.map(r => ru(r.g) + ' (' + r.sets + ')').join(', ')} — недотрен.</div>}
-          {analysis.over.length === 0 && analysis.low.length === 0 && <div style={{ color: '#22c55e', marginTop: 4 }}>✅ Объём по всем группам в пределах нормы.</div>}
-        </div>
-      </div>
-
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6 }}>Объём по группам (MEV / MAV / MRV)</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
-        {analysis.rows.map(r => (
-          <div key={r.g} style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.4fr 0.8fr 0.7fr 0.9fr', gap: 4, fontSize: 11, color: 'rgba(255,255,255,0.85)', alignItems: 'center', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', minWidth: 320 }}>
-            <span style={{ fontWeight: 700 }}>{ru(r.g)}</span>
-            <span style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>{r.sets}</span>
-            <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10 }}>{r.mev}/{r.mav}/{r.gmrv}</span>
-            <span style={{ color: r.color, fontWeight: 700, fontSize: 10 }}>{r.label}</span>
-            <span style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-              <span style={{ display: 'block', height: '100%', width: Math.min(100, Math.round((r.sets / Math.max(r.gmrv, 1)) * 100)) + '%', borderRadius: 3, background: r.color }} />
-            </span>
+        {analysis.breakdown.map((b, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontSize: 10, color: b.ok ? 'rgba(255,255,255,0.7)' : analysis.color }}>
+            <span style={{ fontSize: 9 }}>{b.ok ? '✅' : '❌'}</span>
+            <span style={{ fontWeight: 700, minWidth: 80 }}>{b.label}</span>
+            <span style={{ opacity: 0.8 }}>{b.detail}</span>
           </div>
         ))}
       </div>
 
-      <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>💡 Рекомендации</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
-          {analysis.over.length > 0 && <div>• Снизьте объём групп с превышением MRV ({analysis.over.map(r => ru(r.g)).join(', ')}) — уберите 1–2 подхода или упражнение.</div>}
-          {analysis.low.length > 0 && <div>• Повысьте объём групп ниже MEV ({analysis.low.map(r => ru(r.g)).join(', ')}) — добавьте подход или упражнение.</div>}
-          {analysis.over.length === 0 && analysis.low.length === 0 && <div>• План сбалансирован. Примените «Улучшить программу» во вкладке «План» для тонкой проверки.</div>}
-        </div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6 }}>Объём по группам (Мышца · Сеты · MEV · MAV · MRV · %)</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {analysis.perMuscle.map(pm => {
+          const st = pm.status === 'недотрен' ? '#ef4444' : pm.status === 'перегруз' ? '#f59e0b' : '#22c55e';
+          return (
+            <div key={pm.muscle} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 6, background: st + '10', border: '1px solid ' + st + '30', fontSize: 9 }}>
+              <span style={{ fontWeight: 700, color: '#fff' }}>{ru(pm.muscle)}</span>
+              <span style={{ color: st, fontWeight: 700 }}>{pm.sets}</span>
+              <span style={{ color: 'rgba(255,255,255,0.4)' }}>· MEV {pm.mev} · MAV {pm.mav} · MRV {pm.mrv} · {pm.pct}%</span>
+            </div>
+          );
+        })}
       </div>
+
+      {analysis.recommendations.length > 0 && (
+        <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>💡 Рекомендации</div>
+          {analysis.recommendations.map((r, i) => (
+            <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 2, paddingLeft: 4, borderLeft: '2px solid #f59e0b' }}>{r}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

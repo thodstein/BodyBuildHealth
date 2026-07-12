@@ -126,7 +126,7 @@ export const MARKER_TO_TZ_MECH: MarkerMechLink[] = [
   { marker: 'SPERM_MOTILITY',organId:'reproductive', mechId: 'rep3', direction: 'down', lln: 40 },
   { marker: 'SPERM_MORPHOLOGY',organId:'reproductive',mechId:'rep3', direction: 'down', lln: 4 },
   { marker: 'ESTRADIOL',    organId: 'reproductive', mechId: 'rep4', direction: 'up', uln: 200 },
-  { marker: 'E2_SENSITIVITY',organId:'reproductive', mechId: 'rep4', direction: 'up', uln: 73 },
+  { marker: 'E2_LH_RATIO',  organId:'reproductive', mechId: 'rep4', direction: 'up', uln: 20 },
   { marker: 'SHBG',         organId: 'reproductive', mechId: 'rep4', direction: 'up', uln: 60 },
   { marker: 'INHIBIN_B',    organId: 'reproductive', mechId: 'rep3', direction: 'down', lln: 80 },
   { marker: 'AMH',          organId: 'reproductive', mechId: 'rep3', direction: 'down', lln: 1.0 },
@@ -173,6 +173,26 @@ export const MARKER_TO_TZ_MECH: MarkerMechLink[] = [
   { marker: 'CORTISOL_H',   organId: 'hematologic', mechId: 'hem2', direction: 'up', uln: 700 },
   { marker: 'TESTOSTERONE_FREE', organId: 'reproductive', mechId: 'rep2', direction: 'down', lln: 65 },
   { marker: 'EPI_TESTO',    organId: 'reproductive', mechId: 'rep5', direction: 'down', lln: 5 },
+  // ─── ДОПОЛНИТЕЛЬНЫЕ МАРКЁРЫ (отсутствовали в MARKER_TO_TZ_MECH) ───
+  { marker: 'DHT',          organId: 'reproductive', mechId: 'rep4', direction: 'up', uln: 3.5 },
+  { marker: 'CK',           organId: 'cardio',       mechId: 'cv1',  direction: 'up', uln: 200 },
+  { marker: 'ESR',          organId: 'cardio',       mechId: 'cv1',  direction: 'up', uln: 15 },
+  { marker: 'PLT',          organId: 'hematologic',  mechId: 'hem1', direction: 'up', uln: 400 },
+  { marker: 'PSA_TOTAL',    organId: 'reproductive', mechId: 'rep4', direction: 'up', uln: 4.0 },
+  { marker: 'PSA_FREE',     organId: 'reproductive', mechId: 'rep4', direction: 'down', lln: 0.8 },
+  { marker: 'B12',          organId: 'hematologic',  mechId: 'hem1', direction: 'down', lln: 200 },
+  { marker: 'DHEA_S',       organId: 'reproductive', mechId: 'rep1', direction: 'down', lln: 200 },
+  { marker: 'T3_FREE',      organId: 'cns',          mechId: 'cns4', direction: 'down', lln: 3.5 },
+  { marker: 'T4_FREE',      organId: 'cns',          mechId: 'cns4', direction: 'down', lln: 9.0 },
+  { marker: 'ANTI_TPO',     organId: 'cns',          mechId: 'cns4', direction: 'up', uln: 34 },
+  { marker: 'IL_6',         organId: 'cardio',       mechId: 'cv1',  direction: 'up', uln: 7.0 },
+  { marker: 'TNF_ALPHA',    organId: 'cardio',       mechId: 'cv1',  direction: 'up', uln: 8.1 },
+  { marker: 'CALCIUM',      organId: 'hematologic',  mechId: 'hem4', direction: 'up', uln: 2.6 },
+  { marker: 'MAGNESIUM',    organId: 'hematologic',  mechId: 'hem4', direction: 'down', lln: 0.7 },
+  { marker: 'PSA',          organId: 'reproductive', mechId: 'rep4', direction: 'up', uln: 4.0 },
+  // GLUCOSE как маркер hem2 (инсулинорезистентность) — повторная запись,
+  // чтобы GLUCOSE активировал ОБА меха: cns5 (гипо) и hem2 (IR)
+  { marker: 'GLUCOSE',      organId: 'hematologic',  mechId: 'hem2', direction: 'up', uln: 5.6 },
 ];
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -217,6 +237,40 @@ export const MARKER_ALIASES: Record<string, string> = {
   'Белок в моче': 'PROTEIN_URINE',
   'АФП': 'AFP', 'ТГ-LOW': 'GLUCOSE_LOW',
   'Калий-LOW': 'POTASSIUM', 'К-LOW': 'POTASSIUM',
+  // ─── АНГЛИЙСКИЕ АЛИАСЫ (UI отправляет эти имена через toUpperCase/MARKER_RENAME) ───
+  'TRIGLYCERIDES': 'TG',
+  'TOTAL_CHOLESTEROL': 'CHOL',
+  'CHOLESTEROL_LDL': 'LDL',
+  'CHOLESTEROL_HDL': 'HDL',
+  'FREE_TESTOSTERONE': 'FREE_TESTO',
+  'CRP': 'HsCRP',
+  'HSCRP': 'HsCRP',
+  'HGB': 'HEMOGLOBIN',
+  'PRL': 'PROLACTIN',
+  'BIL': 'BILIRUBIN',
+  'BILIRUBIN_TOTAL': 'BILIRUBIN',
+  'TOTAL_BILIRUBIN': 'BILIRUBIN',
+  'PROG': 'PROGESTERONE',
+  'CALCIUM': 'CA',
+  'MAGNESIUM': 'MG',
+  'HCT': 'HEMATOCRIT',
+  'E2': 'ESTRADIOL',
+  'TOTAL_TESTOSTERONE': 'TESTOSTERONE',
+  'TG_LIPID': 'TG',
+  'LP_A': 'Lpa',
+  'PSA_TOTAL': 'PSA_TOTAL',
+  'PSA_FREE': 'PSA_FREE',
+  'DHEA_S': 'DHEA_S',
+  'IL_6': 'IL_6',
+  'TNF_ALPHA': 'TNF_ALPHA',
+  'TRANSFERRIN_SAT': 'TSAT',
+  'CK_MB': 'CK_MB',
+  'T3_FREE': 'T3_FREE',
+  'T4_FREE': 'T4_FREE',
+  'ANTI_TPO': 'ANTI_TPO',
+  'ANTI_TG': 'ANTI_TG',
+  '3A_ADG': '3A_ADG',
+  'CA_125': 'CA_125',
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -288,28 +342,32 @@ export function getActivatedTzMechs(labs: LabValues): ActivatedMech[] {
   for (const [rawMarker, value] of Object.entries(labs)) {
     if (typeof value !== 'number' || !isFinite(value)) continue;
     const marker = normalizeMarker(rawMarker);
-    const link = MARKER_TO_TZ_MECH.find(x => x.marker === marker);
-    if (!link) continue;
+    // filter (не find) — один маркер может активировать несколько мехов
+    // (например, GLUCOSE → cns5 гипогликемия + hem2 инсулинорезистентность)
+    const links = MARKER_TO_TZ_MECH.filter(x => x.marker === marker);
+    if (links.length === 0) continue;
 
-    const sev = calcSeverity(value, link);
-    if (sev === 'normal') continue;
+    for (const link of links) {
+      const sev = calcSeverity(value, link);
+      if (sev === 'normal') continue;
 
-    const key = link.mechId;
-    const existing = map.get(key);
-    const entry = { marker, value, severity: sev };
+      const key = link.mechId;
+      const existing = map.get(key);
+      const entry = { marker, value, severity: sev };
 
-    if (!existing) {
-      map.set(key, {
-        mechId: link.mechId,
-        organId: link.organId,
-        severity: sev,
-        markers: [entry],
-      });
-    } else {
-      existing.markers.push(entry);
-      // эскалация до максимальной severity
-      if (sevRank[sev] > sevRank[existing.severity]) {
-        existing.severity = sev;
+      if (!existing) {
+        map.set(key, {
+          mechId: link.mechId,
+          organId: link.organId,
+          severity: sev,
+          markers: [entry],
+        });
+      } else {
+        existing.markers.push(entry);
+        // эскалация до максимальной severity
+        if (sevRank[sev] > sevRank[existing.severity]) {
+          existing.severity = sev;
+        }
       }
     }
   }

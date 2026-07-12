@@ -10,10 +10,11 @@ import { RiskScreen } from './ui/screens/RiskScreen';
 import { NutritionScreen } from './ui/screens/NutritionScreen';
 import { ProfileScreen } from './ui/screens/ProfileScreen';
 import { ArticlesScreen } from './ui/screens/ArticlesScreen';
+import { SupplementClinicScreen } from './ui/screens/SupplementClinicScreen';
 
 import { ToastContainer } from './ui/ToastContainer';
 
-type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'articles' | 'marketplace';
+type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'articles' | 'marketplace' | 'clinic';
 
 // Bottom nav: 7 primary tabs
 const PRIMARY_NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -24,6 +25,7 @@ const PRIMARY_NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'risks', label: 'Риски', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> },
   { id: 'pharma', label: 'Фарма', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> },
   { id: 'support', label: 'БАДы', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> },
+  { id: 'clinic', label: 'Клиника', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 2v6a3 3 0 0 0 6 0V2"/><path d="M3 21h18"/><path d="M12 15v6"/><path d="M8 21v-3a4 4 0 0 1 8 0v3"/></svg> },
 ];
 
 function DarkBg() {
@@ -150,6 +152,7 @@ export default function App() {
       case 'marketplace': return <MarketplaceScreen key={key} />;
       case 'profile': return <ProfileScreen key={key} onNavigate={handleNavigate} />;
       case 'articles': return <ArticlesScreen key={key} />;
+      case 'clinic': return <SupplementClinicScreen key={key} />;
       default: return <DashboardScreen key={key} onNavigate={handleNavigate} />;
     }
   };

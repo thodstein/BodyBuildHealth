@@ -123,6 +123,7 @@ export interface BuildPlanInput {
   injuries: Injury[];
   pctForRir: Record<number, number>;
   targetTonnage?: Record<string, number>; // Целевой тоннаж по группам (кг/нед)
+  workMaxOverride?: Record<string, number>; // Полный per-group workMax (ПМ), переопределяет workMax/manualWorkMax
   currentReadiness: number; // 0-100
   sequenceStrategy: 'classic' | 'preexhaust' | 'antagonist';
   preferEquipment?: string[];
@@ -138,7 +139,10 @@ export interface BuildPlanInput {
  * Возвращает дни, недельные сеты по группам и список правок-комментариев.
  */
 export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklySets: Record<string, number>; groupCorrections: string[]; patternBalance: Record<string, number> } {
-  const { cycle, mrv, goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, currentReadiness = 100, targetTonnage, sequenceStrategy = 'classic', preferEquipment: prefEqOverride, courseIntensity } = input;
+  const { cycle, mrv, goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, currentReadiness = 100, targetTonnage, sequenceStrategy = 'classic', preferEquipment: prefEqOverride, courseIntensity, workMaxOverride } = input;
+
+  // Полный per-group workMax: override (ПМ из калькулятора) > workMax > manualWorkMax
+  const workMaxFull = { ...workMax, ...manualWorkMax, ...(workMaxOverride || {}) };
 
   // Фазово-зависимое предпочтение оборудования (если не задано явно)
   const preferEquipment = prefEqOverride ?? (
@@ -273,7 +277,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
          }
 
          const pr = calcExercisePrescription(exSub, goal, level, isWeak(g), false, volMult, 1, mesoLength);
-          const wm = resolveWorkMax(exSub, g, workMax, manualWorkMax);
+          const wm = resolveWorkMax(exSub, g, workMaxFull, manualWorkMax);
           const pct = pctForRir[Math.max(0, Math.min(5, pr.rir))] ?? 0.9;
           let weight = Math.round(wm * pct * exWeightMult);
           
@@ -404,7 +408,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
          }
 
           const pr = calcExercisePrescription(exSub, goal, level, isWeak(g), false, volMult * 0.85, 1, mesoLength);
-          const wm = resolveWorkMax(exSub, g, workMax, manualWorkMax);
+          const wm = resolveWorkMax(exSub, g, workMaxFull, manualWorkMax);
           const pct = pctForRir[Math.max(0, Math.min(5, pr.rir))] ?? 0.9;
           const weight = Math.round(wm * pct * exWeightMult);
 

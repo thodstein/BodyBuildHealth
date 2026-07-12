@@ -3,10 +3,11 @@ import { type GoalType, type HealthCondition, type BioStackProfile } from '../..
 import { type FinderProfile, type GoalType as FinderGoal } from '../../engines/supplement-finder.engine';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 
-export type BSTab = 'profile' | 'search' | 'build' | 'stack' | 'risks' | 'compare' | 'reports';
+export type BSTab = 'profile' | 'search' | 'build' | 'stack' | 'risks' | 'compare' | 'reports' | 'data';
 
 export const SUB_TABS: { id: BSTab; label: string }[] = [
   { id: 'profile', label: '👤 Профиль' },
+  { id: 'data', label: '🩺 Данные' },
   { id: 'search', label: '🔍 Поиск' },
   { id: 'build', label: '🧩 Сборка' },
   { id: 'stack', label: '📋 Мой стек' },

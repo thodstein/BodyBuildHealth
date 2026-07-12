@@ -6,6 +6,13 @@ import { searchBioStack, type RecGoal } from '../../engines/biostack-recommender
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS } from '../../data/support-database';
 import { TZ_MECH_LABELS } from '../../data/support-db';
 import { PillBtn, inputS, PURE_GOALS, ORGANS, SYSTEMS, TOP_MECHANISMS, SYMPTOMS, toFinderProfile, PRICE_RUB } from './BioStackAIConstants';
+import { getEvidenceGrade, checkIngredientAllergens, findMeaningfulReplacement, fuzzySearchSupplements, decomposeComplex } from '../../engines/biostack-clinical-v2.engine';
+
+const SRCH_EVIDENCE: Record<string, { label: string; color: string }> = {
+  A: { label: 'A', color: '#22c55e' },
+  B: { label: 'B', color: '#f59e0b' },
+  C: { label: 'C', color: '#6366f1' },
+};
 import { resolveLabMarker } from '../../core/labs-mapping';
 import { LAB_MARKER_MAP } from '../../data/lab-marker-map';
 import type { LinkedData } from '../../core/data-link';
@@ -198,10 +205,10 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
     return list;
   }, [catFilter, tierFilter, organFilter, systemFilter, mechFilter, goalFilter, searchText, profile, favOnly, favorites]);
 
-  const grouped = useMemo(() => {
+    const grouped = useMemo(() => {
     const g: Record<string, typeof filtered> = {};
     filtered.forEach(c => {
-      const cats = (c.category?.length ? c.category : ['other'] as string[]);
+      const cats = (c.category?.length ? c.category : ['other']) as string[];
       cats.forEach(cat => {
         if (!g[cat]) g[cat] = [];
         g[cat].push(c);
@@ -211,6 +218,15 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
     const entries = Object.entries(g).sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
     return entries;
   }, [filtered]);
+
+  // п.5 аудита: нечёткий поиск (fuzzy) — срабатывает, когда точное совпадение пусто
+  const fuzzyHits = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    if (!q || filtered.length > 0) return [] as typeof filtered;
+    return fuzzySearchSupplements(q, 20)
+      .map(h => SUPPORT_CATALOG_DATA[h.id])
+      .filter((c): c is typeof filtered[number] => Boolean(c)) as typeof filtered;
+  }, [searchText, filtered]);
 
   const hasAnyFilter = catFilter.length > 0 || tierFilter.length > 0 || organFilter.length > 0 || systemFilter.length > 0 || mechFilter.length > 0 || goalFilter !== null || searchText.trim() || favOnly || profileOnly;
 
@@ -497,6 +513,34 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
         </div>
       )}
 
+      {fuzzyHits.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ padding: '6px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.1)', marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b' }}>🔍 Нечёткие совпадения (fuzzy)</span>
+            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>{fuzzyHits.length}</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {fuzzyHits.map(c => {
+              const isFav = favorites.includes(c.id);
+              const inStack = stackIds.includes(c.id);
+              const tierInfo = TIERS.find(t => t.key === c.tier);
+              return (
+                <div key={c.id} style={{ borderRadius: 10, background: inStack ? 'rgba(0,230,138,0.04)' : 'rgba(24,24,27,0.5)', border: inStack ? '1px solid rgba(0,230,138,0.12)' : '1px solid rgba(255,255,255,0.04)', overflow: 'hidden' }}>
+                  <div style={{ padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginBottom: 2 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{c.nameRu || c.name}</span>
+                        {(() => { const g = getEvidenceGrade(c.id); const ev = SRCH_EVIDENCE[g] || SRCH_EVIDENCE.C; return <span key="ev" title={`Доказательность: ${g}`} style={{ padding: '1px 4px', borderRadius: 4, fontSize: 6, fontWeight: 700, background: ev.color + '18', color: ev.color, border: `1px solid ${ev.color}30` }}>{ev.label}</span>; })()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {grouped.map(([cat, items]) => (
         <div key={cat} style={{ marginBottom: 8 }}>
           <div style={{
@@ -524,10 +568,12 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
                     <div onClick={e => { e.stopPropagation(); toggleFav(c.id); }} style={{ cursor: 'pointer', fontSize: 9, flexShrink: 0 }}>
                       {isFav ? '⭐' : '☆'}
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 2 }}>
-                        {c.nameRu || c.name}
-                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginBottom: 2 }}>
+                         <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{c.nameRu || c.name}</span>
+                         {(() => { const g = getEvidenceGrade(c.id); const ev = SRCH_EVIDENCE[g] || SRCH_EVIDENCE.C; return <span key="ev" title={`Доказательность: ${g}`} style={{ padding: '1px 4px', borderRadius: 4, fontSize: 6, fontWeight: 700, background: ev.color + '18', color: ev.color, border: `1px solid ${ev.color}30` }}>{ev.label}</span>; })()}
+                         {(() => { const hits = checkIngredientAllergens([c.id], profile?.drugAllergies || []); return hits.length > 0 ? <span key="al" title={`Возможная аллергия: ${hits.map(h => h.allergen).join(', ')}`} style={{ padding: '1px 4px', borderRadius: 4, fontSize: 6, fontWeight: 700, background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>⚠ Аллергия</span> : null; })()}
+                       </div>
                        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                           {tierInfo && (
                             <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 7, fontWeight: 700, background: tierInfo.color + '20', color: tierInfo.color, border: `1px solid ${tierInfo.color}30` }}>
@@ -651,6 +697,28 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>Загрузка...</div>
               ) : (
                 <>
+                  {/* Lab-aware meaningful replacement (v2 engine) */}
+                  {(() => {
+                    const mr = findMeaningfulReplacement(replacePopup.id, profile || {} as any);
+                    if (!mr) return null;
+                    const cat = SUPPORT_CATALOG_DATA[mr.replacementId];
+                    if (!cat) return null;
+                    const inStack = stackIds.includes(mr.replacementId);
+                    return (
+                      <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.14)' }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 4 }}>💊 Осмысленная замена (по анализам/профилю)</div>
+                        <div onClick={() => { const ns = stackIds.includes(replacePopup.id) ? stackIds.map(s => s === replacePopup.id ? mr.replacementId : s) : [...stackIds.filter(s => s !== replacePopup.id), mr.replacementId]; setStackIds(ns); setReplacePopup(null); }} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{mr.replacementName}{mr.gradeUpgrade ? <span style={{ marginLeft: 5, padding: '1px 5px', borderRadius: 4, fontSize: 6, fontWeight: 700, background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>↑ грейд</span> : null}</div>
+                            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, marginTop: 2 }}>{mr.reason}</div>
+                            {mr.safetyNote ? <div style={{ fontSize: 7, color: '#f59e0b', lineHeight: 1.3, marginTop: 2 }}>⚠ {mr.safetyNote}</div> : null}
+                          </div>
+                          {!inStack && <span style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', flexShrink: 0 }}>Заменить →</span>}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Type selector - vertical list with counts */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 10 }}>
                     {replacePopup.results.map(rt => (
@@ -769,8 +837,23 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
                       {allComps.length > 6 && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)' }}>+{allComps.length - 6}</span>}
                     </div>
                     {cEntry?.description && (
-                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)' }}>📝 {cEntry.description.slice(0, 120)}</div>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>📝 {cEntry.description.slice(0, 120)}</div>
                     )}
+                    {(() => {
+                      const comps = decomposeComplex(m.complexId);
+                      if (comps.length === 0) return null;
+                      return (
+                        <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginTop: 2 }}>
+                          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', alignSelf: 'center' }}>🔬 Состав:</span>
+                          {comps.slice(0, 8).map((cp, k) => (
+                            <span key={k} style={{ padding: '1px 5px', borderRadius: 4, fontSize: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}>
+                              {cp.componentName}
+                            </span>
+                          ))}
+                          {comps.length > 8 && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)' }}>+{comps.length - 8}</span>}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               }) : (

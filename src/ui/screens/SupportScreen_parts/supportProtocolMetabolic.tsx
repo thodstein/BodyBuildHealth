@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner, RX_NOTE } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolMetabolic: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -12,6 +12,13 @@ export const SupportProtocolMetabolic: React.FC<{ s: Record<string, any> }> = ({
                 <div style={{ fontSize:13, fontWeight:800, color:'#a855f7', marginBottom:2 }}>⚖️ Метаболическая поддержка</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Контроль дислипидемии, инсулинорезистентности, электролитных нарушений. ААС-индуцированные метаболические изменения.</p>
               </div>
+
+              <StopBanner title="Критические метаболические пороги — показание к остановке/коррекции курса" thresholds={[
+                'Глюкоза >7.0 ммоль/л или HbA1c >6.5% — эндокринолог (СД 2 типа)',
+                'Калий >5.5 ммоль/л при эплереноне/РААС-блокаде — гиперкалиемия, отмена препарата',
+                'Мочевая кислота >420 мкмоль/л + суставной приступ — подагра',
+                'Магний <0.75 / Калий <3.5 ммоль/л — риск аритмий, срочная коррекция',
+              ]} />
 
               {/* Sub-tabs */}
               <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
@@ -56,13 +63,13 @@ export const SupportProtocolMetabolic: React.FC<{ s: Record<string, any> }> = ({
                       ]},
                     { phase:'ФАЗА 2 · КОРРЕКЦИЯ ДИСЛИПИДЕМИИ', label:'ЛПНП 130-160 / ЛПВП {'<'}35', color:'#f59e0b', condition:'ЛПНП 130-160, ЛПВП {'<'}35', desc:'Целенаправленная коррекция липидного профиля',
                       items:[
-                        { name:'Эзетимиб 10 мг', dose:'10 мг', timing:'Утро', note:'Ингибитор всасывания холестерина в тонком кишечнике. ↓ ЛПНП на 15-20%. Не влияет на ЛПВП' },
+                        { name:'Эзетимиб 10 мг 💊', dose:'10 мг', timing:'Утро', note:'Ингибитор всасывания холестерина в тонком кишечнике. ↓ ЛПНП на 15-20%. Не влияет на ЛПВП. Только по назначению врача' + RX_NOTE },
                         { name:'Красный рис (монаколин K) 10 мг', dose:'10 мг', timing:'Вечер', note:'Ингибитор HMG-CoA редуктазы (природный статин). ↓ ЛПНП на 20-30%. Контроль АЛТ/АСТ' },
                         { name:'Берберин 500 мг', dose:'500 мг', timing:'2×/день', note:'↓ ЛПНП ещё на 15-20% дополнительно к эзетимибу' },
                       ]},
                     { phase:'ФАЗА 3 · КОРРЕКЦИЯ ИР/ГЛЮКОЗЫ', label:'Глюкоза 5.6-7.0 / HOMA-IR {'>'}2.5', color:'#f97316', condition:'Глюкоза {'>'}5.6 или HOMA-IR {'>'}2.5', desc:'Снижение инсулинорезистентности (особенно на оксандролоне/метандростенолоне)',
                       items:[
-                        { name:'Метформин 500-1000 мг', dose:'500 мг', timing:'2×/день с едой', note:'Снижает продукцию глюкозы печенью. ↑ чувствительность к инсулину. ↓ риска СД 2 типа' },
+                        { name:'Метформин 500-1000 мг 💊', dose:'500 мг', timing:'2×/день с едой', note:'Снижает продукцию глюкозы печенью. ↑ чувствительность к инсулину. ↓ риска СД 2 типа. Рецептурный препарат — только по назначению врача' + RX_NOTE },
                         { name:'Берберин 500 мг', dose:'500 мг', timing:'2×/день', note:'Синергия с метформином через AMPK. ↓ гликированного гемоглобина на 0.5-1%' },
                         { name:'Хром (пиколинат)', dose:'200-400 мкг', timing:'Утро', note:'Усиливает действие инсулина. ↓ тягу к углеводам' },
                         { name:'Магний 400 мг', dose:'400 мг', timing:'Вечер', note:'Дефицит Mg²⁺ — независимый фактор ИР. Восполнение улучшает гликемию' },

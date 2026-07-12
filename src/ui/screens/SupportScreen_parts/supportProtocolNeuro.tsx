@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolNeuro: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -13,6 +13,12 @@ export const SupportProtocolNeuro: React.FC<{ s: Record<string, any> }> = ({ s }
                 <div style={{ fontSize:13, fontWeight:800, color:'#06b6d4', marginBottom:2 }}>🧠 Нейротоксичность ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Механизмы нейротоксичности, калькулятор риска и фазовый протокол нейропротекции.</p>
               </div>
+
+              <StopBanner title="Критические нейропороги — показание к отмене ААС" thresholds={[
+                'Депрессия/тревога/агрессия тяжёлой степени или суицидальные мысли — отмена ААС, консультация психиатра',
+                'Сумма симптомов ≥10 баллов — снижение доз ААС + невролог',
+                'Галлюцинации/психоз/спутанность сознания — экстренная помощь',
+              ]} />
 
               {/* Sub-tabs */}
               <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
@@ -158,14 +164,14 @@ export const SupportProtocolNeuro: React.FC<{ s: Record<string, any> }> = ({ s }
                     {
                       phase:'ФАЗА 4 · МАКСИМУМ', label:'При нейросимптомах любой тяжести', color:'#ef4444',
                       condition:'Условие: появление ≥1 симптома нейротоксичности',
-                      desc:'Максимальный уровень защиты при появлении симптомов. Ноотропный компонент для восстановления когнитивных функций.',
+                       desc:'Максимальный уровень защиты при появлении симптомов. Ноотропный компонент — восстановительная поддержка; специфическая доказательная база защиты именно от ААС-нейротоксичности ограничена, эффект экстраполирован из других областей. Ноотропы (Семакс, Кортексин, Ноопепт, Бромантан) — рецептурные, только по назначению врача.',
                       items:[
                         { name:'Bacopa Monnieri', dose:'300-600 мг', timing:'Утро', note:'Улучшение памяти, дендритное ветвление. Стандартизация 20% бакозидов. Эффект через 4-6 нед' },
                         { name:'L-Theanine', dose:'200-400 мг', timing:'Утро + Вечер', note:'ГАМК-модуляция. Повышение альфа-волн мозга. Снижение тревоги без седации' },
                         { name:'Citicoline', dose:'500-1000 мг', timing:'Утро', note:'Цитидин + холин. Синтез фосфатидилхолина мембран. Восстановление после ишемии' },
-                        { name:'Noopept', dose:'10-30 мг', timing:'Утро + День', note:'Циклопролилглицин. Повышение BDNF и NGF. Улучшение памяти и когниций. Биодоступность ~99%' },
-                        { name:'Семакс', dose:'1-3 мг', timing:'Утро интраназально', note:'Пептид ACTH(4-7)-Pro-Gly-Pro. Повышение BDNF +30%. Нейрогенез. Ноотропный эффект' },
-                        { name:'Кортексин', dose:'10 мг/день', timing:'Утро в/м', note:'Полипептиды коры мозга телят. Нейропротекция + нейрорепарация. Курс 10 дней' },
+                        { name:'Noopept 💊', dose:'10-30 мг', timing:'Утро + День', note:'Циклопролилглицин. Повышение BDNF и NGF. Улучшение памяти и когниций. Рецептурно, по назначению врача' },
+                        { name:'Семакс 💊', dose:'1-3 мг', timing:'Утро интраназально', note:'Пептид ACTH(4-7)-Pro-Gly-Pro. Повышение BDNF +30%. Нейрогенез. Ноотропный эффект. Рецептурно' },
+                        { name:'Кортексин 💊', dose:'10 мг/день', timing:'Утро в/м', note:'Полипептиды коры мозга телят. Нейропротекция + нейрорепарация. Курс 10 дней. Рецептурно' },
                       ]
                     },
                   ].map((phase: any, pi: any) =>(

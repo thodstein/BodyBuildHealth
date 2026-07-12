@@ -12,6 +12,13 @@ import { checkStackToxicity, checkNutrientConflicts, optimizeTiming, findAbsorpt
 import { getStackEffectiveness, trackStackStart } from '../../engines/biostack-feedback.engine';
 import { getStackCostBreakdown, buildBudgetStack } from '../../engines/biostack-budget.engine';
 import { LAB_MARKER_MAP } from '../../data/lab-marker-map';
+import { getEvidenceGrade, findMeaningfulReplacement } from '../../engines/biostack-clinical-v2.engine';
+
+const STK_EVIDENCE: Record<string, { label: string; color: string }> = {
+  A: { label: 'A', color: '#22c55e' },
+  B: { label: 'B', color: '#f59e0b' },
+  C: { label: 'C', color: '#6366f1' },
+};
 
 function getTitration(id: string, cat: any): string | null {
   const needy = ['ashwagandha', 'rhodiola', 'shilajit', 'berberine', 'tongkat_ali', 'fadogia', 'ashwa', 'probiotics', 'bromelain', 'serrapeptase', 'nattokinase'];
@@ -1407,6 +1414,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 1 }}>
                     {cat.nameRu || cat.name}
+                    {(() => { const g = getEvidenceGrade(entry.id); const ev = STK_EVIDENCE[g] || STK_EVIDENCE.C; return <span key="ev" title={`Доказательность: ${g}`} style={{ padding: '1px 4px', borderRadius: 4, fontSize: 6, fontWeight: 700, marginLeft: 5, background: ev.color + '18', color: ev.color, border: `1px solid ${ev.color}30` }}>{ev.label}</span>; })()}
                     <span style={{
                       fontSize: 7, marginLeft: 5, fontWeight: 600,
                       color: synergyExplanation?.roles[entry.id] === 'core' ? '#00e68a'
@@ -1521,6 +1529,26 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
               <div style={{ fontSize: 14, fontWeight: 700, color: '#c4b5fd', marginBottom: 10 }}>
                 🔄 Замена: {replacePopup.name}
               </div>
+              {(() => {
+                const mr = findMeaningfulReplacement(replacePopup.id, profile || {} as any);
+                if (!mr) return null;
+                const cat = SUPPORT_CATALOG_DATA[mr.replacementId];
+                if (!cat) return null;
+                const inStack = stackIds.includes(mr.replacementId);
+                return (
+                  <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.14)' }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 4 }}>💊 Осмысленная замена (по анализам/профилю)</div>
+                    <div onClick={() => { handleReplace(replacePopup.id, mr.replacementId); setReplacePopup(null); }} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{mr.replacementName}{mr.gradeUpgrade ? <span style={{ marginLeft: 5, padding: '1px 5px', borderRadius: 4, fontSize: 6, fontWeight: 700, background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>↑ грейд</span> : null}</div>
+                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, marginTop: 2 }}>{mr.reason}</div>
+                        {mr.safetyNote ? <div style={{ fontSize: 7, color: '#f59e0b', lineHeight: 1.3, marginTop: 2 }}>⚠ {mr.safetyNote}</div> : null}
+                      </div>
+                      {!inStack && <span style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', flexShrink: 0 }}>Заменить →</span>}
+                    </div>
+                  </div>
+                );
+              })()}
               {replacePopup.loading ? (
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>Загрузка...</div>
               ) : (

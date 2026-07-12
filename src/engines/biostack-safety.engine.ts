@@ -73,6 +73,19 @@ export interface ToxWarning {
   message: string;
 }
 
+// Canonical nutrient → UL key (resolves compound forms to base nutrient)
+export const UL_CANONICAL: Record<string, string> = {
+  'zinc_picolinate': 'zinc', 'zinc_carnosine': 'zinc', 'zinc_gluconate': 'zinc',
+  'magnesium_citrate': 'magnesium', 'magnesium_glycinate': 'magnesium', 'magnesium_l_threonate': 'magnesium', 'magnesium_oxide': 'magnesium',
+  'iron_bisglycinate': 'iron', 'iron_sulfate': 'iron', 'iron_fumarate': 'iron',
+  'calcium_citrate': 'calcium', 'calcium_carbonate': 'calcium', 'calcium_gluconate': 'calcium',
+  'copper_bisglycinate': 'copper', 'copper_gluconate': 'copper',
+  'selenium_methylselenocysteine': 'selenium', 'selenium_yeast': 'selenium',
+  'vitamin_b6': 'vitamin_b6', 'vitamin_b12': 'vitamin_b12',
+  'alpha_lipoic': 'alpha_lipoic', 'l_carnitine': 'l_carnitine',
+  'chromium_picolate': 'chromium', 'iodine_kelp': 'iodine', 'potassium_citrate': 'potassium',
+};
+
 export function checkStackToxicity(stackIds: string[]): ToxWarning[] {
   const warnings: ToxWarning[] = [];
   const doseSum: Record<string, { total: number; ids: string[]; names: string[] }> = {};
@@ -84,13 +97,15 @@ export function checkStackToxicity(stackIds: string[]): ToxWarning[] {
     const name = cat.nameRu || cat.name || id;
 
     const lc = id.toLowerCase();
-    let mappedKey = '';
-    for (const ulKey of Object.keys(SUPPLEMENT_UPPER_LIMITS)) {
-      if (lc.includes(ulKey) || ulKey.includes(lc)) { mappedKey = ulKey; break; }
+    let mappedKey = UL_CANONICAL[lc] || '';
+    if (!mappedKey) {
+      for (const ulKey of Object.keys(SUPPLEMENT_UPPER_LIMITS)) {
+        if (lc.includes(ulKey) || ulKey.includes(lc)) { mappedKey = ulKey; break; }
+      }
     }
     if (!mappedKey) {
-      for (const [ulKey] of Object.entries(SUPPLEMENT_UPPER_LIMITS)) {
-        const names = cat.nameRu?.toLowerCase() || '';
+      const names = cat.nameRu?.toLowerCase() || '';
+      for (const ulKey of Object.keys(SUPPLEMENT_UPPER_LIMITS)) {
         if (names.includes(ulKey)) { mappedKey = ulKey; break; }
       }
     }

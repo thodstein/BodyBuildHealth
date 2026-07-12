@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolHemato: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -12,6 +12,13 @@ export const SupportProtocolHemato: React.FC<{ s: Record<string, any> }> = ({ s 
                 <div style={{ fontSize:13, fontWeight:800, color:'#ef4444', marginBottom:2 }}>🩸 Гематологическая поддержка на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Контроль полицитемии, коагуляции и анемии. Профилактика тромбозов при высоком Hct.</p>
               </div>
+
+              <StopBanner title="Критические гематологические пороги" thresholds={[
+                'Гематокрит >48% — профилактика (рыбий жир, пиявки, донорство)',
+                'Гематокрит >52% — активная флеботомия (400-500 мл)',
+                'Гематокрит >54% — экстренное кровопускание, риск тромбоза/инфаркта',
+                'Гематокрит >60% или HGB >200 г/л — СМЕРТЕЛЬНЫЙ риск: экстренная медпомощь, остановка курса',
+              ]} />
 
               {/* Sub-tabs */}
               <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>

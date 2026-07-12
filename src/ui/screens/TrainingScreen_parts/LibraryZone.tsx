@@ -38,6 +38,7 @@ interface Props {
   customExercises: CustomEx[];
   setCustomExercises: React.Dispatch<React.SetStateAction<CustomEx[]>>;
   mesoLength: number;
+  onLoadToConstructor?: () => void;
 }
 
 export const LibraryZone: React.FC<Props> = (p) => {
@@ -100,7 +101,7 @@ export const LibraryZone: React.FC<Props> = (p) => {
       {p.tab === 'mytraining' && (
         <InfoErrorBoundary label="Мои тренировки">
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            <MyTrainingTab customExercises={p.customExercises} setCustomExercises={p.setCustomExercises} goal={p.goal} level={p.level} daysPerWeek={p.daysPerWeek} mesoLength={p.mesoLength} />
+            <MyTrainingTab customExercises={p.customExercises} setCustomExercises={p.setCustomExercises} goal={p.goal} level={p.level} daysPerWeek={p.daysPerWeek} mesoLength={p.mesoLength} onLoadToConstructor={p.onLoadToConstructor} />
           </div>
         </InfoErrorBoundary>
       )}

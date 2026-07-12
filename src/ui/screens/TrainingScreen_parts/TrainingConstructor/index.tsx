@@ -45,6 +45,8 @@ import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, phaseExer
 import { getAllVolumeLandmarks } from '../../../../engines/volume-landmarks.engine';
 import { convertCycleToBBPlan } from '../../../../engines/bb/cycle-to-plan';
 import { getCycleById } from '../../../../data/lms-cycles/lms-cycle-index';
+import { acuteChronicRatio, toDailyLoads } from '../../../../engines/pro/training-load.engine';
+import { loadSRPESessions } from '../../../../engines/pro/srpe-store';
 
 interface Props {
   tprofile: TrainingProfile;
@@ -83,11 +85,17 @@ export const TrainingConstructor: React.FC<Props> = ({
   mesoLength, setMesoLength,
   labAnalysis, setTab,
 }) => {
-  const [wizardStep, setWizardStep] = useState(1);
+  const [wizardStep, setWizardStep] = useState<number>(() => {
+    try { const s = JSON.parse(localStorage.getItem('he_manual_cfg') || '{}'); if (typeof s.wizardStep === 'number') return s.wizardStep; } catch {}
+    return 1;
+  });
   const [readinessSlider, setReadinessSlider] = useState((tprofile.recovery ?? 7) * 10);
   const [targetTonnage, setTargetTonnage] = useState<Record<string, number>>({});
 
-  const [manualCfg, setManualCfg] = useState<Record<string, string>>({});
+  const [manualCfg, setManualCfg] = useState<Record<string, string>>(() => {
+    try { const s = JSON.parse(localStorage.getItem('he_manual_cfg') || 'null'); if (s && s.manualCfg) return s.manualCfg; } catch {}
+    return {};
+  });
   const setManual = useCallback((k: string, v: string) => setManualCfg(p => ({ ...p, [k]: v })), []);
   const [manualWorkMax, setManualWorkMax] = useState<Record<string, number>>(() => ({
     chest: tprofile.workMax?.chest || 100, back: tprofile.workMax?.back || 110,
@@ -99,23 +107,27 @@ export const TrainingConstructor: React.FC<Props> = ({
     abs: tprofile.workMax?.abs || 60, traps: tprofile.workMax?.traps || 50,
     forearms: tprofile.workMax?.forearms || 30,
   }));
+  useEffect(() => { setManualWorkMax(w => ({ ...w, ...(tprofile.workMax || {}) })); }, [tprofile.workMax]);
   const [manualResult, setManualResult] = useState<ManualResult | null>(() => {
     try { return JSON.parse(localStorage.getItem('he_manual_session') || 'null'); } catch { return null; }
   });
   useEffect(() => { try { localStorage.setItem('he_manual_session', JSON.stringify(manualResult)); } catch {} }, [manualResult]);
 
-  const [programData, setProgramData] = useState<FullProgram | null>(null);
-  const [programWeeks, setProgramWeeks] = useState<ManualWeek[] | null>(null);
+  const [programData, setProgramData] = useState<FullProgram | null>(() => { try { const s = JSON.parse(localStorage.getItem('he_manual_cfg') || 'null'); if (s && s.programData) return s.programData; } catch {} return null; });
+  const [programWeeks, setProgramWeeks] = useState<ManualWeek[] | null>(() => { try { const s = JSON.parse(localStorage.getItem('he_manual_cfg') || 'null'); if (s && s.programWeeks) return s.programWeeks; } catch {} return null; });
 
   const [macrocycle, setMacrocycle] = useState<MacrocyclePlan | null>(() => {
     try { return JSON.parse(localStorage.getItem('he_macro_session') || 'null'); } catch { return null; }
   });
   useEffect(() => { try { localStorage.setItem('he_macro_session', JSON.stringify(macrocycle)); } catch {} }, [macrocycle]);
-  const [selectedWeek, setSelectedWeek] = useState(1);
+  const [selectedWeek, setSelectedWeek] = useState<number>(() => { try { const s = JSON.parse(localStorage.getItem('he_manual_cfg') || '{}'); if (typeof s.selectedWeek === 'number') return s.selectedWeek; } catch {} return 1; });
+  useEffect(() => {
+    try { const s = JSON.parse(localStorage.getItem('he_manual_cfg') || '{}'); localStorage.setItem('he_manual_cfg', JSON.stringify({ ...s, manualCfg, wizardStep, selectedWeek, programData, programWeeks })); } catch {}
+  }, [manualCfg, wizardStep, selectedWeek, programData, programWeeks]);
   const [currentMicrocycle, setCurrentMicrocycle] = useState<Microcycle | null>(null);
 
   const microcycleToManualResult = useCallback((mc: Microcycle, weekNum: number): ManualResult => {
-    const wm: Record<string, number> = { chest: 100, back: 110, legs: 140, quads: 130, hamstrings: 80, glutes: 80, calves: 60, shoulders: 60, arms: 50, biceps: 40, triceps: 40, core: 60, abs: 60, traps: 50, forearms: 30, full: 80, ...tprofile.workMax, ...manualWorkMax };
+    const wm: Record<string, number> = { chest: 100, back: 110, legs: 140, quads: 130, hamstrings: 80, glutes: 80, calves: 60, shoulders: 60, arms: 50, biceps: 40, triceps: 40, core: 60, abs: 60, traps: 50, forearms: 30, full: 80, ...manualWorkMax, ...tprofile.workMax };
     const days = mc.days.filter((d: any) => d.isTraining).map((d: any, di: number) => ({
       day: di + 1,
       groups: Array.from(new Set((d.exercises || []).map((e: any) => detectGroup(e.name)))) as string[],
@@ -492,17 +504,40 @@ export const TrainingConstructor: React.FC<Props> = ({
     if (manualCfg.generator === 'bb' || manualCfg.generator === 'bb_split') {
       const bbSplitId = manualCfg.bbSplit || SPLIT_PATTERNS[0]?.id || 'upper_lower_4';
       const bbLoadStrategy = (manualCfg.bbLoad || 'double_progression') as LoadStrategy;
-      const bbPeds: PED[] = tprofile.onCourse ? ['AAS'] : [];
+      const bbPeds: PED[] = (tprofile as any).bbPeds?.length ? (tprofile as any).bbPeds : (tprofile.onCourse ? ['AAS'] : []);
       const allLandmarks = getAllVolumeLandmarks(level);
       const pedAdapt = adaptForPEDs(bbPeds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv])));
+
+      // Фокус-группа: отдельно от слабых групп (matched engine focusGroup)
+      const bbFocusGroup = manualCfg.bbFocusGroup || '';
+      const effectiveWeak = [...(tprofile.weakPoints || [])];
+
+      // Авто-делод по ACWR (если включён)
+      const bbAutoDeload = manualCfg.bbAutoDeload === 'on';
+      let deloadWeeks = new Set<number>();
+      if (bbAutoDeload) {
+        try {
+          const srpeSessions = loadSRPESessions();
+          if (srpeSessions.length >= 4) {
+            const acwr = acuteChronicRatio(toDailyLoads(srpeSessions));
+            if (acwr && acwr.ratio > 1.3) {
+              const deloadWeek = Math.max(1, mesoLength - 1);
+              deloadWeeks = new Set([deloadWeek]);
+            }
+          }
+        } catch { /* ignore */ }
+      }
+
       const plan: BBPlan = buildBBPlan({
         patternId: bbSplitId, level, goal: (goal || 'mass') as any, weeks: mesoLength,
-        workMax: workMaxMerged, weakPoints: tprofile.weakPoints || [],
-        volumeGoal: 'mav',
+        workMax: workMaxMerged, weakPoints: effectiveWeak,
+        focusGroup: bbFocusGroup || undefined,
+        volumeGoal: (manualCfg.bbVolGoal || 'mav') as any,
+        specialization: manualCfg.bbSpecialization === 'on',
         injuries: (tprofile.injuries || []) as any,
       }, pedAdapt);
 
-      // Convert BBPlan → ManualResult
+      // Convert BBPlan → ManualResult (с сохранением BB-специфичных полей)
       const bbWeeks: ManualWeek[] = plan.weeks.map(w => {
         const phase = w.week <= Math.ceil(mesoLength * 0.6) ? 'accumulation' : w.week === mesoLength ? 'deload' : 'intensification';
         const phaseLabel = PHASE_LABELS_MAP[phase] || phase;
@@ -511,10 +546,16 @@ export const TrainingConstructor: React.FC<Props> = ({
           groups: [...new Set(s.exercises.map(e => e.muscle))],
           exercises: s.exercises.map(e => ({
             name: e.name, sets: e.sets, reps: String(e.workSets[0]?.reps || 10),
-            rir: e.rir, rest: e.workSets[0]?.restSeconds || 90,
+            rir: e.rir,
+            rest: e.workSets[0]?.restSeconds || e.restSeconds || 90,
             weight: Math.round(e.workSets[0]?.weight || 80),
             group: e.muscle, role: e.role === 'primary' ? 'main' : 'accessory',
             pattern: e.workSets[0]?.technique || '',
+            tempo: e.workSets[0]?.tempo || e.tempoSpec,
+            restSeconds: e.workSets[0]?.restSeconds || e.restSeconds,
+            character: e.character,
+            muscleTarget: e.muscle,
+            technique: e.workSets[0]?.technique,
           })),
           corrections: [s.character + ' · ' + (s.sessionTag || '')],
         }));
@@ -526,7 +567,10 @@ export const TrainingConstructor: React.FC<Props> = ({
         '🤖 Сгенерировано BB-движком (bb-builder.engine)',
         `📐 Сплит: ${SPLIT_PATTERNS.find(p => p.id === bbSplitId)?.name || bbSplitId}`,
         `📈 Стратегия: ${bbLoadStrategy.replace(/_/g, ' ')}`,
-        `📅 ${mesoLength} нед · ${tprofile.weakPoints?.length ? 'слабые: ' + tprofile.weakPoints.join(', ') : 'без слабых групп'}`,
+        `📅 ${mesoLength} нед · ${effectiveWeak.length ? 'слабые: ' + effectiveWeak.join(', ') : 'без слабых групп'}`,
+        ...(bbFocusGroup ? [`🎯 Фокус-группа: ${bbFocusGroup} (+20% MAV)`] : []),
+        ...(manualCfg.bbSpecialization === 'on' ? ['🎯 Блок специализации: слабые на MAV+10%, остальные на MEV (поддержка)'] : []),
+        ...(bbAutoDeload && deloadWeeks.size > 0 ? [`🔄 Авто-делод (${manualCfg.bbDeloadType || 'pump'}): нед ${[...deloadWeeks].join(', ')} по ACWR>1.3`] : []),
         ...(pedAdapt ? [`💉 PED-адаптация MRV×${pedAdapt.combinedMrvMultiplier.toFixed(2)}`] : []),
       ];
 
@@ -538,6 +582,7 @@ export const TrainingConstructor: React.FC<Props> = ({
         weeks: bbWeeks,
         currentWeek: firstW?.weekNumber || 1,
         mesoLength,
+        bbMeta: { generator: 'bb_split', bbPatternId: bbSplitId, bbLoadStrategy: bbLoadStrategy },
       });
       setWizardStep(6);
       return;
@@ -549,7 +594,7 @@ export const TrainingConstructor: React.FC<Props> = ({
       const cycle = getCycleById(bbCycleId);
       if (!cycle) { alert('BB-цикл не выбран'); return; }
       const bbLoadStrategy = (manualCfg.bbLoad || 'double_progression') as LoadStrategy;
-      const bbPeds: PED[] = tprofile.onCourse ? ['AAS'] : [];
+      const bbPeds: PED[] = (tprofile as any).bbPeds?.length ? (tprofile as any).bbPeds : (tprofile.onCourse ? ['AAS'] : []);
       const cycleWeeks = cycle.meta.weeks;
       if (cycleWeeks !== mesoLength) setMesoLength(cycleWeeks);
       const plan = convertCycleToBBPlan({
@@ -560,8 +605,8 @@ export const TrainingConstructor: React.FC<Props> = ({
         loadStrategy: bbLoadStrategy,
       });
 
-      // Convert Cycle → ManualResult
-      const bbWeeks: ManualWeek[] = plan.weeks.map(w => {
+// Convert Cycle → ManualResult (с сохранением BB-специфичных полей)
+       const bbWeeks: ManualWeek[] = plan.weeks.map(w => {
         const phase = phaseForCycleWeek(w.week, cycle);
         const phaseLabel = PHASE_LABELS_MAP[phase] || phase;
         const days: ManualDay[] = w.sessions.map((s, si) => ({
@@ -569,10 +614,16 @@ export const TrainingConstructor: React.FC<Props> = ({
           groups: [...new Set(s.exercises.map(e => e.muscle))],
           exercises: s.exercises.map(e => ({
             name: e.name, sets: e.sets, reps: String(e.workSets[0]?.reps || 10),
-            rir: e.rir, rest: e.workSets[0]?.restSeconds || 90,
+            rir: e.rir,
+            rest: e.workSets[0]?.restSeconds || e.restSeconds || 90,
             weight: Math.round(e.workSets[0]?.weight || 80),
             group: e.muscle, role: e.role === 'primary' ? 'main' : 'accessory',
             pattern: e.workSets[0]?.technique || '',
+            tempo: e.workSets[0]?.tempo || e.tempoSpec,
+            restSeconds: e.workSets[0]?.restSeconds || e.restSeconds,
+            character: e.character,
+            muscleTarget: e.muscle,
+            technique: e.workSets[0]?.technique,
           })),
           corrections: [s.character + ' · ' + (s.sessionTag || '')],
         }));
@@ -600,6 +651,7 @@ export const TrainingConstructor: React.FC<Props> = ({
         weeks: bbWeeks,
         currentWeek: firstW?.weekNumber || 1,
         mesoLength: cycleWeeks,
+        bbMeta: { generator: 'bb_cycle', bbPatternId: manualCfg.cycle || '', bbLoadStrategy: bbLoadStrategy },
       });
       setWizardStep(6);
       return;
@@ -677,7 +729,7 @@ export const TrainingConstructor: React.FC<Props> = ({
   }, [generatedDays, generatedCorrections, manualCfg, mesoLength, deloadFreq, goal, rirWave, level, tprofile, labAnalysis, manualWorkMax, programData, programWeeks]);
 
   const buildProgramWeeks = useCallback((prog: FullProgram): ManualWeek[] => {
-    const wm: Record<string, number> = { chest: 100, back: 110, legs: 140, quads: 130, hamstrings: 80, glutes: 80, calves: 60, shoulders: 60, arms: 50, biceps: 40, triceps: 40, core: 60, abs: 60, traps: 50, forearms: 30, full: 80, ...tprofile.workMax, ...manualWorkMax };
+    const wm: Record<string, number> = { chest: 100, back: 110, legs: 140, quads: 130, hamstrings: 80, glutes: 80, calves: 60, shoulders: 60, arms: 50, biceps: 40, triceps: 40, core: 60, abs: 60, traps: 50, forearms: 30, full: 80, ...manualWorkMax, ...tprofile.workMax };
     return prog.weeks.map((pw) => {
       const days: ManualDay[] = pw.days.map((d: ProgramDay, di: number) => ({
         day: di + 1,
@@ -771,25 +823,64 @@ export const TrainingConstructor: React.FC<Props> = ({
 
   const labAdj = labTrainingAdjust(labAnalysis);
 
-  const [applyPayload, setApplyPayload] = useState<PlannerApply | null>(() => getPlannerApply());
-  useEffect(() => subscribePlannerApply(p => setApplyPayload(p)), []);
+  const lastAppliedTs = useRef<number>(-1);
+  const [applyPayload, setApplyPayload] = useState<PlannerApply | null>(() => {
+    const p = getPlannerApply();
+    return p && Date.now() - p.ts < 10 * 60 * 1000 ? p : null;
+  });
+  useEffect(() => subscribePlannerApply(p => {
+    if (p && p.ts !== lastAppliedTs.current) setApplyPayload(p);
+  }), []);
   const pendingApplyRef = useRef<PlannerApply | null>(null);
   const applyExternal = useCallback(() => {
     const p = getPlannerApply();
     if (!p) return;
     const mrvBase = getMrv(level, tprofile.onCourse, tprofile.courseIntensity, labAdj.mrvMultiplier);
-    if (p.kind === 'split' && p.data?.cycle) {
-      const cycle: string[][] = p.data.cycle;
-      const built = buildPlan(cycle, mrvBase);
-      const corrections: string[] = [
-        `🔗 Сплит применён из калькулятора: «${p.data.name || p.label}» (${cycle.length} дн).`,
-        `Структура дней: ${cycle.map((g, i) => 'Д' + (i + 1) + ':' + g.join('+')).join(' | ')}.`,
-        `Допустимый объём (MRV): ${Math.round(mrvBase)} сетов/нед на группу.`,
-        ...built.groupCorrections,
-      ];
-      const methodResult2 = applyMethodsToPlan(built.days as ManualDay[], manualCfg, manualWorkMax, goal, mrvBase);
-      corrections.push(...methodResult2.log);
-      setManualResult({ splitName: p.data.name || p.label || 'Сплит из калькулятора', corrections, days: methodResult2.days });
+    if (p.kind === 'split') {
+      if (p.data?.cycle) {
+        const cycle: string[][] = p.data.cycle;
+        const built = buildPlan(cycle, mrvBase);
+        const corrections: string[] = [
+          `🔗 Сплит применён из калькулятора: «${p.data.name || p.label}» (${cycle.length} дн).`,
+          `Структура дней: ${cycle.map((g, i) => 'Д' + (i + 1) + ':' + g.join('+')).join(' | ')}.`,
+          `Допустимый объём (MRV): ${Math.round(mrvBase)} сетов/нед на группу.`,
+          ...built.groupCorrections,
+        ];
+        const methodResult2 = applyMethodsToPlan(built.days as ManualDay[], manualCfg, manualWorkMax, goal, mrvBase);
+        corrections.push(...methodResult2.log);
+        setManualResult({ splitName: p.data.name || p.label || 'Сплит из калькулятора', corrections, days: methodResult2.days });
+      } else if (Array.isArray(p.data)) {
+        // Flat-список упражнений из «Мои планы» → распределяем по дням недели
+        const exList = p.data as { name: string; sets: number; reps: number; rir: number }[];
+        if (exList.length === 0) { clearPlannerApply(); setApplyPayload(null); return; }
+        const perDay = Math.max(1, Math.ceil(exList.length / Math.max(1, daysPerWeek)));
+        const days: ManualDay[] = Array.from({ length: Math.max(1, daysPerWeek) }, (_, di) => {
+          const chunk = exList.slice(di * perDay, di * perDay + perDay);
+          return {
+            day: di + 1,
+            groups: [...new Set(chunk.map(e => detectGroup(e.name)))],
+            exercises: chunk.map(e => {
+              const g = detectGroup(e.name);
+              return {
+                name: e.name,
+                sets: e.sets || 3,
+                reps: String(e.reps || 10),
+                rir: e.rir ?? 2,
+                rest: 120,
+                group: g,
+                weight: Math.round((manualWorkMax[g] || manualWorkMax['legs'] || 80) * 0.8),
+                role: 'main' as const,
+                tempo: '2-0-1-0',
+              } as ManualExercise;
+            }),
+          };
+        });
+        const corrections: string[] = [
+          `🔗 План «${p.label}» загружен из «Мои планы»: ${exList.length} упражнений → ${days.length} дн.`,
+          `Допустимый объём (MRV): ${Math.round(mrvBase)} сетов/нед на группу.`,
+        ];
+        setManualResult({ splitName: p.label || 'План из «Мои планы»', corrections, days });
+      }
     } else if (p.kind === 'pri') {
       const mult = (p.data?.volumeMult ?? 1) as number;
       const rirShift = (p.data?.rirShift ?? 0) as number;
@@ -808,10 +899,39 @@ export const TrainingConstructor: React.FC<Props> = ({
       setWeakPoints(groups);
       pendingApplyRef.current = p;
     } else if (p.kind === 'pm') {
-      const pm = p.data || {};
-      if (pm.lift && pm.value) { setManualWorkMax(w => ({ ...w, legs: pm.lift === 'squat' ? pm.value : w.legs, chest: pm.lift === 'bench' ? pm.value : w.chest, back: pm.lift === 'dead' ? pm.value : w.back })); }
-      else { setManualWorkMax(w => ({ ...w, legs: pm.squat || w.legs, chest: pm.bench || w.chest, back: pm.dead || w.back })); }
-      pendingApplyRef.current = p;
+      const d = p.data || {};
+      const sq = (d.squat ?? (d.lift === 'squat' ? d.value : 0) ?? 0) as number;
+      const bn = (d.bench ?? (d.lift === 'bench' ? d.value : 0) ?? 0) as number;
+      const dl = (d.dead ?? (d.lift === 'dead' ? d.value : 0) ?? 0) as number;
+      if (sq || bn || dl) {
+        const base = { ...(tprofile.workMax || {}), ...manualWorkMax };
+        const wm: Record<string, number> = {
+          ...base,
+          legs: sq || base.legs || 140,
+          quads: Math.round((sq || base.legs || 140) * 0.95) || base.quads || 130,
+          hamstrings: Math.round((dl || base.back || 110) * 0.65) || base.hamstrings || 80,
+          glutes: Math.round((sq || base.legs || 140) * 0.6) || base.glutes || 80,
+          chest: bn || base.chest || 100,
+          back: dl || base.back || 110,
+          traps: Math.round((dl || base.back || 110) * 0.4) || base.traps || 50,
+          shoulders: Math.round((bn || base.chest || 100) * 0.6) || base.sholders || 60,
+          arms: Math.round((bn || base.chest || 100) * 0.45) || base.arms || 50,
+          biceps: Math.round((bn || base.chest || 100) * 0.4) || base.biceps || 40,
+          triceps: Math.round((bn || base.chest || 100) * 0.4) || base.triceps || 40,
+          core: Math.round((bn || base.chest || 100) * 0.6) || base.core || 60,
+          abs: Math.round((bn || base.chest || 100) * 0.6) || base.abs || 60,
+          calves: Math.round((sq || base.legs || 140) * 0.45) || base.calves || 60,
+          forearms: Math.round((bn || base.chest || 100) * 0.3) || base.forearms || 30,
+        };
+        setManualWorkMax(wm);
+        updateTProfile({ workMax: wm });
+        const cycle = manualResult ? manualResult.days.map(dd => dd.groups) : [['full']];
+        const built = buildPlan(cycle, mrvOverride ?? 24, { currentReadiness: readinessSlider, targetTonnage, sequenceStrategy, workMaxOverride: wm });
+        setManualResult({ splitName: manualResult?.splitName || 'План с ПМ', corrections: [...(manualResult?.corrections || []), `🔗 ПМ применён: присед ${sq}→ноги/квад ${wm.quads}, жим ${bn}→грудь, тяга ${dl}→спина. Веса пересчитаны.`], days: built.days });
+        pendingApplyRef.current = null;
+      } else {
+        pendingApplyRef.current = p;
+      }
     } else if (p.kind === 'tempo') {
       setTempoAdjust(p.data ? { ...p.data } : null);
       if (manualResult) setManualResult({ ...manualResult, corrections: [...manualResult.corrections, `🔗 Темп применён ко всем упражнениям: ${p.data?.label || ''}.`] });
@@ -845,10 +965,11 @@ export const TrainingConstructor: React.FC<Props> = ({
     setWizardStep(6);
   }, [buildPlan, level, tprofile, labAdj, manualResult, mrvOverride, manualCfg, manualWorkMax, goal, applyMethodsToPlan]);
 
-  const mountedRef = useRef(false);
   useEffect(() => {
-    if (!mountedRef.current) { mountedRef.current = true; clearPlannerApply(); setApplyPayload(null); return; }
-    if (applyPayload) applyExternal();
+    if (applyPayload && applyPayload.ts !== lastAppliedTs.current) {
+      lastAppliedTs.current = applyPayload.ts;
+      applyExternal();
+    }
   }, [applyPayload]);
 
   useEffect(() => {
@@ -873,7 +994,10 @@ export const TrainingConstructor: React.FC<Props> = ({
     const selDays = daysPerWeek + 'дн';
     const selGoal = goal === 'mass' ? 'масса' : goal === 'strength' ? 'сила' : goal === 'powerlifting' ? 'пауэрлифтинг' : goal;
     const selLevel = level === 'beginner' ? 'нов' : level === 'intermediate' ? 'сред' : level === 'advanced' ? 'про' : level;
-    return `${selSplit} · ${selDays} · ${selGoal} · ${selLevel}${manualCfg.specialization ? ' · спец: ' + manualCfg.specialization.slice(0, 25) : ''}`;
+    const bbTags = manualCfg.generator === 'bb' || manualCfg.generator === 'bb_split' || manualCfg.generator === 'bb_cycle'
+      ? ` · BB[${manualCfg.bbSplit || manualCfg.bbCycle || ''}${manualCfg.bbVolGoal ? '/' + manualCfg.bbVolGoal : ''}${manualCfg.bbSpecialization === 'on' ? '/спец' : ''}]`
+      : '';
+    return `${selSplit} · ${selDays} · ${selGoal} · ${selLevel}${bbTags}`;
   }, [manualCfg.split, manualCfg.specialization, daysPerWeek, goal, level]);
 
   /* ─── Quality Score для step 5 (анализ) ─── */

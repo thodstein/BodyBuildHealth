@@ -301,7 +301,6 @@ export interface GuardrailContext {
   onCourse?: boolean;              // на ААС курсе
   inPCT?: boolean;                 // в ПКТ фазе
   e2Level?: number;                // эстрадиол
-  e2Sensitivity?: number;         // эстрадиоловая чувствительность
   hemoglobin?: number;             // гемоглобин
   hematocrit?: number;            // гематокрит
   hasHCG?: boolean;                // есть ХГЧ
@@ -335,8 +334,7 @@ export function checkGuardrail(
   ctx: GuardrailContext
 ): GuardrailResult | null {
   const id = substanceId.toLowerCase();
-  const e2Low = (ctx.e2Level != null && ctx.e2Level < 20) ||
-                  (ctx.e2Sensitivity != null && ctx.e2Sensitivity < 73);
+  const e2Low = (ctx.e2Level != null && ctx.e2Level < 20);
   const e2High = (ctx.e2Level != null && ctx.e2Level > 60);
 
   // 1. T-бустеры на курсе ААС — блок

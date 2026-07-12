@@ -80,6 +80,9 @@ export const CONFIG_LABELS: Record<string, string> = {
   periodization: 'периодизация', progression: 'прогрессия',
   intensity: 'интенсивность', technique: 'техника',
   volume: 'объём', frequency: 'частота', specialization: 'специализация',
+  generator: 'режим', bbSplit: 'BB-сплит', bbLoad: 'стратегия нагрузки',
+  bbCycle: 'BB-цикл', bbFocusGroup: 'фокус-группа', bbAutoDeload: 'авто-делод',
+  bbVolGoal: 'цель по объёму', bbDeloadType: 'тип делода', bbSpecialization: 'спец-блок',
 };
 
 export interface ManualDay {
@@ -120,6 +123,21 @@ export interface ManualExercise {
   warmupScheme?: { pct: number; reps: number; weight: number }[];
   /** Вес добивочного подхода (-20%) */
   backoffWeight?: number;
+  /** BB-специфичные поля (сохраняются при конвертации BBPlan→ManualResult) */
+  restSeconds?: number;
+  character?: 'тяж' | 'памп' | 'лёг';
+  muscleTarget?: string;
+  technique?: string;
+}
+
+/** Признак того, что ManualResult сгенерирован BB-движком */
+export interface ManualResultBBMeta {
+  /** Источник генерации: 'manual' | 'bb_split' | 'bb_cycle' | 'program' */
+  generator?: string;
+  /** ID BB-сплита (если BB-режим) */
+  bbPatternId?: string;
+  /** Стратегия нагрузки (если BB-режим) */
+  bbLoadStrategy?: string;
 }
 
 export interface ManualWeek {
@@ -140,6 +158,8 @@ export interface ManualResult {
   weeks?: ManualWeek[];
   currentWeek?: number;
   mesoLength?: number;
+  /** BB-метаданные (источник генерации, стратегия нагрузки) */
+  bbMeta?: ManualResultBBMeta;
 }
 
 export const DELOAD_OPTIONS: { value: number; label: string }[] = [

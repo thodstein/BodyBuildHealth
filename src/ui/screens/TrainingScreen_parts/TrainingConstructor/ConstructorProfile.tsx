@@ -61,6 +61,57 @@ export const ConstructorProfile: React.FC<Props> = ({
             { id: '24', label: '24 недели' },
           ]} />
       </div>
+
+      {/* ─── PED-выбор для BB-движка ─── */}
+      <div style={{
+        background: 'rgba(24,24,27,0.6)',
+        borderRadius: 12,
+        border: '1px solid rgba(168,85,247,0.08)',
+        padding: 12,
+        marginBottom: 10,
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>💉 PED для BB-движка</div>
+        <div style={{ fontSize: 9, color: DIM, marginBottom: 8 }}>
+          Определяет, какие PED влияют на адаптацию MRV в BB-плане. Базовый курс (ААС) задаётся в профиле выше.
+        </div>
+        <PedToggle tprofile={tprofile} updateTProfile={updateTProfile} />
+      </div>
     </>
+  );
+};
+
+const PED_OPTIONS: { id: string; label: string; color: string }[] = [
+  { id: 'AAS', label: '💪 ААС', color: '#ef4444' },
+  { id: 'GH', label: '🌱 ГР', color: '#22c55e' },
+  { id: 'INSULIN', label: '💉 Инсулин', color: '#3b82f6' },
+  { id: 'IGF', label: '🔬 IGF-1', color: '#a855f7' },
+  { id: 'CLEN', label: '🔥 Клен', color: '#f59e0b' },
+  { id: 'T3', label: '🦋 Т3', color: '#06b6d4' },
+];
+
+const PedToggle: React.FC<{ tprofile: TrainingProfile; updateTProfile: (p: Partial<TrainingProfile>) => void }> = ({ tprofile, updateTProfile }) => {
+  const currentPeds = (tprofile as any).bbPeds as string[] | undefined;
+  const toggle = (ped: string) => {
+    const current = currentPeds || (tprofile.onCourse ? ['AAS'] : []);
+    const next = current.includes(ped) ? current.filter(p => p !== ped) : [...current, ped];
+    updateTProfile({ bbPeds: next } as any);
+  };
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+      {PED_OPTIONS.map(p => {
+        const active = (currentPeds || (tprofile.onCourse ? ['AAS'] : [])).includes(p.id);
+        return (
+          <button key={p.id} onClick={() => toggle(p.id)} style={{
+            padding: '5px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700,
+            border: '1px solid ' + (active ? p.color : 'rgba(255,255,255,0.08)'),
+            background: active ? p.color + '20' : 'rgba(255,255,255,0.03)',
+            color: active ? p.color : 'rgba(255,255,255,0.5)',
+            transition: 'all 0.15s',
+          }}>
+            {p.label}
+          </button>
+        );
+      })}
+    </div>
   );
 };

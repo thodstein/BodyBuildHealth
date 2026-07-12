@@ -41,8 +41,9 @@ export const SupportManualPicker: React.FC<ManualPickerProps> = ({
   const [favSearch, setFavSearch] = React.useState('');
 
   const catSubs = React.useMemo(() => {
-    return catalogSupport.filter((s: any) => !search || (s.name||'').toLowerCase().includes(search.toLowerCase()) || (s.id||'').toLowerCase().includes(search.toLowerCase()));
-  }, [catalogSupport, search]);
+    const source = catalogSubstances.length > 0 ? catalogSubstances : catalogSupport;
+    return source.filter((s: any) => !search || (s.name||'').toLowerCase().includes(search.toLowerCase()) || (s.id||'').toLowerCase().includes(search.toLowerCase()));
+  }, [catalogSubstances, catalogSupport, search]);
 
   const favIds = React.useMemo(() => {
     try { return JSON.parse(localStorage.getItem('he_support_favorites') || '[]') as string[]; } catch { return []; }
@@ -131,13 +132,13 @@ export const SupportManualPicker: React.FC<ManualPickerProps> = ({
                 width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box', marginBottom:8,
               }} />
               <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:4 }}>
-                {search ? `Найдено: ${catSubs.length}` : `Всего: ${catalogSupport.length} препаратов`}
+                {search ? `Найдено: ${catSubs.length}` : `Всего: ${catSubs.length} препаратов`}
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'45vh', overflowY:'auto', marginBottom:8 }}>
                 {catSubs.length === 0 ? (
                   <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:11 }}>Ничего не найдено</div>
                 ) : (
-                  catSubs.slice(0, 100).map((s: any) => {
+                  catSubs.map((s: any) => {
                     const isSel = selected.includes(s.id);
                     const alreadyIn = enhancedSubs.includes(s.id) || SUPPORT_LEVELS[supportLevel]?.subs?.includes(s.id);
                     return (
@@ -168,7 +169,7 @@ export const SupportManualPicker: React.FC<ManualPickerProps> = ({
                   })
                 )}
               </div>
-              {catSubs.length > 100 && <div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'center', marginBottom:4 }}>Показаны первые 100. Уточните поиск.</div>}
+              {catSubs.length > 50 && <div style={{ fontSize:8, color:'var(--text-dim)', textAlign:'center', marginBottom:4 }}>Всего {catSubs.length} препаратов. Используйте поиск для фильтрации.</div>}
               <button onClick={() => { if (selected.length > 0) addToPlan(selected); }}
                 style={{ width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer',
                   background: selected.length > 0 ? 'var(--accent)' : 'rgba(255,255,255,0.05)',

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolCardio: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -12,6 +12,13 @@ export const SupportProtocolCardio: React.FC<{ s: Record<string, any> }> = ({ s 
                 <div style={{ fontSize:13, fontWeight:800, color:'#ef4444', marginBottom:2 }}>❤️ Кардиопротекция на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Протокол защиты сердечно-сосудистой системы: АД, липидный профиль, ремоделирование миокарда, тромбоз. Фазовый подход.</p>
               </div>
+
+              <StopBanner title="Критические СС-пороги — показание к остановке курса ААС" thresholds={[
+                'АД >160/100 мм рт.ст. — остановка курса ААС',
+                'ЛПВП <20 мг/дл — немедленная остановка курса',
+                'Гематокрит >54% — экстренное кровопускание/флеботомия',
+                'QTc >450 мс (м) / >460 мс (ж) или ГЛЖ >12 мм / ФВ <50% — остановка, консультация кардиолога',
+              ]} />
 
               {/* Sub-tabs */}
               <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
@@ -81,9 +88,9 @@ export const SupportProtocolCardio: React.FC<{ s: Record<string, any> }> = ({ s 
                       items:[
                         { name:'Амлодипин 💊', dose:'5-10 мг', timing:'Утро (добавить к сартану)', note:'⚠ Контроль АД на 3-5 день после добавления — риск ортостатической гипотензии. БКК + телмисартан. По назначению врача' },
                         { name:'Эзетимиб 💊', dose:'10 мг', timing:'Вечер', note:'Ингибитор NPC1L1 → ↓ всасывания холестерина. Эффективен в комбинации с розувастатином 5-10 мг (синергия +20%). Монотерапия — лишь −15-18% ЛПНП. По назначению врача' },
-                        { name:'NAC', dose:'1200-2400 мг', timing:'Утро + Вечер', note:'Антиоксидант эндотелия. ↑ NO биодоступность. ↓ окисленных ЛПНП. ↓ гомоцистеина' },
+                        { name:'NAC', dose:'1200-2400 мг', timing:'Утро + Вечер', note:'Антиоксидант эндотелия (восстановление глутатиона → опосредованное улучшение функции сосудов). ↓ окисленных ЛПНП. ↓ гомоцистеина' },
                         { name:'L-Карнитин', dose:'2-3 г', timing:'Утро натощак', note:'Энергия миокарда (β-окисление ЖК). Перорально — общеукрепляющее, поддержка метаболизма. В/в форма изучалась при ИМ (CEDIM), перорально — доказательная база ниже' },
-                        { name:'Ресвератрол', dose:'250-500 мг', timing:'Утро', note:'SIRT1-активатор. ↓ окисленных ЛПНП. ↑ NO. При приёме >3 мес — контроль креатинина (риск нефротоксичности при >500 мг/сут)' },
+                        { name:'Ресвератрол', dose:'250-500 мг', timing:'Утро', note:'SIRT1-активатор. ↓ окисленных ЛПНП. Умеренное улучшение эндотелиальной функции. При длительном приёме — контроль печёночных ферментов (АЛТ/АСТ)' },
                       ]
                     },
                     {

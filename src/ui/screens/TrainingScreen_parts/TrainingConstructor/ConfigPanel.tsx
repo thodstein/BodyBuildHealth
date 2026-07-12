@@ -252,6 +252,53 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
               ]} />
           </>
         )}
+        {manualCfg.generator === 'bb_split' && (
+          <>
+            <Sel label="Фокус-группа" value={manualCfg.bbFocusGroup || ''} onChange={v => setManual('bbFocusGroup', v)}
+              options={[
+                { id: '', label: '—' },
+                ...groups.map(g => ({ id: g.id, label: g.label + ' (×1.2 MAV)' })),
+              ]} hint="Отстающая группа получит +20% объёма" />
+            <Sel label="Цель по объёму" value={manualCfg.bbVolGoal || 'mav'} onChange={v => setManual('bbVolGoal', v)}
+              options={[
+                { id: 'mev', label: 'MEV — минимальный объём', desc: 'Поддержание, восстановление' },
+                { id: 'mav', label: 'MAV — оптимальный объём (рекоменд.)', desc: 'Рост мышечной массы' },
+                { id: 'mrv', label: 'MRV — максимальный объём', desc: 'Для продвинутых, на курсе' },
+              ]} hint="Объём тренировочной нагрузки на мышцу" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: 9, fontWeight: 600, color: DIM, flex: 1 }}>🔄 Авто-делод по ACWR</span>
+              <button onClick={() => setManual('bbAutoDeload', manualCfg.bbAutoDeload === 'on' ? '' : 'on')}
+                style={{
+                  padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700,
+                  border: '1px solid ' + (manualCfg.bbAutoDeload === 'on' ? ACCENT : 'rgba(255,255,255,0.1)'),
+                  background: manualCfg.bbAutoDeload === 'on' ? ACCENT + '20' : 'transparent',
+                  color: manualCfg.bbAutoDeload === 'on' ? ACCENT : DIM,
+                }}>
+                {manualCfg.bbAutoDeload === 'on' ? '✓ ВКЛ' : '✗ ВЫКЛ'}
+              </button>
+            </div>
+            {manualCfg.bbAutoDeload === 'on' && (
+              <Sel label="Тип делода" value={manualCfg.bbDeloadType || 'pump'} onChange={v => setManual('bbDeloadType', v)}
+                options={[
+                  { id: 'pump', label: 'Пампинг-делод (лёгкие веса)', desc: 'Объём −50%, RIR 4, веса 50%' },
+                  { id: 'strength', label: 'Силовой делод', desc: 'Объём −60%, веса 80%, RIR 3' },
+                  { id: 'rest', label: 'Полный отдых', desc: 'Объём −80%, только разминка' },
+                ]} hint="Стратегия разгрузочной недели" />
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: 9, fontWeight: 600, color: DIM, flex: 1 }}>🎯 Блок специализации</span>
+              <button onClick={() => setManual('bbSpecialization', manualCfg.bbSpecialization === 'on' ? '' : 'on')}
+                style={{
+                  padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700,
+                  border: '1px solid ' + (manualCfg.bbSpecialization === 'on' ? '#ec4899' : 'rgba(255,255,255,0.1)'),
+                  background: manualCfg.bbSpecialization === 'on' ? '#ec489920' : 'transparent',
+                  color: manualCfg.bbSpecialization === 'on' ? '#ec4899' : DIM,
+                }}>
+                {manualCfg.bbSpecialization === 'on' ? '✓ ВКЛ' : '✗ ВЫКЛ'}
+              </button>
+            </div>
+          </>
+        )}
       </ConfigSection>
 
       {/* ─── ВЫБРАННЫЕ ПАРАМЕТРЫ ─── */}
