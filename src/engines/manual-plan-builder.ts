@@ -187,7 +187,12 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
     for (const g of groups) {
       const isPrimary = groups.indexOf(g) === 0;
       const cc = isPrimary ? 3 + (isWeak(g) ? 1 : 0) : 2 + (isWeak(g) ? 1 : 0);
-      const poolLen = getExercisesByGroup(g).filter(e => equipment.length === 0 || equipment.includes(e.equipment)).length;
+      const poolLen = getExercisesByGroup(g).filter(e => {
+        if (equipment.length === 0) return true;
+        const rawEq = (e as any).equipment;
+        const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
+        return exEq.length === 0 || exEq.some((eq: string) => equipment.includes(eq));
+      }).length;
       const cCount = Math.min(cc, poolLen);
       const maxSets = Math.min(4, Math.max(13, Math.ceil(mrv / (freqMap[g] || 1))));
       const expected = cCount * maxSets * 5;
@@ -326,7 +331,13 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
     let totalIsoExpected = 0;
     for (const g of groups) {
       const isoCount = (groups.indexOf(g) === 0 ? 2 + levelBoost + (isWeak(g) ? 1 : 0) : 2 + (level === 'advanced' || level === 'enhanced' ? (isWeak(g) ? 2 : 1) : 0));
-      const poolLen = getExercisesByGroup(g).filter(e => (equipment.length === 0 || equipment.includes(e.equipment)) && e.type === 'isolation').length;
+      const poolLen = getExercisesByGroup(g).filter(e => {
+        if (e.type !== 'isolation') return false;
+        if (equipment.length === 0) return true;
+        const rawEq = (e as any).equipment;
+        const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
+        return exEq.length === 0 || exEq.some((eq: string) => equipment.includes(eq));
+      }).length;
       const iCount = Math.min(isoCount, poolLen);
       const expected = iCount * 3 * 3;
       groupIsoExpected[g] = expected;

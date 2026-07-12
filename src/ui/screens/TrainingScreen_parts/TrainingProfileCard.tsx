@@ -78,6 +78,11 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
         const [injMuscle, setInjMuscle] = useState('chest');
         const [injFrom, setInjFrom] = useState('');
         const [injTo, setInjTo] = useState('');
+        const [injGraded, setInjGraded] = useState(false);
+        const [injExclude, setInjExclude] = useState(false);
+        const [injWeightPct, setInjWeightPct] = useState(80);
+        const [injVolPct, setInjVolPct] = useState(80);
+        const [injRepsCap, setInjRepsCap] = useState(12);
         const INJ_GROUPS: [string, string][] = [['chest','Грудь'],['back','Спина'],['legs','Ноги'],['shoulders','Плечи'],['arms','Руки'],['core','Кор']];
         return (
           <div>
@@ -97,7 +102,19 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
                 <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>До (опц)</label>
                 <input type="date" value={injTo} onChange={e => setInjTo(e.target.value)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 8px', fontSize: 11 }} />
               </div>
-              <button onClick={() => { if (!injFrom) return; update({ injuries: [...(profile.injuries || []), { muscle: injMuscle, from: injFrom, to: injTo || undefined }] }); setInjFrom(''); setInjTo(''); }} style={{ padding: '7px 12px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Добавить</button>
+              <div style={{ display: 'flex', gap: 6, marginTop: 4, alignItems: 'center', gridColumn: '1 / -1' }}>
+                <button onClick={() => { setInjGraded(!injGraded); setInjExclude(false); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 9, fontWeight: 700, cursor: 'pointer', border: injGraded ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)', background: injGraded ? 'rgba(245,158,11,0.1)' : 'transparent', color: injGraded ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>⚡ Щадящая</button>
+                <button onClick={() => { setInjExclude(!injExclude); setInjGraded(false); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 9, fontWeight: 700, cursor: 'pointer', border: injExclude ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.08)', background: injExclude ? 'rgba(239,68,68,0.1)' : 'transparent', color: injExclude ? '#ef4444' : 'rgba(255,255,255,0.4)' }}>⛔ Исключить</button>
+                {injGraded && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Вес {injWeightPct}% · Объём {injVolPct}% · Повт ≤{injRepsCap}</span>}
+              </div>
+              {injGraded && (
+                <div style={{ display: 'flex', gap: 6, gridColumn: '1 / -1', alignItems: 'center' }}>
+                  <input type="range" min={30} max={100} value={injWeightPct} onChange={e => setInjWeightPct(+e.target.value)} style={{ flex: 1 }} />
+                  <input type="range" min={30} max={100} value={injVolPct} onChange={e => setInjVolPct(+e.target.value)} style={{ flex: 1 }} />
+                  <input type="range" min={6} max={25} value={injRepsCap} onChange={e => setInjRepsCap(+e.target.value)} style={{ flex: 1 }} />
+                </div>
+              )}
+              <button onClick={() => { if (!injFrom) return; update({ injuries: [...(profile.injuries || []), { muscle: injMuscle, from: injFrom, to: injTo || undefined, exclude: injExclude ? true : undefined, weightPct: injGraded ? injWeightPct : undefined, volumePct: injGraded ? injVolPct : undefined, repsCap: injGraded ? injRepsCap : undefined }] }); setInjFrom(''); setInjTo(''); setInjGraded(false); setInjExclude(false); setInjWeightPct(80); setInjVolPct(80); setInjRepsCap(12); }} style={{ padding: '7px 12px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Добавить</button>
             </div>
             {(profile.injuries || []).length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

@@ -32,7 +32,7 @@ export interface TrainingProfile {
   pharmaCoursesCount: number;
   monthsSinceLastCourse: number;
   totalYearsOnPharma: number;
-  injuries: { muscle: string; from: string; to?: string }[];
+  injuries: { muscle: string; from: string; to?: string; weightPct?: number; volumePct?: number; repsCap?: number; exclude?: boolean }[];
 }
 
 export const DEFAULT_PROFILE: TrainingProfile = {

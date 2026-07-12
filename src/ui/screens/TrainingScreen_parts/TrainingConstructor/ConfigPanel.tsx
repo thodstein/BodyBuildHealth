@@ -7,7 +7,7 @@ import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from '../programs-data';
 import { getMethodsByCategory, type TrainingMethod } from '../../../../engines/training-methodology.engine';
 import { SPLIT_PATTERNS } from '../../../../engines/bb/bb-split-patterns';
 import { ACCENT, DIM, CONFIG_LABELS } from './types';
-import { DIRECTION_METHOD_MAP, getRecommendedMethods, getRecommendedMethodsForSplit } from '../../../../engines/cycle-method-map';
+import { DIRECTION_METHOD_MAP, getRecommendedMethods, getRecommendedMethodsForSplit, getRecommendedForMethods } from '../../../../engines/cycle-method-map';
 
 type DirFilter = 'all' | 'strength' | 'bodybuilding';
 
@@ -73,13 +73,21 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
     return new Set<string>();
   }, [selectedSplitId, selectedCycleId]);
 
-  // Объединённые рекомендации
+  // Объединённые рекомендации (направление + сплит + уже выбранные методики)
   const combinedRecommended = useMemo(() => {
     const s = new Set<string>();
     dirRecommended.forEach(v => s.add(v));
     splitRecommended.forEach(v => s.add(v));
+    // Совместимые с уже выбранными методиками
+    const selMeth = Object.entries(manualCfg)
+      .filter(([k, v]) => v && !['split', 'cycle', 'program', 'generator', 'bbSplit', 'bbLoad', 'bbCycle'].includes(k))
+      .map(([, v]) => v);
+    if (selMeth.length > 0) {
+      const methodRec = getRecommendedForMethods(selMeth);
+      methodRec.forEach(v => s.add(v));
+    }
     return s;
-  }, [dirRecommended, splitRecommended]);
+  }, [dirRecommended, splitRecommended, manualCfg]);
 
   // Фильтрация сплитов по направлению
   const filteredSplits = useMemo(() => {
