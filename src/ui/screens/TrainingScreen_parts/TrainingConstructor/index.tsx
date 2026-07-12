@@ -84,7 +84,7 @@ export const TrainingConstructor: React.FC<Props> = ({
   labAnalysis, setTab,
 }) => {
   const [wizardStep, setWizardStep] = useState(1);
-  const [readinessSlider, setReadinessSlider] = useState(tprofile.recovery || 70);
+  const [readinessSlider, setReadinessSlider] = useState((tprofile.recovery ?? 7) * 10);
   const [targetTonnage, setTargetTonnage] = useState<Record<string, number>>({});
 
   const [manualCfg, setManualCfg] = useState<Record<string, string>>({});

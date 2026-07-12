@@ -171,71 +171,86 @@ function buildSession(
   const exercises: BBExercise[] = [];
   
   // S-MRV: Системный бюджет утомления на день.
-  let dayFatigueBudget = Math.round(dailyCap * S_MRV_FACTOR * (pedAdapt?.combinedRecoveryMultiplier ?? 1));
+  const dayFatigueBudget = Math.round(dailyCap * S_MRV_FACTOR * (pedAdapt?.combinedRecoveryMultiplier ?? 1));
+  
+  // Pre-calculate each muscle's expected volume to allocate budget proportionally
+  interface MusclePlan {
+    muscle: string; resolved: string; role: 'primary' | 'accessory';
+    sets: number; exerciseCount: number; rir: number;
+    reps: number; weight: number; pool: any[]; exDatas: any[]; selType: string;
+  }
+  const plans: MusclePlan[] = [];
+  let totalExpectedFatigue = 0;
   
   for (const muscle of muscles) {
     const resolved = resolveCharacter(muscle, character);
-    
-    // роль: primary если мышца ещё не имела primary в ротации И (это тяж-сессия ИЛИ forced-тяж)
     let role: 'primary' | 'accessory' = 'accessory';
     if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж')) {
       role = 'primary'; musclePrimaryAssigned.add(muscle);
     }
-
-    // объём на эту мышцу в эту сессию
     const mavRot = muscleVolumeRotation[muscle] || 0;
-    const sessionsForMuscle = muscleSessionCount[muscle] || 1;
-    
     let sets = Math.max(1, Math.round(mavRot * (role === 'primary' ? 0.65 : 0.35)));
     if (isWeak(muscle, weakPoints)) sets = Math.round(sets * 1.2);
     if (focusGroup === muscle || (focusGroup && isWeak(muscle, [focusGroup]))) sets = Math.round(sets * 1.3);
-    
     const [rmin, rmax] = charReps(resolved);
     const rir = charRir(resolved, week);
     const wm = workMax[muscle] || PRO_WORKMAX_RATIO[muscle]?.(workMax) || 80;
     const pct = PCT_FOR_RIR[rir] ?? 0.9;
     const reps = Math.round((rmin + rmax) / 2);
     const weight = Math.round(wm * pct * 10) / 10;
-    
-    // SMART SELECTION: выбор 1-3 упражнений
-    const pool = getExercisesByGroup(catalogGroupFor(muscle));
     const exerciseCount = role === 'primary' ? (['back', 'quads', 'chest'].includes(muscle) ? 3 : 2) : 1;
-    // Мышечно-специфичный тип: calves/abs/forearms не имеют compound → всегда isolation
     const selType = ALWAYS_ISOLATION.has(muscle) ? 'isolation' : (role === 'primary' ? 'compound' : 'isolation');
+    const pool = getExercisesByGroup(catalogGroupFor(muscle));
     const selected = selectExercisesSmart({
       candidates: pool, muscleGroup: muscle, count: exerciseCount,
-      selectedIds: exercises.map(e => e.name).map(n => EXERCISE_CATALOG.find(ex => ex.name === n)?.id).filter(Boolean) as string[],
-      equipment: [], weakZones: weakPoints, level, injuryProfile: [], type: selType,
+      selectedIds: [], equipment: [], weakZones: weakPoints, level, injuryProfile: [], type: selType,
     });
     const exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5 }];
+    const expectedFatigue = exerciseCount * (sets / exerciseCount) * (((exDatas[0] as any)?.fatigueCost || 5));
+    totalExpectedFatigue += expectedFatigue;
+    plans.push({ muscle, resolved, role, sets, exerciseCount, rir, reps, weight, pool, exDatas, selType });
+  }
+
+  // Process each muscle with proportional budget
+  for (const pl of plans) {
+    const muscleBudget = totalExpectedFatigue > 0
+      ? Math.floor(dayFatigueBudget * pl.exerciseCount * Math.max(1, Math.round(pl.sets / pl.exerciseCount)) * ((pl.exDatas[0] as any)?.fatigueCost || 5) / totalExpectedFatigue)
+      : Math.floor(dayFatigueBudget / muscles.length);
+    let remainingBudget = Math.max(1, Math.min(muscleBudget, Math.floor(dayFatigueBudget * 0.5))); // cap at 50% total to avoid one group hogging
     
-    for (const exData of exDatas) {
-      // Распределить сеты между упражнениями
-      const exSets = Math.max(1, Math.round(sets / exDatas.length));
-      
-      // Проверка S-MRV: если упражнение слишком тяжёлое для остатка бюджета
-      const cost = (exData.fatigueCost || 5) * exSets;
-      if (dayFatigueBudget < cost) {
-        const reduced = Math.floor(dayFatigueBudget / (exData.fatigueCost || 5));
+    for (const exData of pl.exDatas) {
+      const exSets = Math.max(1, Math.round(pl.sets / pl.exDatas.length));
+      const cost = ((exData as any)?.fatigueCost || 5) * exSets;
+      if (remainingBudget < cost) {
+        const reduced = Math.floor(remainingBudget / ((exData as any)?.fatigueCost || 5));
         if (reduced < 1) continue;
-        sets -= (exSets - reduced);
+        const adjustedSets = Math.min(exSets, reduced);
+        const adjCost = ((exData as any)?.fatigueCost || 5) * adjustedSets;
+        remainingBudget -= adjCost;
+        const tempoSpec = tempoFor(pl.resolved as DayCharacter);
+        const restSeconds = REST_BY_CHARACTER[pl.resolved as DayCharacter];
+        const workSets: BBSet[] = Array.from({ length: adjustedSets }, () => ({
+          reps: pl.reps, rir: pl.rir, weight: pl.weight,
+          tempo: tempoSpec.notation, restSeconds,
+        }));
+        exercises.push({
+          muscle: pl.muscle, name: (exData as any).name, role: pl.role, character: pl.resolved as DayCharacter,
+          sets: adjustedSets, repsRange: [pl.reps - 2, pl.reps + 2], rir: pl.rir, workSets,
+          exerciseName: (exData as any).name, tempoSpec: tempoSpec.notation, restSeconds,
+        });
         continue;
       }
-      dayFatigueBudget -= cost;
-      
-      const tempoSpec = tempoFor(resolved);
-      const restSeconds = REST_BY_CHARACTER[resolved];
+      remainingBudget -= cost;
+      const tempoSpec = tempoFor(pl.resolved as DayCharacter);
+      const restSeconds = REST_BY_CHARACTER[pl.resolved as DayCharacter];
       const workSets: BBSet[] = Array.from({ length: exSets }, () => ({
-        reps, rir, weight,
-        tempo: tempoSpec.notation,
-        restSeconds,
+        reps: pl.reps, rir: pl.rir, weight: pl.weight,
+        tempo: tempoSpec.notation, restSeconds,
       }));
-      
       exercises.push({
-        muscle, name: exData.name, role, character: resolved, sets: exSets, repsRange: [rmin, rmax], rir, workSets,
-        exerciseName: exData.name,
-        tempoSpec: tempoSpec.notation,
-        restSeconds,
+        muscle: pl.muscle, name: (exData as any).name, role: pl.role, character: pl.resolved as DayCharacter,
+        sets: exSets, repsRange: [pl.reps - 2, pl.reps + 2], rir: pl.rir, workSets,
+        exerciseName: (exData as any).name, tempoSpec: tempoSpec.notation, restSeconds,
       });
     }
   }

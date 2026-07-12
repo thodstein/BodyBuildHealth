@@ -179,4 +179,71 @@ export const SaveButton: React.FC<{
   </button>;
 };
 
-export default { PopupNumber, PopupSelect, PopupText, ExpandableCard, MetricCard, SaveButton };
+// ═══ CalcSection — красивый контейнер-секция для калькуляторов ═══
+export const CalcSection: React.FC<{
+  icon: string; title: string; desc?: string; accent?: string; children: React.ReactNode;
+  /** Если true — сетка 2 колонки для содержимого */
+  grid2?: boolean;
+}> = ({ icon, title, desc, accent = ACCENT, children, grid2 }) => (
+  <div style={{
+    background: 'rgba(24,24,27,0.35)', borderRadius: 14,
+    border: `1px solid ${accent}18`, overflow: 'hidden', marginBottom: 10,
+  }}>
+    <div style={{
+      padding: '10px 12px 6px', display: 'flex', alignItems: 'center', gap: 8,
+    }}>
+      <span style={{ fontSize: 16 }}>{icon}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: accent }}>{title}</div>
+        {desc && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 1, lineHeight: 1.3 }}>{desc}</div>}
+      </div>
+    </div>
+    <div style={{
+      padding: grid2 ? 8 : '6px 10px 10px',
+      display: grid2 ? 'grid' : 'flex', flexDirection: grid2 ? undefined : 'column',
+      gridTemplateColumns: grid2 ? '1fr 1fr' : undefined, gap: 8,
+    }}>
+      {children}
+    </div>
+  </div>
+);
+
+// ═══ PopupToggle — переключатель on/off в виде красивой кнопки-карточки ═══
+export const PopupToggle: React.FC<{
+  label: string; value: boolean; onChange: (v: boolean) => void; icon?: string;
+}> = ({ label, value, onChange, icon }) => (
+  <button onClick={() => onChange(!value)} style={{
+    display: 'flex', alignItems: 'center', gap: 8,
+    padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+    background: value ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.03)',
+    border: value ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.06)',
+    color: value ? ACCENT : 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 700, width: '100%', textAlign: 'left' as const,
+  }}>
+    {icon && <span style={{ fontSize: 14 }}>{icon}</span>}
+    <span style={{ flex: 1 }}>{label}</span>
+    <span style={{
+      width: 20, height: 20, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: value ? ACCENT : 'rgba(255,255,255,0.1)', color: value ? '#000' : 'rgba(255,255,255,0.3)',
+      fontSize: 9, fontWeight: 800, transition: 'all 0.15s',
+    }}>
+      {value ? '✓' : '✕'}
+    </span>
+  </button>
+);
+
+// ═══ CalcResult — блок результата расчёта ═══
+export const CalcResult: React.FC<{
+  label: string; value: string; accent?: string; hint?: string;
+}> = ({ label, value, accent = ACCENT, hint }) => (
+  <div style={{
+    padding: '14px 16px', borderRadius: 12, textAlign: 'center',
+    background: `${accent}0d`, border: `1px solid ${accent}22`,
+    marginBottom: 10,
+  }}>
+    <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{label}</div>
+    <div style={{ fontSize: 22, fontWeight: 800, color: accent }}>{value}</div>
+    {hint && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginTop: 2, lineHeight: 1.3 }}>{hint}</div>}
+  </div>
+);
+
+export default { PopupNumber, PopupSelect, PopupText, ExpandableCard, MetricCard, SaveButton, CalcSection, PopupToggle, CalcResult };

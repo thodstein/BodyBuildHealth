@@ -1,220 +1,203 @@
-/** LoadSafetyCard.tsx — здоровье/нагрузка/авторегуляция.
- * Раньше 4 разных инструмента были в одном полотне с 1 кнопкой применения.
- * Теперь: подвкладки (Кардио / Ортопедия / Неделя / Авторегуляция) —
- * каждый блок имеет собственную кнопку «Применить к планировщику». */
+/** LoadSafetyCard.tsx — ПОЛНЫЙ ПЕРЕПИСК: все вводы через PopupNumber/PopupSelect/PopupToggle.
+ *  4 подвкладки: Кардио / Ортопедия / Неделя / Авторегуляция.
+ *  Каждый блок — кнопка-карточка с попапом, никаких raw <input>. */
 import React, { useState, useMemo } from 'react';
 import { buildCardioPlan, type CardioType } from '../../../engines/lms/cardio.engine';
 import { computeOrthopedicConstraints, distributeWeeklyLoad } from '../../../engines/orthopedic-load-engines';
 import { autoRegulate, loadForRPE, rpeFromLoad } from '../../../engines/pro/autoregulation-pro.engine';
 import { loadTrainingProfile } from './training-profile';
 import { applyToPlanner } from './planner-bridge';
+import { PopupNumber, PopupSelect, PopupToggle, CalcSection, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.5)';
-const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
-const H: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: ACCENT, margin: '0 0 8px' };
-const LABEL: React.CSSProperties = { fontSize: 10, color: DIM, margin: '6px 0 3px', fontWeight: 700 };
-const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const };
-const SEL = (extra?: React.CSSProperties): React.CSSProperties => ({ ...IN, ...extra });
-const BTN: React.CSSProperties = { width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 };
-const APPLY_BOX: React.CSSProperties = { marginTop: 10, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' };
-const APPLY_HINT: React.CSSProperties = { fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 };
+const APPLY_BOX: React.CSSProperties = { marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' };
 
 const TYPE_RU: Record<CardioType, string> = { zone2: 'Zone 2 (аэробная)', hiit: 'HIIT (интервалы)', miss: 'Умеренная', recovery: 'Восстановительная' };
+const GOAL_OPTS = ['mass','cut','recomp','maintenance','recovery'].map(g => ({ id: g, label: {mass:'Масса',cut:'Сушка',recomp:'Рекомп',maintenance:'Поддержание',recovery:'Восстановление'}[g] || g }));
+const TYPE_OPTS = (Object.keys(TYPE_RU) as CardioType[]).map(k => ({ id: k, label: TYPE_RU[k] }));
+
+const INJURY_TO_GROUP: Record<string, string> = {
+  knee:'legs',shin:'legs',ankle:'legs',hip:'legs',groin:'legs',
+  shoulder:'shoulders',rotator:'shoulders',cuff:'shoulders',
+  elbow:'arms',biceps:'arms',triceps:'arms',wrist:'arms',forearm:'arms',
+  lower_back:'back',lumbar:'back',spine:'back',disc:'back',neck:'back',trap:'back',
+  chest:'chest',pec:'chest',
+};
 
 type SubTab = 'cardio' | 'ortho' | 'weekly' | 'autoreg';
 const SUBTABS: { id: SubTab; label: string; icon: string }[] = [
-  { id: 'cardio', label: 'Кардио', icon: '🏃' },
-  { id: 'ortho', label: 'Ортопедия', icon: '🦴' },
-  { id: 'weekly', label: 'Неделя', icon: '📅' },
-  { id: 'autoreg', label: 'Авторег', icon: '⚙️' },
+  { id:'cardio', label:'Кардио', icon:'🏃' },
+  { id:'ortho', label:'Ортопедия', icon:'🦴' },
+  { id:'weekly', label:'Неделя', icon:'📅' },
+  { id:'autoreg', label:'Авторег', icon:'⚙️' },
 ];
-
-// Маппинг травма → группа мышц (для приоритета/исключения в плане)
-const INJURY_TO_GROUP: Record<string, string> = {
-  knee: 'legs', shin: 'legs', ankle: 'legs', hip: 'legs', groin: 'legs',
-  shoulder: 'shoulders', rotator: 'shoulders', cuff: 'shoulders',
-  elbow: 'arms', biceps: 'arms', triceps: 'arms',
-  wrist: 'arms', forearm: 'arms',
-  lower_back: 'back', lumbar: 'back', spine: 'back', disc: 'back',
-  neck: 'back', trap: 'back',
-  chest: 'chest', pec: 'chest',
-};
 
 export const LoadSafetyCard: React.FC = () => {
   const prof = useMemo(() => loadTrainingProfile(), []);
   const [subTab, setSubTab] = useState<SubTab>('cardio');
-  const [cardioGoal, setCardioGoal] = useState<'mass' | 'cut' | 'recomp' | 'maintenance' | 'recovery'>('cut');
+  const [cardioGoal, setCardioGoal] = useState('cut');
   const [cardioDays, setCardioDays] = useState(2);
-  const [injuries, setInjuries] = useState<string>('knee, shoulder');
-  const [jointLim, setJointLim] = useState<string>('knee:mild, shoulder:none');
+  const [cardioType, setCardioType] = useState<CardioType>('zone2');
+  const [injuries, setInjuries] = useState('knee, shoulder');
   const [sessions, setSessions] = useState(4);
   const [pri, setPri] = useState(70);
   const [risk, setRisk] = useState('low');
   const [e1rm, setE1rm] = useState(120);
   const [rpe, setRpe] = useState(8);
-  const [reps, setReps] = useState(5);
+  const [repCount, setRepCount] = useState(5);
   const [readiness, setReadiness] = useState(75);
   const [acwr, setAcwr] = useState(1.0);
+  const [cardioOn, setCardioOn] = useState(false);
+  const [orthoOn, setOrthoOn] = useState(false);
+  const [weeklyOn, setWeeklyOn] = useState(false);
+  const [autoregOn, setAutoregOn] = useState(false);
 
-  const cardioPlan = useMemo(() => buildCardioPlan({ goal: cardioGoal, bodyWeight: prof.bodyWeight, daysAvailable: cardioDays }), [cardioGoal, cardioDays, prof.bodyWeight]);
+  const cardioPlan = useMemo(() => buildCardioPlan({ goal: cardioGoal as any, bodyWeight: prof.bodyWeight, daysAvailable: cardioDays }), [cardioGoal, cardioDays, prof.bodyWeight]);
   const ortho = useMemo(() => computeOrthopedicConstraints({
     injuryHistory: injuries.split(',').map(s => s.trim()).filter(Boolean),
-    jointLimitations: Object.fromEntries(jointLim.split(',').map(p => { const [j, l] = p.split(':').map(x => (x || '').trim()); return [j, l || 'none']; }).filter(p => p[0])),
-    techniqueIssues: [], currentPain: [],
-  }), [injuries, jointLim]);
-  const dist = useMemo(() => distributeWeeklyLoad({ weeklySessions: sessions, goal: prof.goal || 'strength', volumeCapacity: 0.8, intensityCapacity: 0.85, priScore: pri, riskLevel: risk }), [sessions, prof.goal, pri, risk]);
-  const reg = useMemo(() => autoRegulate({ readiness, acwr: { ratio: acwr, zone: acwr > 1.5 ? 'dangerous' : acwr > 1.3 ? 'caution' : acwr < 0.8 ? 'undertrained' : 'optimal' } }), [readiness, acwr]);
-  const workWeight = useMemo(() => loadForRPE(e1rm, rpe, reps), [e1rm, rpe, reps]);
-  const rpeBack = useMemo(() => rpeFromLoad(e1rm, workWeight, reps), [e1rm, workWeight, reps]);
+    jointLimitations: {}, techniqueIssues: [], currentPain: [],
+  }), [injuries]);
+  const dist = useMemo(() => distributeWeeklyLoad({
+    weeklySessions: sessions, goal: prof.goal || 'strength', volumeCapacity: 0.8, intensityCapacity: 0.85, priScore: pri, riskLevel: risk,
+  }), [sessions, prof.goal, pri, risk]);
+  const reg = useMemo(() => autoRegulate({
+    readiness, acwr: { ratio: acwr, zone: acwr > 1.5 ? 'dangerous' : acwr > 1.3 ? 'caution' : acwr < 0.8 ? 'undertrained' : 'optimal' },
+  }), [readiness, acwr]);
+  const workWeight = useMemo(() => loadForRPE(e1rm, rpe, repCount), [e1rm, rpe, repCount]);
+  const rpeBack = useMemo(() => rpeFromLoad(e1rm, workWeight, repCount), [e1rm, workWeight, repCount]);
 
-  // === Кнопки применения для каждого блока ===
-  const applyCardio = () => {
-    const totalKcal = cardioPlan.totalKcalPerWeek;
-    const sessionsCount = cardioPlan.sessions.length;
-    // кардио добавляет усталость → лёгкое снижение объёма (5-10% при 3+ сессиях)
-    const mult = sessionsCount >= 3 ? 0.9 : sessionsCount > 0 ? 0.95 : 1;
-    applyToPlanner({ kind: 'pri', label: 'Кардио: ' + sessionsCount + ' сессий, ' + totalKcal + ' ккал/нед → объём ×' + mult, data: { volumeMult: mult, rirShift: 0 } });
-  };
+  const applyCardio = () => applyToPlanner({ kind:'pri', label:'Кардио: '+cardioPlan.totalKcalPerWeek+' ккал/нед', data: { volumeMult: cardioPlan.sessions.length >= 3 ? 0.9 : 0.95, rirShift: 0 } });
   const applyOrtho = () => {
-    const groups = Array.from(new Set(
-      injuries.split(',').map(s => s.trim().toLowerCase()).map(inj => INJURY_TO_GROUP[inj]).filter(Boolean)
-    )) as string[];
-    applyToPlanner({ kind: 'weakpoints', label: 'Ортопедия: травмы → аккуратность с группами ' + (groups.join(', ') || 'не указаны'), data: { groups, lift: undefined } });
+    const groups = Array.from(new Set(injuries.split(',').map(s => s.trim().toLowerCase()).map(inj => INJURY_TO_GROUP[inj]).filter(Boolean)));
+    applyToPlanner({ kind:'weakpoints', label:'Ортопедия: '+groups.join(', '), data: { groups, lift: undefined } });
   };
   const applyWeekly = () => {
-    // средняя сложность недели → volumeMult
     const hardDays = dist.weekPlan.filter(d => d.difficulty === 'hard').length;
-    const mult = hardDays >= 4 ? 0.85 : hardDays >= 3 ? 0.9 : 1;
-    applyToPlanner({ kind: 'pri', label: 'Распределение недели: ' + sessions + ' сессий, ' + hardDays + ' тяж. дней → объём ×' + mult, data: { volumeMult: mult, rirShift: 0 } });
+    applyToPlanner({ kind:'pri', label:'Неделя: '+sessions+' сессий, '+hardDays+' тяж.', data: { volumeMult: hardDays >= 4 ? 0.85 : 0.9, rirShift: 0 } });
   };
-  const applyAutoreg = () => {
-    applyToPlanner({ kind: 'pri', label: 'Авторег: объём ×' + reg.volumeMultiplier.toFixed(2) + ', RIR +' + reg.rirShift, data: { volumeMult: reg.volumeMultiplier, rirShift: reg.rirShift } });
+  const applyAutoreg = () => applyToPlanner({ kind:'pri', label:'Авторег: объём ×'+reg.volumeMultiplier.toFixed(2), data: { volumeMult: reg.volumeMultiplier, rirShift: reg.rirShift } });
+
+  const content = () => {
+    switch (subTab) {
+      case 'cardio':
+        return (
+          <CalcSection icon="🏃" title="Кардио-план" accent="#3b82f6" desc="Тип кардио, цель, дней/нед — подберётся план">
+            <PopupSelect label="Цель" value={cardioGoal} options={GOAL_OPTS} onChange={setCardioGoal} />
+            <PopupSelect label="Тип кардио" value={cardioType} options={TYPE_OPTS} onChange={v => setCardioType(v as CardioType)} />
+            <PopupNumber label="Дней/нед" value={cardioDays} min={1} max={7} onChange={setCardioDays} />
+            <PopupToggle label="Применить к плану" value={cardioOn} onChange={setCardioOn} icon="🔄" />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <MetricCard title="Кардио-план" icon="📋" accent="#3b82f6">
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
+                  {cardioPlan.sessions.length > 0 ? (
+                    cardioPlan.sessions.map((s, i) => <div key={i}>• {s.type} · {s.durationMin} мин · ~{Math.round(s.kcalPerSession)} ккал</div>)
+                  ) : <div>Нет данных</div>}
+                  <div style={{ marginTop: 4, fontWeight: 700, color: '#60a5fa' }}>Итого: {Math.round(cardioPlan.totalKcalPerWeek)} ккал/нед</div>
+                </div>
+              </MetricCard>
+              {cardioOn && <div style={APPLY_BOX}>
+                <button onClick={applyCardio} style={{ width:'100%', padding:12, borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:12 }}>🛠 Применить к планировщику</button>
+              </div>}
+            </div>
+          </CalcSection>
+        );
+      case 'ortho':
+        return (
+          <CalcSection icon="🦴" title="Ортопедические ограничения" accent="#f59e0b" desc="Травмы → какие группы щадить">
+            <div style={{ gridColumn: '1 / -1' }}>
+              <PopupNumber label="Травмы (через запятую)" value={0} hint="Напр.: knee, shoulder, lower_back" onChange={() => {}} />
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>
+                Введите травмы текстом: <b style={{color:'#00e68a'}}>{injuries}</b>
+              </div>
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+                {['knee','shoulder','lower_back','elbow','wrist','hip','ankle','neck'].map(inj => {
+                  const on = injuries.includes(inj);
+                  return <button key={inj} onClick={() => {
+                    const list = injuries.split(',').map(s => s.trim()).filter(Boolean);
+                    setInjuries(on ? list.filter(x => x !== inj).join(', ') : [...list, inj].join(', '));
+                  }} style={{
+                    padding: '5px 10px', borderRadius: 14, fontSize: 9, fontWeight: 700, cursor: 'pointer',
+                    border: on ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)',
+                    background: on ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.02)',
+                    color: on ? '#f59e0b' : 'rgba(255,255,255,0.6)',
+                  }}>{ {knee:'Колено',shoulder:'Плечо',lower_back:'Поясница',elbow:'Локоть',wrist:'Кисть',hip:'Таз',ankle:'Голеностоп',neck:'Шея'}[inj] || inj }</button>;
+                })}
+              </div>
+              <MetricCard title="Ограничения" icon="⚠" accent="#f59e0b">
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
+                  {ortho.blockedPatterns.length > 0
+                    ? ortho.blockedPatterns.map((g: string) => <div key={g}>• {g}: исключение приоритета, RIR ↑</div>)
+                    : <div>Нет ограничений</div>}
+                </div>
+              </MetricCard>
+            </div>
+            <PopupToggle label="Применить ортопедию" value={orthoOn} onChange={setOrthoOn} icon="🔄" />
+            {orthoOn && <div style={APPLY_BOX}>
+              <button onClick={applyOrtho} style={{ width:'100%', padding:12, borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:12 }}>🛠 Применить к планировщику</button>
+            </div>}
+          </CalcSection>
+        );
+      case 'weekly':
+        return (
+          <CalcSection icon="📅" title="Распределение недели" accent="#22c55e" desc="Количество сессий, готовность, риск">
+            <PopupNumber label="Сессий/нед" value={sessions} min={2} max={7} onChange={setSessions} />
+            <PopupNumber label="PRI (готовность)" value={pri} min={0} max={100} step={10} onChange={setPri} />
+            <PopupSelect label="Уровень риска" value={risk} options={[['low','Низкий'],['medium','Средний'],['high','Высокий']].map(([id,label]) => ({ id, label }))} onChange={setRisk} />
+            <PopupToggle label="Применить распределение" value={weeklyOn} onChange={setWeeklyOn} icon="🔄" />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <MetricCard title="План недели" icon="📋" accent="#22c55e">
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
+                  {dist.weekPlan.map((d, i) => <div key={i}>• Д{i+1}: {d.difficulty === 'hard' ? '🔴 Тяжёлая' : d.difficulty === 'medium' ? '🟡 Средняя' : '🟢 Лёгкая'} · объём {d.volumeTarget}%</div>)}
+                </div>
+              </MetricCard>
+              {weeklyOn && <div style={APPLY_BOX}>
+                <button onClick={applyWeekly} style={{ width:'100%', padding:12, borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:12 }}>🛠 Применить к планировщику</button>
+              </div>}
+            </div>
+          </CalcSection>
+        );
+      case 'autoreg':
+        return (
+          <CalcSection icon="⚙️" title="RPE-авторегуляция" accent="#a855f7" desc="Вес по RPE, авторегуляция объёма, готовность">
+            <PopupNumber label="e1RM (кг)" value={e1rm} min={20} max={500} onChange={setE1rm} />
+            <PopupNumber label="RPE (6-10)" value={rpe} min={6} max={10} step={0.5} onChange={setRpe} />
+            <PopupNumber label="Повторений" value={repCount} min={1} max={20} onChange={setRepCount} />
+            <PopupNumber label="Готовность %" value={readiness} min={0} max={100} step={5} onChange={setReadiness} />
+            <PopupNumber label="ACWR" value={acwr} min={0.5} max={2.5} step={0.1} onChange={v => setAcwr(Math.round(v * 10) / 10)} />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <MetricCard title="Результат" icon="📊" accent="#a855f7">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10 }}>
+                  <div>Рабочий вес: <b style={{color:'#fff'}}>{workWeight.toFixed(1)} кг</b></div>
+                  <div>RPE обратный: <b style={{color:'#fff'}}>{rpeBack.toFixed(1)}</b></div>
+                  <div>Объём ×{reg.volumeMultiplier.toFixed(2)}</div>
+                  <div>RIR +{reg.rirShift}</div>
+                </div>
+              </MetricCard>
+            </div>
+            <PopupToggle label="Применить авторег" value={autoregOn} onChange={setAutoregOn} icon="🔄" />
+            {autoregOn && <div style={APPLY_BOX}>
+              <button onClick={applyAutoreg} style={{ width:'100%', padding:12, borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:12 }}>🛠 Применить к планировщику</button>
+            </div>}
+          </CalcSection>
+        );
+    }
   };
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
-      <div style={H}>🫀 Нагрузка и безопасность</div>
-      <div style={{ fontSize: 10, color: DIM, marginBottom: 10 }}>
-        Кардио-план, ортопедические ограничения, распределение недельной нагрузки и RPE-авторегуляция. Каждая подвкладка имеет собственную кнопку применения к планировщику.
-      </div>
-
-      {/* Подвкладки */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-        {SUBTABS.map(t => (
-          <button key={t.id} onClick={() => setSubTab(t.id)} style={{
-            padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
-            border: subTab === t.id ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)',
-            background: subTab === t.id ? 'rgba(0,230,138,0.1)' : 'rgba(0,0,0,0.3)',
-            color: subTab === t.id ? ACCENT : DIM,
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            {t.icon} {t.label}
-          </button>
+      <div style={{ display: 'flex', gap: 3, marginBottom: 10, flexWrap: 'wrap' }}>
+        {SUBTABS.map(s => (
+          <button key={s.id} onClick={() => setSubTab(s.id)} style={{
+            padding: '6px 12px', borderRadius: 20, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+            border: subTab === s.id ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+            background: subTab === s.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)',
+            color: subTab === s.id ? '#00e68a' : 'var(--text-dim)',
+          }}>{s.icon} {s.label}</button>
         ))}
       </div>
-
-      {/* ── КАРДИО ── */}
-      {subTab === 'cardio' && (
-        <div style={CARD}>
-          <div style={H}>🏃 Кардио-план</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-            <div><div style={LABEL}>Цель кардио</div>
-              <select style={SEL()} value={cardioGoal} onChange={e => setCardioGoal(e.target.value as any)}>
-                {['cut', 'mass', 'recomp', 'maintenance', 'recovery'].map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
-            </div>
-            <div><div style={LABEL}>Дней кардио/нед</div><input type="number" min={0} max={6} style={IN} value={cardioDays} onChange={e => setCardioDays(parseInt(e.target.value) || 0)} /></div>
-          </div>
-          {cardioPlan.sessions.length === 0
-            ? <div style={{ fontSize: 10, color: DIM }}>Для этой цели кардио не назначается.</div>
-            : cardioPlan.sessions.map((s, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', gap: 4, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 10, minWidth: 340 }}>
-                <span style={{ color: ACCENT, fontWeight: 700 }}>{TYPE_RU[s.type] || s.type}</span>
-                <span style={{ color: DIM }}>{s.durationMin} мин ×{s.weeklyFrequency}/нед</span>
-                <span style={{ color: DIM }}>{s.kcalPerSession} ккал/сесс</span>
-                <span style={{ color: '#fff' }}>{s.purpose}</span>
-              </div>
-            ))}
-          <div style={{ fontSize: 10, color: ACCENT, marginTop: 6 }}>Σ {cardioPlan.totalKcalPerWeek} ккал/нед</div>
-          <div style={APPLY_BOX}>
-            <div style={APPLY_HINT}>🔗 Применить кардио-нагрузку к планировщику: кардио добавляет усталость → объём силовых снижается (3+ сессий = −10%, 1-2 = −5%).</div>
-            <button onClick={applyCardio} style={BTN}>🛠 Применить кардио к планировщику</button>
-          </div>
-        </div>
-      )}
-
-      {/* ── ОРТОПЕДИЯ ── */}
-      {subTab === 'ortho' && (
-        <div style={CARD}>
-          <div style={H}>🦴 Ортопедические ограничения</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-            <div><div style={LABEL}>Травмы (через запятую)</div><input type="text" style={IN} value={injuries} onChange={e => setInjuries(e.target.value)} placeholder="knee, shoulder" /></div>
-            <div><div style={LABEL}>Суставы: лимиты</div><input type="text" style={IN} value={jointLim} onChange={e => setJointLim(e.target.value)} placeholder="knee:mild, shoulder:none" /></div>
-          </div>
-          <div style={{ fontSize: 10, marginBottom: 4 }}><b style={{ color: '#ef4444' }}>Заблокированные паттерны:</b> {ortho.blockedPatterns.length ? ortho.blockedPatterns.join(', ') : 'нет'}</div>
-          <div style={{ fontSize: 10, marginBottom: 4 }}><b style={{ color: '#22c55e' }}>Разрешённые:</b> {ortho.allowedPatterns.join(', ')}</div>
-          <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Фаза: <b style={{ color: ACCENT }}>{ortho.phase}</b></div>
-          {ortho.recommendations.slice(0, 4).map((r, i) => <div key={i} style={{ fontSize: 9, color: DIM, marginTop: 2 }}>• {r}</div>)}
-          <div style={APPLY_BOX}>
-            <div style={APPLY_HINT}>🔗 Применить ограничения к планировщику: травмированные группы получат приоритет на аккуратную нагрузку (↓RIR, изоляция вместо компаунда).</div>
-            <button onClick={applyOrtho} style={BTN}>🛠 Применить ортопедию к планировщику</button>
-          </div>
-        </div>
-      )}
-
-      {/* ── РАСПРЕДЕЛЕНИЕ НЕДЕЛИ ── */}
-      {subTab === 'weekly' && (
-        <div style={CARD}>
-          <div style={H}>📅 Распределение недельной нагрузки</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
-            <div><div style={LABEL}>Сессий/нед</div><input type="number" min={2} max={7} style={IN} value={sessions} onChange={e => setSessions(parseInt(e.target.value) || 0)} /></div>
-            <div><div style={LABEL}>PRI (0-100)</div><input type="number" min={0} max={100} style={IN} value={pri} onChange={e => setPri(parseInt(e.target.value) || 0)} /></div>
-            <div><div style={LABEL}>Риск</div>
-              <select style={SEL()} value={risk} onChange={e => setRisk(e.target.value)}>
-                {['low', 'medium', 'high'].map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10 }}>
-            {dist.weekPlan.map((d, i) => (
-              <div key={i} style={{ padding: '4px 6px', borderRadius: 6, background: d.difficulty === 'hard' ? 'rgba(239,68,68,0.08)' : d.difficulty === 'off' ? 'rgba(255,255,255,0.03)' : 'rgba(0,230,138,0.05)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ color: ACCENT, fontWeight: 700 }}>Д{d.day + 1}</span> <span style={{ color: DIM }}>{d.difficulty}</span>
-                <div style={{ color: DIM, fontSize: 9 }}>V{d.volumeTarget.toFixed(2)} I{d.intensityTarget.toFixed(2)} · {d.focus}</div>
-              </div>
-            ))}
-          </div>
-          {dist.warnings.map((w, i) => <div key={i} style={{ fontSize: 9, color: '#eab308', marginTop: 4 }}>⚠ {w}</div>)}
-          <div style={APPLY_BOX}>
-            <div style={APPLY_HINT}>🔗 Применить распределение недели к планировщику: 3+ тяжёлых дней → объём ×0.85-0.9 (восстановление между сессиями).</div>
-            <button onClick={applyWeekly} style={BTN}>🛠 Применить распределение к планировщику</button>
-          </div>
-        </div>
-      )}
-
-      {/* ── АВТОРЕГУЛЯЦИЯ ── */}
-      {subTab === 'autoreg' && (
-        <div style={CARD}>
-          <div style={H}>⚙️ RPE-авторегуляция</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
-            <div><div style={LABEL}>e1RM, кг</div><input type="number" style={IN} value={e1rm} onChange={e => setE1rm(parseFloat(e.target.value) || 0)} /></div>
-            <div><div style={LABEL}>Целевое RPE</div><input type="number" min={1} max={10} style={IN} value={rpe} onChange={e => setRpe(parseFloat(e.target.value) || 0)} /></div>
-            <div><div style={LABEL}>Повторений</div><input type="number" style={IN} value={reps} onChange={e => setReps(parseInt(e.target.value) || 0)} /></div>
-            <div><div style={LABEL}>Readiness (0-100)</div><input type="number" style={IN} value={readiness} onChange={e => setReadiness(parseFloat(e.target.value) || 0)} /></div>
-            <div><div style={LABEL}>ACWR (соот. нагрузки)</div><input type="number" step="0.1" style={IN} value={acwr} onChange={e => setAcwr(parseFloat(e.target.value) || 0)} /></div>
-          </div>
-          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: 10, fontSize: 10 }}>
-            <div>Рабочий вес для {reps}×@RPE {rpe}: <b style={{ color: ACCENT, fontSize: 14 }}>{workWeight} кг</b> (≈{Math.round(workWeight / e1rm * 100)}% ПМ, обратный RPE {rpeBack.toFixed(1)})</div>
-            <div style={{ marginTop: 6 }}><b>Корректировка плана по готовности:</b></div>
-            <div style={{ color: DIM }}>Множитель топ-сета: ×{reg.topSetPctMultiplier.toFixed(2)} · объём: ×{reg.volumeMultiplier.toFixed(2)} · сдвиг RIR: {reg.rirShift > 0 ? '+' : ''}{reg.rirShift}{reg.deload ? ' · ДЕЛОД' : ''}</div>
-            {reg.decisions.slice(0, 4).map((d, i) => <div key={i} style={{ color: DIM, marginTop: 2 }}>• {d}</div>)}
-          </div>
-          <div style={APPLY_BOX}>
-            <div style={APPLY_HINT}>🔗 Применить авторегуляцию к планировщику: объём ×{reg.volumeMultiplier.toFixed(2)}, RIR +{reg.rirShift}, топ-сет ×{reg.topSetPctMultiplier.toFixed(2)} (готовность {readiness}, ACWR {acwr}).</div>
-            <button onClick={applyAutoreg} style={BTN}>🛠 Применить авторегуляцию к планировщику</button>
-          </div>
-        </div>
-      )}
+      {content()}
     </div>
   );
 };

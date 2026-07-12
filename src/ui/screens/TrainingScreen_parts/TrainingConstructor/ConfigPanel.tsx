@@ -150,14 +150,19 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
       {/* ─── БАЗОВАЯ СТРУКТУРА ─── */}
       <ConfigSection title="🏗️ БАЗОВАЯ СТРУКТУРА" color="#60a5fa">
         <Sel label="Тип сплита" value={manualCfg.split || ''} onChange={v => setManual('split', v)}
-          options={filteredSplits.map(([id, s]: [string, any]) => ({ id, label: s.name, desc: s.desc }))}
-          hint="Набор групп по дням" />
+          options={filteredSplits.map(([id, s]: [string, any]) => {
+            const d = (s.direction || '').toLowerCase();
+            const dirTag = ['powerlifting','pl','strength','peaking_pl','bench','deadlift'].some(x => d.includes(x)) ? '🏋️' : ['bodybuilding','hypertrophy','peaking_bb','cutting'].some(x => d.includes(x)) ? '💪' : '';
+            const dirMatch = (d: string) => ['powerlifting','peaking_pl','bench','deadlift','pl','squat'].includes(d) ? 'strength' : (['bodybuilding','hypertrophy','peaking_bb','cutting','contest_prep'].includes(d)) ? 'bodybuilding' : 'both';
+            const isRec = directionFilter !== 'all' && (!s.direction || s.direction === 'both' || dirMatch(s.direction) === directionFilter);
+            return { id, label: (dirTag ? dirTag + ' ' : '') + s.name, desc: s.desc + (isRec ? ' · ★ Рекомендовано' : '') };
+          })} hint="Набор групп по дням" />
         <Sel label="Тип цикла" value={manualCfg.cycle || ''} onChange={v => setManual('cycle', v)}
-          options={filteredCycles.map((c: any) => ({
-            id: c.meta.id, label: c.meta.title,
-            desc: (c.meta.id.startsWith('block') ? 'Блок' : c.meta.id.startsWith('embed') ? 'Встроенная' : 'СРЦ') + ' · ' + c.meta.level +
-              ' · ' + normalizeCycleDirection(c.meta.direction),
-          }))} hint="Силовые циклы / блоки / встроенные" />
+          options={filteredCycles.map((c: any) => {
+            const catTag = c.meta.id.startsWith('cycle-bb') ? 'BB' : c.meta.id.startsWith('block') ? 'Блок' : c.meta.id.startsWith('embed') ? 'Встр' : c.meta.id.startsWith('src2') ? 'СРЦ2' : 'СРЦ';
+            const isRec = directionFilter !== 'all' && normalizeCycleDirection(c.meta.direction) === directionFilter;
+            return { id: c.meta.id, label: `[${catTag}] ${c.meta.title}`, desc: c.meta.level + ' · ' + normalizeCycleDirection(c.meta.direction) + (isRec ? ' · ★ Рекомендовано' : '') };
+          })} hint="Силовые циклы / блоки / встроенные" />
         <Sel label="Программа тренировок" value={manualCfg.program || ''} onChange={v => setManual('program', v)}
           options={filteredPrograms.map((p: any) => ({ id: p.id, label: p.name, desc: p.type + ' · ' + p.goal + ' · ' + p.level }))}
           hint="Готовые программы из библиотеки" />
