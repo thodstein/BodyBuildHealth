@@ -139,6 +139,8 @@ export interface SupportRecommendation {
   nutritionTips?: TierNutritionTip[];
   pedFlags?: PEDFlags;  // v5: warnings for UI (multi-oral, GH+ins, winny+oxy)
   contraindications?: import('../data/substance-contraindications').ContraAlert[];
+  protocolWarnings?: string[];   // H3/H4: клинические предупреждения (гипотония, кровотечение)
+  monitoringPlan?: string;       // H5: структурированный график лаб-мониторинга
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -615,6 +617,7 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
   if (peds.length === 0 && phase !== 'pct') return [];
 
   const intensity = computeIntensityFactor(peds);
+  const totalAAS = peds.filter(p => p.pClass.startsWith('aas_')).reduce((s, p) => s + (p.mgPerWeek ?? 0), 0);
   const result: PhaseAssignedDrug[] = [];
   const seen = new Set<string>();
   const add = (id: string, reason: string, trigger: string, category: TzCategory) => {
@@ -628,11 +631,11 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
 
   // ─── УРОВЕНЬ 1: БАЗА (при любом AAS) — dose-aware через intensity ───
   if (flags.hasAAS || flags.hasSarm) {
-    const telDose = doseByIntensity(20, 80, intensity);
+    const telDose = Math.round(doseByIntensity(20, 80, intensity) / 10) * 10;
     const tudcaDose = doseByIntensity(500, 1000, intensity) * (flags.hasOral17 ? 2 : 1);
     const nacDose = doseByIntensity(1200, 1800, intensity) * (flags.hasOral17 ? 1.5 : 1);
     const omegaDose = doseByIntensity(2, 4, intensity);
-    add('tadalafil', `Tadalafil 5 мг/день — PDE5i → вазодилатация + защита простаты`, 'PED в курсе', 'pharma');
+    add('tadalafil', `Tadalafil 5 мг/день — PDE5i → вазодилатация, эндотелий/АД`, 'PED в курсе', 'pharma');
     add('telmisartan', `Telmisartan ${telDose} мг — ARB + PPAR-γ (АД, инсулин-чувствительность)`, 'PED в курсе', 'pharma');
     add('agmatine', 'Agmatine 1 г 2р/день — eNOS → NO, инсулин-сенситайзер', 'PED в курсе', 'pharma');
     add('tudca', `TUDCA ${tudcaDose} мг — BSEP-зависимый желчеотток${flags.hasOral17 ? ' (×2 орал)' : ''}`, 'PED в курсе', 'hepatoprotector');
@@ -641,7 +644,8 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
     add('coq10', 'CoQ10 200 мг — митохондрии миокарда, кофактор', 'PED в курсе', 'antioxidant');
     add('tmg', 'TMG 1000 мг — донатор CH₃ → ↓ гомоцистеин (AAS ↑ Hcy)', 'PED в курсе', 'amino');
     add('taurine', 'Taurine 1000 мг — осмолит, кардиопротектор', 'PED в курсе', 'amino');
-    add('hcg', 'hCG 500 МЕ 2р/нед — клетки Лейдига', 'AAS в курсе', 'hormonal');
+    const hcgDose = totalAAS <= 500 ? '500 МЕ 2р/нед' : totalAAS <= 1000 ? '750 МЕ 2р/нед' : '1000 МЕ 2-3р/нед';
+    add('hcg', `hCG ${hcgDose} — клетки Лейдига (HPTA), поддержка ${totalAAS} мг/нед AAS`, 'AAS в курсе', 'hormonal');
   }
 
   // ─── ТЕСТОСТЕРОН-СПЕЦИФИКА (dose-aware anastrozole) ───
@@ -649,17 +653,22 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
     const testP = peds.find(p => p.pClass === 'aas_test');
     const testMg = testP?.mgPerWeek ?? 500;
     let aiDose = '0.5 мг 2р/нед';
-    if (testMg <= 250) aiDose = 'не нужно (или 0.25 мг при E2↑)';
-    else if (testMg <= 500) aiDose = '0.25-0.5 мг 2р/нед';
+    if (testMg <= 250) aiDose = '0.25 мг 2р/нед (лишь при E2>40)';
+    else if (testMg <= 500) aiDose = '0.25 мг 2р/нед';
     else if (testMg <= 1000) aiDose = '0.5 мг 2р/нед';
     else aiDose = '1 мг/день (титровать)';
     const hasOxy = peds.some(p => p.pClass === 'aas_oral_oxy');
     const oxyNote = hasOxy ? ' ⚠ Anadrol: AI НЕ работает при гино — нужен Tamoxifen (через «Усилить»)' : '';
-    add('anastrozole', `Anastrozole ${aiDose} — ⚠ ТОЛЬКО ПОД КОНТРОЛЕМ АНАЛИЗОВ (E2 20-40 pg/mL) [test ${testMg} мг/нед]${oxyNote}`, `Тестостерон ${testMg} мг/нед`, 'pharma');
+    add('anastrozole', `Anastrozole ${aiDose} — титровать к E2 20-40 pg/mL, НЕ подавлять <15 (боль в суставах, либидо↓)${oxyNote}`, `Тестостерон ${testMg} мг/нед`, 'pharma');
     add('pycnogenol', 'Pycnogenol 150 мг — eNOS + защита эндотелия', 'Тестостерон', 'antioxidant');
     add('citrulline', 'Citrulline 6 г — NO-предшественник', 'Тестостерон', 'amino');
     add('bergamot', 'Bergamot 500 мг — HMG-CoA редуктаза (липиды)', 'Тестостерон', 'cardioprotector');
     add('astaxanthin', 'Astaxanthin 4 мг — липофильный антиоксидант', 'Тестостерон', 'antioxidant');
+  }
+
+  // ─── АРОМАТИЗИРУЮЩИЙ AAS БЕЗ ТЕСТОСТЕРОНА — эстроген-контроль (critical) ───
+  if (!flags.hasTest && (flags.hasNandrolone || flags.hasBold || flags.hasTren)) {
+    add('anastrozole', 'Anastrozole 0.25 мг 2р/нед — эстроген-контроль (nandrolone/boldenone ароматизируют); титровать к E2 20-40 pg/mL, НЕ подавлять <15', 'Ароматизирующий AAS без теста', 'pharma');
   }
 
   // ─── НАНДРОЛОН — особый профиль (progestagen, объём, либидо↓) ───
@@ -722,7 +731,7 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
 
   // ─── ОРАЛЫ 17α: общее + спец ───
   if (flags.hasOral17) {
-    add('milk_thistle', 'Milk thistle 280 мг — стабилизация мембран', 'Орал 17α', 'hepatoprotector');
+    add('milk_thistle', 'Milk thistle 600 мг — стабилизация мембран (силимарин)', 'Орал 17α', 'hepatoprotector');
   }
 
   // ─── WINSTROL special: липиды disaster + суставы ───
@@ -806,6 +815,58 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
   }
 
   return result;
+}
+
+// ── H3/H4: клинические предупреждения по комбинациям в протоколе ──
+function computeProtocolWarnings(protocolIds: string[], flags?: ReturnType<typeof derivePEDFlags>): string[] {
+  const ids = protocolIds.map(s => s.toLowerCase());
+  const has = (x: string) => ids.includes(x);
+  const w: string[] = [];
+  if (has('tadalafil') && has('telmisartan') && has('nebivolol')) {
+    w.push('⚠ ГИПОТОНИЯ: tadalafil + telmisartan + nebivolol одновременно — ежедневный контроль АД (цель систолическое >100 мм рт.ст.); при головокружении/слабости снизить дозу telmisartan или nebivolol');
+  }
+  if (has('tadalafil') && has('telmisartan') && !has('nebivolol')) {
+    w.push('⚠ ГИПОТОНИЯ: tadalafil + telmisartan — контроль АД (оба снижают); при добавлении небиволола риск усиливается');
+  }
+  const hasFib = has('serrapeptase') || has('nattokinase') || has('bromelain');
+  if (has('omega3') && hasFib) {
+    w.push('⚠ КРОВОТЕЧЕНИЕ: omega-3 3-6 г + фибринолитики (серрапептаза/наттокиназа/бромелайн) — отменить ЗА 1-2 нед до операции, инъекций, травмопасных тренировок; контроль времени кровотечения');
+  }
+  // CRITICAL: Winstrol + Anadrol — токсичный дуэт (гепато-/нефро- + липидный коллапс, AI не работает при гино)
+  if (flags?.isWinnyPlusOxy) {
+    w.push('🛑 WINSTROL + ANADROL: крайне гепатотоксичная и липидно-разрушительная комбинация (↓HDL до 50%+). Анастрозол НЕ работает при гинекомастии на оксиметолоне — нужен тамоксифен. Контроль АЛТ/АСТ каждые 2 нед, УЗИ печени, ЛНП/ЛПВП');
+  }
+  // CRITICAL: >1 орал 17α — кумулятивная гепатотоксичность
+  if (flags?.isMultiOral) {
+    w.push('🛑 МУЛЬТИ-ОРАЛ (несколько 17α-алкилированных): кумулятивная гепатотоксичность. Не держать >6-8 нед, АЛТ/АСТ каждые 2 нед, обязателен TUDCA+NAC+силимарин, при АЛТ>200 — СТОП');
+  }
+  // CRITICAL: ароматизирующий AAS без тестостерона → эстроген-контроль обязателен
+  if ((flags?.hasNandrolone || flags?.hasBold || flags?.hasTren) && !flags?.hasTest) {
+    w.push('⚠ Ароматизирующий AAS без базового тестостерона: nandrolone/boldenone ароматизируют в эстрадиол. Назначить анастрозол 0.25-0.5 мг 2р/нед (титровать к E2 20-40 пг/мл), контроль пролактина (nandrolone) и гинекомастии');
+  }
+  // MED: GH + инсулин — тяжёлый ИР + гипогликемия при инсулине
+  if (flags?.isGHPlusInsulin) {
+    w.push('⚠ GH + ИНСУЛИН: выраженная инсулинорезистентность + риск тяжёлой гипогликемии. Берберин 2 г + метформин, глюкоза натощак/постпрандиально каждые 4 нед; инсулин только после углеводной еды, иметь глюкозу под рукой');
+  }
+  return w;
+}
+
+// ── H5: структурированный график лабораторного мониторинга ──
+function buildMonitoringPlan(ctx: MapperCtx, flags: ReturnType<typeof derivePEDFlags>, phase: PhaseKey): string {
+  if (phase === 'pct') {
+    return 'Мониторинг ПКТ: ЛГ / ФСГ / общ. тестостерон / эстрадиол через 2 и 6 нед после отмены; при невосстановлении HPTA (>6 нед) — консультация врача';
+  }
+  const onPED = flags.hasAAS || flags.hasSarm || flags.hasGH || flags.hasInsulin || flags.hasIGF;
+  if (!onPED) return '';
+  const lines: string[] = [];
+  lines.push('• 0 нед (исходно): ОАК+БХ (АЛТ/АСТ/ГГТ/билирубин/ЩФ), липидограмма, эстрадиол, пролактин, ТТГ, глюкоза/HbA1c, АД, ЧСС');
+  if (flags.hasOral17) lines.push('• каждые 2-4 нед: АЛТ/АСТ (орал 17α — гепатотоксичность)');
+  else lines.push('• 4 нед: АД, ЧСС, HCT/гемоглобин, АЛТ/АСТ');
+  lines.push('• 8 нед: ОАК+БХ+липидограмма, эстрадиол, пролактин, ТТГ, УЗИ печени и предстательной железы');
+  lines.push('• 12 нед: как на 8 нед' + (flags.hasGH ? ' (+ глюкоза/HbA1c через 4 нед при GH)' : ''));
+  if (flags.hasInsulin || flags.hasGH) lines.push('• при GH/инсулине: глюкоза натощак + через 2 ч каждые 4 нед (риск гипер-/гипогликемии)');
+  lines.push('• внепланово при симптомах (головная боль, желтуха, отёки, гинекомастия, боль в груди, одышка)');
+  return lines.join('\n');
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -901,6 +962,8 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
   // ── 3. протокол специалиста-фармацевта (ПЕРВЫМ — обязательный стек) ─
   const protocolAll = computeProtocol(ctx);
   const protocolIds = protocolAll.map(pd => pd.substanceId);
+  const protocolWarnings = computeProtocolWarnings(protocolIds, pedFlags);
+  const monitoringPlan = buildMonitoringPlan(ctx, pedFlags, phase);
   const subs: RecommendedSub[] = [];
   const phaseDrugs: PhaseAssignedDrug[] = [];
   for (const pd of protocolAll) {
@@ -1138,7 +1201,7 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
           q: 'B',
           reason: `[БУСТЕР ${ab.label}] ${bs.reason}`,
           mechsCovered: [],
-          priority: 3,
+          priority: ab.key === 'stack' ? 1 : 3,
         });
       }
     }
@@ -1207,6 +1270,8 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     nutritionTips: tierAdj.nutrition,
     pedFlags,
     contraindications: checkContraindications(subs.map(s => s.substanceId), ctx.healthConditions),
+    protocolWarnings,
+    monitoringPlan,
   };
 }
 

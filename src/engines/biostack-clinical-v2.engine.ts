@@ -7,7 +7,9 @@ import {
   applyLabAdjustments,
   type LabAdjustment,
   type DrugSafetyExclusion,
+  type DrugSafetyTitration,
 } from './biostack-safety.engine';
+import { normalizeMechanisms } from './biostack-mechanism-normalizer';
 import { getCost } from './biostack-budget.engine';
 import type { LabCompositeResult } from './lab-analysis.engine';
 import { SUBSTANCE_ANALOGS, SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX } from '../data/support-meta';
@@ -97,23 +99,12 @@ const CONDITION_KEYWORDS: Record<string, string[]> = {
   pressure_low: ['гипотенз', 'давлен низ', 'гипотони'],
   diabetes: ['диабет', 'сахарн', 'гликем'],
   autoimmune: ['аутоим', 'иммуносупр', 'иммуносупресс'],
+  pregnancy: ['беременн', 'лактац', 'кормлен', 'грудн', 'гестац'],
+  bipolar: ['биполяр', 'маниакальн', 'мани', 'психоз', 'аффективн'],
+  glaucoma: ['глауком', 'внутриглазн', 'офтальмотонус'],
+  asthma: ['астм', 'бронхоспазм', 'бронхиальн', 'обструктивн'],
+  epilepsy: ['эпилепс', 'судорог', 'припад', 'порог судорожн'],
 };
-
-const ABSOLUTE_MARKERS = [
-  'противопоказ', 'нельзя', 'запрещ', 'обостр', 'беремен', 'тяжёл', 'тяжела',
-  'хпн', 'клиренс <30', 'клиренс<30', 'егфр', 'стеноз', 'астма', 'мао',
-  'варфарин', 'антикоагул', 'брадикард', 'av-блок', 'av блок', 'полная обструкц',
-  'рак', 'опухол', 'гемофили', 'кровотечен', 'психоз', 'саркоидоз', 'гиперкальцием',
-  'гипервитаминоз', 'миастени', 'судорожн', 'эпилепс',
-];
-
-function buildUserConditionKeywords(p: BioStackProfile): Set<string> {
-  const set = new Set<string>();
-  for (const c of p.healthConditions || []) {
-    for (const kw of CONDITION_KEYWORDS[c] || []) set.add(kw);
-  }
-  return set;
-}
 
 function buildUserMedTokens(p: BioStackProfile): string[] {
   const meds = [...(p.currentMeds || []), ...(p.avoidMeds || [])];
@@ -130,7 +121,6 @@ export function checkAbsoluteContraindications(
   profile: BioStackProfile,
 ): AbsoluteContraindication[] {
   const out: AbsoluteContraindication[] = [];
-  const condKw = buildUserConditionKeywords(profile);
   const medTokens = buildUserMedTokens(profile);
   const allergyKw = (profile.drugAllergies || []).map(a => a.toLowerCase().trim()).filter(a => a.length > 2);
   const avoidSet = new Set((profile.avoidIds || []).map(a => a.toLowerCase()));
@@ -150,17 +140,21 @@ export function checkAbsoluteContraindications(
     let hit: AbsoluteContraindication | null = null;
     for (const line of ci) {
       const low = line.toLowerCase();
-      // condition match
-      for (const kw of condKw) {
-        if (low.includes(kw) && ABSOLUTE_MARKERS.some(m => low.includes(m))) {
-          hit = { substanceId: id, substanceName: nameOf(id), reason: `Противопоказано при вашем состоянии: «${line}»`, source: 'condition' };
+      // condition match (structured by HealthCondition code):
+      // a catalog contraindication line maps to a condition code via the
+      // same keyword families used for user profiling, so detection is
+      // code-based rather than requiring a magic ABSOLUTE_MARKERS token.
+      for (const code of (profile.healthConditions || []) as string[]) {
+        const kws = CONDITION_KEYWORDS[code] || [];
+        if (kws.some(kw => low.includes(kw))) {
+          hit = { substanceId: id, substanceName: nameOf(id), reason: `Противопоказано при состоянии «${code}»: «${line}»`, source: 'condition' };
           break;
         }
       }
       if (hit) break;
       // med match
       for (const tok of medTokens) {
-        if (low.includes(tok) && ABSOLUTE_MARKERS.some(m => low.includes(m))) {
+        if (low.includes(tok)) {
           hit = { substanceId: id, substanceName: nameOf(id), reason: `Конфликт с принимаемым препаратом: «${line}»`, source: 'med' };
           break;
         }
@@ -425,15 +419,56 @@ export interface MeaningfulReplacement {
   gradeUpgrade: boolean;
 }
 
+// Whole-catalog analog fallback: when a substance has no curated
+// SUBSTANCE_ANALOGS entry, derive replacement candidates from any catalog
+// substance sharing normalized mechanisms or the same category. This lifts
+// analog coverage from the ~30 hand-curated entries to the entire catalog.
+function deriveAnalogsByMechanism(
+  originalId: string,
+  limit = 4,
+): { id: string; name: string; group: string; note: string }[] {
+  const orig = cat(originalId);
+  if (!orig) return [];
+  const origMech = new Set(normalizeMechanisms(orig.mechanisms || []));
+  const origCats = new Set((orig as any).category || []);
+  const results: { id: string; name: string; group: string; note: string; score: number }[] = [];
+  for (const [id, entry] of Object.entries(SUPPORT_CATALOG_DATA)) {
+    if (id.toLowerCase() === originalId.toLowerCase()) continue;
+    const e = entry as CatEntry;
+    const mech = normalizeMechanisms(e.mechanisms || []);
+    let shared = 0;
+    for (const m of mech) if (origMech.has(m)) shared++;
+    const cats = new Set((e as any).category || []);
+    let sharedCat = false;
+    for (const c of cats) if (origCats.has(c)) { sharedCat = true; break; }
+    if (shared === 0 && !sharedCat) continue;
+    results.push({
+      id,
+      name: nameOf(id),
+      group: sharedCat ? 'категория' : 'механизм',
+      note: `сходный механизм (${shared})`,
+      score: shared * 10 + mech.length,
+    });
+  }
+  results.sort((a, b) => b.score - a.score);
+  return results.slice(0, limit).map(({ id, name, group, note }) => ({ id, name, group, note }));
+}
+
 export function findMeaningfulReplacement(
   originalId: string,
   profile: BioStackProfile,
   excludedIds: string[] = [],
 ): MeaningfulReplacement | null {
-  const analogs: any = (SUBSTANCE_ANALOGS as any)?.[originalId];
-  if (!analogs || !Array.isArray(analogs) || !analogs.length) return null;
+  let analogs: any = (SUBSTANCE_ANALOGS as any)?.[originalId];
+  if (!analogs || !Array.isArray(analogs) || !analogs.length) {
+    analogs = deriveAnalogsByMechanism(originalId);
+  }
+  if (!analogs.length) return null;
 
-  const condKw = buildUserConditionKeywords(profile);
+  const condKw = new Set<string>();
+  for (const code of (profile.healthConditions || []) as string[]) {
+    for (const kw of (CONDITION_KEYWORDS[code] || [])) condKw.add(kw);
+  }
   const medTokens = buildUserMedTokens(profile);
   const avoidSet = new Set([...(profile.avoidIds || []), ...excludedIds].map(a => a.toLowerCase()));
 
@@ -450,8 +485,8 @@ export function findMeaningfulReplacement(
     let forbidden = false;
     for (const line of ci) {
       const low = line.toLowerCase();
-      if (condKw.size && [...condKw].some(kw => low.includes(kw) && ABSOLUTE_MARKERS.some(m => low.includes(m)))) { forbidden = true; break; }
-      if (medTokens.some(tok => low.includes(tok) && ABSOLUTE_MARKERS.some(m => low.includes(m)))) { forbidden = true; break; }
+      if (condKw.size && [...condKw].some(kw => low.includes(kw))) { forbidden = true; break; }
+      if (medTokens.some(tok => low.includes(tok))) { forbidden = true; break; }
     }
     if (forbidden) continue;
 
@@ -486,6 +521,7 @@ export interface SelectStackResult {
   ids: string[];
   hardStops: AbsoluteContraindication[];
   drugExclusions: DrugSafetyExclusion[];
+  drugTitrations: DrugSafetyTitration[];
   ulWarnings: { substanceId: string; name: string; totalDose: number; ul: number; percentUL: number; severity: string; message: string }[];
   labAdjustments: LabAdjustment[];
   schedule: DailyScheduleSlot[];
@@ -505,8 +541,10 @@ export function selectStack(
   const hardStopIds = new Set(hardStops.map(h => h.substanceId));
   let ids = candidateIds.filter(id => !hardStopIds.has(id));
 
-  // 2. drug–supplement exclusions (HIGH severity known interactions)
-  const drugExclusions: DrugSafetyExclusion[] = getSafeStackRecommendations(ids, profile.currentMeds || []).excluded;
+  // 2. drug–supplement exclusions (HIGH → exclude; MEDIUM → flag for titration)
+  const recs = getSafeStackRecommendations(ids, profile.currentMeds || []);
+  const drugExclusions: DrugSafetyExclusion[] = recs.excluded;
+  const drugTitrations: DrugSafetyTitration[] = recs.titrations;
   const exIds = new Set(drugExclusions.map(e => e.substanceId));
   ids = ids.filter(id => !exIds.has(id));
 
@@ -540,6 +578,7 @@ export function selectStack(
     ids,
     hardStops,
     drugExclusions,
+    drugTitrations,
     ulWarnings,
     labAdjustments,
     schedule,

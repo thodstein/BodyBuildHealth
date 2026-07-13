@@ -824,6 +824,7 @@ export const TrainingConstructor: React.FC<Props> = ({
   const labAdj = labTrainingAdjust(labAnalysis);
 
   const lastAppliedTs = useRef<number>(-1);
+  const [applyErr, setApplyErr] = useState<string | null>(null);
   const [applyPayload, setApplyPayload] = useState<PlannerApply | null>(() => {
     const p = getPlannerApply();
     return p && Date.now() - p.ts < 10 * 60 * 1000 ? p : null;
@@ -968,7 +969,13 @@ export const TrainingConstructor: React.FC<Props> = ({
   useEffect(() => {
     if (applyPayload && applyPayload.ts !== lastAppliedTs.current) {
       lastAppliedTs.current = applyPayload.ts;
-      applyExternal();
+      try {
+        applyExternal();
+        setApplyErr(null);
+      } catch (e) {
+        console.error('applyExternal error', e);
+        setApplyErr(e instanceof Error ? e.message : String(e));
+      }
     }
   }, [applyPayload]);
 
@@ -1099,6 +1106,12 @@ export const TrainingConstructor: React.FC<Props> = ({
       }}>
         {macrocycle ? '🔗 Макроцикл (цель: ' + macrocycle.goal + ')' : '✏️ Ручной режим'}: {buildPreview}
       </div>
+
+      {applyErr && (
+        <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', fontSize: 11, color: '#f87171', fontWeight: 700 }}>
+          ⚠ Ошибка применения: {applyErr}
+        </div>
+      )}
 
       {applyPayload && (
         <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.25)', fontSize: 11, color: ACCENT, fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

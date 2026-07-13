@@ -1,5 +1,6 @@
 import { SUPPORT_CATALOG_DATA as SUPPORT_CATALOG } from './support-catalog-data';
 import { LAB_MARKER_MAP } from './lab-marker-map';
+import { normalizeMechanisms } from '../engines/biostack-mechanism-normalizer';
 
 // ─── Reverse indexes from SUPPORT_CATALOG_DATA ───
 export const SUPPORT_CATALOG_DATA = SUPPORT_CATALOG;
@@ -14,8 +15,10 @@ export const LAB_MARKER_TO_SUPPORT: Record<string, { substanceId: string; mechan
   for (const [id, entry] of Object.entries(SUPPORT_CATALOG_DATA)) {
     ALL_SUPPORT_IDS.push(id);
     for (const m of entry.mechanisms || []) {
-      if (!MECHANISM_TO_SUPPORT[m]) MECHANISM_TO_SUPPORT[m] = [];
-      if (!MECHANISM_TO_SUPPORT[m].includes(id)) MECHANISM_TO_SUPPORT[m].push(id);
+      const canon = normalizeMechanisms([m])[0];
+      if (!canon) continue;
+      if (!MECHANISM_TO_SUPPORT[canon]) MECHANISM_TO_SUPPORT[canon] = [];
+      if (!MECHANISM_TO_SUPPORT[canon].includes(id)) MECHANISM_TO_SUPPORT[canon].push(id);
     }
     for (const o of entry.organs || []) {
       if (!ORGAN_TO_SUPPORT[o]) ORGAN_TO_SUPPORT[o] = [];
@@ -49,7 +52,8 @@ export const LAB_MARKER_TO_SUPPORT: Record<string, { substanceId: string; mechan
     }
     // Also find from mechanism index
     for (const mech of lm.mechanisms) {
-      const ids = MECHANISM_TO_SUPPORT[mech] || [];
+      const canon = normalizeMechanisms([mech])[0] || mech;
+      const ids = MECHANISM_TO_SUPPORT[canon] || [];
       for (const id of ids) {
         if (seen.has(id)) continue;
         seen.add(id);
@@ -71,13 +75,19 @@ export function getSupportEntry(id: string) {
 export function findByMechanisms(...mechs: string[]): string[] {
   if (mechs.length === 0) return [];
   const result = new Set<string>();
-  for (const m of mechs) for (const id of (MECHANISM_TO_SUPPORT[m] || [])) result.add(id);
+  for (const m of mechs) {
+    const canon = normalizeMechanisms([m])[0] || m;
+    for (const id of (MECHANISM_TO_SUPPORT[canon] || [])) result.add(id);
+  }
   return [...result];
 }
 
 export function findByMechanismSubset(mechs: string[], max: number = 6): string[] {
   const result = new Set<string>();
-  for (const m of mechs) for (const id of (MECHANISM_TO_SUPPORT[m] || [])) { result.add(id); if (result.size >= max) break; }
+  for (const m of mechs) {
+    const canon = normalizeMechanisms([m])[0] || m;
+    for (const id of (MECHANISM_TO_SUPPORT[canon] || [])) { result.add(id); if (result.size >= max) break; }
+  }
   if (result.size === 0) return [];
   return [...result].slice(0, max);
 }

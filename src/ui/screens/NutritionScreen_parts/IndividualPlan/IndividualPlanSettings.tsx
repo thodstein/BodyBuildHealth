@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FOOD_DB } from "../../../../core/nutrition-database";
 import { PHARMA_DB } from "../../../../core/pharma-database";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
@@ -162,9 +162,36 @@ export const IndividualPlanSettings: React.FC = () => {
   const specialMealTimingLabel = timingLabels[specialMealTiming] || specialMealTiming;
   const TIME_OPTIONS = Array.from({length:48},(_,i)=>{const h=Math.floor(i/2);const m=i%2===0?'00':'30';return{id:`${String(h).padStart(2,'0')}:${m}`,label:`${String(h).padStart(2,'0')}:${m}`};});
 
+  const [settingsSection, setSettingsSection] = useState<"quick" | "core" | "food" | "training" | "advanced">(() => {
+    try { return (localStorage.getItem("he_settings_section") as any) || "quick"; } catch { return "quick"; }
+  });
+  useEffect(() => { try { localStorage.setItem("he_settings_section", settingsSection); } catch {} }, [settingsSection]);
+  const SECTION_TABS: { id: typeof settingsSection; label: string }[] = [
+    { id: "quick", label: "⚡ Старт" },
+    { id: "core", label: "👤 Ядро" },
+    { id: "food", label: "🍎 Питание" },
+    { id: "training", label: "🏋️ Тренир" },
+    { id: "advanced", label: "⚙️ Эксперт" },
+  ];
+
   return (
     <>
+      {/* Section selector */}
+      <div style={{ display: "flex", gap: 3, padding: "4px 0 8px", overflowX: "auto", scrollbarWidth: "none" }}>
+        {SECTION_TABS.map(st => (
+          <button key={st.id} onClick={() => setSettingsSection(st.id)} style={{
+            flexShrink: 0, padding: "6px 12px", borderRadius: 16, cursor: "pointer",
+            fontSize: 9, fontWeight: settingsSection === st.id ? 700 : 500,
+            border: settingsSection === st.id ? "1px solid #00e68a" : "1px solid rgba(255,255,255,0.06)",
+            background: settingsSection === st.id ? "linear-gradient(135deg,#00e68a,#00c8a0)" : "#18181b",
+            color: settingsSection === st.id ? "#000" : "rgba(255,255,255,0.85)",
+            transition: "all 0.15s",
+          }}>{st.label}</button>
+        ))}
+      </div>
+
       {/* Pro Engine переключатель + быстрая кнопка генерации */}
+      {settingsSection === 'quick' && (
       <GlassCard title="🧬 Движок генерации" icon="🧬" color="#00e68a">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <button onClick={() => setUseProEngine(!useProEngine)} style={{
@@ -191,7 +218,9 @@ export const IndividualPlanSettings: React.FC = () => {
           boxShadow: '0 4px 16px rgba(0,230,138,0.2)',
         }}>✨ Сгенерировать план питания</button>
       </GlassCard>
+      )}
 
+      {settingsSection === 'core' && (
       <GlassCard title="Пользователь" icon="👤" color="#a78bfa">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
           <PopupNumber label="⚖️ Вес (кг)" value={weight} min={30} max={250} suffix="кг" onChange={setWeight} />
@@ -277,8 +306,10 @@ export const IndividualPlanSettings: React.FC = () => {
         )}
         <PopupNumber label="🍽 Голод/сытость (1–сыт, 10–голоден)" value={hungerLevel} min={1} max={10} suffix="/10" onChange={setHungerLevel} />
       </GlassCard>
+      )}
 
         {/* 💧 Electrolytes & Pharma — quick settings */}
+      {settingsSection === 'training' && (
         <GlassCard title="💧 Электролиты и фарма" icon="💧" color="#06b6d4">
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:6 }}>
             <PopupNumber label="Натрий" value={Number(v2Labs.sodium)||3500} min={0} max={10000} step={100} suffix="мг" onChange={v=>setV2Labs((p:any)=>({...p,sodium:v}))} />
@@ -297,8 +328,10 @@ export const IndividualPlanSettings: React.FC = () => {
             ))}
           </div>
         </GlassCard>
+      )}
 
         {/* v2 Scoring Profile — moved to top */}
+      {settingsSection === 'advanced' && (
         <GlassCard title="🧬 v2 Скоринг" icon="🧬" color="#00e68a">
           <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 6, lineHeight: 1.3 }}>
             <div style={{ marginBottom: 4 }}>Качество рациона оценивается по шкале 0–10 на основе: состава макронутриентов, содержания клетчатки, профиля аминокислот и микронутриентной плотности. Результат влияет на подбор продуктов и расчёт итогового скоринга каждого приёма пищи.</div>
@@ -366,7 +399,9 @@ export const IndividualPlanSettings: React.FC = () => {
             }}>{histamineSensitive ? '⚠️ Чувствителен к гистамину' : '✅ Не чувствителен'}</button>
           </div>
         </GlassCard>
+      )}
 
+      {settingsSection === 'advanced' && (
       <GlassCard title="Диетические паузы" icon="🔄" color="#a78bfa">
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
           {[['none','⏹️ Нет','Без пауз'],['refeed','🍝 Рефид','1 день повыш. угл.'],['flex_80_20','📊 80/20','20% гибкость'],['periodization_2_1','⏳ 2+1','2 нед деф. + 1 нед'],['diet_5_2','📅 5/2','5 дней норм + 2 облегч.']].map(([id,label,desc]) => (
@@ -392,7 +427,9 @@ export const IndividualPlanSettings: React.FC = () => {
           </div>
         )}
       </GlassCard>
+      )}
 
+      {settingsSection === 'core' && (
       <GlassCard title="Цель" icon="🎯" color="#00e68a">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
           {GOALS.map(g => (
@@ -426,6 +463,7 @@ export const IndividualPlanSettings: React.FC = () => {
           </div>
         )}
       </GlassCard>
+      )}
       {goal === 'mass' && periodizationEnabled && (
         <div style={{ marginTop: 4, padding: '8px 10px', borderRadius: 10, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.08)' }}>
           <div style={{ fontSize: 9, fontWeight: 600, color: '#8b5cf6', marginBottom: 6 }}>🕐 Таймлайн фаз</div>
@@ -443,6 +481,7 @@ export const IndividualPlanSettings: React.FC = () => {
         </div>
       )}
 
+      {settingsSection === 'training' && (
       <GlassCard title="Фаза и препараты" icon="💉" color="#06b6d4">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
           {PHASES.map(p => (
@@ -667,7 +706,9 @@ export const IndividualPlanSettings: React.FC = () => {
           </div>
         )}
       </GlassCard>
+      )}
 
+      {settingsSection === 'training' && (
       <GlassCard title="Привязка к тренировке" icon="🏋️" color="#22c55e">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <button onClick={() => setLinkToTraining(!linkToTraining)} style={{
@@ -709,7 +750,9 @@ export const IndividualPlanSettings: React.FC = () => {
           </>
         )}
       </GlassCard>
+      )}
 
+      {settingsSection === 'core' && (
       <GlassCard title="КБЖУ" icon="📊" color="#00e68a">
         <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
           {(['auto', 'manual', 'profile'] as const).map(mode => {
@@ -898,7 +941,9 @@ export const IndividualPlanSettings: React.FC = () => {
           </div>
         )}
       </GlassCard>
+      )}
 
+      {settingsSection === 'advanced' && (
       <GlassCard title="Скользящие графики" icon="📊" color="#00e68a">
         {(() => {
           const nm = NUTRITION_LEVELS.find(n => n.id === nutrLevel)?.mult || 1.0;
@@ -947,7 +992,9 @@ export const IndividualPlanSettings: React.FC = () => {
           </div>;
         })()}
       </GlassCard>
+      )}
 
+      {settingsSection === 'food' && (
       <GlassCard title="Уровень бюджета" icon="💰" color="#f59e0b">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
           Определяет качество продуктов: низкий = базовые продукты, средний = сбалансированный, максимум = топ по рейтингу <span style={{ color:'#f59e0b', fontWeight:700 }}>bb_quality_score</span>, усиленный = только элитные.
@@ -975,7 +1022,9 @@ export const IndividualPlanSettings: React.FC = () => {
           })}
         </div>
       </GlassCard>
+      )}
 
+      {settingsSection === 'food' && (
       <GlassCard title="Разнообразие рациона" icon="🎲" color="#8b5cf6">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
           Минимум — одни и те же продукты каждый день (проще готовить и закупать). Максимум — полная ротация для разнообразия нутриентов.
@@ -1000,7 +1049,9 @@ export const IndividualPlanSettings: React.FC = () => {
           ))}
         </div>
       </GlassCard>
+      )}
 
+      {settingsSection === 'food' && (
       <GlassCard title="Уровень питания" icon="📈" color="#22c55e">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
           База ×1.0, Средний ×1.15, Усиление ×1.3, Максимум ×1.5. Используется для коррекции калоража без смены цели.
@@ -1024,7 +1075,9 @@ export const IndividualPlanSettings: React.FC = () => {
           ))}
         </div>
       </GlassCard>
+      )}
 
+      {settingsSection === 'core' && (
       <GlassCard title="Расписание" icon="⏰" color="#06b6d4">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
           <PopupSelect label="Пробуждение" value={wakeTime} options={TIME_OPTIONS} onChange={setWakeTime} />
@@ -1054,8 +1107,10 @@ export const IndividualPlanSettings: React.FC = () => {
           })()}
         </div>
       </GlassCard>
+      )}
 
         {/* Work Schedule — MOVED FROM INSIDE Циклирование */}
+      {settingsSection === 'training' && (
         <GlassCard title="💼 Работа" icon="💼" color="#60a5fa">
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
             <div style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -1153,7 +1208,9 @@ export const IndividualPlanSettings: React.FC = () => {
             </div>
           )}
         </GlassCard>
+      )}
 
+      {settingsSection === 'food' && (
       <GlassCard title="Аллергены и ограничения" icon="⚠️" color="#ef4444">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
           {ALLERGEN_LIST.map(a => (
@@ -1163,7 +1220,9 @@ export const IndividualPlanSettings: React.FC = () => {
           ))}
         </div>
       </GlassCard>
+      )}
 
+      {settingsSection === 'food' && (
       <GlassCard title="Проблемы со здоровьем" icon="🩺" color="#06b6d4">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
           Отметьте проблемы — план автоматически исключит продукты, которые их усугубляют. Например, отёки → снижение натрия, диабет → низкий GI, подагра → низкие пурины.
@@ -1193,7 +1252,9 @@ export const IndividualPlanSettings: React.FC = () => {
           })}
         </div>
       </GlassCard>
+      )}
 
+      {settingsSection === 'food' && (
       <GlassCard title="🌙 Вечерний режим" icon="🌙" color="#6366f1">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
           Автоматически включается при выборе «Отёки» или «Диабет». Снижает количество углеводов в вечернем приёме пищи, перенося их на обед.
@@ -1214,7 +1275,9 @@ export const IndividualPlanSettings: React.FC = () => {
           </button>
         </div>
       </GlassCard>
+      )}
 
+      {settingsSection === 'food' && (
       <GlassCard title="Тип плана питания" icon="📋" color="#a855f7">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
           {PLAN_TYPES.map(pt => (
@@ -1224,7 +1287,9 @@ export const IndividualPlanSettings: React.FC = () => {
           ))}
         </div>
       </GlassCard>
+      )}
 
+      {settingsSection === 'quick' && (
       <GlassCard title="⚡ Быстрые пресеты" icon="⚡" color="#f97316">
         {/* P2.1: 3 categories, 12 presets */}
         {([
@@ -1263,7 +1328,9 @@ export const IndividualPlanSettings: React.FC = () => {
           </div>
         ))}
       </GlassCard>
+      )}
 
+      {settingsSection === 'core' && (
       <GlassCard title="Предпочтения и исключения" icon="🍎" color="#f59e0b">
         <div style={{ marginBottom: 8 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
@@ -1375,6 +1442,7 @@ export const IndividualPlanSettings: React.FC = () => {
         </div>
         <PopupText label="📝 Заметки по питанию" value={customNotes} onChange={v => { setCustomNotes(v); localStorage.setItem('he_nutrition_notes', v); }} placeholder="Например: не ем после 20:00, аллергия на пенициллин, проблемы с ЖКТ..." />
       </GlassCard>
+      )}
 
       {(() => {
         const allRecipes = [...getRecipes(), ...(userRecipes||[])] as Recipe[];
@@ -1472,6 +1540,7 @@ export const IndividualPlanSettings: React.FC = () => {
       </>;
       })()}
 
+      {settingsSection === 'advanced' && (
       <GlassCard title="Циклирование" icon="🔄" color="#3b82f6">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
           {[
@@ -1941,6 +2010,7 @@ export const IndividualPlanSettings: React.FC = () => {
         )}
 
       </GlassCard>
+      )}
 
       {/* Weight adaptation modal */}
       {showWeightAdaptModal && (
@@ -2086,7 +2156,7 @@ export const IndividualPlanSettings: React.FC = () => {
         </div>
       )}
 
-      {(cyclingMode === 'cheatmeal' || cyclingMode === 'carbload') && (
+      {(cyclingMode === 'cheatmeal' || cyclingMode === 'carbload') && settingsSection === 'advanced' && (
         <GlassCard title={cyclingMode === 'cheatmeal' ? 'Читмил' : 'Углеводная загрузка'} icon="📅">
           <div style={{ marginTop: 4, padding: '8px 10px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.12)' }}>
             <div style={{ fontSize: 9, fontWeight: 600, color: '#60a5fa', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -2122,6 +2192,7 @@ export const IndividualPlanSettings: React.FC = () => {
 
 
       {/* B1 — SpecialMealPopup */}
+      {settingsSection === 'advanced' && (
       <GlassCard title="➕ Спецприём" icon="🍽️" color="#f97316">
         <button onClick={() => {
           setSpecialMealType('cheat_meal');
@@ -2151,6 +2222,7 @@ export const IndividualPlanSettings: React.FC = () => {
           </div>
         )}
       </GlassCard>
+      )}
 
         {/* v2 Scoring Profile moved to top */}
 

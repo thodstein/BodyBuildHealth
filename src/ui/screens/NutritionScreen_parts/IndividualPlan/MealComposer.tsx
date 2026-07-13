@@ -82,6 +82,7 @@ export const MealComposer: React.FC = () => {
     recipePickerMeal, setRecipePickerMeal, replaceMealWithRecipe,
     effectiveKcal, effectiveP, effectiveF, effectiveC,
     setDayPlan, setThreeDayPlan, setWeekPlan, saveUndo,
+    setPlanTab,
   } = usePlanCtx();
 
   const [composerMode, setComposerMode] = useState<ComposerMode>('basic');
@@ -156,11 +157,16 @@ export const MealComposer: React.FC = () => {
 
       {!generated && (
         <div style={{ padding:16, textAlign:'center', background:'rgba(0,230,138,0.03)', borderRadius:12, border:'1px solid rgba(0,230,138,0.1)' }}>
-          <div style={{ fontSize:11, color:'rgba(255,255,255,0.85)', marginBottom:10 }}>Сначала сгенерируйте план в разделе «План»</div>
-          <button onClick={() => { setGenerated(true); generatePlan(1); }} style={{
-            padding:'8px 20px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:700,
-            background:'linear-gradient(135deg,#00e68a,#00c8a0)', border:'none', color:'#000',
-          }}>✨ Сгенерировать план на 1 день</button>
+          <div style={{ display:'flex', gap:6, justifyContent:'center' }}>
+            <button onClick={() => { setGenerated(true); generatePlan(1); }} style={{
+              padding:'8px 16px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:700,
+              background:'linear-gradient(135deg,#00e68a,#00c8a0)', border:'none', color:'#000',
+            }}>✨ Создать план</button>
+            <button onClick={() => setPlanTab('plan')} style={{
+              padding:'8px 16px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:600,
+              background:'#202023', border:'1px solid rgba(255,255,255,0.15)', color:'#fff',
+            }}>📋 К плану</button>
+          </div>
         </div>
       )}
 

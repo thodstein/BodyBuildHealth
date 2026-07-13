@@ -1010,6 +1010,8 @@ export interface Exercise {
   cannotReplace?: string[];
   technique?: string;
   pauseSeconds?: number;
+  /** Тип движения: 'competition_lift' (павэрлифтинг/Олимпия), 'bb_compound', 'bb_isolation', 'accessory', 'prehab' */
+  movementType?: string;
   peakContraction?: boolean;
   stretchPhase?: boolean;
   dropSet?: boolean;

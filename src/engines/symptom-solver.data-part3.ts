@@ -12,14 +12,14 @@ export const DB_PART3: SymptomEntry[] = [
     quickFacts: [
       ' На ААС-курсе кортизол ↓ до 50-70%',
       ' Резкая отмена ААС → ↑↑кортизола (синдром отмены)',
-      'Фаза ПКТ —的了 "cortisol rebound" — критическая стадия',
+      'Фаза ПКТ — период восстановления оси HPA — критическая стадия',
     ],
     generalInfo: 'Подавление оси HPA (гипоталамо-гипофизарно-надпочечниковой) — ключевой механизм синдрома отмены ААС. ААС ↓кортизол через подавление ACTH, а после отмены — резкий отскок.',
     problems: [
       {
         problem: 'ААС-подавление HPA оси с последующим rebound',
         probability: 'high',
-        mechanism: 'ААС ↓ACTH →↓кортизол надпочечников. После отмены — кора надпочечников истощена (застой) → ↓выработка → дополнительно ↑CRH → ↑↑↑кортизол (rebound). Может продолжаться 6-12 мес.',
+        mechanism: 'ААС подавляют секрецию АКТГ → снижается стимуляция коры надпочечников → после отмены ось HPA истощена: ↓выработка кортизола (гипокортизолизм). Восстановление занимает 6-12 мес. Клинически — усталость, низкое настроение, снижение стрессоустойчивости.',
         labMarkers: [
           { marker: 'Кортизол утренний', expectedChange: '↓', targetRange: '138-690 нмоль/л', when: 'На курсе + ПКТ' },
           { marker: 'АКТГ', expectedChange: '↓', targetRange: '10-60 пг/мл', when: 'При symptomsах отмены' },
@@ -28,13 +28,13 @@ export const DB_PART3: SymptomEntry[] = [
         solutions: [
           { substanceId: 'ashwagandha', name: 'Ашваганда (KSM-66)', type: 'supplement', dose: '300-600 мг/день', mechanism: '↓восприимчивость к кортизолу, баланс HPA', evidenceLevel: 'B' },
           { substanceId: 'rhodiola', name: 'Родиола розовая', type: 'supplement', dose: '200-400 мг/день', mechanism: 'Адаптоген, ↓усталость', evidenceLevel: 'B' },
-          { substanceId: 'phosphatidylserine', name: 'Фосфатидилсерин', type: 'supplement', dose: '400-600 мг/день', mechanism: '↓кортизол после тренировок', evidenceLevel: 'A' },
+          { substanceId: 'phosphatidylserine', name: 'Фосфатидилсерин', type: 'supplement', dose: '400-600 мг/день', mechanism: '↓кортизол после тренировок', evidenceLevel: 'B' },
           { substanceId: 'vitamin_c_high', name: 'Витамин C 1000 мг', type: 'supplement', dose: '1000 мг/день', mechanism: 'Кофактор стероидогенеза в надпочечниках', evidenceLevel: 'B' },
           { substanceId: 'taper_course', name: 'Постепенная отменя ААС (титрование)', type: 'lifestyle', dose: 'Снижение дозы 25% в неделю', mechanism: '↓синдрома отмены', evidenceLevel: 'A' },
         ],
         expectations: [
           { timeline: 'На курсе', effect: 'Кортизол 138-300 нмоль/л (нижняя граница), симптомы не выражены' },
-          { timeline: 'ПКТ (1-4 нед)', effect: 'Кортизол ↑↑, вимптомы: усталость, депрессия. Фосфатидилсерин + ашваганда ↓симптомы' },
+          { timeline: 'ПКТ (1-4 нед)', effect: 'Кортизол ↑↑, симптомы: усталость, депрессия. Фосфатидилсерин + ашваганда ↓симптомы' },
           { timeline: '6-12 мес после курса', effect: 'Нормализация HPA оси' },
         ],
       },
@@ -60,7 +60,7 @@ export const DB_PART3: SymptomEntry[] = [
         probability: 'high',
         mechanism: 'Тренболон/нандролон имеют прогестиновой активность → ↑пролактина через ↓D2-рецепторный контроль. Печёночный GH ↑пролактин через ↓соматостатин.',
         labMarkers: [
-          { marker: 'Пролактин', expectedChange: '↑↑', targetRange: '4-23 нг/мл (муж.)', when: 'Каждые 4 нед на 19-нор' },
+          { marker: 'Пролактин', expectedChange: '↑↑', targetRange: '2-17 нг/мл (муж.)', when: 'Каждые 4 нед на 19-нор' },
           { marker: 'Прогестерон', expectedChange: '↑', targetRange: '<1.4 нмоль/л (муж.)', when: 'Спец.' },
           { marker: 'Эстрадиол', expectedChange: '↑', targetRange: '<45 пг/мл', when: 'Контроль' },
         ],
@@ -221,7 +221,7 @@ export const DB_PART3: SymptomEntry[] = [
     relatedSymptoms: ['anxiety', 'aggression', 'depression'],
     quickFacts: [
       ' Тренболон + высокий E2 = максимальная лабильность',
-      'Уровни нейромедиаторов: ↓serotonin, ↑dopamine, ↑GABA躁',
+      'Уровни нейромедиаторов: ↓serotonin, ↑dopamine, ↓ГАМК-ергический тонус',
       ' Сон <6 ч → +30% к эмоциональной нестабильности',
     ],
     generalInfo: 'Эмоциональная лабильность — типичный побочный эффект ААС, особенно выс. доз. Комбинация с тренировками, диетой и стрессом ухудшает ситуацию.',
@@ -254,7 +254,7 @@ export const DB_PART3: SymptomEntry[] = [
   {
     id: 'peptide_bpc157_effects',
     symptom: 'Нейтропения / лейкопения от пептидов (BPC-157)',
-    category: 'cns',
+    category: 'hematologic',
     urgency: 'standard',
     linkedDrugs: ['bpc157', 'tb500'],
     relatedSymptoms: ['fatigue'],
@@ -406,7 +406,7 @@ export const DB_PART3: SymptomEntry[] = [
     relatedSymptoms: ['joint_pain', 'back_pumps'],
     quickFacts: [
       ' ААС ↑мышечную силу быстрее, чем адаптация сухожилий',
-      '↓Коллаген synthesis при 17α-алкил + самплинг',
+      '↓синтез коллагена при 17α-алкил + снижение прочности сухожилия',
       ' Маркеры: проксимальный бицепс, ахиллово сухожилие, надостное',
     ],
     generalInfo: 'Дисбаланс между быстро растущей мышечной силой и медленно адаптирующимися сухожилиями — главная причина разрывов на ААС. Коллаген-синтез не успевает.',
@@ -416,7 +416,7 @@ export const DB_PART3: SymptomEntry[] = [
         probability: 'medium',
         mechanism: ' ↑Сила (↑мышцы) → ↑нагрузка на сухожилия, но ↓коллаген-синтез (17α-алкил) → риск микроразрывов и полного разрыва.',
         labMarkers: [
-          { marker: '无明显 маркеры', expectedChange: '↔', targetRange: 'Клиника', when: 'МРТ при боли' },
+          { marker: 'Специфических маркеров нет', expectedChange: '↔', targetRange: 'Клиника', when: 'МРТ при боли' },
           { marker: 'УЗИ сухожилия', expectedChange: '↑', targetRange: 'Контроль', when: 'При хрон. боли' },
         ],
         solutions: [
@@ -488,19 +488,20 @@ export const DB_PART3: SymptomEntry[] = [
       {
         problem: 'Гормональный дефицит + надпочечниковая недостаточность',
         probability: 'high',
-        mechanism: ' Отмена ААС → ↓↓Т (истощённый HPTA) + ↑↑кортизол (rebound) + ↓серотонин/дофамин (нейроадаптация) + ↓IGF-1 (если был GH).',
+        mechanism: ' Отмена ААС → ↓↓Т (истощённый HPTA) + ↑кортизол (нагрузка на ось) + ↓серотонин/дофамин (нейроадаптация) + ↓IGF-1 (если был GH).',
+        stopCriteria: ['Суицидальные мысли — НЕМЕДЛЕННО психиатр + скорая помощь (103)', 'Усиливающаяся депрессия >2 нед + ангедония — обратиться к врачу'],
         labMarkers: [
           { marker: 'Тестостерон', expectedChange: '↓↓', targetRange: '10-35 нмоль/л', when: '2-4 нед ПКТ' },
           { marker: 'Кортизол', expectedChange: '↑↑', targetRange: '138-690 нмоль/л', when: 'Контроль' },
-          { marker: 'Эстрадиол', expectedChange: '↓', targetRange: '11-43 пг/мл', when: 'Падает с T' },
+          { marker: 'Эстрадиол', expectedChange: '↓', targetRange: '20-50 пг/мл', when: 'Падает с T' },
           { marker: 'ЛГ/ФСГ', expectedChange: '↔ или ↑', targetRange: 'Восстановление HPTA', when: 'Через 4-6 нед ПКТ' },
         ],
         solutions: [
           { substanceId: 'serm_pcт', name: 'ПЦИО с SERM (Nolvadex/Enclomiphene)', type: 'pharma', dose: '20 мг Nolva / 12.5 мг Enclom', mechanism: '↑GnRH → ↑LH/FSH → ↑эндогенный T', evidenceLevel: 'A' },
           { substanceId: 'hcg_support', name: 'hCG при необходимости', type: 'pharma', dose: '500-1000 МЕ 2р/нед за 2 нед до ПКТ', mechanism: '↑Лейдига, ↑Т', evidenceLevel: 'B' },
-          { substanceId: 'ashwagandha', name: 'Ашваганда KSM-66', type: 'supplement', dose: '300-600 мг 2р/день', mechanism: '↓кортизол, ↓депрессия', evidenceLevel: 'A' },
+          { substanceId: 'ashwagandha', name: 'Ашваганда KSM-66', type: 'supplement', dose: '300-600 мг 2р/день', mechanism: '↓кортизол, ↓депрессия', evidenceLevel: 'B' },
           { substanceId: 'rhodiola', name: 'Родиола розовая', type: 'supplement', dose: '200-400 мг/день', mechanism: '↑адаптогенность, ↓усталость', evidenceLevel: 'B' },
-          { substanceId: 'omega3_high', name: 'Омега-3 4 г/день', type: 'supplement', dose: '4 г/день', mechanism: '↑нейрогенез, ↓депрессия', evidenceLevel: 'A' },
+          { substanceId: 'omega3_high', name: 'Омега-3 4 г/день', type: 'supplement', dose: '4 г/день', mechanism: '↑нейрогенез, ↓депрессия', evidenceLevel: 'B' },
           { substanceId: 'vitamin_d', name: 'Витамин D3 5000 МЕ', type: 'supplement', dose: '5000-10000 МЕ/день', mechanism: '↓депрессия, ↑иммунитет', evidenceLevel: 'B' },
           { substanceId: 'therapy', name: 'Психотерапия (когнитивная)', type: 'lifestyle', dose: '8-12 сессий', mechanism: '↓симптомы, ↑приверженность', evidenceLevel: 'A' },
         ],
@@ -525,7 +526,7 @@ export const DB_PART3: SymptomEntry[] = [
       ' Риск: 8-15% мужчин-бодибилдеров',
       ' Прогрессирует от курса к курсу',
     ],
-    generalInfo: 'Мышечная дисморфия — психическое расстройство, при котором человек不改 воспринимает своё тело как "слишком маленькое", несмотря на значительную мышечную массу.',
+    generalInfo: 'Мышечная дисморфия — психическое расстройство, при котором человек не воспринимает своё тело как "слишком маленькое", несмотря на значительную мышечную массу.',
     problems: [
       {
         problem: 'Образ тела / одержимость размером',
@@ -563,7 +564,7 @@ export const DB_PART3: SymptomEntry[] = [
       {
         problem: 'ААС-опосредованная импульсивная агрессия',
         probability: 'medium',
-        mechanism: '↑Testosterone → ↑DHT → ↓serotonin- ergic контроль, дофаминовая гиперчувствительность, ↑GABA躁. Нейроадаптация в миндалине, ↓prefrontal контроль.У лиц с историей агрессии риск ↑↑↑.',
+        mechanism: '↑Testosterone → ↑DHT → ↓serotonin- ergic контроль, дофаминовая гиперчувствительность, ↓ГАМК-ергический тонус. Нейроадаптация в миндалине, ↓prefrontal контроль.У лиц с историей агрессии риск ↑↑↑.',
         labMarkers: [
           { marker: 'Клиника', expectedChange: '↑', targetRange: 'Клиническая картина', when: 'Контроль' },
           { marker: 'Тестостерон', expectedChange: '↑↑↑', targetRange: 'Снижение дозы', when: 'Коррекция' },
@@ -572,7 +573,7 @@ export const DB_PART3: SymptomEntry[] = [
           { substanceId: 'reduce_dose', name: 'Немедленно снизить дозу', type: 'lifestyle', dose: '↓25-50%', mechanism: '↓андрогенный стимул', evidenceLevel: 'A' },
           { substanceId: 'l_theanine', name: 'L-теанин', type: 'supplement', dose: '200-400 мг 2р/день', mechanism: '↑GABA, ↓возбуждение', evidenceLevel: 'B' },
           { substanceId: 'magnesium_glycinate', name: 'Магний глицинат', type: 'supplement', dose: '400-600 мг/день', mechanism: '↑GABA-ергическая активность', evidenceLevel: 'B' },
-          { substanceId: 'ashwagandha', name: 'Ашваганда KSM-66', type: 'supplement', dose: '300-600 мг 2р/день', mechanism: '↓кортизол, ↓напряжение', evidenceLevel: 'A' },
+          { substanceId: 'ashwagandha', name: 'Ашваганда KSM-66', type: 'supplement', dose: '300-600 мг 2р/день', mechanism: '↓кортизол, ↓напряжение', evidenceLevel: 'B' },
           { substanceId: 'therapy', name: 'Психотерапия (thermal control)', type: 'lifestyle', dose: 'Еженедельно', mechanism: '↑control импульсов', evidenceLevel: 'A' },
           { substanceId: 'avoid_alcohol', name: 'Полный отказ от алкоголя', type: 'lifestyle', dose: '0 г/день', mechanism: '↓дисингибиция', evidenceLevel: 'A' },
         ],
@@ -614,6 +615,7 @@ export const DB_PART3: SymptomEntry[] = [
         { timeline: '3-7 дней', effect: 'Снижение светобоязни при уменьшении дозы' },
         { timeline: '2-4 нед', effect: 'Полное исчезновение симптомов при отмене' },
       ],
+      stopCriteria: ['Внезапное падение зрения, "шторка"/занавеска, вспышки молний, искривление прямых линий → срочно к офтальмологу (риск отслойки сетчатки при продолжении приёма)'],
     }],
   },
   {
@@ -711,7 +713,7 @@ export const DB_PART3: SymptomEntry[] = [
         { substanceId: 'night_splint', name: 'Ночной ортез кисти', type: 'lifestyle', dose: 'На ночь', mechanism: 'Фиксация кисти в нейтральном положении', evidenceLevel: 'A' },
       ],
       expectations: [
-        { timeline: '1-2 нед', effect: 'Снижение симптомов при ↓ дозы GH', sideNote: 'При сохранении — тиразид по ночам' },
+        { timeline: '1-2 нед', effect: 'Снижение симптомов при ↓ дозы GH', sideNote: 'При сохранении — ночная шина кисти (см. выше) + снижение дозы GH' },
         { timeline: '4-6 нед', effect: 'Полный регресс при отмене/снижении дозы' },
       ],
     }],
@@ -749,7 +751,7 @@ export const DB_PART3: SymptomEntry[] = [
     }],
   },
   {
-    id: 'gh_insulin_resistance',
+    id: 'gh_insulin_resistance_gh',
     symptom: 'Инсулинорезистентность / ↑ глюкозы на GH',
     category: 'endocrine',
     urgency: 'warning',
@@ -852,7 +854,7 @@ export const DB_PART3: SymptomEntry[] = [
   {
     id: 'diuretic_electrolyte',
     symptom: 'Нарушение электролитов на диуретиках (слабость, судороги, аритмия)',
-    category: 'hematologic',
+    category: 'renal',
     urgency: 'critical',
     linkedDrugs: ['diuretics'],
     relatedSymptoms: ['cramps', 'arrhythmia', 'fatigue'],
@@ -905,7 +907,7 @@ export const DB_PART3: SymptomEntry[] = [
         { marker: 'Вертикальное АД', expectedChange: '↓', targetRange: 'САД >100 мм рт.ст.', when: 'Ежедневно' },
         { marker: 'ЧСС стоя', expectedChange: '↑', targetRange: '<90 уд/мин', when: 'Ежедневно' },
         { marker: 'Na⁺ сыворотки', expectedChange: '↑', targetRange: '135-145', when: 'Каждые 3 дня' },
-        { marker: 'Мочевина/креатинин', expectedChange: '↑', targetRange: 'Мочевина <8', when: 'Каждые 3 дня' },
+        { marker: 'Мочевина/креатинин', expectedChange: '↑', targetRange: 'Мочевина <8.3 ммоль/л', when: 'Каждые 3 дня' },
       ],
       solutions: [
         { substanceId: 'hydration', name: 'Увеличение приёма воды', type: 'lifestyle', dose: '+0.5-1 л/сут', mechanism: 'Восполнение ОЦК', evidenceLevel: 'A' },
@@ -930,7 +932,7 @@ export const DB_PART3: SymptomEntry[] = [
     quickFacts: [
       'PFS — редкий (1-3%), но тяжёлый побочный эффект',
       '↑ DHT не восстанавливается даже после отмены у части пациентов',
-      'Механизм: ингибиция 5α-редуктазы → ↑ аллопрегнанолон → нейростероидный дисбаланс',
+      'Механизм: ингибиция 5α-редуктазы → ↓ аллопрегнанолон → нейростероидный дисбаланс',
     ],
     generalInfo: 'Пост-финастеридный синдром (PFS) — персистирующие симптомы даже после отмены финастерида/дутастерида. Включает ↓ либидо, ЭД, депрессию, туман в голове, хроническую усталость.',
     problems: [{
@@ -1040,7 +1042,7 @@ export const DB_PART3: SymptomEntry[] = [
           { marker: 'Гематокрит, вязкость', expectedChange: '↑', targetRange: '<52%', when: 'Контроль' },
         ],
         solutions: [
-          { substanceId: 'emergency_call', name: 'НЕМЕДЛЕННО вызвать скорую', type: 'lifestyle', dose: '103', mechanism: 'Время — миокард. Каждая минута задержки = больше некроза', evidenceLevel: 'A' },
+          { substanceId: 'emergency_call', name: 'НЕМЕДЛЕННО вызвать скорую', type: 'lifestyle', dose: 'срочно', mechanism: 'Время — миокард. Каждая минута задержки = больше некроза', evidenceLevel: 'A' },
           { substanceId: 'aspirin_300', name: 'Аспирин 300 мг разжевать (если нет противопоказаний)', type: 'pharma', dose: '300 мг', mechanism: 'Ингибирование ЦОГ-1 → ↓ тромбоксан A2 → ↓ агрегация', evidenceLevel: 'A' },
           { substanceId: 'nitroglycerin', name: 'Нитроглицерин сублингвально', type: 'pharma', dose: '0.5 мг каждые 5 мин до 3 доз', mechanism: 'Вазодилатация коронарных артерий', evidenceLevel: 'A' },
         ],
@@ -1111,7 +1113,7 @@ export const DB_PART3: SymptomEntry[] = [
           { marker: 'Мочевина/креатинин', expectedChange: '↑', targetRange: 'Креатинин <110', when: 'Контроль' },
         ],
         solutions: [
-          { substanceId: 'emergency_hospitalization', name: 'ЭКСТРЕННАЯ ГОСПИТАЛИЗАЦИЯ', type: 'lifestyle', dose: '103', mechanism: 'Требуется внутривенная гипотензивная терапия', evidenceLevel: 'A' },
+          { substanceId: 'emergency_hospitalization', name: 'ЭКСТРЕННАЯ ГОСПИТАЛИЗАЦИЯ', type: 'lifestyle', dose: 'срочно', mechanism: 'Требуется внутривенная гипотензивная терапия', evidenceLevel: 'A' },
           { substanceId: 'iv_labels', name: 'Лабеталол в/в или нитропруссид натрия', type: 'pharma', dose: 'Лабеталол 20 мг в/в, затем 0.5-2 мг/мин', mechanism: 'αβ-блокада (лабеталол) / донатор NO (нитропруссид)', evidenceLevel: 'A' },
         ],
         expectations: [
@@ -1142,7 +1144,7 @@ export const DB_PART3: SymptomEntry[] = [
           { marker: 'Холтер 24 ч', expectedChange: '↔', targetRange: 'Без жизнеугрожающих аритмий', when: 'Планово' },
         ],
         solutions: [
-          { substanceId: 'emergency_call', name: 'Вызвать скорую (при первом эпизоде на курсе)', type: 'lifestyle', dose: '103', mechanism: 'Исключить ИМ/аритмию', evidenceLevel: 'A' },
+          { substanceId: 'emergency_call', name: 'Вызвать скорую (при первом эпизоде на курсе)', type: 'lifestyle', dose: 'срочно', mechanism: 'Исключить ИМ/аритмию', evidenceLevel: 'A' },
           { substanceId: 'stop_clen_t3', name: 'Прекратить кленбутерол и T3', type: 'lifestyle', dose: '—', mechanism: 'Устранение хронотропного стресса', evidenceLevel: 'B' },
           { substanceId: 'ecg_monitoring', name: 'Холтер-мониторинг + Эхо-КГ', type: 'lifestyle', dose: '—', mechanism: 'Структурная оценка сердца', evidenceLevel: 'A' },
           { substanceId: 'electrolytes', name: 'Коррекция электролитов (K⁺, Mg²⁺)', type: 'supplement', dose: 'K⁺ 4-5.5, Mg 400-600 мг', mechanism: 'Стабилизация мембранного потенциала кардиомиоцитов', evidenceLevel: 'A' },
@@ -1175,7 +1177,7 @@ export const DB_PART3: SymptomEntry[] = [
           { marker: 'Рентгенография лёгких', expectedChange: '↑', targetRange: 'Без инфильтрата', when: 'НЕМЕДЛЕННО' },
         ],
         solutions: [
-          { substanceId: 'emergency_hospitalization', name: 'НЕМЕДЛЕННАЯ госпитализация', type: 'lifestyle', dose: '103', mechanism: 'Исключение массивной ТЭЛА', evidenceLevel: 'A' },
+          { substanceId: 'emergency_hospitalization', name: 'НЕМЕДЛЕННАЯ госпитализация', type: 'lifestyle', dose: 'срочно', mechanism: 'Исключение массивной ТЭЛА', evidenceLevel: 'A' },
           { substanceId: 'stop_all_aas', name: 'Прекратить все ААС (особенно тренболон/нандролон)', type: 'lifestyle', dose: '—', mechanism: '↓ тромбогенного риска', evidenceLevel: 'B' },
           { substanceId: 'anticoagulation', name: 'Антикоагуляция (НМГ/варфарин)', type: 'pharma', dose: 'По протоколу', mechanism: 'Предотвращение рецидива ТЭЛА', evidenceLevel: 'A' },
         ],

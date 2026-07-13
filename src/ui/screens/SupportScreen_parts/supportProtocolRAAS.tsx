@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolRAAS: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -12,6 +12,13 @@ export const SupportProtocolRAAS: React.FC<{ s: Record<string, any> }> = ({ s })
                 <div style={{ fontSize:13, fontWeight:800, color:'#3b82f6', marginBottom:2 }}>🫀 RAAS (АД/почки/фиброз)</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Ренин-ангиотензин-альдостероновая система — ключевая мишень для контроля АД, протеинурии и фиброза на курсе ААС.</p>
               </div>
+
+              <ContraBanner items={[
+                'Эплеренон/спиронолактон при K⁺ >5.0 ммоль/л — гиперкалиемия (остановка препарата)',
+                'Двойная RAAS-блокада (ARB + иАПФ) — НЕ рекомендована (ONTARGET/ALTITUDE): ↑ риск гиперкалиемии и ОПП без доп. пользы',
+                'Калий-сберегающие диуретики + добавки K⁺ — риск гиперкалиемии',
+                'НПВС + RAAS-блокада — двойное снижение СКФ, риск ОПП',
+              ]} />
               <div style={{ display:'flex', gap:4, overflowX:'auto' }}>
                 {[{id:'protocol',label:'Протокол'},{id:'timing',label:'⏰ Тайминг'},{id:'monitoring',label:'🧪 Мониторинг'}].map((t:any)=>(
                   <button key={t.id} onClick={()=>setRaasTab(t.id)} style={raasTab===t.id?pillActive('#3b82f6'):pillInactive()}>{t.label}</button>
@@ -38,7 +45,7 @@ export const SupportProtocolRAAS: React.FC<{ s: Record<string, any> }> = ({ s })
                       items:[
                         {name:'Телмисартан 40-80 мг 💊', dose:'40-80 мг', timing:'Утро', note:triageBadge('ess')+' Максимальная доза. Добавить второй препарат'},
                         {name:'+ Амлодипин 2.5-5 мг 💊', dose:'2.5-5 мг', timing:'Утро/вечер', note:triageBadge('ess')+' БКК. ↓ АД +10/5. Старт 2.5 мг. Отёки лодыжек — дозозависимый побочный эффект'},
-                        {name:'+ Спиронолактон 12.5-25 мг 💊', dose:'12.5-25 мг', timing:'Утро', note:triageBadge('rec')+' Антагонист альдостерона. ↓ АД +5-10. Антифибротический. Контроль K⁺+'},
+                        {name:'+ Эплеренон 25-50 мг 💊', dose:'25-50 мг', timing:'Утро', note:triageBadge('ess')+' Селективный антагонист минералокортикоидных рецепторов. ↓ АД +5-10. Антифибротический. БЕЗ антиандрогенных эффектов (в отличие от спиронолактона). ГиперK⁺ — мониторинг K⁺ 1×/нед+'},
                         {name:'Петлевой диуретик (фуросемид/торасемид) 💊', dose:'20-40 мг', timing:'Утро при отёках', note:triageBadge('rec')+' При задержке жидкости. Контроль K⁺, Mg, Na⁺. Не >2×/нед'},
                         {name:'Контроль K⁺, креатинина, СКФ каждые 2 нед', target:'K⁺ <5.0, СКФ >60', when:'Каждые 2 нед', action:'↑ K⁺ или ↓ СКФ >25% — ↓/отмена RAAS-блокады'},
                       ]},

@@ -31,13 +31,12 @@ export interface BBPlanMetrics {
 export function calcBBPlanMetrics(plan: BBPlan): BBPlanMetrics {
   const level = normLevel((plan as any).level || 'intermediate');
   const agg: Record<string, { total: number; тяж: number; памп: number; лёг: number; rirSum: number; rirN: number; freq: number }> = {};
-  // Use first non-deload week; fall back to week 0 if all are deload
-  const weekIdx = plan.weeks.findIndex(w => {
+  // fix H: метрики считаем по ПИКОВОЙ неделе (макс объёма), а не по первой (где RIR ещё высокий)
+  const weekIdx = plan.weeks.reduce((best, w, i) => {
     const exs = w.sessions.flatMap(s => s.exercises);
-    const totalSets = exs.reduce((s, e) => s + e.sets, 0);
-    const avgRir = totalSets > 0 ? exs.reduce((s, e) => s + e.rir * e.sets, 0) / totalSets : 10;
-    return avgRir < 3.5 && totalSets > 0;
-  });
+    const ts = exs.reduce((s, e) => s + e.sets, 0);
+    return ts > best.ts ? { ts, i } : best;
+  }, { ts: -1, i: 0 }).i;
   const sessions = (weekIdx >= 0 ? plan.weeks[weekIdx] : plan.weeks[0])?.sessions || [];
   for (const s of sessions) {
     for (const ex of s.exercises) {

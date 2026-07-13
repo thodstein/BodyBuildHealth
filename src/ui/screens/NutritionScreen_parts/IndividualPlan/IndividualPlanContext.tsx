@@ -210,6 +210,8 @@ export interface PlanCtx {
   dietPrefs: string[]; setDietPrefs: (v: string[]) => void;
   errorMsg: string | null; setErrorMsg: (v: string | null) => void;
   useProEngine: boolean; setUseProEngine: (v: boolean) => void;
+  // Cross-tab navigation: allows sub-tabs to switch to each other
+  planTab: string; setPlanTab: (v: string) => void;
 }
 
 const PlanContext = createContext<PlanCtx>(null as any);
@@ -459,8 +461,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     setUndoStack(prev => [snap, ...prev].slice(0, 5));
   };
 
-  const calcItemTotals = (items: any[]) => ({ kcal: items.reduce((s: number, i: any) => s + (i.kcal || 0), 0), p: items.reduce((s: number, i: any) => s + (i.p || 0), 0), f: items.reduce((s: number, i: any) => s + (i.f || 0), 0), c: items.reduce((s: number, i: any) => s + (i.c || 0), 0) });
-  const calcMealTotals = (meals: any[]) => ({ kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0) });
+  const calcItemTotals = (items: any[]) => ({ kcal: items.reduce((s: number, i: any) => s + (i.kcal || 0), 0), p: items.reduce((s: number, i: any) => s + (i.p || 0), 0), f: items.reduce((s: number, i: any) => s + (i.f || 0), 0), c: items.reduce((s: number, i: any) => s + (i.c || 0), 0), fiber: items.reduce((s: number, i: any) => s + (i.fiber || 0), 0) });
+  const calcMealTotals = (meals: any[]) => ({ kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0), fiber: meals.reduce((s: number, m: any) => s + (m.totals?.fiber || 0), 0) });
   const updateMealsInPlan = (prev: any, mealIdx: number, itemsUpdater: (items: any[]) => any[]) => {
     if (!prev) return prev;
     const meals = [...prev.meals];
@@ -486,8 +488,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const item = meals[fromMealIdx].items.splice(itemIdx, 1)[0];
       if (!item) return prev;
       meals[toMealIdx].items.push(item);
-      meals.forEach((m: any, i: number) => { meals[i] = { ...m, totals: { kcal: m.items.reduce((s: number, it: any) => s + it.kcal, 0), p: m.items.reduce((s: number, it: any) => s + it.p, 0), f: m.items.reduce((s: number, it: any) => s + it.f, 0), c: m.items.reduce((s: number, it: any) => s + it.c, 0) } }; });
-      const totals = { kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0) };
+      meals.forEach((m: any, i: number) => { meals[i] = { ...m, totals: { kcal: m.items.reduce((s: number, it: any) => s + it.kcal, 0), p: m.items.reduce((s: number, it: any) => s + it.p, 0), f: m.items.reduce((s: number, it: any) => s + it.f, 0), c: m.items.reduce((s: number, it: any) => s + it.c, 0), fiber: m.items.reduce((s: number, it: any) => s + (it.fiber || 0), 0) } }; });
+      const totals = { kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0), fiber: meals.reduce((s: number, m: any) => s + (m.totals?.fiber || 0), 0) };
       return { ...prev, meals, totals };
     });
     setDraggedItem(null); setDropTarget(null);
@@ -535,7 +537,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (!dayData?.meals?.[mealIdx]?.items?.[itemIdx]) return;
     saveUndo();
     const old = dayData.meals[mealIdx].items[itemIdx]; const portion = (old.amount || 100) / 100;
-    const replacement = { ...old, name: newFood.name, id: newFood.id, kcal: Math.round(newFood.kcal * portion), p: Math.round(newFood.protein * portion), f: Math.round(newFood.fat * portion), c: Math.round(newFood.carbs * portion), amount: Math.round(portion * (parseServingSizeGrams(newFood.servingSize) || 100)) };
+    const replacement = { ...old, name: newFood.name, id: newFood.id, kcal: Math.round(newFood.kcal * portion), p: Math.round(newFood.protein * portion), f: Math.round(newFood.fat * portion), c: Math.round(newFood.carbs * portion), fiber: Math.round((newFood.fiber || 0) * portion), amount: Math.round(portion * (parseServingSizeGrams(newFood.servingSize) || 100)) };
     if (dayIdx === 0) {
       setDayPlan((prev: any) => updateMealsInPlan(prev, mealIdx, items => { items[itemIdx] = replacement; return items; }));
     } else if (threeDayPlan && dayIdx >= 1 && dayIdx <= 3) {
@@ -549,7 +551,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const updateItemAmount = (dayIdx: number, mealIdx: number, itemIdx: number, newAmount: number) => {
     if (dayIdx === 0) {
       setDayPlan((prev: any) => updateMealsInPlan(prev, mealIdx, items => {
-        const it = { ...items[itemIdx], amount: Math.max(1, newAmount), kcal: Math.round(items[itemIdx].kcal / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)) };
+        const it = { ...items[itemIdx], amount: Math.max(1, newAmount), kcal: Math.round(items[itemIdx].kcal / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)), p: Math.round((items[itemIdx].p || 0) / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)), f: Math.round((items[itemIdx].f || 0) / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)), c: Math.round((items[itemIdx].c || 0) / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)), fiber: Math.round((items[itemIdx].fiber || 0) / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)) };
         items[itemIdx] = it; return items;
       }));
     } else if (threeDayPlan && dayIdx >= 1 && dayIdx <= 3) {
@@ -701,12 +703,24 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const planRandomSalt = Math.floor(Math.random() * 1000000);
 
       const buildOneDay = (offset: number): any => {
+        // Apply cycling mode adjustments per-day
+        const isTrain = !!trainingDays[offset % 7];
+        let dayKcalMod = 1.0, dayCarbMod = 1.0;
+        if (cyclingMode === 'macro') {
+          if (isTrain) { dayKcalMod = 1.15; dayCarbMod = 1.3; }
+          else { dayKcalMod = 0.85; dayCarbMod = 0.7; }
+        } else if (cyclingMode === 'butch') {
+          // 3 days high carb + 1 day low carb, repeat
+          const cyclePos = offset % 4;
+          if (cyclePos < 3) { dayKcalMod = 1.1; dayCarbMod = 1.4; }
+          else { dayKcalMod = 0.85; dayCarbMod = 0.4; }
+        }
         const input: MealPlanInput = {
           weightKg: weight, lbmKg, bodyFatPct: bfPct, sex,
-          goalKcal: Math.round((effectiveKcal || weight * 30) * nutrMult),
+          goalKcal: Math.round((effectiveKcal || weight * 30) * nutrMult * dayKcalMod),
           goalProteinG: Math.round((effectiveP || weight * 2) * nutrMult),
           goalFatG: Math.round((effectiveF || weight * 0.8) * nutrMult),
-          goalCarbsG: Math.round((effectiveC || weight * 3.5) * nutrMult),
+          goalCarbsG: Math.round((effectiveC || weight * 3.5) * nutrMult * dayCarbMod),
           mealsCount, isTrainingDay: !!trainingDays[offset % 7],
           trainStartMin: linkToTraining && trainingDays[offset % 7] ? toMin(trainStart) : undefined,
           allowIntraWorkout: trainIntensity === 'high',
@@ -718,40 +732,50 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           randomSalt: planRandomSalt,
           variety,
           wakeTime, lunchTime, dinnerTime, bedTime,
+          planTypeMod: (() => { const pt = PLAN_TYPES.find(p => p.id === (dietPrefs.includes('vegetarian') ? 'vegetarian' : planType)); return { pMult: pt?.pMult || 1.0, fMult: pt?.fMult || 1.0, cMult: pt?.cMult || 1.0 }; })(),
+          eveningLowCarb,
         };
         const v2 = buildDayPlanV2(input);
         // Преобразуем DayPlanV2 → совместимый формат старого dayPlan
         const meals = v2.meals.map(m => ({
           label: m.label, time: m.time, items: m.items.map(it => ({
-            name: it.name, id: it.id, amount: it.amount, kcal: it.kcal, p: it.p, f: it.f, c: it.c,
-          })), totals: { kcal: m.totals.kcal, p: m.totals.p, f: m.totals.f, c: m.totals.c },
+            name: it.name, id: it.id, amount: it.amount, kcal: it.kcal, p: it.p, f: it.f, c: it.c, fiber: it.fiber, leucine_mg: it.leucine_mg,
+          })), totals: { kcal: m.totals.kcal, p: m.totals.p, f: m.totals.f, c: m.totals.c, fiber: m.totals.fiber },
           conflictWarnings: undefined, synergyNotes: undefined,
-          rationale: m.rationale, mpsCheck: m.mpsCheck,
+          rationale: m.rationale, mpsCheck: m.mpsCheck, target: m.target,
         }));
+        const dayKcalForPct = Math.max(1, v2.totals.kcal);
+        const mealTimesPro = meals.map(m => ({ time: m.time, label: m.label, pct: Math.round((m.totals.kcal / dayKcalForPct) * 100) }));
         return {
-          meals, totals: { kcal: v2.totals.kcal, p: v2.totals.p, f: v2.totals.f, c: v2.totals.c },
+          meals, totals: { kcal: v2.totals.kcal, p: v2.totals.p, f: v2.totals.f, c: v2.totals.c, fiber: v2.totals.fiber },
           isTrainingDay: v2.isTrainingDay,
-          supplementTimeline: [], waterTimeline: [], nutritionLogic: [],
+          supplementTimeline: buildSupplementTimeline(mealTimesPro, v2.isTrainingDay),
+          waterTimeline: buildWaterTimeline(weight, mealTimesPro, v2.isTrainingDay, trainStart),
+          nutritionLogic: [],
           dietDiversity: { uniqueFoods: v2.diversity.uniqueFoods, totalPortions: 0, categories: v2.diversity.categories, score: Math.min(10, v2.diversity.uniqueFoods), note: `${v2.diversity.uniqueFoods} уникальных продуктов` },
           timingScores: [], intraWorkout: null, mpsSummary: v2.mpsSummary, proNotes: v2.notes,
         };
       };
 
       const d1 = buildOneDay(dayIdx);
+      let d2: any = null, d3: any = null, weekDays: any[] = [], weekData: any = null;
       setDayPlan(d1);
       if (days >= 3) {
-        const d2 = buildOneDay(1); const d3 = buildOneDay(2);
-        setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: d1.totals.kcal + d2.totals.kcal + d3.totals.kcal, p: d1.totals.p + d2.totals.p + d3.totals.p, f: d1.totals.f + d2.totals.f + d3.totals.f, c: d1.totals.c + d2.totals.c + d3.totals.c } });
+        d2 = buildOneDay(1); d3 = buildOneDay(2);
+        setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: d1.totals.kcal + d2.totals.kcal + d3.totals.kcal, p: d1.totals.p + d2.totals.p + d3.totals.p, f: d1.totals.f + d2.totals.f + d3.totals.f, c: d1.totals.c + d2.totals.c + d3.totals.c, fiber: (d1.totals.fiber||0) + (d2.totals.fiber||0) + (d3.totals.fiber||0) } });
       }
       if (days >= 7) {
-        const weekDays = Array.from({ length: 7 }, (_, i) => buildOneDay(i));
-        const weekData = { days: weekDays, totals: { kcal: weekDays.reduce((s: any,d: any) => s + d.totals.kcal, 0), p: weekDays.reduce((s: any,d: any) => s + d.totals.p, 0), f: weekDays.reduce((s: any,d: any) => s + d.totals.f, 0), c: weekDays.reduce((s: any,d: any) => s + d.totals.c, 0) }};
+        weekDays = Array.from({ length: 7 }, (_, i) => buildOneDay(i));
+        weekData = { days: weekDays, totals: { kcal: weekDays.reduce((s: any,d: any) => s + d.totals.kcal, 0), p: weekDays.reduce((s: any,d: any) => s + d.totals.p, 0), f: weekDays.reduce((s: any,d: any) => s + d.totals.f, 0), c: weekDays.reduce((s: any,d: any) => s + d.totals.c, 0) }};
         if (weekIndex !== undefined) { setMonthPlan(prev => { const next = [...prev]; next[weekIndex] = weekData; return next; }); }
         else setWeekPlan(weekData);
       }
-      // Shopping list (упрощённый)
+      // Shopping list — use already-generated plan data (not regenerate!)
       const shoppingMap = new Map<string, any>();
-      const allDayPlans = days >= 7 ? (Array.from({ length: 7 }, (_, i) => buildOneDay(i))) : days >= 3 ? [d1, buildOneDay(1), buildOneDay(2)] : [d1];
+      let allDayPlans: any[];
+      if (days >= 7 && weekDays.length > 0) { allDayPlans = weekDays; }
+      else if (days >= 3 && d2 && d3) { allDayPlans = [d1, d2, d3]; }
+      else { allDayPlans = [d1]; }
       allDayPlans.forEach((dp: any) => { (dp.meals || []).forEach((m: any) => { (m.items || []).forEach((it: any) => {
         const ex = shoppingMap.get(it.id);
         if (ex) { ex.amount += it.amount || 0; ex.kcal += it.kcal || 0; ex.p += it.p || 0; ex.f += it.f || 0; ex.c += it.c || 0; }
@@ -763,7 +787,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const aasCount = injections.filter(i => i.type === 'ААС').length;
       const pharmaHeavy = aasCount + injections.filter(i => i.type === 'инсулин').length + injections.filter(i => i.type === 'ГР').length;
       const baseWaterMl = weight * Math.min(45, 40 + pharmaHeavy * 1.5);
-      setWaterCalc({ baseWater: Math.round(baseWaterMl / 10) / 10, pharmaBaseMl: 40, trainBonus: 0.3, fiberFactor: 0.1, pharmaBonus: hasPharma ? 0.5 : 0, total: Math.max(1.5, Math.round(baseWaterMl / 1000 * 10) / 10), hasPharma, electrolytes: { sodiumMg: 3500, potassiumMg: 3500, magnesiumMg: 400, note: 'Стандарт' } });
+      const trainBonusL = trainingDays.some(Boolean) ? 0.5 : 0.2;
+      const fiberBonusL = 0.1;
+      const pharmaBonusL = hasPharma ? 0.5 : 0;
+      const totalWaterL = Math.max(1.5, Math.round((baseWaterMl / 1000 + trainBonusL + fiberBonusL + pharmaBonusL) * 10) / 10);
+      setWaterCalc({ baseWater: Math.round(baseWaterMl / 10) / 10, pharmaBaseMl: 40, trainBonus: trainBonusL, fiberFactor: fiberBonusL, pharmaBonus: pharmaBonusL, total: totalWaterL, hasPharma, electrolytes: { sodiumMg: 3500, potassiumMg: 3500, magnesiumMg: 400, note: 'Стандарт' } });
       setGenerated(true);
       generateRecommendations();
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -1599,7 +1627,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           weekDays = weekDays.map((d: any) => ({ ...d, meals: d.meals.map((m: any) => ({ ...m, items: m.items.map((it: any) => ({ ...it, amount: Math.round(it.amount * 0.8), kcal: Math.round(it.kcal * 0.8), p: Math.round(it.p * 0.8), f: Math.round(it.f * 0.8), c: Math.round(it.c * 0.8) })) })), totals: { kcal: Math.round(d.totals.kcal * 0.8), p: Math.round(d.totals.p * 0.8), f: Math.round(d.totals.f * 0.8), c: Math.round(d.totals.c * 0.8) } }));
         }
       }
-      const weekData = { days: weekDays, totals: { kcal: weekDays.reduce((s: any,d: any) => s + d.totals.kcal, 0), p: weekDays.reduce((s: any,d: any) => s + d.totals.p, 0), f: weekDays.reduce((s: any,d: any) => s + d.totals.f, 0), c: weekDays.reduce((s: any,d: any) => s + d.totals.c, 0) }};
+      const weekData = { days: weekDays, totals: { kcal: weekDays.reduce((s: any,d: any) => s + d.totals.kcal, 0), p: weekDays.reduce((s: any,d: any) => s + d.totals.p, 0), f: weekDays.reduce((s: any,d: any) => s + d.totals.f, 0), c: weekDays.reduce((s: any,d: any) => s + d.totals.c, 0), fiber: weekDays.reduce((s: any,d: any) => s + (d.totals.fiber||0), 0) }};
       if (weekIndex !== undefined) { setMonthPlan(prev => { const next = [...prev]; next[weekIndex] = weekData; return next; }); }
       else setWeekPlan(weekData);
     }
@@ -1653,6 +1681,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [useProEngine, setUseProEngine] = useState(() => { try { return localStorage.getItem('he_use_pro_engine') !== 'false'; } catch { return true; } });
   useEffect(() => { try { localStorage.setItem('he_use_pro_engine', useProEngine ? 'true' : 'false'); } catch {} }, [useProEngine]);
+  const [planTab, setPlanTab] = useState<string>(() => { try { return localStorage.getItem('he_plan_active_tab') || 'settings'; } catch { return 'settings'; } });
+  useEffect(() => { try { localStorage.setItem('he_plan_active_tab', planTab); } catch {} }, [planTab]);
 
   const [specialMealMode, setSpecialMealMode] = useState(false);
   const [specialMealGoal, setSpecialMealGoal] = useState('custom');
@@ -2035,11 +2065,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   if (warnings.length === 0) warnings.push('✅ Все препараты совместимы с планом питания');
   setDrugCompatReport({ interactions: [], warnings });
   setActiveReports(prev => prev.includes('drug')?prev:[...prev,'drug']); };
-  const generateFullNutritionReport = () => { if (!dayPlan) return; try { const rep = generateNutritionReport({ meals: dayPlan.meals.map((m:any)=>({ label:m.label, items:m.items.map((i:any)=>({name:i.name||'',id:i.id||'',amount:i.amount||100,kcal:i.kcal||0,p:i.p||0,f:i.f||0,c:i.c||0})), totals:m.totals||{kcal:0,p:0,f:0,c:0}, time:m.time||'' })), totals: dayPlan.totals||{kcal:0,p:0,f:0,c:0}, targets: planTargets, userWeight: getProfileSafe()?.settings?.weight||80, userTDEE: planTargets.kcal, healthIssues, planType, variety, budget, allergens, cyclingMode, goal: getProfileSafe()?.settings?.primaryGoal||'maintenance', waterMl: waterCalc?.total?Math.round(waterCalc.total*1000):0, injections: injections.map(i=>({type:i.type,dose:i.dose,name:i.name,time:i.time})), workoutTime: linkToTraining&&trainingDays.some(Boolean)?trainStart:undefined }); if (rep) { setNutritionReport(rep); setActiveReports(prev=>prev.includes('nutrition')?prev:[...prev,'nutrition']); try { const arch = JSON.parse(localStorage.getItem('he_nutrition_report_archive')||'[]'); arch.unshift(rep); localStorage.setItem('he_nutrition_report_archive', JSON.stringify(arch.slice(0,50))); localStorage.setItem('he_nutrition_report_current', JSON.stringify(rep)); try { localStorage.setItem('he_profile_nutrition_reports', JSON.stringify(arch.slice(0,20))); } catch {} } catch {} } } catch(e) { console.error('Report failed:', e); } };
+  const generateFullNutritionReport = () => { if (!dayPlan) return; try { const rep = generateNutritionReport({ meals: dayPlan.meals.map((m:any)=>({ label:m.label, items:m.items.map((i:any)=>({name:i.name||'',id:i.id||'',amount:i.amount||100,kcal:i.kcal||0,p:i.p||0,f:i.f||0,c:i.c||0,fiber:i.fiber||0})), totals:m.totals||{kcal:0,p:0,f:0,c:0}, time:m.time||'' })), totals: dayPlan.totals||{kcal:0,p:0,f:0,c:0}, targets: planTargets, userWeight: getProfileSafe()?.settings?.weight||80, userTDEE: planTargets.kcal, healthIssues, planType, variety, budget, allergens, cyclingMode, goal: getProfileSafe()?.settings?.primaryGoal||'maintenance', waterMl: waterCalc?.total?Math.round(waterCalc.total*1000):0, injections: injections.map(i=>({type:i.type,dose:i.dose,name:i.name,time:i.time})), workoutTime: linkToTraining&&trainingDays.some(Boolean)?trainStart:undefined }); if (rep) { setNutritionReport(rep); setActiveReports(prev=>prev.includes('nutrition')?prev:[...prev,'nutrition']); try { const arch = JSON.parse(localStorage.getItem('he_nutrition_report_archive')||'[]'); arch.unshift(rep); localStorage.setItem('he_nutrition_report_archive', JSON.stringify(arch.slice(0,50))); localStorage.setItem('he_nutrition_report_current', JSON.stringify(rep)); try { localStorage.setItem('he_profile_nutrition_reports', JSON.stringify(arch.slice(0,20))); } catch {} } catch {} } } catch(e) { console.error('Report failed:', e); } };
 
   const renderMealList = (dayData: any, editable = false) => {
     if (!dayData) return null;
-    const d = dayData; const totalKcal = Math.round(d.totals?.kcal || 0); const totalP = Math.round(d.totals?.p || 0); const totalF = Math.round(d.totals?.f || 0); const totalC = Math.round(d.totals?.c || 0);
+    const d = dayData; const totalKcal = Math.round(d.totals?.kcal || 0); const totalP = Math.round(d.totals?.p || 0); const totalF = Math.round(d.totals?.f || 0); const totalC = Math.round(d.totals?.c || 0); const totalFiber = Math.round(d.totals?.fiber || 0);
     const pKcalPct = totalKcal > 0 ? (totalP * 4 / totalKcal) * 100 : 0; const fKcalPct = totalKcal > 0 ? (totalF * 9 / totalKcal) * 100 : 0; const cKcalPct = totalKcal > 0 ? (totalC * 4 / totalKcal) * 100 : 0;
     return (
       <div>
@@ -2058,6 +2088,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
               <span style={{color:'#3b82f6',fontWeight:600}}>💪 {totalP}г/{effectiveP||'—'} <span style={{fontSize:7,color:effectiveP?Math.abs(totalP-(effectiveP||0))<=5?'#22c55e':'#f59e0b':'rgba(255,255,255,0.5)'}}>{effectiveP>0?'('+Math.round(totalP/(effectiveP||1)*100)+'%)':''}</span></span>
               <span style={{color:'#f59e0b',fontWeight:600}}>🧈 {totalF}г/{effectiveF||'—'}</span>
               <span style={{color:'#f97316',fontWeight:600}}>🌾 {totalC}г/{effectiveC||'—'}</span>
+              {totalFiber > 0 && <span style={{color:'#22c55e',fontSize:8,fontWeight:600}}>🌱 {totalFiber}г</span>}
               <span style={{marginLeft:'auto',color:'rgba(255,255,255,0.85)'}}>{weight>0?`${Math.round(totalP/weight)}г/кг`:''}</span>
             </div>
           </div>
@@ -2071,6 +2102,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         {d.meals.map((m: any, mi: number) => {
           const mealKcal = Math.round(m.totals?.kcal || 0); const mealP = Math.round(m.totals?.p || 0); const mealF = Math.round(m.totals?.f || 0); const mealC = Math.round(m.totals?.c || 0);
           const mealDiaas = calcMealDIAAS((m.items || []).map((it: any) => ({ foodId: it.id || it.name, weightGrams: it.amount || 100 })));
+          const mealGL = Math.round((m.items || []).reduce((s: number, it: any) => { const fd = FOOD_DB.find((f: any) => f.id === it.id); const gi = fd?.gi || 0; return s + (gi * (it.c || 0) / 100); }, 0));
+          const mealII = (() => { let wII = 0, wK = 0; (m.items || []).forEach((it: any) => { const fd = FOOD_DB.find((f: any) => f.id === it.id); const ii = fd?.macro_100g?.insulin_index; const k = it.kcal || 0; if (ii != null && k > 0) { wII += ii * k; wK += k; } }); return wK > 0 ? Math.round(wII / wK) : 0; })();
           const isPreWorkout = m.label?.toLowerCase().includes('предтрен'); const isPostWorkout = m.label?.toLowerCase().includes('пост-трен'); const accentColor = isPreWorkout ? '#8b5cf6' : isPostWorkout ? '#f59e0b' : '#00e68a';
           return (
             <div key={mi} style={{marginBottom:6,borderRadius:10,overflow:'hidden',border:`1px solid ${dropTarget===mi?'rgba(0,230,138,0.4)':isPreWorkout?'rgba(139,92,246,0.2)':isPostWorkout?'rgba(245,158,11,0.2)':'rgba(255,255,255,0.15)'}`,transition:'all 0.2s',background:dropTarget===mi?'rgba(0,230,138,0.04)':undefined}}
@@ -2105,7 +2138,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
                     :isReplacing?<><span style={{fontWeight:600}}>{it.name}</span><select onChange={e=>{if(e.target.value){const f=FOOD_DB.find(x=>x.id===e.target.value);if(f)replaceFoodItem(0,mi,ii,f);}}} value="" style={{fontSize:7,padding:'1px 2px',borderRadius:3,border:'1px solid rgba(255,255,255,0.06)',background:'#18181b',color:'#fff',maxWidth:120}}><option value="">🔀 Заменить...</option>{findSimilarFoods(it).map((s:any)=><option key={s.id} value={s.id}>{s.name}</option>)}</select></>
                     :<><span style={{fontWeight:600}}>{it.name}</span>{preferredFoods.includes(it.id)&&<span style={{fontSize:7,color:'#00e68a',padding:'0 1px'}} title="Любимый продукт">⭐</span>}<span style={{color:'rgba(255,255,255,0.9)',fontSize:8}}>{it.amount}г</span>{lockedFoodIds.has(it.id)&&<span style={{fontSize:7,color:'#f59e0b',padding:'0 2px'}} title="Закреплено — не изменится при регенерации">🔒</span>}<span onClick={()=>addToCart({name:it.name,kcal:it.kcal*(it.amount/100),amount:it.amount,category:it.category})} style={{cursor:'pointer',fontSize:7,color:'#00e68a',opacity:0.35,padding:'0 2px'}}>🛒</span><span onClick={()=>toggleLockFood(it.id)} style={{cursor:'pointer',fontSize:7,color:lockedFoodIds.has(it.id)?'#f59e0b':'rgba(255,255,255,0.4)',padding:'0 2px'}} title={lockedFoodIds.has(it.id)?'Открепить':'Закрепить (не изменится при регенерации)'}>{lockedFoodIds.has(it.id)?'🔓':'🔒'}</span><span onClick={()=>{setEditItem({dayIdx:0,mealIdx:mi,itemIdx:ii});setEditAmount(it.amount);}} style={{cursor:'pointer',fontSize:7,color:'rgba(255,255,255,0.8)',padding:'0 2px'}}>✏️</span><span onClick={()=>setReplacingItem({dayIdx:0,mealIdx:mi,itemIdx:ii})} style={{cursor:'pointer',fontSize:7,color:'rgba(245,158,11,0.4)',padding:'0 2px'}}>🔄</span><span onClick={()=>removeFoodItem(0,mi,ii)} style={{cursor:'pointer',fontSize:7,color:'rgba(239,68,68,0.3)',padding:'0 2px'}}>✕</span></>}
                   </span>;})}</div>
-                {m.totals&&<div style={{display:'flex',gap:6,marginTop:4,fontSize:8,alignItems:'center',flexWrap:'wrap'}}><span style={{color:'#3b82f6',fontWeight:600}}>Б {mealP}г</span><span style={{color:'#f59e0b',fontWeight:600}}>Ж {mealF}г</span><span style={{color:'#f97316',fontWeight:600}}>У {mealC}г</span>{mealDiaas.diaas > 0 && <span style={{fontSize:7,fontWeight:600,color:mealDiaas.diaas >= 1 ? '#22c55e' : mealDiaas.diaas >= 0.75 ? '#f59e0b' : '#ef4444',background:(mealDiaas.diaas >= 1 ? 'rgba(34,197,94,0.08)' : mealDiaas.diaas >= 0.75 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)') + ' none repeat scroll 0% 0%',padding:'1px 5px',borderRadius:4}}>DIAAS {mealDiaas.diaas.toFixed(2)}</span>}{m.synergyNotes&&m.synergyNotes.length>0&&<span style={{fontSize:7,color:'#22c55e',fontWeight:600}} title={m.synergyNotes.join('; ')}>✅ {(m.synergyNotes as string[]).length} синерги{((m.synergyNotes as string[]).length>1?'й':'я')}</span>}{m.conflictWarnings&&m.conflictWarnings.length>0&&<span style={{fontSize:7,color:'#ef4444',fontWeight:600}} title={m.conflictWarnings.join('; ')}>⚠️ {(m.conflictWarnings as string[]).length} конфликт{((m.conflictWarnings as string[]).length>1?'ов':'')}</span>}</div>}
+                {m.totals&&<div style={{display:'flex',gap:6,marginTop:4,fontSize:8,alignItems:'center',flexWrap:'wrap'}}>{(() => { const tg = m.target; const fmt = (v: number, t: number|undefined, color: string) => { if (!t || t <= 0) return <span style={{color,fontWeight:600}}>{v}г</span>; const dev = v - t; const ok = Math.abs(dev) <= 3; return <span style={{color,fontWeight:600}}>{v}/{t}г{ok?null:<span style={{fontSize:6,color:dev>0?'#ef4444':'#f59e0b',fontWeight:700}}>{dev>0?('+'+Math.round(dev)):(''+Math.round(dev))}</span>}</span>; }; return <span style={{display:'contents'}}>{fmt(mealP,tg?.p,'#3b82f6')}<span style={{color:'rgba(255,255,255,0.2)',margin:'0 3px'}}>·</span>{fmt(mealF,tg?.f,'#f59e0b')}<span style={{color:'rgba(255,255,255,0.2)',margin:'0 3px'}}>·</span>{fmt(mealC,tg?.c,'#f97316')}</span>; })()}{mealDiaas.diaas > 0 && <span style={{fontSize:7,fontWeight:600,color:mealDiaas.diaas >= 1 ? '#22c55e' : mealDiaas.diaas >= 0.75 ? '#f59e0b' : '#ef4444',background:(mealDiaas.diaas >= 1 ? 'rgba(34,197,94,0.08)' : mealDiaas.diaas >= 0.75 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)') + ' none repeat scroll 0% 0%',padding:'1px 5px',borderRadius:4}}>DIAAS {mealDiaas.diaas.toFixed(2)}</span>}{mealGL > 0 && <span style={{fontSize:7,fontWeight:600,color:mealGL<10?'#22c55e':mealGL<=20?'#f59e0b':'#ef4444',background:(mealGL<10?'rgba(34,197,94,0.08)':mealGL<=20?'rgba(245,158,11,0.08)':'rgba(239,68,68,0.08)'),padding:'1px 5px',borderRadius:4}} title={'Glycemic Load: ' + mealGL + (isPostWorkout ? ' (high GL ok post-workout)' : '')}>GL {mealGL}</span>}{mealII > 0 && <span style={{fontSize:7,fontWeight:600,color:mealII<40?'#22c55e':mealII<=70?'#f59e0b':'#ef4444',background:(mealII<40?'rgba(34,197,94,0.08)':mealII<=70?'rgba(245,158,11,0.08)':'rgba(239,68,68,0.08)'),padding:'1px 5px',borderRadius:4}} title={'Insulin Index (kcal-weighted): ' + mealII}>II {mealII}</span>}{m.mpsCheck && m.mpsCheck.triggers_mTOR && <span style={{fontSize:7,fontWeight:600,color:'#00e68a',background:'rgba(0,230,138,0.08)',padding:'1px 5px',borderRadius:4}} title={'+' + m.mpsCheck.leucineG + 'g leucine, MPS triggered'}>{'\uD83E\uDDEC mTOR'}</span>}{m.mpsCheck && !m.mpsCheck.triggers_mTOR && m.mpsCheck.proteinG > 0 && <span style={{fontSize:7,fontWeight:600,color:'#f59e0b',background:'rgba(245,158,11,0.08)',padding:'1px 5px',borderRadius:4}} title={'Leucine ' + m.mpsCheck.leucineG + 'g < 2.5g threshold'}>{'\u26A0\uFE0F ' + m.mpsCheck.leucineG + 'g'}</span>}{m.synergyNotes&&m.synergyNotes.length>0&&<span style={{fontSize:7,color:'#22c55e',fontWeight:600}} title={m.synergyNotes.join('; ')}>✅ {(m.synergyNotes as string[]).length} синерги{((m.synergyNotes as string[]).length>1?'й':'я')}</span>}{m.conflictWarnings&&m.conflictWarnings.length>0&&<span style={{fontSize:7,color:'#ef4444',fontWeight:600}} title={m.conflictWarnings.join('; ')}>⚠️ {(m.conflictWarnings as string[]).length} конфликт{((m.conflictWarnings as string[]).length>1?'ов':'')}</span>}</div>}
                 {quickAddMealIdx === mi && (
                   <div style={{padding:'4px 10px 8px',background:'#18181b',borderTop:'1px solid rgba(255,255,255,0.04)'}}>
                     <input value={quickAddSearch} onChange={e=>setQuickAddSearch(e.target.value)} placeholder="Поиск продукта..." autoFocus style={{width:'100%',padding:'4px 8px',borderRadius:6,border:'1px solid rgba(0,230,138,0.2)',background:'#202023',color:'#fff',fontSize:9,marginBottom:4}} />
@@ -2120,7 +2153,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
                         return sorted.map((r: any) => {
                           const food = FOOD_DB.find((f: any) => f.id === r.foodId);
                           return (
-                            <span key={r.foodId} onClick={() => { if (!food) return; setDayPlan((prev: any) => { if (!prev) return prev; const meals = prev.meals.map((m1: any, i: number) => { if (i !== mi) return m1; const items = [...m1.items, { name: food.name, id: food.id, amount: 100, kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs }]; const totals = { kcal: items.reduce((s: number, it: any) => s + it.kcal, 0), p: items.reduce((s: number, it: any) => s + it.p, 0), f: items.reduce((s: number, it: any) => s + it.f, 0), c: items.reduce((s: number, it: any) => s + it.c, 0) }; return { ...m1, items, totals }; }); const totals = { kcal: meals.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0) }; return { ...prev, meals, totals }; }); setQuickAddMealIdx(null); setQuickAddSearch(''); }}
+                            <span key={r.foodId} onClick={() => { if (!food) return; setDayPlan((prev: any) => { if (!prev) return prev; const meals = prev.meals.map((m1: any, i: number) => { if (i !== mi) return m1; const items = [...m1.items, { name: food.name, id: food.id, amount: 100, kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs, fiber: food.fiber || 0 }]; const totals = { kcal: items.reduce((s: number, it: any) => s + it.kcal, 0), p: items.reduce((s: number, it: any) => s + it.p, 0), f: items.reduce((s: number, it: any) => s + it.f, 0), c: items.reduce((s: number, it: any) => s + it.c, 0), fiber: items.reduce((s: number, it: any) => s + (it.fiber || 0), 0) }; return { ...m1, items, totals }; }); const totals = { kcal: meals.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0) }; return { ...prev, meals, totals }; }); setQuickAddMealIdx(null); setQuickAddSearch(''); }}
                               style={{padding:'3px 6px',borderRadius:4,fontSize:8,background:'#202023',border:'1px solid rgba(0,230,138,0.1)',color:'#fff',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:3}}>
                               {r.foodName}{r.matchScore > 0 && <span style={{fontSize:6,color:r.color,fontWeight:600}}>{r.matchScore}%</span>}
                             </span>
@@ -2231,6 +2264,53 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             </div>
           </div>
         )}
+        {d.meals && d.meals.length > 0 && (() => {
+          const toMin = (t: string) => { const [h, m] = (t || '00:00').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+          const mealMins = d.meals.map((m: any) => toMin(m.time));
+          const startMin = Math.min(...mealMins, 360);
+          const lastMeal = Math.max(...mealMins);
+          const endMin = Math.max(lastMeal + 90, 1380);
+          const span = Math.max(60, endMin - startMin);
+          const pos = (min: number) => Math.max(0, Math.min(100, ((min - startMin) / span) * 100));
+          const mealPts = d.meals.map((m: any) => ({ ...m, min: toMin(m.time) })).sort((a: any, b: any) => a.min - b.min);
+          const trainMin = (linkToTraining && d.isTrainingDay && trainStart && trainStart.includes(':')) ? toMin(trainStart) : null;
+          const trainEndMin = (trainMin != null && trainEnd && trainEnd.includes(':')) ? toMin(trainEnd) : (trainMin != null ? trainMin + 90 : null);
+          const hourTicks: number[] = []; for (let t = Math.floor(startMin / 60) * 60; t <= endMin; t += 60) hourTicks.push(t);
+          return (
+            <div style={{ marginTop: 6, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,230,138,0.18)' }}>
+              <div style={{ padding: '8px 10px', background: 'rgba(0,230,138,0.04)' }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 6 }}>Таймлайн дня</div>
+                <div style={{ position: 'relative', height: 44, background: '#202023', borderRadius: 6, overflow: 'hidden' }}>
+                  {hourTicks.map((t, i) => (
+                    <div key={i} style={{ position: 'absolute', left: pos(t) + '%', top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.06)' }}>
+                      <span style={{ position: 'absolute', top: 1, left: 2, fontSize: 6, color: 'rgba(255,255,255,0.35)' }}>{String(Math.floor(t / 60) % 24).padStart(2, '0')}</span>
+                    </div>
+                  ))}
+                  {trainMin != null && trainEndMin != null && (
+                    <div style={{ position: 'absolute', left: pos(trainMin) + '%', width: Math.max(2, pos(trainEndMin) - pos(trainMin)) + '%', top: 0, bottom: 0, background: 'linear-gradient(180deg, rgba(239,68,68,0.28), rgba(239,68,68,0.1))', borderLeft: '2px solid #ef4444', borderRight: '2px solid #ef4444' }} title='Тренировка'>
+                      <span style={{ position: 'absolute', top: 1, left: '50%', transform: 'translateX(-50%)', fontSize: 7, fontWeight: 700, color: '#ef4444' }}>T</span>
+                    </div>
+                  )}
+                  {mealPts.map((m: any, i: number) => {
+                    const isW = m.label && (m.label.toLowerCase().includes('предтрен') || m.label.toLowerCase().includes('пост') || m.label.toLowerCase().includes('intra'));
+                    const col = isW ? '#8b5cf6' : '#00e68a';
+                    return (
+                      <div key={i} style={{ position: 'absolute', left: pos(m.min) + '%', top: 14, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }} title={m.time + ' — ' + m.label + ' · ' + Math.round(m.totals?.kcal || 0) + ' ккал'}>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: col, boxShadow: '0 0 4px ' + col }} />
+                        <div style={{ fontSize: 5, color: col, marginTop: 1, whiteSpace: 'nowrap', fontWeight: 600 }}>{(m.label || '').slice(0, 8)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 6, color: 'rgba(255,255,255,0.6)' }}>
+                  <span><span style={{ color: '#00e68a' }}>●</span> Приёмы</span>
+                  <span><span style={{ color: '#8b5cf6' }}>●</span> Peri-workout</span>
+                  {trainMin != null && <span><span style={{ color: '#ef4444' }}>T</span> Тренировка</span>}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   };
@@ -2325,8 +2405,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     labAnalysis,
     errorMsg, setErrorMsg,
     useProEngine, setUseProEngine,
+    planTab, setPlanTab,
     labs,
-  }), [weight, height, age, sex, dailySteps, cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, mealsCount, allergens, healthIssues, eveningLowCarb, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, useProEngine, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
+  }), [weight, height, age, sex, dailySteps, cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, mealsCount, allergens, healthIssues, eveningLowCarb, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, useProEngine, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   return <PlanContext.Provider value={ctx}>{children}</PlanContext.Provider>;
 };

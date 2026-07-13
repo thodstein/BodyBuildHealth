@@ -12,6 +12,12 @@
 
 import { EXERCISE_CATALOG } from '../core/exercise-catalog';
 import type { Exercise } from '../core/types';
+import { derivePattern } from './movement-pattern';
+
+/** Паттерн движения упражнения: из каталога либо выведенный эвристически. */
+function patternOf(ex: Exercise): string {
+  return (ex.movementPattern as string) || derivePattern(ex);
+}
 
 export interface SubstitutionResult {
   exercise: Exercise;
@@ -92,9 +98,11 @@ export function findSubstitutions(
 
   // 3) Тот же movementPattern + другой equipment (например, штанга → гантели)
   if (results.length < 3) {
+    const exPattern = patternOf(ex);
     const samePatternOtherEq = EXERCISE_CATALOG.filter(
       e => e.id !== ex.id &&
-        e.movementPattern === ex.movementPattern &&
+        exPattern !== 'unknown' &&
+        patternOf(e) === exPattern &&
         e.equipment !== ex.equipment &&
         e.jointStress !== 'high' &&
         !injuredMuscles.has(e.group || muscleGroup) &&
@@ -104,7 +112,7 @@ export function findSubstitutions(
       results.push({
         exercise: repl,
         confidence: 'medium',
-        reason: `Тот же тип движения (${ex.movementPattern}), другое оборудование (${repl.equipment}) — снижение нагрузки`,
+        reason: `Тот же тип движения (${exPattern}), другое оборудование (${repl.equipment}) — снижение нагрузки`,
         weightPct: 0.7,
         volumePct: 0.75,
         repsMin: 12,

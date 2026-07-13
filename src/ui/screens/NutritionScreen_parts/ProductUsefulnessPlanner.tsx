@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FOOD_DB, calcBBQualityScore } from '../../../core/nutrition-database';
 import { useDataLink } from '../../../core/data-link';
 import { scoreAllProducts, compareProducts, calcMealScore, CATEGORY_LABELS, GOAL_MAP_RU } from '../../../engines/product-usefulness.engine';
@@ -167,7 +167,8 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   const courseEntries = linked.course ?? [];
   const profileAAS = Array.isArray(courseEntries) && courseEntries.some((e: any) => e.type === 'ААС' || e.class === 'aas');
 
-  const [plannerTab, setPlannerTab] = useState<PlannerTab>('catalog');
+  const [plannerTab, setPlannerTab] = useState<PlannerTab>(() => { try { return (localStorage.getItem('he_pup_tab') as PlannerTab) || 'catalog'; } catch { return 'catalog'; } });
+  useEffect(() => { try { localStorage.setItem('he_pup_tab', plannerTab); } catch {} }, [plannerTab]);
   const [enableA, setEnableA] = useState(true);
   const [enableB, setEnableB] = useState(true);
   const [enableC, setEnableC] = useState(true);
@@ -801,6 +802,13 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
         </div>
       ) : null;
     })()}
+    {enableC && score.costEfficiency && score.costEfficiency.leucineCostRub > 0 && (
+      <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:7, marginTop:2, padding:'2px 6px', borderRadius:4, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.1)' }}>
+        <span style={{ color:'#22c55e', fontWeight:600 }}>🧬 Leu-стоимость</span>
+        <span style={{ fontWeight:700, color:'#22c55e' }}>{score.costEfficiency.leucineCostRub} ₽/г</span>
+        <span style={{ color:'rgba(255,255,255,0.75)' }}>· {score.costEfficiency.proteinCostRub}₽/10г белка</span>
+      </div>
+    )}
     <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', marginTop: 2 }}>Настройте фазу и фармакологию в ⚙️ Параметры → вкладка v2</div>
   </div>
 ) : (
@@ -820,7 +828,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
   </div>}
   {enableC && score.costEfficiency && (
     <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.65)', display: 'flex', gap: 8 }}>
-      <span>💰 {score.costEfficiency.proteinCostRub} ₽/10г белка</span>
+      <span>💰 {score.costEfficiency.proteinCostRub} ₽/10г белка</span><span>🧬 {score.costEfficiency.leucineCostRub} ₽/г лейцина</span>
       <span>💳 <span style={{ color: score.costEfficiency.efficiencyScore >= 50 ? '#22c55e' : '#f59e0b' }}>{score.costEfficiency.efficiencyScore}/100</span></span>
     </div>
   )}
@@ -919,7 +927,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
                     )}
                     {enableC && score.costEfficiency && (
                       <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.9)', textAlign: 'center' }}>
-                        💰 {score.costEfficiency.proteinCostRub} ₽/10г белка · <span style={{ color: score.costEfficiency.efficiencyScore >= 50 ? '#22c55e' : '#f59e0b' }}>{score.costEfficiency.efficiencyScore}/100</span>
+                        💰 {score.costEfficiency.proteinCostRub} ₽/10г белка · 🧬 {score.costEfficiency.leucineCostRub}₽/гLeu · <span style={{ color: score.costEfficiency.efficiencyScore >= 50 ? '#22c55e' : '#f59e0b' }}>{score.costEfficiency.efficiencyScore}/100</span>
                       </div>
                     )}
                     {(() => {
@@ -1140,7 +1148,7 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px',
                     marginTop: 4, borderRadius: 8, background: 'rgba(255,255,255,0.03)', fontSize: 8, color: 'rgba(255,255,255,0.8)',
                   }}>
-                    <span>в€‘ {mealProducts.reduce((s, mp) => {
+                    <span>∑ {mealProducts.reduce((s, mp) => {
                       const f = FOOD_DB.find(x => x.id === mp.foodId);
                       return s + ((f?.kcal || 0) * mp.weightGrams / 100);
                     }, 0).toFixed(0)} ккал</span>
@@ -1447,12 +1455,14 @@ const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) =
               if (found.length === 0) { setSwapResults([]); return; }
               const target = found[0];
               const targetCat = target.food.category;
+              const effScore = (item: { food: any; score: any }) => useV2 ? (v2Scored.get(item.food.id)?.total ?? 0) : item.score.total;
+              const targetScore = effScore(target);
               const sameCat = scored.filter(({food}) => food.category === targetCat && food.id !== target.food.id);
               const withImprovement = sameCat
-                .filter(({score}) => score.total > target.score.total)
-                .sort((a,b) => b.score.total - a.score.total)
+                .filter(item => effScore(item) > targetScore)
+                .sort((a,b) => effScore(b) - effScore(a))
                 .slice(0, 8)
-                .map(({food,score}) => ({ food, score, improvement: Math.round((score.total - target.score.total) / target.score.total * 100) }));
+                .map(item => { const vs = useV2 ? v2Scored.get(item.food.id) : null; const s = vs ?? item.score; return { food: item.food, score: s, improvement: targetScore > 0 ? Math.round((effScore(item) - targetScore) / targetScore * 100) : 0 }; });
               setSwapResults(withImprovement);
               if (withImprovement.length === 0) showToast('Нет продуктов с более высоким скором в этой категории');
             }} style={{

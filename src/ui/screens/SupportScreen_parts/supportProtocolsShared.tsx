@@ -127,15 +127,24 @@ export const StopBanner: React.FC<{ title: string; thresholds: string[] }> = ({ 
   </div>
 );
 
+export const ContraBanner: React.FC<{ items: string[] }> = ({ items }) => (
+  <div style={{ borderRadius:10, padding:'10px 12px', background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.25)' }}>
+    <div style={{ fontSize:9, fontWeight:800, color:'#f59e0b', marginBottom:4 }}>⚠️ Что НЕ назначать / противопоказания</div>
+    {items.map((t: string, i: number) => (
+      <div key={i} style={{ fontSize:8, color:'#fcd34d', lineHeight:1.4, marginBottom:2 }}>• {t}</div>
+    ))}
+  </div>
+);
+
 export const PROTOCOL_CARDS = [
-  { id:'symptoms', icon:'🩺', label:'Симптомы', desc:'Поиск и коррекция симптомов: база решений, дневник, приверженность', color:'#ef4444', system:'Общее', tags:['Симптомы','Решения','Дневник','Лабы'] },
+  { id:'symptoms', icon:'🩺', label:'Симптомы', desc:'Поиск и коррекция симптомов: база решений, дневник, приверженность', color:'#ef4444', system:'Общее', tags:['Симптомы','Решения','Дневник','Лабы'], kind:'reference' },
   { id:'neuro', icon:'🧠', label:'Нейропротекция', desc:'Нейротоксичность ААС: механизмы, калькулятор риска, протокол', color:'#06b6d4', system:'ЦНС', tags:['Нейротоксичность','BDNF','ГАМК','Глутамат'] },
   { id:'cardio', icon:'❤️', label:'Кардио', desc:'СС-защита: АД, липиды, фиброз, аритмии на ААС', color:'#ef4444', system:'ССС', tags:['АД','Липиды','Аритмия','Фиброз'] },
   { id:'hepatic', icon:'🫁', label:'Печень', desc:'Гепатопротекция: 17α-алкилированные, ферменты, стеатоз', color:'#84cc16', system:'Печень', tags:['АЛТ/АСТ','Холестаз','Стеатоз'] },
   { id:'renal', icon:'💧', label:'Почки', desc:'Нефропротекция: RAAS, протеинурия, СКФ, электролиты', color:'#3b82f6', system:'Почки', tags:['СКФ','Протеинурия','RAAS'] },
   { id:'joints', icon:'🦴', label:'Суставы', desc:'Здоровье суставов: коллаген, гиалуронан, сухожилия', color:'#22c55e', system:'ОДА', tags:['Коллаген','Сухожилия','Воспаление'] },
   { id:'acne', icon:'🔴', label:'Акне', desc:'Андроген-индуцированное акне: топика, системная, рубцы', color:'#f97316', system:'Кожа', tags:['Андрогены','Себум','Рубцы'] },
-  { id:'injections', icon:'💉', label:'Инъекции', desc:'Техника, осложнения, постинъекционные абсцессы', color:'#14b8a6', system:'Общее', tags:['Техника','Абсцесс','Стерильность'] },
+  { id:'injections', icon:'💉', label:'Инъекции', desc:'Техника, осложнения, постинъекционные абсцессы', color:'#14b8a6', system:'Общее', tags:['Техника','Абсцесс','Стерильность'], kind:'reference' },
   { id:'thyroid', icon:'🦋', label:'Тиреоидный', desc:'Щитовидная железа: T3/T4/ТТГ на ААС, GH, диете', color:'#ec4899', system:'Эндокринная', tags:['ТТГ','T3/T4','GH','Гипотиреоз'] },
   { id:'immune', icon:'🛡️', label:'Иммунитет', desc:'Иммунная модуляция: SHBG, микроорганизмы, вакцинация', color:'#6366f1', system:'Иммунная', tags:['Инфекции','Вакцинация','SHBG'] },
   { id:'e2', icon:'🔬', label:'Эстрадиол', desc:'Контроль E2: AI, SERM, гинекомастия, стероидный баланс', color:'#f472b6', system:'Гормоны', tags:['Ароматаза','AI','SERM','Гинекомастия'] },
@@ -151,9 +160,9 @@ export const PROTOCOL_CARDS = [
   { id:'prolactin', icon:'🤱', label:'Пролактин', desc:'Гиперпролактинемия: каберголин, B6, фазы по PRL', color:'#ec4899', system:'Гормоны', tags:['PRL','Каберголин','D2-агонист'] },
   { id:'adaptogen', icon:'🌿', label:'Адаптогены/HPA', desc:'Кортизол: фазы, HPA-ось, аддисонический криз', color:'#22c55e', system:'Нервная', tags:['Кортизол','HPA','Адаптогены'] },
   { id:'mito', icon:'⚡', label:'Митохондрии', desc:'NAD⁺/CoQ10/PQQ: митохондриальный биогенез, энергия', color:'#06b6d4', system:'Метаболизм', tags:['NAD⁺','CoQ10','Митохондрии'] },
-  { id:'steatosis', icon:'🫁', label:'Стеатоз', desc:'НАЖБП: берберин, TUDCA, омега-3 EPA, HБП', color:'#84cc16', system:'Печень', tags:['НАЖБП','Стеатоз','Фиброз'] },
+  { id:'steatosis', icon:'🫁', label:'Стеатоз', desc:'НАЖБП/ХБП: берберин, TUDCA, омега-3 EPA', color:'#84cc16', system:'Печень', tags:['НАЖБП','Стеатоз','Фиброз'] },
   { id:'raas', icon:'🫀', label:'RAAS (АД/Почки)', desc:'Ренин-ангиотензин: АД, протеинурия, ХБП, фиброз', color:'#3b82f6', system:'ССС', tags:['АД','RAAS','Протеинурия'] },
-  { id:'peptide', icon:'🧬', label:'Пептиды', desc:'GHRP, BPC-157, ноотропы, иммунные — справочник', color:'#2dd4bf', system:'Общее', tags:['GHRP','BPC-157','Ноотропы'] },
+  { id:'peptide', icon:'🧬', label:'Пептиды', desc:'GHRP, BPC-157, ноотропы, иммунные — справочник', color:'#2dd4bf', system:'Общее', tags:['GHRP','BPC-157','Ноотропы'], kind:'reference' },
   { id:'postcycle', icon:'🔄', label:'Постцикл', desc:'Реабилитация после курса: липиды, HCT, HPTA, нейро', color:'#8b5cf6', system:'Общее', tags:['HPTA','ПКТ','Липиды','Гематокрит'] },
   { id:'pct', icon:'💊', label:'ПКТ', desc:'Послекурсовая терапия: SERM, hCG, HPTA-восстановление', color:'#22c55e', system:'Гормоны', tags:['ПКТ','SERM','hCG','HPTA'] },
   { id:'fertility', icon:'👶', label:'Фертильность', desc:'Репродуктивное здоровье: спермограмма, гормоны, DFI', color:'#ec4899', system:'Репродуктивная', tags:['Сперма','Гормоны','DFI','ЭКО'] },

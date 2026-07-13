@@ -19,7 +19,9 @@ const TAB_META: { key: PlanTab; label: string; icon: string }[] = [
 ];
 
 export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: any[]; labs?: LabPoint[]; labAnalysis?: LabCompositeResult | null }> = ({ profile, course, labs, labAnalysis }) => {
-  const [tab, setTab] = useState<PlanTab>('settings');
+  const { planTab, setPlanTab } = usePlanCtx();
+  const tab = planTab as PlanTab;
+  const setTab = (t: PlanTab) => setPlanTab(t);
   const [disclaimerDismissed, setDisclaimerDismissed] = useState(() => localStorage.getItem('he_disclaimer_dismissed') === 'true');
 
   return (

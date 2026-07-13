@@ -18,6 +18,65 @@
 
 import type { TzMechId, TzOrganId } from './tz-bridge-marker';
 import { STACK_DB, TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../data/support-db';
+import { ALL_STACKS } from '../data/support-stacks';
+import { SYNERGY_PAIRS } from '../data/lab-synergy-engine';
+import { SUPPORT_CATALOG_DATA } from '../data/support-catalog-data';
+
+// ── Автоподбор стеков под недокрытые механизмы ТЗ (режим «Усиление») ──
+// Остаточный риск по органу → выделенный стек той же системы:
+//   печень (liv*)   → hepatoprotection_stack
+//   почки  (ren*)   → nephroprotection_stack
+//   ССС    (cv*)    → cardioprotection_stack
+//   ЦНС    (cns*)   → neuroprotection_stack
+//   репрод (rep*)   → hormonal_pct_stack
+//   гемато hem1*    → fibrinolytic_stack (вязкость/эритроцитоз)
+//   гемато hem2-5*  → glycemic_control_stack (метаб/электролиты)
+
+export interface GapFillMech {
+  organId: TzOrganId;
+  organLabel: string;
+  mechId: TzMechId;
+  mechLabel: string;
+  suggestions: string[];
+}
+
+export interface GapFillSuggestion {
+  stackId: string;
+  stackName: string;
+  mechLabels: string[];   // какие остаточные механизмы закрывает
+  organLabels: string[];  // по каким системам органов
+}
+
+function stackForMech(mechId: TzMechId): string | null {
+  if (mechId.startsWith('liv')) return 'hepatoprotection_stack';
+  if (mechId.startsWith('ren')) return 'nephroprotection_stack';
+  if (mechId.startsWith('cv')) return 'cardioprotection_stack';
+  if (mechId.startsWith('cns')) return 'neuroprotection_stack';
+  if (mechId.startsWith('rep')) return 'hormonal_pct_stack';
+  if (mechId.startsWith('hem1')) return 'fibrinolytic_stack';
+  if (mechId.startsWith('hem')) return 'glycemic_control_stack';
+  return null;
+}
+
+export function buildGapFillSuggestions(gaps: GapFillMech[] = []): GapFillSuggestion[] {
+  if (!gaps || !gaps.length) return [];
+  const byStack = new Map<string, GapFillSuggestion>();
+  for (const g of gaps) {
+    const stackId = stackForMech(g.mechId);
+    if (!stackId) continue;
+    const stack = (ALL_STACKS as any[]).find(s => s.id === stackId)
+      || (STACK_DB[stackId] ? { id: stackId, name: STACK_DB[stackId].name } : null);
+    if (!stack) continue;
+    const name = (stack as any).name || stackId;
+    if (!byStack.has(stackId)) {
+      byStack.set(stackId, { stackId, stackName: name, mechLabels: [], organLabels: [] });
+    }
+    const entry = byStack.get(stackId)!;
+    if (!entry.mechLabels.includes(g.mechLabel)) entry.mechLabels.push(g.mechLabel);
+    if (!entry.organLabels.includes(g.organLabel)) entry.organLabels.push(g.organLabel);
+  }
+  return Array.from(byStack.values());
+}
 
 export type BoosterKey = 'neuro' | 'joints' | 'stack';
 
@@ -132,32 +191,56 @@ export const STACK_BOOSTER_TRIGGERS: StackBoosterTrigger[] = [
 
 // Получить стек-бустер по id
 export function getStackBooster(stackId: string): BoosterDef | null {
+  // 1. Legacy TZ-bridе stacks (25)
   const entry = STACK_DB[stackId];
-  if (!entry) return null;
-  // Извлечь ТЗ-mechIds из coverage
-  const mechs = new Set<TzMechId>();
-  for (const sub of Object.values(entry.coverage)) {
-    for (const t of sub.targets) mechs.add(t as TzMechId);
+  if (entry && entry.substances && entry.substances.length) {
+    const mechs = new Set<TzMechId>();
+    for (const sub of Object.values(entry.coverage)) {
+      for (const t of sub.targets) mechs.add(t as TzMechId);
+    }
+    const organs = new Set<TzOrganId>();
+    for (const oc of entry.organCoverage) organs.add(oc as TzOrganId);
+    return {
+      key: 'stack',
+      label: `📦 ${entry.name}`,
+      description: `Стек: ${substanceId_join(entry.substances)}`,
+      trigger: STACK_BOOSTER_TRIGGERS.find(t => t.stackId === stackId)?.indicator || 'По клиническим показаниям',
+      subs: entry.substances.map((sid, i) => {
+        const c = entry.coverage[Object.keys(entry.coverage)[i]];
+        return {
+          substanceId: sid,
+          reason: c?.q ? `${c.name} — ${c.targets.join('/')} k=${c.k.toFixed(2)} (${c.q})` : sid,
+          category: 'other',
+        };
+      }),
+      mechs: Array.from(mechs),
+      organs: Array.from(organs),
+      rationale: `Готовый стек «${entry.name}». Состав подобран для ${entry.organCoverage.join('/')}. Сила стека (макс k): ${maxK_stack(entry)}.`,
+    };
   }
-  const organs = new Set<TzOrganId>();
-  for (const oc of entry.organCoverage) organs.add(oc as TzOrganId);
-  return {
-    key: 'stack',
-    label: `📦 ${entry.name}`,
-    description: `Стек: ${substanceId_join(entry.substances)}`,
-    trigger: STACK_BOOSTER_TRIGGERS.find(t => t.stackId === stackId)?.indicator || 'По клиническим показаниям',
-    subs: entry.substances.map((sid, i) => {
-      const c = entry.coverage[Object.keys(entry.coverage)[i]];
-      return {
-        substanceId: sid,
-        reason: c?.q ? `${c.name} — ${c.targets.join('/')} k=${c.k.toFixed(2)} (${c.q})` : sid,
+  // 2. Fallback: newer B-format stacks (ALL_STACKS, full 55) — resolve by id
+  const st = (ALL_STACKS || []).find(s => s.id === stackId);
+  if (st && st.substances && st.substances.length) {
+    const mechs = new Set<TzMechId>();
+    for (const m of (st.anatomicalMapping?.mechanismCodes || [])) mechs.add(m as TzMechId);
+    const organs = new Set<TzOrganId>();
+    for (const o of (st.anatomicalMapping?.organSystems || [])) organs.add(o as TzOrganId);
+    return {
+      key: 'stack',
+      label: `📦 ${st.name}`,
+      description: `Стек: ${substanceId_join(st.substances.map((s:any) => s.id))}`,
+      trigger: STACK_BOOSTER_TRIGGERS.find(t => t.stackId === stackId)?.indicator || 'Готовый стек',
+      subs: st.substances.map((s:any) => ({
+        substanceId: s.id,
+        reason: `${s.dose || ''} ${s.timing || ''}`.trim() || s.id,
         category: 'other',
-      };
-    }),
-    mechs: Array.from(mechs),
-    organs: Array.from(organs),
-    rationale: `Готовый стек «${entry.name}». Состав подобран для ${entry.organCoverage.join('/')}. Сила стека (макс k): ${maxK_stack(entry)}.`,
-  };
+      })),
+      mechs: Array.from(mechs),
+      organs: Array.from(organs),
+      rationale: `Готовый стек «${st.name}». Покрытие механизмов ТЗ: ${(st.anatomicalMapping?.mechanismCodes || []).length}.`,
+    };
+  }
+  return null;
 }
 
 function substanceId_join(ids: string[]): string {
@@ -304,4 +387,112 @@ export function getAllBoosters(): BoosterDef[] {
 export function isBoosterAvailable(phaseKey: string): boolean {
   // фертильность — строгая фаза, бустеры ограничены
   return phaseKey !== 'fertility';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  MEGA-ENHANCE — умное усиление плана поддержки
+//
+//  Вместо добавления целого стека (35 веществ наобум) — анализирует:
+//    1. Непокрытые ТЗ-механизмы (gaps из rec.gaps)
+//    2. Синергии с уже назначенными препаратами (SYNERGY_PAIRS)
+//  Подбирает индивидуальные вещества, которые:
+//    - покрывают максимальное число gaps (breadth)
+//    - имеют синергию с текущими препаратами
+//    - не дублируют уже назначенные
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface MegaEnhanceSuggestion {
+  substanceId: string;
+  reason: string;
+  mechsCovered: TzMechId[];
+  synergyWith: string[];
+  breadth: number;
+  totalK: number;
+}
+
+export function megaEnhance(
+  gaps: { mechId: TzMechId; mechLabel: string; organLabel: string; suggestions: string[] }[],
+  currentSubs: string[],
+): MegaEnhanceSuggestion[] {
+  if (!gaps || gaps.length === 0) return [];
+
+  const existingSet = new Set(currentSubs.map(s => s.toLowerCase().replace(/[^a-z0-9]/g, '')));
+  const gapMechIds = new Set(gaps.map(g => g.mechId));
+
+  // 1. Собрать всех кандидатов из gaps (substances, покрывающие непокрытые мехи)
+  const candidates = new Map<string, { mechsCovered: TzMechId[]; totalK: number; reasons: string[] }>();
+
+  for (const g of gaps) {
+    // suggestions уже содержит топ-3 вещества для этого мех-ма
+    for (const sid of g.suggestions) {
+      const canon = sid.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (existingSet.has(canon)) continue;
+      if (!candidates.has(canon)) {
+        candidates.set(canon, { mechsCovered: [], totalK: 0, reasons: [] });
+      }
+      const cand = candidates.get(canon)!;
+      if (!cand.mechsCovered.includes(g.mechId)) {
+        cand.mechsCovered.push(g.mechId);
+        cand.reasons.push(`${g.organLabel}: ${g.mechLabel}`);
+      }
+    }
+  }
+
+  if (candidates.size === 0) return [];
+
+  // 2. Вычислить breadth (сколько gaps покрывает) и totalK
+  const scored: MegaEnhanceSuggestion[] = [];
+
+  for (const [substanceId, cand] of candidates) {
+    // Найти синергии с текущими препаратами
+    const synergyWith: string[] = [];
+    for (const pair of SYNERGY_PAIRS) {
+      const pairPrimaryCanon = pair.primary.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const pairSecondaryCanon = pair.secondary.toLowerCase().replace(/[^a-z0-9]/g, '');
+      // Если кандидат — secondary, а primary уже в плане
+      if (pairSecondaryCanon === substanceId && currentSubs.some(s => s.toLowerCase().replace(/[^a-z0-9]/g, '') === pairPrimaryCanon)) {
+        synergyWith.push(pair.primary);
+      }
+      // Если кандидат — primary, а secondary уже в плане
+      if (pairPrimaryCanon === substanceId && currentSubs.some(s => s.toLowerCase().replace(/[^a-z0-9]/g, '') === pairSecondaryCanon)) {
+        synergyWith.push(pair.secondary);
+      }
+    }
+
+    // Также проверяем синергии из SUPPORT_CATALOG_DATA (synergies[])
+    for (const curSub of currentSubs) {
+      const curCanon = curSub.toLowerCase().replace(/[^a-z0-9]/g, '');
+      // Проверяем каталог на наличие явных синергий
+      const catEntry = (SUPPORT_CATALOG_DATA as any)[curSub] || (SUPPORT_CATALOG_DATA as any)[curSub.toUpperCase()];
+      if (catEntry && Array.isArray(catEntry.synergies)) {
+        for (const syn of catEntry.synergies) {
+          if (typeof syn === 'string' && syn.toLowerCase().replace(/[^a-z0-9]/g, '') === substanceId) {
+            if (!synergyWith.includes(curSub)) synergyWith.push(curSub);
+          }
+          if (syn && typeof syn === 'object' && syn.id && syn.id.toLowerCase().replace(/[^a-z0-9]/g, '') === substanceId) {
+            if (!synergyWith.includes(curSub)) synergyWith.push(curSub);
+          }
+        }
+      }
+    }
+
+    const breadth = cand.mechsCovered.length;
+    scored.push({
+      substanceId,
+      reason: cand.reasons.join('; '),
+      mechsCovered: cand.mechsCovered,
+      synergyWith,
+      breadth,
+      totalK: cand.totalK,
+    });
+  }
+
+  // 3. Сортировка: breadth × 10 + synergyCount × 5 (широкий спектр + синергии в приоритете)
+  scored.sort((a, b) =>
+    (b.breadth * 10 + b.synergyWith.length * 5) -
+    (a.breadth * 10 + a.synergyWith.length * 5)
+  );
+
+  // 4. Отобрать топ-20 (не больше — это усиление, а не замена плана)
+  return scored.slice(0, 20);
 }

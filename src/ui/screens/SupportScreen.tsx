@@ -63,7 +63,6 @@ type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'calc_tools' | 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { PopupBool, PopupNumber, PopupSelect } from '../components/PopupXxx';
 import { BioStackAIScreen } from '../components/BioStackAIScreen';
-import { SupplementClinicScreen } from './SupplementClinicScreen';
 import { SupportPeptideCalc } from './SupportScreen_parts/SupportPeptideCalc';
 import { SupportResearch } from './SupportScreen_parts/SupportResearch';
 import { SupportGeneratorInfo } from './SupportScreen_parts/SupportGeneratorInfo';
@@ -3111,7 +3110,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['calc_tools','🧮 Расчёты выбора препаратов'],['bioavailability','🧬 Биодоступность'],['research','Исследования'],['favorites','⭐ Избранное · Дневник']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['calc_tools','🧮 Расчёты выбора препаратов'],['research','Исследования'],['favorites','⭐ Избранное · Дневник']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
                 else { setTab('main'); setSupportView('calc'); setCalcView('info'); setSection('home'); setInfoView(id as InfoView); }
@@ -3182,7 +3181,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       )}
             {renderView(infoView, 'biostack', () =>
               <div style={{ padding: '0 4px' }}>
-                <SupplementClinicScreen />
+                <BioStackAIScreen />
               </div>
             )}
             {renderView(infoView, 'calc_tools', () =>

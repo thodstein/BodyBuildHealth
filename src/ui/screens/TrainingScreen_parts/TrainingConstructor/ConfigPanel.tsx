@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { PopupSelect } from '../../SRCBBScreen_parts/TrainingPopups';
+import { PopupSelect, cardBtnStyle } from '../../SRCBBScreen_parts/TrainingPopups';
 import { TRAINING_SPLITS } from '../../../../engines/training.engine';
 import { LMS_CYCLES, normalizeCycleDirection } from '../../../../data/lms-cycles/lms-cycle-index';
 import { FULL_PROGRAM_LIBRARY } from '../../../../engines/complete-program-library.engine';
@@ -10,6 +10,20 @@ import { ACCENT, DIM, CONFIG_LABELS } from './types';
 import { DIRECTION_METHOD_MAP, getRecommendedMethods, getRecommendedMethodsForSplit, getRecommendedForMethods } from '../../../../engines/cycle-method-map';
 
 type DirFilter = 'all' | 'strength' | 'bodybuilding';
+type Dir = DirFilter | 'both';
+
+/** Локальные стили попапа (аналог TrainingPopups, не экспортированы оттуда) */
+const overlay: React.CSSProperties = {
+  position: 'fixed', inset: 0, zIndex: 250, display: 'flex',
+  alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)',
+};
+const sheet = (maxW = 360): React.CSSProperties => ({
+  width: '88%', maxWidth: maxW, maxHeight: '78vh', borderRadius: 16,
+  background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
+});
+const topBar: React.CSSProperties = { height: 3, background: 'linear-gradient(90deg,#00e68a,#00c853)' };
+const sheetBody: React.CSSProperties = { padding: '14px 16px', maxHeight: 'calc(78vh - 3px)', overflowY: 'auto' };
+const titleStyle: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: ACCENT, marginBottom: 10 };
 
 interface Props {
   manualCfg: Record<string, string>;
@@ -37,7 +51,7 @@ const Sel: React.FC<{
   recommendedSet?: Set<string>; // имена методов для подсветки
 }> = ({ label, value, onChange, options, hint, recommendedSet }) => {
   const markedOptions = useMemo(() => options.map(o => {
-    const isRec = recommendedSet && recommendedSet.has(o.label);
+    const isRec = recommendedSet && recommendedSet.has(o.id);
     return {
       ...o,
       label: isRec ? '★ ' + o.label : o.label,
@@ -45,6 +59,84 @@ const Sel: React.FC<{
     };
   }), [options, recommendedSet]);
   return <PopupSelect label={label} value={value} onChange={onChange} options={markedOptions} hint={hint} />;
+};
+
+/** Вложенный выбор цикла: сначала категория (Сила/Бодибилдинг), затем сам цикл */
+const CycleSelect: React.FC<{
+  label: string; value: string; allCycles: any[];
+  onChange: (v: string) => void; onCategory: (d: DirFilter) => void;
+  recommendedSet?: Set<string>; hint?: string;
+}> = ({ label, value, allCycles, onChange, onCategory, recommendedSet, hint }) => {
+  const [open, setOpen] = useState(false);
+  const [cat, setCat] = useState<DirFilter>('all');
+  const sel = allCycles.find((c: any) => c.meta.id === value);
+  const catTag = (id: string) =>
+    id.startsWith('cycle-bb') ? 'BB' : id.startsWith('block') ? 'Блок' :
+    id.startsWith('embed') ? 'Встр' : id.startsWith('src2') ? 'СРЦ2' : 'СРЦ';
+  const inCat = (c: any) => {
+    if (cat === 'all') return true;
+    const nd = normalizeCycleDirection(c.meta.direction);
+    return nd === cat || nd === 'both';
+  };
+  return <>
+    <button onClick={() => { setCat('all'); setOpen(true); }} style={cardBtnStyle(!!value)}>
+      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{sel ? `[${catTag(sel.meta.id)}] ${sel.meta.title}` : 'Выбрать…'}</div>
+    </button>
+    {open && <div style={overlay} onClick={() => setOpen(false)}>
+      <div onClick={e => e.stopPropagation()} style={sheet(420)}>
+        <div style={topBar} />
+        <div style={sheetBody}>
+          <div style={titleStyle}>{label}</div>
+          {hint && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
+          {cat === 'all' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {([
+                { id: 'all', label: '📋 Все циклы' },
+                { id: 'strength', label: '🏋️ Силовые (ПЛ / жим / тяга)' },
+                { id: 'bodybuilding', label: '💪 Бодибилдинг (масса / рельеф)' },
+              ] as { id: DirFilter; label: string }[]).map(t => (
+                <button key={t.id} onClick={() => setCat(t.id)}
+                  style={{ display: 'block', width: '100%', padding: '12px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left' as const, fontSize: 12, fontWeight: 700, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)', color: ACCENT }}>
+                  {t.label} <span style={{ float: 'right' }}>→</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div>
+              <button onClick={() => setCat('all')} style={{ fontSize: 10, color: ACCENT, background: 'transparent', border: 'none', cursor: 'pointer', marginBottom: 8 }}>← Назад к категориям</button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {allCycles.filter(inCat).map((c: any) => {
+                  const isRec = recommendedSet && recommendedSet.has(c.meta.id);
+                  const isSel = value === c.meta.id;
+                  return <button key={c.meta.id} onClick={() => {
+                      onChange(c.meta.id);
+                      const nd = normalizeCycleDirection(c.meta.direction);
+                      if (nd === 'strength' || nd === 'bodybuilding') onCategory(nd);
+                      setOpen(false);
+                    }}
+                    style={{
+                      display: 'block', width: '100%', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left' as const,
+                      fontSize: 11, fontWeight: isSel ? 700 : 400,
+                      background: isSel ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                      border: isSel ? '1px solid rgba(0,230,138,0.3)' : (isRec ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)'),
+                      color: isSel ? ACCENT : (isRec ? ACCENT : 'rgba(255,255,255,0.85)'),
+                    }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{isRec ? '★ ' : ''}[{catTag(c.meta.id)}] {c.meta.title}</span>
+                      {isSel && <span style={{ fontSize: 10 }}>✓</span>}
+                    </div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{c.meta.level} · {c.meta.direction}{isRec ? ' · ★ Рекомендовано' : ''}</div>
+                  </button>;
+                })}
+              </div>
+            </div>
+          )}
+          <button onClick={() => setOpen(false)} style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
+        </div>
+      </div>
+    </div>}
+  </>;
 };
 
 export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgram, targetTonnage, setTargetTonnage }) => {
@@ -98,14 +190,54 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
     });
   }, [directionFilter]);
 
-  // Фильтрация циклов по направлению
-  const filteredCycles = useMemo(() => {
-    return LMS_CYCLES.filter(c => {
-      if (directionFilter === 'all') return true;
-      const nd = normalizeCycleDirection(c.meta.direction);
-      return nd === directionFilter || nd === 'both';
-    });
-  }, [directionFilter]);
+  // ── СОВМЕСТИМОСТЬ: эффективное направление (для подсветки) ───
+  const normSplitDir = (d?: string): Dir | null => {
+    if (!d) return null;
+    const x = d.toLowerCase();
+    if (['powerlifting','pl','strength','peaking_pl','bench','deadlift','squat'].includes(x)) return 'strength';
+    if (['bodybuilding','hypertrophy','peaking_bb','cutting','contest_prep'].includes(x)) return 'bodybuilding';
+    return 'both';
+  };
+  const splitDirNorm = selectedSplitId ? normSplitDir(TRAINING_SPLITS[selectedSplitId]?.direction) : null;
+  const cycleDirNorm = selectedCycleId ? (() => {
+    const c = LMS_CYCLES.find(c => c.meta.id === selectedCycleId);
+    return c ? normalizeCycleDirection(c.meta.direction) : null;
+  })() : null;
+  const effectiveDir: Dir | null =
+    cycleDirNorm || splitDirNorm || (directionFilter !== 'all' ? directionFilter : null);
+
+  // Подсветка совместимых сплитов (по направлению)
+  const compatibleSplits = useMemo(() => new Set(
+    Object.entries(TRAINING_SPLITS)
+      .filter(([, s]: [string, any]) => {
+        if (!effectiveDir) return false;
+        const d = normSplitDir(s.direction) || 'both';
+        return d === effectiveDir || d === 'both';
+      })
+      .map(([id]) => id)
+  ), [effectiveDir]);
+
+  // Подсветка совместимых циклов (по направлению)
+  const compatibleCycles = useMemo(() => new Set(
+    LMS_CYCLES
+      .filter(c => {
+        if (!effectiveDir) return false;
+        const d = normalizeCycleDirection(c.meta.direction);
+        return d === effectiveDir || d === 'both';
+      })
+      .map(c => c.meta.id)
+  ), [effectiveDir]);
+
+  // Подсветка совместимых программ (по направлению)
+  const compatiblePrograms = useMemo(() => new Set(
+    allPrograms
+      .filter(p => {
+        if (!effectiveDir) return false;
+        const d: Dir = (p.direction as Dir) || 'both';
+        return d === effectiveDir || d === 'both';
+      })
+      .map(p => p.id)
+  ), [effectiveDir, allPrograms]);
 
   // Фильтрация программ по направлению
   const filteredPrograms = useMemo(() => {
@@ -157,7 +289,7 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
 
       {/* ─── БАЗОВАЯ СТРУКТУРА ─── */}
       <ConfigSection title="🏗️ БАЗОВАЯ СТРУКТУРА" color="#60a5fa">
-        <Sel label="Тип сплита" value={manualCfg.split || ''} onChange={v => setManual('split', v)}
+        <Sel label="Тип сплита" value={manualCfg.split || ''} onChange={v => setManual('split', v)} recommendedSet={compatibleSplits}
           options={filteredSplits.map(([id, s]: [string, any]) => {
             const d = (s.direction || '').toLowerCase();
             const dirTag = ['powerlifting','pl','strength','peaking_pl','bench','deadlift'].some(x => d.includes(x)) ? '🏋️' : ['bodybuilding','hypertrophy','peaking_bb','cutting'].some(x => d.includes(x)) ? '💪' : '';
@@ -165,13 +297,13 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
             const isRec = directionFilter !== 'all' && (!s.direction || s.direction === 'both' || dirMatch(s.direction) === directionFilter);
             return { id, label: (dirTag ? dirTag + ' ' : '') + s.name, desc: s.desc + (isRec ? ' · ★ Рекомендовано' : '') };
           })} hint="Набор групп по дням" />
-        <Sel label="Тип цикла" value={manualCfg.cycle || ''} onChange={v => setManual('cycle', v)}
-          options={filteredCycles.map((c: any) => {
-            const catTag = c.meta.id.startsWith('cycle-bb') ? 'BB' : c.meta.id.startsWith('block') ? 'Блок' : c.meta.id.startsWith('embed') ? 'Встр' : c.meta.id.startsWith('src2') ? 'СРЦ2' : 'СРЦ';
-            const isRec = directionFilter !== 'all' && normalizeCycleDirection(c.meta.direction) === directionFilter;
-            return { id: c.meta.id, label: `[${catTag}] ${c.meta.title}`, desc: c.meta.level + ' · ' + normalizeCycleDirection(c.meta.direction) + (isRec ? ' · ★ Рекомендовано' : '') };
-          })} hint="Силовые циклы / блоки / встроенные" />
-        <Sel label="Программа тренировок" value={manualCfg.program || ''} onChange={v => setManual('program', v)}
+        <CycleSelect label="Тип цикла" value={manualCfg.cycle || ''}
+          allCycles={LMS_CYCLES}
+          onChange={v => setManual('cycle', v)}
+          onCategory={(d: DirFilter) => setDirectionFilter(d)}
+          recommendedSet={compatibleCycles}
+          hint="Сначала категория (Сила/Бодибилдинг), затем цикл" />
+        <Sel label="Программа тренировок" value={manualCfg.program || ''} onChange={v => setManual('program', v)} recommendedSet={compatiblePrograms}
           options={filteredPrograms.map((p: any) => ({ id: p.id, label: p.name, desc: p.type + ' · ' + p.goal + ' · ' + p.level }))}
           hint="Готовые программы из библиотеки" />
         {methodSel('frequency', 'frequency', 'Количество и частота тренировок')}

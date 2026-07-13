@@ -2,10 +2,13 @@ import { getExercisesByGroup, EXERCISE_CATALOG } from '../core/exercise-catalog'
 import type { Exercise } from '../core/types';
 import { calcExercisePrescription } from './training.engine';
 import { prescribeExercises, forceVector, lengthenedPartials } from './pro/exercise-prescription.engine';
-import { generateRepTempo } from './rep-tempo-engine';
+import { tempoFor } from './bb/bb-tempo-rest';
 import { selectExercisesSmart } from './exercise-selector.engine';
 import { S_MRV_FACTOR } from './rir-table';
 import { findSubstitutions } from './exercise-substitution.engine';
+import { isBodyweightExercise, isCarryExercise, derivePattern } from './movement-pattern';
+
+export { derivePattern };
 
 /** Множители веса для PRO-мышц (деривация от родительской группы).
  *  Источник: Israetel M., "Hypertrophy Training Guide", RP Strength, 2021.
@@ -24,11 +27,47 @@ const PRO_WORKMAX_RATIO: Record<string, number> = {
  *  Изоляции используют ~55-60% от workMax группы (жим стоя 80 → махи 44, а не 74). */
 const ISO_WEIGHT_FACTOR = 0.55;
 
+/** Множитель снаряда: workMax указан для ШТАНГИ (barbell) как эталон.
+ *  Гантели/машины/кроссоверы имеют иной переносимый вес.
+ *  dumbbell — вес ОДНОЙ гантели (per-hand ≈ 0.47 × barbell 1RM). */
+const IMPLEMENT_FACTOR: Record<string, number> = {
+  barbell: 1.0,
+  dumbbell: 0.47,
+  kettlebell: 0.45,
+  machine: 0.7,
+  cable: 0.7,
+  'smith-machine': 0.95,
+  band: 0.6,
+  'weighted-bodyweight': 1.0,
+  bodyweight: 0.0,
+};
+
+/** Базовое имя без уточнений в скобках — для дедупа near-dup (EZ-гриф vs обычный). */
+function baseName(n: string): string {
+  return (n || '').replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function implementFactor(ex: any): number {
+  const eq = ex.equipment;
+  const eqArr = Array.isArray(eq) ? eq : (eq ? [String(eq)] : []);
+  for (const e of eqArr) if (IMPLEMENT_FACTOR[e] !== undefined) return IMPLEMENT_FACTOR[e];
+  return 1.0;
+}
+
+/** Ограничить верх реп-диапазона (травма/возраст), сохранив форму «a-b». */
+function clampRepsRange(range: string, cap: number): string {
+  if (!range.includes('-')) { const n = parseInt(range); return `${Math.min(n || 0, cap)}`; }
+  const [a, b] = range.split('-').map(s => parseInt(s));
+  return `${a}-${Math.min(b || a, cap)}`;
+}
+
 /**
  * Вычислить workMax для упражнения с учётом:
  *  1. PRO_WORKMAX_RATIO (трапеции, предплечья)
- *  2. ISO_WEIGHT_FACTOR для изоляций
- *  3. Fallback: workMax[group] или 80 кг
+ *  2. IMPLEMENT_FACTOR (гантели/машины — per-hand для гантелей)
+ *  3. ISO_WEIGHT_FACTOR для изоляций
+ *  4. Собственный вес / загруженные прогулки → 0 (без фейковых kg, выводятся как BW/дистанция)
+ *  5. Fallback: workMax[group] или 80 кг
  */
 function resolveWorkMax(
   ex: Exercise | any,
@@ -36,18 +75,20 @@ function resolveWorkMax(
   workMax: Record<string, number>,
   manualWorkMax: Record<string, number>,
 ): number {
-  const base = workMax[group] || manualWorkMax[group] || 80;
+  // Собственный вес / прогулки — без kg
+  if (isBodyweightExercise(ex) || isCarryExercise(ex)) return 0;
+
+  let base = workMax[group] || manualWorkMax[group] || 80;
 
   // PRO-группы: взять от родителя
   if (PRO_WORKMAX_RATIO[group]) {
     const parent = group === 'traps' ? 'back' : group === 'forearms' ? 'arms' : group.startsWith('delt_') ? 'shoulders' : group;
-    return Math.round((workMax[parent] || 80) * PRO_WORKMAX_RATIO[group]);
+    base = (workMax[parent] || 80) * PRO_WORKMAX_RATIO[group];
   }
 
-  // Изоляции: сниженный вес
-  if (ex.type === 'isolation') return Math.round(base * ISO_WEIGHT_FACTOR);
-
-  return base;
+  let w = base * implementFactor(ex);
+  if (ex.type === 'isolation') w *= ISO_WEIGHT_FACTOR;
+  return Math.round(Math.max(0, w));
 }
 
 export type PlanEx = { 
@@ -58,6 +99,7 @@ export type PlanEx = {
   rest: number; 
   group: string; 
   weight: number; 
+  weightNote?: string; 
   role: 'main' | 'secondary' | 'accessory';
   pattern: string;
   tempo?: string; 
@@ -167,6 +209,8 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
   const levelVolMap: Record<string, number> = { beginner: 0.9, intermediate: 1.0, advanced: 1.15, enhanced: 1.3 };
   const goalVolMap: Record<string, number> = { mass: 1.1, bulk: 1.1, strength: 1.0, cut: 0.85, maintenance: 0.9, recomp: 1.0 };
   const volMult = (levelVolMap[level] ?? 1.0) * (goalVolMap[goal] ?? 1.0);
+  // Цель для RIR-матрицы/диапазонов повторений: mass/bulk → hypertrophy
+  const rxGoal = (g: string) => (g === 'mass' || g === 'bulk') ? 'hypertrophy' : g;
 
   const dailyCap = Math.max(10, Math.min(16, Math.round(8 + groupsInDay(cycle) * 2)));
 
@@ -198,7 +242,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
         return exEq.length === 0 || exEq.some((eq: string) => equipment.includes(eq));
       }).length;
       const cCount = Math.min(cc, poolLen);
-      const maxSets = Math.min(4, Math.max(13, Math.ceil(mrv / (freqMap[g] || 1))));
+      const maxSets = Math.max(4, Math.min(16, Math.ceil(mrv / (freqMap[g] || 1))));
       const expected = cCount * maxSets * 5;
       groupExpected[g] = expected;
       totalExpected += expected;
@@ -243,6 +287,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
         count: Math.min(compoundCount, poolFinal.length),
         selectedIds, equipment, weakZones: weakZonesList, level, injuryProfile, type: 'compound',
         preferEquipment,
+        preferBB: goal === 'mass' || goal === 'bulk' || goal === 'cut',
       });
       const compsSafe = compounds.length === 0 ? poolFinal.slice(0, Math.min(compoundCount, poolFinal.length)) : compounds;
 
@@ -276,10 +321,11 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
            exVolMult *= postInjuryVolPct;
          }
 
-         const pr = calcExercisePrescription(exSub, goal, level, isWeak(g), false, volMult, 1, mesoLength);
+          const pr = calcExercisePrescription(exSub, rxGoal(goal), level, isWeak(g), false, volMult, 1, mesoLength);
           const wm = resolveWorkMax(exSub, g, workMaxFull, manualWorkMax);
           const pct = pctForRir[Math.max(0, Math.min(5, pr.rir))] ?? 0.9;
-          let weight = Math.round(wm * pct * exWeightMult);
+           let weight = Math.round(wm * pct * exWeightMult);
+           const weightNote = isBodyweightExercise(exSub) ? 'BW' : (isCarryExercise(exSub) ? 'дистанция' : undefined);
           
            let sets = Math.max(1, Math.min(Math.round(exSets * exVolMult), 4));
           if (targetTonnage && targetTonnage[g]) {
@@ -296,24 +342,24 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
             }
           }
 
-          const repsCap = injuryFactor?.repsCap ?? 15;
-          const repsVal = parseInt(pr.reps) || 10;
-          const tGoal = goal === 'mass' || goal === 'bulk' ? 'hypertrophy' : goal === 'strength_mass' ? 'strength' : goal;
-          const tempoRes = generateRepTempo({ goal: tGoal as any, riskLevel: level === 'beginner' ? 'high' : level === 'advanced' ? 'low' : 'medium', difficultyLevel: level === 'beginner' ? 'low' : level === 'advanced' ? 'high' : 'medium', techniqueIssues: [], isMainLift: true });
-          const cappedSets = Math.min(sets, remainingDaily);
+           const repsCap = injuryFactor?.repsCap ?? 15;
+           const repsStr = clampRepsRange(pr.reps, repsCap);
+           const tGoal = goal === 'mass' || goal === 'bulk' ? 'hypertrophy' : goal === 'strength_mass' ? 'strength' : goal;
+           const cappedSets = Math.min(sets, remainingDaily);
           if (cappedSets < 1) break;
 
           const fatigueCost = (exSub.fatigueCost || 5) * (isGraded ? 0.75 : 1.0);
           const exFatigue = fatigueCost * cappedSets;
-          if (exFatigue > groupFatigue) break;
+           if (exFatigue > groupFatigue) break;
+           if (exs.some(e => baseName(e.name) === baseName(exSub.name))) continue;
 
-          exs.push({
-            name: exSub.name, sets: cappedSets, reps: `${Math.min(repsVal, repsCap)}`, rir: isGraded ? Math.min(pr.rir + 1, 4) : pr.rir, rest: pr.rest, group: g, weight,
-            role: isPrimaryGroup ? 'main' : 'secondary',
-            pattern: exSub.movementPattern || 'unknown',
-            tempo: tempoRes.tempo.toString,
-            forceVec: forceVector(exSub.group, exSub.type, exSub.name),
-            jointStress: exSub.jointStress,
+           exs.push({
+             name: exSub.name, sets: cappedSets, reps: isGraded ? clampRepsRange(pr.reps, Math.min(repsCap, 12)) : repsStr, rir: isGraded ? 3 : pr.rir, rest: pr.rest, group: g, weight, weightNote,
+             role: isCarryExercise(exSub) ? 'accessory' : (isPrimaryGroup ? 'main' : 'secondary'),
+             pattern: exSub.movementPattern || derivePattern(exSub),
+              tempo: tempoFor(isPrimaryGroup ? 'тяж' : 'памп').notation,
+             forceVec: forceVector(exSub.group, exSub.type, exSub.name),
+             jointStress: exSub.jointStress,
             technique: (exSub as any).technique,
             comments: (exSub as any).comments,
             rationale: (exSub as any).selectionRationale?.join('; '),
@@ -324,7 +370,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
           daySets[g] = ds + cappedSets;
           groupFatigue -= exFatigue;
           remainingCompoundFatigue -= exFatigue;
-          patternBalance[exSub.movementPattern || 'unknown'] = (patternBalance[exSub.movementPattern || 'unknown'] || 0) + 1;
+          patternBalance[exSub.movementPattern || derivePattern(exSub)] = (patternBalance[exSub.movementPattern || derivePattern(exSub)] || 0) + 1;
         }
 
     });
@@ -377,6 +423,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
         count: Math.min(isoCount, poolFinal.length),
         selectedIds, equipment, weakZones: weakZonesList, level, injuryProfile, type: 'isolation',
         preferEquipment,
+        preferBB: goal === 'mass' || goal === 'bulk' || goal === 'cut',
       });
       const isosSafe = isolations.length === 0 ? poolFinal.filter(e => e.type === 'isolation').slice(0, Math.min(isoCount, poolFinal.length)) : isolations;
 
@@ -410,7 +457,8 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
           const pr = calcExercisePrescription(exSub, goal, level, isWeak(g), false, volMult * 0.85, 1, mesoLength);
           const wm = resolveWorkMax(exSub, g, workMaxFull, manualWorkMax);
           const pct = pctForRir[Math.max(0, Math.min(5, pr.rir))] ?? 0.9;
-          const weight = Math.round(wm * pct * exWeightMult);
+           const weight = Math.round(wm * pct * exWeightMult);
+           const weightNote = isBodyweightExercise(exSub) ? 'BW' : (isCarryExercise(exSub) ? 'дистанция' : undefined);
 
           let sets = Math.max(1, Math.min(Math.round(pr.sets * exVolMult), 3));
           if (targetTonnage && targetTonnage[g]) {
@@ -427,22 +475,22 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
             }
           }
 
-          const repsCap = injuryFactor?.repsCap ?? 15;
-          const repsVal = parseInt(pr.reps) || 10;
-          const tGoal = goal === 'mass' || goal === 'bulk' ? 'hypertrophy' : goal;
-          const tempoRes = generateRepTempo({ goal: tGoal as any, riskLevel: level === 'beginner' ? 'high' : 'medium', difficultyLevel: level === 'beginner' ? 'low' : 'medium', techniqueIssues: [], isMainLift: false });
-         const cappedSets = Math.min(sets, remainingDaily);
+           const repsCap = injuryFactor?.repsCap ?? 15;
+           const repsStr = clampRepsRange(pr.reps, repsCap);
+           const tGoal = rxGoal(goal);
+          const cappedSets = Math.min(sets, remainingDaily);
          if (cappedSets < 1) break;
 
           const fatigueCost = (exSub.fatigueCost || 3) * (isGraded ? 0.75 : 1.0);
           const exFatigue = fatigueCost * cappedSets;
-          if (exFatigue > groupIsoFatigue) break;
+           if (exFatigue > groupIsoFatigue) break;
+           if (exs.some(e => baseName(e.name) === baseName(exSub.name))) continue;
 
-          exs.push({
-            name: exSub.name, sets: cappedSets, reps: `${Math.min(repsVal, repsCap)}`, rir: isGraded ? 3 : pr.rir, rest: pr.rest, group: g, weight,
-            role: 'accessory',
-            pattern: exSub.movementPattern || 'unknown',
-            tempo: tempoRes.tempo.toString,
+           exs.push({
+            name: exSub.name, sets: cappedSets, reps: isGraded ? clampRepsRange(pr.reps, Math.min(repsCap, 12)) : repsStr, rir: isGraded ? 3 : pr.rir, rest: pr.rest, group: g, weight, weightNote,
+             role: 'accessory',
+             pattern: exSub.movementPattern || derivePattern(exSub),
+             tempo: tempoFor('памп').notation,
             forceVec: forceVector(exSub.group, exSub.type, exSub.name),
             jointStress: exSub.jointStress,
             technique: (exSub as any).technique,
@@ -455,7 +503,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
           daySets[g] = ds + cappedSets;
           groupIsoFatigue -= exFatigue;
           remainingIsoFatigue -= exFatigue;
-          patternBalance[exSub.movementPattern || 'unknown'] = (patternBalance[exSub.movementPattern || 'unknown'] || 0) + 1;
+          patternBalance[exSub.movementPattern || derivePattern(exSub)] = (patternBalance[exSub.movementPattern || derivePattern(exSub)] || 0) + 1;
         }
 
     });
@@ -542,3 +590,4 @@ function groupsInDay(cycle: string[][]): number {
   for (const grp of cycle) if (grp.length > max) max = grp.length;
   return max;
 }
+

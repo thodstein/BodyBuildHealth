@@ -7,7 +7,7 @@ import type { SupportLevel } from '../../../engines/tz-bridge-mechanism';
 import type { PhaseContext, PhaseKey } from '../../../engines/tz-bridge-phase';
 import type { BoosterTriggerCtx } from '../../../engines/tz-bridge-boosters';
 import { PHASE_PROTOCOL } from '../../../engines/tz-bridge-phase';
-import { STACK_BOOSTER_TRIGGERS } from '../../../engines/tz-bridge-boosters';
+import { STACK_BOOSTER_TRIGGERS, buildGapFillSuggestions, megaEnhance, type MegaEnhanceSuggestion } from '../../../engines/tz-bridge-boosters';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import { CalcSafetyLayer } from './CalcSafetyLayer';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
@@ -23,6 +23,7 @@ import { CalcProfileCard } from './CalcProfileCard';
 import { CalcLabsCard } from './CalcLabsCard';
 import { ALL_STACKS } from '../../../data/support-stacks';
 import { CalcSubstanceManager } from './CalcSubstanceManager';
+import { checkStackToxicity, type ToxWarning } from '../../../engines/biostack-safety.engine';
 
 // ── Конфигурация суставного модуля ──────────────────────────────────────────
 interface JointPreset {
@@ -99,12 +100,210 @@ const NEURO_CATALOG: { id: string; nameRu: string; dose: string; desc: string }[
   { id: 'vitamin_d3', nameRu: 'Витамин D3', dose: '5000 МЕ', desc: '↑ BDNF, ↓ нейровоспаление, VDR в гиппокампе' },
   { id: 'vitamin_b6', nameRu: 'B6 (P5P)', dose: '50 мг', desc: 'Кофактор синтеза ГАМК, серотонина, дофамина' },
   { id: 'vitamin_b12', nameRu: 'B12 (метилкобаламин)', dose: '1000 мкг', desc: 'Синтез миелина, кофактор метионин-синтазы' },
+  { id: 'alpha_lipoic', nameRu: 'α-Липоевая кислота', dose: '600 мг', desc: 'Кофактор митохондрий, ↓ окислит. стресс, нейропатия' },
   { id: 'folate', nameRu: 'Фолат (5-MTHF)', dose: '400 мкг', desc: 'Метилирование, синтез SAME, обмен гомоцистеина' },
   { id: 'taurine', nameRu: 'Таурин', dose: '2 г', desc: '↑ ГАМК-А, ↓ глутаматную эксайтотоксичность' },
   { id: 'magnesium', nameRu: 'Магний (глицинат/цитрат)', dose: '400 мг', desc: '↓ NMDA-рецептор, ↑ ГАМК, ↓ кортизол, расслабление' },
 ];
 const NEURO_RECOMMENDED_HIGH: Set<string> = new Set(['citicoline','lions_mane','magnesium_l_threonate','phosphatidylserine']);
 const NEURO_RECOMMENDED_MEDIUM: Set<string> = new Set(['ashwagandha','theanine','gaba','melatonin','acetyl_l_carnitine','bacopa','rhodiola']);
+
+// ── Доменные карты симптомов (нейротоксичность / ОДА) ─────────────────────────
+interface DomainSym { code: string; label: string; }
+interface DomainCfg {
+  id: string; label: string; icon: string; color: string;
+  symptoms: DomainSym[]; substances: Set<string>;
+}
+const NEURO_DOMAINS: DomainCfg[] = [
+  { id: 'gaba', label: 'ГАМК / эксайтотоксичность', icon: '⚡', color: '#ef4444',
+    symptoms: [
+      { code: 'aggression', label: 'Агрессия / раздражительность' },
+      { code: 'anxiety', label: 'Тревожность' },
+      { code: 'inner_tremor', label: 'Внутренняя дрожь / напряжение' },
+      { code: 'insomnia_onset', label: 'Бессонница (трудно заснуть)' },
+      { code: 'tremor', label: 'Тремор' },
+    ],
+    substances: new Set(['magnesium_l_threonate','theanine','taurine','glycine','gaba','magnesium']) },
+  { id: 'serotonin', label: 'Серотонин / аффект', icon: '🌧️', color: '#a855f7',
+    symptoms: [
+      { code: 'low_mood', label: 'Подавленное настроение' },
+      { code: 'anhedonia', label: 'Ангедония (утрата удовольствия)' },
+      { code: 'mood_labile', label: 'Эмоциональная лабильность' },
+    ],
+    substances: new Set(['x5htp','tryptophan','vitamin_b6']) },
+  { id: 'dopamine', label: 'Дофамин / когниция', icon: '🎯', color: '#f59e0b',
+    symptoms: [
+      { code: 'brain_fog', label: '«Туман в голове»' },
+      { code: 'slow_thinking', label: 'Замедленное мышление' },
+      { code: 'focus', label: 'Снижение концентрации' },
+      { code: 'motivation', label: 'Снижение мотивации' },
+      { code: 'memory', label: 'Проблемы с памятью' },
+    ],
+    substances: new Set(['citicoline','alpha_gpc','acetyl_l_carnitine','uridine_monophosphate','rhodiola']) },
+  { id: 'sleep', label: 'Циркадный сон', icon: '🌙', color: '#3b82f6',
+    symptoms: [
+      { code: 'sleep_onset2', label: 'Долгое засыпание' },
+      { code: 'night_awakenings', label: 'Ночные пробуждения' },
+      { code: 'early_wake', label: 'Ранние пробуждения' },
+      { code: 'nonrestorative', label: 'Сон не восстанавливает' },
+    ],
+    substances: new Set(['melatonin','glycine','magnesium_l_threonate','theanine','gaba']) },
+  { id: 'hpa', label: 'Вегетатика / HPA-ось', icon: '🔥', color: '#ec4899',
+    symptoms: [
+      { code: 'stress', label: 'Высокий стресс / кортизол' },
+      { code: 'sweating', label: 'Потливость' },
+      { code: 'resting_tachy', label: 'Учащённое сердцебиение в покое' },
+      { code: 'weather_dependent', label: 'Метеозависимость' },
+    ],
+    substances: new Set(['phosphatidylserine','ashwagandha','rhodiola']) },
+  { id: 'neuropathy', label: 'Периферич. нейропатия', icon: '🦶', color: '#14b8a6',
+    symptoms: [
+      { code: 'paresthesia', label: 'Парестезии / «мурашки»' },
+      { code: 'numbness', label: 'Онемение конечностей' },
+      { code: 'cramps', label: 'Мышечные судороги' },
+    ],
+    substances: new Set(['vitamin_b12','folate','vitamin_b6','alpha_lipoic','magnesium']) },
+  { id: 'neuroinflammation', label: 'Нейровоспаление', icon: '🧨', color: '#f97316',
+    symptoms: [
+      { code: 'headaches', label: 'Головные боли' },
+      { code: 'neuro_inflammation', label: 'Системное воспаление (CRP↑)' },
+    ],
+    substances: new Set(['curcumin','omega3','vitamin_d3']) },
+];
+const JOINT_DOMAINS: DomainCfg[] = [
+  { id: 'cartilage', label: 'Хрящ / остеоартроз', icon: '🦴', color: '#22c55e',
+    symptoms: [
+      { code: 'load_pain', label: 'Боль при нагрузке' },
+      { code: 'crepitus', label: 'Хруст / крепитация' },
+      { code: 'stiffness_lt30', label: 'Утренняя скованность <30 мин' },
+      { code: 'rom_limit', label: 'Ограничение объёма движений' },
+    ],
+    substances: new Set(['glucosamine','chondroitin','collagen','collagen_uc2','hyaluronic_acid','silicon']) },
+  { id: 'tendon', label: 'Сухожилия / энтезит', icon: '💪', color: '#f59e0b',
+    symptoms: [
+      { code: 'local_pain', label: 'Локальная боль в месте прикрепления' },
+      { code: 'eccentric_pain', label: 'Боль при эксцентрике' },
+      { code: 'joint_swelling', label: 'Локальный отёк' },
+    ],
+    substances: new Set(['collagen','vitamin_c','msm','manganese','bpc','tb500']) },
+  { id: 'ligament', label: 'Связки / нестабильность', icon: '🔗', color: '#06b6d4',
+    symptoms: [
+      { code: 'instability', label: 'Нестабильность / «проворачивание»' },
+      { code: 'hypermobility', label: 'Гипермобильность' },
+    ],
+    substances: new Set(['collagen','vitamin_c','silicon','boron']) },
+  { id: 'bone', label: 'Кость / МПК', icon: '🦷', color: '#a855f7',
+    symptoms: [
+      { code: 'fracture_hx', label: 'Переломы в анамнезе' },
+      { code: 'aas_bone', label: 'Длительная АС-терапия' },
+    ],
+    substances: new Set(['calcium','vitamin_d3','vitamin_k2','boron']) },
+  { id: 'synovitis', label: 'Синовит / воспаление', icon: '🔥', color: '#ef4444',
+    symptoms: [
+      { code: 'joint_swelling2', label: 'Отёк / припухлость сустава' },
+      { code: 'heat', label: 'Локальное тепло / покраснение' },
+      { code: 'stiffness_gt60', label: 'Утренняя скованность >60 мин' },
+      { code: 'crp_up', label: 'CRP ↑' },
+    ],
+    substances: new Set(['omega3','curcumin','boswellia']) },
+  { id: 'posttrauma', label: 'Посттравма / заживление', icon: '🩹', color: '#f97316',
+    symptoms: [
+      { code: 'injury_hx', label: 'Травма / операция в анамнезе' },
+    ],
+    substances: new Set(['bpc','tb500','collagen']) },
+];
+
+function buildNeuroSymptomsFromState(state: any): Set<string> {
+  const s = new Set<string>();
+  const n = state?.neuro || {};
+  const p = state?.profile || {};
+  const symptoms = (state?.symptoms as string[]) || [];
+  const labs = labSliceToValues(state?.labs?.fullPanel);
+  if ((n.aggressionScore || 0) >= 4) s.add('aggression');
+  if (n.gabaBalance === 'overexcited') { s.add('anxiety'); s.add('inner_tremor'); }
+  if (p.sleepHours != null && p.sleepHours < 6) s.add('sleep_onset2');
+  if (n.sleepQuality === 'poor') s.add('nonrestorative');
+  if ((p.stressLevel || 0) >= 7) s.add('stress');
+  if ((n.serotoninScore || 0) <= 2) s.add('low_mood');
+  if ((n.dopamineScore || 0) <= 2) { s.add('anhedonia'); s.add('brain_fog'); }
+  if (n.memoryIssues) s.add('memory');
+  if (n.focusIssues) s.add('focus');
+  if (n.slowThinking) s.add('slow_thinking');
+  if (n.headaches) s.add('headaches');
+  if (n.weatherDependent) s.add('weather_dependent');
+  if (symptoms.includes('insomnia')) s.add('insomnia_onset');
+  if (symptoms.includes('anxiety')) s.add('anxiety');
+  const crp = labs['CRP'] || labs['HSCRP'];
+  if (crp != null && crp > 3) s.add('neuro_inflammation');
+  return s;
+}
+function buildJointSymptomsFromState(state: any): Set<string> {
+  const s = new Set<string>();
+  const oda = state?.oda || {};
+  const symptoms = (state?.symptoms as string[]) || [];
+  const labs = labSliceToValues(state?.labs?.fullPanel);
+  const jp = oda.jointPain;
+  if (jp === 'mild') s.add('load_pain');
+  if (jp === 'moderate') { s.add('load_pain'); s.add('crepitus'); }
+  if (jp === 'severe') { s.add('load_pain'); s.add('crepitus'); s.add('joint_swelling'); }
+  if (oda.ligamentIssues) s.add('instability');
+  if (oda.backPain) s.add('load_pain');
+  if ((oda.injuries || []).length > 0) s.add('injury_hx');
+  if (symptoms.includes('joint_pain')) s.add('load_pain');
+  const crp = labs['CRP'] || labs['HSCRP'];
+  if (crp != null && crp > 3) s.add('crp_up');
+  return s;
+}
+
+// Доменная карта симптомов: чипы по клиническим доменам + профиль риска
+function DomainSymptomMap({ domains, checked, onToggle }: { domains: DomainCfg[]; checked: Set<string>; onToggle: (code: string) => void }) {
+  const scores = domains.map(d => ({ d, score: Math.min(10, d.symptoms.filter(sym => checked.has(sym.code)).length * 3) }));
+  const active = scores.filter(x => x.score >= 6).sort((a, b) => b.score - a.score);
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text)', marginBottom: 5 }}>🩺 Карта симптомов (по клиническим доменам)</div>
+      {domains.map(d => (
+        <div key={d.id} style={{ marginBottom: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+            <span style={{ fontSize: 10 }}>{d.icon}</span>
+            <span style={{ fontSize: 8, fontWeight: 700, color: d.color }}>{d.label}</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {d.symptoms.map(sym => {
+              const on = checked.has(sym.code);
+              return (
+                <button key={sym.code} onClick={() => onToggle(sym.code)}
+                  style={{ fontSize: 7, padding: '3px 6px', borderRadius: 6, cursor: 'pointer', fontWeight: 600,
+                    background: on ? d.color + '22' : 'rgba(255,255,255,0.03)',
+                    border: on ? `1px solid ${d.color}66` : '1px solid rgba(255,255,255,0.06)',
+                    color: on ? d.color : 'rgba(255,255,255,0.5)' }}>
+                  {on ? '✓ ' : ''}{sym.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      <div style={{ marginTop: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 3 }}>Профиль риска по доменам</div>
+        {scores.map(({ d, score }) => (
+          <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+            <span style={{ fontSize: 7, width: 92, color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}>{d.label}</span>
+            <div style={{ flex: 1, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+              <div style={{ width: `${score * 10}%`, height: '100%', background: score >= 8 ? '#ef4444' : score >= 6 ? '#f97316' : score >= 3 ? '#f59e0b' : '#22c55e' }} />
+            </div>
+            <span style={{ fontSize: 7, width: 14, textAlign: 'right', color: 'rgba(255,255,255,0.4)' }}>{score}</span>
+          </div>
+        ))}
+      </div>
+      {active.length > 0 && (
+        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)', marginTop: 4, lineHeight: 1.3 }}>
+          Приоритет: {active.map(x => x.d.label).join(' · ')}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Утилиты отображения вещества ─────────────────────────────────────────────
 const SUB_NAME_CACHE: Record<string, string> = {};
@@ -408,6 +607,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [neuroPreset, setNeuroPreset] = useState<string | null>(null);
   const [neuroSelected, setNeuroSelected] = useState<Set<string>>(new Set());
   const [neuroConfirm, setNeuroConfirm] = useState<boolean>(false);
+  const [neuroSymptoms, setNeuroSymptoms] = useState<Set<string>>(new Set());
+  const [jointSymptoms, setJointSymptoms] = useState<Set<string>>(new Set());
   const [applyFlash, setApplyFlash] = useState(false);
   const [showContraindications, setShowContraindications] = useState(false);
   const [showMonitoring, setShowMonitoring] = useState(false);
@@ -416,6 +617,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [showInteractions, setShowInteractions] = useState(false);
   const [showEnhancementPopup, setShowEnhancementPopup] = useState(false);
   const [enhancementSearch, setEnhancementSearch] = useState('');
+  const [showMegaPopup, setShowMegaPopup] = useState(false);
+  const [megaSelected, setMegaSelected] = useState<Set<string>>(new Set());
 
   const ctx = useMemo(() => {
     const base = buildMapperCtx(state, level, level === 'manual' ? { addSubs: manualSubs } : undefined, selectedStacks);
@@ -448,6 +651,25 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
     return next;
   }, [rec, removedSubs, addedSubs]);
 
+  // Автоподбор стеков под недокрытые механизмы ТЗ (режим «Усиление»)
+  const gapFill = useMemo(() => buildGapFillSuggestions((finalRec?.gaps as any) || []), [finalRec]);
+
+  const megaSuggestions = useMemo(() => {
+    if (!finalRec) return [];
+    const currentSubs = finalRec.subs.map(s => s.substanceId);
+    return megaEnhance(finalRec.gaps as any, currentSubs);
+  }, [finalRec]);
+
+  // Токсикологический контроль дозировок (UL + титрация выше оптимума)
+  const toxWarnings = useMemo<ToxWarning[]>(() => {
+    if (!finalRec || finalRec.subs.length === 0) return [];
+    try {
+      return checkStackToxicity(finalRec.subs.map(s => s.substanceId));
+    } catch {
+      return [];
+    }
+  }, [finalRec]);
+
   const synergyDesc = finalRec ? buildStackSynergyDescription(finalRec) : [];
 
   return (
@@ -470,7 +692,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             <span style={{ fontSize:10, color:'#00e68a' }}>›</span>
           </div>
         </div>
-        <div onClick={() => { if (onOpenManualPicker) onOpenManualPicker(); }} style={{ borderRadius:14, background:'linear-gradient(135deg,rgba(99,102,241,0.06),rgba(59,130,246,0.03))', border:'1.5px solid rgba(99,102,241,0.15)', padding:'12px 12px 10px', cursor:'pointer' }}>
+        <div onClick={() => setShowManualPopup(true)} style={{ borderRadius:14, background:'linear-gradient(135deg,rgba(99,102,241,0.06),rgba(59,130,246,0.03))', border:'1.5px solid rgba(99,102,241,0.15)', padding:'12px 12px 10px', cursor:'pointer' }}>
           <div style={{ display:'flex', alignItems:'center', gap:6 }}>
             <span style={{ fontSize:16 }}>⚙️</span>
             <div style={{ flex:1 }}>
@@ -594,12 +816,17 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               ['neuroprotection_stack', '🧠', 'Нейро', '#818cf8'],
               ['mega_total_support_35', '🚀', 'Мега', '#f87171'],
             ] as const).map(([id, icon, label, col]) => {
-              const active = selectedStacks.includes(id);
+              const active = selectedStacks.includes(id) || (id === 'mega_total_support_35' && megaSelected.size > 0);
               return (
                 <button key={id} onClick={() => {
-                  setStackModulePopup(id);
-                  if (id === 'articular_stack') { setArticularPreset(null); setArticularSelected(new Set()); setArticularConfirm(false); }
-                  if (id === 'neuroprotection_stack') { setNeuroPreset(null); setNeuroSelected(new Set()); setNeuroConfirm(false); }
+                  if (id === 'mega_total_support_35') {
+                    setMegaSelected(new Set());
+                    setShowMegaPopup(true);
+                  } else {
+                    setStackModulePopup(id);
+                    if (id === 'articular_stack') { setArticularPreset(null); setArticularSelected(new Set()); setArticularConfirm(false); setJointSymptoms(buildJointSymptomsFromState(state)); }
+                    if (id === 'neuroprotection_stack') { setNeuroPreset(null); setNeuroSelected(new Set()); setNeuroConfirm(false); setNeuroSymptoms(buildNeuroSymptomsFromState(state)); }
+                  }
                 }}
                   style={{ flex:1, padding:'7px 4px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:1,
                     background: active ? `linear-gradient(135deg,rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : '239,68,68'},0.2),rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : '239,68,68'},0.1))` : 'rgba(255,255,255,0.03)',
@@ -639,6 +866,44 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box', marginBottom:8,
               }} />
             </div>
+
+            {/* ── Автоподбор под недостающие механизмы ТЗ ── */}
+            {gapFill.length > 0 && (
+              <div style={{ padding:'10px 14px', borderBottom:'1px solid rgba(255,255,255,0.08)', background:'rgba(239,68,68,0.04)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                  <span style={{ fontSize:11, fontWeight:800, color:'#f87171' }}>🎯 Автоподбор под недостающие механизмы ({gapFill.length})</span>
+                  <button onClick={() => setSelectedStacks(prev => Array.from(new Set([...prev, ...gapFill.map(g => g.stackId)])))}
+                    style={{ padding:'4px 9px', borderRadius:7, border:'1px solid rgba(239,68,68,0.4)', background:'rgba(239,68,68,0.12)', color:'#fca5a5', cursor:'pointer', fontSize:9, fontWeight:700 }}>
+                    ✅ Все рекомендованные
+                  </button>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                  {gapFill.map(g => {
+                    const active = selectedStacks.includes(g.stackId);
+                    return (
+                      <div key={g.stackId} onClick={() => setSelectedStacks(prev => active ? prev.filter(s => s !== g.stackId) : [...prev, g.stackId])}
+                        style={{ padding:'7px 9px', borderRadius:8, cursor:'pointer',
+                          background: active ? 'rgba(168,85,247,0.12)' : 'rgba(255,255,255,0.03)',
+                          border: active ? '1px solid rgba(168,85,247,0.3)' : '1px solid rgba(255,255,255,0.06)' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          <span style={{ fontSize:11, minWidth:14, color: active ? '#c084fc' : 'var(--text-dim)' }}>{active ? '✓' : '○'}</span>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:10, fontWeight:700, color: active ? '#c084fc' : 'var(--text-light)', lineHeight:1.2 }}>{g.stackName}</div>
+                            <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', lineHeight:1.3, marginTop:1 }}>
+                              {g.organLabels.join(', ')} · закрывает: {g.mechLabels.join(', ')}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', marginTop:5, lineHeight:1.3 }}>
+                  Стек покрывает механизмы, оставшиеся незакрытыми после текущего плана поддержки.
+                </div>
+              </div>
+            )}
+
             <div style={{ flex:1, overflowY:'auto', padding:'0 14px 14px' }}>
               {(ALL_STACKS as any[])
                 .filter((st: any) => {
@@ -681,6 +946,97 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         </div>
       )}
 
+      {/* ── Попап Мега-усиления (умный подбор по gaps + синергии) ── */}
+      {showMegaPopup && (
+        <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setShowMegaPopup(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:400, borderRadius:18, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'88vh', display:'flex', flexDirection:'column' }}>
+            <div style={{ height:3, background:'linear-gradient(90deg,#f87171,#ef4444)' }} />
+            <div style={{ padding:'14px 14px 10px', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontSize:13, fontWeight:800, color:'#f87171' }}>🚀 Мега-усиление</span>
+                <button onClick={() => setShowMegaPopup(false)} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10, fontWeight:600 }}>✕</button>
+              </div>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginTop:4, lineHeight:1.3 }}>
+                Умный подбор по непокрытым механизмам ТЗ ({finalRec?.gaps?.length || 0} gaps) и синергии с текущими препаратами ({finalRec?.subs?.length || 0})
+              </div>
+            </div>
+            <div style={{ flex:1, overflowY:'auto', padding:'10px 14px 14px' }}>
+              {megaSuggestions.length === 0 ? (
+                <div style={{ padding:'20px 10px', textAlign:'center', color:'rgba(255,255,255,0.4)', fontSize:10, lineHeight:1.5 }}>
+                  ✅ Все активированные механизмы ТЗ покрыты текущим планом.<br />Усиление не требуется.
+                </div>
+              ) : (
+                <>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                    <span style={{ fontSize:10, fontWeight:700, color:'#f87171' }}>Найдено {megaSuggestions.length} веществ</span>
+                    <button onClick={() => setMegaSelected(new Set(megaSuggestions.map(s => s.substanceId)))}
+                      style={{ padding:'4px 9px', borderRadius:7, border:'1px solid rgba(239,68,68,0.4)', background:'rgba(239,68,68,0.12)', color:'#fca5a5', cursor:'pointer', fontSize:9, fontWeight:700 }}>
+                      ✅ Все
+                    </button>
+                  </div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                    {megaSuggestions.map(s => {
+                      const active = megaSelected.has(s.substanceId);
+                      return (
+                        <div key={s.substanceId} onClick={() => setMegaSelected(prev => {
+                          const next = new Set(prev);
+                          if (next.has(s.substanceId)) next.delete(s.substanceId);
+                          else next.add(s.substanceId);
+                          return next;
+                        })}
+                          style={{ padding:'8px 10px', borderRadius:8, cursor:'pointer',
+                            background: active ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.02)',
+                            border: active ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ display:'flex', alignItems:'flex-start', gap:6 }}>
+                            <span style={{ fontSize:11, minWidth:14, color: active ? '#f87171' : 'var(--text-dim)', marginTop:1 }}>{active ? '✓' : '○'}</span>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:10, fontWeight:700, color: active ? '#fca5a5' : 'var(--text-light)', lineHeight:1.2 }}>
+                                {subNameRu(s.substanceId)}
+                              </div>
+                              <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', lineHeight:1.3, marginTop:2 }}>
+                                {s.reason}
+                              </div>
+                              <div style={{ fontSize:7, color:'rgba(255,255,255,0.35)', marginTop:3, display:'flex', gap:5, flexWrap:'wrap' }}>
+                                <span>📊 {s.mechsCovered.length} мех.</span>
+                                {s.synergyWith.length > 0 && (
+                                  <span style={{ color:'#fbbf24', fontWeight:700 }}>⚡ синергия: {s.synergyWith.map(x => subNameRu(x)).join(', ')}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+            {megaSuggestions.length > 0 && (
+              <div style={{ padding:'10px 14px', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display:'flex', gap:6 }}>
+                  <button onClick={() => { setMegaSelected(new Set()); setShowMegaPopup(false); }}
+                    style={{ flex:1, padding:'10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'var(--text)' }}>
+                    Отмена
+                  </button>
+                  <button onClick={() => {
+                    const newSubs = Array.from(megaSelected).filter(sid =>
+                      !(finalRec?.subs || []).some(s => canonIdLocal(s.substanceId) === canonIdLocal(sid))
+                    );
+                    setAddedSubs(prev => [...new Set([...prev, ...newSubs])]);
+                    setShowMegaPopup(false);
+                  }}
+                    disabled={megaSelected.size === 0}
+                    style={{ flex:2, padding:'10px', borderRadius:10, fontSize:10, fontWeight:800, cursor: megaSelected.size > 0 ? 'pointer' : 'default', border:'none', color:'#000',
+                      background: megaSelected.size > 0 ? 'linear-gradient(135deg,#f87171,#ef4444)' : 'rgba(255,255,255,0.06)' }}>
+                    ✅ Добавить ({megaSelected.size})
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Попап анализа доп. модуля ── */}
       {stackModulePopup && (() => {
         // Для articular_stack — новый попап с протоколами и выбором
@@ -701,6 +1057,15 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               return next;
             });
           };
+          const toggleJointSymptom = (code: string) => setJointSymptoms(prev => {
+            const next = new Set(prev); if (next.has(code)) next.delete(code); else next.add(code); return next;
+          });
+          const jointDomainScores = JOINT_DOMAINS.map(d => ({ d, score: Math.min(10, d.symptoms.filter(s => jointSymptoms.has(s.code)).length * 3) }));
+          const jointRecSet = new Set<string>();
+          jointDomainScores.forEach(({ d, score }) => { if (score >= 6) d.substances.forEach(id => jointRecSet.add(id)); });
+          JOINT_RECOMMENDED_HIGH.forEach(id => jointRecSet.add(id));
+          JOINT_RECOMMENDED_MEDIUM.forEach(id => jointRecSet.add(id));
+          const jointDomainOf = (id: string) => JOINT_DOMAINS.filter(d => d.substances.has(id));
 
           return (
             <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => { setStackModulePopup(null); setArticularConfirm(false); }}>
@@ -714,8 +1079,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     {hasJointSymptom ? ' · боль в суставах' : ''}{crp && crp > 3 ? ` · CRP ${crp}` : ''}
                   </div>
 
+                  <DomainSymptomMap domains={JOINT_DOMAINS} checked={jointSymptoms} onToggle={toggleJointSymptom} />
+
                   {/* Пресеты-протоколы */}
-                  <div style={{ fontSize:9, fontWeight:700, color:'#4ade80', marginBottom:5 }}>📋 Примерные протоколы</div>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#4ade80', marginBottom:5 }}>📋 Быстрые протоколы</div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:8 }}>
                     {JOINT_PRESETS.map(p => {
                       const active = articularPreset === p.id;
@@ -761,9 +1128,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     {JOINT_CATALOG.map(item => {
                       const selected = articularSelected.has(item.id);
                       const inPlan = planIds.has(canonIdLocal(item.id));
-                      const recommendedHigh = JOINT_RECOMMENDED_HIGH.has(item.id);
-                      const recommendedMed = JOINT_RECOMMENDED_MEDIUM.has(item.id);
-                      const isRecommended = recommendedHigh || (recommendedMed && (hasJointSymptom || crp && crp > 3));
+                      const isRecommended = jointRecSet.has(item.id);
+                      const itemDomains = jointDomainOf(item.id);
                       return (
                         <div key={item.id} onClick={() => { if (!inPlan) toggleSub(item.id); }}
                           style={{
@@ -785,6 +1151,13 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                               {inPlan && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.15)', color:'#00e68a', fontWeight:700 }}>в плане</span>}
                             </div>
                             <div style={{ fontSize:7, color:'rgba(255,255,255,0.35)', lineHeight:1.3, marginTop:1 }}>{item.desc}</div>
+                            {itemDomains.length > 0 && (
+                              <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                                {itemDomains.map(d => (
+                                  <span key={d.id} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:d.color+'18', color:d.color, fontWeight:600 }}>{d.label}</span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -823,6 +1196,15 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           const presetColor = neuroScore < 20 ? '#22c55e' : neuroScore < 40 ? '#f59e0b' : neuroScore < 60 ? '#f97316' : '#ef4444';
 
           const toggleSub = (id: string) => { setNeuroSelected(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }); };
+          const toggleNeuroSymptom = (code: string) => setNeuroSymptoms(prev => {
+            const next = new Set(prev); if (next.has(code)) next.delete(code); else next.add(code); return next;
+          });
+          const neuroDomainScores = NEURO_DOMAINS.map(d => ({ d, score: Math.min(10, d.symptoms.filter(s => neuroSymptoms.has(s.code)).length * 3) }));
+          const neuroRecSet = new Set<string>();
+          neuroDomainScores.forEach(({ d, score }) => { if (score >= 6) d.substances.forEach(id => neuroRecSet.add(id)); });
+          NEURO_RECOMMENDED_HIGH.forEach(id => neuroRecSet.add(id));
+          NEURO_RECOMMENDED_MEDIUM.forEach(id => neuroRecSet.add(id));
+          const neuroDomainOf = (id: string) => NEURO_DOMAINS.filter(d => d.substances.has(id));
 
           return (
             <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => { setStackModulePopup(null); setNeuroConfirm(false); }}>
@@ -835,8 +1217,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     {hasInsomnia ? ' · бессонница' : ''}{hasAnxiety ? ' · тревога' : ''}{sleepHours < 7 ? ` · сон ${sleepHours}ч` : ''}{stressLevel > 7 ? ` · стресс ${stressLevel}/10` : ''}
                   </div>
 
+                  <DomainSymptomMap domains={NEURO_DOMAINS} checked={neuroSymptoms} onToggle={toggleNeuroSymptom} />
+
                   {/* Пресеты */}
-                  <div style={{ fontSize:9, fontWeight:700, color:'#818cf8', marginBottom:5 }}>📋 Примерные протоколы</div>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#818cf8', marginBottom:5 }}>📋 Быстрые протоколы</div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:8 }}>
                     {NEURO_PRESETS.map(p => {
                       const active = neuroPreset === p.id;
@@ -877,9 +1261,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     {NEURO_CATALOG.map(item => {
                       const selected = neuroSelected.has(item.id);
                       const inPlan = planIds.has(canonIdLocal(item.id));
-                      const recHigh = NEURO_RECOMMENDED_HIGH.has(item.id);
-                      const recMed = NEURO_RECOMMENDED_MEDIUM.has(item.id);
-                      const isRecommended = recHigh || (recMed && (hasInsomnia || hasAnxiety || stressLevel > 5));
+                      const isRecommended = neuroRecSet.has(item.id);
+                      const itemDomains = neuroDomainOf(item.id);
                       return (
                         <div key={item.id} onClick={() => { if (!inPlan) toggleSub(item.id); }}
                           style={{
@@ -901,10 +1284,22 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                               {inPlan && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.15)', color:'#00e68a', fontWeight:700 }}>в плане</span>}
                             </div>
                             <div style={{ fontSize:7, color:'rgba(255,255,255,0.35)', lineHeight:1.3, marginTop:1 }}>{item.desc}</div>
+                            {itemDomains.length > 0 && (
+                              <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                                {itemDomains.map(d => (
+                                  <span key={d.id} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:d.color+'18', color:d.color, fontWeight:600 }}>{d.label}</span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
                     })}
+                  </div>
+
+                  {/* Safety-флаг: серотонин + СИОЗС */}
+                  <div style={{ fontSize:7, color:'rgba(168,85,247,0.7)', lineHeight:1.35, marginTop:6, padding:'5px 8px', borderRadius:6, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.18)' }}>
+                    ⚠️ При приёме СИОЗС/СИОЗСН (антидепрессанты) избегайте 5-HTP и L-триптофан — риск серотонинового синдрома. Стимуляторы (амфетамины/модафинил): не добавляйте ночные дофаминергики.
                   </div>
 
                   <div style={{ display:'flex', gap:6 }}>
@@ -1186,6 +1581,34 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               ))}
             </>
           )}
+        </div>
+      )}
+
+      {/* ===== ТОКСИКОЛОГИЧЕСКИЙ КОНТРОЛЬ ДОЗ (UL + титрация) ===== */}
+      {finalRec && toxWarnings.length > 0 && (
+        <div style={{ marginTop:8 }}>
+          <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4, display:'flex', alignItems:'center', gap:4 }}>
+            ⚠️ Контроль дозировок ({toxWarnings.length})
+          </div>
+          {toxWarnings.map((w, i) => {
+            const isDanger = w.severity === 'danger';
+            const isTitr = w.severity === 'titrate';
+            const col = isDanger ? '#ef4444' : isTitr ? '#f59e0b' : '#fbbf24';
+            const bg = isDanger ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.08)';
+            const bd = isDanger ? 'rgba(239,68,68,0.28)' : 'rgba(245,158,11,0.2)';
+            const tag = isDanger ? 'ПРЕВЫШЕН UL' : isTitr ? 'ТИТРАЦИЯ' : 'ВНИМАНИЕ';
+            return (
+              <div key={i} style={{ margin:'3px 0', padding:'6px 8px', borderRadius:8, background:bg, border:`1px solid ${bd}` }}>
+                <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:2 }}>
+                  <span style={{ fontSize:7, fontWeight:800, color:col, padding:'1px 5px', borderRadius:4, background:bg, border:`1px solid ${bd}` }}>{tag}</span>
+                  <span style={{ fontSize:9, fontWeight:700, color:'var(--text)' }}>{subNameRu(w.substanceId)}</span>
+                </div>
+                <div style={{ fontSize:8, color:col, lineHeight:1.4 }}>{w.message}</div>
+                {w.percentUL > 0 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.55)', marginTop:2, lineHeight:1.4 }}>→ {w.percentUL}% от {isTitr ? 'оптимума' : 'UL'} ({w.totalDose} / {w.ul} мг)</div>}
+              </div>
+            );
+          })}
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:3 }}>UL — верхний допустимый предел (элементарное вещество). Титрация — доза выше клинического оптимума, рекомендуется циклирование.</div>
         </div>
       )}
 

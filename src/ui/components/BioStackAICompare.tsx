@@ -8,8 +8,10 @@ import { toFinderProfile } from './BioStackAIConstants';
 import { PopupSelect } from './PopupXxx';
 import type { LinkedData } from '../../core/data-link';
 import { calcStackSynergyScore, suggestSynergyAdditions } from '../../engines/support-plan/display';
+import { selectStack } from '../../engines/biostack-clinical-v2.engine';
+import { loadBioStackProfile } from '../../engines/biostack-ai.engine';
 
-type CompareView = 'all' | 'price' | 'mechanisms' | 'synergy' | 'coverage';
+type CompareView = 'all' | 'price' | 'mechanisms' | 'synergy' | 'coverage' | 'safety';
 
 const MECH_TRANSLATIONS_RU: Record<string, string> = {
   ANTIOXIDANT: 'Антиоксидант', GLUTATHIONE_SYNTHESIS: 'Синтез глутатиона',
@@ -193,6 +195,38 @@ export function CompareTab({ profile, stackIds, setStackIds, linked }: { profile
     return { aPairs, bPairs, aCount: aPairs.length, bCount: bPairs.length };
   }, [stackIds, stackB]);
 
+  /* ── Safety aggregate (selectStack) ── */
+  const safetyAnalysis = useMemo(() => {
+    if (stackB.length === 0) return null;
+    const prof = profile || loadBioStackProfile();
+    const lab = linked?.labAnalysis || null;
+    const compute = (ids: string[]) => {
+      if (ids.length === 0) return null;
+      const r = selectStack(ids, prof, 'comprehensive', lab);
+      const critUL = r.ulWarnings.filter(w => w.severity === 'high' || w.severity === 'critical').length;
+      // Safety score: 100 − penalties
+      const score = Math.max(0, 100
+        - r.hardStops.length * 25
+        - r.drugExclusions.length * 15
+        - r.drugTitrations.length * 5
+        - critUL * 10
+        - (r.ulWarnings.length - critUL) * 3
+        - r.redundancy.length * 2);
+      return {
+        hardStops: r.hardStops.length,
+        drugExclusions: r.drugExclusions.length,
+        drugTitrations: r.drugTitrations.length,
+        ulWarnings: r.ulWarnings.length,
+        critUL,
+        redundancy: r.redundancy.length,
+        labAdjustments: r.labAdjustments.length,
+        score,
+        raw: r,
+      };
+    };
+    return { a: compute(stackIds), b: compute(stackB) };
+  }, [stackIds, stackB, profile, linked]);
+
   /* ── Interactions useMemo ── */
   const intAllSubstances = useMemo(() => {
     const seen = new Set<string>();
@@ -316,6 +350,7 @@ export function CompareTab({ profile, stackIds, setStackIds, linked }: { profile
           { id: 'mechanisms' as const, label: '🧬 Механизмы' },
           { id: 'synergy' as const, label: '🤝 Синергия' },
           { id: 'coverage' as const, label: '🎯 Покрытие' },
+          { id: 'safety' as const, label: '🛡 Безопасность' },
         ].map(v => (
           <button key={v.id} onClick={() => setView(v.id)} style={{
             flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 9, fontWeight: 700, cursor: 'pointer',
@@ -660,6 +695,84 @@ export function CompareTab({ profile, stackIds, setStackIds, linked }: { profile
               ))}
             </div>
           )}
+        </GlassCard>
+      )}
+
+      {/* SAFETY VIEW */}
+      {view === 'safety' && stackB.length > 0 && safetyAnalysis && safetyAnalysis.a && safetyAnalysis.b && (
+        <GlassCard title="🛡 Клиническая безопасность" icon="🛡" color="#ef4444">
+          {/* Safety score gauges */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 8 }}>
+            {[
+              { label: 'Индекс безопасности A', value: safetyAnalysis.a.score, color: '#8b5cf6' },
+              { label: 'Индекс безопасности B', value: safetyAnalysis.b.score, color: '#00e68a' },
+            ].map(g => {
+              const barColor = g.value >= 80 ? '#22c55e' : g.value >= 60 ? '#f59e0b' : '#ef4444';
+              return (
+                <div key={g.label} style={{ padding: '8px', borderRadius: 8, background: g.color + '08', border: '1px solid ' + g.color + '18', textAlign: 'center' }}>
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>{g.label}</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: barColor }}>{g.value}<span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>/100</span></div>
+                  <div style={{ height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginTop: 4 }}>
+                    <div style={{ width: `${g.value}%`, height: '100%', background: barColor, borderRadius: 3 }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Detailed safety metrics table */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: 3, fontSize: 8 }}>
+            <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.4)', padding: '3px 4px' }}>Метрика</div>
+            <div style={{ fontWeight: 700, color: '#c4b5fd', textAlign: 'center', padding: '3px 4px' }}>Стек A</div>
+            <div style={{ fontWeight: 700, color: '#00e68a', textAlign: 'center', padding: '3px 4px' }}>Стек B</div>
+            {[
+              { label: '⛔ Абс. противопоказания', a: safetyAnalysis.a.hardStops, b: safetyAnalysis.b.hardStops, invert: true },
+              { label: '💊 Исключения по ЛС', a: safetyAnalysis.a.drugExclusions, b: safetyAnalysis.b.drugExclusions, invert: true },
+              { label: '⚖ Титрации доз', a: safetyAnalysis.a.drugTitrations, b: safetyAnalysis.b.drugTitrations, invert: true },
+              { label: '🧪 Превыш. UL (крит.)', a: safetyAnalysis.a.critUL, b: safetyAnalysis.b.critUL, invert: true },
+              { label: '🧪 Превыш. UL (всего)', a: safetyAnalysis.a.ulWarnings, b: safetyAnalysis.b.ulWarnings, invert: true },
+              { label: '🔁 Дублир. путей', a: safetyAnalysis.a.redundancy, b: safetyAnalysis.b.redundancy, invert: true },
+              { label: '🩸 Лаб. коррекции', a: safetyAnalysis.a.labAdjustments, b: safetyAnalysis.b.labAdjustments, invert: false },
+            ].map((row, i) => {
+              const better = row.invert ? (row.a < row.b ? 'a' : row.b < row.a ? 'b' : '') : (row.a > row.b ? 'a' : row.b > row.a ? 'b' : '');
+              const cell = (v: number, side: 'a' | 'b') => {
+                const isBetter = better === side;
+                const isWorse = better && better !== side;
+                const col = v === 0 && row.invert ? '#4ade80' : isWorse ? '#ef4444' : isBetter ? '#4ade80' : 'rgba(255,255,255,0.7)';
+                return <div style={{ textAlign: 'center', padding: '3px 4px', borderRadius: 4, fontWeight: 700, color: col, background: i % 2 ? 'rgba(255,255,255,0.015)' : 'transparent' }}>{v}</div>;
+              };
+              return (
+                <React.Fragment key={row.label}>
+                  <div style={{ color: 'rgba(255,255,255,0.6)', padding: '3px 4px', background: i % 2 ? 'rgba(255,255,255,0.015)' : 'transparent' }}>{row.label}</div>
+                  {cell(row.a, 'a')}
+                  {cell(row.b, 'b')}
+                </React.Fragment>
+              );
+            })}
+          </div>
+
+          {/* Hard-stop / exclusion details */}
+          {(safetyAnalysis.a.raw.hardStops.length > 0 || safetyAnalysis.b.raw.hardStops.length > 0) && (
+            <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)' }}>
+              <div style={{ fontSize: 8, color: '#ef4444', fontWeight: 700, marginBottom: 3 }}>⛔ Абсолютные противопоказания</div>
+              {safetyAnalysis.a.raw.hardStops.map((h, i) => (
+                <div key={'a' + i} style={{ fontSize: 7, color: '#f87171', padding: '1px 0' }}>A: {h.substanceName || h.substanceId} — {h.reason}</div>
+              ))}
+              {safetyAnalysis.b.raw.hardStops.map((h, i) => (
+                <div key={'b' + i} style={{ fontSize: 7, color: '#fbbf24', padding: '1px 0' }}>B: {h.substanceName || h.substanceId} — {h.reason}</div>
+              ))}
+            </div>
+          )}
+
+          {/* Verdict */}
+          <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 6, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.1)', fontSize: 8, color: '#4ade80', lineHeight: 1.4 }}>
+            {(() => {
+              const sa = safetyAnalysis.a.score, sb = safetyAnalysis.b.score;
+              if (sb > sa + 5) return `🏆 Стек B безопаснее (индекс ${sb} против ${sa}). Меньше противопоказаний и рисков передозировки.`;
+              if (sa > sb + 5) return `🏆 Стек A безопаснее (индекс ${sa} против ${sb}). Сохраняйте текущий состав.`;
+              return `⚖ Стеки сопоставимы по безопасности (A: ${sa}, B: ${sb}). Выбирайте по покрытию и цене.`;
+            })()}
+          </div>
         </GlassCard>
       )}
 

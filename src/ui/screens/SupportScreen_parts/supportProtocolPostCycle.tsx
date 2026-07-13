@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolPostCycle: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -12,6 +12,13 @@ export const SupportProtocolPostCycle: React.FC<{ s: Record<string, any> }> = ({
                 <div style={{ fontSize:13, fontWeight:800, color:'#8b5cf6', marginBottom:2 }}>🔄 Послекурсовая реабилитация (3-6 мес)</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Комплексное восстановление HPTA-оси, липидного профиля, гематокрита и нейроэндокринного статуса.</p>
               </div>
+
+              <ContraBanner items={[
+                'Тамоксифен — риск тромбоза (редко <1%), контроль D-димера',
+                'hCG без SERM после длинных эфиров — риск задержки восстановления HPTA',
+                'Кломифен при дефиците зрения — редкая ретинопатия (остановка при «искрах»)',
+                'AI в постцикл без высокого E2 — подавление нужного эстрогена',
+              ]} />
               <div style={{ display:'flex', gap:4, overflowX:'auto' }}>
                 {[{id:'phases',label:'📅 Фазы'},{id:'lipids',label:'Липиды'},{id:'hemato',label:'Гематокрит'},{id:'neuro',label:'Нейро'},{id:'monitoring',label:'🧪 Мониторинг'}].map((t:any)=>(
                   <button key={t.id} onClick={()=>setPostCycleTab(t.id)} style={postCycleTab===t.id?pillActive('#8b5cf6'):pillInactive()}>{t.label}</button>
@@ -21,7 +28,7 @@ export const SupportProtocolPostCycle: React.FC<{ s: Record<string, any> }> = ({
                 <div style={{ fontSize:11, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>📅 Фазы восстановления</div>
                 <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)' }}>
                   <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>ФАЗА 1 · ОТМЕНА ААС (0-4 нед)</div>
-                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>• Отмена ААС. При инъекционных ААС длительного действия — hCG 500-1000 МЕ 2×/нед × 2-3 нед (до начала SERM) для восстановления тестикулярного объёма<br/>• SERM (тамоксифен 20 мг ИЛИ энкломифен 12.5-25 мг ИЛИ кломифен 25-50 мг/день) — старт после последней инъекции коротких эфиров или через 2-3 нед после последней инъекции длинных эфиров<br/>• AI — только при высоком E2. Каберголин 0.25×2/нед при ↑ PRL<br/>• Контроль T,E2,PRL,АЛТ,HCT каждые 2 нед</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>• Отмена ААС. Восстановление HPTA — ДВЕ опции (выбрать одну):<br/>&nbsp;&nbsp;— <b>hCG-bridge</b>: при инъекционных ААС длительного действия — hCG 500-1000 МЕ 2×/нед × 2-3 нед (до старта SERM) для восстановления тестикулярного объёма, затем SERM<br/>&nbsp;&nbsp;— <b>SERM-моно</b>: при коротких эфирах или лёгких курсах — SERM сразу без hCG (hCG НЕ обязателен)<br/>• SERM (тамоксифен 20 мг ИЛИ энкломифен 12.5-25 мг ИЛИ кломифен 25-50 мг/день) — старт после последней инъекции коротких эфиров или через 2-3 нед после последней инъекции длинных эфиров<br/>• AI — только при высоком E2. Каберголин 0.25×2/нед при ↑ PRL<br/>• Контроль T,E2,PRL,АЛТ,HCT каждые 2 нед</div>
                 </div>
                 <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)' }}>
                   <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>ФАЗА 2 · ПКТ (4-8 нед)</div>
@@ -29,7 +36,7 @@ export const SupportProtocolPostCycle: React.FC<{ s: Record<string, any> }> = ({
                 </div>
                 <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)' }}>
                   <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>ФАЗА 3 · ВОССТАНОВЛЕНИЕ (8-16 нед)</div>
-                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>• Липиды: омега-3 EPA 4 г, бергамот 1000 мг, ниацин 500 мг<br/>• HCT: кровопускание при {'>'}54, аспирин 100 мг, куркумин<br/>• Нейро: NAC 1200 мг, АЛК 600 мг, PS 400 мг, Mg 600 мг</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>• Липиды: омега-3 EPA 4 г, бергамот 1000 мг, ниацин 500 мг<br/>• HCT: кровопускание при {'>'}54, аспирин 100 мг (при ≥2 факторах тромботического риска), куркумин<br/>• Нейро: NAC 1200 мг, АЛК 600 мг, PS 400 мг, Mg 600 мг</div>
                 </div>
                 <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)' }}>
                   <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>ФАЗА 4 · МОНИТОРИНГ (16-24+ нед)</div>
@@ -38,11 +45,11 @@ export const SupportProtocolPostCycle: React.FC<{ s: Record<string, any> }> = ({
               </div>)}
               {postCycleTab==='lipids'&&(<div style={cardBg}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>🩸 Коррекция липидного профиля</div>
-                {[{n:'Омега-3 EPA 4 г/день',d:'4 г',t:'2+2 г с едой',o:'↑ ЛПВП 10-15%, ↓ ТГ 25-30%'},{n:'Бергамот 1000 мг',d:'1000 мг',t:'2×/д до еды',o:'↓ ЛПНП 30-40%, ↑ ЛПВП 20-25%'},{n:'Ниацин B3 500 мг',d:'500 мг',t:'После еды 2-3×/д',o:'↑ ЛПВП 20-30% — мощный. Старт 100 мг титровать'},{n:'Кр. ферм. рис (монаколин K)',d:'10 мг',t:'Вечер',o:'↓ ЛПНП 20-40% +CoQ10. Контроль АЛТ'},{n:'Эзетимиб 10 мг 💊',d:'10 мг',t:'Утро',o:'↓ ЛПНП 15-20%. Аддитивно к статинам'}].map((x:any,i:any)=>renderRow(x,i,'#8b5cf6'))}
+                {[{n:'Омега-3 EPA 4 г/день',d:'4 г',t:'2+2 г с едой',o:'↑ ЛПВП 10-15%, ↓ ТГ 25-30%'},{n:'Бергамот 1000 мг',d:'1000 мг',t:'2×/д до еды',o:'↓ ЛПНП 30-40%, ↑ ЛПВП 20-25%'},{n:'Ниацин B3 500 мг',d:'500 мг',t:'После еды 2-3×/д',o:'↑ ЛПВП 20-30% — мощный. Старт 100 мг титровать'},{n:'Кр. ферм. рис (монаколин K) 1200-2400 мг',d:'1200-2400 мг',t:'Вечер',o:'≈10 мг монаколина К. ↓ ЛПНП 20-40% +CoQ10. Контроль АЛТ'},{n:'Эзетимиб 10 мг 💊',d:'10 мг',t:'Утро',o:'↓ ЛПНП 15-20%. Аддитивно к статинам'}].map((x:any,i:any)=>renderRow(x,i,'#8b5cf6'))}
               </div>)}
               {postCycleTab==='hemato'&&(<div style={cardBg}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>🩸 Коррекция гематокрита</div>
-                {[{n:'Кровопускание 400-500 мл',d:'—',t:'При HCT >54 до <50',o:'Золотой стандарт. Донорство. Повтор через 4-6 нед'},{n:'Аспирин 100 мг',d:'100 мг',t:'Утро после еды',o:'↓ агрегация тромбоцитов. При HCT >52'},{n:'Чеснок Kyolic 1200 мг',d:'1200 мг',t:'2×/день',o:'↓ вязкость крови'},{n:'Гидратация 3+ л/день',d:'>3 л',t:'Постоянно',o:'Разжижение крови'},{n:'Наттокиназа 100 мг',d:'100 мг',t:'Утро натощак',o:'Фибринолитик. При HCT >50'}].map((x:any,i:any)=>renderRow(x,i,'#8b5cf6'))}
+                {[{n:'Кровопускание 400-500 мл',d:'—',t:'При HCT >54 до <50',o:'Золотой стандарт. Донорство. Повтор через 4-6 нед'},{n:'Аспирин 100 мг',d:'100 мг',t:'Утро после еды',o:'↓ агрегация тромбоцитов. Только при ≥2 факторах тромботического риска (HCT>52, ↑вязкость, ↑ТГ, курение, возраст>40)'},{n:'Чеснок Kyolic 1200 мг',d:'1200 мг',t:'2×/день',o:'↓ вязкость крови'},{n:'Гидратация 3+ л/день',d:'>3 л',t:'Постоянно',o:'Разжижение крови'},{n:'Наттокиназа 100 мг',d:'100 мг',t:'Утро натощак',o:'Фибринолитик. При HCT >50'}].map((x:any,i:any)=>renderRow(x,i,'#8b5cf6'))}
               </div>)}
               {postCycleTab==='neuro'&&(<div style={cardBg}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>🧠 Нейрореабилитация</div>

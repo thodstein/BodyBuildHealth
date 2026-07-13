@@ -15,6 +15,16 @@ export const KNOWN_DRUG_SUP_INTERACTIONS: Array<{ drug: string; substance: strin
   { drug: 'апиксабан', substance: 'curcumin', effect: 'Риск кровотечений (высокие дозы >1 г/сут)', severity: 'MEDIUM', mechanism: 'Антиагрегантный эффект куркумина' },
   { drug: 'дабигатран', substance: 'omega3', effect: 'Потенцирование антикоагуляции', severity: 'MEDIUM', mechanism: 'Снижение агрегации тромбоцитов' },
 
+  // Протеолитические ферменты (серрапептаза/бромелайн) + антикоагулянты/антиагреганты
+  { drug: 'варфарин', substance: 'serrapeptase', effect: 'Риск кровотечений (усиление фибринолиза)', severity: 'HIGH', mechanism: 'Серрапептаза расщепляет фибрин → аддитивно к варфарину' },
+  { drug: 'варфарин', substance: 'bromelain', effect: 'Риск кровотечений (ингибирование агрегации)', severity: 'HIGH', mechanism: 'Бромелайн разрушает фибриноген и агрегацию тромбоцитов' },
+  { drug: 'аспирин', substance: 'serrapeptase', effect: 'Двойной антиагрегантный эффект, риск кровотечений', severity: 'HIGH', mechanism: 'Серрапептаза + аспирин → суммация антитромботического' },
+  { drug: 'аспирин', substance: 'bromelain', effect: 'Усиление антиагрегантного эффекта', severity: 'MEDIUM', mechanism: 'Бромелайн потенцирует ингибирование агрегации' },
+  { drug: 'клопидогрель', substance: 'serrapeptase', effect: 'Риск кровотечений (суммация фибринолиза)', severity: 'MEDIUM', mechanism: 'Серрапептаза + P2Y12-блокада' },
+  { drug: 'клопидогрель', substance: 'bromelain', effect: 'Усиление антиагрегантного эффекта', severity: 'MEDIUM', mechanism: 'Бромелайн + блокада P2Y12' },
+  { drug: 'апиксабан', substance: 'serrapeptase', effect: 'Риск кровотечений', severity: 'HIGH', mechanism: 'Серрапептаза + ингибитор Xa фактора' },
+  { drug: 'апиксабан', substance: 'bromelain', effect: 'Риск кровотечений', severity: 'MEDIUM', mechanism: 'Бромелайн + ингибитор Xa фактора' },
+
   // ── СТАТИНЫ ──
   { drug: 'аторвастатин', substance: 'coq10', effect: 'Снижение миалгий и миопатии от статинов', severity: 'LOW', mechanism: 'Восполнение CoQ10, подавляемого статинами' },
   { drug: 'аторвастатин', substance: 'берберин', effect: 'Дополнительное снижение ЛПНП (аддитивный эффект)', severity: 'MEDIUM', mechanism: 'AMPK + снижение синтеза холестерина (SREBP)' },
@@ -218,4 +228,23 @@ export const KNOWN_DRUG_SUP_INTERACTIONS: Array<{ drug: string; substance: strin
   // ── ИНГИБИТОРЫ КАРБОАНГИДРАЗЫ ──
   { drug: 'ацетазоламид', substance: 'potassium', effect: 'Гипокалиемия на фоне ацетазоламида', severity: 'MEDIUM', mechanism: 'Ингибирование карбоангидразы → ↑ потери K+' },
   { drug: 'ацетазоламид', substance: 'bicarbonate', effect: 'Метаболический ацидоз на фоне ацетазоламида', severity: 'MEDIUM', mechanism: 'Потери HCO3⁻ через почки' },
+
+  // ── ЛИТИЙ + ДОБАВКИ ──
+  { drug: 'литий', substance: 'caffeine', effect: 'Колебания уровня лития при изменении потребления кофеина', severity: 'MEDIUM', mechanism: 'Кофеин ↑ почечный клиренс лития — отмена резко ↑ концентрацию' },
+  { drug: 'литий', substance: 'fiber', effect: 'Снижение всасывания лития', severity: 'MEDIUM', mechanism: 'Пищевые волокна связывают литий в ЖКТ' },
+  { drug: 'литий', substance: 'creatine', effect: 'Дополнительная задержка жидкости, влияние на почечную экскрецию Li+', severity: 'LOW', mechanism: 'Осмотическая нагрузка + конкуренция за реабсорбцию' },
+
+  // ── ГИНКГО / ЧЕСНОК + АНТИКОАГУЛЯНТЫ / АНТИАГРЕГАНТЫ ──
+  { drug: 'варфарин', substance: 'ginkgo', effect: 'Риск кровотечений (усиление антикоагуляции)', severity: 'HIGH', mechanism: 'Гинкголиды ингибируют фактор активации тромбоцитов (PAF)' },
+  { drug: 'аспирин', substance: 'ginkgo', effect: 'Риск кровотечений (спонтанные гифемы, ВЧК)', severity: 'HIGH', mechanism: 'Антиагрегантный эффект гинкголидов + ингибирование COX аспирином' },
+  { drug: 'клопидогрель', substance: 'ginkgo', effect: 'Усиление антиагрегантного эффекта, риск кровотечений', severity: 'HIGH', mechanism: 'Ингибирование PAF + блокада P2Y12' },
+  { drug: 'апиксабан', substance: 'ginkgo', effect: 'Риск кровотечений', severity: 'MEDIUM', mechanism: 'Аддитивный антитромботический эффект' },
+  { drug: 'варфарин', substance: 'garlic', effect: 'Усиление антикоагуляции, риск кровотечений', severity: 'HIGH', mechanism: 'Аджоен/аллицин ингибируют агрегацию тромбоцитов' },
+  { drug: 'варфарин', substance: 'garlic_extract', effect: 'Усиление антикоагуляции, риск кровотечений', severity: 'HIGH', mechanism: 'Аджоен/аллицин ингибируют агрегацию тромбоцитов' },
+  { drug: 'аспирин', substance: 'garlic', effect: 'Риск кровотечений (двойной антиагрегантный эффект)', severity: 'MEDIUM', mechanism: 'Ингибирование агрегации тромбоцитов аллицином' },
+  { drug: 'клопидогрель', substance: 'garlic_extract', effect: 'Усиление антиагрегантного эффекта', severity: 'MEDIUM', mechanism: 'Аддитивное подавление агрегации тромбоцитов' },
+
+  // ── ТАДАЛАФИЛ + NO-ДОНОРЫ (добавки) ──
+  { drug: 'тадалафил', substance: 'arginine', effect: 'Гипотония, ортостатический коллапс (суммация NO-пути)', severity: 'MEDIUM', mechanism: 'NO-донор (аргинин) + ингибирование PDE5 → ↑ цГМФ' },
+  { drug: 'тадалафил', substance: 'agmatine', effect: 'Усиление вазодилатации, снижение АД', severity: 'MEDIUM', mechanism: 'Модуляция NOS + ингибирование PDE5' },
 ];

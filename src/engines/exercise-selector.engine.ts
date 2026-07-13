@@ -13,6 +13,7 @@ export interface SelectorInput {
   muscleGroup: string;
   count: number;
   selectedIds: string[];
+  selectedNames?: string[];
   equipment: string[];
   weakZones?: string[];
   level: string;
@@ -22,11 +23,22 @@ export interface SelectorInput {
   preferEquipment?: string[];
   /** Целевой RIR для фазы (0-4) — упражнения с подходящей сложностью получают бонус */
   targetRir?: number;
+  /** Контекст бодибилдинга: штрафует пауэрлифт/олимпийские тяжёлые подъёмы в пользу изоляции/машин/тросов */
+  preferBB?: boolean;
 }
 
 export interface SelectedExercise extends Exercise {
   selectionScore: number;
   selectionRationale: string[];
+}
+
+/** Детект павэрлифтинг/олимпийских тяжёлых подъёмов (не для бодибилдинга) */
+const COMP_LIFT_PATTERNS = ['штанг', 'становая', 'присед', 'рывок', 'толчок', 'пендл', 'армейский', 'тяга рывковая', 'тяга пендл', 'смит', 'спот', 'доски', 'цепи', 'ленты', 'пины', 'тяга штанги', 'жим штанги лёжа', 'жимовой', 'конвой', 'подъём на грудь'];
+function isCompetitionLift(ex: Exercise): boolean {
+  if (ex.movementType === 'competition_lift') return true;
+  const n = (ex.name || '').toLowerCase();
+  const id = (ex.id || '').toLowerCase();
+  return COMP_LIFT_PATTERNS.some(p => n.includes(p) || id.includes(p));
 }
 
 /** Силовая кривая: определяет слабые зоны по группе мышц */
@@ -184,17 +196,19 @@ function pushPullScore(ex: Exercise, selected: Exercise[]): number {
 
 /** Главная функция: интеллектуальный отбор N упражнений */
 export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
-  const { candidates, muscleGroup, count, selectedIds, equipment, weakZones, level, injuryProfile, type, preferEquipment, targetRir } = input;
+  const { candidates, muscleGroup, count, selectedIds, selectedNames, equipment, weakZones, level, injuryProfile, type, preferEquipment, targetRir, preferBB } = input;
+  const _selNames = selectedNames || [];
 
   let pool = candidates.filter(ex => {
     if (!ex || !ex.id) return false;
     if (selectedIds.includes(ex.id)) return false;
+    if (_selNames.includes(ex.name)) return false;
     if (type && type !== 'any' && ex.type !== type) return false;
     return true;
   });
 
   // Если пул пуст — возвращаем candidates без фильтра
-  if (pool.length === 0) pool = candidates.filter(ex => ex && ex.id && !selectedIds.includes(ex.id));
+  if (pool.length === 0) pool = candidates.filter(ex => ex && ex.id && !selectedIds.includes(ex.id) && !_selNames.includes(ex.name));
 
   // Скоринг
   const scored = pool.map(ex => {
@@ -255,6 +269,12 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     // Бонус для compound (базовые)
     if (ex.type === 'compound') score += 5;
 
+    // 5b. Контекст бодибилдинга: штраф пауэрлифт-подъёмов
+    if (preferBB && isCompetitionLift(ex)) {
+      score -= 18;
+      rationales.push('Бодибилдинг: не соревновательный подъём −18');
+    }
+
     // Бонус для уровня
     if (level === 'beginner' && ex.difficulty && ex.difficulty === 'advanced') score -= 10;
     if (level === 'advanced' && ex.difficulty && ex.difficulty === 'beginner') score -= 3;
@@ -284,11 +304,13 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
   // Жадный отбор: берём лучшее, исключая конфликтующие
   const result: SelectedExercise[] = [];
   const usedIds = new Set<string>();
+  const usedNames = new Set<string>();
   const usedSubGroups = new Map<string, number>();
 
   for (const ex of scored) {
     if (result.length >= count) break;
     if (usedIds.has(ex.id)) continue;
+    if (usedNames.has(ex.name)) continue;
 
     // Разнообразие: не больше 2 упражнений из одной substitutionGroup
     const sg = (ex as any).substitutionGroup || '';
@@ -301,6 +323,7 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
 
     result.push(ex);
     usedIds.add(ex.id);
+    usedNames.add(ex.name);
     if (sg) usedSubGroups.set(sg, sgCount + 1);
   }
 
@@ -309,8 +332,10 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     for (const ex of scored) {
       if (result.length >= count) break;
       if (usedIds.has(ex.id)) continue;
+      if (usedNames.has(ex.name)) continue;
       result.push(ex);
       usedIds.add(ex.id);
+      usedNames.add(ex.name);
     }
   }
 

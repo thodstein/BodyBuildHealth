@@ -8,7 +8,7 @@
 //  computeTierAdjustments(labs) → {addSubs, titrationFactors, nutritionTips, alerts, stopCourse}
 // ════════════════════════════════════════════════════════════════════════════
 
-import { deriveTier, getTierLabel, type Tier } from './lab-tier-ranges';
+import { deriveTier, getTierLabel, LAB_TIERS, type Tier } from './lab-tier-ranges';
 
 export interface TierAddSub {
   id: string;
@@ -125,7 +125,7 @@ const TIER_RULES: TierRule[] = [
   { marker: 'TESTOSTERONE', tier1: { nutrition: [['Цинк', '30 мг (если дефицит)'], ['Витамин D', '5000+ МЕ'], ['Сон', '8+ ч']] }, tier2: { add: [['hcg', 'hCG 500-1000 МЕ 2р/нед (восстановление)']], nutrition: [['Цинк', '30 мг'], ['D3', '10000 МЕ + K2']] }, tier3: { alerts: ['Testosterone = {value} nmol/L — тяжёлый гипогонадизм. Эндокринолог. Заместительная терапия.'] } },
 
   // ─── МЕТАБОЛИЧЕСКИЕ ───
-  { marker: 'GLUCOSE', tier1: { add: [['berberine', 'Berberine 1500 мг — AMPK, ↓ глюкоза'], ['carnitine', 'L-Карнитин 2 г']], nutrition: [['Lowcarb', '<100 г/день'], ['Fiber', '30+ г'], ['TRE', 'Time-restricted eating 12 ч']] }, tier2: { titrate: [['berberine', 1.33, 'Berberine ↑2000 мг']], nutrition: [['Lowcarb', '<50 г/день'], ['STOP GH', 'Отменить GH/инсулин если есть'], ['Врач', 'Эндокринолог']] }, tier3: { alerts: ['⛔ Глюкоза = {value} mmol/L — кетоз/ДКА риск. ER. Инсулин под контролем врача.'], stopCourse: false } },
+  { marker: 'GLUCOSE', tier1: { add: [['berberine', 'Berberine 1500 мг — AMPK, ↓ глюкоза'], ['carnitine', 'L-Карнитин 2 г']], nutrition: [['Lowcarb', '<100 г/день'], ['Fiber', '30+ г'], ['TRE', 'Time-restricted eating 12 ч']] }, tier2: { titrate: [['berberine', 1.33, 'Berberine ↑2000 мг']], nutrition: [['Lowcarb', '<50 г/день'], ['STOP GH', 'Отменить GH/инсулин если есть'], ['Врач', 'Эндокринолог']] }, tier3: { alerts: ['⛔ Глюкоза = {value} mmol/L — тяжёлая гипергликемия/кетоацидоз риск. ОТМЕНИТЬ GH и инсулин. ER. Инсулин под контролем врача.'], stopCourse: true } },
 
   { marker: 'HBA1C', tier1: { add: [['berberine', 'Berberine 1500 мг']], nutrition: [['Lowcarb', '<100 г'], ['Walking', '10k steps/день']] }, tier2: { nutrition: [['STOP GH', 'Обязательно'], ['Врач', 'Эндокринолог'], ['Metformin?', 'Через врача']] }, tier3: { alerts: ['HbA1c = {value}% — сахарный диабет. Эндокринолог.'], stopCourse: false } },
 
@@ -137,7 +137,7 @@ const TIER_RULES: TierRule[] = [
 
   { marker: 'CRP', tier1: { add: [['curcumin', 'Curcumin 500 мг + Piperine — ↓ NF-κB'], ['omega3', 'Омега-3 ↑3 г']], nutrition: [['↑ omega-3', '2-3 г EPA/DHA'], ['↑ рыба', '3×/нед']] }, tier2: { titrate: [['omega3', 1.5, 'Омега-3 ↑4.5 г'], ['curcumin', 2.0, 'Curcumin ↑1000 мг']], nutrition: [['STOP alcohol', 'ZERO'], ['Sleep', '8+ ч']] }, tier3: { alerts: ['СРБ = {value} mg/L — выраженное воспаление. Врач. Исключить инфекцию/сепсис.'] } },
 
-  { marker: 'FERRITIN', tier1: { add: [['iron_bisglycinate', 'Iron bisglycinate 30 мг'], ['vitamin_c', 'VitC 500 мг (↑ всасывание железа ×3)']], nutrition: [['Вместе с мясом', 'Heme-iron'], ['STOP tea/coffee', '1 час до/после еды']] }, tier2: { titrate: [['iron_bisglycinate', 2.0, 'Iron ↑60 мг']], add: [['vitamin_c', 'VitC 1000 мг']], nutrition: [['Врач', 'Гастро/гематолог']] }, tier3: { alerts: ['Ферритин = {value} ng/mL — тяжёлая анемия. Гематолог.'] } },
+  { marker: 'FERRITIN', tier1: { add: [['iron_bisglycinate', 'Iron bisglycinate 30 мг'], ['vitamin_c', 'VitC 500 мг (↑ всасывание железа ×3)']], nutrition: [['Вместе с мясом', 'Heme-iron'], ['STOP tea/coffee', '1 час до/после еды']] }, tier2: { titrate: [['iron_bisglycinate', 2.0, 'Iron ↑60 мг']], add: [['vitamin_c', 'VitC 1000 мг']], nutrition: [['Врач', 'Гастро/гематолог']] }, tier3: { alerts: ['Ферритин = {value} ng/mL — избыток железа. Гематолог (исключить гемохроматоз); НЕ назначать железо.'] } },
 
   // ─── ВИТАМИНЫ/МИНЕРАЛЫ ───
   { marker: 'VITAMIN_D', tier1: { titrate: [['vitamin_d3', 2.0, 'D3 ↑10000 МЕ (было 5000)'], ['vitamin_k2', 2.0, 'K2 ↑200 мкг']], nutrition: [['Солнце', '15 мин/день']] }, tier2: { titrate: [['vitamin_d3', 4.0, 'D3 ↑20000 МЕ'], ['vitamin_k2', 2.0, 'K2 ↑200 мкг']], nutrition: [['Солнце', '20 мин/день']] }, tier3: { alerts: ['D3 = {value} ng/mL — тяжёлый дефицит. Врач. Высокие дозы под контролем.'] } },
@@ -196,6 +196,23 @@ export function computeTierAdjustments(labs: Record<string, number>): TierAdjust
       label: '', // заполнить из LAB_TIERS если нужно
       unit: '',
     });
+
+    // CRITICAL: калий/натрий — direction:'both'. Добавлять препарат/соль ТОЛЬКО при НИЗКОЙ стороне.
+    // При ВЫСОКОЙ стороне (гиперкалиемия/гипернатриемия) добавка K⁺/соли — фатальна → ограничение.
+    const mkey = marker.toUpperCase();
+    const tdef = LAB_TIERS[mkey];
+    const isHighSide = !!tdef && tdef.direction === 'both' && value > (tdef.normal[0] + tdef.normal[1]) / 2;
+    if ((mkey === 'POTASSIUM' || mkey === 'SODIUM') && isHighSide && tier > 0 && tier < 3) {
+      nutrition.push({
+        action: mkey === 'POTASSIUM' ? '🛑 ОГРАНИЧИТЬ КАЛИЙ' : '🛑 ОГРАНИЧИТЬ НАТРИЙ',
+        target: mkey === 'POTASSIUM'
+          ? 'Исключить бананы/авокадо/картофель/апельсины/шпинат; диуретик (фуросемид/буметанид) по врачу; ЭКГ (риск аритмии)'
+          : 'Снизить соль <3 г/день; контроль АД и водного баланса; врач (риск отёка мозга/сердца)',
+        marker,
+        tier,
+      });
+      continue;
+    }
 
     if (tier === 1 && rule.tier1) {
       if (rule.tier1.add) {

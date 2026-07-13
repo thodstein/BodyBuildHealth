@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner, ContraBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolE2: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -12,6 +12,13 @@ export const SupportProtocolE2: React.FC<{ s: Record<string, any> }> = ({ s }) =
                 <div style={{ fontSize:13, fontWeight:800, color:'#f472b6', marginBottom:2 }}>🔬 Контроль эстрадиола на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Поддержание оптимального уровня эстрадиола (E2). Профилактика гинекомастии, контроль ароматизации, управление эстроген-зависимыми побочными эффектами.</p>
               </div>
+
+              <ContraBanner items={[
+                'E2 <20 пг/мл — суставы/либидо/настроение (не «чем ниже тем лучше»)',
+                'Анастрозол НЕ при E2 <40 (риск перелечить → обратные эффекты)',
+                'hCG без контроля E2 — риск гинекомастии (титровать по E2)',
+                'АИ при нормальном E2 — подавление нужного эстрогена',
+              ]} />
 
               <StopBanner title="Критические пороги по эстрадиолу" thresholds={[
                 'E2 >120 пг/мл при симптомах — активная терапия ингибитором ароматазы',
@@ -76,7 +83,7 @@ export const SupportProtocolE2: React.FC<{ s: Record<string, any> }> = ({ s }) =
                       items:[
                         { name:'Отменить/снизить анастрозол', dose:'—', timing:'Немедленно', note:'Снизить дозу АИ вдвое или отменить на 1-2 нед до восстановления E2' },
                         { name:'D-аспарагиновая кислота (DAA)', dose:'3 г', timing:'2×/день', note:'↑ ароматазу → ↑ E2. Мягкое восстановление' },
-                        { name:'Хорионический гонадотропин (hCG)', dose:'500 МЕ', timing:'2×/нед', note:'Стимулирует эндогенный тестостерон → ароматизация → ↑ E2' },
+                        { name:'Хорионический гонадотропин (hCG)', dose:'500-1000 МЕ', timing:'2×/нед (суммарно 1000-2000 МЕ/нед)', note:'Стимулирует эндогенный тестостерон → ароматизация → ↑ E2. При низком E2 — 500 МЕ 2×/нед; при выраженном дефиците/атрофии яичек — до 1000 МЕ 2×/нед' },
                         { name:'Контроль E2', dose:'—', timing:'Каждые 1-2 нед', note:'Целевое восстановление E2 до 20-40 пг/мл. Симптомы проходят при {'>'}20' },
                       ]},
                   ].map((p: any, i: any) => (

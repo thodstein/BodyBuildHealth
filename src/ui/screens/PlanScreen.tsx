@@ -216,7 +216,7 @@ function buildDayPlan(result: TrainingOutput, daysPerWeek: number, weakPoints: s
 
         const presc = calcExercisePrescription(ex, result.splitName.includes('') ? 'strength' : 'hypertrophy', 'intermediate', weakPoints.includes(g), isDeload, 1.0);
 
-        const dropPct = presc.dropSet ? 'в€’20%' : undefined;
+        const dropPct = presc.dropSet ? '−20%' : undefined;
 
         const backoffReps = presc.backoffSet ? '+2пов' : undefined;
 

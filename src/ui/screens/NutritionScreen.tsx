@@ -214,7 +214,7 @@ const CartTab: React.FC = () => {
               </div>
               <div style={{ flex:1, background:'#202023', borderRadius:8, padding:'5px 8px', textAlign:'center' }}>
                 <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)' }}>Сумма</div>
-                <div style={{ fontSize:14, fontWeight:800, color:'#f59e0b' }}>{totalPrice.toFixed(0)}в‚Ѕ</div>
+                <div style={{ fontSize:14, fontWeight:800, color:'#f59e0b' }}>{totalPrice.toFixed(0)}₽</div>
               </div>
             </div>
 
@@ -240,7 +240,7 @@ const CartTab: React.FC = () => {
                   <div key={cat}>
                     <div style={{ fontSize:10, fontWeight:700, color:'#f97316', marginBottom:3, padding:'2px 0', borderBottom:'1px solid rgba(249,115,22,0.1)', display:'flex', alignItems:'center', gap:4 }}>
                       {CART_CAT_LABELS[cat] || cat} <span style={{ fontSize:8, color:'rgba(255,255,255,0.8)', fontWeight:400 }}>({catItems.length})</span>
-                      <span style={{ marginLeft:'auto', fontSize:8, color:'#f59e0b' }}>{catItems.reduce((s,i) => s+(i.price||0),0).toFixed(0)}в‚Ѕ</span>
+                      <span style={{ marginLeft:'auto', fontSize:8, color:'#f59e0b' }}>{catItems.reduce((s,i) => s+(i.price||0),0).toFixed(0)}₽</span>
                     </div>
                     {catItems.map(item => (
                       <div key={item.id} style={{ padding:'6px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)' }}>
@@ -248,7 +248,7 @@ const CartTab: React.FC = () => {
                           <div style={{ flex:1 }}>
                             <div style={{ fontSize:10, fontWeight:600, color:'#fff' }}>{item.name}</div>
                             <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:1 }}>
-                              <button onClick={() => updateQty(item.id, -10)} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.03)', color:'#fff', cursor:'pointer', fontSize:9, display:'flex', alignItems:'center', justifyContent:'center' }}>в€’</button>
+                              <button onClick={() => updateQty(item.id, -10)} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.03)', color:'#fff', cursor:'pointer', fontSize:9, display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
                               <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>{item.amount}г</span>
                               <button onClick={() => updateQty(item.id, 10)} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.03)', color:'#fff', cursor:'pointer', fontSize:9, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
                             </div>
@@ -261,7 +261,7 @@ const CartTab: React.FC = () => {
                         {/* Price + Note row */}
                         <div style={{ display:'flex', gap:4, marginTop:3, alignItems:'center' }}>
                           <div style={{ display:'flex', alignItems:'center', gap:2, background:'#18181b', borderRadius:6, padding:'2px 6px' }}>
-                            <span style={{ fontSize:8, color:'rgba(255,255,255,0.8)' }}>в‚Ѕ</span>
+                            <span style={{ fontSize:8, color:'rgba(255,255,255,0.8)' }}>₽</span>
                             <input value={editingPrice[item.id] ?? (item.price ? item.price.toString() : '')} onChange={e => setItemPrice(item.id, e.target.value)}
                               onBlur={() => confirmPrice(item.id)}
                               style={{ width:45, padding:'2px 4px', borderRadius:4, border:'none', background:'transparent', color:'#f59e0b', fontSize:9, fontWeight:600, textAlign:'right', outline:'none' }}
@@ -269,7 +269,7 @@ const CartTab: React.FC = () => {
                           </div>
                           <input value={item.note} onChange={e => setItemNote(item.id, e.target.value)}
                             placeholder="📌 Заметка к продукту..." style={{ flex:1, padding:'3px 6px', borderRadius:6, fontSize:8, border:'1px solid rgba(255,255,255,0.04)', background:'#18181b', color:'rgba(255,255,255,0.85)', outline:'none' }} />
-                          {item.price > 0 && <span style={{ fontSize:8, color:'#f59e0b', fontWeight:700 }}>{(item.price).toFixed(0)}в‚Ѕ</span>}
+                          {item.price > 0 && <span style={{ fontSize:8, color:'#f59e0b', fontWeight:700 }}>{(item.price).toFixed(0)}₽</span>}
                         </div>
                       </div>
                     ))}
@@ -312,7 +312,7 @@ const CatalogTab: React.FC = () => {
 
   React.useEffect(() => {
     let ok = true;
-    import('../../data/usda-foods').then(m => { if (ok && m.USDA_FOODS) setUsdaFoods(m.USDA_FOODS); }).catch(() => {});
+    import('../../data/usda-foods').then(m => { if (ok && m.USDA_FOODS) setUsdaFoods(m.USDA_FOODS.slice(0, 2000)); }).catch(() => {});
     return () => { ok = false; };
   }, []);
 

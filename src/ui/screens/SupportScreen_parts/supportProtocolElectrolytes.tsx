@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolElectrolytes: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -12,6 +12,13 @@ export const SupportProtocolElectrolytes: React.FC<{ s: Record<string, any> }> =
                 <div style={{ fontSize:13, fontWeight:800, color:'#ef4444', marginBottom:2 }}>⚡ Электролиты (K⁺/Na⁺/Mg²⁺/Ca²⁺)</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Летальный риск: гипер-/гипокалиемия, гипомагниемия, гипонатриемия. Коррекция электролитов обязательна при ААС, диуретиках, GLP-1.</p>
               </div>
+
+              <ContraBanner items={[
+                'Калий/K⁺ >6.0 ммоль/л — остановка сердца (гиперкалиемия)',
+                'Эплеренон/спиронолактон + добавки K⁺ — риск гиперкалиемии',
+                'НПВС + РААС-блокада — двойное снижение СКФ, риск ОПП',
+                'Mg²⁺ >2.0 ммоль/л — угнетение дыхания (при почечной недостаточности)',
+              ]} />
               <div style={{ display:'flex', gap:4, overflowX:'auto' }}>
                 {[{id:'protocol',label:'Протокол'},{id:'emergency',label:'🚑 Экстренная помощь'},{id:'timing',label:'⏰ Тайминг'},{id:'monitoring',label:'🧪 Мониторинг'}].map((t:any)=>(
                   <button key={t.id} onClick={()=>setElectrolytesTab(t.id)} style={electrolytesTab===t.id?pillActive('#ef4444'):pillInactive()}>{t.label}</button>
@@ -22,7 +29,7 @@ export const SupportProtocolElectrolytes: React.FC<{ s: Record<string, any> }> =
                   {[
                     {phase:'ФАЗА 1 · ПРОФИЛАКТИКА (AAS <500 мг)', label:'Базовая поддержка', color:'#22c55e', condition:'Курс до 500 мг тестостерона/без диуретиков', desc:'Профилактика электролитного дисбаланса',
                       items:[
-                        {name:'Калий (цитрат/глюконат)', dose:'200-400 мг', timing:'С едой', note:triageBadge('rec')+' ↓ риск гипокалиемии. Калий-сберегающие: эплеренон (селективный, без антиандрогенных эффектов)'},
+                        {name:'Калий из пищи (добавка цитрат/глюконат)', dose:'200-400 мг соли', timing:'С едой', note:triageBadge('rec')+' Добавка = ~80-160 мг ЭЛЕМЕНТНОГО K⁺ (цитрат-соль ≈16-22%). ЭТО НЕ лечит дефицит! База — пища 3500-4700 мг/сут (картофель, бананы, авокадо). При K⁺<3.5 — терапевтическая добавка 20-40 ммоль/сут под контролем (фаза 2-3). Калий-сберегающие: эплеренон'},
                         {name:'Магний (цитрат/глицинат)', dose:'200-400 мг', timing:'Вечер, за 1-2 ч до сна', note:triageBadge('ess')+' Кofactor для K⁺. ↓ судороги, ↑ качество сна. Mg-цитрат — биодоступнее'},
                         {name:'Натрий — контроль', dose:'—', timing:'—', note:triageBadge('opt')+' При ААС без диуретиков — натрий не ограничивать. Избегать избытка соли (>5 г/день)'},
                       ]},
@@ -55,7 +62,7 @@ export const SupportProtocolElectrolytes: React.FC<{ s: Record<string, any> }> =
                   <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Электролитный дисбаланс — наиболее частая причина летальности при самодеятельной фармакологии. При критических значениях — госпитализация.</p>
                   {[
                     {cond:'Гипокалиемия (K⁺ <3.5)', rec:'Увеличить калий до 800-1200 мг/день. Добавить эплеренон 25-50 мг (селективный MR-антагонист, без антиандрогенных эффектов). Отменить тиазиды. ЭКГ. При <3.0 — в/в', source:'KDIGO, 2023'},
-                    {cond:'Гиперкалиемия (K⁺ >5.5)', rec:'Отменить эплеренон. Отменить ингибиторы РААС (телмисартан). Петлевые диуретики. Глюконат Ca²⁺ в/в', source:'KDIGO, 2023'},
+                    {cond:'Гиперкалиемия (K⁺ >5.0)', rec:'Отменить эплеренон. Отменить ингибиторы РААС (телмисартан). Петлевые диуретики. Глюконат Ca²⁺ в/в', source:'KDIGO, 2023'},
                     {cond:'Гипомагниемия (Mg <0.75)', rec:'Mg-цитрат 400-800 мг/день. При <0.65 — в/в MgSO₄. Коррекция без Mg неэффективна для K⁺', source:'NICE, 2022'},
                     {cond:'Гипонатриемия (Na⁺ <130)', rec:'↑ потребление соли (NaCl 1-3 г/день). Отменить тиазиды. Исключить ГЗТ. ГЛП-1 — риск дегидратации', source:'ESICM, 2021'},
                   ].map((e:any,i:any)=>(
@@ -73,7 +80,7 @@ export const SupportProtocolElectrolytes: React.FC<{ s: Record<string, any> }> =
                 {time:'🌙 Вечер', items:[{n:'Магний глицинат 200-400 мг',why:'За 1-2 ч до сна — расслабление'}]},
               ])}
               {electrolytesTab==='monitoring' && monitoringBlock([
-                {marker:'K⁺ (калий)', target:'3.5-5.0 ммоль/л', when:'1-2×/нед при терапии', action:'<3.5 → ↑ калий + эплеренон. >5.5 → отменить калий + эплеренон'},
+                {marker:'K⁺ (калий)', target:'3.5-5.0 ммоль/л', when:'1-2×/нед при терапии', action:'<3.5 → ↑ калий + эплеренон. >5.0 → отменить калий + эплеренон'},
                 {marker:'Mg²⁺ (магний)', target:'0.75-1.0 ммоль/л', when:'1×/нед', action:'<0.75 → ↑ Mg. <0.65 → в/в MgSO₄'},
                 {marker:'Na⁺ (натрий)', target:'135-148 ммоль/л', when:'1×/2 нед', action:'<130 → ↑ соль + отменить тиазиды. >150 → дегидратация'},
                 {marker:'ЭКГ', target:'Без изменений', when:'При K⁺ <3.0 или >6.0', action:' T (гипер-K⁺), уплощение T + U (гипо-K⁺)'},

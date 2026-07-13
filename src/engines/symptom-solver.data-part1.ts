@@ -14,7 +14,7 @@ export const DB_PART1: SymptomEntry[] = [
           { marker: 'АД (сист./диаст.)', expectedChange: '↑', targetRange: '<130/85 мм рт.ст.', when: 'Ежедневно утром и вечером' },
           { marker: 'Ренин плазмы', expectedChange: '↑', targetRange: '2.8-39.9 мкМЕ/мл', when: 'До курса, каждые 8 нед' },
           { marker: 'Альдостерон', expectedChange: '↑', targetRange: '40-310 пг/мл', when: 'При стойкой гипертензии' },
-          { marker: 'Na⁺, K⁺ сыворотки', expectedChange: '↑', targetRange: 'Na⁺ 135-145, K⁺ 3.5-5.1', when: 'Каждые 4 нед' },
+          { marker: 'Na⁺, K⁺ сыворотки', expectedChange: '↑', targetRange: 'Na⁺ 135-145, K⁺ 3.5-5.1 ммоль/л', when: 'Каждые 4 нед' },
         ],
         solutions: [
           { substanceId: 'telmisartan', name: 'Телмисартан', type: 'pharma', dose: '40-80 мг/сут', mechanism: 'ARB + PPARγ-агонизм', evidenceLevel: 'A' },
@@ -32,7 +32,7 @@ export const DB_PART1: SymptomEntry[] = [
       },
       {
         problem: 'Эритроцитоз и ↑ вязкость крови', probability: 'high',
-        mechanism: 'ААС стимулируют эритропоэз через ↑ EPO-рецепторов → Hct >50% → ↑ периферическое сопротивление + риск тромбоза.',
+        mechanism: 'ААС стимулируют эритропоэз через ↑ эндогенного EPO и чувствительности костного мозга → ↑ Hct >50% → ↑ периферическое сопротивление + риск тромбоза.',
         labMarkers: [
           { marker: 'Гематокрит (Hct)', expectedChange: '↑', targetRange: '40-50%', when: 'До курса, каждые 4-8 нед' },
           { marker: 'Гемоглобин (Hb)', expectedChange: '↑', targetRange: '130-170 г/л ♂', when: 'До курса, каждые 4-8 нед' },
@@ -62,7 +62,7 @@ export const DB_PART1: SymptomEntry[] = [
         mechanism: 'Кленбутерол — β2-агонист → ↑ cAMP → ↑ ЧСС. T3/T4 ↑ плотность β-рецепторов. Кофеин/эфедрин → ↑ катехоламинов.',
         labMarkers: [
           { marker: 'ЧСС покоя', expectedChange: '↑', targetRange: '60-80 уд/мин', when: 'Ежедневно утром' },
-          { marker: 'TT3, TT4', expectedChange: '↔', targetRange: 'TT3 2.6-5.7 пмоль/л', when: 'При приёме тиреоидов' },
+          { marker: 'FT3, FT4', expectedChange: '↔', targetRange: 'FT3 3.1-6.8, FT4 9-22 пмоль/л', when: 'При приёме тиреоидов' },
           { marker: 'K⁺, Mg²⁺', expectedChange: '↓', targetRange: 'K⁺ 3.5-5.1, Mg²⁺ 0.7-1.0', when: 'Каждые 4 нед' },
           { marker: 'ЭКГ (QTc)', expectedChange: '↔', targetRange: 'QTc <440 мс ♂', when: 'При ЧСС >100' },
         ],
@@ -251,7 +251,7 @@ export const DB_PART1: SymptomEntry[] = [
         mechanism: 'Тренболон, оксиметолон ↑ норадреналин/дофамин → ↑ arousal. Кленбутерол — β2-агонист. T3/T4 ↑ метаболизм.',
         labMarkers: [
           { marker: 'Кортизол (слюна, вечер)', expectedChange: '↑', targetRange: '<2.0 нмоль/л (23:00)', when: 'При хронической бессоннице' },
-          { marker: 'TT3, TT4', expectedChange: '↔', targetRange: 'TT3 2.6-5.7', when: 'Исключить тиреотоксикоз' },
+          { marker: 'FT3, FT4', expectedChange: '↔', targetRange: 'FT3 3.1-6.8, FT4 9-22 пмоль/л', when: 'Исключить тиреотоксикоз' },
         ],
         solutions: [
           { substanceId: 'magnesium', name: 'Магния глицинат/треонат', type: 'supplement', dose: '400-600 мг за 1 ч до сна', mechanism: 'Агонист GABA-рецепторов, ↓ кортизол', evidenceLevel: 'A' },
@@ -272,7 +272,7 @@ export const DB_PART1: SymptomEntry[] = [
     problems: [
       {
         problem: 'Глутамат/GABA-дисбаланс (ААС-индуцированный)', probability: 'high',
-        mechanism: 'ААС ↓ аллопрегнанолон (GABA-A модулятор) → ↓ GABA-тонус → ↑ тревожность. Тренбололон активирует NMDA-рецепторы → ↑ глутамат → нейротоксичность + тревога.',
+        mechanism: 'ААС ↓ аллопрегнанолон (GABA-A модулятор) → ↓ GABA-тонус → ↑ тревожность. Тренболон активирует NMDA-рецепторы → ↑ глутамат → нейротоксичность + тревога.',
         labMarkers: [
           { marker: 'Кортизол (слюна, утро)', expectedChange: '↑', targetRange: '5-20 нмоль/л', when: 'При тревожности' },
           { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл ♂', when: 'Каждые 4 нед' },
@@ -328,7 +328,7 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'Гиперпролактинемия', probability: 'high',
         mechanism: 'Нандролон, тренболон ↑ пролактин через PR-агонизм. Пролактин ↓ дофамин → ↓ либидо + ↓ GnRH → ↓ ЛГ → ↓ тестостерон.',
         labMarkers: [
-          { marker: 'Пролактин', expectedChange: '↑', targetRange: '86-324 мкМЕ/мл', when: 'При ↓ либидо' },
+          { marker: 'Пролактин', expectedChange: '↔', targetRange: '86-324 мкМЕ/мл', when: 'При ↓ либидо' },
           { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл ♂', when: 'Каждые 4 нед' },
           { marker: 'DHT', expectedChange: '↓', targetRange: '0.4-2.5 нмоль/л', when: 'При нормальном T и ↓ либидо' },
         ],
@@ -367,7 +367,7 @@ export const DB_PART1: SymptomEntry[] = [
       {
         problem: 'Эстроген-опосредованная гинекомастия', probability: 'high',
         mechanism: 'Ароматизация → ↑ E2 → стимуляция ER-α в молочной железе → пролиферация железистой ткани.',
-        stopCriteria: ['E2 >300 пмоль/л + грудь болит/отекает — немедленно начать AI', 'Сформированная фиброзная ткань (1+ год) — AI/тамоксифен не работают, только хирургия'],
+        stopCriteria: ['E2 >80 пг/мл + грудь болит/отекает — немедленно начать AI', 'Сформированная фиброзная ткань (1+ год) — AI/тамоксифен не работают, только хирургия'],
         drugInteractions: ['Тамоксифен + AI → риск ↓ IGF-1 + ↓ либидо (E2 слишком низкий)', 'Витамин E + AI → аддитивный антиэстрогенный эффект'],
         labMarkers: [
           { marker: 'E2', expectedChange: '↑', targetRange: '20-50 пг/мл ♂', when: 'Немедленно при симптомах' },
@@ -382,7 +382,7 @@ export const DB_PART1: SymptomEntry[] = [
         expectations: [
           { timeline: '24-48 ч', effect: 'Тамоксифен 20 мг: ↓ зуд и чувствительность', sideNote: 'Не злоупотреблять — ↓ IGF-1' },
           { timeline: '3-7 дней', effect: 'Анастрозол: ↓ E2 на 50-70%', sideNote: 'Не крашить E2' },
-          { timeline: 'Немедленно', effect: 'Гин. на прогестагенных ААС — тамоксифен может УСУГУБИТЬ. Использовать каберголин + ралоксифен' },
+          { timeline: 'Немедленно', effect: 'При прогестагенных ААС (нандролон) гинекомастия может быть менее чувствительна к тамоксифену — добавить ралоксифен (селективная ER-блокада в груди)' },
         ],
       },
     ],
@@ -406,7 +406,7 @@ export const DB_PART1: SymptomEntry[] = [
         ],
         expectations: [
           { timeline: '1-2 нед', effect: 'hCG: остановка атрофии, восстановление объёма', sideNote: 'Начинать с 1-й недели курса' },
-          { timeline: 'Постоянно', effect: 'Без hCG: атрофия необратима через 6-12 мес непрерывного подавления' },
+          { timeline: 'Постоянно', effect: 'Без hCG: атрофия может быть длительной, но обычно обратима после ПКТ' },
         ],
       },
     ],
@@ -497,12 +497,12 @@ export const DB_PART1: SymptomEntry[] = [
         solutions: [
           { substanceId: 'reduce_ai', name: 'СНИЗИТЬ дозу AI', type: 'pharma', dose: '↓ на 50% или отменить', mechanism: 'Восстановление E2 до 20-50 пг/мл', evidenceLevel: 'A' },
           { substanceId: 'collagen_type2', name: 'Коллаген II (UC-II)', type: 'supplement', dose: '40 мг/сут', mechanism: 'Oral tolerance → защита хряща', evidenceLevel: 'A' },
-          { substanceId: 'glucosamine_chondroitin', name: 'Глюкозамин + Хондроитин', type: 'supplement', dose: '1500 + 1200 мг/сут', mechanism: 'Субстраты для протеогликанов', evidenceLevel: 'A' },
-          { substanceId: 'curcumin', name: 'Куркумин + пиперин', type: 'supplement', dose: '500-1000 мг + 5 мг', mechanism: '↓ NF-κB → ↓ TNF-α, IL-1β', evidenceLevel: 'A' },
+          { substanceId: 'glucosamine_chondroitin', name: 'Глюкозамин + Хондроитин', type: 'supplement', dose: '1500 + 1200 мг/сут', mechanism: 'Субстраты для протеогликанов', evidenceLevel: 'B' },
+          { substanceId: 'curcumin', name: 'Куркумин + пиперин', type: 'supplement', dose: '500-1000 мг + 5 мг', mechanism: '↓ NF-κB → ↓ TNF-α, IL-1β', evidenceLevel: 'B' },
           { substanceId: 'omega3', name: 'Омега-3', type: 'supplement', dose: '3-4 г/сут', mechanism: '↓ провоспалительные эйкозаноиды', evidenceLevel: 'A' },
         ],
         expectations: [
-          { timeline: '3-7 дней', effect: 'Снижение AI + восстановление E2: ↓ боли', sideNote: 'E2 восстанавливается быстрее после летрозола чем анастрозола' },
+          { timeline: '3-7 дней', effect: 'Снижение AI + восстановление E2: ↓ боли', sideNote: 'Анастрозол восстанавливает E2 быстрее (T½ ~50 ч), летрозол дольше (T½ 2-4 дня)' },
           { timeline: '2-4 нед', effect: 'UC-II коллаген: ↓ утренняя скованность, ↓ боль по WOMAC на 33%' },
           { timeline: '4-8 нед', effect: 'Глюкозамин/хондроитин: регенерация хряща' },
         ],
@@ -619,7 +619,7 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'DHT-опосредованная АГА', probability: 'medium',
         mechanism: '5α-редуктаза конвертирует T в DHT в фолликулах. DHT в 5× аффиннее к AR → ↓ анагеновая фаза → миниатюризация фолликула.',
         labMarkers: [
-          { marker: 'DHT', expectedChange: '↑', targetRange: '0.4-2.5 нмоль/л', when: 'При выпадении' },
+          { marker: 'DHT', expectedChange: '↔', targetRange: '0.4-2.5 нмоль/л', when: 'При выпадении' },
           { marker: 'Ферритин', expectedChange: '↔', targetRange: '>70 мкг/л', when: 'Исключить телогеновую алопецию' },
           { marker: 'ТТГ', expectedChange: '↔', targetRange: '0.4-4.0', when: 'Исключить гипотиреоз' },
         ],
@@ -666,12 +666,13 @@ export const DB_PART1: SymptomEntry[] = [
     ],
   },
   {
-    id: 'depression', symptom: 'Депрессивное настроение / апатия / ангедония', category: 'psychological',
+    id: 'depression', symptom: 'Депрессивное настроение / апатия / ангедония', category: 'psychological', urgency: 'critical',
     generalInfo: 'На курсе: гормональные колебания → аффективная нестабильность. После курса (PCT): гипогонадизм → ↓ дофамин/серотонин/норадреналин → "post-cycle crash". Особенно высок риск после 19-нор-производных.',
     problems: [
       {
         problem: 'Постцикловая депрессия (гипогонадизм-индуцированная)', probability: 'high',
         mechanism: 'После отмены ААС: ГГТ-ось подавлена → ↓ ЛГ/ФСГ → ↓ тестостерон → ↓ нейростероиды (аллопрегнанолон) → ↓ GABA-A → депрессия + тревога.',
+        stopCriteria: ['Суицидальные мысли — НЕМЕДЛЕННО психиатр + скорая помощь (103)', 'Нарастающая депрессия/ангедония >2 нед — обратиться к врачу'],
         labMarkers: [
           { marker: 'T общий', expectedChange: '↓↓', targetRange: '12.1-34.7 нмоль/л', when: 'Через 2-4 нед после последней инъекции' },
           { marker: 'ЛГ, ФСГ', expectedChange: '↓', targetRange: 'ЛГ 1.7-8.6, ФСГ 1.5-12.4', when: 'Через 2-4 нед' },
@@ -755,7 +756,7 @@ export const DB_PART1: SymptomEntry[] = [
         mechanism: 'ААС ↓ eNOS → ↓ NO → ↓ вазодилатация кавернозных тел. ↑ Hct → ↑ вязкость → ↓ микроциркуляция. Эндотелиальная дисфункция — ранний и потенциально необратимый эффект длительного применения.',
         labMarkers: [
           { marker: 'E2 (эстрадиол)', expectedChange: '↔', targetRange: '20-50 пг/мл ♂', when: 'Немедленно' },
-          { marker: 'Пролактин', expectedChange: '↑', targetRange: '86-324 мкМЕ/мл', when: 'Немедленно' },
+          { marker: 'Пролактин', expectedChange: '↔', targetRange: '86-324 мкМЕ/мл', when: 'Немедленно' },
           { marker: 'DHT', expectedChange: '↓', targetRange: '0.4-2.5 нмоль/л', when: 'При нормальном T' },
           { marker: 'Гематокрит', expectedChange: '↑', targetRange: '40-50%', when: 'Каждые 4-8 нед' },
           { marker: 'Гомоцистеин', expectedChange: '↔', targetRange: '<15 мкмоль/л', when: 'При ЭД (маркер эндотелиальной дисфункции)' },
@@ -786,7 +787,7 @@ export const DB_PART1: SymptomEntry[] = [
         mechanism: 'DHT (из тестостерона через 5α-редуктазу) — основной фактор роста простаты. E2 через ER-α также стимулирует пролиферацию стромы. ААС ↑ оба фактора → ↑ объём простаты → компрессия уретры → СНМП.',
         labMarkers: [
           { marker: 'ПСА общий + свободный', expectedChange: '↔', targetRange: '<4 нг/мл, своб/общ >25%', when: 'До курса, каждые 6 мес' },
-          { marker: 'DHT', expectedChange: '↑', targetRange: '0.4-2.5 нмоль/л', when: 'При СНМП' },
+          { marker: 'DHT', expectedChange: '↔', targetRange: '0.4-2.5 нмоль/л', when: 'При СНМП' },
           { marker: 'E2', expectedChange: '↑', targetRange: '20-50 пг/мл', when: 'Каждые 4 нед' },
           { marker: 'УЗИ простаты (ТРУЗИ)', expectedChange: '↔', targetRange: 'Объём <30 см³', when: 'До курса, при СНМП' },
           { marker: 'IPSS (опросник)', expectedChange: '↔', targetRange: '0-7 баллов (лёгкая)', when: 'При СНМП' },
@@ -877,8 +878,8 @@ export const DB_PART1: SymptomEntry[] = [
         mechanism: 'Приём T3 (25-100 мкг/сут) или T4 подавляет ТТГ → ↓ эндогенная продукция → при отмене — временный гипотиреоз до восстановления оси (2-6 нед). Гипертиреоз ↑ метаболизм → ↑ ЧСС, ↑ термогенез, ↑ катаболизм (при недостатке ААС).',
         labMarkers: [
           { marker: 'ТТГ', expectedChange: '↓', targetRange: '0.4-4.0 мМЕ/л', when: 'До курса, каждые 4 нед' },
-          { marker: 'TT3', expectedChange: '↑', targetRange: '2.6-5.7 пмоль/л', when: 'Каждые 4 нед' },
-          { marker: 'TT4 свободный', expectedChange: '↓', targetRange: '9-22 пмоль/л', when: 'Каждые 4 нед (↓ из-за подавления ТТГ)' },
+          { marker: 'FT3', expectedChange: '↑', targetRange: '3.1-6.8 пмоль/л', when: 'Каждые 4 нед' },
+          { marker: 'FT4', expectedChange: '↓', targetRange: '9-22 пмоль/л', when: 'Каждые 4 нед (↓ из-за подавления ТТГ)' },
         ],
         solutions: [
           { substanceId: 'taper_t3', name: 'Постепенное снижение T3 (титрация вниз)', type: 'lifestyle', dose: '↓ на 12.5-25 мкг каждые 3-4 дня', mechanism: 'Дать время гипофизу восстановить ТТГ', evidenceLevel: 'B' },

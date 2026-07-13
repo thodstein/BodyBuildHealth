@@ -1,11 +1,17 @@
 import type { MasterDB, SubstanceEntry } from '../core/types';
+import { normalizeMechanisms } from './biostack-mechanism-normalizer';
 
 export interface SynergyResult { a: string; b: string; score: number; level: string; }
 
 export const SynergyEngine = {
   calculatePair(a: SubstanceEntry, b: SubstanceEntry, db: MasterDB): SynergyResult {
-    const sharedMechanisms = a.mechanisms?.filter(m => b.mechanisms?.includes(m)).length || 0;
-    const oppositeMechanisms = this.countOpposites(a.mechanisms || [], b.mechanisms || []);
+    // Normalize mechanism tokens to a controlled vocabulary so spelling
+    // variants (ANTIOXIDANT vs ANTIOXIDANT_DEFENSE, NRF2_ACTIVATION vs
+    // NRF2_UPREGULATION, etc.) are detected as shared mechanisms.
+    const aMechs = normalizeMechanisms(a.mechanisms || []);
+    const bMechs = normalizeMechanisms(b.mechanisms || []);
+    const sharedMechanisms = aMechs.filter(m => bMechs.includes(m)).length || 0;
+    const oppositeMechanisms = this.countOpposites(aMechs, bMechs);
     const sharedTargets = a.risks?.filter(r => b.risks?.includes(r)).length || 0;
     const interactionPenalty = this.getInteractionPenalty(a.id, b.id, db);
     const categoryBonus = a.category === b.category ? 2 : 0;

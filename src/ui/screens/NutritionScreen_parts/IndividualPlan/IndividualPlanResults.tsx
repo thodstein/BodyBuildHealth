@@ -79,6 +79,7 @@ export const IndividualPlanResults: React.FC = () => {
     workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType,
     v2Phase, v2Pharma, v2Labs, histamineSensitive,
     setErrorMsg,
+    setPlanTab,
   } = usePlanCtx();
 
   const [showCalcPopup, setShowCalcPopup] = useState(false);
@@ -309,7 +310,7 @@ export const IndividualPlanResults: React.FC = () => {
           <div style={{ fontSize: 28, marginBottom: 8 }}>🥗</div>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 }}>План ещё не создан</div>
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 14, lineHeight: 1.5 }}>
-            Перейдите на вкладку «Настройки», задайте параметры<br />и нажмите «Сгенерировать план питания».
+            Задайте параметры во вкладке «Настройки»<br />или нажмите кнопку ниже для быстрой генерации.
           </div>
           <button onClick={() => { setErrorMsg(null); generatePlan(1); }} style={{
             padding: '12px 24px', borderRadius: 10, cursor: 'pointer',
@@ -541,14 +542,28 @@ export const IndividualPlanResults: React.FC = () => {
             <span style={{ color: '#00e68a', fontWeight: 700 }}>📊 Всего: {Math.round(threeDayPlan.totals.kcal)} ккал</span>
             <span style={{ color: 'rgba(255,255,255,0.85)' }}>Среднее: {Math.round(threeDayPlan.totals.kcal / 3)} ккал/день</span>
           </div>
-          {threeDayPlan.days.map((d: any, di: number) => (
+          {threeDayPlan.days.map((d: any, di: number) => {
+            const dKcal = Math.round(d.totals?.kcal || 0);
+            const dP = Math.round(d.totals?.p || 0);
+            const dF = Math.round(d.totals?.f || 0);
+            const dC = Math.round(d.totals?.c || 0);
+            const dIsTrain = d.isTrainingDay;
+            const kcalPct = effectiveKcal > 0 ? Math.round(dKcal / effectiveKcal * 100) : 0;
+            const kcalColor = Math.abs(dKcal - (effectiveKcal||0)) <= Math.max(50, (effectiveKcal||0)*0.08) ? '#00e68a' : '#f59e0b';
+            return (
             <div key={di} style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 6, padding: '3px 8px', borderRadius: 6, background: 'rgba(0,230,138,0.04)', display: 'inline-block' }}>
-                День {di + 1}
+              <div style={{ fontSize: 9, fontWeight: 700, color: dIsTrain ? '#00e68a' : '#a78bfa', marginBottom: 6, padding: '4px 8px', borderRadius: 6, background: dIsTrain ? 'rgba(0,230,138,0.06)' : 'rgba(139,92,246,0.06)', border: dIsTrain ? '1px solid rgba(0,230,138,0.15)' : '1px solid rgba(139,92,246,0.12)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12 }}>{dIsTrain ? '🏋️' : '😴'}</span>
+                <span>{DAY_LABELS[di]} · День {di + 1}</span>
+                <span style={{ color: kcalColor, fontWeight: 800, marginLeft: 'auto' }}>{dKcal} <span style={{ fontSize: 7, fontWeight: 400 }}>/{effectiveKcal || '---'} ({kcalPct}%)</span></span>
+                <span style={{ color: '#3b82f6', fontSize: 8 }}>{dP}г</span>
+                <span style={{ color: '#f59e0b', fontSize: 8 }}>{dF}г</span>
+                <span style={{ color: '#f97316', fontSize: 8 }}>{dC}г</span>
               </div>
               {renderMealList(d)}
             </div>
-          ))}
+            );
+          })}
         </GlassCard>
       )}
 
@@ -597,7 +612,7 @@ export const IndividualPlanResults: React.FC = () => {
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 14 }}>{wIsTraining ? '🏋️' : '?'}</span>
+                      <span style={{ fontSize: 14 }}>{wIsTraining ? '🏋️' : '😴'}</span>
                       <div>
                         <span style={{ fontSize: 10, fontWeight: 700, color: wIsTraining ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>
                           {DAY_LABELS[di]} · День {di + 1}
@@ -1136,23 +1151,23 @@ export const IndividualPlanResults: React.FC = () => {
           <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(6,182,212,0.04)', border: '1px solid rgba(6,182,212,0.08)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>
               <span>База: {waterCalc.hasPharma ? (waterCalc.pharmaBaseMl || 40) : '30'} мл × {weight} кг</span>
-              <span>{waterCalc.baseWater} Р»</span>
+              <span>{waterCalc.baseWater} л</span>
             </div>
             {waterCalc.hasPharma && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>
                 <span>+ Фармакология (повышенный метаболизм)</span>
-                <span>+{waterCalc.pharmaBonus.toFixed(1)} Р»</span>
+                <span>+{waterCalc.pharmaBonus.toFixed(1)} л</span>
               </div>
             )}
             {waterCalc.trainBonus > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>
                 <span>+ Тренировка</span>
-                <span>+{waterCalc.trainBonus} Р»</span>
+                <span>+{waterCalc.trainBonus} л</span>
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
               <span>+ Клетчатка</span>
-              <span>+{waterCalc.fiberFactor} Р»</span>
+              <span>+{waterCalc.fiberFactor} л</span>
             </div>
           </div>
           <div style={{ fontSize: 20, fontWeight: 900, color: '#06b6d4', textAlign: 'center', marginTop: 6 }}>
@@ -1168,7 +1183,7 @@ export const IndividualPlanResults: React.FC = () => {
               <div style={{ fontSize:16, width:28, textAlign:'center' }}>{h.icon}</div>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:10, fontWeight:700, color:'#06b6d4' }}>{h.label}</div>
-                <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{h.desc} — иИсключено {h.foodIds.length} продуктов</div>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{h.desc} — Исключено {h.foodIds.length} продуктов</div>
               </div>
               <div style={{ fontSize:8, color:'rgba(6,182,212,0.6)', background:'rgba(6,182,212,0.1)', padding:'2px 6px', borderRadius:6 }}>{h.foodIds.length}</div>
             </div>

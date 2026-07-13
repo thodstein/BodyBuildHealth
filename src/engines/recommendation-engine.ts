@@ -2,6 +2,7 @@ import type { CalculatorState, CalculatorResult, LabSlice } from './support-plan
 import { TZ_AUTO_BLACKLIST, sameClassIds } from './support-plan/shared-constants';
 import { PHARMA_DB } from '../core/pharma-database';
 import { MECHANISM_TO_SUPPORT, ORGAN_TO_SUPPORT, SYSTEM_TO_SUPPORT, CATEGORY_TO_SUPPORT, DRUG_PD_EFFECT_TO_SUPPORT, getSupportEntry, findByMechanisms, findByLabMarker, findByCategoryAndMech, findByOrganAndMech, SUPPORT_CATALOG_DATA, ALL_SUPPORT_IDS, filterByCoverageLevel, getEntryTier, getSynergyScore, getConflictScore, scoreCombination, COVERAGE_TIER_MAP, getBoostSubstances } from '../data/support-index';
+import { normalizeMechanisms } from './biostack-mechanism-normalizer';
 import { getSupportByMechanism, getSupportBySystem, getFullChainSupport } from '../data/mechanism-support-bridge';
 import { normalizeLabValue } from '../core/constants';
 import { getPrioritySubstances, getBrandName, getSubstancePriority, getPriorityReason, deriveSeverity, type SeverityLevel } from '../data/lab-priority-map';
@@ -94,7 +95,8 @@ function makeSub(id: string, reasoning: string, marker?: string): { id: string; 
 function findSupportByMechanisms(mechs: string[], maxResults: number = 6): string[] {
   const ids = new Set<string>();
   for (const m of mechs) {
-    for (const id of (MECHANISM_TO_SUPPORT[m] || [])) {
+    const canon = normalizeMechanisms([m])[0] || m;
+    for (const id of (MECHANISM_TO_SUPPORT[canon] || [])) {
       if (!REC_BLACKLIST.has(id)) ids.add(id);
     }
   }

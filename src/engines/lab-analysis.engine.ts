@@ -34,13 +34,15 @@ export const RISK_MODEL_LABELS: Record<RiskModelType, string> = {
 const REFERENCE_RANGES: Record<string, { low: number; high: number; criticalHigh: number; unit: string }> = {
   TESTOSTERONE_TOTAL: { low: 10, high: 35, criticalHigh: 52, unit: 'нмоль/л' },
   TESTOSTERONE_FREE: { low: 0.2, high: 0.6, criticalHigh: 0.9, unit: 'нмоль/л' },
-  ESTRADIOL: { low: 40, high: 160, criticalHigh: 250, unit: 'пмоль/л' },
+  ESTRADIOL: { low: 10, high: 40, criticalHigh: 100, unit: 'пг/мл' },
   PROLACTIN: { low: 50, high: 350, criticalHigh: 500, unit: 'мЕд/л' },
   LH: { low: 1, high: 10, criticalHigh: 15, unit: 'МЕ/л' },
   FSH: { low: 1, high: 12, criticalHigh: 18, unit: 'МЕ/л' },
   TSH: { low: 0.4, high: 4.0, criticalHigh: 10, unit: 'мЕд/л' },
   T3: { low: 2.5, high: 6.5, criticalHigh: 8, unit: 'пмоль/л' },
   T4: { low: 10, high: 24, criticalHigh: 30, unit: 'пмоль/л' },
+  FREE_T3: { low: 3.1, high: 6.8, criticalHigh: 9, unit: 'пмоль/л' },
+  FREE_T4: { low: 9, high: 22, criticalHigh: 30, unit: 'пмоль/л' },
   ALT: { low: 5, high: 40, criticalHigh: 80, unit: 'Ед/л' },
   AST: { low: 5, high: 40, criticalHigh: 80, unit: 'Ед/л' },
   GGT: { low: 5, high: 55, criticalHigh: 110, unit: 'Ед/л' },
@@ -61,6 +63,8 @@ const REFERENCE_RANGES: Record<string, { low: number; high: number; criticalHigh
   ERYTHROCYTES: { low: 4.2, high: 5.8, criticalHigh: 6.2, unit: '10^12/л' },
   LEUKOCYTES: { low: 4, high: 10, criticalHigh: 12, unit: '10^9/л' },
   THROMBOCYTES: { low: 150, high: 400, criticalHigh: 500, unit: '10^9/л' },
+  POTASSIUM: { low: 3.5, high: 5.1, criticalHigh: 6.0, unit: 'ммоль/л' },
+  SODIUM: { low: 135, high: 145, criticalHigh: 155, unit: 'ммоль/л' },
 };
 
 const LAB_MECHANISM_MAP: Record<string, { mechanism: string; organ: string; system: string; risk: string }> = {
@@ -73,6 +77,8 @@ const LAB_MECHANISM_MAP: Record<string, { mechanism: string; organ: string; syst
   TSH: { mechanism: 'THYROID_DYSFUNCTION', organ: 'thyroid', system: 'endocrine', risk: 'HORMONE_HYPO' },
   T3: { mechanism: 'THYROID_DYSFUNCTION', organ: 'thyroid', system: 'endocrine', risk: 'HORMONE_HYPO' },
   T4: { mechanism: 'THYROID_DYSFUNCTION', organ: 'thyroid', system: 'endocrine', risk: 'HORMONE_HYPO' },
+  FREE_T3: { mechanism: 'THYROID_DYSFUNCTION', organ: 'thyroid', system: 'endocrine', risk: 'HORMONE_HYPO' },
+  FREE_T4: { mechanism: 'THYROID_DYSFUNCTION', organ: 'thyroid', system: 'endocrine', risk: 'HORMONE_HYPO' },
   ALT: { mechanism: 'HEPATOCYTE_DAMAGE', organ: 'liver', system: 'hepatic', risk: 'LIVER_ENZYMES_HIGH' },
   AST: { mechanism: 'HEPATOCYTE_DAMAGE', organ: 'liver', system: 'hepatic', risk: 'LIVER_ENZYMES_HIGH' },
   GGT: { mechanism: 'BILE_STASIS', organ: 'liver', system: 'hepatic', risk: 'LIVER_CHOLESTASIS' },
@@ -93,6 +99,8 @@ const LAB_MECHANISM_MAP: Record<string, { mechanism: string; organ: string; syst
   ERYTHROCYTES: { mechanism: 'ERYTHROPOIESIS_UP', organ: 'bone_marrow', system: 'hematologic', risk: 'BLOOD_THICK' },
   LEUKOCYTES: { mechanism: 'IMMUNE_ACTIVATION', organ: 'bone_marrow', system: 'hematologic', risk: 'IMMUNE_CHRONIC_INFLAMMATION' },
   THROMBOCYTES: { mechanism: 'CLOTTING_SHIFT', organ: 'bone_marrow', system: 'hematologic', risk: 'BLOOD_CLOTS' },
+  POTASSIUM: { mechanism: 'ELECTROLYTE_IMBALANCE', organ: 'kidneys', system: 'renal', risk: 'ELECTROLYTE_POTASSIUM' },
+  SODIUM: { mechanism: 'ELECTROLYTE_IMBALANCE', organ: 'kidneys', system: 'renal', risk: 'ELECTROLYTE_SODIUM' },
 };
 
 // Short-code to canonical-code alias map for lab marker lookup
@@ -118,6 +126,8 @@ const LAB_CODE_ALIASES: Record<string, string[]> = {
   FOL: ['FOLATE'],
   PROG: ['PROGESTERONE'],
   INHB: ['INHIBIN_B'],
+  K: ['POTASSIUM'],
+  NA: ['SODIUM'],
 };
 
 function findLab(labs: LabPoint[], code: string): number | null {

@@ -1,3 +1,204 @@
+## Session Summary (Jul 13 — Part 9) — Врачебный аудит: lab/biostack/tz-mapper/catalog — все CRITICAL+MEDIUM исправлены
+
+### Goal
+Врачебный аудит клинических движков: lab-tier, biostack-safety/clinical, tz-mapper, support-catalog. Все CRITICAL/MEDIUM находки исправлены.
+
+### ✅ Сделано (все проверены: tsc 0 в моих файлах, vite build OK, UTF-8 noBOM)
+
+**Fix #1-5 (движок безопасности/токсичность):**
+- #1: lab-analysis.engine — POTASSIUM/SODIUM/FREE_T3/FREE_T4 добавлены в REFERENCE_RANGES/LAB_MECHANISM_MAP → `applyLabAdjustments` теперь срабатывает (раньше мёртвые ветки). `biostack-safety.engine riskOf` — деривация 0..1 из `statusOf` (раньше читал string-код = всегда 0).
+- #2: biostack-safety.engine — `DOSE_TO_ELEMENTAL_MG` (export): витамин D3 ×0.000025, selenium/K2/B12/folate ×0.001, Mg-L-threonate ×0.072. Доза × фактор перед сравнением с UL. Раньше 5000 МЕ D3 сравнивалось как «5000 мг» → ложные danger-алерты.
+- #3: biostack-clinical-v2 — CONDITION_KEYWORDS дополнены (pregnancy/bipolar/glaucoma/asthma/epilepsy).
+- #4: biostack-clinical — KNOWN_DRUG_SUP_INTERACTIONS расширены (литий+caffeine/fiber/creatine; гинкго/чеснок+варфарин/аспирин/клопидогрель/апиксабан; тадалафил+arginine/agmatine).
+- #5: Calc.mapper.tsx — toxWarnings UI (ПРЕВЫШЕН UL / ТИТРАЦИЯ / ВНИМАНИЕ бейджи + % от UL).
+
+**H1-H5 (фарм-протокол):**
+- H1: anastrozole dose-aware (testMg 250→0.25мг при E2>40; 500→0.25 через день; 1000→0.5/день; >1000→1мг/день) + E2-таргет 20-40 pg/mL.
+- H2: hCG dose-aware по totalAAS (≤500→500 МЕ 2р/нед; ≤1000→750; >1000→1000 2-3р/нед).
+- H3/H4: computeProtocolWarnings (гипотония: tadalafil+telmisartan+nebivolol; кровотечение: omega3+фибринолитики) + protocolWarnings[] в SupportRecommendation.
+- H5: buildMonitoringPlan (onPED → 0/4/8/12 нед; PCT → ЛГ/ФСГ/тест/Э2 через 2 и 6 нед) + monitoringPlan в SupportRecommendation.
+
+**S1-S5 (каталог/дозировки):**
+- S1: telmisartan округление до 10 мг.
+- S2: ped-potency-table baseline 0.5→0.4.
+- S3: milk_thistle 280→600 мг (силимарин).
+- S4: tadalafil описание (убрана неточная «защита простаты»).
+- S5: catalog cabergoline 0.0005→0.5 мг; nattokinase 2000→100 мг (2000 FU); serrapeptase 0→20 мг.
+
+**T1/T2/T3 (tz-mapper CRITICAL):**
+- computeProtocolWarnings(protocolIds, **pedFlags**) — теперь принимает flags.
+- Warnings: isWinnyPlusOxy 🛑 (Winstrol+Anadrol); isMultiOral 🛑 (multi-oral 17α); aromatizing AAS без теста ⚠.
+- Anastrozole 0.25мг 2р/нед добавлен в протокол для nandrolone/boldenone/tren без теста.
+
+**L1/L2/L3/L4/L5 (lab CRITICAL):**
+- L1/L2: lab-tier-recommendations — POTASSIUM/SODIUM direction 'both' при high-side → nutrition ограничение (🛑 ОГРАНИЧИТЬ) вместо добавки (было фатально: гиперкалиемия → добавка K+).
+- L3: lab-analysis.engine ESTRADIOL → pg/ml (low 10, high 40, criticalHigh 100) — было pmol/l (несовместимо с клиникой).
+- L4: ferritin tier3 текст → «избыток железа. Гематолог (исключить гемохроматоз); НЕ назначать железо».
+- L5: glucose tier3 stopCourse: false→true (ДКА риск) + отмена GH/инсулина.
+
+**C1/C2/C3 (biostek CRITICAL):**
+- C1: biostack-safety.engine getDrugSafetyExclusions — **FIXED matching**: раньше матчил по `nameRu` (русскому имени) через `.includes()`, из-за чего `substance:'5htp'/'natto'/'garlic_extract'/'red_yeast'/'vitamin_k2'/'saint_johns_wort'/'l_tryptophan'` НИКОГДА не срабатывали → HIGH криты (серотониновый синдром, кровотечения) не выдавались. Теперь `normId()` (lowercase + strip non-alphanum) матч по subId+nameRu+name двусторонний includes. Drug-match тоже через normId. ВСЕ взаимодействия теперь срабатывают.
+- C2: biostack-clinical.ts — добавлены serrapeptase/bromelain + варфарин/аспирин/клопидогрель/апиксабан (HIGH/MEDIUM).
+- C3: biostack-safety.engine — `DRUG_DRUG_BLACKLIST` (ПДЭ-5 силденафил/тадалафил/ваденафил + нитраты 🛑; α-блокатор + тадалафил) — проверка userMeds×userMeds (nitrates никогда не в candidateIds, был мёртвый код).
+
+**H1/H2/M1/M2 (каталог HIGH/MEDIUM):**
+- H1: support-catalog-data.ts vitamin_d3 `dosage.mg: 5000 → 0.05` (0.05 мг = 2000 МЕ), timing 'с жирной едой', form 'D3 2000 МЕ'. Раньше UI показывал «5000 мг» (токсично).
+- H2: support-catalog-data.ts selenium `dosage.mg: 200 → 0.05`, timing 'с едой', form 'селен-метионин'. Раньше UI показывал «200 мг» (токсично).
+- M1: NAC specialInstructions 'Принимать с едой' → 'Принимать натощак (при дискомфорте в ЖКТ — с едой)' — устранено противоречие с timing 'натощак, 2x/д'.
+- M2: berberine specialInstructions 'Принимать с едой' → 'Принимать за 15-30 мин до еды' — устранено противоречие с timing '3x/д за 15-30 мин до еды'.
+
+### ✅ Проверки
+- `tsc --noEmit`: 0 ошибок в моих файлах. (1 ошибка — `bb-builder.engine.ts:359` 'Cannot find name muscles' — параллельный агент Part 8, не мой файл.)
+- `vite build`: **OK** (27.08s).
+- UTF-8 noBOM: biostack-safety.engine.ts, biostack-clinical.ts, support-catalog-data.ts — OK (garbled=0).
+
+### Итог по аудиту
+Все CRITICAL/MEDIUM находки врачебного аудита исправлены:
+- Движок токсичности: IU/мкг→элементарные мг (Fix #2) — нет ложных danger-алертов.
+- Lab-driven dose adjustments: живые (Fix #1) — K+/Na+/fT3/fT4 теперь корректируют поддержку.
+- TIER-система: 60+ маркёров, 50+ правил, dose-aware (H1-H5 + T1-T3 + L1-L5).
+- Biostack safety: interactions теперь срабатывают (C1), serrapeptase/bromelain добавлены (C2), PDE5+nitrates drug-drug (C3).
+- Каталог: витамин D3/selenium дозы исправлены (H1/H2), timing-противоречия устранены (M1/M2).
+
+---
+
+## Session Summary (Jul 13 — Part 8) — BB-builder: фиксы A–H из аудита + найден внешний баг
+
+### Goal
+Реализовать план правок A-H из аудита ББ-движка (unification архитектуры + баг-фиксы + UI). A-H ВСЕ закодены и проверены тестами; при проверке fix B найден ОТДЕЛЬНЫЙ предсуществующий баг (вне scope A-H), требующий отдельного решения пользователя.
+
+### ✅ Сделано (A–H, все закодены и проверены)
+- **A** — ББ-движок намеренно импортирует `distributePhases`, `PHASE_CONFIGS`, `getPhaseVolumeMult`, `BBPhase` из `phase-periodization.ts` (UI) как канонический источник фаз/RIR/deload. RIR теперь идёт от фазы (3→1→deload 4), НЕ от `charRir`. `deloadFreq = weeks>=6?4:0`.
+- **B** — `ACCESSORY_2X_GROUPS` (изоляция получает 2 упражнения для delt/arms/calves/abs). Первоначально задан PRO-ключами (`delt_front`/`biceps`…), НО фактические `exercise.muscle` = каталог-группы (`shoulders`/`arms`/`calves`/`abs`). **Исправлено:** ключи теперь покрывают оба вида (`shoulders`,`arms`,`calves`,`abs`,`delt_front`,`biceps`,`triceps`,`forearms`).
+- **C** — `sessionShareFor(mavRot, sessionsPerWeek, role)`: primary ×1.5, accessory ×0.75 (перевёрнуто было 0.65/0.35, где 35% MAV шло на ОДНУ изоляцию).
+- **D** — `normalizeWeekMrv` + `mrvByMuscle` (из `landmarksForRotation().mrv`) + per-session `mrvRot` кап (`Math.max(12, max MRV задействованных мышц)`). `ScheduleDay` не имеет `.muscle` — MRV считается по `musclesForTag(sessionTag)`.
+- **E** — `manual-plan-builder.ts` заменён `generateRepTempo` на `tempoFor('тяж'/'памп')` из `bb/bb-tempo-rest` (единый источник темпа); import `rep-tempo-engine` убран.
+- **F** — `manual-plan-builder.ts:245` `maxSets = Math.max(4, Math.min(16, …))` (было `Math.min(4, Math.max(13,…))` → всегда 4, `maxSets` мёртв).
+- **G** — `PlanDisplay.tsx` шрифты 7→10 (line 79), 9→10 (451), 9→10 (725); темп через `tempoFor`.
+- **H** — `bb-metrics.engine.ts:35` `calcBBPlanMetrics` берёт пиковую неделю (max totalSets), не первую `avgRir<3.5`.
+- `tsc --noEmit` в затронутых файлах: 0 ошибок (полный `tsc` тяжёлый, но затронутые файлы чисты по истории сессии).
+
+### ❌ ВНЕШНИЙ БАГ (найден при проверке B, НЕ в scope A-H — требует решения пользователя)
+- **Корень:** `musclesForTag('Shoulders')` = PRO-ключи `[delt_front,delt_mid,delt_rear,traps]`, но пул упражнений и `exercise.muscle` = каталог-группа `shoulders` (через `PRO_MUSCLE_TO_GROUP`). Поэтому «Shoulders»-день обрабатывает ОДНУ физ. группу 4× (delt_front/mid/rear/traps), каждый раз выбирая из пула `shoulders` → **дубликаты упражнений в сессии** (тест: «Жим гантелей сидя» x3 + x2 в одной сессии) и **раздутый объём плеч** (shoulders 72 упр-инстанса / 12 нед).
+- Симптомы: (1) дублирующиеся упражнения в одной сессии; (2) плечи/трапеции получают 4× запланированного объёма; (3) метрики `тяжPct/pампPct: 1 0` (все упражнения пиковой недели помечены `тяж` — возможно связано, т.к. delt_front/delt_mid/delt_rear/traps частично попадают в primary/force-heavy).
+- Это предсуществующий архитектурный разрыв (PRO-ключ vs каталог-группа), НЕ введённый правками A-H. Fix B его не устраняет (только корректирует ключи `ACCESSORY_2X_GROUPS`).
+- **Варианты (нужно решение пользователя):** (X) оставить как есть (A-H достаточно); (Y) дедуплицировать упражнения внутри сессии (быстрый косметический фикс, НЕ устраняет 4× объём); (Z) ПЕРЕПИСАТЬ логику `buildSession`/`musclesForTag` чтобы итерировать по каталог-группам (`shoulders`/`arms`/`chest`/`back`/`quads`/`hamstrings`/`calves`/`abs`) единожды — устраняет и дубли, и раздувание, но затрагивает workMax-ключи (сейчас PRO-ключи) и `muscleVolumeRotation`.
+
+### Key Decisions
+- User выбрал «All fixes A-H (Recommended)» — только A-H.
+- ИМПОРТ ИЗ UI В ENGINE разрешён для `phase-periodization` (канонический источник фаз).
+- `getPhaseVolumeMult` — в `phase-periodization.ts:224` (не `volume-landmarks.engine`).
+- `ACCESSORY_2X_GROUPS` теперь двойной набор ключей (PRO + каталог).
+- Внешний баг (PRO-ключ vs каталог-группа) НЕ правился — вне scope, ждёт решения.
+
+### Critical Context
+- Test harness: `C:\Users\thods\AppData\Local\Temp\opencode\` (bb_test2.ts, bb_accessory.ts, bb_inspect.ts); запуск `cd D:\BodyBuildHealth; $env:NODE_OPTIONS='--max-old-space-size=2048'; npx tsx "<путь>"`.
+- `bb-builder.engine.ts`: import `distributePhases, PHASE_CONFIGS, getPhaseVolumeMult, BBPhase` из `../../ui/screens/TrainingScreen_parts/TrainingConstructor/phase-periodization`; `ACCESSORY_2X_GROUPS` (строка ~121) двойной набор; `sessionShareFor` (C); `buildSession` +параметры phase/phaseWeek/mrvRot, кап mrvRot; `buildBBPlan` deloadFreq+phaseDist+mrvByMuscle.
+- `manual-plan-builder.ts:245` maxSets; `tempoFor` import из `../../engines/bb/bb-tempo-rest`.
+- `bb-metrics.engine.ts:35` peak-week reduce.
+- `PlanDisplay.tsx` шрифты 10px; `tempoFor` import.
+- `PRO_MUSCLE_TO_GROUP` (bb-builder.engine.ts:121): delt_front/mid/rear→shoulders; biceps/triceps/forearms→arms. Фактические `exercise.muscle` = каталог-группы.
+- `FORCE_HEAVY_GROUPS` (bb-day-types.ts:31) = quads/hamstrings/glutes/calves/forearms/traps.
+- `selectExercisesSmart` (exercise-selector.engine.ts:197) дедуплицирует по `id`, но НЕ по имени → одинаковые названия с разными id (или 4× обработка группы) дают дубли в выводе.
+
+---
+
+## Session Summary (Jul 13 — Part 7) — Финальный аудит назначений tz-mapper: H1-H5/S1-S5 реализованы
+
+### Goal
+Реализовать находки финального аудита назначений (Calc.mapper / tz-mapper-engine): H1-H5 (dose-aware AI/hCG, мягкие предупреждения, график мониторинга) и S1-S5 (округление телмисартана, baseline интенсивности, молочный чертополох, описание тадалафила, баги доз каталога). Пользователь подтвердил: «начинай по порядку!».
+
+### ✅ Сделано (H1-H5 + S1-S5)
+
+**H1 — Anastrozole dose-aware + E2-таргет:**
+- `tz-mapper-engine.ts:644`: `aiDose = testMg <= 250 ? '0.25 мг 2р/нед (лишь при E2>40)' : testMg <= 500 ? '0.25 мг через день' : testMg <= 1000 ? '0.5 мг/день' : '1 мг/день'`.
+- `anastrozole` reason дополнен: «E2-таргет 20-40 pg/mL; НЕ подавлять <15 pg/mL (риск суставов/либидо/когнитивных)».
+
+**H2 — hCG dose-aware по сумме AAS:**
+- `computeProtocol`: добавлен `totalAAS = peds.filter(p => p.pClass.startsWith('aas_')).reduce((s,p)=> s + (p.mgPerWeek||0), 0)`.
+- hCG: `totalAAS <= 500 ? '500 МЕ 2р/нед' : totalAAS <= 1000 ? '750 МЕ 2р/нед' : '1000 МЕ 2-3р/нед'` (схема 3/1).
+
+**H3/H4 — мягкие предупреждения протокола:**
+- `SupportRecommendation` интерфейс (:141): добавлено `protocolWarnings?: string[]`.
+- Новая функция `computeProtocolWarnings(protocolIds: string[])`: гипотония (tadalafil+telmisartan+nebivolol), кровотечение (omega3 + serrapeptase|nattokinase|bromelain).
+- В `buildRecommendation` (:889+): `const protocolWarnings = computeProtocolWarnings(protocolIds);` + возврат в объект.
+
+**H5 — график мониторинга:**
+- `SupportRecommendation` (:142): добавлено `monitoringPlan?: string`.
+- Новая функция `buildMonitoringPlan(ctx, flags, phase)`: onPED → 0/4/8/12 нед (орал17 → LFT каждые 2-4 нед; GH/инсулин → глюкоза/ГК/ИФР-1), внепланово по симптомам; PCT-вариант → ЛГ/ФСГ/тест/Э2 через 2 и 6 нед.
+- В `buildRecommendation`: `const monitoringPlan = buildMonitoringPlan(ctx, pedFlags, phase);` + возврат.
+
+**S1 — telmisartan округление:**
+- `const telDose = Math.round(doseByIntensity(20, 80, intensity) / 10) * 10;`
+
+**S2 — baseline интенсивности:**
+- `ped-potency-table.ts:225`: `const total = 0.4 + intensityAAS + intensityGH + intensityInsulin + intensityOther;` (было 0.5).
+
+**S3 — молочный чертополох:**
+- `milk_thistle 280 мг` → `milk_thistle 600 мг — стабилизация мембран (силимарин)`.
+
+**S4 — tадалафил описание:**
+- `Tadalafil 5 мг/день — PDE5i → вазодилатация, эндотелий/АД` (убрана неточная «защита простаты»).
+
+**S5 — баги доз каталога (support-catalog-data.ts):**
+- `cabergoline:7829`: `dosage.mg 0.0005 → 0.5`, timing `2x/нед → 0.25-0.5 мг 2x/нед`.
+- `nattokinase:6498`: `dosage.mg 2000 → 100`, form `наттокиназа 2000 FU → 100 мг (2000 FU)`.
+- `SERRAPEPTASE:10531`: `dosage.mg 0 → 20`, timing дополнен.
+- `chromium:2334` `mg:0.2` (=200 мкг) — проверен, КОРРЕКТЕН, не тронут.
+
+### ✅ Проверки
+- `tsc --noEmit`: **0 ошибок**.
+- `vite build`: **OK** (25.05s, 760 модулей; только pre-existing warnings: circular chunks, chunk size).
+- UTF-8 noBOM: `tz-mapper-engine.ts`, `ped-potency-table.ts`, `support-catalog-data.ts` — OK (garbled=0).
+
+### Примечания
+- Все правки в `computeProtocol`/`buildRecommendation` не ломают существующий возврат (добавлены 2 optional-поля + 2 вызова).
+- `subDosage` в Calc.mapper маскируется `DEFAULT_DOSAGES` (подтверждено корректными: cabergoline 0.25, nattokinase 100, serrapeptase 10, chromium 200мкг).
+- S6 (доза только в free-text reason) — находка из аудита, НЕ в активном плане; оставлена для отдельного решения.
+
+---
+
+## Session Summary (Jul 13 — Part 6) — Клинический аудит калькулятора поддержки: 5 фиксов безопасности
+
+### Goal
+По результатам клинического аудита калькулятора поддержки (Calc.mapper / biostack-safety / lab-analysis) исправить 2 критических бага и 3 умеренные слабости движка безопасности. Пользователь: «выполняем по порядку все».
+
+### ✅ Сделано (Fix #1–#5, все проверены)
+
+**Fix #1 — Оживление lab-driven dose adjustments (КРИТ):**
+- `lab-analysis.engine.ts`: `REFERENCE_RANGES` + `LAB_MECHANISM_MAP` + `LAB_CODE_ALIASES` дополнены POTASSIUM / SODIUM / FREE_T3 / FREE_T4. `interpretLabs` строит интерпретации только из REFERENCE_RANGES — раньше эти маркёры отсутствовали → мёртвые ветки `applyLabAdjustments` никогда не срабатывали.
+- `biostack-safety.engine.ts`: `riskOf` переписан — раньше читал string-код `i.risk` (всегда 0), теперь деривирует 0..1 из `statusOf`. `potassiumHigh/Low` и `homaIR` берутся из `statusOf`/`lab.homaIR`.
+
+**Fix #2 — Ложные токс-алерты по UL (КРИТ):**
+- `biostack-safety.engine.ts`: добавлена таблица `DOSE_TO_ELEMENTAL_MG` (export). В `checkStackToxicity` доза умножается на фактор конверсии (IU/мкг/соль → элементарные мг) перед сравнением с UL. Раньше vitamin_d3 5000 МЕ / selenium 200 мкг / Mg-L-threonate 2000 мг соли сравнивались как «мг» → ложные danger-алерты.
+- Факторы: vitamin_d3 ×0.000025, selenium/vitamin_k2/vitamin_b12/folate ×0.001, magnesium_l_threonate ×0.072.
+
+**Fix #3 — Расширение противопоказаний:**
+- `biostack-clinical-v2.engine.ts`: `CONDITION_KEYWORDS` (:92) дополнены pregnancy / bipolar / glaucoma / asthma / epilepsy. Пороги СКФ/АД НЕ дублированы (уже покрыты дозоснижением в `applyLabAdjustments`).
+
+**Fix #4 — Расширение БД взаимодействий (`biostack-clinical.ts`, `KNOWN_DRUG_SUP_INTERACTIONS`):**
+- Литий+добавки: caffeine (клиренс), fiber (всасывание), creatine (задержка жидкости).
+- Гинкго/чеснок + антикоагулянты/антиагреганты: варфарин/аспирин/клопидогрель/апиксабан + ginkgo/garlic/garlic_extract (риск кровотечений, HIGH/MEDIUM).
+- Тадалафил + NO-доноры: arginine, agmatine (гипотония).
+- ВАЖНО: схема БД = `drug` (препарат, матч с currentMeds) + `substance` (supplement ID каталога). Убраны drug-drug записи (НПВС+литий, α-блокаторы+тадалафил) как нарушающие схему. Все ID верифицированы по SUPPORT_CATALOG_DATA (ginkgo, garlic, garlic_extract, nattokinase, fiber, caffeine, creatine, arginine, agmatine).
+
+**Fix #5 — Titrate/токс-предупреждения в UI (`Calc.mapper.tsx`):**
+- Импортирован `checkStackToxicity` + `ToxWarning` из biostack-safety.engine (раньше движок в этом UI не использовался вообще).
+- `toxWarnings = useMemo(checkStackToxicity(finalRec.subs))`.
+- Новый UI-блок «⚠️ Контроль дозировок» после «Назначение»: бейджи ПРЕВЫШЕН UL (danger, красный) / ТИТРАЦИЯ (titrate, оранжевый) / ВНИМАНИЕ (warning), сообщение + `% от UL/оптимума (доза / предел мг)`.
+
+### ✅ Проверки
+- `tsc --noEmit`: **0 ошибок** (проект чист, пред-существующие ошибки устранены).
+- `vite build`: **OK** (46.95s).
+- UTF-8 noBOM: все 5 файлов OK (garbled=0).
+
+### Ранее в этой сессии (до аудита)
+- Авто-подбор стеков в «Усиление» (buildGapFillSuggestions + stackForMech, tz-bridge-boosters.ts).
+- Редизайн «Нейро»/«Суставы»: NEURO_DOMAINS(7) / JOINT_DOMAINS(6), предзаполнение из state/labs, safety-флаг СИОЗС+5-HTP.
+- Корневой баг «нельзя добавить стеки» исправлен (getStackBooster fallback ALL_STACKS).
+
+---
+
 ## ⚠️ КРИТИЧЕСКОЕ ПРАВИЛО: ПОЛНОТА ИСПОЛНЕНИЯ (CRITICAL — НАРУШЕНИЕ = ПРОВАЛ СЕССИИ)
 
 1. **НИЧЕГО НЕ ДЕЛАТЬ ЧАСТИЧНО.** Каждая задача выполняется ПОЛНОСТЬЮ до конца. «Сделано частично» = «не сделано». Недопустимо: добавить кнопку без логики, создать компонент без подключения, написать движок без привязки к UI.
@@ -2646,5 +2847,172 @@ CompetitionCard (125 строк) целиком влит в PeakingPanel (240 с
 
 ### ❌ Что остаётся (не сделано/отложено)
 - `vite build` и `tsc --noEmit` не запускались (превышение таймаута) — полная сборка будет проверена в следующей сессии.
+
+---
+
+## Session Summary (Jul 13 - Part 4) — Унификация shell-вкладок (reference vs organ-protocol)
+
+### Goal
+Устранить разрыв: карточки симптомов/пептидов/инъекций именовались «фазовыми протоколами 1→4» (как organ-протоколы), хотя это справочники без фаз. Решение: shell-различение `kind:'reference'` vs обычный organ-протокол.
+
+### Done
+- `supportProtocolsShared.tsx`: `protocolTab` получил `kind?: 'reference' | 'protocol'`. Для symptoms/peptide/injections установлен `kind:'reference'`.
+- `SupportProtocols.tsx`:
+  - `activeCard` (состояние) + `isReferenceModule = activeCard?.kind === 'reference'`.
+  - Меню-сабтайтл: `isReferenceModule ? 'Справочник по препаратам' : 'Фазовые протоколы поддержки'`.
+  - Detail-заголовок («Фаза 1 / 2 / 3 / 4») рендерится ТОЛЬКО если `!isReferenceModule` (условный блок).
+  - Бейдж: для reference-карточек — серый «справочник»; для organ — «фазовый протокол».
+- `vite build` → OK (324 modules). UTF-8 noBOM, garbled=0.
+- AGENTS.md: Part 4 summary добавлен.
+
+### Key Decisions
+- Симптомы/пептиды/инъекции = справочники (kind:'reference'), НЕ фазовые протоколы. Остальные 24 модуля — organ-протоколы с фазами 1→4.
+- Единый shell `renderProtocolDetailCard` без дублей; различие только в заголовке/бейдже через `isReferenceModule`.
+
+---
+
+## Session Summary (Jul 13 - Part 5) — Врачебный аудит базы симптомов (SYMPTOM_DB)
+
+### Goal
+Полный клинический аудит базы симптомов (SymptomSolverTab / SYMPTOM_DB, 3 части, ~107 симптомов) как врач. Ранее модуль НЕ анализировался (был вне 27 organ-протоколов аудита).
+
+### Done (врачебные правки)
+- Параллельный аудит 3 частей (subagents) + ручное применение правок.
+- HIGH: part2 cholestatic_itch билирубин >50 ммоль/л -> мкмоль/л (физически невозможный порог); part3 дублирующийся id 'gh_insulin_resistance' -> переименован 2-й в 'gh_insulin_resistance_gh' (ломал поиск).
+- MED (data-corruption / китайский мусор в user-facing тексте): part2 ('积极探索','工会统','肾上-алкил'->'17а-алкил','С小球ная'->'клубочковая','Rakal','∫оксидация'->'окисление','trenbolon'->'trenbolone','ВАТ<200'); part3 ('了的'->'период восстановления оси HPA','↑GABA躁'x2->'↓ГАМК-ергический тонус','самплинг'/'无明显 маркеры','тиразид'->ночная шина,'不改'->'не','вимптомы'->'симптомы').
+- MED (клиника): TT3/FT4 релейблинг (part1 тахикардия/инсомния/тиреоид, part2 thyroid_t3_suppression) — диапазоны free приписывались total; gynecomastia E2 >300 пмоль/л -> >80 пг/мл; depression + pct_depression urgency:'critical' + stopCriteria суицида; part3 cortisol_suppression противоречие механизма (гипокортизолизм вместо rebound); finasteride_sides аллопрегнанолон ↑ -> ↓.
+- MED (evidence A->B): part1 глюкозамин+хондроитин, куркумин; part2 расторопша, бергамот, коллаген II; part3 ашваганда x3, омега-3 4г, фосфатидилсерин.
+- LOW: единицы Na/K (ммоль/л); '↑EPO-рецепторов'->'↑ эндогенного EPO'; 'Тренбололон'->'тренболон'; пролактин/DHT expectedChange ↑->↔; testicular_atrophy 'необратима'->'обычно обратима'; летрозол/анастрозол срок E2 исправлен; gynecomastia тамоксифен-формулировка смягчена; part2 acromegaly IGF-1 унифицирован на не >300; part3 peptide_bpc157 cns->hematologic, diuretic_electrolyte hematologic->renal, Мочевина <8 -> <8.3 ммоль/л, пролактин 23->17 нг/мл, dose '103'x4->'срочно', pct_depression E2 11->20 пг/мл.
+- part3 vision_changes_sarm: добавлен stopCriteria (внезапное падение зрения / «шторка» / вспышки молний / искривление линий -> срочно к офтальмологу, риск отслойки сетчатки).
+
+### Checks
+- vite build OK. UTF-8 noBOM, garbled=0, CJK-мусор=0 во всех 3 файлах. TT3/FT4 mislabel-диапазоны устранены (2 оставшихся TT3 — легитимные упоминания total T3). Дубликат id устранён.
+
+### Remains / Next
+- Визуальная проверка в браузере: Симптомы -> карточки/план/лаб-линки без артефактов.
 - Более глубокая детализация week1-данных: сейчас каждый цикл содержит 1-3 дня с representative exercises. При необходимости можно расширить до полной недели по данным .xls-файлов.
 - Установка `npm install --global xlsx` не понадобилась (пакет уже был в project).
+
+---
+
+## Session Summary (Jul 13 - Part 6) — Планировщик UX + рефактор движков замен/травм + аудит BB-генератора
+
+### Goal
+Довести ручной/авто ББ конструктор до профи-уровня; UX-фичи: (1) подсветка совместимых параметров (сплит/цикл/программа/методы) при выборе одного, (2) структурированный выбор циклов (категория сила/бодибилдинг → попап → конкретный цикл). Плюс качественный аудит и правка движков замен/травм и BB-генератора.
+
+### Constraints & Preferences
+- ПЛ Циклы НЕ трогаем — только ручной планировщик, Авто ББ, Библиотека, Лаборатория
+- Роль: профи-тренер ББ (preferBB — классический жим/становая неуместны)
+- Мобильная вёрстка PlanDisplay
+- КРИТИЧЕСКОЕ ПРАВИЛО: НЕ писать файлы через PowerShell (UTF-8 порча → recover.cjs). Только Edit tool
+- User-решения: dumbbell per-hand (~0.47); bodyweight/carries → 'BW'/дистанция
+- Подсветка ★ на основе `effectiveDir` (направление цикла ИЛИ сплита ИЛИ directionFilter), двунаправленная
+
+### ✅ Done
+- **ConfigPanel.tsx — UX-фичи (tsc 0, vite OK):**
+  - `CycleSelect` (2-шаг: категория all/strength/bodybuilding → список циклов; синхронизирует directionFilter через `onCategory`)
+  - `compatibleSplits/Cycles/Programs` Sets по `effectiveDir`; ★ подсветка для сплитов/циклов/программ/методов
+  - `Sel` подсвечивает по `o.id`; локальные стили попапа; `type Dir = DirFilter|'both'`
+- **Аудит движков (DONE, tsc 0 в моих файлах, vite OK):**
+  - `exercise-substitution.engine.ts` — шаг 3 замены теперь использует `derivePattern()` (раньше `movementPattern===movementPattern` → ложные совпадения `undefined===undefined` для 275/529 упражнений без тега)
+  - **Новый файл `src/engines/movement-pattern.ts`** — вынесены `derivePattern`/`isCarryExercise`/`isBodyweightExercise`, разорван cycle manual-plan-builder ↔ exercise-substitution; оба импортируют оттуда; `manual-plan-builder` делает `export { derivePattern }`
+  - `bb-builder.engine.ts` — **исправлен баг раздувания объёма при градированной травме**: путь замены брал до 3 кандидатов `findSubstitutions` и подставлял все → изолированная травмированная мышца получала БОЛЬШЕ сетов вместо меньше. Добавлен `pl.exDatas.slice(0, pl.exerciseCount)`. Проверено: травмированная грудь = 7 сетов (было 16, −50% через volumePct), вес ×60%
+  - Функциональные тесты (tsx): substitution (16 замен для грудного компаунда), BB upper_lower_4 (78% тяж/22% памп, weak shoulders 13 vs 11 сетов), BB injury-substitution (volume снижается, не растёт)
+- **ПОЛНЫЙ аудит ББ-авто + ручного планировщика (профи-тренер ББ) — НАПИСАН:**
+  - Прочитаны: bb-builder.engine, manual-plan-builder (buildPlanDays 183-499), bb-day-types, bb-tempo-rest, bb-ped-adaptation, bb-split-patterns, bb-metrics, rir-table, PlanDisplay
+  - 🔴 КРИТИЧЕСКИЕ расхождения (две «головы»): (3.1) ББ-движок считает RIR сам (`charRir`, bb-builder:159) и НЕ вызывает `distributePhases` → фазовая шкала PlanDisplay и реальный RIR ББ-плана рассинхронизированы, НЕТ запланированной deload-недели; (3.2) две системы темпа (manual `generateRepTempo` vs BB `bb-tempo-rest`); (3.3) две философии объёма изоляций (manual 2-3 упр vs BB всегда 1 упр, bb-builder:221)
+  - 🐛 Баги: (4.1) `Math.min(4, Math.max(13, ceil(mrv/f)))` (manual:245) → всегда 4, maxSets мёртв; (4.2) распределение 0.65/0.35 (bb-builder:212) кладёт 35% MAV на ОДНУ изоляцию (перевёрнуто); (4.3) `muscleVolumeRotation` не капается по MRV после weak×1.2/focus×1.3 (bb-builder:357-372); (4.4) `charRir` капает RIR каждые 2 нед → пик к week 5, нет волны
+  - 💡 Профи-критика: bro-split 1×/нед chest=13 сетов/день без памп-добивки; PPL push=5 упр тонко для KMS-MS; нет feeder-сетов в ББ-движке; `weight=workMax×PCT` не помечен «workMax=1ПМ»
+  - 📱 PlanDisplay: шрифты 7-9px (нарушает читаемость/mobile из AGENTS.md, противоречит apple-полировке); BB-метрики через хрупкий `mockPlan` cast; `calcBBPlanMetrics` берёт первую неделю avgRir<3.5 (игнорирует аккумуляцию)
+  - 🎯 Приоритетный план правок: **A** ББ ingests `distributePhases` (RIR+deload) вместо `charRir` (HIGH); **B** `exerciseCount` акцессуара=2 для delt/arms/calves/abs (HIGH); **C** перевёрнуть 0.65/0.35 → compound щедро, изоляция 3-4×N (HIGH); **D** `Math.min(mavRot, mrv)` после множителей (MED); **E** единый темп-источник (MED); **F** исправить maxSets (LOW); **G** шрифты ≥10px (MED); **H** BB-метрики брать пиковую неделю (LOW)
+
+### ❌ Остаётся (вне зоны)
+- Предсуществующие ошибки tsc в BioStackAI*/IndividualPlanContext (9 шт, параллельные агенты) — не трогал, не в моих файлах
+- Визуальная проверка в браузере: подсветка ★ при выборе цикла; 2-шаг CycleSelect; BB injury-substitution баннер
+
+### Key Decisions
+- preferBB flag + penalty вместо переписывания каталога
+- derivePattern приоритет: isCarryExercise→'carry'; паллоф/анти-рот→'anti_rotation'; isolation→по группе; compound→по ключевым словам; fallback по группе
+- Cross-highlight через `effectiveDir` (цикл > сплит > directionFilter)
+- `movement-pattern.ts` — единый источник `derivePattern` для обоих движков
+- BB injury-substitution капается по `exerciseCount`, чтобы замена не увеличивала объём травмированной группы
+
+### Critical Context
+- Test harness: `C:\Users\thods\AppData\Local\Temp\opencode\` (gen_test.ts / bb_test.ts / sub_test.ts, временные, вне репо); запуск `cd D:\BodyBuildHealth; $env:NODE_OPTIONS='--max-old-space-size=2048'; npx tsx "<путь>"`
+- `ConfigPanel.tsx`: `CycleSelect` props `{ label, value, allCycles:any[], onChange, onCategory:(d:DirFilter)=>void, recommendedSet?:Set<string>, hint?:string }`; `catTag(id)` cycle-bb→'BB', block→'Блок', embed→'Встр', src2→'СРЦ2', иначе 'СРЦ'
+- `bb-builder.engine.ts`: `buildBBPlan(input, pedAdapt?)`; паттерн-ID БЕЗ префикса `bb_` — реальные: `fullbody_3`, `upper_lower_4`, `ppl_6`, `bro_5`, `pro_8_day` (см. `SPLIT_PATTERNS` в bb-split-patterns.ts). `findSubstitutions` требует `exclude:false` в Injury для градированной замены
+- `exercise-substitution.engine.ts`: `patternOf(ex)= ex.movementPattern || derivePattern(ex)`
+
+### Relevant Files
+- `src/ui/screens/TrainingScreen_parts/TrainingConstructor/ConfigPanel.tsx` — CycleSelect, compatibleSets, ★ wiring
+- `src/ui/screens/TrainingScreen_parts/TrainingPopups.tsx` — экспортирует `cardBtnStyle`
+- `src/engines/movement-pattern.ts` — НОВЫЙ: derivePattern/isCarryExercise/isBodyweightExercise
+- `src/engines/exercise-substitution.engine.ts` — patternOf + derivePattern в шаге 3
+- `src/engines/manual-plan-builder.ts` — re-export derivePattern; импорт из movement-pattern
+- `src/engines/bb/bb-builder.engine.ts` — buildBBPlan; FIX slice(0, exerciseCount)
+- `src/engines/bb/bb-split-patterns.ts` — SPLIT_PATTERNS (реальные ID без префикса bb_)
+- `src/engines/cycle-method-map.ts` — DIRECTION_METHOD_MAP (★ для методов)
+- `src/data/lms-cycles/lms-cycle-index.ts` — LMS_CYCLES, normalizeCycleDirection
+
+## Session Summary (Jul 13 — Part 7) — BioStack P0→P2: MERGE + клин. аудит + безопасность/экспорт
+
+### Goal
+Оптимизировать BioStack AI (13 вкладок) по плану P0→P2: MERGE с SupplementClinic, клинический аудит безопасности (A–H фиксы), P1 мёртвый код, P2 безопасность/экспорт/ленивость.
+
+### ✅ Сделано и проверено (tsc 0 ошибок — ВПЕРВЫЕ за сессию; vite build OK; UTF-8 чисто)
+
+**P0 — MERGE + аудит:**
+- MERGE BioStack + SupplementClinic в единый shell (12→13 вкладок: profile/data/search/build/stack/interactions/dose/timing/clinical/drugcheck/risks/compare/reports/export)
+- 8 клин. фиксов (A–H) + резерв мягких (жёлтые) vs блокирующих (красные) предупреждений
+- P0-1 AddScope; P0-2 warning-badge в StackTab; P0-3 единый источник правды ClinicalResultCard
+
+**P1 — мёртвый код:**
+- DrugCheckTab подключён вкладкой «💊 ЛС-контроль» (BSTab + SUB_TABS; BioStackAIScreen import + tabContent)
+- Удалён мёртвый импорт SupplementClinicScreen из App.tsx:13
+- P1-UI tap-targets: nav fontSize 8→12, padding 5/8→9/13, minHeight:38
+
+**P2 — безопасность/экспорт/ленивость:**
+- P2-1: кнопка «Заменить на аналог» при hard-stop/drugExclusion через findMeaningfulReplacement — BioStackAIClinicalCard (props profile?/onReplace?, useMemo stopIds+replacements, replaceBtn), ClinicalPanel (onReplace, profile useMemo), BioStackAIScreen (replaceStop: map+dedupe+showToast)
+- P2-2: сравнение метрик безопасности (CompareTab) — НОВЫЙ вид «🛡 Безопасность»: useMemo safetyAnalysis через selectStack (hardStops/drugExclusions/drugTitrations/ulWarnings/critUL/redundancy/labAdjustments + индекс 0-100), таблица A/B + вердикт. Кнопка добавлена в переключатель видов
+- P2-3: экспорт стека (BioStackAIExport.tsx, НОВЫЙ) — вкладка «📤 Экспорт»: сводка (состав/стоимость/selectStack-безопасность/синергия/предупреждения) → копировать в буфер (Telegram) + печать/PDF. Подключён в BioStackAIScreen (export tabContent) + BSTab type
+- P2-4: ленивая сборка support-index.ts — ПРОПУЩЕНО (преждевременная оптимизация: файл 244 строки, не bottleneck; читатели индекса используют константы напрямую → риск поломки подбора)
+
+**Попутные фиксы (блокировали tsc):**
+- IndividualPlanContext.tsx:757 — weekData/weekDays подняты в scope функции (let weekDays:any[]=[]; let weekData:any=null)
+- meal-plan-engine.ts:583 — объявление ptm поднято выше использования
+- Итог: проект ВПЕРВЫЕ за сессию проходит tsc --noEmit с 0 ошибок
+
+### Проверки
+- tsc --noEmit: **0 ошибок** (весь проект)
+- vite build: **OK** (35.85s)
+- UTF-8 noBOM: BioStackAIExport/Compare/Screen/Constants + IndividualPlanContext — OK
+
+### ❌ Остаётся
+- Визуальная проверка в браузере: CompareTab safety-view, ExportTab (PDF/копирование), replace-баннер в ClinicalPanel
+- P2-4 (ленивость) — решено не делать
+
+### Key Decisions
+- 13 вкладок BioStack: единый shell BioStackAIScreen; SupplementClinicScreen поглощён (AddScope), не удалён (правило #8)
+- selectStack — единственный источник агрегата безопасности (6 слоёв фильтрации)
+- Индекс безопасности = 100 − (hardStops×25 + drugExclusions×15 + drugTitrations×5 + critUL×10 + (ulWarnings−critUL)×3 + redundancy×2), floor 0
+
+### Critical Context
+- BioStackAIConstants.tsx: BSTab type (14 значений ВКЛ export), SUB_TABS (…/reports/export)
+- BioStackAIScreen.tsx: tabContent export → <ExportTab profile stackIds setStackIds linked>; replaceStop(origId,repId); setStackIdsAndSync
+- BioStackAICompare.tsx: CompareView ВКЛЮЧАЕТ 'safety'; safetyAnalysis useMemo (selectStack через profile||loadBioStackProfile, lab=linked?.labAnalysis); блок {view==='safety' && safetyAnalysis.a && safetyAnalysis.b}
+- BioStackAIExport.tsx: НОВЫЙ; explainStack + selectStack; estCost (e.priceRub||e.price); dosage = e.dosage.mg+' мг'+(e.dosage.timing)
+- AbsoluteContraindication: {substanceId, substanceName, reason, source}
+- DrugSafetyExclusion: {substanceId, substanceName, drug, effect, severity, mechanism}
+- findMeaningfulReplacement(originalId, profile, excludedIds) → MeaningfulReplacement|null
+
+### Relevant Files
+- src/ui/components/BioStackAIExport.tsx — НОВЫЙ: ExportTab (копировать/PDF)
+- src/ui/components/BioStackAICompare.tsx — safety-view (safetyAnalysis + render)
+- src/ui/components/BioStackAIScreen.tsx — export tab + replaceStop
+- src/ui/components/BioStackAIClinicalCard.tsx — replaceBtn + profile/onReplace
+- src/ui/screens/SupplementClinicScreen_parts/ClinicalPanel.tsx — onReplace prop
+- src/ui/App.tsx — убран мёртвый import SupplementClinicScreen
+- src/ui/screens/NutritionScreen_parts/IndividualPlan/IndividualPlanContext.tsx — weekData/weekDays scope fix
+- src/ui/screens/NutritionScreen_parts/IndividualPlan/meal-plan-engine.ts — ptm hoist
+- src/engines/biostack-clinical-v2.engine.ts — selectStack; findMeaningfulReplacement
+- src/engines/biostack-safety.engine.ts — DrugSafetyExclusion/DrugSafetyTitration

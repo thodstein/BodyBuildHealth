@@ -32,6 +32,7 @@ export interface UsefulnessScore {
   };
   costEfficiency: {
     proteinCostRub: number;
+    leucineCostRub: number;
     efficiencyScore: number;
   } | null;
   label: string;
@@ -162,8 +163,9 @@ export function calcProductUsefulness(
     const price = opts.pricePerKg || ESTIMATED_PRICES[food.id];
     if (price && protein > 0) {
       const proteinCostRub = Math.round(price / (protein * 10));
+      const leucineCostRub = leu > 0 ? Math.round(price * 100 / leu * 10) / 10 : 0;
       const efficiencyScore = Math.max(0, Math.min(100, Math.round(80 - proteinCostRub * 2)));
-      costEfficiency = { proteinCostRub, efficiencyScore };
+      costEfficiency = { proteinCostRub, leucineCostRub, efficiencyScore };
     }
   }
 

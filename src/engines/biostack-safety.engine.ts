@@ -16,6 +16,18 @@ export const SUPPLEMENT_UPPER_LIMITS: Record<string, number> = {
   theanine: 400, glycine: 30000, glutamine: 40000,
 };
 
+/* ─── Daily OPTIMAL doses (mg) — above opt*1.5 flag for titrate/cycling ───
+   Used by checkStackToxicity to warn not just at UL but when a stack pushes
+   a substance well above its evidence-based optimal dose. */
+export const SUPPLEMENT_OPTIMAL_LIMITS: Record<string, number> = {
+  zinc: 30, selenium: 0.2, vitamin_b6: 25, vitamin_c: 1000,
+  calcium: 1200, iron: 18, copper: 3, manganese: 5, boron: 10,
+  chromium: 0.2, iodine: 0.15, coq10: 300, alpha_lipoic: 600,
+  nac: 1200, curcumin: 1000, berberine: 1000, ashwagandha: 600,
+  l_carnitine: 2000, creatine: 5000, taurine: 2000, theanine: 200,
+  glycine: 5000, glutamine: 10000, vitamin_e: 400,
+};
+
 /* ─── Nutrient competition pairs (antagonists) ─── */
 interface CompetitionPair { a: string; b: string; effect: string; recommendation: string; }
 export const NUTRIENT_COMPETITION: CompetitionPair[] = [
@@ -69,7 +81,7 @@ export interface ToxWarning {
   totalDose: number;
   ul: number;
   percentUL: number;
-  severity: 'safe' | 'warning' | 'danger';
+  severity: 'safe' | 'warning' | 'danger' | 'titrate';
   message: string;
 }
 
@@ -86,6 +98,22 @@ export const UL_CANONICAL: Record<string, string> = {
   'chromium_picolate': 'chromium', 'iodine_kelp': 'iodine', 'potassium_citrate': 'potassium',
 };
 
+/* ─── Dose-unit normalization ───
+   Some catalog entries store dosage.mg in IU (МЕ), mcg (мкг) or whole salt
+   mass, while SUPPLEMENT_UPPER_LIMITS are in mg of ELEMENTAL nutrient.
+   This factor converts stored dosage.mg → true elemental mg before UL check.
+   (Prevents false "danger" alerts e.g. D3 5000 МЕ read as 5000 мг = 5,000,000% UL.) */
+export const DOSE_TO_ELEMENTAL_MG: Record<string, number> = {
+  vitamin_d3: 0.000025,          // 1 МЕ = 0.025 мкг → 5000 МЕ = 0.125 мг
+  selenium: 0.001,               // мкг → мг (200 мкг = 0.2 мг)
+  selenium_methylselenocysteine: 0.001,
+  selenium_yeast: 0.001,
+  vitamin_k2: 0.001,             // мкг → мг
+  vitamin_b12: 0.001,            // мкг → мг
+  folate: 0.001,                 // мкг → мг
+  magnesium_l_threonate: 0.072,  // ~7.2% элементарного Mg (144 мг из 2000 мг соли)
+};
+
 export function checkStackToxicity(stackIds: string[]): ToxWarning[] {
   const warnings: ToxWarning[] = [];
   const doseSum: Record<string, { total: number; ids: string[]; names: string[] }> = {};
@@ -93,10 +121,12 @@ export function checkStackToxicity(stackIds: string[]): ToxWarning[] {
   for (const id of stackIds) {
     const cat = SUPPORT_CATALOG_DATA[id];
     if (!cat?.dosage?.mg) continue;
-    const doseMg = cat.dosage.mg;
+    const lc = id.toLowerCase();
+    // Normalize IU/mcg/salt-mass → elemental mg before UL comparison
+    const convFactor = DOSE_TO_ELEMENTAL_MG[lc];
+    const doseMg = convFactor !== undefined ? cat.dosage.mg * convFactor : cat.dosage.mg;
     const name = cat.nameRu || cat.name || id;
 
-    const lc = id.toLowerCase();
     let mappedKey = UL_CANONICAL[lc] || '';
     if (!mappedKey) {
       for (const ulKey of Object.keys(SUPPLEMENT_UPPER_LIMITS)) {
@@ -119,24 +149,46 @@ export function checkStackToxicity(stackIds: string[]): ToxWarning[] {
 
   for (const [key, data] of Object.entries(doseSum)) {
     const ul = SUPPLEMENT_UPPER_LIMITS[key];
-    if (!ul) continue;
-    const pct = (data.total / ul) * 100;
-    if (pct < 80) continue;
+    const opt = SUPPLEMENT_OPTIMAL_LIMITS[key];
+    if (!ul && !opt) continue;
 
-    const severity = pct > 150 ? 'danger' : pct > 100 ? 'warning' : 'safe';
-    warnings.push({
-      substanceId: key,
-      name: data.names.join(' + '),
-      totalDose: Math.round(data.total),
-      ul,
-      percentUL: Math.round(pct),
-      severity,
-      message: severity === 'danger'
-        ? `⛔ СУММАРНАЯ ДОЗА ${Math.round(data.total)} мг превышает UL ${ul} мг в ${Math.round(pct/100)}x! Опасно.`
-        : severity === 'warning'
-        ? `⚠ Суммарная доза ${Math.round(data.total)} мг близка к UL ${ul} мг (${Math.round(pct)}%). Риск токсичности.`
-        : `⚡ Суммарно ${Math.round(data.total)} мг из UL ${ul} мг (${Math.round(pct)}%) — OK, но следите.`,
-    });
+    let pushed = false;
+
+    if (ul) {
+      const pct = (data.total / ul) * 100;
+      if (pct >= 80) {
+        const severity = pct > 150 ? 'danger' : pct > 100 ? 'warning' : 'safe';
+        warnings.push({
+          substanceId: key,
+          name: data.names.join(' + '),
+          totalDose: Math.round(data.total),
+          ul,
+          percentUL: Math.round(pct),
+          severity,
+          message: severity === 'danger'
+            ? `⛔ СУММАРНАЯ ДОЗА ${Math.round(data.total)} мг превышает UL ${ul} мг в ${Math.round(pct / 100)}x! Опасно.`
+            : severity === 'warning'
+            ? `⚠ Суммарная доза ${Math.round(data.total)} мг близка к UL ${ul} мг (${Math.round(pct)}%). Риск токсичности.`
+            : `⚡ Суммарно ${Math.round(data.total)} мг из UL ${ul} мг (${Math.round(pct)}%) — OK, но следите.`,
+        });
+        pushed = true;
+      }
+    }
+
+    // Point D: also warn when a stack pushes a substance well above its
+    // evidence-based OPTIMAL dose (not just UL) → suggest titration/cycling.
+    if (!pushed && opt && data.total > opt * 1.5) {
+      const pctOpt = Math.round((data.total / opt) * 100);
+      warnings.push({
+        substanceId: key,
+        name: data.names.join(' + '),
+        totalDose: Math.round(data.total),
+        ul: opt,
+        percentUL: pctOpt,
+        severity: 'titrate',
+        message: `↕ Суммарная доза ${Math.round(data.total)} мг выше оптимальной (~${opt} мг, ${pctOpt}%). Рассмотрите снижение/циклирование.`,
+      });
+    }
   }
   return warnings;
 }
@@ -162,6 +214,28 @@ export function applyLabAdjustments(
 ): LabAdjustment[] {
   const adjustments: LabAdjustment[] = [];
   if (!lab) return adjustments;
+
+  // Helper: read a single lab interpretation by marker code (set by
+  // lab-analysis.engine from real lab values).
+  const findInterp = (code: string): { code: string; status?: string; riskPercent?: number } | undefined =>
+    (lab as any).interpretations?.find((x: any) => x?.code === code);
+  const statusOf = (code: string): string => {
+    const i = findInterp(code);
+    return i?.status || 'normal';
+  };
+  // Normalize interpretation status → 0..1 risk score (LabInterpretation stores
+  // `risk` as a string code + `riskPercent` 0-40, so derive from status instead).
+  const riskOf = (code: string): number => {
+    const s = statusOf(code);
+    if (s === 'critical_high') return 0.9;
+    if (s === 'high' || s === 'low') return 0.6;
+    return 0;
+  };
+  // Derived electrolyte flags — POTASSIUM now present in REFERENCE_RANGES so
+  // interpretations are actually built (was previously always normal/dead).
+  const potassiumHigh = statusOf('POTASSIUM') === 'high' || statusOf('POTASSIUM') === 'critical_high';
+  const potassiumLow = statusOf('POTASSIUM') === 'low';
+  const homaIR = typeof (lab as any).homaIR === 'number' ? (lab as any).homaIR : 0;
 
   for (const id of stackIds) {
     const cat = SUPPORT_CATALOG_DATA[id];
@@ -197,12 +271,50 @@ export function applyLabAdjustments(
       }
     }
 
-    // Hyperkalemia risk → reduce potassium
-    if ((lab as any).potassiumHigh && lc.includes('potassium')) {
+    // Hyperkalemia risk → reduce potassium (derived from interpretations)
+    if (potassiumHigh && lc.includes('potassium')) {
       multiplier = 0.3;
       reason = 'Гиперкалиемия: резкое снижение дозы калия';
       labMarker = 'K+ elevated';
       severity = 'danger';
+    }
+    // Hypokalemia → flag potassium/cramps supplements for emphasis
+    if (potassiumLow && (lc.includes('potassium') || lc.includes('magnesium'))) {
+      multiplier = Math.max(multiplier, 1.0);
+      reason = 'Гипокалиемия: добор калия/магния под контролем анализов';
+      labMarker = 'K+ low';
+      severity = 'warning';
+    }
+
+    // Thyroid stress (low free T4 / high TSH / abnormal free T3) →
+    // reduce thyroid-sensitive adaptogens (ashwagandha, iodine)
+    if (riskOf('FREE_T4') > 0.5 || riskOf('FREE_T3') > 0.5 || riskOf('TSH') > 0.5) {
+      const thyroidIds = ['ashwagandha', 'iodine', 'lithium'];
+      if (thyroidIds.some(t => lc.includes(t))) {
+        multiplier = Math.min(multiplier, 0.7);
+        reason = 'Нарушение функции ЩЖ: снижение дозы на 30% (контроль ТТГ)';
+        labMarker = `thyroid risk: ${Math.round(Math.max(riskOf('FREE_T4'), riskOf('FREE_T3'), riskOf('TSH')) * 100)}%`;
+        severity = 'warning';
+      }
+    }
+
+    // Glucose / HOMA-IR stress → reduce glycemia-aggravating stimulants
+    if (riskOf('GLUCOSE') > 0.5 || homaIR > 2.5) {
+      const glucoseIds = ['caffeine'];
+      if (glucoseIds.some(g => lc.includes(g))) {
+        multiplier = Math.min(multiplier, 0.5);
+        reason = 'Инсулинорезистентность/гипергликемия: снижение стимуляторов на 50%';
+        labMarker = homaIR > 2.5 ? `HOMA-IR: ${homaIR.toFixed(1)}` : `glucose risk: ${Math.round(riskOf('GLUCOSE') * 100)}%`;
+        severity = 'warning';
+      }
+    }
+
+    // Sodium imbalance → creatine draws water/Na, reduce if Na abnormal
+    if (riskOf('SODIUM') > 0.5 && lc.includes('creatine')) {
+      multiplier = Math.min(multiplier, 0.8);
+      reason = 'Нарушение натриевого баланса: снижение креатина на 20%, контроль воды';
+      labMarker = `Na risk: ${Math.round(riskOf('SODIUM') * 100)}%`;
+      severity = 'warning';
     }
 
     // Cardio risk → reduce stimulants
@@ -381,48 +493,107 @@ export interface DrugSafetyExclusion {
   mechanism: string;
 }
 
+export interface DrugSafetyTitration {
+  substanceId: string;
+  substanceName: string;
+  drug: string;
+  effect: string;
+  mechanism: string;
+  recommendation: string;
+}
+
+// Нормализация для сопоставления (убирает пунктуацию/подчёркивания, lower)
+function normId(s: string): string {
+  return s.toLowerCase().replace(/[^a-zа-яё0-9]/gi, '');
+}
+
+// Критичные ЛЕКАРСТВО-ЛЕКАРСТВО комбинации (оба — ЛС, не добавки)
+const DRUG_DRUG_BLACKLIST: Array<{ a: string; b: string; effect: string; severity: 'HIGH'; mechanism: string }> = [
+  { a: 'силденафил', b: 'нитраты', effect: 'ВЫРАЖЕННАЯ ГИПОТОНИЯ (жизнеугрожающее)', severity: 'HIGH', mechanism: 'NO/цГМФ путь — абсолютное противопоказание' },
+  { a: 'тадалафил', b: 'нитраты', effect: 'ВЫРАЖЕННАЯ ГИПОТОНИЯ', severity: 'HIGH', mechanism: 'NO-доноры + PDE5 = абсолютное противопоказание' },
+  { a: 'ваденафил', b: 'нитраты', effect: 'ВЫРАЖЕННАЯ ГИПОТОНИЯ', severity: 'HIGH', mechanism: 'NO/цГМФ путь — абсолютное противопоказание' },
+  { a: 'альфа-блокатор', b: 'тадалафил', effect: 'Симптоматическая гипотония/коллапс', severity: 'HIGH', mechanism: 'α1-блокада + PDE5 вазодилатация' },
+];
+
 export function getDrugSafetyExclusions(
   candidateIds: string[],
   userMeds: string[]
-): DrugSafetyExclusion[] {
-  if (!userMeds.length || !candidateIds.length) return [];
-  const exclusions: DrugSafetyExclusion[] = [];
+): { excluded: DrugSafetyExclusion[]; titrations: DrugSafetyTitration[] } {
+  if (!userMeds.length || !candidateIds.length) return { excluded: [], titrations: [] };
+  const excluded: DrugSafetyExclusion[] = [];
+  const titrations: DrugSafetyTitration[] = [];
   const medsLower = userMeds.map(m => m.toLowerCase().trim());
+  const medsNorm = medsLower.map(m => normId(m));
 
-  for (const subId of candidateIds) {
-    const cat = SUPPORT_CATALOG_DATA[subId];
-    if (!cat) continue;
-    const subName = (cat.nameRu || cat.name || subId).toLowerCase();
-
-    for (const inter of KNOWN_DRUG_SUP_INTERACTIONS) {
-      if (inter.severity !== 'HIGH') continue;
-      const drugMatch = medsLower.some(m =>
-        m.includes(inter.drug) || inter.drug.includes(m)
-      );
-      const subMatch = subName.includes(inter.substance) || inter.substance.includes(subName);
-      if (drugMatch && subMatch) {
-        exclusions.push({
+  // ЛЕКАРСТВО-ЛЕКАРСТВО блэклист (оба ЛС в userMeds)
+  for (const dd of DRUG_DRUG_BLACKLIST) {
+    const na = normId(dd.a), nb = normId(dd.b);
+    const hasA = medsNorm.some(m => m.includes(na) || na.includes(m));
+    const hasB = medsNorm.some(m => m.includes(nb) || nb.includes(m));
+    if (hasA && hasB) {
+      for (const subId of candidateIds) {
+        const cat = SUPPORT_CATALOG_DATA[subId];
+        if (!cat) continue;
+        excluded.push({
           substanceId: subId,
           substanceName: cat.nameRu || cat.name || subId,
-          drug: inter.drug,
-          effect: inter.effect,
-          severity: inter.severity,
-          mechanism: inter.mechanism,
+          drug: `${dd.a} + ${dd.b}`,
+          effect: dd.effect,
+          severity: dd.severity,
+          mechanism: dd.mechanism,
         });
       }
     }
   }
-  return exclusions;
+
+  for (const subId of candidateIds) {
+    const cat = SUPPORT_CATALOG_DATA[subId];
+    if (!cat) continue;
+    // кандидаты для матча: id + nameRu + name (нормализованные)
+    const subIds = [subId, cat.nameRu || '', cat.name || ''].map(s => normId(s));
+
+    for (const inter of KNOWN_DRUG_SUP_INTERACTIONS) {
+      const drugMatch = medsNorm.some((m, i) =>
+        m.includes(normId(inter.drug)) || normId(inter.drug).includes(m) || medsLower[i].includes(inter.drug) || inter.drug.includes(medsLower[i])
+      );
+      const subNorm = normId(inter.substance);
+      const subMatch = subIds.some(id => id.includes(subNorm) || subNorm.includes(id));
+      if (drugMatch && subMatch) {
+        if (inter.severity === 'HIGH') {
+          // Absolute contraindication with the user's medication → hard exclude
+          excluded.push({
+            substanceId: subId,
+            substanceName: cat.nameRu || cat.name || subId,
+            drug: inter.drug,
+            effect: inter.effect,
+            severity: inter.severity,
+            mechanism: inter.mechanism,
+          });
+        } else {
+          // MEDIUM severity → keep but flag for dose titration / alternative
+          titrations.push({
+            substanceId: subId,
+            substanceName: cat.nameRu || cat.name || subId,
+            drug: inter.drug,
+            effect: inter.effect,
+            mechanism: inter.mechanism,
+            recommendation: `⚠ Снизить дозу и контролировать анализы (риск ${inter.severity}). ${inter.effect}`,
+          });
+        }
+      }
+    }
+  }
+  return { excluded, titrations };
 }
 
 export function getSafeStackRecommendations(
   allRecommended: string[],
   userMeds: string[]
-): { safe: string[]; excluded: DrugSafetyExclusion[] } {
-  const excluded = getDrugSafetyExclusions(allRecommended, userMeds);
+): { safe: string[]; excluded: DrugSafetyExclusion[]; titrations: DrugSafetyTitration[] } {
+  const { excluded, titrations } = getDrugSafetyExclusions(allRecommended, userMeds);
   const excludeIds = new Set(excluded.map(e => e.substanceId));
   const safe = allRecommended.filter(id => !excludeIds.has(id));
-  return { safe, excluded };
+  return { safe, excluded, titrations };
 }
 
 /* ════════════════════════════════════════════════════════════════════

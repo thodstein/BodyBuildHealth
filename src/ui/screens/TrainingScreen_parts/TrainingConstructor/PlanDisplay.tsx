@@ -3,7 +3,7 @@ import { EXERCISE_CATALOG, getSubstitutes, canReplace, getExerciseById } from '.
 import { calcExercisePrescription } from '../../../../engines/training.engine';
 import { SubstitutionPopup } from '../SubstitutionPopup';
 import { getAllVolumeLandmarks } from '../../../../engines/volume-landmarks.engine';
-import { generateRepTempo } from '../../../../engines/rep-tempo-engine';
+import { tempoFor } from '../../../../engines/bb/bb-tempo-rest';
 import { PCT_FOR_RIR, GROUP_RU, ACCENT, DIM, SET_TEMPLATES, type ManualResult, type ManualWeek } from './types';
 import type { TrainingProfile } from '../training-profile';
 import { PHASE_LABELS, type BBPhase } from './phase-periodization';
@@ -37,6 +37,12 @@ const PHASE_COLORS: Record<string, string> = {
   peaking: '#ef4444',
 };
 
+function fmtWt(e: { weight: number; weightNote?: string }): string {
+  if ((e as any).weightNote) return (e as any).weightNote as string;
+  if (e.weight > 0) return `${e.weight} кг`;
+  return '—';
+}
+
 function getExerciseNote(ex: { name: string; role?: string; rir: number; sets: number; reps: string; tempo?: string; group: string; weight: number }, idx: number, dayExs: any[], weeklySetsMap: Record<string, number>, corrections: string[]): string {
   const notes: string[] = [];
   if (idx === 0) notes.push('Первое упражнение дня — задаёт тон всей тренировке.');
@@ -65,6 +71,15 @@ function getExerciseNote(ex: { name: string; role?: string; rir: number; sets: n
     if (est1RM > 0) notes.push('Расчётный 1ПМ: ~' + est1RM + ' кг');
   }
   return notes.join(' | ');
+}
+
+function ExStat({ label, value, onClick, color }: { label: string; value: React.ReactNode; onClick?: () => void; color?: string }) {
+  return (
+    <div style={{ padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>{label}</span>
+      <span onClick={onClick} style={{ fontSize: 11, fontWeight: 700, color: color || 'rgba(255,255,255,0.85)', cursor: onClick ? 'text' : 'default', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+    </div>
+  );
 }
 
 export function calcQualityScore(days: any[], weeklySets: Record<string, number>, level: string, goal: string): {
@@ -433,7 +448,7 @@ export const PlanDisplay: React.FC<Props> = ({
         {/* Per-muscle table */}
         {quality.perMuscle && quality.perMuscle.length > 0 && (
           <div style={{ marginTop: 8, overflowX: 'auto' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: 4 }}>Мышца · Сеты · MEV · MAV · MRV · %</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: 4 }}>Мышца · Сеты · MEV · MAV · MRV · %</div>
             <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
               {quality.perMuscle.map(pm => {
                 const st = pm.status === 'недотрен' ? '#ef4444' : pm.status === 'перегруз' ? '#f59e0b' : '#22c55e';
@@ -706,21 +721,21 @@ export const PlanDisplay: React.FC<Props> = ({
                 <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>💡 Тренер: разминка обязательна перед первым рабочим подходом.</div>
               </div>
             </details>
-            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', margin: '0 -4px', padding: '0 2px', scrollbarWidth: 'none' }}>
-<div style={{ display: 'grid', gridTemplateColumns: '14px 3fr 0.8fr 0.5fr 0.5fr 0.6fr 0.7fr 0.5fr 0.5fr 0.8fr', gap: 2, padding: '4px 10px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', minWidth: 420 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 2px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: '2px 6px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>
                <span></span><span>Упражнение</span><span>С×П</span><span>RIR</span><span>Хар.</span><span>Вес</span><span>Группа</span><span>Темп</span><span>Отдых</span><span>Действия</span>
              </div>
              {d.exercises.map((e, ei) => {
               const tempoKey = di + '-' + ei;
               const overrideTempo = exerciseTempos[tempoKey];
-              const tmpo = globalTempoStr ? { tempo: { toString: () => globalTempoStr } } : (overrideTempo ? { tempo: { toString: () => overrideTempo } } : generateRepTempo({ goal: goal === 'strength' ? 'strength' : 'hypertrophy', riskLevel: 'low', difficultyLevel: 'medium', techniqueIssues: [], isMainLift: ei === 0 }));
+              const tmpo = globalTempoStr ? { tempo: { toString: () => globalTempoStr } } : (overrideTempo ? { tempo: { toString: () => overrideTempo } } : { tempo: { toString: () => tempoFor(ei === 0 ? 'тяж' : 'памп').notation } });
               const note = getExerciseNote(e, ei, d.exercises, weeklySetsMap, result.corrections);
               return (
                 <Fragment key={ei}>
-                  <div draggable onDragStart={ev => handleDragStart(ev, di, ei)} onDragOver={handleDragOver} onDrop={ev => handleDrop(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'grid', gridTemplateColumns: '14px 3fr 0.8fr 0.5fr 0.5fr 0.6fr 0.7fr 0.5fr 0.5fr 0.8fr', gap: 2, padding: '5px 10px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab', alignItems: 'center', minWidth: 420 }}>
+                   <div draggable onDragStart={ev => handleDragStart(ev, di, ei)} onDragOver={handleDragOver} onDrop={ev => handleDrop(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '6px 8px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab', alignItems: 'center' }}>
                     <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', cursor: 'grab', userSelect: 'none' }}>⠿</span>
-                    <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 4, fontWeight: 800, textTransform: 'uppercase',
+                    <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', flex: '1 1 140px', minWidth: 0, wordBreak: 'break-word' }}>
+                      <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 4, fontWeight: 800, textTransform: 'uppercase', flex: '0 0 auto',
                         background: e.role === 'main' ? 'rgba(0,230,138,0.2)' : e.role === 'secondary' ? 'rgba(96,165,250,0.2)' : 'rgba(255,255,255,0.1)',
                         color: e.role === 'main' ? ACCENT : e.role === 'secondary' ? '#60a5fa' : DIM,
                         border: '0.5px solid ' + (e.role === 'main' ? ACCENT : e.role === 'secondary' ? '#60a5fa' : 'rgba(255,255,255,0.2)')
@@ -737,8 +752,8 @@ export const PlanDisplay: React.FC<Props> = ({
                         <><span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'targetVelocity', value: String(e.targetVelocity || 0.5) }); }} style={{ color: '#a855f7' }}>{e.targetVelocity || 0.5} m/s</span>
                         <span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'loadMode', value: 'weight' }); }} style={{ fontSize: 8, opacity: 0.6, cursor: 'pointer' }}>→ кг</span></>
                       ) : (
-                        <>{e.weight} кг
-                        <span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'loadMode', value: 'velocity' }); }} style={{ fontSize: 8, opacity: 0.6, cursor: 'pointer' }}>→ m/s</span></>
+                         <>{fmtWt(e)}
+                         <span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'loadMode', value: 'velocity' }); }} style={{ fontSize: 8, opacity: 0.6, cursor: 'pointer' }}>→ m/s</span></>
                       )}
                     </span>
                     <span style={{ color: 'rgba(255,255,255,0.6)' }}>{GROUP_RU[e.group] || e.group}</span>
@@ -746,7 +761,7 @@ export const PlanDisplay: React.FC<Props> = ({
                       {(e as any).tempo ? (e as any).tempo : (overrideTempo || (tmpo as any).tempo?.toString?.() || '—')}{overrideTempo ? ' *' : ''}
                     </span>
                     <span onClick={() => startInline(di, ei, 'rest', e.rest)} style={{ cursor: 'text', color: 'rgba(255,255,255,0.6)' }}>{e.rest}с</span>
-                    <span style={{ display: 'flex', gap: 2 }}>
+                    <span style={{ display: 'flex', gap: 2, flex: '0 0 auto' }}>
                       <button onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); openSubstitute(di, ei); }} title="Замена" style={actionBtnStyle(ACCENT)}>🔄</button>
                       <button onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); const k = window.prompt('Шаблон (5×5, 3×8, 4×10, 3×12, AMRAP, Myo-rep, 10×10 GVT, 5/3/1):', '5×5'); if (k && SET_TEMPLATES[k]) applySetTemplate(di, ei, k); }} title="Шаблон" style={actionBtnStyle('#a855f7')}>⚡</button>
                     </span>

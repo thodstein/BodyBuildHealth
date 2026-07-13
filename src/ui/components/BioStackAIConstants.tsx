@@ -3,18 +3,51 @@ import { type GoalType, type HealthCondition, type BioStackProfile } from '../..
 import { type FinderProfile, type GoalType as FinderGoal } from '../../engines/supplement-finder.engine';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 
-export type BSTab = 'profile' | 'search' | 'build' | 'stack' | 'risks' | 'compare' | 'reports' | 'data';
+export type BSTab = 'profile' | 'select' | 'stack' | 'analysis' | 'risks' | 'reports';
 
 export const SUB_TABS: { id: BSTab; label: string }[] = [
   { id: 'profile', label: '👤 Профиль' },
-  { id: 'data', label: '🩺 Данные' },
-  { id: 'search', label: '🔍 Поиск' },
-  { id: 'build', label: '🧩 Сборка' },
+  { id: 'select', label: '🔬 Подбор' },
   { id: 'stack', label: '📋 Мой стек' },
-  { id: 'risks', label: '⚠ Риски и лаб.' },
-  { id: 'compare', label: '⚖ Сравнение и совм.' },
+  { id: 'analysis', label: '🔬 Анализ' },
+  { id: 'risks', label: '⚠ Риски' },
   { id: 'reports', label: '📊 Отчёты' },
 ];
+
+export const SUB_TAB_GROUPS: Record<string, { id: string; label: string }[]> = {
+  profile: [
+    { id: 'settings', label: '⚙️ Настройки' },
+    { id: 'auto', label: '🩺 Данные' },
+  ],
+  select: [
+    { id: 'search', label: '🔍 Поиск' },
+    { id: 'build', label: '🧩 Сборка' },
+    { id: 'clinical', label: '🔬 Клин.' },
+  ],
+  analysis: [
+    { id: 'interactions', label: '⚗️ Взаимод.' },
+    { id: 'dose', label: '💊 Доза' },
+    { id: 'timing', label: '⏰ Время' },
+    { id: 'clinical', label: '🩺 Клин.' },
+    { id: 'drugcheck', label: '💊 ЛС' },
+  ],
+  risks: [
+    { id: 'risks', label: '⚠ Риски' },
+    { id: 'compare', label: '⚖ Сравн.' },
+  ],
+  reports: [
+    { id: 'reports', label: '📊 Отчёты' },
+    { id: 'export', label: '📤 Экспорт' },
+  ],
+};
+
+export const DEFAULT_SUB: Record<string, string> = {
+  profile: 'settings',
+  select: 'search',
+  analysis: 'interactions',
+  risks: 'risks',
+  reports: 'reports',
+};
 
 export const GOALS: { key: GoalType; label: string }[] = [
   { key:'sleep', label:'😴 Сон' }, { key:'energy', label:'⚡ Энергия' },

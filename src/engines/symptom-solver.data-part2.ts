@@ -87,7 +87,7 @@ export const DB_PART2: SymptomEntry[] = [
           { substanceId: 'with_food', name: 'Принимать с едой (углеводы + белок)', type: 'lifestyle', dose: 'Таблетку с приёмом пищи', mechanism: 'Замедление абсорбции → ↓ пиковая нагрузка на печень + профилактика гипогликемии', evidenceLevel: 'B' },
           { substanceId: 'tudca', name: 'TUDCA', type: 'supplement', dose: '500-1000 мг/сут', mechanism: 'Гепатопротекция → ↓ ER-стресс → ↓ астения', evidenceLevel: 'A' },
           { substanceId: 'nac', name: 'NAC', type: 'supplement', dose: '1200-2400 мг/сут', mechanism: 'Восстановление глутатиона → детоксикация', evidenceLevel: 'A' },
-          { substanceId: 'milk_thistle', name: 'Расторопша', type: 'supplement', dose: '280 мг/сут', mechanism: 'Стабилизация мембран гепатоцитов', evidenceLevel: 'A' },
+          { substanceId: 'milk_thistle', name: 'Расторопша', type: 'supplement', dose: '280 мг/сут', mechanism: 'Стабилизация мембран гепатоцитов', evidenceLevel: 'B' },
           { substanceId: 'split_dose', name: 'Разделение суточной дозы', type: 'lifestyle', dose: '2 приёма вместо 1', mechanism: '↓ пиковая концентрация → ↓ нагрузка на печень за проход', evidenceLevel: 'C' },
           { substanceId: 'injectable', name: 'Переход на инъекционную форму', type: 'lifestyle', dose: '—', mechanism: 'Обход first-pass метаболизма → нулевая гепатотоксичность (для не-алкилированных)', evidenceLevel: 'A' },
         ],
@@ -149,7 +149,7 @@ export const DB_PART2: SymptomEntry[] = [
         ],
         solutions: [
           { substanceId: 'omega3', name: 'Омега-3 (EPA/DHA)', type: 'supplement', dose: '3-4 г/сут', mechanism: '↑ ЛПВП на 5-10%, ↓ ТГ на 20-30%', evidenceLevel: 'A' },
-          { substanceId: 'citrus_bergamot', name: 'Бергамот (цитрусовый экстракт)', type: 'supplement', dose: '500-1000 мг/сут', mechanism: '↑ ЛПВП на 20-30% через PPARα, ↓ ЛПНП', evidenceLevel: 'A' },
+          { substanceId: 'citrus_bergamot', name: 'Бергамот (цитрусовый экстракт)', type: 'supplement', dose: '500-1000 мг/сут', mechanism: '↑ ЛПВП на 20-30% через PPARα, ↓ ЛПНП', evidenceLevel: 'B' },
           { substanceId: 'red_yeast_rice', name: 'Красный дрожжевой рис (монаколин K)', type: 'supplement', dose: '1200 мг/сут', mechanism: 'Природный статин → ↓ ЛПНП на 15-25%', evidenceLevel: 'A' },
           { substanceId: 'niacin', name: 'Ниацин (B3) — НЕ ИНОЗИТОЛ ГЕКСАНИКОТИНАТ', type: 'supplement', dose: '500-1000 мг/сут (медленная титрация)', mechanism: '↑ ЛПВП на 15-35% (наиболее мощный ЛПВП-бустер)', evidenceLevel: 'A' },
           { substanceId: 'coq10', name: 'CoQ10', type: 'supplement', dose: '100-200 мг/сут', mechanism: 'Защита ЛПВП от окисления + необходимо при приёме статинов/красного риса', evidenceLevel: 'A' },
@@ -176,8 +176,8 @@ export const DB_PART2: SymptomEntry[] = [
         mechanism: 'Экзогенный T3 подавляет ТТГ через негативную обратную связь → щитовидная железа ↓ продукция T4/T3 + ↓ экспрессия NIS (натрий-йод симпортер). После отмены: ТТГ начинает расти через 1-2 нед, но щитовидная отвечает медленно → гипотиреозный промежуток 2-6 нед. Дозозависимо: >50 мкг/сут → более тяжёлый rebound.',
         labMarkers: [
           { marker: 'ТТГ', expectedChange: '↑', targetRange: '0.4-4.0 мМЕ/л', when: 'Каждые 2 нед после отмены' },
-          { marker: 'TT3', expectedChange: '↓', targetRange: '2.6-5.7 пмоль/л', when: 'Каждые 2 нед' },
-          { marker: 'TT4 свободный', expectedChange: '↓', targetRange: '9-22 пмоль/л', when: 'Каждые 2 нед' },
+          { marker: 'FT3', expectedChange: '↓', targetRange: '3.1-6.8 пмоль/л', when: 'Каждые 2 нед' },
+          { marker: 'FT4', expectedChange: '↓', targetRange: '9-22 пмоль/л', when: 'Каждые 2 нед' },
         ],
         solutions: [
           { substanceId: 'taper_t3', name: 'ТИТРАЦИЯ ВНИЗ (taper)', type: 'lifestyle', dose: '↓ на 12.5-25 мкг каждые 4-5 дней', mechanism: 'Постепенное ↓ → постепенное ↑ ТТГ → меньше гипотиреозный провал', evidenceLevel: 'A' },
@@ -199,7 +199,7 @@ export const DB_PART2: SymptomEntry[] = [
     id: 'acromegaly_signs', symptom: 'Рост костей лица / челюсти / кистей / стоп (GH-акромегалия)', category: 'musculoskeletal',
     urgency: 'critical', linkedDrugs: ['gh', 'igf1'],
     quickFacts: ['Необратимое изменение!', 'Первые признаки: увеличение размера обуви/перчаток', 'Рост нижней челюсти (прогнатизм) + диастема (щель между зубами)'],
-    generalInfo: 'Акромегалия — НЕОБРАТИМОЕ осложнение длительного приёма высоких доз GH. Характеризуется ростом костей лица (надбровные дуги, нижняя челюсть), кистей и стоп. В отличие от отёка (обратим), рост кости — постоянный. Ранние признаки: кольца/перчатки становятся малы, увеличивается размер обуви, меняется прикус. IGF-1 >400 нг/мл на постоянной основе — зона риска.',
+    generalInfo: 'Акромегалия — НЕОБРАТИМОЕ осложнение длительного приёма высоких доз GH. Характеризуется ростом костей лица (надбровные дуги, нижняя челюсть), кистей и стоп. В отличие от отёка (обратим), рост кости — постоянный. Ранние признаки: кольца/перчатки становятся малы, увеличивается размер обуви, меняется прикус. IGF-1 >300 нг/мл длительно — зона риска.',
     problems: [
       {
         problem: 'GH-индуцированная акромегалия (необратимый рост костей)', probability: 'medium',
@@ -218,7 +218,7 @@ export const DB_PART2: SymptomEntry[] = [
         expectations: [
           { timeline: 'Немедленно', effect: 'Первые признаки акромегалии → СНИЗИТЬ дозу GH. Не ждать.', sideNote: 'Рост костей НЕОБРАТИМ. То, что выросло — останется навсегда.' },
           { timeline: '1-3 мес', effect: 'Нормализация IGF-1 → остановка прогрессии', sideNote: 'Уже выросшие кости не уменьшатся. Только хирургическая коррекция.' },
-          { timeline: 'Постоянно', effect: 'GH безопасен только при IGF-1 в пределах возрастной нормы. Всё что выше — акромегалия.', sideNote: 'GH ≠ "фонтан молодости". GH в высоких дозах = гарантированная акромегалия через годы.' },
+          { timeline: 'Постоянно', effect: 'GH безопасен только при IGF-1 в пределах возрастной нормы. IGF-1 выше верхней границы референса длительно — риск акромегалии.', sideNote: 'GH ≠ "фонтан молодости". GH в высоких дозах = гарантированная акромегалия через годы.' },
         ],
       },
     ],
@@ -233,7 +233,7 @@ export const DB_PART2: SymptomEntry[] = [
       {
         problem: 'Холестатический зуд (накопление желчных кислот в коже)', probability: 'medium',
         mechanism: 'Блокада BSEP (17α-алкилированные ААС) → ↓ экскреция желчных кислот → ↑ их концентрация в крови → депонирование в коже → активация PAR-2 рецепторов в нервных окончаниях → зуд. + ↑ опиоидный тонус (центральный механизм зуда). ГГТ + ЩФ — первые маркеры.',
-        stopCriteria: ['ГГТ/ЩФ >3×ВГН + зуд — прекратить оральные ААС', 'Билирубин >50 ммоль/л — риск печёночной недостаточности', 'Желтуха (склеры/кожа) — НЕМЕДЛЕННО прекратить все гепатотоксичные препараты'],
+        stopCriteria: ['ГГТ/ЩФ >3×ВГН + зуд — прекратить оральные ААС', 'Билирубин >50 мкмоль/л — риск печёночной недостаточности', 'Желтуха (склеры/кожа) — НЕМЕДЛЕННО прекратить все гепатотоксичные препараты'],
         drugInteractions: ['Рифампицин + TUDCA — конкуренция за BSEP, снижение эффективности TUDCA', 'Холестирамин + TUDCA — сорбция TUDCA, интервал ≥4 ч', 'Опиоиды + холестаз — ↑ центрального компонента зуда'],
         labMarkers: [
           { marker: 'ГГТ', expectedChange: '↑↑', targetRange: '<55 Ед/л', when: 'НЕМЕДЛЕННО' },
@@ -334,7 +334,7 @@ export const DB_PART2: SymptomEntry[] = [
           { substanceId: 'stop_ai', name: 'ОТМЕНИТЬ AI (мастерон + AI = слишком)', type: 'lifestyle', dose: '—', mechanism: 'Мастерон уже ↓ E2. Добавление AI избыточно.', evidenceLevel: 'A' },
           { substanceId: 'add_test', name: '↑ тестостерон (больше субстрата для ароматизации)', type: 'pharma', dose: '+100-200 мг/нед', mechanism: 'Больше T → больше ароматизации → ↑ E2', evidenceLevel: 'B' },
           { substanceId: 'add_dhea', name: 'DHEA', type: 'supplement', dose: '50-100 мг/сут', mechanism: 'Предшественник для синтеза E2', evidenceLevel: 'C' },
-          { substanceId: 'collagen_type2', name: 'Коллаген II (UC-II)', type: 'supplement', dose: '40 мг/сут', mechanism: 'Симптоматическая поддержка суставов', evidenceLevel: 'A' },
+          { substanceId: 'collagen_type2', name: 'Коллаген II (UC-II)', type: 'supplement', dose: '40 мг/сут', mechanism: 'Симптоматическая поддержка суставов', evidenceLevel: 'B' },
         ],
         expectations: [
           { timeline: '3-5 дней', effect: 'Снижение дозы AI/мастерона + ↑ T: E2 начинает расти', sideNote: 'E2 вернётся быстрее при использовании тестостерона энантата (больше субстрата для ароматазы)' },
@@ -482,7 +482,7 @@ export const DB_PART2: SymptomEntry[] = [
         probability: 'high',
         mechanism: 'ААС повышают факторы свёртывания VIII и IX, ↑фибриноген, ↓антитромбин III, угнетают фибринолиз через ↑PAI-1. Высокий Hct усиливает стаз. Эстрогенный компонент добавляет риск (через ↑ангиотензиноген).',
         labMarkers: [
-          { marker: 'D-димер', expectedChange: '↑', targetRange: '<0.5 мкг FEU/мл', when: 'Контроль,积极探索' },
+          { marker: 'D-димер', expectedChange: '↑', targetRange: '<0.5 мкг FEU/мл', when: 'Контроль каждые 4-8 нед' },
           { marker: 'Антитромбин III', expectedChange: '↓', targetRange: '80-120%', when: 'Контроль' },
           { marker: 'Фибриноген', expectedChange: '↑', targetRange: '2-4 г/л', when: 'Контроль' },
           { marker: 'Гематокрит', expectedChange: '↑↑', targetRange: '<52%', when: 'Каждые 4 нед' },
@@ -496,7 +496,7 @@ export const DB_PART2: SymptomEntry[] = [
           { substanceId: 'garlic', name: 'Экстракт чеснока (аллицин)', type: 'supplement', dose: '600-1200 мг/день', mechanism: '↓тромбоксан, ↑NO, ↓фактор VIII', evidenceLevel: 'C' },
         ],
         expectations: [
-          { timeline: '2-4 нед', effect: 'Аспирин: ↓агрегация тромбоцитов (целевое ВАТ <200)' },
+          { timeline: '2-4 нед', effect: 'Аспирин: ↓агрегация тромбоцитов (целевое: снижение агрегации)' },
           { timeline: '4-8 нед', effect: 'Омега-3 и наттокиназа: ↓фибриноген на 10-15%' },
           { timeline: 'Курс', effect: 'Поддержание D-димера <0.5 ф.е./мл, антитромбина III >80%' },
         ],
@@ -679,7 +679,7 @@ export const DB_PART2: SymptomEntry[] = [
       {
         problem: 'ААС-индуцированная гломерулярная гиперфильтрация',
         probability: 'high',
-        mechanism: 'ААС повышают мышечную массу → ↑креатинин → ↑С小球ная фильтрация (GFR) → гломерулярная гипертензия → микроальбуминурия. Симпато-адреналовая активация + ↑АД вносят вклад.',
+        mechanism: 'ААС повышают мышечную массу → ↑креатинин сыворотки (функция СКФ при этом обычно сохранна) → гломерулярная гипертензия → микроальбуминурия. Симпато-адреналовая активация + ↑АД вносят вклад.',
         labMarkers: [
           { marker: 'Микроальбуминурия', expectedChange: '↑', targetRange: '<30 мг/сут', when: 'Каждые 8 нед' },
           { marker: 'Креатинин', expectedChange: '↑', targetRange: '70-110 мкмоль/л', when: 'Контроль' },
@@ -723,7 +723,7 @@ export const DB_PART2: SymptomEntry[] = [
     relatedSymptoms: ['kidney_pain', 'foamy_urine', 'back_pumps'],
     quickFacts: [
       'ААС повышают фильтрацию Ca, уратов → риск камней',
-      'Высокобелковая диета ↑кислотную нагрузку → Rakal',
+      'Высокобелковая диета ↑кислотную нагрузку → ↑риск уратных камней',
       'Гипергидратация (3-4 л/день) — простая профилактика',
     ],
     generalInfo: 'ААС-пользователи входят в группу риска мочекаменной болезни из-за повышенной мышечной массы → ↑креатинина, ↓цитрата (ингибитора кристаллизации), ↑кальция, ↑уратов.',
@@ -831,7 +831,7 @@ export const DB_PART2: SymptomEntry[] = [
     linkedDrugs: ['testosterone', 'trenbolone', 'insulin', 'gh'],
     relatedSymptoms: ['liver_pain', 'cholestatic_itch', 'orals_lethargy'],
     quickFacts: [
-      'Стеатоз — частое осложнение ААС + высокобелковой диеты +工会统',
+      'Стеатоз — частое осложнение ААС + высокобелковой диеты + дефицита холина',
       ' Стеатоз без лечения → стеатогепатит → фиброз → цирроз',
       'УЗИ: гиперэхогенная печень — ранний признак',
     ],
@@ -840,7 +840,7 @@ export const DB_PART2: SymptomEntry[] = [
       {
         problem: 'ААС+инсулин-индуцированная НАЖБП',
         probability: 'high',
-        mechanism: 'Инсулинорезистентность + ↑синтез липидов в печени + ↑∫оксидация→↓β-окисление→ накопление триглицеридов. GH снижает липолиз печени, но повышает IGF-1.',
+        mechanism: 'Инсулинорезистентность + ↑синтез липидов в печени + ↑окисление→↓β-окисление→ накопление триглицеридов. GH снижает липолиз печени, но повышает IGF-1.',
         labMarkers: [
           { marker: 'АЛТ', expectedChange: '↑', targetRange: '<40 Ед/л', when: 'Каждые 4 нед' },
           { marker: 'ГГТ', expectedChange: '↑↑', targetRange: '<55 Ед/л', when: 'Каждые 4 нед' },
@@ -866,7 +866,7 @@ export const DB_PART2: SymptomEntry[] = [
     symptom: 'Застой желчи / дискинезия желчного пузыря',
     category: 'hepatic',
     urgency: 'warning',
-    linkedDrugs: ['testosterone', 'trenbolon', 'estrogen_blockers'],
+    linkedDrugs: ['testosterone', 'trenbolone', 'estrogen_blockers'],
     relatedSymptoms: ['cholestatic_itch', 'nausea', 'bloating', 'liver_pain'],
     quickFacts: [
       'ЖКБ (желчекаменная) в 2 раза чаще на курсе ААС + AI',
@@ -932,7 +932,7 @@ export const DB_PART2: SymptomEntry[] = [
       {
         problem: 'Истинное печёночное повреждениe',
         probability: 'medium',
-        mechanism: '17α-алкил ААС → гепатотоксичность → ↑АЛТ/ГГТ. Тренболон не肾上-алкил, но тоже негативно влияет.',
+        mechanism: '17α-алкил ААС → гепатотоксичность → ↑АЛТ/ГГТ. Тренболон не 17α-алкил, но тоже негативно влияет.',
         labMarkers: [
           { marker: 'ГГТ', expectedChange: '↑↑', targetRange: '<55 Ед/л', when: 'Каждые 4 нед' },
           { marker: 'Билирубин', expectedChange: '↑', targetRange: '<21 мкмоль/л', when: 'Контроль' },

@@ -95,7 +95,7 @@ export const ToolsPanel: React.FC<Props> = ({
       lines.push(''); lines.push(`═ НЕДЕЛЯ ${w.weekNumber} — ${w.phaseLabel} · RIR ${w.rir} ═`);
       w.days.forEach(d => {
         lines.push(''); lines.push(`  День ${d.day} (${d.groups.map(g => GROUP_RU[g] || g).join(', ')})`);
-        d.exercises.forEach(e => lines.push(`    ${e.name} — ${e.sets}×${e.reps} @ RIR${e.rir} · ${e.weight} кг · ${e.rest}с`));
+        d.exercises.forEach(e => lines.push(`    ${e.name} — ${e.sets}×${e.reps} @ RIR${e.rir} · ${e.weightNote || (e.weight + ' кг')} · ${e.rest}с`));
       });
     });
     try { navigator.clipboard?.writeText(lines.join('\n')); } catch {}
@@ -119,14 +119,14 @@ export const ToolsPanel: React.FC<Props> = ({
     const lines: string[] = ['Тренировочный план: ' + result.splitName];
     lines.push('Уровень: ' + level + ' · Цель: ' + goal + ' · Дней/нед: ' + daysPerWeek + ' · Длина: ' + mesoLength + ' нед');
     if (result.corrections?.length) { lines.push(''); lines.push('Комментарии:'); result.corrections.forEach(c => lines.push('  • ' + c)); }
-    result.days.forEach(d => { lines.push(''); lines.push('День ' + d.day + ' (' + d.groups.map(g => GROUP_RU[g] || g).join(', ') + ')'); d.exercises.forEach(e => lines.push('  ' + e.name + ' — ' + e.sets + 'x' + e.reps + ' @ RIR' + e.rir + ' · ' + e.weight + ' кг · ' + e.rest + 'с (' + e.group + ')')); });
+    result.days.forEach(d => { lines.push(''); lines.push('День ' + d.day + ' (' + d.groups.map(g => GROUP_RU[g] || g).join(', ') + ')'); d.exercises.forEach(e => lines.push('  ' + e.name + ' — ' + e.sets + 'x' + e.reps + ' @ RIR' + e.rir + ' · ' + (e.weightNote || (e.weight + ' кг')) + ' · ' + e.rest + 'с (' + e.group + ')')); });
     try { navigator.clipboard?.writeText(lines.join('\n')); } catch {}
     setPlanCopied(true); setTimeout(() => setPlanCopied(false), 1800);
   }, [result, level, goal, daysPerWeek, mesoLength]);
 
   const printPlan = useCallback(() => {
     if (!result) return;
-    const rows = result.days.map(d => '<h3>День ' + d.day + ' (' + d.groups.map(g => GROUP_RU[g] || g).join(', ') + ')</h3><table border=1 cellpadding=4 style=border-collapse:collapse;width:100%><tr><th>Упражнение</th><th>С×П</th><th>RIR</th><th>Вес</th><th>Отдых</th></tr>' + d.exercises.map(e => '<tr><td>' + e.name + '</td><td>' + e.sets + '×' + e.reps + '</td><td>' + e.rir + '</td><td>' + e.weight + ' кг</td><td>' + e.rest + 'с</td></tr>').join('') + '</table>').join('');
+    const rows = result.days.map(d => '<h3>День ' + d.day + ' (' + d.groups.map(g => GROUP_RU[g] || g).join(', ') + ')</h3><table border=1 cellpadding=4 style=border-collapse:collapse;width:100%><tr><th>Упражнение</th><th>С×П</th><th>RIR</th><th>Вес</th><th>Отдых</th></tr>' + d.exercises.map(e => '<tr><td>' + e.name + '</td><td>' + e.sets + '×' + e.reps + '</td><td>' + e.rir + '</td><td>' + (e.weightNote || (e.weight + ' кг')) + '</td><td>' + e.rest + 'с</td></tr>').join('') + '</table>').join('');
     const html = '<html><head><meta charset=utf-8><title>' + result.splitName + '</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#111}h1{color:#008}h3{margin-top:14px;color:#060}table{font-size:12px}</style></head><body><h1>' + result.splitName + '</h1><p>Уровень: ' + level + ' · Цель: ' + goal + ' · ' + daysPerWeek + ' дн/нед · ' + mesoLength + ' нед</p>' + rows + '</body></html>';
     const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(() => w.print(), 300); }
   }, [result, level, goal, daysPerWeek, mesoLength]);

@@ -193,7 +193,12 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
                 <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
                   <button onClick={()=>loadPlan(plan)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(0,230,138,0.2)',background:'rgba(0,230,138,0.08)',color:'var(--accent)',fontSize:8,cursor:'pointer'}}>Загрузить</button>
                   <button onClick={()=>setCustomExercises(prev=>[...prev, ...plan.exercises])} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(139,92,246,0.2)',background:'rgba(139,92,246,0.08)',color:'#8b5cf6',fontSize:8,cursor:'pointer'}}>➕ В мою</button>
-                  <button onClick={() => { applyToPlanner({ kind: 'split', label: plan.name, data: plan.exercises.map(e => ({ name: e.name, sets: e.sets, reps: e.reps, rir: e.rir })) }); if (onLoadToConstructor) onLoadToConstructor({ name: plan.name, exercises: plan.exercises }); }} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(168,85,247,0.2)',background:'rgba(168,85,247,0.08)',color:'#a855f7',fontSize:8,cursor:'pointer',fontWeight:700}}>📥 В конструктор</button>
+                  <button onClick={() => {
+                    const exs = Array.isArray((plan as any).exercises) ? (plan as any).exercises : (Array.isArray((plan as any).days) ? (plan as any).days.flatMap((d:any)=>d.exercises||[]) : []);
+                    const data = exs.map((e:any) => ({ name: e.name, sets: e.sets || e.sets || 3, reps: e.reps || 10, rir: e.rir ?? 2 }));
+                    applyToPlanner({ kind: 'split', label: plan.name, data });
+                    if (onLoadToConstructor) onLoadToConstructor({ name: plan.name, exercises: exs });
+                  }} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(168,85,247,0.2)',background:'rgba(168,85,247,0.08)',color:'#a855f7',fontSize:8,cursor:'pointer',fontWeight:700}}>📥 В конструктор</button>
                   <button onClick={()=>deletePlan(plan.id)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:8,cursor:'pointer'}}>Удалить</button>
                 </div>
               </div>

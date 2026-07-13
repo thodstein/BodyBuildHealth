@@ -15,6 +15,7 @@ import {
 } from '../../engines/biostack-clinical-v2.engine';
 import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
 import type { LinkedData } from '../../core/data-link';
+import { ClinicalResultCard } from './BioStackAIClinicalCard';
 
 type LMState = Record<string, 'off' | 'maintain' | 'correct'>;
 
@@ -614,72 +615,7 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
         );
       })()}
 
-      {(() => {
-        if (!gates) return null;
-        const g = gates;
-        const slots = g.schedule || [];
-        const hasHard = g.hardStops.length > 0;
-        const ulWarn = (g.ulWarnings || []).map(w => w.message).filter((w: string) => /верх|превыш|избыт/i.test(w));
-        return (
-          <div style={{ padding: '8px 10px', borderRadius: 8, marginBottom: 6,
-            background: hasHard ? 'rgba(239,68,68,0.07)' : 'rgba(0,230,138,0.05)',
-            border: `1px solid ${hasHard ? 'rgba(239,68,68,0.14)' : 'rgba(0,230,138,0.1)'}` }}>
-            <div style={{ fontSize: 8, fontWeight: 700, color: hasHard ? '#ef4444' : '#00e68a', marginBottom: 4 }}>
-              🩺 Клинический контроль (доказательность × безопасность)
-            </div>
-            {hasHard && (
-              <div style={{ fontSize: 8, color: '#f87171', lineHeight: 1.3, marginBottom: 4 }}>
-                🛑 Блокировано по абсолютным противопоказаниям:
-                {g.hardStops.map((h, i) => (
-                  <div key={i}>• {h.substanceName}: {h.reason}</div>
-                ))}
-              </div>
-            )}
-            {ulWarn.length > 0 && (
-              <div style={{ fontSize: 8, color: '#f59e0b', lineHeight: 1.3, marginBottom: 4 }}>
-                ⚠ Превышение верхних безопасных доз (UL):
-                {ulWarn.map((w, i) => (
-                  <div key={i}>• {w}</div>
-                ))}
-              </div>
-            )}
-            {g.labAdjustments.length > 0 && (
-              <div style={{ fontSize: 8, color: '#60a5fa', lineHeight: 1.3, marginBottom: 4 }}>
-                🧪 Коррекция по анализам:
-                {g.labAdjustments.map((a, i) => (
-                  <div key={i}>• {a.name}: {a.reason}</div>
-                ))}
-              </div>
-            )}
-            {g.redundancy.length > 0 && (
-              <div style={{ fontSize: 8, color: '#f59e0b', lineHeight: 1.3, marginBottom: 4 }}>
-                🔁 Избыточное дублирование путей:
-                {g.redundancy.map((r, i) => (
-                  <div key={i}>• {r.pathway}: {r.names.join(', ')} — {r.message}</div>
-                ))}
-              </div>
-            )}
-            {slots.length > 0 && (
-              <div style={{ marginBottom: 4 }}>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', marginBottom: 2 }}>🕐 Расписание приёма:</div>
-                {slots.map((sl, i) => (
-                  <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>
-                    <b style={{ color: '#00e68a' }}>{sl.time === 'morning' ? 'Утро' : sl.time === 'afternoon' ? 'День' : sl.time === 'evening' ? 'Вечер' : 'Ночь'}:</b> {sl.names.join(', ')}
-                  </div>
-                ))}
-              </div>
-            )}
-            {g.cycling.length > 0 && (
-              <div style={{ fontSize: 8, color: '#8b5cf6', lineHeight: 1.3 }}>
-                🔄 Циклирование:
-                {g.cycling.map((c, i) => (
-                  <div key={i}>• {c.name}: {c.cycleNote}</div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {gates && <ClinicalResultCard result={gates} />}
 
       {/* ─── Result ─── */}
       {result && (

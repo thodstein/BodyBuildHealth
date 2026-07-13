@@ -2,7 +2,7 @@
 /**
  * SupportProtocols.tsx — SHELL: renders menu or selected protocol module
  */
-import React, { useState } from 'react';
+import React from 'react';
 import { FertilityPCTScreen } from '../FertilityPCTScreen';
 import { InfoErrorBoundary } from './SupportScreenData';
 import { SymptomSolverTab } from './SymptomSolverTab';
@@ -36,20 +36,15 @@ import { SupportProtocolPostCycle } from './supportProtocolPostCycle';
 
 export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const { protocolTab, setProtocolTab, protocolView, setProtocolView } = s;
-
-  const [activeProtocolCount, setActiveProtocolCount] = useState(0);
-  const polypharmNote = activeProtocolCount > 3
-    ? <div style={{ borderRadius:8, padding:10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', marginBottom:8 }}>
-        <div style={{ fontSize:9, fontWeight:700, color:'#ef4444', marginBottom:2 }}>⚠️ Полипрагмазия: активных протоколов {'>'}3 ({activeProtocolCount})</div>
-        <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3 }}>• CYP450-конкуренция: NAC + TUDCA (UGT2B7), берберин + статины (CYP3A4), омега-3 + аспирин (риск кровотечения)<br/>• Разделите NAC и TUDCA на 2 ч, берберин и статины — на 4 ч<br/>• При ≥15 препаратов — риск полипрагмазии: ↓ до 7-10 core</div>
-      </div>
-    : null;
+  const activeCard = PROTOCOL_CARDS.find((p:any)=>p.id===protocolTab);
+  const isReferenceModule = activeCard?.kind === 'reference';
 
   return (
     <div style={{ padding:'0 0 70px' }}>
       {protocolView === 'menu' ? (
         <div>
-          <div style={{ fontSize:14, fontWeight:800, color:'var(--text-light)', marginBottom:8 }}>📋 Выберите протокол поддержки</div>
+          <div style={{ fontSize:14, fontWeight:800, color:'var(--text-light)', marginBottom:2 }}>📋 Выберите протокол поддержки</div>
+          <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:8, lineHeight:1.3 }}>Доступно протоколов: <b style={{color:'#22c55e'}}>{PROTOCOL_CARDS.length}</b> систем органов. Органные протоколы — фазовая модель (1→4) по лабораторным порогам; справочники (пептиды, инъекции, симптомы) — по показаниям.</div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             {PROTOCOL_CARDS.map(p => (
               <button key={p.id} onClick={() => { setProtocolTab(p.id); setProtocolView('detail'); }}
@@ -66,6 +61,10 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
                   </div>
                 </div>
                 <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginTop:3 }}>
+                  {p.kind === 'reference' && (
+                    <span style={{ fontSize:6, fontWeight:600, padding:'1px 5px', borderRadius:4,
+                      background:'#64748b22', color:'#94a3b8' }}>справочник</span>
+                  )}
                   {p.tags.map((t: any, ti: number) => (
                     <span key={ti} style={{ fontSize:6, fontWeight:600, padding:'1px 5px', borderRadius:4,
                       background:p.color+'18', color:p.color }}>{t}</span>
@@ -85,6 +84,13 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
           <div style={{ borderRadius:10, padding:10, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)', marginBottom:8 }}>
             <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}>
               <b style={{color:'#f59e0b'}}>⚠️ Информация ознакомительная.</b> Подбор — врачом. Без лаборатории — среднестатистические риски. 💊 = рецептурный, требует врача.
+            </div>
+            <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3, marginTop:4 }}>
+              {isReferenceModule ? (
+                <>Справочник: <b style={{color:'#22c55e'}}>{activeCard?.label ?? protocolTab}</b> · информация по показаниям, не является фазовым протоколом.</>
+              ) : (
+                <>Активный протокол: <b style={{color:'#22c55e'}}>{activeCard?.label ?? protocolTab}</b> · фазовая модель 1→4. Назначайте по лабораторным порогам из карточек выше.</>
+              )}
             </div>
           </div>
 
@@ -121,13 +127,13 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
           {protocolTab === 'peptide' && <SupportProtocolPeptide s={s} />}
           {protocolTab === 'postcycle' && <SupportProtocolPostCycle s={s} />}
 
+
           {protocolTab === 'symptoms' && (
             <div style={{ padding: '0 0 0' }}>
               <SymptomSolverTab s={s} />
             </div>
           )}
 
-          {polypharmNote}
         </div>
       )}
     </div>

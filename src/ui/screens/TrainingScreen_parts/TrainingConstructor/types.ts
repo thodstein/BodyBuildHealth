@@ -103,6 +103,7 @@ export interface ManualExercise {
   rest: number;
   group: string;
   weight: number;
+  weightNote?: string;
   role?: 'main' | 'secondary' | 'accessory';
   pattern?: string;
   loadMode?: 'weight' | 'velocity';

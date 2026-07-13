@@ -22,6 +22,10 @@ import type { PEDAdaptation } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findSubstitutions } from '../exercise-substitution.engine';
+// Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
+// Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
+// реализация, которую использует и ручной конструктор (phase-periodization).
+import { distributePhases, PHASE_CONFIGS, getPhaseVolumeMult, type BBPhase } from '../../ui/screens/TrainingScreen_parts/TrainingConstructor/phase-periodization';
 
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
 export type BBVolumeGoal = 'mev' | 'mav' | 'mrv';
@@ -140,6 +144,30 @@ function musclesForTag(tag?: string): string[] {
   if (TAG_MUSCLES[tag]) return TAG_MUSCLES[tag];
   return [];
 }
+/** fix Z: ключ коллапса для дедупликации.
+ *  delt_front/mid/rear — три пучка одной мышцы (shoulders), один пул упражнений →
+ *  обрабатываем ОДИН раз как 'shoulders'. Остальные PRO-ключи остаются как есть
+ *  (calves/glutes/forearms имеют собственные landmark-записи). */
+function collapseKey(muscle: string): string {
+  if (muscle === 'delt_front' || muscle === 'delt_mid' || muscle === 'delt_rear') return 'shoulders';
+  return muscle;
+}
+/** fix Z: дедуплицирует PRO-ключи тега по collapseKey.
+ *  Возвращает {group, repKey}: group = collapseKey (ключ для volumeRotation/output),
+ *  repKey = первый PRO-ключ группы (для workMax/FORCE_HEAVY.pool). */
+interface MuscleGroupPlan { group: string; repKey: string; }
+function dedupeMuscles(tag: string | undefined, excluded: Set<string>): MuscleGroupPlan[] {
+  const out: MuscleGroupPlan[] = [];
+  const seen = new Set<string>();
+  for (const m of musclesForTag(tag)) {
+    if (excluded.has(m)) continue;
+    const ck = collapseKey(m);
+    if (seen.has(ck)) continue;
+    seen.add(ck);
+    out.push({ group: ck, repKey: m });
+  }
+  return out;
+}
 
 // Коэффициенты workMax для PRO-мышц (% от родительской группы)
 const PRO_WORKMAX_RATIO: Record<string, (wm: Record<string, number>) => number> = {
@@ -156,10 +184,61 @@ function charReps(c: DayCharacter): [number, number] {
   if (c === 'памп') return [12, 20];
   return [10, 15];
 }
-function charRir(c: DayCharacter, week: number): number {
-  if (c === 'лёг') return 4;
-  const base = c === 'тяж' ? 2 : 3;
-  return Math.max(0, base - Math.floor((week - 1) / 2));
+/** Базовый RIR фазы (с дрейфом внутри фазы, как в phase-periodization). */
+function phaseBaseRir(phase: BBPhase, phaseWeek: number): number {
+  const [startRir, endRir] = PHASE_CONFIGS[phase].rirRange;
+  const drift = Math.min(startRir - endRir, Math.floor(phaseWeek / 2));
+  return Math.max(endRir, startRir - drift);
+}
+/**
+ * RIR упражнения в ББ-плане = фаза (distributePhases) + характер дня.
+ * Тяжёлый день — самый низкий RIR (труднее), памп/лёгкий — на +1 выше.
+ * В делоде RIR принудительно лёгкий (3-4).
+ */
+function bbRir(resolved: DayCharacter, phase: BBPhase, phaseWeek: number): number {
+  const base = phaseBaseRir(phase, phaseWeek);
+  let rir = resolved === 'тяж' ? base : base + 1;
+  if (phase === 'deload') rir = Math.max(3, Math.min(4, rir));
+  return Math.max(0, Math.min(5, rir));
+}
+
+/** Группы, получающие 2 изолирующих упражнения (акцент детализации) — fix B.
+ *  Покрываем и PRO-ключи (delt_front/biceps…), и group-ключи (shoulders/arms…),
+ *  поскольку в плане могут использоваться оба вида. */
+const ACCESSORY_2X_GROUPS = new Set<string>([
+  'delt_front', 'delt_mid', 'delt_rear', 'biceps', 'triceps', 'forearms',
+  'shoulders', 'arms', 'calves', 'abs',
+]);
+/**
+ * Доля объёма мышцы на ОДНУ сессию (fix C):
+ * - 1 сессия/нед → вся цель на эту сессию (было 65% — терялись 35%);
+ * - ≥2 сессии → primary забирает бОльшую долю, accessory — меньшую.
+ * Итоговый недельный объём дополнительно капается по MRV в normalizeWeekMrv.
+ */
+function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary' | 'accessory'): number {
+  if (sessionsPerWeek <= 1) return Math.round(mavRot);
+  const base = mavRot / sessionsPerWeek;
+  const factor = role === 'primary' ? 1.5 : 0.75;
+  return Math.max(1, Math.round(base * factor));
+}
+
+/** fix D: недельный кап объёма каждой мышцы по её истинному MRV (после всех множителей). */
+function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string, number>): void {
+  const sums: Record<string, { total: number; exs: BBExercise[] }> = {};
+  for (const s of weekSessions) {
+    for (const ex of s.exercises) {
+      const info = sums[ex.muscle] || (sums[ex.muscle] = { total: 0, exs: [] });
+      info.total += ex.sets;
+      info.exs.push(ex);
+    }
+  }
+  for (const [m, info] of Object.entries(sums)) {
+    const cap = mrvByMuscle[m];
+    if (cap && info.total > cap) {
+      const factor = cap / info.total;
+      for (const ex of info.exs) ex.sets = Math.max(1, Math.round(ex.sets * factor));
+    }
+  }
 }
 
 function buildSession(
@@ -176,9 +255,12 @@ function buildSession(
   excludedMuscles: Set<string> = new Set(),
   gradedInjuries: Injury[] = [],
   today: string = '',
+  phase: BBPhase = 'accumulation',
+  phaseWeek: number = 1,
+  mrvRot: number = 0,
 ): BBSession {
   const character = sched.character as DayCharacter;
-  const muscles = musclesForTag(sched.sessionTag);
+  const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles);
   const exercises: BBExercise[] = [];
   
   // S-MRV: Системный бюджет утомления на день.
@@ -195,37 +277,52 @@ function buildSession(
   }
   const plans: MusclePlan[] = [];
   let totalExpectedFatigue = 0;
+  const sessionSelectedIds: string[] = [];
+  const sessionSelectedNames: string[] = [];
   
-  for (const muscle of muscles) {
-    // Полностью исключённые группы пропускаем
-    if (excludedMuscles.has(muscle)) continue;
+  for (const mp of musclePlans) {
+    const muscle = mp.group;      // каталог-группа (shoulders/arms/back/legs/core…)
+    const repKey = mp.repKey;     // первый PRO-ключ группы (delt_front/biceps/…)
+    // Полностью исключённые группы пропускаем (dedupeMuscles уже отфильтровал, дублируем страховку)
+    if (excludedMuscles.has(repKey)) continue;
     // Градированные травмы: не пропускаем, но применим замену ниже
-    const isGraded = gradedInjuries.some(inj => inj.muscle === muscle);
-    const injuryFactor = gradedInjuries.find(inj => inj.muscle === muscle);
+    const isGraded = gradedInjuries.some(inj => catalogGroupFor(inj.muscle) === muscle);
+    const injuryFactor = gradedInjuries.find(inj => catalogGroupFor(inj.muscle) === muscle);
 
-    const resolved = resolveCharacter(muscle, character);
+    const resolved = resolveCharacter(repKey, character);
     let role: 'primary' | 'accessory' = 'accessory';
     if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж')) {
       role = 'primary'; musclePrimaryAssigned.add(muscle);
     }
     const mavRot = muscleVolumeRotation[muscle] || 0;
-    let sets = Math.max(1, Math.round(mavRot * (role === 'primary' ? 0.65 : 0.35)));
+    const sessionsForMuscle = muscleSessionCount[muscle] || 1;
+    let sets = sessionShareFor(mavRot, sessionsForMuscle, role);
     if (isWeak(muscle, weakPoints)) sets = Math.round(sets * 1.2);
     if (focusGroup === muscle || (focusGroup && isWeak(muscle, [focusGroup]))) sets = Math.round(sets * 1.3);
+    // Фазовая модуляция объёма (deload/intensification/peaking снижают)
+    sets = Math.round(sets * getPhaseVolumeMult(phase));
+    // MRV-кап: одна сессия не превышает недельный MRV мышцы (fix D)
+    if (mrvRot > 0) sets = Math.max(1, Math.min(sets, mrvRot));
     const [rmin, rmax] = charReps(resolved);
-    const rir = charRir(resolved, week);
-    const wm = workMax[muscle] || PRO_WORKMAX_RATIO[muscle]?.(workMax) || 80;
+    const rir = bbRir(resolved, phase, phaseWeek);
+    const wm = workMax[repKey] || PRO_WORKMAX_RATIO[repKey]?.(workMax) || 80;
     const pct = PCT_FOR_RIR[rir] ?? 0.9;
     const reps = Math.round((rmin + rmax) / 2);
     const weight = Math.round(wm * pct * 10) / 10;
-    const exerciseCount = role === 'primary' ? (['back', 'quads', 'chest'].includes(muscle) ? 3 : 2) : 1;
+    const accessoryCount = ACCESSORY_2X_GROUPS.has(muscle) ? 2 : 1;
+    const exerciseCount = role === 'primary'
+      ? (['back', 'quads', 'chest'].includes(muscle) ? 3 : 2)
+      : accessoryCount;
     const selType = ALWAYS_ISOLATION.has(muscle) ? 'isolation' : (role === 'primary' ? 'compound' : 'isolation');
-    const pool = getExercisesByGroup(catalogGroupFor(muscle));
+    const pool = getExercisesByGroup(catalogGroupFor(repKey));
     const selected = selectExercisesSmart({
       candidates: pool, muscleGroup: muscle, count: exerciseCount,
-      selectedIds: [], equipment: [], weakZones: weakPoints, level, injuryProfile, type: selType,
+      selectedIds: sessionSelectedIds, selectedNames: sessionSelectedNames,
+      equipment: [], weakZones: weakPoints, level, injuryProfile, type: selType,
       targetRir: rir,
+      preferBB: true,
     });
+    for (const s of selected) { if (s && s.id) sessionSelectedIds.push(s.id); if (s && s.name) sessionSelectedNames.push(s.name); }
     const exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5 }];
     const expectedFatigue = exerciseCount * (sets / exerciseCount) * (((exDatas[0] as any)?.fatigueCost || 5));
     totalExpectedFatigue += expectedFatigue;
@@ -234,8 +331,8 @@ function buildSession(
 
   // Apply substitution for graded injuries: replace exercises and adjust loads
   for (const pl of plans) {
-    const isGraded = gradedInjuries.some(inj => inj.muscle === pl.muscle);
-    const injuryFactor = gradedInjuries.find(inj => inj.muscle === pl.muscle);
+    const isGraded = gradedInjuries.some(inj => collapseKey(inj.muscle) === pl.muscle);
+    const injuryFactor = gradedInjuries.find(inj => collapseKey(inj.muscle) === pl.muscle);
     if (isGraded && injuryFactor) {
       const postInjuryVolPct = getInjuryVolumeFactor(injuryFactor, today || todayStr());
       const postInjuryWtPct = injuryFactor.weightPct ?? 1.0;
@@ -258,7 +355,10 @@ function buildSession(
           newExDatas.push(exData);
         }
       }
-      pl.exDatas = newExDatas;
+      // Ограничиваем пул замен исходным числом упражнений (exerciseCount),
+      // иначе изолированная мышца при травме раздувается до 2-3 упражнений
+      // (findSubstitutions возвращает до 3 кандидатов) — объём РАСТЁТ вместо снижения.
+      pl.exDatas = newExDatas.slice(0, pl.exerciseCount);
     }
   }
 
@@ -266,7 +366,7 @@ function buildSession(
   for (const pl of plans) {
     const muscleBudget = totalExpectedFatigue > 0
       ? Math.floor(dayFatigueBudget * pl.exerciseCount * Math.max(1, Math.round(pl.sets / pl.exerciseCount)) * ((pl.exDatas[0] as any)?.fatigueCost || 5) / totalExpectedFatigue)
-      : Math.floor(dayFatigueBudget / muscles.length);
+      : Math.floor(dayFatigueBudget / Math.max(1, plans.length));
     let remainingBudget = Math.max(1, Math.min(muscleBudget, Math.floor(dayFatigueBudget * 0.5))); // cap at 50% total to avoid one group hogging
     
     for (const exData of pl.exDatas) {
@@ -339,16 +439,19 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const injuredMuscles = new Set([...excludedMuscles, ...gradedInjuries.map(inj => inj.muscle)]);
   const injuryProfile = [...injuredMuscles];
 
-  // Вычисляем dailyCap (max групп в день) для S-MRV-бюджета
-  const maxGroupsPerSession = Math.max(1, ...sessions.map(s => musclesForTag(s.sessionTag).filter(m => !excludedMuscles.has(m) && !gradedInjuries.some(g => g.muscle === m)).length));
+  // Вычисляем dailyCap (max групп в день) для S-MRV-бюджета — по дедуплицированным каталог-группам (fix Z)
+  const maxGroupsPerSession = Math.max(1, ...sessions.map(s => dedupeMuscles(s.sessionTag, excludedMuscles).length));
   const dailyCap = Math.max(10, Math.min(16, Math.round(8 + maxGroupsPerSession * 2)));
 
+  // fix Z: muscleSessionCount ключом является collapseKey (delt heads→shoulders, остальные как есть)
   const muscleSessionCount: Record<string, number> = {};
   for (const s of sessions) for (const m of musclesForTag(s.sessionTag)) {
-    if (!excludedMuscles.has(m)) muscleSessionCount[m] = (muscleSessionCount[m] || 0) + 1;
+    const ck = collapseKey(m);
+    if (!excludedMuscles.has(m)) muscleSessionCount[ck] = (muscleSessionCount[ck] || 0) + 1;
   }
 
   const muscleVolumeRotation: Record<string, number> = {};
+  const mrvByMuscle: Record<string, number> = {};
   const specWeak = input.specialization ? expandWeakForSpecialization(input.weakPoints || []).slice(0, 2) : [];
   for (const m of Object.keys(muscleSessionCount)) {
     const lm = landmarksForRotation(level, m, pattern.rotationDays);
@@ -365,19 +468,35 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       if (input.goal === 'cut') v = Math.round(v * 0.9);
       if (input.goal === 'mass' || input.goal === 'strength_mass') v = Math.round(v * 1.1);
       muscleVolumeRotation[m] = v;
+      mrvByMuscle[m] = lm.mrv; // истинный MRV — потолок для капа (fix D)
     }
   }
+
+  // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/deload (fix A)
+  const deloadFreq = input.weeks >= 6 ? 4 : 0;
+  const phaseDist = distributePhases(input.weeks, deloadFreq, input.goal === 'strength_mass' ? 'mass' : (input.goal || 'mass'));
+  const phaseByWeek = new Map<number, BBPhase>();
+  for (const pd of phaseDist) phaseByWeek.set(pd.startWeek, pd.phase);
+  const phaseWeekCounter: Record<string, number> = { accumulation: 0, intensification: 0, deload: 0, peaking: 0 };
 
   const weeks: BBWeek[] = [];
   for (let w = 1; w <= input.weeks; w++) {
     const musclePrimaryAssigned = new Set<string>(); // ← сбрасывается КАЖДУЮ неделю
     const weekSessions: BBSession[] = [];
+    const phase = phaseByWeek.get(w) || 'accumulation';
+    phaseWeekCounter[phase] = (phaseWeekCounter[phase] || 0) + 1;
+    const phaseWeek = phaseWeekCounter[phase];
     for (let i = 0; i < sessions.length; i++) {
       const s = sessions[i];
-      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, dailyCap, level, injuryProfile, new Set(injuryProfile), excludedMuscles, gradedInjuries, today);
+      // fix Z: sessMuscles по collapseKey (delt heads→shoulders) для mrvByMuscle-lookup
+      const sessMuscles = [...new Set(musclesForTag(s.sessionTag).map(m => collapseKey(m)))];
+      const mrvRot = Math.max(12, ...sessMuscles.map(m => mrvByMuscle[m] || 0));
+      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, dailyCap, level, injuryProfile, new Set(injuryProfile), excludedMuscles, gradedInjuries, today, phase, phaseWeek, mrvRot);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       weekSessions.push(sess);
     }
+    // fix D: капаем недельный объём каждой мышцы по её истинному MRV
+    normalizeWeekMrv(weekSessions, mrvByMuscle);
     weeks.push({ week: w, sessions: weekSessions });
   }
 
@@ -386,8 +505,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     `Уровень ${level}, цель ${input.goal}, ${input.weeks} нед`,
     `Объём ${input.volumeGoal || 'MAV'}: ` + Object.entries(muscleVolumeRotation).map(([m, v]) => `${m}=${v}`).join(', '),
     `Специализация: ${focusGroup || 'нет'}`,
-    `RIR-прогрессия: тяж 2→0, памп 3→2 к пику; вес = workMax×%1RM(RIR)`,
-    `S-MRV: автоматический кап объёма на основе бюджета утомления сессии.`,
+    `Фазовая периодизация (distributePhases): накопление → интенсификация${deloadFreq > 0 ? ' → разгрузка (deload)' : ''} (RIR по фазе + волна); вес = workMax×%1RM(RIR)`,
+    `S-MRV: автоматический кап объёма на основе бюджета утомления сессии + потолок по MRV мышцы.`,
     ...(pedAdapt ? [`PED-адаптация: MRV×${pedAdapt.combinedMrvMultiplier.toFixed(2)}, восстановление×${pedAdapt.combinedRecoveryMultiplier.toFixed(2)}`] : []),
     ...(excludedMuscles.size > 0 ? [`Травмы: исключены ${[...excludedMuscles].join(', ')} — упражнения на эти группы не назначаются.`] : []),
     ...(gradedInjuries.length > 0 ? [`Градированные травмы: ${gradedInjuries.map(i => i.muscle).join(', ')} — упражнения заменены на безопасные альтернативы с пониженным весом/объёмом.`] : []),

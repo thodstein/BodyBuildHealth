@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolThyroid: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -12,6 +12,13 @@ export const SupportProtocolThyroid: React.FC<{ s: Record<string, any> }> = ({ s
                 <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:2 }}>🦋 Тиреоидная поддержка на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Контроль функции щитовидной железы: T3, T4, ТТГ. ААС могут подавлять ось HPTA и влиять на метаболизм тиреоидных гормонов.</p>
               </div>
+
+              <ContraBanner items={[
+                'L-T4 без титрования по св. T4/T3 — риск ятрогенного гипер/гипотиреоза (доза ≠ весу 1.6 мкг/кг)',
+                'Йод при аутоиммунном тиреоидите — может спровоцировать гипертиреоз (блокировать только при доказанном дефиците)',
+                'Железо/кальций — интервал 4 ч с L-T4 (снижают всасывание на 20-40%)',
+                'T3 изолированно при не подавленном ТТГ — риск тиреотоксикоза',
+              ]} />
 
               <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
                 {[
@@ -30,7 +37,7 @@ export const SupportProtocolThyroid: React.FC<{ s: Record<string, any> }> = ({ s
                   <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🔬 Механизмы влияния ААС на щитовидную железу</div>
                   {[{ m:'Снижение ТТГ', e:'Экзогенные андрогены подавляют гипоталамо-гипофизарную ось → ↓ ТТГ → ↓ T4 → ↓ T3. Аналогично центральному гипотиреозу' },
                     { m:'Конверсия T4→T3', e:'ААС модулируют дейодиназу D1/D2: ↑ активность → относительный избыток T3 на фоне низкого T4' },
-                    { m:'Транспорт (TBG)', e:'Андрогены снижают тироксин-связывающий глобулин (TBG) в печени → ↓ общего T4/T3 при нормальном свободном' },
+                    { m:'Транспорт (TBG)', e:'Андрогены снижают тироксин-связывающий глобулин (TBG) в печени → ЛОЖНОЕ ↓ общего T4/T3 при нормальном свободном (не истинный гипотиреоз! Контроль — только св. T4/T3)' },
                     { m:'Прямая токсичность', e:'Высокие дозы ААС (особенно тренболон) могут вызывать тиреоидит → ↑ обратного T3 (rT3) → тканевой гипотиреоз' },
                   ].map((x, i) => (
                     <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(236,72,153,0.04)', border:'1px solid rgba(236,72,153,0.08)' }}>
@@ -59,9 +66,9 @@ export const SupportProtocolThyroid: React.FC<{ s: Record<string, any> }> = ({ s
                       ]},
                     { phase:'ФАЗА 3 · МАНИФЕСТНЫЙ ГИПОТИРЕОЗ', label:'ТТГ {'>'}4.5 / T4 низкий', color:'#f97316', condition:'ТТГ {'>'}4.5, T4 св {'<'}9, симптомы', desc:'Заместительная терапия',
                       items:[
-                        { name:'L-T4 (левотироксин) 50-100 мкг 💊', dose:'50-100 мкг', timing:'Утро натощак', note:'Доза по весу: 1.6 мкг/кг. Титрация каждые 4-6 нед' },
+                        { name:'L-T4 (левотироксин) 50-100 мкг 💊', dose:'50-100 мкг', timing:'Утро натощак', note:'Старт 50 мкг. Титрация ПО СВ. T4/T3 (не по весу 1.6 мкг/кг — это полная заместительная доза при тотальной тиреоидэктомии, а не цель при субклиническом ААС-гипотиреозе). Цель ТТГ 0.5-2.0, св. T4 10-22' },
                         { name:'L-T4 + L-T3 (комбинированная терапия) 💊', dose:'T4 50-75 мкг + T3 5-10 мкг', timing:'T4 утром, T3 дробно', note:'При недостаточном ответе на моно-T4. Контроль T3 св. Не превышать T3 {'>'}15 мкг/сут' },
-                        { name:'Исключить дефицит Fe, Se, Zn', dose:'По анализам', timing:'Коррекция до нормализации', note:'Дефицит железа → ↓ активности ТПО. Ферритин {'>'}70, Se {'>'}1.2 мкмоль/л' },
+                        { name:'Исключить дефицит Fe, Se, Zn', dose:'По анализам', timing:'Коррекция до нормализации', note:'Дефицит железа → ↓ активности ТПО. Ферритин {'>'}70, Se {'>'}1.2 мкмоль/л. ТАКЖЕ: гипокалория и дефицит Fe → ↓ конверсии T4→T3 (ложный тканевой гипотиреоз при норм. св. T4/T3)' },
                       ]},
                     { phase:'ФАЗА 4 · ТИРЕОТОКСИКОЗ / ГИПЕРТИРЕОЗ', label:'ТТГ {'<'}0.1 / T3/T4 высокий', color:'#ef4444', condition:'ТТГ {'<'}0.1, T3 св {'>'}6.5, пульс {'>'}100', desc:'Неотложно. Исключить тиреоидит/тиреотоксикоз от ААС',
                       items:[

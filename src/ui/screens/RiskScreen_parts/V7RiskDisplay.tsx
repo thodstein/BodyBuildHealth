@@ -198,7 +198,7 @@ export const V7RiskDisplay: React.FC<{
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 9, color: 'var(--text-dim)', whiteSpace: 'nowrap', minWidth: 22, textAlign: 'right' }}>в€…</span>
+              <span style={{ fontSize: 9, color: 'var(--text-dim)', whiteSpace: 'nowrap', minWidth: 22, textAlign: 'right' }}>∅</span>
               <input type="range" min={0} max={12} value={organWeek} onChange={e => setOrganWeek(parseFloat(e.target.value) || 0)}
                 style={{ flex: 1, accentColor: '#00e68a', height: 4, cursor: 'pointer' }} />
               <span style={{ fontSize: 9, color: 'var(--text-dim)', whiteSpace: 'nowrap', minWidth: 22 }}>12</span>
@@ -610,7 +610,7 @@ export const V7RiskDisplay: React.FC<{
               <input type="range" min={0} max={12} value={organWeek} onChange={e => setOrganWeek(parseFloat(e.target.value) || 0)}
                 style={{ width: '100%', accentColor: '#00e68a', height: 3, cursor: 'pointer' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 1 }}>
-                <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>в€…</span>
+                <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>∅</span>
                 <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>12</span>
               </div>
             </div>
