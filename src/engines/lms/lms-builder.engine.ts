@@ -64,10 +64,11 @@ export interface LMSBuildOutput {
   cycleMetrics: SRCycleMetrics;
 }
 
-/** Извлечь уникальные имена упражнений из шаблона недели 1. */
+/** Извлечь уникальные имена упражнений из шаблона (все недели, если заданы явно). */
 export function extractExercises(tpl: SRCycleTemplate): string[] {
   const set = new Set<string>();
-  for (const day of tpl.week1) for (const ex of day.exercises) set.add(ex.name);
+  const source = tpl.weeks && tpl.weeks.length ? tpl.weeks.flat() : tpl.week1;
+  for (const day of source) for (const ex of day.exercises) set.add(ex.name);
   return [...set];
 }
 
@@ -98,7 +99,14 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   const { template, pmMap, fallbackPm = 100 } = input;
   const mode = input.mode ?? 'natural';
   const exercises = extractExercises(template);
-  const totalWeeks = Math.max(1, Math.round(input.weeksOverride ?? template.meta.weeks));
+
+  // Faithful multi-week: если задана явная раскладка ВСЕХ недель — используем её
+  // дословно, БЕЗ авто-прогрессии (pct каждой недели уже отражает реальную нагрузку).
+  const hasExplicitWeeks = !!(template.weeks && template.weeks.length);
+  const totalWeeks = hasExplicitWeeks
+    ? template.weeks!.length
+    : Math.max(1, Math.round(input.weeksOverride ?? template.meta.weeks));
+
   const pm0Map: Record<string, number> = {};
   for (const name of exercises) pm0Map[name] = pmFor(name, pmMap, fallbackPm);
 
@@ -107,18 +115,25 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     pm0: 100, weeks: totalWeeks, mode,
     weeklyPercent: input.weeklyPercent, courseIntensity: input.courseIntensity,
   };
-  const rationale = progressionRationale({ ...progInput, pm0: 100 });
+  const rationale = hasExplicitWeeks
+    ? 'Программа задана дословно по источнику (явная раскладка всех недель, без авто-прогрессии PM).'
+    : progressionRationale({ ...progInput, pm0: 100 });
 
   const weeks: LMSPlanWeek[] = [];
   for (let w = 0; w < totalWeeks; w++) {
     const pmRow: Record<string, number> = {};
     for (const name of exercises) {
-      const k = (input.weeklyPercent != null ? input.weeklyPercent
-        : mode === 'on_course' ? (input.courseIntensity === 'mild' ? 0.015 : input.courseIntensity === 'heavy' ? 0.025 : 0.02)
-        : mode === 'pct' ? -0.005 : template.meta.correctionPct);
-      pmRow[name] = pm0Map[name] * Math.pow(1 + k, w);
+      if (hasExplicitWeeks) {
+        pmRow[name] = pm0Map[name]; // без прогрессии: реальный PM пользователя
+      } else {
+        const k = (input.weeklyPercent != null ? input.weeklyPercent
+          : mode === 'on_course' ? (input.courseIntensity === 'mild' ? 0.015 : input.courseIntensity === 'heavy' ? 0.025 : 0.02)
+          : mode === 'pct' ? -0.005 : template.meta.correctionPct);
+        pmRow[name] = pm0Map[name] * Math.pow(1 + k, w);
+      }
     }
-    const days: LMSPlanDay[] = template.week1.map((day: SRDaySpec, di: number) => {
+    const weekLayout: SRDaySpec[] = hasExplicitWeeks ? template.weeks![w] : template.week1;
+    const days: LMSPlanDay[] = weekLayout.map((day: SRDaySpec, di: number) => {
       const dayTag = dayLoadTag(day.exercises as { load?: string }[]);
       
       // S-MRV: Бюджет утомления на сессию

@@ -70,4 +70,12 @@ export interface SRDaySpec {
 export interface SRCycleTemplate {
  meta: SRCycleMeta;
  week1: SRDaySpec[];
+ /**
+  * Опционально: явная раскладка ВСЕХ недель (faithful multi-week).
+  * weeks[i] = недели i+1 (массив дней). Когда задано — buildLMSPlan использует
+  * эти недели дословно, БЕЗ авто-прогрессии correctionPct (для циклов с
+  * нелинейными волнами/пирамидами, где прогрессия задана в источнике явно).
+  * week1 должен дублировать weeks[0] для обратной совместимости.
+  */
+ weeks?: SRDaySpec[][];
 }
