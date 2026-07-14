@@ -64,6 +64,8 @@ export interface BBExercise {
   exerciseName?: string;
   tempoSpec?: string;       // PRO: нотация темпа из bb-tempo-rest
   restSeconds?: number;     // PRO: отдых между подходами
+  comment?: string;         // PRO: тренерский комментарий (роль/слабые/фаза/нагрузка)
+  warmupSets?: { load: number; reps: number }[]; // PRO: разминочные подходы (для compounds)
 }
 
 export interface BBSession {
@@ -241,6 +243,40 @@ function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string,
   }
 }
 
+/** Построить тренерский комментарий к упражнению. */
+function buildExComment(
+  muscle: string, name: string, role: 'primary' | 'accessory',
+  character: DayCharacter, sets: number, reps: number, weight: number, rir: number,
+  weakPoints: string[], focusGroup: string | undefined,
+  phase: BBPhase, tempo: string, restSec: number,
+  isSubstituted: boolean,
+): string {
+  const parts: string[] = [];
+  const label = role === 'primary' ? '🎯 Основное' : '📌 Добивочное';
+  parts.push(`${label}: ${muscle}`);
+  if (isWeak(muscle, weakPoints)) parts.push('🔥 Отстающая');
+  if (focusGroup && (muscle === focusGroup || isWeak(muscle, [focusGroup]))) parts.push('⭐ Специализация');
+  if (isSubstituted) parts.unshift('⚠ Замена (травма):');
+  const phaseNames: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
+  const charLabel = character === 'тяж' ? 'тяж' : character === 'памп' ? 'памп' : 'лёг';
+  parts.push(`${phaseNames[phase] || phase}, RIR ${rir} (${charLabel})`);
+  parts.push(`${sets}×${reps} @ ${weight} кг`);
+  parts.push(`Темп ${tempo}, отдых ${restSec}с`);
+  return parts.join('. ');
+}
+
+/** Разминочная пирамида для compound упражнений. */
+function buildWarmup(workWeight: number, isCompound: boolean): { load: number; reps: number }[] {
+  if (!isCompound || workWeight <= 0) return [];
+  const steps = workWeight <= 60 ? 2 : workWeight <= 100 ? 3 : 4;
+  const warmups: { load: number; reps: number }[] = [];
+  for (let i = 1; i <= steps; i++) {
+    const pct = 0.3 + (0.55 / steps) * i;
+    warmups.push({ load: Math.round(workWeight * pct), reps: Math.min(8, 5 + i) });
+  }
+  return warmups;
+}
+
 function buildSession(
   sched: ScheduleDay, dayInRotation: number, week: number,
   muscleVolumeRotation: Record<string, number>,
@@ -395,6 +431,8 @@ function buildSession(
           rir: isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir,
           workSets, exerciseName: (exData as any).name || (exData as any).id,
           tempoSpec: tempoSpec.notation, restSeconds,
+          comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.round(Math.min(pl.reps, repsCap)), Math.round(pl.weight * wPct * 10) / 10, isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir, weakPoints, focusGroup, phase, tempoSpec.notation, restSeconds, isSubstituted),
+          warmupSets: buildWarmup(Math.round(pl.weight * wPct * 10) / 10, pl.role === 'primary'),
         });
         continue;
       }
@@ -412,6 +450,8 @@ function buildSession(
         rir: isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir,
         workSets, exerciseName: (exData as any).name || (exData as any).id,
         tempoSpec: tempoSpec.notation, restSeconds,
+        comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, exSets, Math.round(Math.min(pl.reps, repsCap)), Math.round(pl.weight * wPct * 10) / 10, isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir, weakPoints, focusGroup, phase, tempoSpec.notation, restSeconds, isSubstituted),
+        warmupSets: buildWarmup(Math.round(pl.weight * wPct * 10) / 10, pl.role === 'primary'),
       });
     }
   }

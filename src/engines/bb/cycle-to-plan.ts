@@ -10,6 +10,7 @@ import { PCT_FOR_RIR } from '../rir-table';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
 import { adaptForPEDs, type PED } from './bb-ped-adaptation.engine';
+import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-plan-builder';
 
 export type CycleSourceCycle = SRCycleTemplate;
 
@@ -21,6 +22,7 @@ export interface CycleToPlanInput {
   loadStrategy?: string;
   autoRegVolumeMult?: number;
   autoRegRirShift?: number;
+  injuries?: Injury[];
 }
 
 function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG): string {
@@ -98,13 +100,18 @@ function isPrimaryByLoad(load: string | undefined): boolean {
  * Convert an SRCycleTemplate (BB cycle with concrete exercises) to a full BBPlan.
  */
 export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
-  const { cycle, workMax, weakPoints = [], peds = [], loadStrategy = 'double_progression' } = input;
+  const { cycle, workMax, weakPoints = [], peds = [], loadStrategy = 'double_progression', injuries = [] } = input;
   const meta = cycle.meta;
   const totalWeeks = meta.weeks;
   const daysPerWeek = meta.sessionsPerWeek;
   const week1Days = cycle.week1;
   const rirProg = meta.rirProgression;
   const phases = meta.phases && meta.phases.length > 0 ? meta.phases : undefined;
+
+  // Injury exclusions
+  const today = new Date().toISOString().slice(0, 10);
+  const excludedMuscles = getExcludedMuscles(injuries, today);
+  const gradedInjuries = getGradedInjuries(injuries, today);
 
   // PED adaptation
   const allLandmarks = getAllVolumeLandmarks('advanced');
@@ -125,6 +132,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   }
   if (weakPoints.length > 0) rationale.push(`🔥 Слабые группы (акцент объёма): ${weakPoints.join(', ')}`);
   if (peds.length > 0) rationale.push(`💉 PED-адаптация: MRV ×${mrvMult.toFixed(2)}`);
+  if (excludedMuscles.size > 0) rationale.push(`⚠ Травмы: исключены мышцы ${[...excludedMuscles].join(', ')}`);
+  if (gradedInjuries.length > 0) rationale.push(`⚠ Градированные травмы: ${gradedInjuries.map(i => i.muscle).join(', ')} — сниженный объём`);
   rationale.push(`📈 Стратегия прогрессии: ${loadStrategy.replace(/_/g, ' ')}`);
   rationale.push(`🎯 Источник упражнений: ПРОФ-цикл с фиксированными упражнениями (не автоподбор)`);
 
@@ -138,6 +147,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         const character = exSpec.load === 'Тяжелая' ? 'тяж' : 'памп';
         const workMaxVal = calcWorkMaxForEx(exSpec.name, workMax);
         const muscle = muscleGroupFromExName(exSpec.name, EXERCISE_CATALOG);
+        // Пропускаем упражнения на исключённые мышцы (травмы)
+        if (excludedMuscles.has(muscle)) return null as any;
         const isWeak = weakPoints.includes(muscle);
 
         // Volume boost for weak groups
@@ -175,7 +186,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
           restSeconds,
         };
         return ex;
-      });
+      }).filter(Boolean) as BBExercise[];
 
       // Determine session character from exercises
       const hasHeavy = exercises.some(e => e.character === 'тяж');

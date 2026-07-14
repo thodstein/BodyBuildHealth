@@ -157,7 +157,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
     };
     const activeDomains = [...domainSet];
     const cascadeDesc = activeDomains.length > 0
-      ? `Принцип: ${activeDomains.map(d => domainLabels[d] || d).join(' → ')}. ${pairDetails.length} синергетических пар, ${contributions.length} уникальных механизмов.`
+      ? `Принцип: ${activeDomains.map(d => DOMAIN_LABELS_RU[d] || domainLabels[d] || d).join(' → ')}. ${pairDetails.length} синергетических пар, ${contributions.length} уникальных вкладов.`
       : `Стек из ${stackIds.length} препаратов: ${pairDetails.length} взаимодействий.`;
 
     return { cascadeDesc, pairs: pairDetails, roles, contributions, domains: activeDomains, coverage: [...mechCoverage.entries()].map(([m, ids]) => ({ mechanism: m, coveredBy: ids })) };
@@ -645,54 +645,71 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
 
+  const multiStackHeader = (
+    <div>
+      <div style={{ display: 'flex', gap: 3, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>
+        {allStacks.map((stk, idx) => (
+          <div key={idx} onClick={() => { setActiveStackIdx(idx); setEditingIdx(null); }}
+            onContextMenu={e => { e.preventDefault(); setEditingIdx(idx); setEditName(stackName(stk, idx)); }}
+            style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3, padding: '5px 8px', borderRadius: 12,
+              cursor: 'pointer', fontSize: 8, fontWeight: 600, whiteSpace: 'nowrap', maxWidth: 160,
+              background: activeStackIdx === idx ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+              border: activeStackIdx === idx ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.04)',
+              color: activeStackIdx === idx ? '#00e68a' : 'rgba(255,255,255,0.5)',
+            }}>
+            <span>{stk.length > 0 ? '📋' : '📭'}</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{stackName(stk, idx)}</span>
+            {allStacks.length > 1 && (
+              <span onClick={e => { e.stopPropagation(); deleteStack(idx); }}
+                style={{ marginLeft: 2, fontSize: 7, color: '#ef4444', cursor: 'pointer' }}>✕</span>
+            )}
+          </div>
+        ))}
+        <button onClick={createStack} style={{
+          flexShrink: 0, padding: '5px 10px', borderRadius: 12, fontSize: 8, fontWeight: 600, cursor: 'pointer',
+          background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#a78bfa',
+        }}>+</button>
+      </div>
+      {editingIdx !== null && (
+        <div style={{ padding: '4px 0', marginBottom: 8, display: 'flex', gap: 4 }}>
+          <input value={editName} onChange={e => setEditName(e.target.value)}
+            style={{ flex: 1, padding: '4px 8px', borderRadius: 6, fontSize: 8, background: '#202023', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', outline: 'none' }}
+            placeholder="Название стека" autoFocus />
+          <button onClick={() => { renameStack(editingIdx, editName); setEditingIdx(null); }}
+            style={{ padding: '4px 8px', borderRadius: 6, fontSize: 8, fontWeight: 600, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a' }}>✓</button>
+          <button onClick={() => setEditingIdx(null)}
+            style={{ padding: '4px 8px', borderRadius: 6, fontSize: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}>✕</button>
+        </div>
+      )}
+    </div>
+  );
+
   if (stackIds.length === 0) {
     return (
       <div style={{ paddingBottom: 80 }}>
-        {/* ── Multi-stack header ── */}
-        <div style={{ display: 'flex', gap: 3, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>
-          {allStacks.map((stk, idx) => (
-            <div key={idx} onClick={() => { setActiveStackIdx(idx); setEditingIdx(null); }}
-              onContextMenu={e => { e.preventDefault(); setEditingIdx(idx); setEditName(stackName(stk, idx)); }}
-              style={{
-                flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3, padding: '5px 8px', borderRadius: 12,
-                cursor: 'pointer', fontSize: 8, fontWeight: 600, whiteSpace: 'nowrap', maxWidth: 160,
-                background: activeStackIdx === idx ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
-                border: activeStackIdx === idx ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.04)',
-                color: activeStackIdx === idx ? '#00e68a' : 'rgba(255,255,255,0.5)',
-              }}>
-              <span>{stk.length > 0 ? '📋' : '📭'}</span>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{stackName(stk, idx)}</span>
-              {allStacks.length > 1 && (
-                <span onClick={e => { e.stopPropagation(); deleteStack(idx); }}
-                  style={{ marginLeft: 2, fontSize: 7, color: '#ef4444', cursor: 'pointer' }}>✕</span>
-              )}
-            </div>
-          ))}
-          <button onClick={createStack} style={{
-            flexShrink: 0, padding: '5px 10px', borderRadius: 12, fontSize: 8, fontWeight: 600, cursor: 'pointer',
-            background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#a78bfa',
-          }}>+</button>
-        </div>
+        {multiStackHeader}
 
-        {/* ── Edit name popup ── */}
-        {editingIdx !== null && (
-          <div style={{ padding: '4px 0', marginBottom: 8, display: 'flex', gap: 4 }}>
-            <input value={editName} onChange={e => setEditName(e.target.value)}
-              style={{ flex: 1, padding: '4px 8px', borderRadius: 6, fontSize: 8, background: '#202023', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', outline: 'none' }}
-              placeholder="Название стека" autoFocus />
-            <button onClick={() => { renameStack(editingIdx, editName); setEditingIdx(null); }}
-              style={{ padding: '4px 8px', borderRadius: 6, fontSize: 8, fontWeight: 600, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a' }}>✓</button>
-            <button onClick={() => setEditingIdx(null)}
-              style={{ padding: '4px 8px', borderRadius: 6, fontSize: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}>✕</button>
-          </div>
-        )}
-
-        <div style={{ textAlign: 'center', paddingTop: 30, color: 'rgba(255,255,255,0.3)' }}>
+        <div style={{ textAlign: 'center', paddingTop: 30, paddingBottom: 50 }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Стек пуст</div>
-        <div style={{ fontSize: 10, maxWidth: 280, margin: '0 auto', lineHeight: 1.5, marginBottom: 16 }}>
-          Добавьте препараты через 🔍 Поиск или 🧩 Сборка
-        </div>
+          <div style={{ fontSize: 10, maxWidth: 280, margin: '0 auto', lineHeight: 1.5, marginBottom: 20 }}>
+            Добавьте препараты через вкладки «🔍 Поиск» или «🧩 Сборка» — переключайтесь сверху
+          </div>
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
+            <button onClick={() => {
+              try { localStorage.setItem('he_biostack_tab', 'select'); window.location.reload(); } catch {}
+            }} style={{
+              padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.25)', color: '#00e68a',
+            }}>🔍 Перейти к поиску</button>
+            <button onClick={() => {
+              try { localStorage.setItem('he_biostack_subtab', 'build'); localStorage.setItem('he_biostack_tab', 'select'); window.location.reload(); } catch {}
+            }} style={{
+              padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#8b5cf6',
+            }}>🧩 Быстрая сборка</button>
+          </div>
 
         {/* ═══ Saved stacks ═══ */}
         {savedStacks.length > 0 && (
@@ -729,43 +746,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
 
   return (
     <div style={{ paddingBottom: 80 }}>
-      {/* ── Multi-stack header ── */}
-      <div style={{ display: 'flex', gap: 3, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>
-        {allStacks.map((stk, idx) => (
-          <div key={idx} onClick={() => { setActiveStackIdx(idx); setEditingIdx(null); }}
-            onContextMenu={e => { e.preventDefault(); setEditingIdx(idx); setEditName(stackName(stk, idx)); }}
-            style={{
-              flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3, padding: '5px 8px', borderRadius: 12,
-              cursor: 'pointer', fontSize: 8, fontWeight: 600, whiteSpace: 'nowrap', maxWidth: 160,
-              background: activeStackIdx === idx ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
-              border: activeStackIdx === idx ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.04)',
-              color: activeStackIdx === idx ? '#00e68a' : 'rgba(255,255,255,0.5)',
-            }}>
-            <span>{stk.length > 0 ? '📋' : '📭'}</span>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{stackName(stk, idx)}</span>
-            {allStacks.length > 1 && (
-              <span onClick={e => { e.stopPropagation(); deleteStack(idx); }}
-                style={{ marginLeft: 2, fontSize: 7, color: '#ef4444', cursor: 'pointer' }}>✕</span>
-            )}
-          </div>
-        ))}
-        <button onClick={createStack} style={{
-          flexShrink: 0, padding: '5px 10px', borderRadius: 12, fontSize: 8, fontWeight: 600, cursor: 'pointer',
-          background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#a78bfa',
-        }}>+</button>
-      </div>
-
-      {editingIdx !== null && (
-        <div style={{ padding: '4px 0', marginBottom: 8, display: 'flex', gap: 4 }}>
-          <input value={editName} onChange={e => setEditName(e.target.value)}
-            style={{ flex: 1, padding: '4px 8px', borderRadius: 6, fontSize: 8, background: '#202023', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', outline: 'none' }}
-            placeholder="Название стека" autoFocus />
-          <button onClick={() => { renameStack(editingIdx, editName); setEditingIdx(null); }}
-            style={{ padding: '4px 8px', borderRadius: 6, fontSize: 8, fontWeight: 600, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a' }}>✓</button>
-          <button onClick={() => setEditingIdx(null)}
-            style={{ padding: '4px 8px', borderRadius: 6, fontSize: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}>✕</button>
-        </div>
-      )}
+      {multiStackHeader}
 
       <GlassCard title={`📋 Стек • ${stackIds.length} компонентов`} icon="📊" color="#00e68a">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 4, marginBottom: 6 }}>
@@ -1431,12 +1412,18 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
                         : entry.role})
                     </span>
                   </div>
-                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                    {[cat.tier, ...(cat.category?.slice(0, 2) || [])].filter(Boolean).map((c: any, i: number) => (
-                      <span key={i} style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 7 }}>{catLabel(c)}</span>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(0,230,138,0.1)', color: '#00e68a', fontSize: 8, fontWeight: 600 }}>{catLabel(cat.tier)}</span>
+                    {(cat.category || []).slice(0, 2).map((c: string, i: number) => (
+                      <span key={i} style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(96,165,250,0.08)', color: '#60a5fa', fontSize: 8 }}>{catLabel(c)}</span>
                     ))}
-                    <span>💊 {cat.dosage?.mg ? `${cat.dosage.mg} мг` : '—'} · {cat.dosage?.timing || (cat as any)?.timingDosage || '—'}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 9 }}>💊 {cat.dosage?.mg ? `${cat.dosage.mg} мг · ${cat.dosage?.timing || (cat as any)?.timingDosage || '—'}` : '—'}</span>
                   </div>
+                  {(cat.mechanismOfAction || entry.mechanism) && (
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', lineHeight: 1.3, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                      {(cat.mechanismOfAction || entry.mechanism).slice(0, 80)}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <button onClick={(e) => { e.stopPropagation(); openReplacePopup(entry.id, cat.nameRu || cat.name); }}

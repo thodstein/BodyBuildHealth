@@ -618,16 +618,20 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { if (profile) { try { const ps = profile.settings; if (ps?.weight !== weight || ps?.height !== height || ps?.age !== age || ps?.sex !== sex || ps?.bodyFat !== bodyFatPct) { updateProfile({ settings: { ...profile.settings, weight, height, age, sex, bodyFat: bodyFatPct } } as any); } } catch {} } }, [weight, height, age, sex, bodyFatPct]);
 
   // Auto-recalc macros when course changes
+  const effectiveKcalRef = useRef(effectiveKcal);
+  effectiveKcalRef.current = effectiveKcal;
+  const manualGPerKgRef = useRef(manualGPerKg);
+  manualGPerKgRef.current = manualGPerKg;
   useEffect(() => {
     const aasCount = injections.filter(i => i.type === 'ААС').length;
     if (aasCount > 0 && goal === 'mass') {
       setManualGPerKg(prev => ({ ...prev, protein: 2.5 }));
-    } else if (aasCount === 0 && manualGPerKg.protein > 2.2) {
+    } else if (aasCount === 0 && manualGPerKgRef.current.protein > 2.2) {
       setManualGPerKg(prev => ({ ...prev, protein: 1.8 }));
     }
     const insulinCount = injections.filter(i => i.type === 'инсулин').length;
     if (insulinCount > 0) {
-      setManualKcal(prev => prev || Math.round(effectiveKcal * 1.1));
+      setManualKcal(prev => prev || Math.round(effectiveKcalRef.current * 1.1));
     }
   }, [injections.length]);
 
@@ -654,7 +658,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (pd.targetCarbs) setManualC(pd.targetCarbs);
       if (pd.lazyDayMode) setLazyDayMode(true);
       if (pd.carbCycling) setCyclingMode('macro');
-      if (pd.trainingDays) setTrainingDays([...Array(pd.trainingDays)].map((_, i) => i < pd.trainingDays));
+      if (pd.trainingDays) {
+        if (Array.isArray(pd.trainingDays)) {
+          setTrainingDays(pd.trainingDays.map((v: any) => Boolean(v)));
+        } else {
+          const n = Number(pd.trainingDays) || 0;
+          setTrainingDays(Array.from({ length: 7 }, (_, i) => i < n));
+        }
+      }
       if (pd.sodiumMg) { /* stored for future use in meal generation */ }
       if (pd.potassiumMg) { /* stored for future use */ }
       if (pd.magnesiumMg) { /* stored for future use */ }

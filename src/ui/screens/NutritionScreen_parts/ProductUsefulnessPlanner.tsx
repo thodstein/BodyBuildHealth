@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { FOOD_DB, calcBBQualityScore } from '../../../core/nutrition-database';
+import { FOOD_DB } from '../../../core/nutrition-database';
 import { useDataLink } from '../../../core/data-link';
 import { scoreAllProducts, compareProducts, calcMealScore, CATEGORY_LABELS, GOAL_MAP_RU } from '../../../engines/product-usefulness.engine';
 import type { MealProduct, SavedMeal, MealScore } from '../../../engines/product-usefulness.engine';
-import { calculateOverallScore, scoreAllProductsV2, compareProductsV2, calcMealScoreV2, calcDIAAS, analyzeDailyDiet, getDefaultProfile, type UserDietProfile, type V2ScoreResult, type MealScoreV2 } from '../../../engines/product-usefulness-v2.engine';
+import { scoreAllProductsV2, compareProductsV2, calcMealScoreV2, calcDIAAS, analyzeDailyDiet, getDefaultProfile, type UserDietProfile, type V2ScoreResult, type MealScoreV2 } from '../../../engines/product-usefulness-v2.engine';
 import { PopupBool, PopupNumber, PopupSelect } from '../../components/PopupXxx';
 import { analyzeNutrientGaps, NUTRIENT_CATEGORIES, findBestCombo, type NutrientGap, type NutrientGapResult, type NutrientCombo } from '../../../engines/nutrient-gap-filler.engine';
 
@@ -324,9 +324,10 @@ export const ProductUsefulnessPlanner: React.FC = () => {
     if (plannerTab === 'dashboard') {
       const items = useV2 ? scored.map(({ food }) => {
         const v = v2Scored.get(food.id);
-        return { total: (v?.total ?? 5) * 10 };
+        return v !== undefined ? { total: Math.round(v.total * 10) } : null;
       }) : scored.map(x => ({ total: x.score.total }));
-      const avgScore = items.length > 0 ? Math.round(items.reduce((s, x) => s + x.total, 0) / items.length) : 0;
+      const scoredItems = items.filter((x): x is { total: number } => x !== null);
+      const avgScore = scoredItems.length > 0 ? Math.round(scoredItems.reduce((s, x) => s + x.total, 0) / scoredItems.length) : 0;
       if (avgScore > 0) {
         const today = new Date().toLocaleDateString('ru-RU');
         const updated = [...scoreHistory.filter(h => h.date !== today), { date: today, avg: avgScore, count: items.length }].slice(-30);
@@ -381,7 +382,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         showToast(`✅ Добавлено ${entries.length} продуктов иИз дневника`);
         return;
       }
-    } catch { showToast('Ошибка загрузки'); }
+    } catch (e) { console.warn('openSourcePicker error:', e); showToast('Ошибка загрузки'); }
   };
 
   const handlePickerSelect = (id: string) => {

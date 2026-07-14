@@ -43,7 +43,7 @@ export interface OrganLoadResult {
   giTract: OrganLoadScore & { fermentationG: number; transitHours: number; advice: string };
   adipose: OrganLoadScore & { surplusKcal: number; storageRateGH: number; advice: string };
   bones: OrganLoadScore & { pralNet: number; calciumBalanceMg: number; advice: string };
-  cns: OrganLoadScore & { glycemicSwing: number; tryptophanRatio: number; advice: string };
+  cns: OrganLoadScore & { glycemicSwing: number; advice: string };
   endocrine: OrganLoadScore & { insulinLoad: number; ghrelinSuppressionH: number; advice: string };
   totalMetabolicLoad: OrganLoadScore;
   metabolicProfile: string;
@@ -94,10 +94,10 @@ function levelColor(level: OrganLoadScore['level']): string {
 }
 const build = (score: number): OrganLoadScore => ({ score: Math.round(score), level: scoreLevel(score), color: levelColor(scoreLevel(score)) });
 
-// ─── PRAL (Potential Renal Acid Load) ───
-function calcPRAL(p: number, k: number): number {
-  // PRAL (mEq) = 0.49 * protein_g - 0.021 * potassium_mg
-  return +(0.49 * p - 0.021 * k).toFixed(1);
+// ─── PRAL (Potential Renal Acid Load) — Remer-Manz formula ───
+function calcPRAL(p: number, k: number, phosMg = 1500, mgMg = 350, caMg = 900): number {
+  // PRAL (mEq) = 0.49×protein_g + 0.037×P_mg − 0.021×K_mg − 0.026×Mg_mg − 0.013×Ca_mg
+  return +(0.49 * p + 0.037 * phosMg - 0.021 * k - 0.026 * mgMg - 0.013 * caMg).toFixed(1);
 }
 
 // ─── BMI ───
@@ -138,12 +138,12 @@ export function calcOrganLoad(input: OrganLoadInput): OrganLoadResult {
   // ════════════════════════════════════
   // 1. LIVER (Гепатоцитарная нагрузка)
   // ════════════════════════════════════
-  const liverProtein = p * 0.18;               // дезаминирование → уреагенез
-  const liverFat     = f * 0.14 + tf * 0.5;    // VLDL + липотоксичность
+  const liverProtein = p * 0.10;               // дезаминирование → уреагенез (~10% белка метаболизируется в печени)
+  const liverFat     = f * 0.06 + tf * 0.5;    // VLDL + липотоксичность (~6% жиров достигает печени; трансжиры ×2 нагрузка)
   const liverCarbs   = c * 0.08;               // гликогенез + de novo lipogenesis
   const liverFruct   = sug * 0.15;             // фруктоза = нагрузка ×2 на печень
   const liverRaw     = liverProtein + liverFat + liverCarbs + liverFruct;
-  const ammoniaRate  = +(p * 0.16 / 24).toFixed(1); // г NH₃/ч
+  const ammoniaRate  = +(p * 0.16 * 1.21 / 24).toFixed(1); // г NH₃/ч (N→NH₃: ×17/14≈1.21)
   const liverScore   = clamp(liverRaw * 1.1 * trainMult * (conds.has('nafld') ? 1.5 : 1) * bmiMult, 0, 100);
 
   let liverAdvice = 'Нагрузка на печень в пределах нормы.';
@@ -154,7 +154,7 @@ export function calcOrganLoad(input: OrganLoadInput): OrganLoadResult {
   // ════════════════════════════════════
   // 2. KIDNEYS (Ренальная нагрузка)
   // ════════════════════════════════════
-  const rsl      = p * 5.7 + na * 0.26;         // Renal Solute Load (mOsm)
+  const rsl      = p * 5.7 + na / 23;         // Renal Solute Load: protein mOsm + Na mEq (1 mEq = 23 mg)
   const rslPerKg = rsl / bw;
   const pralVal  = calcPRAL(p, k);              // PRAL
   const waterAdequacy = clamp(water / (bw * 35), 0.3, 1.5);
@@ -171,7 +171,7 @@ export function calcOrganLoad(input: OrganLoadInput): OrganLoadResult {
   // ════════════════════════════════════
   const carbDensity  = totalKcal > 0 ? +(c * 4 / totalKcal * 100).toFixed(0) : 50;
   const glycemicLoad = clamp((c - fib * 0.8) * (1 + sug / 100), 0, 200);
-  const insulinU     = clamp(glycemicLoad * 0.3 + p * 0.03, 0, 100);
+  const insulinU     = clamp(glycemicLoad * 0.25, 0, 100);  // Insulin demand ≈ 0.25×GL (simplified, without individual sensitivity)
   const pancMult     = conds.has('diabetes') ? 1.6 : 1;
   const pancScore    = clamp(insulinU * 1.15 * pancMult * (carbDensity > 70 ? 1.2 : 1), 0, 100);
 
@@ -196,9 +196,9 @@ export function calcOrganLoad(input: OrganLoadInput): OrganLoadResult {
   // ════════════════════════════════════
   // 5. CARDIOVASCULAR (Атерогенная)
   // ════════════════════════════════════
-  const omegaRatio = o3 > 0 ? +((c * 4 / 100) / (o3 / 1000)).toFixed(1) : 20;
-  const ai = (sf * 0.25 + tf * 0.8 + chol * 0.0015 + na * 0.0015) / bw * 8;
-  const cvScore = clamp(ai * 5.5 * (conds.has('hypertension') ? 1.4 : conds.has('diabetes') ? 1.2 : 1) * (tf > 2 ? 1.3 : 1) * (omegaRatio > 10 ? 1.15 : 1), 0, 100);
+  const omegaRatio = 4; // Omega-6/3 ratio requires food-level data (not derivable from macros alone); assume optimal when o3 present
+  const ai = (sf * 0.25 + tf * 0.8 + chol * 0.0015) / bw * 8;  // Atherogenic Index (simplified: SFA + trans fat)
+  const cvScore = clamp(ai * 5.5 * (conds.has('hypertension') ? 1.4 : conds.has('diabetes') ? 1.2 : 1) * (tf > 2 ? 1.3 : 1), 0, 100);
 
   let cvAdvice = 'Атерогенная нагрузка низкая.';
   if (cvScore > 75) cvAdvice = `АИ ${ai.toFixed(1)}, Ω6/3 = ${omegaRatio}:1. Замените насыщенные жиры на оливковое масло, рыбу. EPA+DHA ≥2 г/сут.`;
@@ -221,9 +221,11 @@ export function calcOrganLoad(input: OrganLoadInput): OrganLoadResult {
   // ════════════════════════════════════
   // 7. ADIPOSE (Анаболическая)
   // ════════════════════════════════════
-  const tdeeEst   = bw * 28 + trainH * 200;
+  const bfEst = Math.max(5, Math.min(35, (bmi - 18) * 1.2)); // BMI → BF% estimate
+  const lbmEst = bw * (1 - bfEst / 100);
+  const tdeeEst   = Math.round(lbmEst * 30 + (bw - lbmEst) * 8 + trainH * 200); // LBM-aware TDEE
   const surplus   = totalKcal - tdeeEst;
-  const storageRH = surplus > 0 ? +(surplus / 7700 * 24).toFixed(2) : 0;   // г жира/ч
+  const storageRH = surplus > 0 ? +(surplus / 184.8).toFixed(2) : 0;   // г жира/ч: surplus(kcal/day) / 7700(kcal/kg) * 1000(g/kg) / 24(h)
   const adScore   = clamp(surplus <= 0 ? 0 : (surplus / (tdeeEst * 0.005)) * (bmi > 30 ? 1.3 : 1), 0, 100);
 
   let adAdvice = 'Энергобаланс в норме или дефицит.';
@@ -234,7 +236,7 @@ export function calcOrganLoad(input: OrganLoadInput): OrganLoadResult {
   // ════════════════════════════════════
   // 8. BONES (Кислотно-щелочная)
   // ════════════════════════════════════
-  const caBalance = 800 - (pralVal * 30);
+  const caBalance = 800 - (pralVal * 2);  // ~1-2 mg urinary Ca lost per mEq net acid load (Remer 2003)
   const boneScore = clamp((Math.abs(pralVal) * 4 + Math.max(0, -caBalance) * 0.02) * (k < 3000 ? 1.25 : 1), 0, 100);
 
   let boneAdvice = 'Костный метаболизм в балансе.';
@@ -246,8 +248,7 @@ export function calcOrganLoad(input: OrganLoadInput): OrganLoadResult {
   // 9. CNS (Нейрометаболическая)
   // ════════════════════════════════════
   const glycemicSwing = sug / (1 + fib * 0.08);                    // амплитуда гликемии
-  const trpRatio      = p > 0 ? +(60 / p).toFixed(3) : 0.1;       // триптофан/крупные нейтральные АК
-  const cnsScore      = clamp((glycemicSwing * 0.5 + Math.abs(trpRatio - 0.08) * 200) * (sug > 50 ? 1.3 : 1), 0, 100);
+  const cnsScore      = clamp((glycemicSwing * 0.7) * (sug > 50 ? 1.3 : 1), 0, 100);
 
   let cnsAdvice = 'Нейрометаболическая нагрузка в норме.';
   if (cnsScore > 55) cnsAdvice = `Гликемический размах ${glycemicSwing.toFixed(1)}. Стабилизируйте гликемию: клетчатка, белок в каждом приёме.`;
@@ -297,7 +298,7 @@ export function calcOrganLoad(input: OrganLoadInput): OrganLoadResult {
     giTract:     { ...build(giScore), fermentationG: +fermG.toFixed(1), transitHours: +transitH.toFixed(0), advice: giAdvice },
     adipose:     { ...build(adScore), surplusKcal: Math.round(surplus), storageRateGH: storageRH, advice: adAdvice },
     bones:       { ...build(boneScore), pralNet: pralVal, calciumBalanceMg: Math.round(caBalance), advice: boneAdvice },
-    cns:         { ...build(cnsScore), glycemicSwing: +glycemicSwing.toFixed(1), tryptophanRatio: trpRatio, advice: cnsAdvice },
+    cns:         { ...build(cnsScore), glycemicSwing: +glycemicSwing.toFixed(1), advice: cnsAdvice },
     endocrine:   { ...build(endoScore), insulinLoad: +insulinLoadH.toFixed(0), ghrelinSuppressionH: +ghrelinSuppress.toFixed(0), advice: endoAdvice },
     totalMetabolicLoad: build(totalScore),
     metabolicProfile: profile,

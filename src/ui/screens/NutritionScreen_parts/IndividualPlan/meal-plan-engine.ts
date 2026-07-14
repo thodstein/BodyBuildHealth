@@ -107,10 +107,10 @@ const INTRA_CARB_G_PER_H = 40;
 // Максимально допустимые порции для добавок (г) — защита от абсурдных доз
 const SUPPLEMENT_MAX_G: Record<string, number> = {
   creatine: 10, whey_isolate: 60, whey_protein: 60, whey_concentrate: 60,
-  casein: 60, casein_micellar: 60, bcaa: 20, supp_eaas: 20,
+  casein: 60, casein_micellar: 60, bcaa: 20, supp_eaa: 20,
   glutamine: 15, supp_hmb: 6, supp_beta_alanine: 6, supp_citrulline_dl_malate: 12,
   supp_agmatine_sulfate: 2, supp_l_carnitine_tartrate: 4, supp_alpha_gpc: 2,
-  amylopectin: 80, dextrose: 80, coll_hydro: 20,
+  amylopectin: 80, dextrose: 80, collagen_hydrolysate: 20,
 };
 // Глобальный лимит на одну порцию любого продукта (г)
 const MAX_GRAM_PER_ITEM = 500;
@@ -269,7 +269,7 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     vegGreen: basePool.filter(f => ['broccoli','spinach','cucumber','zucchini','asparagus','green_bean','celery','cabbage','kale','green_apple'].some(k => f.id.includes(k)) && (f.protein || 0) < 20),
     vegColor: basePool.filter(f => ['tomato','pepper','carrot','beetroot','pumpkin','eggplant','pomegranate','citrus'].some(k => f.id.includes(k.toLowerCase())) && (f.protein || 0) < 20),
     dairy: byBudget(basePool.filter(f => f.category === 'dairy' && (f.fat || 0) <= 10)),
-    eaa: basePool.find(f => f.id === 'bcaa'),
+    eaa: basePool.find(f => f.id === 'bcaa' || f.id === 'supp_eaa'),
     dextrin: basePool.find(f => f.id === 'amylopectin' || f.id === 'dextrose'),
   };
 }
@@ -503,7 +503,7 @@ function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof build
     items.push(makeItem(caseinSource, grams, 'slow_protein'));
   }
   // Mg-источник: тыквенные семечки/миндаль/кешью — ротация по seed
-  const mgPool = FOOD_DB.filter(f => ['pumpkin_seeds','sunflower_seeds','nuts_almonds','cashew'].includes(f.id));
+  const mgPool = FOOD_DB.filter(f => ['pumpkin_seeds','sunflower_seeds','almonds','cashew'].includes(f.id));
   const mgSource = pickPriority(mgPool as any as FoodItem[], seed + 1, { recentIds: opts?.recentIds, lockedIds: opts?.lockedIds }) as any || mgPool[0];
   if (mgSource) items.push(makeItem(mgSource, 20, 'fat'));
   // Мелатонин-источник: киви/вишня/ягоды — ротация
@@ -551,7 +551,7 @@ function pickRotationsForDay(dayOffset: number, randomSalt: number, count: numbe
 // Vegetable rotation: different color groups for lunch vs dinner
 const VEG_COLOR_GROUPS = [
   { ids: ['broccoli','spinach','asparagus','green_bean','celery','cabbage'], label: 'зелёные' },
-  { ids: ['tomato','red_pepper','beetroot','radish'], label: 'красные' },
+  { ids: ['tomato','veg_bell_pepper_red','beetroot','radish'], label: 'красные' },
   { ids: ['carrot','pumpkin','sweet_potato'], label: 'оранжевые' },
   { ids: ['cucumber','zucchini','eggplant'], label: 'белые/фиолетовые' },
 ];
@@ -886,7 +886,7 @@ const RDA_TARGETS: Record<string, { rda: number; unit: string; foodId: string; f
   Ca: { rda: 1000, unit: 'мг', foodId: 'sardines', foodG: 50 },
   Omega3: { rda: 1600, unit: 'мг', foodId: 'salmon', foodG: 80 },
   Se: { rda: 55, unit: 'мкг', foodId: 'beef_lean', foodG: 150 },
-  VitC: { rda: 100, unit: 'мг', foodId: 'red_pepper', foodG: 100 },
+  VitC: { rda: 100, unit: 'мг', foodId: 'veg_bell_pepper_red', foodG: 100 },
   VitD: { rda: 15, unit: 'мкг', foodId: 'salmon', foodG: 100 },
   VitB12: { rda: 2.4, unit: 'мкг', foodId: 'beef_lean', foodG: 150 },
   VitB9: { rda: 400, unit: 'мкг', foodId: 'spinach', foodG: 150 },

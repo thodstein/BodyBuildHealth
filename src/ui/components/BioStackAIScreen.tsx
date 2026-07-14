@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
-import { loadBioStackProfile, autoFillFromMainProfile } from '../../engines/biostack-ai.engine';
+import { loadBioStackProfile, autoFillFromMainProfile, getProfileCompleteness } from '../../engines/biostack-ai.engine';
 import { SUB_TABS, SUB_TAB_GROUPS, DEFAULT_SUB, BIO_ANIM_CSS, type BSTab, initBioToast, SkeletonLoader, showToast } from './BioStackAIConstants';
 import { useDataLink, type LinkedData } from '../../core/data-link';
 import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
@@ -180,6 +180,28 @@ export const BioStackAIScreen: React.FC = () => {
       <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', textAlign: 'center', marginBottom: 4 }}>
         🧬 BioStack AI — подбор, синергия и клинический контроль БАДов и фармы
       </div>
+
+      {/* ── Profile completeness banner ── */}
+      {(() => {
+        const comp = getProfileCompleteness(profile);
+        if (comp.percent >= 70) return null;
+        const missingGroups = Object.entries(comp.groupStatus)
+          .filter(([, st]) => !st.filled)
+          .map(([k]) => ({ personal: 'личные данные', health: 'здоровье', goals: 'цели', organs: 'органы', systems: 'системы', lifestyle: 'образ жизни', clinical: 'клинические данные' }[k] || k));
+        return (
+          <div onClick={() => setTab('profile')} style={{
+            marginBottom: 6, padding: '6px 10px', borderRadius: 10, cursor: 'pointer',
+            background: comp.percent < 30 ? 'rgba(239,68,68,0.1)' : 'rgba(251,191,36,0.08)',
+            border: `1px solid ${comp.percent < 30 ? 'rgba(239,68,68,0.2)' : 'rgba(251,191,36,0.15)'}`,
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <span style={{ fontSize: 11 }}>⚠️</span>
+            <span style={{ fontSize: 9, color: comp.percent < 30 ? '#f87171' : '#fbbf24', fontWeight: 600 }}>
+              Профиль заполнен на {comp.percent}%. {missingGroups.slice(0, 2).join(', ')} — нажмите чтобы заполнить
+            </span>
+          </div>
+        );
+      })()}
 
       {/* ── Main tab bar ── */}
       <div style={{ display: 'flex', gap: 2, marginBottom: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>

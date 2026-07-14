@@ -607,6 +607,42 @@ export interface UnifiedSettings {
     alcoholPerWeek: number;       // стандартных дринков
     currentSupplements: SupplementEntry[];
     currentMedications: MedicationEntry[];
+    /** Зеркало текущего плана поддержки (he_support_plan_result) — единая БД «что пьёт пользователь» */
+    supplementStack?: {
+      subs: { id: string; name: string; dose: string; timing: string }[];
+      generatedAt?: string;
+    };
+  };
+
+  // ─────────── 8. ЦЕЛИ ───────────
+  /** Консолидированные цели: тренировочная + цикл-курс (из he_autocalc_state.goals) + BioStack */
+  goals: {
+    primaryGoal: 'bulk' | 'cut' | 'maintenance' | 'strength' | 'hypertrophy' | 'rehab' | 'recomposition' | 'health';
+    cycleGoal?: string;            // цель курса (масса/сушка/сила/рельеф)
+    cycleWeeks?: number;           // длительность курса
+    previousCycles?: number;       // сколько курсов было
+    timeSinceLastCycle?: 'none' | '1-3mo' | '3-6mo' | '6-12mo' | '1y+';
+    secondaryGoals?: string[];     // доп. цели
+    targetWeight?: number;         // кг
+    targetBodyFat?: number;        // %
+    goalTimelineWeeks?: number;    // срок достижения
+    biostackGoals?: string[];      // цели BioStack AI
+  };
+
+  // ─────────── 9. АНАЛИЗЫ (зеркало сводки из IndexedDB labs_log) ───────────
+  /** Не храним историю — только сводку последнего ввода для карточки в Профиле */
+  labs: {
+    lastEnteredDate?: string;      // YYYY-MM-DD последнего ввода
+    enteredCount?: number;         // число введённых маркеров
+    status: 'none' | 'partial' | 'complete';
+    summary: Record<string, { value: number; date: string; unit?: string }>;
+  };
+
+  // ─────────── 10. СИМПТОМЫ (зеркало сводки из he_symptom_diary) ───────────
+  symptoms: {
+    lastEntryDate?: string;
+    activeCount?: number;          // число активных (severity>0) симптомов
+    recent: Record<string, { score: number; date: string }>;
   };
 
   // ─────────── 6. ОБРАЗ ЖИЗНИ ───────────
@@ -710,7 +746,7 @@ export function getDefaultSettings(): UnifiedSettings {
       histamineSensitive: false,
       proteinPerKg: 1.8, fiberG: 25, omega3G: 1.5, sodiumG: 3.5, potassiumG: 3.0,
       alcoholPerWeek: 0,
-      currentSupplements: [], currentMedications: [],
+      currentSupplements: [], currentMedications: [], supplementStack: undefined,
     },
     lifestyle: {
       sleepHours: 7, sleepQuality: 'fair', chronotype: 'mixed',
@@ -726,6 +762,18 @@ export function getDefaultSettings(): UnifiedSettings {
       hasHIIT: false, volumeTonnes: 0, lissMinutesPerWeek: 0,
       goalTimelineWeeks: undefined, targetWeight: undefined,
       targetBodyFat: undefined, secondaryGoals: undefined, email: undefined,
+    },
+    goals: {
+      primaryGoal: 'hypertrophy', cycleGoal: undefined, cycleWeeks: undefined,
+      previousCycles: undefined, timeSinceLastCycle: undefined, secondaryGoals: undefined,
+      targetWeight: undefined, targetBodyFat: undefined, goalTimelineWeeks: undefined,
+      biostackGoals: undefined,
+    },
+    labs: {
+      lastEnteredDate: undefined, enteredCount: 0, status: 'none', summary: {},
+    },
+    symptoms: {
+      lastEntryDate: undefined, activeCount: 0, recent: {},
     },
   };
 }

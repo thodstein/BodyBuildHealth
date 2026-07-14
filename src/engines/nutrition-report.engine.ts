@@ -115,12 +115,8 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
         }
       });
     }
-    // Also track omega3 from food
-    if (food?.micros?.Omega3) {
-      const ratio = item.amount / 100;
-      microTotals['Omega3'] = (microTotals['Omega3'] || 0) + (food.micros.Omega3 as number) * ratio;
-    }
   });
+  // NOTE: Omega3 is already collected via Object.entries(food.micros) above — no duplicate block needed
 
   const micros: Record<string, { actual: number; target: number; pct: number; status: 'ok' | 'low' | 'critical'; foods: string[] }> = {};
   const microDeficiencies: string[] = [];
@@ -375,10 +371,10 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
   allItems.forEach(item => {
     const food = FOOD_DB.find(f => f.id === item.id || f.name === item.name);
     const ratio = item.amount / 100;
-    if (food && food.fat > 0) {
-      const fatG = food.fat * ratio;
-      const satFrac = food.category === 'dairy' ? 0.60 : food.category === 'protein' ? 0.35 : food.category === 'fast_food' ? 0.40 : SAT_FRACTION_BY_CATEGORY[food.category || 'other'] || 0.30;
-      satG += fatG * satFrac;
+    const itemFatG = item.f || (food ? food.fat * ratio : 0);
+    if (itemFatG > 0) {
+      const satFrac = food?.category === 'dairy' ? 0.60 : food?.category === 'protein' ? 0.35 : food?.category === 'fast_food' ? 0.40 : SAT_FRACTION_BY_CATEGORY[food?.category || 'other'] || 0.30;
+      satG += itemFatG * satFrac;
     }
     // Omega3 from known micros
     if (food?.micros?.Omega3 !== undefined) {
@@ -392,14 +388,14 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
   });
   const totalFatG = totals.f;
   const satPct = totalFatG > 0 ? Math.round(satG / totalFatG * 100) : 0;
-  const targetSatPct = 10; // recommend <10% of calories from saturated fat
-  const omega6to3ratio = omega3G > 0.1 ? Math.round((omega6G / omega3G) * 10) / 10 : 15;
-  let fatQualityStatus = satPct <= targetSatPct ? 'ok' : satPct <= 15 ? 'fair' : 'high';
+  const targetSatPct = 35; // saturated fat <35% of total fat (≈10% of calories at 30% fat diet)
+  const omega6to3ratio = omega3G > 0.1 ? Math.round((omega6G / omega3G) * 10) / 10 : null as number | null;
+  let fatQualityStatus: 'ok' | 'fair' | 'high' = satPct <= targetSatPct ? 'ok' : satPct <= 45 ? 'fair' : 'high';
   const fatRecs: string[] = [];
-  if (satPct > targetSatPct) fatRecs.push(`Насыщенные жиры ${satPct}% от всех жиров. Цель <${targetSatPct}%. Уменьшите: сливочное масло, жирное мясо, сыр.`);
+  if (satPct > targetSatPct) fatRecs.push(`Насыщенные жиры ${satPct}% от всех жиров (цель <${targetSatPct}%). Уменьшите: сливочное масло, жирное мясо, сыр.`);
   if (satPct <= targetSatPct) fatRecs.push('Насыщенные жиры в норме.');
   if (omega3G < 1.6) fatRecs.push(`Омега-3: ${omega3G.toFixed(1)}г/день. Норма 1.6-3г. Добавьте: лосось, скумбрия, льняное масло, рыбий жир.`);
-  if (omega6to3ratio > 6) fatRecs.push(`Омега-6/Омега-3 = ${omega6to3ratio}:1 (норма 2-4:1). Избыток омега-6 из растительных масел/фастфуда → хроническое воспаление.`);
+  if (omega6to3ratio !== null && omega6to3ratio > 6) fatRecs.push(`Омега-6/Омега-3 = ${omega6to3ratio}:1 (норма 2-4:1). Избыток омега-6 из растительных масел/фастфуда → хроническое воспаление.`);
   if (fatPct > 35) fatRecs.push(`Жиры ${Math.round(fatPct)}% калорий — выше 35%. Цель 20-30%.`);
   if (fatPct < 20) fatRecs.push(`Жиры ${Math.round(fatPct)}% калорий — ниже 20%. Риск дефицита жирорастворимых витаминов. Минимум 0.8г/кг.`);
   const fatQuality = {
@@ -414,7 +410,10 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
   };
 
   // ─── 14. Meal timing quality ───
-  const mealTimes = meals.filter(m => m.time).map(m => m.time!).sort();
+  const mealTimes = meals.filter(m => m.time).map(m => m.time!).sort((a, b) => {
+    const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
+    return toMin(a) - toMin(b);
+  });
   const timingGaps: string[] = [];
   let longestGap = 0;
   for (let i = 0; i < mealTimes.length - 1; i++) {
@@ -510,7 +509,7 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
   // OVERALL GRADE (expanded with all new metrics)
   // ════════════════════════════════════════════════
   const targetPct = (kbjuPct.kcal + kbjuPct.p + kbjuPct.f + kbjuPct.c) / 4;
-  const deficitCount = microDeficiencies.filter(d => d.includes('critical')).length;
+  const deficitCount = Object.values(micros).filter(m => m.status === 'critical').length;
   let gradePenalties = 0;
   if (waterStatus === 'critical') gradePenalties++;
   if (fiberStatus === 'critical') gradePenalties++;
@@ -518,7 +517,7 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
   if (evennessScore < 50) gradePenalties++;
   if (satPct > 15) gradePenalties += 0.5;
   if (totalGL > 120) gradePenalties += 0.5;
-  if (omega6to3ratio > 8) gradePenalties += 0.5;
+  if (omega6to3ratio !== null && omega6to3ratio > 8) gradePenalties += 0.5;
 
   let overallGrade: 'A' | 'B' | 'C' | 'D';
   if (targetPct >= 85 && targetPct <= 115 && deficitCount === 0 && foodQualityScore >= 7 && gradePenalties <= 0.5) overallGrade = 'A';

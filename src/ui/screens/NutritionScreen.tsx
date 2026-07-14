@@ -568,7 +568,7 @@ const RecipesTab: React.FC = () => {
     };
     const updated = [...myRecipes, newRecipe];
     setMyRecipes(updated);
-    localStorage.setItem('he_recipes', JSON.stringify(updated));
+    try { localStorage.setItem('he_recipes', JSON.stringify(updated)); } catch {}
     setRecName(''); setRecIngredients(''); setRecInstructions('');
     setRecKcal(0); setRecProtein(0); setRecFat(0); setRecCarbs(0);
     setShowRecipeModal(false);
@@ -576,7 +576,7 @@ const RecipesTab: React.FC = () => {
   const deleteMyRecipe = (id: string) => {
     const updated = myRecipes.filter((r: any) => r.id !== id);
     setMyRecipes(updated);
-    localStorage.setItem('he_recipes', JSON.stringify(updated));
+    try { localStorage.setItem('he_recipes', JSON.stringify(updated)); } catch {}
   };
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
     <div style={{ padding:14, ...cardBg }}>
@@ -880,10 +880,12 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
     <button onClick={onClick} style={{ padding:'5px 12px', borderRadius:8, fontSize:9, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: isActive ? 700 : 400 }}>{children}</button>
   );
   const saveReportToArchive = (report: NutritionReport) => {
-    const currentArchive = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]');
-    const updated = [report, ...currentArchive].slice(0, 50);
-    setArchiveReports(updated);
-    localStorage.setItem('he_nutrition_report_archive', JSON.stringify(updated));
+    try {
+      const currentArchive = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]');
+      const updated = [report, ...currentArchive].slice(0, 50);
+      setArchiveReports(updated);
+      localStorage.setItem('he_nutrition_report_archive', JSON.stringify(updated));
+    } catch {}
     try {
       const profileReports = JSON.parse(localStorage.getItem('he_profile_nutrition_reports') || '[]');
       profileReports.push({ date: reportDate, summary: { grade: report.overallGrade, kcalPct: report.kbjuPct.kcal, pPct: report.kbjuPct.p, deficits: report.microDeficiencies.length } });
@@ -911,6 +913,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
       ) : !fullReport ? (
         <div style={{ textAlign:'center', padding:20 }}>
           <button onClick={() => {
+            try {
             const meals = reportMode === 'day' && dayData ? Object.entries(dayData.meals||{}).map(([label, items]:[string,any]) => ({
               label, items: (items||[]).map((i:any) => ({ name: i.name, id: i.id || '', amount: i.amount || 100, kcal: i.kcal||0, p: i.p||0, f: i.f||0, c: i.c||0 })),
               totals: { kcal: (items||[]).reduce((s:number,i:any)=>s+(i.kcal||0),0), p: (items||[]).reduce((s:number,i:any)=>s+(i.p||0),0), f: (items||[]).reduce((s:number,i:any)=>s+(i.f||0),0), c: (items||[]).reduce((s:number,i:any)=>s+(i.c||0),0) },
@@ -927,6 +930,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
             setReportEditMode(false);
             try { localStorage.setItem('he_nutrition_report_current', JSON.stringify(rep)); } catch {}
             saveReportToArchive(rep);
+            } catch {}
           }} style={{ padding:'10px 24px', borderRadius:12, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:12, boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>
             📊 Сгенерировать полный отчёт
           </button>
@@ -1547,12 +1551,12 @@ export const NutritionScreen: React.FC = () => {
       case 'diary': return <InfoErrorBoundary label="Дневник питания"><NutritionDiary foodEntries={foodEntries} targets={macroTargets} weight={(linked.profile?.settings as any)?.personal?.weight} age={(linked.profile?.settings as any)?.personal?.age} sex={(linked.profile?.settings as any)?.personal?.sex} onDiaryChange={reloadDiary} /></InfoErrorBoundary>;
       case 'charts': return <InfoErrorBoundary label="Графики"><Suspense fallback={<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Загрузка графиков...</div>}><NutritionCharts kcalData={chartKcalData} proteinData={chartProteinData} labels={chartLabels} dailyLogs={dailyLogs} /></Suspense></InfoErrorBoundary>;
       case 'mealplan': return <InfoErrorBoundary label="План питания"><IndividualPlan profile={linked.profile} course={linked.course} labs={linked.labs} labAnalysis={linked.labAnalysis} /></InfoErrorBoundary>;
-      case 'cart': return <CartTab />;
-      case 'restaurant': return <RestaurantTab />;
-      case 'favorites': return <FavoritesTab />;
-      case 'catalog': return <CatalogTab />;
-      case 'reference': return <ReferenceTab />;
-      case 'recipes': return <RecipesTab />;
+      case 'cart': return <InfoErrorBoundary label="Корзина"><CartTab /></InfoErrorBoundary>;
+      case 'restaurant': return <InfoErrorBoundary label="Ресторан"><RestaurantTab /></InfoErrorBoundary>;
+      case 'favorites': return <InfoErrorBoundary label="Избранное"><FavoritesTab /></InfoErrorBoundary>;
+      case 'catalog': return <InfoErrorBoundary label="Каталог"><CatalogTab /></InfoErrorBoundary>;
+      case 'reference': return <InfoErrorBoundary label="Справочник"><ReferenceTab /></InfoErrorBoundary>;
+      case 'recipes': return <InfoErrorBoundary label="Рецепты"><RecipesTab /></InfoErrorBoundary>;
       case 'reports': return <InfoErrorBoundary label="Отчёты"><ReportsTab foodEntries={foodEntries} profile={linked.profile} targets={macroTargets} /></InfoErrorBoundary>;
       case 'customfood': return <InfoErrorBoundary label="Свои продукты"><NutritionCustomFood /></InfoErrorBoundary>;
       case 'overview': return <InfoErrorBoundary label="Обзор"><NutritionOverview
@@ -1562,7 +1566,7 @@ export const NutritionScreen: React.FC = () => {
         avgDailyFat={avgDailyFat}
         avgDailyCarbs={avgDailyCarbs}
       /></InfoErrorBoundary>;
-      case 'info': return <InfoTab />;
+      case 'info': return <InfoErrorBoundary label="Инфо"><InfoTab /></InfoErrorBoundary>;
       case 'progress': return <InfoErrorBoundary label="Прогресс"><ProgressTracker /></InfoErrorBoundary>;
       case 'nutria': return <InfoErrorBoundary label="Нутрициолог"><NutriAdvisor /></InfoErrorBoundary>;
       case 'visualize': return <InfoErrorBoundary label="Блюдо"><MealVisualizer items={visualizerItems} /></InfoErrorBoundary>;

@@ -4,8 +4,10 @@
  *
  * Вынесено из BbAutoConstructor.tsx для чистоты UI.
  */
-import type { BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
+import type { BBWeek, BBSession, BBExercise, BBSet, BBPlan } from './bb-builder.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+import { PHASE_CONFIGS, distributePhases } from '../../ui/screens/TrainingScreen_parts/TrainingConstructor/phase-periodization';
+import { PCT_FOR_RIR } from '../rir-table';
 
 /* ──────────── BB phase ──────────── */
 export type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -320,4 +322,178 @@ export function computeOverloadTargets(week: BBWeek, strategy: LoadStrategy, wor
     }
   }
   return targets;
+}
+
+/* ──────────── ЕДИНЫЙ ДВИЖОК ФАЗ (P1) ──────────── */
+
+export interface PostPhaseInput {
+  plan: BBPlan;
+  totalWeeks: number;
+  workMax: Record<string, number>;
+  loadStrategy?: LoadStrategy;
+  autoDeload?: boolean;
+  deloadType?: DeloadType;
+  acwrRatio?: number;
+  autoRegResult?: {
+    volumeMultiplier: number;
+    topSetPctMultiplier: number;
+    rirShift: number;
+  };
+}
+
+/**
+ * Единая пост-обработка BB-плана (фазы, темп, повторы, стратегия, авто-делод, autoReg).
+ * Вызывается ПОСЛЕ buildBBPlan(). Заменяет дублирующую логику из BbAutoConstructor.
+ * phase-periodization.ts — канонический источник RIR/объёма/темпа/повторов по фазам.
+ *
+ * Что делает поверх buildBBPlan():
+ *  1. Фазо-специфичные диапазоны повторений (вместо характер-базированных charReps)
+ *  2. Фазо-специфичный темп и отдых (вместо характер-базированных tempoFor/REST_BY_CHARACTER)
+ *  3. RIR-дрейф внутри фазы (rirDrift — плавное снижение RIR)
+ *  4. Стратегия прогрессии нагрузки (prescribeLoad: doubleProg/linear/wave/rpe)
+ *  5. Структурированные делод-протоколы (pump/neural/full_rest) при ACWR>1.3
+ *  6. Авто-регуляция (readiness → volumeMultiplier, weight, rirShift)
+ */
+export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
+  const { plan, totalWeeks, workMax, loadStrategy, autoDeload, deloadType, acwrRatio, autoRegResult } = input;
+
+  const needsDeload = !!autoDeload && acwrRatio != null && acwrRatio > 1.3;
+  const deloadProtocol = needsDeload && deloadType ? DELOAD_PROTOCOLS[deloadType] : null;
+
+  // Фазовая карта из канонического источника
+  const phaseDist = distributePhases(totalWeeks, totalWeeks >= 6 ? 4 : 0, 'mass');
+  const phaseMap = new Map<number, BBPhase>();
+  for (const pd of phaseDist) {
+    for (const w of pd.weeks) phaseMap.set(w, pd.phase as BBPhase);
+  }
+  for (let wk = 1; wk <= totalWeeks; wk++) {
+    if (!phaseMap.has(wk)) phaseMap.set(wk, 'accumulation');
+  }
+
+  // Счётчик недель в каждой фазе (для RIR-дрейфа)
+  const phaseWeekTotals: Record<string, number> = {};
+  for (let wk = 1; wk <= totalWeeks; wk++) {
+    const ph = phaseMap.get(wk) || 'accumulation';
+    phaseWeekTotals[ph] = (phaseWeekTotals[ph] || 0) + 1;
+  }
+
+  let lastPhase = '';
+  let weeksInPhase = 0;
+
+  const weeks = structuredClone(plan.weeks);
+
+  /** Обновить комментарий упражнения после пост-обработки. */
+  const rebuildComment = (e: BBExercise, phaseName: string) => {
+    const parts: string[] = [];
+    const label = e.role === 'primary' ? '🎯 Основное' : '📌 Добивочное';
+    parts.push(`${label}: ${e.muscle}`);
+    const charLabel = e.character === 'тяж' ? 'тяж' : e.character === 'памп' ? 'памп' : 'лёг';
+    parts.push(`${phaseName}, RIR ${e.rir} (${charLabel})`);
+    const reps = e.workSets[0]?.reps || 10;
+    const weight = e.workSets[0]?.weight || 80;
+    parts.push(`${e.sets}×${reps} @ ${weight} кг`);
+    const tempo = e.workSets[0]?.tempo || '';
+    const rest = e.workSets[0]?.restSeconds || 90;
+    if (tempo) parts.push(`Темп ${tempo}, отдых ${rest}с`);
+    e.comment = parts.join('. ');
+  };
+
+  for (const w of weeks) {
+    const ph = phaseMap.get(w.week) || 'accumulation';
+    const cfg = PHASE_CONFIGS[ph as keyof typeof PHASE_CONFIGS];
+    if (!cfg) continue;
+
+    if (ph !== lastPhase) { weeksInPhase = 1; lastPhase = ph; }
+    else { weeksInPhase++; }
+
+    const phaseWeeksTotal = phaseWeekTotals[ph] || 1;
+
+    if (needsDeload && ph === 'deload' && deloadProtocol) {
+      // Структурированный делод-протокол
+      for (const s of w.sessions) {
+        for (const e of s.exercises) {
+          const baseSets = Math.round(e.sets / Math.max(0.3, cfg.volumeMultiplier));
+          e.sets = Math.max(1, Math.round(baseSets * deloadProtocol.volumeMultiplier));
+          e.rir = deloadProtocol.rirTarget;
+          e.repsRange = [deloadProtocol.repRange[0], deloadProtocol.repRange[1]];
+          for (const ws of e.workSets) {
+            const maxW = workMax[e.muscle] || 80;
+            const basePct = PCT_FOR_RIR[Math.min(5, deloadProtocol.rirTarget)] ?? 0.85;
+            ws.reps = Math.round((deloadProtocol.repRange[0] + deloadProtocol.repRange[1]) / 2);
+            ws.rir = deloadProtocol.rirTarget;
+            ws.tempo = cfg.tempo;
+            ws.weight = Math.round(maxW * basePct * deloadProtocol.intensityMultiplier * 10) / 10;
+            ws.restSeconds = deloadProtocol.restSeconds;
+          }
+          rebuildComment(e, cfg.label);
+        }
+      }
+    } else {
+      // Фазо-специфичная полировка (повторы, RIR-дрейф, темп, отдых, стратегия)
+      const driftedRir = rirDrift(cfg.rirRange, weeksInPhase, phaseWeeksTotal);
+
+      for (const s of w.sessions) {
+        for (const e of s.exercises) {
+          const isPrimary = e.role === 'primary';
+          const isCalvesAbs = ['calves', 'abs'].includes(e.muscle);
+
+          // RIR: primary ближе к отказу, accessory легче
+          e.rir = isPrimary ? driftedRir : Math.min(5, driftedRir + 1);
+
+          // Фазо-специфичные повторы (точнее character-базированных charReps)
+          if (isCalvesAbs) {
+            e.repsRange = [15, 25];
+          } else if (isPrimary) {
+            e.repsRange = [cfg.repRange[0], cfg.repRange[1]];
+          } else {
+            e.repsRange = [cfg.repRange[0] + 2, cfg.repRange[1] + 5];
+          }
+
+          for (const ws of e.workSets) {
+            const maxW = workMax[e.muscle] || 80;
+            const basePct = PCT_FOR_RIR[Math.min(5, e.rir)] ?? 0.9;
+            const baseWeight = Math.round(maxW * basePct * 10) / 10;
+
+            ws.reps = Math.round((e.repsRange[0] + e.repsRange[1]) / 2);
+            ws.rir = e.rir;
+            ws.tempo = cfg.tempo;
+            ws.restSeconds = cfg.restBase;
+
+            // Стратегия прогрессии нагрузки
+            if (loadStrategy) {
+              const prescr = prescribeLoad(loadStrategy, baseWeight, ws.reps, e.rir, maxW, w.week, totalWeeks, ph);
+              ws.weight = Math.round(prescr.nextWeight * 10) / 10;
+            } else {
+              ws.weight = baseWeight;
+            }
+          }
+          rebuildComment(e, cfg.label);
+        }
+      }
+    }
+  }
+
+  // Авто-регуляция (последний слой — поверх всего)
+  if (autoRegResult) {
+    const phaseLabels: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
+    for (const w of weeks) {
+      const ph = phaseMap.get(w.week) || 'accumulation';
+      for (const s of w.sessions) {
+        for (const e of s.exercises) {
+          e.sets = Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier));
+          for (const ws of e.workSets) {
+            ws.weight = Math.round(ws.weight * autoRegResult.topSetPctMultiplier * 10) / 10;
+          }
+          e.rir = Math.min(5, e.rir + autoRegResult.rirShift);
+          e.repsRange = [
+            Math.max(1, e.repsRange[0] - autoRegResult.rirShift),
+            Math.max(2, e.repsRange[1] - autoRegResult.rirShift),
+          ];
+          rebuildComment(e, phaseLabels[ph] || ph);
+        }
+      }
+    }
+  }
+
+  return { ...plan, weeks };
 }

@@ -23,7 +23,7 @@ export interface NutritionV2Output {
   trendKgPerWeek: number;
   metabolicAdaptation: number;
   refeedRecommended: boolean;
-  bmrMethod: 'mifflin' | 'cunningham';
+  bmrMethod: 'mifflin' | 'katch_mcardle';
   lbm: number;
   proteinGPerKgLbm: number;
   carbFloorG: number;
@@ -32,16 +32,16 @@ export interface NutritionV2Output {
 export function calcNutritionV2(input: NutritionV2Input): NutritionV2Output {
   const v2 = getNutritionV2Data();
 
-  // 1. Calculate LBM (lean body mass) — sport dietology standard
-  const bfPct = (input.bodyFatPercent && input.bodyFatPercent > 3) ? input.bodyFatPercent : (input.sex === 'male' ? 15 : 22);
+  // 1. Calculate LBM (lean body mass) — athletic default BF% (B8 fix)
+  const bfPct = (input.bodyFatPercent && input.bodyFatPercent > 3) ? input.bodyFatPercent : (input.sex === 'male' ? 12 : 22);
   const lbm = input.weightKg * (1 - bfPct / 100);
 
-  // 2. BMR — Cunningham when BF known, Mifflin-St Jeor as fallback
+  // 2. BMR — Katch-McArdle when BF known (>3%), Mifflin-St Jeor as fallback (B1+B4 fix)
   let bmr: number;
-  let bmrMethod: 'mifflin' | 'cunningham';
-  if (input.bodyFatPercent && input.bodyFatPercent > 5) {
-    bmr = 370 + 21.6 * lbm;
-    bmrMethod = 'cunningham';
+  let bmrMethod: 'mifflin' | 'katch_mcardle';
+  if (input.bodyFatPercent && input.bodyFatPercent > 3) {
+    bmr = 370 + 21.6 * lbm;  // Katch-McArdle formula (B1: was mislabeled Cunningham)
+    bmrMethod = 'katch_mcardle';
   } else {
     if (input.sex === 'male') {
       bmr = 10 * input.weightKg + 6.25 * input.heightCm - 5 * input.age + 5;
@@ -50,40 +50,48 @@ export function calcNutritionV2(input: NutritionV2Input): NutritionV2Output {
     }
     bmrMethod = 'mifflin';
   }
+  bmr = Math.max(800, bmr);  // Safety floor (B11: prevent negative/absurd BMR)
 
-  // 3. Base TDEE
-  const baseTDEE = Math.round(bmr * input.pal);
+  // 3. Base TDEE — validated PAL (B11 fix)
+  const pal = Math.max(1.15, Math.min(2.4, input.pal || 1.55));
+  const baseTDEE = Math.round(bmr * pal);
 
-  // 4. Weight trend adjustment
+  // 4. Weight trend adjustment (B6: coefficient 770 instead of 700)
   const trend = calcTrend(v2);
   let adjustment = 0;
   if (v2.weightHistory.length >= 3 && Math.abs(trend) > 0.05) {
     if (input.goal === 'deficit' || input.goal === 'mini_cut') {
       const expectedLoss = input.goal === 'deficit' ? -0.5 : -0.7;
       const diff = trend - expectedLoss;
-      adjustment = Math.round(diff * 700);
+      adjustment = Math.round(diff * 770);  // B6: 1kg fat ≈ 7700 kcal → 770 kcal / 0.1 kg/нед
       adjustment = Math.max(-500, Math.min(500, adjustment));
     } else if (input.goal === 'bulk') {
       const expectedGain = 0.25;
       const diff = trend - expectedGain;
-      adjustment = Math.round(diff * 700);
+      adjustment = Math.round(diff * 770);
       adjustment = Math.max(-300, Math.min(300, adjustment));
     }
   }
 
-  // 5. Metabolic adaptation
+  // 5. Metabolic adaptation — continuous, not stepped (B5 fix)
   const dietWeeks = v2.dietWeeks;
   let metaAdapt = 0;
-  if (input.goal === 'deficit' || input.goal === 'mini_cut') {
-    if (dietWeeks > 8) metaAdapt = 0.1;
-    else if (dietWeeks > 4) metaAdapt = 0.05;
+  if ((input.goal === 'deficit' || input.goal === 'mini_cut') && dietWeeks > 2) {
+    metaAdapt = Math.min(0.15, dietWeeks * 0.012);  // B5: ~1.2%/нед непрерывно, кап 15%
   }
   const metaKcal = Math.round(baseTDEE * metaAdapt);
 
-  // 6. Final TDEE
+  // 6. Maintenance TDEE — pure metabolic rate (B2+B3 fix)
   const tdee = baseTDEE + adjustment - metaKcal;
 
-  // 7. Macros — sport dietology standard: LBM-based protein
+  // Target kcal = maintenance TDEE × goal multiplier (B2+B3 fix: single penalty, not double)
+  const goalMult = input.goal === 'deficit' ? 0.85
+    : input.goal === 'mini_cut' ? 0.82  // B3: single multiplier instead of double penalty
+    : input.goal === 'bulk' ? 1.08
+    : 1.0;
+  let targetKcal = Math.round(tdee * goalMult);
+
+  // 7. Macros — sport dietology standard: LBM-based protein, weight-based fat, residual carbs (B2+B3 fix)
   const profileGPerKg = v2.proteinGPerKg || 0;
   const proteinFactor = profileGPerKg > 0 ? profileGPerKg
     : input.goal === 'deficit' || input.goal === 'mini_cut' ? 2.5
@@ -98,42 +106,47 @@ export function calcNutritionV2(input: NutritionV2Input): NutritionV2Output {
     : Math.round(input.weightKg * (input.goal === 'bulk' ? 1.0 : 0.85));
   const fatKcal = fatG * 9;
 
-  // Carbs as training-driven target, not residual
+  // Carbs as residual from target kcal (B2 fix: single penalty, not double)
   const carbFloorG = 130;
+  let carbsG = Math.max(carbFloorG, Math.round((targetKcal - proteinKcal - fatKcal) / 4));
+
+  // Training-driven carb floor: higher volume = more carbs needed
   const trainingDays = input.trainingDaysPerWeek || 3;
   const avgTrainMin = input.avgTrainingMinutes || 60;
   const trainingVolume = trainingDays * avgTrainMin;
-  let carbsGPerKg: number;
-  if (trainingVolume >= 600) carbsGPerKg = 6.5;
-  else if (trainingVolume >= 400) carbsGPerKg = 5.5;
-  else if (trainingVolume >= 200) carbsGPerKg = 4.5;
-  else carbsGPerKg = 3.5;
-  if (input.goal === 'deficit') carbsGPerKg *= 0.7;
-  else if (input.goal === 'mini_cut') carbsGPerKg *= 0.6;
-  else if (input.goal === 'bulk') carbsGPerKg *= 1.2;
+  let carbMinFromVolume: number;
+  if (trainingVolume >= 600) carbMinFromVolume = 4.5;
+  else if (trainingVolume >= 400) carbMinFromVolume = 3.5;
+  else if (trainingVolume >= 200) carbMinFromVolume = 2.5;
+  else carbMinFromVolume = 2.0;
+  if (input.goal === 'deficit') carbMinFromVolume *= 0.7;
+  else if (input.goal === 'mini_cut') carbMinFromVolume *= 0.6;
+  else if (input.goal === 'bulk') carbMinFromVolume *= 1.2;
+  const trainingCarbFloor = Math.round(input.weightKg * carbMinFromVolume);
+  // Raise carb floor if training demands more (but don't exceed calorie budget)
+  carbsG = Math.max(carbsG, Math.min(trainingCarbFloor, Math.max(carbFloorG, Math.round((targetKcal - proteinKcal - fatKcal) / 3.5))));
 
-  let carbsG = Math.round(input.weightKg * carbsGPerKg);
-  if (carbsG < carbFloorG) carbsG = carbFloorG;
-
-  // Recalculate kcal from macros (more accurate than TDEE × factor)
+  // kcal from macros — should be close to targetKcal (B2 fix: one unified pathway)
   let kcal = proteinKcal + fatKcal + carbsG * 4;
+  // Scale to match target exactly (absorb rounding differences into carbs)
+  carbsG = Math.max(carbFloorG, Math.round((targetKcal - proteinKcal - fatKcal) / 4));
+  kcal = proteinKcal + fatKcal + carbsG * 4;
 
-  // Goal adjustment to kcal
-  if (input.goal === 'deficit') kcal = Math.round(kcal * 0.85);
-  else if (input.goal === 'mini_cut') kcal = Math.round(kcal * 0.78);
-  else if (input.goal === 'bulk') kcal = Math.round(kcal * 1.08);
-
-  // Ensure at least TDEE for training
-  if (input.goal !== 'deficit' && input.goal !== 'mini_cut' && kcal < tdee * 0.95) {
-    kcal = Math.round(tdee * 0.95);
+  // Safety bounds (B12 fix)
+  const minKcal = Math.round(proteinKcal + fatKcal + carbFloorG * 4);
+  if (kcal < minKcal) {
+    kcal = minKcal;
+    carbsG = carbFloorG;
+  }
+  const maxKcal = Math.round(tdee * 1.25);  // B12: not more than +25% of maintenance even for bulk
+  if (kcal > maxKcal) {
+    kcal = maxKcal;
+    carbsG = Math.max(carbFloorG, Math.round((maxKcal - proteinKcal - fatKcal) / 4));
   }
 
-  // Recalculate carbs from final kcal
-  const carbsFromKcal = Math.max(carbFloorG, Math.round((kcal - proteinKcal - fatKcal) / 4));
-  carbsG = carbsFromKcal;
-
-  // Refeed recommendation
-  const refeedRecommended = dietWeeks > 4 && input.goal === 'deficit' && trend > -0.2;
+  // Refeed recommendation (B7 fix)
+  const refeedRecommended = dietWeeks > 4 && (input.goal === 'deficit' || input.goal === 'mini_cut')
+    && (trend > -0.2 || dietWeeks >= 6);  // B7: plateau OR prophylactic refeed every 6+ weeks
 
   return {
     tdee: Math.round(tdee),

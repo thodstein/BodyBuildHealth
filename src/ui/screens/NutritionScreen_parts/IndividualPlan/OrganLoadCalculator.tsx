@@ -305,7 +305,7 @@ export const OrganLoadCalculator: React.FC = () => {
         </div>;
       case 'cns':
         return <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', marginBottom: 2 }}>
-          Δ гликемии: {item.glycemicSwing} · Trp/LNAA: {item.tryptophanRatio} · Сахар: {sugar} г
+          Δ гликемии: {item.glycemicSwing} · Сахар: {sugar} г
         </div>;
       case 'endocrine':
         return <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', marginBottom: 2 }}>

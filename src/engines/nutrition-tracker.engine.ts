@@ -131,10 +131,15 @@ export function loadFoodLog(): FoodEntry[] {
 
 function saveFoodLog(entries: FoodEntry[]) {
   entries.sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
-  localStorage.setItem(FOOD_KEY, JSON.stringify(entries.slice(-1000)));
+  try { localStorage.setItem(FOOD_KEY, JSON.stringify(entries.slice(-1000))); } catch {}
 }
 
 export function addFood(entry: Omit<FoodEntry, 'id'>): FoodEntry[] {
+  if (!isFinite(entry.kcal) || entry.kcal < 0) entry.kcal = 0;
+  if (!isFinite(entry.protein) || entry.protein < 0) entry.protein = 0;
+  if (!isFinite(entry.fat) || entry.fat < 0) entry.fat = 0;
+  if (!isFinite(entry.carbs) || entry.carbs < 0) entry.carbs = 0;
+  if (!isFinite(entry.amount) || entry.amount < 0) entry.amount = 100;
   const entries = loadFoodLog();
   entries.push({ ...entry, id: 'food_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) });
   saveFoodLog(entries);
@@ -180,12 +185,13 @@ export function loadWaterLog(): WaterEntry[] {
 }
 
 export function addWater(amountMl: number): WaterEntry[] {
+  if (!isFinite(amountMl) || amountMl <= 0) return loadWaterLog();
   const today = new Date().toISOString().slice(0, 10);
   const entries = loadWaterLog();
   const existing = entries.find(e => e.date === today);
   if (existing) existing.amountMl += amountMl;
   else entries.push({ date: today, amountMl });
-  localStorage.setItem(WATER_KEY, JSON.stringify(entries.slice(-90)));
+  try { localStorage.setItem(WATER_KEY, JSON.stringify(entries.slice(-90))); } catch {}
   return entries;
 }
 

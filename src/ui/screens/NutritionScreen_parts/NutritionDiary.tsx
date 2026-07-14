@@ -46,10 +46,15 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   // Lazy-load USDA database
   useEffect(() => {
     let cancelled = false;
-    import('../../../data/usda-foods').then(m => {
-      if (!cancelled && m.USDA_FOODS) setUsdaFoods(m.USDA_FOODS.slice(0, 5000));
-    }).catch(() => {});
-    return () => { cancelled = true; };
+    // Defer loading to avoid blocking initial render (5MB data file)
+    const timer = setTimeout(() => {
+      import('../../../data/usda-foods').then(m => {
+        if (!cancelled && m.USDA_FOODS) {
+          try { setUsdaFoods(m.USDA_FOODS.slice(0, 5000)); } catch { setUsdaFoods([]); }
+        }
+      }).catch(() => { setUsdaFoods([]); });
+    }, 800);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, []);
   const [diaryData, setDiaryData] = useState<any>(() => { try { return JSON.parse(localStorage.getItem('nutrition_diary') || '{}'); } catch { return {}; } });
   const [refreshKey, setRefreshKey] = useState(0);
@@ -71,26 +76,27 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const saveMealMood = (date: string, mood: { satiety: number; enjoyment: number; note: string }) => {
     const upd = { ...mealMood, [date]: mood };
     setMealMood(upd);
-    localStorage.setItem('he_meal_mood', JSON.stringify(upd));
+    safeSet('he_meal_mood', upd);
   };
   const savePatterns = (date: string, patterns: string[]) => {
     const upd = { ...foodPatterns, [date]: patterns };
     setFoodPatterns(upd);
-    localStorage.setItem('he_food_patterns', JSON.stringify(upd));
+    safeSet('he_food_patterns', upd);
   };
   const saveTriggers = (date: string, triggers: string[]) => {
     const upd = { ...foodTriggers, [date]: triggers };
     setFoodTriggers(upd);
-    localStorage.setItem('he_food_triggers', JSON.stringify(upd));
+    safeSet('he_food_triggers', upd);
   };
   const ocrFileRef = useRef<HTMLInputElement>(null);
   const ocrCameraRef = useRef<HTMLInputElement>(null);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2000); };
+  const safeSet = (key: string, data: any) => { try { localStorage.setItem(key, JSON.stringify(data)); } catch {} };
 
-  useEffect(() => { try { setDiaryData(JSON.parse(localStorage.getItem('nutrition_diary') || '{}')); } catch {} }, [refreshKey, foodEntries]);
-  const saveDiary = (data: any) => { localStorage.setItem('nutrition_diary', JSON.stringify(data)); setDiaryData(data); setRefreshKey(k => k+1); onDiaryChange?.(); };
-  const addCustomMeal = () => { const name = customMealInput.trim(); if (!name || customMeals.includes(name)) return; const updated = [...customMeals, name]; setCustomMeals(updated); localStorage.setItem('he_custom_meals', JSON.stringify(updated)); setCustomMealInput(''); setShowCustomMeal(false); showToast('✅ Приём добавлен'); };
+  useEffect(() => { try { setDiaryData(JSON.parse(localStorage.getItem('nutrition_diary') || '{}')); } catch {} }, [refreshKey]);
+  const saveDiary = (data: any) => { safeSet('nutrition_diary', data); setDiaryData(data); setRefreshKey(k => k+1); onDiaryChange?.(); };
+  const addCustomMeal = () => { const name = customMealInput.trim(); if (!name || customMeals.includes(name)) return; const updated = [...customMeals, name]; setCustomMeals(updated); safeSet('he_custom_meals', updated); setCustomMealInput(''); setShowCustomMeal(false); showToast('✅ Приём добавлен'); };
 
   const allMealTypes = [...MEAL_PRESETS, ...customMeals];
 
@@ -485,11 +491,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 const entries = Object.entries(diaryData).filter(([date]) => date <= selectedDate).slice(-30);
                 if (entries.length < 3) return null;
                 const kcalValues: number[] = [];
-                const sleepDepDays: string[] = [];
                 entries.forEach(([date, day]: [string, any]) => {
                   const total = Object.values(day?.meals || {}).reduce((s: number, items: any) => s + (items as any[]).reduce((ss: number, i: any) => ss + (i.kcal||0), 0), 0);
                   kcalValues.push(total);
-                  if ((foodTriggers[date]||[]).includes('sleep_dep')) sleepDepDays.push(date);
                 });
                 const avg = kcalValues.reduce((s, v) => s + v, 0) / kcalValues.length;
                 const variance = kcalValues.reduce((s, v) => s + Math.pow(v - avg, 2), 0) / kcalValues.length;
@@ -666,7 +670,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                     <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                       <span style={{ fontWeight:600, fontSize:10, color:'#00e68a' }}>{meal}</span>
                       <button onClick={() => copyMeal(meal)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(139,92,246,0.15)', color:'#8b5cf6', fontSize:7 }} title="Копировать">📋</button>
-                      <button onClick={() => { const name = prompt('Название пресета:', meal); if (name) { const preset = { name, items: items.map((i: any) => ({ name: i.name, kcal: i.kcal, p: i.p, f: i.f, c: i.c })) }; const upd = [...mealPresets, preset]; setMealPresets(upd); localStorage.setItem('he_meal_presets', JSON.stringify(upd)); } }} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(0,230,138,0.15)', color:'#00e68a', fontSize:7 }} title="Сохранить как пресет">💾</button>
+                      <button onClick={() => { let name = ''; try { name = prompt('Название пресета:', meal) || ''; } catch { name = meal + ' (пресет)'; } if (name) { const preset = { name, items: items.map((i: any) => ({ name: i.name, kcal: i.kcal, p: i.p, f: i.f, c: i.c })) }; const upd = [...mealPresets, preset]; setMealPresets(upd); safeSet('he_meal_presets', upd); } }} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(0,230,138,0.15)', color:'#00e68a', fontSize:7 }} title="Сохранить как пресет">💾</button>
                     </div>
                     <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:8 }}>
                       <span style={{ color:'rgba(255,255,255,0.85)' }}>Б{Math.round(mealP)} Ж{Math.round(mealF)} У{Math.round(mealC)}</span>

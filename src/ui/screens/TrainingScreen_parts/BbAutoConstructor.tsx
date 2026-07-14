@@ -32,7 +32,7 @@ import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
 import { InjurySelectCard } from './InjurySelectCard';
 import type { InjurySelectEntry } from './InjurySelectCard';
-import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, type LoadStrategy, type DeloadType } from '../../../engines/bb/bb-autocoach.engine';
+import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, applyPostPhaseProcessing, type LoadStrategy, type DeloadType } from '../../../engines/bb/bb-autocoach.engine';
 import { PCT_FOR_RIR } from '../../../engines/rir-table';
 import { getCyclesByDirection, getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 import { convertCycleToBBPlan } from '../../../engines/bb/cycle-to-plan';
@@ -40,7 +40,7 @@ import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { getPlanFeedback } from '../../../engines/plan-execution-feedback.engine';
 import { validatePlan, weeklySetsFromBBPlan } from '../../../engines/plan-validator';
 import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } from './PlanCharts';
-import { distributePhases as distributePhasesUnified, type PhaseDistribution } from './TrainingConstructor/phase-periodization';
+import { distributePhases as distributePhasesUnified, PHASE_CONFIGS, type PhaseDistribution } from './TrainingConstructor/phase-periodization';
 import { validatePlanQuality, bbPlanToQualityInput, type PlanQualityResult } from '../../../engines/plan-quality.engine';
 import { PlanExportCard } from './PlanExportCard';
 
@@ -60,10 +60,6 @@ const TAG_LABELS_RU: Record<string, string> = {
 };
 const PHASE_COLORS: Record<BBPhase, string> = { accumulation: '#60a5fa', intensification: '#ef4444', deload: '#22c55e', peaking: '#a855f7' };
 const PHASE_LABELS: Record<BBPhase, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
-const PHASE_RIR: Record<BBPhase, [number, number]> = { accumulation: [3, 2], intensification: [2, 0], deload: [4, 3], peaking: [1, 0] };
-const PHASE_VOL_MULT: Record<BBPhase, number> = { accumulation: 1.0, intensification: 0.85, deload: 0.5, peaking: 0.7 };
-const PHASE_REP: Record<BBPhase, [number, number]> = { accumulation: [10, 15], intensification: [6, 10], deload: [12, 15], peaking: [3, 6] };
-const PHASE_TEMPO: Record<BBPhase, string> = { accumulation: '3-1-1-0', intensification: '2-0-1-0', deload: '4-2-2-1', peaking: '1-0-1-0' };
 const PHASE_TECHNIQUES: Record<BBPhase, string[]> = {
   accumulation: ['Темповые повторы (TUT)', 'Пауза в растянутой позиции', 'Суперсеты антагонистов'],
   intensification: ['Дроп-сеты (последний подход)', 'Рест-пауза (compounds)', 'Форсированные повторы (с партнёром)'],
@@ -337,6 +333,7 @@ export const BbAutoConstructor: React.FC = () => {
         weakPoints,
         peds,
         loadStrategy: loadStrategy as string,
+        injuries,
       });
       const cycleWeeks = cycle.meta.sessionsPerWeek;
       if (bbDays !== cycleWeeks) setBbDays(cycleWeeks);
@@ -352,110 +349,43 @@ export const BbAutoConstructor: React.FC = () => {
       }, pedAdapt);
     }
 
+    // Единая пост-обработка (фазы, темп, повторы, стратегия, делод, autoReg)
     const srpe = loadSRPESessions();
     const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : null;
-    const needsDeload = autoDeload && acwr && acwr.ratio > 1.3;
-    const deloadProtocol = needsDeload ? DELOAD_PROTOCOLS[deloadType] : null;
 
-    // Track week-in-phase for RIR drift
-    let weeksInCurrentPhase = 0;
-    let lastPhase = '';
-
-    const w2 = structuredClone(plan.weeks);
-    for (const w of w2) {
-      const ph = phaseForWeek(w.week, bbWeeks);
-      const volMult = PHASE_VOL_MULT[ph];
-      const [rirStart, rirEnd] = PHASE_RIR[ph];
-      const [repLo, repHi] = PHASE_REP[ph];
-      const tempoStr = PHASE_TEMPO[ph];
-
-      // Track week-in-phase for RIR drift
-      if (ph !== lastPhase) { weeksInCurrentPhase = 1; lastPhase = ph; }
-      else { weeksInCurrentPhase++; }
-
-      const phaseWeeksTotal = phases.filter(p => p.phase === ph).length;
-
-      // Count phases for phase-based rest times
-      const restByPhase = ph === 'accumulation' ? 60 : ph === 'intensification' ? 90 : ph === 'peaking' ? 150 : 60;
-
-      if (needsDeload && ph === 'deload' && deloadProtocol) {
-        // Apply structured deload protocol
-        for (const s of w.sessions) {
-          for (const e of s.exercises) {
-            e.rir = deloadProtocol.rirTarget;
-            e.repsRange = [deloadProtocol.repRange[0], deloadProtocol.repRange[1]];
-            for (const ws of e.workSets) {
-              const maxW = bbWorkMax[e.muscle] || 80;
-              const basePct = PCT_FOR_RIR[deloadProtocol.rirTarget] ?? 0.85;
-              const baseWeight = Math.round(maxW * basePct * 10) / 10;
-              ws.reps = Math.round((deloadProtocol.repRange[0] + deloadProtocol.repRange[1]) / 2);
-              ws.rir = deloadProtocol.rirTarget;
-              ws.tempo = tempoStr;
-              ws.weight = Math.round(baseWeight * deloadProtocol.intensityMultiplier * 10) / 10;
-              ws.restSeconds = deloadProtocol.restSeconds;
-              e.sets = Math.max(1, Math.round(e.sets * deloadProtocol.volumeMultiplier));
-            }
-          }
-        }
-      } else {
-        for (const s of w.sessions) {
-          for (const e of s.exercises) {
-            e.sets = Math.max(1, Math.round(e.sets * volMult));
-            // RIR drift within phase
-            const driftedRir = rirDrift([rirStart, rirEnd], weeksInCurrentPhase, phaseWeeksTotal);
-            // RIR by exercise type: primary closer to failure, accessory further
-            const isPrimary = e.role === 'primary';
-            const isCalvesAbs = ['calves', 'abs'].includes(e.muscle);
-            e.rir = isPrimary ? driftedRir : Math.min(5, driftedRir + 1);
-            // Rep ranges by exercise type: compounds 8-12, isolation 12-20, calves/abs 15-25
-            if (isCalvesAbs) {
-              e.repsRange = [15, 25];
-            } else if (isPrimary) {
-              e.repsRange = e.character === 'тяж' ? [8, 12] : [10, 15];
-            } else {
-              e.repsRange = e.character === 'тяж' ? [10, 15] : [12, 20];
-            }
-            for (const ws of e.workSets) {
-              const rirForWeight = e.rir; // phase-appropriate RIR (already drifted)
-              const basePct = PCT_FOR_RIR[rirForWeight] ?? 0.9;
-              const maxW = bbWorkMax[e.muscle] || 80;
-              const baseWeight = Math.round(maxW * basePct * 10) / 10;
-
-              ws.reps = Math.round((e.repsRange[0] + e.repsRange[1]) / 2);
-              ws.rir = e.rir;
-              ws.tempo = tempoStr;
-              // Apply load strategy to weight from phase-appropriate baseline
-              const prescr = prescribeLoad(loadStrategy as LoadStrategy, baseWeight, ws.reps, e.rir, maxW, w.week, bbWeeks, ph);
-              ws.weight = Math.round(prescr.nextWeight * 10) / 10;
-              ws.restSeconds = restByPhase;
-            }
-          }
-        }
-      }
-    }
-
-    // Apply auto-regulation multipliers when autoRegOn is active
-    if (autoRegOn && autoRegResult) {
-      for (const w of w2) {
-        for (const s of w.sessions) {
-          for (const e of s.exercises) {
-            e.sets = Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier));
-            for (const ws of e.workSets) {
-              ws.weight = Math.round(ws.weight * autoRegResult.topSetPctMultiplier * 10) / 10;
-            }
-            e.rir = Math.min(5, e.rir + autoRegResult.rirShift);
-            e.repsRange = [Math.max(1, e.repsRange[0] - autoRegResult.rirShift), Math.max(2, e.repsRange[1] - autoRegResult.rirShift)];
-          }
-        }
-      }
-    }
+    const processedPlan = applyPostPhaseProcessing({
+      plan,
+      totalWeeks: bbWeeks,
+      workMax: bbWorkMax,
+      loadStrategy: loadStrategy as LoadStrategy,
+      autoDeload,
+      deloadType,
+      acwrRatio: acwr?.ratio,
+      autoRegResult: autoRegOn && autoRegResult ? {
+        volumeMultiplier: autoRegResult.volumeMultiplier,
+        topSetPctMultiplier: autoRegResult.topSetPctMultiplier,
+        rirShift: autoRegResult.rirShift,
+      } : undefined,
+    });
 
     const modeLabel = planMode === 'bb_cycle' ? `BB-цикл: ${getCycleById(selectedCycleId)?.meta.title || selectedCycleId}` : 'Generic-сплит';
-    setBuiltPlan({ ...plan, weeks: w2, rationale: [...plan.rationale, `📌 Источник: ${modeLabel}`, `📈 Стратегия: ${loadStrategy}`, `🔄 Делод-протокол: ${needsDeload ? DELOAD_PROTOCOLS[deloadType].description : 'нет'}`, `💪 Слабые группы: ${weakPoints.length > 0 ? weakPoints.join(', ') : 'нет'}`] });
+    const deloadNote = autoDeload && acwr && acwr.ratio > 1.3
+      ? `🔄 Делод: ${DELOAD_PROTOCOLS[deloadType].description}`
+      : 'Делод: нет';
+
+    setBuiltPlan({
+      ...processedPlan,
+      rationale: [...processedPlan.rationale,
+        `📌 Источник: ${modeLabel}`,
+        `📈 Стратегия: ${loadStrategy}`,
+        deloadNote,
+        `💪 Слабые группы: ${weakPoints.length > 0 ? weakPoints.join(', ') : 'нет'}`,
+      ],
+    });
     setBbWeekSel(1);
     setStep('plan');
     try {
-      const sessions = w2.flatMap(w => w.sessions.map((s, si) => ({
+      const sessions = processedPlan.weeks.flatMap(w => w.sessions.map((s, si) => ({
         label: 'Нед' + w.week + ' Д' + (si+1),
         exercises: s.exercises.map(e => ({ name: e.name, muscleGroup: e.muscle, sets: e.sets, reps: e.workSets[0]?.reps || 10, weight: e.workSets[0]?.weight || 60, rir: e.rir })),
       })));
@@ -737,7 +667,7 @@ export const BbAutoConstructor: React.FC = () => {
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <span style={{ fontSize:12, fontWeight:700, color:PHASE_COLORS[currentPhase] }}>📌 Фаза: {PHASE_LABELS[currentPhase]}</span>
             <span style={{ fontSize:10, color:'rgba(255,255,255,0.7)' }}>
-              RIR {PHASE_RIR[currentPhase][0]}→{PHASE_RIR[currentPhase][1]} · Повт {PHASE_REP[currentPhase][0]}-{PHASE_REP[currentPhase][1]} · Темп {PHASE_TEMPO[currentPhase]}
+              RIR {PHASE_CONFIGS[currentPhase].rirRange[0]}→{PHASE_CONFIGS[currentPhase].rirRange[1]} · Повт {PHASE_CONFIGS[currentPhase].repRange[0]}-{PHASE_CONFIGS[currentPhase].repRange[1]} · Темп {PHASE_CONFIGS[currentPhase].tempo}
             </span>
           </div>
           <div style={{ marginTop:4, fontSize:10, color:'rgba(255,255,255,0.55)' }}>
@@ -881,9 +811,9 @@ export const BbAutoConstructor: React.FC = () => {
                   const adjSets0 = autoRegOn && autoRegResult ? Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier)) : e.sets;
                   const editKey = `${si}-${ei}`;
                   const edit = exerciseEdits[editKey] || { sets: adjSets0, reps: e.workSets[0]?.reps || 10, weight: adjW };
-                  const comment = exerciseComment(e, weakPoints, bbFocus, currentPhase);
+                  const comment = e.comment || exerciseComment(e, weakPoints, bbFocus, currentPhase);
                   const isEditing = editMode?.dayIdx === si && editMode?.exIdx === ei;
-                  const warmups = e.role === 'primary' && e.character === 'тяж' ? generateWarmupSets(edit.weight, edit.sets, true) : [];
+                  const warmups = (e.warmupSets && e.warmupSets.length > 0) ? e.warmupSets : (e.role === 'primary' && e.character === 'тяж' ? generateWarmupSets(edit.weight, edit.sets, true) : []);
                   const rotEx = rotationSubstitutions(wk.week, bbWeeks, e.muscle, e.name);
                   return (
                     <div key={ei} style={{ padding:'6px 10px', borderTop:'1px solid rgba(255,255,255,0.04)' }}>

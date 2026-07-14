@@ -59,9 +59,11 @@ function buildSearchTermMap(): Record<string, string[]> {
     if (ids.length) add(s.label.replace(/[🫀🧠❤️🫁💪🦴🛡️⚡🫃🩸⚖️🧬🔴👁️🔬🔋]/g,'').trim(), ids);
   });
 
-  // 5. Механизмы → вещества
+  // 5. Механизмы (ТЗ) → вещества — ищем по mechanismOfAction тексту
   TOP_MECHANISMS.forEach(m => {
-    const ids = Object.values(SUPPORT_CATALOG_DATA).filter(c => c.mechanisms?.includes(m.key)).map(c => c.id);
+    const kw = (m.label || '').replace(/[🛡️😌💎😊⚡🔥🔋🩸🧠💪🫁❤️🫘🧬]/g,'').trim().toLowerCase();
+    if (!kw) return;
+    const ids = Object.values(SUPPORT_CATALOG_DATA).filter(c => (c.mechanismOfAction || '').toLowerCase().includes(kw)).map(c => c.id);
     if (ids.length) add(m.label.replace(/[🛡️😌💎😊⚡🔥🔋🩸🧠💪🫁]/g,'').trim(), ids);
   });
 
@@ -175,7 +177,10 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
     if (tierFilter.length > 0) list = list.filter(c => tierFilter.includes(c.tier || ''));
     if (organFilter.length > 0) list = list.filter(c => c.organs?.some(o => organFilter.includes(o)));
     if (systemFilter.length > 0) list = list.filter(c => c.systems?.some(s => systemFilter.includes(s)));
-    if (mechFilter.length > 0) list = list.filter(c => c.mechanisms?.some(m => mechFilter.includes(m)));
+    if (mechFilter.length > 0) {
+      const labels = mechFilter.map(k => (TOP_MECHANISMS.find(t => t.key === k)?.label || '').replace(/[🛡️😌💎😊⚡🔥🔋🩸🧠💪🫁❤️🫘🧬]/g,'').trim().toLowerCase()).filter(Boolean);
+      list = list.filter(c => labels.some(l => (c.mechanismOfAction || '').toLowerCase().includes(l)));
+    }
     if (goalFilter) {
       const matched = findSupplements({ goal: goalFilter, profile: toFinderProfile(profile), maxResults: 999 });
       const ids = new Set(matched.map(m => m.id));

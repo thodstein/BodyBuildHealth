@@ -95,7 +95,8 @@ function calcFoodDIAAS(f: FoodItem): { diaas: number; limitingAA: string } {
   for (const [name, val, ref] of pairs) {
     if (ref <= 0) continue;
     hasData = true;
-    const ratio = (val * digest) / (ref / 1000);
+    const proteinContent = food.protein || 1;
+    const ratio = proteinContent > 0 ? (val * digest) / (proteinContent * ref) : 0;
     if (ratio < minRatio) { minRatio = ratio; limiting = name; }
   }
   if (!hasData) return { diaas: 0, limitingAA: 'нет данных' };
@@ -140,10 +141,18 @@ export function calcKbjuMatchScore(food: FoodItem, target: KbjuTarget, currentKb
   const per100 = { kcal: food.kcal, protein: food.protein, fat: food.fat, carbs: food.carbs };
   const totalGap = remaining.protein + remaining.fat + remaining.carbs;
 
-  // Calculate how much of each macro gap this food fills
-  const proteinFill = remaining.protein > 0 ? Math.min(1, food.protein / Math.max(1, remaining.protein)) : 0;
-  const fatFill = remaining.fat > 0 ? Math.min(1, food.fat / Math.max(1, remaining.fat)) : 0;
-  const carbsFill = remaining.carbs > 0 ? Math.min(1, food.carbs / Math.max(1, remaining.carbs)) : 0;
+  // Calculate macro COMPOSITION match (%, not absolute grams) — compare food profile to gap profile
+  const foodMacroSum = food.protein + food.fat + food.carbs || 1;
+  const gapSum = remaining.protein + remaining.fat + remaining.carbs || 1;
+  const proteinFill = remaining.protein > 0
+    ? Math.min(1, (food.protein / foodMacroSum) / Math.max(0.001, remaining.protein / gapSum))
+    : 0;
+  const fatFill = remaining.fat > 0
+    ? Math.min(1, (food.fat / foodMacroSum) / Math.max(0.001, remaining.fat / gapSum))
+    : 0;
+  const carbsFill = remaining.carbs > 0
+    ? Math.min(1, (food.carbs / foodMacroSum) / Math.max(0.001, remaining.carbs / gapSum))
+    : 0;
 
   // Primary macro match: is the food's primary macro the one most needed?
   const maxGap = Math.max(remaining.protein, remaining.fat, remaining.carbs);
@@ -250,10 +259,22 @@ export function scoreFoodsForKBJU(
  */
 export function parseServingSizeGrams(servingSize?: string): number {
   if (!servingSize) return 100;
-  const m = servingSize.match(/(\d+)\s*г/i);
-  if (m) return parseInt(m[1], 10);
+  // Priority: match "(N г)" or "(N мл)" in parentheses (most specific)
+  const mParen = servingSize.match(/\((\d+)\s*(?:г|g|мл|ml)\)/i);
+  if (mParen) { const v = parseInt(mParen[1], 10); if (v > 0) return v; }
+  // Direct "N г" / "N g" / "N мл" / "N ml"
+  const mDirect = servingSize.match(/(\d+)\s*(?:г|g|мл|ml)/i);
+  if (mDirect) { const v = parseInt(mDirect[1], 10); if (v > 0) return v; }
+  // Fallback: first number, but only if it seems like grams (not "2 шт" = 2 pieces)
   const n = servingSize.match(/(\d+)/);
-  return n ? parseInt(n[1], 10) : 100;
+  if (n) {
+    const v = parseInt(n[1], 10);
+    if (v === 0) return 100; // "0 г" → use default
+    if (v >= 10) return v;   // likely grams
+    // Small numbers (< 10) could be pieces ("2 шт") → use default
+    return 100;
+  }
+  return 100;
 }
 
 /** Весовые коэффициенты распределения КБЖУ по приёмам */
@@ -262,7 +283,7 @@ const MEAL_WEIGHT: Record<string, number> = {
   'обед': 0.3, 'ужин': 0.25, 'перекус': 0.1, 'перекус1': 0.1, 'перекус2': 0.1,
   'ланч': 0.2, 'полдник': 0.15,
 };
-const DEFAULT_MEAL_WEIGHT = 1 / 3;
+const DEFAULT_MEAL_WEIGHT = 0; // unrecognized meals get 0 weight, normalized via 1/mealCount
 
 export function getMealKBJUTarget(dayPlan: any, mealIdx: number): KbjuTarget | null {
   if (!dayPlan?.totals || !dayPlan?.meals) return null;
