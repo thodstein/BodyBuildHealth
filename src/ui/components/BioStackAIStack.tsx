@@ -3,7 +3,6 @@ import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { buildStack, explainStack, findReplacement, findComplexForStack, type ReplacementResult, type ReplacementType, type ComplexMatch } from '../../engines/supplement-finder.engine';
 import { buildSmartStack } from '../../engines/biostack-recommender.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS, ALL_SUBSTANCES } from '../../data/support-database';
-import { TZ_MECH_LABELS } from '../../data/support-db';
 import { decodeGarbled } from '../../utils/text-sanitizer';
 import { GlassCard, StatBox, ORGANS, toFinderProfile, ConfirmModal, showToast, PRICE_RUB, estCost } from './BioStackAIConstants';
 import { SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX } from '../../data/support-meta';
@@ -18,6 +17,20 @@ const STK_EVIDENCE: Record<string, { label: string; color: string }> = {
   A: { label: 'A', color: '#22c55e' },
   B: { label: 'B', color: '#f59e0b' },
   C: { label: 'C', color: '#6366f1' },
+};
+
+const DOMAIN_LABELS_RU: Record<string, string> = {
+  antioxidant: 'Антиоксидантная защита',
+  hepatic: 'Печень и детокс',
+  cardio: 'Сердце и сосуды',
+  neuro: 'Нервная система',
+  metabolic: 'Метаболизм и энергия',
+  detox: 'Детоксикация',
+  immune: 'Иммунитет',
+  hormonal: 'Гормональная регуляция',
+  membrane: 'Клеточные мембраны',
+  adaptogen: 'Адаптогенная поддержка',
+  general: 'Общая поддержка',
 };
 
 function getTitration(id: string, cat: any): string | null {
@@ -106,7 +119,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
         } else {
           const shared = (a.mechanisms || []).filter((m: string) => (b.mechanisms || []).includes(m));
           if (shared.length > 0) {
-            pairDetails.push({ a: nameA, b: nameB, text: `Общие механизмы: ${shared.slice(0, 2).map(m => TZ_MECH_LABELS[m as keyof typeof TZ_MECH_LABELS] || m).join(', ')}`, strength: 'MEDIUM', domain });
+            pairDetails.push({ a: nameA, b: nameB, text: `Общая область: ${DOMAIN_LABELS_RU[domain] || 'Общая поддержка'}`, strength: 'MEDIUM', domain });
           } else {
             pairDetails.push({ a: nameA, b: nameB, text: 'Независимые механизмы — взаимодополнение', strength: 'LOW', domain });
           }
@@ -131,7 +144,8 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
       if (!cat) continue;
       const uniqueMechs = (cat.mechanisms || []).filter(m => (mechCoverage.get(m)?.length || 0) === 1);
       if (uniqueMechs.length > 0) {
-        contributions.push({ id, text: `Единственный источник ${uniqueMechs.slice(0,2).map(m => TZ_MECH_LABELS[m as keyof typeof TZ_MECH_LABELS] || m).join(', ')}` });
+        const ruMech = (cat.mechanismOfAction || cat.description || 'уникальная поддержка').slice(0, 50);
+        contributions.push({ id, text: `Единственный источник: ${ruMech}` });
       }
     }
 
@@ -147,16 +161,6 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
       : `Стек из ${stackIds.length} препаратов: ${pairDetails.length} взаимодействий.`;
 
     return { cascadeDesc, pairs: pairDetails, roles, contributions, domains: activeDomains, coverage: [...mechCoverage.entries()].map(([m, ids]) => ({ mechanism: m, coveredBy: ids })) };
-  }, [stackIds]);
-
-  const stackMechanisms = useMemo(() => {
-    if (stackIds.length === 0) return [];
-    const mechs = new Set<string>();
-    for (const id of stackIds) {
-      const cat = SUPPORT_CATALOG_DATA[id];
-      (cat?.mechanisms || []).forEach(m => mechs.add(m));
-    }
-    return [...mechs].slice(0, 15);
   }, [stackIds]);
 
   const stackSystems = useMemo(() => {
@@ -923,11 +927,11 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
           </div>
 
           <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#22c55e', marginBottom: 4 }}>🔬 Покрытие механизмов ({synergyExplanation.coverage.length})</div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#22c55e', marginBottom: 4 }}>🔬 Области покрытия ({synergyExplanation.domains.length})</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-              {synergyExplanation.coverage.slice(0, 14).map(({ mechanism, coveredBy }) => (
-                <span key={mechanism} title={`${coveredBy.join(', ')}`} style={{ fontSize: 7, padding: '2px 5px', borderRadius: 4, background: 'rgba(34,197,94,0.08)', color: '#22c55e' }}>
-                  {TZ_MECH_LABELS[mechanism as keyof typeof TZ_MECH_LABELS] || mechanism.replace(/_/g, ' ').slice(0, 25)}
+              {synergyExplanation.domains.map(d => (
+                <span key={d} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.08)', color: '#22c55e' }}>
+                  {DOMAIN_LABELS_RU[d] || d}
                 </span>
               ))}
             </div>
@@ -1456,7 +1460,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
                   background: 'rgba(24,24,27,0.3)', border: '1px solid rgba(255,255,255,0.04)', borderTop: 'none',
                 }}>
                   <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4, marginBottom: 6 }}>
-                    🧬 <strong style={{ color: '#a78bfa' }}>Механизм:</strong> {entry.mechanism}
+                    🧬 <strong style={{ color: '#a78bfa' }}>Механизм:</strong> {cat.mechanismOfAction || entry.mechanism}
                   </div>
 
                   {(() => {

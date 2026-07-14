@@ -93,7 +93,7 @@ const ConjugateDesigner: React.FC = () => {
       {/* Основные движения */}
       <div style={{ display: 'flex', gap: 6 }}>
         <div style={{ ...GLASS, flex: 1 }}>
-          <div style={LABEL}>Upper (ME/DE)</div>
+          <div style={LABEL}>Верх (ME/DE)</div>
           <div style={{ display: 'flex', gap: 3 }}>
             {LIFT_OPTIONS.map(o => (
               <button key={o.id} onClick={() => setUpperLift(o.id)} style={PILL(upperLift === o.id, '#ff6b35')}>{o.label}</button>
@@ -101,7 +101,7 @@ const ConjugateDesigner: React.FC = () => {
           </div>
         </div>
         <div style={{ ...GLASS, flex: 1 }}>
-          <div style={LABEL}>Lower (ME/DE)</div>
+          <div style={LABEL}>Низ (ME/DE)</div>
           <div style={{ display: 'flex', gap: 3 }}>
             {LIFT_OPTIONS.map(o => (
               <button key={o.id} onClick={() => setLowerLift(o.id)} style={PILL(lowerLift === o.id, '#3b82f6')}>{o.label}</button>
@@ -150,7 +150,7 @@ const ConjugateDesigner: React.FC = () => {
         </div>
       </div>
       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 6 }}>
-        ME вариации: upper <b style={{ color: '#ff6b35' }}>{currentWeek.meVariation.upper}</b> · lower <b style={{ color: '#ff6b35' }}>{currentWeek.meVariation.lower}</b>
+        ME вариации: верх <b style={{ color: '#ff6b35' }}>{currentWeek.meVariation.upper}</b> · низ <b style={{ color: '#ff6b35' }}>{currentWeek.meVariation.lower}</b>
         <span style={{ marginLeft: 6, color: 'rgba(255,255,255,0.25)' }}>Волна: {waveInfo.note}</span>
       </div>
 
@@ -180,13 +180,13 @@ const ConjugateDesigner: React.FC = () => {
       {/* Вариации */}
       <div style={GLASS}>
         <div style={H}>📋 Все ME-вариации</div>
-        <div style={{ fontSize: 10, color: '#ff6b35', fontWeight: 700, marginBottom: 4 }}>Upper:</div>
+        <div style={{ fontSize: 10, color: '#ff6b35', fontWeight: 700, marginBottom: 4 }}>Верх:</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
           {variations.upper.map((v, i) => (
             <span key={i} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(255,107,53,0.08)', color: '#ff6b35', border: '1px solid rgba(255,107,53,0.15)' }}>{v}</span>
           ))}
         </div>
-        <div style={{ fontSize: 10, color: '#3b82f6', fontWeight: 700, marginBottom: 4 }}>Lower:</div>
+        <div style={{ fontSize: 10, color: '#3b82f6', fontWeight: 700, marginBottom: 4 }}>Низ:</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
           {variations.lower.map((v, i) => (
             <span key={i} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(59,130,246,0.08)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.15)' }}>{v}</span>

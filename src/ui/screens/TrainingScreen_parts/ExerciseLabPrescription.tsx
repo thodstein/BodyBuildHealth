@@ -355,7 +355,7 @@ const PrescriptionTab: React.FC = () => {
             <div>
               <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Уровень</div>
               <select value={genLevel} onChange={e => setGenLevel(e.target.value)} style={{ width: '100%', padding: '5px', borderRadius: 6, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11 }}>
-                <option value="beginner">Новичок</option><option value="intermediate">Средний</option><option value="advanced">Опытный</option><option value="enhanced">Enhanced</option>
+                <option value="beginner">Новичок</option><option value="intermediate">Средний</option><option value="advanced">Опытный</option><option value="enhanced">На курсе</option>
               </select>
             </div>
             <div>

@@ -128,24 +128,53 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
 
       {result && (
         <>
-          {/* Риск до/после + покрытие */}
-          <GlassCard title="📊 Результат" icon="📈" color="#60a5fa" style={{ marginTop: 12 }}>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 120 }}>
-                <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.6)' }}>Риск до поддержки</div>
-                <div style={{ fontSize: 22, fontWeight: 800 }}>{result.riskBefore}</div>
-              </div>
-              <div style={{ flex: 1, minWidth: 120 }}>
-                <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.6)' }}>Риск после поддержки</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: '#00e68a' }}>
-                  {result.riskAfter}
-                </div>
-              </div>
-              <div style={{ flex: 1, minWidth: 120 }}>
-                <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.6)' }}>Покрытие</div>
-                <div style={{ fontSize: 22, fontWeight: 800 }}>{result.coveragePercent}%</div>
-              </div>
-            </div>
+          {/* Риск до/после + покрытие — ТОЛЬКО прогноз изменения (не влияет на расчёт рисков) */}
+          <GlassCard title="📊 Возможное изменение риска" icon="📈" color="#60a5fa" style={{ marginTop: 12 }}>
+            {(() => {
+              const delta = Math.round((result.riskBefore - result.riskAfter) * 10) / 10;
+              const improved = delta > 0;
+              return (
+                <>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ flex: 1, minWidth: 90 }}>
+                      <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.6)' }}>Риск сейчас</div>
+                      <div style={{ fontSize: 22, fontWeight: 800 }}>{result.riskBefore}</div>
+                    </div>
+                    <div style={{ fontSize: 18, color: 'rgba(235,235,245,0.4)' }}>→</div>
+                    <div style={{ flex: 1, minWidth: 90 }}>
+                      <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.6)' }}>Прогноз со стеком</div>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: improved ? '#00e68a' : '#fbbf24' }}>
+                        {result.riskAfter}
+                      </div>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 90 }}>
+                      <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.6)' }}>Δ прогноз</div>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: improved ? '#00e68a' : '#9ca3af' }}>
+                        {improved ? '−' : delta < 0 ? '+' : ''}{Math.abs(delta)}
+                      </div>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 90 }}>
+                      <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.6)' }}>Покрытие</div>
+                      <div style={{ fontSize: 22, fontWeight: 800 }}>{result.coveragePercent}%</div>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 10,
+                      padding: '6px 8px',
+                      borderRadius: 8,
+                      background: 'rgba(96,165,250,0.1)',
+                      fontSize: 10,
+                      color: 'rgba(235,235,245,0.6)',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    ⓘ Прогноз возможного изменения. BioStack не влияет на расчёт рисков — цифры служат
+                    только для оценки потенциального эффекта поддержки.
+                  </div>
+                </>
+              );
+            })()}
             <div style={{ marginTop: 8, fontSize: 11, color: 'rgba(235,235,245,0.55)' }}>
               Источник: {result.sourceOfTruth} · неделя курса {result.courseWeek}
             </div>
@@ -197,15 +226,84 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
             ))}
           </GlassCard>
 
-          {/* Отсеянные */}
-          {result.excluded.length > 0 && (
-            <GlassCard title={`⛔ Отсеяно шлюзом (${result.excluded.length})`} icon="🛡️" color="#f87171" style={{ marginTop: 12 }}>
-              {result.excluded.map((x, i) => (
-                <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontWeight: 600, fontSize: 12 }}>{x.name}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(235,235,245,0.6)' }}>{x.reason}</div>
+          {/* Отсеянные — сгруппированы по клинической тяжести */}
+          {result.excluded.length > 0 && (() => {
+            const SEV_META: Record<string, { title: string; icon: string; color: string; note: string }> = {
+              hard: { title: 'Абсолютные противопоказания', icon: '🛑', color: '#f87171', note: 'Удалены полностью — приём недопустим' },
+              drug: { title: 'Конфликты с лекарствами', icon: '💊', color: '#fb7185', note: 'Удалены из-за взаимодействия с текущими ЛС' },
+              ul: { title: 'Превышен верхний предел (UL)', icon: '⚠️', color: '#f59e0b', note: 'Удалены во избежание передозировки' },
+              titration: { title: 'Требуется титрация дозы', icon: '🔧', color: '#fbbf24', note: 'Не удаление — снизьте/подберите дозу под контролем' },
+              redundant: { title: 'Дублирование (избыточно)', icon: '🔁', color: '#9ca3af', note: 'Убраны как дубли уже покрытых механизмов' },
+            };
+            const order: Array<keyof typeof SEV_META> = ['hard', 'drug', 'ul', 'titration', 'redundant'];
+            const groups = order
+              .map((sev) => ({ sev, meta: SEV_META[sev], items: result.excluded.filter((x) => x.severity === sev) }))
+              .filter((g) => g.items.length > 0);
+            return groups.map((g) => (
+              <GlassCard
+                key={g.sev}
+                title={`${g.meta.title} (${g.items.length})`}
+                icon={g.meta.icon}
+                color={g.meta.color}
+                style={{ marginTop: 12 }}
+              >
+                <div style={{ fontSize: 10, color: g.meta.color, marginBottom: 6, fontWeight: 600 }}>
+                  {g.meta.note}
                 </div>
-              ))}
+                {g.items.map((x, i) => (
+                  <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ fontWeight: 600, fontSize: 12 }}>{x.name}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(235,235,245,0.6)' }}>{x.reason}</div>
+                  </div>
+                ))}
+              </GlassCard>
+            ));
+          })()}
+
+          {/* Титрация доз — веществ, которые ОСТАЛИСЬ в стеке, но требуют коррекции дозы */}
+          {result.safety.drugTitrations.length > 0 && (
+            <GlassCard title={`🔧 Титрация доз (${result.safety.drugTitrations.length})`} icon="🔧" color="#fbbf24" style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 10, color: '#fbbf24', marginBottom: 6, fontWeight: 600 }}>
+                Вещество остаётся в стеке, но дозу нужно подобрать под контролем (взаимодействие с текущими ЛС)
+              </div>
+              {result.safety.drugTitrations.map((t: any, i: number) => {
+                const kept = result.substances.some((s) => s.id === t.substanceId);
+                return (
+                  <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                      <div style={{ fontWeight: 700, fontSize: 12 }}>{t.substanceName}</div>
+                      <span
+                        style={{
+                          fontSize: 9,
+                          padding: '2px 6px',
+                          borderRadius: 6,
+                          background: kept ? 'rgba(0,230,138,0.18)' : 'rgba(156,163,175,0.18)',
+                          color: kept ? '#00e68a' : '#9ca3af',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {kept ? 'в стеке' : 'отсеяно'}
+                      </span>
+                    </div>
+                    {t.drug && (
+                      <div style={{ fontSize: 10, color: 'rgba(235,235,245,0.6)', marginTop: 2 }}>
+                        ЛС: {t.drug}
+                        {t.effect ? ` · ${t.effect}` : ''}
+                      </div>
+                    )}
+                    {t.recommendation && (
+                      <div style={{ fontSize: 11, color: '#fbbf24', marginTop: 3 }}>
+                        → {t.recommendation}
+                      </div>
+                    )}
+                    {t.mechanism && (
+                      <div style={{ fontSize: 10, color: 'rgba(235,235,245,0.5)', marginTop: 2 }}>
+                        {t.mechanism}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </GlassCard>
           )}
 

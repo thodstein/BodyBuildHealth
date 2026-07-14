@@ -235,7 +235,8 @@ export const BbAutoConstructor: React.FC = () => {
   const [autoDeload, setAutoDeload] = useState<boolean>(true);
   const [deloadType, setDeloadType] = useState<DeloadType>('pump');
 
-  const [peds, setPeds] = useState<PED[]>(prof.onCourse ? ['AAS'] : []);
+  const [peds, setPeds] = useState<PED[]>((prof.bbPeds?.length ? prof.bbPeds : (prof.onCourse ? ['AAS'] : [])) as PED[]);
+  const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(prof.courseIntensity || 'moderate');
   const [bbWorkMax, setBbWorkMax] = useState<Record<string, number>>(() => ({
     chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60,
     ...(prof.workMax || {}),
@@ -282,8 +283,8 @@ export const BbAutoConstructor: React.FC = () => {
   }, [builtPlan, bbLevel, weakPoints, autoDeload, peds]);
 
   useEffect(() => {
-    try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, injuries, onCourse: peds.length > 0, loadStrategy, planMode, bbCycleId: selectedCycleId }); } catch {}
-  }, [bbWorkMax, weakPoints, peds, loadStrategy, planMode, selectedCycleId]);
+    try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, injuries, onCourse: peds.length > 0, bbPeds: peds, courseIntensity, loadStrategy, planMode, bbCycleId: selectedCycleId }); } catch {}
+  }, [bbWorkMax, weakPoints, peds, courseIntensity, loadStrategy, planMode, selectedCycleId]);
 
   const adjustVolume = (mult: number) => {
     if (!builtPlan) return;
@@ -302,7 +303,7 @@ export const BbAutoConstructor: React.FC = () => {
     setBuiltPlan({ ...builtPlan, weeks: w2 });
   };
 
-  const bbCyclesList = useMemo(() => getCyclesByDirection('bodybuilding'), []);
+  const bbCyclesList = useMemo(() => getCyclesByDirection('bodybuilding').filter(c => !c.meta.id.startsWith('embed-')), []);
 
   const applyBbSubstitution = useCallback((newId: string) => {
     if (!subTarget || !builtPlan) return;
@@ -620,6 +621,22 @@ export const BbAutoConstructor: React.FC = () => {
           ))}
         </div>
         {peds.length > 0 && <div style={{ ...SMALL, marginTop:6 }}>{explainPEDAdaptation(pedAdapt)}</div>}
+        {peds.length > 0 && (
+          <div style={{ marginTop:8 }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Интенсивность курса</div>
+            <div style={{ display:'flex', gap:6 }}>
+              {([['mild','Лёгкая'],['moderate','Умеренная'],['heavy','Тяжёлая']] as const).map(([val,label]) => (
+                <button key={val} onClick={() => setCourseIntensity(val)}
+                  style={{ padding:'5px 10px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer',
+                    border: courseIntensity===val ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                    background: courseIntensity===val ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)',
+                    color: courseIntensity===val ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       <div style={H}>💪 Рабочие максимумы (кг)</div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:10 }}>
@@ -1012,16 +1029,29 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', padding:'2px 0', minWidth:340 }}>
               <span>Мышца</span><span>Сетов</span><span>Тяж</span><span>Памп</span><span>MRV</span>
             </div>
-            {metrics.perMuscle.map(mm => {
-              const over = mm.totalSets > mm.mrv;
-              return <div key={mm.muscle} style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:10, color:'rgba(255,255,255,0.85)', padding:'3px 0', borderTop:'1px solid rgba(255,255,255,0.04)', minWidth:340 }}>
-                <span style={{ fontWeight:600 }}>{mm.muscle}{over?' ⚠':''}</span>
-                <span style={{ color:over?'#ef4444':ACCENT, fontWeight:700 }}>{mm.totalSets}</span>
-                <span style={{ color:'#ef4444' }}>{mm.тяжSets}</span>
-                <span style={{ color:'#60a5fa' }}>{mm.пампSets}</span>
-                <span style={{ color:'rgba(255,255,255,0.5)' }}>{mm.mrv}</span>
-              </div>;
-            })}
+            {(() => {
+              const weakSet = new Set<string>(weakPoints as string[]);
+              const weakVols = metrics.perMuscle.filter(x => weakSet.has(x.muscle));
+              const normVols = metrics.perMuscle.filter(x => !weakSet.has(x.muscle));
+              const weakAvg = weakVols.length ? Math.round(weakVols.reduce((s,x)=>s+x.totalSets,0)/weakVols.length) : 0;
+              const normAvg = normVols.length ? Math.round(normVols.reduce((s,x)=>s+x.totalSets,0)/normVols.length) : 0;
+              return <>
+                {metrics.perMuscle.map(mm => {
+                  const over = mm.totalSets > mm.mrv;
+                  const weak = weakSet.has(mm.muscle);
+                  return <div key={mm.muscle} style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:10, color:'rgba(255,255,255,0.85)', padding:'3px 0', borderTop:'1px solid rgba(255,255,255,0.04)', minWidth:340, background: weak?'rgba(236,72,153,0.08)':'transparent' }}>
+                    <span style={{ fontWeight:600, color: weak?'#ec4899':undefined }}>{weak?'🔥 ':''}{mm.muscle}{over?' ⚠':''}</span>
+                    <span style={{ color:over?'#ef4444':(weak?'#ec4899':ACCENT), fontWeight:700 }}>{mm.totalSets}</span>
+                    <span style={{ color:'#ef4444' }}>{mm.тяжSets}</span>
+                    <span style={{ color:'#60a5fa' }}>{mm.пампSets}</span>
+                    <span style={{ color:'rgba(255,255,255,0.5)' }}>{mm.mrv}</span>
+                  </div>;
+                })}
+                {weakVols.length > 0 && <div style={{ marginTop:8, padding:'6px 10px', borderRadius:8, background:'rgba(236,72,153,0.1)', border:'1px solid rgba(236,72,153,0.25)', fontSize:10, fontWeight:700, color:'#ec4899' }}>
+                  🔥 Отстающие получают акцент: {weakAvg} сетов/нед против {normAvg} у остальных{normAvg>0 && weakAvg>normAvg?` (+${Math.round((weakAvg/normAvg-1)*100)}%)`:''}
+                </div>}
+              </>;
+            })()}
           </div>
         </MetricCard>
         {/* Phase distribution */}
@@ -1130,7 +1160,7 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ ...CARD, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
               <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🎯 Распределение упражнений ({PHASE_LABELS[mixPhase]})</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, fontSize:10 }}>
-                <div>Compounds: <b style={{ color:'#fff' }}>{(mix.compoundPct * 100).toFixed(0)}%</b></div>
+                <div>Базовые: <b style={{ color:'#fff' }}>{(mix.compoundPct * 100).toFixed(0)}%</b></div>
                 <div>Изоляция: <b style={{ color:'#fff' }}>{(mix.isolationPct * 100).toFixed(0)}%</b></div>
                 <div>Машины: <b style={{ color:'#fff' }}>{(mix.machinePct * 100).toFixed(0)}%</b></div>
                 <div>Кабели: <b style={{ color:'#fff' }}>{(mix.cablePct * 100).toFixed(0)}%</b></div>

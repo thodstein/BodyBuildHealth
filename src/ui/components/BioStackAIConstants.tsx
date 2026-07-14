@@ -3,15 +3,13 @@ import { type GoalType, type HealthCondition, type BioStackProfile } from '../..
 import { type FinderProfile, type GoalType as FinderGoal } from '../../engines/supplement-finder.engine';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 
-export type BSTab = 'profile' | 'select' | 'stack' | 'analysis' | 'risks' | 'reports';
+export type BSTab = 'profile' | 'select' | 'stack' | 'reports';
 
 export const SUB_TABS: { id: BSTab; label: string }[] = [
   { id: 'profile', label: '👤 Профиль' },
-  { id: 'select', label: '🔬 Подбор' },
+  { id: 'select', label: '🔍 Подбор' },
   { id: 'stack', label: '📋 Мой стек' },
-  { id: 'analysis', label: '🔬 Анализ' },
-  { id: 'risks', label: '⚠ Риски' },
-  { id: 'reports', label: '📊 Отчёты' },
+  { id: 'reports', label: '📊 Итоги' },
 ];
 
 export const SUB_TAB_GROUPS: Record<string, { id: string; label: string }[]> = {
@@ -21,21 +19,21 @@ export const SUB_TAB_GROUPS: Record<string, { id: string; label: string }[]> = {
   select: [
     { id: 'search', label: '🔍 Поиск' },
     { id: 'build', label: '🧩 Сборка' },
+    { id: 'complexes', label: '🧪 Комплексы' },
     { id: 'clinical', label: '🔬 Клин.' },
   ],
-  analysis: [
+  stack: [
+    { id: 'mystack', label: '📋 Стек' },
     { id: 'interactions', label: '⚗️ Взаимод.' },
     { id: 'dose', label: '💊 Доза' },
     { id: 'timing', label: '⏰ Время' },
     { id: 'clinical', label: '🩺 Клин.' },
     { id: 'drugcheck', label: '💊 ЛС' },
   ],
-  risks: [
-    { id: 'risks', label: '⚠ Риски' },
-    { id: 'compare', label: '⚖ Сравн.' },
-  ],
   reports: [
     { id: 'reports', label: '📊 Отчёты' },
+    { id: 'risks', label: '⚠ Риски' },
+    { id: 'compare', label: '⚖ Сравн.' },
     { id: 'export', label: '📤 Экспорт' },
   ],
 };
@@ -43,8 +41,7 @@ export const SUB_TAB_GROUPS: Record<string, { id: string; label: string }[]> = {
 export const DEFAULT_SUB: Record<string, string> = {
   profile: 'settings',
   select: 'search',
-  analysis: 'interactions',
-  risks: 'risks',
+  stack: 'mystack',
   reports: 'reports',
 };
 

@@ -4167,6 +4167,79 @@ sulforaphane: {
     clinicalEffect: 'Активация NRF2, детоксикация печени, противовоспалительное и противораковое действие',
     bestForm: 'Сульфорафан 20 мг',
   },
+dim: {
+    id: 'dim',
+    name: 'DIM (Diindolylmethane)',
+    nameRu: 'Дииндолилметан',
+    tier: 'advanced',
+    category: ['hormonal', 'hepatoprotector'],
+    forms: [
+      { id: 'dim', name: 'DIM', nameRu: 'DIM 200 мг (микронизированный)', dose: '200 мг', best: true },
+      { id: 'dim_2', name: 'Indole-3-Carbinol', nameRu: 'Индол-3-карбинол 200 мг', dose: '200 мг', best: false }
+    ],
+    organs: ['LIVER', 'ENDOCRINE'],
+    systems: ['hepatic', 'endocrine', 'reproductive'],
+    mechanisms: ['ESTROGEN_METABOLISM', 'PHASE2_DETOXIFICATION', 'CYP1A1_INDUCTION', 'AROMATASE_MODULATION'],
+    description: 'DIM — метаболит индол-3-карбинола из крестоцветных. Сдвигает метаболизм эстрадиола в сторону слабого 2-гидроксиэстрона. На ПКТ — нутрициональная поддержка клиренса эстрогенов.',
+    synergies: [
+      { with: 'calcium_d_glucarate', effect: 'Полный цикл клиренса эстрогенов', mechanism: 'DIM ↑2-OH метаболизм (фаза I/II), CDG ↓β-глюкуронидазу (экскреция)', severity: 'MEDIUM' },
+      { with: 'sulforaphane', effect: 'Усиление фазы II детоксикации', mechanism: 'DIM ↑CYP1A1, сульфорафан ↑NRF2/GST', severity: 'MEDIUM' },
+    ],
+    conflicts: [
+      { with: 'pharma', effect: 'Возможное снижение уровня эстрогенов ниже нормы', mechanism: 'Совместно с ингибиторами ароматазы — риск чрезмерного ↓E2', severity: 'MEDIUM' },
+    ],
+    monitoring: [
+      { what: 'Эстрадиол (E2)', when: 'Каждые 4 нед на ПКТ' },
+      { what: 'Самочувствие/либидо', when: 'Субъективно (риск гипоэстрогении)' }
+    ],
+    contraindications: ['Индивидуальная непереносимость', 'Гормонозависимые состояния (по назначению врача)', 'Беременность и лактация', 'Совместный приём с ингибиторами ароматазы без контроля E2'],
+    sideEffects: ['Тёмный цвет мочи (безвреден)', 'Головная боль при высоких дозах', 'ЖКТ-дискомфорт'],
+    dosage: { mg: 200, timing: 'с едой', form: 'микронизированный DIM' },
+    bestForCourse: false,
+    analog: ['calcium_d_glucarate', 'sulforaphane'],
+    specialInstructions: ['Принимать с жирной едой (жирорастворимый)', 'Микронизированная форма — лучше биодоступность', 'На ПКТ — контроль E2, не подавлять <15 пг/мл'],
+    targetOrgan: 'Печень, эндокринная система',
+    organMechanism: 'Метаболизм эстрогенов, фаза I/II детоксикации',
+    mechanismOfAction: 'Индукция CYP1A1 → сдвиг метаболизма эстрадиола к 2-гидроксиэстрону (слабый эстроген); модуляция ароматазы; поддержка фазы II детоксикации',
+    clinicalEffect: 'Нутрициональный клиренс эстрогенов, поддержка гормонального баланса на ПКТ',
+    bestForm: 'DIM 200 мг',
+  },
+calcium_d_glucarate: {
+    id: 'calcium_d_glucarate',
+    name: 'Calcium D-Glucarate',
+    nameRu: 'Кальция D-глюкарат',
+    tier: 'advanced',
+    category: ['hormonal', 'hepatoprotector'],
+    forms: [
+      { id: 'calcium_d_glucarate', name: 'Calcium D-Glucarate', nameRu: 'Кальция D-глюкарат 500 мг', dose: '500 мг', best: true }
+    ],
+    organs: ['LIVER', 'INTESTINES', 'ENDOCRINE'],
+    systems: ['hepatic', 'endocrine', 'reproductive'],
+    mechanisms: ['ESTROGEN_METABOLISM', 'PHASE2_DETOXIFICATION', 'GLUCURONIDATION_SUPPORT', 'BETA_GLUCURONIDASE_INHIBITION'],
+    description: 'Кальция D-глюкарат — источник D-глюкаровой кислоты, ингибитор β-глюкуронидазы. Предотвращает деконъюгацию эстрогенов в кишечнике, усиливая их экскрецию. На ПКТ — поддержка клиренса эстрогенов.',
+    synergies: [
+      { with: 'dim', effect: 'Полный цикл клиренса эстрогенов', mechanism: 'DIM ↑2-OH метаболизм, CDG ↓реабсорбции конъюгатов', severity: 'MEDIUM' },
+      { with: 'fiber', effect: 'Усиление экскреции эстрогенов', mechanism: 'Клетчатка связывает конъюгаты, CDG блокирует деконъюгацию', severity: 'MEDIUM' },
+    ],
+    conflicts: [
+      { with: 'pharma', effect: 'Ускорение глюкуронидации лекарств', mechanism: 'Может ↑клиренс препаратов, метаболизируемых глюкуронидацией', severity: 'LOW' },
+    ],
+    monitoring: [
+      { what: 'Эстрадиол (E2)', when: 'Каждые 4 нед на ПКТ' },
+      { what: 'Печёночные ферменты', when: 'Каждые 8-12 нед' }
+    ],
+    contraindications: ['Индивидуальная непереносимость', 'Гиперкальциемия', 'Беременность и лактация'],
+    sideEffects: ['ЖКТ-дискомфорт при высоких дозах', 'Метеоризм'],
+    dosage: { mg: 500, timing: 'с едой 2x/д', form: 'кальция D-глюкарат' },
+    bestForCourse: false,
+    analog: ['dim', 'fiber'],
+    specialInstructions: ['Принимать с едой', '500 мг 2-3 раза в день', 'На ПКТ — контроль E2'],
+    targetOrgan: 'Печень, кишечник, эндокринная система',
+    organMechanism: 'Глюкуронидация (фаза II), энтерогепатическая рециркуляция эстрогенов',
+    mechanismOfAction: 'Ингибирование β-глюкуронидазы → предотвращение деконъюгации эстрогенов в кишечнике → ↑экскреции; поддержка фазы II детоксикации',
+    clinicalEffect: 'Нутрициональный клиренс эстрогенов, снижение энтерогепатической рециркуляции на ПКТ',
+    bestForm: 'Кальция D-глюкарат 500 мг',
+  },
 melatonin: {
     id: 'melatonin',
     name: 'Melatonin',

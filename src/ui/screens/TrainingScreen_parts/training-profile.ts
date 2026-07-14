@@ -29,6 +29,7 @@ export interface TrainingProfile {
   bbCycleId: string;
   onCourse: boolean;
   courseIntensity: 'mild' | 'moderate' | 'heavy';
+  bbPeds: string[];
   pharmaCoursesCount: number;
   monthsSinceLastCourse: number;
   totalYearsOnPharma: number;
@@ -57,6 +58,7 @@ export const DEFAULT_PROFILE: TrainingProfile = {
   bbCycleId: '',
   onCourse: false,
   courseIntensity: 'moderate',
+  bbPeds: [],
   pharmaCoursesCount: 0,
   monthsSinceLastCourse: 0,
   totalYearsOnPharma: 0,

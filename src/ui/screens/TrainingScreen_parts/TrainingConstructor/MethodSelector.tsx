@@ -8,11 +8,12 @@ interface Props {
   value: string;
   onChange: (v: string) => void;
   category: string;
+  recommendedSet?: Set<string>;
 }
 
 const EVIDENCE_COLORS: Record<string, string> = { A: '#22c55e', B: '#f59e0b', C: '#ef4444' };
 
-export const MethodSelector: React.FC<Props> = ({ label, value, onChange, category }) => {
+export const MethodSelector: React.FC<Props> = ({ label, value, onChange, category, recommendedSet }) => {
   const [selectedDesc, setSelectedDesc] = useState<string | null>(null);
   const methods = getMethodsByCategory(category);
   const selected = methods.find((m: TrainingMethod) => m.name === value);
@@ -25,7 +26,14 @@ export const MethodSelector: React.FC<Props> = ({ label, value, onChange, catego
           const m = methods.find((mm: TrainingMethod) => mm.name === v);
           setSelectedDesc(m ? (m.description || m.bestFor || '') : null);
         }}
-        options={methods.map((m: TrainingMethod) => ({ id: m.name, label: m.name, desc: m.bestFor }))} />
+        options={methods.map((m: TrainingMethod) => {
+          const isRec = recommendedSet && recommendedSet.has(m.name);
+          return {
+            id: m.name,
+            label: isRec ? '★ ' + m.name : m.name,
+            desc: isRec ? (m.bestFor ? m.bestFor + ' · ★ Рекомендовано' : '★ Рекомендовано') : m.bestFor,
+          };
+        })} />
       {selected && (
         <div style={{
           marginTop: 4, padding: '6px 8px', borderRadius: 6,

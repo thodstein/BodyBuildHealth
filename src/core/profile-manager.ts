@@ -67,7 +67,14 @@ const FLAT_TO_NESTED: Record<string, string[]> = {
   goalTimelineWeeks:['system','goalTimelineWeeks'], secondaryGoals:['system','secondaryGoals'],
 };
 
+const NESTED_SECTIONS = ['personal','training','pharma','health','nutrition','lifestyle','system'] as const;
+
 function makeSettingsProxy(s: UnifiedSettings): UnifiedSettings {
+  for (const sec of NESTED_SECTIONS) {
+    if ((s as any)[sec] === undefined || (s as any)[sec] === null) {
+      (s as any)[sec] = {};
+    }
+  }
   return new Proxy(s, {
     get(target, prop, receiver) {
       if (typeof prop === 'string' && FLAT_TO_NESTED[prop]) {

@@ -186,7 +186,7 @@ export const RelativeStrengthCalcTab: React.FC = () => {
 
       <div style={{ fontSize: 11, color: DIM, marginTop: 16, lineHeight: 1.5 }}>
         Формулы: <b>Wilks</b> — классический коэффициент IPF (до 2019). <b>DOTS</b> — актуальный коэффициент IPF (с 2019).
-        <b>IPF GL</b> — Goodleigh points. <b>Allometric</b> — тотал / bw<sup>⅔</sup>. <b>Относительная</b> — тотал / bw.
+        <b>IPF GL</b> — GoodLift points. <b>Allometric</b> — тотал / bw<sup>⅔</sup>. <b>Относительная</b> — тотал / bw.
         Нормативы: мужчины, RAW. Источник: спецификация 2026.
       </div>
 <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>

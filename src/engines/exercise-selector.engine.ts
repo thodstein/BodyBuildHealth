@@ -32,13 +32,35 @@ export interface SelectedExercise extends Exercise {
   selectionRationale: string[];
 }
 
-/** Детект павэрлифтинг/олимпийских тяжёлых подъёмов (не для бодибилдинга) */
-const COMP_LIFT_PATTERNS = ['штанг', 'становая', 'присед', 'рывок', 'толчок', 'пендл', 'армейский', 'тяга рывковая', 'тяга пендл', 'смит', 'спот', 'доски', 'цепи', 'ленты', 'пины', 'тяга штанги', 'жим штанги лёжа', 'жимовой', 'конвой', 'подъём на грудь'];
+/**
+ * Детект соревновательных пауэрлифтинг/олимпийских подъёмов (не для бодибилдинга).
+ * ВАЖНО: список ТОЛЬКО из однозначно соревновательных/олимпийских паттернов.
+ * Убраны blanket-паттерны ('штанг','смит','присед','армейский','тяга штанги',
+ * 'жим штанги лёжа','жимовой'), т.к. они штрафовали валидные ББ-лифты
+ * (тяга штанги в наклоне — king спины, Смит, армейский жим, жим лёжа).
+ */
+const COMP_LIFT_PATTERNS = ['становая', 'рывок', 'толчок', 'пендл', 'тяга рывковая', 'тяга пендл', 'спот', 'доски', 'цепи', 'ленты', 'пины', 'конвой', 'подъём на грудь', 'взятие на грудь'];
 function isCompetitionLift(ex: Exercise): boolean {
   if (ex.movementType === 'competition_lift') return true;
   const n = (ex.name || '').toLowerCase();
   const id = (ex.id || '').toLowerCase();
   return COMP_LIFT_PATTERNS.some(p => n.includes(p) || id.includes(p));
+}
+
+/** Hinge-паттерн (становая/мёртвая/румын/гудморнинг/наклоны со штангой) — бицепс бедра, не спина */
+function isHingePattern(ex: Exercise): boolean {
+  const n = (ex.name || '').toLowerCase();
+  const id = (ex.id || '').toLowerCase();
+  return /станов|мёртв|мертв|румын|good.?morning|гудмор/.test(n + ' ' + id) ||
+    (n.includes('наклон') && n.includes('штанг'));
+}
+
+/** Тросовое/блочное упражнение */
+function isCableExercise(ex: Exercise): boolean {
+  const rawEq = (ex as any).equipment;
+  const eq = (Array.isArray(rawEq) ? rawEq.join(' ') : String(rawEq || '')).toLowerCase();
+  const n = (ex.name || '').toLowerCase();
+  return eq.includes('cable') || n.includes('блок') || n.includes('трос') || n.includes('кроссов');
 }
 
 /** Силовая кривая: определяет слабые зоны по группе мышц */
@@ -275,6 +297,14 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
       rationales.push('Бодибилдинг: не соревновательный подъём −18');
     }
 
+    // 5c. ББ-спина: hinge/бицепс-бедра лифты (становая/мёртвая/румын/гудморнинг)
+    // не принадлежат тренировке спины — только ногам. Штрафуем в пуле back.
+    if (preferBB && muscleGroup === 'back' && isHingePattern(ex)) {
+      score -= 25;
+      rationales.push('Бодибилдинг: hinge (бицепс бедра), не спина −25');
+    }
+
+
     // Бонус для уровня
     if (level === 'beginner' && ex.difficulty && ex.difficulty === 'advanced') score -= 10;
     if (level === 'advanced' && ex.difficulty && ex.difficulty === 'beginner') score -= 3;
@@ -306,6 +336,7 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
   const usedIds = new Set<string>();
   const usedNames = new Set<string>();
   const usedSubGroups = new Map<string, number>();
+  let cableCount = 0;
 
   for (const ex of scored) {
     if (result.length >= count) break;
@@ -317,6 +348,10 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     const sgCount = usedSubGroups.get(sg) || 0;
     if (sg && sgCount >= 2) continue;
 
+    // Диверсификация оборудования: не более 2 тросовых/блочных в сессии
+    // (пока есть ещё нетросовые кандидаты для добора)
+    if (isCableExercise(ex) && cableCount >= 2 && result.length < count - 1) continue;
+
     // Проверяем конфликт с уже выбранными
     const conflict = result.some(r => patternConflictScore(ex, [r]) < -20);
     if (conflict && result.length >= count - 1) continue;
@@ -325,6 +360,7 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     usedIds.add(ex.id);
     usedNames.add(ex.name);
     if (sg) usedSubGroups.set(sg, sgCount + 1);
+    if (isCableExercise(ex)) cableCount++;
   }
 
   // Если не набрали нужное количество — добираем по скору

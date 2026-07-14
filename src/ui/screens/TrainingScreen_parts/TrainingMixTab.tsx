@@ -9,6 +9,8 @@ import {
 } from '../../../engines/training-mix-scoring.engine';
 import type { MixSubstance, MixProfile, TrainingMixScore } from '../../../engines/training-mix-scoring.engine';
 import { loadTrainingProfile } from './training-profile';
+import { pushSubsToPlan } from './support-plan-bridge';
+import { PopupNumber } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = 'var(--accent)';
 const CARD: React.CSSProperties = {
@@ -116,6 +118,7 @@ export const TrainingMixTab: React.FC = () => {
   const [mixDrugGLP1, setMixDrugGLP1] = useState(false);
   const [bwInput, setBwInput] = useState(prof.bodyWeight || 80);
   const [mult, setMult] = useState(1);
+  const [mixPushed, setMixPushed] = useState(false);
 
   const isHealth = HEALTH_IDS.has(mixGoal);
 
@@ -293,14 +296,8 @@ export const TrainingMixTab: React.FC = () => {
 
         {isHealth && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>⚖️ Вес тела, кг</div>
-              <input type="number" style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' }} value={bwInput} onChange={e => setBwInput(parseFloat(e.target.value) || 0)} />
-            </div>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>Множитель дозы</div>
-              <input type="number" step="0.1" min="0.5" max="2" style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' }} value={mult} onChange={e => setMult(parseFloat(e.target.value) || 1)} />
-            </div>
+            <PopupNumber label="⚖️ Вес тела" value={bwInput} min={30} max={250} suffix=" кг" onChange={setBwInput} />
+            <PopupNumber label="Множитель дозы" value={mult} min={0.5} max={2} step={0.1} suffix="×" onChange={setMult} />
           </div>
         )}
       </div>
@@ -394,6 +391,14 @@ export const TrainingMixTab: React.FC = () => {
               } catch { /* ignore */ }
             }} style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 600, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a' }}>💾 Комплект</button>
           </div>
+          <button onClick={() => {
+            const ids = stack.filter(sItem => sItem.mg > 0 && sItem.id).map(sItem => sItem.id as string);
+            const n = pushSubsToPlan(ids, 'mix', `Микс: ${mixGoal} (${mixTiming === 'pre' ? 'пред' : mixTiming === 'intra' ? 'интра' : 'пост'})`);
+            if (n > 0) { setMixPushed(true); setTimeout(() => setMixPushed(false), 1800); }
+            else alert('Все вещества микса относятся к питанию (белок/креатин/аминокислоты) — в план поддержки не добавлены.');
+          }} style={{ marginTop: 6, width: '100%', padding: '8px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700, background: mixPushed ? 'rgba(0,230,138,0.9)' : 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.3)', color: mixPushed ? '#0b0b0d' : '#00e68a', transition: 'all 0.2s' }}>
+            {mixPushed ? '✓ Добавлено в план поддержки' : '📋 В план поддержки'}
+          </button>
         </div>
       )}
 

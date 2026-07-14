@@ -12,6 +12,7 @@ import { GlassCard, PillBtn, inputStyle, selectStyle, greenBtn } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
 import { PopupNumber, PopupSelect, PopupText } from '../../../components/PopupXxx';
 import { getRecipes, type Recipe } from '../../../../engines/nutrition-periodization.engine';
+import { getMergedExternalSubIds } from '../../../screens/TrainingScreen_parts/support-plan-bridge';
 
 // P3.2: Collapsible section for compact settings
 const SETTINGS_SECTIONS_KEY = 'he_plan_settings_collapsed';
@@ -673,11 +674,19 @@ export const IndividualPlanSettings: React.FC = () => {
                 <input value={suppSearch} onChange={e => setSuppSearch(e.target.value)} placeholder="Поиск БАД..." style={{ ...inputStyle, flex: 1, fontSize:11, padding:'8px 10px', boxSizing:'border-box' }} />
                 <button onClick={() => {
                   try {
-                    const planData = JSON.parse(localStorage.getItem('he_support_plan_result') || 'null');
-                    if (planData && Array.isArray(planData)) {
-                      const newIds = planData.filter((id: string) => !takenSupplements.includes(id));
-                      if (newIds.length > 0) setTakenSupplements([...takenSupplements, ...newIds]);
+                    // Общий план (he_general_plan) = калькулятор ∪ внешние вещества (миксы/BioStack/питание)
+                    const generalData = JSON.parse(localStorage.getItem('he_general_plan') || 'null');
+                    let merged: string[] = (generalData && Array.isArray(generalData)) ? generalData : [];
+                    // Фолбэк: если общий план ещё не сформирован — берём план калькулятора + внешние
+                    if (merged.length === 0) {
+                      const planData = JSON.parse(localStorage.getItem('he_support_plan_result') || 'null');
+                      const planIds: string[] = (planData && Array.isArray(planData)) ? planData : [];
+                      let extIds: string[] = [];
+                      try { extIds = getMergedExternalSubIds(); } catch {}
+                      merged = [...new Set([...planIds, ...extIds])];
                     }
+                    const newIds = merged.filter((id: string) => !takenSupplements.includes(id));
+                    if (newIds.length > 0) setTakenSupplements([...takenSupplements, ...newIds]);
                   } catch {}
                 }} style={{
                   padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:8, fontWeight:600, whiteSpace:'nowrap',

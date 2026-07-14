@@ -1889,6 +1889,35 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         const hasCns = subs.some(s => (s.mechsCovered || []).some(m => m.startsWith('cns')));
         const hasRepro = subs.some(s => (s.mechsCovered || []).some(m => m.startsWith('rep')));
 
+        // ── Персональный список маркеров, привязанный к конкретным веществам плана ──
+        const personalMarkers = (() => {
+          const map: Record<string, { what: string; when: string; target: string; subs: string[] }> = {};
+          for (const s of subs) {
+            const cat = SUPPORT_CATALOG_DATA[s.substanceId];
+            if (!cat?.monitoring) continue;
+            for (const m of cat.monitoring) {
+              const key = (m.what || '').trim().toLowerCase();
+              if (!key) continue;
+              if (!map[key]) map[key] = { what: m.what, when: m.when || '', target: m.targetRange || '', subs: [] };
+              const nm = cat.nameRu || cat.name || s.substanceId;
+              if (!map[key].subs.includes(nm)) map[key].subs.push(nm);
+            }
+          }
+          return Object.values(map).sort((a, b) => b.subs.length - a.subs.length);
+        })();
+
+        // ── Ведущие вещества по каждой системе (привязка панелей к плану) ──
+        const driversBySystem: Record<string, string[]> = {
+          hep: subs.filter(s => (s.mechsCovered || []).some(m => m.startsWith('liv'))).map(s => subNameRu(s.substanceId)),
+          cardio: subs.filter(s => (s.mechsCovered || []).some(m => m.startsWith('cv'))).map(s => subNameRu(s.substanceId)),
+          renal: subs.filter(s => (s.mechsCovered || []).some(m => m.startsWith('ren'))).map(s => subNameRu(s.substanceId)),
+          hema: subs.filter(s => (s.mechsCovered || []).some(m => m.startsWith('hem'))).map(s => subNameRu(s.substanceId)),
+          horm: subs.filter(s => (s.mechsCovered || []).some(m => m.startsWith('rep'))).map(s => subNameRu(s.substanceId)),
+          meta: subs.filter(s => (s.mechsCovered || []).some(m => m.startsWith('hem') || m.startsWith('cv'))).map(s => subNameRu(s.substanceId)),
+          thy: subs.filter(s => ['selenium', 'iodine', 't3', 't4'].includes(s.substanceId)).map(s => subNameRu(s.substanceId)),
+          vit: subs.map(s => subNameRu(s.substanceId)),
+        };
+
         return (
           <div style={{ marginTop:6 }}>
             <div onClick={() => setShowMonitoring(!showMonitoring)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showMonitoring ? '8px 8px 0 0' : 8, background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.2)' }}>
@@ -1925,7 +1954,32 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
                 {/* ── Лабораторный мониторинг ── */}
                 <div style={{ marginBottom:7 }}>
-                  <div style={{ fontSize:8, fontWeight:700, color:'#60a5fa', marginBottom:3 }}>🧪 Лабораторный мониторинг (график)</div>
+                  <div style={{ fontSize:8, fontWeight:700, color:'#60a5fa', marginBottom:3 }}>🧪 Лабораторный мониторинг</div>
+
+                  {/* Персональный список маркеров (привязка к веществам плана) */}
+                  <div style={{ padding:'6px 7px', borderRadius:6, background:'rgba(96,165,250,0.10)', border:'1px solid rgba(96,165,250,0.18)', marginBottom:4 }}>
+                    <div style={{ fontSize:7, fontWeight:700, color:'#93c5fd', marginBottom:3 }}>🎯 Персональные маркеры ({personalMarkers.length}) — по вашему плану из {subs.length} веществ</div>
+                    {personalMarkers.length === 0 && (
+                      <div style={{ fontSize:6, color:'rgba(255,255,255,0.5)', lineHeight:1.4 }}>Для назначенных веществ не заданы специфические маркеры мониторинга — см. базовые панели ниже.</div>
+                    )}
+                    <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                      {personalMarkers.map((m, mi) => (
+                        <div key={mi} style={{ padding:'4px 6px', borderRadius:5, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                          <div style={{ fontSize:7, fontWeight:700, color:'#bfdbfe', marginBottom:1 }}>{m.what}</div>
+                          <div style={{ fontSize:6, color:'rgba(255,255,255,0.55)', lineHeight:1.4 }}>
+                            <span style={{ color:'#94a3b8', fontWeight:600 }}>Когда:</span> {m.when || '—'}
+                            {m.target ? <> · <span style={{ color:'#94a3b8', fontWeight:600 }}>Цель:</span> {m.target}</> : null}
+                          </div>
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
+                            {m.subs.map((sn, si) => (
+                              <span key={si} style={{ fontSize:6, color:'#e2e8f0', padding:'1px 4px', borderRadius:3, background:'rgba(96,165,250,0.14)', border:'1px solid rgba(96,165,250,0.22)' }}>{sn}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div style={{ padding:'5px 7px', borderRadius:6, background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.12)', marginBottom:4 }}>
                     <div style={{ fontSize:7, fontWeight:700, color:'#93c5fd', marginBottom:2 }}>⏱️ Периодичность сдачи</div>
                     <div style={{ fontSize:6, color:'rgba(255,255,255,0.6)', lineHeight:1.5 }}>
@@ -1937,9 +1991,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   </div>
                 </div>
 
-                {/* ── Панели по системам ── */}
+                {/* ── Панели по системам (с привязкой к веществам) ── */}
                 <div style={{ marginBottom:7 }}>
-                  <div style={{ fontSize:8, fontWeight:700, color:'var(--text)', marginBottom:4 }}>📋 Обязательные панели (назначено {subs.length} препаратов)</div>
+                  <div style={{ fontSize:8, fontWeight:700, color:'var(--text)', marginBottom:4 }}>📋 Системные панели ({subs.length} веществ в плане)</div>
 
                   {[{ id:'hep', icon:'🫁', name:'Печёночная панель', color:'#f59e0b', active:hasHepatic, markers:'АЛТ, АСТ, ГГТ, ЩФ, билирубин общий/прямой, альбумин, ПТИ', freq:'Каждые 4 нед', targets:'АЛТ/АСТ <40 Ед/л, ГГТ <55, билирубин <21 мкмоль/л', alert:'АЛТ >80 → снижение доз · >200 → СТОП' },
                     { id:'cardio', icon:'❤️', name:'Кардио-липидная панель', color:'#f87171', active:hasCardio, markers:'ЛПНП, ЛПВП, ТГ, АпоВ, Лп(а), hs-СРБ, Д-димер, тропонин I (при боли)', freq:'Каждые 4 нед', targets:'ЛПНП <2.6, ЛПВП >1.0, ТГ <1.7, hs-СРБ <1.0', alert:'ЛПНП >4.0 → статины · Д-димер >0.5 → УЗДГ вен' },
@@ -1949,7 +2003,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     { id:'meta', icon:'🍬', name:'Метаболическая панель', color:'#f97316', active:hasHemat || hasCardio, markers:'Глюкоза натощак, HbA1c, инсулин, HOMA-IR, гомоцистеин, СРБ', freq:'Каждые 4–8 нед', targets:'Глюкоза <5.6, HbA1c <5.7%, HOMA-IR <2.5, гомоцистеин <10', alert:'HbA1c >6.0 → метформин · глюкоза >11 → ER · HOMA-IR >3 → берберин' },
                     { id:'thy', icon:'🦋', name:'Тиреоидная панель', color:'#22d3ee', active:subs.some(s => s.substanceId === 'selenium' || s.substanceId === 'iodine' || s.substanceId === 't3' || s.substanceId === 't4'), markers:'ТТГ, Т3 своб., Т4 своб., АТ-ТПО', freq:'Каждые 8 нед (при приёме T3/T4 — каждые 4 нед)', targets:'ТТГ 0.4–4.0, Т3 св. 3.5–6.5, Т4 св. 11.5–22.7', alert:'ТТГ >4.5 → гипотиреоз · ТТГ <0.1 → гипертиреоз · ↑T3 → ↓дозу' },
                     { id:'vit', icon:'💊', name:'Витамины и минералы', color:'#4ade80', active:true, markers:'Витамин D (25-OH), B12, фолат, ферритин, Mg²⁺, Zn²⁺, Se, Ca²⁺ общ., фосфор', freq:'Каждые 8 нед', targets:'D3 50–80 нг/мл, B12 200–900, фолат >4, ферритин 50–200, Mg²⁺ 0.8–1.0, Zn²⁺ 70–140', alert:'D3 <30 → нагрузка 50K МЕ/нед · ферритин <30 → Fe²⁺ + vitC' },
-                  ].map(panel => (
+                  ].map(panel => {
+                    const drivers = driversBySystem[panel.id] || [];
+                    return (
                     <div key={panel.id} style={{ padding:'5px 7px', borderRadius:6, marginBottom:3, background: panel.active ? `${panel.color}08` : 'rgba(255,255,255,0.01)', border:`1px solid ${panel.active ? panel.color+'18' : 'rgba(255,255,255,0.04)'}`, opacity: panel.active ? 1 : 0.6 }}>
                       <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
                         <span style={{ fontSize:11 }}>{panel.icon}</span>
@@ -1962,8 +2018,17 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                         <span style={{ fontWeight:600, color:'rgba(255,255,255,0.6)' }}>Цели:</span> {panel.targets}
                         {panel.active && <><br/><span style={{ fontWeight:600, color:panel.color }}>⚠ Тревога:</span> <span style={{ color:panel.color, opacity:0.85 }}>{panel.alert}</span></>}
                       </div>
+                      {panel.active && drivers.length > 0 && (
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:3, marginLeft:16 }}>
+                          <span style={{ fontSize:6, color:'rgba(255,255,255,0.4)' }}>вещества плана: </span>
+                          {drivers.map((dn, di) => (
+                            <span key={di} style={{ fontSize:6, color:'#e2e8f0', padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>{dn}</span>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* ── Инструментальный мониторинг ── */}

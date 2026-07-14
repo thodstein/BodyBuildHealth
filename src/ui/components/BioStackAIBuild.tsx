@@ -2,12 +2,11 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { type BioStackProfile, type GoalType } from '../../engines/biostack-ai.engine';
 import { buildStack, explainStack, type StackExplanation, findReplacement, findSingleReplacementForStack, type ReplacementResult } from '../../engines/supplement-finder.engine';
 import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS, ALL_STACKS, type SupportStack, getStackSubstanceLabel } from '../../data/support-database';
-import { TZ_MECH_LABELS } from '../../data/support-db';
 import { ORGAN_LABELS, SYSTEM_LABELS_CATALOG } from '../../data/support-database';
 import { LAB_MARKER_MAP, type LabMarkerMap } from '../../data/lab-marker-map';
 import { STACK_TEMPLATES, type BioStackTemplate } from '../../engines/biostack-templates';
-import { SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX } from '../../data/support-meta';
-import { GlassCard, PillBtn, StatBox, ORGANS, SYSTEMS, PURE_GOALS, TARGET_SYSTEMS, toFinderProfile, showToast, estCost } from './BioStackAIConstants';
+import { SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX, MECHANISM_LABELS } from '../../data/support-meta';
+import { GlassCard, PillBtn, StatBox, ORGANS, SYSTEMS, PURE_GOALS, TARGET_SYSTEMS, SYMPTOMS, toFinderProfile, showToast, estCost } from './BioStackAIConstants';
 import { buildSmartStackMulti, type BuildVariant } from '../../engines/biostack-recommender.engine';
 import { getSafeStackRecommendations } from '../../engines/biostack-safety.engine';
 import {
@@ -41,6 +40,25 @@ const GOAL_GROUPS: { key: string; label: string; goal: GoalType }[] = [
 ];
 
 const POPUP_Z = 250;
+
+type Branch = 'organ' | 'symptom' | 'goal' | 'cns' | 'neurotox' | 'ready';
+
+const BRANCHES: { key: Branch; icon: string; label: string; desc: string; color: string }[] = [
+  { key: 'organ', icon: '🫀', label: 'По органу', desc: 'Орган → механизм → маркер', color: '#f43f5e' },
+  { key: 'symptom', icon: '🩹', label: 'По симптому', desc: 'Подбор под жалобы', color: '#f59e0b' },
+  { key: 'goal', icon: '🎯', label: 'По цели', desc: 'Цели и готовые пресеты', color: '#00e68a' },
+  { key: 'cns', icon: '🧠', label: 'ЦНС', desc: 'Когнитивы, настроение, сон', color: '#8b5cf6' },
+  { key: 'neurotox', icon: '☣️', label: 'Нейротоксичность', desc: 'Защита и детокс ЦНС', color: '#a78bfa' },
+  { key: 'ready', icon: '📦', label: 'Готовые стеки', desc: 'Шаблоны и готовые стеки', color: '#60a5fa' },
+];
+
+const TPL_GOAL_MAP: Record<string, GoalType> = {
+  liver_health: 'detox', kidney: 'detox',
+  cardio_health: 'cardio_health', brain: 'brain', energy: 'energy', sleep: 'sleep',
+  immunity: 'immunity', joints: 'joints', digestion: 'digestion', detox: 'detox',
+  hormones: 'hormones', mood: 'mood', stress: 'stress', muscle_gain: 'muscle_gain',
+  fat_loss: 'fat_loss', recovery: 'recovery', longevity: 'longevity', concentration: 'concentration',
+};
 
 /* ─── PopupChips: multi-select grouped chips ─── */
 function PopupChips({ label, options, selected, onChange, groups }: {
@@ -284,6 +302,7 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
   const [goals, setGoals] = useState<GoalType[]>(profile.goals);
   const [selOrgans, setSelOrgans] = useState<string[]>(profile.targetOrgans || []);
   const [selSystems, setSelSystems] = useState<string[]>(profile.targetSystems || []);
+  const [selMechanisms, setSelMechanisms] = useState<string[]>([]);
   const [selTargets, setSelTargets] = useState<GoalType[]>([]);
   const [targetSize, setTargetSize] = useState(() => profile.stackComplexity === 'minimal' ? 5 : profile.stackComplexity === 'balanced' ? 10 : 18);
   const [lmState, setLmState] = useState<LMState>(() => {
@@ -313,6 +332,7 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
   const [buildLoading, setBuildLoading] = useState(false);
   const [multiLoading, setMultiLoading] = useState(false);
   const [gates, setGates] = useState<ReturnType<typeof selectStack> | null>(null);
+  const [branch, setBranch] = useState<Branch | null>(null);
 
   const mergedStacks = useMemo(() => {
     const templates: ExtStackItem[] = STACK_TEMPLATES.map(t => ({
@@ -339,11 +359,31 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
     return items;
   }, [mergedStacks, stkFilter, stkQuery]);
 
+  // ─── Каскад орган → механизм → маркёр (из LAB_MARKER_MAP) ───
+  const organMechanisms = useMemo(() => {
+    if (selOrgans.length === 0) return [] as { id: string; label: string }[];
+    const set = new Set<string>();
+    LAB_MARKER_MAP.forEach(m => {
+      if (selOrgans.includes(m.organ)) m.mechanisms.forEach(x => set.add(x));
+    });
+    return Array.from(set).map(code => ({ id: code, label: MECHANISM_LABELS[code] || code }));
+  }, [selOrgans]);
+
+  const organMarkers = useMemo(() => {
+    if (selOrgans.length === 0) return LAB_MARKER_MAP;
+    const mechIds = new Set(organMechanisms.map(m => m.id));
+    const effMechs = selMechanisms.filter(x => mechIds.has(x));
+    return LAB_MARKER_MAP.filter(m =>
+      selOrgans.includes(m.organ) &&
+      (effMechs.length === 0 || m.mechanisms.some(x => effMechs.includes(x)))
+    );
+  }, [selOrgans, selMechanisms, organMechanisms]);
+
   const handleBuild = useCallback(() => {
     setBuildLoading(true);
     setTimeout(() => {
     const queryOrgans = [...selOrgans];
-    const queryMechs: string[] = [];
+    const queryMechs: string[] = [...selMechanisms];
     const targetToOrgan: Record<string, string> = {
       liver_health: 'LIVER', cardio_health: 'HEART', joints: 'JOINTS',
       skin: 'SKIN', hair: 'SKIN', brain: 'BRAIN', kidney: 'KIDNEYS',
@@ -435,7 +475,7 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
     setResult({ stack: filteredStack, explanation: exp, budgetNote: budgetNote + (drugSafetyNote ? '\n' + drugSafetyNote : '') + gateNote });
     setBuildLoading(false);
     }, 100);
-  }, [goals, selTargets, selOrgans, selSystems, targetSize, lmState, stackIds, profile, avoidConflicts, labAnalysis]);
+  }, [goals, selTargets, selOrgans, selSystems, selMechanisms, targetSize, lmState, stackIds, profile, avoidConflicts, labAnalysis]);
 
   const handleSaveStack = useCallback(() => {
     if (!result) return;
@@ -469,28 +509,105 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
     setStackIds(ids);
   }, [setStackIds]);
 
+  const enterBranch = (key: Branch) => {
+    if (key === 'cns') setGoals(g => Array.from(new Set([...g, 'brain', 'concentration', 'mood'])) as GoalType[]);
+    if (key === 'neurotox') setGoals(g => Array.from(new Set([...g, 'detox', 'brain'])) as GoalType[]);
+    setBranch(key);
+  };
+
+  if (!branch) {
+    return (
+      <div style={{ paddingBottom: 80 }}>
+        <div style={{ textAlign: 'center', margin: '4px 0 12px' }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', letterSpacing: 0.2 }}>🧩 Мастер сборки стека</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Выберите способ подбора — любой шаг можно пропустить</div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+          {BRANCHES.map(b => (
+            <button key={b.key} onClick={() => enterBranch(b.key)} style={{
+              padding: '16px 12px', borderRadius: 16, cursor: 'pointer', textAlign: 'left',
+              background: b.color + '0d', border: '1px solid ' + b.color + '26',
+              display: 'flex', flexDirection: 'column', gap: 4, minHeight: 96,
+            }}>
+              <span style={{ fontSize: 26 }}>{b.icon}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: b.color }}>{b.label}</span>
+              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', lineHeight: 1.3 }}>{b.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const bcfg = BRANCHES.find(b => b.key === branch)!;
+  const showParams = branch !== 'ready';
+  const showLabs = branch === 'organ' || branch === 'symptom' || branch === 'neurotox';
+  const showReady = branch === 'ready';
+  const showBuild = branch !== 'ready';
+  const pGoals = branch === 'goal' || branch === 'cns';
+  const pOrgans = branch === 'organ';
+  const pSystems = branch === 'organ' || branch === 'symptom' || branch === 'neurotox';
+  const pTargets = branch === 'goal' || branch === 'cns';
+  const pSymptoms = branch === 'symptom' || branch === 'neurotox';
+
   return (
     <div style={{ paddingBottom: 80 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <button onClick={() => setBranch(null)} style={{
+          padding: '8px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)',
+        }}>← Назад</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 20 }}>{bcfg.icon}</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: bcfg.color }}>{bcfg.label}</div>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>{bcfg.desc}</div>
+          </div>
+        </div>
+      </div>
       {/* ─── Card 1: Параметры сборки ─── */}
+      {showParams && (
       <GlassCard title="🎯 Параметры сборки" icon="🎯" color="#00e68a">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 4, marginBottom: 6 }}>
+          {pGoals && (
           <PopupChips label="🎯 Цели"
             options={GOAL_GROUPS.map(g => ({ id: g.goal, label: g.label }))}
             selected={goals} onChange={ids => setGoals(ids as GoalType[])}
             groups={[...new Set(GOAL_GROUPS.map(g => g.key))].map(k => ({ key: k, label: k }))}
           />
+          )}
+          {pOrgans && (
           <PopupChips label="🫀 Органы"
             options={ORGANS.map(o => ({ id: o.key, label: o.label }))}
             selected={selOrgans} onChange={setSelOrgans}
           />
+          )}
+          {pOrgans && organMechanisms.length > 0 && (
+          <PopupChips label="🧬 Механизмы"
+            options={organMechanisms}
+            selected={selMechanisms}
+            onChange={ids => setSelMechanisms(ids.filter(id => organMechanisms.some(m => m.id === id)))}
+          />
+          )}
+          {pSystems && (
           <PopupChips label="⚙️ Системы"
             options={SYSTEMS.map(s => ({ id: s.key, label: s.label }))}
             selected={selSystems} onChange={setSelSystems}
           />
+          )}
+          {pTargets && (
           <PopupChips label="🎯 Мишени"
             options={TARGET_SYSTEMS.map(t => ({ id: t.key, label: t.label }))}
             selected={selTargets} onChange={ids => setSelTargets(ids as GoalType[])}
           />
+          )}
+          {pSymptoms && (
+          <PopupChips label="🩺 Симптомы"
+            options={SYMPTOMS.map(s => ({ id: s.label, label: s.label }))}
+            selected={SYMPTOMS.filter(s => goals.includes(s.goal)).map(s => s.label)}
+            onChange={ids => setGoals(Array.from(new Set(SYMPTOMS.filter(s => ids.includes(s.label)).map(s => s.goal))) as GoalType[])}
+          />
+          )}
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>📏 Размер стека: <strong style={{ color: '#60a5fa', fontSize: 16 }}>{targetSize}</strong></span>
@@ -520,8 +637,36 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
           </div>
         </div>
       </GlassCard>
+      )}
+
+      {/* ─── Card 1b: Пресеты целей (быстрый старт) ─── */}
+      {pGoals && (
+      <GlassCard title="🚀 Пресеты целей (быстрый старт)" icon="🚀" color="#00e68a">
+        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
+          Нажмите пресет — цель подставится в параметры сборки. Можно выбрать несколько.
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+          {STACK_TEMPLATES.map(t => {
+            const g = TPL_GOAL_MAP[t.goal] || 'immunity';
+            const active = goals.includes(g);
+            return (
+              <button key={t.id} onClick={() => setGoals(prev => Array.from(new Set([...prev, g])) as GoalType[])}
+                style={{
+                  padding: '7px 10px', borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 700,
+                  background: active ? 'rgba(0,230,138,0.16)' : 'rgba(255,255,255,0.04)',
+                  border: '1px solid ' + (active ? 'rgba(0,230,138,0.4)' : 'rgba(255,255,255,0.08)'),
+                  color: active ? '#00e68a' : 'rgba(255,255,255,0.7)',
+                }}>
+                {t.icon} {t.name}
+              </button>
+            );
+          })}
+        </div>
+      </GlassCard>
+      )}
 
       {/* ─── Card 2: Лабораторные маркеры ─── */}
+      {showLabs && (
       <GlassCard title={`🧪 Анализы${labAnalysis ? ' (авто-заполнено из лаборатории)' : ''}`} icon="🧪" color="#a78bfa">
         {labAnalysis && (
           <div style={{ fontSize: 7, color: '#22c55e', marginBottom: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.1)' }}>
@@ -529,7 +674,7 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 4, marginBottom: 4 }}>
-          <PopupLabs label="Маркеры" markers={LAB_MARKER_MAP} lmState={lmState}
+          <PopupLabs label="Маркеры" markers={branch === 'organ' ? organMarkers : LAB_MARKER_MAP} lmState={lmState}
             onChange={(id, st) => setLmState(prev => ({ ...prev, [id]: st }))} />
           <button onClick={() => setLmState({})} style={{
             padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700,
@@ -537,8 +682,10 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
           }}>🗑 Сбросить</button>
         </div>
       </GlassCard>
+      )}
 
       {/* ─── Card 3: Готовые стеки и шаблоны ─── */}
+      {showReady && (
       <GlassCard title={`📋 Готовые стеки и шаблоны (${filteredStacks.length})`} icon="📋" color="#8b5cf6">
         <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
           <input type="text" value={stkQuery} onChange={e => setStkQuery(e.target.value)}
@@ -571,8 +718,10 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
           )}
         </div>
       </GlassCard>
+      )}
 
       {/* ─── Build buttons ─── */}
+      {showBuild && (
       <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
         <button onClick={handleBuild} disabled={buildLoading}
           style={{
@@ -595,6 +744,7 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
           {multiLoading ? '⏳ Генерируем...' : '🎲 3 варианта'}
         </button>
       </div>
+      )}
 
       {(() => {
         if (!result) return null;

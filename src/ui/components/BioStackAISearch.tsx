@@ -4,7 +4,6 @@ import { type GoalType } from '../../engines/biostack-ai.engine';
 import { findSupplements, findReplacement, findComplexesForSubstance, type ReplacementType, type ReplacementResult, type ComplexMatch } from '../../engines/supplement-finder.engine';
 import { searchBioStack, type RecGoal } from '../../engines/biostack-recommender.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS } from '../../data/support-database';
-import { TZ_MECH_LABELS } from '../../data/support-db';
 import { PillBtn, inputS, PURE_GOALS, ORGANS, SYSTEMS, TOP_MECHANISMS, SYMPTOMS, toFinderProfile, PRICE_RUB } from './BioStackAIConstants';
 import { getEvidenceGrade, checkIngredientAllergens, findMeaningfulReplacement, fuzzySearchSupplements, decomposeComplex } from '../../engines/biostack-clinical-v2.engine';
 
@@ -190,7 +189,7 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
         (c.description || '').toLowerCase().includes(q) ||
         c.category?.some(cat => (CATEGORY_LABELS[cat] || cat).toLowerCase().includes(q)) ||
         c.organs?.some(o => o.toLowerCase().includes(q)) ||
-        c.mechanisms?.some(m => (TZ_MECH_LABELS[m] || m).toLowerCase().includes(q));
+        (c.mechanismOfAction || '').toLowerCase().includes(q);
       list = list.filter(c => directMatch(c) || indexedIds.has(c.id));
     }
     if (favOnly) list = list.filter(c => favorites.includes(c.id));
@@ -255,7 +254,7 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
     tierFilter.forEach(t => chips.push({ label: TIERS.find(x => x.key === t)?.label || t, onRemove: () => toggleArr(tierFilter, setTierFilter, t) }));
     organFilter.forEach(o => chips.push({ label: o, onRemove: () => toggleArr(organFilter, setOrganFilter, o) }));
     systemFilter.forEach(s => chips.push({ label: s, onRemove: () => toggleArr(systemFilter, setSystemFilter, s) }));
-    mechFilter.forEach(m => chips.push({ label: TZ_MECH_LABELS[m] || m, onRemove: () => toggleArr(mechFilter, setMechFilter, m) }));
+    mechFilter.forEach(m => chips.push({ label: TOP_MECHANISMS.find(t => t.key === m)?.label || m, onRemove: () => toggleArr(mechFilter, setMechFilter, m) }));
     if (goalFilter) chips.push({ label: '🎯 ' + (PURE_GOALS.find(g => g.key === goalFilter)?.label || goalFilter), onRemove: () => setGoalFilter(null) });
     if (favOnly) chips.push({ label: '⭐ Избранное', onRemove: () => setFavOnly(false) });
     if (profileOnly) chips.push({ label: `🧩 Под профиль (${profileRelevantIds?.size || 0})`, onRemove: () => setProfileOnly(false) });
@@ -463,12 +462,6 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
                       background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.12)', color: '#22c55e' }}>
                       ⚙️ {sysLabelText}
                     </span>
-                    {m.mechanisms.slice(0, 4).map(mc => (
-                      <span key={mc} style={{ padding: '2px 7px', borderRadius: 6, fontSize: 7,
-                        background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.1)', color: '#60a5fa' }}>
-                        🧬 {TZ_MECH_LABELS[mc as keyof typeof TZ_MECH_LABELS] || mc}
-                      </span>
-                    ))}
                     <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', alignSelf: 'center' }}>
                       {m.higherIsWorse ? '↑ опасен' : '↓ опасен'}
                     </span>

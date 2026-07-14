@@ -1010,7 +1010,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // ── Supplement timeline builder ──
     const buildSupplementTimeline = (mealTimes: { time: string; label: string; pct: number }[], isTrainingDay: boolean) => {
       const userSupps = takenSupplements.map(sid => ALL_SUBSTANCES.find(a => a.id === sid)).filter(Boolean);
-      if (userSupps.length === 0) return [];
       const timeline: { time: string; items: { name: string; dose: string; note: string }[] }[] = [];
       mealTimes.forEach(mt => {
         const isMorning = mt.label === 'Завтрак';

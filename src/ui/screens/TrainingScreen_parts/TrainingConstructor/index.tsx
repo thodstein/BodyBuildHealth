@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { selectSplit } from '../../../../engines/split-selector.engine';
 import { TRAINING_SPLITS, calcTraining, LEVEL_VOLUMES } from '../../../../engines/training.engine';
-import { LMS_CYCLES } from '../../../../data/lms-cycles/lms-cycle-index';
+import { LMS_CYCLES, normalizeCycleDirection } from '../../../../data/lms-cycles/lms-cycle-index';
+import { getRecommendedMethods, getRecommendedMethodsForSplit, getRecommendedForMethods } from '../../../../engines/cycle-method-map';
 import { FULL_PROGRAM_LIBRARY } from '../../../../engines/complete-program-library.engine';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from '../programs-data';
 import type { FullProgram, ProgramDay } from '../../../../engines/complete-program-library.engine';
@@ -91,6 +92,7 @@ export const TrainingConstructor: React.FC<Props> = ({
   });
   const [readinessSlider, setReadinessSlider] = useState((tprofile.recovery ?? 7) * 10);
   const [targetTonnage, setTargetTonnage] = useState<Record<string, number>>({});
+  const [tonnageDraft, setTonnageDraft] = useState<Record<string, string>>({});
 
   const [manualCfg, setManualCfg] = useState<Record<string, string>>(() => {
     try { const s = JSON.parse(localStorage.getItem('he_manual_cfg') || 'null'); if (s && s.manualCfg) return s.manualCfg; } catch {}
@@ -720,7 +722,7 @@ export const TrainingConstructor: React.FC<Props> = ({
     setManualResult({
       splitName,
       corrections,
-      days: firstWeek.days,
+      days: JSON.parse(JSON.stringify(firstWeek.days)),
       weeks,
       currentWeek: firstWeek.weekNumber,
       mesoLength,
@@ -784,7 +786,7 @@ export const TrainingConstructor: React.FC<Props> = ({
     setManualResult({
       splitName: prog.name + ' (неделя 1)',
       corrections,
-      days: first?.days || [],
+      days: first ? JSON.parse(JSON.stringify(first.days)) : [],
       weeks: pWeeks,
       currentWeek: 1,
       mesoLength: prog.durationWeeks,
@@ -1049,6 +1051,23 @@ export const TrainingConstructor: React.FC<Props> = ({
   const allPrograms = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS];
   const selectedList = Object.entries(manualCfg).filter(([, v]) => v);
 
+  /* ─── Рекомендованные методы (подсветка ★) по направлению сплита/цикла + совместимость ─── */
+  const combinedRecommended = useMemo(() => {
+    const s = new Set<string>();
+    const selSplit = (TRAINING_SPLITS as any)[manualCfg.split || ''];
+    const selCycle = LMS_CYCLES.find((c: any) => c.meta.id === (manualCfg.cycle || ''));
+    const splitDir = selSplit?.direction || null;
+    const cycleDir = selCycle ? normalizeCycleDirection(selCycle.meta.direction) : null;
+    const effectiveDir = cycleDir || splitDir;
+    if (effectiveDir) getRecommendedMethods(effectiveDir).forEach(v => s.add(v));
+    if (manualCfg.split) getRecommendedMethodsForSplit(manualCfg.split).forEach(v => s.add(v));
+    const selMeth = Object.entries(manualCfg)
+      .filter(([k, v]) => v && !['split', 'cycle', 'program', 'generator', 'bbSplit', 'bbLoad', 'bbCycle'].includes(k))
+      .map(([, v]) => v as string);
+    if (selMeth.length > 0) getRecommendedForMethods(selMeth).forEach(v => s.add(v));
+    return s;
+  }, [manualCfg]);
+
   /* ─── Шаг 5: коррекция → переход ─── */
   const [correctionLog, setCorrectionLog] = useState<string[]>([]);
 
@@ -1223,7 +1242,7 @@ export const TrainingConstructor: React.FC<Props> = ({
               <Sel label="Программа тренировок" value={manualCfg.program || ''} onChange={v => setManual('program', v)}
                 options={allPrograms.map((p: any) => ({ id: p.id, label: p.name, desc: p.type + ' · ' + p.goal + ' · ' + p.level }))}
                 hint="Готовые программы из библиотеки" />
-              <MethodSelector label="Частота" value={manualCfg.frequency || ''} onChange={v => setManual('frequency', v)} category="frequency" />
+              <MethodSelector label="Частота" value={manualCfg.frequency || ''} onChange={v => setManual('frequency', v)} category="frequency" recommendedSet={combinedRecommended} />
             </div>
             {manualCfg.program && (
               <button onClick={() => { loadProgramToConstructor(manualCfg.program); }}
@@ -1238,8 +1257,14 @@ export const TrainingConstructor: React.FC<Props> = ({
               <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
                 <span style={{ fontSize: 9, fontWeight: 600, color: DIM, flex: 1 }}>{g.label}</span>
                 <input 
-                  type="number" value={targetTonnage[g.id] || ''} 
-                  onChange={e => setTargetTonnage(prev => ({ ...prev, [g.id]: parseInt(e.target.value) || 0 }))}
+                  type="number" inputMode="numeric"
+                  value={tonnageDraft[g.id] ?? (targetTonnage[g.id] ? String(targetTonnage[g.id]) : '')} 
+                  onChange={e => setTonnageDraft(prev => ({ ...prev, [g.id]: e.target.value }))}
+                  onBlur={e => {
+                    const n = parseInt(e.target.value, 10);
+                    setTargetTonnage(prev => ({ ...prev, [g.id]: Number.isFinite(n) ? n : 0 }));
+                    setTonnageDraft(prev => { const next = { ...prev }; delete next[g.id]; return next; });
+                  }}
                   style={{ width: 60, background: '#000', border: '1px solid rgba(255,255,255,0.1)', color: ACCENT, borderRadius: 4, fontSize: 10, textAlign: 'center', padding: '2px 0' }}
                 />
               </div>
@@ -1269,23 +1294,23 @@ export const TrainingConstructor: React.FC<Props> = ({
             <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', marginBottom: 6 }}>📈 ПРОГРЕССИЯ</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <MethodSelector label="Периодизация" value={manualCfg.periodization || ''} onChange={v => setManual('periodization', v)} category="periodization" />
-                <MethodSelector label="Прогрессия" value={manualCfg.progression || ''} onChange={v => setManual('progression', v)} category="progression" />
+                <MethodSelector label="Периодизация" value={manualCfg.periodization || ''} onChange={v => setManual('periodization', v)} category="periodization" recommendedSet={combinedRecommended} />
+                <MethodSelector label="Прогрессия" value={manualCfg.progression || ''} onChange={v => setManual('progression', v)} category="progression" recommendedSet={combinedRecommended} />
               </div>
             </div>
             <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>🎯 ИНТЕНСИВНОСТЬ</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <MethodSelector label="Интенсивность" value={manualCfg.intensity || ''} onChange={v => setManual('intensity', v)} category="intensity" />
-                <MethodSelector label="Техника" value={manualCfg.technique || ''} onChange={v => setManual('technique', v)} category="technique" />
-                <MethodSelector label="Объём" value={manualCfg.volume || ''} onChange={v => setManual('volume', v)} category="volume" />
+                <MethodSelector label="Интенсивность" value={manualCfg.intensity || ''} onChange={v => setManual('intensity', v)} category="intensity" recommendedSet={combinedRecommended} />
+                <MethodSelector label="Техника" value={manualCfg.technique || ''} onChange={v => setManual('technique', v)} category="technique" recommendedSet={combinedRecommended} />
+                <MethodSelector label="Объём" value={manualCfg.volume || ''} onChange={v => setManual('volume', v)} category="volume" recommendedSet={combinedRecommended} />
               </div>
             </div>
           </div>
 
           <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#ec4899', marginBottom: 6 }}>🎯 СПЕЦИАЛИЗАЦИЯ</div>
-            <MethodSelector label="Метод специализации" value={manualCfg.specialization || ''} onChange={v => setManual('specialization', v)} category="specialization" />
+            <MethodSelector label="Метод специализации" value={manualCfg.specialization || ''} onChange={v => setManual('specialization', v)} category="specialization" recommendedSet={combinedRecommended} />
           </div>
 
           {selectedList.filter(([k]) => !['split','cycle','program','frequency'].includes(k)).length > 0 && (

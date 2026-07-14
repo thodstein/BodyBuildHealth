@@ -5,6 +5,7 @@ import React, { useState, useMemo } from 'react';
 import { calculatePRI, getPRIThreshold, autoregulate, getAutoregulationRecommendation, type AutoregulationInput } from '../../../engines/autoregulation.engine';
 import { selectRepPattern } from '../../../engines/rep-pattern.engine';
 import { applyToPlanner } from './planner-bridge';
+import { PopupSelect, PopupText } from '../SRCBBScreen_parts/TrainingPopups';
 import type { ReadinessScores, MovementPattern } from '../../../core/types';
 import type { CycleWeekPlan } from '../../../engines/cycle-types.engine';
 
@@ -13,11 +14,24 @@ const DIM = 'rgba(255,255,255,0.5)';
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
 const H: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: ACCENT, margin: '0 0 8px' };
 const LABEL: React.CSSProperties = { fontSize: 10, color: DIM, margin: '6px 0 3px', fontWeight: 700 };
-const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const };
-const SEL = (e?: React.CSSProperties): React.CSSProperties => ({ ...IN, ...e });
 
 const PATTERNS: MovementPattern[] = ['squat', 'hinge', 'horizontal_push', 'horizontal_pull', 'vertical_push', 'vertical_pull', 'lunge', 'carry'];
 const PAT_RU: Record<string, string> = { squat: 'Присед', hinge: 'Тяга', horizontal_push: 'Жим г.', horizontal_pull: 'Тяга г.', vertical_push: 'Жим в.', vertical_pull: 'Тяга в.', lunge: 'Выпад', carry: 'Носка' };
+const GOAL_OPTS = [
+  { id: 'strength', label: 'Сила' },
+  { id: 'hypertrophy', label: 'Гипертрофия' },
+  { id: 'powerbuilding', label: 'Пауэрбилдинг' },
+  { id: 'rehab', label: 'Реабилитация' },
+  { id: 'conditioning', label: 'Кондиция' },
+  { id: 'technique', label: 'Техника' },
+];
+const DIFF_OPTS = [
+  { id: 'easy', label: 'Лёгкая' },
+  { id: 'medium', label: 'Средняя' },
+  { id: 'hard', label: 'Тяжёлая' },
+  { id: 'advanced', label: 'Продвинутая' },
+];
+const PATTERN_OPTS = PATTERNS.map(p => ({ id: p, label: PAT_RU[p] || p }));
 
 export const PriRepPatternCard: React.FC = () => {
   const [recovery, setRecovery] = useState(70);
@@ -94,23 +108,11 @@ export const PriRepPatternCard: React.FC = () => {
       <div style={CARD}>
         <div style={H}>🔢 Схема повторений</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
-          <div><div style={LABEL}>Цель</div>
-            <select style={SEL()} value={goal} onChange={e => setGoal(e.target.value)}>
-              {['strength', 'hypertrophy', 'powerbuilding', 'rehab', 'conditioning', 'technique'].map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
-          </div>
-          <div><div style={LABEL}>Паттерн</div>
-            <select style={SEL()} value={pattern} onChange={e => setPattern(e.target.value as MovementPattern)}>
-              {PATTERNS.map(p => <option key={p} value={p}>{PAT_RU[p] || p}</option>)}
-            </select>
-          </div>
-          <div><div style={LABEL}>Сложность</div>
-            <select style={SEL()} value={diff} onChange={e => setDiff(e.target.value)}>
-              {['easy', 'medium', 'hard', 'advanced'].map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
+          <PopupSelect label="Цель" value={goal} options={GOAL_OPTS} onChange={setGoal} />
+          <PopupSelect label="Паттерн" value={pattern} options={PATTERN_OPTS} onChange={v => setPattern(v as MovementPattern)} />
+          <PopupSelect label="Сложность" value={diff} options={DIFF_OPTS} onChange={setDiff} />
         </div>
-        <div><div style={LABEL}>Технические проблемы (через запятую)</div><input style={IN} value={techIssues} onChange={e => setTechIssues(e.target.value)} placeholder="напр. rounding" /></div>
+        <PopupText label="Технические проблемы (через запятую)" value={techIssues} onChange={setTechIssues} placeholder="напр. округление спины" hint="Перечислите технические ошибки через запятую — движок подберёт схему повторений с учётом коррекции." />
         <div style={{ marginTop: 10, background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT }}>{repPat.pattern}</div>
           <div style={{ fontSize: 11, color: '#fff' }}>{repPat.minReps}–{repPat.maxReps} повторений{repPat.restBetweenRepsSec ? ` · пауза между повт ${repPat.restBetweenRepsSec}с` : ''}</div>

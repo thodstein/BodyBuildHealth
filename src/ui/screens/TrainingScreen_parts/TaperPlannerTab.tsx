@@ -15,6 +15,7 @@ import {
   getRecoveryProtocols, getMentalRoutines,
 } from '../../../engines/gym-competition.engine';
 import { applyToPlanner } from './planner-bridge';
+import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -134,22 +135,16 @@ export const TaperPlannerTab: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
             <div><div style={LABEL}>📅 Дата старта</div>
               <input type="date" value={meetDate} onChange={e => setMeetDate(e.target.value)} style={IN} /></div>
-            <div><div style={LABEL}>Усталость (RPE-пресс)</div>
-              <select value={fatigueRaw} onChange={e => setFatigueRaw(e.target.value)} style={IN}>
-                {fatigueOpts.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-              </select></div>
-            <div><div style={LABEL}>Стратегия прикидов</div>
-              <select value={strategy} onChange={e => setStrategy(e.target.value as AttemptStrategy)} style={IN}>
-                {strategyOpts.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-              </select></div>
+            <PopupSelect label="Усталость (RPE-пресс)" value={fatigueRaw} options={fatigueOpts} onChange={setFatigueRaw} />
+            <PopupSelect label="Стратегия прикидов" value={strategy} options={strategyOpts} onChange={v => setStrategy(v as AttemptStrategy)} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
-            <div><div style={LABEL}>Присед 1RM</div><input type="number" min={20} max={600} value={squat1RM} onChange={e => setSquat1RM(+e.target.value)} style={IN} /></div>
-            <div><div style={LABEL}>Жим 1RM</div><input type="number" min={20} max={400} value={bench1RM} onChange={e => setBench1RM(+e.target.value)} style={IN} /></div>
-            <div><div style={LABEL}>Тяга 1RM</div><input type="number" min={20} max={600} value={deadlift1RM} onChange={e => setDeadlift1RM(+e.target.value)} style={IN} /></div>
+            <PopupNumber label="Присед 1RM" value={squat1RM} min={20} max={600} suffix="кг" onChange={setSquat1RM} />
+            <PopupNumber label="Жим 1RM" value={bench1RM} min={20} max={400} suffix="кг" onChange={setBench1RM} />
+            <PopupNumber label="Тяга 1RM" value={deadlift1RM} min={20} max={600} suffix="кг" onChange={setDeadlift1RM} />
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{ flex: 1 }}><div style={LABEL}>Усталость число (1-10)</div><input type="number" min={1} max={10} value={fatigueNum} onChange={e => setFatigueNum(+e.target.value)} style={IN} /></div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            <div style={{ flex: 1 }}><PopupNumber label="Усталость число (1-10)" value={fatigueNum} min={1} max={10} onChange={setFatigueNum} /></div>
             {daysUntil > 0 && <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', padding: '4px 0' }}>
               <span style={{ ...SMALL, color: ACCENT }}>До старта: <b>{daysUntil}</b> дн.</span>
             </div>}
@@ -269,12 +264,8 @@ export const TaperPlannerTab: React.FC = () => {
         <div style={CARD_GLASS}>
           <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8 }}>⚖️ Весовая категория</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-            <div><div style={LABEL}>Вес тела, кг</div><input type="number" style={IN} value={bw} onChange={e => setBw(parseFloat(e.target.value) || 0)} /></div>
-            <div><div style={LABEL}>Федерация</div>
-              <select style={IN} value={fed} onChange={e => setFed(e.target.value)}>
-                {['IPF', 'other'].map(f => <option key={f} value={f}>{f === 'IPF' ? 'IPF (офиц.)' : 'Другая'}</option>)}
-              </select>
-            </div>
+            <PopupNumber label="Вес тела, кг" value={bw} min={40} max={200} suffix="кг" onChange={v => setBw(v)} />
+            <PopupSelect label="Федерация" value={fed} options={[{ id: 'IPF', label: 'IPF (офиц.)' }, { id: 'other', label: 'Другая' }]} onChange={v => setFed(v)} />
           </div>
           <div style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 8, padding: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT }}>Категория до {cls.weightClass} кг</div>
@@ -361,10 +352,10 @@ export const TaperPlannerTab: React.FC = () => {
           <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>📝 Параметры шоу-пика</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div><div style={LABEL}>📅 Дата шоу</div><input type="date" style={IN} value={showDate} onChange={e => setShowDate(e.target.value)} /></div>
-            <div><div style={LABEL}>Кондиция (0-1)</div><input type="number" min={0} max={1} step={0.05} style={IN} value={conditioning} onChange={e => setConditioning(+e.target.value)} /></div>
-            <div><div style={LABEL}>Наполненность (0-1)</div><input type="number" min={0} max={1} step={0.05} style={IN} value={fullness} onChange={e => setFullness(+e.target.value)} /></div>
-            <div><div style={LABEL}>Сухость (0-1)</div><input type="number" min={0} max={1} step={0.05} style={IN} value={dryness} onChange={e => setDryness(+e.target.value)} /></div>
-            <div><div style={LABEL}>Толерантность к углеводам</div><input type="number" min={0} max={1} step={0.05} style={IN} value={carbTol} onChange={e => setCarbTol(+e.target.value)} /></div>
+            <PopupNumber label="Кондиция (0-1)" value={conditioning} min={0} max={1} step={0.05} onChange={v => setConditioning(v)} />
+            <PopupNumber label="Наполненность (0-1)" value={fullness} min={0} max={1} step={0.05} onChange={v => setFullness(v)} />
+            <PopupNumber label="Сухость (0-1)" value={dryness} min={0} max={1} step={0.05} onChange={v => setDryness(v)} />
+            <PopupNumber label="Толерантность к углеводам" value={carbTol} min={0} max={1} step={0.05} onChange={v => setCarbTol(v)} />
           </div>
         </div>
         {bb && (

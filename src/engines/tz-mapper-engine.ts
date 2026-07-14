@@ -335,6 +335,50 @@ function selectSubstances(
   }
 
   // ───────────────────────────────────────────────────────────────────
+  // 1b. Обязательная нутриция фазы (mandatoryNutrition)
+  //     Добавляется ВСЕГДА, независимо от покрытия механизмов
+  //     (напр. PCT: эстроген-клиренс DIM/Ca-D-glucarate/fiber/sulforaphane)
+  // ───────────────────────────────────────────────────────────────────
+  if (phaseProto.mandatoryNutrition) {
+    for (const sid of phaseProto.mandatoryNutrition) {
+      if (subs.length >= totalLimit) break;
+      if (shouldBlock(sid)) continue;
+      if (isAlreadyUsed(sid)) continue;
+
+      // Найти лучшее покрытие механизмов в TZ_MECH_TO_SUBS
+      const mechsCovered: TzMechId[] = [];
+      let bestK = 0;
+      let bestQ: 'A'|'B'|'C' = 'C';
+      let bestCat: TzCategory = 'other';
+      let triggeredBy: TzMechId | undefined = undefined;
+      for (const mechId of ALL_TZ_MECH_IDS) {
+        const found = TZ_MECH_TO_SUBS[mechId].substances.find(s => s.substanceId.toLowerCase() === sid.toLowerCase());
+        if (found) {
+          mechsCovered.push(mechId);
+          if (found.k > bestK) {
+            bestK = found.k;
+            bestQ = found.q;
+            bestCat = found.category;
+            triggeredBy = mechId;
+          }
+        }
+      }
+
+      subs.push({
+        substanceId: sid,
+        category: bestCat,
+        k: bestK,
+        q: bestQ,
+        reason: 'Обязательная PCT-нутриция (эстроген-клиренс)',
+        mechsCovered,
+        triggeredByMech: triggeredBy,
+      });
+      markUsed(sid);
+      if (categoryCount.has(bestCat)) categoryCount.set(bestCat, categoryCount.get(bestCat)! + 1);
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────
   // 2. Покрытие активированных механизмов по Labs
   // ───────────────────────────────────────────────────────────────────
   // Сортируем мехи по severity (severe > moderate > mild)

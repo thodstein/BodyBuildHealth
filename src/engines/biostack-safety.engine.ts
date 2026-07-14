@@ -99,10 +99,11 @@ export const UL_CANONICAL: Record<string, string> = {
 };
 
 /* ─── Dose-unit normalization ───
-   Some catalog entries store dosage.mg in IU (МЕ), mcg (мкг) or whole salt
-   mass, while SUPPLEMENT_UPPER_LIMITS are in mg of ELEMENTAL nutrient.
-   This factor converts stored dosage.mg → true elemental mg before UL check.
-   (Prevents false "danger" alerts e.g. D3 5000 МЕ read as 5000 мг = 5,000,000% UL.) */
+   SUPPLEMENT_UPPER_LIMITS are in mg of ELEMENTAL nutrient.
+   Some catalog entries store dosage.mg in IU (МЕ), mcg (мкг) or whole SALT mass
+   (e.g. "Магний 400 мг" = 400 мг цитрата/глицината ≈ 56–64 мг элементарного Mg).
+   factor converts stored dosage.mg → true elemental mg before UL check.
+   (Prevents false "danger" alerts: D3 5000 МЕ, or Mg 400 мг соли vs UL 350 мг.) */
 export const DOSE_TO_ELEMENTAL_MG: Record<string, number> = {
   vitamin_d3: 0.000025,          // 1 МЕ = 0.025 мкг → 5000 МЕ = 0.125 мг
   selenium: 0.001,               // мкг → мг (200 мкг = 0.2 мг)
@@ -114,6 +115,71 @@ export const DOSE_TO_ELEMENTAL_MG: Record<string, number> = {
   magnesium_l_threonate: 0.072,  // ~7.2% элементарного Mg (144 мг из 2000 мг соли)
 };
 
+/* Elemental fraction of the salt by compound form (Cyrillic keywords from catalog `form`).
+   Used when a mineral is stored as salt mass (not the special IU/mcg cases above). */
+const MINERAL_FORM_FRACTION: Record<string, Record<string, number>> = {
+  magnesium: {
+    'оксид': 0.603, 'треонат': 0.072, 'цитрат': 0.16, 'глицинат': 0.139,
+    'бисглицинат': 0.139, 'лизинат': 0.106, 'малат': 0.155, 'таурат': 0.087,
+    'хлорид': 0.12, 'лактат': 0.12,
+  },
+  zinc: {
+    'пиколинат': 0.20, 'глюконат': 0.143, 'карнозин': 0.22, 'цитрат': 0.345,
+    'оксид': 0.80, 'сульфат': 0.23, 'бисглицинат': 0.16, 'хелат': 0.16,
+  },
+  iron: {
+    'бисглицинат': 0.16, 'сульфат': 0.20, 'фумарат': 0.329, 'глюконат': 0.12, 'цитрат': 0.18,
+  },
+  calcium: {
+    'карбонат': 0.40, 'цитрат': 0.21, 'глюконат': 0.089, 'лактат': 0.13, 'малат': 0.13,
+  },
+  copper: {
+    'бисглицинат': 0.154, 'глюконат': 0.143, 'цитрат': 0.38, 'сульфат': 0.254,
+  },
+  manganese: {
+    'глицинат': 0.136, 'глюконат': 0.228, 'сульфат': 0.368, 'цитрат': 0.30,
+  },
+  boron: {
+    'цитрат': 0.16, 'глицинат': 0.16,
+  },
+  potassium: {
+    'цитрат': 0.28, 'хлорид': 0.52, 'глюконат': 0.14, 'оратат': 0.30,
+  },
+};
+
+/* Conservative default elemental fraction if the exact form keyword is not recognized. */
+const MINERAL_DEFAULT_FRACTION: Record<string, number> = {
+  magnesium: 0.15, zinc: 0.20, iron: 0.16, calcium: 0.30,
+  copper: 0.15, manganese: 0.15, boron: 0.16, potassium: 0.30,
+};
+
+/**
+ * Resolve the conversion factor (stored salt mass → elemental mg) for a catalog id.
+ * Returns `undefined` when the nutrient is stored directly as elemental (factor 1).
+ */
+export function resolveElementalFactor(id: string, cat: any): number | undefined {
+  const lc = id.toLowerCase();
+  // 1) Explicit IU/mcg/special-salt override
+  if (DOSE_TO_ELEMENTAL_MG[lc] !== undefined) return DOSE_TO_ELEMENTAL_MG[lc];
+  // 2) Mineral salt → derive from compound form
+  const keyHint = lc.includes('magnesium') ? 'magnesium'
+    : lc.includes('zinc') ? 'zinc'
+    : lc.includes('iron') ? 'iron'
+    : lc.includes('calcium') ? 'calcium'
+    : lc.includes('copper') ? 'copper'
+    : lc.includes('manganese') ? 'manganese'
+    : lc.includes('boron') ? 'boron'
+    : lc.includes('potassium') ? 'potassium'
+    : '';
+  if (!keyHint) return undefined; // non-mineral: stored as-is (factor 1)
+  const form = ((cat?.dosage?.form || '') + ' ' + (cat?.nameRu || '')).toLowerCase();
+  const table = MINERAL_FORM_FRACTION[keyHint];
+  for (const kw of Object.keys(table)) {
+    if (form.includes(kw)) return table[kw];
+  }
+  return MINERAL_DEFAULT_FRACTION[keyHint];
+}
+
 export function checkStackToxicity(stackIds: string[]): ToxWarning[] {
   const warnings: ToxWarning[] = [];
   const doseSum: Record<string, { total: number; ids: string[]; names: string[] }> = {};
@@ -123,7 +189,7 @@ export function checkStackToxicity(stackIds: string[]): ToxWarning[] {
     if (!cat?.dosage?.mg) continue;
     const lc = id.toLowerCase();
     // Normalize IU/mcg/salt-mass → elemental mg before UL comparison
-    const convFactor = DOSE_TO_ELEMENTAL_MG[lc];
+    const convFactor = resolveElementalFactor(id, cat);
     const doseMg = convFactor !== undefined ? cat.dosage.mg * convFactor : cat.dosage.mg;
     const name = cat.nameRu || cat.name || id;
 

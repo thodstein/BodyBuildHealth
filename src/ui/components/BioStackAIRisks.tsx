@@ -764,11 +764,6 @@ function PairCard({ p, open, onToggle, compact }: { p: any; open: boolean; onTog
           <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.65)', lineHeight: 1.4, marginBottom: 3 }}>
             {p.effect}
           </div>
-          {p.mechanisms && p.mechanisms.length > 0 && (
-            <div style={{ fontSize: 7, color: '#a78bfa', marginBottom: 2 }}>
-              🧬 Механизмы: {p.mechanisms.join(', ')}
-            </div>
-          )}
           {p.notes && (
             <div style={{ fontSize: 7, color: '#f59e0b', lineHeight: 1.3 }}>
               📝 {p.notes}

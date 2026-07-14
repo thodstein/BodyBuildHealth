@@ -468,7 +468,13 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       if (input.goal === 'cut') v = Math.round(v * 0.9);
       if (input.goal === 'mass' || input.goal === 'strength_mass') v = Math.round(v * 1.1);
       muscleVolumeRotation[m] = v;
-      mrvByMuscle[m] = lm.mrv; // истинный MRV — потолок для капа (fix D)
+      // fix D: истинный MRV — потолок для капа.
+      // fix C: для отстающих/фокус-групп поднимаем потолок в такт объёмному
+      // бусту (weak ×1.2, focus ×1.3), иначе normalizeWeekMrv стирает акцент.
+      let capMrv = lm.mrv;
+      if (isWeak(m, weakPoints)) capMrv = Math.round(capMrv * 1.2);
+      if (focusGroup === m || (focusGroup && isWeak(m, [focusGroup]))) capMrv = Math.round(capMrv * 1.3);
+      mrvByMuscle[m] = capMrv;
     }
   }
 

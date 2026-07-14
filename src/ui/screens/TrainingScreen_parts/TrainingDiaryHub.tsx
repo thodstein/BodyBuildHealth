@@ -621,7 +621,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 <span>FFMI:</span><span style={{ fontWeight: 600 }}>{measureAnalytics.ffmi?.toFixed(1)}</span>
                 <span>LBM:</span><span style={{ fontWeight: 600 }}>{measureAnalytics.lbm?.toFixed(1)} кг</span>
                 <span>BMI:</span><span style={{ fontWeight: 600 }}>{measureAnalytics.bmi?.toFixed(1)}</span>
-                <span>Fat:</span><span style={{ fontWeight: 600 }}>{measureAnalytics.fatMass?.toFixed(1)} кг</span>
+                <span>Жир:</span><span style={{ fontWeight: 600 }}>{measureAnalytics.fatMass?.toFixed(1)} кг</span>
               </div>
             </div>
           )}

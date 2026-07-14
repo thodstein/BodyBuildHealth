@@ -7,6 +7,7 @@ import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
   import { ProfileTab } from './BioStackAIProfile';
   import { SearchTab } from './BioStackAISearch';
   import { BuildTab } from './BioStackAIBuild';
+  import { ComplexTab } from './BioStackAIComplexes';
   import { StackTab } from './BioStackAIStack';
   import { RisksTab } from './BioStackAIRisks';
   import { CompareTab } from './BioStackAICompare';
@@ -133,12 +134,18 @@ export const BioStackAIScreen: React.FC = () => {
 
       case 'select':
         if (activeSub === 'build') return <BuildTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} labAnalysis={labAnalysis} linked={linked} />;
+        if (activeSub === 'complexes') return <ComplexTab stackIds={stackIds} setStackIds={setStackIdsAndSync} />;
         if (activeSub === 'clinical') return (
           <BioStackAIClinicalBuild profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} labAnalysis={labAnalysis} linked={linked} />
         );
         return <SearchTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} />;
 
       case 'stack':
+        if (activeSub === 'interactions') return (<div><StackPicker stackIds={stackIds} onChange={setStackIdsAndSync} /><InteractionPanel stackIds={stackIds} /></div>);
+        if (activeSub === 'dose') return (<div><StackPicker stackIds={stackIds} onChange={setStackIdsAndSync} /><DosePanel stackIds={stackIds} /></div>);
+        if (activeSub === 'timing') return (<div><StackPicker stackIds={stackIds} onChange={setStackIdsAndSync} /><TimingPanel stackIds={stackIds} /></div>);
+        if (activeSub === 'drugcheck') return <DrugCheckTab profile={profile} stackIds={stackIds} />;
+        if (activeSub === 'clinical') return (<div><StackPicker stackIds={stackIds} onChange={setStackIdsAndSync} /><ClinicalPanel stackIds={stackIds} labAnalysis={labAnalysis} onClearStops={clearStops} onReplace={replaceStop} /></div>);
         return (
           <StackTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync}
             allStacks={allStacks} activeStackIdx={activeStackIdx}
@@ -154,18 +161,9 @@ export const BioStackAIScreen: React.FC = () => {
           />
         );
 
-      case 'analysis':
-        if (activeSub === 'drugcheck') return <DrugCheckTab profile={profile} stackIds={stackIds} />;
-        if (activeSub === 'dose') return (<div><StackPicker stackIds={stackIds} onChange={setStackIdsAndSync} /><DosePanel stackIds={stackIds} /></div>);
-        if (activeSub === 'timing') return (<div><StackPicker stackIds={stackIds} onChange={setStackIdsAndSync} /><TimingPanel stackIds={stackIds} /></div>);
-        if (activeSub === 'clinical') return (<div><StackPicker stackIds={stackIds} onChange={setStackIdsAndSync} /><ClinicalPanel stackIds={stackIds} labAnalysis={labAnalysis} onClearStops={clearStops} onReplace={replaceStop} /></div>);
-        return (<div><StackPicker stackIds={stackIds} onChange={setStackIdsAndSync} /><InteractionPanel stackIds={stackIds} /></div>);
-
-      case 'risks':
-        if (activeSub === 'compare') return <CompareTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} />;
-        return <RisksTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} activeAAS={activeAAS} />;
-
       case 'reports':
+        if (activeSub === 'risks') return <RisksTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} activeAAS={activeAAS} />;
+        if (activeSub === 'compare') return <CompareTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} />;
         if (activeSub === 'export') return <ExportTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} />;
         return <ReportsTab profile={profile} stackIds={stackIds} linked={linked} />;
 

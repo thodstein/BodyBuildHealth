@@ -148,8 +148,14 @@ export function useDataLink(): LinkedData {
 
   const s = profile.settings;
   const activeDrugs = computeActiveDrugs(course);
-  const pal = derivePAL(s.training.daysPerWeek, s.training.minutesPerSession);
-  const trainingLoad = deriveTrainingLoad(s.training.daysPerWeek, s.training.minutesPerSession);
+  const _t = s.training ?? {};
+  const _l = s.lifestyle ?? {};
+  const _n = s.nutrition ?? {};
+  const _h = s.health ?? {};
+  const _p = s.personal ?? {};
+  const _sys = s.system ?? {};
+  const pal = derivePAL(_t.daysPerWeek ?? 3, _t.minutesPerSession ?? 60);
+  const trainingLoad = deriveTrainingLoad(_t.daysPerWeek ?? 3, _t.minutesPerSession ?? 60);
 
   // sRPE-оверлей: реальная тренировочная нагрузка из дневника sRPE → корректирует readiness
   const _srpe = loadSRPESessions();
@@ -188,22 +194,22 @@ export function useDataLink(): LinkedData {
     })();
 
     return calcReadiness({
-      sleepHours: s.lifestyle.sleepHours ?? 7,
-      sleepQuality: (s.lifestyle.sleepQuality === 'good' || s.lifestyle.sleepQuality === 'fair' || s.lifestyle.sleepQuality === 'poor') ? (
-        s.lifestyle.sleepQuality === 'good' ? 8 : s.lifestyle.sleepQuality === 'fair' ? 5 : 3
+      sleepHours: _l.sleepHours ?? 7,
+      sleepQuality: (_l.sleepQuality === 'good' || _l.sleepQuality === 'fair' || _l.sleepQuality === 'poor') ? (
+        _l.sleepQuality === 'good' ? 8 : _l.sleepQuality === 'fair' ? 5 : 3
       ) : 5,
-      nightAwakenings: s.lifestyle.nightAwakenings ?? 1,
-      chronotype: s.lifestyle.chronotype, bedtime: s.lifestyle.bedtime, wakeTime: s.lifestyle.wakeTime,
-      hrvRatio: s.lifestyle.baselineHrvRatio ?? 1.0,
-      doms: Math.min(10, (s.lifestyle.fatigueLevel ?? 3) * 1.5 + sRpeFatigueAdj),
-      stress: s.lifestyle.stressLevel ?? 3,
-      calRatio: s.system.nutritionFactor ?? 0.8,
+      nightAwakenings: _l.nightAwakenings ?? 1,
+      chronotype: _l.chronotype, bedtime: _l.bedtime, wakeTime: _l.wakeTime,
+      hrvRatio: _l.baselineHrvRatio ?? 1.0,
+      doms: Math.min(10, (_l.fatigueLevel ?? 3) * 1.5 + sRpeFatigueAdj),
+      stress: _l.stressLevel ?? 3,
+      calRatio: _sys.nutritionFactor ?? 0.8,
       proteinRatio: 0.8,
-      waterRatio: Math.min(1, (s.lifestyle.dailyWaterLiters ?? 2) / 3),
+      waterRatio: Math.min(1, (_l.dailyWaterLiters ?? 2) / 3),
       fiberRatio: 0.6,
-      omega3Flag: (s.nutrition.currentSupplements ?? []).some((sup: any) => /omega|омега/i.test(sup.name)),
+      omega3Flag: (_n.currentSupplements ?? []).some((sup: any) => /omega|омега/i.test(sup.name)),
       trainingLoadRatio: Math.max(0.2, Math.min(1.5, trainingLoad + sRpeLoadAdj)),
-      subjFatigue: Math.min(10, (s.lifestyle.fatigueLevel ?? 3) + sRpeFatigueAdj),
+      subjFatigue: Math.min(10, (_l.fatigueLevel ?? 3) + sRpeFatigueAdj),
       hrIncrease: crpNorm > 0.6 ? 0.3 : 0.1,
       mixQualityScore: lastMix?.score ?? undefined,
     });
@@ -217,18 +223,18 @@ export function useDataLink(): LinkedData {
       systemBreakdown: {} as Record<string, { raw: number; net: number }>,
     };
     try {
-      const genetics = s.health.genetics ?? {};
+      const genetics = _h.genetics ?? {};
       // Compute support coverage first, then pass to risk calculation
-      const supportIds = (s.nutrition.currentSupplements ?? []).map((sup: any) => sup.id).filter(Boolean);
+      const supportIds = (_n.currentSupplements ?? []).map((sup: any) => sup.id).filter(Boolean);
       let coverage: Record<string, number> = {};
       try {
         const supportResult = calculateSupport({
           substances: supportIds,
           labs: labs.slice(-10).map(l => ({ code: l.code, value: l.value })),
-          demographics: { age: s.personal.age ?? 30, weight: s.personal.weight ?? 80, sex: s.personal.sex ?? 'male' },
+          demographics: { age: _p.age ?? 30, weight: _p.weight ?? 80, sex: _p.sex ?? 'male' },
           genetics,
-          nutritionFactor: s.system.nutritionFactor ?? 0.8,
-          trainingFactor: s.system.trainingFactor ?? 0.7,
+          nutritionFactor: _sys.nutritionFactor ?? 0.8,
+          trainingFactor: _sys.trainingFactor ?? 0.7,
           drugDoses: Object.fromEntries(Object.entries(activeDrugs).map(([k, v]) => [k, v.dosePerWeek])),
         });
         if (supportResult.systemSupport) {
@@ -240,8 +246,8 @@ export function useDataLink(): LinkedData {
       } catch {}
       const riskResult = calculateRisks({
         genetics,
-        nutritionFactor: s.system.nutritionFactor ?? 0.8,
-        trainingFactor: s.system.trainingFactor ?? 0.7,
+        nutritionFactor: _sys.nutritionFactor ?? 0.8,
+        trainingFactor: _sys.trainingFactor ?? 0.7,
         activeDrugs,
         supportCoverage: coverage,
       });

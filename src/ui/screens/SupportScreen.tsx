@@ -48,6 +48,7 @@ import { writeRiskBridge } from '../../engines/risk-bridge';
 import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from '../../engines/recommendation-engine';
 import { calculateMixScore, type TrainingMixScore, type MixSubstance, type MixProfile, MIX_MECHANISMS, MIX_SYNERGY, MIX_TEMPLATES, type MixTemplate, buildBestRecipe, type MixRecipe, type MixRecipeItem, groupRecipeItemsByTiming } from '../../engines/training-mix-scoring.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
+import { drainExternalSubsQueue, subscribeExternalSubs, getMergedExternalSubIds } from './TrainingScreen_parts/support-plan-bridge';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 // Force Vite to include SUPPORT_CATALOG_DATA and CANONICAL_ID_MAP (prevents tree-shaking)
 // @ts-ignore
@@ -120,6 +121,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
   const showToast = (msg: string, type: string = 'success') => { setToast({ msg, type: type as 'success' | 'warning' | 'error' }); setTimeout(() => setToast(null), 3000); };
   const [selectedAnalogs, setSelectedAnalogs] = useState<Record<string, string>>({});
   const [enhancedSubs, setEnhancedSubs] = useState<string[]>([]);
+  // Внешние добавки (миксы/BioStack/питание) — идут ТОЛЬКО в общий план (he_general_plan), НЕ в план калькулятора
+  const [externalSubs, setExternalSubs] = useState<string[]>(() => {
+    try { return getMergedExternalSubIds(); } catch { return []; }
+  });
   const [supportGoal, setSupportGoal] = useState('muscle_gain');
   const [supportDrugs, setSupportDrugs] = useState<string[]>([]);
   const [autoLevel, setAutoLevel] = useState<'basic' | 'mid' | 'max' | 'boost'>('mid');
@@ -497,8 +502,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       if (boostSubs.length > 0) showToast(`🚀 Режим «Усиление»: добавлено ${boostSubs.length} веществ (гонадотропины, пептиды, ноотропы)`, 'warning');
       if (jointSubs.length > 0) showToast(`🦴 Суставная поддержка: добавлено ${jointSubs.length} веществ (глюкозамин, коллаген, куркумин)`, 'warning');
     } catch {}
-    // Сохраняем ID веществ в localStorage для импорта в план питания
-    try { localStorage.setItem('he_support_plan_result', JSON.stringify(planRes.substances.map(p => p.id))); } catch {}
     // subs + dosages из единого результата (с dedup)
     const subs: string[] = [...new Set(planRes.substances.map(p => p.id))];
     const dosages: Record<string, { mg: number; timing: string }> = {};
@@ -524,8 +527,23 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
         dosages[enhId] = d ? { mg: d.mg, timing: d.timing } : { mg: 500, timing: 'с едой' };
       }
     }
+    // ПЛАН 1 (калькулятор): risk-driven вещества + ручные правки поддержки. БЕЗ миксов/BioStack/питания.
+    try { localStorage.setItem('he_support_plan_result', JSON.stringify(subs)); } catch {}
     return { subs, dosages };
   }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, linked.course, linked.profile, courseWeekState, boostEnabled, jointMode, reproMode, neuroMode]);
+
+  // ПЛАН 2 (общий): калькулятор ∪ внешние добавки (миксы/BioStack/питание). Для удобства, без привязки к рискам.
+  useEffect(() => {
+    try {
+      const calcSubs: string[] = effectiveLevel?.subs || [];
+      const general = [...calcSubs];
+      for (const extId of externalSubs) {
+        const extCanon = canonId(extId);
+        if (!general.some(s => canonId(s) === extCanon)) general.push(extId);
+      }
+      localStorage.setItem('he_general_plan', JSON.stringify(general));
+    } catch {}
+  }, [effectiveLevel, externalSubs]);
 
   const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost', overrideSubs?: string[]) => {
     try {
@@ -738,12 +756,29 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTa
       if (raw) {
         const data = JSON.parse(raw);
         if (data.stackIds && Array.isArray(data.stackIds) && data.stackIds.length > 0) {
-          setEnhancedSubs(prev => [...new Set([...prev, ...data.stackIds])]);
+          setExternalSubs(prev => [...new Set([...prev, ...data.stackIds])]);
           localStorage.removeItem('he_biostack_to_plan');
-          showToast(`BioStack: +${data.stackIds.length} веществ добавлено в план`, 'success');
+          showToast(`BioStack: +${data.stackIds.length} веществ добавлено в общий план`, 'success');
         }
       }
     } catch {}
+  }, []);
+  useEffect(() => {
+    const SOURCE_RU: Record<string, string> = { mix: 'Миксы', nutrition: 'Питание', biostack: 'BioStack' };
+    const consume = () => {
+      try {
+        const entries = drainExternalSubsQueue();
+        if (entries.length === 0) return;
+        const ids = [...new Set(entries.flatMap(e => e.ids))];
+        if (ids.length === 0) return;
+        setExternalSubs(prev => [...new Set([...prev, ...ids])]);
+        const bySource = [...new Set(entries.map(e => SOURCE_RU[e.source] || e.source))].join(', ');
+        showToast(`${bySource}: +${ids.length} веществ добавлено в общий план`, 'success');
+      } catch {}
+    };
+    consume();
+    const unsub = subscribeExternalSubs(() => consume());
+    return unsub;
   }, []);
   const [planSubTab, setPlanSubTab] = useState<'active' | 'archive' | 'myplans'>('active');
   const [favSearch, setFavSearch] = useState('');

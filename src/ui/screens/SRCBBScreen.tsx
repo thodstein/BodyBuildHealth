@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { LMS_CYCLES, getCycleById } from '../../data/lms-cycles/lms-cycle-index';
+import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, selectBestCycle, explainSelection, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
 import { buildLMSPlan, extractExercises, type LMSBuildOutput } from '../../engines/lms/lms-builder.engine';
 import { mesocyclePhaseForWeek } from '../../engines/rir-matrix.engine';
@@ -155,7 +155,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const setExPM = (name: string, val: number) => {
     setExercisePMs(prev => ({ ...prev, [name]: val }));
   };
-  const [selectedCycleId, setSelectedCycleId] = useState<string>(_plSaved?.selectedCycleId || 'cycle-01');
+  const [selectedCycleId, setSelectedCycleId] = useState<string>(() => {
+    const saved = _plSaved?.selectedCycleId;
+    const c = saved ? getCycleById(saved) : null;
+    if (c && normalizeCycleDirection(c.meta.direction) === 'bodybuilding') return 'cycle-01';
+    return saved || 'cycle-01';
+  });
   const [cycleWeeks, setCycleWeeks] = useState<number>(_plSaved?.cycleWeeks ?? 12);
   const [builtSrc, setBuiltSrc] = useState<LMSBuildOutput | null>(_plSaved?.builtSrc ?? null);
   const [srcWeek, setSrcWeek] = useState<number>(_plSaved?.srcWeek ?? 1);
@@ -209,7 +214,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     return { volumeMult, technique, label };
   };
 
-  const ranked = useMemo(() => rankCycles({ goal: goal as any, level: level as any, bodyWeight: bw, daysPerWeek: days, direction: dir as any, mode: 'natural' }), [goal, level, bw, days, dir]);
+  // ПЛ-авто работает ТОЛЬКО с силовыми циклами (бодибилдинг-циклы имеют свой экран track='bb')
+  const plCycles = useMemo(() => LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) !== 'bodybuilding'), []);
+  const ranked = useMemo(() => rankCycles({ goal: goal as any, level: level as any, bodyWeight: bw, daysPerWeek: days, direction: dir as any, mode: 'natural' }).filter(r => normalizeCycleDirection(r.cycle.meta.direction) !== 'bodybuilding'), [goal, level, bw, days, dir]);
   const best = ranked[0];
 
   const buildSrc = () => {
@@ -523,13 +530,13 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <PopupSelect label="Уровень спортсмена" value={level} onChange={setLevel} options={[['novice','Новичок'],['II-KMS','II разряд — КМС'],['KMS-MS','КМС — МС'],['MS-MSMK','МС — МСМК'],['II-MS','II разряд — МС'],['intermediate','Средний']].map(([id,label]) => ({ id, label }))} />
             <PopupSelect label="Цель тренировок" value={goal} onChange={setGoal} options={[['strength','Сила'],['mass','Мышечная масса'],['endurance','Выносливость'],['peak','Выход на пик'],['mixed','Смешанная']].map(([id,label]) => ({ id, label }))} />
-            <PopupSelect label="Направление" value={dir} onChange={setDir} options={[['powerlifting','Троеборье'],['bench','Жим лёжа'],['deadlift_bench','Тяга + Жим'],['armwrestling','Армрестлинг'],['bodybuilding','Бодибилдинг']].map(([id,label]) => ({ id, label }))} />
+            <PopupSelect label="Направление" value={dir} onChange={setDir} options={[['powerlifting','Троеборье'],['bench','Жим лёжа'],['deadlift_bench','Тяга + Жим'],['armwrestling','Армрестлинг']].map(([id,label]) => ({ id, label }))} />
             <PopupNumber label="Дней в неделю" value={days} min={2} max={7} suffix="" onChange={v => setDays(v)} />
             <PopupNumber label="Вес тела" value={bw} min={40} max={200} suffix=" кг" onChange={v => setBw(v)} />
           </div>
           {best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { setSelectedCycleId(best.cycle.meta.id); setTimeout(buildSrc, 0); }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,#00e68a,#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
-          <div style={H}>📂 Каталог циклов ({LMS_CYCLES.length})</div>
-          <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={LMS_CYCLES.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${({ powerlifting: 'Троеборье', bench: 'Жим лёжа', deadlift_bench: 'Тяга+Жим', armwrestling: 'Армрестлинг', bodybuilding: 'Бодибилдинг' } as Record<string,string>)[c.meta.direction] || c.meta.direction} · ${c.meta.period} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
+          <div style={H}>📂 Каталог силовых циклов ({plCycles.length})</div>
+          <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={plCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${({ powerlifting: 'Троеборье', bench: 'Жим лёжа', deadlift_bench: 'Тяга+Жим', armwrestling: 'Армрестлинг' } as Record<string,string>)[c.meta.direction] || c.meta.direction} · ${c.meta.period} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
           {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
           <div style={H}>💪 Предельные максимумы (ПМ) по упражнениям цикла</div>
           {(() => {

@@ -38,7 +38,7 @@ export const LoadSafetyCard: React.FC = () => {
   const [cardioGoal, setCardioGoal] = useState('cut');
   const [cardioDays, setCardioDays] = useState(2);
   const [cardioType, setCardioType] = useState<CardioType>('zone2');
-  const [injuries, setInjuries] = useState('knee, shoulder');
+  const [injuries, setInjuries] = useState('');
   const [sessions, setSessions] = useState(4);
   const [pri, setPri] = useState(70);
   const [risk, setRisk] = useState('low');
@@ -105,12 +105,7 @@ export const LoadSafetyCard: React.FC = () => {
         return (
           <CalcSection icon="🦴" title="Ортопедические ограничения" accent="#f59e0b" desc="Травмы → какие группы щадить">
             <div style={{ gridColumn: '1 / -1' }}>
-              <PopupNumber label="Травмы (через запятую)" value={0} hint="Напр.: knee, shoulder, lower_back" onChange={() => {}} />
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>
-                Введите травмы текстом: <b style={{color:'#00e68a'}}>{injuries}</b>
-              </div>
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 6 }}>🩹 Отметьте травмированные зоны</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
                 {['knee','shoulder','lower_back','elbow','wrist','hip','ankle','neck'].map(inj => {
                   const on = injuries.includes(inj);

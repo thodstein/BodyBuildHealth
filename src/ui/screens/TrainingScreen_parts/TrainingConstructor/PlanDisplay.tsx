@@ -37,6 +37,14 @@ const PHASE_COLORS: Record<string, string> = {
   peaking: '#ef4444',
 };
 
+// Синхронизация правок дней с текущей неделей мезоцикла (иначе изменения
+// теряются при переключении недель — goToWeek перезаписывает result.days из weeks[]).
+function syncCurrentWeek(r: ManualResult, days: ManualResult['days']): ManualWeek[] | undefined {
+  if (!r.weeks?.length) return r.weeks;
+  const cw = r.currentWeek || 1;
+  return r.weeks.map(w => w.weekNumber === cw ? { ...w, days } : w);
+}
+
 function fmtWt(e: { weight: number; weightNote?: string }): string {
   if ((e as any).weightNote) return (e as any).weightNote as string;
   if (e.weight > 0) return `${e.weight} кг`;
@@ -225,7 +233,7 @@ export const PlanDisplay: React.FC<Props> = ({
       else if (field === 'targetVelocity') { const v = parseFloat(value); if (!isNaN(v)) ne.targetVelocity = v; }
       return ne;
     }) } : d);
-    setResult({ ...result, days, corrections: [...result.corrections, '✏️ ' + old.name + ': ' + field + '=' + value] });
+    setResult({ ...result, days, weeks: syncCurrentWeek(result, days), corrections: [...result.corrections, '✏️ ' + old.name + ': ' + field + '=' + value] });
     setInlineEdit(null);
   }, [inlineEdit, result, setResult]);
 
@@ -244,7 +252,7 @@ export const PlanDisplay: React.FC<Props> = ({
     const pct = PCT_FOR_RIR[Math.max(0, Math.min(5, old.rir))] ?? 0.9;
     const weight = Math.round(wm * pct);
     const days = result.days.map((d, di) => di === dayIdx ? { ...d, exercises: d.exercises.map((ex, ei) => ei === exIdx ? { ...ex, name: rep.name, group: rep.group, weight } : ex) } : d);
-    setResult({ ...result, days, corrections: [...result.corrections, '🔄 Замена: "' + old.name + '" → "' + rep.name + '". Вес ' + weight + ' кг.'] });
+    setResult({ ...result, days, weeks: syncCurrentWeek(result, days), corrections: [...result.corrections, '🔄 Замена: "' + old.name + '" → "' + rep.name + '". Вес ' + weight + ' кг.'] });
     setSubTarget(null);
   }, [subTarget, result, tprofile, manualWorkMax, setResult]);
 
@@ -260,28 +268,29 @@ export const PlanDisplay: React.FC<Props> = ({
     const moved = days[fDay].exercises.splice(fEx, 1)[0]; if (!moved) { setDragFrom(null); return; }
     const insertAt = fDay === tDay && tEx > fEx ? tEx - 1 : tEx;
     days[tDay].exercises.splice(insertAt, 0, moved);
-    setResult({ ...result, days, corrections: [...result.corrections, '↕️ "' + moved.name + '" — День ' + days[fDay].day + ' → День ' + days[tDay].day + '.'] });
+    setResult({ ...result, days, weeks: syncCurrentWeek(result, days), corrections: [...result.corrections, '↕️ "' + moved.name + '" — День ' + days[fDay].day + ' → День ' + days[tDay].day + '.'] });
     setDragFrom(null);
   }, [dragFrom, result, setResult]);
 
   const copyDay = useCallback((di: number) => {
     if (!result) return;
     const src = result.days[di]; const newNum = Math.max(...result.days.map(d => d.day)) + 1;
-    setResult({ ...result, days: [...result.days, { ...src, day: newNum, exercises: src.exercises.map(e => ({ ...e })) }], corrections: [...result.corrections, '📋 День ' + src.day + ' скопирован → День ' + newNum + '.'] });
+    const days = [...result.days, { ...src, day: newNum, exercises: src.exercises.map(e => ({ ...e })) }];
+    setResult({ ...result, days, weeks: syncCurrentWeek(result, days), corrections: [...result.corrections, '📋 День ' + src.day + ' скопирован → День ' + newNum + '.'] });
   }, [result, setResult]);
 
   const massEditWeight = useCallback((pct: number) => {
     if (!result) return;
     const sgn = pct > 0 ? '+' : '';
     const days = result.days.map(d => ({ ...d, exercises: d.exercises.map(e => ({ ...e, weight: Math.round(e.weight * (1 + pct / 100)) })) }));
-    setResult({ ...result, days, corrections: [...result.corrections, '⚡ Масс-правка: веса ' + sgn + pct + '%.'] });
+    setResult({ ...result, days, weeks: syncCurrentWeek(result, days), corrections: [...result.corrections, '⚡ Масс-правка: веса ' + sgn + pct + '%.'] });
   }, [result, setResult]);
 
   const massEditVolume = useCallback((pct: number) => {
     if (!result) return;
     const sgn = pct > 0 ? '+' : '';
     const days = result.days.map(d => ({ ...d, exercises: d.exercises.map(e => ({ ...e, sets: Math.max(1, Math.round(e.sets * (1 + pct / 100))) })) }));
-    setResult({ ...result, days, corrections: [...result.corrections, '⚡ Масс-правка: объём ' + sgn + pct + '%.'] });
+    setResult({ ...result, days, weeks: syncCurrentWeek(result, days), corrections: [...result.corrections, '⚡ Масс-правка: объём ' + sgn + pct + '%.'] });
   }, [result, setResult]);
 
   const applySetTemplate = useCallback((di: number, ei: number, key: string) => {
@@ -291,7 +300,7 @@ export const PlanDisplay: React.FC<Props> = ({
     const pct = PCT_FOR_RIR[Math.max(0, Math.min(5, t.rir))] ?? 0.9;
     const wm = tprofile.workMax[e.group] || manualWorkMax[e.group] || 80;
     const days = result.days.map((d, di2) => di2 === di ? { ...d, exercises: d.exercises.map((ex, ei2) => ei2 === ei ? { ...ex, sets: t.sets, reps: t.reps, rir: t.rir, rest: t.rest, weight: Math.round(wm * pct) } : ex) } : d);
-    setResult({ ...result, days, corrections: [...result.corrections, '⚡ Шаблон "' + key + '" → "' + e.name + '": ' + t.sets + '×' + t.reps + ', RIR ' + t.rir + '.'] });
+    setResult({ ...result, days, weeks: syncCurrentWeek(result, days), corrections: [...result.corrections, '⚡ Шаблон "' + key + '" → "' + e.name + '": ' + t.sets + '×' + t.reps + ', RIR ' + t.rir + '.'] });
   }, [result, tprofile, manualWorkMax, setResult]);
 
   /* ─── Переключение недель (фазовая периодизация) ─── */
@@ -721,50 +730,73 @@ export const PlanDisplay: React.FC<Props> = ({
                 <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>💡 Тренер: разминка обязательна перед первым рабочим подходом.</div>
               </div>
             </details>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 2px' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: '2px 6px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>
-               <span></span><span>Упражнение</span><span>С×П</span><span>RIR</span><span>Хар.</span><span>Вес</span><span>Группа</span><span>Темп</span><span>Отдых</span><span>Действия</span>
-             </div>
+             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 2px' }}>
              {d.exercises.map((e, ei) => {
               const tempoKey = di + '-' + ei;
               const overrideTempo = exerciseTempos[tempoKey];
               const tmpo = globalTempoStr ? { tempo: { toString: () => globalTempoStr } } : (overrideTempo ? { tempo: { toString: () => overrideTempo } } : { tempo: { toString: () => tempoFor(ei === 0 ? 'тяж' : 'памп').notation } });
               const note = getExerciseNote(e, ei, d.exercises, weeklySetsMap, result.corrections);
+              const chipWrap: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 1, minHeight: 28, background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '3px 8px', justifyContent: 'center', minWidth: 0 };
+              const chipLbl: React.CSSProperties = { fontSize: 8, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', fontWeight: 700, lineHeight: 1 };
+              const chipVal: React.CSSProperties = { fontSize: 12, fontWeight: 700, lineHeight: 1.15 };
               return (
                 <Fragment key={ei}>
-                   <div draggable onDragStart={ev => handleDragStart(ev, di, ei)} onDragOver={handleDragOver} onDrop={ev => handleDrop(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '6px 8px', fontSize: 10, color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab', alignItems: 'center' }}>
-                    <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', cursor: 'grab', userSelect: 'none' }}>⠿</span>
-                    <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', flex: '1 1 140px', minWidth: 0, wordBreak: 'break-word' }}>
-                      <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 4, fontWeight: 800, textTransform: 'uppercase', flex: '0 0 auto',
-                        background: e.role === 'main' ? 'rgba(0,230,138,0.2)' : e.role === 'secondary' ? 'rgba(96,165,250,0.2)' : 'rgba(255,255,255,0.1)',
-                        color: e.role === 'main' ? ACCENT : e.role === 'secondary' ? '#60a5fa' : DIM,
-                        border: '0.5px solid ' + (e.role === 'main' ? ACCENT : e.role === 'secondary' ? '#60a5fa' : 'rgba(255,255,255,0.2)')
-                      }}>{e.role === 'main' ? 'База' : e.role === 'secondary' ? 'Доп' : 'Изо'}</span>
-                      {e.name}
-                    </span>
-                    <span onClick={() => startInline(di, ei, 'sets', e.sets)} style={{ cursor: 'text', color: ACCENT, fontWeight: 700 }}>{e.sets}×{e.reps}</span>
-                    <span onClick={() => startInline(di, ei, 'rir', e.rir)} style={{ cursor: 'text', color: '#f59e0b' }}>{e.rir}</span>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: (e as any).character === 'тяж' ? '#ef4444' : (e as any).character === 'памп' ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>
-                      {(e as any).character ? ((e as any).character === 'тяж' ? '💪' : (e as any).character === 'памп' ? '🔥' : '🌿') : '—'}
-                    </span>
-                    <span onClick={() => startInline(di, ei, 'weight', e.weight)} style={{ cursor: 'text', color: '#60a5fa', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {e.loadMode === 'velocity' ? (
-                        <><span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'targetVelocity', value: String(e.targetVelocity || 0.5) }); }} style={{ color: '#a855f7' }}>{e.targetVelocity || 0.5} m/s</span>
-                        <span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'loadMode', value: 'weight' }); }} style={{ fontSize: 8, opacity: 0.6, cursor: 'pointer' }}>→ кг</span></>
-                      ) : (
-                         <>{fmtWt(e)}
-                         <span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'loadMode', value: 'velocity' }); }} style={{ fontSize: 8, opacity: 0.6, cursor: 'pointer' }}>→ m/s</span></>
-                      )}
-                    </span>
-                    <span style={{ color: 'rgba(255,255,255,0.6)' }}>{GROUP_RU[e.group] || e.group}</span>
-                    <span onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); setTempoPicker({ dayIdx: di, exIdx: ei }); }} title="Сменить темп" style={{ fontSize: 9, color: '#a855f7', fontWeight: 700, background: 'rgba(168,85,247,0.1)', padding: '2px 4px', borderRadius: 4, cursor: 'pointer', border: overrideTempo ? '1px solid #a855f7' : '1px solid transparent', textAlign: 'center' }}>
-                      {(e as any).tempo ? (e as any).tempo : (overrideTempo || (tmpo as any).tempo?.toString?.() || '—')}{overrideTempo ? ' *' : ''}
-                    </span>
-                    <span onClick={() => startInline(di, ei, 'rest', e.rest)} style={{ cursor: 'text', color: 'rgba(255,255,255,0.6)' }}>{e.rest}с</span>
-                    <span style={{ display: 'flex', gap: 2, flex: '0 0 auto' }}>
-                      <button onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); openSubstitute(di, ei); }} title="Замена" style={actionBtnStyle(ACCENT)}>🔄</button>
-                      <button onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); const k = window.prompt('Шаблон (5×5, 3×8, 4×10, 3×12, AMRAP, Myo-rep, 10×10 GVT, 5/3/1):', '5×5'); if (k && SET_TEMPLATES[k]) applySetTemplate(di, ei, k); }} title="Шаблон" style={actionBtnStyle('#a855f7')}>⚡</button>
-                    </span>
+                   <div draggable onDragStart={ev => handleDragStart(ev, di, ei)} onDragOver={handleDragOver} onDrop={ev => handleDrop(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: '8px', color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', cursor: 'grab', userSelect: 'none' }}>⠿</span>
+                      <span style={{ fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0, wordBreak: 'break-word' }}>
+                        <span style={{ fontSize: 8, padding: '2px 5px', borderRadius: 4, fontWeight: 800, textTransform: 'uppercase', flex: '0 0 auto',
+                          background: e.role === 'main' ? 'rgba(0,230,138,0.2)' : e.role === 'secondary' ? 'rgba(96,165,250,0.2)' : 'rgba(255,255,255,0.1)',
+                          color: e.role === 'main' ? ACCENT : e.role === 'secondary' ? '#60a5fa' : DIM,
+                          border: '0.5px solid ' + (e.role === 'main' ? ACCENT : e.role === 'secondary' ? '#60a5fa' : 'rgba(255,255,255,0.2)')
+                        }}>{e.role === 'main' ? 'База' : e.role === 'secondary' ? 'Доп' : 'Изо'}</span>
+                        {e.name}
+                      </span>
+                      <span style={{ display: 'flex', gap: 4, flex: '0 0 auto' }}>
+                        <button onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); openSubstitute(di, ei); }} title="Замена" style={actionBtnStyle(ACCENT)}>🔄</button>
+                        <button onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); const k = window.prompt('Шаблон (5×5, 3×8, 4×10, 3×12, AMRAP, Myo-rep, 10×10 GVT, 5/3/1):', '5×5'); if (k && SET_TEMPLATES[k]) applySetTemplate(di, ei, k); }} title="Шаблон" style={actionBtnStyle('#a855f7')}>⚡</button>
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 5, paddingLeft: 18 }}>
+                      <div style={chipWrap} onClick={() => startInline(di, ei, 'sets', e.sets)}>
+                        <span style={chipLbl}>С×П</span>
+                        <span style={{ ...chipVal, color: ACCENT }}>{e.sets}×{e.reps}</span>
+                      </div>
+                      <div style={chipWrap} onClick={() => startInline(di, ei, 'rir', e.rir)}>
+                        <span style={chipLbl}>RIR</span>
+                        <span style={{ ...chipVal, color: '#f59e0b' }}>{e.rir}</span>
+                      </div>
+                      <div style={chipWrap}>
+                        <span style={chipLbl}>Хар.</span>
+                        <span style={{ ...chipVal, color: (e as any).character === 'тяж' ? '#ef4444' : (e as any).character === 'памп' ? '#f59e0b' : 'rgba(255,255,255,0.5)' }}>
+                          {(e as any).character ? ((e as any).character === 'тяж' ? '💪' : (e as any).character === 'памп' ? '🔥' : '🌿') : '—'}
+                        </span>
+                      </div>
+                      <div style={chipWrap} onClick={() => e.loadMode !== 'velocity' && startInline(di, ei, 'weight', e.weight)}>
+                        <span style={chipLbl}>Вес</span>
+                        <span style={{ ...chipVal, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                          {e.loadMode === 'velocity' ? (
+                            <><span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'targetVelocity', value: String(e.targetVelocity || 0.5) }); }} style={{ color: '#a855f7' }}>{e.targetVelocity || 0.5} m/s</span>
+                            <span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'loadMode', value: 'weight' }); }} style={{ fontSize: 8, opacity: 0.6, cursor: 'pointer' }}>→ кг</span></>
+                          ) : (
+                             <>{fmtWt(e)}
+                             <span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'loadMode', value: 'velocity' }); }} style={{ fontSize: 8, opacity: 0.6, cursor: 'pointer' }}>→ m/s</span></>
+                          )}
+                        </span>
+                      </div>
+                      <div style={chipWrap}>
+                        <span style={chipLbl}>Группа</span>
+                        <span style={{ ...chipVal, color: 'rgba(255,255,255,0.7)', fontSize: 10 }}>{GROUP_RU[e.group] || e.group}</span>
+                      </div>
+                      <div style={chipWrap} onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); setTempoPicker({ dayIdx: di, exIdx: ei }); }} title="Сменить темп">
+                        <span style={chipLbl}>Темп</span>
+                        <span style={{ ...chipVal, color: '#a855f7' }}>{(e as any).tempo ? (e as any).tempo : (overrideTempo || (tmpo as any).tempo?.toString?.() || '—')}{overrideTempo ? ' *' : ''}</span>
+                      </div>
+                      <div style={chipWrap} onClick={() => startInline(di, ei, 'rest', e.rest)}>
+                        <span style={chipLbl}>Отдых</span>
+                        <span style={{ ...chipVal, color: 'rgba(255,255,255,0.7)' }}>{e.rest}с</span>
+                      </div>
+                    </div>
                   </div>
                   {note && (
                     <div style={{ padding: '2px 10px 4px 10px', fontSize: 9, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4, borderBottom: '1px solid rgba(255,255,255,0.03)' }}>

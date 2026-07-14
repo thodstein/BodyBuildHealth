@@ -9,12 +9,13 @@ import {
 } from '../../../engines/performance-analytics.engine';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
 import { applyToPlanner } from './planner-bridge';
+import { PopupNumber } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
 const H: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: ACCENT, margin: '0 0 8px' };
-const LABEL: React.CSSProperties = { fontSize: 10, color: DIM, margin: '6px 0 3px', fontWeight: 700 };
+
 
 const EXS = [
   { id: 'squat', label: 'Присед' },
@@ -68,8 +69,6 @@ export const StrengthAnalyticsCard: React.FC = () => {
     </div>
   );
 
-  const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const };
-
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>💪 Аналитика силы</div>
@@ -80,12 +79,12 @@ export const StrengthAnalyticsCard: React.FC = () => {
       <div style={CARD}>
         <div style={H}>⚙️ Ввод</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-          <div><div style={LABEL}>Присед, кг</div><input type="number" style={IN} value={squat} onChange={e => setSquat(parseFloat(e.target.value) || 0)} /></div>
-          <div><div style={LABEL}>Жим, кг</div><input type="number" style={IN} value={bench} onChange={e => setBench(parseFloat(e.target.value) || 0)} /></div>
-          <div><div style={LABEL}>Тяга, кг</div><input type="number" style={IN} value={dead} onChange={e => setDead(parseFloat(e.target.value) || 0)} /></div>
-          <div><div style={LABEL}>Жим стоя, кг</div><input type="number" style={IN} value={ohp} onChange={e => setOhp(parseFloat(e.target.value) || 0)} /></div>
-          <div><div style={LABEL}>Вес тела, кг</div><input type="number" style={IN} value={bw} onChange={e => setBw(parseFloat(e.target.value) || 0)} /></div>
-          <div><div style={LABEL}>Стаж, лет</div><input type="number" style={IN} value={years} onChange={e => setYears(parseFloat(e.target.value) || 0)} /></div>
+          <PopupNumber label="Присед" value={squat} min={0} max={500} suffix="кг" onChange={setSquat} />
+          <PopupNumber label="Жим" value={bench} min={0} max={400} suffix="кг" onChange={setBench} />
+          <PopupNumber label="Тяга" value={dead} min={0} max={500} suffix="кг" onChange={setDead} />
+          <PopupNumber label="Жим стоя" value={ohp} min={0} max={300} suffix="кг" onChange={setOhp} />
+          <PopupNumber label="Вес тела" value={bw} min={0} max={250} suffix="кг" onChange={setBw} />
+          <PopupNumber label="Стаж" value={years} min={0} max={40} suffix="лет" onChange={setYears} />
         </div>
       </div>
 
@@ -103,7 +102,7 @@ export const StrengthAnalyticsCard: React.FC = () => {
           <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><span style={{ color: DIM, fontSize: 10 }}>Присед/Тяга</span><div style={{ fontWeight: 700 }}>{ratios.squatToDeadlift}%</div></div>
           <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><span style={{ color: DIM, fontSize: 10 }}>Жим/Присед</span><div style={{ fontWeight: 700 }}>{ratios.benchToSquat}%</div></div>
           <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><span style={{ color: DIM, fontSize: 10 }}>Жим стоя/Жим</span><div style={{ fontWeight: 700 }}>{ratios.overheadToBench || 0}%</div></div>
-          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><span style={{ color: DIM, fontSize: 10 }}>Push/Pull</span><div style={{ fontWeight: 700 }}>{ratios.pushPullRatio}%</div></div>
+          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><span style={{ color: DIM, fontSize: 10 }}>Жим/Тяга</span><div style={{ fontWeight: 700 }}>{ratios.pushPullRatio}%</div></div>
         </div>
         {issues.length === 0
           ? <div style={{ fontSize: 10, color: '#22c55e', marginTop: 8 }}>✓ Дисбалансов не обнаружено — пропорции в норме.</div>
@@ -130,9 +129,8 @@ export const StrengthAnalyticsCard: React.FC = () => {
       <div style={CARD}>
         <div style={H}>📐 Объёмные ориентиры (MEV/MAV/MRV)</div>
         <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Уровень: {LEVEL_RU[prof.level || 'intermediate'] || prof.level}. Статус для текущего объёма:</div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-          <input type="number" style={{ ...IN, width: 120 }} value={weeklyVol} onChange={e => setWeeklyVol(parseFloat(e.target.value) || 0)} aria-label="объём подходов/нед" />
-          <span style={{ fontSize: 10, color: DIM, alignSelf: 'center' }}>подходов/нед (по грудь)</span>
+        <div style={{ marginBottom: 8 }}>
+          <PopupNumber label="Объём (по грудь)" value={weeklyVol} min={0} max={40} suffix="подходов/нед" onChange={setWeeklyVol} />
         </div>
         {landmarks.slice(0, 6).map(l => {
           const chest = l.muscle === 'chest' ? checkVolumeStatus(weeklyVol, l) : null;

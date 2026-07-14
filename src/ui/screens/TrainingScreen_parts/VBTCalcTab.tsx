@@ -109,7 +109,7 @@ export const VBTCalcTab: React.FC = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
         <MetricCard title="Целевой %1RM" icon="🎯" accent={ACCENT}>
           <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{Math.round(tgt.tp * 100)}%</div>
-          <div style={SMALL}>intent target</div>
+          <div style={SMALL}>по намерению</div>
         </MetricCard>
         <MetricCard title="Рабочий вес" icon="🏋️" accent={ACCENT}>
           <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{tgt.workWeight}</div>

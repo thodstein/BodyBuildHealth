@@ -96,10 +96,8 @@ async function bootstrap() {
     return;
   }
 
-  console.log('[bootstrap] step 1: fixMobileViewport');
   try { fixMobileViewport(); } catch (e) { console.warn('fixMobileViewport failed:', e); }
 
-  console.log('[bootstrap] step 2: initTelegramWebApp');
   let isTg = false;
   try { isTg = initTelegramWebApp(); } catch (e) { console.warn('initTelegramWebApp failed:', e); }
 
@@ -175,8 +173,30 @@ window.addEventListener('beforeunload', () => {
   try { localStorage.setItem('he_last_active', new Date().toISOString()); } catch {}
 });
 
+// Re-init Telegram WebApp viewport on resume (fix: buttons unresponsive after minimize/restore)
+function resumeTelegramViewport() {
+  const tg = (window as any).Telegram?.WebApp;
+  try {
+    if (tg) {
+      tg.ready?.();
+      tg.expand?.();
+    }
+  } catch (e) { /* no-op */ }
+  // Recalc viewport CSS vars so layout/tap-zones realign after resume
+  try {
+    const h = (tg && tg.viewportHeight) ? tg.viewportHeight : window.innerHeight;
+    document.documentElement.style.setProperty('--vh', `${h * 0.01}px`);
+    document.documentElement.style.setProperty('--app-height', `${h}px`);
+  } catch (e) { /* no-op */ }
+}
+
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
+    resumeTelegramViewport();
     processQueue();
   }
 });
+
+// Telegram may fire these on return from background; recalc viewport defensively
+window.addEventListener('focus', resumeTelegramViewport);
+window.addEventListener('pageshow', resumeTelegramViewport);

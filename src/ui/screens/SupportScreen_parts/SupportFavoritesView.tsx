@@ -2,6 +2,7 @@
 import React from 'react';
 import { ALL_INTERACTIONS } from '../../../data/support-database';
 import { CATEGORY_LABELS } from './SupportScreenData';
+import { getMergedExternalSubIds } from '../TrainingScreen_parts/support-plan-bridge';
 
 export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const {
@@ -578,11 +579,23 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
             const weightKg = profile?.settings?.weight ?? 80;
             const age = profile?.settings?.age ?? 30;
             const sex = profile?.settings?.sex ?? 'male';
-            const levelSubIds = SUPPORT_LEVELS[supportLevel]?.subs || [];
+            // ПЛАН 1 (калькулятор): risk-driven + ручные правки ∪ уровень
+            let computedIds: string[] = [];
+            try { computedIds = JSON.parse(localStorage.getItem('he_support_plan_result') || '[]'); } catch {}
+            const calcSubIds = [...new Set([...(SUPPORT_LEVELS[supportLevel]?.subs || []), ...computedIds])];
+            // ПЛАН 2 (общий): внешние вещества (миксы/BioStack/питание), которых нет в плане калькулятора
+            let extIds: string[] = [];
+            try {
+              const generalData = JSON.parse(localStorage.getItem('he_general_plan') || 'null');
+              if (generalData && Array.isArray(generalData)) extIds = generalData.filter((id: string) => !calcSubIds.includes(id));
+              else extIds = getMergedExternalSubIds();
+            } catch { try { extIds = getMergedExternalSubIds(); } catch {} }
+            const levelSubIds = [...new Set([...calcSubIds, ...extIds])];
             const planItems = levelSubIds.map((id:string) => {
               const sub = catalogSubstances.find((s:any) => s.id === id);
               const dos = { mg:500, timing:'с едой' };
-              return { id, name:sub?.name||id, dose:dos.mg+'мг', timing:dos.timing, categories:sub?.categories||[], mechanisms:sub?.mechanisms||[] };
+              const plan = calcSubIds.includes(id) ? 'calc' : 'general';
+              return { id, name:sub?.name||id, dose:dos.mg+'мг', timing:dos.timing, categories:sub?.categories||[], mechanisms:sub?.mechanisms||[], plan };
             });
             const report = {
               id: Date.now().toString(),
@@ -611,6 +624,13 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                   <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', marginBottom:4, background:'var(--bg-secondary)', borderRadius:8, border:'1px solid var(--border)' }}>
                     <div>
                       <div style={{ fontSize:9, color:'var(--text-light)' }}>Отчёт {r.level || ''} · {r.items?.length || 0} препаратов</div>
+                      {(() => {
+                        const calcN = (r.items || []).filter((it: any) => it.plan !== 'general').length;
+                        const genN = (r.items || []).filter((it: any) => it.plan === 'general').length;
+                        return genN > 0 ? (
+                          <div style={{ fontSize:8, color:'var(--text-dim)' }}>Калькулятор: {calcN} · Общий (+внешние): {genN}</div>
+                        ) : null;
+                      })()}
                       <div style={{ fontSize:8, color:'var(--text-dim)' }}>{new Date(r.date).toLocaleDateString('ru-RU')}</div>
                     </div>
                     <button onClick={() => {

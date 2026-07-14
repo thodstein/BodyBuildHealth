@@ -158,10 +158,10 @@ export function ReportsTab({ profile, stackIds, linked }: { profile: BioStackPro
         if (cat?.sideEffects && cat.sideEffects.length > 0) lines.push(`    ⚡ Побочные: ${cat.sideEffects.slice(0, 3).join(', ')}`);
       });
       lines.push('');
-      lines.push('🔬 ПОКРЫТИЕ МЕХАНИЗМОВ ПО ГРУППАМ:');
+      lines.push('🔬 ПОКРЫТИЕ ПО ГРУППАМ:');
       if (metrics.organMechs) {
         metrics.organMechs.forEach((mechs, group) => {
-          lines.push(`  • ${group}: ${mechs.slice(0, 4).join(', ')}${mechs.length > 4 ? ` (+${mechs.length - 4})` : ''}`);
+          lines.push(`  • ${group}: ${mechs.length} мех.`);
         });
       }
       lines.push('');
@@ -261,10 +261,10 @@ export function ReportsTab({ profile, stackIds, linked }: { profile: BioStackPro
       });
     }
     lines.push('');
-    lines.push('🔬 МЕХАНИЗМЫ ПО ГРУППАМ:');
+    lines.push('🔬 ПОКРЫТИЕ ПО ГРУППАМ:');
     if (metrics.organMechs) {
       metrics.organMechs.forEach((mechs, group) => {
-        lines.push(`  • ${group}: ${mechs.slice(0, 3).join(', ')}${mechs.length > 3 ? ` (+${mechs.length - 3})` : ''}`);
+        lines.push(`  • ${group}: ${mechs.length} мех.`);
       });
     }
     lines.push('');

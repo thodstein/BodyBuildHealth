@@ -334,7 +334,7 @@ export const TrainingCalendarTab: React.FC = () => {
                           <div><span style={{ color: DIM }}>Фокус:</span> <span style={{ color: '#fff' }}>{day.plannedFocus || '—'}</span></div>
                           <div><span style={{ color: DIM }}>Подходов:</span> <span style={{ color: '#fff' }}>{day.plannedSets} план / {day.actualSets} факт</span></div>
                           <div><span style={{ color: DIM }}>Объём:</span> <span style={{ color: '#fff' }}>{formatVol(day.plannedVolume)} план / {formatVol(day.actualVolume)} факт</span></div>
-                          <div><span style={{ color: DIM }}>Compliance:</span> <span style={{ color: day.compliance >= 80 ? ACCENT : day.compliance >= 30 ? '#f59e0b' : '#ef4444', fontWeight: 700 }}>{day.compliance}%</span></div>
+                          <div><span style={{ color: DIM }}>Соблюдение:</span> <span style={{ color: day.compliance >= 80 ? ACCENT : day.compliance >= 30 ? '#f59e0b' : '#ef4444', fontWeight: 700 }}>{day.compliance}%</span></div>
                         </div>
                       )}
 

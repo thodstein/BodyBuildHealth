@@ -4,13 +4,12 @@ import React, { useState, useMemo } from 'react';
 import { diagnoseWeakPoint, WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
 import { applyToPlanner } from './planner-bridge';
+import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
 const H: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: ACCENT, margin: '0 0 8px' };
-const LABEL: React.CSSProperties = { fontSize: 10, color: DIM, margin: '6px 0 3px', fontWeight: 700 };
-const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const };
 
 const LIFT_RU: Record<Lift, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга' };
 const WP_RU: Record<WeakPoint, string> = { off_chest: 'Сход со груди', mid: 'Средняя точка', lockout: 'Дожим', start: 'Старт', bottom: 'Низ (выход из ямы)', sticking_mid: 'Зависание в середине' };
@@ -36,16 +35,8 @@ export const PlWeakpointsCard: React.FC = () => {
 
       <div style={CARD}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-          <div><div style={LABEL}>Движение</div>
-            <select style={SEL} value={lift} onChange={e => changeLift(e.target.value as Lift)}>
-              {(Object.keys(LIFT_RU) as Lift[]).map(l => <option key={l} value={l}>{LIFT_RU[l]}</option>)}
-            </select>
-          </div>
-          <div><div style={LABEL}>Слабая точка</div>
-            <select style={SEL} value={wp} onChange={e => setWp(e.target.value as WeakPoint)}>
-              {wps.map(w => <option key={w} value={w}>{WP_RU[w] || w}</option>)}
-            </select>
-          </div>
+          <PopupSelect label="Движение" value={lift} options={(Object.keys(LIFT_RU) as Lift[]).map(l => ({ id: l, label: LIFT_RU[l] }))} onChange={v => changeLift(v as Lift)} />
+          <PopupSelect label="Слабая точка" value={wp} options={wps.map(w => ({ id: w, label: WP_RU[w] || w }))} onChange={v => setWp(v as WeakPoint)} />
         </div>
 
         <div style={{ background: 'rgba(239,68,68,0.06)', borderRadius: 8, padding: 10, border: '1px solid rgba(239,68,68,0.2)', marginBottom: 10 }}>

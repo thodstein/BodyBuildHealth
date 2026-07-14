@@ -26,7 +26,7 @@ const MECH_TRANSLATIONS_RU: Record<string, string> = {
 };
 
 function resolveMech(m: string): string {
-  return MECH_TRANSLATIONS_RU[m] || m.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return MECH_TRANSLATIONS_RU[m] || '—';
 }
 
 /* ─── Interactions helpers ─── */

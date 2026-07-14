@@ -9,6 +9,14 @@ import { PCT_FOR_RIR, GROUP_RU, ACCENT, DIM, type ManualResult } from './types';
 import type { TrainingProfile } from '../training-profile';
 import { prescribeLoad, suggestFeeders } from '../../../../engines/bb/bb-autocoach.engine';
 
+// Синхронизация правок дней с текущей неделей мезоцикла (иначе теряются при
+// переключении недель — goToWeek перезаписывает result.days из weeks[]).
+function syncCurrentWeek(r: ManualResult, days: ManualResult['days']): ManualResult['weeks'] {
+  if (!r.weeks?.length) return r.weeks;
+  const cw = r.currentWeek || 1;
+  return r.weeks.map(w => w.weekNumber === cw ? { ...w, days } : w);
+}
+
 interface Props {
   result: ManualResult | null;
   setResult: (r: ManualResult | null) => void;
@@ -84,7 +92,7 @@ export const ToolsPanel: React.FC<Props> = ({
       }
     });
     if (notes.length === 0) { setImproveModal({ notes: ['План уже сбалансирован.'], apply: () => setImproveModal(null) }); return; }
-    setImproveModal({ notes, apply: () => { setResult({ ...result!, days, corrections: [...result!.corrections, '🎯 Улучшение программы:', ...notes] }); setImproveModal(null); } });
+    setImproveModal({ notes, apply: () => { setResult({ ...result!, days, weeks: syncCurrentWeek(result!, days), corrections: [...result!.corrections, '🎯 Улучшение программы:', ...notes] }); setImproveModal(null); } });
   }, [result, labAnalysis, tprofile, level, goal, mesoLength, manualWorkMax, setResult]);
 
   const exportWeeksText = useCallback(() => {
@@ -111,7 +119,7 @@ export const ToolsPanel: React.FC<Props> = ({
       const pct = PCT_FOR_RIR[Math.max(0, Math.min(5, e.rir))] ?? 0.9;
       return { ...e, weight: Math.round(wm * pct) };
     }) }));
-    setResult({ ...result, days, corrections: [...result.corrections, `🔄 Веса пересчитаны по workMax × %1RM(RIR).`] });
+    setResult({ ...result, days, weeks: syncCurrentWeek(result, days), corrections: [...result.corrections, `🔄 Веса пересчитаны по workMax × %1RM(RIR).`] });
   }, [result, tprofile, manualWorkMax, setResult]);
 
   const exportText = useCallback(() => {
@@ -256,7 +264,7 @@ export const ToolsPanel: React.FC<Props> = ({
                       return { ...e, weight: prescr.nextWeight, rir: prescr.nextRIR, reps: String(prescr.nextReps) };
                     }),
                   }));
-                  setResult({ ...result, days, corrections: [...result.corrections, `📈 Применена стратегия: ${strat}`] });
+                  setResult({ ...result, days, weeks: syncCurrentWeek(result, days), corrections: [...result.corrections, `📈 Применена стратегия: ${strat}`] });
                   setShowLoadStrategy(false);
                 }} style={{ padding:'6px 10px', borderRadius:6, fontSize:10, fontWeight:600, cursor:'pointer', border:'1px solid rgba(168,85,247,0.15)', background:'rgba(168,85,247,0.04)', color:'rgba(255,255,255,0.8)', textAlign:'left' }}>
                   {label}
