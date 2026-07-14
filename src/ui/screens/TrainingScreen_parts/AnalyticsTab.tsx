@@ -69,7 +69,7 @@ export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => 
             : 'Недостаточно данных для расчёта (нужны сеты с весом).'}
         </div>
         {sessions.length > 0 && <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Найдено тренировок: {sessions.length}</div>}
-        {analyticsError && <div style={{ fontSize: 9, color: '#ef4444', marginTop: 4 }}>Ошибка: {analyticsError}</div>}
+        {analyticsError && <div style={{ fontSize: 10, color: '#ef4444', marginTop: 4 }}>Ошибка: {analyticsError}</div>}
         <button onClick={() => onRefresh?.()} style={{
           marginTop: 8, padding: '6px 14px', borderRadius: 8, border: '1px solid var(--accent)',
           background: 'transparent', color: 'var(--accent)', fontSize: 10, cursor: 'pointer',
@@ -85,27 +85,27 @@ export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => 
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
         <div className="card" style={{ padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Объём/нед</div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Объём/нед</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#00e68a' }}>{volume.weeklyVolumeKg.toLocaleString()} кг</div>
-          <div style={{ fontSize: 9, color: volume.volumeTrend >= 0 ? '#22c55e' : '#ef4444' }}>
+          <div style={{ fontSize: 10, color: volume.volumeTrend >= 0 ? '#22c55e' : '#ef4444' }}>
             {volume.volumeTrend >= 0 ? '↑' : '↓'} {Math.abs(volume.volumeTrend)}% vs пред.
           </div>
         </div>
         <div className="card" style={{ padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Интенсивность</div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Интенсивность</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#60a5fa' }}>{intensity.avgIntensity}%</div>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
             RPE avg: {intensity.avgRPE}
           </div>
         </div>
         <div className="card" style={{ padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Усталость</div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Усталость</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: fatigue.weeklyFatigue > 0.7 ? '#ef4444' : fatigue.weeklyFatigue > 0.4 ? '#f59e0b' : '#22c55e' }}>
             {Math.round(fatigue.weeklyFatigue * 100)}%
           </div>
         </div>
         <div className="card" style={{ padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Готовность</div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Готовность</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: recovery.readinessEstimate > 60 ? '#22c55e' : recovery.readinessEstimate > 40 ? '#f59e0b' : '#ef4444' }}>
             {recovery.readinessEstimate}%
           </div>
@@ -120,7 +120,7 @@ export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => 
           <div style={{ width: `${intensity.intensityDistribution.hypertrophy}%`, background: '#f59e0b' }} title="" />
           <div style={{ width: `${intensity.intensityDistribution.endurance}%`, background: '#22c55e' }} title="" />
         </div>
-        <div style={{ display: 'flex', gap: 10, fontSize: 9, color: 'var(--text-dim)' }}>
+        <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--text-dim)' }}>
           <span>🔴 Сила {intensity.intensityDistribution.strength}%</span>
           <span>🟠 Гипертрофия {intensity.intensityDistribution.hypertrophy}%</span>
           <span>🟢 Выносливость {intensity.intensityDistribution.endurance}%</span>
@@ -141,7 +141,7 @@ export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => 
                 <div style={{ flex: 1, height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
                   <div style={{ width: `${(vol / maxVol) * 100}%`, height: '100%', background: '#8b5cf6', borderRadius: 4 }} />
                 </div>
-                <span style={{ fontSize: 9, color: 'var(--text-dim)', width: 50 }}>{Math.round(vol).toLocaleString()} кг</span>
+                <span style={{ fontSize: 10, color: 'var(--text-dim)', width: 50 }}>{Math.round(vol).toLocaleString()} кг</span>
               </div>
             );
           })}

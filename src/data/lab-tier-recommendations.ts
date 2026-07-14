@@ -135,7 +135,7 @@ const TIER_RULES: TierRule[] = [
 
   { marker: 'HOMOCYSTEINE', tier1: { titrate: [['tmg', 1.5, 'TMG ↑1500 мг (было 1000)'], ['vitamin_b6', 2.0, 'B6 ↑50 мг'], ['vitamin_b12', 2.0, 'B12 ↑2000 мкг']], nutrition: [['↑ овощи', 'folate из овощей']] }, tier2: { titrate: [['tmg', 2.0, 'TMG ↑2000-3000 мг'], ['folate', 1.5, 'Folate ↑600 мкг']], nutrition: [['B-complex', 'Активные формы']] }, tier3: { alerts: ['Гомоцистеин = {value} mcmol/L — риск тромбоза. B6+B12+Folate+TMG высокие дозы. Врач.'] } },
 
-  { marker: 'CRP', tier1: { add: [['curcumin', 'Curcumin 500 мг + Piperine — ↓ NF-κB'], ['omega3', 'Омега-3 ↑3 г']], nutrition: [['↑ omega-3', '2-3 г EPA/DHA'], ['↑ рыба', '3×/нед']] }, tier2: { titrate: [['omega3', 1.5, 'Омега-3 ↑4.5 г'], ['curcumin', 2.0, 'Curcumin ↑1000 мг']], nutrition: [['STOP alcohol', 'ZERO'], ['Sleep', '8+ ч']] }, tier3: { alerts: ['СРБ = {value} mg/L — выраженное воспаление. Врач. Исключить инфекцию/сепсис.'] } },
+  { marker: 'CRP', tier1: { add: [['curcumin', 'Curcumin 500 мг + Piperine — ↓ NF-κB'], ['berberine', 'Берберин 1000 мг — AMPK + ↓ цитокины']], nutrition: [['↑ рыба', '3×/нед'], ['↑ полифенолы', 'ягоды/куркума']] }, tier2: { titrate: [['curcumin', 2.0, 'Curcumin ↑1000 мг'], ['berberine', 1.5, 'Берберин ↑1500 мг']], add: [['omega3', 'Омакор (очищенный ЭПК) 2-4 г — только при ТГ/аритмии']], nutrition: [['STOP alcohol', 'ZERO'], ['Sleep', '8+ ч']] }, tier3: { alerts: ['СРБ = {value} mg/L — выраженное воспаление. Врач. Исключить инфекцию/сепсис.'] } },
 
   { marker: 'FERRITIN', tier1: { add: [['iron_bisglycinate', 'Iron bisglycinate 30 мг'], ['vitamin_c', 'VitC 500 мг (↑ всасывание железа ×3)']], nutrition: [['Вместе с мясом', 'Heme-iron'], ['STOP tea/coffee', '1 час до/после еды']] }, tier2: { titrate: [['iron_bisglycinate', 2.0, 'Iron ↑60 мг']], add: [['vitamin_c', 'VitC 1000 мг']], nutrition: [['Врач', 'Гастро/гематолог']] }, tier3: { alerts: ['Ферритин = {value} ng/mL — избыток железа. Гематолог (исключить гемохроматоз); НЕ назначать железо.'] } },
 
@@ -163,7 +163,7 @@ const TIER_RULES: TierRule[] = [
 
   { marker: 'URIC_ACID', tier1: { add: [['vitamin_c', 'VitC 1000 мг — ↑ выведение мочевой кислоты']], nutrition: [['↓ purine', 'Меньше красного мяса/морепродуктов'], ['Вода', '45+ мл/кг'], ['STOP alcohol', 'ZERO пиво']] }, tier2: { add: [['vitamin_c', 'VitC 2000 мг']], nutrition: [['STOP alcohol', 'ZERO'], ['Cherry', 'Вишнёвый сок (↓ uric acid)']] }, tier3: { alerts: ['Мочевая кислота = {value} — подагра. Ревматолог.'] } },
 
-  { marker: 'ESR', tier1: { nutrition: [['Curcumin', '500 мг'], ['Omega-3', '3 г']] }, tier2: { add: [['curcumin', 'Curcumin 1000 мг'], ['omega3', 'Омега-3 4 г']], nutrition: [['Врач', 'Терапевт (инфекция/иммун)']] }, tier3: { alerts: ['СОЭ = {value} мм/ч — выраженное воспаление. Врач.'] } },
+  { marker: 'ESR', tier1: { nutrition: [['Curcumin', '500 мг'], ['Полифенолы', 'куркума/ягоды']] }, tier2: { add: [['curcumin', 'Curcumin 1000 мг'], ['berberine', 'Берберин 1500 мг']], nutrition: [['Врач', 'Терапевт (инфекция/иммун)']] }, tier3: { alerts: ['СОЭ = {value} мм/ч — выраженное воспаление. Врач.'] } },
 
   { marker: 'AMMONIA', tier1: { add: [['nac', 'NAC 1200 мг'], ['l_carnitine', 'L-Карнитин 2 г']], nutrition: [['↓ белок', '1.5 г/кг временно']] }, tier2: { titrate: [['nac', 1.5, 'NAC ↑1800 мг'], ['l_carnitine', 2.0, 'Carnitine ↑4 г']], nutrition: [['STOP белок', '0.8 г/кг'], ['Lactulose', 'По рецепту врача']] }, tier3: { alerts: ['⛔ Аммиак = {value} mcmol/L — печёночная энцефалопатия. ER.'], stopCourse: true } },
 

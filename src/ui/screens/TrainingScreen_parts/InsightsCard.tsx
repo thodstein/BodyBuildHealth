@@ -74,11 +74,11 @@ export const InsightsCard: React.FC = () => {
           <div style={CARD}>
             <div style={H}>📊 Сводка истории</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-              <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 9, color: DIM }}>Всего тренировок</div><div style={{ fontSize: 16, fontWeight: 700 }}>{ctx.totalSessions}</div></div>
-              <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 9, color: DIM }}>Объём за неделю</div><div style={{ fontSize: 14, fontWeight: 700 }}>{ctx.weeklyVolume.toLocaleString()} кг·пов</div></div>
-              <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 9, color: DIM }}>Серия</div><div style={{ fontSize: 16, fontWeight: 700 }}>{ctx.currentStreak} <span style={{ fontSize: 9, color: DIM }}>/ {ctx.bestStreak}</span></div></div>
+              <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 10, color: DIM }}>Всего тренировок</div><div style={{ fontSize: 16, fontWeight: 700 }}>{ctx.totalSessions}</div></div>
+              <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 10, color: DIM }}>Объём за неделю</div><div style={{ fontSize: 14, fontWeight: 700 }}>{ctx.weeklyVolume.toLocaleString()} кг·пов</div></div>
+              <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 10, color: DIM }}>Серия</div><div style={{ fontSize: 16, fontWeight: 700 }}>{ctx.currentStreak} <span style={{ fontSize: 10, color: DIM }}>/ {ctx.bestStreak}</span></div></div>
             </div>
-            {ctx.firstSessionDate && <div style={{ fontSize: 9, color: DIM, marginTop: 6 }}>первая запись: {ctx.firstSessionDate}</div>}
+            {ctx.firstSessionDate && <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>первая запись: {ctx.firstSessionDate}</div>}
           </div>
 
           {last1RM.length > 0 && (
@@ -100,8 +100,8 @@ export const InsightsCard: React.FC = () => {
               : insights.map((ins, i) => (
                 <div key={i} style={{ marginBottom: 6, padding: 10, borderRadius: 8, background: (TYPE_COLOR[ins.type] || ACCENT) + '0a', border: '1px solid ' + (TYPE_COLOR[ins.type] || ACCENT) + '33' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: TYPE_COLOR[ins.type] || ACCENT }}>{TYPE_ICON[ins.type] || '•'} {ins.message}</div>
-                  <div style={{ fontSize: 9, color: DIM, marginTop: 2 }}>{ins.detail}</div>
-                  <div style={{ fontSize: 8, color: DIM, marginTop: 2, textTransform: 'uppercase' }}>{ins.category}</div>
+                  <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{ins.detail}</div>
+                  <div style={{ fontSize: 10, color: DIM, marginTop: 2, textTransform: 'uppercase' }}>{ins.category}</div>
                 </div>
               ))}
           </div>

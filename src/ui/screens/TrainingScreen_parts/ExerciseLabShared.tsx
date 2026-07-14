@@ -16,7 +16,7 @@ export const BG = 'rgba(24,24,27,0.15)';
 export const BORDER = 'rgba(255,255,255,0.05)';
 export const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
 export const CARD: React.CSSProperties = { padding: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)' };
-export const pill: React.CSSProperties = { display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 9, fontWeight: 600, marginRight: 6, marginBottom: 4 };
+export const pill: React.CSSProperties = { display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600, marginRight: 6, marginBottom: 4 };
 export const secTitle: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: ACCENT, margin: '12px 0 6px', borderBottom: '1px solid rgba(0,230,138,0.15)', paddingBottom: 4 };
 export const chipRow: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 };
 
@@ -263,19 +263,19 @@ export const TechniqueDetail: React.FC<{
     <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
       <div style={{ ...secTitle, fontSize: 10 * s }}>📊 Технический счёт ({score.total}/100)</div>
       {score.breakdown.map((b, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontSize: 9 * s }}>
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontSize: 10 * s }}>
           <div style={{ width: 110 * s, color: DIM, textAlign: 'right', flexShrink: 0 }}>{b.label}</div>
           <div style={{ flex: 1, height: 6 * s, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${(b.value / b.max) * 100}%`, borderRadius: 3, background: lvl(b.value, b.max) }} />
           </div>
           <div style={{ width: 28, textAlign: 'right', fontWeight: 700, color: lvl(b.value, b.max) }}>{b.value}</div>
-          <div style={{ width: 16, color: 'rgba(255,255,255,0.2)', fontSize: 8 * s }}>/ {b.max}</div>
+          <div style={{ width: 16, color: 'rgba(255,255,255,0.2)', fontSize: 10 * s }}>/ {b.max}</div>
         </div>
       ))}
       {technique ? (
         <>
           <div style={{ ...secTitle, fontSize: 10 * s }}>🎯 Полный разбор техники</div>
-          <div style={{ fontSize: 9 * s, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 10 * s, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
             <p style={{ margin: '0 0 6px', fontWeight: 700, color: ACCENT }}>Исходное положение:</p>
             {technique.setup.map((t: string, i: number) => <div key={i} style={{ marginBottom: 2 }}>{i + 1}. {t}</div>)}
             <p style={{ margin: '8px 0 6px', fontWeight: 700, color: ACCENT }}>Выполнение:</p>
@@ -293,7 +293,7 @@ export const TechniqueDetail: React.FC<{
       ) : ex.technique ? (
         <>
           <div style={{ ...secTitle, fontSize: 10 * s }}>🎯 Техника выполнения</div>
-          <div style={{ fontSize: 9 * s, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{ex.technique}</div>
+          <div style={{ fontSize: 10 * s, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{ex.technique}</div>
         </>
       ) : null}
       {cues.length > 0 && (
@@ -301,7 +301,7 @@ export const TechniqueDetail: React.FC<{
           <div style={{ ...secTitle, fontSize: 10 * s }}>💡 Ключевые подсказки (cues)</div>
           <div style={chipRow}>
             {cues.map((c: any, i: number) => (
-              <span key={i} style={{ ...pill, background: c.priority === 'critical' ? 'rgba(239,68,68,0.12)' : c.priority === 'important' ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', color: c.priority === 'critical' ? '#f87171' : c.priority === 'important' ? '#fbbf24' : DIM, fontSize: 8 * s }}>
+              <span key={i} style={{ ...pill, background: c.priority === 'critical' ? 'rgba(239,68,68,0.12)' : c.priority === 'important' ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', color: c.priority === 'critical' ? '#f87171' : c.priority === 'important' ? '#fbbf24' : DIM, fontSize: 10 * s }}>
                 {c.priority === 'critical' ? '⚡' : c.priority === 'important' ? '📌' : '💬'} {c.cue}
               </span>
             ))}
@@ -313,9 +313,9 @@ export const TechniqueDetail: React.FC<{
           <div style={{ ...secTitle, fontSize: 10 * s }}>⚠️ Частые ошибки</div>
           {errors.map((e: any, i: number) => (
             <div key={i} style={{ marginBottom: 4, padding: '6px 8px', background: 'rgba(239,68,68,0.05)', borderRadius: 5, border: '1px solid rgba(239,68,68,0.1)' }}>
-              <div style={{ fontSize: 9 * s, fontWeight: 700, color: '#f87171' }}>{e.error}</div>
-              <div style={{ fontSize: 8 * s, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>Причина: {e.cause}</div>
-              <div style={{ fontSize: 8 * s, color: '#22c55e', marginTop: 1 }}>Исправление: {e.fix}</div>
+              <div style={{ fontSize: 10 * s, fontWeight: 700, color: '#f87171' }}>{e.error}</div>
+              <div style={{ fontSize: 10 * s, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>Причина: {e.cause}</div>
+              <div style={{ fontSize: 10 * s, color: '#22c55e', marginTop: 1 }}>Исправление: {e.fix}</div>
             </div>
           ))}
         </>
@@ -323,23 +323,23 @@ export const TechniqueDetail: React.FC<{
       {progression.length > 0 && (
         <>
           <div style={{ ...secTitle, fontSize: 10 * s }}>📈 Прогрессия</div>
-          <div style={{ fontSize: 9 * s, color: '#22c55e', background: 'rgba(34,197,94,0.06)', padding: '6px 8px', borderRadius: 5 }}>{progression.join(' → ')}</div>
+          <div style={{ fontSize: 10 * s, color: '#22c55e', background: 'rgba(34,197,94,0.06)', padding: '6px 8px', borderRadius: 5 }}>{progression.join(' → ')}</div>
         </>
       )}
       {(technique?.regression?.length ?? 0) > 0 && (
         <>
           <div style={{ ...secTitle, fontSize: 10 * s }}>📉 Регрессия</div>
-          <div style={{ fontSize: 9 * s, color: '#f59e0b', background: 'rgba(245,158,11,0.06)', padding: '6px 8px', borderRadius: 5 }}>{technique.regression.join(' → ')}</div>
+          <div style={{ fontSize: 10 * s, color: '#f59e0b', background: 'rgba(245,158,11,0.06)', padding: '6px 8px', borderRadius: 5 }}>{technique.regression.join(' → ')}</div>
         </>
       )}
       {subList.length > 0 && (
         <>
           <div style={{ ...secTitle, fontSize: 10 * s }}>🔄 Цепочка замен</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, fontSize: 9 * s }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, fontSize: 10 * s }}>
             {subList.map((ss: any) => (
               <div key={ss.id} style={{ background: 'rgba(168,85,247,0.06)', borderRadius: 5, padding: '3px 6px', border: '1px solid rgba(168,85,247,0.1)' }}>
                 <span style={{ color: '#c084fc', fontWeight: 600 }}>{getExerciseById(ss.id)?.name || ss.id}</span>
-                {ss.reason && <span style={{ color: DIM, marginLeft: 3, fontSize: 8 * s }}>— {ss.reason}</span>}
+                {ss.reason && <span style={{ color: DIM, marginLeft: 3, fontSize: 10 * s }}>— {ss.reason}</span>}
               </div>
             ))}
           </div>
@@ -347,7 +347,7 @@ export const TechniqueDetail: React.FC<{
       )}
       <div style={{ ...secTitle, fontSize: 10 * s }}>💪 Мышечная синергия</div>
       {synergy && synergy.primary.length > 0 && (
-        <div style={{ fontSize: 9 * s, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 10 * s, lineHeight: 1.5 }}>
           <div><span style={{ color: ACCENT }}>Основные:</span> {synergy.primary.join(', ')}</div>
           {synergy.secondary.length > 0 && <div><span style={{ color: '#60a5fa' }}>Вспом.:</span> {synergy.secondary.join(', ')}</div>}
           {synergy.stabilizers.length > 0 && <div><span style={{ color: '#a855f7' }}>Стаб.:</span> {synergy.stabilizers.join(', ')}</div>}
@@ -358,7 +358,7 @@ export const TechniqueDetail: React.FC<{
       {lengthened.length > 0 && (
         <>
           <div style={{ ...secTitle, fontSize: 10 * s }}>🎯 Региональная гипертрофия</div>
-          <div style={{ fontSize: 9 * s, color: DIM, lineHeight: 1.4 }}>{lengthened.map((l: any, i: number) => <div key={i} style={{ marginBottom: 2 }}>• {l.name}: {l.emphasis}</div>)}</div>
+          <div style={{ fontSize: 10 * s, color: DIM, lineHeight: 1.4 }}>{lengthened.map((l: any, i: number) => <div key={i} style={{ marginBottom: 2 }}>• {l.name}: {l.emphasis}</div>)}</div>
         </>
       )}
       <div style={{ ...secTitle, fontSize: 10 * s }}>⏱ Темпо-прескрипция</div>
@@ -369,19 +369,19 @@ export const TechniqueDetail: React.FC<{
           return (
             <div key={i} style={{ flex: 1, textAlign: 'center', background: `${colors[i]}14`, borderRadius: 6, padding: '4px 2px', border: `1px solid ${colors[i]}22` }}>
               <div style={{ fontSize: 16 * s, fontWeight: 800, color: colors[i] }}>{sec === 0 ? 'X' : sec}</div>
-              <div style={{ fontSize: 9 * s, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{labels[i]}</div>
+              <div style={{ fontSize: 10 * s, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{labels[i]}</div>
             </div>
           );
         })}
       </div>
-      <div style={{ fontSize: 8 * s, color: DIM, fontStyle: 'italic' }}>{tempoRes.rationale}</div>
+      <div style={{ fontSize: 10 * s, color: DIM, fontStyle: 'italic' }}>{tempoRes.rationale}</div>
       <div style={{ ...secTitle, fontSize: 10 * s }}>🛡 Безопасность ({safety.score}/100)</div>
-      {safety.requiresSpotter && <div style={{ fontSize: 9 * s, color: '#f59e0b' }}>⚠ Требуется страхующий (споттер)</div>}
-      {safety.contraindications.length > 0 && <div style={{ fontSize: 9 * s, color: '#f87171' }}><b>Противопоказания:</b> {safety.contraindications.join('; ')}</div>}
-      {safety.precautions.length > 0 && <div style={{ fontSize: 9 * s, color: '#fbbf24' }}><b>Предосторожности:</b> {safety.precautions.join('; ')}</div>}
-      {safety.highRiskPopulation.length > 0 && <div style={{ fontSize: 9 * s, color: DIM }}><b>Группы риска:</b> {safety.highRiskPopulation.join(', ')}</div>}
+      {safety.requiresSpotter && <div style={{ fontSize: 10 * s, color: '#f59e0b' }}>⚠ Требуется страхующий (споттер)</div>}
+      {safety.contraindications.length > 0 && <div style={{ fontSize: 10 * s, color: '#f87171' }}><b>Противопоказания:</b> {safety.contraindications.join('; ')}</div>}
+      {safety.precautions.length > 0 && <div style={{ fontSize: 10 * s, color: '#fbbf24' }}><b>Предосторожности:</b> {safety.precautions.join('; ')}</div>}
+      {safety.highRiskPopulation.length > 0 && <div style={{ fontSize: 10 * s, color: DIM }}><b>Группы риска:</b> {safety.highRiskPopulation.join(', ')}</div>}
       <div style={{ ...secTitle, fontSize: 10 * s }}>📐 Классификация движения</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px', fontSize: 9 * s, color: DIM }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px', fontSize: 10 * s, color: DIM }}>
         <div>Плоскость: <b style={{ color: '#fff' }}>{classification.plane}</b></div>
         <div>Нагрузка: <b style={{ color: '#fff' }}>{classification.loadType}</b></div>
         <div>Стойка: <b style={{ color: '#fff' }}>{classification.groundingPattern}</b></div>

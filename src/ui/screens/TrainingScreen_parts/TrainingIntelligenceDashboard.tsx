@@ -114,7 +114,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
               fontSize: 10, fontWeight: 700, color: cat.color,
               textTransform: 'uppercase', letterSpacing: 0.4, flex: 1,
             }}>{cat.label}</span>
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{cat.tools.length}</span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{cat.tools.length}</span>
           </div>
 
           {/* Tool cards grid */}
@@ -137,7 +137,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
                   </span>
                   {t.badge && (
                     <span style={{
-                      marginLeft: 'auto', fontSize: 8, fontWeight: 700,
+                      marginLeft: 'auto', fontSize: 10, fontWeight: 700,
                       color: t.badge.color, padding: '1px 5px', borderRadius: 4,
                       background: t.badge.color + '15',
                       whiteSpace: 'nowrap',
@@ -146,7 +146,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
                     </span>
                   )}
                 </div>
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>
                   {t.desc}
                 </span>
               </button>

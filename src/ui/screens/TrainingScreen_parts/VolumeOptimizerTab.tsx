@@ -16,7 +16,7 @@ const ACCENT = '#00e68a';
 const DIM_ = 'rgba(255,255,255,0.5)';
 const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '7px 8px', width: '100%', boxSizing: 'border-box' as const, fontSize: 11, textAlign: 'center' as const };
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.5)', borderRadius: 10, padding: 12, border: '1px solid rgba(255,255,255,0.05)' };
-const BADGE = (color: string): React.CSSProperties => ({ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 700, color: '#000', background: color });
+const BADGE = (color: string): React.CSSProperties => ({ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, color: '#000', background: color });
 
 const MUSCLE_RU: Record<string, string> = {
   chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор',
@@ -191,10 +191,10 @@ export const VolumeOptimizerTab: React.FC = () => {
 
   const renderSFRBadge = (exerciseId: string): React.ReactNode => {
     const sfr = getSFRProfile(exerciseId);
-    if (!sfr) return <span style={{ fontSize: 9, color: DIM_ }}>—</span>;
+    if (!sfr) return <span style={{ fontSize: 10, color: DIM_ }}>—</span>;
     const color = SFR_TIER_COLOR[sfr.tier] || DIM_;
     return (
-      <span style={{ padding: '1px 6px', borderRadius: 3, fontSize: 9, fontWeight: 700, background: color + '22', color, border: '1px solid ' + color + '44' }}>
+      <span style={{ padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 700, background: color + '22', color, border: '1px solid ' + color + '44' }}>
         {sfr.tier} · {sfr.sfrRatio.toFixed(2)}
       </span>
     );
@@ -244,7 +244,7 @@ export const VolumeOptimizerTab: React.FC = () => {
       {/* ── Controls (2-col on mobile) ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 12 }}>
         <div>
-          <label style={{ display: 'block', fontSize: 9, color: DIM_, marginBottom: 1 }}>Уровень</label>
+          <label style={{ display: 'block', fontSize: 10, color: DIM_, marginBottom: 1 }}>Уровень</label>
           <select value={level} onChange={e => setLevel(e.target.value as TrainingLevel)} style={IN}>
             <option value="beginner">Начальный</option>
             <option value="intermediate">Средний</option>
@@ -253,13 +253,13 @@ export const VolumeOptimizerTab: React.FC = () => {
           </select>
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 9, color: DIM_, marginBottom: 1 }}>Недель</label>
+          <label style={{ display: 'block', fontSize: 10, color: DIM_, marginBottom: 1 }}>Недель</label>
           <select value={mesoWeeks} onChange={e => setMesoWeeks(+e.target.value)} style={IN}>
             {[1, 2, 3, 4, 5, 6, 8, 12].map(w => <option key={w} value={w}>{w}</option>)}
           </select>
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 9, color: DIM_, marginBottom: 1 }}>1RM глоб. (кг)</label>
+          <label style={{ display: 'block', fontSize: 10, color: DIM_, marginBottom: 1 }}>1RM глоб. (кг)</label>
           <input type="number" value={oneRMGlobal} onChange={e => setOneRMGlobal(+e.target.value)} style={IN} min={0} max={500} />
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', paddingBottom: 2, flexWrap: 'wrap' }}>
@@ -311,19 +311,19 @@ export const VolumeOptimizerTab: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 12 }}>
           <MetricCard title="Всего подходов" icon="✅" accent={ACCENT}>
             <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{analysis.totalSets}</div>
-            <div style={{ fontSize: 9, color: DIM_ }}>за {analysis.weekCount} нед</div>
+            <div style={{ fontSize: 10, color: DIM_ }}>за {analysis.weekCount} нед</div>
           </MetricCard>
           <MetricCard title="Тоннаж" icon="📦" accent={ACCENT}>
             <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{(analysis.totalTonnage / 1000).toFixed(1)}k</div>
-            <div style={{ fontSize: 9, color: DIM_ }}>кг·повт</div>
+            <div style={{ fontSize: 10, color: DIM_ }}>кг·повт</div>
           </MetricCard>
           <MetricCard title="КПШ" icon="⚡" accent={ACCENT}>
             <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{(analysis.totalKPSh / 1000).toFixed(1)}k</div>
-            <div style={{ fontSize: 9, color: DIM_ }}>инт. ед.</div>
+            <div style={{ fontSize: 10, color: DIM_ }}>инт. ед.</div>
           </MetricCard>
           <MetricCard title="Качество" icon="🎯" accent={qualityColor}>
             <div style={{ fontSize: 20, fontWeight: 800, color: qualityColor }}>{quality?.score ?? 0}</div>
-            <div style={{ fontSize: 9, color: DIM_ }}>/ 100</div>
+            <div style={{ fontSize: 10, color: DIM_ }}>/ 100</div>
           </MetricCard>
         </div>
       )}
@@ -347,36 +347,36 @@ export const VolumeOptimizerTab: React.FC = () => {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 7, color: DIM_ }}>Нед</label>
+                  <label style={{ display: 'block', fontSize: 10, color: DIM_ }}>Нед</label>
                   <input type="number" value={row.week} onChange={e => upd(row.id, 'week', +e.target.value)} style={IN} min={1} max={mesoWeeks} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 7, color: DIM_ }}>День</label>
+                  <label style={{ display: 'block', fontSize: 10, color: DIM_ }}>День</label>
                   <input type="number" value={row.day} onChange={e => upd(row.id, 'day', +e.target.value)} style={IN} min={1} max={7} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 7, color: DIM_ }}>Вес</label>
+                  <label style={{ display: 'block', fontSize: 10, color: DIM_ }}>Вес</label>
                   <input type="number" value={row.weight} onChange={e => upd(row.id, 'weight', +e.target.value)} style={IN} min={0} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 7, color: DIM_ }}>Повт</label>
+                  <label style={{ display: 'block', fontSize: 10, color: DIM_ }}>Повт</label>
                   <input type="number" value={row.reps} onChange={e => upd(row.id, 'reps', +e.target.value)} style={IN} min={0} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 7, color: DIM_ }}>Подх</label>
+                  <label style={{ display: 'block', fontSize: 10, color: DIM_ }}>Подх</label>
                   <input type="number" value={row.sets} onChange={e => upd(row.id, 'sets', +e.target.value)} style={IN} min={0} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 7, color: DIM_ }}>RPE</label>
+                  <label style={{ display: 'block', fontSize: 10, color: DIM_ }}>RPE</label>
                   <input type="number" value={row.rpe ?? ''} onChange={e => { const v = +e.target.value; upd(row.id, 'rpe', v >= 5 && v <= 10 ? v : undefined); }} style={IN} min={5} max={10} step={0.5} placeholder="7" />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 7, color: DIM_ }}>SFR</label>
+                  <label style={{ display: 'block', fontSize: 10, color: DIM_ }}>SFR</label>
                   {renderSFRBadge(row.exerciseId)}
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 7, color: DIM_ }}>Группа</label>
-                  <span style={{ fontSize: 9, color: DIM_, display: 'block', textAlign: 'center', paddingTop: 7 }}>{ex ? muscleRu(ex.group) : '—'}</span>
+                  <label style={{ display: 'block', fontSize: 10, color: DIM_ }}>Группа</label>
+                  <span style={{ fontSize: 10, color: DIM_, display: 'block', textAlign: 'center', paddingTop: 7 }}>{ex ? muscleRu(ex.group) : '—'}</span>
                 </div>
               </div>
             </div>
@@ -405,7 +405,7 @@ export const VolumeOptimizerTab: React.FC = () => {
                   const color = item.val >= 70 ? '#22c55e' : item.val >= 45 ? '#f59e0b' : '#ef4444';
                   return (
                     <div key={item.label}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, marginBottom: 2 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
                         <span style={{ color: DIM_ }}>{item.label}</span>
                         <span style={{ color, fontWeight: 700 }}>{item.val}</span>
                       </div>
@@ -450,11 +450,11 @@ export const VolumeOptimizerTab: React.FC = () => {
                     <span style={{ fontSize: 11, color: DIM_, fontWeight: 400 }}> / {analysis.cnsFatigue.maxRecommended}</span>
                   </div>
                   {renderBar(analysis.cnsFatigue.totalCNSScore, analysis.cnsFatigue.maxRecommended * 1.5, '#a78bfa')}
-                  <div style={{ marginTop: 6, fontSize: 9, color: DIM_ }}>
+                  <div style={{ marginTop: 6, fontSize: 10, color: DIM_ }}>
                     Тяж. компаунд: {analysis.cnsFatigue.heavyCompoundSets} · Тяж. изоляция: {analysis.cnsFatigue.heavyIsolationSets}
                   </div>
-                  {analysis.cnsFatigue.warning && <div style={{ marginTop: 4, fontSize: 9, color: '#ef4444', fontWeight: 700 }}>⚠ {analysis.cnsFatigue.warning}</div>}
-                  <div style={{ marginTop: 4, fontSize: 9, color: DIM_ }}>{analysis.cnsFatigue.recommendation}</div>
+                  {analysis.cnsFatigue.warning && <div style={{ marginTop: 4, fontSize: 10, color: '#ef4444', fontWeight: 700 }}>⚠ {analysis.cnsFatigue.warning}</div>}
+                  <div style={{ marginTop: 4, fontSize: 10, color: DIM_ }}>{analysis.cnsFatigue.recommendation}</div>
                 </div>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>Ёмкость восстановления</div>
@@ -462,14 +462,14 @@ export const VolumeOptimizerTab: React.FC = () => {
                     {analysis.recovery.utilizationPercent}%
                   </div>
                   {renderBar(analysis.recovery.utilizationPercent, 100, '#60a5fa')}
-                  <div style={{ marginTop: 6, fontSize: 9, color: DIM_ }}>
+                  <div style={{ marginTop: 6, fontSize: 10, color: DIM_ }}>
                     {analysis.recovery.totalWeeklySets} / {analysis.recovery.estimatedMaxRecoverable} подходов · Системная: {analysis.recovery.systemicFatigue}%
                   </div>
-                  {analysis.recovery.deloadRecommended && <div style={{ marginTop: 4, fontSize: 9, color: '#ef4444', fontWeight: 700 }}>⚠ {analysis.recovery.deloadReason}</div>}
+                  {analysis.recovery.deloadRecommended && <div style={{ marginTop: 4, fontSize: 10, color: '#ef4444', fontWeight: 700 }}>⚠ {analysis.recovery.deloadReason}</div>}
                   {Object.entries(analysis.recovery.localFatigueByMuscle).length > 0 && (
                     <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                       {Object.entries(analysis.recovery.localFatigueByMuscle).slice(0, 6).map(([m, v]) => (
-                        <span key={m} style={{ fontSize: 8, padding: '2px 5px', borderRadius: 3, background: v > 100 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)', color: v > 100 ? '#ef4444' : DIM_ }}>
+                        <span key={m} style={{ fontSize: 10, padding: '2px 5px', borderRadius: 3, background: v > 100 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)', color: v > 100 ? '#ef4444' : DIM_ }}>
                           {muscleRu(m)} {v}%
                         </span>
                       ))}
@@ -497,7 +497,7 @@ export const VolumeOptimizerTab: React.FC = () => {
                         <span style={{ fontSize: 12, fontWeight: 700 }}>{m.muscleRu}</span>
                         <span style={{ ...BADGE(color), marginLeft: 6 }}>{STATUS_LABEL[m.status]}</span>
                       </div>
-                      <div style={{ fontSize: 9, color: DIM_ }}>
+                      <div style={{ fontSize: 10, color: DIM_ }}>
                         SFR ср. {m.avgSFR.toFixed(2)} · Эфф. {m.efficiencyScore}%
                       </div>
                     </div>
@@ -506,11 +506,11 @@ export const VolumeOptimizerTab: React.FC = () => {
                       <div style={{ position: 'absolute', left: 0, width: (m.mev / m.mrv * 100) + '%', height: '100%', background: 'rgba(34,197,94,0.15)', borderRadius: '4px 0 0 4px' }} />
                       <div style={{ position: 'absolute', left: (m.mev / m.mrv * 100) + '%', width: ((m.mav - m.mev) / m.mrv * 100) + '%', height: '100%', background: 'rgba(0,230,138,0.1)' }} />
                       <div style={{ position: 'absolute', left: Math.min(98, (m.currentSets / m.mrv * 100)) + '%', top: -3, width: 4, height: 28, background: color, borderRadius: 2, transform: 'translateX(-50%)', zIndex: 2, boxShadow: '0 0 6px ' + color }} />
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px', zIndex: 1, fontSize: 8, color: DIM_ }}>
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px', zIndex: 1, fontSize: 10, color: DIM_ }}>
                         <span>MEV {m.mev}</span><span>MAV {m.mav}</span><span>MRV {m.mrv}</span>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 12, fontSize: 9, color: DIM_, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: DIM_, flexWrap: 'wrap' }}>
                       <span>Подходов: <b style={{ color }}>{m.currentSets}</b></span>
                       <span>База: {m.compoundSets} / Изол: {m.isolationSets}</span>
                       <span>Тяж: {m.heavySets}</span>
@@ -520,7 +520,7 @@ export const VolumeOptimizerTab: React.FC = () => {
                     {m.actionableTips.length > 0 && (
                       <div style={{ marginTop: 4 }}>
                         {m.actionableTips.map((t, i) => (
-                          <div key={i} style={{ fontSize: 9, color: '#f59e0b', marginBottom: 1 }}>💡 {t}</div>
+                          <div key={i} style={{ fontSize: 10, color: '#f59e0b', marginBottom: 1 }}>💡 {t}</div>
                         ))}
                       </div>
                     )}
@@ -538,9 +538,9 @@ export const VolumeOptimizerTab: React.FC = () => {
           {sectionHeader('progression', '📈', 'Планировщик прогрессии')}
           {expandedSections.progression && (
             <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 9, color: DIM_, marginBottom: 8 }}>Модель: {progression.progressionModel}</div>
+              <div style={{ fontSize: 10, color: DIM_, marginBottom: 8 }}>Модель: {progression.progressionModel}</div>
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 9 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
                   <thead>
                     <tr style={{ color: ACCENT }}>
                       <th style={{ padding: 4, textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>Нед</th>
@@ -559,7 +559,7 @@ export const VolumeOptimizerTab: React.FC = () => {
                         <td style={{ padding: 4, textAlign: 'center' }}>{w.targetTotalSets}</td>
                         <td style={{ padding: 4, textAlign: 'center', color: DIM_ }}>{w.intensityZone}</td>
                         <td style={{ padding: 4, textAlign: 'center', color: '#f59e0b' }}>{w.rirTarget}</td>
-                        <td style={{ padding: 4, fontSize: 9, color: DIM_ }}>
+                        <td style={{ padding: 4, fontSize: 10, color: DIM_ }}>
                           {Object.entries(w.setsByMuscle).slice(0, 5).map(([m, s]) => `${m}:${s}`).join(', ')}
                         </td>
                       </tr>
@@ -583,7 +583,7 @@ export const VolumeOptimizerTab: React.FC = () => {
                   <div style={{ fontSize: 10, fontWeight: 700 }}>
                     {g.missing ? '❌' : '⚠'} {g.muscleRu} — {g.missing ? 'НЕТ упражнений' : `${g.sets}/${g.mev} подходов (ниже MEV)`}
                   </div>
-                  <div style={{ fontSize: 9, color: DIM_, marginTop: 2 }}>💡 {g.suggestion}</div>
+                  <div style={{ fontSize: 10, color: DIM_, marginTop: 2 }}>💡 {g.suggestion}</div>
                 </div>
               ))}
             </div>
@@ -600,14 +600,14 @@ export const VolumeOptimizerTab: React.FC = () => {
               {swaps.slice(0, 5).map(s => (
                 <div key={s.currentExerciseId} style={{ marginBottom: 8, padding: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
                   <div style={{ fontSize: 10, color: DIM_, marginBottom: 4 }}>
-                    Текущее: <b style={{ color: '#fff' }}>{s.currentName}</b> <span style={{ fontSize: 9, color: '#f59e0b' }}>(SFR {s.currentSFR.toFixed(2)})</span>
+                    Текущее: <b style={{ color: '#fff' }}>{s.currentName}</b> <span style={{ fontSize: 10, color: '#f59e0b' }}>(SFR {s.currentSFR.toFixed(2)})</span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     {s.betterOptions.map((opt, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', background: 'rgba(0,230,138,0.04)', borderRadius: 4 }}>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: ACCENT }}>→ {opt.name}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: ACCENT }}>→ {opt.name}</span>
                         <span style={{ ...BADGE('#22c55e') }}>SFR {opt.sfr.toFixed(2)}</span>
-                        <span style={{ fontSize: 8, color: DIM_ }}>{opt.reason}</span>
+                        <span style={{ fontSize: 10, color: DIM_ }}>{opt.reason}</span>
                       </div>
                     ))}
                   </div>
@@ -624,7 +624,7 @@ export const VolumeOptimizerTab: React.FC = () => {
           {sectionHeader('reference', '📖', 'SFR-экономика (справка)')}
           {expandedSections.reference && (
             <div style={{ marginTop: 10, overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 9 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
                 <thead>
                   <tr style={{ color: ACCENT }}>
                     <th style={{ padding: 3, textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>Упражнение</th>
@@ -647,13 +647,13 @@ export const VolumeOptimizerTab: React.FC = () => {
                         <td style={{ padding: 3, textAlign: 'center', color: '#22c55e' }}>{sfr.sfrRatio.toFixed(2)}</td>
                         <td style={{ padding: 3, textAlign: 'center' }}>{sfr.stimulus}</td>
                         <td style={{ padding: 3, textAlign: 'center' }}>{sfr.localFatigue}</td>
-                        <td style={{ padding: 3, fontSize: 8, color: DIM_ }}>{sfr.bestFor}</td>
+                        <td style={{ padding: 3, fontSize: 10, color: DIM_ }}>{sfr.bestFor}</td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
-              <div style={{ fontSize: 8, color: DIM_, marginTop: 6, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 10, color: DIM_, marginTop: 6, lineHeight: 1.5 }}>
                 SFR = Стимул / (ЛокУст + СисУст). Тир S — идеальный баланс, A — отличный, B — средний, C — высокоутомляемый.
               </div>
             </div>

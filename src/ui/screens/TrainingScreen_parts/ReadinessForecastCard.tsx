@@ -39,15 +39,15 @@ export const ReadinessForecastCard: React.FC = () => {
         {forecast?.values.map((v: number, i: number) => <circle key={i} cx={px(recs.length - 1 + i)} cy={py(v)} r={2.5} fill={ACCENT} />)}
       </svg>
       <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 4 }}>
-        <span style={{ fontSize: 9, color: '#60a5fa' }}>● история</span>
-        <span style={{ fontSize: 9, color: ACCENT }}>● прогноз</span>
+        <span style={{ fontSize: 10, color: '#60a5fa' }}>● история</span>
+        <span style={{ fontSize: 10, color: ACCENT }}>● прогноз</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8 }}>
         {forecast?.values.map((v: number, i: number) => (
           <div key={i} style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 8, padding: 6, textAlign: 'center' }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>+{i + 1} дн</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>+{i + 1} дн</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: v >= 70 ? '#22c55e' : v >= 50 ? '#eab308' : '#ef4444' }}>{Math.round(v)}</div>
-            {forecast.ci95[i] && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>ДИ {Math.round(forecast.ci95[i][0])}-{Math.round(forecast.ci95[i][1])}</div>}
+            {forecast.ci95[i] && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>ДИ {Math.round(forecast.ci95[i][0])}-{Math.round(forecast.ci95[i][1])}</div>}
           </div>
         ))}
       </div>

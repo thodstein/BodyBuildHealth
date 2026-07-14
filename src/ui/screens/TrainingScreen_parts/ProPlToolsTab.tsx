@@ -44,14 +44,14 @@ export const ProPlToolsTab: React.FC = () => {
       {tab === 'taper' && (<>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>Тапер к соревнованиям: снижение объёма 40-60%, удержание интенсивности, peak-week прикиды.</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
-          <div><label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Дата старта</label><input type="date" value={meetDate} onChange={e => setMeetDate(e.target.value)} style={IN} /></div>
-          <div><label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Усталость (1-10)</label><input type="number" min={1} max={10} value={fatigue} onChange={e => setFatigue(+e.target.value)} style={IN} /></div>
-          <div><label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Стратегия</label><select value={strategy} onChange={e => setStrategy(e.target.value as AttemptStrategy)} style={{ ...IN, textAlign: 'left' }}><option value="conservative">Консервативная</option><option value="balanced">Сбалансированная</option><option value="aggressive">Агрессивная</option></select></div>
+          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Дата старта</label><input type="date" value={meetDate} onChange={e => setMeetDate(e.target.value)} style={IN} /></div>
+          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Усталость (1-10)</label><input type="number" min={1} max={10} value={fatigue} onChange={e => setFatigue(+e.target.value)} style={IN} /></div>
+          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Стратегия</label><select value={strategy} onChange={e => setStrategy(e.target.value as AttemptStrategy)} style={{ ...IN, textAlign: 'left' }}><option value="conservative">Консервативная</option><option value="balanced">Сбалансированная</option><option value="aggressive">Агрессивная</option></select></div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
-          <div><label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Присед 1RM</label><input type="number" value={squat1RM} onChange={e => setSquat1RM(+e.target.value)} style={IN} /></div>
-          <div><label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Жим 1RM</label><input type="number" value={bench1RM} onChange={e => setBench1RM(+e.target.value)} style={IN} /></div>
-          <div><label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Тяга 1RM</label><input type="number" value={deadlift1RM} onChange={e => setDeadlift1RM(+e.target.value)} style={IN} /></div>
+          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Присед 1RM</label><input type="number" value={squat1RM} onChange={e => setSquat1RM(+e.target.value)} style={IN} /></div>
+          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Жим 1RM</label><input type="number" value={bench1RM} onChange={e => setBench1RM(+e.target.value)} style={IN} /></div>
+          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Тяга 1RM</label><input type="number" value={deadlift1RM} onChange={e => setDeadlift1RM(+e.target.value)} style={IN} /></div>
         </div>
         {taper && (<>
           <div style={CARD}>
@@ -92,7 +92,7 @@ export const ProPlToolsTab: React.FC = () => {
           ))}
         </div>
         <div style={{ marginBottom: 10 }}>
-          <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Слабая фаза</label>
+          <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Слабая фаза</label>
           <select value={diagPhase} onChange={e => setDiagPhase(e.target.value)} style={{ ...IN, textAlign: 'left' }}>
             <option value="">Выберите фазу...</option>
             {phases.map(p => <option key={p} value={p}>{p}</option>)}
@@ -114,7 +114,7 @@ export const ProPlToolsTab: React.FC = () => {
           <div style={{ fontSize: 12, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>📊 Bar-path анализ</div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
             {(['forward_drift', 'hips_shoot_up', 'good_morning', 'bar_loops', 'asymmetric'] as BarPathIssue[]).map(iss => (
-              <button key={iss} onClick={() => setBarIssues(prev => prev.includes(iss) ? prev.filter(x => x !== iss) : [...prev, iss])} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: barIssues.includes(iss) ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.08)', background: barIssues.includes(iss) ? 'rgba(168,85,247,0.12)' : 'transparent', color: barIssues.includes(iss) ? '#a855f7' : 'var(--text-dim)' }}>{iss.replace(/_/g, ' ')}</button>
+              <button key={iss} onClick={() => setBarIssues(prev => prev.includes(iss) ? prev.filter(x => x !== iss) : [...prev, iss])} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', border: barIssues.includes(iss) ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.08)', background: barIssues.includes(iss) ? 'rgba(168,85,247,0.12)' : 'transparent', color: barIssues.includes(iss) ? '#a855f7' : 'var(--text-dim)' }}>{iss.replace(/_/g, ' ')}</button>
             ))}
           </div>
           {barPath?.diagnoses.map((d, i) => (

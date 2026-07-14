@@ -20,10 +20,10 @@ const weekChip = (w: PeakingWeek, accent: string): React.ReactNode => (
     <div>
       <span style={{ fontWeight: 700, color: accent, marginRight: 6 }}>Н{w.week}</span>
       <span style={{ color: '#fff' }}>{w.label}</span>
-      {w.deloadBefore && <span style={{ marginLeft: 6, fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(96,165,250,0.15)', color: '#60a5fa' }}>разгрузка перед</span>}
-      <div style={{ fontSize: 9, color: DIM, marginTop: 2 }}>{w.focus}</div>
+      {w.deloadBefore && <span style={{ marginLeft: 6, fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'rgba(96,165,250,0.15)', color: '#60a5fa' }}>разгрузка перед</span>}
+      <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{w.focus}</div>
     </div>
-    <div style={{ textAlign: 'right', fontSize: 9 }}>
+    <div style={{ textAlign: 'right', fontSize: 10 }}>
       <div>Объём: <b style={{ color: accent }}>{Math.round(w.volumePct * 100)}%</b></div>
       <div>Инт: <b style={{ color: accent }}>{Math.round(w.intensityPct * 100)}%</b></div>
       <div>RIR: <b style={{ color: accent }}>{w.rirMin}-{w.rirMax}</b></div>
@@ -70,7 +70,7 @@ export const PeakingProtocolsTab: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 800, color }}>
-                  {icon} {proto.name} <span style={{ fontSize: 9, fontWeight: 400, color: DIM }}>({proto.durationWeeks} нед)</span>
+                  {icon} {proto.name} <span style={{ fontSize: 10, fontWeight: 400, color: DIM }}>({proto.durationWeeks} нед)</span>
                 </div>
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginTop: 4, lineHeight: 1.5 }}>
                   {proto.description}
@@ -113,13 +113,13 @@ export const PeakingProtocolsTab: React.FC = () => {
                 background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.12)',
               }}>
                 <div style={{ fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>
-                  {r.name} <span style={{ fontSize: 8, color: DIM, fontWeight: 400 }}>({r.durationMin} мин)</span>
+                  {r.name} <span style={{ fontSize: 10, color: DIM, fontWeight: 400 }}>({r.durationMin} мин)</span>
                 </div>
-                <ol style={{ margin: '0 0 6px 14px', padding: 0, color: 'rgba(255,255,255,0.8)', fontSize: 9 }}>
+                <ol style={{ margin: '0 0 6px 14px', padding: 0, color: 'rgba(255,255,255,0.8)', fontSize: 10 }}>
                   {r.instructions.slice(0, 3).map((s, i) => <li key={i} style={{ marginBottom: 1 }}>{s}</li>)}
                   {r.instructions.length > 3 && <li style={{ color: DIM }}>…</li>}
                 </ol>
-                <div style={{ fontSize: 8, color: DIM }}>{r.whenToUse}</div>
+                <div style={{ fontSize: 10, color: DIM }}>{r.whenToUse}</div>
               </div>
             ))}
           </div>
@@ -142,14 +142,14 @@ export const PeakingProtocolsTab: React.FC = () => {
                 background: 'rgba(167,139,250,0.04)', border: '1px solid rgba(167,139,250,0.12)',
               }}>
                 <div style={{ fontWeight: 700, color: '#a78bfa', marginBottom: 4, fontSize: 11 }}>{r.name}</div>
-                <div style={{ fontSize: 9, color: DIM, marginBottom: 6 }}>{r.whenToUse}</div>
+                <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>{r.whenToUse}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {r.steps.map((s, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                      <span style={{ color: '#a78bfa', fontWeight: 700, fontSize: 9, minWidth: 45, textAlign: 'right' }}>{s.duration}</span>
+                      <span style={{ color: '#a78bfa', fontWeight: 700, fontSize: 10, minWidth: 45, textAlign: 'right' }}>{s.duration}</span>
                       <div>
                         <div style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{s.action}</div>
-                        <div style={{ fontSize: 9, color: DIM }}>{s.notes}</div>
+                        <div style={{ fontSize: 10, color: DIM }}>{s.notes}</div>
                       </div>
                     </div>
                   ))}

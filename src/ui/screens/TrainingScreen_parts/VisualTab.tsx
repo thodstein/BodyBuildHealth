@@ -59,10 +59,10 @@ export const VisualTab: React.FC<{ sessions: any[] }> = ({ sessions }) => {
       <div style={{ display:'flex', alignItems:'flex-end', gap:3, height:90, padding:'4px 2px' }}>
         {weekly.map((w,i) => { const maxV = Math.max(...weekly.map(x=>x.volume),1); return <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
           <div style={{ width:'80%', borderRadius:'6px 6px 2px 2px', height:`${Math.max(6, (w.volume/maxV)*100)}%`, background:'linear-gradient(180deg,#00e68a,rgba(0,230,138,0.3))', transition:'height 0.4s cubic-bezier(0.22,1,0.36,1)' }} />
-          <span style={{ fontSize:7, color:'rgba(255,255,255,0.35)', marginTop:4, fontWeight:500 }}>Н{w.week}</span>
+          <span style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginTop:4, fontWeight:500 }}>Н{w.week}</span>
         </div>})}
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, fontSize:9, marginTop:6, padding:'6px 4px', background:'rgba(255,255,255,0.03)', borderRadius:8 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, fontSize:10, marginTop:6, padding:'6px 4px', background:'rgba(255,255,255,0.03)', borderRadius:8 }}>
         <span style={{ color:'rgba(255,255,255,0.4)' }}>Пик <b style={{color:'#fff'}}>{(dashboard.summary as any).peakVolume || dashboard.summary.totalVolume}</b></span>
         <span style={{ color:'rgba(255,255,255,0.4)' }}>Интенс. <b style={{color:'#fff'}}>{dashboard.summary.avgIntensity}%</b></span>
         <span style={{ color:'rgba(255,255,255,0.4)' }}>Тренд <b style={{color:(dashboard.summary as any).trend==='up'?'#34d399':(dashboard.summary as any).trend==='down'?'#f87171':'#9ca3af'}}>{(dashboard.summary as any).trend==='up'?'↑ +':(dashboard.summary as any).trend==='down'?'↓ ':'→'}</b></span>
@@ -73,11 +73,11 @@ export const VisualTab: React.FC<{ sessions: any[] }> = ({ sessions }) => {
     {muscleVol.length > 0 && <div style={glassCard}>
       <div style={gLabel}>💪 Объём по группам</div>
       {muscleVol.map((mv,i) => <div key={i} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
-        <span style={{ width:55, fontSize:9, color:'rgba(255,255,255,0.5)', fontWeight:500, textAlign:'right' }}>{mv.muscle}</span>
+        <span style={{ width:55, fontSize:10, color:'rgba(255,255,255,0.5)', fontWeight:500, textAlign:'right' }}>{mv.muscle}</span>
         <div style={{ flex:1, background:'rgba(255,255,255,0.04)', borderRadius:8, height:10, overflow:'hidden', position:'relative' }}>
           <div style={{ width:`${mv.percent}%`, height:'100%', borderRadius:8, background:'linear-gradient(90deg,#3b82f6,#60a5fa)', transition:'width 0.5s cubic-bezier(0.22,1,0.36,1)' }} />
         </div>
-        <span style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.7)', minWidth:32, textAlign:'right' }}>{mv.percent}%</span>
+        <span style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.7)', minWidth:32, textAlign:'right' }}>{mv.percent}%</span>
       </div>)}
     </div>}
 
@@ -92,8 +92,8 @@ export const VisualTab: React.FC<{ sessions: any[] }> = ({ sessions }) => {
           const change = first > 0 ? Math.round((latest - first) / first * 100) : 0;
           return <div key={i} style={{ background:'rgba(255,255,255,0.03)', borderRadius:10, padding:'6px 8px' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
-              <span style={{ fontSize:9, fontWeight:600, color:'rgba(255,255,255,0.7)' }}>{p.exercise}</span>
-              <span style={{ fontSize:9, fontWeight:700, color: change >= 0 ? '#34d399' : '#f87171' }}>{change >= 0 ? `+${change}` : change}%</span>
+              <span style={{ fontSize:10, fontWeight:600, color:'rgba(255,255,255,0.7)' }}>{p.exercise}</span>
+              <span style={{ fontSize:10, fontWeight:700, color: change >= 0 ? '#34d399' : '#f87171' }}>{change >= 0 ? `+${change}` : change}%</span>
             </div>
             <div style={{ display:'flex', gap:2, alignItems:'flex-end', height:24 }}>
               {p.weeks.map((w,wi) => (

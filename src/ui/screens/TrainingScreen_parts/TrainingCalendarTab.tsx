@@ -203,7 +203,7 @@ export const TrainingCalendarTab: React.FC = () => {
           <button onClick={() => navigateMonth(-1)} style={btnStyle}>◀</button>
           <span style={{ fontSize: 16, fontWeight: 700, margin: '0 8px', color: ACCENT, whiteSpace: 'nowrap' }}>{MONTH_NAMES_RU[month]} {year}</span>
           <button onClick={() => navigateMonth(1)} style={btnStyle}>▶</button>
-          <button onClick={goToday} style={{ ...btnStyle, marginLeft: 4, background: 'rgba(0,230,138,0.08)', borderColor: 'rgba(0,230,138,0.3)', color: ACCENT, fontSize: 9 }}>Сегодня</button>
+          <button onClick={goToday} style={{ ...btnStyle, marginLeft: 4, background: 'rgba(0,230,138,0.08)', borderColor: 'rgba(0,230,138,0.3)', color: ACCENT, fontSize: 10 }}>Сегодня</button>
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
           {(['month', 'week', 'meso'] as const).map(v => (
@@ -231,7 +231,7 @@ export const TrainingCalendarTab: React.FC = () => {
 
           {/* Compliance gauge bar */}
           <div style={CARD}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: DIM, marginBottom: 3 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: DIM, marginBottom: 3 }}>
               <span>Compliance месяца</span>
               <span style={{ fontWeight: 700, color: cal.compliance >= 80 ? ACCENT : cal.compliance >= 50 ? '#f59e0b' : '#ef4444' }}>{cal.compliance}%</span>
             </div>
@@ -244,13 +244,13 @@ export const TrainingCalendarTab: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '32px repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
             <div />
             {DAY_NAMES_RU.map((d, i) => (
-              <div key={i} style={{ textAlign: 'center', fontSize: 9, fontWeight: 600, color: DIM, padding: '4px 0' }}>{d}</div>
+              <div key={i} style={{ textAlign: 'center', fontSize: 10, fontWeight: 600, color: DIM, padding: '4px 0' }}>{d}</div>
             ))}
           </div>
 
           {cal.weeks.map((week, wi) => (
             <div key={wi} style={{ display: 'grid', gridTemplateColumns: '32px repeat(7, 1fr)', gap: 2, marginBottom: 2 }}>
-              <div style={{ fontSize: 8, color: DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>Н{wi + 1}</div>
+              <div style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>Н{wi + 1}</div>
               {week.map((day, di) => (
                 <CalendarCell key={di} day={day} today={today} onClick={() => { setView('week'); setSelectedWeek(wi + 1); }} />
               ))}
@@ -259,7 +259,7 @@ export const TrainingCalendarTab: React.FC = () => {
 
           <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
             {['done', 'partial', 'missed', 'planned', 'rest'].filter(k => k !== 'none').map(k => (
-              <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, color: DIM }}>
+              <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: DIM }}>
                 <div style={{ width: 10, height: 10, borderRadius: 2, background: STATUS_COLORS[k] }} />
                 {STATUS_LABELS[k]}
               </div>
@@ -312,17 +312,17 @@ export const TrainingCalendarTab: React.FC = () => {
                           <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
                             {DAY_NAMES_RU[day.dayOfWeek]} · {day.date}
                           </span>
-                          {day.isToday && <span style={{ fontSize: 8, color: ACCENT, marginLeft: 6, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.2)' }}>Сегодня</span>}
+                          {day.isToday && <span style={{ fontSize: 10, color: ACCENT, marginLeft: 6, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.2)' }}>Сегодня</span>}
                         </div>
                         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                           {day.date && day.date <= today && (
                             <button onClick={(e) => { e.stopPropagation(); toggleManualDone(day.date); }}
-                              style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: flaggedDates.has(day.date) ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)', color: flaggedDates.has(day.date) ? ACCENT : DIM }}>
+                              style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: flaggedDates.has(day.date) ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)', color: flaggedDates.has(day.date) ? ACCENT : DIM }}>
                               {flaggedDates.has(day.date) ? '✓ Отм.' : '☐ Отм.'}
                             </button>
                           )}
                           <span style={{
-                            fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
+                            fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
                             background: STATUS_BG[day.status] || 'transparent',
                             color: STATUS_COLORS[day.status] || DIM,
                           }}>{STATUS_LABELS[day.status] || ''}</span>
@@ -330,7 +330,7 @@ export const TrainingCalendarTab: React.FC = () => {
                       </div>
 
                       {day.isTrainingDay && (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 9 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10 }}>
                           <div><span style={{ color: DIM }}>Фокус:</span> <span style={{ color: '#fff' }}>{day.plannedFocus || '—'}</span></div>
                           <div><span style={{ color: DIM }}>Подходов:</span> <span style={{ color: '#fff' }}>{day.plannedSets} план / {day.actualSets} факт</span></div>
                           <div><span style={{ color: DIM }}>Объём:</span> <span style={{ color: '#fff' }}>{formatVol(day.plannedVolume)} план / {formatVol(day.actualVolume)} факт</span></div>
@@ -342,7 +342,7 @@ export const TrainingCalendarTab: React.FC = () => {
                       {exNames.length > 0 && (
                         <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                           {exNames.filter(Boolean).map((ex, ei) => (
-                            <span key={ei} style={{ fontSize: 8, padding: '1px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: ACCENT }}>
+                            <span key={ei} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: ACCENT }}>
                               {ex}
                             </span>
                           ))}
@@ -363,13 +363,13 @@ export const TrainingCalendarTab: React.FC = () => {
                       )}
 
                       {!day.isTrainingDay && day.actualVolume > 0 && (
-                        <div style={{ fontSize: 9, color: ACCENT, marginTop: 4 }}>
+                        <div style={{ fontSize: 10, color: ACCENT, marginTop: 4 }}>
                           ✅ Незапланированная тренировка — {formatVol(day.actualVolume)} кг
                         </div>
                       )}
 
                       {flaggedDates.has(day.date) && !day.actualCompleted && (
-                        <div style={{ fontSize: 9, color: '#f59e0b', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                           ⚑ Отмечено вручную
                         </div>
                       )}
@@ -437,7 +437,7 @@ export const TrainingCalendarTab: React.FC = () => {
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>Compliance по неделям</div>
                 {overview.weekCompliance.map((wc, i) => (
                   <div key={i} style={{ marginBottom: 6 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: DIM, marginBottom: 2 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: DIM, marginBottom: 2 }}>
                       <span>Нед {wc.week}</span>
                       <span>{wc.actual}/{wc.planned} — {wc.compliance}%</span>
                     </div>
@@ -463,18 +463,18 @@ export const TrainingCalendarTab: React.FC = () => {
                       const ah = `${(weekActual / maxVol) * 80}px`;
                       return (
                         <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                          <div style={{ fontSize: 7, color: DIM }}>{formatVol(weekActual)}</div>
+                          <div style={{ fontSize: 10, color: DIM }}>{formatVol(weekActual)}</div>
                           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                             <div title="План" style={{ height: ph === '0px' ? '2px' : ph, width: '70%', borderRadius: 2, background: 'rgba(59,130,246,0.35)', border: '1px dashed rgba(59,130,246,0.5)', minHeight: 2, transition: 'height 0.3s' }} />
                             <div title="Факт" style={{ height: ah === '0px' ? '2px' : ah, width: '60%', borderRadius: 2, background: ACCENT, border: '1px solid rgba(0,230,138,0.3)', minHeight: 2, transition: 'height 0.3s' }} />
                           </div>
-                          <div style={{ fontSize: 8, color: DIM, marginTop: 2 }}>Н{wc.week}</div>
+                          <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>Н{wc.week}</div>
                         </div>
                       );
                     });
                   })()}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: 16, fontSize: 8, color: DIM, marginTop: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 16, fontSize: 10, color: DIM, marginTop: 8 }}>
                   <span>▬ Факт</span>
                   <span style={{ borderTop: '1px dashed rgba(59,130,246,0.5)' }}>--- План</span>
                 </div>
@@ -523,12 +523,12 @@ const CalendarCell: React.FC<{ day: CalendarDay; today: string; onClick: () => v
         {day.date.slice(8)}
       </div>
       {day.isTrainingDay && (
-        <div style={{ fontSize: 7, color: DIM, marginTop: 1 }}>
+        <div style={{ fontSize: 10, color: DIM, marginTop: 1 }}>
           {day.plannedExercises}упр
         </div>
       )}
       {day.isTrainingDay && day.status !== 'planned' && (
-        <div style={{ fontSize: 7, color: STATUS_COLORS[day.status] || DIM, marginTop: 1 }}>
+        <div style={{ fontSize: 10, color: STATUS_COLORS[day.status] || DIM, marginTop: 1 }}>
           {day.compliance}%
         </div>
       )}
@@ -558,7 +558,7 @@ const MiniStat: React.FC<{ label: string; value: string | number; color: string 
     textAlign: 'center', minWidth: 60,
   }}>
     <div style={{ fontSize: 16, fontWeight: 800, color }}>{value}</div>
-    <div style={{ fontSize: 8, color: DIM, marginTop: 1 }}>{label}</div>
+    <div style={{ fontSize: 10, color: DIM, marginTop: 1 }}>{label}</div>
   </div>
 );
 

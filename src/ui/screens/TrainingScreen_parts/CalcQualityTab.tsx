@@ -46,7 +46,7 @@ export const CalcQualityTab: React.FC<{ plan: Plan; level: string; goal?: string
         </div>
         {analysis.breakdown.map((b, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontSize: 10, color: b.ok ? 'rgba(255,255,255,0.7)' : analysis.color }}>
-            <span style={{ fontSize: 9 }}>{b.ok ? '✅' : '❌'}</span>
+            <span style={{ fontSize: 11 }}>{b.ok ? '✅' : '❌'}</span>
             <span style={{ fontWeight: 700, minWidth: 80 }}>{b.label}</span>
             <span style={{ opacity: 0.8 }}>{b.detail}</span>
           </div>
@@ -58,7 +58,7 @@ export const CalcQualityTab: React.FC<{ plan: Plan; level: string; goal?: string
         {analysis.perMuscle.map(pm => {
           const st = pm.status === 'недотрен' ? '#ef4444' : pm.status === 'перегруз' ? '#f59e0b' : '#22c55e';
           return (
-            <div key={pm.muscle} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 6, background: st + '10', border: '1px solid ' + st + '30', fontSize: 9 }}>
+            <div key={pm.muscle} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, background: st + '10', border: '1px solid ' + st + '30', fontSize: 11 }}>
               <span style={{ fontWeight: 700, color: '#fff' }}>{ru(pm.muscle)}</span>
               <span style={{ color: st, fontWeight: 700 }}>{pm.sets}</span>
               <span style={{ color: 'rgba(255,255,255,0.4)' }}>· MEV {pm.mev} · MAV {pm.mav} · MRV {pm.mrv} · {pm.pct}%</span>
@@ -71,7 +71,7 @@ export const CalcQualityTab: React.FC<{ plan: Plan; level: string; goal?: string
         <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>💡 Рекомендации</div>
           {analysis.recommendations.map((r, i) => (
-            <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 2, paddingLeft: 4, borderLeft: '2px solid #f59e0b' }}>{r}</div>
+            <div key={i} style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', marginBottom: 3, paddingLeft: 4, borderLeft: '2px solid #f59e0b' }}>{r}</div>
           ))}
         </div>
       )}

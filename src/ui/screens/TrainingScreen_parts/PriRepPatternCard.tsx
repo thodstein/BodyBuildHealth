@@ -86,7 +86,7 @@ export const PriRepPatternCard: React.FC = () => {
         {rec && <div style={{ marginTop: 8, padding: 8, borderRadius: 6, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', fontSize: 10, color: '#60a5fa' }}><b>Рекомендация:</b> {rec}</div>}
         {auto && auto.recommendations.length > 0 && (
           <div style={{ marginTop: 6 }}>
-            {auto.recommendations.slice(0, 5).map((r, i) => <div key={i} style={{ fontSize: 9, color: DIM, marginTop: 2 }}>• {r}</div>)}
+            {auto.recommendations.slice(0, 5).map((r, i) => <div key={i} style={{ fontSize: 10, color: DIM, marginTop: 2 }}>• {r}</div>)}
           </div>
         )}
       </div>

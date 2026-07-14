@@ -78,7 +78,7 @@ export const DeloadProtocolCard: React.FC<Props> = ({ ctx, overrideProtocol }) =
         {Object.entries(DELOAD_PROTOCOLS).map(([key, p]) => (
           <button key={key}
             style={{
-              padding: '3px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer',
+              padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
               border: `1px solid ${protocol.protocolType === p.protocolType ? '#00e68a' : 'rgba(255,255,255,0.1)'}`,
               background: protocol.protocolType === p.protocolType ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)',
               color: protocol.protocolType === p.protocolType ? '#00e68a' : 'rgba(255,255,255,0.5)',
@@ -107,7 +107,7 @@ export const DeloadProtocolCard: React.FC<Props> = ({ ctx, overrideProtocol }) =
               <span>{DAY_ICONS[day.type] || '📌'}</span>
               <span style={{ fontWeight: 600, minWidth: 20 }}>Д{day.day}</span>
               <span style={{ color: 'rgba(255,255,255,0.6)', flex: 1 }}>{day.description}</span>
-              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{expandedDay === day.day ? '▲' : '▼'}</span>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{expandedDay === day.day ? '▲' : '▼'}</span>
             </button>
 
             {expandedDay === day.day && (
@@ -131,14 +131,14 @@ export const DeloadProtocolCard: React.FC<Props> = ({ ctx, overrideProtocol }) =
       {/* Предупреждения */}
       {protocol.warnings.length > 0 && (
         <div style={{ marginTop: 6, padding: 8, borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', marginBottom: 6 }}>
-          <div style={{ fontSize: 9, fontWeight: 600, color: '#ef4444', marginBottom: 4 }}>⚠️</div>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#ef4444', marginBottom: 4 }}>⚠️</div>
           {protocol.warnings.map((w, i) => (
-            <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>{w}</div>
+            <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>{w}</div>
           ))}
         </div>
       )}
 
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
         Ожидаемое восстановление: {protocol.expectedRecovery}
       </div>
     </div>

@@ -56,7 +56,7 @@ export const MethodologyEncyclopedia: React.FC = () => {
       {list.length === 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Нет методов в категории.</div>}
       {list.map((m, i) => (
         <ExpandableCard key={i} title={m.name} icon="" accent={EV_COLOR[m.evidenceLevel] || '#00e68a'}
-          short={<><span style={{ fontSize: 9, color: EV_COLOR[m.evidenceLevel], fontWeight: 700, marginRight: 6 }}>{EV_LABEL[m.evidenceLevel]}</span>{m.description}</>}
+          short={<><span style={{ fontSize: 10, color: EV_COLOR[m.evidenceLevel], fontWeight: 700, marginRight: 6 }}>{EV_LABEL[m.evidenceLevel]}</span>{m.description}</>}
           full={<div>
             <div style={{ marginBottom: 6 }}><b style={{ color: '#00e68a' }}>Как работает:</b> {m.howItWorks}</div>
             <div style={{ marginBottom: 6 }}><b style={{ color: '#00e68a' }}>Кому подходит:</b> {m.bestFor}</div>

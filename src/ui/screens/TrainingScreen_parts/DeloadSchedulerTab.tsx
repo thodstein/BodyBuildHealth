@@ -217,21 +217,21 @@ export const DeloadSchedulerTab: React.FC = () => {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
             <div style={{ textAlign: 'center', padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>Сессий</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Сессий</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>{srpeSessions.length}</div>
             </div>
             {acwr && (
               <div style={{ textAlign: 'center', padding: 8, borderRadius: 8, background: acwr.ratio > 1.5 ? 'rgba(239,68,68,0.08)' : acwr.ratio > 1.3 ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.06)' }}>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>ACWR</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>ACWR</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: acwr.ratio > 1.5 ? '#ef4444' : acwr.ratio > 1.3 ? '#f59e0b' : '#22c55e' }}>{acwr.ratio.toFixed(2)}</div>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{acwr.zone === 'dangerous' ? 'ОПАСНО' : acwr.zone === 'caution' ? 'Осторожно' : acwr.zone === 'optimal' ? 'Оптимум' : 'Недотрен'}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{acwr.zone === 'dangerous' ? 'ОПАСНО' : acwr.zone === 'caution' ? 'Осторожно' : acwr.zone === 'optimal' ? 'Оптимум' : 'Недотрен'}</div>
               </div>
             )}
             {monotonyResult && (
               <div style={{ textAlign: 'center', padding: 8, borderRadius: 8, background: monotonyResult.monotony > 2 ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)' }}>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>Монотонность</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Монотонность</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: monotonyResult.monotony > 2 ? '#ef4444' : ACCENT }}>{monotonyResult.monotony.toFixed(1)}</div>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Strain: {Math.round(monotonyResult.strain)}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Strain: {Math.round(monotonyResult.strain)}</div>
               </div>
             )}
           </div>
@@ -260,11 +260,11 @@ export const DeloadSchedulerTab: React.FC = () => {
              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>🛠️ Корректировка маркеров</div>
              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
                <div>
-                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 3 }}>Падение 1RM (%)</div>
+                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 3 }}>Падение 1RM (%)</div>
                  <input type="number" value={perfDecline} onChange={e => setPerfDecline(+e.target.value)} style={{ width: '100%', padding: '6px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: '#18181b', color: '#fff', fontSize: 10, outline: 'none' }} />
                </div>
                <div>
-                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 3 }}>Пульс покоя ↑ (уд/мин)</div>
+                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 3 }}>Пульс покоя ↑ (уд/мин)</div>
                  <input type="number" value={restingHR} onChange={e => setRestingHR(+e.target.value)} style={{ width: '100%', padding: '6px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: '#18181b', color: '#fff', fontSize: 10, outline: 'none' }} />
                </div>
              </div>
@@ -274,7 +274,7 @@ export const DeloadSchedulerTab: React.FC = () => {
                    key={key} 
                    onClick={() => setOtSymptoms(p => ({ ...p, [key]: !p[key] }))}
                    style={{ 
-                     padding: '4px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', 
+                     padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', 
                      background: otSymptoms[key] ? ACCENT : 'rgba(255,255,255,0.05)', 
                      color: otSymptoms[key] ? '#000' : 'rgba(255,255,255,0.7)', 
                      border: '1px solid ' + (otSymptoms[key] ? ACCENT : 'rgba(255,255,255,0.08)'),
@@ -322,20 +322,20 @@ export const DeloadSchedulerTab: React.FC = () => {
                          background: isDeload ? `linear-gradient(135deg, ${color}, ${color}88)` : color,
                          border: isDeload ? '2px solid #60a5fa' : '1px solid transparent',
                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                         fontSize: 9, fontWeight: 800, color: isDeload ? '#fff' : '#000',
+                         fontSize: 10, fontWeight: 800, color: isDeload ? '#fff' : '#000',
                          boxShadow: isDeload ? `0 0 8px ${color}66` : 'none',
                          transition: 'all 0.2s',
                        }}>
                          {w.week}
                        </div>
 
-                  <div style={{ fontSize: 9, color: color, fontWeight: 600, textAlign: 'center', lineHeight: 1.2 }}>
+                  <div style={{ fontSize: 10, color: color, fontWeight: 600, textAlign: 'center', lineHeight: 1.2 }}>
                     {PHASE_LABELS_RU[w.phase]}
                   </div>
                   <div style={{ height: 3, width: '100%', borderRadius: 2, background: 'rgba(255,255,255,0.04)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: Math.round(w.volumePercent) + '%', borderRadius: 2, background: color }} />
                   </div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>{w.volumePercent}%</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{w.volumePercent}%</div>
                 </div>
               );
             })}
@@ -347,7 +347,7 @@ export const DeloadSchedulerTab: React.FC = () => {
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>📋 Детальный понедельный план</div>
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '0.4fr 1fr 0.5fr 0.5fr 0.4fr 0.4fr', gap: 2, padding: '4px 8px', fontSize:9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', minWidth: 340 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '0.4fr 1fr 0.5fr 0.5fr 0.4fr 0.4fr', gap: 2, padding: '4px 8px', fontSize:10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', minWidth: 340 }}>
           <span>Нед</span><span>Фаза</span><span>Объём</span><span>Инт.</span><span>RPE</span><span>RIR</span>
         </div>
         {schedule.weeks.slice(0, 24).map((w, i) => {
@@ -363,7 +363,7 @@ export const DeloadSchedulerTab: React.FC = () => {
               minWidth: 340,
             }}>
               <span style={{ fontWeight: 700, color }}>{w.week}</span>
-              <span style={{ color, fontWeight: 600, fontSize: 9 }}>{PHASE_LABELS_RU[w.phase]}{isDeload ? ' ⬇' : ''}</span>
+              <span style={{ color, fontWeight: 600, fontSize: 10 }}>{PHASE_LABELS_RU[w.phase]}{isDeload ? ' ⬇' : ''}</span>
               <span style={{ color: 'rgba(255,255,255,0.7)' }}>{w.volumePercent}%</span>
               <span style={{ color: '#f59e0b' }}>{w.intensityPercent}%</span>
               <span style={{ color: '#a855f7' }}>{w.rpeTarget}</span>

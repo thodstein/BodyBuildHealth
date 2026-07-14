@@ -81,17 +81,17 @@ export const TimersTab: React.FC = () => {
 
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
       <div>
-        <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Работа (с)</label>
+        <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Работа (с)</label>
         <input type="number" min={5} max={600} value={totalSec || ''} onChange={e => setTotalSec(parseInt(e.target.value) || 60)} disabled={isRunning}
           style={{ width: '100%', padding: '8px', borderRadius: 8, textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }} />
       </div>
       <div>
-        <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Отдых (с)</label>
+        <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Отдых (с)</label>
         <input type="number" min={5} max={600} value={restSec || ''} onChange={e => setRestSec(parseInt(e.target.value) || 30)} disabled={isRunning}
           style={{ width: '100%', padding: '8px', borderRadius: 8, textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }} />
       </div>
       <div>
-        <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Раунды</label>
+        <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Раунды</label>
         <input type="number" min={1} max={20} value={rounds || ''} onChange={e => setRounds(parseInt(e.target.value) || 3)} disabled={isRunning}
           style={{ width: '100%', padding: '8px', borderRadius: 8, textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }} />
       </div>

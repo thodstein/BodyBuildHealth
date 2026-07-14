@@ -115,7 +115,7 @@ const ExerciseLabSubstitute: React.FC = () => {
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   }}>
                     <span style={{ fontWeight: 600 }}>{e.name}</span>
-                    <span style={{ fontSize: 8, color: canRep ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>
+                    <span style={{ fontSize: 10, color: canRep ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>
                       {canRep ? '✅ замена' : '⚠️ проверьте'}
                     </span>
                   </div>

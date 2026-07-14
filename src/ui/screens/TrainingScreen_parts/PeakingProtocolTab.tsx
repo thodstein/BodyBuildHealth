@@ -62,7 +62,7 @@ const PeakingProtocolTab: React.FC = () => {
               <span>Интенсивность {Math.round(w.intensityPct * 100)}%</span>
               {w.deloadBefore && <span style={{ color: '#ffaa00' }}>⚠ После делода</span>}
             </div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{w.focus}</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{w.focus}</div>
           </div>
         ))}
       </div>

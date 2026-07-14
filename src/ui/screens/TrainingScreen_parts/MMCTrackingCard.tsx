@@ -45,7 +45,7 @@ const MMCTrackingCard: React.FC = () => {
           <div key={i} style={{ marginBottom: 10, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, color: '#fff', marginBottom: 4 }}>
               <span>{a.exerciseName} {TREND_ICON[a.trend]}</span>
-              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{a.totalSets} сетов</span>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{a.totalSets} сетов</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10 }}>
               <div style={LABEL}>MMC: {a.avgMmc.toFixed(1)}/10{bar(a.avgMmc)}</div>

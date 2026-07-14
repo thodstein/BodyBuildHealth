@@ -24,6 +24,7 @@ import { generateCycle, type CycleType, type CycleInput, type CycleOutput, type 
 import { generateConjugateProgram, type ConjugateMode } from './conjugate.engine';
 import { generateMesocycleProgression, type MesocycleConfig, type MesoGoal } from './pro/mesocycle-progression.engine';
 import { taperPlan, taperWeeksForFatigue, peakWeekAttempts, type AttemptStrategy, type Lift, type TaperPlan } from './pro/taper.engine';
+import { detectMuscleGroup, coarsen } from './muscle-group';
 
 const DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
@@ -59,15 +60,7 @@ const GOAL_COMPOUND_PRIORITY: Record<string, number> = {
 };
 
 function detectGroup(name: string): string {
-  const n = name.toLowerCase();
-  if (/shoulder|плеч|delt|жим стоя|жим из-за головы|overhead press|military/.test(n)) return 'shoulders';
-  if (/squat|присед|leg|quad|ножн|выпад|lunge|ict/.test(n)) return 'legs';
-  if (/deadlift|станов|тяга|row|pull|спин|back|chin|lat|наклон|подтяг|гиперэкст|hyperext|shrug|шраг/.test(n)) return 'back';
-  if (/bench|жим|chest|груд/.test(n)) return 'chest';
-  if (/curl|бицеп|bicep/.test(n)) return 'arms';
-  if (/tricep|трицеп|француз/.test(n)) return 'arms';
-  if (/пресс|ab|core|скручив|crunch|sit|планк/.test(n)) return 'core';
-  return 'full';
+  return coarsen(detectMuscleGroup(name));
 }
 
 function isCompoundName(name: string): boolean {

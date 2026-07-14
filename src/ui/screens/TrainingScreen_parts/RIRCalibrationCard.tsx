@@ -56,13 +56,13 @@ export const RIRCalibrationCard: React.FC = () => {
             <div style={{ fontSize: 16, fontWeight: 800, color: Math.abs(stats.overallAvgBias) > 1.5 ? '#ef4444' : Math.abs(stats.overallAvgBias) > 0.5 ? '#eab308' : '#22c55e' }}>
               {stats.overallAvgBias.toFixed(2)}
             </div>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{stats.overallAvgBias > 0.5 ? 'Вы тяжелее, чем думаете' : stats.overallAvgBias < -0.5 ? 'Вы легче, чем думаете' : 'Точная оценка'}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{stats.overallAvgBias > 0.5 ? 'Вы тяжелее, чем думаете' : stats.overallAvgBias < -0.5 ? 'Вы легче, чем думаете' : 'Точная оценка'}</div>
           </MetricCard>
           <MetricCard title="Согласованность" accent={stats.overallConsistency >= 0.7 ? '#22c55e' : '#eab308'}>
             <div style={{ fontSize: 16, fontWeight: 800, color: stats.overallConsistency >= 0.7 ? '#22c55e' : '#eab308' }}>
               {(stats.overallConsistency * 100).toFixed(0)}%
             </div>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{stats.overallConsistency >= 0.7 ? 'Стабильная оценка' : 'Разброс >30%'}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{stats.overallConsistency >= 0.7 ? 'Стабильная оценка' : 'Разброс >30%'}</div>
           </MetricCard>
         </div>
 

@@ -118,7 +118,7 @@ export const LoadSafetyCard: React.FC = () => {
                     const list = injuries.split(',').map(s => s.trim()).filter(Boolean);
                     setInjuries(on ? list.filter(x => x !== inj).join(', ') : [...list, inj].join(', '));
                   }} style={{
-                    padding: '5px 10px', borderRadius: 14, fontSize: 9, fontWeight: 700, cursor: 'pointer',
+                    padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: 'pointer',
                     border: on ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)',
                     background: on ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.02)',
                     color: on ? '#f59e0b' : 'rgba(255,255,255,0.6)',

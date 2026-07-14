@@ -88,7 +88,7 @@ const ProAnalysisTab: React.FC = () => {
             <div key={fv} style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.15)', textAlign: 'center' }}>
               <div style={{ fontSize: 10, color: '#c084fc' }}>{fv.replace(/_/g, ' ')}</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: '#c084fc' }}>{count}</div>
-              <div style={{ fontSize: 8, color: DIM }}>упражнений</div>
+              <div style={{ fontSize: 10, color: DIM }}>упражнений</div>
             </div>
           ))}
         </div>
@@ -101,7 +101,7 @@ const ProAnalysisTab: React.FC = () => {
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', borderRadius: 4, marginBottom: 3, background: i === 0 ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.02)', fontSize: 10 }}>
               <span style={{ fontWeight: 600 }}>#{i + 1} {g.exercise.name}</span>
               <span style={{ color: '#22c55e' }}>{g.rp.score}/10</span>
-              <span style={{ color: DIM, fontSize: 8 }}>{g.exercise.type === 'compound' ? 'База' : 'Изол.'}</span>
+              <span style={{ color: DIM, fontSize: 10 }}>{g.exercise.type === 'compound' ? 'База' : 'Изол.'}</span>
             </div>
           ))
         ) : <div style={{ fontSize: 10, color: DIM, padding: 8 }}>Нет stretch-mediated упражнений в этой группе.</div>}
@@ -111,17 +111,17 @@ const ProAnalysisTab: React.FC = () => {
         <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 8 }}>📍 Покрытие подрегионов: {regionalCoverage.covered.length}/{regionalCoverage.total}</div>
         {regionalCoverage.covered.length > 0 && (
           <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 9, color: '#22c55e', fontWeight: 600, marginBottom: 2 }}>✅ Покрыты:</div>
+            <div style={{ fontSize: 10, color: '#22c55e', fontWeight: 600, marginBottom: 2 }}>✅ Покрыты:</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-              {regionalCoverage.covered.map(r => <span key={r} style={{ padding: '2px 8px', borderRadius: 10, fontSize: 8, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{r}</span>)}
+              {regionalCoverage.covered.map(r => <span key={r} style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{r}</span>)}
             </div>
           </div>
         )}
         {regionalCoverage.uncovered.length > 0 && (
           <div>
-            <div style={{ fontSize: 9, color: '#ef4444', fontWeight: 600, marginBottom: 2 }}>❌ Не покрыты:</div>
+            <div style={{ fontSize: 10, color: '#ef4444', fontWeight: 600, marginBottom: 2 }}>❌ Не покрыты:</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-              {regionalCoverage.uncovered.map(r => <span key={r} style={{ padding: '2px 8px', borderRadius: 10, fontSize: 8, background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>{r}</span>)}
+              {regionalCoverage.uncovered.map(r => <span key={r} style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>{r}</span>)}
             </div>
           </div>
         )}
@@ -131,7 +131,7 @@ const ProAnalysisTab: React.FC = () => {
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fb923c', marginBottom: 8 }}>🔗 Сила синергии: лучшие пары</div>
         {synergyPairs.length > 0 ? (
           synergyPairs.map((p, i) => (
-            <div key={i} style={{ padding: '6px 8px', borderRadius: 6, marginBottom: 4, background: 'rgba(251,146,60,0.04)', border: '1px solid rgba(251,146,60,0.1)', fontSize: 9 }}>
+            <div key={i} style={{ padding: '6px 8px', borderRadius: 6, marginBottom: 4, background: 'rgba(251,146,60,0.04)', border: '1px solid rgba(251,146,60,0.1)', fontSize: 10 }}>
               <div style={{ fontWeight: 700, color: '#fff', marginBottom: 2 }}>{p.a} + {p.b}</div>
               <div style={{ color: DIM }}>{p.type}: {p.reason}</div>
             </div>
@@ -142,7 +142,7 @@ const ProAnalysisTab: React.FC = () => {
       <div style={{ ...CARD, border: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: DIM, marginBottom: 8 }}>📋 Полная таблица анализа</div>
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: '2px 4px', fontSize:9, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 4, marginBottom: 4, minWidth: 340 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: '2px 4px', fontSize:10, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 4, marginBottom: 4, minWidth: 340 }}>
           <span style={{ color: DIM }}>Упражнение</span>
           <span style={{ color: DIM, textAlign: 'center' }}>Профиль</span>
           <span style={{ color: DIM, textAlign: 'center' }}>Force-вектор</span>
@@ -150,7 +150,7 @@ const ProAnalysisTab: React.FC = () => {
           <span style={{ color: DIM, textAlign: 'center' }}>Безоп.</span>
         </div>
         {groupExercises.map((g, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: '2px 4px', padding: '3px 0', fontSize:9, borderBottom: '1px solid rgba(255,255,255,0.02)', minWidth: 340 }}>
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: '2px 4px', padding: '3px 0', fontSize:10, borderBottom: '1px solid rgba(255,255,255,0.02)', minWidth: 340 }}>
             <span style={{ fontWeight: 600, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{g.exercise.name}</span>
             <span style={{ textAlign: 'center', color: g.rp.curve === 'stretch_mediated' ? '#22c55e' : g.rp.curve === 'mid_range' ? '#60a5fa' : '#f59e0b' }}>{g.rp.score}/10</span>
             <span style={{ textAlign: 'center', color: '#c084fc' }}>{g.fv.replace(/_/g, ' ')}</span>

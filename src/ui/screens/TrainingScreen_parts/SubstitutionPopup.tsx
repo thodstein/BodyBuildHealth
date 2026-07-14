@@ -55,7 +55,7 @@ const BioLine: React.FC<{ bio?: ExerciseBio }> = ({ bio }) => {
   const js = bio.jointStress;
   const strs = Object.entries(js || {}).map(([k, v]) => `${STRESS_KEYS_RU[k] || k} ${v}/10`);
   return (
-    <div style={{ marginBottom: 4, background: 'rgba(59,130,246,0.04)', borderRadius: 8, padding: '5px 8px', fontSize: 8, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4 }}>
+    <div style={{ marginBottom: 4, background: 'rgba(59,130,246,0.04)', borderRadius: 8, padding: '5px 8px', fontSize: 10, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4 }}>
       🔬 Биомеханика: {strs.join(', ')} | Сложность: {bio.difficulty}/10 | ЦНС: {bio.cnsDemand}/5
       {bio.primaryMuscles?.length > 0 && <div style={{ marginTop: 2 }}>🎯 Цель: {bio.primaryMuscles.join(', ')}{bio.secondaryMuscles?.length ? ' + ' + bio.secondaryMuscles.join(', ') : ''}</div>}
     </div>
@@ -172,7 +172,7 @@ export const SubstitutionPopup: React.FC<Props> = ({ exerciseName, group, onSele
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{opt.name}</span>
                   <span style={{
-                    fontSize: 8, fontWeight: 800, padding: '1px 6px', borderRadius: 4, textTransform: 'uppercase',
+                    fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 4, textTransform: 'uppercase',
                     background: opt.type === 'compound' ? 'rgba(0,230,138,0.15)' : 'rgba(96,165,250,0.15)',
                     color: opt.type === 'compound' ? ACCENT : '#60a5fa',
                     border: `0.5px solid ${opt.type === 'compound' ? ACCENT : '#60a5fa'}40`,
@@ -181,32 +181,32 @@ export const SubstitutionPopup: React.FC<Props> = ({ exerciseName, group, onSele
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
-                  <span style={{ fontSize: 9, color: DIM }}>
+                  <span style={{ fontSize: 10, color: DIM }}>
                     {opt.equipment}
                   </span>
                   <span style={{
-                    fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
+                    fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
                     background: (DIFF_COLORS[opt.difficulty] || '#666') + '20',
                     color: DIFF_COLORS[opt.difficulty] || '#666',
                   }}>
                     {opt.difficulty === 'beginner' ? 'новичок' : opt.difficulty === 'intermediate' ? 'средний' : opt.difficulty === 'advanced' ? 'продвинутый' : opt.difficulty}
                   </span>
-                  <span style={{ fontSize: 9, color: opt.jointStress === 'high' ? '#ef4444' : opt.jointStress === 'med' ? '#f59e0b' : '#22c55e' }}>
+                  <span style={{ fontSize: 10, color: opt.jointStress === 'high' ? '#ef4444' : opt.jointStress === 'med' ? '#f59e0b' : '#22c55e' }}>
                     {STRESS_ICONS[opt.jointStress] || ''} {opt.jointStress === 'high' ? 'высокая' : opt.jointStress === 'med' ? 'средняя' : 'низкая'} нагрузка
                   </span>
                 </div>
                 {opt.reason && (
-                  <div style={{ fontSize: 9, color: '#60a5fa', fontStyle: 'italic' }}>
+                  <div style={{ fontSize: 10, color: '#60a5fa', fontStyle: 'italic' }}>
                     ↳ {opt.reason}
                   </div>
                 )}
                 {opt.technique && (
-                  <div style={{ fontSize: 9, color: DIM, marginTop: 1 }}>
+                  <div style={{ fontSize: 10, color: DIM, marginTop: 1 }}>
                     🎯 {opt.technique}
                   </div>
                 )}
                 {opt.description && (
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 1, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 1, lineHeight: 1.4 }}>
                     📝 {opt.description}
                   </div>
                 )}

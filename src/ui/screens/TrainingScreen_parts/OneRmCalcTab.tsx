@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { estimate1RMFormula, estimate1RMConsensus, type RMFormula } from '../../../engines/pro/estimate1rm.engine';
 import { applyToPlanner } from './planner-bridge';
+import { PopupNumber } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
-const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const, fontSize: 12, textAlign: 'center' as const };
+const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.7)', fontSize: 12, lineHeight: 1.5 };
 const FORMULAS: RMFormula[] = ['epley', 'brzycki', 'lander', 'lombardi', 'mayhew', 'oconner', 'wathen'];
 const RU: Record<string, string> = { epley: 'Epley', brzycki: 'Brzycki', lander: 'Lander', lombardi: 'Lombardi', mayhew: 'Mayhew', oconner: "O'Conner", wathen: 'Wathen' };
 
@@ -27,18 +27,12 @@ export const OneRmCalcTab: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>🎯 Калькулятор 1RM (оценка максимума)</div>
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>Введите вес и повторения в рабочем сете — оценка 1RM по 7 формулам + консенсус и таблица %1RM.</div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>🎯 Калькулятор 1ПМ (оценка максимума)</div>
+      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 10, lineHeight: 1.5 }}>Введите вес и повторения в рабочем сете — оценка 1ПМ по 7 формулам + консенсус и таблица %1ПМ.</div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-        <div>
-          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Вес, кг</label>
-          <input type="number" value={weight} min={0} max={500} onChange={e => setWeight(+e.target.value)} style={IN} />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Повторения</label>
-          <input type="number" value={reps} min={1} max={20} onChange={e => setReps(+e.target.value)} style={IN} />
-        </div>
+        <PopupNumber label="Вес, кг" value={weight} min={0} max={500} suffix=" кг" hint="Вес штанги в рабочем подходе" onChange={setWeight} />
+        <PopupNumber label="Повторения" value={reps} min={1} max={20} hint="Количество чистых повторений" onChange={setReps} />
       </div>
 
       {!results ? (
@@ -65,7 +59,7 @@ export const OneRmCalcTab: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4 }}>
             {pctTable.map(t => (
               <div key={t.p} style={{ padding: '6px 2px', borderRadius: 6, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.12)', textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{t.p}%</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{t.p}%</div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa' }}>{t.kg}</div>
               </div>
             ))}

@@ -11,7 +11,6 @@ import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
   import { RisksTab } from './BioStackAIRisks';
   import { CompareTab } from './BioStackAICompare';
   import { ReportsTab } from './BioStackAIReports';
-  import BioStackAIData from './BioStackAIData';
   import { selectStack } from '../../engines/biostack-clinical-v2.engine';
   import { StackPicker } from '../screens/SupplementClinicScreen_parts/StackPicker';
   import { InteractionPanel } from '../screens/SupplementClinicScreen_parts/InteractionPanel';
@@ -130,7 +129,6 @@ export const BioStackAIScreen: React.FC = () => {
   const renderSubContent = (): React.ReactNode => {
     switch (tab) {
       case 'profile':
-        if (activeSub === 'auto') return <BioStackAIData profile={profile} onChange={setProfile} />;
         return <ProfileTab profile={profile} setProfile={setProfile} setStackIds={setStackIdsAndSync} />;
 
       case 'select':

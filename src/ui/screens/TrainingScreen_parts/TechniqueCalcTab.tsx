@@ -77,7 +77,7 @@ function lvl(v: number, max: number): string {
 }
 
 const card: React.CSSProperties = { background: BG, borderRadius: 10, border: `1px solid ${BORDER}`, padding: '12px 14px', marginBottom: 8 };
-const pill: React.CSSProperties = { display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 9, fontWeight: 600, marginRight: 6, marginBottom: 4 };
+const pill: React.CSSProperties = { display: 'inline-block', padding: '3px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600, marginRight: 6, marginBottom: 4 };
 const sectionTitle: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: ACCENT, margin: '12px 0 6px', borderBottom: '1px solid rgba(0,230,138,0.15)', paddingBottom: 4 };
 const chipRow: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 };
 const filterBtn = (active: boolean): React.CSSProperties => ({
@@ -160,34 +160,34 @@ export const TechniqueCalcTab: React.FC = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8, marginBottom: 10 }}>
         <PopupSelect label="Целевая группа мышц" value={group} options={GROUPS.map(g => ({ id: g, label: GROUP_RU[g], desc: '' }))} hint="Фильтр по целевой группе" onChange={v => { setGroup(v); setExpandedEx(null); }} />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{ fontSize: 9, color: DIM, fontWeight: 600, marginBottom: 4 }}>Поиск по названию</div>
+          <div style={{ fontSize: 10, color: DIM, fontWeight: 600, marginBottom: 4 }}>Поиск по названию</div>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Название упражнения…" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 11, boxSizing: 'border-box', width: '100%' }} />
         </div>
       </div>
 
       {/* ── Быстрые фильтры-чипсы ── */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10, alignItems: 'center' }}>
-        <span style={{ fontSize: 9, color: DIM, fontWeight: 600, marginRight: 2 }}>Тип:</span>
+        <span style={{ fontSize: 10, color: DIM, fontWeight: 600, marginRight: 2 }}>Тип:</span>
         {(['all','compound','isolation'] as const).map(t => (
           <button key={t} onClick={() => setFilterType(t)} style={filterBtn(filterType === t)}>{t === 'all' ? 'Все' : TYPE_RU[t]}</button>
         ))}
-        <span style={{ fontSize: 9, color: DIM, fontWeight: 600, marginLeft: 8, marginRight: 2 }}>Уровень:</span>
+        <span style={{ fontSize: 10, color: DIM, fontWeight: 600, marginLeft: 8, marginRight: 2 }}>Уровень:</span>
         {(['all','beginner','intermediate','advanced'] as const).map(d => (
           <button key={d} onClick={() => setFilterDiff(d)} style={filterBtn(filterDiff === d)}>{d === 'all' ? 'Все' : d === 'beginner' ? 'Новичок' : d === 'advanced' ? 'Продв.' : 'Средний'}</button>
         ))}
-        <span style={{ fontSize: 9, color: DIM, fontWeight: 600, marginLeft: 8, marginRight: 2 }}>Оборуд.:</span>
-        <select value={filterEquip} onChange={e => setFilterEquip(e.target.value)} style={{ padding: '3px 8px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.3)', color: DIM, fontSize: 10 }}>
-          {equipmentOptions.map(eq => <option key={eq} value={eq}>{eq === 'all' ? 'Всё оборудование' : EQUIP_RU[eq] || eq}</option>)}
-        </select>
-        <span style={{ fontSize: 9, color: DIM, fontWeight: 600, marginLeft: 8, marginRight: 2 }}>Щадящий:</span>
-        <select value={filterJoint} onChange={e => setFilterJoint(e.target.value)} style={{ padding: '3px 8px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.3)', color: DIM, fontSize: 10 }}>
-          <option value="all">Все суставы</option>
-          <option value="spine">Щадить позвоночник</option>
-          <option value="knee">Щадить колени</option>
-          <option value="shoulder">Щадить плечи</option>
-          <option value="elbow">Щадить локти</option>
-          <option value="hip">Щадить таз</option>
-        </select>
+        <div style={{ minWidth: 150 }}>
+          <PopupSelect label="Оборудование" value={filterEquip} options={equipmentOptions.map(eq => ({ id: eq, label: eq === 'all' ? 'Всё оборудование' : EQUIP_RU[eq] || eq, desc: '' }))} onChange={setFilterEquip} />
+        </div>
+        <div style={{ minWidth: 150 }}>
+          <PopupSelect label="Щадящий режим" value={filterJoint} options={[
+            { id: 'all', label: 'Все суставы', desc: '' },
+            { id: 'spine', label: 'Щадить позвоночник', desc: '' },
+            { id: 'knee', label: 'Щадить колени', desc: '' },
+            { id: 'shoulder', label: 'Щадить плечи', desc: '' },
+            { id: 'elbow', label: 'Щадить локти', desc: '' },
+            { id: 'hip', label: 'Щадить таз', desc: '' },
+          ]} onChange={setFilterJoint} />
+        </div>
         <button onClick={() => setShowFavOnly(v => !v)} style={filterBtn(showFavOnly)}>⭐ Избранное ({favorites.length})</button>
       </div>
 
@@ -236,7 +236,7 @@ export const TechniqueCalcTab: React.FC = () => {
                   }}>
                     <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: -1 }}>{score.total}</div>
                   </div>
-                  <div style={{ fontSize: 8, color: getRiskColor(score.level), marginTop: 2, fontWeight: 700 }}>{score.label}</div>
+                  <div style={{ fontSize: 10, color: getRiskColor(score.level), marginTop: 2, fontWeight: 700 }}>{score.label}</div>
                 </div>
               </div>
               {ex.technique && (
@@ -264,7 +264,7 @@ export const TechniqueCalcTab: React.FC = () => {
                       <div style={{ height: '100%', width: `${(b.value / b.max) * 100}%`, borderRadius: 4, background: lvl(b.value, b.max), transition: 'width 0.3s' }} />
                     </div>
                     <div style={{ width: 32, textAlign: 'right', fontWeight: 700, color: lvl(b.value, b.max) }}>{b.value}</div>
-                    <div style={{ width: 20, color: 'rgba(255,255,255,0.2)', fontSize: 9 }}>/ {b.max}</div>
+                    <div style={{ width: 22, color: 'rgba(255,255,255,0.35)', fontSize: 10 }}>/ {b.max}</div>
                   </div>
                 ))}
 
@@ -300,7 +300,7 @@ export const TechniqueCalcTab: React.FC = () => {
                     <div style={sectionTitle}>💡 Ключевые подсказки (cues)</div>
                     <div style={chipRow}>
                       {cues.map((c: any, i: number) => (
-                        <span key={i} style={{ ...pill, background: c.priority === 'critical' ? 'rgba(239,68,68,0.12)' : c.priority === 'important' ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', color: c.priority === 'critical' ? '#f87171' : c.priority === 'important' ? '#fbbf24' : DIM, fontSize: 9 }}>
+                        <span key={i} style={{ ...pill, background: c.priority === 'critical' ? 'rgba(239,68,68,0.12)' : c.priority === 'important' ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', color: c.priority === 'critical' ? '#f87171' : c.priority === 'important' ? '#fbbf24' : DIM }}>
                           {c.priority === 'critical' ? '⚡' : c.priority === 'important' ? '📌' : '💬'} {c.cue}
                         </span>
                       ))}
@@ -310,7 +310,7 @@ export const TechniqueCalcTab: React.FC = () => {
                 {cues.length === 0 && (bio?.techniqueCues?.length ?? 0) > 0 && (
                   <>
                     <div style={sectionTitle}>💡 Ключевые подсказки</div>
-                    <div style={chipRow}>{bio!.techniqueCues!.map((cue: string, i: number) => <span key={i} style={{ ...pill, background: 'rgba(0,230,138,0.08)', color: ACCENT, fontSize: 9 }}>{cue}</span>)}</div>
+                    <div style={chipRow}>{bio!.techniqueCues!.map((cue: string, i: number) => <span key={i} style={{ ...pill, background: 'rgba(0,230,138,0.08)', color: ACCENT }}>{cue}</span>)}</div>
                   </>
                 )}
 
@@ -321,8 +321,8 @@ export const TechniqueCalcTab: React.FC = () => {
                     {errors.map((e: any, i: number) => (
                       <div key={i} style={{ marginBottom: 6, padding: '8px 10px', background: 'rgba(239,68,68,0.05)', borderRadius: 6, border: '1px solid rgba(239,68,68,0.1)' }}>
                         <div style={{ fontSize: 10, fontWeight: 700, color: '#f87171' }}>{e.error}</div>
-                        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Причина: {e.cause}</div>
-                        <div style={{ fontSize: 9, color: '#22c55e', marginTop: 2 }}>Исправление: {e.fix}</div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>Причина: {e.cause}</div>
+                        <div style={{ fontSize: 10, color: '#22c55e', marginTop: 2 }}>Исправление: {e.fix}</div>
                       </div>
                     ))}
                   </>
@@ -368,7 +368,7 @@ export const TechniqueCalcTab: React.FC = () => {
                       {subList.map((s: any) => (
                         <div key={s.id} style={{ background: 'rgba(168,85,247,0.06)', borderRadius: 6, padding: '4px 8px', border: '1px solid rgba(168,85,247,0.1)' }}>
                           <span style={{ color: '#c084fc', fontWeight: 600 }}>{getExerciseById(s.id)?.name || s.id}</span>
-                          {s.reason && <span style={{ color: DIM, marginLeft: 4, fontSize: 9 }}>— {s.reason}</span>}
+                          {s.reason && <span style={{ color: DIM, marginLeft: 4, fontSize: 10 }}>— {s.reason}</span>}
                         </div>
                       ))}
                     </div>
@@ -386,9 +386,9 @@ export const TechniqueCalcTab: React.FC = () => {
                         const maxVal = Math.max(...(Object.values(val).filter((v: any) => typeof v === 'number') as number[]));
                         return (
                           <div key={joint} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '6px 8px', textAlign: 'center' }}>
-                            <div style={{ fontSize: 8, color: DIM, marginBottom: 3 }}>{JOINT_RU[joint] || joint}</div>
-                            <div style={{ fontSize: 14, fontWeight: 800, color: getRiskColor(level) }}>{maxVal}</div>
-                            <div style={{ fontSize: 7, color: getRiskColor(level) }}>{level === 'high' ? 'Высокая' : level === 'medium' ? 'Средняя' : 'Низкая'}</div>
+                            <div style={{ fontSize: 10, color: DIM, marginBottom: 3 }}>{JOINT_RU[joint] || joint}</div>
+                            <div style={{ fontSize: 15, fontWeight: 800, color: getRiskColor(level) }}>{maxVal}</div>
+                            <div style={{ fontSize: 10, color: getRiskColor(level) }}>{level === 'high' ? 'Высокая' : level === 'medium' ? 'Средняя' : 'Низкая'}</div>
                           </div>
                         );
                       })}
@@ -437,8 +437,8 @@ export const TechniqueCalcTab: React.FC = () => {
                     return (
                       <div key={i} style={{ flex: 1, textAlign: 'center', background: `${colors[i]}14`, borderRadius: 8, padding: '6px 4px', border: `1px solid ${colors[i]}22` }}>
                         <div style={{ fontSize: 18, fontWeight: 800, color: colors[i] }}>{sec === 0 ? 'X' : sec}</div>
-                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{labels[i]}</div>
-                        <div style={{ fontSize: 8, color: colors[i] }}>{i === 0 ? `${sec}c` : i === 2 ? (sec === 0 ? 'взрыв' : `${sec}c`) : `${sec}c`}</div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{labels[i]}</div>
+                        <div style={{ fontSize: 10, color: colors[i] }}>{i === 0 ? `${sec}c` : i === 2 ? (sec === 0 ? 'взрыв' : `${sec}c`) : `${sec}c`}</div>
                       </div>
                     );
                   })}
@@ -447,7 +447,7 @@ export const TechniqueCalcTab: React.FC = () => {
                   <div style={{ background: 'rgba(59,130,246,0.06)', borderRadius: 6, padding: 6, textAlign: 'center' }}><div style={{ color: DIM }}>Паттерн</div><div style={{ fontWeight: 800, color: '#60a5fa' }}>{tempoRes.pattern}</div></div>
                   <div style={{ background: 'rgba(59,130,246,0.06)', borderRadius: 6, padding: 6, textAlign: 'center' }}><div style={{ color: DIM }}>RPE / RIR</div><div style={{ fontWeight: 800, color: '#60a5fa' }}>{tempoRes.targetRPE} / {tempoRes.targetRIR}</div></div>
                 </div>
-                <div style={{ fontSize: 9, color: DIM, marginTop: 4, fontStyle: 'italic' }}>{tempoRes.rationale}</div>
+                <div style={{ fontSize: 10, color: DIM, marginTop: 4, fontStyle: 'italic' }}>{tempoRes.rationale}</div>
 
                 {/* Безопасность */}
                 <div style={sectionTitle}>🛡 Оценка безопасности (safety score: {safety.score}/100)</div>
@@ -521,7 +521,7 @@ export const TechniqueCalcTab: React.FC = () => {
                   }
                   if (checklist.length === 0) checklist.push('[ ] Контролируйте полную амплитуду движения');
                   return (
-                    <div style={{ fontSize: 9, color: DIM, background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '8px 10px', lineHeight: 1.8, fontFamily: 'monospace', maxHeight: 200, overflowY: 'auto' }}>
+                    <div style={{ fontSize: 10, color: DIM, background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '8px 10px', lineHeight: 1.8, fontFamily: 'monospace', maxHeight: 200, overflowY: 'auto' }}>
                       {checklist.map((item, i) => <div key={i}>{item.startsWith('[ ]') ? item : `[ ] ${item}`}</div>)}
                     </div>
                   );
@@ -668,7 +668,7 @@ export const TechniqueCalcTab: React.FC = () => {
                       <td style={{ padding: '6px 8px', textAlign: 'center', color: romCount >= 3 ? '#f59e0b' : '#22c55e' }}>{romCount || '—'}</td>
                       <td style={{ padding: '6px 8px', textAlign: 'center', color: getRiskColor(safety.level) }}>{safety.level === 'safe' ? '✅' : safety.level === 'moderate' ? '⚠️' : '❌'}</td>
                       <td style={{ padding: '6px 8px', textAlign: 'center' }}>
-                        <span style={{ color: ex.difficulty === 'beginner' ? '#22c55e' : ex.difficulty === 'advanced' ? '#ef4444' : '#f59e0b', fontSize: 9, fontWeight: 600 }}>
+                        <span style={{ color: ex.difficulty === 'beginner' ? '#22c55e' : ex.difficulty === 'advanced' ? '#ef4444' : '#f59e0b', fontSize: 10, fontWeight: 600 }}>
                           {ex.difficulty === 'beginner' ? 'Нов' : ex.difficulty === 'advanced' ? 'Про' : 'Ср'}
                         </span>
                       </td>

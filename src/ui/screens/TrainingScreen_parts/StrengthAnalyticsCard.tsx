@@ -64,7 +64,7 @@ export const StrengthAnalyticsCard: React.FC = () => {
         <div style={{ width: Math.min(100, pct) + '%', height: '100%', background: pct >= 70 ? '#00e68a' : pct >= 40 ? '#eab308' : '#ef4444', borderRadius: 4 }} />
       </div>
       <span style={{ fontSize: 11, fontWeight: 700, color: pct >= 70 ? '#00e68a' : pct >= 40 ? '#eab308' : '#ef4444', minWidth: 32, textAlign: 'right' }}>{pct}%</span>
-      {level && <span style={{ fontSize: 9, color: DIM, minWidth: 70 }}>{LEVEL_RU[level] || level}</span>}
+      {level && <span style={{ fontSize: 10, color: DIM, minWidth: 70 }}>{LEVEL_RU[level] || level}</span>}
     </div>
   );
 
@@ -100,10 +100,10 @@ export const StrengthAnalyticsCard: React.FC = () => {
       <div style={CARD}>
         <div style={H}>⚖️ Соотношения</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 11 }}>
-          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><span style={{ color: DIM, fontSize: 9 }}>Присед/Тяга</span><div style={{ fontWeight: 700 }}>{ratios.squatToDeadlift}%</div></div>
-          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><span style={{ color: DIM, fontSize: 9 }}>Жим/Присед</span><div style={{ fontWeight: 700 }}>{ratios.benchToSquat}%</div></div>
-          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><span style={{ color: DIM, fontSize: 9 }}>Жим стоя/Жим</span><div style={{ fontWeight: 700 }}>{ratios.overheadToBench || 0}%</div></div>
-          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><span style={{ color: DIM, fontSize: 9 }}>Push/Pull</span><div style={{ fontWeight: 700 }}>{ratios.pushPullRatio}%</div></div>
+          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><span style={{ color: DIM, fontSize: 10 }}>Присед/Тяга</span><div style={{ fontWeight: 700 }}>{ratios.squatToDeadlift}%</div></div>
+          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><span style={{ color: DIM, fontSize: 10 }}>Жим/Присед</span><div style={{ fontWeight: 700 }}>{ratios.benchToSquat}%</div></div>
+          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><span style={{ color: DIM, fontSize: 10 }}>Жим стоя/Жим</span><div style={{ fontWeight: 700 }}>{ratios.overheadToBench || 0}%</div></div>
+          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><span style={{ color: DIM, fontSize: 10 }}>Push/Pull</span><div style={{ fontWeight: 700 }}>{ratios.pushPullRatio}%</div></div>
         </div>
         {issues.length === 0
           ? <div style={{ fontSize: 10, color: '#22c55e', marginTop: 8 }}>✓ Дисбалансов не обнаружено — пропорции в норме.</div>

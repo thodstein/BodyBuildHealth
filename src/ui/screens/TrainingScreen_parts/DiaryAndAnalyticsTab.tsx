@@ -161,7 +161,7 @@ export const DiaryAndAnalyticsTab: React.FC<DiaryAndAnalyticsTabProps> = ({ diar
         <div style={{ ...style.card, border: '1px solid rgba(0,230,138,0.12)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Текущая программа</div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Текущая программа</div>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{macrocycle.totalWeeks}-нед макроцикл</div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Фаза: <b>{PHASE_RU[curPhase.type] || curPhase.type}</b> · Нед {selectedWeek}</div>
             </div>
@@ -180,32 +180,32 @@ export const DiaryAndAnalyticsTab: React.FC<DiaryAndAnalyticsTabProps> = ({ diar
           {/* Date + Duration + RPE row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
             <div>
-              <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Дата</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Дата</label>
               <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} style={style.input} />
             </div>
             <div>
-              <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Длительность (мин)</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Длительность (мин)</label>
               <input type="number" min={1} value={logDuration} onChange={e => setLogDuration(parseInt(e.target.value) || 0)} style={style.input} />
             </div>
             <div>
-              <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>RPE (1-10)</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>RPE (1-10)</label>
               <input type="number" min={1} max={10} value={logRPE} onChange={e => setLogRPE(parseInt(e.target.value) || 5)} style={style.input} />
             </div>
           </div>
           {/* Recovery + Split + Felt row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
             <div>
-              <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Восстановление (1-10)</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Восстановление (1-10)</label>
               <input type="number" min={1} max={10} value={logRecovery} onChange={e => setLogRecovery(parseInt(e.target.value) || 5)} style={style.input} />
             </div>
             <div>
-              <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Сплит</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Сплит</label>
               <select value={logSplit} onChange={e => setLogSplit(e.target.value)} style={style.input}>
                 {Object.entries(SP_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Самочувствие</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Самочувствие</label>
               <select value={logFelt} onChange={e => setLogFelt(parseInt(e.target.value))} style={style.input}>
                 {FELT_LABELS.map((l, i) => <option key={i} value={i}>{l}</option>)}
               </select>
@@ -213,29 +213,29 @@ export const DiaryAndAnalyticsTab: React.FC<DiaryAndAnalyticsTabProps> = ({ diar
           </div>
           {/* Notes */}
           <div style={{ marginBottom: 8 }}>
-            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Заметки</label>
+            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Заметки</label>
             <input type="text" value={logNotes} onChange={e => setLogNotes(e.target.value)} placeholder="Самочувствие, особенности, инвентарь..." style={style.input} />
           </div>
           {/* Add exercise */}
           <div style={style.label}>🏋️ Упражнения</div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr 1fr auto' : '1fr 0.5fr 0.5fr 0.5fr auto', gap: 4, marginBottom: 6, alignItems: 'end' }}>
             <div style={isMobile ? { gridColumn: '1 / -1' } : undefined}>
-              <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Упражнение</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Упражнение</label>
               <select value={exId} onChange={e => setExId(e.target.value)} style={style.input}>
                 <option value="">— Выбрать —</option>
                 {EXERCISE_CATALOG.slice(0, 50).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Вес (кг)</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
               <input type="number" value={exW} onChange={e => setExW(parseFloat(e.target.value) || 0)} style={style.input} />
             </div>
             <div>
-              <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Повт</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Повт</label>
               <input type="number" value={exR} onChange={e => setExR(parseInt(e.target.value) || 0)} style={style.input} />
             </div>
             <div>
-              <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>RIR</label>
+              <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>RIR</label>
               <input type="number" min={0} max={5} value={exRI} onChange={e => setExRI(parseInt(e.target.value) || 0)} style={style.input} />
             </div>
             <button onClick={addExercise} disabled={!exId} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--accent)', background: exId ? 'rgba(0,230,138,0.12)' : 'transparent', color: exId ? 'var(--accent)' : 'var(--text-dim)', cursor: exId ? 'pointer' : 'not-allowed', fontSize: 11, whiteSpace: 'nowrap' }}>+ Добавить</button>
@@ -293,7 +293,7 @@ export const DiaryAndAnalyticsTab: React.FC<DiaryAndAnalyticsTabProps> = ({ diar
               </div>
               {/* Volume bar chart */}
               <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>📈 Тоннаж по неделям</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>📈 Тоннаж по неделям</div>
                 <div style={{ display: 'flex', gap: 2, height: 50, alignItems: 'flex-end' }}>
                   {diaryProgress.slice(-12).map((w, i) => {
                     const maxVol = Math.max(...diaryProgress.map(w => w.totalVolume), 1);
@@ -301,7 +301,7 @@ export const DiaryAndAnalyticsTab: React.FC<DiaryAndAnalyticsTabProps> = ({ diar
                     return (
                       <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                         <div style={{ width: '70%', height: `${h}%`, background: w.totalVolume === maxVol ? 'var(--accent)' : 'rgba(0,230,138,0.3)', borderRadius: '2px 2px 0 0' }} />
-                        <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{w.week}</span>
+                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{w.week}</span>
                       </div>
                     );
                   })}
@@ -364,25 +364,25 @@ export const DiaryAndAnalyticsTab: React.FC<DiaryAndAnalyticsTabProps> = ({ diar
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
                 <div style={style.card}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Объём/нед</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Объём/нед</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: ACCENT }}>{analytics.volume.weeklyVolumeKg.toLocaleString()} кг</div>
-                  <div style={{ fontSize: 9, color: analytics.volume.volumeTrend >= 0 ? '#22c55e' : '#ef4444' }}>
+                  <div style={{ fontSize: 10, color: analytics.volume.volumeTrend >= 0 ? '#22c55e' : '#ef4444' }}>
                     {analytics.volume.volumeTrend >= 0 ? '↑' : '↓'} {Math.abs(analytics.volume.volumeTrend)}% vs пред.
                   </div>
                 </div>
                 <div style={style.card}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Интенсивность</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Интенсивность</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: '#60a5fa' }}>{analytics.intensity.avgIntensity}%</div>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>RPE avg: {analytics.intensity.avgRPE}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>RPE avg: {analytics.intensity.avgRPE}</div>
                 </div>
                 <div style={style.card}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Усталость</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Усталость</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: analytics.fatigue.weeklyFatigue > 0.7 ? '#ef4444' : analytics.fatigue.weeklyFatigue > 0.4 ? '#f59e0b' : '#22c55e' }}>
                     {Math.round(analytics.fatigue.weeklyFatigue * 100)}%
                   </div>
                 </div>
                 <div style={style.card}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Готовность</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Готовность</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: analytics.recovery.readinessEstimate > 60 ? '#22c55e' : analytics.recovery.readinessEstimate > 40 ? '#f59e0b' : '#ef4444' }}>
                     {analytics.recovery.readinessEstimate}%
                   </div>
@@ -396,7 +396,7 @@ export const DiaryAndAnalyticsTab: React.FC<DiaryAndAnalyticsTabProps> = ({ diar
                   <div style={{ width: `${analytics.intensity.intensityDistribution.hypertrophy}%`, background: '#f59e0b' }} />
                   <div style={{ width: `${analytics.intensity.intensityDistribution.endurance}%`, background: '#22c55e' }} />
                 </div>
-                <div style={{ display: 'flex', gap: 10, fontSize: 9, color: 'var(--text-dim)' }}>
+                <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--text-dim)' }}>
                   <span>🔴 Сила {analytics.intensity.intensityDistribution.strength}%</span>
                   <span>🟠 Гипертрофия {analytics.intensity.intensityDistribution.hypertrophy}%</span>
                   <span>🟢 Выносливость {analytics.intensity.intensityDistribution.endurance}%</span>
@@ -417,7 +417,7 @@ export const DiaryAndAnalyticsTab: React.FC<DiaryAndAnalyticsTabProps> = ({ diar
                       </div>
                     ))}
                   </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
                     {groups.filter(g => (wsg[g]?.reduce((s: number, x: number) => s + x, 0) || 0) > 0).map(g => (
                       <span key={g} style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ width: 6, height: 6, borderRadius: 1, background: GROUP_COLORS[g] || '#888', display: 'inline-block' }} />{GRP_RU[g] || g}</span>
                     ))}
@@ -436,7 +436,7 @@ export const DiaryAndAnalyticsTab: React.FC<DiaryAndAnalyticsTabProps> = ({ diar
                       <div style={{ flex: 1, height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
                         <div style={{ width: `${(v / maxVol) * 100}%`, height: '100%', background: '#8b5cf6', borderRadius: 4 }} />
                       </div>
-                      <span style={{ fontSize: 9, color: 'var(--text-dim)', width: 50 }}>{Math.round(v).toLocaleString()} кг</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-dim)', width: 50 }}>{Math.round(v).toLocaleString()} кг</span>
                     </div>
                   );
                 })}
@@ -462,15 +462,15 @@ export const DiaryAndAnalyticsTab: React.FC<DiaryAndAnalyticsTabProps> = ({ diar
                 <div style={style.label}>Метрики усталости</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 10 }}>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                    <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Монотонность</div>
+                    <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>Монотонность</div>
                     <div style={{ fontWeight: 700, color: analytics.fatigue.monotony > 2 ? '#ef4444' : ACCENT }}>{analytics.fatigue.monotony.toFixed(1)}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                    <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Напряжение</div>
+                    <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>Напряжение</div>
                     <div style={{ fontWeight: 700, color: analytics.fatigue.strain > 300 ? '#ef4444' : ACCENT }}>{Math.round(analytics.fatigue.strain)}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                    <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>ЦНС</div>
+                    <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>ЦНС</div>
                     <div style={{ fontWeight: 700, color: analytics.fatigue.cnsFatigue > 0.7 ? '#ef4444' : ACCENT }}>{Math.round(analytics.fatigue.cnsFatigue * 100)}%</div>
                   </div>
                 </div>
@@ -503,11 +503,11 @@ const WorkoutWeekCard: React.FC<{ weekLabel: string; workouts: WorkoutLog[] }> =
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
         <div>
           <span style={{ fontWeight: 700, fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>{weekLabel}</span>
-          <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 6 }}>{workouts.length} тр · {totalSets} сетов</span>
+          <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>{workouts.length} тр · {totalSets} сетов</span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{Math.round(totalVol).toLocaleString()} кг</span>
-          <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{expanded ? '▴' : '▾'}</span>
+          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{expanded ? '▴' : '▾'}</span>
         </div>
       </div>
       {expanded && (
@@ -518,21 +518,21 @@ const WorkoutWeekCard: React.FC<{ weekLabel: string; workouts: WorkoutLog[] }> =
               { label:'Сетов', value:totalSets, color:'#60a5fa' },
               { label:'Длит.', value:`${Math.round(totalDur / Math.max(1, workouts.length))} мин`, color:'#f59e0b' },
             ].map((s, i) => <div key={i} style={{ background:'rgba(255,255,255,0.02)', borderRadius:6, padding:'4px 6px', textAlign:'center' }}>
-              <div style={{ fontSize:8, color:'rgba(255,255,255,0.3)' }}>{s.label}</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)' }}>{s.label}</div>
               <div style={{ fontSize:12, fontWeight:700, color:s.color }}>{s.value}</div>
             </div>)}
           </div>
           {workouts.map((w: WorkoutLog, wi: number) => {
             return (
               <div key={wi} style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)', marginBottom: 4 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontSize: 9 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontSize: 10 }}>
                   <span style={{ color: 'var(--text-dim)' }}>{w.date} · {w.duration} мин · RPE {w.overallRPE} · {SP_LABELS[w.split as keyof typeof SP_LABELS] || w.split}</span>
-                  <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 8 }}>{w.notes?.slice(0, 40)}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10 }}>{w.notes?.slice(0, 40)}</span>
                 </div>
                 {(w.exercises || []).map((ex: any, ei: number) => {
                   const bestSet = (ex.sets || []).reduce((b: any, s: any) => s.weight > b.weight ? s : b, { weight: 0, reps: 0, rir: 0 });
                   return (
-                    <div key={ei} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: 9 }}>
+                    <div key={ei} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: 10 }}>
                       <span style={{ color: 'rgba(255,255,255,0.6)' }}>{ex.exerciseName || ex.exerciseId}</span>
                       <span style={{ color: '#34d399' }}>{bestSet.weight}×{bestSet.reps} @ RIR {bestSet.rir}</span>
                       <span style={{ color: 'rgba(255,255,255,0.3)' }}>1RM {Math.round(ex.estimated1RM || 0)} кг</span>

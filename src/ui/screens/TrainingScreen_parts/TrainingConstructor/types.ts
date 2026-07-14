@@ -179,19 +179,5 @@ export const RIR_WAVE_PATTERNS: Record<string, { label: string; desc: string; ri
 
 export type ConstructorMode = 'macro' | 'manual';
 
-export function detectGroup(name: string): string {
-  const n = name.toLowerCase();
-  if (/squat|присед|quad|ножн|выпад|lunge|leg press|жим ног/i.test(n)) return 'quads';
-  if (/bench|жим.*леж|chest|груд|pec|push.*up/i.test(n)) return /shoulder|плеч|delt|армей|воен/i.test(n) ? 'shoulders' : 'chest';
-  if (/deadlift|станов|тяга|row|pull|спин|back|chin|lat/i.test(n)) return 'back';
-  if (/curl|бицеп|bicep|молот/i.test(n)) return 'biceps';
-  if (/tricep|трицеп|extension.*бл|kick\s*back/i.test(n)) return 'triceps';
-  if (/hamstring|сгиб.*ног|бицеп.*бедр|рум.*dead/i.test(n)) return 'hamstrings';
-  if (/glute|ягод|hip.*thrust|таз/i.test(n)) return 'glutes';
-  if (/calf|икр|носоч|подъем.*нос/i.test(n)) return 'calves';
-  if (/trap|шраг|трап/i.test(n)) return 'traps';
-  if (/forearm|предплеч|запясть|кистев/i.test(n)) return 'forearms';
-  if (/ohp|shoulder|плеч|армей|жим.*сид|дельт|delt.*raise|махи.*сторон/i.test(n)) return 'shoulders';
-  if (/pres|пресс|ab|кранч|скруч|планк|side.*bend|подъем.*ног|corp|core/i.test(n)) return 'abs';
-  return 'full';
-}
+import { detectMuscleGroup as detectGroup } from '../../../../engines/muscle-group';
+export { detectGroup };

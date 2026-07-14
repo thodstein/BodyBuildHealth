@@ -43,7 +43,7 @@ export const ExerciseGeneratorContent: React.FC = () => {
   return (<>
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
       <div>
-        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Группа мышц</div>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Группа мышц</div>
         <select value={genGroup} onChange={e => setGenGroup(e.target.value)}
           style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
           {['chest','back','legs','shoulders','arms','core'].map(g => (
@@ -52,21 +52,21 @@ export const ExerciseGeneratorContent: React.FC = () => {
         </select>
       </div>
       <div>
-        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Цель</div>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Цель</div>
         <select value={genGoal} onChange={e => setGenGoal(e.target.value)}
           style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
           {EX_GEN_GOALS.map(g => <option key={g} value={g}>{EX_GEN_GOAL_LABELS[g]}</option>)}
         </select>
       </div>
       <div>
-        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Уровень</div>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Уровень</div>
         <select value={genLevel} onChange={e => setGenLevel(e.target.value)}
           style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
           {EX_GEN_LEVELS.map(l => <option key={l} value={l}>{EX_GEN_LEVEL_LABELS[l]}</option>)}
         </select>
       </div>
       <div>
-        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Кол-во</div>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Кол-во</div>
         <select value={genCount} onChange={e => setGenCount(parseInt(e.target.value))}
           style={{ width:'100%', padding:'5px', borderRadius:6, background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text)', fontSize:11 }}>
           {[3,5,8,10].map(n => <option key={n} value={n}>{n}</option>)}
@@ -76,7 +76,7 @@ export const ExerciseGeneratorContent: React.FC = () => {
 
     {genResult && genResult.length > 0 ? (
       <div>
-        <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 6px', borderRadius:4, marginBottom:4, fontSize:8, color:'var(--text-dim)', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 6px', borderRadius:4, marginBottom:4, fontSize:10, color:'var(--text-dim)', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
           <span style={{ flex:1 }}>Упражнение</span>
           <span style={{ width:30, textAlign:'center' }}>Тип</span>
           <span style={{ width:30, textAlign:'center' }}>Инв.</span>
@@ -86,10 +86,10 @@ export const ExerciseGeneratorContent: React.FC = () => {
           <span style={{ width:35, textAlign:'center' }}>Отдых</span>
         </div>
         {genResult.map((r, i) => (
-          <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 6px', borderRadius:4, marginBottom:2, background:'rgba(255,255,255,0.02)', fontSize:9 }}>
+          <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 6px', borderRadius:4, marginBottom:2, background:'rgba(255,255,255,0.02)', fontSize:10 }}>
             <span style={{ flex:1, fontWeight:600 }}>{r.name}</span>
-            <span style={{ width:30, textAlign:'center', fontSize:7, color:'var(--text-dim)' }}>{r.type === 'compound' ? 'Базовое' : 'Изол.'}</span>
-            <span style={{ width:30, textAlign:'center', fontSize:7, color:'var(--text-dim)' }}>{r.equipment}</span>
+            <span style={{ width:30, textAlign:'center', fontSize:10, color:'var(--text-dim)' }}>{r.type === 'compound' ? 'Базовое' : 'Изол.'}</span>
+            <span style={{ width:30, textAlign:'center', fontSize:10, color:'var(--text-dim)' }}>{r.equipment}</span>
             <span style={{ width:45, textAlign:'center', color:'var(--accent)', fontWeight:700 }}>{r.sets}</span>
             <span style={{ width:50, textAlign:'center', color:'var(--accent)', fontWeight:600 }}>{r.reps}</span>
             <span style={{ width:28, textAlign:'center', color:'var(--text-dim)' }}>{r.rir}</span>

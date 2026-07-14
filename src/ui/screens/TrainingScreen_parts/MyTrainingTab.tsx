@@ -125,7 +125,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
   return (
     <div>
       <div style={{fontSize:14,fontWeight:700,color:'var(--accent)',marginBottom:4}}>⭐ Моя тренировка</div>
-      <div style={{fontSize:9,color:'var(--text-dim)',marginBottom:8}}>Пользовательские упражнения, планы и циклы</div>
+      <div style={{fontSize:10,color:'var(--text-dim)',marginBottom:8}}>Пользовательские упражнения, планы и циклы</div>
 
       <div style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
         {(['exercises','plans','cycles','progress'] as const).map(t => (
@@ -140,10 +140,10 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
           <div className="card" style={{padding:10,marginBottom:8}}>
             <h4 style={{margin:'0 0 6px',fontSize:12}}>➕ Добавить упражнение</h4>
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:4,marginBottom:4}}>
-              <div style={{fontSize:7,color:'var(--text-dim)',paddingLeft:2}}>Упражнение</div>
-              <div style={{fontSize:7,color:'var(--text-dim)',paddingLeft:2}}>Сеты</div>
-              <div style={{fontSize:7,color:'var(--text-dim)',paddingLeft:2}}>Повторы</div>
-              <div style={{fontSize:7,color:'var(--text-dim)',paddingLeft:2}}>RIR</div>
+              <div style={{fontSize:10,color:'var(--text-dim)',paddingLeft:2}}>Упражнение</div>
+              <div style={{fontSize:10,color:'var(--text-dim)',paddingLeft:2}}>Сеты</div>
+              <div style={{fontSize:10,color:'var(--text-dim)',paddingLeft:2}}>Повторы</div>
+              <div style={{fontSize:10,color:'var(--text-dim)',paddingLeft:2}}>RIR</div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:4,marginBottom:6}}>
               <input value={newExName} onChange={e=>setNewExName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addExercise()} placeholder="Название упражнения" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
@@ -152,8 +152,8 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
               <input type="number" min="0" max="4" value={newExRir} onChange={e=>setNewExRir(parseFloat(e.target.value) || 0)} placeholder="0-4" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box',textAlign:'center'}} />
             </div>
             <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:6}}>
-              <span style={{fontSize:7,color:'var(--text-dim)',padding:'2px 4px',alignSelf:'center'}}>Категория:</span>
-              {groupOptions.slice(0,12).map(g=><button key={g} onClick={()=>setNewExName(g+' → ')} style={{padding:'2px 6px',borderRadius:4,fontSize:7,cursor:'pointer',background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text-dim)'}}>{GROUP_LABELS[g] || g}</button>)}
+              <span style={{fontSize:10,color:'var(--text-dim)',padding:'2px 4px',alignSelf:'center'}}>Категория:</span>
+              {groupOptions.slice(0,12).map(g=><button key={g} onClick={()=>setNewExName(g+' → ')} style={{padding:'2px 6px',borderRadius:4,fontSize:10,cursor:'pointer',background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text-dim)'}}>{GROUP_LABELS[g] || g}</button>)}
             </div>
             <button onClick={addExercise} style={{width:'100%',padding:6,borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:11}}>Добавить</button>
           </div>
@@ -166,9 +166,9 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
                   <div key={i} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 8px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
                     <div style={{flex:1}}>
                       <div style={{fontSize:10,fontWeight:600,color:'var(--text-light)'}}>{ex.name}</div>
-                      <div style={{fontSize:8,color:'var(--text-dim)'}}>{ex.sets}×{ex.reps} @ RIR {ex.rir}</div>
+                      <div style={{fontSize:10,color:'var(--text-dim)'}}>{ex.sets}×{ex.reps} @ RIR {ex.rir}</div>
                     </div>
-                    <button onClick={()=>setCustomExercises(prev=>prev.filter((_,j)=>j!==i))} style={{padding:'2px 6px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:9,cursor:'pointer'}}>✕</button>
+                    <button onClick={()=>setCustomExercises(prev=>prev.filter((_,j)=>j!==i))} style={{padding:'2px 6px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:10,cursor:'pointer'}}>✕</button>
                   </div>
                 ))}
               </div>
@@ -188,23 +188,23 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
                 <div>
                   <div style={{fontSize:11,fontWeight:700,color:'var(--text-light)'}}>{plan.name}</div>
-                  <div style={{fontSize:8,color:'var(--text-dim)'}}>{new Date(plan.date).toLocaleDateString('ru')} · {plan.exercises.length} упр.</div>
+                  <div style={{fontSize:10,color:'var(--text-dim)'}}>{new Date(plan.date).toLocaleDateString('ru')} · {plan.exercises.length} упр.</div>
                 </div>
                 <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                  <button onClick={()=>loadPlan(plan)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(0,230,138,0.2)',background:'rgba(0,230,138,0.08)',color:'var(--accent)',fontSize:8,cursor:'pointer'}}>Загрузить</button>
-                  <button onClick={()=>setCustomExercises(prev=>[...prev, ...plan.exercises])} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(139,92,246,0.2)',background:'rgba(139,92,246,0.08)',color:'#8b5cf6',fontSize:8,cursor:'pointer'}}>➕ В мою</button>
+                  <button onClick={()=>loadPlan(plan)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(0,230,138,0.2)',background:'rgba(0,230,138,0.08)',color:'var(--accent)',fontSize:10,cursor:'pointer'}}>Загрузить</button>
+                  <button onClick={()=>setCustomExercises(prev=>[...prev, ...plan.exercises])} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(139,92,246,0.2)',background:'rgba(139,92,246,0.08)',color:'#8b5cf6',fontSize:10,cursor:'pointer'}}>➕ В мою</button>
                   <button onClick={() => {
                     const exs = Array.isArray((plan as any).exercises) ? (plan as any).exercises : (Array.isArray((plan as any).days) ? (plan as any).days.flatMap((d:any)=>d.exercises||[]) : []);
                     const data = exs.map((e:any) => ({ name: e.name, sets: e.sets || e.sets || 3, reps: e.reps || 10, rir: e.rir ?? 2 }));
                     applyToPlanner({ kind: 'split', label: plan.name, data });
                     if (onLoadToConstructor) onLoadToConstructor({ name: plan.name, exercises: exs });
-                  }} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(168,85,247,0.2)',background:'rgba(168,85,247,0.08)',color:'#a855f7',fontSize:8,cursor:'pointer',fontWeight:700}}>📥 В конструктор</button>
-                  <button onClick={()=>deletePlan(plan.id)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:8,cursor:'pointer'}}>Удалить</button>
+                  }} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(168,85,247,0.2)',background:'rgba(168,85,247,0.08)',color:'#a855f7',fontSize:10,cursor:'pointer',fontWeight:700}}>📥 В конструктор</button>
+                  <button onClick={()=>deletePlan(plan.id)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:10,cursor:'pointer'}}>Удалить</button>
                 </div>
               </div>
               <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
                 {plan.exercises.map((ex,i) => (
-                  <span key={i} style={{fontSize:7,padding:'2px 6px',borderRadius:4,background:'rgba(0,230,138,0.06)',border:'1px solid rgba(0,230,138,0.12)',color:'var(--text-light)'}}>{ex.name} {ex.sets}×{ex.reps}</span>
+                  <span key={i} style={{fontSize:10,padding:'2px 6px',borderRadius:4,background:'rgba(0,230,138,0.06)',border:'1px solid rgba(0,230,138,0.12)',color:'var(--text-light)'}}>{ex.name} {ex.sets}×{ex.reps}</span>
                 ))}
               </div>
             </div>
@@ -218,7 +218,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
               <input value={cycleName} onChange={e=>setCycleName(e.target.value)} placeholder="Название цикла..." style={{flex:1,padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
               <button onClick={saveCycle} style={{padding:'6px 12px',borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:10}}>💾 Сохранить</button>
             </div>
-            <div style={{fontSize:8,color:'var(--text-dim)'}}>Цикл создаётся на основе текущих настроек плана</div>
+            <div style={{fontSize:10,color:'var(--text-dim)'}}>Цикл создаётся на основе текущих настроек плана</div>
           </div>
           {savedCycles.length === 0 && <div className="card" style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Нет сохранённых циклов</div>}
           {savedCycles.map(cycle => (
@@ -226,9 +226,9 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <div>
                   <div style={{fontSize:11,fontWeight:700,color:'var(--text-light)'}}>{cycle.name}</div>
-                  <div style={{fontSize:8,color:'var(--text-dim)'}}>{new Date(cycle.date).toLocaleDateString('ru')} · {cycle.weeks} нед · {cycle.days} д/н</div>
+                  <div style={{fontSize:10,color:'var(--text-dim)'}}>{new Date(cycle.date).toLocaleDateString('ru')} · {cycle.weeks} нед · {cycle.days} д/н</div>
                 </div>
-                <button onClick={()=>deleteCycle(cycle.id)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:8,cursor:'pointer'}}>Удалить</button>
+                <button onClick={()=>deleteCycle(cycle.id)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:10,cursor:'pointer'}}>Удалить</button>
               </div>
             </div>
           ))}
@@ -243,21 +243,21 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
           ) : (
             <>
               <div className="card" style={{padding:10,marginBottom:6}}>
-                <div style={{fontSize:9,fontWeight:700,color:'var(--text-dim)',marginBottom:4,textTransform:'uppercase'}}>Сводка</div>
+                <div style={{fontSize:10,fontWeight:700,color:'var(--text-dim)',marginBottom:4,textTransform:'uppercase'}}>Сводка</div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
                   <div style={{padding:6,borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
-                    <div style={{fontSize:8,color:'var(--text-dim)'}}>Тренировок</div>
+                    <div style={{fontSize:10,color:'var(--text-dim)'}}>Тренировок</div>
                     <div style={{fontSize:14,fontWeight:700,color:'rgba(96,165,250,0.9)'}}>{progressData.total}</div>
                   </div>
                   <div style={{padding:6,borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
-                    <div style={{fontSize:8,color:'var(--text-dim)'}}>Тоннаж</div>
+                    <div style={{fontSize:10,color:'var(--text-dim)'}}>Тоннаж</div>
                     <div style={{fontSize:14,fontWeight:700,color:'rgba(96,165,250,0.9)'}}>{Math.round(progressData.totalTonnageAll / 1000).toFixed(1)}k кг</div>
                   </div>
                 </div>
               </div>
 
               <div className="card" style={{padding:10,marginBottom:6}}>
-                <div style={{fontSize:9,fontWeight:700,color:'var(--text-dim)',marginBottom:6,textTransform:'uppercase'}}>Топ-3 упражнения: расчётный 1ПМ</div>
+                <div style={{fontSize:10,fontWeight:700,color:'var(--text-dim)',marginBottom:6,textTransform:'uppercase'}}>Топ-3 упражнения: расчётный 1ПМ</div>
                 {progressData.topExercises.length === 0 ? (
                   <div style={{fontSize:10,color:'var(--text-dim)'}}>Недостаточно данных</div>
                 ) : (
@@ -270,7 +270,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
                       <div key={i} style={{marginBottom:6,padding:8,borderRadius:6,background:'var(--bg-secondary)',border:'1px solid rgba(255,255,255,0.04)'}}>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
                           <div style={{fontSize:10,fontWeight:600,color:'var(--text-light)'}}>{i+1}. {ex.exercise}</div>
-                          <div style={{fontSize:9,fontWeight:700,color:SHOWchied>0?'var(--accent)':'var(--text-dim)'}}>
+                          <div style={{fontSize:10,fontWeight:700,color:SHOWchied>0?'var(--accent)':'var(--text-dim)'}}>
                             {SHOWchied > 0 ? '+':''}{SHOWchied}% · лучший {ex.best}кг ({ex.count} тренировок)
                           </div>
                         </div>
@@ -292,7 +292,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
                           </svg>
                         </div>
                         {ex.history.length > 1 ? (
-                          <div style={{fontSize:7,color:'var(--text-dim)',marginTop:2,display:'flex',justifyContent:'space-between'}}>
+                          <div style={{fontSize:10,color:'var(--text-dim)',marginTop:2,display:'flex',justifyContent:'space-between'}}>
                             <span>{ex.history[0].date.slice(5)}</span>
                             <span>Спред: {spread}кг</span>
                             <span>{ex.history[ex.history.length-1].date.slice(5)}</span>
@@ -305,7 +305,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
               </div>
 
               <div className="card" style={{padding:10,marginBottom:6}}>
-                <div style={{fontSize:9,fontWeight:700,color:'var(--text-dim)',marginBottom:6,textTransform:'uppercase'}}>Тоннаж по неделям (8 нед)</div>
+                <div style={{fontSize:10,fontWeight:700,color:'var(--text-dim)',marginBottom:6,textTransform:'uppercase'}}>Тоннаж по неделям (8 нед)</div>
                 {progressData.weeks.length === 0 ? (
                   <div style={{fontSize:10,color:'var(--text-dim)'}}>Нет данных</div>
                 ) : (
@@ -314,7 +314,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
                     return (
                       <div style={{display:'flex',flexDirection:'column',gap:3}}>
                         {progressData.weeks.map((w: any, i: number) => (
-                          <div key={i} style={{display:'flex',alignItems:'center',gap:4,fontSize:8,color:'var(--text-dim)'}}>
+                          <div key={i} style={{display:'flex',alignItems:'center',gap:4,fontSize:10,color:'var(--text-dim)'}}>
                             <span style={{minWidth:72}}>{w[0]}</span>
                             <div style={{height:8,background:'rgba(96,165,250,0.3)',borderRadius:2,width:Math.round((w[1] / maxT) * 150)+'px',minWidth:4}}></div>
                             <span style={{minWidth:50}}>{Math.round(w[1]).toLocaleString()} кг</span>

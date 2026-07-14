@@ -159,8 +159,8 @@ export const LAB_PRIORITY_MAP: LabPriorityMap[] = [
     { substanceId: 'lumbrokinase', priority: 3, brandName: 'Лумброкиназа', reason: 'Мощный фибринолитик при гипофибринолизисе', minSeverity: 'severe' },
   ]},
   { marker: 'ESR', entries: [
-    { substanceId: 'omega3', priority: 1, brandName: 'Омакор', reason: '↓ воспаления → ↓ фибриногена → ↓ СОЭ', minSeverity: 'mild' },
-    { substanceId: 'curcumin_sup', priority: 2, brandName: 'Куркумин / Куркуминоид', reason: 'NF-κB-ингибиция → ↓ воспалительных маркёров', minSeverity: 'moderate' },
+    { substanceId: 'curcumin_sup', priority: 1, brandName: 'Куркумин / Куркуминоид', reason: 'NF-κB-ингибиция → ↓ воспалительных маркёров → ↓ СОЭ (сильнее Омега-3)', minSeverity: 'mild' },
+    { substanceId: 'omega3', priority: 2, brandName: 'Омакор / очищенный ЭПК', reason: '↓ воспаления → ↓ фибриногена → ↓ СОЭ (только очищенный ЭПК ≥2 г)', minSeverity: 'mild' },
     { substanceId: 'ashwagandha', priority: 3, brandName: 'Ашваганда / Withania somnifera', reason: 'Иммуно-модуляция, ↓ системного воспаления', minSeverity: 'moderate' },
   ]},
 
@@ -302,20 +302,25 @@ export const LAB_PRIORITY_MAP: LabPriorityMap[] = [
 
   // ─── ВОСПАЛЕНИЕ / Иммунная ───
   { marker: 'CRP', entries: [
-    { substanceId: 'omega3', priority: 1, brandName: 'Омакор / ЭПК+ДГК', reason: '↓ IL-6, ↓ TNF-α → ↓ СРБ (доказано в мета-анализах)', minSeverity: 'mild' },
-    { substanceId: 'curcumin_sup', priority: 2, brandName: 'Куркумин (с пиперином)', reason: 'NF-κB-ингибиция → ↓ воспалительных цитокинов → ↓ СРБ', minSeverity: 'moderate' },
-    { substanceId: 'ashwagandha', priority: 3, brandName: 'Ашваганда', reason: '↓ CRP на 30% (мета-анализ), иммуномодуляция', minSeverity: 'moderate' },
+    { substanceId: 'curcumin_sup', priority: 1, brandName: 'Куркумин (с пиперином)', reason: 'NF-κB-ингибиция → ↓ воспалительных цитокинов → ↓ СРБ (сильнее Омега-3 при системном воспалении)', minSeverity: 'mild' },
+    { substanceId: 'berberine', priority: 2, brandName: 'Берберин', reason: 'AMPK + ↓ провоспалительных цитокинов → ↓ СРБ (мета-анализ)', minSeverity: 'moderate' },
+    { substanceId: 'bergamot', priority: 3, brandName: 'Бергамот / Кардио-Бергамот', reason: 'Полифенолы → ↓ СРБ и провоспалительного статуса', minSeverity: 'moderate' },
+    { substanceId: 'omega3', priority: 4, brandName: 'Омакор / очищенный ЭПК', reason: '↓ IL-6, TNF-α → ↓ СРБ (доказано, но только очищенный ЭПК ≥2 г; дешёвый рыбий жир слаб)', minSeverity: 'moderate' },
+    { substanceId: 'ashwagandha', priority: 4, brandName: 'Ашваганда', reason: '↓ CRP на 30% (мета-анализ), иммуномодуляция', minSeverity: 'moderate' },
     { substanceId: 'probiotic', priority: 4, brandName: 'Пробиотик (Lactobacillus+)', reason: '↓ системного воспаления через ось кишечник-иммунитет', minSeverity: 'moderate' },
   ]},
   { marker: 'TNF_ALPHA', entries: [
-    { substanceId: 'omega3', priority: 1, brandName: 'Омакор', reason: 'ЭПК → резольвины → ↓ TNF-α', minSeverity: 'moderate' },
-    { substanceId: 'curcumin_sup', priority: 2, brandName: 'Куркумин', reason: 'NF-κB → ↓ TNF-α экспрессии', minSeverity: 'moderate' },
-    { substanceId: 'ashwagandha', priority: 3, brandName: 'Ашваганда', reason: '↓ TNF-α, ↓ воспаления', minSeverity: 'severe' },
+    { substanceId: 'curcumin_sup', priority: 1, brandName: 'Куркумин (с пиперином)', reason: 'NF-κB-ингибиция → ↓ экспрессии TNF-α (сильнее Омега-3)', minSeverity: 'moderate' },
+    { substanceId: 'berberine', priority: 2, brandName: 'Берберин', reason: 'AMPK + снижение провоспалительных цитокинов → ↓ TNF-α', minSeverity: 'moderate' },
+    { substanceId: 'omega3', priority: 3, brandName: 'Омакор / очищенный ЭПК', reason: 'ЭПК → резольвины → ↓ TNF-α (только очищенный ЭПК ≥2 г)', minSeverity: 'moderate' },
+    { substanceId: 'ashwagandha', priority: 4, brandName: 'Ашваганда', reason: '↓ TNF-α, ↓ воспаления', minSeverity: 'severe' },
   ]},
   { marker: 'IL6', entries: [
-    { substanceId: 'omega3', priority: 1, brandName: 'Омакор', reason: '↓ IL-6 через анти-воспалительные медиаторы', minSeverity: 'moderate' },
-    { substanceId: 'curcumin_sup', priority: 2, brandName: 'Куркумин', reason: 'NF-κB-ингибиция → ↓ IL-6', minSeverity: 'moderate' },
-    { substanceId: 'vitamin_d3', priority: 3, brandName: 'Витамин D3', reason: '↓ IL-6 через VDR-рецепторы (при дефиците D)', minSeverity: 'moderate' },
+    { substanceId: 'curcumin_sup', priority: 1, brandName: 'Куркумин (с пиперином)', reason: 'NF-κB-ингибиция → ↓ IL-6 (сильнее Омега-3)', minSeverity: 'moderate' },
+    { substanceId: 'berberine', priority: 2, brandName: 'Берберин', reason: 'AMPK + ↓ провоспалительных цитокинов → ↓ IL-6', minSeverity: 'moderate' },
+    { substanceId: 'bergamot', priority: 3, brandName: 'Бергамот', reason: 'Полифенолы → ↓ IL-6 и системного воспаления', minSeverity: 'moderate' },
+    { substanceId: 'omega3', priority: 4, brandName: 'Омакор / очищенный ЭПК', reason: '↓ IL-6 через резольвины (только очищенный ЭПК ≥2 г)', minSeverity: 'moderate' },
+    { substanceId: 'vitamin_d3', priority: 4, brandName: 'Витамин D3', reason: '↓ IL-6 через VDR-рецепторы (при дефиците D)', minSeverity: 'moderate' },
   ]},
 
   // ─── ВИТАМИНЫ И МИНЕРАЛЫ ───

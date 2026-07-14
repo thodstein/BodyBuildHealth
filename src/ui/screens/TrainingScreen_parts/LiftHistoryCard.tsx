@@ -65,7 +65,7 @@ export const LiftHistoryCard: React.FC<{ sessions: Session[] }> = ({ sessions })
             ))}
             {series.map((p, i) => <text key={i} x={x(i)} y={H - 6} fontSize={6} fill="rgba(255,255,255,0.4)" textAnchor="middle">{p.date.slice(5)}</text>)}
           </svg>
-          <div style={{ display: 'flex', gap: 12, fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 4, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 4, flexWrap: 'wrap' }}>
             <span>🟢 e1RM</span><span>🔵 тоннаж</span><span>🏆 PR</span>
             {last && <span>· последний: e1RM <b style={{ color: ACCENT }}>{last.e1rm}</b> кг, тоннаж <b style={{ color: '#60a5fa' }}>{Math.round(last.tonnage)}</b></span>}
           </div>

@@ -130,12 +130,12 @@ export const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelected
             }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{p.name}</div>
-              <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.1)', color: 'var(--accent)', fontWeight: 600 }}>
+              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.1)', color: 'var(--accent)', fontWeight: 600 }}>
                 {PROGRAM_GOAL_MAP[p.goal] || p.goal}
               </span>
             </div>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>{p.description}</div>
-            <div style={{ display: 'flex', gap: 10, fontSize: 9, color: 'var(--text-light)' }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>{p.description}</div>
+            <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--text-light)' }}>
               <span>Автор: <b>{p.author}</b></span>
               <span>Уровень: <b style={{ color: 'var(--accent)' }}>{PROGRAM_LEVEL_MAP[p.level] || p.level}</b></span>
               <span>{p.daysPerWeek} дн/нед</span>
@@ -162,15 +162,15 @@ export const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelected
           <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '0 0 8px' }}>{selected.description}</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, marginBottom: 8 }}>
             <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Уровень</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>Уровень</div>
               <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{PROGRAM_LEVEL_MAP[selected.level] || selected.level}</div>
             </div>
             <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Цель</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>Цель</div>
               <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{PROGRAM_GOAL_MAP[selected.goal] || selected.goal}</div>
             </div>
             <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Дней/нед</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>Дней/нед</div>
               <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{selected.daysPerWeek}</div>
             </div>
           </div>
@@ -185,7 +185,7 @@ export const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelected
             <b>Разгрузка:</b> {selected.deloadProtocol}
           </div>
           {selected.warnings.length > 0 && (
-            <div style={{ fontSize: 9, color: '#f59e0b', background: 'rgba(245,158,11,0.08)', borderRadius: 8, padding: 8, marginBottom: 8 }}>
+            <div style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.08)', borderRadius: 8, padding: 8, marginBottom: 8 }}>
               {selected.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
             </div>
           )}
@@ -285,17 +285,17 @@ export const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelected
                         }}
                       >
                         {isRest ? (
-                          <span style={{ fontSize: 9, color: 'var(--text-dim)', opacity: 0.5 }}>Отдых</span>
+                          <span style={{ fontSize: 10, color: 'var(--text-dim)', opacity: 0.5 }}>Отдых</span>
                         ) : (
                           <>
-                            <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-light)' }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-light)' }}>
                               {day.focus || day.name}
                             </span>
-                            <span style={{ fontSize: 8, color: 'var(--accent)', marginTop: 1 }}>
+                            <span style={{ fontSize: 10, color: 'var(--accent)', marginTop: 1 }}>
                               {day.exercises.length} упр
                             </span>
                             {day.day && (
-                              <span style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 1 }}>
+                              <span style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>
                                 День {day.day}
                               </span>
                             )}
@@ -318,15 +318,15 @@ export const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelected
                           {DAY_NAMES[expandedDay - 1]} — День {day.day}: {day.name}
                         </div>
                         <button onClick={() => setExpandedDay(null)} style={{
-                          padding: '2px 8px', borderRadius: 4, fontSize: 9, cursor: 'pointer',
+                          padding: '2px 8px', borderRadius: 4, fontSize: 10, cursor: 'pointer',
                           background: 'transparent', border: '1px solid var(--border)',
                           color: 'var(--text-dim)',
                         }}>✕</button>
                       </div>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>
                         {day.focus} · Разминка: {day.warmup} · Заминка: {day.cooldown}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px', borderRadius: 4, marginBottom: 2, fontSize: 8, color: 'var(--text-dim)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px', borderRadius: 4, marginBottom: 2, fontSize: 10, color: 'var(--text-dim)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <span style={{ flex: 1 }}>Упражнение</span>
                         <span style={{ minWidth: 50, textAlign: 'center' }}>Подходы</span>
                         <span style={{ minWidth: 35, textAlign: 'center' }}>RPE</span>
@@ -337,14 +337,14 @@ export const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelected
                         <div key={ei} style={{
                           display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px',
                           borderRadius: 6, marginBottom: 2, background: 'rgba(255,255,255,0.03)',
-                          fontSize: 9,
+                          fontSize: 10,
                         }}>
                           <span style={{ flex: 1, fontWeight: 600 }}>{ex.name}</span>
                           <span style={{ color: 'var(--accent)' }}>{ex.sets}×{ex.reps}</span>
                           <span style={{ color: 'var(--text-dim)' }}>RPE {ex.rpe}</span>
                           <span style={{ color: 'var(--text-dim)' }}>RIR {ex.rir}</span>
                           <span style={{ color: 'var(--text-dim)' }}>Отд {ex.restSec}с</span>
-                          {ex.notes ? <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{ex.notes}</span> : null}
+                          {ex.notes ? <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{ex.notes}</span> : null}
                         </div>
                       ))}
                     </div>

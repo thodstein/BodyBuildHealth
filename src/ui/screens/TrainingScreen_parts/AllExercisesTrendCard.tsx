@@ -44,7 +44,7 @@ const AllExercisesTrendCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions 
           </span>
         )}
       </div>
-      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>{progressions.length} упражнений</div>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>{progressions.length} упражнений</div>
       <div style={{ maxHeight: 280, overflowY: 'auto' }}>
         <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse' }}>
           <thead>
@@ -84,7 +84,7 @@ const AllExercisesTrendCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions 
         </table>
       </div>
       {progressions.filter(p => p.plateauWeeks >= 3).length > 0 && (
-        <div style={{ marginTop: 4, fontSize: 9, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', borderRadius: 4, padding: '4px 6px' }}>
+        <div style={{ marginTop: 4, fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', borderRadius: 4, padding: '4px 6px' }}>
           ⚠ {progressions.filter(p => p.plateauWeeks >= 3).length} упражнений в плато ≥3 нед. Рекомендуется смена программы или делод.
         </div>
       )}

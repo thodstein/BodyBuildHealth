@@ -3016,3 +3016,58 @@ CompetitionCard (125 строк) целиком влит в PeakingPanel (240 с
 - src/ui/screens/NutritionScreen_parts/IndividualPlan/meal-plan-engine.ts — ptm hoist
 - src/engines/biostack-clinical-v2.engine.ts — selectStack; findMeaningfulReplacement
 - src/engines/biostack-safety.engine.ts — DrugSafetyExclusion/DrugSafetyTitration
+
+## Session Summary (Jul 14 — BioStack AIScreen переписан + Профиль/Данные слиты в один экран
+
+### Goal
+Переписать BioStackAIScreen (15 → 6 вкладок, sub-pills + единый рендер), затем слить подвкладки «Профиль» (Настройки) и «Данные» в ОДИН экран: «Данные» была чистым дублем, превращена в кнопку автозаполнения внутри профиля. Проверить, что все поля профиля, нужные для расчёта клинического стека, присутствуют.
+
+### ✅ Сделано и проверено (tsc --noEmit 0 ошибок в BioStack-файлах; vite build OK 40.9s; UTF-8 noBOM)
+**1. BioStackAIScreen.tsx — переписан (было в In Progress, стало Done):**
+- Удалён мёртвый импорт SupplementClinicScreen (из App.tsx).
+- 6 вкладок (BSTab): profile, select, interactions, dose, stack, reports — рендер через enderContent() (без sub-pills на верхнем уровне).
+- Sub-pills: SUB_TAB_GROUPS держит ONLY группы с ≥2 подвкладок (select: build/clinical; stack: mystacks/collection; reports: fill/report; interactions: симптомы/ЛС/пептиды/инъекции; dose: режим/тайминг/таблетки; profile: settings).
+- ctiveSub = валидный sub ИЛИ DEFAULT_SUB[tab]; DEFAULT_SUB сбрасывается при смене tab (if (tab !== lastTabRef.current) { setSubTab(DEFAULT_SUB[tab] || ''); lastTabRef.current = tab; }).
+- BIO_SUBTAB_KEY persisted (sub-tab восстанавливается на маунте).
+
+**2. Профиль + Данные → ОДИН экран (user-запрос):**
+- SUB_TAB_GROUPS.profile теперь ['settings' ('⚙️ Профиль')] — подвкладка «Данные» (id uto/data) УДАЛЕНА.
+- BioStackAIScreen.tsx: убран импорт BioStackAIData и ветка if (activeSub === 'auto') return <BioStackAIData .../>; case 'profile' → всегда <ProfileTab>.
+- BioStackAIData.tsx УДАЛЁН (стал orphan после удаления sub-pills — единственный импорт был в BioStackAIScreen).
+- Автозаполнение осталось в ProfileTab («📥 Заполнить из профиля» = utoFillFromMainProfile() + «🧭 Быстрый старт») — дублирование устранено.
+
+**3. Сохранение поля maxStackSize (единственное, что было ТОЛЬКО в BioStackAIData):**
+- Добавлено в PopupHealth (BioStackAIProfile.tsx): числовой input «📦 Макс. размер стека» (min1/max30), сохраняется в u({... maxStackSize}).
+- maxStackSize используется в BioStackAIStack.tsx (targetSize buildStack, лимит-предупреждение) — теперь не потеряно.
+
+### ✅ Проверка полноты данных для расчётов (buildClinicalStack, biostack-clinical-recommender.ts)
+uildClinicalStack(profile) берёт из BioStackProfile ТОЛЬКО:
+- healthConditions → mapping в contraindications — **есть** (PopupHealth) ✓
+- drugAllergies → contraindications.allergies — **есть** (PopupClinical) ✓
+- goals → jointMode/neuroMode — **есть** (PopupGoals) ✓
+- stackComplexity → powerLevel + boostEnabled — **есть** (PopupHealth) ✓
+- Прочие поля (pharma/labs/neuro/CI) подтягиваются через hydrateState() из localStorage AutoCalculator (вне BioStackProfile).
+Прочие поля профиля (sex/age/weight/height/experience→PopupPersonal; aasStatus/budget→PopupHealth; currentMeds/adClass→PopupClinical; avoidIds/avoidMeds→PopupLifestyle; targetOrgans→PopupOrgans; targetSystems→PopupSystems) — все присутствуют в ProfileTab и нужны другим табам (Build/Search/Stack). Итог: ВСЕ данные для расчёта клинического стека доступны в едином экране Профиль.
+
+### ❌ Остаётся
+- Визуальная проверка в браузере: единый экран Профиль (sub-pills только «⚙️ Профиль»), автозаполнение кнопкой работает.
+
+### Key Decisions
+- Подвкладки profile сведены к 1 (settings) — НЕ оставлять пустую «Данные».
+- BioStackAIData удалён (правило «нет orphan-файлов») — его функционал (автозаполнение + maxStackSize) перенесён в ProfileTab.
+- DEFAULT_SUB сброс при смене tab предотвращает «залипание» sub-pills от предыдущей вкладки.
+
+### Critical Context
+- BioStackAIScreen.tsx: BSTab type = 6 вкладок; SUB_TAB_GROUPS = {select, stack, reports, interactions, dose, profile:[settings]}; renderContent() switch; lastTabRef для сброса sub.
+- BioStackAIConstants.tsx: SUB_TAB_GROUPS.profile = [{id:'settings',label:'⚙️ Профиль'}].
+- BioStackAIProfile.tsx: ProfileTab (popups: personal/health/goals/organs/systems/lifestyle/clinical) + handleAutoFill + handleQuickStack + completeness. PopupHealth теперь редактирует aasStatus/budget/stackComplexity/maxStackSize/healthConditions.
+- uildClinicalStack (biostack-clinical-recommender.ts:320) — источник истины = runSupportUnified(hydrateState() ⊕ profile).
+- utoFillFromMainProfile (biostack-ai.engine.ts:243) — единственный источник автозаполнения (используется и ProfileTab, и ранее BioStackAIData).
+
+### Relevant Files
+- src/ui/components/BioStackAIScreen.tsx — переписан (6 tabs, sub-pills, DEFAULT_SUB reset, удалён BioStackAIData import)
+- src/ui/components/BioStackAIConstants.tsx — SUB_TAB_GROUPS (profile=[settings])
+- src/ui/components/BioStackAIProfile.tsx — PopupHealth + maxStackSize
+- src/ui/App.tsx — убран мёртвый import SupplementClinicScreen
+- src/ui/components/BioStackAIData.tsx — УДАЛЁН (orphan)
+- src/engines/biostack-clinical-recommender.ts — buildClinicalStack (источник истины профиля)

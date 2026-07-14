@@ -89,7 +89,7 @@ export const VBTCalcTab: React.FC = () => {
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>⚡ VBT / Bar speed калькулятор (Velocity-Based Training)</div>
       <div style={{ ...SMALL, color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}>
-        Тренировка по скорости штанги: нагрузка свяendpoint с %1RM через load-velocity profile (Gonzalez-Badillo / Jovanovic).
+        Тренировка по скорости штанги: нагрузка связана с %1RM через load-velocity profile (Gonzalez-Badillo / Jovanovic).
         <b>1.</b> Целевой intent → прогнозируемый %1RM, скорость, рабочий вес.<br />
         <b>2.</b> e1RM по измеренной скорости и поднятому весу (через LVP).<br />
         <b>3.</b> Velocity-loss анализ: порог потери скорости по intent для авторегулируемого окончания сета.
@@ -129,8 +129,8 @@ export const VBTCalcTab: React.FC = () => {
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>📏 Расчёт e1RM по скорости штанги (измеренной)</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-          <div><div style={{ fontSize: 9, color: DIM, marginBottom: 3 }}>Скорость штанги (м/с)</div><input style={IN} type="number" step="0.01" min={0} max={2} value={measuredVelocity} onChange={e => setMeasuredVelocity(+e.target.value || 0)} placeholder="0.45" /></div>
-          <div><div style={{ fontSize: 9, color: DIM, marginBottom: 3 }}>Поднятый вес (кг)</div><input style={IN} type="number" min={0} max={600} value={measuredWeight} onChange={e => setMeasuredWeight(+e.target.value || 0)} placeholder="150" /></div>
+          <PopupNumber label="Скорость штанги (м/с)" value={measuredVelocity} min={0} max={2} step={0.01} suffix=" м/с" onChange={v => setMeasuredVelocity(v || 0)} />
+          <PopupNumber label="Поднятый вес (кг)" value={measuredWeight} min={0} max={600} suffix=" кг" onChange={v => setMeasuredWeight(v || 0)} />
         </div>
         {velEst ? (
           <div style={ROWStyle(ACCENT)}>
@@ -145,7 +145,7 @@ export const VBTCalcTab: React.FC = () => {
       {/* Velocity-loss анализ */}
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📉 Потеря скорости в сете (velocity-loss)</div>
-        <div style={{ fontSize: 9, color: DIM, marginBottom: 8 }}>Массив скоростей повторов (через запятую): стоп сета при превышении порога {vlThreshold}% (для intent «{INTENT_RU[intent]}»).</div>
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>Массив скоростей повторов (через запятую): стоп сета при превышении порога {vlThreshold}% (для intent «{INTENT_RU[intent]}»).</div>
         <input type="text" value={velocitiesStr} onChange={e => setVelocitiesStr(e.target.value)} style={{ ...IN, textAlign: 'left' as const, marginBottom: 8 }} placeholder="1.0, 0.94, 0.9, 0.86, 0.82" />
         {vlRes ? (
           <>
@@ -195,7 +195,7 @@ export const VBTCalcTab: React.FC = () => {
         ))}
       </ExpandableCard>
 
-      <div style={{ fontSize: 9, color: DIM, marginTop: 12, lineHeight: 1.4 }}>
+      <div style={{ fontSize: 10, color: DIM, marginTop: 12, lineHeight: 1.4 }}>
         Источники: Gonzalez-Badillo & Sanchez-Medina (2010) для приседа/жима; Jovanovic M. (2017) VBT-методология.
         Пороги потери скорости: power 10%, strength 20%, hypertrophy 25%, metabolic 40%.
       </div>
@@ -214,7 +214,7 @@ function ROWStyle(c: string): React.CSSProperties { return { display: 'flex', ju
 function SmallMetric({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div style={{ padding: 8, borderRadius: 8, textAlign: 'center', background: `${color}0f`, border: `1px solid ${color}33` }}>
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{label}</div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{label}</div>
       <div style={{ fontSize: 13, fontWeight: 800, color }}>{value}</div>
     </div>
   );

@@ -122,17 +122,17 @@ export const TempoTab: React.FC = () => {
               style={{
                 padding: '6px 4px', borderRadius: 8, border: '1px solid ' + (selectedGoal === g ? ACCENT : 'rgba(255,255,255,0.08)'),
                 background: selectedGoal === g ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
-                color: selectedGoal === g ? ACCENT : 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 9, fontWeight: 700,
+                color: selectedGoal === g ? ACCENT : 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 10, fontWeight: 700,
                 textAlign: 'center' as const, transition: 'all 0.2s',
               }}
             >
-              <div style={{ fontSize: 8, textTransform: 'uppercase', opacity: 0.6, marginBottom: 2 }}>
+              <div style={{ fontSize: 10, textTransform: 'uppercase', opacity: 0.6, marginBottom: 2 }}>
                 {g === 'strength' ? 'Сила' : g === 'hypertrophy' ? 'Гипертрофия' : g === 'power' ? 'Мощность' : 'Техника'}
               </div>
-              <div style={{ fontSize: 8, color: '#a855f7' }}>
+              <div style={{ fontSize: 10, color: '#a855f7' }}>
                 сост: {goalTempos[g]?.compound || '-'}
               </div>
-              <div style={{ fontSize: 8, color: '#60a5fa' }}>
+              <div style={{ fontSize: 10, color: '#60a5fa' }}>
                 изол: {goalTempos[g]?.isolation || '-'}
               </div>
             </button>
@@ -144,28 +144,28 @@ export const TempoTab: React.FC = () => {
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>
           🎨 Визуальная схема темпа: <span style={{ color: ACCENT, fontFamily: 'monospace', fontSize: 15 }}>{formatTempo(customTempo)}</span>
-          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginLeft: 8 }}>TUL: {totalRepTime}с</span>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginLeft: 8 }}>TUL: {totalRepTime}с</span>
         </div>
 
         <div style={{ display: 'flex', gap: 1, height: 40, marginBottom: 8, borderRadius: 8, overflow: 'hidden' }}>
           {customTempo.eccentric > 0 && (
             <div style={{ flex: customTempo.eccentric / maxPhase * 100, background: PHASE_COLORS.eccentric, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-              <span style={{ fontSize: 7, fontWeight: 800, color: '#000' }}>↓{customTempo.eccentric}с</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#000' }}>↓{customTempo.eccentric}с</span>
             </div>
           )}
           {customTempo.bottomPause > 0 && (
             <div style={{ flex: customTempo.bottomPause / maxPhase * 100, background: PHASE_COLORS.bottomPause, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 7, fontWeight: 800, color: '#000' }}>⊡{customTempo.bottomPause}с</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#000' }}>⊡{customTempo.bottomPause}с</span>
             </div>
           )}
           {customTempo.concentric > 0 && (
             <div style={{ flex: customTempo.concentric / maxPhase * 100, background: PHASE_COLORS.concentric, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 7, fontWeight: 800, color: '#000' }}>↑{customTempo.concentric}с</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#000' }}>↑{customTempo.concentric}с</span>
             </div>
           )}
           {customTempo.topPause > 0 && (
             <div style={{ flex: customTempo.topPause / maxPhase * 100, background: PHASE_COLORS.topPause, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 7, fontWeight: 800, color: '#000' }}>⊤{customTempo.topPause}с</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#000' }}>⊤{customTempo.topPause}с</span>
             </div>
           )}
         </div>
@@ -173,7 +173,7 @@ export const TempoTab: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 4 }}>
           {(['eccentric', 'bottomPause', 'concentric', 'topPause'] as const).map(phase => (
             <div key={phase} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 8, color: PHASE_COLORS[phase], fontWeight: 700, marginBottom: 2 }}>{PHASE_NAMES[phase]}</div>
+              <div style={{ fontSize: 10, color: PHASE_COLORS[phase], fontWeight: 700, marginBottom: 2 }}>{PHASE_NAMES[phase]}</div>
               <input
                 type="range"
                 min={0} max={5} step={1}
@@ -181,7 +181,7 @@ export const TempoTab: React.FC = () => {
                 onChange={e => setCustomTempo(prev => ({ ...prev, [phase]: +e.target.value }))}
                 style={{ width: '100%', accentColor: PHASE_COLORS[phase] }}
               />
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)' }}>{customTempo[phase]}с</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{customTempo[phase]}с</div>
             </div>
           ))}
         </div>
@@ -194,7 +194,7 @@ export const TempoTab: React.FC = () => {
           <div style={{ display: 'flex', gap: 4 }}>
             <button
               onClick={() => setFilterGoal('all')}
-              style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (filterGoal === 'all' ? ACCENT : 'rgba(255,255,255,0.1)'), background: filterGoal === 'all' ? 'rgba(0,230,138,0.1)' : 'transparent', color: filterGoal === 'all' ? ACCENT : 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 9, fontWeight: 700 }}
+              style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (filterGoal === 'all' ? ACCENT : 'rgba(255,255,255,0.1)'), background: filterGoal === 'all' ? 'rgba(0,230,138,0.1)' : 'transparent', color: filterGoal === 'all' ? ACCENT : 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
             >
               Все
             </button>
@@ -202,7 +202,7 @@ export const TempoTab: React.FC = () => {
               <button
                 key={g}
                 onClick={() => setFilterGoal(g)}
-                style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (filterGoal === g ? ACCENT : 'rgba(255,255,255,0.1)'), background: filterGoal === g ? 'rgba(0,230,138,0.1)' : 'transparent', color: filterGoal === g ? ACCENT : 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 9, fontWeight: 700 }}
+                style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (filterGoal === g ? ACCENT : 'rgba(255,255,255,0.1)'), background: filterGoal === g ? 'rgba(0,230,138,0.1)' : 'transparent', color: filterGoal === g ? ACCENT : 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
               >
                 {g === 'strength' ? 'Сила' : g === 'hypertrophy' ? 'Гипер' : g === 'power' ? 'Мощь' : 'Техн'}
               </button>
@@ -234,7 +234,7 @@ export const TempoTab: React.FC = () => {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{preset.nameRu}</span>
-                  <span style={{ fontSize: 9, color: ACCENT, fontFamily: 'monospace', fontWeight: 700 }}>
+                  <span style={{ fontSize: 10, color: ACCENT, fontFamily: 'monospace', fontWeight: 700 }}>
                     {formatTempo(t)}
                     <span style={{ color: 'rgba(255,255,255,0.35)', marginLeft: 4 }}>TUL {repTime}с</span>
                   </span>
@@ -249,11 +249,11 @@ export const TempoTab: React.FC = () => {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}
                     >
-                      <span style={{ fontSize: 9, fontWeight: 800, color: '#000' }}>{p.val}с</span>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: '#000' }}>{p.val}с</span>
                     </div>
                   ))}
                 </div>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>
                   {preset.description}
                 </div>
               </div>
@@ -274,8 +274,8 @@ export const TempoTab: React.FC = () => {
             return (
               <div key={rp.id} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 2 }}>{rp.nameRu}</div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', lineHeight: 1.3, marginBottom: 3 }}>{rp.desc}</div>
-                <div style={{ fontSize: 7, color: '#a855f7', fontFamily: 'monospace', background: 'rgba(168,85,247,0.1)', padding: '1px 5px', borderRadius: 4, display: 'inline-block' }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1.3, marginBottom: 3 }}>{rp.desc}</div>
+                <div style={{ fontSize: 10, color: '#a855f7', fontFamily: 'monospace', background: 'rgba(168,85,247,0.1)', padding: '1px 5px', borderRadius: 4, display: 'inline-block' }}>
                   {engineTempo.tempo.toString}
                 </div>
               </div>
@@ -287,7 +287,7 @@ export const TempoTab: React.FC = () => {
       {/* Как использовать */}
       <div style={{ ...CARD, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)' }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>💡 Как применять темп в плане</div>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
           • <b>Сила (2-1-1-0):</b> контролируй эксцентрику, пауза для снятия инерции, взрывной подъём.<br />
           • <b>Гипертрофия (3-1-1-0):</b> медленный негатив + пауза в растяжении = макс. микротравмы.<br />
           • <b>Мощность (1-0-0-0):</b> компенсаторное ускорение, никаких пауз, макс. скорость.<br />

@@ -136,11 +136,11 @@ export const FatigueIndexTab: React.FC = () => {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           <div style={{ padding: 8, borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)' }}>
-            <div style={{ fontSize: 9, color: DIM }}>Острая (7д)</div>
+            <div style={{ fontSize: 10, color: DIM }}>Острая (7д)</div>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#3b82f6' }}>{Math.round(acwr.acute)} AU/дн</div>
           </div>
           <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.04)' }}>
-            <div style={{ fontSize: 9, color: DIM }}>Хроническая (28д)</div>
+            <div style={{ fontSize: 10, color: DIM }}>Хроническая (28д)</div>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{Math.round(acwr.chronic)} AU/дн</div>
           </div>
         </div>
@@ -181,15 +181,15 @@ export const FatigueIndexTab: React.FC = () => {
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📈 Тренд нагрузки</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
-          <div><div style={{ fontSize: 9, color: DIM, marginBottom: 3 }}>Окно тренда</div>
+          <div><div style={{ fontSize: 10, color: DIM, marginBottom: 3 }}>Окно тренда</div>
             <PopupSelect label="" value={String(trendDays)} options={trendOpts} onChange={v => setTrendDays(+v)} />
           </div>
           <div>
-            <div style={{ fontSize: 9, color: DIM, marginBottom: 3 }}>Slope (AU/дн)</div>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 3 }}>Slope (AU/дн)</div>
             <div style={{ ...IN, display: 'flex', alignItems: 'center', justifyContent: 'center', color: trend.trend === 'up' ? '#ef4444' : trend.trend === 'down' ? '#3b82f6' : '#fff' }}>{trend.slope.toFixed(2)}</div>
           </div>
           <div>
-            <div style={{ fontSize: 9, color: DIM, marginBottom: 3 }}>Тренд %</div>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 3 }}>Тренд %</div>
             <div style={{ ...IN, display: 'flex', alignItems: 'center', justifyContent: 'center', color: trend.trend === 'up' ? '#ef4444' : trend.trend === 'down' ? '#3b82f6' : '#fff', fontWeight: 700 }}>
               {trend.pct > 0 ? '↑' : trend.pct < 0 ? '↓' : '—'} {Math.abs(trend.pct)}%
             </div>
@@ -234,7 +234,7 @@ export const FatigueIndexTab: React.FC = () => {
         {trend.trend === 'down' && trend.pct < -10 && <div style={{ padding: 8, borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', color: '#60a5fa', fontSize: 11, marginBottom: 6 }}>📉 Тренд падает ({trend.pct}%): разгрузка или недогруз.</div>}
       </div>
 
-      <div style={{ fontSize: 9, color: DIM, marginTop: 12, lineHeight: 1.4 }}>
+      <div style={{ fontSize: 10, color: DIM, marginTop: 12, lineHeight: 1.4 }}>
         Foster C., Impellizzeri F. (2017) — sRPE × длительность = AU. EWMA: Rollisson et al. — α=2/(N+1). ACWR zones (Gabbett): 0.8-1.3 optimum, &gt;1.5 опасно. Монотонность &gt;2 — высокий риск перетрена (Foster).
       </div>
 {acwr && (
@@ -250,7 +250,7 @@ export const FatigueIndexTab: React.FC = () => {
 function TrendBar({ acuteTrend, chronicTrend }: { acuteTrend: { pct: number; trend: string }; chronicTrend: { pct: number; trend: string } }) {
   const mk = (t: { pct: number; trend: string }, label: string, color: string) => (
     <div style={{ padding: 8, borderRadius: 8, background: `${color}0a`, border: `1px solid ${color}22`, textAlign: 'center' as const }}>
-      <div style={{ fontSize: 9, color: DIM }}>{label}</div>
+      <div style={{ fontSize: 10, color: DIM }}>{label}</div>
       <div style={{ fontSize: 13, fontWeight: 800, color }}>{t.trend === 'up' ? '↑' : t.trend === 'down' ? '↓' : '—'} {Math.abs(t.pct)}%</div>
     </div>
   );

@@ -135,10 +135,10 @@ const StandardForecastCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }
               <span style={{ fontSize: 11, fontWeight: 600 }}>{r.lift}</span>
               <span style={{ fontSize: 11, fontWeight: 700, color: '#00e68a' }}>{r.current} кг</span>
             </div>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>
               {r.name.length > 25 ? r.name.slice(0, 23) + '…' : r.name}
             </div>
-            <div style={{ display: 'flex', gap: 8, fontSize: 9 }}>
+            <div style={{ display: 'flex', gap: 8, fontSize: 10 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ color: 'var(--text-dim)', marginBottom: 2 }}>МС ({r.std.ms} кг) — {msPct}%</div>
                 <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
@@ -164,7 +164,7 @@ const StandardForecastCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }
       {forecasts.lifts.length >= 2 && (
         <div style={{ fontSize: 10, padding: '4px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.06)', marginTop: 4 }}>
           <div style={{ fontWeight: 600, marginBottom: 2 }}>Сумма: {forecasts.total.current} / {forecasts.total.ms} кг (МС)</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 9 }}>
+          <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>
             {forecasts.total.current >= forecasts.total.ms
               ? '✅ Норматив МС по сумме выполнен'
               : `При текущем темпе (+${forecasts.avgGain.toFixed(1)} кг/нед в среднем) МС по сумме достигается через ${formatWeeks((forecasts.total.ms - forecasts.total.current) / Math.max(0.1, forecasts.avgGain * forecasts.lifts.length))}`}

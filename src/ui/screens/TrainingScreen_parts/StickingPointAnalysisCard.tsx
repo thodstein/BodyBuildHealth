@@ -116,21 +116,21 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
               </div>
               {active.diagnosis && (
                 <>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>
                     {active.diagnosis.biomechanicalReason}
                   </div>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>
                     Слабые мышцы: {active.diagnosis.weakMuscles.join(', ')}
                   </div>
-                  <div style={{ fontSize: 9 }}>
+                  <div style={{ fontSize: 10 }}>
                     <span style={{ color: '#22c55e' }}>Корректирующие упражнения:</span>
                     <ul style={{ margin: '2px 0 0 14px', padding: 0 }}>
                       {active.diagnosis.corrections.slice(0, 4).map((c: string, i: number) => (
-                        <li key={i} style={{ color: 'var(--text-dim)', fontSize: 9, marginBottom: 1 }}>{c}</li>
+                        <li key={i} style={{ color: 'var(--text-dim)', fontSize: 10, marginBottom: 1 }}>{c}</li>
                       ))}
                     </ul>
                   </div>
-                  <div style={{ fontSize: 9, color: '#818cf8', marginTop: 2 }}>
+                  <div style={{ fontSize: 10, color: '#818cf8', marginTop: 2 }}>
                     🎯 {active.diagnosis.loadCues}
                   </div>
                 </>
@@ -138,7 +138,7 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
             </div>
           )}
           {active.totalFailedSets === 0 && (
-            <div style={{ fontSize: 9, color: '#22c55e', padding: '4px 6px', background: 'rgba(34,197,94,0.08)', borderRadius: 4 }}>
+            <div style={{ fontSize: 10, color: '#22c55e', padding: '4px 6px', background: 'rgba(34,197,94,0.08)', borderRadius: 4 }}>
               ✅ Срывов не обнаружено. Прогрессия стабильна.
             </div>
           )}
@@ -146,7 +146,7 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
       )}
 {active && active.diagnosis && active.diagnosis.weakMuscles && active.diagnosis.weakMuscles.length > 0 && (() => { const mapM = (m: string) => { const l = m.toLowerCase(); if (/трицеп|бицеп|arm/.test(l)) return 'arms'; if (/дельт|плеч|shoulder/.test(l)) return 'shoulders'; if (/груд|chest|pec/.test(l)) return 'chest'; if (/спин|широк|трап|back|lat/.test(l)) return 'back'; if (/квадр|ягод|икр|бедр|ног|leg|quad|glute|calf/.test(l)) return 'legs'; if (/пресс|кор|core|ab/.test(l)) return 'core'; return null; }; const groups = Array.from(new Set(active.diagnosis.weakMuscles.map(mapM).filter(Boolean) as string[])); return (
       <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>🔗 Слабые мышцы по срывам «{active.label}»: {active.diagnosis.weakMuscles.join(', ')} → приоритет групп планировщику.</div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>🔗 Слабые мышцы по срывам «{active.label}»: {active.diagnosis.weakMuscles.join(', ')} → приоритет групп планировщику.</div>
         <button onClick={() => applyToPlanner({ kind: 'weakpoints', label: 'Срывы ' + active.label + ': ' + groups.join(', '), data: { groups, lift: active.lift } })} style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 12, minHeight: 40 }}>🛠 Слабые мышцы → планировщик</button>
       </div>
     ); })()}

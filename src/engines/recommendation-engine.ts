@@ -350,7 +350,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
     const ldlSev: SeverityLevel = (state.cardio.ldlElevation === 'severe' || (ldlVal !== null && ldlVal > 4.5)) ? 'severe' : 'moderate';
     const priorityIds = getPrioritySubstances('LDL', ldlSev).map(e => e.substanceId);
     let ids: string[] = priorityIds.length >= 2 ? [...priorityIds] : findSupportByMechanisms(['CHOLESTEROL_REDUCTION', 'AMPK_ACTIVATION', 'LIPID_LOWERING', 'EPA_DHA_UP']);
-    if (ids.length < 3) ids = ['bergamot', 'berberine', 'omega3', 'vitamin_e', 'coq10'];
+    if (ids.length < 3) ids = ['bergamot', 'berberine', 'red_yeast_rice', 'vitamin_e', 'coq10'];
     const reasoning: Record<string, string> = {};
     ids.forEach(id => { reasoning[id] = getPriorityReason('LDL', id) || getSupportEntry(id)?.description?.slice(0, 80) || 'Липидная поддержка'; });
     if (state.cardio.ldlElevation === 'severe' || (ldlVal !== null && ldlVal > 4.5)) {
@@ -483,7 +483,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
   if (crpVal !== null && crpVal > 5) {
     const crpSev: SeverityLevel = crpVal > 20 ? 'severe' : 'moderate';
     const priorityIds = getPrioritySubstances('CRP', crpSev).map(e => e.substanceId);
-    const ids = priorityIds.length >= 2 ? priorityIds : ['omega3', 'curcumin_sup', 'ashwagandha', 'probiotic'];
+    const ids = priorityIds.length >= 2 ? priorityIds : ['curcumin_sup', 'berberine', 'bergamot', 'omega3', 'ashwagandha'];
     const reasoning: Record<string, string> = {};
     ids.forEach(id => { reasoning[id] = getPriorityReason('CRP', id) || 'Противовоспалительная поддержка'; });
     addRec('lab_crp', 'medium', '', 'Воспаление',
@@ -692,7 +692,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
     { condition: state.profile.workoutsPerWeek <= 2 || state.profile.avgWorkoutMinutes < 30, id:'training_low', severity:'info', system:'', label:'Тренировки', title:`Низкая активность: ${state.profile.workoutsPerWeek}×/нед`, mechanisms:['MITOCHONDRIAL_ENERGY','CIRCULATION_ENHANCEMENT'], fallback:['citrulline','taurine','shilajit'], reasoning:'Повышение энергии и кровотока', escalation:'Увеличить активность до 3×/нед', monitoring:'Вес, состав тела, АД' },
 
     // ── Nutrition ──
-    { condition: state.nutrition.omega3 === false && maxLipid > 0, id:'nutrition_omega3', severity:'low', system:'cardio', label:'Питание', title:'Омега-3 не принимается → добавить', mechanisms:['EPA_DHA_UP','ANTIINFLAMMATORY'], categories:['fatty_acid'], fallback:['omega3'], reasoning:'Липидная поддержка', escalation:'EPA+DHA минимум 2000 мг/день', monitoring:'Липидограмма' },
+    { condition: state.nutrition.omega3 === false && maxLipid > 0, id:'nutrition_omega3', severity:'low', system:'cardio', label:'Питание', title:'Омега-3 (очищенный ЭПК) — при ↑ триглицеридов', mechanisms:['TRIGLYCERIDE_LOWERING','EPA_DHA_UP'], categories:['fatty_acid'], fallback:['omega3'], reasoning:'Снижение триглицеридов — только очищенный ЭПК (Омакор). Для ↑ ЛПНП эффективнее бергамот/берберин/красный рис', escalation:'Омакор (икосапент этил) 2-4 г/день только при ТГ>2.3 ммоль/л или аритмии', monitoring:'Липидограмма (ТГ), АЛТ' },
     { condition: (state.nutrition.fiberG || 0) < 20, id:'nutrition_fiber', severity:'low', system:'', label:'Питание', title:`Клетчатка ${state.nutrition.fiberG} г/день (< 20 г)`, mechanisms:['GUT_BARRIER_INTEGRITY','SHORT_CHAIN_FATTY_ACID_PRODUCTION','BINDING_TOXINS'], categories:['gastrointestinal'], fallback:['psyllium','glutamine','probiotic'], reasoning:'Поддержка ЖКТ, связывание токсинов', escalation:'↑ овощи, клетчатка до 30 г/день', monitoring:'Стул, альбумин, липиды' },
     { condition: (state.nutrition.waterL || 0) < 2, id:'nutrition_water', severity:'low', system:'renal', label:'Питание', title:`Гидратация ${state.nutrition.waterL} л/день (< 2 л)`, mechanisms:['OSMOREGULATION','RENOPROTECTION'], fallback:['taurine'], reasoning:'Улучшение гидратации', escalation:'Пить 3+ л/день, особенно на ААС', monitoring:'HCT, креатинин, мочевина' },
     { condition: state.nutrition.saltIntake === 'high' && (state.cardio.bpStage !== 'normal' || state.cardio.heartRate > 85), id:'nutrition_salt', severity:'low', system:'cardio', label:'Питание', title:'Избыток соли при склонности к ↑ АД', mechanisms:['BP_REDUCTION','OSMOREGULATION'], fallback:['telmisartan','taurine'], reasoning:'Контроль АД и натрия', escalation:'↓ соль до 3-5 г/день', monitoring:'АД, Na, K' },

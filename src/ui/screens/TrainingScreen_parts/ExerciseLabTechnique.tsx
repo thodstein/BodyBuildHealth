@@ -124,11 +124,11 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare }) => {
           <div style={{ width: 42, height: 42, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `conic-gradient(${getRiskColor(score.level)} ${score.total * 3.6}deg, rgba(255,255,255,0.06) 0)`, margin: '0 auto' }}>
             <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: -1 }}>{score.total}</div>
           </div>
-          <div style={{ fontSize: 7, color: getRiskColor(score.level), marginTop: 1, fontWeight: 700 }}>{score.label}</div>
+          <div style={{ fontSize: 10, color: getRiskColor(score.level), marginTop: 1, fontWeight: 700 }}>{score.label}</div>
         </div>
       </div>
-      {ex.technique && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, marginTop: 6, fontStyle: 'italic' }}>{ex.technique.length > 140 ? ex.technique.slice(0, 140) + '…' : ex.technique}</div>}
-      <div style={{ display: 'flex', gap: 10, marginTop: 6, fontSize: 9 }}>
+      {ex.technique && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, marginTop: 6, fontStyle: 'italic' }}>{ex.technique.length > 140 ? ex.technique.slice(0, 140) + '…' : ex.technique}</div>}
+      <div style={{ display: 'flex', gap: 10, marginTop: 6, fontSize: 10 }}>
         <span>{getJointEmoji(ex.jointStress)} Суставы: {ex.jointStress === 'high' ? 'высокая' : ex.jointStress === 'med' ? 'средняя' : 'низкая'}</span>
         {bio && <span>🧠 ЦНС: {bio.cnsDemand}/5</span>}
         <span style={{ color: getRiskColor(safety.level) }}>{safety.level === 'safe' ? '✅ Безоп.' : safety.level === 'moderate' ? '⚠️ Вним.' : '🚫 Риск.'}</span>
@@ -161,7 +161,7 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare }) => {
         <PopupSelect label="Целевая группа" value={group} options={GROUPS.filter(g => g !== 'all').map(g => ({ id: g, label: `${GROUP_ICON[g] || ''} ${GROUP_RU[g]}`, desc: '' }))} hint="Группа" onChange={v => { setGroup(v); setExpandedEx(null); setExpandedRegion(null); }} />
         {viewMode === 'list' && (
           <div>
-            <div style={{ fontSize: 9, color: DIM, fontWeight: 600, marginBottom: 2 }}>Поиск</div>
+            <div style={{ fontSize: 10, color: DIM, fontWeight: 600, marginBottom: 2 }}>Поиск</div>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Название упражнения…" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 11, boxSizing: 'border-box', width: '100%' }} />
           </div>
         )}
@@ -169,15 +169,15 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare }) => {
 
       {viewMode === 'list' && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10, alignItems: 'center' }}>
-          <span style={{ fontSize: 9, color: DIM, fontWeight: 600, marginRight: 2 }}>Тип:</span>
+          <span style={{ fontSize: 10, color: DIM, fontWeight: 600, marginRight: 2 }}>Тип:</span>
           {(['all', 'compound', 'isolation'] as const).map(t => <button key={t} onClick={() => setFilterType(t)} style={filterBtn(filterType === t)}>{t === 'all' ? 'Все' : TYPE_RU[t]}</button>)}
-          <span style={{ fontSize: 9, color: DIM, fontWeight: 600, marginLeft: 8, marginRight: 2 }}>Уровень:</span>
+          <span style={{ fontSize: 10, color: DIM, fontWeight: 600, marginLeft: 8, marginRight: 2 }}>Уровень:</span>
           {(['all', 'beginner', 'intermediate', 'advanced'] as const).map(d => <button key={d} onClick={() => setFilterDiff(d)} style={filterBtn(filterDiff === d)}>{d === 'all' ? 'Все' : d === 'beginner' ? 'Новичок' : d === 'advanced' ? 'Продв.' : 'Средний'}</button>)}
-          <span style={{ fontSize: 9, color: DIM, fontWeight: 600, marginLeft: 8, marginRight: 2 }}>Оборуд.:</span>
+          <span style={{ fontSize: 10, color: DIM, fontWeight: 600, marginLeft: 8, marginRight: 2 }}>Оборуд.:</span>
           <select value={filterEquip} onChange={e => setFilterEquip(e.target.value)} style={{ padding: '3px 8px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.3)', color: DIM, fontSize: 10 }}>
             {equipmentOptions.map(eq => <option key={eq} value={eq}>{eq === 'all' ? 'Всё' : EQUIP_RU[eq] || eq}</option>)}
           </select>
-          <span style={{ fontSize: 9, color: DIM, fontWeight: 600, marginLeft: 8, marginRight: 2 }}>Щадящий:</span>
+          <span style={{ fontSize: 10, color: DIM, fontWeight: 600, marginLeft: 8, marginRight: 2 }}>Щадящий:</span>
           <select value={filterJoint} onChange={e => setFilterJoint(e.target.value)} style={{ padding: '3px 8px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.3)', color: DIM, fontSize: 10 }}>
             <option value="all">Все</option><option value="spine">Позвоночник</option><option value="knee">Колени</option><option value="shoulder">Плечи</option><option value="elbow">Локти</option><option value="hip">Таз</option>
           </select>
@@ -205,11 +205,11 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare }) => {
                 </div>
                 <div style={{ textAlign: 'center', minWidth: 70 }}>
                   <div style={{ fontSize: 24, fontWeight: 800, color: SUB_REGION_COLORS[srIdx % SUB_REGION_COLORS.length] }}>{filteredExs.length}</div>
-                  <div style={{ fontSize: 9, color: DIM }}>упражнений</div>
+                  <div style={{ fontSize: 10, color: DIM }}>упражнений</div>
                 </div>
               </div>
               <div style={{ textAlign: 'center', marginTop: 8 }}>
-                <button style={{ padding: '3px 12px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: DIM, cursor: 'pointer', fontSize: 9, fontWeight: 600 }}>{isRegionExpanded ? '▲ Свернуть' : '▼ Развернуть'}</button>
+                <button style={{ padding: '3px 12px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: DIM, cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>{isRegionExpanded ? '▲ Свернуть' : '▼ Развернуть'}</button>
               </div>
             </div>
             {isRegionExpanded && (
@@ -229,15 +229,15 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare }) => {
                         {ex.comments && (
                           <div style={{ marginTop: 8 }}>
                             <div style={secTitle}>💬 Комментарий</div>
-                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4, fontStyle: 'italic' }}>{ex.comments}</div>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4, fontStyle: 'italic' }}>{ex.comments}</div>
                           </div>
                         )}
                       </>}
                       <div style={{ marginTop: isExpanded ? 10 : 4, textAlign: 'center', display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <button onClick={() => toggleExpandEx(ex.id)} style={{ padding: '3px 14px', borderRadius: 14, border: '1px solid rgba(0,230,138,0.15)', background: isExpanded ? 'rgba(0,230,138,0.06)' : 'transparent', color: isExpanded ? ACCENT : DIM, cursor: 'pointer', fontSize: 9, fontWeight: 600 }}>{isExpanded ? '▲ Свернуть' : '▼ Разбор'}</button>
+                        <button onClick={() => toggleExpandEx(ex.id)} style={{ padding: '3px 14px', borderRadius: 14, border: '1px solid rgba(0,230,138,0.15)', background: isExpanded ? 'rgba(0,230,138,0.06)' : 'transparent', color: isExpanded ? ACCENT : DIM, cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>{isExpanded ? '▲ Свернуть' : '▼ Разбор'}</button>
                         {isExpanded && <>
-                          <button onClick={() => printExercise(ex.id, printId)} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>🖨 Печать</button>
-                          <button onClick={() => { navigator.clipboard.writeText(document.getElementById(printId)?.innerText || ''); }} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)', color: '#60a5fa', cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>📋 Копировать</button>
+                          <button onClick={() => printExercise(ex.id, printId)} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 600, fontSize: 10 }}>🖨 Печать</button>
+                          <button onClick={() => { navigator.clipboard.writeText(document.getElementById(printId)?.innerText || ''); }} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)', color: '#60a5fa', cursor: 'pointer', fontWeight: 600, fontSize: 10 }}>📋 Копировать</button>
                         </>}
                       </div>
                       {isExpanded && <div id={printId} style={{ display: 'none' }}>
@@ -271,15 +271,15 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare }) => {
               {ex.comments && (
                 <div style={{ marginTop: 8 }}>
                   <div style={secTitle}>💬 Комментарий</div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4, fontStyle: 'italic' }}>{ex.comments}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4, fontStyle: 'italic' }}>{ex.comments}</div>
                 </div>
               )}
             </>}
             <div style={{ marginTop: isExpanded ? 10 : 4, textAlign: 'center', display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <button onClick={() => toggleExpandEx(ex.id)} style={{ padding: '3px 14px', borderRadius: 14, border: '1px solid rgba(0,230,138,0.15)', background: isExpanded ? 'rgba(0,230,138,0.06)' : 'transparent', color: isExpanded ? ACCENT : DIM, cursor: 'pointer', fontSize: 9, fontWeight: 600 }}>{isExpanded ? '▲ Свернуть разбор' : '▼ Развернуть разбор'}</button>
+              <button onClick={() => toggleExpandEx(ex.id)} style={{ padding: '3px 14px', borderRadius: 14, border: '1px solid rgba(0,230,138,0.15)', background: isExpanded ? 'rgba(0,230,138,0.06)' : 'transparent', color: isExpanded ? ACCENT : DIM, cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>{isExpanded ? '▲ Свернуть разбор' : '▼ Развернуть разбор'}</button>
               {isExpanded && <>
-                <button onClick={() => printExercise(ex.id, printId)} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>🖨 Печать</button>
-                <button onClick={() => { navigator.clipboard.writeText(document.getElementById(printId)?.innerText || ''); }} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)', color: '#60a5fa', cursor: 'pointer', fontWeight: 600, fontSize: 9 }}>📋 Копировать</button>
+                <button onClick={() => printExercise(ex.id, printId)} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 600, fontSize: 10 }}>🖨 Печать</button>
+                <button onClick={() => { navigator.clipboard.writeText(document.getElementById(printId)?.innerText || ''); }} style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)', color: '#60a5fa', cursor: 'pointer', fontWeight: 600, fontSize: 10 }}>📋 Копировать</button>
               </>}
             </div>
             {isExpanded && <div id={printId} style={{ display: 'none' }}>

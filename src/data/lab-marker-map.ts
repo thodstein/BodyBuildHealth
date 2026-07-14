@@ -62,7 +62,7 @@ export const LAB_MARKER_MAP: LabMarkerMap[] = [
   { marker:'RETICULOCYTES', name:'Ретикулоциты', organ:'BLOOD', system:'hematologic', mechanisms:['ERYTHROPOIESIS','HEMOGLOBIN_SYNTHESIS'], higherIsWorse:true, defaultValue:2.5, unit:'%', correctionIds:['iron_supplement','folate','vitamin_b12'] },
   { marker:'ERYTHROPOIETIN', name:'Эритропоэтин', organ:'BLOOD', system:'hematologic', mechanisms:['ERYTHROPOIESIS','IRON_METABOLISM'], higherIsWorse:true, defaultValue:25, unit:'мМЕ/мл', correctionIds:['serrapeptase','nattokinase'] },
   { marker:'HAPTOGLOBIN', name:'Гаптоглобин', organ:'BLOOD', system:'hematologic', mechanisms:['ANTIOXIDANT','HEMOGLOBIN_SYNTHESIS'], higherIsWorse:false, defaultValue:0.5, unit:'г/л', correctionIds:['vitamin_e','curcumin_sup','alpha_lipoic'] },
-  { marker:'ESR', name:'СОЭ', organ:'BLOOD', system:'hematologic', mechanisms:['ANTIINFLAMMATORY','NF_KB_INHIBITION','COX2_INHIBITION'], higherIsWorse:true, defaultValue:20, unit:'мм/ч', correctionIds:['omega3','curcumin_sup','ashwagandha'] },
+  { marker:'ESR', name:'СОЭ', organ:'BLOOD', system:'hematologic', mechanisms:['ANTIINFLAMMATORY','NF_KB_INHIBITION','COX2_INHIBITION'], higherIsWorse:true, defaultValue:20, unit:'мм/ч', correctionIds:['curcumin_sup','omega3','ashwagandha'] },
 
   // ─── COAGULATION ───
   { marker:'D-dimer', name:'D-димер', organ:'BLOOD', system:'hematologic', mechanisms:['PLATELET_AGGREGATION_INHIBITION','FIBRINOLYSIS','ANTICOAGULANT'], higherIsWorse:true, defaultValue:0.5, unit:'мкг/мл', correctionIds:['serrapeptase','nattokinase','naringin','lumbrokinase','aspirin'] },
@@ -113,9 +113,9 @@ export const LAB_MARKER_MAP: LabMarkerMap[] = [
   { marker:'LIPASE', name:'Липаза', organ:'PANCREAS', system:'metabolic', mechanisms:['ANTIINFLAMMATORY'], higherIsWorse:true, defaultValue:60, unit:'U/L', correctionIds:['curcumin_sup','omega3'] },
 
   // ─── INFLAMMATION / Immune ───
-  { marker:'CRP', name:'СРБ', organ:'LIVER', system:'hematologic', mechanisms:['ANTIINFLAMMATORY','NF_KB_INHIBITION','COX2_INHIBITION'], higherIsWorse:true, defaultValue:5, unit:'мг/л', correctionIds:['omega3','curcumin_sup','ashwagandha','probiotic'] },
-  { marker:'TNF_ALPHA', name:'ФНО-α', organ:'IMMUNE_SYSTEM', system:'immune', mechanisms:['NF_KB_INHIBITION','ANTIINFLAMMATORY'], higherIsWorse:true, defaultValue:8, unit:'пг/мл', correctionIds:['omega3','curcumin_sup','ashwagandha'] },
-  { marker:'IL6', name:'ИЛ-6', organ:'IMMUNE_SYSTEM', system:'immune', mechanisms:['NF_KB_INHIBITION','ANTIINFLAMMATORY'], higherIsWorse:true, defaultValue:7, unit:'пг/мл', correctionIds:['omega3','curcumin_sup','vitamin_d3'] },
+  { marker:'CRP', name:'СРБ', organ:'LIVER', system:'hematologic', mechanisms:['ANTIINFLAMMATORY','NF_KB_INHIBITION','COX2_INHIBITION'], higherIsWorse:true, defaultValue:5, unit:'мг/л', correctionIds:['curcumin_sup','berberine','bergamot','omega3','ashwagandha','probiotic'] },
+  { marker:'TNF_ALPHA', name:'ФНО-α', organ:'IMMUNE_SYSTEM', system:'immune', mechanisms:['NF_KB_INHIBITION','ANTIINFLAMMATORY'], higherIsWorse:true, defaultValue:8, unit:'пг/мл', correctionIds:['curcumin_sup','berberine','omega3','ashwagandha'] },
+  { marker:'IL6', name:'ИЛ-6', organ:'IMMUNE_SYSTEM', system:'immune', mechanisms:['NF_KB_INHIBITION','ANTIINFLAMMATORY'], higherIsWorse:true, defaultValue:7, unit:'пг/мл', correctionIds:['curcumin_sup','berberine','bergamot','omega3','vitamin_d3'] },
   { marker:'IL1B', name:'ИЛ-1β', organ:'IMMUNE_SYSTEM', system:'immune', mechanisms:['NF_KB_INHIBITION','ANTIINFLAMMATORY'], higherIsWorse:true, defaultValue:5, unit:'пг/мл', correctionIds:['omega3','curcumin_sup'] },
 
   // ─── METABOLIC / General ───

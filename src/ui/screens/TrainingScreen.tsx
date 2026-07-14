@@ -445,7 +445,7 @@ export const TrainingScreen: React.FC = () => {
               {ZONE_ORDER.map(z => {
                 const group = ZONES[z];
                 return (
-                <button key={z} onClick={() => { hapticImpact('light'); setPage('tabs'); setZone(z); if (z !== 'planner' && z !== 'calculators') setTab(group.tabs[0]); }} style={{
+                <button key={z} onClick={() => { hapticImpact('light'); setPage('tabs'); setZone(z); if (z === 'calculators') setTab('runtime'); else if (z !== 'planner') setTab(group.tabs[0]); }} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
                   background: 'rgba(20,22,30,0.35)', border: '1px solid var(--glass-border)', color: 'var(--text)',
                   transition: 'all 0.2s',

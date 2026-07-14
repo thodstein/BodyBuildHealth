@@ -21,7 +21,7 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
     <div style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(0,230,138,0.2)', padding: 12, margin: '0 0 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT }}>🧬 Профиль тренированности</div>
-        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>единый источник данных</span>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>единый источник данных</span>
       </div>
 
       <div style={LABEL}>Цель и уровень</div>
@@ -89,23 +89,23 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginBottom: 6 }}>Указанные группы исключаются из генерации плана на активный период.</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr auto', gap: 6, marginBottom: 8, alignItems: 'end' }}>
               <div>
-                <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Группа</label>
+                <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Группа</label>
                 <select value={injMuscle} onChange={e => setInjMuscle(e.target.value)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 8px', fontSize: 11 }}>
                   {INJ_GROUPS.map(([g, l]) => <option key={g} value={g}>{l}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>С</label>
+                <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>С</label>
                 <input type="date" value={injFrom} onChange={e => setInjFrom(e.target.value)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 8px', fontSize: 11 }} />
               </div>
               <div>
-                <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>До (опц)</label>
+                <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>До (опц)</label>
                 <input type="date" value={injTo} onChange={e => setInjTo(e.target.value)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 8px', fontSize: 11 }} />
               </div>
               <div style={{ display: 'flex', gap: 6, marginTop: 4, alignItems: 'center', gridColumn: '1 / -1' }}>
-                <button onClick={() => { setInjGraded(!injGraded); setInjExclude(false); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 9, fontWeight: 700, cursor: 'pointer', border: injGraded ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)', background: injGraded ? 'rgba(245,158,11,0.1)' : 'transparent', color: injGraded ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>⚡ Щадящая</button>
-                <button onClick={() => { setInjExclude(!injExclude); setInjGraded(false); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 9, fontWeight: 700, cursor: 'pointer', border: injExclude ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.08)', background: injExclude ? 'rgba(239,68,68,0.1)' : 'transparent', color: injExclude ? '#ef4444' : 'rgba(255,255,255,0.4)' }}>⛔ Исключить</button>
-                {injGraded && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Вес {injWeightPct}% · Объём {injVolPct}% · Повт ≤{injRepsCap}</span>}
+                <button onClick={() => { setInjGraded(!injGraded); setInjExclude(false); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: injGraded ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)', background: injGraded ? 'rgba(245,158,11,0.1)' : 'transparent', color: injGraded ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>⚡ Щадящая</button>
+                <button onClick={() => { setInjExclude(!injExclude); setInjGraded(false); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: injExclude ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.08)', background: injExclude ? 'rgba(239,68,68,0.1)' : 'transparent', color: injExclude ? '#ef4444' : 'rgba(255,255,255,0.4)' }}>⛔ Исключить</button>
+                {injGraded && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Вес {injWeightPct}% · Объём {injVolPct}% · Повт ≤{injRepsCap}</span>}
               </div>
               {injGraded && (
                 <div style={{ display: 'flex', gap: 6, gridColumn: '1 / -1', alignItems: 'center' }}>
@@ -125,7 +125,7 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
                   return (
                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', borderRadius: 6, background: active ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.02)', border: '1px solid ' + (active ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.04)') }}>
                       <span style={{ fontSize: 11, color: active ? '#fca5a5' : 'rgba(255,255,255,0.4)' }}>{ru} · {inj.from}–{inj.to || '…'}{active ? ' · активна' : ''}</span>
-                      <button onClick={() => update({ injuries: (profile.injuries || []).filter((_: any, j: number) => j !== i) })} style={{ padding: '2px 7px', borderRadius: 4, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: 9, cursor: 'pointer' }}>✕</button>
+                      <button onClick={() => update({ injuries: (profile.injuries || []).filter((_: any, j: number) => j !== i) })} style={{ padding: '2px 7px', borderRadius: 4, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: 10, cursor: 'pointer' }}>✕</button>
                     </div>
                   );
                 })}
@@ -140,7 +140,7 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
         <PopupSelect label='На курсе' value={profile.onCourse ? 'yes' : 'no'} onChange={v => update({ onCourse: v === 'yes' })} options={[['no','Нет (натурал)'],['yes','Да (на курсе)']].map(([id,l]) => ({ id, label: l }))} />
         <PopupSelect label='Интенсивность курса' value={profile.courseIntensity} onChange={v => update({ courseIntensity: v as any })} options={[['mild','Лёгкая'],['moderate','Умеренная'],['heavy','Тяжёлая']].map(([id,l]) => ({ id, label: l }))} />
       </div>
-      {profile.onCourse && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>На курсе MRV повышается (~+20-30%), восстановление учитывается в готовности.</div>}
+      {profile.onCourse && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>На курсе MRV повышается (~+20-30%), восстановление учитывается в готовности.</div>}
 
       <div style={{ ...LABEL, marginTop: 10 }}>📊 Фармакологическая история</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
@@ -148,7 +148,7 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
         <PopupNumber label="С последнего курса" value={profile.monthsSinceLastCourse} min={0} max={999} suffix=" мес" onChange={v => update({ monthsSinceLastCourse: v })} />
         <PopupNumber label="Лет на фарме" value={profile.totalYearsOnPharma} min={0} max={50} suffix=" лет" onChange={v => update({ totalYearsOnPharma: v })} />
       </div>
-      {compact !== true && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>Эти данные используются ПЛ, ББ, ручным конструктором и калькуляторами для расчётов.</div>}
+      {compact !== true && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>Эти данные используются ПЛ, ББ, ручным конструктором и калькуляторами для расчётов.</div>}
     </div>
   );
 };

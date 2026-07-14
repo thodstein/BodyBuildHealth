@@ -193,8 +193,9 @@ function PopupHealth({ profile, u, onClose }: { profile: BioStackProfile; u: (p:
   const [aas, setAas] = useState(profile.aasStatus);
   const [budget, setBudget] = useState(profile.budget);
   const [compl, setCompl] = useState(profile.stackComplexity);
+  const [maxSize, setMaxSize] = useState(profile.maxStackSize || 8);
   const [conds, setConds] = useState<typeof profile.healthConditions>([...profile.healthConditions]);
-  const save = () => { u({ aasStatus: aas, healthConditions: conds, budget, stackComplexity: compl }); onClose(); };
+  const save = () => { u({ aasStatus: aas, healthConditions: conds, budget, stackComplexity: compl, maxStackSize: maxSize }); onClose(); };
   return <PopupOverlay title="Здоровье и режим" icon="🫀" color="#ef4444" onClose={onClose}>
     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:6 }}>
       <select value={aas} onChange={e => setAas(e.target.value as AASStatus)}
@@ -212,6 +213,11 @@ function PopupHealth({ profile, u, onClose }: { profile: BioStackProfile; u: (p:
         style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:10,appearance:'none'}}>
         <option value="minimal">🔵 Минимальный стек (3-5 БАДов)</option><option value="balanced">🟢 Средний стек (5-10)</option><option value="maximum">🔴 Максимальный (10-20)</option>
       </select>
+    </div>
+    <div style={{marginBottom:6}}>
+      <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',marginBottom:2,display:'block'}}>📦 Макс. размер стека (число веществ):</label>
+      <input type="number" value={maxSize} min={1} max={30} onChange={e => setMaxSize(Math.max(1, Math.min(30, Number(e.target.value) || 1)))}
+        style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:11,textAlign:'center',boxSizing:'border-box'}} />
     </div>
     <div style={{fontSize:9,color:'rgba(255,255,255,0.5)',marginBottom:4}}>🩺 Состояния здоровья:</div>
     <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:4 }}>

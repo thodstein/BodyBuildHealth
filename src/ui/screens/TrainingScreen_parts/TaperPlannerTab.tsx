@@ -166,9 +166,9 @@ export const TaperPlannerTab: React.FC = () => {
               { title: 'Цель 3rd DL', val: plan.attempts.deadlift.third + ' кг', sub: plan.attempts.deadlift.rpeNote, clr: '#f59e0b' },
             ].map(s => (
               <div key={s.title} style={{ padding: 12, borderRadius: 12, textAlign: 'center', background: 'rgba(24,24,27,0.5)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ fontSize: 9, color: DIM, marginBottom: 2 }}>{s.title}</div>
+                <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>{s.title}</div>
                 <div style={{ fontSize: 20, fontWeight: 800, color: s.clr }}>{s.val}</div>
-                <div style={{ fontSize: 9, color: DIM }}>{s.sub}</div>
+                <div style={{ fontSize: 10, color: DIM }}>{s.sub}</div>
               </div>
             ))}
           </div>
@@ -228,7 +228,7 @@ export const TaperPlannerTab: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
                   {(['opener', 'second', 'third', 'target'] as const).map(a => (
                     <div key={a} style={{ padding: 8, borderRadius: 8, textAlign: 'center', background: a === 'target' ? 'rgba(245,158,11,0.06)' : 'rgba(24,24,27,0.6)', border: a === 'target' ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(255,255,255,0.04)' }}>
-                      <div style={{ fontSize: 9, color: DIM }}>{a === 'opener' ? 'Опенер' : a === 'second' ? 'Вторая' : a === 'third' ? 'Третья' : 'Цель'}</div>
+                      <div style={{ fontSize: 10, color: DIM }}>{a === 'opener' ? 'Опенер' : a === 'second' ? 'Вторая' : a === 'third' ? 'Третья' : 'Цель'}</div>
                       <div style={{ fontSize: 14, fontWeight: 800, color: a === 'target' ? '#f59e0b' : '#fff' }}>{plan.attempts[l][a]} кг</div>
                     </div>
                   ))}
@@ -303,9 +303,9 @@ export const TaperPlannerTab: React.FC = () => {
           <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8 }}>🔄 Протоколы восстановления</div>
           {recovery.map((r, i) => (
             <div key={i} style={{ marginBottom: 6, padding: 8, borderRadius: 6, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa' }}>{r.name} <span style={{ fontSize: 9, color: DIM }}>({r.type}, {r.durationMin} мин)</span></div>
-              <div style={{ fontSize: 9, color: DIM, marginTop: 2 }}>Когда: {r.whenToUse}</div>
-              <div style={{ fontSize: 9, color: DIM, marginTop: 1 }}>{r.instructions.join(' · ')}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa' }}>{r.name} <span style={{ fontSize: 10, color: DIM }}>({r.type}, {r.durationMin} мин)</span></div>
+              <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>Когда: {r.whenToUse}</div>
+              <div style={{ fontSize: 10, color: DIM, marginTop: 1 }}>{r.instructions.join(' · ')}</div>
             </div>
           ))}
         </div>
@@ -316,9 +316,9 @@ export const TaperPlannerTab: React.FC = () => {
           {mental.map((m, i) => (
             <div key={i} style={{ marginBottom: 6, padding: 8, borderRadius: 6, background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.15)' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7' }}>{m.name}</div>
-              <div style={{ fontSize: 9, color: DIM }}>Когда: {m.whenToUse}</div>
+              <div style={{ fontSize: 10, color: DIM }}>Когда: {m.whenToUse}</div>
               {m.steps.map((s, j) => (
-                <div key={j} style={{ fontSize: 9, color: DIM, marginTop: 2 }}>• {s.action} ({s.duration}) {s.notes}</div>
+                <div key={j} style={{ fontSize: 10, color: DIM, marginTop: 2 }}>• {s.action} ({s.duration}) {s.notes}</div>
               ))}
             </div>
           ))}

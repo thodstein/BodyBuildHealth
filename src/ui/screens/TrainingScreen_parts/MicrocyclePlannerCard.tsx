@@ -39,11 +39,11 @@ const MicrocyclePlannerCardBase: React.FC = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
         <div>
-          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Недель: <b style={{ color: ACCENT }}>{weeks}</b></label>
+          <label style={{ display: 'block', fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Недель: <b style={{ color: ACCENT }}>{weeks}</b></label>
           <input type="range" min={4} max={16} step={1} value={weeks} onChange={e => setWeeks(+e.target.value)} style={{ width: '100%' }} />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Цель</label>
+          <label style={{ display: 'block', fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Цель</label>
           <select value={selGoal} onChange={e => setSelGoal(e.target.value as GoalType)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 8, fontSize: 11 }}>
             {GOAL_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
@@ -61,7 +61,7 @@ const MicrocyclePlannerCardBase: React.FC = () => {
               <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>нед {rows.filter(r => r.phase === ph.phase)[0]?.week}–{rows.filter(r => r.phase === ph.phase).slice(-1)[0]?.week} ({ph.weeks} нед)</span>
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 4, lineHeight: 1.5 }}>{PHASE_HINTS[ph.phase] || ''}</div>
-            <div style={{ display: 'flex', gap: 8, fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 6, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 6, flexWrap: 'wrap' }}>
               <span>📊 Объём: <b style={{ color: volColor[ph.params.volumeLevel] }}>{ph.params.volumeLevel}</b></span>
               <span>🔥 Интенсивность: <b>{ph.params.intensityLevel}</b></span>
               <span>🔁 Частота: <b>{ph.params.frequencyLevel}</b></span>
@@ -78,8 +78,8 @@ const MicrocyclePlannerCardBase: React.FC = () => {
         <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
           {rows.map(r => (
             <div key={r.week} title={`Нед ${r.week}: ${PHASE_LABELS[r.phase] || r.phase} · объём ${r.params.volumeLevel}`} style={{ flex: '1 0 28px', minWidth: 28, padding: '6px 4px', borderRadius: 6, textAlign: 'center', background: phaseColor[r.phase] + '18', border: `1px solid ${phaseColor[r.phase]}40` }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: phaseColor[r.phase] }}>{r.week}</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{PHASE_LABELS[r.phase] || ''}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: phaseColor[r.phase] }}>{r.week}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{PHASE_LABELS[r.phase] || ''}</div>
             </div>
           ))}
         </div>

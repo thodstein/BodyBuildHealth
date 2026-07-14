@@ -59,12 +59,12 @@ export const PlWeakpointsCard: React.FC = () => {
           : diag.assistance.map((a, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', marginBottom: 4, borderRadius: 6, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.15)' }}>
               <span style={{ fontSize: 11, color: '#fff' }}>{a}</span>
-              <span style={{ fontSize: 9, color: ACCENT }}>≈ {Math.round(diag.intensityPct * 100)}% ПМ</span>
+              <span style={{ fontSize: 10, color: ACCENT }}>≈ {Math.round(diag.intensityPct * 100)}% ПМ</span>
             </div>
           ))}
 
         <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)' }}>
-          <div style={{ fontSize: 9, color: '#60a5fa', fontWeight: 700, marginBottom: 2 }}>📋 Обоснование</div>
+          <div style={{ fontSize: 10, color: '#60a5fa', fontWeight: 700, marginBottom: 2 }}>📋 Обоснование</div>
           <div style={{ fontSize: 10, color: DIM }}>{diag.rationale}</div>
         </div>
 

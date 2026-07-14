@@ -52,7 +52,7 @@ const DiagnosticsBiomechanicsCard: React.FC = () => {
         ))}
       </div>
       <div style={{ marginBottom: 10 }}>
-        <label style={{ fontSize: 9, color: DIM }}>Слабая фаза</label>
+        <label style={{ fontSize: 10, color: DIM }}>Слабая фаза</label>
         <select value={diagPhase} onChange={e => setDiagPhase(e.target.value)} style={{ ...IN, textAlign: 'left', marginTop: 3 }}>
           <option value="">Выберите фазу...</option>
           {phases.map(p => <option key={p} value={p}>{p}</option>)}
@@ -75,7 +75,7 @@ const DiagnosticsBiomechanicsCard: React.FC = () => {
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
           {(['forward_drift', 'hips_shoot_up', 'good_morning', 'bar_loops', 'asymmetric'] as BarPathIssue[]).map(iss => (
             <button key={iss} onClick={() => setBarIssues(prev => prev.includes(iss) ? prev.filter(x => x !== iss) : [...prev, iss])} style={{
-              padding: '4px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer',
+              padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
               border: barIssues.includes(iss) ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.08)',
               background: barIssues.includes(iss) ? 'rgba(168,85,247,0.12)' : 'transparent',
               color: barIssues.includes(iss) ? '#a855f7' : DIM

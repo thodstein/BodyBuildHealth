@@ -81,7 +81,7 @@ const ExerciseLabMerged: React.FC = () => {
             >
               {icon} {label}
               {m === 'compare' && compareIds.length > 0 && (
-                <span style={{ background: ACCENT, color: '#000', borderRadius: 10, fontSize: 9, padding: '1px 6px', fontWeight: 800 }}>{compareIds.length}</span>
+                <span style={{ background: ACCENT, color: '#000', borderRadius: 10, fontSize: 10, padding: '1px 6px', fontWeight: 800 }}>{compareIds.length}</span>
               )}
             </button>
           );

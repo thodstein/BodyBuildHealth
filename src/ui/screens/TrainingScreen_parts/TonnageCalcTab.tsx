@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { EXERCISE_CATALOG, getExerciseById } from '../../../core/exercise-catalog';
-import { PopupSelect, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
+import { PopupSelect, PopupNumber, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
@@ -9,7 +9,6 @@ const CARD: React.CSSProperties = {
   background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)',
   marginBottom: 10,
 };
-const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const, fontSize: 12, textAlign: 'center' as const };
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
 
 interface Row { id: string; exerciseId: string; weight: number; reps: number; sets: number; oneRM?: number; }
@@ -82,34 +81,29 @@ export const TonnageCalcTab: React.FC = () => {
           <button onClick={addRow} style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 700, fontSize: 11 }}>＋ Добавить упражнение</button>
         </div>
         {rows.map(row => (
-          <div key={row.id} style={{ display: 'flex', gap: 8, alignItems: 'start', marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div key={row.id} style={{ display: 'flex', gap: 8, alignItems: 'end', marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ flex: 2, minWidth: 140 }}>
               <PopupSelect label="Упр." value={row.exerciseId}
                 options={EXERCISE_CATALOG.map(e => ({ id: e.id, label: e.name, desc: `${e.group} · ${e.type === 'compound' ? 'Базовое' : 'Изолированное'}` }))}
                 hint="Поиск" onChange={v => upd(row.id, 'exerciseId', v)} />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Вес</div>
-              <input type="number" value={row.weight} onChange={e => upd(row.id, 'weight', +e.target.value)} style={IN} min={0} />
+              <PopupNumber label="Вес" value={row.weight} min={0} suffix=" кг" onChange={v => upd(row.id, 'weight', v)} />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Повт</div>
-              <input type="number" value={row.reps} onChange={e => upd(row.id, 'reps', +e.target.value)} style={IN} min={0} />
+              <PopupNumber label="Повт" value={row.reps} min={0} onChange={v => upd(row.id, 'reps', v)} />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Сеты</div>
-              <input type="number" value={row.sets} onChange={e => upd(row.id, 'sets', +e.target.value)} style={IN} min={0} />
+              <PopupNumber label="Сеты" value={row.sets} min={0} onChange={v => upd(row.id, 'sets', v)} />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>1RM</div>
-              <input type="number" value={row.oneRM ?? 0} onChange={e => { const v = +e.target.value; upd(row.id, 'oneRM', v === 0 ? undefined : v); }} style={IN} min={0} placeholder="–" />
+              <PopupNumber label="1ПМ" value={row.oneRM ?? 0} min={0} suffix=" кг" hint="0 = общий 1ПМ" onChange={v => upd(row.id, 'oneRM', v === 0 ? undefined : v)} />
             </div>
-            <button onClick={() => delRow(row.id)} style={{ marginTop: 16, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', borderRadius: 8, cursor: 'pointer', fontSize: 12, padding: '6px 8px' }}>✕</button>
+            <button onClick={() => delRow(row.id)} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', borderRadius: 8, cursor: 'pointer', fontSize: 12, padding: '9px 10px', minHeight: 38 }}>✕</button>
           </div>
         ))}
-        <div style={{ marginTop: 6 }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>Глобальный 1ПМ (если не задан индивидуально), кг</div>
-          <input type="number" value={oneRMGlobal} onChange={e => setOneRMGlobal(+e.target.value)} style={{ ...IN, maxWidth: 120 }} min={0} />
+        <div style={{ marginTop: 6, maxWidth: 200 }}>
+          <PopupNumber label="Глобальный 1ПМ (кг)" value={oneRMGlobal} min={0} suffix=" кг" hint="если не задан индивидуально" onChange={v => setOneRMGlobal(v)} />
         </div>
       </div>
 
@@ -161,7 +155,7 @@ export const TonnageCalcTab: React.FC = () => {
             <div key={key} style={{ background: `${color}0f`, border: `1px solid ${color}33`, borderRadius: 8, padding: 10, textAlign: 'center' }}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>{label}</div>
               <div style={{ fontSize: 18, fontWeight: 800, color }}>{(memo.byZone[key as keyof typeof memo.byZone] ?? 0).toLocaleString()}</div>
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>кг·повт</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>кг·повт</div>
             </div>
           ))}
         </div>

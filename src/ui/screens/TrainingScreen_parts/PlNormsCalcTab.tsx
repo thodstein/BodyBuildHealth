@@ -2,10 +2,10 @@ import React, { useMemo, useState } from 'react';
 import { PL_NORM_TABLES, classifyTotal, findCategory, type Federation, type Discipline, RANK_LABELS } from '../../../engines/pl-norms.engine';
 import { calcAllPoints } from '../../../engines/pl-points.engine';
 import { applyToPlanner } from './planner-bridge';
+import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
-const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const, fontSize: 12, textAlign: 'center' as const };
+const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.7)', fontSize: 12, lineHeight: 1.5 };
 
 const FEDS: { id: Federation; label: string }[] = [
   { id: 'fpr_ipf', label: 'ФПР / IPF (с ДК)' },
@@ -39,26 +39,10 @@ export const PlNormsCalcTab: React.FC = () => {
       <div style={{ ...SMALL, marginBottom: 10 }}>Мужчины, RAW (без экипировки). Источник: спецификация 2026 (ФПР/IPF, WRPF/СПР). Выберите федерацию, дисциплину, вес и сумму — определю разряд и сколько кг до следующего.</div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-        <div>
-          <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Федерация</label>
-          <select value={fed} onChange={e => { setFed(e.target.value as Federation); if (e.target.value === 'fpr_ipf') setDisc('total'); }} style={{ ...IN, textAlign: 'left' }}>
-            {FEDS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Дисциплина</label>
-          <select value={disc} onChange={e => setDisc(e.target.value as Discipline)} style={{ ...IN, textAlign: 'left' }}>
-            {availDisc.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Собственный вес, кг</label>
-          <input type="number" value={bw} min={30} max={250} onChange={e => setBw(+e.target.value)} style={IN} />
-        </div>
-        <div>
-          <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Сумма / результат, кг</label>
-          <input type="number" value={total} min={0} max={1500} step={2.5} onChange={e => setTotal(+e.target.value)} style={IN} />
-        </div>
+        <PopupSelect label="Федерация" value={fed} options={FEDS.map(f => ({ id: f.id, label: f.label }))} onChange={v => { setFed(v as Federation); if (v === 'fpr_ipf') setDisc('total'); }} />
+        <PopupSelect label="Дисциплина" value={disc} options={availDisc.map(d => ({ id: d.id, label: d.label }))} onChange={v => setDisc(v as Discipline)} />
+        <PopupNumber label="Собственный вес, кг" value={bw} min={30} max={250} suffix=" кг" onChange={setBw} />
+        <PopupNumber label="Сумма / результат, кг" value={total} min={0} max={1500} step={2.5} suffix=" кг" onChange={setTotal} />
       </div>
 
       {result && cat && (
@@ -88,7 +72,7 @@ export const PlNormsCalcTab: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                 {_pts.map(p => (
                   <div key={p.formula} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div><div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa' }}>{p.label}</div><div style={{ fontSize: 8, color: 'var(--text-dim)' }}>{p.scale}</div></div>
+                    <div><div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa' }}>{p.label}</div><div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{p.scale}</div></div>
                     <div style={{ fontSize: 18, fontWeight: 800, color: '#60a5fa' }}>{p.points}</div>
                   </div>
                 ))}

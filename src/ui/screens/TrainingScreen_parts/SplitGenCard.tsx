@@ -260,8 +260,8 @@ export const SplitGenCard: React.FC = () => {
                   }}>
                   <div style={{ fontSize:18, marginBottom:4 }}>{s.icon}</div>
                   <div style={{ fontSize:11, fontWeight:700, color:active?ACCENT:'#fff', marginBottom:2 }}>{s.name}</div>
-                  <div style={{ fontSize:8, color:DIM, marginBottom:4 }}>{s.who} · {s.days>0 ? s.days+' дн/нед' : 'авто'}</div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)', lineHeight:1.3 }}>{s.desc}</div>
+                  <div style={{ fontSize:10, color:DIM, marginBottom:4 }}>{s.who} · {s.days>0 ? s.days+' дн/нед' : 'авто'}</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', lineHeight:1.3 }}>{s.desc}</div>
                 </button>
               );
             })}
@@ -289,12 +289,12 @@ export const SplitGenCard: React.FC = () => {
             </div>
             <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
               {weak.map(g => (
-                <span key={g} style={{ padding:'4px 10px', borderRadius:14, fontSize:9, fontWeight:700, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:ACCENT, cursor:'pointer' }}
+                <span key={g} style={{ padding:'4px 10px', borderRadius:14, fontSize:10, fontWeight:700, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:ACCENT, cursor:'pointer' }}
                   onClick={() => setWeak(p => p.filter(w => w !== g))}>
                   {GROUP_RU[g] || g} ✕
                 </span>
               ))}
-              {weak.length === 0 && <span style={{ fontSize:9, color:DIM }}>Не выбраны — сплит строится без акцента</span>}
+              {weak.length === 0 && <span style={{ fontSize:10, color:DIM }}>Не выбраны — сплит строится без акцента</span>}
             </div>
           </div>
         </div>
@@ -311,15 +311,15 @@ export const SplitGenCard: React.FC = () => {
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(100px, 1fr))', gap:6 }}>
                 {calendar.map((d, i) => (
                   <div key={i} style={{ padding:10, borderRadius:8, background:'rgba(0,0,0,0.2)', border:'1px solid rgba(255,255,255,0.05)', textAlign:'center' }}>
-                    <div style={{ fontSize:9, color:DIM, fontWeight:700, marginBottom:4 }}>День {d.day} · {d.focus}</div>
+                    <div style={{ fontSize:10, color:DIM, fontWeight:700, marginBottom:4 }}>День {d.day} · {d.focus}</div>
                     <div style={{ display:'flex', flexWrap:'wrap', gap:3, justifyContent:'center' }}>
                       {d.groups.map(g => (
-                        <span key={g} style={{ padding:'2px 6px', borderRadius:10, fontSize:7, fontWeight:700, background:GROUP_COLOR[g]+'22', color:GROUP_COLOR[g], border:'1px solid '+GROUP_COLOR[g]+'33' }}>
+                        <span key={g} style={{ padding:'2px 6px', borderRadius:10, fontSize:10, fontWeight:700, background:GROUP_COLOR[g]+'22', color:GROUP_COLOR[g], border:'1px solid '+GROUP_COLOR[g]+'33' }}>
                           {GROUP_RU[g]}
                         </span>
                       ))}
                     </div>
-                    <div style={{ fontSize:7, color:DIM, marginTop:4 }}>
+                    <div style={{ fontSize:10, color:DIM, marginTop:4 }}>
                       {d.priority === 'strength' ? '💪 Сила' : d.priority === 'hypertrophy' ? '🏋️ Гипертрофия' : '🎯 '+d.priority}
                     </div>
                   </div>
@@ -327,7 +327,7 @@ export const SplitGenCard: React.FC = () => {
                 {/* Empty days */}
                 {Array.from({ length: Math.max(0, 7 - calendar.length) }).map((_, i) => (
                   <div key={'empty'+i} style={{ padding:10, borderRadius:8, background:'rgba(0,0,0,0.1)', border:'1px solid rgba(255,255,255,0.02)', textAlign:'center', opacity:0.3 }}>
-                    <div style={{ fontSize:9, color:DIM }}>Отдых</div>
+                    <div style={{ fontSize:10, color:DIM }}>Отдых</div>
                   </div>
                 ))}
               </div>
@@ -346,13 +346,13 @@ export const SplitGenCard: React.FC = () => {
                       const isMain = sl.role === 'main';
                       return (
                         <span key={j} style={{
-                          padding:'3px 7px', borderRadius:12, fontSize:8, fontWeight:700,
+                          padding:'3px 7px', borderRadius:12, fontSize:10, fontWeight:700,
                           border: isMain ? '1px solid '+ACCENT : '1px solid rgba(255,255,255,0.08)',
                           background: isMain ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)',
                           color: isMain ? ACCENT : DIM,
                         }}>
                           {PATTERN_RU[sl.pattern] || sl.pattern}
-                          <span style={{ opacity:0.5, fontSize:7 }}> · {sl.role}</span>
+                          <span style={{ opacity:0.5, fontSize:10 }}> · {sl.role}</span>
                         </span>
                       );
                     })}
@@ -372,7 +372,7 @@ export const SplitGenCard: React.FC = () => {
                 const cov = dayCoverage[g] || 0;
                 return (
                   <div key={g} style={{ marginBottom:4 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, marginBottom:1 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, marginBottom:1 }}>
                       <span style={{ color:GROUP_COLOR[g], fontWeight:700 }}>{GROUP_RU[g]}</span>
                       <span style={{ color:DIM }}>{s} сет/нед · {cov}×/нед · MEV {n.mev} / MAV {n.mav} / MRV {n.mrv}</span>
                     </div>
@@ -388,7 +388,7 @@ export const SplitGenCard: React.FC = () => {
             {out.recommendations.length > 0 && (
               <div style={{ marginTop:6, padding:10, borderRadius:8, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)' }}>
                 <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>💡 Рекомендации</div>
-                {out.recommendations.map((r, i) => <div key={i} style={{ fontSize:9, color:DIM, marginBottom:2 }}>• {r}</div>)}
+                {out.recommendations.map((r, i) => <div key={i} style={{ fontSize:10, color:DIM, marginBottom:2 }}>• {r}</div>)}
               </div>
             )}
 
@@ -407,7 +407,7 @@ export const SplitGenCard: React.FC = () => {
                 <div style={{ marginTop:8, padding:10, borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
                   <div style={{ fontSize:10, fontWeight:700, color:'#f87171', marginBottom:4 }}>⚠️ Низкий интервал восстановления</div>
                   {overlaps.map((o, i) => (
-                    <div key={i} style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>
+                    <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>
                       {GROUP_RU[o.group]}: дни {o.days.join(', ')} — интервал {o.gap} дн (рекомендуется ≥2 дн). Добавьте день отдыха между этими тренировками.
                     </div>
                   ))}
@@ -454,13 +454,13 @@ export const SplitGenCard: React.FC = () => {
                   const d = visCalendar.find(c => c.day === i+1);
                   if (!d) return (
                     <div key={i} style={{ padding:8, borderRadius:8, background:'rgba(0,0,0,0.15)', border:'1px solid rgba(255,255,255,0.03)', textAlign:'center', opacity:0.25, minHeight:60 }}>
-                      <div style={{ fontSize:8, color:DIM, fontWeight:700 }}>Д {i+1}</div>
-                      <div style={{ fontSize:7, color:DIM, marginTop:4 }}>Отдых</div>
+                      <div style={{ fontSize:10, color:DIM, fontWeight:700 }}>Д {i+1}</div>
+                      <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Отдых</div>
                     </div>
                   );
                   return (
                     <div key={i} style={{ padding:'6px 4px', borderRadius:8, background:'rgba(0,0,0,0.2)', border:'1px solid rgba(0,230,138,0.1)', textAlign:'center', minHeight:60 }}>
-                      <div style={{ fontSize:7, color:DIM, fontWeight:700, marginBottom:3 }}>Д {d.day}</div>
+                      <div style={{ fontSize:10, color:DIM, fontWeight:700, marginBottom:3 }}>Д {d.day}</div>
                       {d.groups.map(g => (
                         <div key={g} style={{ padding:'1px 4px', borderRadius:8, fontSize:6, fontWeight:700, marginBottom:1, background:GROUP_COLOR[g]+'33', color:GROUP_COLOR[g] }}>
                           {GROUP_RU[g]}
@@ -484,7 +484,7 @@ export const SplitGenCard: React.FC = () => {
                   const color = s < n.mev ? '#ef4444' : s < n.mav ? '#f59e0b' : s <= n.mrv ? '#22c55e' : '#ef4444';
                   return (
                     <div key={g} style={{ marginBottom:3 }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:8 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:10 }}>
                         <span style={{ color:GROUP_COLOR[g], fontWeight:700, width:50 }}>{GROUP_RU[g]}</span>
                         <span style={{ color:DIM, flex:1, textAlign:'right' }}>{s} сет/нед (MEV:{n.mev} MAV:{n.mav} MRV:{n.mrv})</span>
                       </div>
@@ -530,13 +530,13 @@ export const SplitGenCard: React.FC = () => {
                 {/* Column A */}
                 <div style={{ padding:10, borderRadius:8, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.12)' }}>
                   <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>{cmpOutA.name}</div>
-                  <div style={{ fontSize:9, color:DIM, marginBottom:6 }}>{cmpOutA.sessions.length} дн/нед · {cmpOutA.description}</div>
+                  <div style={{ fontSize:10, color:DIM, marginBottom:6 }}>{cmpOutA.sessions.length} дн/нед · {cmpOutA.description}</div>
                   {(['chest','back','legs','shoulders','arms','core'] as string[]).map(g => {
                     const s = cmpSetsA[g] || 0;
                     const n = VOLUME_NORMS[g];
                     const stat = s < n.mev ? '⬇' : s <= n.mav ? '—' : s <= n.mrv ? '⬆' : '⚠';
                     return (
-                      <div key={g} style={{ display:'flex', justifyContent:'space-between', fontSize:8, padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                      <div key={g} style={{ display:'flex', justifyContent:'space-between', fontSize:10, padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
                         <span style={{ color:GROUP_COLOR[g] }}>{GROUP_RU[g]}</span>
                         <span style={{ color:DIM }}>{s} сет {stat}</span>
                       </div>
@@ -547,13 +547,13 @@ export const SplitGenCard: React.FC = () => {
                 {/* Column B */}
                 <div style={{ padding:10, borderRadius:8, background:'rgba(168,85,247,0.04)', border:'1px solid rgba(168,85,247,0.12)' }}>
                   <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>{cmpOutB.name}</div>
-                  <div style={{ fontSize:9, color:DIM, marginBottom:6 }}>{cmpOutB.sessions.length} дн/нед · {cmpOutB.description}</div>
+                  <div style={{ fontSize:10, color:DIM, marginBottom:6 }}>{cmpOutB.sessions.length} дн/нед · {cmpOutB.description}</div>
                   {(['chest','back','legs','shoulders','arms','core'] as string[]).map(g => {
                     const s = cmpSetsB[g] || 0;
                     const n = VOLUME_NORMS[g];
                     const stat = s < n.mev ? '⬇' : s <= n.mav ? '—' : s <= n.mrv ? '⬆' : '⚠';
                     return (
-                      <div key={g} style={{ display:'flex', justifyContent:'space-between', fontSize:8, padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                      <div key={g} style={{ display:'flex', justifyContent:'space-between', fontSize:10, padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
                         <span style={{ color:GROUP_COLOR[g] }}>{GROUP_RU[g]}</span>
                         <span style={{ color:DIM }}>{s} сет {stat}</span>
                       </div>
@@ -569,7 +569,7 @@ export const SplitGenCard: React.FC = () => {
                   const d = (cmpSetsA[g] || 0) - (cmpSetsB[g] || 0);
                   if (d === 0) return null;
                   return (
-                    <div key={g} style={{ display:'flex', justifyContent:'space-between', fontSize:8, padding:'2px 0' }}>
+                    <div key={g} style={{ display:'flex', justifyContent:'space-between', fontSize:10, padding:'2px 0' }}>
                       <span style={{ color:GROUP_COLOR[g] }}>{GROUP_RU[g]}</span>
                       <span style={{ color: d > 0 ? '#22c55e' : '#ef4444', fontWeight:700 }}>
                         {d > 0 ? '+' : ''}{d} сет

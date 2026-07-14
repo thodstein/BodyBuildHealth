@@ -138,7 +138,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
         </div>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           <button onClick={handleNewDesign} style={btn}>➕ Новый</button>
-          <select value={currentId || ''} onChange={e => setCurrentId(e.target.value || null)} style={{ ...btn, padding: '6px 8px', background: 'rgba(24,24,27,0.6)', fontSize: 9 }}>
+          <select value={currentId || ''} onChange={e => setCurrentId(e.target.value || null)} style={{ ...btn, padding: '6px 8px', background: 'rgba(24,24,27,0.6)', fontSize: 10 }}>
             <option value="">— выберите дизайн —</option>
             {designs.map(d => <option key={d.id} value={d.id}>{d.name} ({d.blocks.length} блоков)</option>)}
           </select>
@@ -177,7 +177,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
               </div>
             )}
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-              <button onClick={handleDuplicate} style={{ ...btn, fontSize: 9 }}>📋 Дублировать</button>
+              <button onClick={handleDuplicate} style={{ ...btn, fontSize: 10 }}>📋 Дублировать</button>
             </div>
           </div>
 
@@ -190,7 +190,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
                   draggable
                   onDragStart={() => setDragPhase(pk)}
                   style={{
-                    padding: '4px 10px', borderRadius: 8, fontSize: 9, fontWeight: 600, cursor: 'grab',
+                    padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 600, cursor: 'grab',
                     background: PHASE_COLORS[pk] + '22', border: '1px solid ' + PHASE_COLORS[pk] + '55',
                     color: PHASE_COLORS[pk], display: 'flex', alignItems: 'center', gap: 4,
                     transition: 'transform 0.1s', userSelect: 'none',
@@ -217,7 +217,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
                 <div style={{ width: 44, flexShrink: 0 }} />
                 {Array.from({ length: quarterEnd - quarterStart + 1 }, (_, i) => {
                   const wn = quarterStart + i;
-                  return <div key={wn} style={{ width: 32, flexShrink: 0, textAlign: 'center', fontSize: 7, color: DIM }}>{wn}</div>;
+                  return <div key={wn} style={{ width: 32, flexShrink: 0, textAlign: 'center', fontSize: 10, color: DIM }}>{wn}</div>;
                 })}
               </div>
 
@@ -266,16 +266,16 @@ export const PeriodizationDesignerTab: React.FC = () => {
                         padding: '0 6px', cursor: 'pointer', zIndex: 2,
                         transition: 'border 0.15s',
                       }}>
-                      <span style={{ fontSize: 9, fontWeight: 600, color, flex: 1, wordBreak: 'break-word' }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color, flex: 1, wordBreak: 'break-word' }}>
                         {PHASE_ICONS[block.phaseKey]} {PHASE_LABELS_RU[block.phaseKey]}
                       </span>
                       <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                         {/* Resize handle (drag right edge) */}
-                        <div style={{ fontSize: 7, color: color + '99' }}>
+                        <div style={{ fontSize: 10, color: color + '99' }}>
                           {block.endWeek - block.startWeek + 1}н
                         </div>
                         <button onClick={e => { e.stopPropagation(); handleDeleteBlock(block.id); }}
-                          style={{ fontSize: 8, padding: '0 4px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', lineHeight: 1 }}>
+                          style={{ fontSize: 10, padding: '0 4px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', lineHeight: 1 }}>
                           ✕
                         </button>
                       </div>
@@ -289,7 +289,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
                 <div style={{ width: 44, flexShrink: 0 }} />
                 {Array.from({ length: quarterEnd - quarterStart + 1 }, (_, i) => {
                   const wn = quarterStart + i;
-                  return <div key={wn} style={{ width: 32, flexShrink: 0, textAlign: 'center', fontSize: 7, color: DIM }}>{wn}</div>;
+                  return <div key={wn} style={{ width: 32, flexShrink: 0, textAlign: 'center', fontSize: 10, color: DIM }}>{wn}</div>;
                 })}
               </div>
             </div>
@@ -310,27 +310,27 @@ export const PeriodizationDesignerTab: React.FC = () => {
                 <div><span style={{ color: DIM }}>Длительность:</span> <b>{editBlock.endWeek - editBlock.startWeek + 1} нед</b></div>
               </div>
               <div style={{ marginTop: 6 }}>
-                <div style={{ fontSize: 9, color: DIM, marginBottom: 2 }}>Длительность (недель):</div>
+                <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Длительность (недель):</div>
                 <input type="range" min={1} max={12} value={editBlock.endWeek - editBlock.startWeek + 1}
                   onChange={e => handleResize(editBlock.id, editBlock.startWeek + parseInt(e.target.value) - 1)}
                   style={{ width: '100%' }} />
               </div>
               <div style={{ marginTop: 6 }}>
-                <div style={{ fontSize: 9, color: DIM, marginBottom: 2 }}>Сдвинуть на (недель):</div>
+                <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Сдвинуть на (недель):</div>
                 <div style={{ display: 'flex', gap: 4 }}>
                   {[-4, -2, -1, 1, 2, 4].map(delta => (
                     <button key={delta} onClick={() => {
                       const newStart = Math.max(1, Math.min(current!.totalWeeks - (editBlock.endWeek - editBlock.startWeek), editBlock.startWeek + delta));
                       handleMoveBlock(editBlock.id, newStart);
                     }}
-                      style={{ ...btn, fontSize: 9, padding: '4px 8px' }}>
+                      style={{ ...btn, fontSize: 10, padding: '4px 8px' }}>
                       {delta > 0 ? '+' : ''}{delta}
                     </button>
                   ))}
                 </div>
               </div>
               <div style={{ marginTop: 6 }}>
-                <div style={{ fontSize: 9, color: DIM, marginBottom: 2 }}>Заметки:</div>
+                <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Заметки:</div>
                 <textarea value={editBlock.notes} onChange={e => {
                   const updated = updateBlockNotes(current!, editBlock.id, e.target.value);
                   saveDesign(updated);
@@ -351,7 +351,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
                 const pct = stats.totalWeeks > 0 ? Math.round((totalWeeks / stats.totalWeeks) * 100) : 0;
                 return (
                   <div key={pk} style={{ marginBottom: 4 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: DIM, marginBottom: 2 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: DIM, marginBottom: 2 }}>
                       <span><span style={{ color: PHASE_COLORS[pk as PhaseKey] }}>{PHASE_ICONS[pk as PhaseKey]}</span> {PHASE_LABELS_RU[pk as PhaseKey]}</span>
                       <span>{totalWeeks} нед ({pct}%)</span>
                     </div>

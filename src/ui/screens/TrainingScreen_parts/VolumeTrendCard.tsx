@@ -26,15 +26,15 @@ export const VolumeTrendCard: React.FC<{ sessions: WorkoutLog[]; weeks?: number 
               const v = wsg[g]?.[wi] || 0;
               if (v === 0) return null;
               const h = (v / maxTotal) * 100;
-              return <div key={g} style={{ height: h + '%', background: GROUP_COLORS[g] || '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, color: 'rgba(0,0,0,0.6)', fontWeight: 700 }}>{v > 4 ? v : ''}</div>;
+              return <div key={g} style={{ height: h + '%', background: GROUP_COLORS[g] || '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'rgba(0,0,0,0.6)', fontWeight: 700 }}>{v > 4 ? v : ''}</div>;
             })}
           </div>
         ))}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
         {totals.map((_, wi) => <span key={wi} style={{ flex: 1, textAlign: 'center' }}>Н{wi + 1}</span>)}
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 9, color: 'rgba(255,255,255,0.6)' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
         {groups.filter(g => (wsg[g]?.reduce((s: number, x: number) => s + x, 0) || 0) > 0).map(g => (
           <span key={g} style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: GROUP_COLORS[g] || '#888', display: 'inline-block' }} />{GRP_RU[g] || g}</span>
         ))}

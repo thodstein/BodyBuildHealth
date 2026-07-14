@@ -63,7 +63,7 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
           <div style={{ width: 44, height: 44, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `conic-gradient(${getRiskColor(score.level)} ${score.total * 3.6}deg, rgba(255,255,255,0.06) 0)` }}>
             <div style={{ fontSize: 14, fontWeight: 800 }}>{score.total}</div>
           </div>
-          <div><div style={{ fontSize: 11, fontWeight: 700 }}>{score.label}</div><div style={{ fontSize: 9, color: DIM }}>технический счёт</div></div>
+          <div><div style={{ fontSize: 11, fontWeight: 700 }}>{score.label}</div><div style={{ fontSize: 10, color: DIM }}>технический счёт</div></div>
         </div>
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
           <div>📐 Сеты: <b>{presc.sets}</b> · Повторы: <b>{presc.reps}</b></div>
@@ -72,7 +72,7 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
           <div>🛡 Безоп.: <b style={{ color: getRiskColor(safety.level) }}>{safety.score}/100</b> · {safety.level === 'safe' ? '✅' : safety.level === 'moderate' ? '⚠️' : '🚫'}</div>
         </div>
         {d1 && d2 && d === d1 && (
-          <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', fontSize: 9, lineHeight: 1.4 }}>
+          <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', fontSize: 10, lineHeight: 1.4 }}>
             {ex1!.type !== ex2!.type && <div>📌 Разные типы: {TYPE_RU[ex1!.type]} vs {TYPE_RU[ex2!.type]} — {ex1!.type === 'compound' ? 'база для общей стимуляции' : 'изоляция для целевой мышцы'}</div>}
             {ex1!.jointStress !== ex2!.jointStress && <div>🦴 Нагрузка на суставы: {ex1!.jointStress} vs {ex2!.jointStress} — {ex1!.jointStress === 'high' ? 'выше у 1-го' : 'выше у 2-го'}</div>}
             {d1.bio?.cnsDemand !== d2.bio?.cnsDemand && <div>🧠 ЦНС-нагрузка: {d1.bio?.cnsDemand} vs {d2.bio?.cnsDemand}</div>}

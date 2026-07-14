@@ -146,8 +146,26 @@ const GOAL_MAP: Record<GoalType, { organs: string[]; mechanisms: string[]; categ
 };
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
+function normalizeId(id: string): string {
+  if (!id) return id;
+  const lower = id.toLowerCase();
+  if (SUPPORT_CATALOG_DATA[id]) return id;
+  if (SUPPORT_CATALOG_DATA[lower]) return lower;
+  const under = lower.replace(/-/g, '_');
+  if (SUPPORT_CATALOG_DATA[under]) return under;
+  const dash = lower.replace(/_/g, '-');
+  if (SUPPORT_CATALOG_DATA[dash]) return dash;
+  const upper = id.toUpperCase();
+  if (SUPPORT_CATALOG_DATA[upper]) return upper;
+  return id;
+}
+
 function getEntry(id: string) {
-  return SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toLowerCase()];
+  return SUPPORT_CATALOG_DATA[id]
+    || SUPPORT_CATALOG_DATA[id.toLowerCase()]
+    || SUPPORT_CATALOG_DATA[id.toLowerCase().replace(/-/g, '_')]
+    || SUPPORT_CATALOG_DATA[id.toLowerCase().replace(/_/g, '-')]
+    || SUPPORT_CATALOG_DATA[id.toUpperCase()];
 }
 
 function getEntryName(id: string): string {
@@ -378,7 +396,8 @@ function getAnalogScore(id: string): { sideEffects: number; contraindications: n
   };
 }
 
-export function findReplacement(id: string, type: ReplacementType, profile?: FinderProfile): ReplacementResult[] {
+export function findReplacement(rawId: string, type: ReplacementType, profile?: FinderProfile): ReplacementResult[] {
+  const id = normalizeId(rawId);
   const entry = getEntry(id);
   if (!entry) return [];
   const results: ReplacementResult[] = [];

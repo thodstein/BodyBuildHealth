@@ -59,10 +59,10 @@ export const BbToolsCard: React.FC = () => {
           <div><div style={LABEL}>Повторений в сете</div><input type="number" min={1} max={30} style={{ ...SEL }} value={reps} onChange={e => setReps(parseInt(e.target.value) || 0)} /></div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
-          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 9, color: DIM }}>Темп</div><div style={{ fontSize: 14, fontWeight: 700 }}>{tempo.notation}</div></div>
-          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 9, color: DIM }}>TUT/повт</div><div style={{ fontSize: 14, fontWeight: 700 }}>{tempo.tutPerRep}с</div></div>
-          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 9, color: DIM }}>TUT сета</div><div style={{ fontSize: 14, fontWeight: 700 }}>{tut}с</div></div>
-          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 9, color: DIM }}>Отдых</div><div style={{ fontSize: 14, fontWeight: 700 }}>{rest}с</div></div>
+          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 10, color: DIM }}>Темп</div><div style={{ fontSize: 14, fontWeight: 700 }}>{tempo.notation}</div></div>
+          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 10, color: DIM }}>TUT/повт</div><div style={{ fontSize: 14, fontWeight: 700 }}>{tempo.tutPerRep}с</div></div>
+          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 10, color: DIM }}>TUT сета</div><div style={{ fontSize: 14, fontWeight: 700 }}>{tut}с</div></div>
+          <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 10, color: DIM }}>Отдых</div><div style={{ fontSize: 14, fontWeight: 700 }}>{rest}с</div></div>
         </div>
         <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Эксцентрик {tempo.eccentric}с · пауза {tempo.pause}с · концентрика {tempo.concentric}с.</div>
         <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
@@ -83,7 +83,7 @@ export const BbToolsCard: React.FC = () => {
           ? <div style={{ fontSize: 10, color: DIM }}>Для этого характера/уровня техник нет.</div>
           : techs.map((t: TechniqueSpec) => (
             <div key={t.technique} style={{ padding: '6px 8px', marginBottom: 4, borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(0,230,138,0.1)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT }}>{t.name} <span style={{ fontSize: 9, color: DIM }}>({t.appliesTo})</span></div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT }}>{t.name} <span style={{ fontSize: 10, color: DIM }}>({t.appliesTo})</span></div>
               <div style={{ fontSize: 10, color: DIM }}>{t.description}</div>
             </div>
           ))}

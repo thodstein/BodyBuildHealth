@@ -16,8 +16,7 @@ export const SUB_TABS: { id: BSTab; label: string }[] = [
 
 export const SUB_TAB_GROUPS: Record<string, { id: string; label: string }[]> = {
   profile: [
-    { id: 'settings', label: '⚙️ Настройки' },
-    { id: 'auto', label: '🩺 Данные' },
+    { id: 'settings', label: '⚙️ Профиль' },
   ],
   select: [
     { id: 'search', label: '🔍 Поиск' },

@@ -18,14 +18,14 @@ const TAB_META: { key: PlanTab; label: string; icon: string }[] = [
   { key: 'organload', label: 'Нагрузка БЖУ', icon: '🧬' },
 ];
 
-export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: any[]; labs?: LabPoint[]; labAnalysis?: LabCompositeResult | null }> = ({ profile, course, labs, labAnalysis }) => {
+const IndividualPlanInner: React.FC = () => {
   const { planTab, setPlanTab } = usePlanCtx();
   const tab = planTab as PlanTab;
   const setTab = (t: PlanTab) => setPlanTab(t);
   const [disclaimerDismissed, setDisclaimerDismissed] = useState(() => localStorage.getItem('he_disclaimer_dismissed') === 'true');
 
   return (
-    <IndividualPlanProvider profile={profile} course={course} labs={labs} labAnalysis={labAnalysis}>
+    <>
       {!disclaimerDismissed && <MedicalDisclaimer onDismiss={() => { setDisclaimerDismissed(true); localStorage.setItem('he_disclaimer_dismissed', 'true'); }} />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 80, maxWidth: 540, margin: '0 auto' }}>
         <div style={{ display:'flex', gap:3, padding:'4px 0', overflowX:'auto', scrollbarWidth:'none' }}>
@@ -48,6 +48,14 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
         {tab === 'report' && <ReportTab />}
         {tab === 'organload' && <OrganLoadCalculator />}
       </div>
+    </>
+  );
+};
+
+export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: any[]; labs?: LabPoint[]; labAnalysis?: LabCompositeResult | null }> = ({ profile, course, labs, labAnalysis }) => {
+  return (
+    <IndividualPlanProvider profile={profile} course={course} labs={labs} labAnalysis={labAnalysis}>
+      <IndividualPlanInner />
     </IndividualPlanProvider>
   );
 };

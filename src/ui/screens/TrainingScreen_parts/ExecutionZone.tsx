@@ -152,15 +152,15 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                         return (
                           <>
                             <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: 6 }}>
-                              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Подходов</div>
+                              <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>Подходов</div>
                               <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalSets}</div>
                             </div>
                             <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: 6 }}>
-                              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Тоннаж</div>
+                              <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>Тоннаж</div>
                               <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalVolume.toLocaleString()} кг</div>
                             </div>
                             <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: 6 }}>
-                              <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>Макс 1RM</div>
+                              <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>Макс 1RM</div>
                               <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{max1RM} кг</div>
                             </div>
                           </>
@@ -249,8 +249,8 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>{ex.name}</div>
                       </div>
                       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>  
-                        <span style={{ fontSize: 9, padding: '2px 5px', borderRadius: 3, background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>{scheme?.schemeType || 'straight'}</span>
-                        <span style={{ fontSize: 9, padding: '2px 5px', borderRadius: 3, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{formatTempo(tempo)}</span>
+                        <span style={{ fontSize: 10, padding: '2px 5px', borderRadius: 3, background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>{scheme?.schemeType || 'straight'}</span>
+                        <span style={{ fontSize: 10, padding: '2px 5px', borderRadius: 3, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{formatTempo(tempo)}</span>
                       </div>
                     </div>
 
@@ -263,21 +263,21 @@ export const ExecutionZone: React.FC<Props> = (p) => {
 
                     {/* Technique note */}
                     {ex.technique && (
-                      <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(0,230,138,0.05)', borderRadius: 6, fontSize: 9, color: 'var(--text)', lineHeight: 1.4 }}>
+                      <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(0,230,138,0.05)', borderRadius: 6, fontSize: 10, color: 'var(--text)', lineHeight: 1.4 }}>
                         <span style={{ fontWeight: 600, color: 'var(--accent)' }}>🎯 </span>{ex.technique}
                       </div>
                     )}
 
                     {/* Warmup ramp-up (first set only) */}
                     {log.sets.length === 0 && ex.weight && (
-                      <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(255,145,0,0.05)', borderRadius: 6, fontSize: 9 }}>
+                      <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(255,145,0,0.05)', borderRadius: 6, fontSize: 10 }}>
                         <div style={{ fontWeight: 600, color: '#ff9100', marginBottom: 3 }}>🔥 Разминочные подходы</div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 2, color: 'var(--text-dim)' }}>
                           {[{ pct: 20, reps: 10 }, { pct: 40, reps: 5 }, { pct: 60, reps: 3 }, { pct: 75, reps: 1 }].map(wu => (
                             <div key={wu.pct} style={{ textAlign: 'center', padding: '2px 4px', background: 'rgba(255,145,0,0.08)', borderRadius: 3 }}>
                               <div style={{ color: '#ff9100', fontWeight: 600 }}>~{Math.round((ex.weight || 80) * wu.pct / 100)}кг</div>
-                              <div style={{ fontSize: 7 }}>{wu.reps} повт</div>
-                              <div style={{ fontSize: 7 }}>{wu.pct}%</div>
+                              <div style={{ fontSize: 10 }}>{wu.reps} повт</div>
+                              <div style={{ fontSize: 10 }}>{wu.pct}%</div>
                             </div>
                           ))}
                         </div>
@@ -292,7 +292,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                     {/* Previous sets log */}
                     {log.sets.length > 0 && (
                       <div style={{ marginBottom: 8 }}>
-                        <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 2 }}>Выполнено:</div>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 2 }}>Выполнено:</div>
                         {log.sets.map((s, si) => (
                           <div key={si} style={{ display: 'flex', gap: 8, fontSize: 10, padding: '2px 0' }}>
                             <span style={{ fontWeight: 600, minWidth: 16 }}>#{si + 1}</span>
@@ -303,7 +303,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                           </div>
                         ))}
                         {last1RM > 0 && (
-                          <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 2 }}>1RM последний: {last1RM}кг | Объём: {estimatedVolume}кг | RPE ср: {avgRPE}</div>
+                          <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2 }}>1RM последний: {last1RM}кг | Объём: {estimatedVolume}кг | RPE ср: {avgRPE}</div>
                         )}
                         {/* Autoregulation hint */}
                         {log.sets.length >= 1 && (() => {
@@ -321,7 +321,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                             hintColor = '#f59e0b';
                           }
                           if (!hint) return null;
-                          return <div style={{ fontSize: 9, color: hintColor, marginTop: 2, fontWeight: 600 }}>{hint}</div>;
+                          return <div style={{ fontSize: 10, color: hintColor, marginTop: 2, fontWeight: 600 }}>{hint}</div>;
                         })()}
                       </div>
                     )}
@@ -331,22 +331,22 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       <div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 6 }}>
                           <div>
-                            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Вес (кг)</label>
+                            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
                             <input type="number" value={runtimeSetW} onChange={e => setRuntimeSetW(parseFloat(e.target.value) || 0)}
                               style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
                           </div>
                           <div>
-                            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Повторения</label>
+                            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Повторения</label>
                             <input type="number" value={runtimeSetR} onChange={e => setRuntimeSetR(parseFloat(e.target.value) || 0)}
                               style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
                           </div>
                           <div>
-                            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>RPE (1-10)</label>
+                            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>RPE (1-10)</label>
                             <input type="number" min={1} max={10} value={runtimeSetRP} onChange={e => setRuntimeSetRP(parseFloat(e.target.value) || 0)}
                               style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
                           </div>
                           <div>
-                            <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>RIR</label>
+                            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>RIR</label>
                             <input type="number" min={0} max={5} value={runtimeSetRI} onChange={e => setRuntimeSetRI(parseFloat(e.target.value) || 0)}
                               style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
                           </div>

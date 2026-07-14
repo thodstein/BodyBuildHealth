@@ -129,7 +129,7 @@ export const MRVEstimatorTab: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
           <PopupSelect label="Уровень (стандарт)" value={level} options={levelOpts} onChange={v => setLevel(v as keyof typeof LEVEL_MRVAULT)} />
           <div>
-            <div style={{ fontSize: 9, color: DIM, marginBottom: 3 }}>Сессий / дней готовности</div>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 3 }}>Сессий / дней готовности</div>
             <div style={{ padding: 10, borderRadius: 8, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' as const, fontSize: 12, color: '#fff', minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{sessions.length} / {readiness.length}</div>
           </div>
         </div>
@@ -198,7 +198,7 @@ export const MRVEstimatorTab: React.FC = () => {
               });
             })()}
           </svg>
-          <div style={{ display: 'flex', gap: 12, fontSize: 9, color: DIM, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 12, fontSize: 10, color: DIM, marginTop: 8 }}>
             <span>🟩 Объём (sRPE AU)</span>
             <span>🔵 Готовность (recovery)</span>
             <span>🟥 Точка перегиба</span>
@@ -233,7 +233,7 @@ export const MRVEstimatorTab: React.FC = () => {
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', padding: '4px 0' }}>Недельная нагрузка: <b style={{ color: ACCENT }}>{mon.weeklyLoad} AU</b></div>
       </div>
 
-      <div style={{ fontSize: 9, color: DIM, marginTop: 12, lineHeight: 1.4 }}>
+      <div style={{ fontSize: 10, color: DIM, marginTop: 12, lineHeight: 1.4 }}>
         MRV (Maximum Recoverable Volume) — максимальный тренировочный объём, при котором вы восстанавливаетесь к следующей неделе.
         Справочные значения: Helms M. (2018) — 12-30+ сет/м/нед по уровню/PED. Точка перегиба = первая неделя, где рост объёма привёл к падению recovery ≥5 п.
       </div>

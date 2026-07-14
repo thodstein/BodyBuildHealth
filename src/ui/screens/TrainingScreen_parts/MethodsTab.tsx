@@ -24,6 +24,7 @@ import { getExerciseBio } from '../../../data/exercise-biomechanics-db';
 import { getStrengthLevel, getNextLevelTarget } from '../../../engines/performance-analytics.engine';
 import { computeStructuredAnalytics } from '../../../engines/structured-analytics.engine';
 import { TaperPlannerTab } from './TaperPlannerTab';
+import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import {
   WARMUP_LABELS, GOALS, LEVELS, MUSCLE_GROUPS, GROUP_LABELS, EQUIP_LABELS, JOINT_LABELS,
   PHASE_LABELS, PHASE_HINTS, TAB_LABELS,
@@ -35,12 +36,28 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
   const methods = React.useMemo(() => getTrainingMethods(), []);
   const volumes = React.useMemo(() => getVolumeReferences(), []);
   const visuals = React.useMemo(() => getSplitVisuals(), []);
+
+  const CAT_LABELS: Record<string, string> = {
+    periodization: 'Периодизация', progression: 'Прогрессия', technique: 'Техника',
+    intensity: 'Интенсивность', volume: 'Объём', frequency: 'Частота',
+    specialization: 'Специализация', recovery: 'Восстановление', mobility: 'Мобильность',
+    mindset: 'Психология',
+  };
+  const cats = [...new Set(methods.map(m => m.category))];
+  const methodCatOptions = [
+    { id: 'all', label: 'Все категории' },
+    ...cats.map(c => ({ id: c, label: CAT_LABELS[c] || c })),
+  ];
+  const volLevelOptions = [
+    { id: 'beginner', label: 'Новичок' },
+    { id: 'intermediate', label: 'Средний' },
+    { id: 'advanced', label: 'Продвинутый' },
+  ];
   const [methodCat, setMethodCat] = React.useState('all');
   const [analysisLoaded, setAnalysisLoaded] = React.useState(false);
   const [volLevel, setVolLevel] = React.useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
   const [expandedSplit, setExpandedSplit] = React.useState<number | null>(null);
   const filtered = methodCat === 'all' ? methods : getMethodsByCategory(methodCat);
-  const cats = [...new Set(methods.map(m => m.category))];
 
   // ── Derived analytics from real data ──
   const realVolumes = React.useMemo(() => {
@@ -188,7 +205,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
     </div>
     {Object.keys(appliedMethods).length > 0 && (
       <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginBottom:8 }}>
-        {Object.entries(appliedMethods).map(([c, n]) => <span key={c} onClick={() => onToggleMethod(n, c)} style={{ fontSize:9, padding:"3px 8px", borderRadius:10, cursor:"pointer", background:"rgba(0,230,138,0.12)", border:"1px solid rgba(0,230,138,0.3)", color:"#00e68a" }}>{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление', mobility:'Мобильность', mindset:'Психология' } as Record<string,string>)[c] || c}: {n} ✕</span>)}
+        {Object.entries(appliedMethods).map(([c, n]) => <span key={c} onClick={() => onToggleMethod(n, c)} style={{ fontSize:10, padding:"3px 8px", borderRadius:10, cursor:"pointer", background:"rgba(0,230,138,0.12)", border:"1px solid rgba(0,230,138,0.3)", color:"#00e68a" }}>{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление', mobility:'Мобильность', mindset:'Психология' } as Record<string,string>)[c] || c}: {n} ✕</span>)}
       </div>
     )}
     {/* ── Data Analysis Trigger ── */}
@@ -211,7 +228,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
         {/* Current Split + Training Status */}
         <div className="card" style={{ marginBottom: 8, padding: 10 }}>
           <h4 style={{ margin: '0 0 6px', fontSize: 12, color: '#8b5cf6' }}>🔍 Анализ ваших тренировок</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 9 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10 }}>
             <div>
               <span style={{ color: 'var(--text-dim)' }}>Сплит: </span>
               <b>{trainingOutput?.splitName || 'Не определён'}</b>
@@ -258,7 +275,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
               const barColor = v.weeklySets < mev ? '#ef4444' : v.weeklySets < mav ? '#f59e0b' : v.weeklySets <= mrv ? '#22c55e' : '#ef4444';
               return (
                 <div key={group} style={{ marginBottom: 4 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, marginBottom: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 1 }}>
                     <span style={{ fontWeight: 600 }}>{groupLabelMap[group] || group}</span>
                     <span style={{ color: barColor }}>
                       {v.weeklySets} подходов/нед (MEV:{mev} MAV:{mav} MRV:{mrv})
@@ -300,7 +317,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
               <div style={{ width: `${intensityDist.mid}%`, background: '#f59e0b' }} title="RIR 2-3" />
               <div style={{ width: `${intensityDist.high}%`, background: '#22c55e' }} title="RIR 4+" />
             </div>
-            <div style={{ display: 'flex', gap: 10, fontSize: 9, color: 'var(--text-dim)' }}>
+            <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--text-dim)' }}>
               <span>🔴 RIR 0-1: {intensityDist.low}%</span>
               <span>🟠 RIR 2-3: {intensityDist.mid}%</span>
               <span>🟢 RIR 4+: {intensityDist.high}%</span>
@@ -315,7 +332,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {Object.entries(frequencyAnalysis).map(([g, f]) => (
                 <span key={g} style={{
-                  padding: '3px 8px', borderRadius: 12, fontSize: 9,
+                  padding: '3px 8px', borderRadius: 12, fontSize: 10,
                   background: f >= 2 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
                   color: f >= 2 ? '#22c55e' : '#ef4444',
                   border: `1px solid ${f >= 2 ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
@@ -333,15 +350,15 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
             <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>💤 Статус восстановления</h4>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 10 }}>
               <div style={{ textAlign: 'center', padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.04)' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Усталость</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Усталость</div>
                 <div style={{ fontWeight: 700, color: (readiness.fatigue || 30) > 50 ? '#ef4444' : '#22c55e' }}>{Math.round(readiness.fatigue || 30)}%</div>
               </div>
               <div style={{ textAlign: 'center', padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.04)' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Восстановление</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Восстановление</div>
                 <div style={{ fontWeight: 700, color: (readiness.recovery || 70) > 60 ? '#22c55e' : '#f59e0b' }}>{Math.round(readiness.recovery || 70)}%</div>
               </div>
               <div style={{ textAlign: 'center', padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.04)' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Готовность</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Готовность</div>
                 <div style={{ fontWeight: 700, color: '#8b5cf6' }}>{Math.max(0, Math.round((readiness?.recovery || 50) - (readiness?.fatigue || 30)))}%</div>
               </div>
             </div>
@@ -358,15 +375,15 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
                   <div style={{ fontWeight: 600, fontSize: 11, color: (appliedMethods[r.method!.category] === r.method!.name) ? '#00e68a' : '#8b5cf6' }}>
                     {(appliedMethods[r.method!.category] === r.method!.name) ? '✓ ' : ''}{r.method.name}
                   </div>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>{r.reason}</div>
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{r.method.description}</div>
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{r.reason}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{r.method.description}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
                     Протокол: {r.method.example} | Уровень доказательности: {r.method.evidenceLevel}
                   </div>
                   {(appliedMethods[r.method!.category] === r.method!.name) ? (
-                    <div style={{ marginTop: 4, fontSize: 8, color: '#00e68a', fontWeight: 600 }}>✅ Применена к плану</div>
+                    <div style={{ marginTop: 4, fontSize: 10, color: '#00e68a', fontWeight: 600 }}>✅ Применена к плану</div>
                   ) : (
-                    <button onClick={() => onToggleMethod(r.method!.name, r.method!.category)} style={{ marginTop: 4, padding: '3px 8px', borderRadius: 4, fontSize: 8, background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Применить к плану</button>
+                    <button onClick={() => onToggleMethod(r.method!.name, r.method!.category)} style={{ marginTop: 4, padding: '3px 8px', borderRadius: 4, fontSize: 10, background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Применить к плану</button>
                   )}
                 </div>
               ))}
@@ -378,35 +395,34 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
 
     {/* ── Method Reference Library (always visible) ── */}
     <h4 style={{ margin: '12px 0 8px', fontSize: 12, color: 'var(--accent)' }}>📚 Библиотека методик</h4>
-    <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
-      <button onClick={()=>setMethodCat('all')} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, background: methodCat==='all'?'var(--accent)':'var(--bg-secondary)', color: methodCat==='all'?'#000':'var(--text-dim)', border:'none', cursor:'pointer' }}>Все</button>
-      {cats.map(c => <button key={c} onClick={()=>setMethodCat(c)} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, background: methodCat===c?'rgba(139,92,246,0.2)':'var(--bg-secondary)', border: methodCat===c?'1px solid #8b5cf6':'1px solid var(--border)', color: methodCat===c?'#8b5cf6':'var(--text-dim)', cursor:'pointer' }}>{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление', mobility:'Мобильность', mindset:'Психология' } as Record<string,string>)[c] || c}</button>)}
+    <div style={{ marginBottom: 8 }}>
+      <PopupSelect label="Категория методики" value={methodCat} options={methodCatOptions} onChange={setMethodCat} />
     </div>
     {filtered.map((m,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10, border: (appliedMethods[m.category] === m.name) ? '1px solid rgba(0,230,138,0.3)' : '1px solid var(--border)' }}>
-      <div style={{ fontWeight:600, fontSize:12 }}>{(appliedMethods[m.category] === m.name) ? '✓ ' : ''}{m.name} <span style={{ fontSize:9, color:'var(--text-dim)' }}>[{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление', mobility:'Мобильность', mindset:'Психология' } as Record<string,string>)[m.category] || m.category}]</span></div>
-      <div style={{ fontSize:9, color:'var(--text-light)', marginTop:2 }}>{m.description}</div>
-      <div style={{ fontSize:8, color:'var(--text-dim)' }}>Лучше всего для: {m.bestFor}</div>
-      <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>Как работает: {m.howItWorks}</div>
-      <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)' }}>Протокол: {m.example}</div>
-      <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', marginTop:1 }}>Док-во: {m.evidenceLevel} | Авторы: {m.popularizedBy}</div>
-      {m.caveats?.length > 0 && <div style={{ fontSize:7, color:'#f87171', marginTop:2, padding:'4px 6px', background:'rgba(239,68,68,0.06)', borderRadius:4 }}>⚠ {m.caveats.join(' | ')}</div>}
+      <div style={{ fontWeight:600, fontSize:12 }}>{(appliedMethods[m.category] === m.name) ? '✓ ' : ''}{m.name} <span style={{ fontSize:10, color:'var(--text-dim)' }}>[{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление', mobility:'Мобильность', mindset:'Психология' } as Record<string,string>)[m.category] || m.category}]</span></div>
+      <div style={{ fontSize:10, color:'var(--text-light)', marginTop:2 }}>{m.description}</div>
+      <div style={{ fontSize:10, color:'var(--text-dim)' }}>Лучше всего для: {m.bestFor}</div>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)' }}>Как работает: {m.howItWorks}</div>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>Протокол: {m.example}</div>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginTop:1 }}>Док-во: {m.evidenceLevel} | Авторы: {m.popularizedBy}</div>
+      {m.caveats?.length > 0 && <div style={{ fontSize:10, color:'#f87171', marginTop:2, padding:'4px 6px', background:'rgba(239,68,68,0.06)', borderRadius:4 }}>⚠ {m.caveats.join(' | ')}</div>}
       {(appliedMethods[m.category] === m.name) ? (
-        <div style={{ marginTop:4, fontSize:8, color:'#00e68a', fontWeight:600 }}>✅ Применена к плану</div>
+        <div style={{ marginTop:4, fontSize:10, color:'#00e68a', fontWeight:600 }}>✅ Применена к плану</div>
       ) : (
-        <button onClick={() => onToggleMethod(m.name, m.category)} style={{ marginTop:4, padding:'3px 8px', borderRadius:4, fontSize:8, background:'var(--accent)', color:'#000', border:'none', cursor:'pointer', fontWeight:600 }}>Применить к плану</button>
+        <button onClick={() => onToggleMethod(m.name, m.category)} style={{ marginTop:4, padding:'3px 8px', borderRadius:4, fontSize:10, background:'var(--accent)', color:'#000', border:'none', cursor:'pointer', fontWeight:600 }}>Применить к плану</button>
       )}
     </div>)}
 
     <h4 style={{ margin:'12px 0 8px', fontSize:12 }}>📊 Объёмные ориентиры (MEV / MAV / MRV)</h4>
-    <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
-      {([['beginner','Новичок'],['intermediate','Средний'],['advanced','Продвинутый']] as const).map(([id,l]) => <button key={id} onClick={() => setVolLevel(id)} style={{ padding:'5px 12px', borderRadius:14, fontSize:10, fontWeight: volLevel===id?700:500, cursor:'pointer', border: volLevel===id?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background: volLevel===id?'rgba(0,230,138,0.14)':'rgba(255,255,255,0.02)', color: volLevel===id?'#00e68a':'rgba(255,255,255,0.6)' }}>{l}</button>)}
+    <div style={{ marginBottom: 8 }}>
+      <PopupSelect label="Уровень для ориентиров" value={volLevel} options={volLevelOptions} onChange={(v) => setVolLevel(v as 'beginner' | 'intermediate' | 'advanced')} />
     </div>
     {volumes.map((v,i) => { const lvl = v[volLevel]; return <div key={i} className="card" style={{ marginBottom:4, padding:8 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
         <div style={{ fontWeight:700, fontSize:11, color:'#fff' }}>{v.muscle}</div>
-        <div style={{ fontSize:9, color:'#00e68a', fontWeight:700 }}>MEV {lvl.mev} · MAV {lvl.mav} · MRV {lvl.mrv}</div>
+        <div style={{ fontSize:10, color:'#00e68a', fontWeight:700 }}>MEV {lvl.mev} · MAV {lvl.mav} · MRV {lvl.mrv}</div>
       </div>
-      <div style={{ display:'flex', gap:6, fontSize:9, color:'rgba(255,255,255,0.6)', marginTop:3 }}>
+      <div style={{ display:'flex', gap:6, fontSize:10, color:'rgba(255,255,255,0.6)', marginTop:3 }}>
         <span>📡 {lvl.frequency}</span>
         <span style={{ flex:1 }}>
           <span style={{ display:'inline-block', width:100, height:5, background:'rgba(255,255,255,0.06)', borderRadius:3, verticalAlign:'middle', marginRight:4 }}>
@@ -414,26 +430,26 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
           </span>
         </span>
       </div>
-      <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:3 }}>{v.notes}</div>
-      <div style={{ fontSize:8, color:'rgba(0,230,138,0.7)', marginTop:2 }}>🏋️ {v.bestExercises.join(' · ')}</div>
+      <div style={{ fontSize:10, color:'var(--text-dim)', marginTop:3 }}>{v.notes}</div>
+      <div style={{ fontSize:10, color:'rgba(0,230,138,0.7)', marginTop:2 }}>🏋️ {v.bestExercises.join(' · ')}</div>
     </div>; })}
 
     <h4 style={{ margin:'12px 0 8px', fontSize:12 }}>📐 Визуализация сплитов (нажмите для раскрытия)</h4>
     {visuals.map((s,i) => <div key={i} className="card" style={{ marginBottom:6, padding:8, cursor:'pointer', border: expandedSplit===i?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)' }} onClick={() => setExpandedSplit(expandedSplit===i?null:i)}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
         <div style={{ fontWeight:700, fontSize:11, color: expandedSplit===i?'#00e68a':'#fff' }}>{s.name}</div>
-        <span style={{ fontSize:9, color:'#00e68a' }}>{expandedSplit===i?'▲':'▼'}</span>
+        <span style={{ fontSize:10, color:'#00e68a' }}>{expandedSplit===i?'▲':'▼'}</span>
       </div>
-      <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>📊 {s.totalVolume} · 🔁 {s.totalFrequency}</div>
-      <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:1 }}>✅ Подходит: {s.suitability.join(', ')}</div>
+      <div style={{ fontSize:10, color:'var(--text-dim)', marginTop:2 }}>📊 {s.totalVolume} · 🔁 {s.totalFrequency}</div>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', marginTop:1 }}>✅ Подходит: {s.suitability.join(', ')}</div>
       {expandedSplit===i && <div style={{ marginTop:8, borderTop:'1px solid rgba(255,255,255,0.06)', paddingTop:8 }}>
         {s.days.map((d,di) => <div key={di} style={{ background:'rgba(255,255,255,0.02)', borderRadius:6, padding:'6px 8px', marginBottom:4, borderLeft:'2px solid #00e68a' }}>
           <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, fontWeight:700, color:'#fff' }}>
             <span>Д{d.day}: {d.name}</span>
-            <span style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>{d.volume} объём · {d.intensity} инт.</span>
+            <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>{d.volume} объём · {d.intensity} инт.</span>
           </div>
-          <div style={{ fontSize:9, color:'rgba(0,230,138,0.8)', marginTop:2 }}>🎯 {d.focus}</div>
-          <div style={{ fontSize:8, color:'rgba(255,255,255,0.55)', marginTop:2 }}>Шаблоны: {d.patterns.join(' · ')}</div>
+          <div style={{ fontSize:10, color:'rgba(0,230,138,0.8)', marginTop:2 }}>🎯 {d.focus}</div>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginTop:2 }}>Шаблоны: {d.patterns.join(' · ')}</div>
         </div>)}
       </div>}
       </div>)}

@@ -339,13 +339,13 @@ const PrescriptionTab: React.FC = () => {
         <div style={{ ...CARD, marginBottom: 12, border: '1px solid rgba(0,230,138,0.15)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
             <div>
-              <div style={{ fontSize: 9, color: DIM, marginBottom: 2 }}>Группа мышц</div>
+              <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Группа мышц</div>
               <select value={genGroup} onChange={e => setGenGroup(e.target.value)} style={{ width: '100%', padding: '5px', borderRadius: 6, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11 }}>
                 {['chest', 'back', 'legs', 'shoulders', 'arms', 'core'].map(g => <option key={g} value={g}>{GROUP_RU[g]}</option>)}
               </select>
             </div>
             <div>
-              <div style={{ fontSize: 9, color: DIM, marginBottom: 2 }}>Цель</div>
+              <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Цель</div>
               <select value={genGoal} onChange={e => setGenGoal(e.target.value)} style={{ width: '100%', padding: '5px', borderRadius: 6, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11 }}>
                 <option value="bulk">Масса</option><option value="strength">Сила</option><option value="cut">Сушка</option>
                 <option value="maintenance">Поддержание</option><option value="recomp">Рекомп</option>
@@ -353,13 +353,13 @@ const PrescriptionTab: React.FC = () => {
               </select>
             </div>
             <div>
-              <div style={{ fontSize: 9, color: DIM, marginBottom: 2 }}>Уровень</div>
+              <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Уровень</div>
               <select value={genLevel} onChange={e => setGenLevel(e.target.value)} style={{ width: '100%', padding: '5px', borderRadius: 6, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11 }}>
                 <option value="beginner">Новичок</option><option value="intermediate">Средний</option><option value="advanced">Опытный</option><option value="enhanced">Enhanced</option>
               </select>
             </div>
             <div>
-              <div style={{ fontSize: 9, color: DIM, marginBottom: 2 }}>Кол-во</div>
+              <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Кол-во</div>
               <select value={genCount} onChange={e => setGenCount(parseInt(e.target.value))} style={{ width: '100%', padding: '5px', borderRadius: 6, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11 }}>
                 {[3, 5, 8, 10].map(n => <option key={n} value={n}>{n}</option>)}
               </select>
@@ -367,14 +367,14 @@ const PrescriptionTab: React.FC = () => {
           </div>
           {genResult && genResult.length > 0 ? (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 6px', borderRadius: 4, marginBottom: 4, fontSize: 8, color: DIM, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 6px', borderRadius: 4, marginBottom: 4, fontSize: 10, color: DIM, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <span style={{ flex: 1 }}>Упражнение</span><span style={{ width: 30, textAlign: 'center' }}>Тип</span><span style={{ width: 45, textAlign: 'center' }}>Сеты</span><span style={{ width: 50, textAlign: 'center' }}>Повторы</span><span style={{ width: 28, textAlign: 'center' }}>RIR</span><span style={{ width: 45, textAlign: 'center' }}>Вес</span>
               </div>
               {genResult.map((r, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 4, marginBottom: 2, background: 'rgba(255,255,255,0.02)', fontSize: 9, cursor: 'pointer' }}
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 4, marginBottom: 2, background: 'rgba(255,255,255,0.02)', fontSize: 10, cursor: 'pointer' }}
                   onClick={() => { setGroup(r.group); setExId(EXERCISE_CATALOG.find(e => e.name === r.name)?.id || ''); setGoal(r.rir <= 2 ? 'strength' : r.rir <= 4 ? 'hypertrophy' : 'endurance'); }}>
                   <span style={{ flex: 1, fontWeight: 600 }}>{r.name}</span>
-                  <span style={{ width: 30, textAlign: 'center', fontSize: 7, color: DIM }}>{r.type === 'compound' ? 'Базовое' : 'Изол.'}</span>
+                  <span style={{ width: 30, textAlign: 'center', fontSize: 10, color: DIM }}>{r.type === 'compound' ? 'Базовое' : 'Изол.'}</span>
                   <span style={{ width: 45, textAlign: 'center', color: ACCENT, fontWeight: 700 }}>{r.sets}</span>
                   <span style={{ width: 50, textAlign: 'center', color: ACCENT, fontWeight: 600 }}>{r.reps}</span>
                   <span style={{ width: 28, textAlign: 'center', color: DIM }}>{r.rir}</span>
@@ -464,7 +464,7 @@ const PrescriptionTab: React.FC = () => {
             <div style={{ fontSize: 11, fontWeight: 700, color: resistanceProfile.curve === 'stretch_mediated' ? '#22c55e' : '#60a5fa', marginBottom: 4 }}>📐 Профиль сопротивления</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <div style={{ fontSize: 26, fontWeight: 800, color: resistanceProfile.curve === 'stretch_mediated' ? '#22c55e' : '#60a5fa' }}>{resistanceProfile.score}/10</div>
-              <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: 12 }}>{resistanceProfile.label}</div><div style={{ ...SMALL, fontSize: 9 }}>{resistanceProfile.desc}</div></div>
+              <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: 12 }}>{resistanceProfile.label}</div><div style={{ ...SMALL, fontSize: 10 }}>{resistanceProfile.desc}</div></div>
             </div>
           </div>
         )}
@@ -476,9 +476,9 @@ const PrescriptionTab: React.FC = () => {
               <div key={i} style={{ padding: '8px 10px', borderRadius: 6, marginBottom: 4, background: d.diff === 'easier' ? 'rgba(34,197,94,0.06)' : 'rgba(245,158,11,0.06)', border: `1px solid ${d.diff === 'easier' ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)'}`, borderLeft: `3px solid ${d.diff === 'easier' ? '#22c55e' : '#f59e0b'}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontWeight: 700, fontSize: 12 }}>{d.name}</span>
-                  <span style={{ padding: '1px 6px', borderRadius: 3, fontSize: 9, fontWeight: 600, background: d.diff === 'easier' ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', color: d.diff === 'easier' ? '#22c55e' : '#f59e0b' }}>{d.diff === 'easier' ? '⬇ Упрощение' : '⬆ Усложнение'}</span>
+                  <span style={{ padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: d.diff === 'easier' ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', color: d.diff === 'easier' ? '#22c55e' : '#f59e0b' }}>{d.diff === 'easier' ? '⬇ Упрощение' : '⬆ Усложнение'}</span>
                 </div>
-                <div style={{ ...SMALL, fontSize: 9, marginTop: 2 }}>{d.how}</div>
+                <div style={{ ...SMALL, fontSize: 10, marginTop: 2 }}>{d.how}</div>
               </div>
             ))}
           </div>
@@ -498,10 +498,10 @@ const PrescriptionTab: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6 }}>
               {autoProgression.map((w, i) => (
                 <div key={i} style={{ textAlign: 'center', padding: 8, background: 'rgba(0,0,0,0.12)', borderRadius: 6, border: i === 0 ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.04)' }}>
-                  <div style={{ fontSize: 9, color: DIM }}>Нед {w.w}</div>
+                  <div style={{ fontSize: 10, color: DIM }}>Нед {w.w}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, margin: '2px 0' }}>{w.sets}×{w.reps}</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT }}>{w.weight} кг</div>
-                  <div style={{ fontSize: 9, color: DIM }}>RIR {w.rir} · {(w.pct)}%</div>
+                  <div style={{ fontSize: 10, color: DIM }}>RIR {w.rir} · {(w.pct)}%</div>
                 </div>
               ))}
             </div>
@@ -512,11 +512,11 @@ const PrescriptionTab: React.FC = () => {
           <div style={{ ...CARD, marginTop: 10, border: '1px solid rgba(245,158,11,0.2)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>⚡ Анализ утомления</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 6 }}>
-              <div><span style={{ ...SMALL }}>ЦНС</span><div style={{ fontSize: 16, fontWeight: 700, color: fatigueAnalysis.cnsLoad >= 7 ? '#ef4444' : fatigueAnalysis.cnsLoad >= 4 ? '#f59e0b' : '#22c55e' }}>{fatigueAnalysis.cnsLoad}/10</div><div style={{ ...SMALL, fontSize: 9 }}>{fatigueAnalysis.cnsLabel}</div></div>
-              <div><span style={{ ...SMALL }}>Мышцы</span><div style={{ fontSize: 16, fontWeight: 700, color: fatigueAnalysis.muscularLoad >= 7 ? '#ef4444' : fatigueAnalysis.muscularLoad >= 4 ? '#f59e0b' : '#22c55e' }}>{fatigueAnalysis.muscularLoad}/10</div><div style={{ ...SMALL, fontSize: 9 }}>{fatigueAnalysis.muscularLabel}</div></div>
-              <div><span style={{ ...SMALL }}>Восст.</span><div style={{ fontSize: 16, fontWeight: 700, color: '#60a5fa' }}>{fatigueAnalysis.recoveryHours}ч</div><div style={{ ...SMALL, fontSize: 9 }}>до след. тяжёлой</div></div>
+              <div><span style={{ ...SMALL }}>ЦНС</span><div style={{ fontSize: 16, fontWeight: 700, color: fatigueAnalysis.cnsLoad >= 7 ? '#ef4444' : fatigueAnalysis.cnsLoad >= 4 ? '#f59e0b' : '#22c55e' }}>{fatigueAnalysis.cnsLoad}/10</div><div style={{ ...SMALL, fontSize: 10 }}>{fatigueAnalysis.cnsLabel}</div></div>
+              <div><span style={{ ...SMALL }}>Мышцы</span><div style={{ fontSize: 16, fontWeight: 700, color: fatigueAnalysis.muscularLoad >= 7 ? '#ef4444' : fatigueAnalysis.muscularLoad >= 4 ? '#f59e0b' : '#22c55e' }}>{fatigueAnalysis.muscularLoad}/10</div><div style={{ ...SMALL, fontSize: 10 }}>{fatigueAnalysis.muscularLabel}</div></div>
+              <div><span style={{ ...SMALL }}>Восст.</span><div style={{ fontSize: 16, fontWeight: 700, color: '#60a5fa' }}>{fatigueAnalysis.recoveryHours}ч</div><div style={{ ...SMALL, fontSize: 10 }}>до след. тяжёлой</div></div>
             </div>
-            <div style={{ ...SMALL, fontSize: 9, marginTop: 4, lineHeight: 1.3 }}>{fatigueAnalysis.advice}</div>
+            <div style={{ ...SMALL, fontSize: 10, marginTop: 4, lineHeight: 1.3 }}>{fatigueAnalysis.advice}</div>
           </div>
         )}
 
@@ -526,7 +526,7 @@ const PrescriptionTab: React.FC = () => {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {warmupRamp.steps.map((s, i) => (
                 <div key={i} style={{ flex: '1 0 60px', textAlign: 'center', padding: 6, background: 'rgba(0,0,0,0.15)', borderRadius: 6, border: `1px solid ${i === warmupRamp.steps.length - 1 ? 'rgba(251,146,60,0.3)' : 'rgba(255,255,255,0.04)'}` }}>
-                  <div style={{ fontSize: 8, color: DIM }}>{s.label}</div><div style={{ fontSize: 13, fontWeight: 700 }}>{s.weight} кг</div><div style={{ fontSize: 9, color: DIM }}>{s.pct}% · {s.reps} повт</div>
+                  <div style={{ fontSize: 10, color: DIM }}>{s.label}</div><div style={{ fontSize: 13, fontWeight: 700 }}>{s.weight} кг</div><div style={{ fontSize: 10, color: DIM }}>{s.pct}% · {s.reps} повт</div>
                 </div>
               ))}
             </div>
@@ -551,7 +551,7 @@ const PrescriptionTab: React.FC = () => {
             <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>🏅 Рейтинг в группе «{GROUP_RU[ex!.group]}» (цель: {goal === 'hypertrophy' ? 'гипертрофия' : goal})</div>
             <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Позиция: <b style={{ color: ACCENT }}>#{exerciseRanking.currentRank}</b> из {exerciseRanking.total} · score: {exerciseRanking.currentScore}</div>
             {exerciseRanking.list.map((item, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', borderRadius: 4, marginBottom: 2, background: item.id === ex!.id ? 'rgba(0,230,138,0.08)' : 'transparent', fontSize: 9 }}>
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', borderRadius: 4, marginBottom: 2, background: item.id === ex!.id ? 'rgba(0,230,138,0.08)' : 'transparent', fontSize: 10 }}>
                 <span style={{ color: item.id === ex!.id ? ACCENT : DIM }}>#{i + 1} {item.name}</span>
                 <span style={{ color: DIM }}>{item.type === 'compound' ? 'База' : 'Изол.'} · {item.score} pts</span>
               </div>
@@ -569,9 +569,9 @@ const PrescriptionTab: React.FC = () => {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
               {proFvDist.map(([fv, count]) => (
                 <div key={fv} style={{ padding: '5px 10px', borderRadius: 6, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.12)', textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: '#c084fc' }}>{fv.replace(/_/g, ' ')}</div>
+                  <div style={{ fontSize: 10, color: '#c084fc' }}>{fv.replace(/_/g, ' ')}</div>
                   <div style={{ fontSize: 16, fontWeight: 800, color: '#c084fc' }}>{count}</div>
-                  <div style={{ fontSize: 7, color: DIM }}>упр.</div>
+                  <div style={{ fontSize: 10, color: DIM }}>упр.</div>
                 </div>
               ))}
             </div>
@@ -580,29 +580,29 @@ const PrescriptionTab: React.FC = () => {
           <div style={{ ...CARD, marginBottom: 10, border: '1px solid rgba(34,197,94,0.2)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginBottom: 6 }}>🏆 Stretch-mediated лидеры (топ-5)</div>
             {proStretchLeaders.length > 0 ? proStretchLeaders.map((g, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', borderRadius: 4, marginBottom: 2, background: i === 0 ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.02)', fontSize: 9 }}>
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', borderRadius: 4, marginBottom: 2, background: i === 0 ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.02)', fontSize: 10 }}>
                 <span style={{ fontWeight: 600 }}>#{i + 1} {g.exercise.name}</span>
                 <span style={{ color: '#22c55e' }}>{g.rp.score}/10</span>
-                <span style={{ color: DIM, fontSize: 8 }}>{g.exercise.type === 'compound' ? 'База' : 'Изол.'}</span>
+                <span style={{ color: DIM, fontSize: 10 }}>{g.exercise.type === 'compound' ? 'База' : 'Изол.'}</span>
               </div>
-            )) : <div style={{ fontSize: 9, color: DIM, padding: 6 }}>Нет stretch-mediated упражнений в этой группе.</div>}
+            )) : <div style={{ fontSize: 10, color: DIM, padding: 6 }}>Нет stretch-mediated упражнений в этой группе.</div>}
           </div>
 
           <div style={{ ...CARD, marginBottom: 10, border: '1px solid rgba(59,130,246,0.2)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>📍 Покрытие подрегионов: {proRegionalCoverage.covered.length}/{proRegionalCoverage.total}</div>
             {proRegionalCoverage.covered.length > 0 && (
               <div style={{ marginBottom: 4 }}>
-                <div style={{ fontSize: 8, color: '#22c55e', fontWeight: 600, marginBottom: 2 }}>✅ Покрыты:</div>
+                <div style={{ fontSize: 10, color: '#22c55e', fontWeight: 600, marginBottom: 2 }}>✅ Покрыты:</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                  {proRegionalCoverage.covered.map(r => <span key={r} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 7, background: 'rgba(34,197,94,0.08)', color: '#22c55e' }}>{r}</span>)}
+                  {proRegionalCoverage.covered.map(r => <span key={r} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, background: 'rgba(34,197,94,0.08)', color: '#22c55e' }}>{r}</span>)}
                 </div>
               </div>
             )}
             {proRegionalCoverage.uncovered.length > 0 && (
               <div>
-                <div style={{ fontSize: 8, color: '#ef4444', fontWeight: 600, marginBottom: 2 }}>❌ Не покрыты:</div>
+                <div style={{ fontSize: 10, color: '#ef4444', fontWeight: 600, marginBottom: 2 }}>❌ Не покрыты:</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                  {proRegionalCoverage.uncovered.map(r => <span key={r} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 7, background: 'rgba(239,68,68,0.08)', color: '#ef4444' }}>{r}</span>)}
+                  {proRegionalCoverage.uncovered.map(r => <span key={r} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, background: 'rgba(239,68,68,0.08)', color: '#ef4444' }}>{r}</span>)}
                 </div>
               </div>
             )}
@@ -611,11 +611,11 @@ const PrescriptionTab: React.FC = () => {
           <div style={{ ...CARD, marginBottom: 10, border: '1px solid rgba(251,146,60,0.2)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#fb923c', marginBottom: 6 }}>🔗 Сила синергии: лучшие пары</div>
             {proSynergyPairs.length > 0 ? proSynergyPairs.map((p, i) => (
-              <div key={i} style={{ padding: '5px 6px', borderRadius: 4, marginBottom: 3, background: 'rgba(251,146,60,0.03)', border: '1px solid rgba(251,146,60,0.08)', fontSize: 8 }}>
+              <div key={i} style={{ padding: '5px 6px', borderRadius: 4, marginBottom: 3, background: 'rgba(251,146,60,0.03)', border: '1px solid rgba(251,146,60,0.08)', fontSize: 10 }}>
                 <div style={{ fontWeight: 700, color: '#fff', marginBottom: 1 }}>{p.a} + {p.b}</div>
                 <div style={{ color: DIM }}>{p.type}: {p.reason}</div>
               </div>
-            )) : <div style={{ fontSize: 9, color: DIM, padding: 6 }}>Нет явных синергетических пар в этой группе.</div>}
+            )) : <div style={{ fontSize: 10, color: DIM, padding: 6 }}>Нет явных синергетических пар в этой группе.</div>}
           </div>
         </>)}
 
@@ -631,7 +631,7 @@ const PrescriptionTab: React.FC = () => {
           <div style={{ ...CARD, marginTop: 10, border: '1px solid rgba(168,85,247,0.2)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>📂 Сохранённые расчёты (последние {savedCalcs.length})</div>
             {savedCalcs.map((s, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 6px', borderRadius: 4, marginBottom: 2, background: 'rgba(255,255,255,0.02)', fontSize: 9, cursor: 'pointer' }}
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 6px', borderRadius: 4, marginBottom: 2, background: 'rgba(255,255,255,0.02)', fontSize: 10, cursor: 'pointer' }}
                 onClick={() => { const found = EXERCISE_CATALOG.find(e => e.name === s.name); if (found) { setGroup(found.group); setExId(found.id); setGoal(s.goal); setWeek(s.week); setOneRM(s.oneRM); } }}>
                 <span style={{ fontWeight: 600 }}>{s.name}</span>
                 <span style={{ color: DIM }}>{s.date} · {s.sets}×{s.reps} · RIR {s.rir} · {s.weight} кг</span>

@@ -149,14 +149,11 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
           <PopupNumber label={`Рабочий вес (${unitLabel})`} value={targetWeight} min={barWeight} max={800} suffix={` ${unitLabel}`} onChange={setTargetWeight} />
-          <div>
-            <div style={{ fontSize: 9, color: DIM, marginBottom: 3 }}>Вес грифа ({unitLabel})</div>
-            <input type="number" min={1} max={60} value={barWeight} onChange={e => setBarWeight(+e.target.value || 0)} style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px', minHeight: 40, width: '100%', boxSizing: 'border-box' as const, fontSize: 12, textAlign: 'center' as const }} />
-          </div>
+          <PopupNumber label={`Вес грифа (${unitLabel})`} value={barWeight} min={1} max={60} suffix={` ${unitLabel}`} onChange={v => setBarWeight(v || 0)} />
         </div>
         {/* Быстрые пресеты грифов */}
         <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 9, color: DIM, marginBottom: 3 }}>Быстрый выбор грифа</div>
+          <div style={{ fontSize: 10, color: DIM, marginBottom: 3 }}>Быстрый выбор грифа</div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {['men_olympic', 'women_olympic', 'ez_curl', 'trap_bar', 'ssb', 'swiss_bar', 'technique', 'standard'].map(id => {
               const p = BAR_PRESETS_BOTH[id];
@@ -175,7 +172,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
         <div style={{ marginBottom: 8, padding: 8, background: 'rgba(59,130,246,0.04)', borderRadius: 6, border: '1px solid rgba(59,130,246,0.1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
             <input type="number" min={0} max={1000} placeholder={`1ПМ (${unitLabel})`} value={oneRM || ''} onChange={e => setOneRM(+e.target.value || 0)} style={{ width: 70, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '5px 6px', fontSize: 10, textAlign: 'center' }} />
-            <span style={{ fontSize: 9, color: DIM }}>1ПМ для расчёта рабочего веса по проценту</span>
+            <span style={{ fontSize: 10, color: DIM }}>1ПМ для расчёта рабочего веса по проценту</span>
             {oneRM > 0 && <button onClick={() => setOneRM(0)} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 10 }}>✕</button>}
           </div>
           {oneRM > 0 && (
@@ -188,7 +185,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 9, color: DIM, marginBottom: 3 }}>Доступные блины (через запятую, {unitLabel})</div>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 3 }}>Доступные блины (через запятую, {unitLabel})</div>
             <input type="text" value={customPlates} placeholder="напр.: 25,20,15,10,5,2.5" onChange={e => setCustomPlates(e.target.value)} style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px', minHeight: 40, width: '100%', boxSizing: 'border-box' as const, fontSize: 12 }} />
           </div>
           {customPlates.trim() && <button onClick={() => setCustomPlates('')} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 10, whiteSpace: 'nowrap' }}>Сброс</button>}
@@ -222,7 +219,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
             {plates.platesPerSide.map((p, i) => (
               <div key={i} style={{ ...ROW, borderBottom: 'none' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ display: 'inline-block', width: 28, height: 28, borderRadius: '50%', background: p.plate >= 20 ? '#ef4444' : p.plate >= 10 ? '#f59e0b' : '#3b82f6', border: '2px solid rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: '24px', fontSize: 9, fontWeight: 800, color: '#fff' }}>{p.plate}</span>
+                  <span style={{ display: 'inline-block', width: 28, height: 28, borderRadius: '50%', background: p.plate >= 20 ? '#ef4444' : p.plate >= 10 ? '#f59e0b' : '#3b82f6', border: '2px solid rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: '24px', fontSize: 10, fontWeight: 800, color: '#fff' }}>{p.plate}</span>
                   <span>Блин {p.plate} {unitLabel}</span>
                 </span>
                 <b style={{ color: ACCENT }}>×{p.count} на сторону</b>
@@ -351,14 +348,14 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
                   const arr = savedPresets.filter(x => x.id !== p.id);
                   setSavedPresets(arr);
                   try { localStorage.setItem('he_plate_presets', JSON.stringify(arr)); } catch { /* ignore */ }
-                }} style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 9 }}>✕</button>
+                }} style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 10 }}>✕</button>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <div style={{ fontSize: 9, color: DIM, marginTop: 12, lineHeight: 1.4 }}>
+      <div style={{ fontSize: 10, color: DIM, marginTop: 12, lineHeight: 1.4 }}>
         Жадный алгоритм: блин большего номинала — первым (минимум числа блинов).
         Если отклонение &gt; 2 {unitLabel} — добавьте блины мелких номиналов (1.25 {unitLabel} или 2.5 {unitLabel}).
       </div>

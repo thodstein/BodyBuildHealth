@@ -308,21 +308,21 @@ export const PlanExportCard: React.FC<PlanExportCardProps> = ({
 
         {/* Quick stats */}
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 9, color: DIM, padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.04)' }}>
+          <span style={{ fontSize: 10, color: DIM, padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.04)' }}>
             {qualityResult.metadata.totalSets} сетов/нед
           </span>
-          <span style={{ fontSize: 9, color: DIM, padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.04)' }}>
+          <span style={{ fontSize: 10, color: DIM, padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.04)' }}>
             Т/Т: {qualityResult.metadata.pushPullRatio}
           </span>
           <span style={{
-            fontSize: 9, padding: '2px 6px', borderRadius: 4,
+            fontSize: 10, padding: '2px 6px', borderRadius: 4,
             background: qualityResult.metadata.hasDeload ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
             color: qualityResult.metadata.hasDeload ? '#22c55e' : '#ef4444',
           }}>
             {qualityResult.metadata.hasDeload ? '✓ Разгрузка' : '✕ Нет разгрузки'}
           </span>
           <span style={{
-            fontSize: 9, padding: '2px 6px', borderRadius: 4,
+            fontSize: 10, padding: '2px 6px', borderRadius: 4,
             background: qualityResult.metadata.weakPointCoverage >= 80 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
             color: qualityResult.metadata.weakPointCoverage >= 80 ? '#22c55e' : '#ef4444',
           }}>
@@ -337,7 +337,7 @@ export const PlanExportCard: React.FC<PlanExportCardProps> = ({
           {criticals.length > 0 && (
             <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>
               🔴 {criticals.length} критических:
-              {criticals.slice(0, 3).map((c, i) => <div key={i} style={{ fontSize: 9, fontWeight: 400, color: 'rgba(255,255,255,0.6)', marginLeft: 12 }}>{c.message}</div>)}
+              {criticals.slice(0, 3).map((c, i) => <div key={i} style={{ fontSize: 10, fontWeight: 400, color: 'rgba(255,255,255,0.6)', marginLeft: 12 }}>{c.message}</div>)}
             </div>
           )}
           {warnings.length > 0 && (
@@ -361,13 +361,13 @@ export const PlanExportCard: React.FC<PlanExportCardProps> = ({
               : '#22c55e';
             return (
               <div key={m.muscle} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                <span style={{ fontSize: 9, color: DIM, width: 70, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 10, color: DIM, width: 70, textAlign: 'right', whiteSpace: 'nowrap' }}>
                   {GROUP_RU[m.muscle] || m.muscle}{m.weakPoint ? ' ★' : ''}
                 </span>
                 <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
                   <div style={{ height: '100%', width: `${barPct}%`, borderRadius: 2, background: barColor, transition: 'width 0.3s' }} />
                 </div>
-                <span style={{ fontSize: 8, color: barColor, width: 40, textAlign: 'right' }}>
+                <span style={{ fontSize: 10, color: barColor, width: 40, textAlign: 'right' }}>
                   {m.weeklySets}с
                 </span>
               </div>

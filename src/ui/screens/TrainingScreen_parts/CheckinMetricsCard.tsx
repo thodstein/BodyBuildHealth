@@ -31,9 +31,9 @@ export const CheckinMetricsCard: React.FC = () => {
   const trendColor = trend < 0 ? '#00e68a' : trend > 0 ? '#eab308' : DIM;
   const Metric = ({ label, value, unit, hint }: { label: string; value: number | string; unit?: string; hint?: string }) => (
     <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}>
-      <div style={{ fontSize: 9, color: DIM }}>{label}</div>
+      <div style={{ fontSize: 10, color: DIM }}>{label}</div>
       <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{value}{unit ? <span style={{ fontSize: 10, color: DIM }}> {unit}</span> : null}</div>
-      {hint && <div style={{ fontSize: 8, color: DIM, marginTop: 1 }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 10, color: DIM, marginTop: 1 }}>{hint}</div>}
     </div>
   );
 
