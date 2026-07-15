@@ -617,9 +617,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const hasSnack = !trainWindow && input.mealsCount >= 4;
 
   const mealBudget = {
-    breakfast: { p: Math.max(25, mpsPerMeal), c: breakC, f: Math.round(fatTotal * 0.15) },
-    lunch: { p: Math.max(25, mpsPerMeal), c: (input.eveningLowCarb ? Math.round((trainWindow ? trainCarbLunch : restCarbLunch - snackC) * 1.3) : (trainWindow ? trainCarbLunch : restCarbLunch - snackC)), f: Math.round(fatTotal * 0.12) },
-    dinner: { p: Math.max(25, mpsPerMeal), c: input.eveningLowCarb ? Math.round((trainWindow ? trainCarbDinner : restCarbDinner) * 0.5) : (trainWindow ? trainCarbDinner : restCarbDinner), f: Math.round(fatTotal * 0.18) },
+    breakfast: { p: Math.max(30, Math.round(mpsPerMeal * 1.2)), c: breakC, f: Math.round(fatTotal * 0.15) },
+    lunch: { p: Math.max(30, Math.round(mpsPerMeal * 1.2)), c: (input.eveningLowCarb ? Math.round((trainWindow ? trainCarbLunch : restCarbLunch - snackC) * 1.3) : (trainWindow ? trainCarbLunch : restCarbLunch - snackC)), f: Math.round(fatTotal * 0.12) },
+    dinner: { p: Math.max(30, Math.round(mpsPerMeal * 1.2)), c: input.eveningLowCarb ? Math.round((trainWindow ? trainCarbDinner : restCarbDinner) * 0.5) : (trainWindow ? trainCarbDinner : restCarbDinner), f: Math.round(fatTotal * 0.18) },
     prew: trainWindow ? { p: PREW_PROTEIN_G, c: PREW_CARB_SLOW_G, f: PREW_FAT_MAX_G } : null,
     postw: trainWindow ? { p: POSTW_FAST_PROTEIN_G, c: POSTW_FAST_CARB_G, f: 0 } : null,
     snack: hasSnack ? { p: snackP, c: snackC, f: snackF } : null,
@@ -803,7 +803,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         fatItems.forEach(({ meal, item }) => {
           const food = FOOD_DB.find(f => f.id === item.id);
           if (!food || !food.fat) return;
-          const addGrams = Math.round(kcalPerItem / (food.kcal || 1) * 100);
+          const addGrams = Math.min(Math.round(item.amount * 0.5), Math.round(kcalPerItem / (food.kcal || 1) * 100));
           const newAmount = Math.min(MAX_GRAM_PER_ITEM, item.amount + addGrams);
           const factor = newAmount / (item.amount || 1);
           item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
@@ -872,8 +872,6 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     notes.push(`✅ Клетчатка: ${fiberG}г / ${fiberTarget}г`);
   }
 
-  const deficiencyClosure = closeFoodDeficiencies(meals);
-  if (deficiencyClosure.length > 0) notes.push(...deficiencyClosure);
   // Omega-3 boost: ensure at least one omega-3 source per day
   {
     const omega3Ids = new Set(['salmon','mackerel','sardines','red_fish','flaxseed','chia_seeds','walnuts']);
@@ -903,6 +901,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
   }
 
+  const deficiencyClosure = closeFoodDeficiencies(meals);
+  if (deficiencyClosure.length > 0) notes.push(...deficiencyClosure);
   // P5: Phase-specific nutrition protocol (bodybuilder-specific)
   const phaseNotes: string[] = [];
   const cp: string | undefined = input.cyclePhase as string | undefined;

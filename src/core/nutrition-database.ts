@@ -240,9 +240,9 @@ export function enrichFoodItemV2(f: FoodItem): FoodItem {
   // Amino acid ratios: animal vs plant
   const aaFactor = isLegume ? 0.65 : isGrain ? 0.55 : effectiveAnimal || isFish ? 1.0 : isSuppBCAA ? 1.5 : hasCollagen ? 0.6 : 0.75;
   f.amino_acid_profile_100g = {
-    leucine_mg: m.Leucine ?? Math.round(f.protein * 42 * aaFactor),
-    isoleucine_mg: m.Isoleucine ?? Math.round(f.protein * 25 * aaFactor),
-    valine_mg: m.Valine ?? Math.round(f.protein * 27 * aaFactor),
+    leucine_mg: m.Leucine ?? Math.round(f.protein * 85 * aaFactor),
+    isoleucine_mg: m.Isoleucine ?? Math.round(f.protein * 48 * aaFactor),
+    valine_mg: m.Valine ?? Math.round(f.protein * 50 * aaFactor),
     lysine_mg: Math.round(f.protein * (isGrain ? 25 : isLegume ? 35 : isNut ? 22 : 38) * aaFactor),
     methionine_mg: Math.round(f.protein * 12 * (isLegume ? 0.5 : 1)),
     arginine_mg: Math.round(f.protein * (isNut ? 60 : 32) * aaFactor),
