@@ -411,7 +411,28 @@ function buildSession(
       ? (['back', 'quads', 'chest', 'shoulders'].includes(muscle) ? 3 : 2)
       : accessoryCount;
     const selType = ALWAYS_ISOLATION.has(muscle) ? 'isolation' : (role === 'primary' ? 'compound' : 'isolation');
-    const pool = getExercisesByGroup(catalogGroupFor(repKey));
+    let pool = getExercisesByGroup(catalogGroupFor(repKey));
+    // Фильтр: убираем упражнения, не соответствующие контексту сессии
+    const tag = (sched.sessionTag || '').toLowerCase();
+    pool = pool.filter(ex => {
+      const n = (ex.name || '').toLowerCase();
+      const id = (ex.id || '').toLowerCase();
+      // Push/Chest/Shoulders день: исключаем тяги, становую, carries
+      if (tag.includes('push') || tag === 'chest' || tag === 'shoulders') {
+        if (n.includes('тяга')||n.includes('становая')||n.includes('мёртвая')||n.includes('гиперэкстенз')||n.includes('фермер')||n.includes('carry')) return false;
+      }
+      // Pull/Back день: исключаем жимы, фронтальные махи
+      if (tag.includes('pull') || tag === 'back') {
+        if (n.includes('жим')&&!n.includes('ногами')||n.includes('press')||n.includes('разгиб')||n.includes('extension')) return false;
+      }
+      // Legs день: исключаем верх тела
+      if (tag === 'legs' || tag === 'lower') {
+        if (n.includes('жим')&&!n.includes('ногами')||n.includes('тяга')||n.includes('подтяг')||n.includes('бицепс')||n.includes('трицепс')) return false;
+      }
+      return true;
+    });
+    // Если после фильтра пул опустел — возвращаем полный
+    if (pool.length === 0) pool = getExercisesByGroup(catalogGroupFor(repKey));
     const selected = selectExercisesSmart({
       candidates: pool, muscleGroup: muscle, count: exerciseCount,
       selectedIds: sessionSelectedIds, selectedNames: sessionSelectedNames,
@@ -446,6 +467,18 @@ function buildSession(
       }
       if (diverse.length >= exerciseCount) exDatas = diverse.slice(0, exerciseCount);
     }
+
+    // Per-exercise weight modifier (гантели 80%, наклон 85%, блок 70% etc.)
+    function weightModFor(exName: string): number {
+      const n = (exName || '').toLowerCase();
+      if (n.includes('гантел') || n.includes('dumbbell')) return 0.80;
+      if (n.includes('наклон') || n.includes('incline')) return 0.85;
+      if (n.includes('смит') || n.includes('smith')) return 0.90;
+      if (n.includes('трен') || n.includes('машин') || n.includes('machine')) return 0.75;
+      if (n.includes('блок') || n.includes('кабель') || n.includes('cable') || n.includes('кроссов')) return 0.70;
+      return 1.0;
+    }
+    for (const d of exDatas) (d as any)._weightMod = weightModFor((d as any).name || '');
 
     const expectedFatigue = exerciseCount * (sets / exerciseCount) * (((exDatas[0] as any)?.fatigueCost || 5));
     totalExpectedFatigue += expectedFatigue;
@@ -502,8 +535,7 @@ function buildSession(
       const exSets = Math.max(1, Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct));
       const cost = ((exData as any)?.fatigueCost || 5) * exSets;
       if (remainingBudget < cost) {
-        const reduced = Math.floor(remainingBudget / ((exData as any)?.fatigueCost || 5));
-        if (reduced < 1) continue;
+        const reduced = Math.max(2, Math.floor(remainingBudget / ((exData as any)?.fatigueCost || 5)));
         const adjustedSets = Math.min(exSets, reduced);
         const adjCost = ((exData as any)?.fatigueCost || 5) * adjustedSets;
         remainingBudget -= adjCost;
@@ -511,7 +543,7 @@ function buildSession(
         const restSeconds = REST_BY_CHARACTER[pl.resolved as DayCharacter];
         const workSets: BBSet[] = Array.from({ length: adjustedSets }, () => ({
           reps: Math.round(Math.min(pl.reps, repsCap)), rir: isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir,
-          weight: Math.round(pl.weight * wPct * 10) / 10,
+          weight: Math.round(pl.weight * wPct * ((exData as any)._weightMod || 1) * 10) / 10,
           tempo: tempoSpec.notation, restSeconds,
         }));
         exercises.push({
@@ -520,8 +552,8 @@ function buildSession(
           rir: isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir,
           workSets, exerciseName: (exData as any).name || (exData as any).id,
           tempoSpec: tempoSpec.notation, restSeconds,
-          comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.round(Math.min(pl.reps, repsCap)), Math.round(pl.weight * wPct * 10) / 10, isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir, weakPoints, focusGroup, phase, tempoSpec.notation, restSeconds, isSubstituted),
-          warmupSets: buildWarmup(Math.round(pl.weight * wPct * 10) / 10, pl.role === 'primary'),
+          comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.round(Math.min(pl.reps, repsCap)), Math.round(pl.weight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir, weakPoints, focusGroup, phase, tempoSpec.notation, restSeconds, isSubstituted),
+          warmupSets: buildWarmup(Math.round(pl.weight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary'),
           rationale: pl.rationaleMap.get((exData as any).name) || '',
         });
         continue;
@@ -531,7 +563,7 @@ function buildSession(
       const restSeconds = REST_BY_CHARACTER[pl.resolved as DayCharacter];
       const workSets: BBSet[] = Array.from({ length: exSets }, () => ({
         reps: Math.round(Math.min(pl.reps, repsCap)), rir: isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir,
-        weight: Math.round(pl.weight * wPct * 10) / 10,
+        weight: Math.round(pl.weight * wPct * ((exData as any)._weightMod || 1) * 10) / 10,
         tempo: tempoSpec.notation, restSeconds,
       }));
       exercises.push({
@@ -540,11 +572,20 @@ function buildSession(
         rir: isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir,
         workSets, exerciseName: (exData as any).name || (exData as any).id,
         tempoSpec: tempoSpec.notation, restSeconds,
-        comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, exSets, Math.round(Math.min(pl.reps, repsCap)), Math.round(pl.weight * wPct * 10) / 10, isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir, weakPoints, focusGroup, phase, tempoSpec.notation, restSeconds, isSubstituted),
-        warmupSets: buildWarmup(Math.round(pl.weight * wPct * 10) / 10, pl.role === 'primary'),
+        comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, exSets, Math.round(Math.min(pl.reps, repsCap)), Math.round(pl.weight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir, weakPoints, focusGroup, phase, tempoSpec.notation, restSeconds, isSubstituted),
+        warmupSets: buildWarmup(Math.round(pl.weight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary'),
         rationale: pl.rationaleMap.get((exData as any).name) || '',
       });
     }
+  }
+  // Кап упражнений в сессии: максимум 10 (реалистичная тренировка)
+  if (exercises.length > 10) {
+    // Сохраняем primary, обрезаем accessory с конца
+    const kept = exercises.filter(e => e.role === 'primary');
+    const acc = exercises.filter(e => e.role === 'accessory');
+    const maxAcc = Math.max(0, 10 - kept.length);
+    exercises.length = 0;
+    exercises.push(...kept, ...acc.slice(0, maxAcc));
   }
   return { day: dayInRotation, weekOffset: 0, character, sessionTag: sched.sessionTag, exercises };
 }

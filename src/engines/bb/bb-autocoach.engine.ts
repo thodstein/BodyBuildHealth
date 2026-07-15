@@ -417,12 +417,11 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
           e.rir = deloadProtocol.rirTarget;
           e.repsRange = [deloadProtocol.repRange[0], deloadProtocol.repRange[1]];
           for (const ws of e.workSets) {
-            const maxW = workMax[e.muscle] || 80;
-            const basePct = PCT_FOR_RIR[Math.min(5, deloadProtocol.rirTarget)] ?? 0.85;
+            const engineWeight = ws.weight > 0 ? ws.weight : 40;
             ws.reps = Math.round((deloadProtocol.repRange[0] + deloadProtocol.repRange[1]) / 2);
             ws.rir = deloadProtocol.rirTarget;
             ws.tempo = cfg.tempo;
-            ws.weight = Math.round(maxW * basePct * deloadProtocol.intensityMultiplier * 10) / 10;
+            ws.weight = Math.round(engineWeight * deloadProtocol.intensityMultiplier * 10) / 10;
             ws.restSeconds = deloadProtocol.restSeconds;
           }
           rebuildComment(e, cfg.label);
@@ -451,20 +450,21 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
 
           for (const ws of e.workSets) {
             const maxW = workMax[e.muscle] || 80;
-            const basePct = PCT_FOR_RIR[Math.min(5, e.rir)] ?? 0.9;
-            const baseWeight = Math.round(maxW * basePct * 10) / 10;
+            // Используем вес из движка (уже учитывает PRO_WORKMAX_RATIO), не пересчитываем заново.
+            // Это сохраняет дифференциацию: жим штанги ≠ жим гантелей ≠ наклонный.
+            const engineWeight = ws.weight > 0 ? ws.weight : Math.round(maxW * (PCT_FOR_RIR[Math.min(5, e.rir)] ?? 0.9) * 10) / 10;
 
             ws.reps = Math.round((e.repsRange[0] + e.repsRange[1]) / 2);
             ws.rir = e.rir;
             ws.tempo = cfg.tempo;
             ws.restSeconds = cfg.restBase;
 
-            // Стратегия прогрессии нагрузки
+            // Стратегия прогрессии нагрузки поверх движкового веса
             if (loadStrategy) {
-              const prescr = prescribeLoad(loadStrategy, baseWeight, ws.reps, e.rir, maxW, w.week, totalWeeks, ph);
+              const prescr = prescribeLoad(loadStrategy, engineWeight, ws.reps, e.rir, maxW, w.week, totalWeeks, ph);
               ws.weight = Math.round(prescr.nextWeight * 10) / 10;
             } else {
-              ws.weight = baseWeight;
+              // Оставляем движковый вес без изменений
             }
           }
           rebuildComment(e, cfg.label);
