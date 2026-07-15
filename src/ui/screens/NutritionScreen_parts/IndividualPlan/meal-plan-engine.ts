@@ -269,7 +269,7 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     vegGreen: basePool.filter(f => f.category === 'veg_fruit' && ['broccoli','spinach','cucumber','zucchini','asparagus','green_bean','celery','cabbage','kale','green_apple'].some(k => f.id.includes(k)) && (f.protein || 0) < 10),
     vegColor: basePool.filter(f => f.category === 'veg_fruit' && ['tomato','pepper','carrot','beetroot','pumpkin','eggplant','pomegranate','citrus'].some(k => f.id.includes(k.toLowerCase())) && (f.protein || 0) < 10),
     dairy: byBudget(basePool.filter(f => f.category === 'dairy' && (f.fat || 0) <= 10)),
-    eaa: FOOD_DB.find(f => !excludedIds.has(f.id) && (f.id === 'supp_eaa' || f.id === 'bcaa')),
+    eaa: FOOD_DB.find(f => !excludedIds.has(f.id) && f.id === 'supp_eaa') ?? FOOD_DB.find(f => !excludedIds.has(f.id) && f.id === 'bcaa'),
     dextrin: FOOD_DB.find(f => !excludedIds.has(f.id) && (f.id === 'amylopectin' || f.id === 'dextrose')),
   };
 }
@@ -405,7 +405,7 @@ function buildPreWorkout(
   preferredIds?: Set<string>,
   opts?: { lockedIds?: Set<string>; recentIds?: Set<string> },
 ): Meal {
-  const leanProteinPool = pool.proteinLean.length > 0 ? pool.proteinLean : pool.proteinSolid;
+  const leanProteinPool = (pool.proteinLean.length > 0 ? pool.proteinLean : pool.proteinSolid).filter(f => !['octopus','squid','clam','mussel','cockle','whelk','sea_urchin','abalone'].some(k => f.id.includes(k)));
   const prefProtein = preferredIds && preferredIds.size > 0 ? leanProteinPool.filter(f => preferredIds.has(f.id)) : [];
   const proteinSource = pickPriority(prefProtein.length > 0 ? prefProtein : leanProteinPool, seed, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds });
   const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
@@ -634,7 +634,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const rotLabels = [...new Set(mealRotations.map(r => r.label))].join(' / ');
   const notes: string[] = [
     `Ротация белка: ${rotLabels} — разные группы в каждый приём`,
-    `MPS per meal: ${mpsPerMeal} г (≈${MPS_LBM_LOW} г/кг LBM), интервал 3–5 ч для синтеза`,
+    `MPS per meal: ${Math.max(30, Math.round(mpsPerMeal * 1.2))} г (≈${MPS_LBM_LOW} г/кг LBM), интервал 3–5 ч для синтеза`,
   ];
 
   // 1. Завтрак — белок + медленные углеводы + жиры + ягоды ─────────────
