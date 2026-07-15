@@ -813,7 +813,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
   }
-  // P4: Protein overshoot correction — if protein >15% over goal, scale down protein items (preserve MPS min 25g/meal)
+  // P4: Protein overshoot correction — if protein >10% over goal, scale down protein items (preserve MPS min 25g/meal)
   {
     const goalP = adjustedProteinG || input.goalProteinG;
     const devP = (totals.p - goalP) / Math.max(1, goalP);
@@ -826,13 +826,35 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const food = FOOD_DB.find(f => f.id === item.id);
           if (!food || !food.protein) return;
           const reduceGrams = Math.round(reducePerItem / food.protein * 100);
-          const newAmount = Math.max(20, item.amount - reduceGrams);
+          const newAmount = Math.max(15, item.amount - reduceGrams);
           const factor = newAmount / (item.amount || 1);
           item.amount = newAmount;
           item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
         });
         meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
         totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0);
+      }
+    }
+  }
+  // P4d: Fat overshoot correction — if fat >12% over goal, reduce fat items
+  {
+    const goalF2 = fatTotal;
+    const devF2 = (totals.f - goalF2) / Math.max(1, goalF2);
+    if (devF2 > 0.12) {
+      const excessF = totals.f - goalF2;
+      const fatItems2 = meals.flatMap(m => m.items.filter(it => it.role === 'fat').map(it => ({ meal: m, item: it })));
+      if (fatItems2.length > 0) {
+        const reducePerItem = excessF / fatItems2.length;
+        fatItems2.forEach(({ meal, item }) => {
+          const food = FOOD_DB.find(f => f.id === item.id);
+          if (!food || !food.fat) return;
+          const reduceGrams = Math.round(reducePerItem / food.fat * 100);
+          const newAmount = Math.max(10, item.amount - reduceGrams);
+          const factor = newAmount / (item.amount || 1);
+          item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
+        });
+        meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
+        totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0);
       }
     }
   }
