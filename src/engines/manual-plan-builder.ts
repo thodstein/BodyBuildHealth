@@ -125,6 +125,7 @@ export type PlanEx = {
   technique?: string;
   comments?: string;
   rationale?: string;
+  progressionNote?: string;
   fatigueCost?: number;
   substitutions?: string[];
 };

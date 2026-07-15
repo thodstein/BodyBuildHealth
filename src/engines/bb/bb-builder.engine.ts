@@ -501,8 +501,8 @@ function buildSession(
           if (isPress(d) && !isLateral(d) && !isRear(d)) { headRatio = 1.0; headRirDelta = 0; }
           else if (isLateral(d) && !isPress(d) && !isRear(d)) { headRatio = 0.9; headRirDelta = 1; }
           else if (isRear(d) && !isPress(d) && !isLateral(d)) { headRatio = 0.7; headRirDelta = 1; }
-          (d as any)._effWeight = Math.round(pl.weight * headRatio * 10) / 10;
-          (d as any)._deltRir = Math.min(5, pl.rir + headRirDelta);
+          (d as any)._effWeight = Math.round(weight * headRatio * 10) / 10;
+          (d as any)._deltRir = Math.min(5, rir + headRirDelta);
         }
       }
     }

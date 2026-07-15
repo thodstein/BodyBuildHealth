@@ -126,7 +126,7 @@ export const OnboardingWizard: React.FC<OnboardingProps> = ({ profile, onComplet
                   padding: '8px 12px', borderRadius: 16, cursor: 'pointer', fontSize: 9, fontWeight: 600,
                   background: active ? 'rgba(239,68,68,0.14)' : 'rgba(255,255,255,0.03)',
                   border: active ? '2px solid rgba(239,68,68,0.35)' : '1px solid rgba(255,255,255,0.06)',
-                  color: active ? '#ef4444' : 'rgba(255,255,255,0.6)', fontSize: 10,
+                  color: active ? '#ef4444' : 'rgba(255,255,255,0.6)',
                 }}>{h.label}</button>
               );
             })}

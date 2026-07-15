@@ -610,17 +610,27 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: ACCENT }}>🎯 Слабые группы (акцент, сохраняются в профиль)</div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6 }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: "pointer", border: on ? "1px solid #00e68a" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "#00e68a" : "rgba(255,255,255,0.6)" }}>{l}{on ? " ✓" : ""}</button>; })}</div>
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: '#8b5cf6' }}>🎯 Слабые точки СРЦ-движений (диагностика weakpoint-pl)</div>
-          {PL_WEAKPOINT_OPTIONS.map((opt) => (
+          {(() => {
+            const WP_LABELS: Record<string, string> = {
+              off_chest: 'Сход со груди', mid: 'Середина', lockout: 'Дожим',
+              bottom: 'Низ (яма)', start: 'Старт (с пола)',
+            };
+            const PL_WEAKPOINT_OPTIONS = Object.entries(WEAK_POINTS_BY_LIFT).map(([lift, wps]) => ({
+              lift,
+              weakPoints: (wps as string[]).map((wp: string) => ({ id: wp, label: WP_LABELS[wp] || wp })),
+            }));
+            return PL_WEAKPOINT_OPTIONS.map((opt) => (
             <div key={opt.lift} style={{ marginTop: 4 }}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>{opt.lift === 'bench' ? 'Жим лёжа' : opt.lift === 'squat' ? 'Присед' : 'Становая'}</div>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {opt.weakPoints.map((wp) => {
                   const on = plWeakPoints.some(x => x.lift === opt.lift && x.weakPoint === wp.id);
-                  return <button key={wp.id} onClick={() => togglePlWeak(opt.lift, wp.id)} style={{ padding: "4px 8px", borderRadius: 12, fontSize: 9, fontWeight: 700, cursor: "pointer", border: on ? "1px solid #8b5cf6" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.02)", color: on ? "#8b5cf6" : "rgba(255,255,255,0.6)" }}>{wp.label}{on ? " ✓" : ""}</button>;
+                  return <button key={wp.id} onClick={() => togglePlWeak(opt.lift as Lift, wp.id as WeakPoint)} style={{ padding: "4px 8px", borderRadius: 12, fontSize: 9, fontWeight: 700, cursor: "pointer", border: on ? "1px solid #8b5cf6" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.02)", color: on ? "#8b5cf6" : "rgba(255,255,255,0.6)" }}>{wp.label}{on ? " ✓" : ""}</button>;
                 })}
               </div>
             </div>
-          ))}
+            ));
+          })()}
           <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={buildSrc}>Сгенерировать план ({cycleWeeks} нед)</button>
           {builtSrc && (() => {
             const W = builtSrc.weeks;

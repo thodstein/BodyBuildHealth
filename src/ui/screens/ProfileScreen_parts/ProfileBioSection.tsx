@@ -1,7 +1,7 @@
 import React from 'react';
 import type { UserProfile, UnifiedSettings } from '../../../core/types';
 import { getWeightLog, saveWeightLog } from '../../../engines/profile-store';
-import { theme, HealthBool, NumberPc, TextPc, PopupCard } from './ProfileComponents';
+import { theme, HealthBool, NumberPc, TextPc, PopupCard, glassCardStyle } from './ProfileComponents';
 
 interface Props {
   settings: UserProfile['settings'];

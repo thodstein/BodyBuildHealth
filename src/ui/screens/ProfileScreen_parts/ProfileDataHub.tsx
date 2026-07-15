@@ -81,17 +81,17 @@ export const ProfileDataHub: React.FC<ProfileDataHubProps> = ({
 
   const personalFields = [
     personal.age, personal.sex, personal.height, personal.weight, personal.bodyFat,
-  ].filter((v) => v !== undefined && v !== null && v !== '');
+  ].filter((v) => v !== undefined && v !== null);
 
   const trainingFields = [
     training.daysPerWeek, training.level, training.primaryGoal,
     training.pmSquat, training.pmBench, training.pmDeadlift,
-  ].filter((v) => v !== undefined && v !== null && v !== '');
+  ].filter((v) => v !== undefined && v !== null);
   const trainingExtra = (training.weakPoints?.length ? 1 : 0) + (training.workMax && Object.keys(training.workMax).length ? 1 : 0);
 
   const pharmaFields = [
     pharma.phase, pharma.totalCycles, pharma.trainingCycleType, pharma.trainingCycleWeeks,
-  ].filter((v) => v !== undefined && v !== null && v !== '');
+  ].filter((v) => v !== undefined && v !== null);
 
   const healthFields = [
     health.chronicConditions?.length, health.injuries?.length,
@@ -107,7 +107,7 @@ export const ProfileDataHub: React.FC<ProfileDataHubProps> = ({
   const lifestyleFields = [
     lifestyle.sleepHours, lifestyle.stressLevel, lifestyle.dailySteps,
     lifestyle.dailyWaterLiters, lifestyle.chronotype,
-  ].filter((v) => v !== undefined && v !== null && v !== '');
+  ].filter((v) => v !== undefined && v !== null);
 
   // ── Живые данные ──
   const labCount = labs?.length || 0;

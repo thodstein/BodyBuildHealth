@@ -1,4 +1,4 @@
-import { Exercise, ExerciseSubstitution } from './types';
+import { Exercise, ExerciseSubstitution, type MovementPattern } from './types';
 import { derivePattern } from '../engines/movement-pattern';
 
 export const EXERCISE_CATALOG: Exercise[] = [
@@ -619,7 +619,7 @@ export const EXERCISE_CATALOG: Exercise[] = [
   // не считает разнообразие паттернов. derivePattern восстанавливает тег из
   // группы/названия/типа.
   for (const ex of EXERCISE_CATALOG) {
-    if (!ex.movementPattern) ex.movementPattern = derivePattern(ex);
+    if (!ex.movementPattern) ex.movementPattern = derivePattern(ex) as MovementPattern;
   }
 
   // P0.3: слить точные дубликаты по имени — объединить equipment в массив,

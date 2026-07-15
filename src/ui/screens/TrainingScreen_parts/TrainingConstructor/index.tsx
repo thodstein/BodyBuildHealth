@@ -14,7 +14,7 @@ import { EXERCISE_CATALOG } from '../../../../core/exercise-catalog';
 import { TrainingProfileCard } from '../TrainingProfileCard';
 import type { TrainingProfile } from '../training-profile';
 import { PCT_FOR_RIR, ACCENT, DIM, detectGroup, getMrv, getPerMuscleMrvFromLevel, CONFIG_LABELS, DELOAD_OPTIONS, RIR_WAVE_PATTERNS, GROUP_RU, type ManualResult, type ManualDay, type ManualWeek, type ManualExercise } from './types';
-import { buildPhasePlan, PHASE_CONFIGS, PHASE_LABELS, distributePhases, getRirForWeek, calcPhaseWeight, type BBPhase } from './phase-periodization';
+import { buildPhasePlan, PHASE_CONFIGS, PHASE_LABELS, distributePhases, getRirForWeek, calcPhaseWeight, getDeloadOverride, type BBPhase } from './phase-periodization';
 const PHASE_LABELS_MAP: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', peaking: 'Пик', deload: 'Разгрузка', gpp: 'GPP', spp: 'SPP' };
 function phaseForCycleWeek(week: number, cycle: import('../../../../data/lms-cycles/lms-types').SRCycleTemplate): string {
   const ph = cycle.meta.phases;
@@ -150,6 +150,7 @@ export const TrainingConstructor: React.FC<Props> = ({
 
   const [programData, setProgramData] = useState<FullProgram | null>(() => { try { const s = JSON.parse(localStorage.getItem('he_manual_cfg') || 'null'); if (s && s.programData) return s.programData; } catch {} return null; });
   const [programWeeks, setProgramWeeks] = useState<ManualWeek[] | null>(() => { try { const s = JSON.parse(localStorage.getItem('he_manual_cfg') || 'null'); if (s && s.programWeeks) return s.programWeeks; } catch {} return null; });
+  const [addDeloadWeek, setAddDeloadWeek] = useState<boolean>(() => { try { const s = JSON.parse(localStorage.getItem('he_manual_cfg') || 'null'); if (s && typeof s.addDeloadWeek === 'boolean') return s.addDeloadWeek; } catch {} return false; });
 
   const [macrocycle, setMacrocycle] = useState<MacrocyclePlan | null>(() => {
     try { return JSON.parse(localStorage.getItem('he_macro_session') || 'null'); } catch { return null; }
@@ -157,8 +158,8 @@ export const TrainingConstructor: React.FC<Props> = ({
   useEffect(() => { try { localStorage.setItem('he_macro_session', JSON.stringify(macrocycle)); } catch {} }, [macrocycle]);
   const [selectedWeek, setSelectedWeek] = useState<number>(() => { try { const s = JSON.parse(localStorage.getItem('he_manual_cfg') || '{}'); if (typeof s.selectedWeek === 'number') return s.selectedWeek; } catch {} return 1; });
   useEffect(() => {
-    try { const s = JSON.parse(localStorage.getItem('he_manual_cfg') || '{}'); localStorage.setItem('he_manual_cfg', JSON.stringify({ ...s, manualCfg, wizardStep, selectedWeek, programData, programWeeks })); } catch {}
-  }, [manualCfg, wizardStep, selectedWeek, programData, programWeeks]);
+    try { const s = JSON.parse(localStorage.getItem('he_manual_cfg') || '{}'); localStorage.setItem('he_manual_cfg', JSON.stringify({ ...s, manualCfg, wizardStep, selectedWeek, programData, programWeeks, addDeloadWeek })); } catch {}
+  }, [manualCfg, wizardStep, selectedWeek, programData, programWeeks, addDeloadWeek]);
   const [currentMicrocycle, setCurrentMicrocycle] = useState<Microcycle | null>(null);
 
   const microcycleToManualResult = useCallback((mc: Microcycle, weekNum: number): ManualResult => {

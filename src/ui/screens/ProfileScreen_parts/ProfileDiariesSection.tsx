@@ -15,7 +15,8 @@ interface Props {
   onNavigate?: (screen: string) => void;
 }
 
-const diaryItems = [
+type DiaryItem = { id: string; icon: string; title: string; desc: string; nav: boolean; navScreen?: string };
+const diaryItems: DiaryItem[] = [
   { id:'sleep', icon:'🛌', title:'Сон', desc:'Часы, качество, пробуждения, график', nav:false },
   { id:'bp', icon:'❤️', title:'Давление', desc:'Систола/диастола/пульс, график, архив', nav:false },
   { id:'measurements', icon:'📈', title:'История замеров', desc:'Динамика, фото, графики', nav:false },
