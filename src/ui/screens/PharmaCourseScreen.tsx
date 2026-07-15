@@ -55,6 +55,8 @@ export const PharmaCourseScreen: React.FC = () => {
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 4]);
   const [startWeek, setStartWeek] = useState(0);
   const [endWeek, setEndWeek] = useState(12);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<CourseEntry | null>(null);
   const [interactions, setInteractions] = useState<ReturnType<typeof checkDrugInteractions>>([]);
   const [validation, setValidation] = useState<{ valid: boolean; warnings: string[] }>({ valid: true, warnings: [] });
   const [loading, setLoading] = useState(true);
@@ -136,6 +138,26 @@ export const PharmaCourseScreen: React.FC = () => {
 
   const subName = (id: string) => PHARMA_DB[id]?.name ?? id;
   const subClass = (id: string) => PHARMA_DB[id]?.class ?? '';
+
+  const startEdit = (e: CourseEntry) => {
+    setEditId(e.id);
+    setEditDraft({ ...e });
+  };
+
+  const saveEdit = async () => {
+    if (!editId || !editDraft) return;
+    const d = Number(editDraft.doseValue);
+    if (isNaN(d) || d <= 0) return;
+    await updateEntry(editId, {
+      doseValue: d,
+      doseUnit: editDraft.doseUnit,
+      frequency: editDraft.frequency,
+      startWeek: editDraft.startWeek,
+      endWeek: editDraft.endWeek,
+    });
+    setEditId(null);
+    setEditDraft(null);
+  };
 
   const freqDisplay = (entry: CourseEntry) => {
     if (typeof entry.frequency === 'number') return `${entry.frequency}×/нед`;
@@ -250,20 +272,48 @@ export const PharmaCourseScreen: React.FC = () => {
                         {CLASS_LABELS[cls] || cls}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
-                      <span style={{ color: '#fff', fontWeight: 600 }}>{entry.doseValue}</span>
-                      <span style={{ color: 'rgba(255,255,255,0.4)' }}>{entry.doseUnit}</span>
-                      <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
-                      <span>{freqDisplay(entry)}</span>
-                      <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
-                      <span>нед {entry.startWeek}–{entry.endWeek}</span>
-                      {sub?.pk?.halfLifeHours && (
-                        <>
-                          <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
-                          <span>T½ {sub.pk.halfLifeHours >= 168 ? `${(sub.pk.halfLifeHours / 168).toFixed(1)} нед` : `${(sub.pk.halfLifeHours / 24).toFixed(1)} дн`}</span>
-                        </>
-                      )}
-                    </div>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+                       {editId === entry.id && editDraft ? (
+                         <>
+                           <input type="number" value={editDraft.doseValue || ''} onChange={e => setEditDraft({ ...editDraft, doseValue: parseFloat(e.target.value) || 0 })}
+                             className="pc-input" style={{ width: 64, padding: '4px 6px', background: '#202023', border: '1px solid #00e68a', borderRadius: 6, color: '#fff', fontSize: 12, boxSizing: 'border-box' }} />
+                           <select value={editDraft.doseUnit} onChange={e => setEditDraft({ ...editDraft, doseUnit: e.target.value })}
+                             className="pc-input" style={{ padding: '4px 4px', background: '#202023', border: '1px solid #00e68a', borderRadius: 6, color: '#fff', fontSize: 10, boxSizing: 'border-box' }}>
+                             {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                           </select>
+                           <select value={typeof editDraft.frequency === 'string' ? editDraft.frequency : '2x/wk'} onChange={e => setEditDraft({ ...editDraft, frequency: e.target.value })}
+                             className="pc-input" style={{ padding: '4px 4px', background: '#202023', border: '1px solid #00e68a', borderRadius: 6, color: '#fff', fontSize: 10, boxSizing: 'border-box' }}>
+                             {FREQ_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                           </select>
+                           <input type="number" value={editDraft.startWeek} onChange={e => setEditDraft({ ...editDraft, startWeek: parseFloat(e.target.value) || 0 })}
+                             className="pc-input" style={{ width: 40, padding: '4px 4px', background: '#202023', border: '1px solid #00e68a', borderRadius: 6, color: '#fff', fontSize: 11, boxSizing: 'border-box' }} title="неделя с" />
+                           <span style={{ color: 'rgba(255,255,255,0.4)' }}>–</span>
+                           <input type="number" value={editDraft.endWeek} onChange={e => setEditDraft({ ...editDraft, endWeek: parseFloat(e.target.value) || 0 })}
+                             className="pc-input" style={{ width: 40, padding: '4px 4px', background: '#202023', border: '1px solid #00e68a', borderRadius: 6, color: '#fff', fontSize: 11, boxSizing: 'border-box' }} title="неделя по" />
+                           <button onClick={saveEdit} className="pc-btn" style={{ background: 'rgba(0,230,138,0.18)', border: '1px solid rgba(0,230,138,0.4)', color: '#00e68a', borderRadius: 6, padding: '4px 8px', fontSize: 11, fontWeight: 700 }}>
+                             Сохранить
+                           </button>
+                           <button onClick={() => { setEditId(null); setEditDraft(null); }} className="pc-btn" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '4px 8px', fontSize: 11 }}>
+                             ✕
+                           </button>
+                         </>
+                       ) : (
+                         <>
+                           <span style={{ color: '#fff', fontWeight: 600 }}>{entry.doseValue}</span>
+                           <span style={{ color: 'rgba(255,255,255,0.4)' }}>{entry.doseUnit}</span>
+                           <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+                           <span>{freqDisplay(entry)}</span>
+                           <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+                           <span>нед {entry.startWeek}–{entry.endWeek}</span>
+                           {sub?.pk?.halfLifeHours && (
+                             <>
+                               <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+                               <span>T½ {sub.pk.halfLifeHours >= 168 ? `${(sub.pk.halfLifeHours / 168).toFixed(1)} нед` : `${(sub.pk.halfLifeHours / 24).toFixed(1)} дн`}</span>
+                             </>
+                           )}
+                         </>
+                       )}
+                     </div>
                     {/* Week bar visual */}
                     {totalWeeks > 0 && (
                       <div style={{ marginTop: 6, height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, position: 'relative', overflow: 'hidden' }}>
@@ -276,16 +326,23 @@ export const PharmaCourseScreen: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Actions */}
-                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                    <button onClick={() => removeEntry(entry.id)} className="pc-btn" style={{
-                      background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
-                      color: '#ef4444', borderRadius: 8, padding: '6px 8px', fontSize: 12, lineHeight: 1,
-                    }}
-                      title="Удалить">
-                      ✕
-                    </button>
-                  </div>
+                   {/* Actions */}
+                   <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                     <button onClick={() => startEdit(entry)} className="pc-btn" style={{
+                       background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.25)',
+                       color: '#00e68a', borderRadius: 8, padding: '6px 8px', fontSize: 12, lineHeight: 1,
+                     }}
+                       title="Изменить дозу">
+                       ✎
+                     </button>
+                     <button onClick={() => removeEntry(entry.id)} className="pc-btn" style={{
+                       background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
+                       color: '#ef4444', borderRadius: 8, padding: '6px 8px', fontSize: 12, lineHeight: 1,
+                     }}
+                       title="Удалить">
+                       ✕
+                     </button>
+                   </div>
                 </div>
               </div>
             );
@@ -436,15 +493,15 @@ export const PharmaCourseScreen: React.FC = () => {
                 {subsForClass.map(sub => {
                   const color = CLASS_COLORS[sub.class] || '#00e68a';
                   const defDose = sub.dosageRange?.min ? Math.round((sub.dosageRange.min + sub.dosageRange.max) / 2) : 250;
+                  const customDose = (dose && parseFloat(dose) > 0) ? parseFloat(dose) : null;
                   const hl = sub.pk?.halfLifeHours;
                   return (
                     <div key={sub.id} onClick={() => {
-                      const doseVal = defDose;
-                      setDose(String(doseVal));
+                      const doseVal = (dose && parseFloat(dose) > 0) ? parseFloat(dose) : defDose;
                       addEntry(sub.id, doseVal);
                     }} className="pc-sub-btn" style={{
                       background: '#202023',
-                      border: `1px solid #3f3f46`,
+                      border: `1px solid ${customDose ? color : '#3f3f46'}`,
                       borderRadius: 10, padding: '10px 8px',
                       cursor: 'pointer', textAlign: 'center',
                       position: 'relative', overflow: 'hidden',
@@ -457,10 +514,10 @@ export const PharmaCourseScreen: React.FC = () => {
                       </div>
                       <div style={{
                         display: 'inline-flex', alignItems: 'center', gap: 3,
-                        background: `${color}25`, color, borderRadius: 6,
+                        background: customDose ? `${color}35` : `${color}25`, color, borderRadius: 6,
                         padding: '3px 10px', fontSize: 10, fontWeight: 700, marginTop: 3,
                       }}>
-                        + {defDose} {unit}
+                        + {customDose ?? defDose} {unit}
                       </div>
                     </div>
                   );
