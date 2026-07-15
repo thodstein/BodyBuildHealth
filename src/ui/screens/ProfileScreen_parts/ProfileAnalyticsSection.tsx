@@ -49,6 +49,7 @@ export const ProfileAnalyticsSection: React.FC<Props> = ({ settings, save, labs,
   const [analyticsSubTab, setAnalyticsSubTab] = React.useState<'reports' | 'pharma_reports' | 'goals_habits'>('reports');
   const [reportTab, setReportTab] = React.useState<'current' | 'archive'>('current');
   const [showCustomReport, setShowCustomReport] = React.useState(false);
+  const [archiveVersion, setArchiveVersion] = React.useState(0);
 
   const bmiVal = p.weight && p.height ? (p.weight / Math.pow(p.height / 100, 2)).toFixed(1) : '—';
   const lbmVal = p.weight && p.bodyFat ? (p.weight * (1 - p.bodyFat / 100)).toFixed(1) : '—';
@@ -200,6 +201,21 @@ export const ProfileAnalyticsSection: React.FC<Props> = ({ settings, save, labs,
       </div>
 
       {analyticsSubTab === 'reports' && (
+        <React.Fragment>
+        {(() => {
+          const latest = (() => { try { const a = JSON.parse(localStorage.getItem('he_profile_reports') || '[]'); return a[0] || null; } catch { return null; } })();
+          if (!latest) return null;
+          const typeLabel: Record<string, string> = { trainer: 'Тренерский', doctor: 'Врачебный', general: 'Общий', custom: 'Пользовательский' };
+          return (
+            <div style={{ ...glassCardStyle, padding: 12, marginBottom: 10, borderLeft: `3px solid ${theme.accent}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <div style={{ fontSize: 12, fontWeight: 700 }}>📄 Последний отчёт: {typeLabel[latest.type as string] || latest.type} · {latest.date}</div>
+                <button onClick={() => setReportTab('archive')} style={{ fontSize: 10, padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.12)', color: theme.accent, cursor: 'pointer' }}>Архив</button>
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', whiteSpace: 'pre-wrap', maxHeight: 96, overflow: 'hidden' }}>{String(latest.text).slice(0, 600)}</div>
+            </div>
+          );
+        })()}
         <ProfessionalReports
           data={reportData}
           reportTab={reportTab}
@@ -212,9 +228,11 @@ export const ProfileAnalyticsSection: React.FC<Props> = ({ settings, save, labs,
               const archive = JSON.parse(localStorage.getItem('he_profile_reports') || '[]');
               archive.unshift(rep);
               localStorage.setItem('he_profile_reports', JSON.stringify(archive.slice(0, 30)));
+              setArchiveVersion(v => v + 1);
             } catch {}
           }}
         />
+        </React.Fragment>
       )}
       {analyticsSubTab === 'pharma_reports' && <PharmaBlockReports />}
       {analyticsSubTab === 'goals_habits' && <ProfileGoalsHabitsCard />}
