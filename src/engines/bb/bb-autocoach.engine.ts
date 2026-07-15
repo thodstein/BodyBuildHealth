@@ -395,6 +395,10 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
     const tempo = e.workSets[0]?.tempo || '';
     const rest = e.workSets[0]?.restSeconds || 90;
     if (tempo) parts.push(`Темп ${tempo}, отдых ${rest}с`);
+    // Сохраняем ⚠ предупреждения из оригинального комментария движка
+    const oldComment = e.comment || '';
+    const riskIdx = oldComment.indexOf('⚠');
+    if (riskIdx >= 0) parts.push(oldComment.substring(riskIdx));
     e.comment = parts.join('. ');
   };
 

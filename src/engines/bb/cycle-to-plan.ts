@@ -169,9 +169,14 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         if (excludedMuscles.has(muscle)) return null as any;
         const isWeak = weakPoints.includes(muscle);
 
-        // Volume boost for weak groups + PED adaptation
-        const setMult = (isWeak ? 1.2 : 1.0) * mrvMult;
-        const targetSets = Math.max(1, Math.round((exSpec.sets[0]?.sets || 3) * setMult));
+        // Volume boost: weak groups + PED adaptation.
+        // При активных PED: primary получает полный множитель, accessory — 80% множителя, минимум 2 сета.
+        const pedFactor = peds.length > 0 ? (isPrimary ? mrvMult : Math.max(1.0, mrvMult * 0.8)) : 1.0;
+        const setMult = (isWeak ? 1.2 : 1.0) * pedFactor;
+        const baseSets = exSpec.sets[0]?.sets || 3;
+        let targetSets = Math.max(1, Math.round(baseSets * setMult));
+        // Минимум 2 сета для любого упражнения (ББ-практика)
+        if (targetSets < 2) targetSets = 2;
 
         // RIR: weak groups get 0.5 harder
         const effectiveRir = isWeak ? Math.max(0, exRir - 1) : exRir;
@@ -214,6 +219,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         };
         return ex;
       }).filter(Boolean) as BBExercise[];
+      // Сортировка: primary первыми, accessory после
+      exercises.sort((a, b) => (a.role === 'primary' ? -1 : 1) - (b.role === 'primary' ? -1 : 1));
 
       // Determine session character from exercises
       const hasHeavy = exercises.some(e => e.character === 'тяж');
