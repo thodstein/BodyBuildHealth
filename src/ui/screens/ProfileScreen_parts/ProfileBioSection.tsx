@@ -68,8 +68,30 @@ export const ProfileBioSection: React.FC<Props> = ({ settings, save, calcData, u
     setWeightLog(updated); saveWeightLog(updated); save({ weight: w });
   };
 
+  const summaryStats: Array<[string, string, string]> = [
+    ['Вес', p.weight ? `${p.weight} кг` : '—', theme.accent],
+    ['Рост', p.height ? `${p.height} см` : '—', '#60a5fa'],
+    ['BMI', bmi || '—', parseFloat(bmi || '0') < 25 ? '#00e68a' : '#f59e0b'],
+    ['FFMI', ffmi || '—', parseFloat(ffmi || '0') < 22 ? '#f59e0b' : '#00e68a'],
+    ['Цель', GOALS.find(g => g.id === tr.primaryGoal)?.label || '—', '#a78bfa'],
+  ];
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+      <div style={{ gridColumn: '1 / -1', ...glassCardStyle, padding: '14px 16px', display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', borderLeft: `3px solid ${theme.accent}` }}>
+        <div style={{ flex: 1, minWidth: 120 }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4, color: theme.textDim }}>Профиль</div>
+          <div style={{ fontSize: 16, fontWeight: 800 }}>
+            {p.sex === 'male' ? '♂' : p.sex === 'female' ? '♀' : '⚧'} {p.age ? `${p.age} лет` : ''} · {TRAINING_LEVELS.find(t => t.id === tr.level)?.label || ''}
+          </div>
+        </div>
+        {summaryStats.map(([label, val, col]) => (
+          <div key={label} style={{ minWidth: 64, textAlign: 'center' }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: col }}>{val}</div>
+            <div style={{ fontSize: 10, color: theme.textDim, textTransform: 'uppercase', letterSpacing: 0.3 }}>{label}</div>
+          </div>
+        ))}
+      </div>
       <NumberPc icon="🎂" label="Возраст" value={p.age || ''} onChange={v => save({ age: parseInt(v) || 0 })} suffix="лет" placeholder="30" />
       <PopupCard icon="⚤" label="Пол" value={p.sex === 'male' ? 'Мужской' : p.sex === 'female' ? 'Женский' : '—'}>
         <div style={{ display: 'flex', gap: 6 }}>
