@@ -733,6 +733,9 @@ export const TrainingConstructor: React.FC<Props> = ({
       workMaxMerged,
       tprofile.weakPoints || [],
       globalTempoStr,
+      undefined,
+      true,
+      addDeloadWeek,
     );
     const firstWeek = weeks[0];
 
@@ -762,7 +765,7 @@ export const TrainingConstructor: React.FC<Props> = ({
       days: JSON.parse(JSON.stringify(firstWeek.days)),
       weeks,
       currentWeek: firstWeek.weekNumber,
-      mesoLength,
+      mesoLength: weeks.length,
     });
     setWizardStep(6);
   }, [generatedDays, generatedCorrections, manualCfg, mesoLength, deloadFreq, goal, rirWave, level, tprofile, labAnalysis, manualWorkMax, programData, programWeeks]);
@@ -1468,6 +1471,15 @@ export const TrainingConstructor: React.FC<Props> = ({
                 <div style={{ fontSize: 9, color: DIM, marginBottom: 2 }}>Готовность: {readinessSlider}%</div>
                 <input type="range" min={0} max={100} value={readinessSlider} onChange={e => setReadinessSlider(+e.target.value)}
                   style={{ width: '100%' }} />
+              </div>
+              <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center' }}>
+                <button onClick={() => setAddDeloadWeek(!addDeloadWeek)}
+                  style={{ padding: '8px 12px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+                    border: '1px solid ' + (addDeloadWeek ? '#00e68a' : 'rgba(255,255,255,0.1)'),
+                    background: addDeloadWeek ? '#00e68a20' : 'transparent',
+                    color: addDeloadWeek ? '#00e68a' : 'rgba(235,235,245,0.6)', minHeight: 38 }}>
+                  {addDeloadWeek ? '✓ Разгрузочная неделя (финал)' : '＋ Разгрузочная неделя (финал)'}
+                </button>
               </div>
             </div>
           </div>
