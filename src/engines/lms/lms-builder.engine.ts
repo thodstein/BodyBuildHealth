@@ -72,12 +72,16 @@ export function extractExercises(tpl: SRCycleTemplate): string[] {
   return [...set];
 }
 
+function norm(s: string): string { return s.toLowerCase().replace(/ё/g, 'е'); }
+
 function pmFor(exName: string, pmMap: Record<string, number>, fallback: number): number {
   if (pmMap[exName] != null) return pmMap[exName];
-  // эвристика: жимовые/присед/тяга — попытка сопоставления по ключам
+  // эвристика: жимовые/присед/тяга — попытка сопоставления по ключам (с нормализацией ё→е)
+  const n = norm(exName);
   const keys = Object.keys(pmMap);
   for (const k of keys) {
-    if (exName.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(exName.toLowerCase())) {
+    const nk = norm(k);
+    if (n.includes(nk) || nk.includes(n)) {
       return pmMap[k];
     }
   }
