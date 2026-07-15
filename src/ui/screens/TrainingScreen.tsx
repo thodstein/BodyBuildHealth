@@ -32,6 +32,7 @@ import { LoadSafetyCard } from './TrainingScreen_parts/LoadSafetyCard';
 import { SplitGenCard } from './TrainingScreen_parts/SplitGenCard';
 import { PriRepPatternCard } from './TrainingScreen_parts/PriRepPatternCard';
 import { TrainingMixTab } from './TrainingScreen_parts/TrainingMixTab';
+import { MixPresetsCard } from './TrainingScreen_parts/MixPresetsCard';
 
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { StrengthAnalysisHub } from './TrainingScreen_parts/StrengthAnalysisHub';
@@ -651,7 +652,7 @@ export const TrainingScreen: React.FC = () => {
 
       {/* ═══════════ ⚡ ИНТЕЛЛЕКТ ТРЕНИРОВКИ (дашборд вместо пилюль) ═══════════ */}
       {zone === 'calculators' && (() => {
-        const CALC_TABS = new Set(['strength_analysis','load_management','diagnostics','periodization_hub','exercise_lab','calc_plates','volume','load_safety','split_gen','pri_reppat','tonnage','calc_quality','training_mix_hub']);
+        const CALC_TABS = new Set(['strength_analysis','load_management','diagnostics','periodization_hub','exercise_lab','calc_plates','volume','load_safety','split_gen','pri_reppat','tonnage','calc_quality','training_mix_hub','mix_presets']);
         const isCalcTab = CALC_TABS.has(tab);
         if (isCalcTab) {
           // Показываем конкретный инструмент с кнопкой назад
@@ -671,6 +672,7 @@ export const TrainingScreen: React.FC = () => {
             {tab === 'tonnage' && <InfoErrorBoundary label="Тоннаж"><TonnageCalcTab /></InfoErrorBoundary>}
              {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} goal={goal} onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
             {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixTab /></InfoErrorBoundary>}
+            {tab === 'mix_presets' && <InfoErrorBoundary label="Пресеты здоровья"><MixPresetsCard /></InfoErrorBoundary>}
           </>);
         }
         return <TrainingIntelligenceDashboard

@@ -4,13 +4,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useDataLink } from '../../../core/data-link';
 import {
   buildDefaultStack, calculateMixScore,
-  getDefaultTemplate, resolveTemplateItems,
-  type MixTemplate,
 } from '../../../engines/training-mix-scoring.engine';
 import type { MixSubstance, MixProfile, TrainingMixScore } from '../../../engines/training-mix-scoring.engine';
 import { loadTrainingProfile } from './training-profile';
 import { pushSubsToPlan } from './support-plan-bridge';
-import { PopupNumber } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = 'var(--accent)';
 const CARD: React.CSSProperties = {
@@ -30,13 +27,6 @@ const GOAL_OPTIONS: { id: string; label: string; emoji: string }[] = [
   { id: 'hiit', label: 'HIIT', emoji: '💨' },
   { id: 'mma', label: 'MMA', emoji: '🥊' },
   { id: 'sprint', label: 'Спринт', emoji: '🏃' },
-  { id: 'fat_loss', label: 'Жиросжигание', emoji: '🔥' },
-  { id: 'joint', label: 'Суставы/связки', emoji: '🦵' },
-  { id: 'gut', label: 'ЖКТ', emoji: '🫃' },
-  { id: 'sleep', label: 'Сон', emoji: '😴' },
-  { id: 'hydration', label: 'Гидратация', emoji: '💧' },
-  { id: 'antiinflammatory', label: 'Противовоспал', emoji: '🧪' },
-  { id: 'immunity', label: 'Иммунитет', emoji: '🛡️' },
 ];
 
 const WO_TYPE: { id: string; label: string }[] = [
@@ -67,7 +57,6 @@ const DAY_TYPES: { id: string; label: string }[] = [
 ];
 
 const TIMING_RU: Record<string, string> = { pre: 'До тренировки', intra: 'Во время', post: 'После' };
-const HEALTH_IDS = new Set(['fat_loss', 'joint', 'gut', 'sleep', 'hydration', 'antiinflammatory', 'immunity']);
 
 const chip = (active: boolean, accent = '#a78bfa'): React.CSSProperties => ({
   padding: '3px 7px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 600,
@@ -83,19 +72,6 @@ const ScoreBar: React.FC<{ label: string; value: number; color: string }> = ({ l
       <div style={{ width: `${Math.min(100, value)}%`, height: '100%', borderRadius: 3, background: color, transition: 'width 0.5s' }} />
     </div>
     <span style={{ fontSize: 10, fontWeight: 700, color, minWidth: 24, textAlign: 'right' }}>{value}</span>
-  </div>
-);
-
-const PresetItem: React.FC<{ r: { name: string; id: string; dose: string; unit: string; note: string; mg: number } }> = ({ r }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-    <div>
-      <div style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>{r.name}</div>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{r.note}</div>
-    </div>
-    <div style={{ textAlign: 'right' }}>
-      <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700 }}>{r.dose}{r.unit}</div>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{r.mg >= 1000 ? (r.mg / 1000).toFixed(1) + 'г' : r.mg + 'мг'}</div>
-    </div>
   </div>
 );
 
@@ -116,11 +92,7 @@ export const TrainingMixTab: React.FC = () => {
   const [mixDrugGH, setMixDrugGH] = useState<number>(0);
   const [mixDrugMGF, setMixDrugMGF] = useState<number>(0);
   const [mixDrugGLP1, setMixDrugGLP1] = useState(false);
-  const [bwInput, setBwInput] = useState(prof.bodyWeight || 80);
-  const [mult, setMult] = useState(1);
   const [mixPushed, setMixPushed] = useState(false);
-
-  const isHealth = HEALTH_IDS.has(mixGoal);
 
   // автоопределение фармы
   useEffect(() => {
@@ -205,17 +177,6 @@ export const TrainingMixTab: React.FC = () => {
     }
   }, [mixSubstances, mixGoal, mixTiming, bw, isOnCycle, mixInsulin, mixDrugIGF, mixDrugGH, mixDrugMGF, mixDrugGLP1, hasNandrolone, na, kVal, cl, mixWorkoutType, mixTimeOfDay, durHrs, mixExperience, mixDayType, linked.course]);
 
-  // пресет здоровья
-  const tpl: MixTemplate | undefined = useMemo(() => getDefaultTemplate(mixGoal), [mixGoal]);
-  const phases = useMemo(() => {
-    if (!tpl) return null;
-    return {
-      pre: resolveTemplateItems(tpl.pre, mult, bwInput),
-      intra: resolveTemplateItems(tpl.intra, mult, bwInput),
-      post: resolveTemplateItems(tpl.post, mult, bwInput),
-    };
-  }, [tpl, mult, bwInput]);
-
   const timingLabel = mixTiming === 'pre' ? 'За 30-60 мин до тренировки' : mixTiming === 'intra' ? 'В течение тренировки' : 'Сразу после тренировки';
   const stackTitle = mixTiming === 'pre' ? '🔥 Пред-тренировочный стек' : mixTiming === 'intra' ? '💧 Интра-тренировочный стек' : '🍗 Пост-тренировочный стек';
 
@@ -223,7 +184,7 @@ export const TrainingMixTab: React.FC = () => {
     <div style={{ padding: '0 12px 80px', maxWidth: 600, margin: '0 auto' }}>
       <h2 style={{ margin: '0 0 2px', fontSize: 16, fontWeight: 800, color: ACCENT }}>💪 Тренировочные миксы</h2>
       <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '0 0 12px' }}>
-        {isHealth ? 'Готовые пресеты (pre/intra/post) под оздоровительную цель' : 'Подбор пред-/интра-/пост-тренировочных стеков по цели и весу'}
+        Подбор пред-/интра-/пост-тренировочных стеков по цели и весу
       </p>
 
       <div style={CARD}>
@@ -238,7 +199,7 @@ export const TrainingMixTab: React.FC = () => {
 
 
 
-        {!isHealth && (
+        {true && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
             <div>
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>⏰ Тайминг</div>
@@ -259,7 +220,7 @@ export const TrainingMixTab: React.FC = () => {
           </div>
         )}
 
-        {!isHealth && (
+        {true && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
             <div>
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>🌅 Время суток</div>
@@ -276,7 +237,7 @@ export const TrainingMixTab: React.FC = () => {
           </div>
         )}
 
-        {!isHealth && (
+        {true && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
             <div>
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>📆 Тип дня</div>
@@ -287,23 +248,16 @@ export const TrainingMixTab: React.FC = () => {
           </div>
         )}
 
-        {!isHealth && (
+        {true && (
           <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>
             ⚖️ Вес тела: <b style={{ color: ACCENT }}>{bw} кг</b>
             {isOnCycle ? <span style={{ color: '#a78bfa', marginLeft: 6 }}>🔥 Курс (×1.25)</span> : ''}
           </div>
         )}
-
-        {isHealth && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <PopupNumber label="⚖️ Вес тела" value={bwInput} min={30} max={250} suffix=" кг" onChange={setBwInput} />
-            <PopupNumber label="Множитель дозы" value={mult} min={0.5} max={2} step={0.1} suffix="×" onChange={setMult} />
-          </div>
-        )}
       </div>
 
       {/* ── Фарма (только для тренировки) ── */}
-      {!isHealth && (mixInsulin > 0 || mixDrugIGF > 0 || mixDrugGH > 0 || mixDrugMGF > 0 || mixDrugGLP1) && (
+      {true && (mixInsulin > 0 || mixDrugIGF > 0 || mixDrugGH > 0 || mixDrugMGF > 0 || mixDrugGLP1) && (
         <div style={{ ...CARD, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', marginBottom: 6 }}>💉 Фармакология (автоопределение)</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -321,7 +275,7 @@ export const TrainingMixTab: React.FC = () => {
       )}
 
       {/* ── Результат: тренировочный стек ── */}
-      {!isHealth && mixSubstances.length > 0 && (
+      {true && mixSubstances.length > 0 && (
         <div style={{ ...CARD, background: 'linear-gradient(135deg, rgba(0,230,138,0.04), rgba(139,92,246,0.04))', border: '1px solid var(--glass-border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 24 }}>{mixTiming === 'pre' ? '🔥' : mixTiming === 'intra' ? '💧' : '🍗'}</span>
@@ -402,7 +356,7 @@ export const TrainingMixTab: React.FC = () => {
         </div>
       )}
 
-      {!isHealth && stack.filter(sItem => sItem.mg > 0).length > 0 && (
+      {true && stack.filter(sItem => sItem.mg > 0).length > 0 && (
         <div style={CARD}>
           <h4 style={{ margin: '0 0 8px', fontSize: 11, color: 'var(--text)' }}>📋 Состав стека</h4>
           {stack.filter(sItem => sItem.mg > 0).map((sItem, i) => (
@@ -415,27 +369,8 @@ export const TrainingMixTab: React.FC = () => {
         </div>
       )}
 
-      {/* ── Результат: пресет здоровья ── */}
-      {isHealth && tpl && phases && (
-        <div style={CARD}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, margin: '0 0 4px' }}>{tpl.name}</div>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>{tpl.description}</div>
-          {(['pre', 'intra', 'post'] as const).map(t => {
-            const items = phases[t];
-            if (!items || items.length === 0) return null;
-            return (
-              <div key={t} style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, margin: '6px 0 4px' }}>⏱️ {TIMING_RU[t]} ({items.length})</div>
-                {items.map((r, i) => <PresetItem key={i} r={r} />)}
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {isHealth && !tpl && <div style={CARD}><div style={{ color: 'var(--text-dim)', fontSize: 11 }}>Для этой цели пресета нет.</div></div>}
-
       {/* ── История (только для тренировки) ── */}
-      {!isHealth && mixHistory.length > 0 && (
+      {true && mixHistory.length > 0 && (
         <div style={CARD}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <h4 style={{ margin: 0, fontSize: 11, color: 'var(--text)' }}>📂 История ({mixHistory.length})</h4>

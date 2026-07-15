@@ -79,7 +79,8 @@ export default function TrainingIntelligenceDashboard(p: Props) {
     {
       icon: '💊', label: 'Подготовка к тренировке', color: '#ec4899',
       tools: [
-        { icon: '🧪', label: 'Тренировочные миксы', desc: 'Пресеты составов pre/intra/post, синергия веществ', tab: 'training_mix_hub' },
+        { icon: '🧪', label: 'Тренировочные миксы', desc: 'Подбор пред-/интра-/пост-тренировочных стеков по цели и весу', tab: 'training_mix_hub' },
+        { icon: '🛡️', label: 'Пресеты здоровья', desc: 'Жиросжигание, суставы, ЖКТ, сон, гидратация, противовоспал, иммунитет', tab: 'mix_presets' },
       ],
     },
   ];
