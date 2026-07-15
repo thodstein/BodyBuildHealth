@@ -151,8 +151,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         if (excludedMuscles.has(muscle)) return null as any;
         const isWeak = weakPoints.includes(muscle);
 
-        // Volume boost for weak groups
-        const setMult = isWeak ? 1.2 : 1.0;
+        // Volume boost for weak groups + PED adaptation
+        const setMult = (isWeak ? 1.2 : 1.0) * mrvMult;
         const targetSets = Math.max(1, Math.round((exSpec.sets[0]?.sets || 3) * setMult));
 
         // RIR: weak groups get 0.5 harder

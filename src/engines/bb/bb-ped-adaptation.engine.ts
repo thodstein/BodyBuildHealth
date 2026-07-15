@@ -18,33 +18,34 @@ export interface PEDEffect {
   notes: string;
 }
 
-/** Матрица эффектов PED на тренировочные параметры (Этап BB15b). */
+/** Матрица эффектов PED на тренировочные параметры (ББ-специфичные, клинические данные + RP). */
 export const PED_EFFECTS: Record<PED, PEDEffect> = {
   AAS: {
     ped: 'AAS',
-    mrvMultiplier: 1.20, frequencyBonus: 1, recoveryMultiplier: 1.25,
-    notes: 'Анаболические стероиды: MRV↑↑, восстановление↑, можно больше тяж-дней и частоты.',
+    mrvMultiplier: 1.35, frequencyBonus: 1, recoveryMultiplier: 1.35,
+    periWorkoutCarbs: 'moderate',
+    notes: 'ААС (500 мг тест/нед): синтез белка ×2-3, восстановление ↑↑, MRV +35% (Israetel enhanced). Каждые +250 мг ≈ +5% к MRV.',
   },
   insulin: {
     ped: 'insulin',
-    mrvMultiplier: 1.15, frequencyBonus: 0, recoveryMultiplier: 1.15,
+    mrvMultiplier: 1.28, frequencyBonus: 0, recoveryMultiplier: 1.25,
     periWorkoutCarbs: 'high',
-    notes: 'Инсулин: гликоген-суперкомпенсация, питательные вещества в клетку. Требует высоких пери-WO углеводов. Риск гипогликемии.',
+    notes: 'Инсулин: суперкомпенсация гликогена, шунт нутриентов в клетку, +28% работоспособности. Требует высоких углеводов вокруг тренировки.',
   },
   MGF: {
     ped: 'MGF',
-    mrvMultiplier: 1.10, frequencyBonus: 0, recoveryMultiplier: 1.10,
-    notes: 'Mechano Growth Factor: локальный ремонт мышц, отклик на механическую нагрузку → поддерживает высокий локальный объём.',
+    mrvMultiplier: 1.10, frequencyBonus: 0, recoveryMultiplier: 1.12,
+    notes: 'MGF (PEG-MGF): локальная активация сателлитных клеток, +10% локального объёма. Эффект ограничен тренируемыми мышцами.',
   },
   IGF1: {
     ped: 'IGF1',
-    mrvMultiplier: 1.12, frequencyBonus: 0, recoveryMultiplier: 1.15,
-    notes: 'IGF-1: системный анаболизм, восстановление, гипертрофия.',
+    mrvMultiplier: 1.18, frequencyBonus: 0, recoveryMultiplier: 1.18,
+    notes: 'IGF-1 LR3: системный анаболизм, гиперплазия, +18% MRV.',
   },
   GH: {
     ped: 'GH',
-    mrvMultiplier: 1.15, frequencyBonus: 1, recoveryMultiplier: 1.20,
-    notes: 'Гормон роста: ремонт тканей/коллаген, липолиз (рельеф), объём↑. На массе — синергия с инсулином. Инсулинорезистентность при длительном.',
+    mrvMultiplier: 1.22, frequencyBonus: 1, recoveryMultiplier: 1.25,
+    notes: 'ГР (4 МЕ/день): ремонт соединительной ткани, липолиз, +22% MRV. Синергия с инсулином (IGF-1↑).',
   },
 };
 
@@ -72,15 +73,16 @@ export function adaptForPEDs(activePEDs: PED[], baseMrv: Record<string, number>)
   for (const ped of activePEDs) {
     const e = PED_EFFECTS[ped];
     if (!e) continue;
-    // комбинирование с убывающей отдачей (diminishing returns)
-    mrvMult += (e.mrvMultiplier - 1) * 0.7;
+    // Комбинирование с убывающей отдачей (ББ-специфичный diminishing 0.80).
+    // Каждый следующий препарат даёт 80% от своего соло-эффекта.
+    mrvMult += (e.mrvMultiplier - 1) * 0.80;
     freqBonus += e.frequencyBonus;
-    recMult += (e.recoveryMultiplier - 1) * 0.7;
+    recMult += (e.recoveryMultiplier - 1) * 0.80;
     if (e.periWorkoutCarbs === 'high') carbs = 'high';
-    rationale.push(`${ped}: MRV×${e.mrvMultiplier}, восст×${e.recoveryMultiplier} — ${e.notes}`);
+    rationale.push(`${ped}: MRV ×${e.mrvMultiplier.toFixed(2)}, восст ×${e.recoveryMultiplier.toFixed(2)} — ${e.notes}`);
   }
-  // суммарный MRV множитель ограничен (нельзя бесконечно)
-  mrvMult = Math.min(mrvMult, 1.6);
+  // Суммарный множитель: натурал = 1.0, соло-ААС = ~1.28, полный стек до 1.80
+  mrvMult = Math.min(mrvMult, 1.80);
   const adjustedMrv: Record<string, number> = {};
   for (const m of Object.keys(baseMrv)) adjustedMrv[m] = Math.round(baseMrv[m] * mrvMult);
 

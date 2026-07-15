@@ -270,7 +270,7 @@ export const BbAutoConstructor: React.FC = () => {
   const allLandmarks = useMemo(() => getAllVolumeLandmarks(bbLevel), [bbLevel]);
   const pedAdapt = useMemo(() => adaptForPEDs(peds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv]))), [peds, allLandmarks]);
 
-  const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan) : null, [builtPlan]);
+  const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan, pedAdapt.combinedMrvMultiplier) : null, [builtPlan, pedAdapt]);
   const quality = useMemo(() => metrics ? calcQualityScore(metrics, weakPoints, phases) : null, [metrics, weakPoints, phases]);
   const unifiedQuality = useMemo(() => {
     if (!builtPlan) return null;
@@ -952,6 +952,11 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={SMALL}>RIR: <b style={{ color:'#f59e0b' }}>{metrics.avgRir.toFixed(1)}</b></div>
             <div style={SMALL}>Фаз: <b style={{ color:'#a855f7' }}>{phases.filter((p,i,a) => p.phase !== a[i-1]?.phase).length}</b></div>
           </div>
+          {pedAdapt.combinedMrvMultiplier > 1 && (
+            <div style={{ marginTop:6, fontSize:10, fontWeight:700, color:'#f59e0b', background:'rgba(245,158,11,0.08)', padding:'4px 10px', borderRadius:6, display:'inline-block' }}>
+              💉 PED: MRV ×{pedAdapt.combinedMrvMultiplier.toFixed(2)} — пороги MEV/MAV/MRV увеличены
+            </div>
+          )}
         </div>
         {/* MRV table */}
         <MetricCard title="Объём по мышцам (сетов/нед vs MEV/MAV/MRV)" icon="🏋️" accent="#a855f7">

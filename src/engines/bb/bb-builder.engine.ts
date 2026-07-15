@@ -123,6 +123,9 @@ const ALWAYS_ISOLATION: Set<string> = new Set(['calves', 'forearms', 'abs']);
 const PRO_MUSCLE_TO_GROUP: Record<string, string> = {
   delt_front: 'shoulders', delt_mid: 'shoulders', delt_rear: 'shoulders',
   traps: 'back', calves: 'legs', glutes: 'legs', abs: 'core', forearms: 'arms',
+  quads: 'legs', hamstrings: 'legs', biceps: 'arms', triceps: 'arms',
+  chest: 'chest', back: 'back', shoulders: 'shoulders', legs: 'legs',
+  arms: 'arms', core: 'core',
 };
 function catalogGroupFor(muscle: string): string {
   return PRO_MUSCLE_TO_GROUP[muscle] || muscle;
@@ -224,7 +227,8 @@ function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary
   return Math.max(1, Math.round(base * factor));
 }
 
-/** fix D: недельный кап объёма каждой мышцы по её истинному MRV (после всех множителей). */
+/** fix D: недельный кап объёма каждой мышцы по её истинному MRV (после всех множителей).
+ *  + per-exercise кап: максимум 8 сетов на упражнение (ББ-практика). */
 function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string, number>): void {
   const sums: Record<string, { total: number; exs: BBExercise[] }> = {};
   for (const s of weekSessions) {
@@ -235,6 +239,13 @@ function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string,
     }
   }
   for (const [m, info] of Object.entries(sums)) {
+    // Per-exercise cap: не более 8 сетов на одно упражнение
+    for (const ex of info.exs) {
+      if (ex.sets > 8) ex.sets = 8;
+    }
+    // Пересчитать total после per-exercise капа
+    info.total = info.exs.reduce((s, ex) => s + ex.sets, 0);
+    // MRV-кап
     const cap = mrvByMuscle[m];
     if (cap && info.total > cap) {
       const factor = cap / info.total;
@@ -327,8 +338,21 @@ function buildSession(
 
     const resolved = resolveCharacter(repKey, character);
     let role: 'primary' | 'accessory' = 'accessory';
+    // Изолированные дни (Chest/Back/Shoulders/Arms/Legs): primary только для основной мышцы дня.
+    // Это предотвращает marking delt_front как primary в Chest-дне (через collapseKey),
+    // что блокировало бы primary для Shoulders-дня.
+    const soloTags = new Set(['Chest', 'Back', 'Shoulders', 'Arms', 'Legs']);
+    const isSoloDay = soloTags.has(sched.sessionTag || '');
+    const soloDayMuscle = sched.sessionTag?.toLowerCase();
+    const isMainMuscleOfDay = isSoloDay && soloDayMuscle && (
+      muscle === soloDayMuscle || catalogGroupFor(repKey) === soloDayMuscle ||
+      (soloDayMuscle === 'arms' && ['biceps', 'triceps', 'forearms'].includes(muscle)) ||
+      (soloDayMuscle === 'shoulders' && ['shoulders'].includes(muscle))
+    );
     if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж')) {
-      role = 'primary'; musclePrimaryAssigned.add(muscle);
+      if (!isSoloDay || isMainMuscleOfDay) {
+        role = 'primary'; musclePrimaryAssigned.add(muscle);
+      }
     }
     const mavRot = muscleVolumeRotation[muscle] || 0;
     const sessionsForMuscle = muscleSessionCount[muscle] || 1;
@@ -347,7 +371,7 @@ function buildSession(
     const weight = Math.round(wm * pct * 10) / 10;
     const accessoryCount = ACCESSORY_2X_GROUPS.has(muscle) ? 2 : 1;
     const exerciseCount = role === 'primary'
-      ? (['back', 'quads', 'chest'].includes(muscle) ? 3 : 2)
+      ? (['back', 'quads', 'chest', 'shoulders'].includes(muscle) ? 3 : 2)
       : accessoryCount;
     const selType = ALWAYS_ISOLATION.has(muscle) ? 'isolation' : (role === 'primary' ? 'compound' : 'isolation');
     const pool = getExercisesByGroup(catalogGroupFor(repKey));
@@ -359,7 +383,28 @@ function buildSession(
       preferBB: true,
     });
     for (const s of selected) { if (s && s.id) sessionSelectedIds.push(s.id); if (s && s.name) sessionSelectedNames.push(s.name); }
-    const exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5 }];
+    let exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5 }];
+
+    // Shoulders diversity: принудительно 1 жим (front) + 1 махи (mid) + 1 задняя (rear)
+    if (muscle === 'shoulders' && exerciseCount >= 3 && pool.length >= 3) {
+      const isPress = (e: any) => /жим|press|армей|overhead/i.test(e.name || '');
+      const isLateral = (e: any) => /мах|подъем|отведение|lateral|raise|side/i.test(e.name || '');
+      const isRear = (e: any) => /наклон|rear|тяга.*лиц|face.*pull|бабочка/i.test(e.name || '');
+      const presses = pool.filter(e => isPress(e) && !isLateral(e) && !isRear(e));
+      const laterals = pool.filter(e => isLateral(e) && !isPress(e) && !isRear(e));
+      const rears = pool.filter(e => isRear(e) && !isPress(e) && !isLateral(e));
+      const diverse: any[] = [];
+      if (presses.length > 0) diverse.push(presses[0]);
+      if (laterals.length > 0) diverse.push(laterals[0]);
+      if (rears.length > 0) diverse.push(rears[0]);
+      // Добрать до exerciseCount если не хватило
+      for (const e of pool) {
+        if (diverse.length >= exerciseCount) break;
+        if (!diverse.some(d => d.id === e.id)) diverse.push(e);
+      }
+      if (diverse.length >= exerciseCount) exDatas = diverse.slice(0, exerciseCount);
+    }
+
     const expectedFatigue = exerciseCount * (sets / exerciseCount) * (((exDatas[0] as any)?.fatigueCost || 5));
     totalExpectedFatigue += expectedFatigue;
     plans.push({ muscle, resolved, role, sets, exerciseCount, rir, reps, weight, pool, exDatas, selType });
@@ -403,7 +448,9 @@ function buildSession(
     const muscleBudget = totalExpectedFatigue > 0
       ? Math.floor(dayFatigueBudget * pl.exerciseCount * Math.max(1, Math.round(pl.sets / pl.exerciseCount)) * ((pl.exDatas[0] as any)?.fatigueCost || 5) / totalExpectedFatigue)
       : Math.floor(dayFatigueBudget / Math.max(1, plans.length));
-    let remainingBudget = Math.max(1, Math.min(muscleBudget, Math.floor(dayFatigueBudget * 0.5))); // cap at 50% total to avoid one group hogging
+    // Solo-дни (1-2 мышцы): 90% бюджета; multi-дни: 50% (анти-хогинг)
+    const budgetCapPct = plans.length <= 2 ? 0.90 : 0.50;
+    let remainingBudget = Math.max(1, Math.min(muscleBudget, Math.floor(dayFatigueBudget * budgetCapPct)));
     
     for (const exData of pl.exDatas) {
       const wPct = (exData as any).substitutionWeightPct ?? 1.0;
@@ -505,13 +552,16 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         if (input.volumeGoal === 'mev') v = lm.mev;
         else if (input.volumeGoal === 'mrv') v = lm.mrv;
       }
-      if (input.goal === 'cut') v = Math.round(v * 0.9);
+      if (input.goal === 'cut') v = Math.round(v * 0.75);  // дефицит калорий → восстановление ↓25%, объём соответственно
       if (input.goal === 'mass' || input.goal === 'strength_mass') v = Math.round(v * 1.1);
+      // PED-адаптация: увеличиваем целевой объём пропорционально MRV-множителю
+      v = Math.round(v * (pedAdapt?.combinedMrvMultiplier ?? 1));
       muscleVolumeRotation[m] = v;
       // fix D: истинный MRV — потолок для капа.
       // fix C: для отстающих/фокус-групп поднимаем потолок в такт объёмному
       // бусту (weak ×1.2, focus ×1.3), иначе normalizeWeekMrv стирает акцент.
-      let capMrv = lm.mrv;
+      // PED: базовый MRV умножается на combinedMrvMultiplier ДО корректировок
+      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1));
       if (isWeak(m, weakPoints)) capMrv = Math.round(capMrv * 1.2);
       if (focusGroup === m || (focusGroup && isWeak(m, [focusGroup]))) capMrv = Math.round(capMrv * 1.3);
       mrvByMuscle[m] = capMrv;
@@ -534,10 +584,27 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const phaseWeek = phaseWeekCounter[phase];
     for (let i = 0; i < sessions.length; i++) {
       const s = sessions[i];
+      // FullBody: распределяем primary равномерно по дням (fix #3)
+      // День 1: грудь+спина primary, день 2: ноги primary, день 3: плечи+руки primary
+      if (s.sessionTag === 'FullBody') {
+        const fbSchedule = [
+          ['chest', 'back'],
+          ['quads', 'hamstrings'],
+          ['shoulders', 'arms'],
+        ];
+        const fbPrimary = fbSchedule[i % fbSchedule.length];
+        // Блокируем все мышцы, кроме назначенных на этот день
+        const allFbMuscles = (musclesForTag('FullBody') || []).map(m => collapseKey(m));
+        for (const m of allFbMuscles) {
+          if (!fbPrimary.includes(m)) musclePrimaryAssigned.add(m);
+        }
+      }
       // fix Z: sessMuscles по collapseKey (delt heads→shoulders) для mrvByMuscle-lookup
       const sessMuscles = [...new Set(musclesForTag(s.sessionTag).map(m => collapseKey(m)))];
+      // Solo-дни (1-2 группы мышц): увеличиваем бюджет на 50% — вся энергия дня идёт на эти мышцы
+      const sessDailyCap = sessMuscles.length <= 2 ? Math.round(dailyCap * 1.5) : dailyCap;
       const mrvRot = Math.max(12, ...sessMuscles.map(m => mrvByMuscle[m] || 0));
-      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, dailyCap, level, injuryProfile, new Set(injuryProfile), excludedMuscles, gradedInjuries, today, phase, phaseWeek, mrvRot);
+      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, injuryProfile, new Set(injuryProfile), excludedMuscles, gradedInjuries, today, phase, phaseWeek, mrvRot);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       weekSessions.push(sess);
     }

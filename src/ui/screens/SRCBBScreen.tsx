@@ -493,7 +493,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const bbChart: BBMuscleMetric[] = useMemo(() => {
     if (!builtBb) return [];
     const mult = methodHints.volumeMult;
-    return calcBBPlanMetrics(builtBb).perMuscle.map(p => ({ muscle: p.muscle, sets: Math.round(p.totalSets * mult), тяж: Math.round(p.тяжSets * mult), памп: Math.round(p.пампSets * mult), mrv: p.mrv }));
+    return calcBBPlanMetrics(builtBb, pedAdapt.combinedMrvMultiplier).perMuscle.map(p => ({ muscle: p.muscle, sets: Math.round(p.totalSets * mult), тяж: Math.round(p.тяжSets * mult), памп: Math.round(p.пампSets * mult), mrv: p.mrv }));
   }, [builtBb]);
 
   // Сохраняем построенный план (дни + фокус + неделя) в localStorage, чтобы
@@ -971,7 +971,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           {builtBb && (() => {
             const W = builtBb.weeks;
             const wk = W[Math.min(bbWeekSel, W.length) - 1] || W[0];
-            const m = calcBBPlanMetrics(builtBb);
+            const m = calcBBPlanMetrics(builtBb, pedAdapt.combinedMrvMultiplier);
             return <div style={{ ...CARD, borderLeft: `3px solid ${ACCENT}`, boxShadow: '0 0 0 1px rgba(0,230,138,0.08)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8 }}>
                 <div style={{ ...H, margin:0 }}>📋 План: {builtBb.pattern.name}</div>

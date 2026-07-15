@@ -558,6 +558,7 @@ export const TrainingConstructor: React.FC<Props> = ({
             character: e.character,
             muscleTarget: e.muscle,
             technique: e.workSets[0]?.technique,
+            note: e.comment || '',
           })),
           corrections: [s.character + ' · ' + (s.sessionTag || '')],
         }));
@@ -626,6 +627,7 @@ export const TrainingConstructor: React.FC<Props> = ({
             character: e.character,
             muscleTarget: e.muscle,
             technique: e.workSets[0]?.technique,
+            note: e.comment || '',
           })),
           corrections: [s.character + ' · ' + (s.sessionTag || '')],
         }));

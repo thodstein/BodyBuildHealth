@@ -26,9 +26,11 @@ export interface BBPlanMetrics {
   пампPct: number;
   avgRir: number;
   sessionsPerRotation: number;
+  mrvMultiplier: number; // применённый PED-множитель (1.0 = натурал)
 }
 
-export function calcBBPlanMetrics(plan: BBPlan): BBPlanMetrics {
+export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanMetrics {
+  const mult = mrvMultiplier ?? 1.0;
   const level = normLevel((plan as any).level || 'intermediate');
   const agg: Record<string, { total: number; тяж: number; памп: number; лёг: number; rirSum: number; rirN: number; freq: number }> = {};
   // fix H: метрики считаем по ПИКОВОЙ неделе (макс объёма), а не по первой (где RIR ещё высокий)
@@ -55,15 +57,18 @@ export function calcBBPlanMetrics(plan: BBPlan): BBPlanMetrics {
 
   const perMuscle: BBMuscleVolume[] = Object.entries(agg).map(([muscle, a]) => {
     const lm = getVolumeLandmarks(level, muscle) || { mev: 0, mav: 0, mrv: 0 };
+    const mev = Math.round(lm.mev * mult);
+    const mav = Math.round(lm.mav * mult);
+    const mrv = Math.round(lm.mrv * mult);
     let status: BBMuscleVolume['status'] = 'below_mev';
-    if (a.total >= lm.mrv) status = 'exceeding_mrv';
-    else if (a.total > lm.mav) status = 'approaching_mrv';
-    else if (a.total >= lm.mev) status = 'optimal';
+    if (a.total >= mrv) status = 'exceeding_mrv';
+    else if (a.total > mav) status = 'approaching_mrv';
+    else if (a.total >= mev) status = 'optimal';
     return {
       muscle, totalSets: a.total, тяжSets: a.тяж, пампSets: a.памп, лёгSets: a.лёг,
       avgRir: a.rirN > 0 ? a.rirSum / a.rirN : 0,
       frequencyPerRotation: freqMap[muscle] || 0,
-      mev: lm.mev, mav: lm.mav, mrv: lm.mrv, status,
+      mev, mav, mrv, status,
     };
   });
   const totalSets = perMuscle.reduce((s, m) => s + m.totalSets, 0);
@@ -76,6 +81,7 @@ export function calcBBPlanMetrics(plan: BBPlan): BBPlanMetrics {
     пампPct: totalSets > 0 ? пампSets / totalSets : 0,
     avgRir: totalSets > 0 ? rirSum / totalSets : 0,
     sessionsPerRotation: sessions.length,
+    mrvMultiplier: mult,
   };
 }
 
