@@ -565,9 +565,37 @@ export const BbAutoConstructor: React.FC = () => {
                 </button>
               ))}
             </div>
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+          {/* Рекомендации по питанию */}
+          {(() => {
+            const nut: Record<string, { cal: string; pro: string; tip: string }> = {
+              mass: { cal: 'Профицит 300-500 ккал/день', pro: '1.8-2.2 г/кг (≥160 г/день)', tip: 'Углеводы вокруг тренировки. 4-6 приёмов пищи.' },
+              cut: { cal: 'Дефицит 300-500 ккал/день', pro: '2.2-2.8 г/кг (≥180 г/день)', tip: 'Белок повышен для сохранения мышц. Клетчатка 30+ г/день.' },
+              recomp: { cal: 'Поддержание ±100 ккал', pro: '2.0-2.4 г/кг', tip: 'Циклирование углеводов: высокие в дни тренировок, низкие в дни отдыха.' },
+              maintenance: { cal: 'Поддержание (TDEE)', pro: '1.6-2.0 г/кг', tip: 'Стабильное питание, контроль веса 1 раз/нед.' },
+              strength_mass: { cal: 'Профицит 400-600 ккал/день', pro: '2.0-2.5 г/кг (≥180 г/день)', tip: 'Углеводы 5-7 г/кг для силовой производительности.' },
+            };
+            const n = nut[bbGoal] || nut.mass;
+            const calMult = (pedAdapt.combinedMrvMultiplier - 1) * 3 + 1; // PED boost = больше калорий
+            const adjCal = bbGoal === 'cut' ? n.cal : n.cal.replace(/\d+/, m => String(Math.round(Number(m) * calMult)));
+            return (
+              <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.15)' }}>
+                <div style={{ fontSize:11, fontWeight:800, color:'#22c55e', marginBottom:6 }}>🥗 Рекомендации по питанию ({bbGoal})</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:10 }}>
+                  <div><span style={{ color:'rgba(255,255,255,0.5)' }}>Калории: </span><span style={{ fontWeight:700, color:'#f59e0b' }}>{adjCal}</span></div>
+                  <div><span style={{ color:'rgba(255,255,255,0.5)' }}>Белок: </span><span style={{ fontWeight:700, color:'#22c55e' }}>{n.pro}</span></div>
+                  <div style={{ gridColumn:'1/-1' }}><span style={{ color:'rgba(255,255,255,0.5)' }}>💡 </span><span style={{ color:'rgba(255,255,255,0.7)' }}>{n.tip}</span></div>
+                  {pedAdapt.combinedMrvMultiplier > 1 && (
+                    <div style={{ gridColumn:'1/-1', marginTop:4, fontSize:9, color:'#f59e0b' }}>
+                      💉 PED увеличивают потребность в калориях и белке — значения скорректированы.
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
       <div style={H}>💪 Рабочие максимумы (кг)</div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:10 }}>
         {BB_WM_KEYS.map(k => <PopupNumber key={k} label={BB_WM_RU[k]} value={bbWorkMax[k] || 80} min={10} max={500} suffix=' кг' onChange={v => setBbWorkMax(p => ({ ...p, [k]: v }))} />)}

@@ -255,6 +255,24 @@ function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string,
   }
 }
 
+/** Предупреждения о рисках для конкретных упражнений. */
+function exerciseRiskWarning(name: string): string {
+  const n = (name || '').toLowerCase();
+  if (n.includes('становая') || n.includes('мёртвая') || n.includes('мертвая'))
+    return '⚠ Поясница: строгая техника, не круглить спину. При боли — заменить на гиперэкстензию.';
+  if (n.includes('присед') && !n.includes('гантел') && !n.includes('гудмор'))
+    return '⚠ Колени не выходят за носки, спина прямая. При дискомфорте — заменить на жим ногами.';
+  if (n.includes('гудморнинг') || (n.includes('наклон') && n.includes('штанг')))
+    return '⚠ Высокий риск поясницы. Спина прямая, колени чуть согнуты. Только для продвинутых.';
+  if (n.includes('тяга') && n.includes('штанги') && n.includes('наклоне'))
+    return '⚠ Поясница: держать спину прямой, не дёргать вес. При боли — заменить на тягу блока.';
+  if (n.includes('жим') && (n.includes('стоя') || n.includes('сидя') || n.includes('армейский')))
+    return '⚠ Плечевой сустав: не опускать гриф ниже подбородка. При боли — заменить на жим гантелей.';
+  if (n.includes('французский') || (n.includes('разгиб') && n.includes('лёжа')))
+    return '⚠ Локтевой сустав: не переразгибать. При боли — заменить на разгибания на блоке.';
+  return '';
+}
+
 /** Построить тренерский комментарий к упражнению. */
 function buildExComment(
   muscle: string, name: string, role: 'primary' | 'accessory',
@@ -274,6 +292,8 @@ function buildExComment(
   parts.push(`${phaseNames[phase] || phase}, RIR ${rir} (${charLabel})`);
   parts.push(`${sets}×${reps} @ ${weight} кг`);
   parts.push(`Темп ${tempo}, отдых ${restSec}с`);
+  const warn = exerciseRiskWarning(name);
+  if (warn) parts.push(warn);
   return parts.join('. ');
 }
 
