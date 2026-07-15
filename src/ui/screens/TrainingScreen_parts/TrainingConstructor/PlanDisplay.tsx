@@ -2,7 +2,8 @@ import React, { useRef, useState, useCallback, Fragment, useMemo } from 'react';
 import { EXERCISE_CATALOG, getSubstitutes, canReplace, getExerciseById } from '../../../../core/exercise-catalog';
 import { calcExercisePrescription } from '../../../../engines/training.engine';
 import { SubstitutionPopup } from '../SubstitutionPopup';
-import { getAllVolumeLandmarks } from '../../../../engines/volume-landmarks.engine';
+import { getPerMuscleMrvFromLevel } from '../../../../engines/volume-landmarks.engine';
+import { labTrainingAdjust } from '../lab-training-adjust';
 import { tempoFor } from '../../../../engines/bb/bb-tempo-rest';
 import { PCT_FOR_RIR, GROUP_RU, ACCENT, DIM, SET_TEMPLATES, type ManualResult, type ManualWeek } from './types';
 import type { TrainingProfile } from '../training-profile';
@@ -28,6 +29,8 @@ interface Props {
   setResult: (r: ManualResult | null) => void;
   onToRuntime: () => void;
   globalTempoStr?: string;
+  mrvOverride?: number | null;
+  labAnalysis?: any;
 }
 
 const PHASE_COLORS: Record<string, string> = {
@@ -90,23 +93,32 @@ function ExStat({ label, value, onClick, color }: { label: string; value: React.
   );
 }
 
-export function calcQualityScore(days: any[], weeklySets: Record<string, number>, level: string, goal: string): {
+export function calcQualityScore(
+  days: any[],
+  weeklySets: Record<string, number>,
+  level: string,
+  goal: string,
+  opts?: { mrvOverride?: number | null; onCourse?: boolean; courseIntensity?: 'none' | 'mild' | 'moderate' | 'heavy'; labMult?: number }
+): {
   score: number; color: string;
   breakdown: { label: string; ok: boolean; detail: string }[];
   recommendations: string[];
   perMuscle: { muscle: string; sets: number; mev: number; mav: number; mrv: number; status: string; pct: number }[];
 } {
-  const vl = getAllVolumeLandmarks(level);
+  const levelBaseMrv = { beginner: 15, intermediate: 20, advanced: 24, enhanced: 28 }[level] ?? 20;
+  const mrvScale = opts?.mrvOverride != null && levelBaseMrv > 0 ? opts.mrvOverride / levelBaseMrv : 1;
   const breakdown: { label: string; ok: boolean; detail: string }[] = [];
   const recommendations: string[] = [];
   const perMuscle: { muscle: string; sets: number; mev: number; mav: number; mrv: number; status: 'недотрен' | 'оптимум' | 'перегруз'; pct: number }[] = [];
   let score = 100;
 
-  // Per-muscle analysis using volume landmarks
+  // Per-muscle analysis using composed volume landmarks (consistency with generation + mrvOverride)
   for (const [g, sets] of Object.entries(weeklySets)) {
-    const key = Object.keys(vl).find(k => k === g || k === g.replace(/s$/, ''));
-    if (!key || !vl[key]) continue;
-    const { mev, mav, mrv } = vl[key];
+    const lm = getPerMuscleMrvFromLevel(level, g, opts?.onCourse ?? false, opts?.courseIntensity ?? 'none', opts?.labMult ?? 1);
+    if (!lm || !lm.mrv) continue;
+    const mrv = Math.round(lm.mrv * mrvScale);
+    const mev = Math.round(lm.mev * mrvScale);
+    const mav = Math.round(lm.mav * mrvScale);
     let status: 'недотрен' | 'оптимум' | 'перегруз' = 'оптимум';
     const pct = mrv > 0 ? (sets / mrv) * 100 : 0;
     if (sets < mev) { status = 'недотрен'; score -= 8; }
@@ -321,7 +333,12 @@ export const PlanDisplay: React.FC<Props> = ({
 
   const weeklySetsMap: Record<string, number> = {};
   result.days.forEach(d => d.exercises.forEach(e => { weeklySetsMap[e.group] = (weeklySetsMap[e.group] || 0) + e.sets; }));
-  const quality = calcQualityScore(result.days, weeklySetsMap, level, goal);
+  const quality = calcQualityScore(result.days, weeklySetsMap, level, goal, {
+    mrvOverride,
+    onCourse: tprofile.onCourse,
+    courseIntensity: tprofile.courseIntensity,
+    labMult: labAnalysis ? labTrainingAdjust(labAnalysis).mrvMultiplier : 1,
+  });
   const load = calcLoadAnalysis(result.days);
 
   const hasWeeks = !!result.weeks?.length;

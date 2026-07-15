@@ -1600,6 +1600,8 @@ export const TrainingConstructor: React.FC<Props> = ({
             setResult={setManualResult}
             onToRuntime={manualToRuntime}
             globalTempoStr={globalTempoStr}
+            mrvOverride={mrvOverride}
+            labAnalysis={labAnalysis}
           />
 
           {manualResult && (
