@@ -7,6 +7,7 @@ import { selectExercisesSmart } from './exercise-selector.engine';
 import { S_MRV_FACTOR } from './rir-table';
 import { findSubstitutions } from './exercise-substitution.engine';
 import { isBodyweightExercise, isCarryExercise, derivePattern } from './movement-pattern';
+import { getVolumeLandmarks } from './volume-landmarks.engine';
 
 export { derivePattern };
 
@@ -211,12 +212,21 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
   );
   const weeklySets: Record<string, number> = {};
   const patternBalance: Record<string, number> = {};
-  // dailyMrv — дневной аллоуэшн MRV с учётом частоты группы в цикле
+  // weeklyMrvOf — недельный MRV конкретной группы из volume-landmarks.engine
+  // (per-group: chest/back/legs/shoulders/arms/core; композиты arms=bi+tri, legs=qu+ha).
+  // P1.3: жёсткий недельный кап — сумма сетов за все дни недели не превышает MRV группы.
+  const weeklyMrvOf = (g: string): number => {
+    const lm = getVolumeLandmarks(level, g);
+    return lm?.mrv ?? mrv;
+  };
+  // freqMap — частота группы в микроцикле (сколько дней в неделю тренируется)
   const freqMap: Record<string, number> = {};
   cycle.forEach(d => d.forEach(g => { freqMap[g] = (freqMap[g] || 0) + 1; }));
+  // dailyMrv — дневной аллоуэшн: равномерное распределение недельного MRV по частоте,
+  // без искусственного пола 13 (для 3×/нед группы MRV/3 ≈ 6-7 — корректно).
   const dailyMrv = (g: string) => {
     const f = freqMap[g] || 1;
-    return Math.max(13, Math.ceil(mrv / f));
+    return Math.max(10, Math.min(16, Math.round(weeklyMrvOf(g) / f)));
   };
   const groupCorrections: string[] = [];
   const isWeak = (g: string) => weakPoints.includes(g);
@@ -227,6 +237,11 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
   const volMult = (levelVolMap[level] ?? 1.0) * (goalVolMap[goal] ?? 1.0);
   // Цель для RIR-матрицы/диапазонов повторений: mass/bulk → hypertrophy
   const rxGoal = (g: string) => (g === 'mass' || g === 'bulk') ? 'hypertrophy' : g;
+
+  // P1.1: аккумулятор выбранных id на ВСЮ неделю — исключает повтор одноимённого
+  // упражнения в разных днях недели (день1 грудь и день2 грудь не должны давать
+  // «Жим штанги» дважды). Внутри дня дедуп уже есть через exs.
+  const weekSelectedIds: string[] = [];
 
   const dailyCap = Math.max(10, Math.min(16, Math.round(8 + groupsInDay(cycle) * 2)));
 
@@ -292,7 +307,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
       }
 
       const alreadyChosen = exs.map(e => e.name);
-      const selectedIds = alreadyChosen.map(name => EXERCISE_CATALOG.find(ex => ex.name === name)?.id).filter(Boolean) as string[];
+      const selectedIds = Array.from(new Set([...alreadyChosen.map(name => EXERCISE_CATALOG.find(ex => ex.name === name)?.id).filter(Boolean), ...weekSelectedIds])) as string[];
       const injuryProfile = injuries.map(i => i.muscle);
       const weakZonesList = isWeak(g) ? [g] : [];
       const isPrimaryGroup = groups.indexOf(g) === 0;
@@ -309,11 +324,14 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
 
       let groupFatigue = groupCompoundBudget[g] || Math.floor(remainingCompoundFatigue / (groups.length - groups.indexOf(g)));
 
-       for (const ex of compsSafe) {
-         const ds = daySets[g] || 0;
-         const remainingDaily = Math.max(0, dailyMrv(g) - ds);
-         if (remainingDaily < 3) break;
-         if (groupFatigue < (ex.fatigueCost || 5)) break;
+        for (const ex of compsSafe) {
+          const ds = daySets[g] || 0;
+          const remainingDaily = Math.max(0, dailyMrv(g) - ds);
+          if (remainingDaily < 3) break;
+          // P1.3: недельный кап — сумма сетов группы за неделю ≤ MRV группы
+          const remainingWeekly = Math.max(0, weeklyMrvOf(g) - (weeklySets[g] || 0));
+          if (remainingWeekly < 3) break;
+          if (groupFatigue < (ex.fatigueCost || 5)) break;
 
          // Подстановка для градированной травмы
          let exSub = ex;
@@ -372,17 +390,18 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
            exs.push({
              name: exSub.name, sets: cappedSets, reps: isGraded ? clampRepsRange(pr.reps, Math.min(repsCap, 12)) : repsStr, rir: isGraded ? 3 : pr.rir, rest: pr.rest, group: g, weight, weightNote,
              role: isCarryExercise(exSub) ? 'accessory' : (isPrimaryGroup ? 'main' : 'secondary'),
-             pattern: exSub.movementPattern || derivePattern(exSub),
-              tempo: tempoFor(isPrimaryGroup ? 'тяж' : 'памп').notation,
-             forceVec: forceVector(exSub.group, exSub.type, exSub.name),
-             jointStress: exSub.jointStress,
-            technique: (exSub as any).technique,
-            comments: (exSub as any).comments,
-            rationale: (exSub as any).selectionRationale?.join('; '),
-            fatigueCost: exSub.fatigueCost,
-            substitutions: (exSub as any).canReplace?.map((id: string) => EXERCISE_CATALOG.find(e => e.id === id)?.name).filter(Boolean),
-          });
-          weeklySets[g] = (weeklySets[g] || 0) + cappedSets;
+              pattern: exSub.movementPattern || derivePattern(exSub),
+               tempo: tempoFor(isPrimaryGroup ? 'тяж' : 'памп').notation,
+              forceVec: forceVector(exSub.group, exSub.type, exSub.name),
+              jointStress: exSub.jointStress,
+             technique: (exSub as any).technique,
+             comments: (exSub as any).comments,
+             rationale: (exSub as any).selectionRationale?.join('; '),
+             fatigueCost: exSub.fatigueCost,
+             substitutions: (exSub as any).canReplace?.map((id: string) => EXERCISE_CATALOG.find(e => e.id === id)?.name).filter(Boolean),
+           });
+           weekSelectedIds.push((exSub as any).id);
+           weeklySets[g] = (weeklySets[g] || 0) + cappedSets;
           daySets[g] = ds + cappedSets;
           groupFatigue -= exFatigue;
           remainingCompoundFatigue -= exFatigue;
@@ -429,7 +448,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
       if (equipment.length > 0 && pool.length === 0) poolFinal = allPool;
 
       const alreadyChosen = exs.map(e => e.name);
-      const selectedIds = alreadyChosen.map(name => EXERCISE_CATALOG.find(ex => ex.name === name)?.id).filter(Boolean) as string[];
+      const selectedIds = Array.from(new Set([...alreadyChosen.map(name => EXERCISE_CATALOG.find(ex => ex.name === name)?.id).filter(Boolean), ...weekSelectedIds])) as string[];
       const injuryProfile = injuries.map(i => i.muscle);
       const weakZonesList = isWeak(g) ? [g] : [];
       const isPrimaryGroup = groups.indexOf(g) === 0;
@@ -446,15 +465,19 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
       let groupIsoFatigue = groupIsoBudget[g] || Math.floor(remainingIsoFatigue / (groups.length - groups.indexOf(g)));
 
        for (const ex of isosSafe) {
-         const ds = daySets[g] || 0;
-         const remainingDaily = Math.max(0, dailyMrv(g) - ds);
-         if (remainingDaily < 3) break;
-         if (groupIsoFatigue < (ex.fatigueCost || 3)) break;
+          const ds = daySets[g] || 0;
+          const remainingDaily = Math.max(0, dailyMrv(g) - ds);
+          if (remainingDaily < 3) break;
+          // P1.3: недельный кап — сумма сетов группы за неделю ≤ MRV группы
+          const remainingWeekly = Math.max(0, weeklyMrvOf(g) - (weeklySets[g] || 0));
+          if (remainingWeekly < 3) break;
+          if (groupIsoFatigue < (ex.fatigueCost || 3)) break;
 
          // Подстановка для градированной травмы
-         let exSub = ex;
-         let exWeightMult = 1.0;
-         let exVolMult = 1.0;
+          let exSub = ex;
+          let exWeightMult = 1.0;
+          let exVolMult = 1.0;
+          weekSelectedIds.push((exSub as any).id);
 
          if (isGraded) {
            const subs = findSubstitutions(ex.name, g, new Set([g]));
@@ -505,9 +528,9 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
            exs.push({
             name: exSub.name, sets: cappedSets, reps: isGraded ? clampRepsRange(pr.reps, Math.min(repsCap, 12)) : repsStr, rir: isGraded ? 3 : pr.rir, rest: pr.rest, group: g, weight, weightNote,
              role: 'accessory',
-             pattern: exSub.movementPattern || derivePattern(exSub),
-             tempo: tempoFor('памп').notation,
-            forceVec: forceVector(exSub.group, exSub.type, exSub.name),
+              pattern: exSub.movementPattern || derivePattern(exSub),
+              tempo: tempoFor('памп').notation,
+              forceVec: forceVector(exSub.group, exSub.type, exSub.name),
             jointStress: exSub.jointStress,
             technique: (exSub as any).technique,
             comments: (exSub as any).comments,
