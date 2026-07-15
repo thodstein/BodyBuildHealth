@@ -41,11 +41,11 @@ export function resolveWeeklyPercent(input: PMProgressionInput): number {
   return DEFAULT_WEEKLY_PERCENT[input.mode] ?? 0.005;
 }
 
-/** PM на конкретной неделе (1-индекс: неделя 1 = PM0×(1+k)^1? — в cycle1 прирост идёт с каждой неделей). */
+/** PM на конкретной неделе (1-индекс: неделя 1 = PM0, прирост начинается со 2-й недели). */
 export function pmForWeek(input: PMProgressionInput, weekNumber: number): number {
   const k = resolveWeeklyPercent(input);
-  if (weekNumber <= 0) return input.pm0;
-  return input.pm0 * Math.pow(1 + k, weekNumber);
+  if (weekNumber <= 1) return input.pm0;
+  return input.pm0 * Math.pow(1 + k, weekNumber - 1);
 }
 
 /** Полный ряд PM по всем неделям цикла. */
