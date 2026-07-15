@@ -39,14 +39,32 @@ function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG)
   }
   // fallback by name keywords
   const l = exName.toLowerCase();
-  if (l.includes('жим') || l.includes('кроссовер') || l.includes('развед') || l.includes('гантел') && l.includes('накл')) return 'chest';
-  if (l.includes('тяга') || l.includes('подтяг') || l.includes('шраг') || l.includes('пулловер')) return 'back';
-  if (l.includes('присед') || l.includes('разгиб') || l.includes('сгибан') || l.includes('выпад') || l.includes('румын') || l.includes('фронт')) return 'quads';
-  if (l.includes('жим') && (l.includes('стоя') || l.includes('сидя'))) return 'shoulders';
-  if (l.includes('бицепс') || l.includes('молотк') || l.includes('сгиб') && l.includes('штанги')) return 'biceps';
-  if (l.includes('трицепс') || l.includes('француз') || l.includes('разгиб') && l.includes('блок')) return 'triceps';
-  if (l.includes('икры') || l.includes('подъем на носки')) return 'calves';
-  if (l.includes('пресс') || l.includes('скручив')) return 'abs';
+  // Плечи: махи, подъёмы перед собой / в стороны
+  if (l.includes('махи') || l.includes('перед собой') || l.includes('в стороны') || l.includes('в сторону')) return 'shoulders';
+  // Жимы на плечи
+  if (l.includes('жим') && (l.includes('стоя') || l.includes('сидя') || l.includes('армей') || l.includes('швунг'))) return 'shoulders';
+  // Грудь: жимы + разведения
+  if (l.includes('жим') || l.includes('кроссовер') || l.includes('развод') || l.includes('сведен')) return 'chest';
+  if (l.includes('пуловер')) return 'chest';
+  // Спина: тяги + подтягивания
+  if (l.includes('тяга') || l.includes('подтяг') || l.includes('шраг')) return 'back';
+  if (l.includes('гиперэкстенз') || l.includes('наклон') && l.includes('штанг')) return 'back';
+  // Ноги — квадрицепс
+  if (l.includes('присед') || l.includes('выпад') || l.includes('фронт')) return 'quads';
+  if (l.includes('разгиб') && !l.includes('трицепс') && !l.includes('француз')) return 'quads';
+  // Ноги — бицепс бедра
+  if (l.includes('румын') || l.includes('мёртв') || l.includes('мертв') || l.includes('становая')) return 'hamstrings';
+  if (l.includes('сгибан') && !l.includes('бицепс') && !l.includes('молотк')) return 'hamstrings';
+  // Икры
+  if (l.includes('икры') || l.includes('подъем на носки') || l.includes('подъём на носки')) return 'calves';
+  // Бицепс
+  if (l.includes('бицепс') || l.includes('молотк')) return 'biceps';
+  if (l.includes('сгиб') && l.includes('штанги') && !l.includes('ног')) return 'biceps';
+  // Трицепс
+  if (l.includes('трицепс') || l.includes('француз')) return 'triceps';
+  if (l.includes('разгиб') && l.includes('блок') && !l.includes('ног')) return 'triceps';
+  // Пресс
+  if (l.includes('пресс') || l.includes('скручив') || l.includes('планк')) return 'abs';
   return 'chest';
 }
 
@@ -184,6 +202,15 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
           rir: effectiveRir,
           workSets,
           restSeconds,
+          comment: `${isPrimary ? '🎯 Основное' : '📌 Добивочное'}: ${muscle}. ${targetSets}×${targetReps} @${Math.round(workMaxVal * pct)}кг, RIR ${effectiveRir}.`,
+          warmupSets: isPrimary ? (() => {
+            const w = Math.round(workMaxVal * pct);
+            if (w <= 0) return [];
+            const steps = w <= 60 ? 2 : w <= 100 ? 3 : 4;
+            const wu: { load: number; reps: number }[] = [];
+            for (let i = 1; i <= steps; i++) wu.push({ load: Math.round(w * (0.3+0.55/steps*i)), reps: Math.min(8,5+i) });
+            return wu;
+          })() : [],
         };
         return ex;
       }).filter(Boolean) as BBExercise[];
