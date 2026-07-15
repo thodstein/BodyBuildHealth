@@ -176,7 +176,8 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
   const [replacePopup, setReplacePopup] = useState<{ id: string; type: ReplacementType; results: { key: ReplacementType; label: string; icon: string; results: ReplacementResult[] }[]; loading: boolean; name: string } | null>(null);
   const [swapMode, setSwapMode] = useState(false);
   const openReplacePopup = useCallback((id: string, name: string) => {
-    const fp = toFinderProfile(profile);
+    let fp;
+    try { fp = toFinderProfile(profile || ({} as any)); } catch { fp = undefined as any; }
     const allTypes = REPLACE_TYPES.map(rt => {
       const results = findReplacement(id, rt.key, fp);
       return { key: rt.key, label: rt.label, icon: rt.icon, results };
@@ -1538,7 +1539,8 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
             <div style={{ padding: '12px 18px', overflowY: 'auto', flex: 1 }}>
               {/* Meaningful replacement (profile-aware) */}
               {(() => {
-                const mr = findMeaningfulReplacement(replacePopup.id, profile || {} as any);
+                let mr: ReturnType<typeof findMeaningfulReplacement> = null;
+                try { mr = findMeaningfulReplacement(replacePopup.id, profile || ({} as any)); } catch { mr = null; }
                 if (!mr) return null;
                 const cat = SUPPORT_CATALOG_DATA[mr.replacementId];
                 if (!cat) return null;

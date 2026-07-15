@@ -113,7 +113,8 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
 
   /* ── Pre-compute ALL replacement types on open ── */
   const openReplacePopup = useCallback((id: string, name: string) => {
-    const fp = toFinderProfile(profile);
+    let fp;
+    try { fp = toFinderProfile(profile || ({} as any)); } catch { fp = undefined as any; }
     const allTypes: { key: ReplacementType; label: string; icon: string; results: ReplacementResult[] }[] = REPLACE_TYPES.map(rt => {
       const results = findReplacement(id, rt.key, fp);
       return { key: rt.key, label: rt.label, icon: rt.icon, results };
@@ -701,7 +702,8 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
                 <>
                   {/* Lab-aware meaningful replacement (v2 engine) */}
                   {(() => {
-                    const mr = findMeaningfulReplacement(replacePopup.id, profile || {} as any);
+                    let mr: ReturnType<typeof findMeaningfulReplacement> = null;
+                    try { mr = findMeaningfulReplacement(replacePopup.id, profile || ({} as any)); } catch { mr = null; }
                     if (!mr) return null;
                     const cat = SUPPORT_CATALOG_DATA[mr.replacementId];
                     if (!cat) return null;
