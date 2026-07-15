@@ -305,6 +305,8 @@ function buildSession(
   phase: BBPhase = 'accumulation',
   phaseWeek: number = 1,
   mrvRot: number = 0,
+  preSelectedIds: string[] = [],
+  preSelectedNames: string[] = [],
 ): BBSession {
   const character = sched.character as DayCharacter;
   const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles);
@@ -324,8 +326,8 @@ function buildSession(
   }
   const plans: MusclePlan[] = [];
   let totalExpectedFatigue = 0;
-  const sessionSelectedIds: string[] = [];
-  const sessionSelectedNames: string[] = [];
+  const sessionSelectedIds: string[] = [...preSelectedIds];
+  const sessionSelectedNames: string[] = [...preSelectedNames];
   
   for (const mp of musclePlans) {
     const muscle = mp.group;      // каталог-группа (shoulders/arms/back/legs/core…)
@@ -338,21 +340,34 @@ function buildSession(
 
     const resolved = resolveCharacter(repKey, character);
     let role: 'primary' | 'accessory' = 'accessory';
-    // Изолированные дни (Chest/Back/Shoulders/Arms/Legs): primary только для основной мышцы дня.
-    // Это предотвращает marking delt_front как primary в Chest-дне (через collapseKey),
-    // что блокировало бы primary для Shoulders-дня.
-    const soloTags = new Set(['Chest', 'Back', 'Shoulders', 'Arms', 'Legs']);
-    const isSoloDay = soloTags.has(sched.sessionTag || '');
-    const soloDayMuscle = sched.sessionTag?.toLowerCase();
-    const isMainMuscleOfDay = isSoloDay && soloDayMuscle && (
-      muscle === soloDayMuscle || catalogGroupFor(repKey) === soloDayMuscle ||
-      (soloDayMuscle === 'arms' && ['biceps', 'triceps', 'forearms'].includes(muscle)) ||
-      (soloDayMuscle === 'shoulders' && ['shoulders'].includes(muscle))
-    );
-    if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж')) {
-      if (!isSoloDay || isMainMuscleOfDay) {
-        role = 'primary'; musclePrimaryAssigned.add(muscle);
-      }
+    // Какие мышцы являются "главными" для каждого тега сессии.
+    // Остальные мышцы тега — добивочные (accessory), даже если тяж-день.
+    // Это предотвращает: delt_front=primary в Chest-дне → блокирует Shoulders-день.
+    const TAG_PRIMARY_MUSCLES: Record<string, Set<string>> = {
+      Chest: new Set(['chest']),
+      Back: new Set(['back']),
+      Shoulders: new Set(['shoulders']),
+      Arms: new Set(['biceps', 'triceps', 'forearms']),
+      Legs: new Set(['quads', 'hamstrings', 'glutes', 'calves']),
+      Push: new Set(['chest', 'shoulders', 'triceps']),
+      Pull: new Set(['back', 'biceps', 'traps']),
+      ChestBack: new Set(['chest', 'back']),
+      ShouldersArms: new Set(['shoulders', 'biceps', 'triceps', 'forearms']),
+      Upper: new Set(['chest', 'back', 'shoulders', 'biceps', 'triceps']),
+      Lower: new Set(['quads', 'hamstrings', 'glutes', 'calves']),
+      FullBody: new Set(['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'arms']),
+      Torso: new Set(['chest', 'back', 'shoulders']),
+      Limbs: new Set(['quads', 'hamstrings', 'glutes', 'biceps', 'triceps', 'calves']),
+      UpperPower: new Set(['chest', 'back', 'shoulders', 'biceps', 'triceps']),
+      LowerPower: new Set(['quads', 'hamstrings', 'glutes', 'calves']),
+      UpperHyp: new Set(['chest', 'back', 'shoulders', 'biceps', 'triceps']),
+      LowerHyp: new Set(['quads', 'hamstrings', 'glutes', 'calves']),
+      LegsBiceps: new Set(['quads', 'hamstrings', 'calves', 'biceps']),
+    };
+    const tagPrimaries = sched.sessionTag ? TAG_PRIMARY_MUSCLES[sched.sessionTag] : undefined;
+    const isMainMuscle = !tagPrimaries || tagPrimaries.has(muscle);
+    if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж') && isMainMuscle) {
+      role = 'primary'; musclePrimaryAssigned.add(muscle);
     }
     const mavRot = muscleVolumeRotation[muscle] || 0;
     const sessionsForMuscle = muscleSessionCount[muscle] || 1;
@@ -582,11 +597,15 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const phase = phaseByWeek.get(w) || 'accumulation';
     phaseWeekCounter[phase] = (phaseWeekCounter[phase] || 0) + 1;
     const phaseWeek = phaseWeekCounter[phase];
+    // FB-ротация: запрещаем повтор упражнений между днями
+    const fbUsedIds: string[] = [];
+    const fbUsedNames: string[] = [];
     for (let i = 0; i < sessions.length; i++) {
       const s = sessions[i];
       // FullBody: распределяем primary равномерно по дням (fix #3)
       // День 1: грудь+спина primary, день 2: ноги primary, день 3: плечи+руки primary
-      if (s.sessionTag === 'FullBody') {
+      const isFB = s.sessionTag === 'FullBody';
+      if (isFB) {
         const fbSchedule = [
           ['chest', 'back'],
           ['quads', 'hamstrings'],
@@ -604,8 +623,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // Solo-дни (1-2 группы мышц): увеличиваем бюджет на 50% — вся энергия дня идёт на эти мышцы
       const sessDailyCap = sessMuscles.length <= 2 ? Math.round(dailyCap * 1.5) : dailyCap;
       const mrvRot = Math.max(12, ...sessMuscles.map(m => mrvByMuscle[m] || 0));
-      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, injuryProfile, new Set(injuryProfile), excludedMuscles, gradedInjuries, today, phase, phaseWeek, mrvRot);
+      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, injuryProfile, new Set(injuryProfile), excludedMuscles, gradedInjuries, today, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], isFB ? fbUsedNames : []);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
+      // FB: собираем ID и имена упражнений для запрета повторов
+      if (isFB) for (const ex of sess.exercises) {
+        if (ex.exerciseName) { fbUsedIds.push(ex.exerciseName); fbUsedNames.push(ex.exerciseName); }
+      }
       weekSessions.push(sess);
     }
     // fix D: капаем недельный объём каждой мышцы по её истинному MRV
