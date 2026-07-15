@@ -314,17 +314,15 @@ function computeTrainingFactorTZ(training: TZTrainingInput, system: string, mech
 
 // ─── Support Factor (net risk reduction) ───
 
-const SUPPORT_REDUCTIONS_TZ: Record<string, Record<string, Record<number, number>>> = {};
-
-// Import and merge existing SUPPORT_REDUCTIONS from V7
-// (We'll load these at init time from the V7 module)
+// Augment the live SUPPORT_COVERAGE_MAP (the single source of support
+// reductions consumed by computeSupportFactor) with the V7-derived extended set.
 let _supportReductionsLoaded = false;
-function ensureSupportReductions(): Record<string, Record<string, Record<number, number>>> {
-  if (_supportReductionsLoaded) return SUPPORT_REDUCTIONS_TZ;
+function ensureSupportReductions(): void {
+  if (_supportReductionsLoaded) return;
   try {
     // Dynamic import for SUPPORT_REDUCTIONS — not exported from V7 module
     // We define our own extended set here
-    Object.assign(SUPPORT_REDUCTIONS_TZ, {
+    Object.assign(SUPPORT_COVERAGE_MAP, {
       NAC: { hepatic: { 2: 0.25, 3: 0.3, 7: 0.25 }, renal: { 5: 0.15 }, neuro: { 5: 0.2 } },
       TUDCA: { hepatic: { 1: 0.3, 2: 0.2, 7: 0.25 } },
       milk_thistle: { hepatic: { 2: 0.2, 3: 0.25, 5: 0.15, 7: 0.2 } },
@@ -452,7 +450,6 @@ function ensureSupportReductions(): Record<string, Record<string, Record<number,
     });
     _supportReductionsLoaded = true;
   } catch {}
-  return SUPPORT_REDUCTIONS_TZ;
 }
 
 function computeSupportFactor(supportIds: string[], system: string, mechIdx: number): number {
