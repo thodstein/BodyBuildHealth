@@ -37,7 +37,7 @@ export interface NutritionReport {
   sodiumPotassium: { naMg: number; kMg: number; ratio: number; targetRatio: number; status: 'ok' | 'high' | 'low'; recommendation: string };
   proteinTiming: { evennessScore: number; gaps: string[]; maxGapHours: number; recommendation: string };
   glycemicLoad: { totalGL: number; avgGI: number; maxPerMeal: number; mealsHighGI: number; status: 'ok' | 'high' | 'low'; recommendation: string };
-  fatQuality: { satG: number; unsatG: number; satPct: number; targetSatPct: number; omega3G: number; omega6to3ratio: number; status: string; recommendation: string };
+  fatQuality: { satG: number; unsatG: number; satPct: number; targetSatPct: number; omega3G: number; omega6to3ratio: number | null; status: string; recommendation: string };
   mealTiming: { mealCount: number; longestGapHours: number; hasPreWorkout: boolean; hasPostWorkout: boolean; eveningCarbOk: boolean; proteinSpreadOk: boolean; gaps: string[]; recommendation: string };
   fiberAnalysis: { totalG: number; targetG: number; pct: number; status: 'ok' | 'low' | 'critical'; recommendation: string };
   calciumMagnesium: { caMg: number; mgMg: number; ratio: number; targetRatio: number; status: string; recommendation: string };

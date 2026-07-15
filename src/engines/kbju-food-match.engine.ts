@@ -95,7 +95,7 @@ function calcFoodDIAAS(f: FoodItem): { diaas: number; limitingAA: string } {
   for (const [name, val, ref] of pairs) {
     if (ref <= 0) continue;
     hasData = true;
-    const proteinContent = food.protein || 1;
+    const proteinContent = f.protein || 1;
     const ratio = proteinContent > 0 ? (val * digest) / (proteinContent * ref) : 0;
     if (ratio < minRatio) { minRatio = ratio; limiting = name; }
   }

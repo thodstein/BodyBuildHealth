@@ -249,7 +249,7 @@ const ReportTab: React.FC = () => {
           {r.fatQuality && <div style={card}>
             <div style={{ fontSize:9, fontWeight:600, color:'#f59e0b', marginBottom:4 }}>🧈 Жиры</div>
             <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>
-              Ω3 {r.fatQuality.omega3G.toFixed(2)}г · Ω6/Ω3 {r.fatQuality.omega6to3ratio.toFixed(1)}:1
+              Ω3 {r.fatQuality.omega3G.toFixed(2)}г · Ω6/Ω3 {(r.fatQuality.omega6to3ratio ?? 0).toFixed(1)}:1
             </div>
             <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>
               Нас.{r.fatQuality.satG.toFixed(0)}г ({r.fatQuality.satPct.toFixed(0)}%) · Ненас.{r.fatQuality.unsatG.toFixed(0)}г

@@ -873,23 +873,23 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     };
     // N1: track used food IDs across meals to avoid duplicates when budget=max
     const usedFoodIds = new Set<string>();
-    const portableFilter = (pool: any[]) => { if (workFood !== 'portable') return pool; const nonPortableIds = new Set(['kfc_wings','kfc_soup','kfc_bucket','mcd_big_mac','mcd_royale','bk_whopper','vt_big_smoke','pizza_margherita','french_fries','soup_chicken','soup_borscht','soup_mushroom','porridge_oat','porridge_buckwheat','rice_white_cooked','pasta_boiled','mayonnaise','ketchup','cream_sauce','bouillon_cube','soda','coca_cola','juice_apple','juice_orange','ice_cream','condensed_milk','cheese_processed','marmalade','cookie','chocolate']); return pool.filter(f => !nonPortableIds.has(f.id)); };
+    const portableFilter = (pool: any[]) => { if (workFood !== 'portable') return pool; const nonPortableIds = new Set(['kfc_wings','kfc_soup','kfc_bucket','mcd_big_mac','mcd_royale','bk_whopper','vt_big_smoke','pizza_margherita','french_fries','soup_chicken','soup_borscht','soup_mushroom','porridge_oat','porridge_buckwheat','rice_white_cooked','pasta_durum','mayonnaise','ketchup','cream_sauce','bouillon_cube','soda','coca_cola','juice_apple','juice_orange','ice_cream','condensed_milk','cheese_processed','marmalade','cookie','chocolate']); return pool.filter(f => !nonPortableIds.has(f.id)); };
     const applyFoodPrefs = (pool: any[], prefType: string) => { const lower = prefType.toLowerCase(); if (pool.length <= 3) return pool; return portableFilter(pool).filter(f => !excludedIds.has(f.id) && [...allergenIds].every(a => !getFoodAllergens(f.id).includes(a) && !allergenTextMatches(a, f.name))); };
     const seedRand = (seed: number) => { const x = Math.sin(seed) * 10000; return x - Math.floor(x); };
     // ═══════════════════════════════════════════════════════════════════════
     // T1.1 — Smart breakfast templates by day type
     // ═══════════════════════════════════════════════════════════════════════
     const getBreakfastTemplate = (isTraining: boolean, isCutting: boolean, isVeg: boolean) => {
-      const vegProts = ['pea_protein','soy_isolate'];
+      const vegProts = ['supp_pea_protein','soy_isolate'];
       const fastProts = isVeg ? vegProts : ['whey_isolate','whey_concentrate','egg_white'];
-      const slowCarbs = isVeg ? ['oatmeal','buckwheat','quinoa'] : ['oatmeal','buckwheat','quinoa','egg_whole'];
-      const fastCarbs = isVeg ? ['rice_cakes','banana'] : ['rice_cakes','banana','white_bread'];
-      const fatSources = isVeg ? ['avocado','seed_chia','nuts_almonds','flaxseed_oil'] : ['egg_whole','avocado','seed_chia','nuts_almonds','butter_peanut'];
+      const slowCarbs = isVeg ? ['oats','buckwheat','quinoa'] : ['oats','buckwheat','quinoa','egg_whole'];
+      const fastCarbs = isVeg ? ['rice_cakes','banana'] : ['rice_cakes','banana','bread_white'];
+      const fatSources = isVeg ? ['avocado','chia_seeds','almonds','flaxseed_oil'] : ['egg_whole','avocado','chia_seeds','almonds','peanut_butter'];
       const berries = ['fruit_blueberry','fruit_strawberry','fruit_raspberry'];
       const greens = ['veg_spinach','veg_kale'];
-      if (isCutting) return { name:'Омлет + зелень', pId:isVeg?'pea_protein':'egg_white', carbId:'veg_spinach', fatId:'avocado', berryId:'fruit_blueberry', pG:0.5, cG:0.15, fG:0.3, note:'Сушка: белок + клетчатка + min углеводов' };
+      if (isCutting) return { name:'Омлет + зелень', pId:isVeg?'supp_pea_protein':'egg_white', carbId:'veg_spinach', fatId:'avocado', berryId:'fruit_blueberry', pG:0.5, cG:0.15, fG:0.3, note:'Сушка: белок + клетчатка + min углеводов' };
       if (isTraining) return { name:'Рисовый крем + протеин + ягоды', pId:fastProts[Math.floor(Math.random()*fastProts.length)], carbId:fastCarbs[Math.floor(Math.random()*fastCarbs.length)], fatId:fatSources[Math.floor(Math.random()*fatSources.length)], berryId:berries[Math.floor(Math.random()*berries.length)], pG:0.4, cG:0.7, fG:0.3, note:'Тренировочный день: быстрые углеводы + белок + омега-3' };
-      return { name:'Овсянка + протеин + орехи', pId:fastProts[Math.floor(Math.random()*fastProts.length)], carbId:'oatmeal', fatId:'nuts_almonds', berryId:berries[Math.floor(Math.random()*berries.length)], pG:0.4, cG:0.5, fG:0.5, note:'День отдыха: медленные углеводы + жиры для сытости' };
+      return { name:'Овсянка + протеин + орехи', pId:fastProts[Math.floor(Math.random()*fastProts.length)], carbId:'oats', fatId:'almonds', berryId:berries[Math.floor(Math.random()*berries.length)], pG:0.4, cG:0.5, fG:0.5, note:'День отдыха: медленные углеводы + жиры для сытости' };
     };
     // ═══════════════════════════════════════════════════════════════════════
     // T1.2 — Protein source rotation (4 sources across week)
@@ -958,7 +958,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       casein: { id:'casein', dose:30, reason:'Медленный белок → ночной анаболизм 6-8ч' },
       cottage: { id:'cottage_cheese_5', dose:200, reason:'Казеин + кальций → релаксация мышц' },
       pumpkin_seeds: { id:'pumpkin_seeds', dose:30, reason:'Магний 150мг + триптофан → GABA + мелатонин' },
-      almonds: { id:'nuts_almonds', dose:20, reason:'Магний 50мг → релаксация нервной системы' },
+      almonds: { id:'almonds', dose:20, reason:'Магний 50мг → релаксация нервной системы' },
       kiwi: { id:'kiwi', dose:100, reason:'Серотонин + антиоксиданты → качество сна +42%' },
       cherry: { id:'cherry', dose:100, reason:'Естественный мелатонин → засыпание −17 мин' },
       yogurt: { id:'yogurt_greek', dose:150, reason:'Казеин + пробиотики → ось кишечник-мозг' },
@@ -998,18 +998,18 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // T3.1 — Micronutrient periodization by cycle phase
     // ═══════════════════════════════════════════════════════════════════════
     const PHASE_FOOD_BOOST: Record<string, { priorityIds: string[]; avoidIds: string[]; note: string }> = {
-      course: { priorityIds:['broccoli','cauliflower','brussels_sprouts','garlic','beetroot','avocado','egg_whole','spinach','nuts_almonds'], avoidIds:['alcohol','sugar','grapefruit'], note:'Курс ААС: крестоцветные (гепатопротекция), свёкла (NO), яйца (холин), авокадо (глутатион)' },
-      pct: { priorityIds:['egg_whole','oyster','pumpkin_seeds','red_meat','salmon','nuts_brazil','avocado','olive_oil'], avoidIds:['soy','flaxseed','mint'], note:'ПКТ: холестерин→тестостерон (яйца/мясо), цинк (устрицы/семечки), омега-3, селен' },
-      cutting: { priorityIds:['chicken_breast','turkey_breast','cod','egg_white','broccoli','spinach','cucumber','berries','grapefruit'], avoidIds:['sugar','bread','pasta','rice_white','potato','banana','dates'], note:'Сушка: белковая плотность, клетчатка, термогенные продукты' },
-      bridge: { priorityIds:['salmon','avocado','olive_oil','nuts_almonds','egg_whole','broccoli','spinach'], avoidIds:['sugar','fast_food'], note:'Мост: омега-3, мононенасыщенные жиры, поддержка липидного профиля' },
+      course: { priorityIds:['broccoli','cauliflower','brussels_sprouts','garlic','beetroot','avocado','egg_whole','spinach','almonds'], avoidIds:['alcohol','sugar','grapefruit'], note:'Курс ААС: крестоцветные (гепатопротекция), свёкла (NO), яйца (холин), авокадо (глутатион)' },
+      pct: { priorityIds:['egg_whole','oysters','pumpkin_seeds','red_meat','salmon','nuts_brazil','avocado','olive_oil'], avoidIds:['soy','flaxseed','mint'], note:'ПКТ: холестерин→тестостерон (яйца/мясо), цинк (устрицы/семечки), омега-3, селен' },
+      cutting: { priorityIds:['chicken_breast','turkey_breast','cod','egg_white','broccoli','spinach','cucumber','berries','grapefruit'], avoidIds:['sugar','bread','pasta_durum','rice_white','potato_boiled','banana','dates'], note:'Сушка: белковая плотность, клетчатка, термогенные продукты' },
+      bridge: { priorityIds:['salmon','avocado','olive_oil','almonds','egg_whole','broccoli','spinach'], avoidIds:['sugar','fast_food'], note:'Мост: омега-3, мононенасыщенные жиры, поддержка липидного профиля' },
       recovery: { priorityIds:['beef_steak','salmon','egg_whole','sweet_potato','spinach','berries','bone_broth','orange'], avoidIds:['alcohol','processed_food'], note:'Восстановление: цинк+железо (говядина), коллаген (костный бульон), витамин C' },
     };
     const phaseFoodBoost = PHASE_FOOD_BOOST[phase] || null;
     // 🟠12 — Lab-based food adjustments
     const labBoosts: string[] = []; const labAvoids: string[] = [];
     if (v2Labs.alt && parseFloat(v2Labs.alt) > 45) { labBoosts.push('broccoli','cauliflower','garlic','beetroot','avocado'); labAvoids.push('alcohol','sugar','grapefruit'); }
-    if (v2Labs.ast && parseFloat(v2Labs.ast) > 40) { labBoosts.push('spinach','nuts_almonds','olive_oil'); }
-    if (v2Labs.ldl && parseFloat(v2Labs.ldl) > 4.2) { labAvoids.push('butter','cheese_cream','sausage','bacon','fatty_meat'); labBoosts.push('salmon','avocado','olive_oil','oatmeal'); }
+    if (v2Labs.ast && parseFloat(v2Labs.ast) > 40) { labBoosts.push('spinach','almonds','olive_oil'); }
+    if (v2Labs.ldl && parseFloat(v2Labs.ldl) > 4.2) { labAvoids.push('butter','cheese_cream','sausage','bacon','fatty_meat'); labBoosts.push('salmon','avocado','olive_oil','oats'); }
     if (v2Labs.crp && parseFloat(v2Labs.crp) > 3) { labBoosts.push('salmon','berries','green_tea'); }
     if (v2Labs.creatinine && parseFloat(v2Labs.creatinine) > 110) { labAvoids.push('red_meat','salt','processed_food'); labBoosts.push('watermelon','cucumber','celery'); }
     const effectivePhaseBoost = phaseFoodBoost ? {
@@ -1294,7 +1294,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         };
         if (isPreWorkout) {
           const isVeg = dietPrefs.includes('vegetarian');
-          const preProts = isVeg ? ['pea_protein','soy_isolate','egg_white','cottage_cheese_5'] : ['whey_isolate','whey_concentrate','egg_white','chicken_breast'];
+          const preProts = isVeg ? ['supp_pea_protein','soy_isolate','egg_white','cottage_cheese_5'] : ['whey_isolate','whey_concentrate','egg_white','chicken_breast'];
           const preCarbsFiltered = FOOD_DB.filter(f => (f.gi||0) >= 70 && (f.category==='carb'||f.category==='grain'||f.category==='veg_fruit') && f.carbs>10);
           const preCarbs = preCarbsFiltered.length > 0 ? preCarbsFiltered.map(f=>f.id) : ['banana','rice_cakes'];
           const prePG = Math.max(20, Math.round(weight * 0.3));
@@ -1318,9 +1318,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           }
         } else if (isPostWorkout) {
           const isVeg = dietPrefs.includes('vegetarian');
-          const postProts = isVeg ? ['pea_protein','soy_isolate','egg_white'] : ['whey_isolate','whey_concentrate','chicken_breast','egg_whole','turkey_breast'];
+          const postProts = isVeg ? ['supp_pea_protein','soy_isolate','egg_white'] : ['whey_isolate','whey_concentrate','chicken_breast','egg_whole','turkey_breast'];
           const postCarbsFiltered = FOOD_DB.filter(f => (f.gi||0) >= 75 && (f.category==='carb'||f.category==='grain'||f.category==='veg_fruit') && f.carbs>10);
-          const postCarbs = postCarbsFiltered.length > 0 ? postCarbsFiltered.map(f=>f.id) : ['rice_white','potato','white_bread'];
+          const postCarbs = postCarbsFiltered.length > 0 ? postCarbsFiltered.map(f=>f.id) : ['rice_white','potato_boiled','bread_white'];
           const postPG = Math.max(30, Math.round(weight * 0.4));
           const postCG = Math.max(40, Math.round(weight * 0.8));
           const ppIdx = Math.abs(dayOffset * 17 + idx * 11) % postProts.length;
@@ -1441,9 +1441,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const addMacroTopUp = (macro: 'p' | 'f' | 'c', deficit: number) => {
         if (deficit <= 0 || meals.length === 0) return;
         const targetMeal = meals[meals.length - 1];
-        const PROTEIN_TOPPERS = ['whey_isolate','chicken_breast','egg_whole','cottage_cheese','turkey_breast'];
-        const FAT_TOPPERS = ['olive_oil','avocado','nuts_almonds','flaxseed_oil'];
-        const CARB_TOPPERS = ['rice_white','buckwheat','pasta','oatmeal','potato'];
+        const PROTEIN_TOPPERS = ['whey_isolate','chicken_breast','egg_whole','cottage_cheese_5','turkey_breast'];
+        const FAT_TOPPERS = ['olive_oil','avocado','almonds','flaxseed_oil'];
+        const CARB_TOPPERS = ['rice_white','buckwheat','pasta_durum','oats','potato_boiled'];
         const topperPool = macro === 'p' ? PROTEIN_TOPPERS : macro === 'f' ? FAT_TOPPERS : CARB_TOPPERS;
         const candidateId = topperPool[Math.floor(Math.random() * topperPool.length)];
         const food = FOOD_DB.find(f => f.id === candidateId);
@@ -1508,7 +1508,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       // ── MPS optimization: ensure each meal triggers mTOR (>=25g protein, >=2.5g leucine) ──
       const mpsMinProtein = 25;
       const mpsMinLeucine = 2500;
-      const mpsWheyId = dietPrefs.includes('vegetarian') ? 'pea_protein' : 'whey_isolate';
+      const mpsWheyId = dietPrefs.includes('vegetarian') ? 'supp_pea_protein' : 'whey_isolate';
       const mpsWhey = FOOD_DB.find(f => f.id === mpsWheyId);
       if (mpsWhey) {
         meals.forEach((m: any) => {
@@ -1548,14 +1548,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         };
       }
       // ── Protein timing optimization: morning fast protein + casein pre-bed ──
-      const fastProteinIds = ['whey_isolate','whey_concentrate','egg_white','egg_whole','chicken_breast','turkey_breast','pea_protein','soy_isolate'];
-      const caseinIds = ['casein','cottage_cheese_5','cottage_cheese_2','cottage_cheese_0','yogurt_greek'];
+      const fastProteinIds = ['whey_isolate','whey_concentrate','egg_white','egg_whole','chicken_breast','turkey_breast','supp_pea_protein','soy_isolate'];
+      const caseinIds = ['casein','cottage_cheese_5','cottage_cheese_5_2','cottage_cheese_5_0','yogurt_greek'];
       const morningMeal = meals.find((m: any) => m.label === 'Завтрак');
       if (morningMeal) {
         const hasFastProtein = morningMeal.items.some((it: any) => fastProteinIds.includes(it.id));
         const morningP = morningMeal.items.reduce((s: number, i: any) => s + (i.p || 0), 0);
         if (!hasFastProtein || morningP < 25) {
-          const mpId = dietPrefs.includes('vegetarian') ? 'pea_protein' : 'whey_isolate';
+          const mpId = dietPrefs.includes('vegetarian') ? 'supp_pea_protein' : 'whey_isolate';
           const mp = FOOD_DB.find(f => f.id === mpId);
           if (mp) {
             const needG = Math.max(10, 25 - Math.max(0, morningP));
@@ -1581,9 +1581,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           }
         }
         // Add Mg-rich food for GABA/melatonin pathway
-        const hasMg = lastMeal.items.some((it: any) => ['pumpkin_seeds','nuts_almonds','spinach'].includes(it.id));
+        const hasMg = lastMeal.items.some((it: any) => ['pumpkin_seeds','almonds','spinach'].includes(it.id));
         if (!hasMg) {
-          const mgFood = FOOD_DB.find(f => f.id === 'pumpkin_seeds') || FOOD_DB.find(f => f.id === 'nuts_almonds');
+          const mgFood = FOOD_DB.find(f => f.id === 'pumpkin_seeds') || FOOD_DB.find(f => f.id === 'almonds');
           if (mgFood) {
             lastMeal.items.push({name:mgFood.name,id:mgFood.id,amount:20,kcal:Math.round(mgFood.kcal*0.2),p:Math.round(mgFood.protein*0.2),f:Math.round(mgFood.fat*0.2),c:Math.round(mgFood.carbs*0.2)});
           }
@@ -2058,7 +2058,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (/шпинат|капуст|брокколи|зелен|spinach|kale|broccoli|cabbage|green/i.test(allFoodNames)) warnings.push('💊 Варфарин + витамин K (зелень/капуста): снижение INR → риск тромбоза. Контролируйте потребление зелени.');
   }
   if (takenSupplements.some(s => s.includes('enalapril') || s.includes('lisino') || s.includes('ramipril') || s.includes('telmisartan') || s.includes('losartan'))) {
-    if (/банан|картоф|шпинат|авокадо|томат|potato|banana|spinach|avocado|tomato/i.test(allFoodNames)) warnings.push('💊 ACEi/ARB + калий-богатые продукты: риск гиперкалиемии. Ограничьте бананы/картофель/шпинат.');
+    if (/банан|картоф|шпинат|авокадо|томат|potato_boiled|banana|spinach|avocado|tomato/i.test(allFoodNames)) warnings.push('💊 ACEi/ARB + калий-богатые продукты: риск гиперкалиемии. Ограничьте бананы/картофель/шпинат.');
   }
   if (takenSupplements.some(s => s.includes('metformin') || s.includes('метформин'))) {
     if (/алкогол|пив|вин|водк|alcohol|beer|wine/i.test(allFoodNames)) warnings.push('💊 Метформин + алкоголь: риск лактатацидоза. Исключите алкоголь.');

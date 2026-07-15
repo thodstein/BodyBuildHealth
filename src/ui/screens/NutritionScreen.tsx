@@ -1094,7 +1094,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
               </div>
               <div style={{ flex:1, background:'rgba(139,92,246,0.06)', borderRadius:6, padding:'4px', textAlign:'center' }}>
                 <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>Ом-6/3</div>
-                <div style={{ fontSize:11, fontWeight:700, color: fullReport.fatQuality.omega6to3ratio > 6 ? '#ef4444' : '#00e68a' }}>{fullReport.fatQuality.omega6to3ratio}:1</div>
+                  <div style={{ fontSize:11, fontWeight:700, color: (fullReport.fatQuality.omega6to3ratio ?? 0) > 6 ? '#ef4444' : '#00e68a' }}>{fullReport.fatQuality.omega6to3ratio ?? '-'}:1</div>
               </div>
             </div>
             <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{fullReport.fatQuality.recommendation}</div>

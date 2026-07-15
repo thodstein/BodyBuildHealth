@@ -23,7 +23,7 @@
  * Выход: DayPlan (массив meals с items, totals, заметками по MPS/нутритаймингу).
  */
 
-import { FOOD_DB } from "../../../../core/nutrition-database";
+import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
 import type { FoodItem } from "../../../../core/nutrition-database";
 
 // ─── Публичные типы ────────────────────────────────────────────────────
@@ -115,7 +115,7 @@ const SUPPLEMENT_MAX_G: Record<string, number> = {
 // Глобальный лимит на одну порцию любого продукта (г)
 const MAX_GRAM_PER_ITEM = 500;
 
-const MEAT_KEYWORDS = ['beef','pork','chicken','turkey','lamb','veal','duck','salmon','tuna','shrimp','cod','mackerel','trout','sardine','crab','lobster','squid','octopus','venison','rabbit','goose','pate','sausage','bacon','ham','pepperoni','salami','bologna','hot_dog','meatball','cutlet','steak','pollock','tilapia','herring','anchovy','clam','mussel','oyster','scallops','catfish','flounder','sole'];
+const MEAT_KEYWORDS = ['beef','pork','chicken','turkey','lamb','veal','duck','salmon','tuna','shrimp','cod','mackerel','trout','sardine','crab','lobster','squid','octopus','venison','rabbit','goose','pate','sausage','bacon','ham','pepperoni','salami','bologna','hot_dog','meatball','cutlet','steak','pollock','tilapia','herring','anchovy','clam','mussel','oyster','scallops','catfish','flounder','sole','white_fish','whelk','cockles','seafood_','protein_','fish_','_fish','mintai','mahi','trumpeter','shellfish','cockle','abalone','conch','snail','escargot','sea_urchin','sea_cucumber','caviar','roe','liver','kidney','heart_tripe','tongue','brain','sweetbread','gizzard'];
 const isMeatId = (id: string): boolean => MEAT_KEYWORDS.some(k => id.toLowerCase().includes(k));
 
 // ─── Источники белковой ротации (только существующие ID в FOOD_DB) ──────
@@ -226,7 +226,7 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
   const basePool = FOOD_DB.filter(f => {
     if (excludedIds.has(f.id)) return false;
     if (!isMealFood(f)) return false;
-    if (isVeg && isMeatId(f.id) && !f.isVegetarian && !f.isVegan) return false;
+    if (isVeg) { const diet = FOOD_ALLERGEN_DIET[f.id]; if ((diet && diet.isVegetarian === false) || f.isVegetarian === false || (isMeatId(f.id) && !f.isVegetarian && !f.isVegan)) return false; }
     return true;
   });
   const byBudget = <T extends FoodItem>(arr: T[]): T[] => {
@@ -260,17 +260,17 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     proteinSolid: limitPoolByVariety(pSolid.length > 0 ? pSolid : anyProtein, 10001),
     proteinFatty: limitPoolByVariety(pFatty.length > 0 ? pFatty : anyProtein, 10003),
     proteinLean: limitPoolByVariety(pLean.length > 0 ? pLean : anyProtein, 10005),
-    fastProtein: limitPoolByVariety(basePool.filter(f => f.id === 'whey_isolate' || f.id === 'whey_protein' || f.id === 'egg_white' || f.id === 'whey_concentrate'), 10007),
-    slowProtein: limitPoolByVariety(basePool.filter(f => f.id === 'casein' || f.id === 'cottage_cheese_5' || f.id === 'greek_yogurt' || f.id === 'yogurt_greek'), 10009),
+    fastProtein: FOOD_DB.filter(f => !excludedIds.has(f.id) && (f.id === 'whey_isolate' || f.id === 'whey_concentrate' || f.id === 'whey_protein' || f.id === 'egg_white')),
+    slowProtein: FOOD_DB.filter(f => !excludedIds.has(f.id) && (f.id === 'casein' || f.id === 'casein_micellar' || f.id === 'cottage_cheese_5' || f.id === 'yogurt_greek')),
     carbSlow: limitPoolByVariety(cSlowBud.length > 0 ? cSlowBud : cSlowRaw.length > 0 ? cSlowRaw : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15), 10011),
     carbFast: limitPoolByVariety(cFastBud.length > 0 ? cFastBud : cFastRaw.length > 0 ? cFastRaw : cFruitBud.length > 0 ? cFruitBud : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15), 10013),
     carbFruit: limitPoolByVariety(cFruitBud.length > 0 ? cFruitBud : cFruitRaw, 10015),
     fats: limitPoolByVariety(fatsBud.length > 0 ? fatsBud : fatsRaw, 10017),
-    vegGreen: basePool.filter(f => ['broccoli','spinach','cucumber','zucchini','asparagus','green_bean','celery','cabbage','kale','green_apple'].some(k => f.id.includes(k)) && (f.protein || 0) < 20),
-    vegColor: basePool.filter(f => ['tomato','pepper','carrot','beetroot','pumpkin','eggplant','pomegranate','citrus'].some(k => f.id.includes(k.toLowerCase())) && (f.protein || 0) < 20),
+    vegGreen: basePool.filter(f => f.category === 'veg_fruit' && ['broccoli','spinach','cucumber','zucchini','asparagus','green_bean','celery','cabbage','kale','green_apple'].some(k => f.id.includes(k)) && (f.protein || 0) < 10),
+    vegColor: basePool.filter(f => f.category === 'veg_fruit' && ['tomato','pepper','carrot','beetroot','pumpkin','eggplant','pomegranate','citrus'].some(k => f.id.includes(k.toLowerCase())) && (f.protein || 0) < 10),
     dairy: byBudget(basePool.filter(f => f.category === 'dairy' && (f.fat || 0) <= 10)),
-    eaa: basePool.find(f => f.id === 'bcaa' || f.id === 'supp_eaa'),
-    dextrin: basePool.find(f => f.id === 'amylopectin' || f.id === 'dextrose'),
+    eaa: FOOD_DB.find(f => !excludedIds.has(f.id) && (f.id === 'supp_eaa' || f.id === 'bcaa')),
+    dextrin: FOOD_DB.find(f => !excludedIds.has(f.id) && (f.id === 'amylopectin' || f.id === 'dextrose')),
   };
 }
 
@@ -305,28 +305,19 @@ function buildWholeMeal(
     if (grams > 0) {
       const item = makeItem(proteinSource, grams, 'protein');
       items.push(item); remP -= item.p; remF -= item.f; remC -= item.c;
-      // Низколейциновый белок? Добор сывороткой (≤40 г raw, ≤25 г protein), чтобы достичь порога лейцина
-      const curLeu = items.reduce((s, i) => s + (i.leucine_mg || 0), 0);
-      if (curLeu < LEU_THRESHOLD_MG && pool.fastProtein.length > 0) {
-        const whey = pool.fastProtein[0];
-        const needLeu = LEU_THRESHOLD_MG - curLeu;
-        const wheyLeuPer100 = getLeucine(whey);
-        const wheyProteinPer100 = whey.protein || 0;
-        const wheyGramsRaw = Math.round(needLeu / Math.max(1, wheyLeuPer100) * 100);
-        const wheyGrams = Math.min(40, Math.max(15, wheyGramsRaw));
-        const wItem = makeItem(whey, wheyGrams, 'fast_protein');
-        if (wItem.p > 25) { wItem.p = 25; wItem.kcal = Math.round(wItem.p * 4 + wItem.f * 9 + wItem.c * 4); }
-        items.push(wItem); remP -= wItem.p; remF -= wItem.f; remC -= wItem.c;
-      }
     }
   }
 
   // 2. Углеводы: медленные по умолчанию (предпочтение — preferred)
   if (remC > 8) {
+    // Reserve carb budget for veg/fruit that will be added later (they contribute ~8-12g carbs each)
+    const vegCarbReserve = includeVeg ? 12 : 0;
+    const fruitCarbReserve = includeFruit ? 10 : 0;
+    const carbTarget = Math.max(5, remC - vegCarbReserve - fruitCarbReserve);
     const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
     const carbSource = pickPriority(prefCarb.length > 0 ? prefCarb : pool.carbSlow, seed + 1, { lockedIds, recentIds });
     if (carbSource) {
-      const grams = gramsForMacro(carbSource, remC, 'carbs');
+      const grams = gramsForMacro(carbSource, carbTarget, 'carbs');
       if (grams > 0) {
         const item = makeItem(carbSource, grams, 'carb_slow');
         items.push(item); remP -= item.p; remF -= item.f; remC -= item.c;
@@ -377,6 +368,22 @@ function buildWholeMeal(
     }
   }
 
+      // 6. MPS-добор: проверяем ПОСЛЕ сборки всего приёма
+      //    Только если белок <25г И лейцин <2.5г — минимальный добор сывороткой
+      {
+        const curP = items.reduce((s, i) => s + i.p, 0);
+        const curLeu = items.reduce((s, i) => s + (i.leucine_mg || 0), 0);
+        if (curP < 25 && curLeu < LEU_THRESHOLD_MG && pool.fastProtein.length > 0) {
+          const whey = pool.fastProtein.find(f => f.id === 'whey_isolate') ?? pool.fastProtein.find(f => f.id === 'whey_concentrate') ?? pool.fastProtein[0];
+          const needLeu = LEU_THRESHOLD_MG - curLeu;
+          const wheyLeuPer100 = getLeucine(whey);
+          const wheyGramsRaw = Math.round(needLeu / Math.max(1, wheyLeuPer100) * 100);
+          const wheyGrams = Math.min(40, Math.max(15, wheyGramsRaw));
+          const wItem = makeItem(whey, wheyGrams, 'fast_protein');
+          if (wItem.p > 25) { wItem.p = 25; wItem.kcal = Math.round(wItem.p * 4 + wItem.f * 9 + wItem.c * 4); }
+          items.push(wItem); remP -= wItem.p; remF -= wItem.f; remC -= wItem.c;
+        }
+      }
   const totals = items.reduce((acc, it) => ({
     kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
     fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
@@ -436,7 +443,7 @@ function buildPostWorkout(
   preferredIds?: Set<string>,
   opts?: { lockedIds?: Set<string>; recentIds?: Set<string> },
 ): Meal {
-  const fastProtein = pool.fastProtein[0];
+  const fastProtein = pool.fastProtein.find(f => f.id === 'whey_isolate') ?? pool.fastProtein.find(f => f.id === 'whey_concentrate') ?? pool.fastProtein.find(f => f.id === 'whey_protein') ?? pool.fastProtein[0];
   const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbFast.filter(f => preferredIds.has(f.id)) : [];
   const fastCarb = pickPriority(prefCarb.length > 0 ? prefCarb : pool.carbFast, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds });
   const items: MealItem[] = [];
@@ -505,7 +512,7 @@ function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof build
   // Mg-источник: тыквенные семечки/миндаль/кешью — ротация по seed
   const mgPool = FOOD_DB.filter(f => ['pumpkin_seeds','sunflower_seeds','almonds','cashew'].includes(f.id));
   const mgSource = pickPriority(mgPool as any as FoodItem[], seed + 1, { recentIds: opts?.recentIds, lockedIds: opts?.lockedIds }) as any || mgPool[0];
-  if (mgSource) items.push(makeItem(mgSource, 20, 'fat'));
+  if (mgSource) items.push(makeItem(mgSource, 15, 'fat'));
   // Мелатонин-источник: киви/вишня/ягоды — ротация
   const melPool = FOOD_DB.filter(f => f.id === 'kiwi' || f.id === 'cherry' || f.id.includes('berries'));
   const melSource = pickPriority(melPool as any as FoodItem[], seed + 2, { recentIds: opts?.recentIds, lockedIds: opts?.lockedIds }) as any || melPool[0];
@@ -610,9 +617,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const hasSnack = !trainWindow && input.mealsCount >= 4;
 
   const mealBudget = {
-    breakfast: { p: Math.max(25, mpsPerMeal), c: breakC, f: Math.round(fatTotal * 0.25) },
-    lunch: { p: Math.max(25, mpsPerMeal), c: (input.eveningLowCarb ? Math.round((trainWindow ? trainCarbLunch : restCarbLunch - snackC) * 1.3) : (trainWindow ? trainCarbLunch : restCarbLunch - snackC)), f: Math.round(fatTotal * 0.2) },
-    dinner: { p: Math.max(25, mpsPerMeal), c: input.eveningLowCarb ? Math.round((trainWindow ? trainCarbDinner : restCarbDinner) * 0.5) : (trainWindow ? trainCarbDinner : restCarbDinner), f: Math.round(fatTotal * 0.3) },
+    breakfast: { p: Math.max(25, mpsPerMeal), c: breakC, f: Math.round(fatTotal * 0.15) },
+    lunch: { p: Math.max(25, mpsPerMeal), c: (input.eveningLowCarb ? Math.round((trainWindow ? trainCarbLunch : restCarbLunch - snackC) * 1.3) : (trainWindow ? trainCarbLunch : restCarbLunch - snackC)), f: Math.round(fatTotal * 0.12) },
+    dinner: { p: Math.max(25, mpsPerMeal), c: input.eveningLowCarb ? Math.round((trainWindow ? trainCarbDinner : restCarbDinner) * 0.5) : (trainWindow ? trainCarbDinner : restCarbDinner), f: Math.round(fatTotal * 0.18) },
     prew: trainWindow ? { p: PREW_PROTEIN_G, c: PREW_CARB_SLOW_G, f: PREW_FAT_MAX_G } : null,
     postw: trainWindow ? { p: POSTW_FAST_PROTEIN_G, c: POSTW_FAST_CARB_G, f: 0 } : null,
     snack: hasSnack ? { p: snackP, c: snackC, f: snackF } : null,
@@ -783,48 +790,75 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     notes.push(`⚠ Цель ${input.goalKcal} ккал ниже минимальной (${minKcal} ккал = белок + минимум жиров/углеводов). Белок сохранён, но план не может достичь цели без ущерба для MPS.`);
   }
 
-  // ─── Коррекция KBJU: сохраняем белок, корректируем углеводы/жиры ───
-  const TOL = 0.08; // 8% tolerance — real-world meal assembly varies 8-12%
-  const devK = Math.abs(totals.kcal - input.goalKcal) / Math.max(1, input.goalKcal);
-  if (devK > TOL) {
-    const kcalDiff = input.goalKcal - totals.kcal; // positive = need more, negative = need less
-    // Strategy: adjust carb/fat portions (NOT protein — it's MPS-optimized per meal)
-    // Find all non-protein items (carbs + fats), sorted by amount descending (adjust biggest first)
-    const adjustableItems = meals.flatMap(m => m.items.filter(it => it.role === 'carb_slow' || it.role === 'carb_fast' || it.role === 'fat' || it.role === 'fruit').map(it => ({ meal: m, item: it })));
-    if (adjustableItems.length > 0) {
-      const kcalPerItem = Math.round(kcalDiff / adjustableItems.length);
-      adjustableItems.forEach(({ meal, item }) => {
-        const food = FOOD_DB.find(f => f.id === item.id);
-        if (!food) return;
-        const kcalPer100g = food.kcal || 0;
-        if (kcalPer100g <= 0) return;
-        const deltaGrams = Math.round(kcalPerItem / kcalPer100g * 100);
-        const newAmount = Math.max(15, Math.min(MAX_GRAM_PER_ITEM, item.amount + deltaGrams));
-        const factor = newAmount / (item.amount || 1);
-        item.amount = newAmount;
-        item.kcal = Math.round(item.kcal * factor);
-        item.p = Math.round(item.p * factor);
-        item.f = Math.round(item.f * factor);
-        item.c = Math.round(item.c * factor);
-        item.fiber = Math.round(item.fiber * factor);
-        item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
-      });
-      // Recalculate all meal totals
-      meals.forEach(m => {
-        m.totals = m.items.reduce((acc, it) => ({
-          kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
-          fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
-        }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
-      });
-      totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0);
-      totals.p = meals.reduce((s, m) => s + m.totals.p, 0);
-      totals.f = meals.reduce((s, m) => s + m.totals.f, 0);
-      totals.c = meals.reduce((s, m) => s + m.totals.c, 0);
-      totals.fiber = meals.reduce((s, m) => s + m.totals.fiber, 0);
-      totals.leucine_mg = meals.reduce((s, m) => s + m.totals.leucine_mg, 0);
+
+  // KBJU fine-tune: if kcal >10% under goal, add fat (capped at fatTotal*1.10)
+  {
+    const devK = (input.goalKcal - totals.kcal) / Math.max(1, input.goalKcal);
+    if (devK > 0.10 && totals.f < fatTotal * 1.10) {
+      const kcalNeed = input.goalKcal - totals.kcal;
+      const fatCap = fatTotal * 1.10 - totals.f;
+      const fatItems = meals.flatMap(m => m.items.filter(it => it.role === 'fat').map(it => ({ meal: m, item: it })));
+      if (fatItems.length > 0 && fatCap > 2) {
+        const kcalPerItem = Math.min(kcalNeed / fatItems.length, fatCap * 9 / fatItems.length);
+        fatItems.forEach(({ meal, item }) => {
+          const food = FOOD_DB.find(f => f.id === item.id);
+          if (!food || !food.fat) return;
+          const addGrams = Math.round(kcalPerItem / (food.kcal || 1) * 100);
+          const newAmount = Math.min(MAX_GRAM_PER_ITEM, item.amount + addGrams);
+          const factor = newAmount / (item.amount || 1);
+          item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
+        });
+        meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
+        totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0);
+      }
     }
   }
-
+  // P4: Protein overshoot correction — if protein >15% over goal, scale down protein items (preserve MPS min 25g/meal)
+  {
+    const goalP = adjustedProteinG || input.goalProteinG;
+    const devP = (totals.p - goalP) / Math.max(1, goalP);
+    if (devP > 0.10) {
+      const excessP = totals.p - goalP;
+      const proteinItems = meals.flatMap(m => m.items.filter(it => it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein').map(it => ({ meal: m, item: it })));
+      if (proteinItems.length > 0) {
+        const reducePerItem = excessP / proteinItems.length;
+        proteinItems.forEach(({ meal, item }) => {
+          const food = FOOD_DB.find(f => f.id === item.id);
+          if (!food || !food.protein) return;
+          const reduceGrams = Math.round(reducePerItem / food.protein * 100);
+          const newAmount = Math.max(20, item.amount - reduceGrams);
+          const factor = newAmount / (item.amount || 1);
+          item.amount = newAmount;
+          item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
+        });
+        meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
+        totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0);
+      }
+    }
+  }
+  // P4c: Fat deficit correction — if fat >12% under goal, increase fat items
+  {
+    const goalF = fatTotal;
+    const devF = (goalF - totals.f) / Math.max(1, goalF);
+    if (devF > 0.12) {
+      const fatDeficit = goalF - totals.f;
+      const fatItems = meals.flatMap(m => m.items.filter(it => it.role === 'fat').map(it => ({ meal: m, item: it })));
+      if (fatItems.length > 0) {
+        const addPerItem = fatDeficit / fatItems.length;
+        fatItems.forEach(({ meal, item }) => {
+          const food = FOOD_DB.find(f => f.id === item.id);
+          if (!food || !food.fat) return;
+          const addGrams = Math.round(addPerItem / food.fat * 100);
+          const newAmount = Math.min(MAX_GRAM_PER_ITEM, item.amount + addGrams);
+          const factor = newAmount / (item.amount || 1);
+          item.amount = newAmount;
+          item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
+        });
+        meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
+        totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0);
+      }
+    }
+  }
   notes.push(`Сводка MPS: ${feedings} feedings × ${mpsSummary.avg_protein_per_meal_g} г/meal, ${mpsSummary.avg_leucine_g} г лейцина (порог ${LEU_THRESHOLD_MG / 1000} г)`);
   notes.push(`Диверсификация: ${uniqueFoods} уникальных продуктов (${Object.keys(categories).length} категорий)`);
   if (input.isCutting) notes.push('Сушка: повышенная плотность белка, заниженные углеводы у ужина');
@@ -840,6 +874,34 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   const deficiencyClosure = closeFoodDeficiencies(meals);
   if (deficiencyClosure.length > 0) notes.push(...deficiencyClosure);
+  // Omega-3 boost: ensure at least one omega-3 source per day
+  {
+    const omega3Ids = new Set(['salmon','mackerel','sardines','red_fish','flaxseed','chia_seeds','walnuts']);
+    const hasOmega3 = meals.some(m => m.items.some(it => omega3Ids.has(it.id)));
+    if (!hasOmega3 && !input.isVegetarian) {
+      const fish = FOOD_DB.find(f => f.id === 'salmon' && !(input.excludedIds||new Set()).has(f.id)) || FOOD_DB.find(f => f.id === 'mackerel' && !(input.excludedIds||new Set()).has(f.id));
+      if (fish) {
+        const lunchMeal = meals.find(m => m.type === 'lunch') || meals[1];
+        if (lunchMeal) {
+          // Replace the main protein source in lunch with fish (swap, not add)
+          const protIdx = lunchMeal.items.findIndex(it => it.role === 'protein');
+          if (protIdx >= 0) {
+            const oldItem = lunchMeal.items[protIdx];
+            const fishGrams = oldItem.amount || 100;
+            lunchMeal.items[protIdx] = makeItem(fish, fishGrams, 'protein');
+            allFoodsUsed[allFoodsUsed.indexOf(oldItem.id)] = fish.id;
+          } else {
+            lunchMeal.items.push(makeItem(fish, 80, 'protein'));
+            allFoodsUsed.push(fish.id);
+          }
+          lunchMeal.totals = lunchMeal.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+          // Recalculate day totals
+          totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + m.totals.fiber, 0); totals.leucine_mg = meals.reduce((s, m) => s + m.totals.leucine_mg, 0);
+          notes.push('🐟 Омега-3 буст: лосось заменяет белок в обеде (EPA/DHA ~2.2г) — противовоспалительный жир');
+        }
+      }
+    }
+  }
 
   // P5: Phase-specific nutrition protocol (bodybuilder-specific)
   const phaseNotes: string[] = [];
