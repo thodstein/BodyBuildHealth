@@ -2,7 +2,7 @@ import React, { useRef, useState, useCallback, Fragment, useMemo } from 'react';
 import { EXERCISE_CATALOG, getSubstitutes, canReplace, getExerciseById } from '../../../../core/exercise-catalog';
 import { calcExercisePrescription } from '../../../../engines/training.engine';
 import { SubstitutionPopup } from '../SubstitutionPopup';
-import { getPerMuscleMrvFromLevel } from '../../../../engines/volume-landmarks.engine';
+import { getVolumeLandmarks, computeVolumeLandmarks, type VolumeLandmarkRow } from '../../../../engines/volume-landmarks.engine';
 import { labTrainingAdjust } from '../lab-training-adjust';
 import { tempoFor } from '../../../../engines/bb/bb-tempo-rest';
 import { PCT_FOR_RIR, GROUP_RU, ACCENT, DIM, SET_TEMPLATES, type ManualResult, type ManualWeek } from './types';
@@ -114,11 +114,16 @@ export function calcQualityScore(
 
   // Per-muscle analysis using composed volume landmarks (consistency with generation + mrvOverride)
   for (const [g, sets] of Object.entries(weeklySets)) {
-    const lm = getPerMuscleMrvFromLevel(level, g, opts?.onCourse ?? false, opts?.courseIntensity ?? 'none', opts?.labMult ?? 1);
-    if (!lm || !lm.mrv) continue;
-    const mrv = Math.round(lm.mrv * mrvScale);
-    const mev = Math.round(lm.mev * mrvScale);
-    const mav = Math.round(lm.mav * mrvScale);
+    const lm = getVolumeLandmarks(level, g);
+    if (!lm) continue;
+    let mrv = Math.round(lm.mrv * mrvScale);
+    let mev = Math.round(lm.mev * mrvScale);
+    let mav = Math.round(lm.mav * mrvScale);
+    if (opts?.onCourse) {
+      const courseMult = opts.courseIntensity === 'heavy' ? 1.3 : opts.courseIntensity === 'moderate' ? 1.2 : 1.15;
+      mrv = Math.round(mrv * courseMult); mev = Math.round(mev * courseMult); mav = Math.round(mav * courseMult);
+    }
+    if (opts?.labMult) { mrv = Math.round(mrv * opts.labMult); mev = Math.round(mev * opts.labMult); mav = Math.round(mav * opts.labMult); }
     let status: 'недотрен' | 'оптимум' | 'перегруз' = 'оптимум';
     const pct = mrv > 0 ? (sets / mrv) * 100 : 0;
     if (sets < mev) { status = 'недотрен'; score -= 8; }
@@ -212,7 +217,7 @@ function getWarmup(exercises: any[], goal: string): { general: string[]; specifi
 
 export const PlanDisplay: React.FC<Props> = ({
   result, manualWorkMax, tprofile, goal, level, mesoLength, daysPerWeek,
-  setResult, onToRuntime, globalTempoStr,
+  setResult, onToRuntime, globalTempoStr, mrvOverride, labAnalysis,
 }) => {
   const [subTarget, setSubTarget] = useState<{ dayIdx: number; exIdx: number } | null>(null);
   const [inlineEdit, setInlineEdit] = useState<{ dayIdx: number; exIdx: number; field: string; value: string } | null>(null);
@@ -333,6 +338,10 @@ export const PlanDisplay: React.FC<Props> = ({
 
   const weeklySetsMap: Record<string, number> = {};
   result.days.forEach(d => d.exercises.forEach(e => { weeklySetsMap[e.group] = (weeklySetsMap[e.group] || 0) + e.sets; }));
+  const labMult = labAnalysis ? labTrainingAdjust(labAnalysis).mrvMultiplier : 1;
+  const volumeRows: VolumeLandmarkRow[] = weeklySetsMap && Object.keys(weeklySetsMap).length
+    ? computeVolumeLandmarks(weeklySetsMap, level, { labMult })
+    : [];
   const quality = calcQualityScore(result.days, weeklySetsMap, level, goal, {
     mrvOverride,
     onCourse: tprofile.onCourse,
@@ -353,6 +362,33 @@ export const PlanDisplay: React.FC<Props> = ({
           {result.days.length} дн/нед · {result.mesoLength || mesoLength} нед
         </span>
       </div>
+
+      {/* ═══ ОБЪЁМ vs MRV (volume-landmarks, единый источник) ═══ */}
+      {volumeRows.length > 0 && (
+        <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.18)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>
+            📊 Объём vs MRV {labMult !== 1 && <span style={{ opacity: 0.7, fontWeight: 600 }}>(MRV×{labMult.toFixed(2)})</span>}
+          </div>
+          {volumeRows.map(r => {
+            const lColor = r.status === 'exceeding_mrv' ? '#ef4444' : r.status === 'approaching_mrv' ? '#f59e0b' : r.status === 'optimal' ? '#22c55e' : '#60a5fa';
+            const barMax = Math.max(r.mrv, r.sets, 1);
+            return (
+              <div key={r.group} style={{ marginBottom: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                  <span style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 700 }}>{r.label}</span>
+                  <span style={{ color: lColor, fontWeight: 800 }}>{r.sets} подх <span style={{ opacity: 0.6, fontWeight: 600 }}>/ MRV {r.mrv}</span></span>
+                </div>
+                <div style={{ position: 'relative', height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: (r.sets / barMax * 100) + '%', background: lColor, borderRadius: 4 }} />
+                  <div style={{ position: 'absolute', left: (r.mav / barMax * 100) + '%', top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.5)' }} />
+                  <div style={{ position: 'absolute', left: (r.mrv / barMax * 100) + '%', top: 0, bottom: 0, width: 2, background: '#ef4444' }} />
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>Белая линия — MAV · красная — MRV. Превышение MRV → риск перетренированности.</div>
+        </div>
+      )}
 
       {/* ═══ ФАЗОВАЯ ШКАЛА (все недели) ═══ */}
       {hasWeeks && (() => {

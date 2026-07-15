@@ -14,6 +14,7 @@ import { selectExercisesSmart } from '../exercise-selector.engine';
 import { mesocyclePhaseForWeek, RIR_MATRIX, MesoPhaseConfigs, type MesocyclePhase } from '../rir-matrix.engine';
 import { diagnoseWeakPoint, type Lift, type WeakPoint } from './weakpoint-pl';
 import { getVolumeByMuscle } from '../training-methodology.engine';
+import { computeVolumeLandmarks } from '../volume-landmarks.engine';
 
 export interface LMSBuildInput {
   template: SRCycleTemplate;
@@ -373,7 +374,6 @@ function calcCycleMetricsAggregate(sessions: SRExercise[][], weeksCount: number)
  * Берётся пиковая по суммарному объёму неделя (наиболее нагруженная) — «худший случай».
  */
 export function getPLVolumeLandmarks(weeks: LMSPlanWeek[], level: string, pedMrvMult = 1): PLVolumeLandmark[] {
-  const vrLevel = vrLevelKey(level);
   let peakIdx = 0, peakTotal = -1;
   const weekGroups: Record<number, Record<string, number>> = {};
   weeks.forEach((wk, i) => {
@@ -388,16 +388,13 @@ export function getPLVolumeLandmarks(weeks: LMSPlanWeek[], level: string, pedMrv
     if (total > peakTotal) { peakTotal = total; peakIdx = i; }
   });
   const peak = weekGroups[peakIdx] || {};
-  const out: PLVolumeLandmark[] = [];
-  for (const [eg, sets] of Object.entries(peak)) {
-    const vr = getVolumeByMuscle(eg);
-    if (!vr) continue;
-    const ref = vr[vrLevel]; if (!ref) continue;
-    const mrv = Math.round(ref.mrv * pedMrvMult);
-    const status: PLVolumeLandmark['status'] = sets < ref.mev ? 'under' : sets <= ref.mav ? 'optimal' : sets <= mrv ? 'high' : 'over';
-    out.push({ group: eg, muscle: vr.muscle, peakWeek: peakIdx + 1, sets, mev: ref.mev, mav: ref.mav, mrv, status });
-  }
-  const order: Record<PLVolumeLandmark['status'], number> = { over: 0, high: 1, optimal: 2, under: 3 };
-  out.sort((a, b) => (order[a.status] - order[b.status]) || (b.sets - a.sets));
-  return out;
+  // Делегируем в канонический движок (единый источник MEV/MAV/MRV по EN-мышцам).
+  const rows = computeVolumeLandmarks(peak, level, { labMult: pedMrvMult, peakWeek: peakIdx + 1 });
+  return rows.map(r => {
+    const status: PLVolumeLandmark['status'] =
+      r.status === 'below_mev' ? 'under' :
+      r.status === 'optimal' ? 'optimal' :
+      r.status === 'approaching_mrv' ? 'high' : 'over';
+    return { group: r.group, muscle: r.label, peakWeek: r.peakWeek ?? (peakIdx + 1), sets: r.sets, mev: r.mev, mav: r.mav, mrv: r.mrv, status };
+  });
 }

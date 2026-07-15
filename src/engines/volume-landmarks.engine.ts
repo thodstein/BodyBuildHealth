@@ -224,3 +224,58 @@ export function landmarksForRotation(level: string, muscle: string, rotationDays
     mrv: Math.round(base.mrv * f),
   };
 }
+
+/** RU-подписи мышц для отображения в UI. */
+export const MUSCLE_LABEL_RU: Record<string, string> = {
+  chest: 'Грудь', back: 'Спина', quads: 'Квадрицепсы', hamstrings: 'Бицепс бедра',
+  shoulders: 'Плечи', delt_front: 'Передняя дельта', delt_mid: 'Средняя дельта', delt_rear: 'Задняя дельта',
+  biceps: 'Бицепс', triceps: 'Трицепс', calves: 'Икры', glutes: 'Ягодицы',
+  abs: 'Пресс / Кор', traps: 'Трапеции', forearms: 'Предплечья',
+  arms: 'Руки (бицепс+трицепс)', legs: 'Ноги (квадрицепсы+бицепс бедра)',
+};
+
+/** Унифицированная строка volume-landmark для любого планировщика. */
+export interface VolumeLandmarkRow {
+  group: string;       // канонический EN-ключ
+  label: string;       // RU-подпись
+  muscle?: string;     // alias label (back-compat)
+  sets: number;        // фактический недельный объём (пиковая неделя)
+  mev: number; mav: number; mrv: number;
+  status: VolumeStatus;
+  peakWeek?: number;
+}
+
+const STATUS_ORDER: Record<VolumeStatus, number> = {
+  exceeding_mrv: 0, approaching_mrv: 1, optimal: 2, below_mev: 3,
+};
+
+/**
+ * Универсальный расчёт volume-landmarks для ЛЮБОГО плана (PL/BB/ручной).
+ * @param weeklySets — объём (sets/week) по каноническим группам мышц.
+ * @param level — уровень (beginner/intermediate/advanced/enhanced/...).
+ * @param opts.labMult — множитель MRV (курс/лаб. коррекция), напр. 1.25.
+ * @param opts.onlyGroups — ограничить перечень групп.
+ * @param opts.peakWeek — номер пиковой недели для отображения.
+ */
+export function computeVolumeLandmarks(
+  weeklySets: Record<string, number>,
+  level: string,
+  opts?: { labMult?: number; onlyGroups?: string[]; peakWeek?: number },
+): VolumeLandmarkRow[] {
+  const out: VolumeLandmarkRow[] = [];
+  const groups = opts?.onlyGroups || Object.keys(weeklySets);
+  for (const g of groups) {
+    const sets = Math.round(weeklySets[g] || 0);
+    if (!sets) continue;
+    const musc = normMuscle(g);
+    const lm = getVolumeLandmarks(level, musc);
+    if (!lm) continue;
+    let mrv = lm.mrv;
+    if (opts?.labMult) mrv = Math.round(mrv * opts.labMult);
+    const status = checkVolumeStatus(sets, { ...lm, mrv });
+    const label = MUSCLE_LABEL_RU[musc] || musc;
+    out.push({ group: musc, label, muscle: label, sets, mev: lm.mev, mav: lm.mav, mrv, status, peakWeek: opts?.peakWeek });
+  }
+  out.sort((a, b) => (STATUS_ORDER[a.status] - STATUS_ORDER[b.status]) || (b.sets - a.sets));
+  return out;
+}
