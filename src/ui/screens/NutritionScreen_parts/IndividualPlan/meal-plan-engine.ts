@@ -134,6 +134,9 @@ function pickRotation(dayOffset: number): { label: string; ids: string[]; note: 
   return PROTEIN_ROTATION[Math.abs(dayOffset) % PROTEIN_ROTATION.length] || PROTEIN_ROTATION[0];
 }
 
+// ─── Preference: common bodybuilding carbs get selection bonus ───
+const COMMON_CARB_IDS = new Set(['rice','oat','buck','potato','pasta','quinoa','barley','cereal','millet','cousc','noodle','spaghetti','udon','soba','bulgur','chickpea','lentil','beans','corn','bread']);
+
 // ─── Утилиты: детерминированный выбор ─────────────────────────────────
 function seededRandom(seed: number): number {
   const x = Math.sin(seed * 9999) * 10000;
@@ -315,7 +318,10 @@ function buildWholeMeal(
     const fruitCarbReserve = includeFruit ? 10 : 0;
     const carbTarget = Math.max(5, remC - vegCarbReserve - fruitCarbReserve);
     const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
-    const carbSource = pickPriority(prefCarb.length > 0 ? prefCarb : pool.carbSlow, seed + 1, { lockedIds, recentIds });
+    const carbPool = prefCarb.length > 0 ? prefCarb : pool.carbSlow;
+    // Prefer common carbs (rice, oats, buckwheat, potato, pasta) over exotic ones
+    const commonCarbs = carbPool.filter(f => [...COMMON_CARB_IDS].some(k => f.id.includes(k)));
+    const carbSource = pickPriority(commonCarbs.length > 0 ? commonCarbs : carbPool, seed + 1, { lockedIds, recentIds });
     if (carbSource) {
       const grams = gramsForMacro(carbSource, carbTarget, 'carbs');
       if (grams > 0) {
@@ -409,7 +415,9 @@ function buildPreWorkout(
   const prefProtein = preferredIds && preferredIds.size > 0 ? leanProteinPool.filter(f => preferredIds.has(f.id)) : [];
   const proteinSource = pickPriority(prefProtein.length > 0 ? prefProtein : leanProteinPool, seed, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds });
   const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
-  const carbSource = pickPriority(prefCarb.length > 0 ? prefCarb : pool.carbSlow, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds });
+  const carbPoolPW = prefCarb.length > 0 ? prefCarb : pool.carbSlow;
+  const commonCarbsPW = carbPoolPW.filter(f => [...COMMON_CARB_IDS].some(k => f.id.includes(k)));
+  const carbSource = pickPriority(commonCarbsPW.length > 0 ? commonCarbsPW : carbPoolPW, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds });
   const items: MealItem[] = [];
 
   if (proteinSource) {
