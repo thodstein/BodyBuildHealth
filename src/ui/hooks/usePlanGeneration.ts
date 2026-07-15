@@ -25,6 +25,7 @@ export interface PlanGenOpts {
   currentReadiness?: number;
   targetTonnage?: Record<string, number>;
   workMaxOverride?: Record<string, number>;
+  mrvOverride?: number | null;
   sequenceStrategy?: 'classic' | 'preexhaust' | 'antagonist';
 }
 
@@ -42,6 +43,7 @@ export function usePlanGeneration(deps: PlanGenDeps) {
         currentReadiness: opts?.currentReadiness ?? 100,
         targetTonnage: opts?.targetTonnage,
         workMaxOverride: opts?.workMaxOverride,
+        mrvOverride: opts?.mrvOverride,
         sequenceStrategy: opts?.sequenceStrategy ?? 'classic',
         courseIntensity,
       }),

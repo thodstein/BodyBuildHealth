@@ -172,6 +172,7 @@ export function getGradedInjuries(injuries: Injury[], today: string): Injury[] {
 export interface BuildPlanInput {
   cycle: string[][];
   mrv: number;
+  mrvOverride?: number | null; // Глобальный оверрайд MRV (плоский) — масштабирует per-muscle ландмарки
   goal: string;
   level: string;
   mesoLength: number;
@@ -198,7 +199,7 @@ export interface BuildPlanInput {
  * Возвращает дни, недельные сеты по группам и список правок-комментариев.
  */
 export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklySets: Record<string, number>; groupCorrections: string[]; patternBalance: Record<string, number> } {
-  const { cycle, mrv, goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, currentReadiness = 100, targetTonnage, sequenceStrategy = 'classic', preferEquipment: prefEqOverride, courseIntensity, workMaxOverride } = input;
+  const { cycle, mrv, mrvOverride, goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, currentReadiness = 100, targetTonnage, sequenceStrategy = 'classic', preferEquipment: prefEqOverride, courseIntensity, workMaxOverride } = input;
 
   // Полный per-group workMax: override (ПМ из калькулятора) > workMax > manualWorkMax
   const workMaxFull = { ...workMax, ...manualWorkMax, ...(workMaxOverride || {}) };
@@ -219,7 +220,9 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
   //   кап — сумма сетов за все дни недели не превышает weeklyMrvOf(g).
   const weeklyMrvOf = (g: string): number => {
     const lm = getVolumeLandmarks(level, g);
-    const base = lm?.mrv ?? mrv;
+    const levelBaseMrv = { beginner: 15, intermediate: 20, advanced: 24, enhanced: 28 }[level] ?? 20;
+    const mrvScale = mrvOverride != null && levelBaseMrv > 0 ? mrvOverride / levelBaseMrv : 1;
+    const base = Math.round((lm?.mrv ?? mrv) * mrvScale);
     if (!isWeak(g)) {
       const mav = lm?.mav ?? Math.round(base * 0.8);
       return Math.min(mav, base);

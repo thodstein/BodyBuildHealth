@@ -931,7 +931,7 @@ export const TrainingConstructor: React.FC<Props> = ({
         setManualWorkMax(wm);
         updateTProfile({ workMax: wm });
         const cycle = manualResult ? manualResult.days.map(dd => dd.groups) : [['full']];
-        const built = buildPlan(cycle, mrvOverride ?? 24, { currentReadiness: readinessSlider, targetTonnage, sequenceStrategy, workMaxOverride: wm });
+        const built = buildPlan(cycle, mrvOverride ?? 24, { currentReadiness: readinessSlider, targetTonnage, sequenceStrategy, workMaxOverride: wm, mrvOverride: mrvOverride ?? null });
         setManualResult({ splitName: manualResult?.splitName || 'План с ПМ', corrections: [...(manualResult?.corrections || []), `🔗 ПМ применён: присед ${sq}→ноги/квад ${wm.quads}, жим ${bn}→грудь, тяга ${dl}→спина. Веса пересчитаны.`], days: built.days });
         pendingApplyRef.current = null;
       } else {
@@ -1020,8 +1020,10 @@ export const TrainingConstructor: React.FC<Props> = ({
     const items: { label: string; ok: boolean; detail: string; group?: string }[] = [];
     for (const [g, sets] of Object.entries(wk)) {
       const lm = getPerMuscleMrvFromLevel(level, g, tprofile.onCourse, tprofile.courseIntensity, labTrainingAdjust(labAnalysis).mrvMultiplier);
-      const mrvG = lm.mrv;
-      const mevG = lm.mev;
+      const levelBaseMrv = MRV_MAP[level] ?? 20;
+      const mrvScale = mrvOverride != null && levelBaseMrv > 0 ? mrvOverride / levelBaseMrv : 1;
+      const mrvG = Math.round(lm.mrv * mrvScale);
+      const mevG = Math.round(lm.mev * mrvScale);
       if (sets > mrvG * 1.15) {
         score -= 8;
         items.push({ label: g, ok: false, detail: `${sets} сетов > MRV×1.15=${Math.round(mrvG * 1.15)} ⚠ перегруз`, group: g });
