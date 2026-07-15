@@ -23,6 +23,22 @@ const PRO_WORKMAX_RATIO: Record<string, number> = {
   traps: 0.55, forearms: 0.40,
 };
 
+/** Маппинг PRO-мышц в group каталога для getExercisesByGroup().
+ *  Каталог (exercise-catalog.ts) содержит только 6 групп
+ *  (legs/back/arms/chest/shoulders/core), тогда как cycle/weakPoints
+ *  могут нести PRO-ключи (delt_front/mid/rear, traps, forearms, quads...).
+ *  Без этого пул упражнений для PRO-ключа был бы пустым → день без упражнений. */
+const PRO_MUSCLE_TO_GROUP: Record<string, string> = {
+  delt_front: 'shoulders', delt_mid: 'shoulders', delt_rear: 'shoulders',
+  traps: 'back', calves: 'legs', glutes: 'legs', abs: 'core', forearms: 'arms',
+  quads: 'legs', hamstrings: 'legs', biceps: 'arms', triceps: 'arms',
+  chest: 'chest', back: 'back', shoulders: 'shoulders', legs: 'legs',
+  arms: 'arms', core: 'core',
+};
+function catalogGroupFor(muscle: string): string {
+  return PRO_MUSCLE_TO_GROUP[muscle] || muscle;
+}
+
 /** Множитель веса для изоляционных упражнений.
  *  Изоляции используют ~55-60% от workMax группы (жим стоя 80 → махи 44, а не 74). */
 const ISO_WEIGHT_FACTOR = 0.55;
@@ -235,7 +251,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
     for (const g of groups) {
       const isPrimary = groups.indexOf(g) === 0;
       const cc = isPrimary ? 3 + (isWeak(g) ? 1 : 0) : 2 + (isWeak(g) ? 1 : 0);
-      const poolLen = getExercisesByGroup(g).filter(e => {
+      const poolLen = getExercisesByGroup(catalogGroupFor(g)).filter(e => {
         if (equipment.length === 0) return true;
         const rawEq = (e as any).equipment;
         const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
@@ -266,7 +282,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
       const postInjuryVolPct = injuryFactor ? getInjuryVolumeFactor(injuryFactor, today) : 1.0;
       const postInjuryWtPct = injuryFactor?.weightPct ?? 1.0;
 
-      const allPool = getExercisesByGroup(g);
+      const allPool = getExercisesByGroup(catalogGroupFor(g));
       const eqFilter = (e: any) => equipment.length === 0 || equipment.includes(e.equipment);
       const pool = allPool.filter(eqFilter);
       let poolFinal = pool;
@@ -381,7 +397,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
     let totalIsoExpected = 0;
     for (const g of groups) {
       const isoCount = (groups.indexOf(g) === 0 ? 2 + levelBoost + (isWeak(g) ? 1 : 0) : 2 + (level === 'advanced' || level === 'enhanced' ? (isWeak(g) ? 2 : 1) : 0));
-      const poolLen = getExercisesByGroup(g).filter(e => {
+      const poolLen = getExercisesByGroup(catalogGroupFor(g)).filter(e => {
         if (e.type !== 'isolation') return false;
         if (equipment.length === 0) return true;
         const rawEq = (e as any).equipment;
@@ -406,7 +422,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
       const postInjuryVolPct = injuryFactor ? getInjuryVolumeFactor(injuryFactor, today) : 1.0;
       const postInjuryWtPct = injuryFactor?.weightPct ?? 1.0;
 
-      const allPool = getExercisesByGroup(g);
+      const allPool = getExercisesByGroup(catalogGroupFor(g));
       const eqFilter = (e: any) => equipment.length === 0 || equipment.includes(e.equipment);
       const pool = allPool.filter(eqFilter);
       let poolFinal = pool;
