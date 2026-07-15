@@ -304,8 +304,22 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
       rationales.push('Бодибилдинг: hinge (бицепс бедра), не спина −25');
     }
 
-
-    // Бонус для уровня
+    // 5d. Безопасность: опасные упражнения для новичков/средних
+    const exLower = ((ex.name || '') + (ex.id || '')).toLowerCase();
+    const isDangerous = (
+      exLower.includes('за голов') ||     // behind-the-neck (тяга/жим)
+      (exLower.includes('гудморнинг') && level !== 'advanced' && level !== 'enhanced') ||
+      (exLower.includes('швунг') && (level === 'beginner' || level === 'intermediate')) ||
+      (exLower.includes('толчок') && level === 'beginner') ||
+      (exLower.includes('рывок') && level === 'beginner')
+    );
+    if (isDangerous && (level === 'beginner' || level === 'intermediate')) {
+      score -= 30;
+      rationales.push('Безопасность: опасное для уровня −30');
+    } else if (isDangerous) {
+      score -= 10;
+      rationales.push('Безопасность: требует техники −10');
+    }
     if (level === 'beginner' && ex.difficulty && ex.difficulty === 'advanced') score -= 10;
     if (level === 'advanced' && ex.difficulty && ex.difficulty === 'beginner') score -= 3;
 
