@@ -650,6 +650,7 @@ export function buildStack(query: StackQuery): { stack: string[]; explanation: S
   const usedSet = new Set(selected.map(s => s.toLowerCase()));
   const avoidSet = new Set((query.avoidIds || []).map(a => a.toLowerCase()));
   const allIds = getAllIds().filter(id => !usedSet.has(id.toLowerCase()) && !avoidSet.has(id.toLowerCase()));
+  const timingNotes: Array<{ a: string; b: string; note: string }> = [];
 
   const finderQuery: FinderQuery = {
     goal: query.goal, organs: query.organs, mechanisms: query.mechanisms,
@@ -704,7 +705,6 @@ export function buildStack(query: StackQuery): { stack: string[]; explanation: S
     const usedNames = new Set<string>();
     for (const s of selected) { const e = getEntry(s); if (e?.nameRu) usedNames.add(e.nameRu.toLowerCase()); }
     const hardConflictSet = new Set<string>(); // substances with unresolvable conflicts
-    const timingNotes: Array<{ a: string; b: string; note: string }> = [];
 
     // Phase 1: synergy-aware selection with time-separable conflicts
     for (const c of candidates) {
@@ -787,7 +787,7 @@ export function buildStack(query: StackQuery): { stack: string[]; explanation: S
   }
 
   const explanation = explainStack(selected, query.profile);
-  if (timingNotes && timingNotes.length > 0) {
+  if (timingNotes.length > 0) {
     explanation.timingNotes = timingNotes;
   }
   return { stack: selected, explanation };
