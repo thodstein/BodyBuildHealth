@@ -13,6 +13,7 @@ import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catal
 import { selectExercisesSmart } from '../exercise-selector.engine';
 import { mesocyclePhaseForWeek, RIR_MATRIX, MesoPhaseConfigs, type MesocyclePhase } from '../rir-matrix.engine';
 import { diagnoseWeakPoint, type Lift, type WeakPoint } from './weakpoint-pl';
+import { getVolumeByMuscle } from '../training-methodology.engine';
 
 export interface LMSBuildInput {
   template: SRCycleTemplate;
@@ -68,6 +69,44 @@ export interface LMSBuildOutput {
   progressionRationale: string;
   weeks: LMSPlanWeek[];
   cycleMetrics: SRCycleMetrics;
+  /** Валидация объёма по группам мышц против MEV/MAV/MRV (volume-landmarks). */
+  plVolumeLandmarks?: PLVolumeLandmark[];
+}
+
+export interface PLVolumeLandmark {
+  group: string;       // английская группа (chest/back/legs/...)
+  muscle: string;      // русское имя мышцы (из VOLUME_REFERENCES)
+  peakWeek: number;    // неделя с пиковым объёмом
+  sets: number;        // сетов/нед в пиковую неделю
+  mev: number; mav: number; mrv: number;
+  status: 'under' | 'optimal' | 'high' | 'over';
+}
+
+/** Уровень → ключ VolumeReference (enhanced → advanced). */
+function vrLevelKey(level: string): 'beginner' | 'intermediate' | 'advanced' {
+  switch (level) {
+    case 'novice': return 'beginner';
+    case 'intermediate': case 'II-KMS': return 'intermediate';
+    case 'KMS-MS': case 'II-MS': case 'KMS-MSMK': case 'MS-MSMK': case 'enhanced': return 'advanced';
+    default: return 'intermediate';
+  }
+}
+
+const RU_TO_EN: Record<string, string> = { 'Грудь': 'chest', 'Спина': 'back', 'Ноги': 'legs', 'Плечи': 'shoulders', 'Руки': 'arms', 'Кор': 'core' };
+const SENT_TO_RU: Record<string, string> = { 'ПР': 'Грудь', 'ЖМ': 'Ноги', 'ТГ': 'Спина' };
+const EN_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
+
+/** Нормализовать группу упражнения (рус/сентимент) → английский ключ для volume-landmarks. */
+function exEnGroup(g: string | undefined): string | undefined {
+  if (!g) return undefined;
+  if ((EN_GROUPS as readonly string[]).includes(g)) return g;
+  const ru = SENT_TO_RU[g] || g;
+  return RU_TO_EN[ru];
+}
+
+/** Группа (английский ключ) основного лифта — для MRV soft-cap внедряемого аксессуара. */
+function liftToEnGroup(lift: Lift): string {
+  return lift === 'bench' ? 'chest' : lift === 'squat' ? 'legs' : 'back';
 }
 
 /** Извлечь уникальные имена упражнений из шаблона (все недели, если заданы явно). */
@@ -138,6 +177,8 @@ function injectPLWeakPoints(
   pmRow: Record<string, number>,
   rirBase: number,
   phaseVolMod: number,
+  vrLevel: 'beginner' | 'intermediate' | 'advanced',
+  pedMrvMult: number,
 ): void {
   for (const wp of weakPoints) {
     const diag = diagnoseWeakPoint(wp.lift, wp.weakPoint);
@@ -151,6 +192,17 @@ function injectPLWeakPoints(
     const pm = pmRow[target] ?? pmRow[mainName] ?? 80;
     const sets = Math.max(2, Math.round(3 * phaseVolMod));
     const pct = diag.intensityPct;
+    // MRV soft-cap: не превышаем восстанавливаемый объём группы (auto-циклы)
+    const hostGroup = liftToEnGroup(wp.lift);
+    if (hostGroup) {
+      const ref = getVolumeByMuscle(hostGroup)?.[vrLevel];
+      if (ref) {
+        const cur = days.reduce((s, d) => s + d.exercises
+          .filter(e => exEnGroup(e.group) === hostGroup)
+          .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0), 0);
+        if (cur + sets > Math.round(ref.mrv * pedMrvMult)) continue;
+      }
+    }
     hostDay.exercises.push({
       name: target,
       group: wp.lift === 'bench' ? 'ПР' : wp.lift === 'squat' ? 'ЖМ' : 'ТГ',
@@ -190,6 +242,10 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
   const goalKey = rirGoalKey(template.meta.period);
   const levelKey = rirLevelKey(template.meta.level);
+  const vrLevel = vrLevelKey(template.meta.level);
+  const pedMrvMult = input.mode === 'on_course'
+    ? (input.courseIntensity === 'heavy' ? 1.35 : input.courseIntensity === 'moderate' ? 1.25 : 1.15)
+    : 1;
 
   const weeks: LMSPlanWeek[] = [];
   for (let w = 0; w < totalWeeks; w++) {
@@ -262,7 +318,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
     // Инъекция ассистентов по слабым точкам СРЦ-движений (только auto-прогрессирующие циклы)
     if (input.plWeakPoints && input.plWeakPoints.length && !hasExplicitWeeks) {
-      injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod);
+      injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, pedMrvMult);
     }
 
     // Пересчёт метрик сессий (после возможной инъекции слабых точек)
@@ -290,7 +346,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     `S-MRV: объём сессий автоматически ограничен бюджетом утомления (Ready: ${input.currentReadiness || 80}%).`,
   ].filter(Boolean).join(' ');
 
-  return { template, progressionRationale: proRationale, weeks, cycleMetrics };
+  return { template, progressionRationale: proRationale, weeks, cycleMetrics, plVolumeLandmarks: getPLVolumeLandmarks(weeks, template.meta.level, pedMrvMult) };
 }
 
 
@@ -310,4 +366,38 @@ function calcCycleMetricsAggregate(sessions: SRExercise[][], weeksCount: number)
     sessions: perSession.length,
     perSession,
   };
+}
+
+/**
+ * Агрегация объёма PL-плана по группам мышц и сравнение с volume-landmarks (MEV/MAV/MRV).
+ * Берётся пиковая по суммарному объёму неделя (наиболее нагруженная) — «худший случай».
+ */
+export function getPLVolumeLandmarks(weeks: LMSPlanWeek[], level: string, pedMrvMult = 1): PLVolumeLandmark[] {
+  const vrLevel = vrLevelKey(level);
+  let peakIdx = 0, peakTotal = -1;
+  const weekGroups: Record<number, Record<string, number>> = {};
+  weeks.forEach((wk, i) => {
+    const g: Record<string, number> = {};
+    for (const day of wk.days) for (const ex of day.exercises) {
+      const eg = exEnGroup(ex.group); if (!eg) continue;
+      const sets = ex.workSets.reduce((s, ws) => s + ws.sets, 0);
+      g[eg] = (g[eg] || 0) + sets;
+    }
+    weekGroups[i] = g;
+    const total = Object.values(g).reduce((a, b) => a + b, 0);
+    if (total > peakTotal) { peakTotal = total; peakIdx = i; }
+  });
+  const peak = weekGroups[peakIdx] || {};
+  const out: PLVolumeLandmark[] = [];
+  for (const [eg, sets] of Object.entries(peak)) {
+    const vr = getVolumeByMuscle(eg);
+    if (!vr) continue;
+    const ref = vr[vrLevel]; if (!ref) continue;
+    const mrv = Math.round(ref.mrv * pedMrvMult);
+    const status: PLVolumeLandmark['status'] = sets < ref.mev ? 'under' : sets <= ref.mav ? 'optimal' : sets <= mrv ? 'high' : 'over';
+    out.push({ group: eg, muscle: vr.muscle, peakWeek: peakIdx + 1, sets, mev: ref.mev, mav: ref.mav, mrv, status });
+  }
+  const order: Record<PLVolumeLandmark['status'], number> = { over: 0, high: 1, optimal: 2, under: 3 };
+  out.sort((a, b) => (order[a.status] - order[b.status]) || (b.sets - a.sets));
+  return out;
 }

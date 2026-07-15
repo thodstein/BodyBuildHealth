@@ -839,6 +839,29 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>УОИ: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.uoi.toFixed(3)}</b></div>
                 </div>
               </MetricCard>
+              {builtSrc && builtSrc.plVolumeLandmarks && builtSrc.plVolumeLandmarks.length > 0 && (
+                <MetricCard title={'Объём vs MRV (volume-landmarks)'} icon="📊">
+                  <div style={{ color:'rgba(255,255,255,0.55)', fontSize:11, marginBottom:8 }}>Пиковая неделя: {builtSrc.plVolumeLandmarks[0].peakWeek}</div>
+                  {builtSrc.plVolumeLandmarks.map((lm) => {
+                    const c = lm.status === 'over' ? '#ff5252' : lm.status === 'high' ? '#ffb74d' : lm.status === 'optimal' ? '#4caf50' : '#90caf9';
+                    const lbl = lm.status === 'over' ? 'ПЕРЕБОР' : lm.status === 'high' ? 'высоко' : lm.status === 'optimal' ? 'оптимум' : 'низко';
+                    return (
+                      <div key={lm.group} style={{ marginBottom: 6 }}>
+                        <div style={{ display:'flex', justifyContent:'space-between' }}>
+                          <span style={{ color:'#fff', fontSize:12 }}>{lm.muscle}</span>
+                          <span style={{ color: c, fontSize:12, fontWeight:700 }}>{lm.sets} / MRV {lm.mrv} · {lbl}</span>
+                        </div>
+                        <div style={{ height:6, background:'rgba(255,255,255,0.1)', borderRadius:3, marginTop:3, overflow:'hidden' }}>
+                          <div style={{ width: `${Math.min(100, (lm.sets / lm.mrv) * 100)}%`, height:'100%', background:c, borderRadius:3 }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {builtSrc.plVolumeLandmarks.some(l => l.status === 'over') && (
+                    <div style={{ color:'#ff5252', fontSize:11, marginTop:4 }}>⚠ Объём выше MRV — риск перетренированности. Снизьте подходы или добавьте разгрузку.</div>
+                  )}
+                </MetricCard>
+              )}
               <MesocycleProgressionCard weeks={totalW} startVolumeSets={Math.round(W.reduce((s, w) => s + w.days.reduce((ss, d) => ss + d.exercises.reduce((sss, e) => sss + e.workSets.reduce((a, ws) => a + ws.sets, 0), 0), 0), 0) / totalW / (days || 3))} startIntensityPct={0.72} startRIR={3} goal="strength" title="Прогрессия мезоцикла (ПЛ)" />
               {/* ── ПРОФЕССИОНАЛЬНЫЕ ПЛ-РЕКОМЕНДАЦИИ для слабых групп ── */}
               {weakPoints.length > 0 && (() => {
