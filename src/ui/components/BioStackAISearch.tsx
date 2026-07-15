@@ -17,10 +17,10 @@ import { LAB_MARKER_MAP } from '../../data/lab-marker-map';
 import type { LinkedData } from '../../core/data-link';
 
 const TIERS = [
-  { key: 'core', label: '🟢 Core', color: '#22c55e', desc: 'Обязательно на любом курсе' },
-  { key: 'standard', label: '🟡 Standard', color: '#eab308', desc: 'Рекомендовано при дозах >500 мг/нед' },
-  { key: 'advanced', label: '🟠 Advanced', color: '#f97316', desc: 'При специфических целях' },
-  { key: 'specialty', label: '🔴 Specialty', color: '#ef4444', desc: 'Фармакология, рецептурные' },
+  { key: 'core', label: '🟢 Базовый (core)', color: '#22c55e', desc: 'Обязательно на любом курсе' },
+  { key: 'standard', label: '🟡 Стандарт', color: '#eab308', desc: 'Рекомендовано при дозах >500 мг/нед' },
+  { key: 'advanced', label: '🟠 Продвинутый', color: '#f97316', desc: 'При специфических целях' },
+  { key: 'specialty', label: '🔴 Фарма', color: '#ef4444', desc: 'Фармакология, рецептурные' },
 ];
 
 /* ─── Поисковый индекс: термин → ID веществ ─── */
@@ -205,6 +205,10 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
         const pb = PRICE_RUB[b.id] || 999999;
         return sortBy === 'price_asc' ? pa - pb : pb - pa;
       });
+    } else {
+      // Tier first: core > standard > advanced > specialty
+      const tierOrder: Record<string,number> = { core:0, standard:1, advanced:2, specialty:3 };
+      list = [...list].sort((a, b) => (tierOrder[a.tier] ?? 2) - (tierOrder[b.tier] ?? 2));
     }
     return list;
   }, [catFilter, tierFilter, organFilter, systemFilter, mechFilter, goalFilter, searchText, profile, favOnly, favorites]);
