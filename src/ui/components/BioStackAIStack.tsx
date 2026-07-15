@@ -1504,105 +1504,111 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
         })}
       </GlassCard>
 
-      {/* Global replace popup (optimized: all types with counts) */}
+      {/* Global replace popup */}
       {replacePopup && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 251,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(0,0,0,0.85)'
+          background: 'rgba(0,0,0,0.88)', padding: 16,
         }} onClick={() => setReplacePopup(null)}>
           <div onClick={e => e.stopPropagation()} style={{
-            width: '90%', maxWidth: 360, maxHeight: '80vh', borderRadius: 16,
-            background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
+            width: '100%', maxWidth: 420, maxHeight: '82vh', borderRadius: 18,
+            background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', overflow: 'hidden',
+            display: 'flex', flexDirection: 'column',
           }}>
-            <div style={{ height: 3, background: 'linear-gradient(90deg,#8b5cf6,#6d28d9)' }} />
-            <div style={{ padding: '14px 16px', maxHeight: 'calc(80vh - 3px)', overflowY: 'auto' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#c4b5fd', marginBottom: 10 }}>
+            <div style={{ height: 3, background: 'linear-gradient(90deg,#8b5cf6,#6d28d9)', flexShrink: 0 }} />
+            {/* Header */}
+            <div style={{ padding: '14px 18px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#c4b5fd' }}>
                 🔄 Замена: {replacePopup.name}
               </div>
+            </div>
+            {/* Scrollable body */}
+            <div style={{ padding: '12px 18px', overflowY: 'auto', flex: 1 }}>
+              {/* Meaningful replacement (profile-aware) */}
               {(() => {
                 const mr = findMeaningfulReplacement(replacePopup.id, profile || {} as any);
                 if (!mr) return null;
                 const cat = SUPPORT_CATALOG_DATA[mr.replacementId];
                 if (!cat) return null;
-                const inStack = stackIds.includes(mr.replacementId);
                 return (
-                  <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.14)' }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 4 }}>💊 Осмысленная замена (по анализам/профилю)</div>
-                    <div onClick={() => { handleReplace(replacePopup.id, mr.replacementId); setReplacePopup(null); }} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{mr.replacementName}{mr.gradeUpgrade ? <span style={{ marginLeft: 5, padding: '1px 5px', borderRadius: 4, fontSize: 6, fontWeight: 700, background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>↑ грейд</span> : null}</div>
-                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, marginTop: 2 }}>{mr.reason}</div>
-                        {mr.safetyNote ? <div style={{ fontSize: 7, color: '#f59e0b', lineHeight: 1.3, marginTop: 2 }}>⚠ {mr.safetyNote}</div> : null}
+                  <div style={{ marginBottom: 12, padding: '12px 14px', borderRadius: 14, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.16)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#00e68a', marginBottom: 6 }}>💊 Осмысленная замена (по профилю и анализам)</div>
+                    <div onClick={() => { handleReplace(replacePopup.id, mr.replacementId); setReplacePopup(null); }} style={{ cursor: 'pointer' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 3 }}>
+                        {mr.replacementName}
+                        {mr.gradeUpgrade ? <span style={{ marginLeft: 6, padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(34,197,94,0.14)', color: '#22c55e' }}>↑ грейд</span> : null}
                       </div>
-                      {!inStack && <span style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', flexShrink: 0 }}>Заменить →</span>}
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>{mr.reason}</div>
+                      {mr.safetyNote && <div style={{ fontSize: 10, color: '#f59e0b', lineHeight: 1.3, marginTop: 3 }}>⚠ {mr.safetyNote}</div>}
                     </div>
                   </div>
                 );
               })()}
-              {replacePopup.loading ? (
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>Загрузка...</div>
-              ) : (
-                <>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 10 }}>
-                    {replacePopup.results.map(rt => (
-                      <button key={rt.key} onClick={() => switchReplaceType(rt.key)} style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '6px 10px', borderRadius: 8, fontSize: 8, fontWeight: 600, cursor: 'pointer', border: 'none',
-                        background: replacePopup.type === rt.key ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.02)',
-                        color: replacePopup.type === rt.key ? '#a78bfa' : 'rgba(255,255,255,0.5)',
-                        transition: 'all 0.12s',
-                      }}>
-                        <span style={{ fontSize: 10 }}>{rt.icon}</span>
-                        <span style={{ flex: 1, textAlign: 'left' }}>{rt.label}</span>
-                        <span style={{
-                          padding: '2px 6px', borderRadius: 8, fontSize: 7, fontWeight: 700,
-                          background: rt.results.length > 0 ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)',
-                          color: rt.results.length > 0 ? '#a78bfa' : 'rgba(255,255,255,0.25)',
-                        }}>{rt.results.length}</span>
-                      </button>
-                    ))}
-                  </div>
-                  {(() => {
-                    const active = replacePopup.results.find(rt => rt.key === replacePopup.type);
-                    if (!active || active.results.length === 0) {
-                      return <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 12 }}>
-                        Нет результатов по этому типу
-                      </div>;
-                    }
-                    return active.results.slice(0, 6).map((r, i) => (
+
+              {/* Type tabs */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 4, marginBottom: 12 }}>
+                {replacePopup.results.filter(rt => rt.results.length > 0).map(rt => (
+                  <button key={rt.key} onClick={() => switchReplaceType(rt.key)} style={{
+                    padding: '8px 12px', borderRadius: 10, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none',
+                    background: replacePopup.type === rt.key ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.03)',
+                    color: replacePopup.type === rt.key ? '#a78bfa' : 'rgba(255,255,255,0.6)',
+                    transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
+                    <span>{rt.icon}</span>
+                    <span>{rt.label}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 700, opacity: 0.6 }}>{rt.results.length}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Results list */}
+              {(() => {
+                const active = replacePopup.results.find(rt => rt.key === replacePopup.type);
+                if (!active || active.results.length === 0) {
+                  return <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 20 }}>
+                    Нет подходящих замен. Попробуйте другой тип поиска.
+                  </div>;
+                }
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {active.results.slice(0, 8).map((r, i) => (
                       <div key={i} onClick={() => { handleReplace(replacePopup.id, r.replacementId); setReplacePopup(null); }}
                         style={{
-                          padding: '8px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer',
+                          padding: '10px 14px', borderRadius: 12, cursor: 'pointer',
                           background: r.personalMatch ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)',
-                          border: `1px solid ${r.personalMatch ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)'}`,
+                          border: `1px solid ${r.personalMatch ? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.05)'}`,
+                          transition: 'all 0.12s',
                         }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 2 }}>
-                          <span style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{r.replacementName}</span>
-                          <div style={{ display:'flex', gap:3 }}>
-                            <span style={{ padding:'1px 5px', borderRadius:4, fontSize:7, fontWeight:600,
-                              background: r.tierChange === 'upgrade' ? 'rgba(0,230,138,0.1)' : r.tierChange === 'downgrade' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
-                              color: r.tierChange === 'upgrade' ? '#00e68a' : r.tierChange === 'downgrade' ? '#ef4444' : 'rgba(255,255,255,0.3)',
-                            }}>{r.tierChange === 'upgrade' ? '↑' : r.tierChange === 'downgrade' ? '↓' : '∼'}</span>
-                            <span style={{ padding:'1px 5px', borderRadius:4, fontSize:7, fontWeight:600,
-                              background: r.priceDelta === 'cheaper' ? 'rgba(0,230,138,0.1)' : r.priceDelta === 'expensive' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
-                              color: r.priceDelta === 'cheaper' ? '#00e68a' : r.priceDelta === 'expensive' ? '#ef4444' : 'rgba(255,255,255,0.3)',
-                            }}>{r.priceDelta === 'cheaper' ? '💰-' : r.priceDelta === 'expensive' ? '💰+' : '💰='}</span>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 3 }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{r.replacementName}</span>
+                          <div style={{ display:'flex', gap: 4 }}>
+                            <span style={{ padding:'2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600,
+                              background: r.tierChange==='upgrade'?'rgba(0,230,138,0.12)':r.tierChange==='downgrade'?'rgba(239,68,68,0.1)':'rgba(255,255,255,0.04)',
+                              color: r.tierChange==='upgrade'?'#00e68a':r.tierChange==='downgrade'?'#ef4444':'rgba(255,255,255,0.35)',
+                            }}>{r.tierChange==='upgrade'?'↑ тир':r.tierChange==='downgrade'?'↓ тир':'∼'}</span>
+                            <span style={{ padding:'2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600,
+                              background: r.priceDelta==='cheaper'?'rgba(0,230,138,0.1)':r.priceDelta==='expensive'?'rgba(239,68,68,0.1)':'rgba(255,255,255,0.04)',
+                              color: r.priceDelta==='cheaper'?'#00e68a':r.priceDelta==='expensive'?'#ef4444':'rgba(255,255,255,0.3)',
+                            }}>{r.priceDelta==='cheaper'?'💰-':r.priceDelta==='expensive'?'💰+':'💰='}</span>
                           </div>
                         </div>
-                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{r.reason}</div>
-                        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', lineHeight: 1.3 }}>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{r.reason}</div>
+                        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', lineHeight: 1.4 }}>
                           {r.explanation}
-                          {r.bestForm && <span style={{ color:'#60a5fa' }}> • 💊 {r.bestForm}</span>}
+                          {r.bestForm && <span style={{ color:'#60a5fa' }}> · 💊 {r.bestForm}</span>}
                         </div>
                       </div>
-                    ));
-                  })()}
-                </>
-              )}
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+            {/* Footer */}
+            <div style={{ padding: '10px 18px', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
               <button onClick={() => setReplacePopup(null)} style={{
-                width:'100%', padding:'10px 0', borderRadius:10, marginTop:8, cursor:'pointer',
-                background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.5)', fontSize:10, fontWeight:700,
+                width:'100%', padding:'12px 0', borderRadius: 12, cursor: 'pointer',
+                background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 700,
               }}>✕ Закрыть</button>
             </div>
           </div>

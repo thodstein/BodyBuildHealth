@@ -212,7 +212,7 @@ function checkContraindications(id: string, profile?: FinderProfile): string[] {
   if (!e || !e.contraindications) return warnings;
   for (const ci of e.contraindications) {
     const ciLower = ci.toLowerCase();
-    for (const hc of profile.healthConditions) {
+    for (const hc of (profile.healthConditions || [])) {
       if (ciLower.includes(hc) || hc.includes(ciLower)) {
         warnings.push(`Противопоказание при ${hc}: ${ci}`);
       }
@@ -277,6 +277,10 @@ function scoreEntry(entryId: string, query: FinderQuery): { score: number; reaso
   let score = 0;
   const reasons: string[] = [];
   const profile = query.profile;
+
+  // Tier bonus: core > standard > advanced > specialty (фарма — не БАД)
+  const tierScore: Record<string,number> = { core: 5, standard: 3, advanced: 1, specialty: -4 };
+  score += tierScore[entry.tier] ?? 0;
 
   if (query.searchText) {
     const q = query.searchText.toLowerCase();
@@ -435,7 +439,7 @@ export function findReplacement(rawId: string, type: ReplacementType, profile?: 
           results.push({
             originalId: id, replacementId: candidateId, replacementName: getEntryName(candidateId),
             type: 'functional', reason: 'Функциональный аналог',
-            explanation: `Общие органы: ${sharedOrgans.join(', ')}. Механизмы: ${sharedMechanisms.slice(0,3).join(', ')}. Другая категория — иной подход.`,
+            explanation: `Общие органы: ${sharedOrgans.length}. Категория: ${(ce.category||[]).slice(0,2).join(', ')}. Иной подход к той же цели.`,
             tierLabel: getSubstanceTier(candidateId) || 'standard', tierChange: 'same', safetyNote: contra.length > 0 ? `⚠ ${contra[0]}` : '', bestForm: ce.bestForm || '',
             priceDelta: 'same', safetyDelta: 0, personalMatch: contra.length === 0,
           });
@@ -536,7 +540,7 @@ export function findReplacement(rawId: string, type: ReplacementType, profile?: 
             results.push({
               originalId: id, replacementId: candidateId, replacementName: getEntryName(candidateId),
               type: 'single_to_stack', reason: 'Узкая специализация',
-              explanation: `Покрывает: ${shared.slice(0,3).join(', ')}. Разделение даёт гибкость доз.`,
+              explanation: `Узкая специализация. Разделение даёт гибкость доз и тайминга.`,
               tierLabel: getSubstanceTier(candidateId) || 'standard', tierChange: 'same', safetyNote: '', bestForm: ce.bestForm || '',
               priceDelta: 'expensive', safetyDelta: 0, personalMatch: checkContraindications(candidateId, profile).length === 0,
             });
@@ -639,10 +643,15 @@ export function buildStack(query: StackQuery): { stack: string[]; explanation: S
   const candidates = findSupplements(finderQuery);
 
   if (query.autoFill) {
+    const usedNames = new Set<string>();
+    for (const s of selected) { const e = getEntry(s); if (e?.nameRu) usedNames.add(e.nameRu.toLowerCase()); }
     for (const c of candidates) {
       if (selected.length >= query.targetSize) break;
-      if (!usedSet.has(c.id.toLowerCase()) && !avoidSet.has(c.id.toLowerCase())) {
+      const e = getEntry(c.id);
+      const cName = (e?.nameRu || '').toLowerCase();
+      if (!usedSet.has(c.id.toLowerCase()) && !avoidSet.has(c.id.toLowerCase()) && !usedNames.has(cName)) {
         selected.push(c.id); usedSet.add(c.id.toLowerCase());
+        if (cName) usedNames.add(cName);
       }
     }
   }

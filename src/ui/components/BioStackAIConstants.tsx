@@ -113,12 +113,10 @@ export const ORGANS: { key: string; label: string }[] = [
   { key:'BONES', label:'🦴 Кости' }, { key:'JOINTS', label:'🦴 Суставы' },
   { key:'SKIN', label:'🧴 Кожа' }, { key:'IMMUNE_SYSTEM', label:'🛡️ Иммунитет' },
   { key:'NERVES', label:'⚡ Нервы' }, { key:'GUT', label:'🫃 ЖКТ' },
-  { key:'VESSELS', label:'🩸 Сосуды' }, { key:'ADRENALS', label:'⚖️ Надпочечники' },
-  { key:'THYROID', label:'🦋 Щитовидная' }, { key:'REPRODUCTIVE', label:'🧬 Репродуктивная' },
-  { key:'PROSTATE', label:'🔴 Простата' }, { key:'BLOOD', label:'🩸 Кровь' },
-  { key:'EYES', label:'👁️ Глаза' }, { key:'PANCREAS', label:'🫁 Поджелудочная' },
-  { key:'CELLS', label:'🔬 Клетки' }, { key:'MITOCHONDRIA', label:'🔋 Митохондрии' },
-  { key:'ENDOCRINE', label:'⚖️ Эндокринная' }, { key:'PITUITARY', label:'🧠 Гипофиз' },
+  { key:'VESSELS', label:'🩸 Сосуды' }, { key:'THYROID', label:'🦋 Щитовидная' },
+  { key:'REPRODUCTIVE', label:'🧬 Репродуктивная' }, { key:'PROSTATE', label:'🔴 Простата' },
+  { key:'BLOOD', label:'🩸 Кровь' }, { key:'PANCREAS', label:'🫁 Поджелудочная' },
+  { key:'ENDOCRINE', label:'⚖️ Эндокринная' }, { key:'ADRENALS', label:'⚖️ Надпочечники' },
 ];
 
 export const SYSTEMS: { key: string; label: string }[] = [

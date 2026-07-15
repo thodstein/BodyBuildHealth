@@ -473,9 +473,12 @@ function PopupPresets({ profile, u, onClose }: { profile: BioStackProfile; u: (p
                     <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:2 }}>
                       {(pre.p.goals as GoalType[] || []).slice(0,3).map(g => {
                         const gl = PURE_GOALS.find(x => x.key === g);
-                        return gl ? <span key={g} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.06)', color:'#00e68a', whiteSpace:'nowrap' }}>{gl.label.replace(/^.{1,2}\s/, '')}</span> : null;
+                        return gl ? <span key={g} style={{ fontSize:7,padding:'1px 5px',borderRadius:3,background:'rgba(0,230,138,0.08)',color:'#00e68a',whiteSpace:'nowrap' }}>{gl.label.replace(/^.{1,2}\s/,'')}</span> : null;
                       })}
-                      {((pre.p.goals as GoalType[])?.length || 0) > 3 && <span style={{ fontSize:6, color:'rgba(255,255,255,0.25)' }}>+{(pre.p.goals as GoalType[]).length - 3}</span>}
+                      {(pre.p.targetOrgans || []).slice(0,2).map(o => {
+                        const ol = ORGANS.find(x => x.key === o);
+                        return ol ? <span key={o} style={{ fontSize:7,padding:'1px 5px',borderRadius:3,background:'rgba(96,165,250,0.08)',color:'#60a5fa',whiteSpace:'nowrap' }}>{ol.label.replace(/^.{1,2}\s/,'')}</span> : null;
+                      })}
                     </div>
                   </div>
                 </button>

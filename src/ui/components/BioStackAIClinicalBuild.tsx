@@ -78,147 +78,114 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
 
   return (
     <div style={{ padding: 12 }}>
-      <GlassCard
-        title="🔬 Клинический подбор"
-        icon="🧬"
-        color="#00e68a"
-      >
-        <div style={{ fontSize: 12, color: 'rgba(235,235,245,0.7)', lineHeight: 1.5 }}>
-          Стек собирается <b>движком калькулятора поддержки</b> (тот же источник истины, что и
-          раздел «Калькулятор поддержки»). BioStack не придумывает дозы — берутся канонические
-          значения и механизмы ТЗ, затем вещества проходят клинический шлюз безопасности
-          (противопоказания, ЛС-конфликты, верхние пределы, лаб-коррекции).
+      <GlassCard title="🔬 Клинический подбор" icon="🧬" color="#00e68a">
+        {/* ── Clinical header bar ── */}
+        <div style={{
+          display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:12,marginBottom:10,
+          background:'rgba(0,230,138,0.06)',border:'1px solid rgba(0,230,138,0.1)',
+        }}>
+          <span style={{ fontSize:28 }}>⚕️</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:14,fontWeight:800,color:'#00e68a' }}>Стек строится движком поддержки</div>
+            <div style={{ fontSize:11,color:'rgba(255,255,255,0.45)',lineHeight:1.4,marginTop:2 }}>
+              Единый источник истины — калькулятор поддержки. Канонические дозы, механизмы ТЗ (28 кодов),
+              клинический шлюз безопасности: противопоказания, ЛС-конфликты, UL, лаб-коррекции.
+            </div>
+          </div>
         </div>
 
-        <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ marginTop:10,display:'flex',gap:8,flexWrap:'wrap' }}>
           {STRATEGIES.map((s) => (
-            <PillBtn
-              key={s.id}
-              active={strategy === s.id}
-              onClick={() => setStrategy(s.id)}
-              color="#00e68a"
-              small
-            >
+            <PillBtn key={s.id} active={strategy===s.id} onClick={()=>setStrategy(s.id)} color="#00e68a" small>
               {s.label}
             </PillBtn>
           ))}
         </div>
 
-        <button
-          onClick={onBuild}
-          disabled={building}
-          style={{
-            marginTop: 12,
-            width: '100%',
-            padding: '12px',
-            borderRadius: 12,
-            border: 'none',
-            background: building
-              ? 'rgba(0,230,138,0.4)'
-              : 'linear-gradient(135deg,#00e68a,#00b4d8)',
-            color: '#00120c',
-            fontWeight: 800,
-            fontSize: 14,
-            cursor: 'pointer',
-          }}
-        >
-          {building ? 'Собираю…' : '⚕️ Собрать клинический стек'}
+        <button onClick={onBuild} disabled={building} style={{
+          marginTop:12,width:'100%',padding:'14px 0',borderRadius:14,border:'none',
+          background:building?'rgba(0,230,138,0.4)':'linear-gradient(135deg,#00e68a,#00b4d8)',
+          color:'#00120c',fontWeight:800,fontSize:15,cursor:'pointer',
+          boxShadow:building?'none':'0 6px 20px rgba(0,230,138,0.2)',
+        }}>
+          {building?'⚙️ Собираю…':'⚕️ Собрать клинический стек'}
         </button>
       </GlassCard>
 
       {result && (
         <>
-          {/* Риск до/после + покрытие — ТОЛЬКО прогноз изменения (не влияет на расчёт рисков) */}
+          {/* Риск до/после — прогноз (не влияет на расчёт рисков) */}
           <GlassCard title="📊 Возможное изменение риска" icon="📈" color="#60a5fa" style={{ marginTop: 12 }}>
             {(() => {
               const delta = Math.round((result.riskBefore - result.riskAfter) * 10) / 10;
               const improved = delta > 0;
               return (
                 <>
-                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <div style={{ flex: 1, minWidth: 90 }}>
-                      <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.6)' }}>Риск сейчас</div>
-                      <div style={{ fontSize: 22, fontWeight: 800 }}>{result.riskBefore}</div>
+                  <div style={{ display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'center' }}>
+                    <div style={{ padding:'12px',borderRadius:12,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.06)',textAlign:'center' }}>
+                      <div style={{ fontSize:11,color:'rgba(255,255,255,0.45)',marginBottom:4 }}>Риск сейчас</div>
+                      <div style={{ fontSize:32,fontWeight:800,color:'#fff' }}>{result.riskBefore}</div>
                     </div>
-                    <div style={{ fontSize: 18, color: 'rgba(235,235,245,0.4)' }}>→</div>
-                    <div style={{ flex: 1, minWidth: 90 }}>
-                      <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.6)' }}>Прогноз со стеком</div>
-                      <div style={{ fontSize: 22, fontWeight: 800, color: improved ? '#00e68a' : '#fbbf24' }}>
-                        {result.riskAfter}
-                      </div>
-                    </div>
-                    <div style={{ flex: 1, minWidth: 90 }}>
-                      <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.6)' }}>Δ прогноз</div>
-                      <div style={{ fontSize: 22, fontWeight: 800, color: improved ? '#00e68a' : '#9ca3af' }}>
-                        {improved ? '−' : delta < 0 ? '+' : ''}{Math.abs(delta)}
-                      </div>
-                    </div>
-                    <div style={{ flex: 1, minWidth: 90 }}>
-                      <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.6)' }}>Покрытие</div>
-                      <div style={{ fontSize: 22, fontWeight: 800 }}>{result.coveragePercent}%</div>
+                    <div style={{ fontSize:24,color:'rgba(255,255,255,0.3)',fontWeight:300 }}>→</div>
+                    <div style={{ padding:'12px',borderRadius:12,background:improved?'rgba(34,197,94,0.06)':'rgba(245,158,11,0.06)',border:`1px solid ${improved?'rgba(34,197,94,0.15)':'rgba(245,158,11,0.15)'}`,textAlign:'center' }}>
+                      <div style={{ fontSize:11,color:'rgba(255,255,255,0.45)',marginBottom:4 }}>Прогноз</div>
+                      <div style={{ fontSize:32,fontWeight:800,color:improved?'#22c55e':'#fbbf24' }}>{result.riskAfter}</div>
                     </div>
                   </div>
-                  <div
-                    style={{
-                      marginTop: 10,
-                      padding: '6px 8px',
-                      borderRadius: 8,
-                      background: 'rgba(96,165,250,0.1)',
-                      fontSize: 10,
-                      color: 'rgba(235,235,245,0.6)',
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    ⓘ Прогноз возможного изменения. BioStack не влияет на расчёт рисков — цифры служат
-                    только для оценки потенциального эффекта поддержки.
+                  <div style={{ display:'flex',gap:8,marginTop:10 }}>
+                    <div style={{ flex:1,padding:'8px 12px',borderRadius:10,background:'rgba(96,165,250,0.06)',border:'1px solid rgba(96,165,250,0.1)',textAlign:'center' }}>
+                      <div style={{ fontSize:20,fontWeight:800,color:improved?'#22c55e':'#f59e0b' }}>{improved?`−${delta}`:`+${Math.abs(delta)}`}</div>
+                      <div style={{ fontSize:10,color:'rgba(255,255,255,0.4)' }}>Δ прогноз</div>
+                    </div>
+                    <div style={{ flex:1,padding:'8px 12px',borderRadius:10,background:'rgba(96,165,250,0.06)',border:'1px solid rgba(96,165,250,0.1)',textAlign:'center' }}>
+                      <div style={{ fontSize:20,fontWeight:800,color:'#60a5fa' }}>{result.coveragePercent}%</div>
+                      <div style={{ fontSize:10,color:'rgba(255,255,255,0.4)' }}>Покрытие</div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop:8,padding:'6px 10px',borderRadius:8,background:'rgba(96,165,250,0.08)',fontSize:10,color:'rgba(255,255,255,0.45)',lineHeight:1.4 }}>
+                    ⓘ Прогноз изменения риска. BioStack не влияет на расчёт — только оценка эффекта поддержки.
                   </div>
                 </>
               );
             })()}
-            <div style={{ marginTop: 8, fontSize: 11, color: 'rgba(235,235,245,0.55)' }}>
-              Источник: {result.sourceOfTruth} · неделя курса {result.courseWeek}
+            <div style={{ marginTop:8,fontSize:10,color:'rgba(255,255,255,0.3)' }}>
+              Источник: {result.sourceOfTruth} · неделя {result.courseWeek}
             </div>
           </GlassCard>
 
           {/* Состав */}
           <GlassCard title={`💊 Состав (${result.substances.length})`} icon="💊" color="#a78bfa" style={{ marginTop: 12 }}>
             {result.substances.map((s) => (
-              <div
-                key={s.id}
-                style={{
-                  padding: '10px 0',
-                  borderBottom: '1px solid rgba(255,255,255,0.06)',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>{s.name}</div>
-                  <div style={{ fontSize: 12, color: '#00e68a', fontWeight: 700 }}>
+              <div key={s.id} style={{
+                padding:'12px 14px',marginBottom:4,borderRadius:12,
+                background:'rgba(167,139,250,0.04)',border:'1px solid rgba(167,139,250,0.08)',
+              }}>
+                <div style={{ display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8 }}>
+                  <div>
+                    <span style={{ fontWeight:700,fontSize:14,color:'#fff' }}>{s.name}</span>
+                    <span style={{ marginLeft:6,fontSize:9,padding:'2px 6px',borderRadius:4,
+                      background: s.tier==='core'?'rgba(34,197,94,0.15)':s.tier==='standard'?'rgba(96,165,250,0.15)':'rgba(167,139,250,0.1)',
+                      color: s.tier==='core'?'#22c55e':s.tier==='standard'?'#60a5fa':'#a78bfa' }}>{s.tier}</span>
+                  </div>
+                  <div style={{ fontSize:14,fontWeight:700,color:'#00e68a' }}>
                     {s.doseDisplay || `${s.doseMg} мг`}
                   </div>
                 </div>
-                <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.6)' }}>
-                  {s.timing} · tier {s.tier}
+                <div style={{ fontSize:11,color:'rgba(255,255,255,0.4)',marginTop:2 }}>
+                  {s.timing}
                 </div>
-                {s.tzMechanisms.length > 0 && (
-                  <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {s.tzMechanisms.slice(0, 5).map((m) => (
-                      <span
-                        key={m.mechId}
-                        style={{
-                          fontSize: 9,
-                          padding: '2px 6px',
-                          borderRadius: 6,
-                          background: 'rgba(96,165,250,0.18)',
-                          color: '#93c5fd',
-                        }}
-                      >
-                        {m.label}
-                      </span>
+                {s.tzMechanisms.length>0 && (
+                  <div style={{ marginTop:6,display:'flex',gap:4,flexWrap:'wrap' }}>
+                    {s.tzMechanisms.slice(0,5).map((m) => (
+                      <span key={m.mechId} style={{
+                        fontSize:9,padding:'3px 8px',borderRadius:6,
+                        background:'rgba(96,165,250,0.15)',color:'#93c5fd',fontWeight:600,
+                      }}>{m.label}</span>
                     ))}
                   </div>
                 )}
                 {s.mechanismReason && (
-                  <div style={{ marginTop: 4, fontSize: 10, color: 'rgba(235,235,245,0.5)' }}>
+                  <div style={{ marginTop:4,fontSize:10,color:'rgba(255,255,255,0.35)',lineHeight:1.3 }}>
                     {s.mechanismReason}
                   </div>
                 )}

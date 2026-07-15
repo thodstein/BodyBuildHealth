@@ -5,7 +5,7 @@ import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS, ALL_STACKS, type SupportStack, 
 import { ORGAN_LABELS, SYSTEM_LABELS_CATALOG } from '../../data/support-database';
 import { LAB_MARKER_MAP, type LabMarkerMap } from '../../data/lab-marker-map';
 import { STACK_TEMPLATES, type BioStackTemplate } from '../../engines/biostack-templates';
-import { SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX, MECHANISM_LABELS } from '../../data/support-meta';
+import { SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX, MECHANISM_LABELS, COMPLEX_NAMES } from '../../data/support-meta';
 import { GlassCard, PillBtn, StatBox, ORGANS, SYSTEMS, PURE_GOALS, TARGET_SYSTEMS, SYMPTOMS, toFinderProfile, showToast, estCost } from './BioStackAIConstants';
 import { buildSmartStackMulti, type BuildVariant } from '../../engines/biostack-recommender.engine';
 import { getSafeStackRecommendations } from '../../engines/biostack-safety.engine';
@@ -939,7 +939,7 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
             if (valid.length >= 2) {
               s2sItems.push({
                 complexId: id,
-                complexName: SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id,
+complexName: COMPLEX_NAMES[id] || SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id,
                 components: valid.map(c => ({ id: c, name: SUPPORT_CATALOG_DATA[c]?.nameRu || SUPPORT_CATALOG_DATA[c]?.name || c })),
               });
               continue;
@@ -959,10 +959,10 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
         const s2sMerges: { targetId: string; targetName: string; ids: string[] }[] = [];
         for (const [complexId, components] of Object.entries(SUPPLEMENT_COMPOSITION)) {
           const inStack = components.filter(c => curStack.includes(c));
-          if (inStack.length >= 2 && SUPPORT_CATALOG_DATA[complexId]) {
+          if (inStack.length >= 2) {
             s2sMerges.push({
               targetId: complexId,
-              targetName: SUPPORT_CATALOG_DATA[complexId]?.nameRu || SUPPORT_CATALOG_DATA[complexId]?.name || complexId,
+              targetName: COMPLEX_NAMES[complexId] || SUPPORT_CATALOG_DATA[complexId]?.nameRu || SUPPORT_CATALOG_DATA[complexId]?.name || complexId,
               ids: inStack,
             });
           }

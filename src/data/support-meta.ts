@@ -2823,6 +2823,42 @@ export const SUPPLEMENT_COMPOSITION: Record<string, string[]> = {
   adaptogen_complex: ['ashwagandha','rhodiola','holy_basil','ginseng'],
   mushroom_complex: ['reishi','lions_mane','cordyceps','chaga'],
   polyphenol_complex: ['curcumin','egcg','resveratrol','quercetin'],
+  // ── Практические комплексы ──
+  hepatoprotection: ['tudca','milk_thistle','nac','alpha_lipoic'],
+  joint_support: ['glucosamine','msm','collagen','curcumin'],
+  sleep_support: ['melatonin','magnesium','glycine','theanine'],
+  testosterone_boost: ['zinc','magnesium','vitamin_d3','boron'],
+  pre_workout: ['creatine','beta_alanine','citrulline','caffeine'],
+  cardio_protection: ['coq10','omega3','magnesium','taurine'],
+  anti_inflammatory: ['curcumin','boswellia','bromelain'],
+  immuno_support: ['vitamin_c','zinc','selenium','lactoferrin'],
+  detox_support: ['milk_thistle','nac','selenium','alpha_lipoic'],
+};
+
+// Russian display names for complexes
+export const COMPLEX_NAMES: Record<string, string> = {
+  vitamin_b_complex: 'Комплекс витаминов B',
+  vitamin_b_complex_2: 'Комплекс витаминов B + холин',
+  omega3: 'Омега-3 комплекс (EPA + DHA)',
+  collagen: 'Коллагеновый комплекс',
+  probiotics: 'Пробиотический комплекс',
+  vitamin_d3: 'Витамин D3 + K2',
+  magnesium: 'Магний + Таурин',
+  antioxidant_complex: 'Антиоксидантный комплекс',
+  electrolyte_complex: 'Электролитный комплекс',
+  amino_complex: 'Аминокислотный комплекс',
+  adaptogen_complex: 'Адаптогенный комплекс',
+  mushroom_complex: 'Грибной комплекс',
+  polyphenol_complex: 'Полифенольный комплекс',
+  hepatoprotection: 'Гепатопротекция (NAC + TUDCA + Силимарин)',
+  joint_support: 'Поддержка суставов (Глюкозамин + Коллаген + Куркумин)',
+  sleep_support: 'Поддержка сна (Мелатонин + Магний + Глицин + Теанин)',
+  testosterone_boost: 'Тестостерон-буст (Цинк + Магний + D3 + Бор)',
+  pre_workout: 'Предтренировочный (Креатин + Бета-Аланин + Цитруллин)',
+  cardio_protection: 'Кардиопротекция (CoQ10 + Омега-3 + Магний + Таурин)',
+  anti_inflammatory: 'Противовоспалительный (Куркумин + Босвеллия + Бромелайн)',
+  immuno_support: 'Иммунная поддержка (Витамин C + Цинк + Селен + Лактоферрин)',
+  detox_support: 'Детокс-поддержка (Силимарин + NAC + Селен + АЛЬК)',
 };
 
 // Reverse map: component ID → list of complex IDs that contain it
