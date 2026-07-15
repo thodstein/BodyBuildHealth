@@ -1019,14 +1019,17 @@ export const TrainingConstructor: React.FC<Props> = ({
     let score = 100;
     const items: { label: string; ok: boolean; detail: string; group?: string }[] = [];
     for (const [g, sets] of Object.entries(wk)) {
-      if (sets > mrv * 1.15) {
+      const lm = getPerMuscleMrvFromLevel(level, g, tprofile.onCourse, tprofile.courseIntensity, labTrainingAdjust(labAnalysis).mrvMultiplier);
+      const mrvG = lm.mrv;
+      const mevG = lm.mev;
+      if (sets > mrvG * 1.15) {
         score -= 8;
-        items.push({ label: g, ok: false, detail: `${sets} сетов > MRV×1.15=${Math.round(mrv * 1.15)} ⚠ перегруз`, group: g });
-      } else if (sets < mrv * 0.4) {
+        items.push({ label: g, ok: false, detail: `${sets} сетов > MRV×1.15=${Math.round(mrvG * 1.15)} ⚠ перегруз`, group: g });
+      } else if (sets < mevG) {
         score -= 6;
-        items.push({ label: g, ok: false, detail: `${sets} сетов < MEV=${Math.round(mrv * 0.4)} — недотрен`, group: g });
+        items.push({ label: g, ok: false, detail: `${sets} сетов < MEV=${mevG} — недотрен`, group: g });
       } else {
-        items.push({ label: g, ok: true, detail: `${sets} сетов (MEV→MRV)`, group: g });
+        items.push({ label: g, ok: true, detail: `${sets} сетов (MEV ${mevG}→MRV ${mrvG})`, group: g });
       }
     }
     const groupsPresent = Object.keys(wk).length;
