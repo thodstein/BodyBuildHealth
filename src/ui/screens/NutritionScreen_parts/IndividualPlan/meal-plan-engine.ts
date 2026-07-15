@@ -899,7 +899,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         fatItems.forEach(({ meal, item }) => {
           const food = FOOD_DB.find(f => f.id === item.id);
           if (!food || !food.fat) return;
-          const addGrams = Math.min(Math.round(item.amount * 1.0), Math.round(addPerItem / food.fat * 100));
+          const addGrams = Math.min(Math.round(item.amount * 1.5), Math.round(addPerItem / food.fat * 100));
           const newAmount = Math.min(MAX_GRAM_PER_ITEM, item.amount + addGrams);
           const factor = newAmount / (item.amount || 1);
           item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
