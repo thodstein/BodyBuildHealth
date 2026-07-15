@@ -962,6 +962,17 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
               {explanation.warnings.slice(0, 5).map((w: string, i: number) => <div key={i} style={{ fontSize: 7, color: '#f87171', lineHeight: 1.3 }}>• {w}</div>)}
             </div>
           )}
+
+          {explanation?.timingNotes && explanation.timingNotes.length > 0 && (
+            <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.12)' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>⏰ Разнесено по времени (для безопасности)</div>
+              {explanation.timingNotes.map((tn: any, i: number) => (
+                <div key={i} style={{ fontSize: 8, color: '#93c5fd', lineHeight: 1.4 }}>
+                  💡 {tn.note}
+                </div>
+              ))}
+            </div>
+          )}
         </GlassCard>
       )}
 

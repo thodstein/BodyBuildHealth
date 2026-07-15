@@ -70,6 +70,21 @@ export interface FinderMatch {
   estimatedDose: string;
   contraindicationWarnings: string[];
   priceEstimate: 'low' | 'medium' | 'high';
+  conflictWith?: Set<string>;
+  timeSeparableConflicts?: Map<string, string>; // conflictId → timing note
+}
+
+// ── Timing helper: categorize substance timing slot ──
+function getTimingSlot(id: string): string {
+  const e = getEntry(id);
+  const t = (e?.dosage as any)?.timing || (e as any)?.timingDosage || (e as any)?.timing || '';
+  const tl = t.toLowerCase();
+  if (tl.includes('утр') || tl.includes('morning')) return 'morning';
+  if (tl.includes('дн') || tl.includes('обед') || tl.includes('afternoon') || tl.includes('noon')) return 'afternoon';
+  if (tl.includes('веч') || tl.includes('evening')) return 'evening';
+  if (tl.includes('ноч') || tl.includes('сон') || tl.includes('перед сном') || tl.includes('night')) return 'night';
+  if (tl.includes('нат') || tl.includes('голод') || tl.includes('fasting')) return 'fasting';
+  return 'any';
 }
 
 export interface ReplacementResult {
@@ -106,6 +121,7 @@ export interface StackExplanation {
   totalSynergyScore: number;
   completeness: number;
   totalDoseCount: number;
+  timingNotes?: Array<{ a: string; b: string; note: string }>;
 }
 
 export interface StackQuery {
@@ -638,43 +654,142 @@ export function buildStack(query: StackQuery): { stack: string[]; explanation: S
   const finderQuery: FinderQuery = {
     goal: query.goal, organs: query.organs, mechanisms: query.mechanisms,
     categories: query.categories, excludeIds: [...query.baseIds, ...(query.avoidIds || [])],
-    maxResults: query.targetSize * 3, profile: query.profile,
+    maxResults: query.targetSize * 5, profile: query.profile,
   };
   const candidates = findSupplements(finderQuery);
 
+  // ── Build synergy index: for each candidate, count synergies with other candidates ──
+  const synergyMap = new Map<string, { count: number; partners: string[] }>();
+  for (let i = 0; i < candidates.length; i++) {
+    const a = candidates[i];
+    for (let j = i + 1; j < candidates.length; j++) {
+      const b = candidates[j];
+      const hasSynergy = ALL_INTERACTIONS.some(inx =>
+        (inx.substanceA === a.id && inx.substanceB === b.id && inx.type !== 'conflict') ||
+        (inx.substanceB === a.id && inx.substanceA === b.id && inx.type !== 'conflict'));
+      const hasConflict = ALL_INTERACTIONS.some(inx =>
+        (inx.substanceA === a.id && inx.substanceB === b.id && inx.type === 'conflict' && inx.severity === 'HIGH') ||
+        (inx.substanceB === a.id && inx.substanceA === b.id && inx.type === 'conflict' && inx.severity === 'HIGH'));
+      if (hasSynergy) {
+        if (!synergyMap.has(a.id)) synergyMap.set(a.id, { count: 0, partners: [] });
+        if (!synergyMap.has(b.id)) synergyMap.set(b.id, { count: 0, partners: [] });
+        synergyMap.get(a.id)!.count++;
+        synergyMap.get(a.id)!.partners.push(b.id);
+        synergyMap.get(b.id)!.count++;
+        synergyMap.get(b.id)!.partners.push(b.id);
+      }
+      if (hasConflict) {
+        candidates[i].conflictWith ??= new Set();
+        candidates[i].conflictWith!.add(b.id);
+        candidates[j].conflictWith ??= new Set();
+        candidates[j].conflictWith!.add(a.id);
+      }
+    }
+  }
+
+  // ── Re-sort candidates: tier first, then synergy count, then relevance score ──
+  const tierOrder: Record<string,number> = { core:0, standard:1, advanced:2, specialty:3 };
+  candidates.sort((a, b) => {
+    const ta = tierOrder[a.tier] ?? 2;
+    const tb = tierOrder[b.tier] ?? 2;
+    if (ta !== tb) return ta - tb;
+    const sa = synergyMap.get(a.id)?.count || 0;
+    const sb = synergyMap.get(b.id)?.count || 0;
+    if (sa !== sb) return sb - sa; // more synergies = higher priority
+    return b.relevanceScore - a.relevanceScore;
+  });
+
+  // ── Auto-fill with synergy prioritization + conflict avoidance + timing separation ──
   if (query.autoFill) {
     const usedNames = new Set<string>();
     for (const s of selected) { const e = getEntry(s); if (e?.nameRu) usedNames.add(e.nameRu.toLowerCase()); }
+    const hardConflictSet = new Set<string>(); // substances with unresolvable conflicts
+    const timingNotes: Array<{ a: string; b: string; note: string }> = [];
+
+    // Phase 1: synergy-aware selection with time-separable conflicts
     for (const c of candidates) {
       if (selected.length >= query.targetSize) break;
-      const e = getEntry(c.id);
-      const cName = (e?.nameRu || '').toLowerCase();
-      if (!usedSet.has(c.id.toLowerCase()) && !avoidSet.has(c.id.toLowerCase()) && !usedNames.has(cName)) {
-        selected.push(c.id); usedSet.add(c.id.toLowerCase());
+      if (usedSet.has(c.id.toLowerCase()) || avoidSet.has(c.id.toLowerCase()) || usedNames.has((getEntry(c.id)?.nameRu || '').toLowerCase())) continue;
+      if (hardConflictSet.has(c.id.toLowerCase())) continue;
+
+      // Conflict check with already-selected substances
+      if (c.conflictWith) {
+        let hasHardConflict = false;
+        for (const s of selected) {
+          if (c.conflictWith!.has(s)) {
+            // Check if timing separation can resolve it
+            const ct = getTimingSlot(c.id);
+            const st = getTimingSlot(s);
+            if (ct !== 'any' && st !== 'any' && ct !== st) {
+              // Different timing slots — keep both, add timing note
+              const cName = getEntry(c.id)?.nameRu || c.id;
+              const sName = getEntry(s)?.nameRu || s;
+              const ctLabel = ct === 'morning' ? 'утро' : ct === 'afternoon' ? 'день' : ct === 'evening' ? 'вечер' : ct === 'night' ? 'ночь' : ct;
+              const stLabel = st === 'morning' ? 'утро' : st === 'afternoon' ? 'день' : st === 'evening' ? 'вечер' : st === 'night' ? 'ночь' : st;
+              timingNotes.push({ a: c.id, b: s, note: `${cName} → ${ctLabel}, ${sName} → ${stLabel} (разделены по времени)` });
+            } else {
+              // Same timing or unknown — hard conflict
+              hasHardConflict = true;
+              break;
+            }
+          }
+        }
+        if (hasHardConflict) { hardConflictSet.add(c.id.toLowerCase()); continue; }
+      }
+
+      selected.push(c.id); usedSet.add(c.id.toLowerCase());
+      const cName = (getEntry(c.id)?.nameRu || '').toLowerCase();
+      if (cName) usedNames.add(cName);
+    }
+
+    // Phase 2: synergy-first — candidates with most synergies to selected get priority
+    if (selected.length < query.targetSize) {
+      const remaining = candidates.filter(c => !usedSet.has(c.id.toLowerCase()) && !hardConflictSet.has(c.id.toLowerCase()));
+      // Score by synergy count with selected
+      const scoredRemaining = remaining.map(c => ({
+        id: c.id,
+        synergyScore: (synergyMap.get(c.id)?.partners || []).filter(p => selected.includes(p)).length * 5 + c.relevanceScore,
+      }));
+      scoredRemaining.sort((a, b) => {
+        const ta = tierOrder[getEntry(a.id)?.tier || ''] ?? 2;
+        const tb = tierOrder[getEntry(b.id)?.tier || ''] ?? 2;
+        if (ta !== tb) return ta - tb;
+        return b.synergyScore - a.synergyScore;
+      });
+      for (const s of scoredRemaining) {
+        if (selected.length >= query.targetSize) break;
+        if (usedNames.has((getEntry(s.id)?.nameRu || '').toLowerCase())) continue;
+        selected.push(s.id); usedSet.add(s.id.toLowerCase());
+        const cName = (getEntry(s.id)?.nameRu || '').toLowerCase();
         if (cName) usedNames.add(cName);
       }
     }
   }
 
+  // Fallback: bestForCourse
   if (query.autoFill && selected.length < query.targetSize) {
     for (const id of allIds) {
       if (selected.length >= query.targetSize) break;
       const e = getEntry(id);
-      if (e && e.bestForCourse) { selected.push(id); usedSet.add(id.toLowerCase()); }
+      if (e && e.bestForCourse && !usedSet.has(id.toLowerCase())) { selected.push(id); usedSet.add(id.toLowerCase()); }
     }
   }
 
+  // Fallback: same categories
   if (query.autoFill && selected.length < query.targetSize) {
     const baseCats = new Set<string>();
-    for (const baseId of query.baseIds) { getEntry(baseId)?.category?.forEach(c => baseCats.add(c)); }
+    for (const baseId of selected) { getEntry(baseId)?.category?.forEach(c => baseCats.add(c)); }
     for (const id of allIds) {
       if (selected.length >= query.targetSize) break;
       const e = getEntry(id);
-      if (e && (e.category || []).some(c => baseCats.has(c))) { selected.push(id); usedSet.add(id.toLowerCase()); }
+      if (e && (e.category || []).some(c => baseCats.has(c)) && !usedSet.has(id.toLowerCase())) { selected.push(id); usedSet.add(id.toLowerCase()); }
     }
   }
 
   const explanation = explainStack(selected, query.profile);
+  if (timingNotes && timingNotes.length > 0) {
+    explanation.timingNotes = timingNotes;
+  }
   return { stack: selected, explanation };
 }
 

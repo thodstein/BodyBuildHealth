@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, selectBestCycle, explainSelection, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
 import { buildLMSPlan, extractExercises, type LMSBuildOutput } from '../../engines/lms/lms-builder.engine';
+import { WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
 import { mesocyclePhaseForWeek } from '../../engines/rir-matrix.engine';
 import { autoRegulate, shouldTrainToday, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
@@ -233,6 +234,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       currentReadiness: linked.readiness?.recovery,
       equipment: linked.profile?.settings?.equipment,
       weakPoints: weakPoints,
+      plWeakPoints: plWeakPoints,
     });
     setBuiltSrc(plan); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setSrcAdditions({}); setPickerDay(null);
     // TRAINING INTEGRATION: конвертировать PL план в сессии
@@ -254,6 +256,19 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [weakPoints, setWeakPoints] = useState<string[]>(_profPL.weakPoints || []);
   const toggleWeak = (g: string) => setWeakPoints(p => p.includes(g) ? p.filter(x => x !== g) : [...p, g]);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), weakPoints }); } catch {} }, [weakPoints]);
+  // 🎯 Слабые точки СРЦ-движений (профи-диагностика weakpoint-pl)
+  const [plWeakPoints, setPlWeakPoints] = useState<{ lift: Lift; weakPoint: WeakPoint }[]>([]);
+  const togglePlWeak = (lift: Lift, weakPoint: WeakPoint) => setPlWeakPoints(p => {
+    const idx = p.findIndex(x => x.lift === lift && x.weakPoint === weakPoint);
+    if (idx >= 0) return p.filter((_, i) => i !== idx);
+    return [...p, { lift, weakPoint }];
+  });
+  const PL_WEAKPOINT_LABELS: Record<WeakPoint, string> = {
+    off_chest: 'Сход с груди', mid: 'Середина', lockout: 'Дожим', start: 'Старт', bottom: 'Низ', sticking_mid: 'Застревание',
+  };
+  const PL_WP_OPTIONS = (['bench', 'squat', 'deadlift'] as Lift[]).map(lift => ({
+    lift, weakPoints: WEAK_POINTS_BY_LIFT[lift].map(wp => ({ id: wp, label: PL_WEAKPOINT_LABELS[wp] || wp })),
+  }));
   // 🔗 planner-bridge: приём корректировок от калькуляторов (ПМ/слабые точки/PRI/сплит)
   const [applyPayload, setApplyPayload] = useState<PlannerApply | null>(() => getPlannerApply());
   const [priAdjust, setPriAdjust] = useState<{ volumeMult: number; rirShift: number } | null>(null);
@@ -594,6 +609,18 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           </div>
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: ACCENT }}>🎯 Слабые группы (акцент, сохраняются в профиль)</div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6 }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: "pointer", border: on ? "1px solid #00e68a" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "#00e68a" : "rgba(255,255,255,0.6)" }}>{l}{on ? " ✓" : ""}</button>; })}</div>
+          <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: '#8b5cf6' }}>🎯 Слабые точки СРЦ-движений (диагностика weakpoint-pl)</div>
+          {PL_WEAKPOINT_OPTIONS.map((opt) => (
+            <div key={opt.lift} style={{ marginTop: 4 }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>{opt.lift === 'bench' ? 'Жим лёжа' : opt.lift === 'squat' ? 'Присед' : 'Становая'}</div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {opt.weakPoints.map((wp) => {
+                  const on = plWeakPoints.some(x => x.lift === opt.lift && x.weakPoint === wp.id);
+                  return <button key={wp.id} onClick={() => togglePlWeak(opt.lift, wp.id)} style={{ padding: "4px 8px", borderRadius: 12, fontSize: 9, fontWeight: 700, cursor: "pointer", border: on ? "1px solid #8b5cf6" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.02)", color: on ? "#8b5cf6" : "rgba(255,255,255,0.6)" }}>{wp.label}{on ? " ✓" : ""}</button>;
+                })}
+              </div>
+            </div>
+          ))}
           <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={buildSrc}>Сгенерировать план ({cycleWeeks} нед)</button>
           {builtSrc && (() => {
             const W = builtSrc.weeks;
