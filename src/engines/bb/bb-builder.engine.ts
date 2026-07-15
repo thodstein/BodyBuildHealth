@@ -624,8 +624,8 @@ function buildSession(
   }
   // Кап упражнений в сессии: максимум 10 (реалистичная тренировка)
   if (exercises.length > 10) {
-    // Сохраняем primary, обрезаем accessory с конца
-    const kept = exercises.filter(e => e.role === 'primary');
+    // Сохраняем primary (первые 8), обрезаем accessory
+    const kept = exercises.filter(e => e.role === 'primary').slice(0, 8);
     const acc = exercises.filter(e => e.role === 'accessory');
     const maxAcc = Math.max(0, 10 - kept.length);
     exercises.length = 0;
