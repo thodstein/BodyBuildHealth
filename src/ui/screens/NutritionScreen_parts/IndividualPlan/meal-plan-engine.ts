@@ -958,6 +958,7 @@ function getMicroFromFood(food: FoodItem, field: string): number {
   const e = food.electrolytes_100g as Record<string, number> | undefined;
   const t = food.trace_elements_100g as Record<string, number> | undefined;
   const v = food.vitamins_100g as Record<string, number> | undefined;
+  const mg = food.macro_100g as Record<string, number> | undefined;
   // Direct match in micros (primary source)
   const direct = m?.[field];
   if (direct !== undefined) return direct;
@@ -971,7 +972,7 @@ function getMicroFromFood(food: FoodItem, field: string): number {
   const altKeys = fieldMap[field];
   if (altKeys) {
     for (const key of altKeys) {
-      const val = e?.[key] ?? t?.[key] ?? v?.[key];
+      const val = e?.[key] ?? t?.[key] ?? v?.[key] ?? mg?.[key];
       if (val !== undefined) return val;
     }
   }

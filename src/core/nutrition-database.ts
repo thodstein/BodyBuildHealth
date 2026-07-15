@@ -2168,7 +2168,7 @@ export { RATION_TIERS };
       bb_quality_score: 7.0,
     },
     whey_isolate: {
-      amino_acid_profile_100g: { leucine_mg:3100,isoleucine_mg:1800,valine_mg:1900,lysine_mg:2900,methionine_mg:850,arginine_mg:1100,glutamine_mg:4200,tryptophan_mg:400,phenylalanine_mg:1500,threonine_mg:1600,histidine_mg:900,cysteine_mg:500 },
+      amino_acid_profile_100g: { leucine_mg:9700,isoleucine_mg:5300,valine_mg:4800,lysine_mg:7900,methionine_mg:1800,arginine_mg:1100,glutamine_mg:4200,tryptophan_mg:400,phenylalanine_mg:1500,threonine_mg:1600,histidine_mg:900,cysteine_mg:500 },
       bb_quality_score: 9.5,
     },
     // ─── Supplement file additions (supp_* prefix) ───
