@@ -199,7 +199,7 @@ export const TrainingMixTab: React.FC = () => {
 
 
 
-        {true && (
+        {(
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
             <div>
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>⏰ Тайминг</div>
@@ -220,7 +220,7 @@ export const TrainingMixTab: React.FC = () => {
           </div>
         )}
 
-        {true && (
+        {(
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
             <div>
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>🌅 Время суток</div>
@@ -237,7 +237,7 @@ export const TrainingMixTab: React.FC = () => {
           </div>
         )}
 
-        {true && (
+        {(
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
             <div>
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>📆 Тип дня</div>
@@ -248,7 +248,7 @@ export const TrainingMixTab: React.FC = () => {
           </div>
         )}
 
-        {true && (
+        {(
           <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>
             ⚖️ Вес тела: <b style={{ color: ACCENT }}>{bw} кг</b>
             {isOnCycle ? <span style={{ color: '#a78bfa', marginLeft: 6 }}>🔥 Курс (×1.25)</span> : ''}
@@ -257,7 +257,7 @@ export const TrainingMixTab: React.FC = () => {
       </div>
 
       {/* ── Фарма (только для тренировки) ── */}
-      {true && (mixInsulin > 0 || mixDrugIGF > 0 || mixDrugGH > 0 || mixDrugMGF > 0 || mixDrugGLP1) && (
+      {(mixInsulin > 0 || mixDrugIGF > 0 || mixDrugGH > 0 || mixDrugMGF > 0 || mixDrugGLP1) && (
         <div style={{ ...CARD, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', marginBottom: 6 }}>💉 Фармакология (автоопределение)</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -275,7 +275,7 @@ export const TrainingMixTab: React.FC = () => {
       )}
 
       {/* ── Результат: тренировочный стек ── */}
-      {true && mixSubstances.length > 0 && (
+      {mixSubstances.length > 0 && (
         <div style={{ ...CARD, background: 'linear-gradient(135deg, rgba(0,230,138,0.04), rgba(139,92,246,0.04))', border: '1px solid var(--glass-border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 24 }}>{mixTiming === 'pre' ? '🔥' : mixTiming === 'intra' ? '💧' : '🍗'}</span>
@@ -356,7 +356,7 @@ export const TrainingMixTab: React.FC = () => {
         </div>
       )}
 
-      {true && stack.filter(sItem => sItem.mg > 0).length > 0 && (
+      {stack.filter(sItem => sItem.mg > 0).length > 0 && (
         <div style={CARD}>
           <h4 style={{ margin: '0 0 8px', fontSize: 11, color: 'var(--text)' }}>📋 Состав стека</h4>
           {stack.filter(sItem => sItem.mg > 0).map((sItem, i) => (
@@ -370,7 +370,7 @@ export const TrainingMixTab: React.FC = () => {
       )}
 
       {/* ── История (только для тренировки) ── */}
-      {true && mixHistory.length > 0 && (
+      {mixHistory.length > 0 && (
         <div style={CARD}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <h4 style={{ margin: 0, fontSize: 11, color: 'var(--text)' }}>📂 История ({mixHistory.length})</h4>
