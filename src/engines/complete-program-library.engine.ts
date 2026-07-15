@@ -339,6 +339,10 @@ export const FULL_PROGRAM_LIBRARY: FullProgram[] = [
   STARTING_STRENGTH, FIVE_THREE_ONE_BBB, PPL_HYPERTROPHY, SMOLOV_JR,
 ];
 
+// Нормализация имён упражнений программ на русский язык (для всех экранов)
+import { normalizeProgramLibraryNames } from './exercise-name-translate';
+normalizeProgramLibraryNames(FULL_PROGRAM_LIBRARY as any[]);
+
 export function getProgramById(id: string): FullProgram | undefined {
   return FULL_PROGRAM_LIBRARY.find(p => p.id === id);
 }

@@ -2044,3 +2044,7 @@ export const PROGRAM_GOAL_MAP: Record<string, string> = {
 export const PROGRAM_EQUIP_MAP: Record<string, string> = {
   barbell: 'Штанга', dumbbell: 'Гантели', machine: 'Тренажёр', cable: 'Блок', bodyweight: 'Вес тела', bench: 'Скамья', rack: 'Стойка', kettlebell: 'Гиря', band: 'Резинка',
 };
+
+// Нормализация имён упражнений программ на русский язык (для всех экранов)
+import { normalizeProgramLibraryNames } from '../../../engines/exercise-name-translate';
+normalizeProgramLibraryNames([...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS] as any[]);
