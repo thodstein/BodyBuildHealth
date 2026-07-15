@@ -18,14 +18,9 @@ interface Props {
 const diaryItems = [
   { id:'sleep', icon:'🛌', title:'Сон', desc:'Часы, качество, пробуждения, график', nav:false },
   { id:'bp', icon:'❤️', title:'Давление', desc:'Систола/диастола/пульс, график, архив', nav:false },
-  { id:'measurements', icon:'📏', title:'Замеры', desc:'Антропометрия, фото, история', nav:false },
+  { id:'measurements', icon:'📈', title:'История замеров', desc:'Динамика, фото, графики', nav:false },
   { id:'inj_diary', icon:'🩼', title:'Инъекции', desc:'Зоны, PIP, отёчность, журнал', nav:false },
   { id:'lab_diary', icon:'📊', title:'Дневник анализов', desc:'Динамика маркеров, графики', nav:false },
-  { id:'nutrition', icon:'🍽️', title:'Питание (внеш.)', desc:'Дневник приёмов пищи', nav:true, navScreen:'nutrition' },
-  { id:'training', icon:'🏋️', title:'Тренировки (внеш.)', desc:'Дневник, прогресс, календарь', nav:true, navScreen:'training' },
-  { id:'pharma', icon:'💉', title:'Фарма / Курс (внеш.)', desc:'Препараты, цикл, отчёты', nav:true, navScreen:'pharma' },
-  { id:'support', icon:'🧪', title:'Поддержка (внеш.)', desc:'БАДы, калькулятор, протоколы', nav:true, navScreen:'support' },
-  { id:'risks', icon:'🩺', title:'Риски (внеш.)', desc:'Оценка здоровья по 28 мех.', nav:true, navScreen:'risks' },
 ];
 
 export const ProfileDiariesSection: React.FC<Props> = ({ settings, save, labs, workoutLogs, onNavigate }) => {
@@ -69,8 +64,8 @@ export const ProfileDiariesSection: React.FC<Props> = ({ settings, save, labs, w
       <div style={{ marginTop:12 }}>
         {diarySubTab === 'sleep' && <SleepDiaryTab settings={settings} save={save} />}
         {diarySubTab === 'bp' && <BPDiaryTab />}
-        {diarySubTab === 'lab_diary' && <LabDiaryTab labs={labs} />}
         {diarySubTab === 'measurements' && <ProfileMeasurementsTab />}
+        {diarySubTab === 'lab_diary' && <LabDiaryTab labs={labs} />}
         {diarySubTab === 'inj_diary' && <InjectionDiaryTab />}
       </div>
     </div>

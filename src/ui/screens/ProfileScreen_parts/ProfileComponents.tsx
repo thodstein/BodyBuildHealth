@@ -2,9 +2,9 @@ import React from 'react';
 
 /* ── Design tokens ── */
 export const theme = {
-  glassBg: 'rgba(24,24,27,0.12)',
-  glassBorder: '1px solid rgba(255,255,255,0.04)',
-  cardRadius: 14,
+  glassBg: 'rgba(28,28,32,0.55)',
+  glassBorder: '1px solid rgba(255,255,255,0.10)',
+  cardRadius: 16,
   accent: '#00e68a',
   accentDim: 'rgba(0,230,138,0.15)',
   accentBorder: '1px solid rgba(0,230,138,0.3)',
@@ -13,7 +13,7 @@ export const theme = {
   inputFocus: '1px solid rgba(0,230,138,0.4)',
   textPrimary: 'rgba(255,255,255,0.95)',
   textSecondary: 'rgba(255,255,255,0.9)',
-  textDim: 'rgba(255,255,255,0.85)',
+  textDim: 'rgba(255,255,255,0.6)',
   pillBg: 'rgba(255,255,255,0.06)',
   pillActiveBg: 'rgba(0,230,138,0.12)',
   gradientGreen: 'linear-gradient(135deg, #00e68a, #00b864)',
@@ -21,13 +21,19 @@ export const theme = {
   gradientOrange: 'linear-gradient(135deg, #f59e0b, #f97316)',
   gradientRed: 'linear-gradient(135deg, #ef4444, #dc2626)',
   gradientPurple: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
+  blur: 'blur(20px) saturate(160%)',
+  shadowSm: '0 4px 16px rgba(0,0,0,0.25)',
+  shadowMd: '0 10px 30px rgba(0,0,0,0.35)',
 } as const;
 
 /* ── Styles ── */
 export const glassCardStyle: React.CSSProperties = {
   background: theme.glassBg,
+  backdropFilter: theme.blur,
+  WebkitBackdropFilter: theme.blur,
   borderRadius: theme.cardRadius,
   border: theme.glassBorder,
+  boxShadow: theme.shadowSm,
   padding: 16,
   marginBottom: 10,
 };
@@ -249,33 +255,39 @@ interface PopupCardProps {
 }
 export const PopupCard: React.FC<PopupCardProps> = ({ label, value, icon, color = theme.accent, children, wide }) => {
   const [open, setOpen] = React.useState(false);
+  const isFilled = !!value && value !== '—' && value !== 'Нет' && value !== 'Нет данных' && value !== 'не указан' && !/^—/.test(String(value));
   return (
     <>
       <button onClick={() => setOpen(true)}
         style={{
-          display:'flex', alignItems:'center', gap:8, width:'100%', padding:'10px 12px', borderRadius:10, cursor:'pointer', textAlign:'left',
-          background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', transition:'all 0.15s',
-        }}>
-        {icon && <span style={{ fontSize:16, flexShrink:0 }}>{icon}</span>}
+          display:'flex', alignItems:'center', gap:10, width:'100%', padding:'12px 14px', borderRadius:theme.cardRadius, cursor:'pointer', textAlign:'left',
+          background:'rgba(255,255,255,0.04)', border:`1px solid ${color}33`, borderLeft:`3px solid ${color}`, color:theme.textPrimary,
+          transition:'all 0.15s', boxShadow:'0 1px 2px rgba(0,0,0,0.2)',
+        }}
+        onMouseDown={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.98)'; }}
+        onMouseUp={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
+      >
+        {icon && <span style={{ fontSize:18, flexShrink:0 }}>{icon}</span>}
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', marginBottom:1 }}>{label}</div>
-          <div style={{ fontSize:13, fontWeight:600, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{value}</div>
+          <div style={{ fontSize:10, color:theme.textDim, marginBottom:2, textTransform:'uppercase', letterSpacing:'0.3px' }}>{label}</div>
+          <div style={{ fontSize:14, fontWeight:700, color: isFilled ? color : 'rgba(255,255,255,0.35)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{value}</div>
         </div>
-        <span style={{ fontSize:14, color:'rgba(255,255,255,0.2)' }}>{'>'}</span>
+        <span style={{ width:8, height:8, borderRadius:'50%', flexShrink:0, background: isFilled ? color : 'rgba(255,255,255,0.15)' }} />
       </button>
       {open && (
         <div onClick={() => setOpen(false)}
           style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.7)', backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)', padding:16 }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ width: wide ? '100%' : 300, maxHeight:'80vh', overflowY:'auto', background:'#18181b', borderRadius:16, border:'1px solid rgba(255,255,255,0.1)', padding:20, boxShadow:'0 20px 60px rgba(0,0,0,0.5)' }}>
-            <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
-              {icon && <span>{icon}</span>}
+            style={{ width: wide ? '100%' : 320, maxHeight:'82vh', overflowY:'auto', background:'#18181b', borderRadius:20, border:'1px solid rgba(255,255,255,0.12)', padding:20, boxShadow:theme.shadowMd }}>
+            <div style={{ fontSize:15, fontWeight:700, color:'#fff', marginBottom:14, display:'flex', alignItems:'center', gap:10 }}>
+              {icon && <span style={{ width:32, height:32, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, background: color + '22' }}>{icon}</span>}
               <span>{label}</span>
             </div>
             {children}
             <button onClick={() => setOpen(false)}
-              style={{ width:'100%', padding:'10px 0', marginTop:14, borderRadius:10, border:'none', background:'rgba(255,255,255,0.06)', cursor:'pointer', fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.6)' }}>
-              Закрыть
+              style={{ width:'100%', padding:'11px 0', marginTop:16, borderRadius:12, border:'none', background:'rgba(255,255,255,0.06)', cursor:'pointer', fontSize:13, fontWeight:700, color:'rgba(255,255,255,0.7)' }}>
+              Готово
             </button>
           </div>
         </div>
@@ -391,3 +403,21 @@ export const ExpandableCard: React.FC<ExpandableCardProps> = ({ icon, title, col
     </div>
   );
 };
+
+/* ── SectionTitle ── */
+export const SectionTitle: React.FC<{ icon?: string; title: string; subtitle?: string; color?: string }> = ({ icon, title, subtitle, color = theme.accent }) => (
+  <div style={{ display:'flex', alignItems:'center', gap:10, margin:'2px 0 12px' }}>
+    {icon && (
+      <div style={{ width:38, height:38, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', fontSize:19, background: (color || theme.accent) + '22', flexShrink:0, boxShadow:'0 2px 8px rgba(0,0,0,0.2)' }}>{icon}</div>
+    )}
+    <div>
+      <div style={{ fontSize:17, fontWeight:800, color:'#fff', letterSpacing:'-0.2px', lineHeight:1.2 }}>{title}</div>
+      {subtitle && <div style={{ fontSize:11, color:theme.textDim, marginTop:2, lineHeight:1.3 }}>{subtitle}</div>}
+    </div>
+  </div>
+);
+
+/* ── ValueChip ── */
+export const ValueChip: React.FC<{ children: React.ReactNode; color?: string }> = ({ children, color = theme.accent }) => (
+  <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 9px', borderRadius:20, fontSize:11, fontWeight:700, color, background: color + '1a', border:`1px solid ${color}33` }}>{children}</span>
+);

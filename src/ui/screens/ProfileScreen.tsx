@@ -15,9 +15,10 @@ import { ProfileTrainingSection } from './ProfileScreen_parts/ProfileTrainingSec
 import { ProfileDiariesSection } from './ProfileScreen_parts/ProfileDiariesSection';
 import { ProfileAnalyticsSection } from './ProfileScreen_parts/ProfileAnalyticsSection';
 import { ProfileContactsSection } from './ProfileScreen_parts/ProfileContactsSection';
-import { theme } from './ProfileScreen_parts/ProfileComponents';
+import { ProfileDataHub } from './ProfileScreen_parts/ProfileDataHub';
+import { theme, SectionTitle } from './ProfileScreen_parts/ProfileComponents';
 
-type ProfileTab = 'overview' | 'anthropometry' | 'sleep' | 'lifestyle' | 'diet' | 'health' | 'training' | 'diaries' | 'progress' | 'analytics' | 'contacts' | 'measurements';
+type ProfileTab = 'overview' | 'anthropometry' | 'lifestyle' | 'diet' | 'health' | 'training' | 'diaries' | 'data' | 'analytics' | 'contacts';
 type ProfilePage = 'hero' | 'tabs';
 type MainTab = 'info' | 'analytics' | 'contacts';
 
@@ -151,8 +152,19 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     { id: 'health', label: 'Здоровье' },
     { id: 'diet', label: 'Питание'},
     { id: 'diaries', label: 'Дневники' },
+    { id: 'data', label: 'Мои данные' },
   ];
   const us = settings as UnifiedSettings;
+  const sectionHeaders: Record<string, { icon: string; title: string; subtitle: string }> = {
+    overview: { icon: '👤', title: 'Общие сведения', subtitle: 'Персональные данные и профиль' },
+    anthropometry: { icon: '📏', title: 'Антропометрия', subtitle: 'Замеры тела и композиция' },
+    lifestyle: { icon: '🌿', title: 'Образ жизни', subtitle: 'Сон, стресс, активность' },
+    training: { icon: '🏋️', title: 'Тренировки', subtitle: 'Цель, уровень, сплит, фаза' },
+    health: { icon: '🩺', title: 'Здоровье', subtitle: 'Хроника, аллергии, риски' },
+    diet: { icon: '🥗', title: 'Питание', subtitle: 'Диета, аллергии, привычки' },
+    diaries: { icon: '📓', title: 'Дневники', subtitle: 'Сон, давление, замеры, инъекции' },
+    data: { icon: '🗂️', title: 'Мои данные', subtitle: 'Агрегированные источники' },
+  };
   useEffect(() => {
     if (us) saveContraindications({
       chronicConditions: us.health?.chronicConditions || [],
@@ -259,6 +271,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
 
             {/* ═══ RENDER SECTIONS ═══ */}
             {mainTab === 'info' && (<>
+              {sectionHeaders[tab] && <SectionTitle icon={sectionHeaders[tab].icon} title={sectionHeaders[tab].title} subtitle={sectionHeaders[tab].subtitle} />}
               {tab === 'overview' && (
                 <InfoErrorBoundary label="Сведения о пользователе">
                   <ProfileBioSection settings={settings} save={save} calcData={calcData} upCalc={upCalc} onNavigate={onNavigate} />
@@ -292,6 +305,18 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
               {tab === 'diaries' && (
                 <InfoErrorBoundary label="Дневники">
                   <ProfileDiariesSection settings={settings} save={save} labs={labs} workoutLogs={workoutLogs} onNavigate={onNavigate} />
+                </InfoErrorBoundary>
+              )}
+              {tab === 'data' && (
+                <InfoErrorBoundary label="Мои данные">
+                  <ProfileDataHub
+                    settings={settings}
+                    labs={labs}
+                    workoutLogs={workoutLogs}
+                    foodDiaryAvg={foodDiaryAvg}
+                    onOpenProfileTab={(t: string) => setTab(t as ProfileTab)}
+                    onNavigate={onNavigate}
+                  />
                 </InfoErrorBoundary>
               )}
             </>)}
