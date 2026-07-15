@@ -864,6 +864,13 @@ export const BbAutoConstructor: React.FC = () => {
                       <div style={{ marginTop:4, padding:'4px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.08)', fontSize:10, color:'rgba(255,255,255,0.7)', lineHeight:1.5 }}>
                         💡 {comment}
                       </div>
+                      {/* Selection rationale */}
+                      {e.rationale && (
+                        <details style={{ marginTop:2 }}>
+                          <summary style={{ fontSize:9, fontWeight:600, color:'rgba(96,165,250,0.7)', cursor:'pointer' }}>🧠 Почему это упражнение?</summary>
+                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', padding:'2px 6px', lineHeight:1.4 }}>{e.rationale}</div>
+                        </details>
+                      )}
                       {/* Rotation suggestion */}
                       {rotEx.length > 0 && currentPhase === 'intensification' && (
                         <div style={{ marginTop:3, fontSize:10, color:'rgba(168,85,247,0.6)' }}>
@@ -958,6 +965,50 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           )}
         </div>
+        {/* Прогноз пиковой загрузки */}
+        {(() => {
+          const peakWeek = W.reduce((best, w, i) => {
+            const ts = w.sessions.reduce((s, ss) => s + ss.exercises.reduce((ss2, e) => ss2 + e.sets, 0), 0);
+            return ts > best.ts ? { wk: w.week, ts } : best;
+          }, { wk: 1, ts: 0 });
+          const deloadWeeks = phases.filter(p => p.phase === 'deload').map(p => p.week);
+          const hasDeload = deloadWeeks.length > 0;
+          const accWeeks = phases.filter(p => p.phase === 'accumulation');
+          const intensWeeks = phases.filter(p => p.phase === 'intensification');
+          return (
+            <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#22c55e', marginBottom:6 }}>🔮 Прогноз по фазам</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, fontSize:10 }}>
+                <div>
+                  <span style={{ color:'rgba(255,255,255,0.5)' }}>Пик объёма: </span>
+                  <span style={{ fontWeight:700, color:'#f59e0b' }}>нед {peakWeek.wk}</span>
+                  <span style={{ color:'rgba(255,255,255,0.4)' }}> ({peakWeek.ts} сетов)</span>
+                </div>
+                <div>
+                  <span style={{ color:'rgba(255,255,255,0.5)' }}>Разгрузка: </span>
+                  <span style={{ fontWeight:700, color: hasDeload ? '#22c55e' : '#ef4444' }}>
+                    {hasDeload ? 'нед ' + deloadWeeks.join(', ') : 'НЕ ЗАПЛАНИРОВАНА ⚠'}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ color:'rgba(255,255,255,0.5)' }}>Накопление: </span>
+                  <span style={{ fontWeight:700, color:'#60a5fa' }}>{accWeeks.length} нед</span>
+                  <span style={{ color:'rgba(255,255,255,0.4)' }}> (RIR {PHASE_CONFIGS.accumulation.rirRange[0]}→{PHASE_CONFIGS.accumulation.rirRange[1]})</span>
+                </div>
+                <div>
+                  <span style={{ color:'rgba(255,255,255,0.5)' }}>Интенсификация: </span>
+                  <span style={{ fontWeight:700, color:'#ef4444' }}>{intensWeeks.length} нед</span>
+                  <span style={{ color:'rgba(255,255,255,0.4)' }}> (RIR {PHASE_CONFIGS.intensification.rirRange[0]}→{PHASE_CONFIGS.intensification.rirRange[1]})</span>
+                </div>
+              </div>
+              {!hasDeload && bbWeeks >= 6 && (
+                <div style={{ marginTop:6, padding:'4px 8px', borderRadius:6, background:'rgba(239,68,68,0.1)', fontSize:10, color:'#ef4444' }}>
+                  ⚠ Мезоцикл {bbWeeks} нед без разгрузки — высокий риск перетрена. Добавьте разгрузочную неделю.
+                </div>
+              )}
+            </div>
+          );
+        })()}
         {/* MRV table */}
         <MetricCard title="Объём по мышцам (сетов/нед vs MEV/MAV/MRV)" icon="🏋️" accent="#a855f7">
           <div style={{ overflowX:'auto' }}>
@@ -1007,6 +1058,62 @@ export const BbAutoConstructor: React.FC = () => {
             </div>;
           })}
         </div>
+        {/* Прогрессия весов по неделям (основные упражнения) */}
+        {(() => {
+          const primaryExs = new Map<string, { name: string; muscle: string; weights: number[] }>();
+          for (const w of W) {
+            for (const s of w.sessions) {
+              for (const e of s.exercises) {
+                if (e.role !== 'primary') continue;
+                const key = e.name;
+                if (!primaryExs.has(key)) primaryExs.set(key, { name: e.name, muscle: e.muscle, weights: new Array(W.length).fill(0) });
+                const rec = primaryExs.get(key)!;
+                rec.weights[w.week - 1] = e.workSets[0]?.weight || 0;
+              }
+            }
+          }
+          if (primaryExs.size === 0) return null;
+          const top = [...primaryExs.values()].filter(e => e.weights.some(w => w > 0)).slice(0, 6);
+          if (top.length === 0) return null;
+          return (
+            <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>📈 Прогрессия весов (кг) по неделям</div>
+              <div style={{ overflowX:'auto' }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1.2fr ' + '0.45fr '.repeat(Math.min(8, bbWeeks)), gap:2, fontSize:9, minWidth:Math.min(8,bbWeeks)*40+120 }}>
+                  <span style={{ fontWeight:700, color:'rgba(255,255,255,0.5)' }}>Упражнение</span>
+                  {Array.from({ length: Math.min(8, bbWeeks) }, (_, i) => (
+                    <span key={i} style={{ fontWeight:700, color:'rgba(255,255,255,0.4)', textAlign:'center' }}>{i+1}</span>
+                  ))}
+                </div>
+                {top.map(ex => {
+                  const weights = ex.weights.slice(0, 8);
+                  const first = weights.find(w => w > 0) || 0;
+                  const last = weights.filter(w => w > 0).pop() || first;
+                  const delta = last > first ? '+' + (last - first) : '';
+                  return (
+                    <div key={ex.name} style={{ display:'grid', gridTemplateColumns:'1.2fr ' + '0.45fr '.repeat(Math.min(8, bbWeeks)), gap:2, fontSize:9, padding:'2px 0', borderTop:'1px solid rgba(255,255,255,0.04)', alignItems:'center' }}>
+                      <span style={{ fontWeight:600, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={ex.name}>{ex.name.substring(0, 18)}</span>
+                      {weights.map((w, wi) => {
+                        const prev = wi > 0 ? weights[wi-1] : 0;
+                        const up = prev > 0 && w > prev;
+                        const down = prev > 0 && w < prev;
+                        return (
+                          <span key={wi} style={{
+                            textAlign:'center', fontWeight: w > 0 ? 700 : 400,
+                            color: w > 0 ? (up ? '#22c55e' : down ? '#ef4444' : '#f59e0b') : 'rgba(255,255,255,0.2)',
+                          }}>{w > 0 ? w : '—'}</span>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop:4, fontSize:9, color:'rgba(255,255,255,0.4)', display:'flex', gap:12 }}>
+                <span>🟢 +вес</span><span>🟡 стабильно</span><span>🔴 −вес (разгрузка)</span>
+              </div>
+            </div>
+          );
+        })()}
         {/* 3D evolution chart */}
         <div style={{ ...CARD, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
           <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📈 3D эволюция объёма/интенсивности/частоты</div>

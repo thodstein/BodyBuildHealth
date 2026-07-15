@@ -66,6 +66,7 @@ export interface BBExercise {
   restSeconds?: number;     // PRO: отдых между подходами
   comment?: string;         // PRO: тренерский комментарий (роль/слабые/фаза/нагрузка)
   warmupSets?: { load: number; reps: number }[]; // PRO: разминочные подходы (для compounds)
+  rationale?: string;       // PRO: почему выбрано именно это упражнение
 }
 
 export interface BBSession {
@@ -323,6 +324,7 @@ function buildSession(
     muscle: string; resolved: string; role: 'primary' | 'accessory';
     sets: number; exerciseCount: number; rir: number;
     reps: number; weight: number; pool: any[]; exDatas: any[]; selType: string;
+    rationaleMap: Map<string, string>;
   }
   const plans: MusclePlan[] = [];
   let totalExpectedFatigue = 0;
@@ -399,6 +401,11 @@ function buildSession(
     });
     for (const s of selected) { if (s && s.id) sessionSelectedIds.push(s.id); if (s && s.name) sessionSelectedNames.push(s.name); }
     let exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5 }];
+    // Сохраняем rationale выбора для каждого упражнения
+    const rationaleMap = new Map<string, string>();
+    for (const s of selected) {
+      if (s.selectionRationale?.length) rationaleMap.set(s.name, s.selectionRationale.join('; '));
+    }
 
     // Shoulders diversity: принудительно 1 жим (front) + 1 махи (mid) + 1 задняя (rear)
     if (muscle === 'shoulders' && exerciseCount >= 3 && pool.length >= 3) {
@@ -422,7 +429,7 @@ function buildSession(
 
     const expectedFatigue = exerciseCount * (sets / exerciseCount) * (((exDatas[0] as any)?.fatigueCost || 5));
     totalExpectedFatigue += expectedFatigue;
-    plans.push({ muscle, resolved, role, sets, exerciseCount, rir, reps, weight, pool, exDatas, selType });
+    plans.push({ muscle, resolved, role, sets, exerciseCount, rir, reps, weight, pool, exDatas, selType, rationaleMap });
   }
 
   // Apply substitution for graded injuries: replace exercises and adjust loads
@@ -495,6 +502,7 @@ function buildSession(
           tempoSpec: tempoSpec.notation, restSeconds,
           comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.round(Math.min(pl.reps, repsCap)), Math.round(pl.weight * wPct * 10) / 10, isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir, weakPoints, focusGroup, phase, tempoSpec.notation, restSeconds, isSubstituted),
           warmupSets: buildWarmup(Math.round(pl.weight * wPct * 10) / 10, pl.role === 'primary'),
+          rationale: pl.rationaleMap.get((exData as any).name) || '',
         });
         continue;
       }
@@ -514,6 +522,7 @@ function buildSession(
         tempoSpec: tempoSpec.notation, restSeconds,
         comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, exSets, Math.round(Math.min(pl.reps, repsCap)), Math.round(pl.weight * wPct * 10) / 10, isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir, weakPoints, focusGroup, phase, tempoSpec.notation, restSeconds, isSubstituted),
         warmupSets: buildWarmup(Math.round(pl.weight * wPct * 10) / 10, pl.role === 'primary'),
+        rationale: pl.rationaleMap.get((exData as any).name) || '',
       });
     }
   }
