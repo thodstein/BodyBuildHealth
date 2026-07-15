@@ -394,19 +394,20 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
            if (exFatigue > groupFatigue) break;
            if (exs.some(e => baseName(e.name) === baseName(exSub.name))) continue;
 
-           exs.push({
-             name: exSub.name, sets: cappedSets, reps: isGraded ? clampRepsRange(pr.reps, Math.min(repsCap, 12)) : repsStr, rir: isGraded ? 3 : pr.rir, rest: pr.rest, group: g, weight, weightNote,
-             role: isCarryExercise(exSub) ? 'accessory' : (isPrimaryGroup ? 'main' : 'secondary'),
-              pattern: exSub.movementPattern || derivePattern(exSub),
-               tempo: tempoFor(isPrimaryGroup ? 'тяж' : 'памп').notation,
-              forceVec: forceVector(exSub.group, exSub.type, exSub.name),
-              jointStress: exSub.jointStress,
-             technique: (exSub as any).technique,
-             comments: (exSub as any).comments,
-             rationale: (exSub as any).selectionRationale?.join('; '),
-             fatigueCost: exSub.fatigueCost,
-             substitutions: (exSub as any).canReplace?.map((id: string) => EXERCISE_CATALOG.find(e => e.id === id)?.name).filter(Boolean),
-           });
+            exs.push({
+              name: exSub.name, sets: cappedSets, reps: isGraded ? clampRepsRange(pr.reps, Math.min(repsCap, 12)) : repsStr, rir: isGraded ? 3 : pr.rir, rest: pr.rest, group: g, weight, weightNote,
+              role: isCarryExercise(exSub) ? 'accessory' : (isPrimaryGroup ? 'main' : 'secondary'),
+               pattern: exSub.movementPattern || derivePattern(exSub),
+                tempo: tempoFor(isPrimaryGroup ? 'тяж' : 'памп').notation,
+               forceVec: forceVector(exSub.group, exSub.type, exSub.name),
+               jointStress: exSub.jointStress,
+              technique: (exSub as any).technique,
+              comments: (exSub as any).comments,
+              rationale: (exSub as any).selectionRationale?.join('; '),
+              progressionNote: pr.progressionNote,
+              fatigueCost: exSub.fatigueCost,
+              substitutions: (exSub as any).canReplace?.map((id: string) => EXERCISE_CATALOG.find(e => e.id === id)?.name).filter(Boolean),
+            });
            weekSelectedIds.push((exSub as any).id);
            weeklySets[g] = (weeklySets[g] || 0) + cappedSets;
           daySets[g] = ds + cappedSets;
@@ -532,19 +533,20 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
            if (exFatigue > groupIsoFatigue) break;
            if (exs.some(e => baseName(e.name) === baseName(exSub.name))) continue;
 
-           exs.push({
-            name: exSub.name, sets: cappedSets, reps: isGraded ? clampRepsRange(pr.reps, Math.min(repsCap, 12)) : repsStr, rir: isGraded ? 3 : pr.rir, rest: pr.rest, group: g, weight, weightNote,
-             role: 'accessory',
-              pattern: exSub.movementPattern || derivePattern(exSub),
-              tempo: tempoFor('памп').notation,
-              forceVec: forceVector(exSub.group, exSub.type, exSub.name),
-            jointStress: exSub.jointStress,
-            technique: (exSub as any).technique,
-            comments: (exSub as any).comments,
-            rationale: (exSub as any).selectionRationale?.join('; '),
-            fatigueCost: exSub.fatigueCost,
-            substitutions: (exSub as any).canReplace?.map((id: string) => EXERCISE_CATALOG.find(e => e.id === id)?.name).filter(Boolean),
-          });
+            exs.push({
+             name: exSub.name, sets: cappedSets, reps: isGraded ? clampRepsRange(pr.reps, Math.min(repsCap, 12)) : repsStr, rir: isGraded ? 3 : pr.rir, rest: pr.rest, group: g, weight, weightNote,
+              role: 'accessory',
+               pattern: exSub.movementPattern || derivePattern(exSub),
+               tempo: tempoFor('памп').notation,
+               forceVec: forceVector(exSub.group, exSub.type, exSub.name),
+             jointStress: exSub.jointStress,
+             technique: (exSub as any).technique,
+             comments: (exSub as any).comments,
+             rationale: (exSub as any).selectionRationale?.join('; '),
+             progressionNote: pr.progressionNote,
+             fatigueCost: exSub.fatigueCost,
+             substitutions: (exSub as any).canReplace?.map((id: string) => EXERCISE_CATALOG.find(e => e.id === id)?.name).filter(Boolean),
+           });
           weeklySets[g] = (weeklySets[g] || 0) + cappedSets;
           daySets[g] = ds + cappedSets;
           groupIsoFatigue -= exFatigue;
