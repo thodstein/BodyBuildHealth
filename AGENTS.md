@@ -3157,3 +3157,111 @@ CompetitionCard (125 строк) целиком влит в PeakingPanel (240 с
 - src/ui/App.tsx — убран мёртвый import SupplementClinicScreen
 - src/ui/components/BioStackAIData.tsx — УДАЛЁН (orphan)
 - src/engines/biostack-clinical-recommender.ts — buildClinicalStack (источник истины профиля)
+
+---
+
+## Session Summary (Jul 15 — Part 11) — Профиль: Apple-стиль, единый хаб данных, интеграция дневников/отчётов
+
+### Goal
+Переделать экран «Профиль» в Apple-стиль: красивые карточки-кнопки с попапами, выделение значений, единый хаб «Мои данные», устранение дублей, двусторонний поток данных и ПОЛНАЯ интеграция дневников и отчётов со всей информацией на экране.
+
+### ✅ Сделано (все проверены esbuild-сборкой каждого файла; 3 коммита)
+- **ProfileDataHub.tsx** (НОВЫЙ, 334 строки): централизованный хаб «Мои данные» — агрегирует 15 источников (био/антропометрия/питание/фарма/анализы/тренировки/сон/давление/инъекции/симптомы/курс/поддержка/замеры/контакты/калькулятор), показывает % заполненности по每个 источнику + бар + чипсы незаполненного (клик → переход к нужной секции), общий прогресс `Заполнено N из M`. Навигация через `onNavigate`/`onOpenProfileTab`.
+- **ProfileScreen.tsx**: подвкладка `data` подключена; `ProfileTab` тип очищен (убраны sleep/measurements/progress дубли); карта `sectionHeaders` (8 вкладок) + рендер `<SectionTitle>` над каждой info-секцией. `save()` делает deep-merge в UnifiedSettings → `updateProfile` + `syncAllProfiles` (двусторонний поток, re-render через `useProfileRefresh`).
+- **ProfileDiariesSection.tsx**: убраны 5 внешних дубль-карточек-ссылок; каждая карточка открывает РЕАЛЬНЫЙ дневник inline: `SleepDiaryTab`, `BPDiaryTab`, `ProfileMeasurementsTab`, `LabDiaryTab`, `InjectionDiaryTab`. Замеры разделены: антропометрия = ввод (`ProfileBodySection`), история = `ProfileMeasurementsTab`.
+- **ProfileComponents.tsx — Apple-upgrade примитивов**: theme (glassBg `rgba(28,28,32,0.55)`, blur `blur(20px) saturate(160%)`, cardRadius 16, textDim 0.6); `glassCardStyle` (backdrop-filter + тень + light border); `PopupCard` (акцентная левая рамка 3px, значение в цвете — пустое → dim, dot-индикатор заполнения, press scale(0.98), uppercase label, модалка с иконкой + кнопка «Готово»); добавлены `SectionTitle` + `ValueChip`.
+- **ProfileBioSection.tsx**: hero-сводка вверху обзора (возраст/пол/уровень + Вес/Рост/BMI/FFMI/Цель) — вся ключевая информация видна сразу.
+- **ProfileAnalyticsSection.tsx**: превью последнего сохранённого отчёта (из `he_profile_reports`) прямо на вкладке «Сводные отчёты», реактивно обновляется при сохранении. Отчёты интегрированы: `ProfessionalReports` (тренер/врач/общий + кастом, сохранение в архив) + `PharmaBlockReports` + `ProfileGoalsHabitsCard`.
+- **ProfileBodySection.tsx**: композиция тела (BMI/LBM/FFMI/Navy BF%) + график истории веса + обхваты — уже показывает все данные.
+
+### ✅ Проверки
+- esbuild на `ProfileComponents.tsx` (131kb), `ProfileScreen.tsx` (5.9mb), `ProfileBioSection.tsx`, `ProfileAnalyticsSection.tsx` — **0 ошибок** каждый.
+- Все `color` props — 6-значные hex (безопасно для `color+'22'`).
+- Двусторонний поток: запись в попап → `save()` → `updateProfile`+`syncAllProfiles` → `useProfileRefresh` re-render (проверено по коду).
+- Дневники и отчёты РЕАЛЬНО интегрированы (inline-компоненты, localStorage-архивы).
+
+### ❌ Остаётся
+- `vite build` падает на `meal-plan-engine.ts:559` `Unexpected "export"` (параллельный агент, НЕ мой файл — не трогал).
+- Визуальная проверка в браузере (frosted-карточки/выделение значений/hero-сводка) — требует глазной ревью.
+
+### Key Decisions
+- Scoped Apple-upgrade через примитивы `ProfileComponents` поднимает ВСЕ секции (Bio/Body/Lifestyle/Diet/Health/Training/Analytics/Contacts/DataHub) одним edit.
+- Выделение значения через акцентный цвет + dot-индикатор = Apple-list стиль + видимость заполненности.
+- `ProfileDataHub` читает support-plan через `he_support_plan_result`; симптомы через `getSymptomDiaryStats()`; sleep/bp/injection/autocalc/biostack через localStorage-ключи.
+- ProfileScreen читает `getSettings()`; все секции пишут через `save()`.
+
+### Relevant Files
+- src/ui/screens/ProfileScreen_parts/ProfileComponents.tsx — theme, glassCardStyle, PopupCard (value highlight + accent), SectionTitle, ValueChip.
+- src/ui/screens/ProfileScreen.tsx — sectionHeaders + SectionTitle, save/state, diary/report интеграция.
+- src/ui/screens/ProfileScreen_parts/ProfileDataHub.tsx — агрегированный хаб (15 источников).
+- src/ui/screens/ProfileScreen_parts/ProfileDiariesSection.tsx — инлайн-дневники (без внешних дублей).
+- src/ui/screens/ProfileScreen_parts/ProfileBioSection.tsx — hero-сводка (age/weight/height/BMI/FFMI/goal).
+- src/ui/screens/ProfileScreen_parts/ProfileAnalyticsSection.tsx — превью последнего отчёта.
+- src/ui/screens/ProfileScreen_parts/ProfileBodySection.tsx — композиция + обхваты.
+- src/engines/symptom-diary.engine.ts — getSymptomDiaryStats().
+- src/ui/screens/NutritionScreen_parts/IndividualPlan/meal-plan-engine.ts — блокер сборки (559).
+
+### Коммиты сессии
+- dd7c88d6 — Profile: Apple-style card-buttons+popups, value highlight, section headers, data hub, dedupe diaries
+- 422b63c8 — Profile: add hero summary (age/weight/height/BMI/FFMI/goal) on bio overview
+- acb3a83f — Profile: show latest saved report preview on analytics tab (reactive to save)
+
+---
+
+## Session Summary (Jul 15 — Part 12) — PL-avto: profi-fiksy predpisaniya (fazovyy RIR + pik/deload + S-MRV + weakpoint-pl)
+
+### Done and verified (tsc: 0 errors in my files; vite build OK; UTF-8 noBOM)
+
+**Profi-audit PL-avto planirovshchika** (rol: profi-trener SRTS) vyyavil i ustranil 5 kriticheskikh raskhozhdeniy mezhdu planom i vypolneniem:
+
+1. **Fazovyy RIR teper v obekte plana (a ne tolko v UI-bannere)** — LMSWorkSet.rir / LMSPlanExercise.rir zapolnyayutsya iz RIR_MATRIX[goalKey][levelKey][phase] (base=2, build=2, peak=1, deload=4 dlya mass/intermediate). Ran'she RIR zhil tol'ko v bannele, a v execution (bridge lmsPlanToSessions) byl khardkod rir: 0 -> vse podkhody ispolnyaalis kak RIR 0 (do otkaza). Fiks: training-integration.engine.ts -> rir: ws.rir ?? 0. Test: wk1 base rir=2, wk4 deload rir=4, wk7-8 peak rir=1.
+
+2. **Real'naya struktura pik/deload (fazovaya modulyatsiya obyoma)** — dlya AVTO-progressiruyushchikh tsiklov (!hasExplicitWeeks) k setam assistentov primenyayetsya phaseVolMod iz MesoPhaseConfigs[phase].volumeMod (base 1.0, build 1.10, peak 0.60, deload 0.50). Vernye (imeyushchie svoi nodeli) tsikly NE trogayutsya (fakticheskiy obyom iz shablona sokhranyayetsya). Deload teper vyrazhen i cherez RIR (4) i cherez -50% obyoma assistentov.
+
+3. **S-MRV floor (assistenty minimum 2 podkhoda)** — posle phaseVolMod primenyayetsya Math.max(2, ...) k setam kazhdogo assistantnogo uprazhneniya. Ustranen bag "assistenty padali do 0-1 podkhoda v pik/deload" (prioritetnyy kap obyoma). Test: minAccSets=2 na vsekh nedyelyakh.
+
+4. **pmForWeek off-by-one** — lms-progression.engine.ts: PM_week = PM0 x (1+k)^(week-1) (bylo ^(week) -> week 1 schitalsya kak +k% rost). Teper week 1 = PM0.
+
+5. **weakpoint-pl inyektsiya v plan + UI-selektor** — LMSBuildInput.plWeakPoints: {lift, weakPoint}[]; injectPLWeakPoints() dobavlyayet 1 assistantnoe uprazhnenie (iz diagnoseWeakPoint) v den, soderzhashchiy osnovnoe dvizhenie (Prised/Zhim lyozha/Stanovaya tyaga), s prioritetnym RIR (x0.7) i %PM; dedupikatsiya po imeni. UI: SRCBBScreen.tsx — pod blokom "Slabye gruppy" dobavlen blok "Slabye tochki SRTS-dvizheniy" (3 lifta x weakpoints iz WEAK_POINTS_BY_LIFT), toggle togglePlWeak -> buildLMSPlan({plWeakPoints}). Test: bench+lockout -> v den zhimа dobavlen "Dozhim s 3 sm".
+
+### Arkhitekturnye resheniya
+- buildLMSPlan ostaetsya STATICHESKIM (stroi iz shablona nedeli 1), no teper: (a) embedit fazovyy RIR v kazhdyy set, (b) primenyayet phaseVolMod k assistentam dlya auto-tsiklov, (c) inyektiruyet weakpoint-assistenty v auto-tsiklakh.
+- injectPLWeakPoints tol'ko dlya !hasExplicitWeeks (vernye tsikly ne zasoryayutsya).
+- PM-progressiya: natural +0.5%/ned, on_course +2%/ned, pct -0.5%/ned; klyuchi RIR-matritsy ot template.meta.period / template.meta.level.
+
+### Proverki
+- tsc --noEmit: 0 oshibok v lms-builder.engine.ts, lms-progression.engine.ts, training-integration.engine.ts, SRCBBScreen.tsx.
+- vite build: OK (1m 8s), 0 oshibok.
+- Funktsionalnyy test (tsx, 38-tsikl): cycle-01 8 ned -> RIR po fazam (2/2/2/4/2/2/1/1), minAccSets=2, weakpoint-inyektsiya rabotaet; src2-sheiko-13 (vernyy, 14 ned) -> RIR=2 na wk1 (embedit, vol-mod ne primenyayetsya).
+- UTF-8: SRCBBScreen.tsx — OK (garbled=0).
+
+### Kommit
+- fd75ed15 — PL-auto: phase-aware RIR in plan, peak/deload volume mod, S-MRV floor, pmForWeek off-by-one, weakpoint-pl injection + UI selector
+
+## Session Summary (Jul 15 — Part 13) — MRV/volume-landmark validation + UI panels для BB-auto и ручного
+
+### ✅ Сделано (tsc 0 ошибок в моих файлах; esbuild OK; runtime-тест OK; UTF-8 noBOM)
+
+**Единый источник volume-landmarks (расширение):**
+- olume-landmarks.engine.ts: добавлены computeVolumeLandmarks(setsByMuscle, level, { labMult?, onlyGroups?, peakWeek? }), тип VolumeLandmarkRow, MUSCLE_LABEL_RU (EN→RU), STATUS_ORDER. Функция нормализует ключи (arms/legs→дочерние, weak→group), берёт ландмарки из getVolumeLandmarks(level, muscle), применяет labMult к MRV, сортирует по severity затем по sets desc.
+
+**PL (рефактор):**
+- lms-builder.engine.ts: getPLVolumeLandmarks теперь делегирует в computeVolumeLandmarks (вместо устаревшего getVolumeByMuscle). Маппинг статусов elow_mev→under / optimal→optimal / approaching_mrv→high / over_mrv→over; peakWeek коercится (.peakWeek ?? peakIdx+1) чтобы соответствовать PLVolumeLandmark (peakWeek: number).
+
+**BB-авто (ранее сделано, подтверждено в коммите):**
+- b-builder.engine.ts: BBPlan.volumeLandmarks?: VolumeLandmarkRow[] + getBBVolumeLandmarks(plan, level, pedMrvMult) — агрегирует пиковую неделю по sessions[].exercises[].muscle, нормализует PRO-ключи через collapseKey (delt_front→shoulders и т.д.), применяет pedMrvMult; заполняется в uildBBPlan.
+- BbAutoConstructor.tsx: MRV-панель из uiltPlan.volumeLandmarks (пиковая неделя, MAV/MRV маркеры, цветовой статус).
+
+**Ручной конструктор (PlanDisplay.tsx):**
+- MRV-панель: computeVolumeLandmarks(weeklySetsMap, level, { labMult }) (weeklySetsMap из esult.days[].exercises[].group), цветовой статус, MAV/MRV маркеры, список перегруженных/недотренированных групп.
+- Фиксы: добавлены labAnalysis+mrvOverride в деструктуризацию PlanDisplay Props (были в интерфейсе, но не во входе — ломало tsc); восстановлена сломанная петля calcQualityScore (использовала getPerMuscleMrvFromLevel как объект lm.mrv/mev/mav, хотя функция возвращает 
+umber — заменено на getVolumeLandmarks + применение onCourse/labMult-множителей).
+
+### ✅ Проверки
+- 	sc --noEmit: 0 ошибок в моих файлах (итого 1 ошибка в проекте — meal-plan-engine.ts:1055 } expected, ПРЕДСУЩЕСТВУЮЩИЙ блокер параллельного агента, не мой файл).
+- esbuild: OK для PlanDisplay.tsx и BbAutoConstructor.tsx (эмитит бандл).
+- runtime (tsx): MANUAL computeVolumeLandmarks({chest:18,back:22,legs:26,shoulders:12,arms:14,core:8},'advanced') → 6 строк, labMult 0.85 снижает MRV груди 24→20; BB getBBVolumeLandmarks мок-план → 8 строк (back/quads/chest/hamstrings/calves/triceps/biceps/shoulders), корректная нормализация delt_front→shoulders, статусы верны.
+- UTF-8: все файлы OK.
+
+### Коммит
+- 0e011b79 — MRV/volume-landmark validation + UI panels для BB-auto и ручного (3 файла: volume-landmarks.engine, lms-builder.engine, PlanDisplay.tsx). bb-builder.engine + BbAutoConstructor уже закоммичены ранее (94057b876 и др.).
