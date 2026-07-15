@@ -212,12 +212,19 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
   );
   const weeklySets: Record<string, number> = {};
   const patternBalance: Record<string, number> = {};
-  // weeklyMrvOf — недельный MRV конкретной группы из volume-landmarks.engine
+  // weeklyMrvOf — недельный объём конкретной группы из volume-landmarks.engine
   // (per-group: chest/back/legs/shoulders/arms/core; композиты arms=bi+tri, legs=qu+ha).
-  // P1.3: жёсткий недельный кап — сумма сетов за все дни недели не превышает MRV группы.
+  // P1.2: слабые группы получают MRV (приоритет), остальные — MAV (реаллокация объёма
+  //   от сильных групп к слабым в пределах недельного бюджета). P1.3: жёсткий недельный
+  //   кап — сумма сетов за все дни недели не превышает weeklyMrvOf(g).
   const weeklyMrvOf = (g: string): number => {
     const lm = getVolumeLandmarks(level, g);
-    return lm?.mrv ?? mrv;
+    const base = lm?.mrv ?? mrv;
+    if (!isWeak(g)) {
+      const mav = lm?.mav ?? Math.round(base * 0.8);
+      return Math.min(mav, base);
+    }
+    return base;
   };
   // freqMap — частота группы в микроцикле (сколько дней в неделю тренируется)
   const freqMap: Record<string, number> = {};
