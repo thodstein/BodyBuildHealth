@@ -34,7 +34,7 @@ export const RISK_MODEL_LABELS: Record<RiskModelType, string> = {
 const REFERENCE_RANGES: Record<string, { low: number; high: number; criticalHigh: number; unit: string }> = {
   TESTOSTERONE_TOTAL: { low: 10, high: 35, criticalHigh: 52, unit: 'нмоль/л' },
   TESTOSTERONE_FREE: { low: 0.2, high: 0.6, criticalHigh: 0.9, unit: 'нмоль/л' },
-  ESTRADIOL: { low: 10, high: 40, criticalHigh: 100, unit: 'пг/мл' },
+  ESTRADIOL: { low: 10, high: 40, criticalHigh: 60, unit: 'пг/мл' },
   PROLACTIN: { low: 50, high: 350, criticalHigh: 500, unit: 'мЕд/л' },
   LH: { low: 1, high: 10, criticalHigh: 15, unit: 'МЕ/л' },
   FSH: { low: 1, high: 12, criticalHigh: 18, unit: 'МЕ/л' },
