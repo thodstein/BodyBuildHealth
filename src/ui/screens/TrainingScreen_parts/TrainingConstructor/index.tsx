@@ -72,6 +72,39 @@ const Sel: React.FC<{ label: string; value: string; onChange: (v: string) => voi
     <PopupSelect label={label} value={value} onChange={onChange} options={options} hint={hint} />
   );
 
+/** Добавить финальную разгрузочную неделю: клонировать последнюю, режим объём/вес по deload-оверрайду, RIR 3. */
+function appendDeloadWeek(weeks: ManualWeek[], goal: string): ManualWeek[] {
+  if (weeks.length === 0) return weeks;
+  const last = weeks[weeks.length - 1];
+  const dt = getDeloadOverride(goal);
+  const deloadDays: ManualDay[] = last.days.map((d) => ({
+    ...d,
+    exercises: d.exercises.map((ex) => ({
+      ...ex,
+      sets: Math.max(1, Math.round(ex.sets * dt.volumeMultiplier)),
+      rir: 3,
+      rest: 90,
+      weight: Math.round((ex.weight || 80) * dt.intensityMultiplier),
+    })),
+  }));
+  const weekTonnage = Math.round(deloadDays.reduce((sum, d) => sum + d.exercises.reduce((s, ex) => {
+    const repAvg = ex.reps.includes('-') ? (parseInt(ex.reps) + parseInt(ex.reps.split('-')[1] || ex.reps)) / 2 : parseInt(ex.reps) || 10;
+    return s + ex.sets * ex.weight * repAvg;
+  }, 0), 0));
+  return [
+    ...weeks,
+    {
+      weekNumber: weeks.length + 1,
+      phase: 'deload',
+      phaseLabel: 'Разгрузка',
+      rir: 3,
+      days: deloadDays,
+      corrections: [`🆕 Финальная разгрузочная неделя: объём ×${dt.volumeMultiplier}, вес ×${dt.intensityMultiplier} — восстановление перед новым циклом.`],
+      totalTonnage: weekTonnage,
+    },
+  ];
+}
+
 
 
 export const TrainingConstructor: React.FC<Props> = ({
@@ -668,13 +701,14 @@ export const TrainingConstructor: React.FC<Props> = ({
         `📥 Программа: ${programData.name} (${programData.author || ''}) — ${programData.durationWeeks} нед, цели: ${programData.goal}, уровень: ${programData.level}.`,
         ...(programData.warnings?.length ? ['⚠ ' + programData.warnings.join('; ')] : []),
       ];
+      const progWeeks = addDeloadWeek ? appendDeloadWeek(programWeeks, goal) : programWeeks;
       setManualResult({
         splitName: programData.name,
-        corrections,
+        corrections: addDeloadWeek ? [...corrections, `🆕 Добавлена финальная разгрузочная неделя (нед ${progWeeks.length}).`] : corrections,
         days: firstWeek.days,
-        weeks: programWeeks,
+        weeks: progWeeks,
         currentWeek: 1,
-        mesoLength: programData.durationWeeks,
+        mesoLength: progWeeks.length,
       });
       setWizardStep(6);
       return;

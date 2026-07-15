@@ -273,7 +273,7 @@ interface DeloadOverride {
   label: string;
 }
 
-function getDeloadOverride(goal: string): DeloadOverride {
+export function getDeloadOverride(goal: string): DeloadOverride {
   if (goal === 'strength' || goal === 'powerlifting') {
     return { volumeMultiplier: 0.30, intensityMultiplier: 0.85, repRange: [1, 3], label: 'интенсивный (сила)' };
   }
@@ -420,8 +420,12 @@ export function buildPhasePlan(
   globalTempoStr?: string,
   rotationFreq: number = 3,
   rotationEnabled: boolean = true,
+  addFinalDeload: boolean = false,
 ): ManualWeek[] {
   const dist = distributePhases(mesoLength, deloadFreq, goal);
+  if (addFinalDeload) {
+    dist.push({ phase: 'deload', startWeek: mesoLength + 1, endWeek: mesoLength + 1, weeks: [mesoLength + 1], config: PHASE_CONFIGS.deload });
+  }
   
   // Подсчёт общего числа недель в каждой фазе (для DUP-повторений)
   const phaseTotals: Record<string, number> = { accumulation: 0, intensification: 0, deload: 0, peaking: 0 };

@@ -188,6 +188,7 @@ export interface BuildPlanInput {
   sequenceStrategy: 'classic' | 'preexhaust' | 'antagonist';
   preferEquipment?: string[];
   courseIntensity?: 'none' | 'mild' | 'moderate' | 'heavy'; // ААС-интенсивность для ПЕД-коррекции объёма
+  addDeloadWeek?: boolean; // Добавить финальную разгрузочную неделю (объём −50%, RIR 3)
 }
 
 /**

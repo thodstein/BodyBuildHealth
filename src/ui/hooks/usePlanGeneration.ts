@@ -27,6 +27,7 @@ export interface PlanGenOpts {
   workMaxOverride?: Record<string, number>;
   mrvOverride?: number | null;
   sequenceStrategy?: 'classic' | 'preexhaust' | 'antagonist';
+  addDeloadWeek?: boolean;
 }
 
 /**
@@ -46,6 +47,7 @@ export function usePlanGeneration(deps: PlanGenDeps) {
         mrvOverride: opts?.mrvOverride,
         sequenceStrategy: opts?.sequenceStrategy ?? 'classic',
         courseIntensity,
+        addDeloadWeek: opts?.addDeloadWeek,
       }),
     [goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, courseIntensity]
   );
