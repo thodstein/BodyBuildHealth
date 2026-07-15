@@ -5,30 +5,30 @@ import { toFinderProfile, PURE_GOALS, HEALTH_CONDS } from './BioStackAIConstants
 import type { GoalType, HealthCondition, ExperienceLevel, AASStatus } from '../../engines/biostack-ai.engine';
 
 const STEP_STYLES = {
-  container: { maxWidth: 380, margin: '0 auto', paddingBottom: 80 } as React.CSSProperties,
-  title: { fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 4, textAlign: 'center' } as React.CSSProperties,
-  subtitle: { fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 12, textAlign: 'center', lineHeight: 1.4 } as React.CSSProperties,
-  cardGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 12 } as React.CSSProperties,
+  container: { maxWidth: 400, margin: '0 auto', paddingBottom: 80 } as React.CSSProperties,
+  title: { fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 4, textAlign: 'center' as const },
+  subtitle: { fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 14, textAlign: 'center' as const, lineHeight: 1.4 },
+  cardGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 14 } as React.CSSProperties,
   card: (active: boolean, color: string): React.CSSProperties => ({
-    padding: '12px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
-    background: active ? `${color}12` : 'rgba(24,24,27,0.7)',
-    border: active ? `1.5px solid ${color}` : '1px solid rgba(255,255,255,0.06)',
+    padding: '14px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'center' as const,
+    background: active ? `${color}14` : 'rgba(24,24,27,0.7)',
+    border: active ? `2px solid ${color}` : '1px solid rgba(255,255,255,0.06)',
     transition: 'all 0.15s',
   }),
-  cardIcon: { fontSize: 22, marginBottom: 4 } as React.CSSProperties,
-  cardTitle: { fontSize: 9, fontWeight: 700, color: '#fff', marginBottom: 2 } as React.CSSProperties,
-  cardDesc: { fontSize: 7, color: 'rgba(255,255,255,0.4)', lineHeight: 1.2 } as React.CSSProperties,
+  cardIcon: { fontSize: 26, marginBottom: 4 } as React.CSSProperties,
+  cardTitle: { fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 2 } as React.CSSProperties,
+  cardDesc: { fontSize: 9, color: 'rgba(255,255,255,0.4)', lineHeight: 1.3 } as React.CSSProperties,
   nextBtn: (color: string): React.CSSProperties => ({
-    width: '100%', padding: '12px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
-    background: `linear-gradient(135deg,${color},${color}dd)`, color: '#000', fontWeight: 800, fontSize: 12,
-    boxShadow: `0 3px 14px ${color}22`,
+    width: '100%', padding: '14px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
+    background: `linear-gradient(135deg,${color},${color}dd)`, color: '#000', fontWeight: 800, fontSize: 13,
+    boxShadow: `0 4px 16px ${color}28`,
   }),
-  backBtn: { width: '100%', padding: '8px 0', borderRadius: 8, marginTop: 6, cursor: 'pointer',
-    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontSize: 9, fontWeight: 600 },
-  progress: { display: 'flex', gap: 3, justifyContent: 'center', marginBottom: 12 } as React.CSSProperties,
+  backBtn: { width: '100%', padding: '10px 0', borderRadius: 10, marginTop: 6, cursor: 'pointer',
+    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: 600 },
+  progress: { display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 14 } as React.CSSProperties,
   dot: (active: boolean): React.CSSProperties => ({
-    width: 6, height: 6, borderRadius: 3,
-    background: active ? '#00e68a' : 'rgba(255,255,255,0.15)',
+    width: 8, height: 8, borderRadius: 4,
+    background: active ? '#00e68a' : 'rgba(255,255,255,0.12)',
     transition: 'all 0.2s',
   }),
 };
@@ -124,9 +124,9 @@ export const OnboardingWizard: React.FC<OnboardingProps> = ({ profile, onComplet
               return (
                 <button key={h.key} onClick={() => toggleHealth(h.key)} style={{
                   padding: '8px 12px', borderRadius: 16, cursor: 'pointer', fontSize: 9, fontWeight: 600,
-                  background: active ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
-                  border: active ? '1.5px solid rgba(239,68,68,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                  color: active ? '#ef4444' : 'rgba(255,255,255,0.6)',
+                  background: active ? 'rgba(239,68,68,0.14)' : 'rgba(255,255,255,0.03)',
+                  border: active ? '2px solid rgba(239,68,68,0.35)' : '1px solid rgba(255,255,255,0.06)',
+                  color: active ? '#ef4444' : 'rgba(255,255,255,0.6)', fontSize: 10,
                 }}>{h.label}</button>
               );
             })}
@@ -146,24 +146,26 @@ export const OnboardingWizard: React.FC<OnboardingProps> = ({ profile, onComplet
           <div style={STEP_STYLES.title}>💪 Ваш уровень и режим</div>
           <div style={STEP_STYLES.subtitle}>Это влияет на размер и сложность стека</div>
 
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 4, fontWeight: 600 }}>ОПЫТ ТРЕНИРОВОК</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, marginBottom: 8 }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontWeight: 600 }}>ОПЫТ ТРЕНИРОВОК</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 12 }}>
             {EXP_CARDS.map(e => (
               <div key={e.key} onClick={() => setExperience(e.key)}
-                style={{ ...STEP_STYLES.card(experience === e.key, '#60a5fa'), padding: '8px 6px' }}>
-                <div style={{ fontSize: 16, marginBottom: 1 }}>{e.icon}</div>
-                <div style={{ fontSize: 7, fontWeight: 700, color: experience === e.key ? '#60a5fa' : '#fff' }}>{e.title}</div>
+                style={{ ...STEP_STYLES.card(experience === e.key, '#60a5fa'), padding: '10px 8px' }}>
+                <div style={{ fontSize: 22, marginBottom: 2 }}>{e.icon}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: experience === e.key ? '#60a5fa' : '#fff' }}>{e.title}</div>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{e.desc}</div>
               </div>
             ))}
           </div>
 
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 4, fontWeight: 600 }}>СТАТУС ААС</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 3, marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontWeight: 600 }}>СТАТУС ААС</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 14 }}>
             {AAS_CARDS.map(a => (
               <div key={a.key} onClick={() => setAasStatus(a.key)}
-                style={{ ...STEP_STYLES.card(aasStatus === a.key, '#8b5cf6'), padding: '8px 4px' }}>
-                <div style={{ fontSize: 14, marginBottom: 1 }}>{a.icon}</div>
-                <div style={{ fontSize: 7, fontWeight: 700, color: aasStatus === a.key ? '#8b5cf6' : '#fff' }}>{a.title}</div>
+                style={{ ...STEP_STYLES.card(aasStatus === a.key, '#8b5cf6'), padding: '12px 10px' }}>
+                <div style={{ fontSize: 20, marginBottom: 2 }}>{a.icon}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: aasStatus === a.key ? '#8b5cf6' : '#fff' }}>{a.title}</div>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{a.desc}</div>
               </div>
             ))}
           </div>

@@ -189,6 +189,18 @@ export function mavPerGroup(level: string): Record<string, number> {
   return out;
 }
 
+/** MRV для конкретной мышцы с учётом курса и лаб. коррекции. */
+export function getPerMuscleMrvFromLevel(level: string, muscle: string, onCourse: boolean, courseIntensity: string, labMult: number): number {
+  const lm = getVolumeLandmarks(level, muscle);
+  let mrv = lm?.mrv || 12;
+  if (onCourse) {
+    const courseMult = courseIntensity === 'heavy' ? 1.3 : courseIntensity === 'moderate' ? 1.2 : 1.15;
+    mrv = Math.round(mrv * courseMult);
+  }
+  mrv = Math.round(mrv * (labMult || 1));
+  return mrv;
+}
+
 /** Статус фактического объёма относительно ориентиров. */
 export function checkVolumeStatus(currentSets: number, landmarks: MuscleVolumeLandmarks): VolumeStatus {
   if (currentSets < landmarks.mev) return 'below_mev';
