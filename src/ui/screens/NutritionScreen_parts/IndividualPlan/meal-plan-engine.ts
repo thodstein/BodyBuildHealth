@@ -909,6 +909,39 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
   }
+
+
+  // ─── Итеративная коррекция макросов: точность ≤3% (макросы приоритет, ккал следует) ───
+  for (let iter = 0; iter < 8; iter++) {
+    const gP = adjustedProteinG || input.goalProteinG, gC = carbsTotal, gF = fatTotal;
+    const dP = (gP - totals.p) / Math.max(1, gP);
+    const dC = (gC - totals.c) / Math.max(1, gC);
+    const dF = (gF - totals.f) / Math.max(1, gF);
+    if (Math.abs(dP) <= 0.03 && Math.abs(dC) <= 0.03 && Math.abs(dF) <= 0.03) break;
+    // Fix each macro independently by scaling its items
+    const fixM = (roles: string[], dev: number, floor: number) => {
+      if (Math.abs(dev) <= 0.03) return;
+      const items = meals.flatMap(m => m.items.filter(it => roles.includes(it.role)).map(item => ({ item })));
+      if (items.length === 0) return;
+      const scale = Math.max(0.88, Math.min(1.12, 1 + dev * 0.65));
+      items.forEach(({ item }) => {
+        const suppMin = SUPPLEMENT_MAX_G[item.id] ? 5 : floor;
+        const newAmount = Math.max(suppMin, Math.round(item.amount * scale));
+        const factor = newAmount / (item.amount || 1);
+        item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
+      });
+    };
+    fixM(['protein','fast_protein','slow_protein'], dP, 10);
+    fixM(['carb_slow','carb_fast','fruit'], dC, 10);
+    fixM(['fat'], dF, 5);
+    // Recalculate
+    meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
+    totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + m.totals.fiber, 0); totals.leucine_mg = meals.reduce((s, m) => s + m.totals.leucine_mg, 0);
+  }
+
+  // ─── Atwater kcal: totals.kcal = P*4 + C*4 + F*9 (соответствует макросам) ───
+  totals.kcal = Math.round(totals.p * 4 + totals.c * 4 + totals.f * 9);
+  meals.forEach(m => { m.totals.kcal = Math.round(m.totals.p * 4 + m.totals.c * 4 + m.totals.f * 9); });
   const deficiencyClosure = closeFoodDeficiencies(meals);
   if (deficiencyClosure.length > 0) notes.push(...deficiencyClosure);
   // P5: Phase-specific nutrition protocol (bodybuilder-specific)
