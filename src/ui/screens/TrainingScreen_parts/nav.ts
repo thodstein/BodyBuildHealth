@@ -60,6 +60,10 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     color: '#f59e0b',
     subtitle: 'Каталог процессов: циклы, программы, методики, пик-протоколы, упражнения',
     tabs: ['library', 'programs', 'methods', 'peaking', 'calc_taper', 'exercises', 'mytraining'],
+    categories: [
+      { label: 'Процессы', icon: '🗂', tabs: ['library', 'programs', 'mytraining'] },
+      { label: 'Знания и методики', icon: '🧠', tabs: ['methods', 'peaking', 'calc_taper', 'exercises'] },
+    ],
   },
 };
 
