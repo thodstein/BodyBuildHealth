@@ -768,30 +768,30 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               {wk.days.map((d, di) => (
                 <div key={di} style={{ ...CARD, marginTop:10, borderLeft:`3px solid ${ACCENT}` }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, gap:6 }}>
-                    <span style={{ fontSize:13, fontWeight:700, color:'#fff' }}>🏋️ День {di+1}{d.exercises[0]?.load ? ' · '+d.exercises[0].load : ''}</span>
-                    <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)', textAlign:'right' }}>{d.metrics.tonnage.toFixed(0)}т · {d.metrics.kpsh}КПШ · УОИ {d.metrics.uoi.toFixed(2)}</span>
+                    <span style={{ fontSize:13, fontWeight:700, color:'#fff', flex:1, minWidth:0, overflowWrap:'anywhere' }}>🏋️ День {di+1}{d.exercises[0]?.load ? ' · '+d.exercises[0].load : ''}</span>
+                    <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)', textAlign:'right', flexShrink:0 }}>{d.metrics.tonnage.toFixed(0)}т · {d.metrics.kpsh}КПШ · УОИ {d.metrics.uoi.toFixed(2)}</span>
                   </div>
                   {!editMode && (
-                    <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:8, overflowX:'auto', overflowY:'hidden', WebkitOverflowScrolling:'touch', border:'1px solid rgba(255,255,255,0.06)', scrollbarWidth:'none', msOverflowStyle:'none' }}>
-                      <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 0.6fr 0.7fr', gap:2, padding:'5px 6px', fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.45)', textTransform:'uppercase', background:'rgba(0,230,138,0.05)' }}>
-                        <span>Упражнение</span><span>Подходы</span><span>Хар-р</span><span>Темп</span>
-                      </div>
-                       {d.exercises.map((e, ei) => {
-                         const tmpo = getTempo(e.name, goal, e.load === 'main');
-                         const currentT = e.workSets.map((ws, si) => {
-                           const k = setKey(wk.week, di, ei, si);
-                           return tempoStr || srcEdits[k]?.tempo || tmpo.tempo.toString;
-                         });
-                         return (
-                          <div key={ei} style={{ display:'grid', gridTemplateColumns:'2fr 1fr 0.6fr 0.7fr', gap:2, padding:'6px 6px', fontSize:11, color:'rgba(255,255,255,0.9)', borderTop:'1px solid rgba(255,255,255,0.05)', alignItems:'center' }}>
-                           <span style={{ fontWeight:600, whiteSpace:'normal', overflowWrap:'anywhere' }}>{e.name}</span>
-                           <span style={{ color:'rgba(255,255,255,0.85)' }}>{e.workSets.map((ws, si) => setStr(effSet(wk.week, di, ei, si, ws))).join('  ·  ')}</span>
-                           <span style={{ fontSize:9, fontWeight:700, color:e.load === 'main' ? '#00e68a' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>{e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}</span>
-                           <span style={{ fontSize:9, color:'#a855f7', fontWeight:700, background:'rgba(168,85,247,0.1)', padding:'2px 6px', borderRadius:4, textAlign:'center' }}>{tempoStr || currentT[0]}</span>
-                         </div>
-                         );
-                       })}
-
+                    <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                      {d.exercises.map((e, ei) => {
+                        const tmpo = getTempo(e.name, goal, e.load === 'main');
+                        const currentT = e.workSets.map((ws, si) => {
+                          const k = setKey(wk.week, di, ei, si);
+                          return tempoStr || srcEdits[k]?.tempo || tmpo.tempo.toString;
+                        });
+                        return (
+                          <div key={ei} style={{ background:'rgba(255,255,255,0.02)', borderRadius:8, padding:'7px 9px', border:'1px solid rgba(255,255,255,0.04)' }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6 }}>
+                              <span style={{ fontSize:12, fontWeight:600, color:'#fff', flex:1, minWidth:0, overflowWrap:'anywhere' }}>{e.name}</span>
+                              <span style={{ fontSize:9, fontWeight:700, flexShrink:0, color:e.load === 'main' ? '#00e68a' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.4)', padding:'1px 6px', borderRadius:4, background: e.load === 'main' ? 'rgba(0,230,138,0.1)' : e.load === 'additional' ? 'rgba(245,158,11,0.1)' : 'transparent' }}>{e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}</span>
+                            </div>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, marginTop:4 }}>
+                              <span style={{ fontSize:10, color:'rgba(255,255,255,0.85)', flex:1, minWidth:0, overflowWrap:'anywhere' }}>{e.workSets.map((ws, si) => setStr(effSet(wk.week, di, ei, si, ws))).join('  ·  ')}</span>
+                              <span style={{ fontSize:9, color:'#a855f7', fontWeight:700, background:'rgba(168,85,247,0.1)', padding:'2px 6px', borderRadius:4, flexShrink:0 }}>{tempoStr || currentT[0]}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                   {editMode && d.exercises.map((e, ei) => (
