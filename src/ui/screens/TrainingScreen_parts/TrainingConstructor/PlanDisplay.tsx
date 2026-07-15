@@ -751,8 +751,11 @@ export const PlanDisplay: React.FC<Props> = ({
                           border: '0.5px solid ' + (e.role === 'main' ? ACCENT : e.role === 'secondary' ? '#60a5fa' : 'rgba(255,255,255,0.2)')
                         }}>{e.role === 'main' ? 'База' : e.role === 'secondary' ? 'Доп' : 'Изо'}</span>
                         {e.name}
+                        {e.weight && !(e as any).weightNote && (
+                          <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, fontWeight: 700, background: 'rgba(96,165,250,0.18)', color: '#60a5fa', border: '0.5px solid rgba(96,165,250,0.4)', flex: '0 0 auto' }}>от 1ПМ</span>
+                        )}
                       </span>
-                      <span style={{ display: 'flex', gap: 4, flex: '0 0 auto' }}>
+                       <span style={{ display: 'flex', gap: 4, flex: '0 0 auto' }}>
                         <button onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); openSubstitute(di, ei); }} title="Замена" style={actionBtnStyle(ACCENT)}>🔄</button>
                         <button onClick={(ev: React.MouseEvent) => { ev.stopPropagation(); const k = window.prompt('Шаблон (5×5, 3×8, 4×10, 3×12, AMRAP, Myo-rep, 10×10 GVT, 5/3/1):', '5×5'); if (k && SET_TEMPLATES[k]) applySetTemplate(di, ei, k); }} title="Шаблон" style={actionBtnStyle('#a855f7')}>⚡</button>
                       </span>
