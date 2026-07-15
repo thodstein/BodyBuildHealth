@@ -791,6 +791,34 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
 
 
+  // Omega-3 boost: ensure at least one omega-3 source per day
+  {
+    const omega3Ids = new Set(['salmon','mackerel','sardines','red_fish','flaxseed','chia_seeds','walnuts']);
+    const hasOmega3 = meals.some(m => m.items.some(it => omega3Ids.has(it.id)));
+    if (!hasOmega3 && !input.isVegetarian) {
+      const fish = FOOD_DB.find(f => f.id === 'salmon' && !(input.excludedIds||new Set()).has(f.id)) || FOOD_DB.find(f => f.id === 'mackerel' && !(input.excludedIds||new Set()).has(f.id));
+      if (fish) {
+        const lunchMeal = meals.find(m => m.type === 'lunch') || meals[1];
+        if (lunchMeal) {
+          // Replace the main protein source in lunch with fish (swap, not add)
+          const protIdx = lunchMeal.items.findIndex(it => it.role === 'protein');
+          if (protIdx >= 0) {
+            const oldItem = lunchMeal.items[protIdx];
+            const fishGrams = oldItem.amount || 100;
+            lunchMeal.items[protIdx] = makeItem(fish, fishGrams, 'protein');
+            allFoodsUsed[allFoodsUsed.indexOf(oldItem.id)] = fish.id;
+          } else {
+            lunchMeal.items.push(makeItem(fish, 80, 'protein'));
+            allFoodsUsed.push(fish.id);
+          }
+          lunchMeal.totals = lunchMeal.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+          // Recalculate day totals
+          totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + m.totals.fiber, 0); totals.leucine_mg = meals.reduce((s, m) => s + m.totals.leucine_mg, 0);
+          notes.push('🐟 Омега-3 буст: лосось заменяет белок в обеде (EPA/DHA ~2.2г) — противовоспалительный жир');
+        }
+      }
+    }
+  }
   // KBJU fine-tune: if kcal >10% under goal, add fat (capped at fatTotal*1.10)
   {
     const devK = (input.goalKcal - totals.kcal) / Math.max(1, input.goalKcal);
@@ -840,7 +868,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   {
     const goalF2 = fatTotal;
     const devF2 = (totals.f - goalF2) / Math.max(1, goalF2);
-    if (devF2 > 0.12) {
+    if (devF2 > 0.12) { console.error('DBG FAT TRIM: devF2=', devF2, ' excessF=', (totals.f - goalF2), ' fatItems=', fatItems2.length);
       const excessF = totals.f - goalF2;
       const fatItems2 = meals.flatMap(m => m.items.filter(it => it.role === 'fat').map(it => ({ meal: m, item: it })));
       if (fatItems2.length > 0) {
@@ -894,34 +922,6 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     notes.push(`✅ Клетчатка: ${fiberG}г / ${fiberTarget}г`);
   }
 
-  // Omega-3 boost: ensure at least one omega-3 source per day
-  {
-    const omega3Ids = new Set(['salmon','mackerel','sardines','red_fish','flaxseed','chia_seeds','walnuts']);
-    const hasOmega3 = meals.some(m => m.items.some(it => omega3Ids.has(it.id)));
-    if (!hasOmega3 && !input.isVegetarian) {
-      const fish = FOOD_DB.find(f => f.id === 'salmon' && !(input.excludedIds||new Set()).has(f.id)) || FOOD_DB.find(f => f.id === 'mackerel' && !(input.excludedIds||new Set()).has(f.id));
-      if (fish) {
-        const lunchMeal = meals.find(m => m.type === 'lunch') || meals[1];
-        if (lunchMeal) {
-          // Replace the main protein source in lunch with fish (swap, not add)
-          const protIdx = lunchMeal.items.findIndex(it => it.role === 'protein');
-          if (protIdx >= 0) {
-            const oldItem = lunchMeal.items[protIdx];
-            const fishGrams = oldItem.amount || 100;
-            lunchMeal.items[protIdx] = makeItem(fish, fishGrams, 'protein');
-            allFoodsUsed[allFoodsUsed.indexOf(oldItem.id)] = fish.id;
-          } else {
-            lunchMeal.items.push(makeItem(fish, 80, 'protein'));
-            allFoodsUsed.push(fish.id);
-          }
-          lunchMeal.totals = lunchMeal.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
-          // Recalculate day totals
-          totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + m.totals.fiber, 0); totals.leucine_mg = meals.reduce((s, m) => s + m.totals.leucine_mg, 0);
-          notes.push('🐟 Омега-3 буст: лосось заменяет белок в обеде (EPA/DHA ~2.2г) — противовоспалительный жир');
-        }
-      }
-    }
-  }
 
   const deficiencyClosure = closeFoodDeficiencies(meals);
   if (deficiencyClosure.length > 0) notes.push(...deficiencyClosure);
