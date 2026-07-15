@@ -69,3 +69,61 @@ export function derivePattern(ex: any): string {
   };
   return gMap[g] || 'unknown';
 }
+
+/**
+ * Каноническая мышца упражнения (по movementPattern + targetMuscle).
+ * Возвращает null для упражнений, которые НЕ принадлежат телу-строительному
+ * плану (переноски, становая/рывок/толчок/олимпийские, good morning/hinge).
+ * Это устраняет корень бага: bb-builder брал пул из КОМПОЗИТНЫХ групп
+ * (arms/legs) и метил упражнение ролью плана → leg curls считались «calves»,
+ * farmer's walk — «biceps», good morning — «quads».
+ */
+const MP_TO_MUSCLE: Record<string, string | null> = {
+  horizontal_push: 'chest', incline_push: 'chest', dip_push: 'chest', decline_push: 'chest', vertical_push: 'chest',
+  isolation_chest: 'chest',
+  vertical_pull: 'back', horizontal_pull: 'back', isolation_back: 'back',
+  isolation_shoulders: 'shoulders',
+  squat: 'quads', lunge: 'quads', isolation_legs_quad: 'quads',
+  isolation_legs_ham: 'hamstrings',
+  glute_squat: 'glutes',
+  isolation_calves: 'calves',
+  core: 'abs', anti_rotation: 'abs', rotation: 'abs',
+  carry: null, hinge: null,
+};
+
+export function trueMuscleOf(ex: any): string | null {
+  const mp = ex?.movementPattern || derivePattern(ex);
+  const tgt: string = (ex?.targetMuscle || '').toLowerCase();
+  const nm: string = (ex?.name || '').toLowerCase();
+  // Переноски (фермерская/официанта) — не мышечная группа ББ
+  if (isCarryExercise(ex)) return null;
+  // Соревновательные/ПЛ движения — не принадлежат ББ-плану
+  if (/станов|рывок|толчок|пендл|подъём на грудь|взятие на грудь|армлифт|конвой|удержание штанг|олимп/.test(nm)) return null;
+  // Hinge (good morning / deadlift / RDL) — ПЛ-движение, не ББ
+  if (mp === 'hinge') return null;
+  const base = MP_TO_MUSCLE[mp];
+  if (base) return base;
+  if (mp === 'isolation_arms') {
+    if (/трицепс/.test(tgt)) return 'triceps';
+    if (/предплеч|хват/.test(tgt)) return 'forearms';
+    return 'biceps'; // сгибания на бицепс по умолчанию
+  }
+  if (mp === 'isolation_back') {
+    if (/трапеци/.test(tgt)) return 'traps';
+    return 'back';
+  }
+  return null;
+}
+
+/** Множество канонических мышц для роли плана (композиты раскрываются). */
+export function musclesForRole(repKey: string): string[] {
+  const m = (repKey || '').toLowerCase();
+  const map: Record<string, string[]> = {
+    chest: ['chest'], back: ['back'], traps: ['traps'],
+    shoulders: ['shoulders'], delt_front: ['shoulders'], delt_mid: ['shoulders'], delt_rear: ['shoulders'],
+    quads: ['quads'], hamstrings: ['hamstrings'], glutes: ['glutes'], calves: ['calves'], legs: ['quads', 'hamstrings', 'glutes', 'calves'],
+    abs: ['abs'], forearms: ['forearms'],
+    biceps: ['biceps'], triceps: ['triceps'], arms: ['biceps', 'triceps'],
+  };
+  return map[m] || [m];
+}

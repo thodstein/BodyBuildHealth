@@ -15,8 +15,9 @@ import { SPLIT_PATTERNS, getPattern, sessionsOf, type SplitPattern, type Schedul
 import { FORCE_HEAVY_GROUPS, getPair, resolveCharacter, type DayCharacter, type MuscleSlot } from './bb-day-types';
 import { getAllVolumeLandmarks, landmarksForRotation, normLevel, type TrainingLevel, type MuscleVolumeLandmarks } from '../volume-landmarks.engine';
 import { tempoFor, REST_BY_CHARACTER, type TempoSpec } from './bb-tempo-rest';
-import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
+import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { selectExercisesSmart } from '../exercise-selector.engine';
+import { trueMuscleOf, musclesForRole } from '../movement-pattern';
 import { PCT_FOR_RIR, S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
@@ -436,28 +437,36 @@ function buildSession(
       ? (['back', 'quads', 'chest', 'shoulders'].includes(muscle) ? 3 : 2)
       : accessoryCount;
     const selType = ALWAYS_ISOLATION.has(muscle) ? 'isolation' : (role === 'primary' ? 'compound' : 'isolation');
-    let pool = getExercisesByGroup(catalogGroupFor(repKey));
-    // Фильтр: убираем упражнения, не соответствующие контексту сессии
+    // Корень фикса: пул строится по ИСТИННОЙ мышце упражнения (movementPattern +
+    // targetMuscle), а не по композитной группе каталога. Это устраняет
+    // неверную атрибуцию (leg curl → «calves», farmer walk → «biceps»,
+    // good morning → «quads») и исключает ПЛ-движения (carry/hinge/становая).
+    const roleMuscles = musclesForRole(repKey);
+    let pool = EXERCISE_CATALOG.filter((ex: any) => {
+      const tm = trueMuscleOf(ex);
+      return tm !== null && roleMuscles.includes(tm);
+    });
+    // Фильтр по контексту сессии (доп. страховка, в основном инертен после
+    // фильтрации по истинной мышце)
     const tag = (sched.sessionTag || '').toLowerCase();
     pool = pool.filter(ex => {
       const n = (ex.name || '').toLowerCase();
-      const id = (ex.id || '').toLowerCase();
-      // Push/Chest/Shoulders день: исключаем тяги, становую, carries
       if (tag.includes('push') || tag === 'chest' || tag === 'shoulders') {
         if (n.includes('тяга')||n.includes('становая')||n.includes('мёртвая')||n.includes('гиперэкстенз')||n.includes('фермер')||n.includes('carry')) return false;
       }
-      // Pull/Back день: исключаем жимы, фронтальные махи
       if (tag.includes('pull') || tag === 'back') {
         if (n.includes('жим')&&!n.includes('ногами')||n.includes('press')||n.includes('разгиб')||n.includes('extension')) return false;
       }
-      // Legs день: исключаем верх тела
       if (tag === 'legs' || tag === 'lower') {
         if (n.includes('жим')&&!n.includes('ногами')||n.includes('тяга')||n.includes('подтяг')||n.includes('бицепс')||n.includes('трицепс')) return false;
       }
       return true;
     });
-    // Если после фильтра пул опустел — возвращаем полный
-    if (pool.length === 0) pool = getExercisesByGroup(catalogGroupFor(repKey));
+    // Если после фильтра пул опустел — fallback на тот же истинный-мышечный пул
+    if (pool.length === 0) pool = EXERCISE_CATALOG.filter((ex: any) => {
+      const tm = trueMuscleOf(ex);
+      return tm !== null && roleMuscles.includes(tm);
+    });
     const selected = selectExercisesSmart({
       candidates: pool, muscleGroup: muscle, count: exerciseCount,
       selectedIds: sessionSelectedIds, selectedNames: sessionSelectedNames,
@@ -591,7 +600,7 @@ function buildSession(
           tempo: tempoSpec.notation, restSeconds,
         }));
         exercises.push({
-          muscle: pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: pl.resolved as DayCharacter,
+          muscle: trueMuscleOf(exData) || pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: pl.resolved as DayCharacter,
           sets: adjustedSets, repsRange: [Math.round(Math.min(pl.reps - 2, repsCap)), Math.round(Math.min(pl.reps + 2, repsCap))],
           rir: finalRir,
           workSets, exerciseName: (exData as any).name || (exData as any).id,
