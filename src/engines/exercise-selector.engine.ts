@@ -350,7 +350,42 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
   const usedIds = new Set<string>();
   const usedNames = new Set<string>();
   const usedSubGroups = new Map<string, number>();
+  const usedAngles = new Set<string>();
+  const usedEquipment = new Set<string>();
   let cableCount = 0;
+
+  /** Detector: слишком похожие упражнения (одинаковый угол + оборудование). */
+  function isTooSimilar(ex: Exercise, selected: SelectedExercise[]): boolean {
+    const exName = (ex.name || '').toLowerCase();
+    for (const s of selected) {
+      const sName = (s.name || '').toLowerCase();
+      // Оба жимы лёжа со штангой → слишком похожи
+      const exIsPress = exName.includes('жим') && exName.includes('лёжа');
+      const sIsPress = sName.includes('жим') && sName.includes('лёжа');
+      if (exIsPress && sIsPress) {
+        const exHasDumbbell = exName.includes('гантел');
+        const sHasDumbbell = sName.includes('гантел');
+        const exHasSmith = exName.includes('смит');
+        const sHasSmith = sName.includes('смит');
+        // Разные снаряды → OK
+        if (exHasDumbbell !== sHasDumbbell || exHasSmith !== sHasSmith) continue;
+        // Оба штанга или оба гантели → слишком похожи
+        return true;
+      }
+      // Обе тяги блока одинаковые
+      const exIsPulldown = (exName.includes('тяга') && exName.includes('блок')) || exName.includes('pulldown');
+      const sIsPulldown = (sName.includes('тяга') && sName.includes('блок')) || sName.includes('pulldown');
+      if (exIsPulldown && sIsPulldown) {
+        const exWide = exName.includes('широк') || exName.includes('за голов');
+        const sWide = sName.includes('широк') || sName.includes('за голов');
+        if (exWide === sWide) return true; // одинаковый вариант
+      }
+      // Обе разгибания/сгибания ног
+      if ((exName.includes('разгиб') && sName.includes('разгиб')) ||
+          (exName.includes('сгибан') && sName.includes('сгибан'))) return true;
+    }
+    return false;
+  }
 
   for (const ex of scored) {
     if (result.length >= count) break;
@@ -365,6 +400,9 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     // Диверсификация оборудования: не более 2 тросовых/блочных в сессии
     // (пока есть ещё нетросовые кандидаты для добора)
     if (isCableExercise(ex) && cableCount >= 2 && result.length < count - 1) continue;
+
+    // Штраф за слишком похожее упражнение
+    if (isTooSimilar(ex, result) && result.length < count - 1) continue;
 
     // Проверяем конфликт с уже выбранными
     const conflict = result.some(r => patternConflictScore(ex, [r]) < -20);
