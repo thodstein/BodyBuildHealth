@@ -1242,7 +1242,7 @@ export const IndividualPlanSettings: React.FC = () => {
             return (
               <button key={h.id} onClick={() => toggleHealthIssue(h.id)} style={{
                 display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', width: '100%',
-                background: active ? 'rgba(6,182,212,0.12)' : '#202023',
+                background: active ? 'rgba(6,182,212,0.25)' : '#202023', boxShadow: active ? '0 2px 12px rgba(6,182,212,0.3)' : 'none',
                 border: active ? '1.5px solid #06b6d4' : '1px solid rgba(255,255,255,0.06)',
                 transition: 'all 0.2s',
               }}>

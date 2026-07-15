@@ -32,11 +32,13 @@ const IndividualPlanInner: React.FC = () => {
           {TAB_META.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)} style={{
               flexShrink:0, padding:'6px 12px', borderRadius:16, cursor:'pointer',
-              fontSize:9, fontWeight: tab === t.key ? 700 : 500,
-              border: tab === t.key ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+              fontSize:10, fontWeight: tab === t.key ? 800 : 500,
+              border: tab === t.key ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
               background: tab === t.key ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-              color: tab === t.key ? '#000' : '#fff',
-              transition:'all 0.15s',
+              color: tab === t.key ? '#000' : 'rgba(255,255,255,0.6)',
+              boxShadow: tab === t.key ? '0 2px 12px rgba(0,230,138,0.3)' : 'none',
+              transform: tab === t.key ? 'scale(1.05)' : 'scale(1)',
+              transition:'all 0.15s ease',
             }}>
               {t.icon} {t.label}
             </button>

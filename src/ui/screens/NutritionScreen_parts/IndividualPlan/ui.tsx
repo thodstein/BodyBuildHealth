@@ -32,12 +32,13 @@ export const GlassCard: React.FC<{ title?: string; icon?: string; color?: string
 
 export const PillBtn: React.FC<{ active?: boolean; onClick: () => void; color?: string; children: React.ReactNode; style?: React.CSSProperties }> = ({ active, onClick, color, children, style }) => (
   <button onClick={onClick} style={{
-    padding: '6px 14px', borderRadius: 20, fontSize: 10, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap', letterSpacing: '-0.1px',
-    background: active ? (color ? `${color}18` : 'rgba(0,230,138,0.12)') : '#202023',
-    border: active ? `1px solid ${color || '#00e68a'}` : '1px solid rgba(255,255,255,0.06)',
-    color: active ? (color || '#00e68a') : '#fff',
-    transition: 'all 0.2s',
-    boxShadow: active ? `0 0 12px ${(color || '#00e68a')}22` : 'none',
+    padding: '7px 16px', borderRadius: 20, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', letterSpacing: '-0.1px', transition: 'all 0.15s ease',
+    transform: active ? 'scale(1.05)' : 'scale(1)',
+    fontWeight: active ? 800 : 600,
+    background: active ? (color ? color : 'linear-gradient(135deg,#00e68a,#00c8a0)') : '#202023',
+    border: active ? '2px solid '+(color || '#00e68a') : '1px solid rgba(255,255,255,0.06)',
+    color: active ? (color ? '#fff' : '#000') : 'rgba(255,255,255,0.7)',
+    boxShadow: active ? '0 2px 16px '+(color || '#00e68a')+'44, 0 0 0 2px '+(color || '#00e68a')+'33' : 'none',
     ...style,
   }}>{children}</button>
 );

@@ -868,7 +868,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   {
     const goalF2 = fatTotal;
     const devF2 = (totals.f - goalF2) / Math.max(1, goalF2);
-    if (devF2 > 0.12) { console.error('DBG FAT TRIM: devF2=', devF2, ' excessF=', (totals.f - goalF2), ' fatItems=', fatItems2.length);
+    if (devF2 > 0.12) {
       const excessF = totals.f - goalF2;
       const fatItems2 = meals.flatMap(m => m.items.filter(it => it.role === 'fat').map(it => ({ meal: m, item: it })));
       if (fatItems2.length > 0) {
