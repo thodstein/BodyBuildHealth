@@ -1017,7 +1017,7 @@ export const TrainingConstructor: React.FC<Props> = ({
     const mrv = mrvOverride ?? MRV_MAP[level] ?? 20;
     const wk = generatedWeeklySets;
     let score = 100;
-    const items: { label: string; ok: boolean; detail: string; group?: string }[] = [];
+    const items: { label: string; ok: boolean; detail: string; group?: string; kind?: 'over' | 'under' }[] = [];
     for (const [g, sets] of Object.entries(wk)) {
       const lm = getPerMuscleMrvFromLevel(level, g, tprofile.onCourse, tprofile.courseIntensity, labTrainingAdjust(labAnalysis).mrvMultiplier);
       const levelBaseMrv = MRV_MAP[level] ?? 20;
@@ -1026,10 +1026,10 @@ export const TrainingConstructor: React.FC<Props> = ({
       const mevG = Math.round(lm.mev * mrvScale);
       if (sets > mrvG * 1.15) {
         score -= 8;
-        items.push({ label: g, ok: false, detail: `${sets} сетов > MRV×1.15=${Math.round(mrvG * 1.15)} ⚠ перегруз`, group: g });
+        items.push({ label: g, ok: false, detail: `${sets} сетов > MRV×1.15=${Math.round(mrvG * 1.15)} ⚠ перегруз`, group: g, kind: 'over' });
       } else if (sets < mevG) {
         score -= 6;
-        items.push({ label: g, ok: false, detail: `${sets} сетов < MEV=${mevG} — недотрен`, group: g });
+        items.push({ label: g, ok: false, detail: `${sets} сетов < MEV=${mevG} — недотрен`, group: g, kind: 'under' });
       } else {
         items.push({ label: g, ok: true, detail: `${sets} сетов (MEV ${mevG}→MRV ${mrvG})`, group: g });
       }
@@ -1545,7 +1545,7 @@ export const TrainingConstructor: React.FC<Props> = ({
             {analysisQuality.items.filter(b => !b.ok).map((b, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', marginBottom: 4, borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
                 <span style={{ fontSize: 9, color: b.ok ? 'inherit' : '#f59e0b', flex: 1 }}>{b.detail}</span>
-                {b.group && analysisQuality.wk[b.group] > analysisQuality.mrv && (
+                {b.group && b.kind === 'over' && (
                   <button onClick={() => applyCorrection('mrv')} style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.06)', color: '#f59e0b', cursor: 'pointer', fontSize: 9, fontWeight: 700, whiteSpace: 'nowrap' }}>
                     ↑ MRV
                   </button>
