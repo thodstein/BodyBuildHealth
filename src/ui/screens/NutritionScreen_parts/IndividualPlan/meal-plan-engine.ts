@@ -125,7 +125,7 @@ const PROTEIN_ROTATION: { label: string; ids: string[]; note: string }[] = [
   { label: 'Постная рыба', ids: ['cod','pollock','white_fish_cod','white_fish_mintai','tuna_steak'], note: 'Самая высокая плотность белка, низкий жир, идеальна ночью' },
   { label: 'Красное мясо', ids: ['beef_lean','beef_minced','beef_liver','rabbit'], note: 'Гемовое железо + Zn + B12, креатин 4–5 г/кг' },
   { label: 'Яйца/молоко', ids: ['egg_whole','egg_white','cottage_cheese_5','yogurt_greek'], note: 'Биологическая ценность яйца = 100, казеин = 77' },
-  { label: 'Морепродукты', ids: ['shrimp','tuna_canned'], note: 'Йод + таурин, низкокалорийно' },
+  { label: 'Морепродукты', ids: ['shrimp','tuna_canned','cod','pollock'], note: 'Йод + таурин, низкокалорийно' },
   { label: 'Сыворотка/молоко', ids: ['whey_protein','whey_isolate','milk','kefir'], note: 'Сыворотка — самый быстрый белок, пик аминокислот 60 мин' },
   { label: 'Веган/бобовые', ids: ['tofu','tempeh','lentils','chickpeas','seitan'], note: 'Растительный белок, дополнить сывороткой для лейцина' },
 ];
@@ -296,7 +296,7 @@ function buildWholeMeal(
   let remP = proteinG, remC = carbG, remF = fatG;
 
   // 1. Белок: роторный источник (предпочтение — preferred)
-  const rotPool = pool.proteinSolid.filter(f => proteinRotationIds.includes(f.id));
+  const rotPool = [...pool.proteinSolid, ...pool.proteinFatty].filter(f => proteinRotationIds.includes(f.id));
   const preferredRot = preferredIds && preferredIds.size > 0 ? rotPool.filter(f => preferredIds.has(f.id)) : [];
   const proteinPool = preferredRot.length > 0 ? preferredRot : rotPool.length > 0 ? rotPool : pool.proteinLean.length > 0 ? pool.proteinLean : pool.proteinSolid;
   const proteinSource = pickPriority(proteinPool, seed, { lockedIds, preferredIds: preferredRot.length > 0 ? undefined : preferredIds, recentIds });
@@ -543,9 +543,15 @@ function fmtTime(min: number): string {
 function pickRotationsForDay(dayOffset: number, randomSalt: number, count: number): { label: string; ids: string[]; note: string }[] {
   const result: { label: string; ids: string[]; note: string }[] = [];
   const used = new Set<number>();
-  for (let i = 0; i < count; i++) {
+  // Always include omega-3 fish rotation (index 1) for health coverage
+  const omega3Idx = 1; // Жирная рыба (Omega-3)
+  result.push(PROTEIN_ROTATION[omega3Idx]);
+  used.add(omega3Idx);
+  for (let i = 1; i < count; i++) {
     const seed = Math.abs(dayOffset * 10007 + randomSalt * 777 + i * 31);
-    const idx = Math.floor(seededRandom(seed) * PROTEIN_ROTATION.length) % PROTEIN_ROTATION.length;
+    let idx = Math.floor(seededRandom(seed) * PROTEIN_ROTATION.length) % PROTEIN_ROTATION.length;
+    let attempts = 0;
+    while (used.has(idx) && attempts < PROTEIN_ROTATION.length) { idx = (idx + 1) % PROTEIN_ROTATION.length; attempts++; }
     if (!used.has(idx)) {
       used.add(idx);
       result.push(PROTEIN_ROTATION[idx]);
@@ -589,7 +595,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Ротация: разные группы белка в разные приёмы (раньше — одна на весь день)
   const mealRotations = pickRotationsForDay(input.dayOffset, randomSalt, 4);
   function rotationForMeal(mealIdx: number): { label: string; ids: string[]; note: string } {
-    return mealRotations[Math.abs(mealIdx) % mealRotations.length] || mealRotations[0];
+    // Shift rotation by dayOffset so omega-3 fish lands on different meals each day
+    const shift = Math.abs(input.dayOffset) % mealRotations.length;
+    return mealRotations[(mealIdx + shift) % mealRotations.length] || mealRotations[0];
   }
   const meals: Meal[] = [];
 
