@@ -79,7 +79,10 @@ const _phaseMapCache = new Map<string, Map<number, BBPhase>>();
 function getPhaseMap(totalWeeks: number): Map<number, BBPhase> {
   const cacheKey = String(totalWeeks);
   if (_phaseMapCache.has(cacheKey)) return _phaseMapCache.get(cacheKey)!;
-  const dist: PhaseDistribution[] = distributePhasesUnified(totalWeeks, 0, 'bulk');
+  // P1: синхронизируем deloadFreq с движком buildBBPlan (deloadFreq = weeks>=6 ? 4 : 0),
+  // иначе календарь/баннер показывал «без делода», а сгенерированный план содержал deload-неделю.
+  const deloadFreq = totalWeeks >= 6 ? 4 : 0;
+  const dist: PhaseDistribution[] = distributePhasesUnified(totalWeeks, deloadFreq, 'mass');
   const map = new Map<number, BBPhase>();
   for (const d of dist) {
     for (const w of d.weeks) {
@@ -993,6 +996,32 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           )}
         </div>
+        {/* Объём vs MRV (volume-landmarks, единый источник) */}
+        {builtPlan?.volumeLandmarks && builtPlan.volumeLandmarks.length > 0 && (
+          <div style={{ ...CARD, marginBottom: 8, background: 'rgba(0,230,138,0.04)', borderLeft: '3px solid #00e68a' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#00e68a', marginBottom: 6 }}>
+              📊 Объём по мышцам vs MRV {pedAdapt.combinedMrvMultiplier > 1 && <span style={{ opacity: 0.7, fontWeight: 600 }}>(MRV×{pedAdapt.combinedMrvMultiplier.toFixed(2)})</span>}
+            </div>
+            {builtPlan.volumeLandmarks.map(r => {
+              const lColor = r.status === 'exceeding_mrv' ? '#ef4444' : r.status === 'approaching_mrv' ? '#f59e0b' : r.status === 'optimal' ? '#22c55e' : '#60a5fa';
+              const barMax = Math.max(r.mrv, r.sets, 1);
+              return (
+                <div key={r.group} style={{ marginBottom: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                    <span style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 700 }}>{r.label}</span>
+                    <span style={{ color: lColor, fontWeight: 800 }}>{r.sets} подх <span style={{ opacity: 0.6, fontWeight: 600 }}>/ MRV {r.mrv}</span></span>
+                  </div>
+                  <div style={{ position: 'relative', height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: (r.sets / barMax * 100) + '%', background: lColor, borderRadius: 4 }} />
+                    <div style={{ position: 'absolute', left: (r.mav / barMax * 100) + '%', top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.5)' }} />
+                    <div style={{ position: 'absolute', left: (r.mrv / barMax * 100) + '%', top: 0, bottom: 0, width: 2, background: '#ef4444' }} />
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>Белая линия — MAV · красная — MRV. Превышение MRV → риск перетренированности.</div>
+          </div>
+        )}
         {/* Прогноз пиковой загрузки */}
         {(() => {
           const peakWeek = W.reduce((best, w, i) => {

@@ -22,6 +22,7 @@ import type { PEDAdaptation } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findSubstitutions } from '../exercise-substitution.engine';
+import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landmarks.engine';
 // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
@@ -87,6 +88,30 @@ export interface BBPlan {
   weeks: BBWeek[];
   rotationMuscleVolume: Record<string, number>; // MAV×ротация на мышцу
   rationale: string[];
+  /** Volume-landmarks (MEV/MAV/MRV) по пиковой неделе — единый источник, как в PL/ручном. */
+  volumeLandmarks?: VolumeLandmarkRow[];
+}
+
+/**
+ * Агрегация объёма BB-плана по группам мышц и сравнение с volume-landmarks (MEV/MAV/MRV).
+ * Берётся пиковая по суммарному объёму неделя (наиболее нагруженная) — «худший случай».
+ * PRO-ключи мышц (delt_front/mid/rear и т.п.) коллапсируются к каноническому EN-ключу.
+ */
+export function getBBVolumeLandmarks(plan: BBPlan, level: string, pedMrvMult = 1): VolumeLandmarkRow[] {
+  let peakIdx = 0, peakTotal = -1;
+  const weekGroups: Record<number, Record<string, number>> = {};
+  plan.weeks.forEach((wk, i) => {
+    const g: Record<string, number> = {};
+    for (const s of wk.sessions) for (const ex of s.exercises) {
+      const ck = collapseKey(ex.muscle);
+      g[ck] = (g[ck] || 0) + (ex.sets || 0);
+    }
+    weekGroups[i] = g;
+    const total = Object.values(g).reduce((a, b) => a + b, 0);
+    if (total > peakTotal) { peakTotal = total; peakIdx = i; }
+  });
+  const peak = weekGroups[peakIdx] || {};
+  return computeVolumeLandmarks(peak, level, { labMult: pedMrvMult, peakWeek: peakIdx + 1 });
 }
 
 // sessionTag -> мышцы (канонические EN-ключи)
@@ -465,7 +490,21 @@ function buildSession(
         if (diverse.length >= exerciseCount) break;
         if (!diverse.some(d => d.id === e.id)) diverse.push(e);
       }
-      if (diverse.length >= exerciseCount) exDatas = diverse.slice(0, exerciseCount);
+      if (diverse.length >= exerciseCount) {
+        exDatas = diverse.slice(0, exerciseCount);
+        // P4: дифференцируем рабочий вес по пучкам дельты (жим тяжелее махов/задней дельты).
+        // PRO_WORKMAX_RATIO: delt_front 0.50, delt_mid 0.45, delt_rear 0.35 →
+        // относительно delt_front: головной коэффициент 1.0 / 0.9 / 0.7.
+        // P5: дифференцируем RIR — жим тяж (базовый RIR), махи/задняя дельта памп (RIR+1).
+        for (const d of exDatas) {
+          let headRatio = 1.0, headRirDelta = 0;
+          if (isPress(d) && !isLateral(d) && !isRear(d)) { headRatio = 1.0; headRirDelta = 0; }
+          else if (isLateral(d) && !isPress(d) && !isRear(d)) { headRatio = 0.9; headRirDelta = 1; }
+          else if (isRear(d) && !isPress(d) && !isLateral(d)) { headRatio = 0.7; headRirDelta = 1; }
+          (d as any)._effWeight = Math.round(pl.weight * headRatio * 10) / 10;
+          (d as any)._deltRir = Math.min(5, pl.rir + headRirDelta);
+        }
+      }
     }
 
     // Per-exercise weight modifier (гантели 80%, наклон 85%, блок 70% etc.)
@@ -514,7 +553,10 @@ function buildSession(
       // Ограничиваем пул замен исходным числом упражнений (exerciseCount),
       // иначе изолированная мышца при травме раздувается до 2-3 упражнений
       // (findSubstitutions возвращает до 3 кандидатов) — объём РАСТЁТ вместо снижения.
-      pl.exDatas = newExDatas.slice(0, pl.exerciseCount);
+      // Кроме того, снижаем число упражнений на травмированной группе на 1
+      // (реальная разгрузка, а не только вес/объём каждого упражнения).
+      const injuredExCount = Math.max(1, pl.exerciseCount - 1);
+      pl.exDatas = newExDatas.slice(0, injuredExCount);
     }
   }
 
@@ -533,6 +575,8 @@ function buildSession(
       const isSubstituted = (exData as any).substituted === true;
       const repsCap = (exData as any).repsCap ?? 20;
       const exSets = Math.max(1, Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct));
+      const exWeight = (exData as any)._effWeight ?? pl.weight;
+      const finalRir = isSubstituted ? Math.min(pl.rir + 1, 4) : ((exData as any)._deltRir ?? pl.rir);
       const cost = ((exData as any)?.fatigueCost || 5) * exSets;
       if (remainingBudget < cost) {
         const reduced = Math.max(2, Math.floor(remainingBudget / ((exData as any)?.fatigueCost || 5)));
@@ -542,18 +586,18 @@ function buildSession(
         const tempoSpec = tempoFor(pl.resolved as DayCharacter);
         const restSeconds = REST_BY_CHARACTER[pl.resolved as DayCharacter];
         const workSets: BBSet[] = Array.from({ length: adjustedSets }, () => ({
-          reps: Math.round(Math.min(pl.reps, repsCap)), rir: isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir,
-          weight: Math.round(pl.weight * wPct * ((exData as any)._weightMod || 1) * 10) / 10,
+          reps: Math.round(Math.min(pl.reps, repsCap)), rir: finalRir,
+          weight: Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10,
           tempo: tempoSpec.notation, restSeconds,
         }));
         exercises.push({
           muscle: pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: pl.resolved as DayCharacter,
           sets: adjustedSets, repsRange: [Math.round(Math.min(pl.reps - 2, repsCap)), Math.round(Math.min(pl.reps + 2, repsCap))],
-          rir: isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir,
+          rir: finalRir,
           workSets, exerciseName: (exData as any).name || (exData as any).id,
           tempoSpec: tempoSpec.notation, restSeconds,
-          comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.round(Math.min(pl.reps, repsCap)), Math.round(pl.weight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir, weakPoints, focusGroup, phase, tempoSpec.notation, restSeconds, isSubstituted),
-          warmupSets: buildWarmup(Math.round(pl.weight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary'),
+          comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.round(Math.min(pl.reps, repsCap)), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoSpec.notation, restSeconds, isSubstituted),
+          warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary'),
           rationale: pl.rationaleMap.get((exData as any).name) || '',
         });
         continue;
@@ -562,18 +606,18 @@ function buildSession(
       const tempoSpec = tempoFor(pl.resolved as DayCharacter);
       const restSeconds = REST_BY_CHARACTER[pl.resolved as DayCharacter];
       const workSets: BBSet[] = Array.from({ length: exSets }, () => ({
-        reps: Math.round(Math.min(pl.reps, repsCap)), rir: isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir,
-        weight: Math.round(pl.weight * wPct * ((exData as any)._weightMod || 1) * 10) / 10,
+        reps: Math.round(Math.min(pl.reps, repsCap)), rir: finalRir,
+        weight: Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10,
         tempo: tempoSpec.notation, restSeconds,
       }));
       exercises.push({
         muscle: pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: pl.resolved as DayCharacter,
         sets: exSets, repsRange: [Math.round(Math.min(pl.reps - 2, repsCap)), Math.round(Math.min(pl.reps + 2, repsCap))],
-        rir: isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir,
+        rir: finalRir,
         workSets, exerciseName: (exData as any).name || (exData as any).id,
         tempoSpec: tempoSpec.notation, restSeconds,
-        comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, exSets, Math.round(Math.min(pl.reps, repsCap)), Math.round(pl.weight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, isSubstituted ? Math.min(pl.rir + 1, 4) : pl.rir, weakPoints, focusGroup, phase, tempoSpec.notation, restSeconds, isSubstituted),
-        warmupSets: buildWarmup(Math.round(pl.weight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary'),
+        comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, exSets, Math.round(Math.min(pl.reps, repsCap)), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoSpec.notation, restSeconds, isSubstituted),
+        warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary'),
         rationale: pl.rationaleMap.get((exData as any).name) || '',
       });
     }
@@ -718,5 +762,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     ...(gradedInjuries.length > 0 ? [`Градированные травмы: ${gradedInjuries.map(i => i.muscle).join(', ')} — упражнения заменены на безопасные альтернативы с пониженным весом/объёмом.`] : []),
   ];
 
-  return { pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale };
+  const pedMrvMult = (pedAdapt?.combinedMrvMultiplier ?? 1);
+  const volumeLandmarks = getBBVolumeLandmarks({ pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale }, level, pedMrvMult);
+  return { pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale, volumeLandmarks };
 }
