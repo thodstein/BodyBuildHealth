@@ -1,4 +1,5 @@
 import { Exercise, ExerciseSubstitution } from './types';
+import { derivePattern } from '../engines/movement-pattern';
 
 export const EXERCISE_CATALOG: Exercise[] = [
   // ══ ГРУДЬ ══
@@ -609,6 +610,36 @@ export const EXERCISE_CATALOG: Exercise[] = [
   { id:'seated_bent_raise', name:'Разводка сидя в наклоне', group:'back', type:'isolation', equipment:'dumbbell', difficulty:'beginner', jointStress:'low', fatigueCost:3, targetMuscle:'Задняя дельта', order:3, substitutionGroup:'rear_iso', movementPattern:'isolation_shoulders', canReplace:['rear_delt_fly'], cannotReplace:['ohp_bar'], technique:'Сидя, наклон 45°. Разведение в стороны. Убирает инерцию тела.' },
   { id:'banded_bench', name:'Жим с резиновыми лентами', group:'chest', type:'compound', equipment:'barbell', difficulty:'advanced', jointStress:'med', fatigueCost:7, targetMuscle:'Взрывная сила, lockout', order:2, substitutionGroup:'hor_push', movementPattern:'horizontal_push', canReplace:['bench_bands'], cannotReplace:['fly_db'], technique:'Резина на грифе. Возрастающее сопротивление к lockout.' },
 ];
+
+// ═══ Нормализация каталога (исправления качества P0.2 / P0.3) ═══
+// Выполняется один раз при загрузке модуля.
+(function normalizeExerciseCatalog() {
+  // P0.2: заполнить movementPattern для записей без тега (275/529)
+  // selectExercisesSmart использует patternBalance → без тега сыплет «unknown» и
+  // не считает разнообразие паттернов. derivePattern восстанавливает тег из
+  // группы/названия/типа.
+  for (const ex of EXERCISE_CATALOG) {
+    if (!ex.movementPattern) ex.movementPattern = derivePattern(ex);
+  }
+
+  // P0.3: слить точные дубликаты по имени — объединить equipment в массив,
+  // оставить первую запись, удалить последующие (16 пар: legs/shoulders/arms/core/chest).
+  // Без этого пул содержит две одноимённые записи → планировщик может выбрать
+  // одно и то же упражнение дважды в разных днях/слотах.
+  const seen = new Map<string, any>();
+  for (let i = EXERCISE_CATALOG.length - 1; i >= 0; i--) {
+    const ex = EXERCISE_CATALOG[i];
+    const first = seen.get(ex.name);
+    if (first) {
+      const eqA = Array.isArray(first.equipment) ? first.equipment : [first.equipment].filter(Boolean);
+      const eqB = Array.isArray(ex.equipment) ? ex.equipment : [ex.equipment].filter(Boolean);
+      first.equipment = Array.from(new Set([...eqA, ...eqB]));
+      EXERCISE_CATALOG.splice(i, 1);
+    } else {
+      seen.set(ex.name, ex);
+    }
+  }
+})();
 
 export const SUBSTITUTION_MAP: ExerciseSubstitution[] = [
   { exerciseId:'squat', substitutes:[{id:'front_squat',reason:'Меньше поясницы, больше квадрицепс',priority:1},{id:'hack_squat',reason:'Машинная альтернатива',priority:2},{id:'squat_ssb',reason:'При болях в плечах',priority:3},{id:'leg_press',reason:'Машинная, безопаснее',priority:4}], forbidden:[{id:'leg_ext',reason:'Разгибания ног — изоляция квадрицепса, не заменяет компаунд-присед'},{id:'calf_raise',reason:'Совершенно другая мышечная группа'},{id:'leg_curl',reason:'Бицепс бедра, не квадрицепс'}] },
