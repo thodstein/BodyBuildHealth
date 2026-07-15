@@ -1,3 +1,79 @@
+## Session Summary (Jul 15 — Part 10) — Планировщик питания: полный аудит + фикс + git commit
+
+# Goal
+Проверить планировщик питания (IndividualPlan + meal-plan-engine.ts), исправить ВСЕ ошибки, обеспечить работоспособность и качество рационов.
+
+# Причина пропадания изменений (КРИТИЧНО)
+Все предыдущие правки планировщика (3+ попыток) НЕ были закоммичены в git. Изменения оставались uncommitted в рабочей директории. Любой git checkout/stash/reset/pull или параллельный агент удалял их безвозвратно.
+**Фикс:** все правки закоммичены (commit b3323cc1d). Добавлено правило 19 в AGENTS.md — обязательный git commit после каждой задачи.
+
+# Сделано (commit b3323cc1d, 8 файлов, +171 -109 строк)
+
+**P1 — Ошибки компиляции tsc (2):**
+- kbju-food-match.engine.ts:98 — food → f (переменная food не существовала, расчёт DIAAS сломан)
+- nutrition-report.engine.ts — omega6to3ratio: number → number | null + 2 UI-потребителя (NutritionScreen.tsx, index.tsx)
+
+**P2 — Сыворотка/казеин исключены из пулов (CRITICAL):**
+- isMealFood фильтр выбрасывал category=supplement (whey_isolate, whey_concentrate, casein_micellar)
+- fastProtein pool = только egg_white → пост-трен 318г яичных белков вместо 40г сыворотки
+- eaa/dextrin = undefined → intra-workout не работал
+- Фикс: fastProtein/slowProtein/eaa/dextrin строятся из полного FOOD_DB
+
+- Пост-трен: Изолят сыворотки 33г (было: Белок яичный 318г)
+- Pre-sleep: Мицеллярный казеин 51г (было: только dairy)
+- Intra: BCAA + Амилопектин (было: undefined → синтетический пункт)
+
+**P3 — Неверные ID продуктов (legacy-путь, 10 ID):**
+- oatmeal→oats, white_bread→bread_white, seed_chia→chia_seeds, nuts_almonds→almonds
+- butter_peanut→peanut_butter, pea_protein→supp_pea_protein, oyster→oysters
+- cottage_cheese→cottage_cheese_5, pasta→pasta_durum, potato→potato_boiled
+
+**P4 — Перебор белка +34% → +4-11%:**
+- MPS-добор перенесён после сборки приёма (только при P<25г И leu<2.5г)
+- Добавлена коррекция белка (>10% сверх цели → масштабирование)
+- Egg white больше не в каждом приёме
+
+**P5 — Качество сборки:**
+- VegGreen/VegColor требуют category=veg_fruit + protein<10 → исключён celery seeds 235г=59г жира
+- Carb reserve (veg 12г + fruit 10г) — компенсация вклада овощей/ягод
+- Fat-распределение 15/12/18/8% (учёт pre-sleep ~23г жира)
+- KBJU fine-tune: fat top-up capped at fatTotal*1.10
+
+**P6 — Данные supp_eaa:**
+- leucine_mg 2.5→2500, isoleucine 1.3→1300, valine 1.3→1300 (были в граммах вместо мг)
+
+**P9 — Omega-3 буст:**
+- Если нет omega-3 источника → лосось заменяет белок в обеде (EPA/DHA ~2.2г)
+- Omega-3: 0г→1.6г/день, микро-дефициты 11→9
+
+**P10 — Вегетарианский режим (CRITICAL):**
+- Мясо пропускало фильтр: bison, frog_legs, seafood_cockles, white_fish_mintai
+- Фикс: FOOD_ALLERGEN_DIET чек + расширены MEAT_KEYWORDS (+30 слов)
+- Результат: 0 non-veg items в veg-режиме (было 3+)
+
+**Дополнительно:**
+- src2-solovyov-bench-28.ts: ]]→]) синтаксис (блокировал vite build)
+
+# Проверки
+- tsc: 0 ошибок в моих файлах (5 предсуществующих в auth-module/ProfileDataHub/ProfileDiaries)
+- vite build: OK (43-55с)
+- UTF-8 noBOM: OK
+- 4 тестовых сценария (train/rest/cut/veg) + 7-дневный план + отчёт nutrition-report.engine
+
+
+# Изменённые файлы (commit b3323cc1d)
+- src/ui/screens/NutritionScreen_parts/IndividualPlan/meal-plan-engine.ts — пулы, carb reserve, omega-3, veg-фильтр, MPS, MEAT_KEYWORDS
+- src/ui/screens/NutritionScreen_parts/IndividualPlan/IndividualPlanContext.tsx — неверные ID (10)
+- src/ui/screens/NutritionScreen_parts/IndividualPlan/index.tsx — null-safe toFixed
+- src/ui/screens/NutritionScreen.tsx — null-safe omega6to3ratio
+- src/engines/kbju-food-match.engine.ts — food→f
+- src/engines/nutrition-report.engine.ts — omega6to3ratio type
+- src/core/nutrition-database-supplement-other.ts — supp_eaa leucine
+- src/data/lms-cycles/src2/src2-solovyov-bench-28.ts — syntax fix
+
+
+---
+
 ## Session Summary (Jul 13 — Part 9) — Врачебный аудит: lab/biostack/tz-mapper/catalog — все CRITICAL+MEDIUM исправлены
 
 ### Goal
@@ -761,6 +837,16 @@ SupportScreen.calcSupport()
 16. **ProfileScreen** — проверить ВСЕ useState в conditional IIFE: `tab === 'bp_diary'`, `tab === 'diaries'`, `tab === 'progress'`. Каждый такой блок рискует крашем. Выносить в отдельные компоненты.
 17. **IndividualPlan** — все новые импорты (calcNutritionV2, contraindications, nutrition-v2-data) обернуть в try-catch при вызове, не при импорте.
 18. **Зависимости** — проверить нет ли циклических зависимостей между nutrition-v2-data.ts, contraindications.ts, bp-hr-data.ts.
+
+19. **ОБЯЗАТЕЛЬНЫЙ GIT COMMIT ПОСЛЕ КАЖДОЙ ЗАДАЧИ (CRITICAL — НАРУШЕНИЕ = ПОТЕРЯ ВСЕЙ РАБОТЫ):**
+    - **ПОСЛЕ завершения каждой задачи (не в конце сессии, а ПОСЛЕ КАЖДОЙ ЗАДАЧИ) — НЕМЕДЛЕННО выполнить git add + git commit для изменённых файлов.**
+    - Изменения в рабочей директории (uncommitted) = НЕ СУЩЕСТВУЮТ. Любой git checkout, git stash, git reset, git pull или параллельный агент УДАЛЯЕТ их безвозвратно.
+    - Команда: git add <файлы> && git commit -m <описание> — после КАЖДОЙ завершённой задачи, не ждать конца сессии.
+    - **Проверка перед коммитом:** git status --short — убедиться что изменены только нужные файлы.
+    - **Проверка после коммита:** git show HEAD:<файл> — убедиться что изменения в коммите.
+    - Если другой агент перезаписал файл — восстановить: git checkout HEAD -- <файл>.
+    - НЕ коммитить файлы других агентов (только свои).
+    - Это правило добавлено потому что правки планировщика питания делались 3+ раза, но каждый раз исчезали из-за отсутствия коммита.
 
 ## Key Decisions
 - PAL formula: `1.2 + (workoutsPerWeek × 0.075) + (avgWorkoutMinutes > 60 ? 0.1 : 0)` clamped [1.2, 1.9]
