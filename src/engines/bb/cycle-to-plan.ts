@@ -190,7 +190,27 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
 
       // Determine session character from exercises
       const hasHeavy = exercises.some(e => e.character === 'тяж');
-      const sessionTag = ['Upper', 'Lower', 'Push', 'Pull', 'Legs', 'FullBody', 'Arms', 'Shoulders', 'ChestBack', 'ShouldersArms'][dayIdx % 10] || 'FullBody';
+      // Determine session tag from actual exercises (not day index)
+      const dayMuscles = [...new Set(exercises.map(e => e.muscle))];
+      let sessionTag = 'FullBody';
+      const isChest = dayMuscles.some(m => m === 'chest');
+      const isBack = dayMuscles.some(m => m === 'back');
+      const isQuads = dayMuscles.some(m => m === 'quads');
+      const isHams = dayMuscles.some(m => m === 'hamstrings');
+      const isShoulders = dayMuscles.some(m => m === 'shoulders');
+      const isBi = dayMuscles.some(m => m === 'biceps');
+      const isTri = dayMuscles.some(m => m === 'triceps');
+      const isLegs = isQuads || isHams;
+      if (isChest && isBack && !isLegs) sessionTag = 'ChestBack';
+      else if (isChest && isTri && !isBack && !isLegs) sessionTag = 'Push';
+      else if (isBack && isBi && !isChest && !isLegs) sessionTag = 'Pull';
+      else if (isShoulders && (isBi || isTri) && !isChest && !isBack && !isLegs) sessionTag = 'ShouldersArms';
+      else if (isChest && !isBack && !isLegs) sessionTag = 'Chest';
+      else if (isBack && !isChest && !isLegs) sessionTag = 'Back';
+      else if (isShoulders && !isChest && !isBack && !isLegs) sessionTag = 'Shoulders';
+      else if ((isBi || isTri) && !isChest && !isBack && !isLegs && !isShoulders) sessionTag = 'Arms';
+      else if (isLegs && !isChest && !isBack) sessionTag = 'Legs';
+      else if (isChest && isBack && isLegs) sessionTag = 'FullBody';
       const session: BBSession = {
         day: dayIdx + 1,
         weekOffset: (w - 1) * daysPerWeek + dayIdx + 1,
