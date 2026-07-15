@@ -48,7 +48,7 @@ export const VOLUME_LANDMARKS_DB: Record<TrainingLevel, Record<string, MuscleVol
     calves:     { mev: 4,  mav: 8,  mrv: 14 },
     glutes:     { mev: 4,  mav: 8,  mrv: 12 },
     abs:        { mev: 4,  mav: 8,  mrv: 12 },
-    traps:      { mev: 2,  mav: 4,  mrv: 8  },
+    traps:      { mev: 3,  mav: 6,  mrv: 11 },
     forearms:   { mev: 2,  mav: 4,  mrv: 8  },
   },
   intermediate: {
@@ -65,7 +65,7 @@ export const VOLUME_LANDMARKS_DB: Record<TrainingLevel, Record<string, MuscleVol
     calves:     { mev: 6,  mav: 10, mrv: 18 },
     glutes:     { mev: 6,  mav: 10, mrv: 16 },
     abs:        { mev: 4,  mav: 10, mrv: 14 },
-    traps:      { mev: 4,  mav: 6,  mrv: 10 },
+    traps:      { mev: 5,  mav: 8,  mrv: 14 },
     forearms:   { mev: 4,  mav: 6,  mrv: 10 },
   },
   advanced: {
@@ -143,6 +143,17 @@ export function normMuscle(muscle: string): string {
 export function getVolumeLandmarks(level: string, muscle: string): MuscleVolumeLandmarks | null {
   const lvl = normLevel(level);
   const musc = normMuscle(muscle);
+  // Composite groups: суммируем значения подгрупп
+  if (musc === 'arms') {
+    const bi = VOLUME_LANDMARKS_DB[lvl]?.biceps;
+    const tr = VOLUME_LANDMARKS_DB[lvl]?.triceps;
+    if (bi && tr) return { mev: bi.mev + tr.mev, mav: bi.mav + tr.mav, mrv: bi.mrv + tr.mrv };
+  }
+  if (musc === 'legs') {
+    const qu = VOLUME_LANDMARKS_DB[lvl]?.quads;
+    const ha = VOLUME_LANDMARKS_DB[lvl]?.hamstrings;
+    if (qu && ha) return { mev: qu.mev + ha.mev, mav: qu.mav + ha.mav, mrv: qu.mrv + ha.mrv };
+  }
   const data = VOLUME_LANDMARKS_DB[lvl]?.[musc];
   return data ? { ...data } : null;
 }
