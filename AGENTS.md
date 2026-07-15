@@ -1,3 +1,30 @@
+## Session Summary (Jul 16) — Калькулятор поддержки: фикс 4 мобильных UI-багов
+
+### Goal
+Исправить 4 UI-бага мобильной версии Калькулятора поддержки: (1) карточка курса ААС не помещается, (2) стеки ручного режима не видны после выбора, (3) риски, (4) нижняя кнопка перекрыта/нет прокрутки.
+
+### ✅ Сделано (проверено: tsc --noEmit → 0 ошибок)
+- **Bug #1 (ААС карточка переполняется)** — `src/ui/screens/Calculator/AutoCalculator.tsx`: редактор недель старта/конца ААС (`state.pharma.aas`, C19) ранее держал два `PopupNumber` внутри горизонтального flex-ряда → переполнение на телефоне. Перестроено: внешний div `flexDirection:'column'`, верхний ряд (точка/имя/доза/недели/класс-пилюля) с `flexWrap`, нижний ряд с `PopupNumber` старт/конец вынесен отдельно с `flexWrap`. Теперь помещается.
+- **Bug #4 (нижняя кнопка перекрыта)** — `AutoCalculator.tsx`: внешний padding `0 12px 80px` → `0 12px 130px`, чтобы нижние кнопки («Применить расчёт» / «Вернуться») не перекрывались на мобильном / safe-area.
+- **Bug #2 (стеки ручного режима не видны)** — `src/ui/screens/Calculator/Calc.mapper.tsx`: после выбора стеков в попапе ручного режима (`selectedStacks`) они НЕ отображались в карточке (показывались только `manualSubs`-вещества). Добавлен блок «📦 Выбранные стеки поддержки (N)» с именами стеков (из `ALL_STACKS`) и кнопкой ✕ удаления. Сам попап `showManualPopup` (строки 741-804) корректно рендерит `ALL_STACKS` — стеки там видны; проблема была в отсутствии отображения ВЫБОРА.
+- **Bug #3 (риски)** — исследован: `AutoCalculator.tsx:505-514` вызывает `TzRiskCard` корректно с `tz={result.tzSpecResult}` (из `calculateSupportTZ`/`CalculatorResult`, `tzSpecResult` заполняется в `support-plan/engine.ts:604`). Fallback `result.risk.systems` существует (создаётся в engine:577/606). Кодовый путь работает; визуальное несоответствие рисков требует скриншота от пользователя для точной диагностики.
+
+### ❌ Не сделано / нужна проверка пользователем
+- **Bug #3**: точная причина «не верных» рисков не подтверждена без скриншота. Код-путь корректен. Нужно визуальное подтверждение.
+- **Bug #2 «размытый экран»**: если при открытии попапа виден только тёмный overlay без контента — это, вероятно, модалка `showManualPicker` из `SupportScreen` (открывается по «Открыть полный каталог» через `onOpenManualPicker`), а не сам `showManualPopup`. Требует проверки в браузере.
+
+### Key Decisions
+- Не трогал `TzRiskCard.tsx` и логику расчёта рисков (работает) — ограничился отображением выбранных стеков и overflow-фиксами.
+- `GLASS` (Calc.types.ts:4) НЕ имеет backdrop-filter → containing-block bug для fixed-попапов неприменим; размытие = overlay `rgba(0,0,0,0.8)`.
+
+### Relevant Files
+- `src/ui/screens/Calculator/AutoCalculator.tsx` — баги #1 (AAS редактор, ~395-446), #4 (padding 176), #3 (риск-карточка 505-514)
+- `src/ui/screens/Calculator/Calc.mapper.tsx` — баг #2 (selectedStacks summary ~755-783, manual popup 741-804)
+- `src/engines/support-plan/engine.ts` — `tzSpecResult` формируется (604), `risk` (577/606)
+- `src/engines/support-plan/types.ts` — `CalculatorResult` имеет `tzSpecResult?` (259), `overallRiskBefore/After` (247-248)
+
+---
+
 ## Session Summary (Jul 15 — Part 10) — Планировщик питания: полный аудит + фикс + git commit
 
 # Goal

@@ -765,6 +765,22 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   </div>
                 </div>
               )}
+              {selectedStacks.length > 0 && (
+                <div style={{ marginBottom:8 }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#c084fc', marginBottom:4 }}>📦 Выбранные стеки поддержки ({selectedStacks.length})</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                    {selectedStacks.map((stId) => {
+                      const st = (ALL_STACKS as any[]).find(s => s.id === stId);
+                      return (
+                        <span key={stId} style={{ fontSize:8, padding:'2px 6px', borderRadius:6, fontWeight:600, background:'rgba(168,85,247,0.12)', color:'#c084fc', display:'inline-flex', alignItems:'center', gap:3, margin:1 }}>
+                          {st?.name || stId}
+                          <span onClick={() => setSelectedStacks(prev => prev.filter(s => s !== stId))} style={{ cursor:'pointer', color:'rgba(255,255,255,0.4)', fontSize:9 }}>✕</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4, marginTop:4 }}>📦 Добавить стек из {ALL_STACKS.length} готовых</div>
               <input value={manualStackSearch} onChange={e => setManualStackSearch(e.target.value)} placeholder="🔍 Поиск стека..." style={{
                 width:'100%', padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:10, boxSizing:'border-box', marginBottom:6, outline:'none',

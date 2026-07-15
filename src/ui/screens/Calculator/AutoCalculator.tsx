@@ -173,7 +173,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   };
 
   return (
-    <div style={embedded ? {} : { padding: '0 12px 80px', maxWidth: 600, margin: '0 auto' }}>
+    <div style={embedded ? {} : { padding: '0 12px 130px', maxWidth: 600, margin: '0 auto' }}>
       {!embedded && <div style={{ marginBottom: 10, textAlign: 'center' }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>🧮 Калькулятор поддержки</div>
         <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight:1.4 }}>Механизм-ориентированная модель ТЗ-28: лабы → 28 механизмов → отбор веществ по k×breadth → фаза → guardrails → бустеры</div>
@@ -393,11 +393,14 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
                 : phClass === 'sarm' ? 'rgba(59,130,246,0.15)'
                 : 'rgba(255,255,255,0.04)';
               return (
-                <div key={i} style={{
-                  display:'flex', alignItems:'center', gap:8,
-                  padding:'6px 10px', borderRadius:10,
-                  background:'rgba(0,0,0,0.15)',
-                  border:'1px solid rgba(255,255,255,0.04)',
+              <div key={i} style={{
+                display:'flex', flexDirection:'column', gap:6,
+                padding:'8px 10px', borderRadius:10,
+                background:'rgba(0,0,0,0.15)',
+                border:'1px solid rgba(255,255,255,0.04)',
+              }}>
+                <div style={{
+                  display:'flex', alignItems:'center', gap:8, flexWrap:'wrap',
                 }}>
                   <div style={{
                     width:6, height:6, borderRadius:3,
@@ -420,30 +423,31 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
                       {phClass === 'oral_17aa' ? 'орал' : phClass.slice(0,6)}
                     </span>
                   )}
-                  {/* C19: редактор недель старта/конца для ААС */}
-                  <div style={{ display:'flex', gap:4, marginTop:4 }}>
-                    <PopupNumber
-                      label={`${phName} · старт нед`}
-                      value={a.startWeek || 1}
-                      min={1} max={Math.max(2, (a.endWeek || 12) - 1)} step={1}
-                      suffix="нед"
-                      onChange={(v: number) => {
-                        const sw = Math.max(1, Math.min(v, (a.endWeek || 12) - 1));
-                        uPharm({ aas: state.pharma.aas.map((x, xi) => xi === i ? { ...x, startWeek: sw } : x) as any });
-                      }}
-                    />
-                    <PopupNumber
-                      label={`${phName} · конец нед`}
-                      value={a.endWeek || 12}
-                      min={Math.min((a.startWeek || 1) + 1, 2)} max={52} step={1}
-                      suffix="нед"
-                      onChange={(v: number) => {
-                        const ew = Math.max((a.startWeek || 1) + 1, Math.min(v, 52));
-                        uPharm({ aas: state.pharma.aas.map((x, xi) => xi === i ? { ...x, endWeek: ew } : x) as any });
-                      }}
-                    />
-                  </div>
                 </div>
+                {/* C19: редактор недель старта/конца для ААС */}
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                  <PopupNumber
+                    label={`${phName} · старт нед`}
+                    value={a.startWeek || 1}
+                    min={1} max={Math.max(2, (a.endWeek || 12) - 1)} step={1}
+                    suffix="нед"
+                    onChange={(v: number) => {
+                      const sw = Math.max(1, Math.min(v, (a.endWeek || 12) - 1));
+                      uPharm({ aas: state.pharma.aas.map((x, xi) => xi === i ? { ...x, startWeek: sw } : x) as any });
+                    }}
+                  />
+                  <PopupNumber
+                    label={`${phName} · конец нед`}
+                    value={a.endWeek || 12}
+                    min={Math.min((a.startWeek || 1) + 1, 2)} max={52} step={1}
+                    suffix="нед"
+                    onChange={(v: number) => {
+                      const ew = Math.max((a.startWeek || 1) + 1, Math.min(v, 52));
+                      uPharm({ aas: state.pharma.aas.map((x, xi) => xi === i ? { ...x, endWeek: ew } : x) as any });
+                    }}
+                  />
+                </div>
+              </div>
               );
             })}
           </div>
