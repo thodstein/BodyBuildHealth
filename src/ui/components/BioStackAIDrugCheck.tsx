@@ -4,39 +4,7 @@ import { type BioStackProfile, saveBioStackProfile } from '../../engines/biostac
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { GlassCard, PillBtn, showToast } from './BioStackAIConstants';
 import { KNOWN_DRUG_SUP_INTERACTIONS, type DrugSupInteraction } from '../../engines/biostack-clinical';
-
-const DRUG_SYNONYM_MAP: Record<string, string[]> = {
-  'иАПФ': ['рамиприл','лизиноприл','эналаприл','каптоприл','периндоприл','квинаприл','фозиноприл'],
-  'АРА': ['лозартан','валсартан','ирбесартан','кандесартан','телмисартан','эпросартан'],
-  'β-блокаторы': ['бисопролол','метопролол','атенолол','пропранолол','небиволол','карведилол'],
-  'БКК': ['амлодипин','нифедипин','фелодипин','верапамил','дилтиазем'],
-  'СИОЗС': ['эсциталопрам','циталопрам','флуоксетин','пароксетин','сертралин','флувоксамин'],
-  'СИОЗСиН': ['венлафаксин','дулоксетин','левомилнаципран'],
-  'ИПП': ['омепразол','эзомепразол','лансопразол','пантопразол','рабепразол'],
-  'статины': ['аторвастатин','розувастатин','симвастатин','ловастатин','правастатин'],
-  'НПВС': ['ибупрофен','диклофенак','напроксен','кетопрофен','мелоксикам','целекоксиб'],
-  'ГКС': ['преднизолон','метилпреднизолон','дексаметазон','гидрокортизон'],
-  'диуретики': ['гидрохлоротиазид','фуросемид','торасемид','индапамид','спиронолактон'],
-  'антикоагулянты': ['варфарин','апиксабан','дабигатран','ривароксабан'],
-  'метформин': ['метформин','сиофор','глюкофаж'],
-  'ПДЭ-5': ['силденафил','тадалафил','варденафил'],
-};
-
-function expandDrugMatches(input: string): string[] {
-  const lowered = input.toLowerCase().trim();
-  const results = new Set<string>();
-  results.add(lowered);
-  for (const [className, synonyms] of Object.entries(DRUG_SYNONYM_MAP)) {
-    const lc = className.toLowerCase();
-    if (lowered.includes(lc) || lc.includes(lowered)) { synonyms.forEach(s => results.add(s.toLowerCase())); }
-    for (const syn of synonyms) {
-      if (lowered.includes(syn.toLowerCase()) || syn.toLowerCase().includes(lowered)) {
-        results.add(lc); synonyms.forEach(s => results.add(s.toLowerCase()));
-      }
-    }
-  }
-  return [...results];
-}
+import { expandDrug } from '../../engines/biostack-safety.engine';
 
 const CYP_LABELS: Record<string, string> = {
   unknown:'❓ Неизвестен', normal:'🟢 Нормальный (EM)', poor:'🔴 Медленный (PM)',
@@ -93,11 +61,11 @@ export function DrugCheckTab({ profile, stackIds }: { profile: BioStackProfile; 
     if (drugs.length === 0) return null;
     const found: CheckResult[] = [];
     for (const drug of drugs) {
-      const expandedDrugs = expandDrugMatches(drug);
+      const expandedDrugs = expandDrug(drug);
       for (const [id, cat] of Object.entries(SUPPORT_CATALOG_DATA)) {
         const subName = (cat.nameRu || cat.name || id).toLowerCase();
         const direct = KNOWN_DRUG_SUP_INTERACTIONS.filter(k =>
-          expandedDrugs.some(d => d.includes(k.drug) || k.drug.includes(d)) &&
+          expandDrug(k.drug).some(dt => expandedDrugs.includes(dt)) &&
           (subName.includes(k.substance) || id.includes(k.substance)));
         direct.forEach(d => found.push({ ...d, substance: cat.nameRu || cat.name || id }));
       }
@@ -114,13 +82,13 @@ export function DrugCheckTab({ profile, stackIds }: { profile: BioStackProfile; 
     const res: CheckResult[] = [];
     const targetIds = checkMode === 'stack' ? stackIds : Object.keys(SUPPORT_CATALOG_DATA).slice(0, 50);
     for (const drug of drugs) {
-      const expandedDrugs = expandDrugMatches(drug);
+      const expandedDrugs = expandDrug(drug);
       for (const id of targetIds) {
         const cat = SUPPORT_CATALOG_DATA[id];
         if (!cat) continue;
         const subName = (cat.nameRu || cat.name || id).toLowerCase();
         const direct = KNOWN_DRUG_SUP_INTERACTIONS.filter(k =>
-          expandedDrugs.some(d => d.includes(k.drug) || k.drug.includes(d)) &&
+          expandDrug(k.drug).some(dt => expandedDrugs.includes(dt)) &&
           (subName.includes(k.substance) || id.includes(k.substance)));
         direct.forEach(d => res.push({ ...d, substance: cat.nameRu || cat.name || id }));
       }

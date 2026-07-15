@@ -573,6 +573,137 @@ function normId(s: string): string {
   return s.toLowerCase().replace(/[^a-zа-яё0-9]/gi, '');
 }
 
+/* ════════════════════════════════════════════════════════════════════
+   DRUG ALIASES — единый источник en↔ru синонимов ЛС.
+   РАНЕЕ: взаимодействия ЛС↔БАД матчились ТОЛЬКО по русским именам →
+   ввод «tadalafil»/«warfarin»/«nitrates» НИКОГДА не давал предупреждения
+   (жизнеугрожающие комбинации PDE5i+нитраты, варфарин+наттокиназа были
+   молчаливо отключены). Теперь обе стороны (ввод пользователя и БД)
+   расширяются до объединённого набора токенов и матчатся по пересечению.
+   ════════════════════════════════════════════════════════════════════ */
+const DRUG_ALIASES: Record<string, string[]> = {
+  // ── PDE5-ингибиторы ──
+  'пдэ-5 (силденафил)': ['силденафил', 'sildenafil', 'виагра', 'viagra', 'пдэ5', 'pde5'],
+  'пдэ-5 (тадалафил)': ['тадалафил', 'tadalafil', 'сиалис', 'cialis', 'пдэ5', 'pde5'],
+  'ваденафил': ['vardenafil', 'левитра', 'levitra'],
+  // ── Нитраты ──
+  'нитраты': ['nitrates', 'нитроглицерин', 'nitroglycerin', 'изосорбида', 'isosorbide', 'моночик', 'мононитрат'],
+  // ── α-блокаторы ──
+  'альфа-блокатор': ['альфа1-блокатор', 'alphablocker', 'doxazosin', 'доксазозин', 'тамсулозин', 'tamsulosin', 'terazosin', 'теразозин', 'prazosin', 'празозин'],
+  // ── Антикоагулянты / антиагреганты ──
+  'варфарин': ['warfarin'],
+  'клопидогрель': ['clopidogrel', 'плавикс', 'plavix'],
+  'аспирин': ['aspirin', 'ацетилсалициловая', 'acetylsalicylic'],
+  'апиксабан': ['apixaban', 'эликвис', 'eliquis'],
+  'дабигатран': ['dabigatran', 'прадакса', 'pradaxa'],
+  'ривароксабан': ['rivaroxaban', 'ксарелто', 'xarelto'],
+  'гепарин': ['heparin', 'эноксапарин', 'enoxaparin', 'клексан', 'clexane'],
+  // ── СИОЗС / СИОЗСиН / ИМАО ──
+  'эсциталопрам (сиозс)': ['эсциталопрам', 'escitalopram', 'ципралекс', 'cipralex', 'сиозс', 'ssri'],
+  'сиозсин (венлафаксин)': ['венлафаксин', 'venlafaxine', 'сиозсин', 'snri'],
+  'сиозсин (дулоксетин)': ['дулоксетин', 'duloxetine', 'сиозсин', 'snri'],
+  'имао': ['maoi', 'моклобемид', 'moclobemide', 'ниаламид', 'nialamide', 'транилципромин', 'tranylcypromine', 'селегилин', 'selegiline', 'фенелзин', 'phenelzine', 'ингибитор мао'],
+  // ── Сердечно-сосудистые ──
+  'иапф (рамиприл)': ['рамиприл', 'ramipril', 'эналаприл', 'enalapril', 'лизиноприл', 'lisinopril', 'каптоприл', 'captopril', 'периндоприл', 'perindopril', 'квинаприл', 'quinapril', 'фозиноприл', 'fosinopril', 'иапф', 'ace inhibitor'],
+  'ара (лозартан)': ['лозартан', 'losartan', 'валсартан', 'valsartan', 'ирбесартан', 'irbesartan', 'кандесартан', 'candesartan', 'телмисартан', 'telmisartan', 'эпросартан', 'eprosartan', 'ара', 'arb'],
+  'β-блокаторы (бисопролол)': ['бисопролол', 'bisoprolol', 'метопролол', 'metoprolol', 'атенолол', 'atenolol', 'пропранолол', 'propranolol', 'небиволол', 'nebivolol', 'карведилол', 'carvedilol', 'бета-блокатор', 'betablocker'],
+  'бкк (амлодипин)': ['амлодипин', 'amlodipine', 'фелодипин', 'felodipine', 'нифедипин', 'nifedipine', 'бкк', 'ccb'],
+  'бкк (верапамил)': ['верапамил', 'verapamil', 'дилтиазем', 'diltiazem', 'бкк', 'ccb'],
+  'тиазидные (гидрохлоротиазид)': ['гидрохлоротиазид', 'hydrochlorothiazide', 'хлорталидон', 'chlorthalidone', 'тиазид', 'thiazide'],
+  'петлевые (фуросемид)': ['фуросемид', 'furosemide', 'торасемид', 'torasemide', 'петлевой', 'loop diuretic'],
+  'калийсберегающие (спиронолактон)': ['спиронолактон', 'spironolactone', 'эплеренон', 'eplerenone', 'калийсберегающий', 'potassium sparing'],
+  'амиодарон': ['amiodarone'],
+  'дигоксин': ['digoxin'],
+  // ── НПВС / анальгетики ──
+  'нпвс (ибупрофен)': ['ибупрофен', 'ibuprofen', 'диклофенак', 'diclofenac', 'напроксен', 'naproxen', 'кетопрофен', 'ketoprofen', 'мелоксикам', 'meloxicam', 'целекоксиб', 'celecoxib', 'нпвс', 'nsaid'],
+  'нпвс (диклофенак)': ['диклофенак', 'diclofenac', 'ибупрофен', 'ibuprofen', 'нпвс', 'nsaid'],
+  'трамадол': ['tramadol'],
+  'прегабалин': ['pregabalin', 'лирика', 'lyrica'],
+  'клозапин': ['clozapine'],
+  'метадон': ['methadone'],
+  'бупренорфин': ['buprenorphine'],
+  'триптаны (суматриптан)': ['суматриптан', 'sumatriptan', 'золмитриптан', 'zolmitriptan', 'триптан', 'triptan'],
+  'дифенгидрамин': ['diphenhydramine', 'димедрол', 'dimedrol'],
+  // ── Иммуносупрессоры / противоопухолевые ──
+  'циклоспорин': ['cyclosporine', 'cyclosporin', 'сандиммун', 'sandimmun'],
+  'такролимус': ['tacrolimus', 'програф', 'prograf'],
+  'метотрексат': ['methotrexate'],
+  'колхицин': ['colchicine'],
+  // ── Противосудорожные / нормотимики ──
+  'вальпроат': ['valproate', 'депакин', 'depakine', 'вальпроевая'],
+  'карбамазепин': ['carbamazepine'],
+  'топирамат': ['topiramate'],
+  // ── Психотропные ──
+  'оланзапин': ['olanzapine'],
+  'бензодиазепины': ['benzodiazepine', 'диазепам', 'diazepam', 'клоназепам', 'clonazepam', 'феназепам', 'phenazepam', 'лоразепам', 'lorazepam'],
+  'z-гипнотики (золпидем)': ['золпидем', 'zolpidem', 'амбен', 'ambien'],
+  // ── Паркинсонизм ──
+  'леводопа': ['levodopa', 'l-dopa', 'синемет', 'sinemet'],
+  // ── Бронхолитики ──
+  'сальбутамол': ['salbutamol', 'albuterol', 'вентолин', 'ventolin'],
+  'теофиллин': ['theophylline'],
+  // ── Антибиотики ──
+  'фторхинолоны (ципрофлоксацин)': ['ципрофлоксацин', 'ciprofloxacin', 'левофлоксацин', 'levofloxacin', 'офлоксацин', 'ofloxacin', 'фторхинолон', 'fluoroquinolone'],
+  'тетрациклины (доксициклин)': ['доксициклин', 'doxycycline', 'тетрациклин', 'tetracycline', 'миноциклин', 'minocycline'],
+  // ── Костная ткань ──
+  'алендронат': ['alendronate', 'фосамакс', 'fosamax'],
+  // ── Гормональные ──
+  'пероральные контрацептивы': ['oral contraceptive', 'ок', 'жанин', 'janine', 'лексинет', 'lexinet', 'ригевидон', 'rigevidon', 'ярина', 'yarinа'],
+  'глюкокортикоиды (преднизолон)': ['преднизолон', 'prednisolone', 'преднизон', 'prednisone', 'метилпреднизолон', 'methylprednisolone', 'дексаметазон', 'dexamethasone', 'гкс', 'глюкокортикоид', 'glucocorticoid'],
+  'левотироксин': ['левотироксин', 'levothyroxine', 'lthyroxine', 'эутирокс', 'euthyrox', 'l-тироксин', 'lt4'],
+  'левтироксин': ['левотироксин', 'levothyroxine', 'эутирокс', 'euthyrox'],
+  'мерказолил (тиреостатики)': ['мерказолил', 'тиамазол', 'thiamazole', 'methimazole', 'тиреостатик', 'antithyroid'],
+  'бигуаниды': ['biguanide', 'метформин', 'metformin', 'сиофор', 'glucophage', 'глюкофаж'],
+  'глп-1 (агонисты)': ['glp1', 'liraglutide', 'лираглутид', 'semaglutide', 'семаглутид', 'оземпик', 'ozempic', 'эксенатид', 'exenatide', 'агонист глп1', 'glp1 agonist'],
+  'sglt2 (глифлозины)': ['sglt2', 'empagliflozin', 'эмпаглифлозин', 'dapagliflozin', 'дапаглифлозин', 'глифлозин', 'gliflozin'],
+  // ── Прочие ──
+  'ингибиторы протонной помпы': ['ppi', 'омепразол', 'omeprazole', 'эзомепразол', 'esomeprazole', 'пантопразол', 'pantoprazole', 'рабепразол', 'rabeprazole', 'ипп'],
+  'инсулин': ['insulin'],
+  'метформин': ['metformin', 'сиофор', 'glucophage'],
+  'литий': ['lithium'],
+  'орлистат': ['orlistat', 'ксеникал', 'xenical'],
+  'аллопуринол': ['allopurinol'],
+  'ондансетрон': ['ondansetron'],
+  'домперидон': ['domperidone', 'мотилиум', 'motilium'],
+  'метоклопрамид': ['metoclopramide'],
+  'варениклин': ['varenicline', 'чампикс', 'champix'],
+  'бупропион': ['bupropion', 'зибан', 'zyban'],
+  'тенофовир': ['tenofovir'],
+  'ацикловир': ['acyclovir'],
+  'тизанидин': ['tizanidine'],
+  'клонидин': ['clonidine'],
+  'баклофен': ['baclofen'],
+  'кетоконазол': ['ketoconazole'],
+  'ацетазоламид': ['acetazolamide', 'диакарб', 'diacarb'],
+  'изониазид': ['isoniazid'],
+  'рифампицин': ['rifampicin', 'rifampin', 'рифампицин'],
+  'финастерид': ['finasteride', 'проскар', 'proscar', 'проpecia', 'propecia'],
+  'дутастерид': ['dutasteride', 'аводарт', 'avodart'],
+  'гинкго': ['ginkgo', 'гинкго билоба', 'ginkgo biloba'],
+  'чеснок': ['garlic', 'garlic_extract', 'аджоен', 'ajoene'],
+  'кофеин': ['caffeine', 'кофеин'],
+};
+
+// Индекс: каждый токен (нормализованный) → объединённый набор всех вариантов
+const DRUG_ALIAS_INDEX = new Map<string, string[]>();
+for (const [canon, aliases] of Object.entries(DRUG_ALIASES)) {
+  const all = [canon, ...aliases].map(normId);
+  const set = Array.from(new Set(all));
+  for (const tok of set) DRUG_ALIAS_INDEX.set(tok, set);
+}
+
+/** Расширить название ЛС до объединённого набора нормализованных токенов (en+ru). */
+export function expandDrug(s: string): string[] {
+  const n = normId(s);
+  const hit = DRUG_ALIAS_INDEX.get(n);
+  if (hit) return [...hit];
+  // частичное совпадение по подстроке (напр. ввод «рамиприл» ⊂ «иапф (рамиприл)»)
+  for (const [, set] of DRUG_ALIAS_INDEX) {
+    if (set.some(t => t.includes(n) || n.includes(t))) return [...set];
+  }
+  return [n];
+}
+
 // Критичные ЛЕКАРСТВО-ЛЕКАРСТВО комбинации (оба — ЛС, не добавки)
 const DRUG_DRUG_BLACKLIST: Array<{ a: string; b: string; effect: string; severity: 'HIGH'; mechanism: string }> = [
   { a: 'силденафил', b: 'нитраты', effect: 'ВЫРАЖЕННАЯ ГИПОТОНИЯ (жизнеугрожающее)', severity: 'HIGH', mechanism: 'NO/цГМФ путь — абсолютное противопоказание' },
@@ -588,27 +719,27 @@ export function getDrugSafetyExclusions(
   if (!userMeds.length || !candidateIds.length) return { excluded: [], titrations: [] };
   const excluded: DrugSafetyExclusion[] = [];
   const titrations: DrugSafetyTitration[] = [];
-  const medsLower = userMeds.map(m => m.toLowerCase().trim());
-  const medsNorm = medsLower.map(m => normId(m));
+  // Расширенные токены ЛС пользователя (en+ru алиасы) для точного матча
+  const medTokens = userMeds.flatMap(m => expandDrug(m));
 
-  // ЛЕКАРСТВО-ЛЕКАРСТВО блэклист (оба ЛС в userMeds)
+  // ЛЕКАРСТВО-ЛЕКАРСТВО блэклист (оба ЛС в userMeds).
+  // КРИТИЧ: ранее эта проверка пушала исключение ВСЕМ кандидатам стека →
+  // при наличии ЛС-ЛС конфликта весь стек молча выбрасывался. Теперь это
+  // ОТДЕЛЬНОЕ drug-drug предупреждение (в titrations), не удаляющее добавки.
   for (const dd of DRUG_DRUG_BLACKLIST) {
-    const na = normId(dd.a), nb = normId(dd.b);
-    const hasA = medsNorm.some(m => m.includes(na) || na.includes(m));
-    const hasB = medsNorm.some(m => m.includes(nb) || nb.includes(m));
+    const aTok = expandDrug(dd.a);
+    const bTok = expandDrug(dd.b);
+    const hasA = medTokens.some(m => aTok.includes(m));
+    const hasB = medTokens.some(m => bTok.includes(m));
     if (hasA && hasB) {
-      for (const subId of candidateIds) {
-        const cat = SUPPORT_CATALOG_DATA[subId];
-        if (!cat) continue;
-        excluded.push({
-          substanceId: subId,
-          substanceName: cat.nameRu || cat.name || subId,
-          drug: `${dd.a} + ${dd.b}`,
-          effect: dd.effect,
-          severity: dd.severity,
-          mechanism: dd.mechanism,
-        });
-      }
+      titrations.push({
+        substanceId: '__DRUG_DRUG__',
+        substanceName: `${dd.a} + ${dd.b}`,
+        drug: `${dd.a} + ${dd.b}`,
+        effect: dd.effect,
+        mechanism: dd.mechanism,
+        recommendation: `🛑 АБСОЛЮТНОЕ ПРОТИВОПОКАЗАНИЕ. Немедленно проконсультируйтесь с врачом. Данную комбинацию лекарств НЕ принимайте.`,
+      });
     }
   }
 
@@ -619,9 +750,9 @@ export function getDrugSafetyExclusions(
     const subIds = [subId, cat.nameRu || '', cat.name || ''].map(s => normId(s));
 
     for (const inter of KNOWN_DRUG_SUP_INTERACTIONS) {
-      const drugMatch = medsNorm.some((m, i) =>
-        m.includes(normId(inter.drug)) || normId(inter.drug).includes(m) || medsLower[i].includes(inter.drug) || inter.drug.includes(medsLower[i])
-      );
+      // alias-aware пересечение токенов ЛС (en↔ru теперь матчится корректно)
+      const drugTok = expandDrug(inter.drug);
+      const drugMatch = medTokens.some(m => drugTok.includes(m));
       const subNorm = normId(inter.substance);
       const subMatch = subIds.some(id => id.includes(subNorm) || subNorm.includes(id));
       if (drugMatch && subMatch) {
