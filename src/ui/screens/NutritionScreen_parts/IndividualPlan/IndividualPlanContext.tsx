@@ -728,10 +728,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         }
         const input: MealPlanInput = {
           weightKg: weight, lbmKg, bodyFatPct: bfPct, sex,
-          goalKcal: Math.round((effectiveKcal || weight * 30) * nutrMult * dayKcalMod),
-          goalProteinG: Math.round((effectiveP || weight * 2) * nutrMult),
-          goalFatG: Math.round((effectiveF || weight * 0.8) * nutrMult),
-          goalCarbsG: Math.round((effectiveC || weight * 3.5) * nutrMult * dayCarbMod),
+          goalKcal: Math.round(Math.max(1200, effectiveKcal || weight * 30 || 2500) * nutrMult * dayKcalMod),
+          goalProteinG: Math.round(Math.max(80, effectiveP || weight * 2 || 160) * nutrMult),
+          goalFatG: Math.round(Math.max(30, effectiveF || weight * 0.8 || 70) * nutrMult),
+          goalCarbsG: Math.round(Math.max(50, effectiveC || weight * 3.5 || 300) * nutrMult * dayCarbMod),
           mealsCount, isTrainingDay: !!trainingDays[offset % 7],
           trainStartMin: linkToTraining && trainingDays[offset % 7] ? toMin(trainStart) : undefined,
           allowIntraWorkout: trainIntensity === 'high',
@@ -1689,7 +1689,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   };
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [useProEngine, setUseProEngine] = useState(() => { try { return localStorage.getItem('he_use_pro_engine') !== 'false'; } catch { return true; } });
+  const [useProEngine, setUseProEngine] = useState(true);
   useEffect(() => { try { localStorage.setItem('he_use_pro_engine', useProEngine ? 'true' : 'false'); } catch {} }, [useProEngine]);
   const [planTab, setPlanTab] = useState<string>(() => { try { return localStorage.getItem('he_plan_active_tab') || 'settings'; } catch { return 'settings'; } });
   useEffect(() => { try { localStorage.setItem('he_plan_active_tab', planTab); } catch {} }, [planTab]);

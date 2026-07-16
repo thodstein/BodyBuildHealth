@@ -163,6 +163,7 @@ export const IndividualPlanSettings: React.FC = () => {
   const specialMealTimingLabel = timingLabels[specialMealTiming] || specialMealTiming;
   const TIME_OPTIONS = Array.from({length:48},(_,i)=>{const h=Math.floor(i/2);const m=i%2===0?'00':'30';return{id:`${String(h).padStart(2,'0')}:${m}`,label:`${String(h).padStart(2,'0')}:${m}`};});
 
+  const [recentPreset, setRecentPreset] = useState<string | null>(null);
   const [settingsSection, setSettingsSection] = useState<"quick" | "core" | "food" | "training" | "advanced">(() => {
     try { return (localStorage.getItem("he_settings_section") as any) || "quick"; } catch { return "quick"; }
   });
@@ -772,7 +773,7 @@ export const IndividualPlanSettings: React.FC = () => {
                 flex: 1, padding: '5px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600,
                 background: kbjuMode === mode ? `${colors[mode]}20` : '#202023',
                 border: kbjuMode === mode ? `1px solid ${colors[mode]}` : '1px solid rgba(255,255,255,0.06)',
-                color: kbjuMode === mode ? colors[mode] : 'rgba(255,255,255,0.85)',
+                color: kbjuMode === mode ? '#000' : 'rgba(255,255,255,0.7)',
               }}>{labels[mode]}</button>
             );
           })}
@@ -1325,9 +1326,9 @@ export const IndividualPlanSettings: React.FC = () => {
             <div style={{ fontSize: 8, fontWeight: 700, color: group.color, marginBottom: 4, letterSpacing: 0.3 }}>{group.cat}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {group.presets.map(p => (
-                <button key={p.id} onClick={() => { p.fn(); }} style={{ flex: 1, minWidth: 75, padding: '7px 5px', borderRadius: 10, cursor: 'pointer', textAlign: 'center', background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)', fontSize: 7, fontWeight: 600, transition: 'all 0.15s' }}
-                  onMouseEnter={e => { (e.target as HTMLElement).style.background = group.color + '15'; (e.target as HTMLElement).style.borderColor = group.color + '40'; }}
-                  onMouseLeave={e => { (e.target as HTMLElement).style.background = '#202023'; (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'; }}>
+                <button key={p.id} onClick={() => { p.fn(); setRecentPreset(p.id); }} style={{ flex: 1, minWidth: 75, padding: '7px 5px', borderRadius: 10, cursor: 'pointer', textAlign: 'center', background: recentPreset === p.id ? group.color : '#202023', border: recentPreset === p.id ? '2px solid '+group.color : '1px solid rgba(255,255,255,0.06)', color: recentPreset === p.id ? '#000' : 'rgba(255,255,255,0.85)', fontSize: 7, fontWeight: recentPreset === p.id ? 800 : 600, transition: 'all 0.15s' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = group.color + '30'; (e.currentTarget as HTMLElement).style.borderColor = group.color; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#202023'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'; }}>
                   <div style={{ fontSize: 14, marginBottom: 2 }}>{p.label.slice(0,2)}</div>
                   <div>{p.label.slice(2)}</div>
                   <div style={{ fontSize: 5, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>{p.desc}</div>
