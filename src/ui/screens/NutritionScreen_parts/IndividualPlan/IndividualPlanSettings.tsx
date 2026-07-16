@@ -894,7 +894,7 @@ export const IndividualPlanSettings: React.FC = () => {
                       position:'relative', overflow:'hidden',
                     }}>
                       <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background: m.c }} />
-                      <input type="number" value={m.v === 0 ? 0 : m.v || ''} onChange={e => m.setter(+e.target.value || null)} style={{
+                      <input type="number" value={m.v === 0 ? 0 : m.v || ''} onChange={e => m.setter(e.target.value === '' ? null : +e.target.value)} style={{
                         width:'100%', fontSize:18, fontWeight:800, color:m.c,
                         textAlign:'center', background:'transparent', border:'none',
                         outline:'none', padding:0, lineHeight:1.2, MozAppearance:'textfield',
