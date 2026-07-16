@@ -242,10 +242,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
       <div style={{ display:'flex', gap:3, padding:'2px 0' }}>
         {(['add','day'] as const).map(t => <button key={t} onClick={() => setTab(t)} style={{
-          flex:1, padding:'7px', borderRadius:10, cursor:'pointer', fontSize:10, fontWeight: tab===t ? 700 : 400,
-          border: tab===t ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-          background: tab===t ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023',
-          color: tab===t ? '#00e68a' : 'rgba(255,255,255,0.8)',
+          flex:1, padding:'7px', borderRadius:10, cursor:'pointer', fontSize:10, fontWeight: tab===t ? 800 : 500,
+          border: tab===t ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+          background: tab===t ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+          color: tab===t ? '#000' : 'rgba(255,255,255,0.6)',
         }}>{t === 'add' ? '➕ Добавить' : '📋 День'}</button>)}
       </div>
 
