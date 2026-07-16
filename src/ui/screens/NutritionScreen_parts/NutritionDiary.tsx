@@ -218,11 +218,11 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             return (
               <div key={i} onClick={() => setSelectedDate(ds)} style={{
                 flex:1, display:'flex', flexDirection:'column', alignItems:'center', padding:'6px 0', borderRadius:12, cursor:'pointer',
-                background: isSelected ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : 'transparent',
-                border: isSelected ? '1px solid #00e68a' : '1px solid transparent',
+                background: isSelected ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'transparent',
+                color: isSelected ? '#000' : 'rgba(255,255,255,0.6)', fontWeight: isSelected ? 800 : 500,
                 transition:'all 0.15s',
               }}>
-                <span style={{ fontSize:8, color: isSelected ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: isSelected ? 700 : 400 }}>{DAY_NAMES[i]}</span>
+                border: isSelected ? '2px solid #00e68a' : '1px solid transparent',
                 <span style={{ fontSize:14, fontWeight:700, color: isToday ? '#00e68a' : isSelected ? '#fff' : 'rgba(255,255,255,0.8)', marginTop:1 }}>{new Date(ds).getDate()}</span>
                 {hasData && <div style={{ width:5, height:5, borderRadius:'50%', background:'#00e68a', marginTop:2 }} />}
               </div>
@@ -251,7 +251,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
       {tab === 'add' && (
         <>
-          <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ padding:14, borderRadius:18, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', boxShadow:'0 2px 12px rgba(0,0,0,0.15)' }}>
             <input type="text" value={foodSearch} onChange={e => setFoodSearch(e.target.value)}
               placeholder="🔍 Поиск продуктов (начните печатать...)"
               autoFocus
