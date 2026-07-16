@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { buildStack, explainStack, findReplacement, findSupplements, findComplexForStack, type ReplacementResult, type ReplacementType, type ComplexMatch } from '../../engines/supplement-finder.engine';
 import { buildSmartStack } from '../../engines/biostack-recommender.engine';
@@ -1551,8 +1552,8 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
         })}
       </GlassCard>
 
-      {/* Global replace popup */}
-      {replacePopup && (
+      {/* Global replace popup — rendered via portal to escape backdrop-filter containing-block */}
+      {replacePopup && ReactDOM.createPortal(
         <div style={{
           position: 'fixed', inset: 0, zIndex: 251,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1665,7 +1666,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 }

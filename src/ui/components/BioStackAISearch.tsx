@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { type GoalType } from '../../engines/biostack-ai.engine';
 import { findSupplements, findReplacement, findComplexesForSubstance, type ReplacementType, type ReplacementResult, type ComplexMatch } from '../../engines/supplement-finder.engine';
@@ -681,7 +682,7 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
         </div>
       ))}
       {/* ── Replacement popup (optimized: all types with counts) ── */}
-      {replacePopup && (
+      {replacePopup && ReactDOM.createPortal(
         <div style={{
           position: 'fixed', inset: 0, zIndex: 251,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -791,9 +792,9 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
       {/* ── Complex popup ── */}
-      {complexPopup && (
+      {complexPopup && ReactDOM.createPortal(
         <div style={{
           position: 'fixed', inset: 0, zIndex: 251,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -870,7 +871,7 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 }
