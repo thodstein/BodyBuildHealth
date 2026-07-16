@@ -115,8 +115,20 @@ const SUPPLEMENT_MAX_G: Record<string, number> = {
 // Глобальный лимит на одну порцию любого продукта (г)
 const MAX_GRAM_PER_ITEM = 500;
 
-const MEAT_KEYWORDS = ['beef','pork','chicken','turkey','lamb','veal','duck','salmon','tuna','shrimp','cod','mackerel','trout','sardine','crab','lobster','squid','octopus','venison','rabbit','goose','pate','sausage','bacon','ham','pepperoni','salami','bologna','hot_dog','meatball','cutlet','steak','pollock','tilapia','herring','anchovy','clam','mussel','oyster','scallops','catfish','flounder','sole','white_fish','whelk','cockles','seafood_','protein_','fish_','_fish','mintai','mahi','trumpeter','shellfish','cockle','abalone','conch','snail','escargot','sea_urchin','sea_cucumber','caviar','roe','liver','kidney','heart_tripe','tongue','brain','sweetbread','gizzard'];
+const MEAT_KEYWORDS = ['beef','pork','chicken','turkey','lamb','veal','duck','salmon','tuna','shrimp','cod','mackerel','trout','sardine','crab','lobster','squid','octopus','venison','rabbit','goose','pate','sausage','bacon','ham','pepperoni','salami','bologna','hot_dog','meatball','cutlet','steak','pollock','tilapia','herring','anchovy','clam','mussel','oyster','scallops','catfish','flounder','sole','white_fish','whelk','cockles','seafood_','fish_','_fish','mintai','mahi','trumpeter','shellfish','cockle','abalone','conch','snail','escargot','sea_urchin','sea_cucumber','caviar','roe','liver','kidney','heart_tripe','tongue','brain','sweetbread','gizzard'];
 const isMeatId = (id: string): boolean => MEAT_KEYWORDS.some(k => id.toLowerCase().includes(k));
+
+// Д-3: Premium / exotic / rare foods that should NOT appear in a low/medium-budget plan.
+// 'low'/'medium' budget previously filtered only by bb_quality_score, letting luxury items
+// (abalone, macadamia, loquat, game meats, exotic oils/eggs) into rations. This set excludes them.
+const PREMIUM_OR_EXOTIC = ['abalone','sea_urchin','caviar','roe','truffle','macadamia','medlar',
+  'mustard_oil','black_cumin','saffron','vanilla','quail_egg','duck_egg','goose_egg','ostrich',
+  'venison','rabbit','duck_breast','duck_leg','goose_roasted','veal','mahi','trumpeter','conch',
+  'sea_cucumber','whale','bear','chestnut','pine_nut','hemp_oil','pistachio_oil','walnut_oil'];
+const isPremiumOrExotic = (id: string): boolean => {
+  const lid = id.toLowerCase();
+  return PREMIUM_OR_EXOTIC.some(k => lid.includes(k)) || lid.startsWith('lamb');
+};
 
 // ─── Источники белковой ротации (только существующие ID в FOOD_DB) ──────
 const PROTEIN_ROTATION: { label: string; ids: string[]; note: string }[] = [
@@ -226,16 +238,24 @@ function makeItem(food: FoodItem, grams: number, role: MealItem['role']): MealIt
 function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPlanInput['budget'], varietyPoolSize?: number) {
   const isMealFood = (f: FoodItem) =>
     f.category !== 'supplement' && !['whey_protein','casein'].includes(f.id);
-  const basePool = FOOD_DB.filter(f => {
+  // Д-3: build basePoolRaw first, then exclude premium/exotic at the source for low/medium budgets so
+  // they cannot enter ANY pool via raw fallbacks (fatsRaw, cFruitRaw) which bypass byBudget.
+  const basePoolRaw = FOOD_DB.filter(f => {
     if (excludedIds.has(f.id)) return false;
     if (!isMealFood(f)) return false;
-    if (isVeg) { const diet = FOOD_ALLERGEN_DIET[f.id]; if ((diet && diet.isVegetarian === false) || f.isVegetarian === false || (isMeatId(f.id) && !f.isVegetarian && !f.isVegan)) return false; }
+    // Д-10: prefer explicit isVegetarian tag; isMeatId is only a last-resort heuristic for unlabeled foods.
+    // Vegetarian (lacto-ovo) ALLOWS dairy and eggs — only isVegan excludes them, so we don't use isVegan here.
+    if (isVeg) { const diet = FOOD_ALLERGEN_DIET[f.id]; if ((diet && diet.isVegetarian === false) || (diet === undefined && f.isVegetarian === false) || (isMeatId(f.id) && f.isVegetarian !== true && f.isVegan !== true)) return false; }
     return true;
   });
+  const basePool = (budget === 'max' || budget === 'enhanced')
+    ? basePoolRaw
+    : basePoolRaw.filter(f => !isPremiumOrExotic(f.id));
   const byBudget = <T extends FoodItem>(arr: T[]): T[] => {
     if (budget === 'max' || budget === 'enhanced') return arr.filter(f => (f.bb_quality_score ?? 5) >= 8);
-    if (budget === 'low') return arr.filter(f => (f.bb_quality_score ?? 5) <= 7);
-    return arr;
+    // Д-3: 'low' budget = affordable quality AND not premium/exotic (abalone, game, macadamia, etc.)
+    if (budget === 'low') return arr.filter(f => (f.bb_quality_score ?? 5) <= 7 && !isPremiumOrExotic(f.id));
+    return arr.filter(f => !isPremiumOrExotic(f.id));
   };
   const pSolid = byBudget(basePool.filter(f => (f.category === 'protein' || f.category === 'dairy') && (f.fat || 0) <= 8 && (f.protein || 0) >= 13));
   const pFatty = byBudget(basePool.filter(f => f.category === 'protein' && (f.fat || 0) > 8 && (f.protein || 0) >= 12));
@@ -272,6 +292,13 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     vegGreen: basePool.filter(f => f.category === 'veg_fruit' && ['broccoli','spinach','cucumber','zucchini','asparagus','green_bean','celery','cabbage','kale','green_apple'].some(k => f.id.includes(k)) && (f.protein || 0) < 10),
     vegColor: basePool.filter(f => f.category === 'veg_fruit' && ['tomato','pepper','carrot','beetroot','pumpkin','eggplant','pomegranate','citrus'].some(k => f.id.includes(k.toLowerCase())) && (f.protein || 0) < 10),
     dairy: byBudget(basePool.filter(f => f.category === 'dairy' && (f.fat || 0) <= 10)),
+    // Д-5: vegetarian protein pool — relaxed thresholds so tofu/tempeh/seitan and carb-category
+    // legumes (lentils, chickpeas, edamame) actually enter the rotation (not only dairy).
+    vegProteinExtra: basePool.filter(f => !isPremiumOrExotic(f.id) && (
+      (f.category === 'protein' && (f.protein || 0) >= 8) ||
+      (f.id === 'tofu' || f.id === 'tempeh' || f.id === 'seitan' || f.id === 'edamame' ||
+       f.id === 'lentils' || f.id === 'chickpeas' || f.id === 'hummus' || f.id === 'falafel_pita')
+    )),
     eaa: FOOD_DB.find(f => !excludedIds.has(f.id) && f.id === 'supp_eaa') ?? FOOD_DB.find(f => !excludedIds.has(f.id) && f.id === 'bcaa'),
     dextrin: FOOD_DB.find(f => !excludedIds.has(f.id) && (f.id === 'amylopectin' || f.id === 'dextrose')),
   };
@@ -299,9 +326,17 @@ function buildWholeMeal(
   let remP = proteinG, remC = carbG, remF = fatG;
 
   // 1. Белок: роторный источник (предпочтение — preferred)
-  const rotPool = [...pool.proteinSolid, ...pool.proteinFatty].filter(f => proteinRotationIds.includes(f.id));
+  // Д-5: rotation pool also includes vegetarian extras (tofu/tempeh/seitan/legumes) so the
+  // "Веган/бобовые" rotation resolves to plant proteins instead of falling back to dairy only.
+  const rotPool = [...pool.proteinSolid, ...pool.proteinFatty, ...(pool.vegProteinExtra || [])].filter(f => proteinRotationIds.includes(f.id));
   const preferredRot = preferredIds && preferredIds.size > 0 ? rotPool.filter(f => preferredIds.has(f.id)) : [];
-  const proteinPool = preferredRot.length > 0 ? preferredRot : rotPool.length > 0 ? rotPool : pool.proteinLean.length > 0 ? pool.proteinLean : pool.proteinSolid;
+  // Д-5: veg fallback chain adds vegProteinExtra (plant proteins) before generic dairy pools.
+  const proteinPool = preferredRot.length > 0
+    ? preferredRot
+    : rotPool.length > 0 ? rotPool
+    : (pool.vegProteinExtra && pool.vegProteinExtra.length > 0) ? pool.vegProteinExtra
+    : pool.proteinLean.length > 0 ? pool.proteinLean
+    : pool.proteinSolid;
   const proteinSource = pickPriority(proteinPool, seed, { lockedIds, preferredIds: preferredRot.length > 0 ? undefined : preferredIds, recentIds });
   if (proteinSource) {
     const grams = gramsForMacro(proteinSource, remP, 'protein');
@@ -562,19 +597,21 @@ function fmtTime(min: number): string {
 }
 
 // ─── Вспомогательная: выбрать несколько белковых ротаций на день ──────
-function pickRotationsForDay(dayOffset: number, randomSalt: number, count: number): { label: string; ids: string[]; note: string }[] {
+// Д-5: vegetarian-aware rotation picker. Meat/fish rotations are skipped for veg users, and the
+// "Веган/бобовые" rotation (tofu/tempeh/seitan/legumes) is forced in so plant proteins appear.
+function pickRotationsForDay(dayOffset: number, randomSalt: number, count: number, isVegetarian = false): { label: string; ids: string[]; note: string }[] {
   const result: { label: string; ids: string[]; note: string }[] = [];
   const used = new Set<number>();
-  // Always include omega-3 fish rotation (index 1) for health coverage
-  const omega3Idx = 1; // Жирная рыба (Omega-3)
-  result.push(PROTEIN_ROTATION[omega3Idx]);
-  used.add(omega3Idx);
+  // Veg-valid rotation indices: 4 = Яйца/молоко (lacto-ovo), 6 = Сыворотка/молоко, 7 = Веган/бобовые.
+  const vegValid = new Set([4, 6, 7]);
+  if (isVegetarian) { result.push(PROTEIN_ROTATION[7]); used.add(7); }
+  else { result.push(PROTEIN_ROTATION[1]); used.add(1); }
   for (let i = 1; i < count; i++) {
     const seed = Math.abs(dayOffset * 10007 + randomSalt * 777 + i * 31);
     let idx = Math.floor(seededRandom(seed) * PROTEIN_ROTATION.length) % PROTEIN_ROTATION.length;
     let attempts = 0;
-    while (used.has(idx) && attempts < PROTEIN_ROTATION.length) { idx = (idx + 1) % PROTEIN_ROTATION.length; attempts++; }
-    if (!used.has(idx)) {
+    while ((used.has(idx) || (isVegetarian && !vegValid.has(idx))) && attempts < PROTEIN_ROTATION.length) { idx = (idx + 1) % PROTEIN_ROTATION.length; attempts++; }
+    if (!used.has(idx) && (!isVegetarian || vegValid.has(idx))) {
       used.add(idx);
       result.push(PROTEIN_ROTATION[idx]);
     }
@@ -615,7 +652,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
   const seedBase = (input.dayOffset + randomSalt) * 10007 + (input.isTrainingDay ? 3000 : 7000);
   // Ротация: разные группы белка в разные приёмы (раньше — одна на весь день)
-  const mealRotations = pickRotationsForDay(input.dayOffset, randomSalt, 4);
+  const mealRotations = pickRotationsForDay(input.dayOffset, randomSalt, 4, !!input.isVegetarian);
   function rotationForMeal(mealIdx: number): { label: string; ids: string[]; note: string } {
     // Shift rotation by dayOffset so omega-3 fish lands on different meals each day
     const shift = Math.abs(input.dayOffset) % mealRotations.length;
@@ -677,6 +714,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const residualC = Math.max(0, carbsTotal - usedC);
 
   const allFoodsUsed: string[] = [];
+  // Д-4: intra-day diversity — foods already used today are deprioritized for subsequent meals
+  // (recentFoodIds only covers PREVIOUS days; without this a food can repeat across today's meals).
+  const usedTodayIds = new Set<string>();
+  const effRecentIds = (): Set<string> => new Set<string>([...(input.recentFoodIds || []), ...usedTodayIds]);
+  const markUsed = (meal: Meal) => { meal.items.forEach(it => { allFoodsUsed.push(it.id); usedTodayIds.add(it.id); }); };
   const rotLabels = [...new Set(mealRotations.map(r => r.label))].join(' / ');
   const notes: string[] = [
     `Ротация белка: ${rotLabels} — разные группы в каждый приём`,
@@ -693,7 +735,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     pool, proteinRotationIds: breakfastRot.ids, seed: seedBase + 1,
     includeVeg: input.mealsCount >= 5, includeFruit: true,
     preferredIds: effectivePreferred,
-    lockedIds: input.lockedIds, recentIds: input.recentFoodIds,
+    lockedIds: input.lockedIds, recentIds: effRecentIds(),
     rationales: [
       `Завтрак: белок (${breakfastRot.label}) + медленные углеводы + жиры + ягоды`,
       'Желчь активна, липаза готова — жиры хорошо усваиваются',
@@ -701,7 +743,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     ],
   });
   meals.push(breakfast);
-  breakfast.items.forEach(i => allFoodsUsed.push(i.id));
+  markUsed(breakfast);
 
   // 2. Обед — основной цельный приём ─────────────────────────────────────
   const lunchRot = rotationForMeal(1);
@@ -713,7 +755,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     pool, proteinRotationIds: lunchRot.ids, seed: seedBase + 2,
     includeVeg: true, includeFruit: false,
     preferredIds: effectivePreferred,
-    lockedIds: input.lockedIds, recentIds: input.recentFoodIds,
+    lockedIds: input.lockedIds, recentIds: effRecentIds(),
     vegColorIdx: input.dayOffset, // lunch: green day 0, red day 1, orange day 2...
     rationales: [
       `Обед: цельная пища (${lunchRot.label} + злак + овощи + жиры)`,
@@ -721,7 +763,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     ],
   });
   meals.push(lunch);
-  lunch.items.forEach(i => allFoodsUsed.push(i.id));
+  markUsed(lunch);
 
   // P1.4: 2b. Snack 15:00 — нетренировочный день (MPS gap fill)
   if (hasSnack && mealBudget.snack) {
@@ -734,23 +776,23 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       pool, proteinRotationIds: snackRot.ids, seed: seedBase + 8,
       includeVeg: false, includeFruit: true,
       preferredIds: effectivePreferred,
-      lockedIds: input.lockedIds, recentIds: input.recentFoodIds,
+      lockedIds: input.lockedIds, recentIds: effRecentIds(),
       rationales: [
         `Полдник: лёгкий белок (${snackRot.label}) + фрукт — поддержание MPS (интервал 3ч от обеда)`,
         'Заполняет окно 6.5ч между обедом и ужином — предотвращает катаболизм',
       ],
     });
     meals.push(snack);
-    snack.items.forEach(i => allFoodsUsed.push(i.id));
+    markUsed(snack);
     notes.push('Полдник 15:30: MPS gap fill (нетренировочный день) — белок + фрукт');
   }
 
   // 3. Pre-workout (если тренировка) — за 90 мин до старта ─────────────
   if (trainWindow && mealBudget.prew && input.trainStartMin) {
     const preTime = fmtTime(input.trainStartMin - 90);
-    const prew = buildPreWorkout(preTime, 'Предтрен', seedBase + 3, pool, input.budget, effectivePreferred, { lockedIds: input.lockedIds, recentIds: input.recentFoodIds }, prewCarbG);
+    const prew = buildPreWorkout(preTime, 'Предтрен', seedBase + 3, pool, input.budget, effectivePreferred, { lockedIds: input.lockedIds, recentIds: effRecentIds() }, prewCarbG);
     meals.push(prew);
-    prew.items.forEach(i => allFoodsUsed.push(i.id));
+    markUsed(prew);
     notes.push('Pre-workout: белок + медленные углеводы за 90 мин (как минимум 1 прием пищи до тренировки)');
   }
 
@@ -765,9 +807,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // 5. Post-workout (+60 мин) ──────────────────────────────────────────
   if (trainWindow && mealBudget.postw && input.trainStartMin) {
     const postTime = fmtTime(input.trainStartMin + 60);
-    const postw = buildPostWorkout(postTime, 'Пост-трен', seedBase + 5, pool, effectivePreferred, { lockedIds: input.lockedIds, recentIds: input.recentFoodIds }, postwCarbG);
+    const postw = buildPostWorkout(postTime, 'Пост-трен', seedBase + 5, pool, effectivePreferred, { lockedIds: input.lockedIds, recentIds: effRecentIds() }, postwCarbG);
     meals.push(postw);
-    postw.items.forEach(i => allFoodsUsed.push(i.id));
+    markUsed(postw);
     notes.push('Post-workout: сыворотка + быстрые углеводы в течение 60 мин (анаболическое окно)');
   }
 
@@ -781,7 +823,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     pool, proteinRotationIds: dinnerRot.ids, seed: seedBase + 6,
     includeVeg: true, includeFruit: false,
     preferredIds: effectivePreferred,
-    lockedIds: input.lockedIds, recentIds: input.recentFoodIds,
+    lockedIds: input.lockedIds, recentIds: effRecentIds(),
     vegColorIdx: input.dayOffset + 2, // dinner: different color than lunch
     rationales: [
       `Ужин: ${dinnerRot.label} + 30% жиров — медленная абсорбция на ночь`,
@@ -790,12 +832,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     ],
   });
   meals.push(dinner);
-  dinner.items.forEach(i => allFoodsUsed.push(i.id));
+  markUsed(dinner);
 
   // 7. Pre-sleep — казеин + Mg + мелатонин ───────────────────────────────
   const preSleepSeed = seedBase + 7 + randomSalt * 13;
-  const preSleep = wantPreSleep ? buildPreSleep(tPreSleep, preSleepSeed, pool, residualP, { lockedIds: input.lockedIds, recentIds: input.recentFoodIds }) : null;
-  if (preSleep) { meals.push(preSleep); preSleep.items.forEach(i => allFoodsUsed.push(i.id)); notes.push('Pre-sleep: казеин + Mg + мелатонин-источник для ночного восстановления'); }
+  const preSleep = wantPreSleep ? buildPreSleep(tPreSleep, preSleepSeed, pool, residualP, { lockedIds: input.lockedIds, recentIds: effRecentIds() }) : null;
+  if (preSleep) { meals.push(preSleep); markUsed(preSleep); notes.push('Pre-sleep: казеин + Mg + мелатонин-источник для ночного восстановления'); }
 
   // Sort meals by time (chronological order)
   meals.sort((a, b) => {
@@ -981,7 +1023,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // ─── Atwater kcal: totals.kcal = P*4 + C*4 + F*9 (соответствует макросам) ───
   totals.kcal = Math.round(totals.p * 4 + totals.c * 4 + totals.f * 9);
   meals.forEach(m => { m.totals.kcal = Math.round(m.totals.p * 4 + m.totals.c * 4 + m.totals.f * 9); });
-  const deficiencyClosure = closeFoodDeficiencies(meals);
+  const deficiencyClosure = closeFoodDeficiencies(meals, !!input.isVegetarian);
   if (deficiencyClosure.length > 0) notes.push(...deficiencyClosure);
   // P5: Phase-specific nutrition protocol (bodybuilder-specific)
   const phaseNotes: string[] = [];
@@ -1020,18 +1062,19 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 }
 
 // ─── Покрытие микронутриентов: выявление дефицитов + рекомендации ─────
-const RDA_TARGETS: Record<string, { rda: number; unit: string; foodId: string; foodG: number }> = {
-  Fe: { rda: 18, unit: 'мг', foodId: 'beef_liver', foodG: 50 },
-  Mg: { rda: 400, unit: 'мг', foodId: 'pumpkin_seeds', foodG: 30 },
-  Zn: { rda: 15, unit: 'мг', foodId: 'oysters', foodG: 50 },
-  K: { rda: 3500, unit: 'мг', foodId: 'avocado', foodG: 100 },
-  Ca: { rda: 1000, unit: 'мг', foodId: 'sardines', foodG: 50 },
-  Omega3: { rda: 1600, unit: 'мг', foodId: 'salmon', foodG: 80 },
-  Se: { rda: 55, unit: 'мкг', foodId: 'beef_lean', foodG: 150 },
-  VitC: { rda: 100, unit: 'мг', foodId: 'veg_bell_pepper_red', foodG: 100 },
-  VitD: { rda: 15, unit: 'мкг', foodId: 'salmon', foodG: 100 },
-  VitB12: { rda: 2.4, unit: 'мкг', foodId: 'beef_lean', foodG: 150 },
-  VitB9: { rda: 400, unit: 'мкг', foodId: 'spinach', foodG: 150 },
+// Д-6: each nutrient carries a vegFoodId so deficiency recommendations respect vegetarian mode.
+const RDA_TARGETS: Record<string, { rda: number; unit: string; foodId: string; vegFoodId: string; foodG: number }> = {
+  Fe: { rda: 18, unit: 'мг', foodId: 'beef_liver', vegFoodId: 'lentils', foodG: 50 },
+  Mg: { rda: 400, unit: 'мг', foodId: 'pumpkin_seeds', vegFoodId: 'pumpkin_seeds', foodG: 30 },
+  Zn: { rda: 15, unit: 'мг', foodId: 'oysters', vegFoodId: 'pumpkin_seeds', foodG: 50 },
+  K: { rda: 3500, unit: 'мг', foodId: 'avocado', vegFoodId: 'avocado', foodG: 100 },
+  Ca: { rda: 1000, unit: 'мг', foodId: 'sardines', vegFoodId: 'tofu', foodG: 50 },
+  Omega3: { rda: 1600, unit: 'мг', foodId: 'salmon', vegFoodId: 'flaxseed', foodG: 80 },
+  Se: { rda: 55, unit: 'мкг', foodId: 'beef_lean', vegFoodId: 'brazil_nuts', foodG: 150 },
+  VitC: { rda: 100, unit: 'мг', foodId: 'veg_bell_pepper_red', vegFoodId: 'veg_bell_pepper_red', foodG: 100 },
+  VitD: { rda: 15, unit: 'мкг', foodId: 'salmon', vegFoodId: 'egg_yolk_cooked', foodG: 100 },
+  VitB12: { rda: 2.4, unit: 'мкг', foodId: 'beef_lean', vegFoodId: 'egg_yolk_cooked', foodG: 150 },
+  VitB9: { rda: 400, unit: 'мкг', foodId: 'spinach', vegFoodId: 'spinach', foodG: 150 },
 };
 function getMicroFromFood(food: FoodItem, field: string): number {
   const m = food.micros as Record<string, number> | undefined;
@@ -1058,7 +1101,9 @@ function getMicroFromFood(food: FoodItem, field: string): number {
   }
   return 0;
 }
-function closeFoodDeficiencies(meals: Meal[]): string[] {
+// Д-6: veg-aware. In vegetarian mode, deficiency recommendations use plant/dairy sources,
+// never suggesting meat/fish (salmon/oysters/beef_liver) which the user does not eat.
+function closeFoodDeficiencies(meals: Meal[], isVegetarian = false): string[] {
   const allItems = meals.flatMap(m => m.items.map(it => ({ ...it, food: FOOD_DB.find(f => f.id === it.id) })));
   const totals: Record<string, number> = {};
   allItems.forEach(({ food, amount }) => {
@@ -1072,7 +1117,8 @@ function closeFoodDeficiencies(meals: Meal[]): string[] {
   Object.entries(RDA_TARGETS).forEach(([key, cfg]) => {
     const val = totals[key] || 0;
     if (val < cfg.rda * 0.6) {
-      const food = FOOD_DB.find(f => f.id === cfg.foodId);
+      const sourceId = isVegetarian ? (cfg.vegFoodId || cfg.foodId) : cfg.foodId;
+      const food = FOOD_DB.find(f => f.id === sourceId) || FOOD_DB.find(f => f.id === cfg.foodId);
       const name = food?.name || cfg.foodId;
       const pct = Math.round(val / cfg.rda * 100);
       const addG = cfg.foodG;
