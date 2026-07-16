@@ -11,8 +11,8 @@ const DIM = 'rgba(255,255,255,0.5)';
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
 const H: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: ACCENT, margin: '0 0 8px' };
 
-const LIFT_RU: Record<Lift, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга' };
-const WP_RU: Record<WeakPoint, string> = { off_chest: 'Сход со груди', mid: 'Средняя точка', lockout: 'Дожим', start: 'Старт', bottom: 'Низ (выход из ямы)', sticking_mid: 'Зависание в середине' };
+const LIFT_RU: Record<Lift, string> = { bench: 'Жим лёжа', squat: 'Присед',   deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга верхнего блока', incline_press: 'Жим на наклонной' };
+const WP_RU: Record<WeakPoint, string> = { off_chest: 'Сход со груди', mid: 'Средняя точка', lockout: 'Дожим', start: 'Старт', bottom: 'Низ (выход из ямы)',   sticking_mid: 'Зависание в середине', ohp_start: 'Старт с плеч', ohp_mid: 'Середина', ohp_lockout: 'Дожим вверх', row_start: 'Старт (съём)', row_mid: 'Середина', row_squeeze: 'Сведение лопаток', pd_top: 'Верх (старт)', pd_mid: 'Середина', pd_squeeze: 'Сведение к груди', inc_off: 'Сход с груди (верх)', inc_mid: 'Середина', inc_lockout: 'Дожим' };
 
 export const PlWeakpointsCard: React.FC = () => {
   const [lift, setLift] = useState<Lift>('bench');
@@ -21,7 +21,7 @@ export const PlWeakpointsCard: React.FC = () => {
   const diag = useMemo(() => diagnoseWeakPoint(lift, wp), [lift, wp]);
   const [saved, setSaved] = useState(false);
   // маппинг движение → слабая группа профиля (используется ПЛ/ББ/ручным для приоритета объёма)
-  const LIFT_TO_GROUP: Record<Lift, string> = { bench: 'chest', squat: 'legs', deadlift: 'back' };
+  const LIFT_TO_GROUP: Record<Lift, string> = { bench: 'chest', squat: 'legs',   deadlift: 'back', ohp: 'shoulders', row: 'back', pulldown: 'back', incline_press: 'chest' };
   const saveFocus = () => { const p = loadTrainingProfile(); const g = LIFT_TO_GROUP[lift]; if (g && !p.weakPoints.includes(g)) saveTrainingProfile({ ...p, weakPoints: [...p.weakPoints, g] }); applyToPlanner({ kind: 'weakpoints', label: 'Слабая группа (ПЛ): ' + LIFT_RU[lift] + ' → ' + g, data: { groups: [g], lift } }); setSaved(true); setTimeout(() => setSaved(false), 2500); };
 
   const changeLift = (l: Lift) => { setLift(l); setWp(WEAK_POINTS_BY_LIFT[l][0]); };
