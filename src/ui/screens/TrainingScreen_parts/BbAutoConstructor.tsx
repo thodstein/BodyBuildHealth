@@ -156,69 +156,6 @@ function exerciseComment(ex: BBExercise, weakPoints: string[], focusGroup: strin
   return parts.join(' · ');
 }
 
-function calcQualityScore(metrics: BBPlanMetrics, weakPoints: string[], phases: { week: number; phase: BBPhase }[]): {
-  score: number; label: string; details: string[];
-  perMuscle: { muscle: string; sets: number; mev: number; mav: number; mrv: number; pct: number; status: string }[];
-  recommendations: string[];
-} {
-  const details: string[] = [];
-  const recommendations: string[] = [];
-  const perMuscle: { muscle: string; sets: number; mev: number; mav: number; mrv: number; pct: number; status: string }[] = [];
-  let score = 100;
-  let mrvPenalty = 0;
-  let weakCoverageBonus = 0;
-  for (const m of metrics.perMuscle) {
-    const pct = m.mrv > 0 ? Math.round((m.totalSets / m.mrv) * 100) : 0;
-    let status = 'optimal';
-    if (m.status === 'exceeding_mrv') {
-      mrvPenalty += 15;
-      details.push('⚠ ' + m.muscle + ': превышение MRV (' + m.totalSets + ' > ' + m.mrv + ')');
-      recommendations.push('➖ ' + m.muscle + ': −' + (m.totalSets - m.mrv) + ' сетов/нед (MRV=' + m.mrv + ')');
-      status = 'overload';
-    } else if (m.status === 'approaching_mrv') {
-      mrvPenalty += 5;
-      details.push('📈 ' + m.muscle + ': близко к MRV (' + m.totalSets + '/' + m.mrv + ')');
-      status = 'near_max';
-    } else if (m.status === 'below_mev') {
-      mrvPenalty += 10;
-      details.push('⚠ ' + m.muscle + ': недогруз (' + m.totalSets + ' < MEV ' + m.mev + ')');
-      recommendations.push('➕ ' + m.muscle + ': +' + (m.mev - m.totalSets) + ' сетов/нед (MEV=' + m.mev + ')');
-      status = 'undertrained';
-    }
-    if (weakPoints.includes(m.muscle) && m.totalSets >= m.mev) weakCoverageBonus += 10;
-    if (weakPoints.includes(m.muscle) && m.status === 'below_mev') {
-      details.push('❌ Слабая группа «' + m.muscle + '» недогружена (' + m.totalSets + '/' + m.mev + ')');
-      recommendations.push('🔴 ' + m.muscle + ' (слабая группа): +' + (m.mev - m.totalSets) + ' сетов/нед');
-    }
-    perMuscle.push({ muscle: m.muscle, sets: m.totalSets, mev: m.mev, mav: m.mav, mrv: m.mrv, pct, status });
-  }
-  score -= mrvPenalty;
-  score += Math.min(weakCoverageBonus, 30);
-
-  // Balance detection
-  if (perMuscle.length >= 2) {
-    const sorted = [...perMuscle].filter(p => p.mrv > 0).sort((a, b) => b.pct - a.pct);
-    const maxPct = sorted[0]?.pct || 0;
-    const minPct = sorted[sorted.length - 1]?.pct || 0;
-    if (maxPct - minPct > 40) {
-      score -= 5;
-      details.push('⚖ Дисбаланс объёма: ' + sorted[0].muscle + ' (' + maxPct + '%) vs ' + sorted[sorted.length - 1].muscle + ' (' + minPct + '%)');
-      recommendations.push('⚖ Увеличьте объём для ' + sorted[sorted.length - 1].muscle + ' (отстаёт от ' + sorted[0].muscle + ')');
-    }
-  }
-
-  const hasDeload = phases.some(p => p.phase === 'deload');
-  if (!hasDeload && phases.length >= 6) { score -= 10; details.push('❌ Нет фазы разгрузки при мезо ' + phases.length + ' нед — риск перетрена'); }
-  const hpRatio = metrics.тяжPct > 0 && metrics.пампPct > 0 ? metrics.тяжPct / metrics.пампPct : 0;
-  if (hpRatio > 3) { score -= 10; details.push('⚖ Дисбаланс: тяж ' + (metrics.тяжPct*100).toFixed(0) + '% vs памп ' + (metrics.пампPct*100).toFixed(0) + '%'); }
-  if (hpRatio < 0.3) { score -= 5; details.push('⚖ Мало тяжёлой нагрузки (необходима для прогрессии)'); }
-  for (const m of metrics.perMuscle) {
-    if (m.frequencyPerRotation < 1) { score -= 10; details.push('❌ ' + m.muscle + ' тренируется <1×/ротация'); }
-  }
-  score = Math.max(0, Math.min(100, score));
-  const label = score >= 85 ? '🟢 Профессионально' : score >= 65 ? '🟡 Хорошо' : score >= 45 ? '🟠 Удовлетворительно' : '🔴 Требует доработки';
-  return { score, label, details, perMuscle, recommendations };
-}
 
 function rotationSubstitutions(week: number, totalWeeks: number, muscle: string, currentName: string): string[] {
   const catalog = EXERCISE_CATALOG.filter(e => (e.group || '') === muscle && e.name !== currentName);
@@ -1418,7 +1355,7 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:6 }}>🏋️ Мышцы · сеты · MEV · MAV · MRV · %</div>
             <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
               {quality.perMuscle.map(pm => {
-                const color = pm.status === 'overload' ? '#ef4444' : pm.status === 'undertrained' ? '#f59e0b' : '#22c55e';
+                const color = pm.status === 'exceeding_mrv' ? '#ef4444' : pm.status === 'below_mev' ? '#f59e0b' : '#22c55e';
                 return (
                   <div key={pm.muscle} style={{ padding:'4px 8px', borderRadius:6, background:color+'10', border:'1px solid '+color+'30', fontSize:10, display:'flex', alignItems:'center', gap:4 }}>
                     <span style={{ fontWeight:700, color:'#fff' }}>{pm.muscle}</span>
@@ -1489,7 +1426,7 @@ export const BbAutoConstructor: React.FC = () => {
           <div style={{ ...SMALL, whiteSpace:'pre-wrap' }}>{explainBBMetrics(metrics)}</div>
         </div>
         {/* Export plan card */}
-        {unifiedQuality && (
+        {quality && (
           <div style={{ marginTop:8 }}>
             <PlanExportCard
               bbPlan={builtPlan}
