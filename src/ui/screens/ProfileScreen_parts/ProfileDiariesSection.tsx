@@ -4,7 +4,6 @@ import { theme, NavCard, PopupCard } from './ProfileComponents';
 import { SleepDiaryTab } from './SleepDiaryTab';
 import { BPDiaryTab } from '../../components/BPDiaryTab';
 import { LabDiaryTab } from '../LabsScreen_parts/LabDiaryTab';
-import { ProfileMeasurementsTab } from './ProfileMeasurementsTab';
 import { InjectionDiaryTab } from './InjectionDiaryTab';
 
 interface Props {
@@ -20,14 +19,13 @@ type DiaryItem = { id: string; icon: string; title: string; desc: string; color:
 const diaryItems: DiaryItem[] = [
   { id: 'sleep', icon: '🛌', title: 'Сон', desc: 'Часы, качество, график', color: '#8b5cf6', kind: 'inline' },
   { id: 'bp', icon: '❤️', title: 'Давление', desc: 'Систола/диастола, пульс', color: '#ef4444', kind: 'inline' },
-  { id: 'measurements', icon: '📈', title: 'Замеры', desc: 'Обхваты, фото, график', color: '#3b82f6', kind: 'inline' },
   { id: 'inj_diary', icon: '🩼', title: 'Инъекции', desc: 'Зоны, PIP, журнал', color: '#f59e0b', kind: 'inline' },
   { id: 'lab_diary', icon: '📊', title: 'Анализы', desc: 'Динамика маркеров', color: '#6366f1', kind: 'inline' },
   { id: 'nutrition', icon: '🥗', title: 'Питание', desc: 'Дневник еды, КБЖУ', color: '#22c55e', kind: 'nav', navScreen: 'nutrition', navFlag: 'he_nav_nutrition_diary', navFlagVal: '1' },
   { id: 'training', icon: '🏋️', title: 'Тренировки', desc: 'Журнал, объём, нагрузка', color: '#3b82f6', kind: 'nav', navScreen: 'training', navFlag: 'he_nav_training_diary', navFlagVal: '1' },
   { id: 'pharma', icon: '💊', title: 'Фарма', desc: 'Курс, препараты, ПКТ', color: '#ec4899', kind: 'nav', navScreen: 'pharma' },
   { id: 'support', icon: '🧪', title: 'Поддержка', desc: 'БАДы, план, стеки', color: '#06b6d4', kind: 'nav', navScreen: 'support' },
-  { id: 'symptoms', icon: '🩺', title: 'Симптомы', desc: 'Жалобы, трекинг', color: '#f97316', kind: 'nav', navScreen: 'support', navFlag: 'he_nav_support_complaints', navFlagVal: '1' },
+  { id: 'symptoms', icon: '🩺', title: 'Симптомы', desc: 'Жалобы, трекинг', color: '#f97316', kind: 'nav', navScreen: 'support', navFlag: 'he_nav_support_diary', navFlagVal: '1' },
 ];
 
 const INLINE_IDS = new Set(diaryItems.filter(d => d.kind === 'inline').map(d => d.id));
@@ -95,7 +93,6 @@ export const ProfileDiariesSection: React.FC<Props> = ({ settings, save, labs, w
       <div>
         {diarySubTab === 'sleep' && <SleepDiaryTab settings={settings} save={save} />}
         {diarySubTab === 'bp' && <BPDiaryTab />}
-        {diarySubTab === 'measurements' && <ProfileMeasurementsTab />}
         {diarySubTab === 'lab_diary' && <LabDiaryTab labs={labs} />}
         {diarySubTab === 'inj_diary' && <InjectionDiaryTab />}
       </div>

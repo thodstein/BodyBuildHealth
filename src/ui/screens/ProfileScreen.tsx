@@ -19,19 +19,61 @@ import { ProfileDataHub } from './ProfileScreen_parts/ProfileDataHub';
 import { theme, SectionTitle } from './ProfileScreen_parts/ProfileComponents';
 
 type ProfileTab = 'overview' | 'lifestyle' | 'diet' | 'health' | 'training' | 'diaries' | 'data' | 'analytics' | 'contacts';
-type ProfilePage = 'hero' | 'tabs';
-type MainTab = 'info' | 'analytics' | 'contacts';
+type ProfilePage = 'hero' | 'sections' | 'detail';
 
 const WEIGHT_LOG_KEY = 'he_weight_log';
 interface WeightEntry { date: string; weight: number; }
 function getWeightLog(): WeightEntry[] { try { return JSON.parse(localStorage.getItem(WEIGHT_LOG_KEY) || '[]'); } catch { return []; } }
 function saveWeightLog(log: WeightEntry[]) { localStorage.setItem(WEIGHT_LOG_KEY, JSON.stringify(log.slice(-90))); }
 
+/* ── Glass card styles for hero ── */
+const glassCard: React.CSSProperties = {
+  background: 'rgba(28,28,32,0.65)',
+  backdropFilter: 'blur(28px) saturate(180%)',
+  WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+  borderRadius: 20,
+  border: '1px solid rgba(255,255,255,0.10)',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.35), inset 0 0.5px 0 rgba(255,255,255,0.08)',
+  cursor: 'pointer',
+  transition: 'all 0.25s cubic-bezier(0.2,0.9,0.4,1)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 14,
+  padding: '16px 18px',
+  width: '100%',
+  textAlign: 'left' as const,
+  color: '#fff',
+};
+const glassCardHover = {
+  transform: 'translateY(-2px)',
+  boxShadow: '0 14px 40px rgba(0,0,0,0.45), inset 0 0.5px 0 rgba(255,255,255,0.10)',
+};
+
+/* ── Section config ── */
+interface SectionDef {
+  id: ProfileTab;
+  icon: string;
+  title: string;
+  subtitle: string;
+  color: string;
+  wide?: boolean;
+}
+const SECTIONS: SectionDef[] = [
+  { id: 'overview',   icon: '👤', title: 'Общие сведения',   subtitle: 'Персональные данные · Антропометрия · Композиция тела', color: '#00e68a' },
+  { id: 'training',   icon: '🏋️', title: 'Тренировки',       subtitle: 'Цель, уровень, сплит, программа, стаж',              color: '#3b82f6' },
+  { id: 'health',     icon: '🩺', title: 'Здоровье',         subtitle: 'Хроника, аллергии, генетика, риски',                   color: '#ef4444' },
+  { id: 'diet',       icon: '🥗', title: 'Питание',          subtitle: 'Диета, аллергии, КБЖУ, привычки',                     color: '#22c55e' },
+  { id: 'lifestyle',  icon: '🌿', title: 'Образ жизни',      subtitle: 'Сон, стресс, активность, вода',                       color: '#8b5cf6' },
+  { id: 'diaries',    icon: '📓', title: 'Дневники',         subtitle: 'Все дневники: сон, давление, питание, тренировки',     color: '#f59e0b' },
+  { id: 'analytics',  icon: '📊', title: 'Аналитика',        subtitle: 'Сводные отчёты · Отчёты по модулям · Архив',          color: '#ec4899' },
+  { id: 'data',       icon: '🗂️', title: 'Мои данные',       subtitle: 'Агрегированные источники · Заполненность профиля',    color: '#14b8a6' },
+  { id: 'contacts',   icon: '📞', title: 'Контакты и друзья',subtitle: 'Список друзей, шаринг, поддержка',                    color: '#6366f1' },
+];
+
 export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> = ({ onNavigate }) => {
   const profile = useProfileRefresh();
-  const [tab, setTab] = useState<ProfileTab>('overview');
+  const [section, setSection] = useState<ProfileTab | null>(null);
   const [page, setPage] = useState<ProfilePage>('hero');
-  const [mainTab, setMainTab] = useState<MainTab>('info');
   const [labs, setLabs] = useState<LabPoint[]>([]);
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
   const [weightLog, setWeightLog] = useState<WeightEntry[]>(getWeightLog);
@@ -41,6 +83,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
   });
 
   const settings = profile.settings;
+  const us = settings as UnifiedSettings;
 
   const upCalc = (k: string, v: any) => {
     const next = { ...calcData };
@@ -48,7 +91,6 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     let o = next; for (let i = 0; i < keys.length - 1; i++) { o[keys[i]] = o[keys[i]] || {}; o = o[keys[i]]; }
     o[keys[keys.length - 1]] = v; setCalcData(next);
     try { localStorage.setItem('he_autocalc_state', JSON.stringify(next)); } catch {}
-    // sync matching fields to main profile settings for cross-tab visibility
     const syncMap: Record<string, string> = {
       'neuro.sleepQuality': 'baselineSleepQuality',
       'psych.fearOfLoss': 'baselineStressLevel',
@@ -61,19 +103,14 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     }
   };
 
-  /** Deep-merge partial into UnifiedSettings. Supports both flat legacy keys and nested keys. */
   const save = (partial: Record<string, any>) => {
     const curSettings = getProfile().settings || ({} as UnifiedSettings);
-
-    // Log weight changes
     if (partial.weight !== undefined && partial.weight !== (curSettings as any).personal?.weight) {
       const newEntry: WeightEntry = { date: new Date().toISOString().split('T')[0], weight: partial.weight };
       const updated = [...weightLog.filter(w => w.date !== newEntry.date), newEntry].sort((a, b) => a.date.localeCompare(b.date));
       setWeightLog(updated);
       saveWeightLog(updated);
     }
-
-    // Convert flat legacy keys to nested UnifiedSettings
     const flatToNested: Record<string, string> = {
       age: 'personal.age', sex: 'personal.sex', weight: 'personal.weight',
       height: 'personal.height', bodyFat: 'personal.bodyFat',
@@ -111,7 +148,6 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
       targetWeight: 'system.targetWeight', targetBodyFat: 'system.targetBodyFat',
       preferredUnits: 'system.preferredUnits',
     };
-
     const nested: UnifiedSettings = JSON.parse(JSON.stringify(curSettings));
     for (const [k, v] of Object.entries(partial)) {
       if (v === undefined || v === null) continue;
@@ -122,7 +158,6 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
       } else if (parts.length === 3 && parts[0] === 'health' && parts[1] === 'contraindications') {
         (nested as any).health.contraindications[parts[2]] = v;
       } else {
-        // Section-level override (e.g. { training: { weakPoints: [...] } })
         const section = parts[0] as keyof UnifiedSettings;
         if (typeof v === 'object' && !Array.isArray(v)) {
           (nested as any)[section] = { ...(nested as any)[section], ...v };
@@ -131,7 +166,6 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
         }
       }
     }
-
     updateProfile({ settings: nested });
     syncAllProfiles(nested);
   };
@@ -141,29 +175,6 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     save({ weakPoints: wp.includes(id) ? wp.filter(x => x !== id) : [...wp, id] });
   };
 
-  const tabs: { id: MainTab; label: string }[] = [
-    { id: 'info', label: '📋 Сведения' },
-    { id: 'analytics', label: '📊 Аналитика' },
-    { id: 'contacts', label: '📞 Контакты' },
-  ];
-  const infoSubTabs: { id: ProfileTab; label: string }[] = [
-    { id: 'overview', label: 'Общие сведения' },
-    { id: 'lifestyle', label: 'Образ жизни' }, { id: 'training', label: 'Тренировки' },
-    { id: 'health', label: 'Здоровье' },
-    { id: 'diet', label: 'Питание'},
-    { id: 'diaries', label: 'Дневники' },
-    { id: 'data', label: 'Мои данные' },
-  ];
-  const us = settings as UnifiedSettings;
-  const sectionHeaders: Record<string, { icon: string; title: string; subtitle: string }> = {
-    overview: { icon: '👤', title: 'Общие сведения', subtitle: 'Персональные данные · Антропометрия · Композиция тела' },
-    lifestyle: { icon: '🌿', title: 'Образ жизни', subtitle: 'Сон, стресс, активность' },
-    training: { icon: '🏋️', title: 'Тренировки', subtitle: 'Цель, уровень, сплит, фаза' },
-    health: { icon: '🩺', title: 'Здоровье', subtitle: 'Хроника, аллергии, риски' },
-    diet: { icon: '🥗', title: 'Питание', subtitle: 'Диета, аллергии, привычки' },
-    diaries: { icon: '📓', title: 'Дневники', subtitle: 'Все дневники приложения: сон, давление, питание, тренировки и др.' },
-    data: { icon: '🗂️', title: 'Мои данные', subtitle: 'Агрегированные источники' },
-  };
   useEffect(() => {
     if (us) saveContraindications({
       chronicConditions: us.health?.chronicConditions || [],
@@ -198,138 +209,224 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
   }, []);
 
   const initials = (profile.name || 'П').charAt(0).toUpperCase();
+  const ageStr = (us.personal as any)?.age ? `${(us.personal as any).age} лет` : '—';
+  const weightStr = (us.personal as any)?.weight ? `${(us.personal as any).weight} кг` : '';
+
+  /* ── Navigate to section detail ── */
+  const openSection = (id: ProfileTab) => {
+    setSection(id);
+    setPage('detail');
+  };
+  const backToSections = () => {
+    setSection(null);
+    setPage('sections');
+  };
+  const backToHero = () => {
+    setSection(null);
+    setPage('hero');
+  };
+
+  /* ── Render section content ── */
+  const renderSectionContent = (tab: ProfileTab) => (
+    <InfoErrorBoundary label={SECTIONS.find(s => s.id === tab)?.title || ''}>
+      {tab === 'overview' && (
+        <>
+          <ProfileBioSection settings={settings} save={save} calcData={calcData} upCalc={upCalc} onNavigate={onNavigate} />
+          <div style={{ marginTop: 6 }}>
+            <ProfileBodySection settings={settings} save={save} />
+          </div>
+        </>
+      )}
+      {tab === 'lifestyle' && <ProfileLifestyleSection settings={settings} save={save} calcData={calcData} upCalc={upCalc} toggleWeakPoint={toggleWeakPoint} />}
+      {tab === 'health' && <ProfileHealthSection settings={settings} save={save} calcData={calcData} upCalc={upCalc} onNavigate={onNavigate} />}
+      {tab === 'diet' && <ProfileDietSection settings={settings} save={save} />}
+      {tab === 'training' && <ProfileTrainingSection settings={settings} save={save} calcData={calcData} upCalc={upCalc} toggleWeakPoint={toggleWeakPoint} />}
+      {tab === 'diaries' && <ProfileDiariesSection settings={settings} save={save} labs={labs} workoutLogs={workoutLogs} onNavigate={onNavigate} />}
+      {tab === 'data' && (
+        <ProfileDataHub
+          settings={settings}
+          labs={labs}
+          workoutLogs={workoutLogs}
+          foodDiaryAvg={foodDiaryAvg}
+          onOpenProfileTab={(t: string) => openSection(t as ProfileTab)}
+          onNavigate={onNavigate}
+        />
+      )}
+      {tab === 'analytics' && <ProfileAnalyticsSection settings={settings} save={save} labs={labs} workoutLogs={workoutLogs} foodDiaryAvg={foodDiaryAvg} profileName={profile.name} onNavigate={onNavigate} />}
+      {tab === 'contacts' && <ProfileContactsSection settings={settings} profileName={profile.name} onNavigate={onNavigate} />}
+    </InfoErrorBoundary>
+  );
+
+  /* ── Bottom quick-nav chips on detail page ── */
+  const QuickNavChips: React.FC<{ current: ProfileTab }> = ({ current }) => (
+    <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>
+        Другие разделы
+      </div>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        {SECTIONS.filter(s => s.id !== current && s.id !== 'analytics' && s.id !== 'contacts').slice(0, 7).map(s => (
+          <button key={s.id} onClick={() => setSection(s.id)}
+            style={{
+              padding: '6px 12px', borderRadius: 20, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+              border: `1px solid ${s.color}22`, background: `${s.color}0d`, color: s.color,
+              whiteSpace: 'nowrap', transition: 'all 0.15s',
+            }}>
+            {s.icon} {s.title}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="screen profile">
-      {page === 'hero' ? (
-        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
-          <img src="/profile-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', display:'block', objectFit:'cover', objectPosition:'center top' }} />
-          <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
-          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
-            <div style={{ marginBottom:16 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
-                <div style={{ width:56, height:56, borderRadius:'50%', background: theme.gradientGreen, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, fontWeight:800, color:'#000', border:'2px solid rgba(255,255,255,0.15)', boxShadow:'0 4px 20px rgba(0,230,138,0.3)' }}>
-                  {initials}
-                </div>
+      {/* ═══════════════ HERO PAGE ═══════════════ */}
+      {page === 'hero' && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <img src="/profile-hero.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block', objectFit: 'cover', objectPosition: 'center top' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.92) 100%)' }} />
+
+          <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '20px 16px 90px' }}>
+            {/* Avatar + name */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{
+                  width: 62, height: 62, borderRadius: '50%', flexShrink: 0,
+                  background: 'linear-gradient(135deg, #00e68a, #00b864)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 26, fontWeight: 800, color: '#000',
+                  border: '2.5px solid rgba(255,255,255,0.2)',
+                  boxShadow: '0 8px 32px rgba(0,230,138,0.35)',
+                }}>{initials}</div>
                 <div>
-                  <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:0, textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Профиль</h1>
-                  <p style={{ fontSize:12, color:'rgba(255,255,255,0.85)', margin:'4px 0 0', textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>
-                    {profile.name || 'Пользователь'} • {(settings as UnifiedSettings).personal?.age || '—'} лет
+                  <h1 style={{ fontSize: 24, fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '-0.4px', lineHeight: 1.1, textShadow: '0 2px 16px rgba(0,0,0,0.85)' }}>
+                    {profile.name || 'Пользователь'}
+                  </h1>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', margin: '4px 0 0', textShadow: '0 1px 8px rgba(0,0,0,0.7)' }}>
+                    {ageStr}{weightStr ? ` · ${weightStr}` : ''}
                   </p>
                 </div>
               </div>
             </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              {[
-                { id: 'info', icon: '📋', title: 'Сведения о пользователе', desc: 'Персональные данные, антропометрия, тренировки, образ жизни, питание, здоровье, дневники', color: '#00e68a' },
-                { id: 'analytics', icon: '📊', title: 'Аналитика', desc: 'Отчёты по всем модулям, графики прогресса, архив отчётов', color: '#3b82f6' },
-                { id: 'contacts', icon: '📞', title: 'Контакты и друзья', desc: 'Список друзей, шаринг, поддержка и контакты', color: '#8b5cf6' },
-              ].map(card => (
-                <button key={card.id} onClick={() => { setPage('tabs'); setTab(card.id === 'info' ? 'overview' : card.id as ProfileTab); }}
-                  style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text)', transition:'all 0.2s' }}>
-                  <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: card.color + '18', fontSize:20 }}>{card.icon}</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color: card.color }}>{card.title}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', lineHeight:1.3 }}>{card.desc}</div>
-                  </div>
-                  <span style={{ color: card.color, fontSize:16, opacity:0.6 }}>→</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div style={{ position:'relative', minHeight:'100%' }}>
-          <div style={{ position:'relative', zIndex:1, padding:'10px 12px 80px' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0, marginBottom:8 }}>
-              <button onClick={() => setPage('hero')}
-                style={{ padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:12, fontWeight:600, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.9)' }}>
-                ← На главную</button>
-            </div>
 
-            {/* Main tabs */}
-            <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none', marginBottom:6, paddingBottom:2 }}>
-              {tabs.map(t => (
-                <button key={t.id} onClick={() => { setMainTab(t.id); if (t.id === 'analytics') setTab('analytics'); if (t.id === 'contacts') setTab('contacts'); if (t.id === 'info' && mainTab !== 'info') setTab('overview'); }}
-                  style={{ padding:'8px 18px', borderRadius:22, fontSize:12, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background: mainTab === t.id ? 'rgba(0,230,138,0.12)' : 'rgba(24,24,27,0.12)', border: mainTab === t.id ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.04)', color: mainTab === t.id ? '#00e68a' : 'rgba(255,255,255,0.9)', transition:'all 0.2s' }}>
-                  {t.label}</button>
-              ))}
-            </div>
-
-            {/* Sub‑tabs as pills (original design) */}
-            {mainTab === 'info' && (
-              <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none', marginBottom:12, paddingBottom:2 }}>
-                {infoSubTabs.map(t => (
-                  <button key={t.id} onClick={() => setTab(t.id)}
-                    style={{ padding:'8px 18px', borderRadius:22, fontSize:12, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, background: tab === t.id ? 'rgba(0,230,138,0.12)' : 'rgba(24,24,27,0.12)', border: tab === t.id ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.04)', color: tab === t.id ? '#00e68a' : 'rgba(255,255,255,0.9)', transition:'all 0.2s' }}>
-                    {t.label}
+            {/* Section grid: 3-column on wider screens, 2-column on mobile */}
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 10 }}>
+                Разделы профиля
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                {/* Primary sections — first 6 in grid */}
+                {SECTIONS.filter(s => s.id !== 'analytics' && s.id !== 'contacts' && s.id !== 'data').map(s => (
+                  <button key={s.id} onClick={() => openSection(s.id)}
+                    style={{
+                      ...glassCard, padding: '13px 14px', gap: 10, borderRadius: 16,
+                      borderLeft: `3px solid ${s.color}`,
+                    }}
+                    onMouseEnter={e => { Object.assign((e.currentTarget as HTMLElement).style, glassCardHover); }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.transform = '';
+                      (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 32px rgba(0,0,0,0.35), inset 0 0.5px 0 rgba(255,255,255,0.08)';
+                    }}
+                    onMouseDown={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.97)'; }}
+                    onMouseUp={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
+                  >
+                    <span style={{ fontSize: 22, flexShrink: 0 }}>{s.icon}</span>
+                    <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{s.title}</div>
+                      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginTop: 2, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.subtitle}</div>
+                    </div>
                   </button>
                 ))}
               </div>
-            )}
 
-            {/* ═══ RENDER SECTIONS ═══ */}
-            {mainTab === 'info' && (<>
-              {sectionHeaders[tab] && <SectionTitle icon={sectionHeaders[tab].icon} title={sectionHeaders[tab].title} subtitle={sectionHeaders[tab].subtitle} />}
-              {tab === 'overview' && (
-                <InfoErrorBoundary label="Сведения о пользователе">
-                  <ProfileBioSection settings={settings} save={save} calcData={calcData} upCalc={upCalc} onNavigate={onNavigate} />
-                  <div style={{ marginTop: 6 }}>
-                    <ProfileBodySection settings={settings} save={save} />
-                  </div>
-                </InfoErrorBoundary>
-              )}
-              {tab === 'lifestyle' && (
-                <InfoErrorBoundary label="Образ жизни">
-                  <ProfileLifestyleSection settings={settings} save={save} calcData={calcData} upCalc={upCalc} toggleWeakPoint={toggleWeakPoint} />
-                </InfoErrorBoundary>
-              )}
-              {tab === 'health' && (
-                <InfoErrorBoundary label="Здоровье">
-                  <ProfileHealthSection settings={settings} save={save} calcData={calcData} upCalc={upCalc} onNavigate={onNavigate} />
-                </InfoErrorBoundary>
-              )}
-              {tab === 'diet' && (
-                <InfoErrorBoundary label="Питание">
-                  <ProfileDietSection settings={settings} save={save} />
-                </InfoErrorBoundary>
-              )}
-              {tab === 'training' && (
-                <InfoErrorBoundary label="Тренировки">
-                  <ProfileTrainingSection settings={settings} save={save} calcData={calcData} upCalc={upCalc} toggleWeakPoint={toggleWeakPoint} />
-                </InfoErrorBoundary>
-              )}
-              {tab === 'diaries' && (
-                <InfoErrorBoundary label="Дневники">
-                  <ProfileDiariesSection settings={settings} save={save} labs={labs} workoutLogs={workoutLogs} onNavigate={onNavigate} />
-                </InfoErrorBoundary>
-              )}
-              {tab === 'data' && (
-                <InfoErrorBoundary label="Мои данные">
-                  <ProfileDataHub
-                    settings={settings}
-                    labs={labs}
-                    workoutLogs={workoutLogs}
-                    foodDiaryAvg={foodDiaryAvg}
-                    onOpenProfileTab={(t: string) => setTab(t as ProfileTab)}
-                    onNavigate={onNavigate}
-                  />
-                </InfoErrorBoundary>
-              )}
-            </>)}
-
-            {mainTab === 'analytics' && (
-              <InfoErrorBoundary label="Аналитика">
-                <ProfileAnalyticsSection settings={settings} save={save} labs={labs} workoutLogs={workoutLogs} foodDiaryAvg={foodDiaryAvg} profileName={profile.name} onNavigate={onNavigate} />
-              </InfoErrorBoundary>
-            )}
-
-            {mainTab === 'contacts' && (
-              <InfoErrorBoundary label="Контакты">
-                <ProfileContactsSection settings={settings} profileName={profile.name} onNavigate={onNavigate} />
-              </InfoErrorBoundary>
-            )}
+              {/* Bottom row: analytics + data + contacts — wider cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
+                {SECTIONS.filter(s => s.id === 'analytics' || s.id === 'data' || s.id === 'contacts').map(s => (
+                  <button key={s.id} onClick={() => openSection(s.id)}
+                    style={{
+                      ...glassCard, padding: '12px 6px', gap: 6, borderRadius: 16, flexDirection: 'column', textAlign: 'center',
+                      borderTop: `2px solid ${s.color}`,
+                    }}
+                    onMouseEnter={e => { Object.assign((e.currentTarget as HTMLElement).style, glassCardHover); }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.transform = '';
+                      (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 32px rgba(0,0,0,0.35), inset 0 0.5px 0 rgba(255,255,255,0.08)';
+                    }}
+                    onMouseDown={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.97)'; }}
+                    onMouseUp={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
+                  >
+                    <span style={{ fontSize: 22 }}>{s.icon}</span>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{s.title}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* ═══════════════ SECTIONS PAGE (grid) ═══════════════ */}
+      {page === 'sections' && (
+        <div style={{ position: 'relative', minHeight: '100%', padding: '16px 14px 90px' }}>
+          <button onClick={backToHero}
+            style={{ padding: '8px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.9)', marginBottom: 14 }}>
+            ← Назад
+          </button>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 10 }}>
+            Все разделы
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {SECTIONS.map(s => (
+              <button key={s.id} onClick={() => openSection(s.id)}
+                style={{
+                  ...glassCard, padding: '15px 16px', borderRadius: 16,
+                  borderLeft: `3px solid ${s.color}`,
+                }}
+                onMouseEnter={e => { Object.assign((e.currentTarget as HTMLElement).style, glassCardHover); }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.transform = '';
+                  (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 32px rgba(0,0,0,0.35), inset 0 0.5px 0 rgba(255,255,255,0.08)';
+                }}
+                onMouseDown={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.98)'; }}
+                onMouseUp={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
+              >
+                <span style={{ fontSize: 24, flexShrink: 0 }}>{s.icon}</span>
+                <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{s.title}</div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 3, lineHeight: 1.3 }}>{s.subtitle}</div>
+                </div>
+                <span style={{ fontSize: 14, color: s.color, fontWeight: 600 }}>→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════ DETAIL PAGE (section content) ═══════════════ */}
+      {page === 'detail' && section && (
+        <div style={{ position: 'relative', minHeight: '100%', padding: '10px 14px 100px' }}>
+          {/* Back */}
+          <button onClick={backToSections}
+            style={{ padding: '8px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.9)', marginBottom: 10 }}>
+            ← Назад
+          </button>
+
+          {/* Section title */}
+          {(() => {
+            const sec = SECTIONS.find(s => s.id === section);
+            if (!sec) return null;
+            return <SectionTitle icon={sec.icon} title={sec.title} subtitle={sec.subtitle} color={sec.color} />;
+          })()}
+
+          {/* Content */}
+          {renderSectionContent(section)}
+
+          {/* Quick nav chips */}
+          <QuickNavChips current={section} />
         </div>
       )}
     </div>
