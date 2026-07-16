@@ -123,10 +123,13 @@ const isMeatId = (id: string): boolean => MEAT_KEYWORDS.some(k => id.toLowerCase
 // Д-3: Premium / exotic / rare foods that should NOT appear in a low/medium-budget plan.
 // 'low'/'medium' budget previously filtered only by bb_quality_score, letting luxury items
 // (abalone, macadamia, loquat, game meats, exotic oils/eggs) into rations. This set excludes them.
+// Д-3: premium/exotic foods excluded from low/medium budgets. Tokens match REAL FOOD_DB ids
+// (e.g. oil_mustard, oil_black_cumin, oil_perilla, oil_camelina, oil_truffle, oil_macadamia).
 const PREMIUM_OR_EXOTIC = ['abalone','sea_urchin','caviar','roe','truffle','macadamia','medlar',
-  'mustard_oil','black_cumin','saffron','vanilla','quail_egg','duck_egg','goose_egg','ostrich',
-  'venison','rabbit','duck_breast','duck_leg','goose_roasted','veal','mahi','trumpeter','conch',
-  'sea_cucumber','whale','bear','chestnut','pine_nut','hemp_oil','pistachio_oil','walnut_oil'];
+  'oil_mustard','oil_black_cumin','oil_perilla','oil_camelina','oil_truffle','oil_macadamia','oil_hazelnut',
+  'oil_almond','oil_walnut','oil_cedar','oil_pistachio','saffron','vanilla','quail_egg','duck_egg','goose_egg','ostrich',
+  'venison','rabbit','duck_breast','duck_leg','goose_roasted','veal','mahi','trumpeter','conch','quail_whole',
+  'sea_cucumber','whale','bear','chestnut','pine_nut','oil_hemp_organic','oil_rice_bran_organic','oil_grapeseed_cold'];
 const isPremiumOrExotic = (id: string): boolean => {
   const lid = id.toLowerCase();
   return PREMIUM_OR_EXOTIC.some(k => lid.includes(k)) || lid.startsWith('lamb');
@@ -330,14 +333,21 @@ function buildWholeMeal(
   // 1. Белок: роторный источник (предпочтение — preferred)
   // Д-5: rotation pool also includes vegetarian extras (tofu/tempeh/seitan/legumes) so the
   // "Веган/бобовые" rotation resolves to plant proteins instead of falling back to dairy only.
-  const rotPool = [...pool.proteinSolid, ...pool.proteinFatty, ...(pool.vegProteinExtra || [])].filter(f => proteinRotationIds.includes(f.id));
-  const preferredRot = preferredIds && preferredIds.size > 0 ? rotPool.filter(f => preferredIds.has(f.id)) : [];
+  const rotPoolAll = [...pool.proteinSolid, ...pool.proteinFatty, ...(pool.vegProteinExtra || [])].filter(f => proteinRotationIds.includes(f.id));
+  // Д-15: fat-aware filter. Fatty proteins embed fat the fat-correction loop can't reach, so when the
+  // meal fat budget is tight (remF < ~12 g) prefer lean rotation proteins (fat<=5); keep fatty ones only
+  // when there is ample fat budget. Preferred/locked foods bypass the fat filter (user intent).
+  const rotPool = (remF < 12)
+    ? rotPoolAll.filter(f => (f.fat || 0) <= 5)
+    : rotPoolAll;
+  const rotPoolFinal = rotPool.length > 0 ? rotPool : rotPoolAll; // fall back to full rotation if lean empty
+  const preferredRot = preferredIds && preferredIds.size > 0 ? rotPoolAll.filter(f => preferredIds.has(f.id)) : [];
   // Д-5: veg fallback chain adds vegProteinExtra (plant proteins) before generic dairy pools.
   const proteinPool = preferredRot.length > 0
     ? preferredRot
-    : rotPool.length > 0 ? rotPool
+    : rotPoolFinal.length > 0 ? rotPoolFinal
     : (pool.vegProteinExtra && pool.vegProteinExtra.length > 0) ? pool.vegProteinExtra
-    : pool.proteinLean.length > 0 ? pool.proteinLean
+    : (remF < 12 && pool.proteinLean.length > 0) ? pool.proteinLean
     : pool.proteinSolid;
   const proteinSource = pickPriority(proteinPool, seed, { lockedIds, preferredIds: preferredRot.length > 0 ? undefined : preferredIds, recentIds });
   if (proteinSource) {
