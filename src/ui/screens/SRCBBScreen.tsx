@@ -554,6 +554,26 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     }).filter(s => s.pts.length > 0);
   }, [strengthLogs]);
 
+  // V7 (расширение): личные 1ПМ по КАЖДОМУ упражнению из дневника (Epley из реальных подходов)
+  const exerciseE1rm = useMemo(() => {
+    if (!strengthLogs.length) return [];
+    const best = new Map<string, { e1: number; w: number; r: number }>();
+    for (const log of strengthLogs) {
+      for (const ex of (log.exercises || [])) {
+        const nm = ex.exerciseName || '';
+        if (!nm) continue;
+        let be1 = 0, bw = 0, br = 0;
+        for (const st of (ex.sets || [])) {
+          const w = +st.weight || 0, r = +st.reps || 0;
+          if (w > 0) { const e1 = r <= 1 ? w : Math.round(w * (1 + r / 30) * 10) / 10; if (e1 > be1) { be1 = e1; bw = w; br = r; } }
+        }
+        const cur = best.get(nm);
+        if (!cur || be1 > cur.e1) best.set(nm, { e1: be1, w: bw, r: br });
+      }
+    }
+    return [...best.entries()].filter(([, v]) => v.e1 > 0).sort((a, b) => b[1].e1 - a[1].e1).map(([name, v]) => ({ name, ...v }));
+  }, [strengthLogs]);
+
   return (
     <div key={mainTab} style={{ padding: 12, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
       {/* Заголовок текущего режима планирования (выбор режима — в навигации блока) */}
@@ -826,6 +846,24 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     </svg>
                     <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>{e1rmSeries.map(s => <span key={s.lift} style={{ fontSize: 11, color: s.color }}>● {s.label} {s.pts[s.pts.length - 1].val} кг</span>)}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>PM0 плана: присед {pmSquat} · жим {pmBench} · становая {pmDead} кг</div>
+                    {exerciseE1rm.length > 0 && (
+                      <div style={{ marginTop: 10, borderTop: '1px solid var(--accent-dim)', paddingTop: 8 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4 }}>Личные 1ПМ по упражнениям (из дневника):</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '3px 8px', fontSize: 10, alignItems: 'center' }}>
+                          <div style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Упражнение</div>
+                          <div style={{ color: 'var(--text-dim)', fontWeight: 600, textAlign: 'right' }}>1ПМ</div>
+                          <div style={{ color: 'var(--text-dim)', fontWeight: 600, textAlign: 'right' }}>подход</div>
+                          {exerciseE1rm.slice(0, 15).map((e) => (
+                            <React.Fragment key={e.name}>
+                              <div style={{ color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</div>
+                              <div style={{ color: 'var(--accent)', fontWeight: 700, textAlign: 'right' }}>{e.e1}</div>
+                              <div style={{ color: 'rgba(255,255,255,0.5)', textAlign: 'right' }}>{e.w}×{e.r}</div>
+                            </React.Fragment>
+                          ))}
+                        </div>
+                        {exerciseE1rm.length > 15 && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>показано 15 из {exerciseE1rm.length}</div>}
+                      </div>
+                    )}
                   </MetricCard>
                 );
               })()}
