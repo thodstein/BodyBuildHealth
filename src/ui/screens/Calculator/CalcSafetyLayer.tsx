@@ -12,6 +12,20 @@ const INJECTABLE_AAS: string[] = [
 const sevColor = (s: string) => (s === 'absolute' ? '#ef4444' : s === 'relative' ? '#f59e0b' : '#60a5fa');
 const tierColor = (t: number) => (t >= 3 ? '#ef4444' : t === 2 ? '#f59e0b' : '#fbbf24');
 const guardColor = (l: string) => (l === 'high' ? '#ef4444' : l === 'medium' ? '#f59e0b' : '#4ade80');
+const labSevColor = (s: string) => (s === 'critical' ? '#ef4444' : s === 'high' ? '#f59e0b' : s === 'medium' ? '#fbbf24' : s === 'low' ? '#60a5fa' : '#94a3b8');
+const labSevLabel = (s: string) => (s === 'critical' ? 'КРИТ' : s === 'high' ? 'ВЫСОК' : s === 'medium' ? 'СРЕД' : s === 'low' ? 'НИЗК' : 'ИНФО');
+
+const ORGAN_META: Record<string, { label: string; icon: string }> = {
+  cardio: { label: 'Сердечно-сосудистая', icon: '🫀' },
+  hepatic: { label: 'Печень', icon: '🩸' },
+  renal: { label: 'Почки', icon: '🫘' },
+  neuro: { label: 'Нервная', icon: '🧠' },
+  reproductive: { label: 'Репродуктивная', icon: '🧬' },
+  hematologic: { label: 'Кровь', icon: '🩸' },
+  metabolic: { label: 'Метаболизм', icon: '⚡' },
+  hormonal: { label: 'Гормональная', icon: '🧪' },
+};
+const ORGAN_ORDER = ['cardio', 'hepatic', 'renal', 'neuro', 'reproductive', 'hematologic', 'metabolic', 'hormonal', 'other'];
 
 export const CalcSafetyLayer: React.FC<{ rec: SupportRecommendation; planResult?: PlanResult }> = ({ rec, planResult }) => {
   const subs = rec.subs || [];
@@ -101,20 +115,49 @@ export const CalcSafetyLayer: React.FC<{ rec: SupportRecommendation; planResult?
         </div>
       )}
 
-      {/* ── ЛАБОРАТОРНЫЕ НАХОДКИ (из PlanResult) ── */}
-      {labFindings.length > 0 && (
-        <div style={{ marginBottom: 7 }}>
-          <div style={{ fontSize: 8, fontWeight: 700, color: '#f472b6', marginBottom: 3 }}>🔬 Лабораторные находки (персональный мониторинг)</div>
-          {labFindings.map((f: any, i: number) => (
-            <div key={i} style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: 'rgba(244,114,182,0.06)', border: '1px solid rgba(244,114,182,0.18)' }}>
-              <div style={{ fontSize: 7, fontWeight: 700, color: '#f9a8d4', marginBottom: 1 }}>{f.name} ({f.marker}) = {f.value} <span style={{ opacity: 0.6 }}>порог: {f.threshold}</span></div>
-              {f.suggestedSubs && f.suggestedSubs.length > 0 && (
-                <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>→ Назначить: {f.suggestedSubs.join(', ')}</div>
-              )}
+      {/* ── ЛАБОРАТОРНЫЕ НАХОДКИ (структурировано по органам) ── */}
+      {labFindings.length > 0 && (() => {
+        const groups: Record<string, any[]> = {};
+        for (const f of labFindings) {
+          const key = ORGAN_ORDER.includes(f.system) ? f.system : 'other';
+          (groups[key] ||= []).push(f);
+        }
+        const cnt = (sev: string) => labFindings.filter((f: any) => f.severity === sev).length;
+        return (
+          <div style={{ marginBottom: 7 }}>
+            <div style={{ fontSize: 8, fontWeight: 700, color: '#f472b6', marginBottom: 3 }}>🔬 Лабораторные находки (персональный мониторинг)</div>
+            <div style={{ fontSize: 6.5, color: 'rgba(255,255,255,0.7)', marginBottom: 4, padding: '3px 7px', borderRadius: 6, background: 'rgba(244,114,182,0.06)', border: '1px solid rgba(244,114,182,0.16)' }}>
+              📊 Итого: <b style={{ color: '#ef4444' }}>{cnt('critical')}</b> критичных · <b style={{ color: '#f59e0b' }}>{cnt('high')}</b> высоких · <b style={{ color: '#fbbf24' }}>{cnt('medium')}</b> средних · всего {labFindings.length}
             </div>
-          ))}
-        </div>
-      )}
+            {ORGAN_ORDER.filter((k: string) => groups[k] && groups[k].length > 0).map((k: string) => (
+              <div key={k} style={{ marginBottom: 4 }}>
+                <div style={{ fontSize: 7, fontWeight: 800, color: 'rgba(255,255,255,0.82)', marginBottom: 2 }}>
+                  {ORGAN_META[k]?.icon || '🧩'} {ORGAN_META[k]?.label || 'Прочее'} <span style={{ opacity: 0.5, fontWeight: 600, fontSize: 6 }}>({groups[k].length})</span>
+                </div>
+                {groups[k].map((f: any, i: number) => (
+                  <div key={i} style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: `${labSevColor(f.severity)}0c`, border: `1px solid ${labSevColor(f.severity)}40` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 1 }}>
+                      <span style={{ fontSize: 6, fontWeight: 800, color: labSevColor(f.severity), padding: '1px 5px', borderRadius: 4, background: `${labSevColor(f.severity)}1f` }}>{labSevLabel(f.severity)}</span>
+                      <span style={{ fontSize: 7, fontWeight: 700, color: '#fff' }}>{f.title}</span>
+                    </div>
+                    {f.substances && f.substances.length > 0 && (
+                      <div style={{ marginLeft: 2, marginTop: 1 }}>
+                        {f.substances.map((s: any, si: number) => (
+                          <div key={si} style={{ fontSize: 6, color: 'rgba(255,255,255,0.72)', lineHeight: 1.5 }}>
+                            • {s.name}{s.dose ? ` ${s.dose}` : ''}{s.reasoning ? ` — ${s.reasoning}` : ''} <span style={{ opacity: 0.45 }}>[{s.tier}]</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {f.monitoring && <div style={{ fontSize: 6, color: '#38bdf8', marginTop: 1, fontWeight: 600 }}>🔬 {f.monitoring}</div>}
+                    {f.escalation && <div style={{ fontSize: 6, color: '#f59e0b', marginTop: 1, fontWeight: 600 }}>⚠ {f.escalation}</div>}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* ── КАСКАД ВЫМЫВАНИЯ НУТРИЕНТОВ ── */}
       {depletionWarnings.length > 0 && (
@@ -203,45 +246,6 @@ export const CalcSafetyLayer: React.FC<{ rec: SupportRecommendation; planResult?
           )}
         </div>
       )}
-
-      {/* ── КОРРЕКЦИЯ ДОЗ ПО ФУНКЦИИ ОРГАНОВ (labFindings) ── */}
-      {labFindings.length > 0 && (() => {
-        const renalMarkers = labFindings.filter((f: any) => ['creatinine', 'egfr', 'cystatin_c', 'bun'].includes((f.marker || '').toLowerCase()));
-        const hepaticMarkers = labFindings.filter((f: any) => ['alt', 'ast', 'ggt', 'bilirubin'].includes((f.marker || '').toLowerCase()));
-        const psaMarker = labFindings.find((f: any) => (f.marker || '').toLowerCase().includes('psa'));
-        const hasRenalIssue = renalMarkers.some((f: any) => parseFloat(f.value) > 130 || (f.marker || '').toLowerCase() === 'egfr' && parseFloat(f.value) < 60);
-        const hasHepaticIssue = hepaticMarkers.some((f: any) => parseFloat(f.value) > 80);
-        if (!hasRenalIssue && !hasHepaticIssue && !psaMarker) return null;
-        return (
-          <div style={{ marginBottom: 7 }}>
-            <div style={{ fontSize: 8, fontWeight: 700, color: '#c084fc', marginBottom: 3 }}>💊 Коррекция доз по функции органов</div>
-            {hasRenalIssue && (
-              <div style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.2)' }}>
-                <div style={{ fontSize: 7, fontWeight: 700, color: '#38bdf8', marginBottom: 1 }}>Почечная функция — снижение доз</div>
-                <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
-                  Креатинин &gt;130 или рСКФ &lt;60: снизить дозу ренально-клиренсных препаратов на 30–50%. Астрагалус ×2, кордицепс ×2 для нефропротекции. Избегать высоких доз креатина, калия, магния.
-                </div>
-              </div>
-            )}
-            {hasHepaticIssue && (
-              <div style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                <div style={{ fontSize: 7, fontWeight: 700, color: '#f59e0b', marginBottom: 1 }}>Печёночная функция — снижение/отмена</div>
-                <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
-                  АЛТ &gt;80: снизить пероральные 17α на 50% или отменить. NAC ×1.5, TUDCA ×2, силимарин ×2. При АЛТ &gt;200 — СТОП курс.
-                </div>
-              </div>
-            )}
-            {psaMarker && parseFloat(psaMarker.value) > 2.5 && (
-              <div style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
-                <div style={{ fontSize: 7, fontWeight: 700, color: '#a855f7', marginBottom: 1 }}>PSA повышен — урологический контроль</div>
-                <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
-                  PSA = {psaMarker.value} нг/мл. Пальцевое ректальное исследование + УЗИ простаты. При PSA &gt;4.0 — биопсия. Saw palmetto + ликопин профилактически.
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
 
       {/* ── PCT: ТАЙМИНГ И ТЕЙПЕР ── */}
       {(isPct || hasPctDrug) && (

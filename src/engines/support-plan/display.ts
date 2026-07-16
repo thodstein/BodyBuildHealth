@@ -6,7 +6,7 @@
 
 import { ALL_INTERACTIONS, SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { evaluateRecommendations } from '../recommendation-engine';
-import type { CalculatorState, CalculatorResult } from './types';
+import type { CalculatorState, CalculatorResult, LabFinding } from './types';
 import { catalogEntry, NUTRIENT_UL, MINERAL_SEPARATION_HOURS, SUBSTANCE_HALF_LIFE } from './types';
 
 /** Клинические механизмы для распространённых конфликтов (используется
@@ -286,27 +286,43 @@ export function suggestSynergyAdditions(
   return out.slice(0, maxSuggestions || 8);
 }
 
-/** Лабораторные отклонения и рекомендации по веществам (из evaluateRecommendations). */
+/** Лабораторные отклонения и рекомендации по веществам (из evaluateRecommendations).
+ *  Возвращает СТРУКТУРИРОВАННЫЙ список LabFinding (с тяжестью, системой, веществами,
+ *  мониторингом и эскалацией) — без схлопывания в одну строку. */
 export function buildLabFindings(
   state: CalculatorState,
   tzRes: CalculatorResult
-): Array<{ marker: string; name: string; value: string; threshold: string; organ: string; suggestedSubs: string[] }> {
-  const out: Array<{ marker: string; name: string; value: string; threshold: string; organ: string; suggestedSubs: string[] }> = [];
+): LabFinding[] {
+  const out: LabFinding[] = [];
   try {
     const recs = evaluateRecommendations(state, tzRes, state.courseWeek);
     const seen = new Set<string>();
     for (const rec of recs) {
       if (!rec.substances || rec.substances.length === 0) continue;
+      // курсовая динамика (изменение доз по неделям) — это не лабораторное отклонение
+      if ((rec.id || '') === '__week_change') continue;
       const key = `${rec.id || ''}|${rec.title || ''}`;
       if (seen.has(key)) continue;
       seen.add(key);
       out.push({
-        marker: rec.id || '',
-        name: rec.title || rec.systemLabel || '',
-        value: rec.substances.map((s: any) => `${s.name}: ${s.reasoning || ''}`).join('; '),
-        threshold: rec.escalation || '',
-        organ: rec.system || rec.systemLabel || '',
-        suggestedSubs: rec.substances.map((s: any) => s.id || s.name).filter(Boolean),
+        id: rec.id || '',
+        severity: rec.severity,
+        system: rec.system || rec.systemLabel || 'other',
+        systemLabel: rec.systemLabel || rec.system || 'Прочее',
+        title: rec.title || '',
+        status: rec.status,
+        substances: rec.substances.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          dose: s.dose || '',
+          reasoning: s.reasoning || '',
+          tier: s.tier || 'base',
+          priority: s.priority,
+          brandName: s.brandName,
+        })),
+        escalation: rec.escalation || '',
+        monitoring: rec.monitoring || '',
+        conflicts: rec.conflicts || [],
       });
     }
   } catch {}

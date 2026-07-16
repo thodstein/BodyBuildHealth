@@ -360,7 +360,7 @@ export interface PlanResult {
   riskDynamics: Array<{ system: string; before: number; after: number; mechanisms: PlanMechanism[] }>;
   overallRiskBefore: number;
   overallRiskAfter: number;
-  labFindings: Array<{ marker: string; name: string; value: string; threshold: string; organ: string; suggestedSubs: string[] }>;
+  labFindings: LabFinding[];
   uncoveredMechanisms: Array<{ mechKey: string; mechLabel: string; systemLabel: string; risk: number }>;
   coverageGaps: Array<{ system: string; label: string; raw: number; net: number; gapPercent: number }>;
   weekScale: number;
