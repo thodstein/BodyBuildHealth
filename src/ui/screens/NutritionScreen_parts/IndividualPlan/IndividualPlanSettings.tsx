@@ -172,7 +172,7 @@ export const IndividualPlanSettings: React.FC = () => {
     { id: "quick", label: "⚡ Старт" },
     { id: "core", label: "👤 Ядро" },
     { id: "food", label: "🍎 Питание" },
-    { id: "training", label: "🏋️ Тренир" },
+    { id: "training", label: "🏋️ Тренер" },
     { id: "advanced", label: "⚙️ Эксперт" },
   ];
 
@@ -183,11 +183,11 @@ export const IndividualPlanSettings: React.FC = () => {
         {SECTION_TABS.map(st => (
           <button key={st.id} onClick={() => setSettingsSection(st.id)} style={{
             flexShrink: 0, padding: "6px 12px", borderRadius: 16, cursor: "pointer",
-            fontSize: 9, fontWeight: settingsSection === st.id ? 700 : 500,
-            border: settingsSection === st.id ? "1px solid #00e68a" : "1px solid rgba(255,255,255,0.06)",
+            fontSize: 10, fontWeight: settingsSection === st.id ? 800 : 500,
+            border: settingsSection === st.id ? "2px solid #00e68a" : "1px solid rgba(255,255,255,0.06)",
             background: settingsSection === st.id ? "linear-gradient(135deg,#00e68a,#00c8a0)" : "#18181b",
             color: settingsSection === st.id ? "#000" : "rgba(255,255,255,0.85)",
-            transition: "all 0.15s",
+            transition: "all 0.15s ease", transform: settingsSection === st.id ? "scale(1.05)" : "scale(1)", boxShadow: settingsSection === st.id ? "0 2px 12px rgba(0,230,138,0.3)" : "none",
           }}>{st.label}</button>
         ))}
       </div>
@@ -935,7 +935,7 @@ export const IndividualPlanSettings: React.FC = () => {
                       position:'relative', overflow:'hidden',
                     }}>
                       <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background: m.c }} />
-                      <input type="number" step="0.1" value={m.v > 0 ? m.v : ''} onChange={e => m.setter(+e.target.value || 0)} placeholder="0.0" style={{
+                      <input type="number" step="0.1" value={m.v > 0 ? m.v : ''} onChange={e => m.setter(e.target.value === '' ? null : +e.target.value)} placeholder="0.0" style={{
                         width:'100%', fontSize:18, fontWeight:800, color:m.c,
                         textAlign:'center', background:'transparent', border:'none',
                         outline:'none', padding:0, lineHeight:1.2, MozAppearance:'textfield',
