@@ -298,7 +298,7 @@ function buildExComment(
 }
 
 /** Разминочная пирамида для compound упражнений. */
-function buildWarmup(workWeight: number, isCompound: boolean): { load: number; reps: number }[] {
+export function buildWarmup(workWeight: number, isCompound: boolean): { load: number; reps: number }[] {
   if (!isCompound || workWeight <= 0) return [];
   const steps = workWeight <= 60 ? 2 : workWeight <= 100 ? 3 : 4;
   const warmups: { load: number; reps: number }[] = [];

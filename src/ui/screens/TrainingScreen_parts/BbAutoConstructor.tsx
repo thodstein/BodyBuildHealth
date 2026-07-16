@@ -19,7 +19,7 @@ import { EXERCISE_CATALOG, getExercisesByGroup, getSubstitutes, getExerciseById 
 import { SubstitutionPopup } from './SubstitutionPopup';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { rankBBSplits, explainBBSelection, getMuscleFrequencies, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
-import { buildBBPlan, type BBPlan, type BBExercise, type BBSession, type BBSet } from '../../../engines/bb/bb-builder.engine';
+import { buildBBPlan, buildWarmup, type BBPlan, type BBExercise, type BBSession, type BBSet } from '../../../engines/bb/bb-builder.engine';
 import { calcBBPlanMetrics, explainBBMetrics, type BBPlanMetrics, type BBMuscleVolume } from '../../../engines/bb/bb-metrics.engine';
 import { adaptForPEDs, explainPEDAdaptation, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
@@ -199,17 +199,6 @@ function calcQualityScore(metrics: BBPlanMetrics, weakPoints: string[], phases: 
   return { score, label, details, perMuscle, recommendations };
 }
 
-function generateWarmupSets(workSetWeight: number, targetSets: number, isCompound: boolean): { load: number; reps: number }[] {
-  if (!isCompound || targetSets <= 0) return [];
-  const warmups: { load: number; reps: number }[] = [];
-  const steps = workSetWeight <= 60 ? 2 : workSetWeight <= 100 ? 3 : 4;
-  for (let i = 1; i <= steps; i++) {
-    const pct = 0.3 + (0.55 / steps) * i;
-    warmups.push({ load: Math.round(workSetWeight * pct), reps: Math.min(8, 5 + i) });
-  }
-  return warmups;
-}
-
 function rotationSubstitutions(week: number, totalWeeks: number, muscle: string, currentName: string): string[] {
   const catalog = EXERCISE_CATALOG.filter(e => (e.group || '') === muscle && e.name !== currentName);
   if (catalog.length === 0) return [];
@@ -295,6 +284,21 @@ export const BbAutoConstructor: React.FC = () => {
   useEffect(() => {
     try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, injuries, onCourse: peds.length > 0, bbPeds: peds, courseIntensity, loadStrategy, planMode, bbCycleId: selectedCycleId }); } catch {}
   }, [bbWorkMax, weakPoints, peds, courseIntensity, loadStrategy, planMode, selectedCycleId]);
+
+  // FIX-19: Авто-загрузка сохранённого плана при монтировании
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('he_bb_plan_saved');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.plan && parsed.date) {
+          setBuiltPlan(parsed.plan);
+          setBbWeekSel(1);
+          setStep('plan');
+        }
+      }
+    } catch {}
+  }, []);
 
   const adjustVolume = (mult: number) => {
     if (!builtPlan) return;
@@ -875,7 +879,7 @@ export const BbAutoConstructor: React.FC = () => {
                   const edit = exerciseEdits[editKey] || { sets: adjSets0, reps: e.workSets[0]?.reps || 10, weight: adjW };
                   const comment = e.comment || exerciseComment(e, weakPoints, bbFocus, currentPhase);
                   const isEditing = editMode?.dayIdx === si && editMode?.exIdx === ei;
-                  const warmups = (e.warmupSets && e.warmupSets.length > 0) ? e.warmupSets : (e.role === 'primary' && e.character === 'тяж' ? generateWarmupSets(edit.weight, edit.sets, true) : []);
+                  const warmups = (e.warmupSets && e.warmupSets.length > 0) ? e.warmupSets : (e.role === 'primary' && e.character === 'тяж' ? buildWarmup(edit.weight, true) : []);
                   const rotEx = rotationSubstitutions(wk.week, bbWeeks, e.muscle, e.name);
                   return (
                     <div key={ei} style={{ padding:'6px 10px', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
