@@ -1534,6 +1534,9 @@ export const TrainingConstructor: React.FC<Props> = ({
             mrvOverride={mrvOverride}
             level={level}
             corrections={generatedCorrections}
+            onCourse={tprofile.onCourse}
+            courseIntensity={tprofile.courseIntensity}
+            labMult={labTrainingAdjust(labAnalysis).mrvMultiplier}
           />
 
           {/* Анализ слабых групп — тренерская рекомендация */}

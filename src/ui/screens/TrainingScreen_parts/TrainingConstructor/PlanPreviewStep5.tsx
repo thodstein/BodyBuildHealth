@@ -1,5 +1,6 @@
 import React from 'react';
 import { ACCENT, DIM, GROUP_RU } from './types';
+import { getVolumeLandmarks } from '../../../../engines/volume-landmarks.engine';
 
 interface Props {
   generatedDays: any[];
@@ -7,6 +8,9 @@ interface Props {
   mrvOverride: number | null;
   level: string;
   corrections: string[];
+  onCourse?: boolean;
+  courseIntensity?: string;
+  labMult?: number;
 }
 
 const GROUP_COLORS: Record<string, string> = {
@@ -14,10 +18,22 @@ const GROUP_COLORS: Record<string, string> = {
   arms: '#a855f7', core: '#ec4899',
 };
 
-const MRV_MAP: Record<string, number> = { beginner: 15, intermediate: 20, advanced: 24, enhanced: 28 };
+const LEVEL_BASE_MRV: Record<string, number> = { beginner: 15, intermediate: 20, advanced: 24, enhanced: 28 };
 
-export const PlanPreviewStep5: React.FC<Props> = ({ generatedDays, weeklySets, mrvOverride, level, corrections }) => {
-  const mrv = mrvOverride ?? MRV_MAP[level] ?? 20;
+export const PlanPreviewStep5: React.FC<Props> = ({ generatedDays, weeklySets, mrvOverride, level, corrections, onCourse, courseIntensity, labMult }) => {
+  const levelBaseMrv = LEVEL_BASE_MRV[level] ?? 20;
+  const mrvScale = mrvOverride != null && levelBaseMrv > 0 ? mrvOverride / levelBaseMrv : 1;
+  const mrvFor = (g: string): number => {
+    const lm = getVolumeLandmarks(level, g);
+    let mrv = lm ? lm.mrv : levelBaseMrv;
+    mrv = Math.round(mrv * mrvScale);
+    if (onCourse) {
+      const courseMult = courseIntensity === 'heavy' ? 1.3 : courseIntensity === 'moderate' ? 1.2 : 1.15;
+      mrv = Math.round(mrv * courseMult);
+    }
+    if (labMult) mrv = Math.round(mrv * labMult);
+    return mrv;
+  };
   const totalEx = generatedDays.reduce((s: number, d: any) => s + d.exercises.length, 0);
   const totalSets = generatedDays.reduce((s: number, d: any) => s + d.exercises.reduce((ss: number, e: any) => ss + e.sets, 0), 0);
   const compoundCount = generatedDays.reduce((s: number, d: any) => s + d.exercises.filter((e: any) => e.role === 'main').length, 0);
@@ -46,8 +62,9 @@ export const PlanPreviewStep5: React.FC<Props> = ({ generatedDays, weeklySets, m
         <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', marginBottom: 6 }}>📊 Объём по группам (сетов/нед)</div>
           {Object.entries(weeklySets).map(([g, sets]) => {
-            const pct = Math.min(100, Math.round((sets as number) / mrv * 100));
-            const color = (sets as number) > mrv * 1.1 ? '#ef4444' : (sets as number) < mrv * 0.4 ? '#f59e0b' : '#22c55e';
+            const mrvG = mrvFor(g);
+            const pct = Math.min(100, Math.round((sets as number) / mrvG * 100));
+            const color = (sets as number) > mrvG * 1.1 ? '#ef4444' : (sets as number) < mrvG * 0.4 ? '#f59e0b' : '#22c55e';
             return (
               <div key={g} style={{ marginBottom: 4 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, marginBottom: 2 }}>
@@ -58,7 +75,7 @@ export const PlanPreviewStep5: React.FC<Props> = ({ generatedDays, weeklySets, m
                   <div style={{ height: '100%', width: pct + '%', borderRadius: 3, background: color, transition: 'width 0.5s' }} />
                 </div>
                 <div style={{ fontSize: 7, color: DIM, marginTop: 1 }}>
-                  {pct < 40 ? 'Недогруз (MEV)' : pct > 110 ? 'Перегруз (MRV)' : 'Оптимум'} · MRV: {mrv}
+                  {pct < 40 ? 'Недогруз (MEV)' : pct > 110 ? 'Перегруз (MRV)' : 'Оптимум'} · MRV: {mrvG}
                 </div>
               </div>
             );
