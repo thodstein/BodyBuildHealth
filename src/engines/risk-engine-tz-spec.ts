@@ -90,6 +90,7 @@ export interface TzSpecMechanismResult {
 export interface TzSpecOrganResult {
   id: string; name: string; icon: string;
   rawScore: number; rawPercent: number; afterScore: number; afterPercent: number;
+  maxRaw: number;
   category: 'low'|'moderate'|'high'|'very_high';
   mechanisms: TzSpecMechanismResult[]; k_protect: number;
 }
@@ -647,6 +648,7 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
       id:sys.id,name:sys.name,icon:sys.icon,
       rawScore:Math.round(totalBefore*10)/10,rawPercent,
       afterScore:Math.round(totalAfter*10)/10,afterPercent,
+      maxRaw:sys.maxRaw,
       category:afterPercent<25?'low':afterPercent<50?'moderate':afterPercent<75?'high':'very_high',
       mechanisms:mechResults,k_protect,
     });

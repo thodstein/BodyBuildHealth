@@ -152,9 +152,11 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after }) => {
             {/* Expanded mechanisms */}
             {isExpanded && (
               <div style={{ padding: '5px 10px 8px', borderTop: '1px solid rgba(255,255,255,0.04)', marginTop: 3 }}>
-                {organ.mechanisms.map((m: TzSpecMechanismResult) => {
-                  const hasProtection = m.k_used > 0;
-                  return (
+                 {organ.mechanisms.map((m: TzSpecMechanismResult) => {
+                   const hasProtection = m.k_used > 0;
+                   const beforePct = organ.maxRaw ? Math.min(100, Math.round((m.raw / organ.maxRaw) * 100)) : Math.round(m.raw);
+                   const afterPct = organ.maxRaw ? Math.min(100, Math.round((m.afterSupport / organ.maxRaw) * 100)) : Math.round(m.afterSupport);
+                   return (
                     <div key={m.id} style={{
                       display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px',
                       borderRadius: 6, marginBottom: 2,
@@ -177,16 +179,16 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after }) => {
                           </span>
                         </div>
                       </div>
-                      <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <div style={{ fontSize: 9, fontWeight: 700, color: hasProtection ? '#4ade80' : '#f87171' }}>
-                          {Math.round(m.raw)} &rarr; {Math.round(m.afterSupport)}
-                        </div>
-                        {hasProtection && (
-                          <div style={{ fontSize: 7, color: ACCENT, fontWeight: 600 }}>
-                            &darr;{m.k_used}% &middot; Q={m.q_label}
-                          </div>
-                        )}
-                      </div>
+                       <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                         <div style={{ fontSize: 9, fontWeight: 700, color: riskColor(afterPct) }}>
+                           {beforePct}% &rarr; {afterPct}%
+                         </div>
+                         {hasProtection && (
+                           <div style={{ fontSize: 7, color: ACCENT, fontWeight: 600 }}>
+                             &darr;{m.k_used}% &middot; Q={m.q_label}
+                           </div>
+                         )}
+                       </div>
                     </div>
                   );
                 })}

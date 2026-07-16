@@ -1,3 +1,37 @@
+## Session Summary (Jul 16) — Калькулятор поддержки: фикс 4 мобильных UI-багов
+
+### Goal
+Исправить 4 UI-бага мобильной версии Калькулятора поддержки: (1) карточка курса ААС не помещается, (2) стеки ручного режима не видны после выбора, (3) риски, (4) нижняя кнопка перекрыта/нет прокрутки.
+
+### ✅ Сделано и проверено (tsc 0 ошибок в моих файлах)
+- **Bug #1 (ААС карточка переполняется)** — `AutoCalculator.tsx`: редактор недель старта/конца ААС (`state.pharma.aas`, C19) ранее держал два `PopupNumber` внутри горизонтального flex-ряда → переполнение на телефоне. Перестроено: внешний div `flexDirection:'column'`, верхний ряд (точка/имя/доза/недели/класс-пилюля) с `flexWrap`, нижний ряд с `PopupNumber` старт/конец вынесен отдельно с `flexWrap`. Теперь помещается.
+- **Bug #4 (нижняя кнопка перекрыта)** — `AutoCalculator.tsx`: внешний padding `0 12px 80px` → `0 12px 130px`, чтобы нижние кнопки («Применить расчёт» / «Вернуться») не перекрывались на мобильном / safe-area.
+- **Bug #2 (стеки ручного режима не видны)** — `Calc.mapper.tsx`: после выбора стеков в попапе (`selectedStacks`) они НЕ отображались в карточке (показывались только `manualSubs`-вещества). Добавлен блок «📦 Выбранные стеки поддержки (N)» с именами стеков (из `ALL_STACKS`) и кнопкой ✕ удаления. Сам попап `showManualPopup` (строки 741-804) корректно рендерит `ALL_STACKS` — стеки там видны; проблема была в отсутствии отображения ВЫБОРА. **Уточнение после жалобы пользователя:** попап также рендерился внутри карточки с `backdrop-filter`-предком (`.training-screen [style*="rgba(24,24,27"]` в styles.css) → fixed-попап размывался/не показывал контент. Исправлено РЕНДЕРОМ ЧЕРЕЗ REACT PORTAL в `document.body` (`ReactDOM.createPortal`) для `showManualPopup` и `showIntellPopup` — уходят из-под containing-block. Дополнительно выбранные стеки теперь видны прямо в карточке (не только в попапе).
+- **Bug #3 (риски)** — DIAGNOSED & FIXED: `TzRiskCard.tsx` показывал механизмы как АБСОЛЮТНЫЕ баллы (`m.raw` ~10), а систему как ПРОЦЕНТ (`mechRaw/maxRaw*100` = 86 для cardio при `maxRaw=200`). Разные шкалы → ложное противоречие «ССС 86, а механизмы 10». Фикс: добавлено `maxRaw` в `TzSpecOrganResult` (risk-engine-tz-spec.ts:92) и заполнено из `sys.maxRaw` (646); `TzRiskCard` теперь показывает механизмы как **проценты той же шкалы** (`beforePct% → afterPct%`, цвет по `riskColor`), которые суммируются в процент системы. Шапка механизмов уточнена: «механизм · нагрузка % · вклад в риск».
+
+### ❌ Уточнения от пользователя (важно)
+- Bug #3: «риск показывает ССС 86, а по механизмам там и 10 нет» — подтвердило scale-mismatch корень.
+- Bug #2: «НЕ ПОКАЗЫВАЕТ СТЕКИ, НУ НЕТ ОТОБРАЖЕНИЯ» — НЕ «размыто», а отсутствие показа выбора + размытие попапа от backdrop-filter предка. Оба устранены (visible-in-card + portal).
+
+### Key Decisions
+- `maxRaw` per system: cardio=200, hepatic=60, renal=25, cns=100, reproductive=165 (risk-engine-tz-spec.ts:18-55).
+- Portal-подход робастен против ЛЮБОГО предка с `backdrop-filter`/`transform` (containing-block bug для `position:fixed`).
+- Bug #3 — НЕ клиническая ошибка, а несогласованность единиц отображения; исправлена без изменения расчёта риска.
+
+### Relevant Files
+- `src/ui/screens/Calculator/AutoCalculator.tsx` — баги #1 (AAS редактор, ~395-446), #4 (padding 176)
+- `src/ui/screens/Calculator/Calc.mapper.tsx` — баг #2 (selectedStacks summary ~755-783, manual popup 741-804, portal для обоих попапов)
+- `src/ui/screens/Calculator/TzRiskCard.tsx` — баг #3 (механизмы → % через organ.maxRaw)
+- `src/engines/risk-engine-tz-spec.ts` — `maxRaw` в TzSpecOrganResult + заполнение
+- `src/data/support-stacks.ts` — `ALL_STACKS` наполнен (12) — попап стеки рендерит
+- `src/styles.css` — `.training-screen [style*="rgba(24,24,27"]` backdrop-filter:blur (корень размытия попапа)
+
+### Проверки
+- `tsc --noEmit`: 0 ошибок в моих файлах.
+- UTF-8 noBOM: все файлы OK.
+
+---
+
 ## Session Summary (Jul 16) — Тренировки: фикс 3 багов калькуляторов (срывы/RIR/биомеханика)
 
 ### Goal

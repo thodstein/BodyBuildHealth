@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import type { LabSlice } from '../../../engines/support-plan';
 import type { CalculatorState } from '../../../engines/support-plan';
 import { resolvePlan } from '../../../engines/tz-mapper-engine';
@@ -707,7 +708,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       </div>
 
       {/* ── Попап интеллектуального выбора ── */}
-      {showIntellPopup && (
+      {showIntellPopup && ReactDOM.createPortal(
         <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setShowIntellPopup(false)}>
           <div onClick={e => e.stopPropagation()} style={{ width:'88%', maxWidth:320, borderRadius:18, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden' }}>
             <div style={{ height:3, background:'linear-gradient(90deg,#00e68a,#00c853)' }} />
@@ -735,10 +736,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
       {/* ── Попап ручного режима ── */}
-      {showManualPopup && (
+      {showManualPopup && ReactDOM.createPortal(
         <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setShowManualPopup(false)}>
           <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'88vh', display:'flex', flexDirection:'column' }}>
             <div style={{ height:3, background:'linear-gradient(90deg,#818cf8,#6366f1)' }} />
@@ -817,7 +818,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
       {/* ===== УСИЛЕНИЕ: все стеки каталога ===== */}
       {level !== 'manual' && (
