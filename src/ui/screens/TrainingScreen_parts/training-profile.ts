@@ -20,6 +20,8 @@ export interface TrainingProfile {
   stressLevel: number;  // 1-10
   weakPoints: string[];
   equipment: string[];
+  favoriteExercises: string[];
+  excludedExercises: string[];
   pmSquat: number;
   pmBench: number;
   pmDead: number;
@@ -48,6 +50,8 @@ export const DEFAULT_PROFILE: TrainingProfile = {
   stressLevel: 5,
   weakPoints: [],
   equipment: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'],
+  favoriteExercises: [],
+  excludedExercises: [],
   pmSquat: 120,
   pmBench: 100,
   pmDead: 140,
@@ -93,6 +97,8 @@ export function saveTrainingProfile(p: TrainingProfile): void {
       if (p.sleepHours) ls.sleepHours = p.sleepHours;
       if (p.stressLevel) ls.stressLevel = p.stressLevel;
       if (p.weakPoints?.length) tr.weakPoints = p.weakPoints;
+      if (p.favoriteExercises?.length) tr.favoriteExercises = p.favoriteExercises;
+      if (p.excludedExercises?.length) tr.excludedExercises = p.excludedExercises;
       if (p.equipment?.length) tr.equipment = p.equipment;
       if (p.loadStrategy) tr.loadStrategy = p.loadStrategy;
       if (p.pmSquat) tr.pmSquat = p.pmSquat;

@@ -18,7 +18,11 @@ export interface StickingPointInfo {
 
 // Фазы: bench (локоть 0=на груди → 180=дожим), squat (колено 0=глубоко → 180=вверху),
 // deadlift (таз/колено: 0=с пола → 180=вверху).
-const STICKING_POINTS: Record<Lift, Partial<Record<WeakPoint, StickingPointInfo>>> = {
+// Partial: детальные биомеханические данные (углы/суставы/коррекции) есть только для
+// 3 классических движений (bench/squat/deadlift). ohp/row/pulldown/incline_press покрыты
+// в weakpoint-pl (WEAK_POINTS_BY_LIFT), но без угловой диагностики — underspecified здесь.
+// diagnoseLift/stickingPhases безопасно возвращают null/[] для неподдержанных движений.
+const STICKING_POINTS: Partial<Record<Lift, Partial<Record<WeakPoint, StickingPointInfo>>>> = {
   bench: {
     off_chest: { phase: "off_chest", angleRangeDeg: [0, 30], keyJoint: "плечо (горизонтальное сгибание)", weakMuscles: ["Большая грудная", "Передняя дельта"], biomechanicalReason: "Максимальный плечевой момент в нижней точке; слабый старт = недостаток стартовой силы груди/дельты.", corrections: ["Жим с паузой 2-3с на груди", "Жим с пола (dead-stop)", "Наклонный жим на верх груди", "Отжимания с глубиной"], loadCues: "Пауза на груди + съём без отбива (dead-stop) — тренирует чистый старт." },
     mid: { phase: "mid", angleRangeDeg: [30, 90], keyJoint: "локоть (переход)", weakMuscles: ["Грудные (концентрический переход)", "Передняя дельта"], biomechanicalReason: "Переход груди→трицепс в середине; «зависание» = слабый переход и скорость.", corrections: ["Жим средним хватом", "Жим с остановками (2-3 паузы в амплитуде)", "Скоростной жим (динамические усилия)"], loadCues: "Остановки в амплитуде тренируют удержание позиции в переходе." },

@@ -190,6 +190,8 @@ export interface BuildPlanInput {
   preferEquipment?: string[];
   courseIntensity?: 'none' | 'mild' | 'moderate' | 'heavy'; // ААС-интенсивность для ПЕД-коррекции объёма
   addDeloadWeek?: boolean; // Добавить финальную разгрузочную неделю (объём −50%, RIR 3)
+  favoriteExercises?: string[]; // Любимые упражнения — получают +15 приоритет
+  excludedExercises?: string[]; // Нелюбимые/исключённые упражнения — полностью исключаются
 }
 
 /**
@@ -202,6 +204,8 @@ export interface BuildPlanInput {
  */
 export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklySets: Record<string, number>; groupCorrections: string[]; patternBalance: Record<string, number> } {
   const { cycle, mrv, mrvOverride, goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, currentReadiness = 100, targetTonnage, sequenceStrategy = 'classic', preferEquipment: prefEqOverride, courseIntensity, workMaxOverride } = input;
+  const favoriteIds = input.favoriteExercises || [];
+  const excludeIds = input.excludedExercises || [];
 
   // Полный per-group workMax: override (ПМ из калькулятора) > workMax > manualWorkMax
   const workMaxFull = { ...workMax, ...manualWorkMax, ...(workMaxOverride || {}) };
@@ -331,6 +335,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
         selectedIds, equipment, weakZones: weakZonesList, level, injuryProfile, type: 'compound',
         preferEquipment,
         preferBB: goal === 'mass' || goal === 'bulk' || goal === 'cut',
+        favoriteIds, excludeIds,
       });
       const compsSafe = compounds.length === 0 ? poolFinal.slice(0, Math.min(compoundCount, poolFinal.length)) : compounds;
 
@@ -472,6 +477,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
         selectedIds, equipment, weakZones: weakZonesList, level, injuryProfile, type: 'isolation',
         preferEquipment,
         preferBB: goal === 'mass' || goal === 'bulk' || goal === 'cut',
+        favoriteIds, excludeIds,
       });
       const isosSafe = isolations.length === 0 ? poolFinal.filter(e => e.type === 'isolation').slice(0, Math.min(isoCount, poolFinal.length)) : isolations;
 

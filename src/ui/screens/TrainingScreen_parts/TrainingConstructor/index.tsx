@@ -191,6 +191,8 @@ export const TrainingConstructor: React.FC<Props> = ({
     equipment: tprofile.equipment, workMax: tprofile.workMax,
     manualWorkMax, injuries: tprofile.injuries || [], pctForRir: PCT_FOR_RIR,
     courseIntensity: tprofile.onCourse ? (tprofile.courseIntensity || 'mild') : 'none',
+    favoriteExercises: tprofile.favoriteExercises || [],
+    excludedExercises: tprofile.excludedExercises || [],
   });
 
   const [tempoAdjust, setTempoAdjust] = useState<{ eccentric: number; bottomPause: number; concentric: number; topPause: number; label?: string } | null>(null);
@@ -573,6 +575,9 @@ export const TrainingConstructor: React.FC<Props> = ({
         volumeGoal: (manualCfg.bbVolGoal || 'mav') as any,
         specialization: manualCfg.bbSpecialization === 'on',
         injuries: (tprofile.injuries || []) as any,
+        planStartWeek: new Date().toISOString().slice(0, 10),
+        favoriteExercises: tprofile.favoriteExercises || [],
+        excludedExercises: tprofile.excludedExercises || [],
       }, pedAdapt);
 
       // FIX-9: Фазы через distributePhases (единый источник) вместо хардкода

@@ -324,6 +324,9 @@ export const BbAutoConstructor: React.FC = () => {
         workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any,
         specialization: specializationMode,
         injuries,
+        planStartWeek: new Date().toISOString().slice(0, 10),
+        favoriteExercises: prof.favoriteExercises || [],
+        excludedExercises: prof.excludedExercises || [],
       }, pedAdapt);
     }
 

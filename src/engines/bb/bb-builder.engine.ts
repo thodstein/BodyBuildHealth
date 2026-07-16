@@ -44,6 +44,9 @@ export interface BBBuilderInput {
   volumeGoal?: BBVolumeGoal;     // цель по объёму: MEV | MAV | MRV
   specialization?: boolean;      // true = слабые на MAV+10%, остальные на MEV
   injuries?: Injury[];           // травмы — группы с активной травмой исключаются из плана
+  planStartWeek?: string;        // ISO-дата начала мезоцикла (неделя 1) — для per-week оценки травм (fix F)
+  favoriteExercises?: string[];  // Любимые упражнения — +15 приоритет при отборе
+  excludedExercises?: string[];  // Нелюбимые упражнения — полностью исключаются из пула
 }
 
 export interface BBSet {
@@ -339,6 +342,8 @@ function buildSession(
   preSelectedIds: string[] = [],
   preSelectedNames: string[] = [],
   rotationBlockIds: string[] = [],
+  favoriteIds: string[] = [],
+  excludeIds: string[] = [],
 ): BBSession {
   const character = sched.character as DayCharacter;
   const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles);
@@ -461,6 +466,7 @@ function buildSession(
       equipment: [], weakZones: weakPoints, level, injuryProfile, type: selType,
       targetRir: rir,
       preferBB: true,
+      favoriteIds, excludeIds,
     });
     for (const s of selected) { if (s && s.id) sessionSelectedIds.push(s.id); if (s && s.name) sessionSelectedNames.push(s.name); }
     let exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5 }];
@@ -636,6 +642,14 @@ function todayStr(): string {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
+/** Сдвинуть ISO-дату на N дней (fix F: per-week оценка травм). */
+function addDaysISO(from: string, days: number): string {
+  const d = new Date(from + 'T00:00:00');
+  if (isNaN(d.getTime())) return todayStr();
+  d.setDate(d.getDate() + days);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BBPlan {
   const pattern = getPattern(input.patternId) || SPLIT_PATTERNS[0];
   const level = normLevel(input.level) as TrainingLevel;
@@ -644,6 +658,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const focusGroup = input.focusGroup;
   const sessions = sessionsOf(pattern);
   const injuries = input.injuries || [];
+  const favIds = input.favoriteExercises || [];
+  const exclIds = input.excludedExercises || [];
 
   const today = todayStr();
   const excludedMuscles = getExcludedMuscles(injuries, today);
@@ -747,9 +763,18 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         rotationIds.push(...prevIds);
       }
       // Solo-дни (1-2 группы мышц): увеличиваем бюджет на 50% — вся энергия дня идёт на эти мышцы
-      const sessDailyCap = sessMuscles.length <= 2 ? Math.round(dailyCap * 1.5) : dailyCap;
+      // fix I: фазовая модуляция объёма — deload/peak реально снижают число сетов (не только RIR).
+      // Бюджет сессии масштабируется по volumeMultiplier фазы (PHASE_CONFIGS), MRV-потолок не трогаем.
+      const phaseVol = PHASE_CONFIGS[phase]?.volumeMultiplier ?? 1.0;
+      const sessDailyCap = Math.round((sessMuscles.length <= 2 ? dailyCap * 1.5 : dailyCap) * phaseVol);
       const mrvRot = Math.max(12, ...sessMuscles.map(m => mrvByMuscle[m] || 0));
-      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, injuryProfile, new Set(injuryProfile), excludedMuscles, gradedInjuries, today, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], isFB ? fbUsedNames : [], rotationIds);
+      // fix F: per-week оценка травм относительно даты недели (а не только «сегодня»).
+      // Травма с from > даты недели ещё неактивна; травма с to < даты недели уже зажила.
+      const weekDate = input.planStartWeek ? addDaysISO(input.planStartWeek, (w - 1) * 7) : today;
+      const weekExcluded = getExcludedMuscles(injuries, weekDate);
+      const weekGraded = getGradedInjuries(injuries, weekDate);
+      const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
+      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], isFB ? fbUsedNames : [], rotationIds, favIds, exclIds);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {
@@ -761,6 +786,90 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         if (!rotationUsedByMuscle.has(m)) rotationUsedByMuscle.set(m, []);
         const arr = rotationUsedByMuscle.get(m)!;
         if (ex.exerciseName && !arr.includes(ex.exerciseName)) arr.push(ex.exerciseName);
+      }
+      // fix J: фидер-сеты для отстающих групп — изоляция высоким повторением (grease-the-groove
+      // финишер) в дни, где слабая группа уже тренируется. Добивочное кровенаполнение без роста fatigue.
+      const addedFeeders = new Set<string>();
+      for (const wm of sessMuscles) {
+        if (!isWeak(wm, weakPoints)) continue;
+        if (Array.from(weekExcluded).includes(wm)) continue;
+        if (addedFeeders.has(wm)) continue;
+        // Точное совпадение по сырому muscle (или collapseKey) + изоляция: исключаем
+        // «чужие» тяговые движения, ошибочно помеченные как эта группа.
+        const feederPool = (EXERCISE_CATALOG as any[]).filter((e: any) => {
+          const raw = e.muscle;
+          const mg = collapseKey(trueMuscleOf(e) || raw);
+          return (raw === wm || mg === wm) && (e.exerciseType === 'isolation' || e.type === 'isolation');
+        });
+        if (!feederPool.length) continue;
+        // Ранжируем: приоритет — изоляции именно этой группы (плечо/грудь/спина...),
+        // штраф — «чужие» тяговые движения, ошибочно помеченные как эта группа.
+        const scoreFeeder = (e: any): number => {
+          const nm = (e.name || '').toLowerCase();
+          let s = 0;
+          if (/(плеч|дельт|латерал|отвод|мах|развод|fly|raise|lateral|rear|face ?pull|передняя|задняя)/.test(nm)) s += 3;
+          if (/(тяга|pull|row|наклон|присед|жим|станов|отжим)/.test(nm)) s -= 3;
+          if (e.exerciseType === 'isolation' || e.type === 'isolation') s += 1;
+          return s;
+        };
+        feederPool.sort((a, b) => scoreFeeder(b) - scoreFeeder(a));
+        const fData: any = feederPool[0];
+        if (!fData) continue;
+        const fName = fData.name || fData.id;
+        // Дедуп: не добавлять, если такое упражнение уже есть в дне (основное или фидер)
+        if (sess.exercises.some(e => e.exerciseName === fName) || addedFeeders.has(fName)) continue;
+        const fBase = (workMax as any)[wm] || DEFAULT_WORKMAX[wm] || 50;
+        const feederWeight = Math.max(5, Math.round(fBase * 0.3 * 10) / 10);
+        const fTempo = tempoFor('памп');
+        sess.exercises.push({
+          muscle: wm, name: fName, role: 'accessory' as const, character: 'памп' as DayCharacter,
+          sets: 1, repsRange: [15, 20] as [number, number], rir: 2,
+          workSets: [{ reps: 18, rir: 2, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 }],
+          exerciseName: fName, tempoSpec: fTempo.notation, restSeconds: 30,
+          comment: `Фидер-сет (grease-the-groove) для отстающей группы ${wm}: изоляция 18×1, ~30% рабочего веса, пампинг.`,
+          warmupSets: [], rationale: 'Акцент на отстающую группу: добивочный кровенаполнительный сет в конце дня.',
+        });
+        addedFeeders.add(wm);
+        addedFeeders.add(fName);
+      }
+      // fix K: памп-финишер для первичных групп, у которых день — толко «тяж» (без метаболического стресса).
+      // bro-split (1 группа/день) иначе = только тяжёлые сеты. Добавляем 1 изоляцию высоким повторением.
+      for (const pm of sessMuscles) {
+        if (isWeak(pm, weakPoints)) continue;
+        if (Array.from(weekExcluded).includes(pm)) continue;
+        if (sess.exercises.some(e => (e.muscle === pm || collapseKey(e.muscle) === pm) && (e as any).character === 'памп')) continue;
+        const pumpPool = (EXERCISE_CATALOG as any[]).filter((e: any) => {
+          const raw = e.muscle;
+          const mg = collapseKey(trueMuscleOf(e) || raw);
+          return (raw === pm || mg === pm) && (e.exerciseType === 'isolation' || e.type === 'isolation');
+        });
+        if (!pumpPool.length) continue;
+        pumpPool.sort((a: any, b: any) => {
+          const na = (a.name || '').toLowerCase(), nb = (b.name || '').toLowerCase();
+          let sa = 0, sb = 0;
+          if (/(плеч|дельт|латерал|отвод|мах|развод|fly|raise|lateral|rear|face ?pull|передняя|задняя)/.test(na)) sa += 3;
+          if (/(тяга|pull|row|наклон|присед|жим|станов|отжим)/.test(na)) sa -= 3;
+          if (/(плеч|дельт|латерал|отвод|мах|развод|fly|raise|lateral|rear|face ?pull|передняя|задняя)/.test(nb)) sb += 3;
+          if (/(тяга|pull|row|наклон|присед|жим|станов|отжим)/.test(nb)) sb -= 3;
+          return sb - sa;
+        });
+        const pData: any = pumpPool[0];
+        if (!pData) continue;
+        const pName = pData.name || pData.id;
+        if (sess.exercises.some(e => e.exerciseName === pName) || addedFeeders.has(pName)) continue;
+        const pBase = (workMax as any)[pm] || DEFAULT_WORKMAX[pm] || 50;
+        const pumpWeight = Math.max(5, Math.round(pBase * 0.3 * 10) / 10);
+        const pTempo = tempoFor('памп');
+        sess.exercises.push({
+          muscle: pm, name: pName, role: 'accessory' as const, character: 'памп' as DayCharacter,
+          sets: 1, repsRange: [15, 20] as [number, number], rir: 2,
+          workSets: [{ reps: 18, rir: 2, weight: pumpWeight, tempo: pTempo.notation, restSeconds: 30 }],
+          exerciseName: pName, tempoSpec: pTempo.notation, restSeconds: 30,
+          comment: `Памп-финишер для ${pm}: изоляция 18×1, ~30% рабочего веса, метаболический стресс в конце тяжёлого дня.`,
+          warmupSets: [], rationale: 'Баланс тяж/памп: добивочный high-rep сет для гипертрофии.',
+        });
+        addedFeeders.add(pm);
+        addedFeeders.add(pName);
       }
       weekSessions.push(sess);
     }
@@ -807,8 +916,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     `Ротация упражнений: каждые ${ROTATION_INTERVAL} нед — свежий пул (запрет повторов из предыдущего блока).`,
     `S-MRV: автоматический кап объёма на основе бюджета утомления сессии + потолок по MRV мышцы.`,
     ...(pedAdapt ? [`PED-адаптация: MRV×${pedAdapt.combinedMrvMultiplier.toFixed(2)}, восстановление×${pedAdapt.combinedRecoveryMultiplier.toFixed(2)}`] : []),
-    ...(excludedMuscles.size > 0 ? [`Травмы: исключены ${[...excludedMuscles].join(', ')} — упражнения на эти группы не назначаются.`] : []),
-    ...(gradedInjuries.length > 0 ? [`Градированные травмы: ${gradedInjuries.map(i => i.muscle).join(', ')} — упражнения заменены на безопасные альтернативы с пониженным весом/объёмом.`] : []),
+    ...(injuries.length > 0 ? [`Травмы (per-week по дате плана${input.planStartWeek ? ` со старта ${input.planStartWeek}` : ''}): исключены ${[...new Set(injuries.filter(i => i.exclude !== false).map(i => i.muscle))].join(', ') || '—'}; градация ${[...new Set(injuries.filter(i => i.exclude === false).map(i => i.muscle))].join(', ') || '—'} — упражнения заменяются на безопасные альтернативы с пониженным весом/объёмом.`] : []),
   ];
 
   const pedMrvMult = (pedAdapt?.combinedMrvMultiplier ?? 1);

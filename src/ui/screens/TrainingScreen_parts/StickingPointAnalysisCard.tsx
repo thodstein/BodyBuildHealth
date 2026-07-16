@@ -67,7 +67,7 @@ function detectFailures(sessions: WorkoutLog[], lift: Lift, aliases: string[]): 
     const en = (e.exerciseName || e.exerciseId || '').toLowerCase();
     return ss + (aliases.some(a => en.includes(a)) ? (e.sets || []).length : 0);
   }, 0), 0);
-  const labels: Record<Lift, string> = { squat: 'Присед', bench: 'Жим лёжа', deadlift: 'Становая тяга' };
+  const labels: Record<Lift, string> = { squat: 'Присед', bench: 'Жим лёжа', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга верхнего блока', incline_press: 'Жим на наклонной' };
   return {
     lift, label: labels[lift] || lift,
     currentMax,
@@ -82,6 +82,10 @@ const LIFT_ALIASES: Record<Lift, string[]> = {
   squat: ['squat', 'присед', 'приседания', 'barbell squat'],
   bench: ['bench', 'жим', 'жим лёжа', 'bench press'],
   deadlift: ['deadlift', 'тяга', 'становая тяга', 'conventional deadlift'],
+  ohp: ['overhead press', 'жим стоя', 'ohp', 'military press'],
+  row: ['barbell row', 'тяга в наклоне', 'bent over row', 'pendlay row'],
+  pulldown: ['pulldown', 'тяга верхнего', 'lat pulldown', 'подтягивания'],
+  incline_press: ['incline bench', 'жим на наклонной', 'жим под углом', 'incline press'],
 };
 
 const PHASE_LABELS: Record<string, string> = {

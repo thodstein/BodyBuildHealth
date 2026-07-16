@@ -25,6 +25,10 @@ export interface SelectorInput {
   targetRir?: number;
   /** Контекст бодибилдинга: штрафует пауэрлифт/олимпийские тяжёлые подъёмы в пользу изоляции/машин/тросов */
   preferBB?: boolean;
+  /** Любимые упражнения (ID) — получают +15 к скору, приоритет при отборе */
+  favoriteIds?: string[];
+  /** Исключённые упражнения (ID) — полностью исключаются из пула */
+  excludeIds?: string[];
 }
 
 export interface SelectedExercise extends Exercise {
@@ -218,13 +222,16 @@ function pushPullScore(ex: Exercise, selected: Exercise[]): number {
 
 /** Главная функция: интеллектуальный отбор N упражнений */
 export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
-  const { candidates, muscleGroup, count, selectedIds, selectedNames, equipment, weakZones, level, injuryProfile, type, preferEquipment, targetRir, preferBB } = input;
+  const { candidates, muscleGroup, count, selectedIds, selectedNames, equipment, weakZones, level, injuryProfile, type, preferEquipment, targetRir, preferBB, favoriteIds, excludeIds } = input;
   const _selNames = selectedNames || [];
+  const _exclIds = new Set(excludeIds || []);
+  const _favIds = new Set(favoriteIds || []);
 
   let pool = candidates.filter(ex => {
     if (!ex || !ex.id) return false;
     if (selectedIds.includes(ex.id)) return false;
     if (_selNames.includes(ex.name)) return false;
+    if (_exclIds.has(ex.id)) return false;
     if (type && type !== 'any' && ex.type !== type) return false;
     return true;
   });
@@ -265,6 +272,12 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     const pp = pushPullScore(ex, alreadySelected);
     score += pp;
     if (pp !== 0) rationales.push(`push/pull ${pp > 0 ? '+' : ''}${pp}`);
+
+    // 5x. Любимые упражнения (+15)
+    if (_favIds.has(ex.id)) {
+      score += 15;
+      rationales.push('Любимое +15');
+    }
 
     // 6. Оборудование: предпочитаем доступное
     if (equipment.length > 0) {
@@ -435,7 +448,7 @@ export function selectTopN(
   exercises: Exercise[],
   group: string,
   n: number,
-  opts: { selectedIds?: string[]; equipment?: string[]; weakZones?: string[]; level?: string; injuryProfile?: string[]; type?: 'compound' | 'isolation' | 'any' } = {}
+  opts: { selectedIds?: string[]; equipment?: string[]; weakZones?: string[]; level?: string; injuryProfile?: string[]; type?: 'compound' | 'isolation' | 'any'; favoriteIds?: string[]; excludeIds?: string[] } = {}
 ): SelectedExercise[] {
   return selectExercisesSmart({
     candidates: exercises,
@@ -447,6 +460,8 @@ export function selectTopN(
     level: opts.level || 'intermediate',
     injuryProfile: opts.injuryProfile || [],
     type: opts.type || 'any',
+    favoriteIds: opts.favoriteIds,
+    excludeIds: opts.excludeIds,
   });
 }
 
