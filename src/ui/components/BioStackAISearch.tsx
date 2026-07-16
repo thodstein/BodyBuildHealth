@@ -711,7 +711,8 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
                     return (
                       <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.14)' }}>
                         <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 4 }}>💊 Осмысленная замена (по анализам/профилю)</div>
-                        <div onClick={() => { const ns = stackIds.includes(replacePopup.id) ? stackIds.map(s => s === replacePopup.id ? mr.replacementId : s) : [...stackIds.filter(s => s !== replacePopup.id), mr.replacementId]; setStackIds(ns); setReplacePopup(null); }} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                        <div onClick={() => {                         const oldLow = (replacePopup.id || '').toLowerCase();
+                        const ns = stackIds.some(s => s.toLowerCase() === oldLow) ? stackIds.map(s => s.toLowerCase() === oldLow ? mr.replacementId : s) : [...stackIds.filter(s => s.toLowerCase() !== oldLow), mr.replacementId]; setStackIds(ns); setReplacePopup(null); }} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{mr.replacementName}{mr.gradeUpgrade ? <span style={{ marginLeft: 5, padding: '1px 5px', borderRadius: 4, fontSize: 6, fontWeight: 700, background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>↑ грейд</span> : null}</div>
                             <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, marginTop: 2 }}>{mr.reason}</div>
@@ -753,9 +754,10 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
                     }
                     return active.results.slice(0, 6).map((r, i) => (
                       <div key={i} onClick={() => {
-                        const newStack = stackIds.includes(replacePopup.id)
-                          ? stackIds.map(s => s === replacePopup.id ? r.replacementId : s)
-                          : [...stackIds.filter(s => s !== replacePopup.id), r.replacementId];
+                        const oldLow = (replacePopup.id || '').toLowerCase();
+                        const newStack = stackIds.some(s => s.toLowerCase() === oldLow)
+                          ? stackIds.map(s => s.toLowerCase() === oldLow ? r.replacementId : s)
+                          : [...stackIds.filter(s => s.toLowerCase() !== oldLow), r.replacementId];
                         setStackIds(newStack);
                         setReplacePopup(null);
                       }} style={{

@@ -102,7 +102,9 @@ export const BioStackAIScreen: React.FC = () => {
   const clearStops = () => setStackIds(stackIds.filter((id) => !stopIds.has(id)));
   const replaceStop = (originalId: string, replacementId: string) => {
     if (!replacementId) return;
-    const next = stackIds.map((id) => (id === originalId ? replacementId : id));
+    const oldLow = (originalId || '').toLowerCase();
+    if (!oldLow) return;
+    const next = stackIds.map((id) => (id.toLowerCase() === oldLow ? replacementId : id));
     setStackIds([...new Set(next)]);
     showToast(`🔄 Заменено на аналог`, 'info');
   };

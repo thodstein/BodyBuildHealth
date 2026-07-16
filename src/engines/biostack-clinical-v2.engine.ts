@@ -477,7 +477,7 @@ export function findMeaningfulReplacement(
 
   for (const cand of analogs) {
     const cid = cand?.id || cand;
-    if (!cid || avoidSet.has(cid.toLowerCase())) continue;
+    if (!cid || cid.toLowerCase() === originalId.toLowerCase() || avoidSet.has(cid.toLowerCase())) continue;
     const c = cat(cid);
     if (!c) continue;
     // reject if the candidate is itself absolutely contraindicated

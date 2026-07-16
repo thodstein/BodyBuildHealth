@@ -11,7 +11,7 @@ import { checkStackToxicity, checkNutrientConflicts, optimizeTiming, findAbsorpt
 import { getStackEffectiveness, trackStackStart } from '../../engines/biostack-feedback.engine';
 import { getStackCostBreakdown, buildBudgetStack } from '../../engines/biostack-budget.engine';
 import { LAB_MARKER_MAP } from '../../data/lab-marker-map';
-import { getEvidenceGrade, findMeaningfulReplacement } from '../../engines/biostack-clinical-v2.engine';
+import { getEvidenceGrade, findMeaningfulReplacement, selectStack } from '../../engines/biostack-clinical-v2.engine';
 
 const STK_EVIDENCE: Record<string, { label: string; color: string }> = {
   A: { label: 'A', color: '#22c55e' },
@@ -217,7 +217,9 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
   }, [stackIds, setStackIds]);
 
   const handleReplace = useCallback((oldId: string, newId: string) => {
-    setStackIds(stackIds.map(s => s === oldId ? newId : s));
+    const oldLow = (oldId || '').toLowerCase();
+    if (!oldLow || !newId) return;
+    setStackIds(stackIds.map(s => s.toLowerCase() === oldLow ? newId : s));
   }, [stackIds, setStackIds]);
 
   const handleSaveStack = useCallback(() => {
@@ -312,19 +314,25 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
         setActionLoading('best');
         setTimeout(() => {
           const fp = toFinderProfile(profile);
+          const lab = (linked as any)?.labAnalysis || null;
           const r = buildStack({ baseIds: [], targetSize: profile.maxStackSize || 10, autoFill: true, profile: fp });
-          const exp = explainStack(r.stack, fp);
-          const lines = r.stack.map(id => { const c = SUPPORT_CATALOG_DATA[id]; return `• ${c?.nameRu || c?.name || id}`; });
+          // Клинический шлюз безопасности (как в buildClinicalStack) — единый safety-путь
+          const gate = selectStack(r.stack, profile, 'comprehensive', lab);
+          const finalStack = gate.ids;
+          const removed = r.stack.filter(id => !finalStack.includes(id));
+          const exp = explainStack(finalStack, fp);
+          const lines = finalStack.map(id => { const c = SUPPORT_CATALOG_DATA[id]; return `• ${c?.nameRu || c?.name || id}`; });
           const disp = synergyExplanation;
           setActionResult({
-            title: '🏆 Лучший стек под ваш профиль',
+            title: '🏆 Лучший стек (клинически отфильтрован)',
             sections: [
-              { icon: '📋', text: `Состав (${r.stack.length}):\n${lines.join('\n')}`, color: '#8b5cf6' },
+              { icon: '📋', text: `Состав (${finalStack.length}):\n${lines.join('\n')}`, color: '#8b5cf6' },
               { icon: '🎯', text: `Синергия: ${exp.totalSynergyScore} • Покрытие: ${exp.completeness}% • Механизмов: ${exp.coverage.mechanisms.length}`, color: '#22c55e' },
-              { icon: '🔄', text: `Пар синергии: ${exp.pairwiseSynergies.length} из ${(r.stack.length * (r.stack.length - 1)) / 2} возможных`, color: '#60a5fa' },
-              { icon: '⚡', text: disp ? disp.cascadeDesc : `Принцип: ${r.stack.length} компонентов, подобранных под профиль`, color: '#f59e0b' },
+              { icon: '🔄', text: `Пар синергии: ${exp.pairwiseSynergies.length} из ${(finalStack.length * (finalStack.length - 1)) / 2} возможных`, color: '#60a5fa' },
+              { icon: '⚡', text: disp ? disp.cascadeDesc : `Принцип: ${finalStack.length} компонентов, подобранных под профиль`, color: '#f59e0b' },
+              ...(removed.length > 0 ? [{ icon: '🛡️', text: `Отсеяно клиническим шлюзом (${removed.length}): противопоказания / ЛС-конфликты / UL`, color: '#ef4444' }] : []),
             ],
-            resultStack: r.stack,
+            resultStack: finalStack,
           });
           setActionLoading(null);
         }, 500);
@@ -335,21 +343,24 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
         setActionLoading('optimize');
         setTimeout(() => {
           const fp = toFinderProfile(profile);
+          const lab = (linked as any)?.labAnalysis || null;
           const r = buildStack({ baseIds: stackIds, targetSize: Math.max(stackIds.length, 10), autoFill: true, profile: fp });
-          const exp = explainStack(r.stack, fp);
-          const added = r.stack.filter(id => !stackIds.includes(id));
-          const removed = stackIds.filter(id => !r.stack.includes(id));
+          // Клинический шлюз безопасности (как в buildClinicalStack) — единый safety-путь
+          const finalStack = selectStack(r.stack, profile, 'comprehensive', lab).ids;
+          const exp = explainStack(finalStack, fp);
+          const added = finalStack.filter(id => !stackIds.includes(id));
+          const removed = stackIds.filter(id => !finalStack.includes(id));
           const addedLines = added.map(id => { const c = SUPPORT_CATALOG_DATA[id]; return `• +${c?.nameRu || c?.name || id}`; });
           const removedLines = removed.map(id => { const c = SUPPORT_CATALOG_DATA[id]; return `• -${c?.nameRu || c?.name || id}`; });
           setActionResult({
-            title: '⚡ Оптимизированный стек',
+            title: '⚡ Оптимизированный стек (клинически отфильтрован)',
             sections: [
               ...(addedLines.length > 0 ? [{ icon: '✅', text: `Добавлено (${addedLines.length}):\n${addedLines.join('\n')}`, color: '#22c55e' }] : []),
               ...(removedLines.length > 0 ? [{ icon: '❌', text: `Удалено (${removedLines.length}):\n${removedLines.join('\n')}`, color: '#ef4444' }] : []),
               ...(addedLines.length === 0 && removedLines.length === 0 ? [{ icon: '💡', text: 'Стек оптимален — изменений не требуется', color: '#22c55e' }] : []),
               { icon: '📊', text: `Синергия: ${exp.totalSynergyScore} (было ${explanation?.totalSynergyScore ?? 0}) • Покрытие: ${exp.completeness}% (было ${explanation?.completeness ?? 0}%)`, color: '#60a5fa' },
             ],
-            resultStack: r.stack,
+            resultStack: finalStack,
           });
           setActionLoading(null);
         }, 500);
@@ -615,7 +626,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
           setActionLoading(null);
         }, 500);
       }},
-  ], [stackIds, profile, explanation, synergyExplanation]);
+  ], [stackIds, profile, explanation, synergyExplanation, linked]);
 
   const catLabel = (c: string) => CATEGORY_LABELS[c as keyof typeof CATEGORY_LABELS] || c;
 
