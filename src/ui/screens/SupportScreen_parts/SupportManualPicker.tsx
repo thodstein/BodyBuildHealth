@@ -36,8 +36,6 @@ export const SupportManualPicker: React.FC<ManualPickerProps> = ({
   const [tab, setTab] = React.useState<'catalog' | 'stacks' | 'favorites' | 'saved'>('catalog');
   const [search, setSearch] = React.useState('');
   const [selected, setSelected] = React.useState<string[]>([]);
-  const [stackSearch, setStackSearch] = React.useState('');
-  const [expandedStack, setExpandedStack] = React.useState<string | null>(null);
   const [favSearch, setFavSearch] = React.useState('');
 
   const catSubs = React.useMemo(() => {
@@ -107,7 +105,6 @@ export const SupportManualPicker: React.FC<ManualPickerProps> = ({
           <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', flexWrap:'wrap' }}>
             {[
               ['catalog','📋 Каталог'],
-              ['stacks','📦 Готовые стеки'],
               ['favorites','⭐ Избранное'],
               ['saved','💾 Сохранённые'],
             ].map(([id, label]) => (
@@ -176,69 +173,6 @@ export const SupportManualPicker: React.FC<ManualPickerProps> = ({
                   color: selected.length > 0 ? '#000' : 'var(--text-dim)', fontWeight:700, fontSize:11 }}>
                 {selected.length > 0 ? `✅ Добавить в план (${selected.length})` : 'Выберите препараты'}
               </button>
-            </div>
-          )}
-
-          {/* ===== TAB 2: READY-MADE STACKS ===== */}
-          {tab === 'stacks' && (
-            <div>
-              <input value={stackSearch} onChange={e => setStackSearch(e.target.value)} placeholder="🔍 Поиск стека..." style={{
-                width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box', marginBottom:8,
-              }} />
-              {(() => {
-                const filtered = (ALL_STACKS || []).filter((s: any) => !stackSearch || (s.name||'').toLowerCase().includes(stackSearch.toLowerCase()) || (s.problem||'').toLowerCase().includes(stackSearch.toLowerCase()) || (s.system||'').toLowerCase().includes(stackSearch.toLowerCase()));
-                if (filtered.length === 0) return <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:11 }}>Стеки не найдены</div>;
-                return (
-                  <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:'55vh', overflowY:'auto', paddingBottom:8 }}>
-                    {filtered.map((st: any) => {
-                      const isExpanded = expandedStack === st.id;
-                      const stackSubIds = (st.substances||[]).map((sub: any) => sub.id);
-                      const alreadyInAll = stackSubIds.every((id: string) => enhancedSubs.includes(id) || SUPPORT_LEVELS[supportLevel]?.subs?.includes(id));
-                      const someIn = stackSubIds.some((id: string) => enhancedSubs.includes(id) || SUPPORT_LEVELS[supportLevel]?.subs?.includes(id));
-                      return (
-                        <div key={st.id} style={{ borderRadius:10, border:'1px solid var(--border)', overflow:'hidden', background:'var(--bg-secondary)' }}>
-                          <div onClick={() => setExpandedStack(isExpanded ? null : st.id)}
-                            style={{ padding:'9px 12px', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'flex-start',
-                              borderBottom: isExpanded ? '1px solid var(--border)' : 'none' }}>
-                            <div style={{ flex:1 }}>
-                              <div style={{ fontSize:11, fontWeight:700, color:'var(--accent)' }}>{st.name || st.id}</div>
-                              <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:1 }}>{st.system || ''} · {stackSubIds.length} веществ · synergy: {st.synergyScore||'?'}</div>
-                              {alreadyInAll && <span style={{ fontSize:7, padding:'1px 4px', borderRadius:3, background:'rgba(34,197,94,0.12)', color:'#22c55e', marginTop:2, display:'inline-block' }}>✓ уже в плане</span>}
-                            </div>
-                            <span style={{ fontSize:10, color:'var(--text-dim)', flexShrink:0 }}>{isExpanded ? '▲' : '▼'}</span>
-                          </div>
-                          {isExpanded && (
-                            <div style={{ padding:'8px 12px 10px' }}>
-                              {st.description && <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4, marginBottom:6 }}>{decodeGarbled(st.description)}</div>}
-                              <div style={{ display:'flex', flexDirection:'column', gap:2, marginBottom:6 }}>
-                                {stackSubIds.map((sid: string) => {
-                                  const subInfo = catalogSubstances.find((c: any) => c.id === sid);
-                                  const sd = (st.substances||[]).find((s: any) => s.id === sid);
-                                  return (
-                                    <div key={sid} style={{ fontSize:9, padding:'4px 8px', borderRadius:6, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.1)' }}>
-                                      <span style={{ fontWeight:600, color:'var(--text-light)' }}>{subInfo?.name || sd?.id || sid}</span>
-                                      {sd?.dose && <span style={{ color:'#00e68a', marginLeft:4 }}>{sd.dose}</span>}
-                                      {sd?.timing && <span style={{ color:'var(--text-dim)', marginLeft:4, fontSize:8 }}>{sd.timing}</span>}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              {!alreadyInAll && (
-                                <button onClick={() => addToPlan(stackSubIds)}
-                                  style={{ width:'100%', padding:'8px', borderRadius:8, border:'none', cursor:'pointer',
-                                    background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:10 }}>
-                                  ✅ Добавить стек в план ({stackSubIds.length} веществ{someIn ? ', новые: ' + stackSubIds.filter(id => !enhancedSubs.includes(id) && !SUPPORT_LEVELS[supportLevel]?.subs?.includes(id)).length : ''})
-                                </button>
-                              )}
-                              {alreadyInAll && <div style={{ textAlign:'center', fontSize:9, color:'#22c55e', padding:6 }}>✓ Все вещества стека уже в плане</div>}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
             </div>
           )}
 

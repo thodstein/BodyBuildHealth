@@ -6,6 +6,7 @@ import { getVolumeLandmarks, computeVolumeLandmarks, type VolumeLandmarkRow } fr
 import { labTrainingAdjust } from '../lab-training-adjust';
 import { tempoFor } from '../../../../engines/bb/bb-tempo-rest';
 import { PCT_FOR_RIR, GROUP_RU, ACCENT, DIM, SET_TEMPLATES, type ManualResult, type ManualWeek } from './types';
+import { DayCard, type PhaseKey } from '../PlanOutput';
 import type { TrainingProfile } from '../training-profile';
 import { PHASE_LABELS, type BBPhase } from './phase-periodization';
 import { getPlanFeedback } from '../../../../engines/plan-execution-feedback.engine';
@@ -756,14 +757,18 @@ export const PlanDisplay: React.FC<Props> = ({
 
       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {result.days.map((d, di) => (
-          <div key={d.day} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'rgba(0,230,138,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>🏋️ День {d.day}</span>
+          <DayCard key={d.day} day={{
+            key: String(d.day),
+            title: '🏋️ День ' + d.day,
+            phase: currentWeekMeta ? (currentWeekMeta.phase as PhaseKey) : undefined,
+            headerActions: (
               <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                 <span style={{ fontSize: 9, color: ACCENT, fontWeight: 700 }}>{d.groups.map(g => GROUP_RU[g] || g).join(' · ')}</span>
                 <button onClick={() => copyDay(di)} title="Копировать день" style={{ padding: '1px 6px', borderRadius: 4, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', fontSize: 9, fontWeight: 700 }}>📋</button>
               </span>
-            </div>
+            ),
+            renderBody: (
+              <>
             <details style={{ margin: '4px 10px' }}>
               <summary style={{ fontSize: 9, fontWeight: 700, color: '#a855f7', cursor: 'pointer', padding: '4px 0', opacity: 0.7 }}>
                 🔥 Разминка ({goal === 'strength' || goal === 'powerlifting' ? 'силовой протокол' : 'гипертрофия'})
@@ -897,7 +902,7 @@ export const PlanDisplay: React.FC<Props> = ({
               );
             })}
             </div>
-          </div>
+          </>)} } />
         ))}
       </div>
 

@@ -43,6 +43,7 @@ import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } fro
 import { distributePhases as distributePhasesUnified, PHASE_CONFIGS, type PhaseDistribution } from './TrainingConstructor/phase-periodization';
 import { validatePlanQuality, bbPlanToQualityInput, type PlanQualityResult } from '../../../engines/plan-quality.engine';
 import { PlanExportCard } from './PlanExportCard';
+import { DayCard, ExerciseRow, PhaseBanner, WeekStrip, PHASE_COLORS, PHASE_LABELS, type PlanDayView, type PlanExerciseView, type PhaseKey } from './PlanOutput';
 
 type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -57,9 +58,7 @@ const TAG_LABELS_RU: Record<string, string> = {
   FullBody: 'Всё тело', Chest: 'Грудь', Back: 'Спина', Shoulders: 'Плечи', Arms: 'Руки',
   ChestBack: 'Грудь+Спина', ShouldersArms: 'Плечи+Руки', Torso: 'Торс', Limbs: 'Конечности',
   UpperPower: 'Верх(сила)', LowerPower: 'Низ(сила)', UpperHyp: 'Верх(гиперт)', LowerHyp: 'Низ(гиперт)',
-};
-const PHASE_COLORS: Record<BBPhase, string> = { accumulation: '#60a5fa', intensification: '#ef4444', deload: '#22c55e', peaking: '#a855f7' };
-const PHASE_LABELS: Record<BBPhase, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
+  };
 const PHASE_TECHNIQUES: Record<BBPhase, string[]> = {
   accumulation: ['Темповые повторы (TUT)', 'Пауза в растянутой позиции', 'Суперсеты антагонистов'],
   intensification: ['Дроп-сеты (последний подход)', 'Рест-пауза (compounds)', 'Форсированные повторы (с партнёром)'],
@@ -847,43 +846,23 @@ export const BbAutoConstructor: React.FC = () => {
             const dayColor = PHASE_COLORS[currentPhase];
             const daySets = s.exercises.reduce((ss, e) => ss + e.sets, 0);
             return (
-              <div key={si} style={{
-                background: 'rgba(28,28,32,0.65)',
-                backdropFilter: 'blur(18px) saturate(160%)',
-                WebkitBackdropFilter: 'blur(18px) saturate(160%)',
-                borderRadius: 14,
-                border: '1px solid rgba(255,255,255,0.06)',
-                borderLeft: '4px solid ' + dayColor,
-                overflow: 'hidden',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.22), inset 0 0.5px 0 rgba(255,255,255,0.04)',
-              }}>
-                {/* День — заголовок */}
-                <div style={{
-                  display:'flex', justifyContent:'space-between', alignItems:'center',
-                  padding:'10px 14px',
-                  background: dayColor + '0d',
-                  borderBottom: '1px solid rgba(255,255,255,0.06)',
-                }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                    <span style={{ fontSize:15, fontWeight:800, color:'#fff', letterSpacing:'-0.3px' }}>
-                      День {si + 1}
-                    </span>
-                    <span style={{
-                      padding:'3px 8px', borderRadius:7, fontSize:10, fontWeight:700,
-                      background: dayColor + '20', color: dayColor, border: '1px solid ' + dayColor + '30',
-                    }}>
+              <DayCard key={si} day={{
+                key: String(si),
+                title: 'День ' + (si + 1),
+                phase: currentPhase,
+                volumeTag: s.exercises.length + ' упр · ' + daySets + ' сет',
+                headerActions: (
+                  <span style={{ display:'flex', gap:6, alignItems:'center' }}>
+                    <span style={{ padding:'3px 8px', borderRadius:7, fontSize:10, fontWeight:700, background: dayColor + '20', color: dayColor, border:'1px solid ' + dayColor + '30' }}>
                       {PHASE_LABELS[currentPhase]}
                     </span>
-                  </div>
-                  <div style={{ display:'flex', gap:6, alignItems:'center' }}>
                     <span style={{ fontSize:10, fontWeight:600, color:'rgba(255,255,255,0.45)' }}>
                       {s.character} · {s.sessionTag || ''}
                     </span>
-                    <span style={{ fontSize:10, fontWeight:700, color: dayColor, background: dayColor + '15', padding:'2px 8px', borderRadius:6 }}>
-                      {s.exercises.length} упр · {daySets} сет
-                    </span>
-                  </div>
-                </div>
+                  </span>
+                ),
+                renderBody: (
+                  <>
 
                 {/* Упражнения */}
                 <div style={{ padding:'8px 10px' }}>
@@ -994,7 +973,7 @@ export const BbAutoConstructor: React.FC = () => {
                     );
                   })}
                 </div>
-              </div>
+              </>)} } />
             );
           })}
         </div>
