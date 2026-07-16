@@ -136,9 +136,9 @@ export const NutritionCharts: React.FC<{
             {([7, 14, 30] as ChartRange[]).map(r => (
               <button key={r} onClick={() => setRange(r)} style={{
                 padding: '4px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600,
-                background: range === r ? 'rgba(0,230,138,0.15)' : '#202023',
-                border: range === r ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-                color: range === r ? '#00e68a' : '#fff',
+                background: range === r ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+                border: range === r ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+                color: range === r ? '#000' : 'rgba(255,255,255,0.7)',
                 transition: 'all 0.15s',
               }}>{r}д</button>
             ))}
@@ -148,9 +148,9 @@ export const NutritionCharts: React.FC<{
           {['both', 'kcal', 'macro'].map(m => (
             <button key={m} onClick={() => setChartMode(m as any)} style={{
               flex: 1, padding: '4px 0', borderRadius: 6, fontSize: 8, cursor: 'pointer', fontWeight: 600,
-              background: chartMode === m ? 'rgba(139,92,246,0.15)' : '#202023',
-              border: chartMode === m ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
-              color: chartMode === m ? '#a78bfa' : '#fff',
+              background: chartMode === m ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : '#202023',
+              border: chartMode === m ? '2px solid #a78bfa' : '1px solid rgba(255,255,255,0.06)',
+              color: chartMode === m ? '#fff' : 'rgba(255,255,255,0.7)',
             }}>{m === 'both' ? 'Все' : m === 'kcal' ? 'Ккал' : 'БЖУ'}</button>
           ))}
         </div>
