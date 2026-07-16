@@ -107,7 +107,7 @@ const INTRA_CARB_G_PER_H = 40;
 // Максимально допустимые порции для добавок (г) — защита от абсурдных доз
 const SUPPLEMENT_MAX_G: Record<string, number> = {
   creatine: 10, whey_isolate: 60, whey_protein: 60, whey_concentrate: 60,
-  casein: 60, casein_micellar: 60, bcaa: 20, supp_eaa: 20,
+  casein: 140, casein_micellar: 140, bcaa: 20, supp_eaa: 20,
   glutamine: 15, supp_hmb: 6, supp_beta_alanine: 6, supp_citrulline_dl_malate: 12,
   supp_agmatine_sulfate: 2, supp_l_carnitine_tartrate: 4, supp_alpha_gpc: 2,
   amylopectin: 80, dextrose: 80, collagen_hydrolysate: 20,
@@ -410,6 +410,7 @@ function buildPreWorkout(
   budget: MealPlanInput['budget'],
   preferredIds?: Set<string>,
   opts?: { lockedIds?: Set<string>; recentIds?: Set<string> },
+  carbG: number = PREW_CARB_SLOW_G,
 ): Meal {
   const leanProteinPool = (pool.proteinLean.length > 0 ? pool.proteinLean : pool.proteinSolid).filter(f => !['octopus','squid','clam','mussel','cockle','whelk','sea_urchin','abalone'].some(k => f.id.includes(k)));
   const prefProtein = preferredIds && preferredIds.size > 0 ? leanProteinPool.filter(f => preferredIds.has(f.id)) : [];
@@ -425,7 +426,7 @@ function buildPreWorkout(
     items.push(makeItem(proteinSource, grams, 'protein'));
   }
   if (carbSource) {
-    const grams = gramsForMacro(carbSource, PREW_CARB_SLOW_G, 'carbs');
+    const grams = gramsForMacro(carbSource, carbG, 'carbs');
     items.push(makeItem(carbSource, grams, 'carb_slow'));
   }
 
@@ -512,10 +513,22 @@ function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof build
   const caseinIdx = Math.floor(seededRandom(seed) * caseinPool.length) % caseinPool.length;
   const caseinSource = caseinPool[caseinIdx] || caseinPool[0];
   const items: MealItem[] = [];
+  const targetP = Math.max(30, Math.min(45, residualP));
   if (caseinSource) {
-    const targetP = Math.max(30, Math.min(45, residualP));
-    const grams = gramsForMacro(caseinSource, targetP, 'protein');
+    // Д-1: casein powder protein% is low (~22/100), so supplement-capped grams may not reach the 30-45g night MPS target.
+    // Use whole dairy (cottage cheese / greek yogurt) as a second slow-protein source to fill the gap.
+    let grams = gramsForMacro(caseinSource, targetP, 'protein');
+    let deliveredP = (caseinSource.protein || 0) * grams / 100;
     items.push(makeItem(caseinSource, grams, 'slow_protein'));
+    if (deliveredP < targetP - 3) {
+      const dairyPool = pool.slowProtein.filter(f => f.id !== caseinSource.id && (f.id.includes('cottage') || f.id === 'yogurt_greek' || f.id.includes('kefir')));
+      const dairy = dairyPool.length > 0 ? dairyPool[Math.floor(seededRandom(seed + 9) * dairyPool.length)] : undefined;
+      if (dairy) {
+        const restP = targetP - deliveredP;
+        const dairyGrams = gramsForMacro(dairy, restP, 'protein');
+        if (dairyGrams > 0) { items.push(makeItem(dairy, dairyGrams, 'slow_protein')); }
+      }
+    }
   }
   // Mg-источник: тыквенные семечки/миндаль/кешью — ротация по seed
   const mgPool = FOOD_DB.filter(f => ['pumpkin_seeds','sunflower_seeds','almonds','cashew'].includes(f.id));
