@@ -347,8 +347,8 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
         </div>
       </ConfigSection>
 
-      {/* ─── BB-АВТО ДВИЖОК ─── */}
-      <ConfigSection title="🏋️ BB-АВТО ДВИЖОК" color="#f97316">
+      {/* ─── BB-авто генератор ─── */}
+      <ConfigSection title="🏋️ BB-авто генератор" color="#f97316">
         <Sel label="Режим генерации" value={manualCfg.generator || ''} onChange={v => setManual('generator', v)}
           options={[
             { id: '', label: '🔨 Ручная сборка (по группам)' },

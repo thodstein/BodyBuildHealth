@@ -721,8 +721,8 @@ export const PlanDisplay: React.FC<Props> = ({
                     color: w.weekNumber === currentWeekNum ? '#fff' : 'rgba(255,255,255,0.6)',
                     fontSize: 9, fontWeight: 700, textAlign: 'center',
                   }}>{w.weekNumber}</button>
-                  <div style={{ fontSize: 8, fontWeight: 600, minWidth: 72, color: pc }}>{w.phaseLabel}</div>
-                  <div style={{ fontSize: 9, fontWeight: 700, minWidth: 22, textAlign: 'center', color: w.rir <= 1 ? '#ef4444' : w.rir <= 2 ? '#f59e0b' : '#22c55e' }}>RIR{w.rir}</div>
+                  <div style={{ fontSize: 10, fontWeight: 600, minWidth: 72, color: pc }}>{w.phaseLabel}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, minWidth: 22, textAlign: 'center', color: w.rir <= 1 ? '#ef4444' : w.rir <= 2 ? '#f59e0b' : '#22c55e' }}>RIR{w.rir}</div>
                   <div style={{ flex: 1, display: 'flex', gap: 2, alignItems: 'center' }}>
                     <div style={{
                       height: 10, width: Math.round((totalSets / Math.max(1, maxSets)) * barMaxW), borderRadius: 4,
@@ -790,22 +790,22 @@ export const PlanDisplay: React.FC<Props> = ({
               const tmpo = globalTempoStr ? { tempo: { toString: () => globalTempoStr } } : (overrideTempo ? { tempo: { toString: () => overrideTempo } } : { tempo: { toString: () => tempoFor(ei === 0 ? 'тяж' : 'памп').notation } });
               const note = getExerciseNote(e, ei, d.exercises, weeklySetsMap, result.corrections);
               const chipWrap: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 1, minHeight: 28, background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '3px 8px', justifyContent: 'center', minWidth: 0 };
-              const chipLbl: React.CSSProperties = { fontSize: 8, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', fontWeight: 700, lineHeight: 1 };
-              const chipVal: React.CSSProperties = { fontSize: 12, fontWeight: 700, lineHeight: 1.15 };
+              const chipLbl: React.CSSProperties = { fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', fontWeight: 700, lineHeight: 1 };
+              const chipVal: React.CSSProperties = { fontSize: 13, fontWeight: 700, lineHeight: 1.15 };
               return (
                 <Fragment key={ei}>
                    <div draggable onDragStart={ev => handleDragStart(ev, di, ei)} onDragOver={handleDragOver} onDrop={ev => handleDrop(ev, di, ei)} onDragEnd={() => setDragFrom(null)} style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: '8px', color: 'rgba(255,255,255,0.85)', borderTop: '1px solid rgba(255,255,255,0.04)', background: dragFrom?.dayIdx === di && dragFrom?.exIdx === ei ? 'rgba(0,230,138,0.1)' : 'transparent', cursor: 'grab' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', cursor: 'grab', userSelect: 'none' }}>⠿</span>
                       <span style={{ fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0, wordBreak: 'break-word' }}>
-                        <span style={{ fontSize: 8, padding: '2px 5px', borderRadius: 4, fontWeight: 800, textTransform: 'uppercase', flex: '0 0 auto',
+                        <span style={{ fontSize: 10, padding: '2px 5px', borderRadius: 4, fontWeight: 800, textTransform: 'uppercase', flex: '0 0 auto',
                           background: e.role === 'main' ? 'rgba(0,230,138,0.2)' : e.role === 'secondary' ? 'rgba(96,165,250,0.2)' : 'rgba(255,255,255,0.1)',
                           color: e.role === 'main' ? ACCENT : e.role === 'secondary' ? '#60a5fa' : DIM,
                           border: '0.5px solid ' + (e.role === 'main' ? ACCENT : e.role === 'secondary' ? '#60a5fa' : 'rgba(255,255,255,0.2)')
                         }}>{e.role === 'main' ? 'База' : e.role === 'secondary' ? 'Доп' : 'Изо'}</span>
                         {e.name}
                         {e.weight && !(e as any).weightNote && (
-                          <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, fontWeight: 700, background: 'rgba(96,165,250,0.18)', color: '#60a5fa', border: '0.5px solid rgba(96,165,250,0.4)', flex: '0 0 auto' }}>от 1ПМ</span>
+                          <span style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, fontWeight: 700, background: 'rgba(96,165,250,0.18)', color: '#60a5fa', border: '0.5px solid rgba(96,165,250,0.4)', flex: '0 0 auto' }}>от 1ПМ</span>
                         )}
                       </span>
                        <span style={{ display: 'flex', gap: 4, flex: '0 0 auto' }}>

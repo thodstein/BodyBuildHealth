@@ -120,7 +120,8 @@ function exerciseComment(ex: BBExercise, weakPoints: string[], focusGroup: strin
   }
   const phaseTech = PHASE_TECHNIQUES[phase];
   if (phaseTech.length > 0) {
-    const techHint = phaseTech[Math.floor(Math.random() * phaseTech.length)];
+    const seed = (ex.name || '').split('').reduce((a, c, i) => a + c.charCodeAt(0) * (i + 1), 0);
+    const techHint = phaseTech[seed % phaseTech.length];
     parts.push('💡 ' + techHint);
   }
   if (ex.character === 'тяж') parts.push('💪 Силовая нагрузка');
@@ -440,8 +441,10 @@ export const BbAutoConstructor: React.FC = () => {
         exercises: s.exercises.map(e => ({ name: e.name, muscleGroup: e.muscle, sets: e.sets, reps: e.workSets[0]?.reps || 10, weight: e.workSets[0]?.weight || 60, rir: e.rir })),
       })));
       localStorage.setItem('he_pl_runtime', JSON.stringify(sessions));
-      alert('План отправлен на выполнение. Перейдите в Тренировка.');
-    } catch { alert('Ошибка'); }
+      // FIX-12: Авто-переход на вкладку «Тренировка» (как ручной конструктор)
+      localStorage.setItem('he_training_tab', 'runtime');
+      window.dispatchEvent(new StorageEvent('storage', { key: 'he_training_tab' }));
+    } catch { alert('Ошибка при отправке плана на выполнение'); }
   };
 
   const stepList: Step[] = planMode === 'bb_cycle' ? ['params','ped','plan','quality','adjust'] : ['params','ped','split','plan','quality','adjust'];
@@ -619,6 +622,10 @@ export const BbAutoConstructor: React.FC = () => {
           })()}
         </div>
       <div style={H}>💪 Рабочие максимумы (кг)</div>
+      <div style={{ marginBottom:8, padding:'6px 10px', borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.12)', fontSize:10, color:'rgba(255,255,255,0.6)' }}>
+        💡 Введите <b>рабочий вес на 5-8 повторений</b> (НЕ 1ПМ!) для каждой группы. Например: жим лёжа 100кг×8 → «Грудь 100».
+        Для икр/пресса — вес в тренажёре. Веса используются для расчёта нагрузки по RIR и %1RM.
+      </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:10 }}>
         {BB_WM_KEYS.map(k => <PopupNumber key={k} label={BB_WM_RU[k]} value={bbWorkMax[k] || 80} min={10} max={500} suffix=' кг' onChange={v => setBbWorkMax(p => ({ ...p, [k]: v }))} />)}
       </div>
@@ -645,6 +652,11 @@ export const BbAutoConstructor: React.FC = () => {
       <button style={{ ...BTN, width:'100%' }} onClick={() => planMode === 'bb_cycle' ? buildBb() : setStep('split')}>
         {planMode === 'bb_cycle' ? '⚡ Собрать план по циклу →' : 'Далее: выбрать сплит →'}
       </button>
+      {planMode === 'bb_cycle' && (
+        <button style={{ ...BTN_GHOST, width:'100%', marginTop:6 }} onClick={() => setStep('params')}>
+          ← Назад к параметрам
+        </button>
+      )}
     </div>
   );
 
