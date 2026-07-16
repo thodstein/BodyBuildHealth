@@ -100,6 +100,27 @@ function phaseForWeek(week: number, totalWeeks: number): BBPhase {
   return getPhaseMap(totalWeeks).get(week) || 'accumulation';
 }
 
+/** Проверка: мышца в списке слабых групп (с учётом родительских групп). */
+function isWeakMuscle(muscle: string, weakPoints: string[]): boolean {
+  if (weakPoints.includes(muscle)) return true;
+  const PARENT: Record<string, string> = { delt_front: 'shoulders', delt_mid: 'shoulders', delt_rear: 'shoulders' };
+  return weakPoints.includes(PARENT[muscle] ?? '');
+}
+
+/** Мини-чип для параметров упражнения. */
+const Chip: React.FC<{ label: string; value: string; color: string }> = ({ label, value, color }) => (
+  <div style={{
+    padding: '5px 8px', borderRadius: 7,
+    background: color.replace(')', ',0.08)').replace('rgb', 'rgba').replace(/rgba\([\d,.\s]+\)/, color + '15'),
+    border: '0.5px solid ' + color + '30',
+    display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center',
+    minWidth: 50,
+  }}>
+    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', fontWeight: 700 }}>{label}</span>
+    <span style={{ fontSize: 13, fontWeight: 800, color, lineHeight: 1.1 }}>{value}</span>
+  </div>
+);
+
 function computePhases(totalWeeks: number): { week: number; phase: BBPhase }[] {
   const phases: { week: number; phase: BBPhase }[] = [];
   for (let w = 1; w <= totalWeeks; w++) {
@@ -225,6 +246,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [deloadType, setDeloadType] = useState<DeloadType>('pump');
 
   const [peds, setPeds] = useState<PED[]>((prof.bbPeds?.length ? prof.bbPeds : (prof.onCourse ? ['AAS'] : [])) as PED[]);
+  const [pedDoses, setPedDoses] = useState<Record<string, number>>({ AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
   const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(prof.courseIntensity || 'moderate');
   const [bbWorkMax, setBbWorkMax] = useState<Record<string, number>>(() => ({
     chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60,
@@ -579,6 +601,26 @@ export const BbAutoConstructor: React.FC = () => {
             </button>
           ))}
         </div>
+        {/* FIX-15: Дозировки активных PED */}
+        {peds.length > 0 && (
+          <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.5)', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.03em' }}>Дозировки (мг/нед или МЕ/нед)</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+              {peds.map(p => {
+                const labels: Record<string, string> = { AAS: 'ААС, мг/нед', insulin: 'Инсулин, МЕ/день', MGF: 'MGF, мкг/нед', IGF1: 'IGF-1, мкг/день', GH: 'ГР, МЕ/день' };
+                const steps: Record<string, number> = { AAS: 50, insulin: 5, MGF: 50, IGF1: 10, GH: 1 };
+                return (
+                  <div key={p} style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>{labels[p] || p}</span>
+                    <input type="number" value={pedDoses[p] || 0} min={0} max={p === 'AAS' ? 3000 : p === 'insulin' ? 50 : 500}
+                      onChange={e => setPedDoses(d => ({ ...d, [p]: parseInt(e.target.value) || 0 }))}
+                      style={{ width:'100%', padding:'5px 8px', borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:11, fontWeight:700, textAlign:'center', boxSizing:'border-box' }} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {peds.length > 0 && <div style={{ ...SMALL, marginTop:6 }}>{explainPEDAdaptation(pedAdapt)}</div>}
         {peds.length > 0 && (
           <div style={{ marginTop:8 }}>
@@ -862,95 +904,163 @@ export const BbAutoConstructor: React.FC = () => {
           );
         })()}
 
-        {/* Daily session tables with phase-aware comments */}
-        <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:8 }}>
-          {wk.sessions.map((s, si) => (
-            <div key={si} style={{ background:'rgba(255,255,255,0.02)', borderRadius:10, border:'1px solid rgba(255,255,255,0.06)', overflow:'hidden' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', background:PHASE_COLORS[currentPhase] + '12', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
-                <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>🏋️ День {si+1} · {s.character} · {s.sessionTag}</span>
-                <span style={{ fontSize:10, color:PHASE_COLORS[currentPhase], fontWeight:700 }}>{PHASE_LABELS[currentPhase]}</span>
-              </div>
-              <div style={{ padding:'4px 0' }}>
-                {s.exercises.map((e, ei) => {
-                  const rawW = e.workSets[0]?.weight || 80;
-                  const adjW = autoRegOn && autoRegResult ? Math.round(rawW * autoRegResult.topSetPctMultiplier * 10) / 10 : rawW;
-                  const adjSets0 = autoRegOn && autoRegResult ? Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier)) : e.sets;
-                  const editKey = `${si}-${ei}`;
-                  const edit = exerciseEdits[editKey] || { sets: adjSets0, reps: e.workSets[0]?.reps || 10, weight: adjW };
-                  const comment = e.comment || exerciseComment(e, weakPoints, bbFocus, currentPhase);
-                  const isEditing = editMode?.dayIdx === si && editMode?.exIdx === ei;
-                  const warmups = (e.warmupSets && e.warmupSets.length > 0) ? e.warmupSets : (e.role === 'primary' && e.character === 'тяж' ? buildWarmup(edit.weight, true) : []);
-                  const rotEx = rotationSubstitutions(wk.week, bbWeeks, e.muscle, e.name);
-                  return (
-                    <div key={ei} style={{ padding:'6px 10px', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <div style={{ fontWeight:700, fontSize:11, color:'#fff' }}>{e.name}</div>
-                        <div style={{ display:'flex', gap:4, alignItems:'center' }}>
-                          <button onClick={() => setSubTarget({ dayIdx: si, exIdx: ei, sessionIdx: si })}
-                            style={{ padding:'3px 8px', borderRadius:6, fontSize:10, fontWeight:600, cursor:'pointer', border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.06)', color:'#00e68a' }}>
-                            🔄
-                          </button>
-                          <button onClick={() => setEditMode(isEditing ? null : { dayIdx: si, exIdx: ei })}
-                            style={{ padding:'3px 8px', borderRadius:6, fontSize:10, fontWeight:600, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.7)' }}>
-                            {isEditing ? '✕ Готово' : '✎ Править'}
-                          </button>
-                        </div>
-                      </div>
-                      {isEditing ? (
-                        <div style={{ display:'flex', gap:8, marginTop:6, alignItems:'center' }}>
-                          <div><span style={SMALL}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, sets: parseInt(e2.target.value) || 0 } }))} style={{ width:45, ...IN }} /></div>
-                          <div><span style={SMALL}>Повт</span><input type="number" value={edit.reps} min={1} max={30} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, reps: parseInt(e2.target.value) || 1 } }))} style={{ width:45, ...IN }} /></div>
-                          <div><span style={SMALL}>Вес</span><input type="number" value={edit.weight} min={0} max={500} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, weight: parseInt(e2.target.value) || 0 } }))} style={{ width:55, ...IN }} /></div>
-                        </div>
-                      ) : null}
-                      <div style={{ display:'flex', gap:8, marginTop:4, fontSize:10, color:'rgba(255,255,255,0.85)' }}>
-                        <span style={{ padding:'2px 6px', borderRadius:4, background:e.role==='primary'?'rgba(0,230,138,0.12)':'rgba(168,85,247,0.12)', color:e.role==='primary'?'#00e68a':'#a855f7', fontWeight:700, fontSize:10 }}>{e.role === 'primary' ? '🎯 Primary' : '📌 Accessory'}</span>
-                        <span style={{ padding:'2px 6px', borderRadius:4, background:e.character==='тяж'?'rgba(239,68,68,0.12)':'rgba(96,165,250,0.12)', color:e.character==='тяж'?'#ef4444':'#60a5fa', fontWeight:700, fontSize:10 }}>{e.character}</span>
-                        <span style={{ fontWeight:600 }}>{edit.sets}×{edit.reps}</span>
-                        <span style={{ color:'#f59e0b' }}>RIR {e.rir}</span>
-                        <span style={{ color:ACCENT, fontWeight:700 }}>{edit.weight} кг</span>
-                        {e.workSets[0]?.tempo && <span style={{ color:'rgba(255,255,255,0.5)' }}>темп {e.workSets[0].tempo}</span>}
-                        {e.workSets[0]?.restSeconds && <span style={{ color:'rgba(255,255,255,0.5)' }}>отдых {e.workSets[0].restSeconds}с</span>}
-                      </div>
-                      {/* Warm-up ramp for primary heavy exercises */}
-                      {warmups.length > 0 && (
-                        <div style={{ marginTop:3, display:'flex', gap:4, flexWrap:'wrap' }}>
-                          {warmups.map((wu, wi) => (
-                            <span key={wi} style={{ padding:'1px 5px', borderRadius:4, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.15)', fontSize:10, color:'rgba(255,255,255,0.5)' }}>
-                              🔥 Разминка: {wu.load} кг × {wu.reps}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      {/* Phase-specific technique suggestion */}
-                      <div style={{ marginTop:2, fontSize:10, color:PHASE_COLORS[currentPhase] + 'cc', fontStyle:'italic' }}>
-                        {PHASE_TECHNIQUES[currentPhase][ei % PHASE_TECHNIQUES[currentPhase].length]}
-                      </div>
-                      {/* Exercise comment */}
-                      <div style={{ marginTop:4, padding:'4px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.08)', fontSize:10, color:'rgba(255,255,255,0.7)', lineHeight:1.5 }}>
-                        💡 {comment}
-                      </div>
-                      {/* Selection rationale */}
-                      {e.rationale && (
-                        <details style={{ marginTop:2 }}>
-                          <summary style={{ fontSize:9, fontWeight:600, color:'rgba(96,165,250,0.7)', cursor:'pointer' }}>🧠 Почему это упражнение?</summary>
-                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', padding:'2px 6px', lineHeight:1.4 }}>{e.rationale}</div>
-                        </details>
-                      )}
-                      {/* Rotation suggestion */}
-                      {rotEx.length > 0 && currentPhase === 'intensification' && (
-                        <div style={{ marginTop:3, fontSize:10, color:'rgba(168,85,247,0.6)' }}>
-                          🔄 Варианты замены: {rotEx.join(', ')} (ротация изоляции на границе фаз)
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* Daily session cards — карточки дней с frosted glass */}
+        <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:12 }}>
+          {wk.sessions.map((s, si) => {
+            const dayColor = PHASE_COLORS[currentPhase];
+            const daySets = s.exercises.reduce((ss, e) => ss + e.sets, 0);
+            return (
+              <div key={si} style={{
+                background: 'rgba(28,28,32,0.65)',
+                backdropFilter: 'blur(18px) saturate(160%)',
+                WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+                borderRadius: 14,
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderLeft: '4px solid ' + dayColor,
+                overflow: 'hidden',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.22), inset 0 0.5px 0 rgba(255,255,255,0.04)',
+              }}>
+                {/* День — заголовок */}
+                <div style={{
+                  display:'flex', justifyContent:'space-between', alignItems:'center',
+                  padding:'10px 14px',
+                  background: dayColor + '0d',
+                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <span style={{ fontSize:15, fontWeight:800, color:'#fff', letterSpacing:'-0.3px' }}>
+                      День {si + 1}
+                    </span>
+                    <span style={{
+                      padding:'3px 8px', borderRadius:7, fontSize:10, fontWeight:700,
+                      background: dayColor + '20', color: dayColor, border: '1px solid ' + dayColor + '30',
+                    }}>
+                      {PHASE_LABELS[currentPhase]}
+                    </span>
+                  </div>
+                  <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                    <span style={{ fontSize:10, fontWeight:600, color:'rgba(255,255,255,0.45)' }}>
+                      {s.character} · {s.sessionTag || ''}
+                    </span>
+                    <span style={{ fontSize:10, fontWeight:700, color: dayColor, background: dayColor + '15', padding:'2px 8px', borderRadius:6 }}>
+                      {s.exercises.length} упр · {daySets} сет
+                    </span>
+                  </div>
+                </div>
 
+                {/* Упражнения */}
+                <div style={{ padding:'8px 10px' }}>
+                  {s.exercises.map((e, ei) => {
+                    const rawW = e.workSets[0]?.weight || 80;
+                    const adjW = autoRegOn && autoRegResult ? Math.round(rawW * autoRegResult.topSetPctMultiplier * 10) / 10 : rawW;
+                    const adjSets0 = autoRegOn && autoRegResult ? Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier)) : e.sets;
+                    const editKey = `${si}-${ei}`;
+                    const edit = exerciseEdits[editKey] || { sets: adjSets0, reps: e.workSets[0]?.reps || 10, weight: adjW };
+                    const isEditing = editMode?.dayIdx === si && editMode?.exIdx === ei;
+                    const comment = e.comment || exerciseComment(e, weakPoints, bbFocus, currentPhase);
+                    const roleColor = e.role === 'primary' ? '#00e68a' : '#a855f7';
+                    const charColor = e.character === 'тяж' ? '#ef4444' : '#60a5fa';
+                    
+                    return (
+                      <div key={ei} style={{
+                        padding:'10px 12px', marginBottom:8,
+                        background: 'rgba(255,255,255,0.025)',
+                        borderRadius:10, border: '0.5px solid rgba(255,255,255,0.04)',
+                      }}>
+                        {/* Имя упражнения + кнопки */}
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:14, fontWeight:800, color:'#fff', lineHeight:1.25, marginBottom:5, letterSpacing:'-0.2px' }}>
+                              {e.name}
+                            </div>
+                            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                              <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:5, background: roleColor + '20', color: roleColor, border: '0.5px solid ' + roleColor + '30' }}>
+                                {e.role === 'primary' ? '🎯 Основное' : '📌 Добивка'}
+                              </span>
+                              <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:5, background: charColor + '20', color: charColor, border: '0.5px solid ' + charColor + '30' }}>
+                                {e.character === 'тяж' ? '💪 Тяж' : e.character === 'памп' ? '🩸 Памп' : '🌿 Лёг'}
+                              </span>
+                              {isWeakMuscle(e.muscle, weakPoints) && (
+                                <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(250,204,21,0.15)', color:'#facc15', border:'0.5px solid rgba(250,204,21,0.3)' }}>
+                                  🔥 Отстающая
+                                </span>
+                              )}
+                              {bbFocus === e.muscle && (
+                                <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(236,72,153,0.15)', color:'#ec4899', border:'0.5px solid rgba(236,72,153,0.3)' }}>
+                                  ⭐ Специализация
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div style={{ display:'flex', gap:6, marginLeft:8 }}>
+                            <button onClick={() => setSubTarget({ dayIdx: si, exIdx: ei, sessionIdx: si })} title="Заменить"
+                              style={{ padding:'3px 8px', borderRadius:6, fontSize:10, fontWeight:600, cursor:'pointer', border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.06)', color:'#00e68a' }}>
+                              🔄
+                            </button>
+                            <button onClick={() => setEditMode(isEditing ? null : { dayIdx: si, exIdx: ei })} title="Править"
+                              style={{ padding:'3px 8px', borderRadius:6, fontSize:10, fontWeight:600, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.7)' }}>
+                              {isEditing ? '✓' : '✎'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Редактирование (inline) */}
+                        {isEditing && (
+                          <div style={{ display:'flex', gap:8, marginBottom:8, alignItems:'center', padding:'6px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)' }}>
+                            <div><span style={SMALL}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, sets: parseInt(e2.target.value) || 0 } }))} style={{ width:48, ...IN }} /></div>
+                            <div><span style={SMALL}>Повт</span><input type="number" value={edit.reps} min={1} max={30} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, reps: parseInt(e2.target.value) || 1 } }))} style={{ width:48, ...IN }} /></div>
+                            <div><span style={SMALL}>Вес</span><input type="number" value={edit.weight} min={0} max={500} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, weight: parseInt(e2.target.value) || 0 } }))} style={{ width:55, ...IN }} /></div>
+                          </div>
+                        )}
+
+                        {/* Параметры: грид чипсов */}
+                        <div style={{
+                          display:'grid',
+                          gridTemplateColumns:'repeat(auto-fill, minmax(80px, 1fr))',
+                          gap:6,
+                        }}>
+                          <Chip label="Подходы" value={edit.sets + '×' + edit.reps} color="#22c55e" />
+                          <Chip label="RIR" value={String(e.rir)} color="#f59e0b" />
+                          <Chip label="Вес" value={edit.weight + ' кг'} color="#60a5fa" />
+                          {e.workSets[0]?.tempo && <Chip label="Темп" value={e.workSets[0].tempo} color="#a855f7" />}
+                          {e.workSets[0]?.restSeconds && <Chip label="Отдых" value={e.workSets[0].restSeconds + 'с'} color="rgba(255,255,255,0.55)" />}
+                          <Chip label="Группа" value={e.muscle} color="rgba(255,255,255,0.55)" />
+                        </div>
+
+                        {/* Комментарий */}
+                        <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)', lineHeight:1.4, padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)' }}>
+                          {comment}
+                        </div>
+
+                        {/* Разминка */}
+                        {(e.warmupSets && e.warmupSets.length > 0 ? e.warmupSets : (e.role === 'primary' && e.character === 'тяж' ? buildWarmup(edit.weight, true) : [])).length > 0 && (
+                          <details style={{ marginTop:4 }}>
+                            <summary style={{ fontSize:10, fontWeight:600, color:'rgba(96,165,250,0.7)', cursor:'pointer' }}>🔥 Разминка ({(e.warmupSets && e.warmupSets.length > 0 ? e.warmupSets : buildWarmup(edit.weight, true)).length} подхода)</summary>
+                            <div style={{ display:'flex', gap:8, marginTop:4, flexWrap:'wrap' }}>
+                              {(e.warmupSets && e.warmupSets.length > 0 ? e.warmupSets : buildWarmup(edit.weight, true)).map((w, wi) => (
+                                <span key={wi} style={{ fontSize:9, color:'rgba(255,255,255,0.6)', padding:'2px 6px', borderRadius:4, background:'rgba(96,165,250,0.08)' }}>
+                                  {w.reps}×{w.load} кг
+                                </span>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+
+                        {/* Rationale */}
+                        {e.rationale && (
+                          <details style={{ marginTop:4 }}>
+                            <summary style={{ fontSize:10, fontWeight:600, color:'rgba(96,165,250,0.6)', cursor:'pointer' }}>🧠 Почему это упражнение?</summary>
+                            <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', padding:'2px 6px', lineHeight:1.4, marginTop:2 }}>{e.rationale}</div>
+                          </details>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
         {/* Feeder sets for weak points */}
         {weakPoints.length > 0 && (() => {
           const feeders = suggestFeeders(weakPoints, []);

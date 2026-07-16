@@ -281,9 +281,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
               {allMealTypes.slice(0, 8).map(mt => (
                 <button key={mt} onClick={() => setMealType(mealType === mt ? '' : mt)} style={{
                   padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer',
-                  background: mealType === mt ? 'rgba(0,230,138,0.2)' : '#202023',
-                  border: mealType === mt ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-                  color: mealType === mt ? '#00e68a' : 'rgba(255,255,255,0.8)', fontWeight: mealType === mt ? 600 : 400,
+                  background: mealType === mt ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+                  border: mealType === mt ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+                  color: mealType === mt ? '#000' : 'rgba(255,255,255,0.7)', fontWeight: mealType === mt ? 800 : 500,
                 }}>{mt}</button>
               ))}
               <button onClick={() => setShowCustomMeal(!showCustomMeal)} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6' }}>+</button>

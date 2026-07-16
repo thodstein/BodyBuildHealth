@@ -105,7 +105,7 @@ const CycleSelect: React.FC<{
           ) : (
             <div>
               <button onClick={() => setCat('all')} style={{ fontSize: 10, color: ACCENT, background: 'transparent', border: 'none', cursor: 'pointer', marginBottom: 8 }}>← Назад к категориям</button>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflowY: 'auto', paddingRight: 4 }}>
                 {allCycles.filter(inCat).map((c: any) => {
                   const isRec = recommendedSet && recommendedSet.has(c.meta.id);
                   const isSel = value === c.meta.id;
@@ -311,16 +311,29 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
 
       {/* ─── ЦЕЛЕВОЙ ТОННАЖ ─── */}
       <ConfigSection title="⚖️ ЦЕЛЕВОЙ ТОННАЖ (кг/нед)" color="#00e68a">
+        <div style={{ marginBottom:6, padding:'4px 8px', borderRadius:6, background:'rgba(0,230,138,0.06)', fontSize:9, color:'rgba(255,255,255,0.55)', lineHeight:1.4 }}>
+          💡 Суммарный вес × повторы × подходы за неделю. Ориентир: <b>50-80 кг/нед</b> для малых групп (руки), <b>200-400 кг/нед</b> для крупных (грудь/спина/ноги). Заполнять необязательно — при 0 генератор подберёт сам.
+        </div>
         {groups.map(g => (
           <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
             <span style={{ fontSize: 9, fontWeight: 600, color: DIM, flex: 1 }}>{g.label}</span>
             <input 
               type="number" value={targetTonnage[g.id] || ''} 
               onChange={e => setTargetTonnage(g.id, parseInt(e.target.value) || 0)}
+              placeholder="0"
               style={{ width: 60, background: '#000', border: '1px solid rgba(255,255,255,0.1)', color: ACCENT, borderRadius: 4, fontSize: 10, textAlign: 'center', padding: '2px 0' }}
             />
           </div>
         ))}
+        {(() => {
+          const total = Object.values(targetTonnage).reduce((a: number, b: number) => a + (b || 0), 0);
+          return total > 0 ? (
+            <div style={{ marginTop:6, padding:'4px 8px', borderRadius:6, background:'rgba(0,230,138,0.08)', fontSize:10, fontWeight:700, color:ACCENT, display:'flex', justifyContent:'space-between' }}>
+              <span>📊 Суммарный тоннаж</span>
+              <span>{total.toLocaleString()} кг/нед</span>
+            </div>
+          ) : null;
+        })()}
       </ConfigSection>
 
       {/* ─── МЕТОДОЛОГИЯ ─── */}
