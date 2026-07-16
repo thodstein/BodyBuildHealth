@@ -373,6 +373,29 @@ export interface PlanResult {
   pillBurden?: { totalSubstances: number; estimatedPillsPerDay: number; morningPills: number; afternoonPills: number; eveningPills: number; feasibility: string; message: string };
 }
 
+export interface LabFindingSub {
+  id: string;
+  name: string;
+  dose: string;
+  reasoning: string;
+  tier: 'base' | 'first' | 'second' | 'third';
+  priority?: number;
+  brandName?: string;
+}
+
+export interface LabFinding {
+  id: string;
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  system: string;
+  systemLabel: string;
+  title: string;
+  status: 'active' | 'escalated' | 'blocked' | 'covered';
+  substances: LabFindingSub[];
+  escalation: string;
+  monitoring: string;
+  conflicts: string[];
+}
+
 export interface StackRecommendation {
   stack: any;
   score: number;
