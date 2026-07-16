@@ -88,7 +88,7 @@ export const NutritionOverview: React.FC<{
             const pct = m.target > 0 ? Math.min(200, Math.round((m.val / m.target) * 100)) : 0;
             const status = pct < 80 ? '⬇️' : pct > 110 ? '⬆️' : '✅';
             return (
-              <div key={m.label} style={{ background: 'var(--bg-secondary)', padding: 10, borderRadius: 8 }}>
+              <div key={m.label} style={{ background: '#18181b', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <span style={{ fontSize: 12, fontWeight: 600 }}>{m.label}</span>
                   <span style={{ fontSize: 10 }}>{status}</span>
