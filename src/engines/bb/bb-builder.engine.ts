@@ -12,7 +12,7 @@
  */
 
 import { SPLIT_PATTERNS, getPattern, sessionsOf, type SplitPattern, type ScheduleDay } from './bb-split-patterns';
-import { FORCE_HEAVY_GROUPS, getPair, resolveCharacter, type DayCharacter, type MuscleSlot } from './bb-day-types';
+import { FORCE_HEAVY_GROUPS, getPair, resolveCharacter, TAG_MUSCLES, type DayCharacter, type MuscleSlot } from './bb-day-types';
 import { getAllVolumeLandmarks, landmarksForRotation, normLevel, type TrainingLevel, type MuscleVolumeLandmarks } from '../volume-landmarks.engine';
 import { tempoFor, REST_BY_CHARACTER, type TempoSpec } from './bb-tempo-rest';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -116,35 +116,8 @@ export function getBBVolumeLandmarks(plan: BBPlan, level: string, pedMrvMult = 1
   return computeVolumeLandmarks(peak, level, { labMult: pedMrvMult, peakWeek: peakIdx + 1 });
 }
 
-// sessionTag -> мышцы (канонические EN-ключи)
-// PRO-расширение: дельта разделена на пучки (Push: передняя+средняя, Pull: задняя)
-// Для Upper/FullBody оставлен aggregate shoulders (одно упр на все пучки)
-// traps/forearms добавлены в Pull (трен. спины)
-// Новые теги: ChestBack, ShouldersArms, Chest, Back, Shoulders, Arms,
-// Torso, Limbs, UpperPower, LowerPower, UpperHyp, LowerHyp
-const TAG_MUSCLES: Record<string, string[]> = {
-  Push: ['chest', 'delt_front', 'delt_mid', 'triceps'],
-  Pull: ['back', 'biceps', 'delt_rear', 'traps'],
-  Legs: ['quads', 'hamstrings', 'glutes', 'calves'],
-  Upper: ['chest', 'back', 'shoulders', 'biceps', 'triceps'],
-  Lower: ['quads', 'hamstrings', 'glutes', 'calves', 'abs'],
-  FullBody: ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'arms'],
-  // PRO-расширенные сплиты:
-  Chest: ['chest', 'delt_front', 'triceps'],
-  Back: ['back', 'biceps', 'delt_rear', 'traps'],
-  Shoulders: ['delt_front', 'delt_mid', 'delt_rear', 'traps'],
-  Arms: ['biceps', 'triceps', 'forearms'],
-  ChestBack: ['chest', 'back', 'delt_front', 'delt_rear', 'traps', 'forearms'],
-  ShouldersArms: ['delt_front', 'delt_mid', 'delt_rear', 'biceps', 'triceps', 'traps', 'forearms'],
-  Torso: ['chest', 'back', 'shoulders', 'traps', 'abs'],
-  Limbs: ['quads', 'hamstrings', 'glutes', 'biceps', 'triceps', 'calves', 'forearms'],
-  UpperPower: ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'traps'],
-  LowerPower: ['quads', 'hamstrings', 'glutes', 'calves', 'abs', 'lower_back'],
-  UpperHyp: ['chest', 'back', 'delt_front', 'delt_mid', 'delt_rear', 'biceps', 'triceps'],
-  LowerHyp: ['quads', 'hamstrings', 'glutes', 'calves', 'abs'],
-  // Специализированные теги для 8-дневного PRO-сплита
-  LegsBiceps: ['quads', 'hamstrings', 'calves', 'biceps'],
-};
+// sessionTag -> мышцы (канонические EN-ключи) — импортированы из bb-day-types (FIX-8, единый источник)
+
 /** Для каких мышц в BB-контексте ВСЕГДА брать только изоляцию (нет compound аналогов). */
 const ALWAYS_ISOLATION: Set<string> = new Set(['calves', 'forearms', 'abs']);
 /** Маппинг PRO-мышц в group каталога для getExercisesByGroup(). */

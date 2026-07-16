@@ -575,9 +575,19 @@ export const TrainingConstructor: React.FC<Props> = ({
         injuries: (tprofile.injuries || []) as any,
       }, pedAdapt);
 
+      // FIX-9: Фазы через distributePhases (единый источник) вместо хардкода
+      const bbPhaseDist = distributePhases(mesoLength, mesoLength >= 6 ? 4 : 0, goal || 'mass');
+      const bbPhaseByWeek = new Map<number, BBPhase>();
+      for (const pd of bbPhaseDist) {
+        for (const w of pd.weeks) bbPhaseByWeek.set(w, pd.phase);
+      }
+      for (let w = 1; w <= mesoLength; w++) {
+        if (!bbPhaseByWeek.has(w)) bbPhaseByWeek.set(w, 'accumulation');
+      }
+
       // Convert BBPlan → ManualResult (с сохранением BB-специфичных полей)
       const bbWeeks: ManualWeek[] = plan.weeks.map(w => {
-        const phase = w.week <= Math.ceil(mesoLength * 0.6) ? 'accumulation' : w.week === mesoLength ? 'deload' : 'intensification';
+        const phase = bbPhaseByWeek.get(w.week) || 'accumulation';
         const phaseLabel = PHASE_LABELS_MAP[phase] || phase;
         const days: ManualDay[] = w.sessions.map((s, si) => ({
           day: si + 1,

@@ -274,11 +274,21 @@ export const BbAutoConstructor: React.FC = () => {
   const pedAdapt = useMemo(() => adaptForPEDs(peds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv]))), [peds, allLandmarks]);
 
   const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan, pedAdapt.combinedMrvMultiplier) : null, [builtPlan, pedAdapt]);
-  const quality = useMemo(() => metrics ? calcQualityScore(metrics, weakPoints, phases) : null, [metrics, weakPoints, phases]);
-  const unifiedQuality = useMemo(() => {
+  // FIX-6: Единый источник качества — validatePlanQuality (канонический движок)
+  const quality = useMemo(() => {
     if (!builtPlan) return null;
     const input = bbPlanToQualityInput(builtPlan, { level: bbLevel, weakPoints, hasDeload: autoDeload, onCourse: peds.length > 0 });
-    return validatePlanQuality(input);
+    const result = validatePlanQuality(input);
+    return {
+      score: result.score,
+      label: result.grade,
+      details: result.issues.map(i => i.message),
+      perMuscle: result.muscles.map(m => ({
+        muscle: m.muscle, sets: m.weeklySets, mev: m.mev, mav: m.mav, mrv: m.mrv,
+        pct: m.pctOfMav, status: m.status,
+      })),
+      recommendations: result.recommendations,
+    };
   }, [builtPlan, bbLevel, weakPoints, autoDeload, peds]);
 
   useEffect(() => {
@@ -371,6 +381,7 @@ export const BbAutoConstructor: React.FC = () => {
         topSetPctMultiplier: autoRegResult.topSetPctMultiplier,
         rirShift: autoRegResult.rirShift,
       } : undefined,
+      skipPhaseRedistribution: true,   // FIX-5: buildBBPlan уже распределил фазы
     });
 
     const modeLabel = planMode === 'bb_cycle' ? `BB-цикл: ${getCycleById(selectedCycleId)?.meta.title || selectedCycleId}` : 'Generic-сплит';

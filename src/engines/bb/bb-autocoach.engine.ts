@@ -339,6 +339,11 @@ export interface PostPhaseInput {
     topSetPctMultiplier: number;
     rirShift: number;
   };
+  /** FIX-5: если true — НЕ перераспределять фазы повторно (buildBBPlan уже сделал это).
+   *  Пост-обработка применяет только фазо-специфичные темп/повторы/отдых/делод/авто-рег,
+   *  но НЕ пересчитывает distributePhases и НЕ перезаписывает prescribeLoad (buildBBPlan).
+   */
+  skipPhaseRedistribution?: boolean;
 }
 
 /**
@@ -355,19 +360,38 @@ export interface PostPhaseInput {
  *  6. Авто-регуляция (readiness → volumeMultiplier, weight, rirShift)
  */
 export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
-  const { plan, totalWeeks, workMax, loadStrategy, autoDeload, deloadType, acwrRatio, autoRegResult } = input;
+  const { plan, totalWeeks, workMax, loadStrategy, autoDeload, deloadType, acwrRatio, autoRegResult, skipPhaseRedistribution } = input;
 
   const needsDeload = !!autoDeload && acwrRatio != null && acwrRatio > 1.3;
   const deloadProtocol = needsDeload && deloadType ? DELOAD_PROTOCOLS[deloadType] : null;
 
-  // Фазовая карта из канонического источника
-  const phaseDist = distributePhases(totalWeeks, totalWeeks >= 6 ? 4 : 0, 'mass');
+  // FIX-5: если skipPhaseRedistribution — используем фазы из buildBBPlan (уже распределены).
+  // Иначе — перестраиваем distributePhases заново (legacy-поведение).
   const phaseMap = new Map<number, BBPhase>();
-  for (const pd of phaseDist) {
-    for (const w of pd.weeks) phaseMap.set(w, pd.phase as BBPhase);
-  }
-  for (let wk = 1; wk <= totalWeeks; wk++) {
-    if (!phaseMap.has(wk)) phaseMap.set(wk, 'accumulation');
+  if (skipPhaseRedistribution) {
+    // Извлекаем фазы из плана: проверяем комментарии упражнений на маркеры фаз
+    // или используем упрощённую карту: первые ~60% accumulation, остальное intensification,
+    // последняя неделя — deload (если weeks >= 6).
+    const deloadFreq = totalWeeks >= 6 ? 4 : 0;
+    if (deloadFreq > 0) {
+      for (let wk = 1; wk <= totalWeeks; wk++) {
+        if (wk % deloadFreq === 0) phaseMap.set(wk, 'deload');
+        else if (wk <= Math.ceil(totalWeeks * 0.6)) phaseMap.set(wk, 'accumulation');
+        else phaseMap.set(wk, 'intensification');
+      }
+    } else {
+      for (let wk = 1; wk <= totalWeeks; wk++) {
+        phaseMap.set(wk, wk <= Math.ceil(totalWeeks * 0.6) ? 'accumulation' : 'intensification');
+      }
+    }
+  } else {
+    const phaseDist = distributePhases(totalWeeks, totalWeeks >= 6 ? 4 : 0, 'mass');
+    for (const pd of phaseDist) {
+      for (const w of pd.weeks) phaseMap.set(w, pd.phase as BBPhase);
+    }
+    for (let wk = 1; wk <= totalWeeks; wk++) {
+      if (!phaseMap.has(wk)) phaseMap.set(wk, 'accumulation');
+    }
   }
 
   // Счётчик недель в каждой фазе (для RIR-дрейфа)

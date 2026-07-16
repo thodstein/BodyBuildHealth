@@ -4,6 +4,7 @@
  */
 import { SPLIT_PATTERNS, type SplitPattern } from './bb-split-patterns';
 import { normLevel } from '../volume-landmarks.engine';
+import { TAG_MUSCLES } from './bb-day-types';
 
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
 export type BBLevel = 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
@@ -23,20 +24,7 @@ export interface BBRankedPattern {
   warnings: string[];
 }
 
-const TAG_MUSCLES: Record<string, string[]> = {
-  Push: ['chest','delt_front','delt_mid','triceps'], Pull: ['back','biceps','delt_rear','traps'],
-  Legs: ['quads','hamstrings','glutes','calves'], Upper: ['chest','back','shoulders','biceps','triceps'],
-  Lower: ['quads','hamstrings','glutes','calves','abs'], FullBody: ['chest','back','quads','hamstrings','shoulders','arms'],
-  Chest: ['chest','delt_front','triceps'], Back: ['back','biceps','delt_rear','traps'],
-  Shoulders: ['delt_front','delt_mid','delt_rear','traps'], Arms: ['biceps','triceps','forearms'],
-  ChestBack: ['chest','back','delt_front','delt_rear','traps','forearms'],
-  ShouldersArms: ['delt_front','delt_mid','delt_rear','biceps','triceps','traps','forearms'],
-  Torso: ['chest','back','shoulders','traps','abs'], Limbs: ['quads','hamstrings','glutes','biceps','triceps','calves','forearms'],
-  UpperPower: ['chest','back','shoulders','biceps','triceps','traps'],
-  LowerPower: ['quads','hamstrings','glutes','calves','abs','lower_back'],
-  UpperHyp: ['chest','back','delt_front','delt_mid','delt_rear','biceps','triceps'],
-  LowerHyp: ['quads','hamstrings','glutes','calves','abs'],
-};
+// FIX-8: TAG_MUSCLES — единый источник в bb-day-types.ts (было дублировано без LegsBiceps)
 
 function muscleFreq(p: SplitPattern): Record<string, number> {
   const tagCounts: Record<string, number> = {};

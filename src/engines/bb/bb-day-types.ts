@@ -30,6 +30,30 @@ export interface BBDay {
 /** Per-group блокировка: группа всегда только тяж (ноги), никогда чистый памп. */
 export const FORCE_HEAVY_GROUPS: ReadonlySet<string> = new Set(['quads', 'hamstrings', 'glutes', 'calves', 'forearms', 'traps']);
 
+/** FIX-8: Единый источник sessionTag→мышцы для bb-builder + bb-selector.
+ *  Ранее дублировался в двух файлах (bb-selector без LegsBiceps). */
+export const TAG_MUSCLES: Record<string, string[]> = {
+  Push: ['chest', 'delt_front', 'delt_mid', 'triceps'],
+  Pull: ['back', 'biceps', 'delt_rear', 'traps'],
+  Legs: ['quads', 'hamstrings', 'glutes', 'calves'],
+  Upper: ['chest', 'back', 'shoulders', 'biceps', 'triceps'],
+  Lower: ['quads', 'hamstrings', 'glutes', 'calves', 'abs'],
+  FullBody: ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'arms'],
+  Chest: ['chest', 'delt_front', 'triceps'],
+  Back: ['back', 'biceps', 'delt_rear', 'traps'],
+  Shoulders: ['delt_front', 'delt_mid', 'delt_rear', 'traps'],
+  Arms: ['biceps', 'triceps', 'forearms'],
+  ChestBack: ['chest', 'back', 'delt_front', 'delt_rear', 'traps', 'forearms'],
+  ShouldersArms: ['delt_front', 'delt_mid', 'delt_rear', 'biceps', 'triceps', 'traps', 'forearms'],
+  Torso: ['chest', 'back', 'shoulders', 'traps', 'abs'],
+  Limbs: ['quads', 'hamstrings', 'glutes', 'biceps', 'triceps', 'calves', 'forearms'],
+  UpperPower: ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'traps'],
+  LowerPower: ['quads', 'hamstrings', 'glutes', 'calves', 'abs', 'lower_back'],
+  UpperHyp: ['chest', 'back', 'delt_front', 'delt_mid', 'delt_rear', 'biceps', 'triceps'],
+  LowerHyp: ['quads', 'hamstrings', 'glutes', 'calves', 'abs'],
+  LegsBiceps: ['quads', 'hamstrings', 'calves', 'biceps'],
+};
+
 /** Пары ротации первичная/добивочная: (A тяж + B добивка) / (B тяж + A добивка). */
 export const ROTATION_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['quads', 'hamstrings'],
