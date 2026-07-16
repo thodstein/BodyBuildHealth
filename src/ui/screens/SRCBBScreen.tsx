@@ -65,7 +65,7 @@ const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 
 const cardBg = CARD;
 const ACCENT = 'var(--accent)';
 const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 12, minHeight: 40, cursor: 'pointer' };
-const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: `1px solid ${ACCENT}20` };
+const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: '1px solid var(--accent-dim)' };
 const PILL = (active: boolean) => ({ padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight: active ? 700 : 500, cursor:'pointer', border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)', background: active ? 'linear-gradient(135deg,var(--accent),#00c8a0)' : '#18181b', color: active ? '#000' : '#fff', flexShrink:0 } as React.CSSProperties);
 const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 40, width: '100%', outline: 'none', boxSizing: 'border-box' };
 const IN: React.CSSProperties = { ...SEL, padding: '10px' };
@@ -264,10 +264,16 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (idx >= 0) return p.filter((_, i) => i !== idx);
     return [...p, { lift, weakPoint }];
   });
+  // V7 расширение: тренд 1ПМ по выбранному упражнению
+  const [selectedTrendEx, setSelectedTrendEx] = useState<string | null>(null);
   const PL_WEAKPOINT_LABELS: Record<WeakPoint, string> = {
     off_chest: 'Сход с груди', mid: 'Середина', lockout: 'Дожим', start: 'Старт', bottom: 'Низ', sticking_mid: 'Застревание',
+    ohp_start: 'Старт с плеч', ohp_mid: 'Середина', ohp_lockout: 'Дожим',
+    row_start: 'Старт (съём)', row_mid: 'Середина', row_squeeze: 'Сведение лопаток',
+    pd_top: 'Верх (старт)', pd_mid: 'Середина', pd_squeeze: 'Сведение к груди',
+    inc_off: 'Сход с груди (верх)', inc_mid: 'Середина', inc_lockout: 'Дожим',
   };
-  const PL_WP_OPTIONS = (['bench', 'squat', 'deadlift'] as Lift[]).map(lift => ({
+  const PL_WP_OPTIONS = (Object.keys(WEAK_POINTS_BY_LIFT) as Lift[]).map(lift => ({
     lift, weakPoints: WEAK_POINTS_BY_LIFT[lift].map(wp => ({ id: wp, label: PL_WEAKPOINT_LABELS[wp] || wp })),
   }));
   // 🔗 planner-bridge: приём корректировок от калькуляторов (ПМ/слабые точки/PRI/сплит)
@@ -574,6 +580,29 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     return [...best.entries()].filter(([, v]) => v.e1 > 0).sort((a, b) => b[1].e1 - a[1].e1).map(([name, v]) => ({ name, ...v }));
   }, [strengthLogs]);
 
+  // V7 расширение: тренд 1ПМ по выбранному упражнению во времени
+  const exTrendSeries = useMemo(() => {
+    if (!selectedTrendEx || !strengthLogs.length) return [] as { date: string; e1: number; w: number; r: number }[];
+    const byDate = new Map<string, { e1: number; w: number; r: number }>();
+    for (const log of strengthLogs) {
+      const date = log.date?.slice(0, 10) || '';
+      if (!date) continue;
+      let be1 = 0, bw = 0, br = 0;
+      for (const ex of (log.exercises || [])) {
+        if ((ex.exerciseName || '') !== selectedTrendEx) continue;
+        for (const st of (ex.sets || [])) {
+          const w = +st.weight || 0, r = +st.reps || 0;
+          if (w > 0) { const e1 = r <= 1 ? w : Math.round(w * (1 + r / 30) * 10) / 10; if (e1 > be1) { be1 = e1; bw = w; br = r; } }
+        }
+      }
+      if (be1 > 0) {
+        const cur = byDate.get(date);
+        if (!cur || be1 > cur.e1) byDate.set(date, { e1: be1, w: bw, r: br });
+      }
+    }
+    return [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([d, v]) => ({ date: d, ...v }));
+  }, [strengthLogs, selectedTrendEx]);
+
   return (
     <div key={mainTab} style={{ padding: 12, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
       {/* Заголовок текущего режима планирования (выбор режима — в навигации блока) */}
@@ -670,6 +699,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             const WP_LABELS: Record<string, string> = {
               off_chest: 'Сход со груди', mid: 'Середина', lockout: 'Дожим',
               bottom: 'Низ (яма)', start: 'Старт (с пола)',
+              ohp_start: 'Старт с плеч', ohp_mid: 'Середина', ohp_lockout: 'Дожим вверх',
+              row_start: 'Старт (съём)', row_mid: 'Середина', row_squeeze: 'Сведение лопаток',
+              pd_top: 'Верх (старт)', pd_mid: 'Середина', pd_squeeze: 'Сведение к груди',
+              inc_off: 'Сход с груди (верх)', inc_mid: 'Середина', inc_lockout: 'Дожим',
             };
             const PL_WEAKPOINT_OPTIONS = Object.entries(WEAK_POINTS_BY_LIFT).map(([lift, wps]) => ({
               lift,
@@ -677,7 +710,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             }));
             return PL_WEAKPOINT_OPTIONS.map((opt) => (
             <div key={opt.lift} style={{ marginTop: 4 }}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>{opt.lift === 'bench' ? 'Жим лёжа' : opt.lift === 'squat' ? 'Присед' : 'Становая'}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>{opt.lift === 'bench' ? 'Жим лёжа' : opt.lift === 'squat' ? 'Присед' : opt.lift === 'deadlift' ? 'Становая' : opt.lift === 'ohp' ? 'Жим стоя' : opt.lift === 'row' ? 'Тяга в наклоне' : opt.lift === 'pulldown' ? 'Тяга верхн. блока' : opt.lift === 'incline_press' ? 'Жим на наклонной' : opt.lift}</div>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {opt.weakPoints.map((wp) => {
                   const on = plWeakPoints.some(x => x.lift === opt.lift && x.weakPoint === wp.id);
@@ -719,7 +752,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   <div style={{ fontWeight:700, marginBottom:4 }}>🎯 Слабые точки СРЦ (добавлены ассистенты в план):</div>
                   {plWeakPoints.map((wp, i) => {
                     const diag = diagnoseWeakPoint(wp.lift, wp.weakPoint);
-                    const liftLabel = wp.lift === 'bench' ? 'Жим лёжа' : wp.lift === 'squat' ? 'Присед' : 'Становая тяга';
+                    const liftLabelMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга верхнего блока', incline_press: 'Жим на наклонной' };
+                    const liftLabel = liftLabelMap[wp.lift] || wp.lift;
                     const assist = diag.assistance[0] || '—';
                     return <div key={i} style={{ marginBottom:2 }}>• <b>{PL_WEAKPOINT_LABELS[wp.weakPoint]}</b> ({liftLabel}): + {assist} — {diag.rationale}</div>;
                   })}
@@ -862,6 +896,49 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                           ))}
                         </div>
                         {exerciseE1rm.length > 15 && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>показано 15 из {exerciseE1rm.length}</div>}
+                      </div>
+                    )}
+                    {exerciseE1rm.length > 0 && (
+                      <div style={{ marginTop: 10, borderTop: '1px solid var(--accent-dim)', paddingTop: 8 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4 }}>Тренд 1ПМ по упражнению (график во времени):</div>
+                        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
+                          {exerciseE1rm.slice(0, 10).map((e) => (
+                            <button key={e.name} onClick={() => setSelectedTrendEx(s => s === e.name ? null : e.name)}
+                              style={{ padding: '2px 7px', borderRadius: 10, fontSize: 9, fontWeight: 600, cursor: 'pointer',
+                                border: selectedTrendEx === e.name ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                                background: selectedTrendEx === e.name ? 'var(--accent-dim)' : 'rgba(255,255,255,0.03)',
+                                color: selectedTrendEx === e.name ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}>
+                              {e.name} ({e.e1}кг)
+                            </button>
+                          ))}
+                        </div>
+                        {selectedTrendEx && exTrendSeries.length >= 2 && (() => {
+                          const W = 300, H = 100, PADX = 28, PADY = 16;
+                          const vals = exTrendSeries.map(p => p.e1);
+                          const minV = Math.min(...vals) - 5;
+                          const maxV = Math.max(...vals) + 5;
+                          const n = exTrendSeries.length;
+                          const px = (i: number) => PADX + (i / Math.max(n - 1, 1)) * (W - PADX - 8);
+                          const py = (v: number) => H - PADY - ((v - minV) / ((maxV - minV) || 1)) * (H - PADY - 12);
+                          return (
+                            <div>
+                              <div style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 700, marginBottom: 2 }}>{selectedTrendEx}</div>
+                              <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+                                {[0, 1, 2].map(g => <line key={g} x1={PADX} x2={W - 8} y1={12 + g * ((H - PADY - 12) / 2)} y2={12 + g * ((H - PADY - 12) / 2)} stroke="rgba(255,255,255,0.05)" strokeWidth={0.5} />)}
+                                <polyline points={exTrendSeries.map((p, i) => `${px(i)},${py(p.e1)}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={1.8} />
+                                {exTrendSeries.map((p, i) => <circle key={i} cx={px(i)} cy={py(p.e1)} r={2.5} fill="var(--accent)" />)}
+                              </svg>
+                              <div style={{ display: 'flex', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: 9, color: 'var(--accent)' }}>посл: {exTrendSeries[exTrendSeries.length - 1].e1}кг</span>
+                                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>макс: {maxV.toFixed(0)}кг</span>
+                                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>тренировок: {n}</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                        {selectedTrendEx && exTrendSeries.length < 2 && (
+                          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>нужно ≥2 тренировок для графика (найдено {exTrendSeries.length})</div>
+                        )}
                       </div>
                     )}
                   </MetricCard>

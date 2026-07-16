@@ -6,8 +6,12 @@
  */
 import { LMS_EXERCISES } from '../../data/lms-cycles/lms-exercises';
 
-export type Lift = 'bench' | 'squat' | 'deadlift';
-export type WeakPoint = 'off_chest' | 'mid' | 'lockout' | 'start' | 'bottom' | 'sticking_mid';
+export type Lift = 'bench' | 'squat' | 'deadlift' | 'ohp' | 'row' | 'pulldown' | 'incline_press';
+export type WeakPoint = 'off_chest' | 'mid' | 'lockout' | 'start' | 'bottom' | 'sticking_mid'
+  | 'ohp_start' | 'ohp_mid' | 'ohp_lockout'
+  | 'row_start' | 'row_mid' | 'row_squeeze'
+  | 'pd_top' | 'pd_mid' | 'pd_squeeze'
+  | 'inc_off' | 'inc_mid' | 'inc_lockout';
 
 export interface WeakPointDiagnosis {
   lift: Lift;
@@ -36,6 +40,26 @@ const DIAGNOSIS: Record<Lift, Partial<Record<WeakPoint, Omit<WeakPointDiagnosis,
     mid: { weakPoint: 'mid', label: 'Середина (колени)', description: 'Зависание на коленях — слабая спина/переход.', assistanceFromCatalog: ['Становая тяга с остановками', 'Тяга на прямых ногах'], intensityPct: 0.7, rationale: 'Тяга с остановками тренирует удержание позиции; RDL — бицепс бедра/разгибатели.' },
     lockout: { weakPoint: 'lockout', label: 'Дожим (локдаун)', description: 'Не дожимает — слабые ягодицы/верх спины.', assistanceFromCatalog: ['Становая тяга с плинтов'], intensityPct: 0.75, rationale: 'Тяга с плинтов (выше колен) — изолированный дожим.' },
   },
+  ohp: {
+    ohp_start: { weakPoint: 'ohp_start', label: 'Старт с плеч', description: 'Не хватает стартовой силы — слабые передние дельты в нижней точке.', assistanceFromCatalog: ['Армейский жим', 'Жим гантелей', 'Махи гантелями в стороны'], intensityPct: 0.65, rationale: 'Армейский жим + жим гантелей для силы дельт в старте.' },
+    ohp_mid: { weakPoint: 'ohp_mid', label: 'Середина (переход)', description: 'Зависание по ходу — переход дельты→трицепс.', assistanceFromCatalog: ['Армейский жим', 'Жим гантелей', 'Махи гантелями в стороны'], intensityPct: 0.7, rationale: 'Скоростной жим + средний хват для мощности в средней фазе.' },
+    ohp_lockout: { weakPoint: 'ohp_lockout', label: 'Дожим вверх', description: 'Не дожимает вверху — слабый трицепс/трапеции.', assistanceFromCatalog: ['Французский жим', 'Махи гантелями в стороны', 'Армейский жим'], intensityPct: 0.75, rationale: 'Французский жим изолирует трицепс в локдауне.' },
+  },
+  row: {
+    row_start: { weakPoint: 'row_start', label: 'Старт (съём)', description: 'Не начать тягу — слабые широчайшие в старте.', assistanceFromCatalog: ['Тяга штанги в наклоне', 'Тяга гантели в наклоне', 'Гиперэкстензия'], intensityPct: 0.7, rationale: 'Тяга штанги/гантели в наклоне — базовый горизонтальный пул.' },
+    row_mid: { weakPoint: 'row_mid', label: 'Середина (на пояс)', description: 'Зависание на уровне пояса — слабая концентрика.', assistanceFromCatalog: ['Тяга штанги в наклоне', 'Тяга верхнего блока', 'Тяга гантели в наклоне'], intensityPct: 0.7, rationale: 'Тяга верхнего блока + штанги в наклоне для усиления концентрической фазы.' },
+    row_squeeze: { weakPoint: 'row_squeeze', label: 'Сведение лопаток', description: 'Не свести лопатки в пике — слабые ромбовидные/средняя трапеция.', assistanceFromCatalog: ['Гиперэкстензия', 'Тяга штанги в наклоне', 'Тяга верхнего блока'], intensityPct: 0.65, rationale: 'Гиперэкстензия + тяга к поясу для завершающего сведения.' },
+  },
+  pulldown: {
+    pd_top: { weakPoint: 'pd_top', label: 'Верх (старт сверху)', description: 'Лопатки не опущены при старте — слабые широчайшие в верхней точке.', assistanceFromCatalog: ['Тяга верхнего блока', 'Подтягивания', 'Тяга гантели в наклоне'], intensityPct: 0.65, rationale: 'Подтягивания + тяга верхнего блока для силы в старте сверху.' },
+    pd_mid: { weakPoint: 'pd_mid', label: 'Середина (на грудь)', description: 'Зависание по ходу — слабый переход.', assistanceFromCatalog: ['Тяга верхнего блока', 'Тяга гантели в наклоне'], intensityPct: 0.7, rationale: 'Тяга блока к груди + гантели для мощности в средней фазе.' },
+    pd_squeeze: { weakPoint: 'pd_squeeze', label: 'Сведение к груди', description: 'Не дотянуть до груди — слабые широчайшие/большая круглая.', assistanceFromCatalog: ['Подтягивания', 'Тяга верхнего блока'], intensityPct: 0.75, rationale: 'Подтягивания — изолированная работа широчайших в нижней точке.' },
+  },
+  incline_press: {
+    inc_off: { weakPoint: 'inc_off', label: 'Сход с груди (верх)', description: 'Не хватает стартовой силы верха груди — слабые ключичные пучки.', assistanceFromCatalog: ['Жим гантелей на наклонной', 'Жим гантелей', 'Армейский жим'], intensityPct: 0.65, rationale: 'Жим гантелей на наклонной акцентирует верх груди в старте.' },
+    inc_mid: { weakPoint: 'inc_mid', label: 'Середина', description: 'Зависание в середине — переход верх груди→трицепс.', assistanceFromCatalog: ['Жим гантелей на наклонной', 'Жим гантелей', 'Армейский жим'], intensityPct: 0.7, rationale: 'Жим гантелей + средний хват для мощности в средней фазе.' },
+    inc_lockout: { weakPoint: 'inc_lockout', label: 'Дожим', description: 'Не дожимает вверху — слабый трицепс.', assistanceFromCatalog: ['Французский жим', 'Жим гантелей на наклонной', 'Жим гантелей'], intensityPct: 0.75, rationale: 'Французский жим изолирует трицепс в локдауне.' },
+  },
 };
 
 const namesAvailable = new Set(LMS_EXERCISES.map(e => e.name));
@@ -58,4 +82,8 @@ export const WEAK_POINTS_BY_LIFT: Record<Lift, WeakPoint[]> = {
   bench: ['off_chest', 'mid', 'lockout', 'start'],
   squat: ['bottom', 'mid', 'lockout'],
   deadlift: ['start', 'mid', 'lockout'],
+  ohp: ['ohp_start', 'ohp_mid', 'ohp_lockout'],
+  row: ['row_start', 'row_mid', 'row_squeeze'],
+  pulldown: ['pd_top', 'pd_mid', 'pd_squeeze'],
+  incline_press: ['inc_off', 'inc_mid', 'inc_lockout'],
 };

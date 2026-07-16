@@ -109,7 +109,8 @@ function exEnGroup(g: string | undefined): string | undefined {
 
 /** Группа (английский ключ) основного лифта — для MRV soft-cap внедряемого аксессуара. */
 function liftToEnGroup(lift: Lift): string {
-  return lift === 'bench' ? 'chest' : lift === 'squat' ? 'legs' : 'back';
+  const m: Record<string, string> = { bench: 'chest', squat: 'legs', deadlift: 'back', ohp: 'shoulders', row: 'back', pulldown: 'back', incline_press: 'chest' };
+  return m[lift] || 'back';
 }
 
 /** Извлечь уникальные имена упражнений из шаблона (все недели, если заданы явно). */
@@ -187,8 +188,9 @@ function injectPLWeakPoints(
     const diag = diagnoseWeakPoint(wp.lift, wp.weakPoint);
     if (!diag.assistance.length) continue;
     const target = diag.assistance[0];
-    // найти день, содержащий основной лифт (Присед/Жим лежа/Становая тяга)
-    const mainName = wp.lift === 'bench' ? 'Жим лёжа' : wp.lift === 'squat' ? 'Присед' : 'Становая тяга';
+    // найти день, содержащий основной лифт (Присед/Жим лежа/Становая тяга/Жим стоя/Тяга/Жим гантелей)
+    const mainNameMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга', pulldown: 'Тяга', incline_press: 'Жим гантелей' };
+    const mainName = mainNameMap[wp.lift] || 'Жим';
     let hostDay = days.find(d => d.exercises.some(e => norm(e.name).includes(norm(mainName)) || norm(mainName).includes(norm(e.name))));
     if (!hostDay) hostDay = days[0];
     // Предпочитаем ассистент, который реально есть в каталоге упражнений (корректный fatigueCost + лейбл в выполнении)
@@ -209,9 +211,10 @@ function injectPLWeakPoints(
         if (cur + sets > Math.round(ref.mrv * pedMrvMult)) continue;
       }
     }
+    const groupMap: Record<string, string> = { bench: 'ПР', squat: 'ЖМ', deadlift: 'ТГ', ohp: 'ПР', row: 'ТГ', pulldown: 'ТГ', incline_press: 'ПР' };
     hostDay.exercises.push({
       name: targetName,
-      group: wp.lift === 'bench' ? 'ПР' : wp.lift === 'squat' ? 'ЖМ' : 'ТГ',
+      group: groupMap[wp.lift] || 'ТГ',
       coef: 0.7,
       mnosz: 1,
       load: 'Средняя',
