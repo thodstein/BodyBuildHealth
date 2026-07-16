@@ -486,13 +486,12 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
           if (remainingWeekly < 3) break;
           if (groupIsoFatigue < (ex.fatigueCost || 3)) break;
 
-         // Подстановка для градированной травмы
-          let exSub = ex;
-          let exWeightMult = 1.0;
-          let exVolMult = 1.0;
-          weekSelectedIds.push((exSub as any).id);
+          // Подстановка для градированной травмы
+           let exSub = ex;
+           let exWeightMult = 1.0;
+           let exVolMult = 1.0;
 
-         if (isGraded) {
+          if (isGraded) {
            const subs = findSubstitutions(ex.name, g, new Set([g]));
            if (subs.length > 0) {
              exSub = subs[0].exercise;
@@ -502,11 +501,15 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
                groupCorrections.push(`  → изоляция: ${ex.name} → ${subs[0].exercise.name}`);
              }
            }
-           exWeightMult *= postInjuryWtPct;
-           exVolMult *= postInjuryVolPct;
-         }
+            exWeightMult *= postInjuryWtPct;
+            exVolMult *= postInjuryVolPct;
+          }
 
-          const pr = calcExercisePrescription(exSub, goal, level, isWeak(g), false, volMult * 0.85, 1, mesoLength);
+           // fix H: отслеживаем ПОДСТАВЛЕННОЕ упражнение (после замены по травме),
+           // иначе дубль замены проскакивает cross-day дедуп через weekSelectedIds
+           weekSelectedIds.push((exSub as any).id);
+
+           const pr = calcExercisePrescription(exSub, goal, level, isWeak(g), false, volMult * 0.85, 1, mesoLength);
           const wm = resolveWorkMax(exSub, g, workMaxFull, manualWorkMax);
           const pct = pctForRir[Math.max(0, Math.min(5, pr.rir))] ?? 0.9;
            const weight = Math.round(wm * pct * exWeightMult);

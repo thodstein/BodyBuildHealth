@@ -177,9 +177,9 @@ function dedupeMuscles(tag: string | undefined, excluded: Set<string>): MuscleGr
 
 // Коэффициенты workMax для PRO-мышц (% от родительской группы)
 const PRO_WORKMAX_RATIO: Record<string, (wm: Record<string, number>) => number> = {
-  delt_front: wm => (wm['shoulders'] || 80) * 0.50,
-  delt_mid:   wm => (wm['shoulders'] || 80) * 0.45,
-  delt_rear:  wm => (wm['shoulders'] || 80) * 0.35,
+  delt_front: wm => (wm['shoulders'] || DEFAULT_WORKMAX['shoulders']) * 0.50,
+  delt_mid:   wm => (wm['shoulders'] || DEFAULT_WORKMAX['shoulders']) * 0.45,
+  delt_rear:  wm => (wm['shoulders'] || DEFAULT_WORKMAX['shoulders']) * 0.35,
   traps:      wm => (wm['back'] || 100) * 0.55,
   forearms:   wm => (wm['arms'] || wm['biceps'] || 60) * 0.45,
   abs:        wm => wm['core'] || 40,
@@ -309,6 +309,16 @@ export function buildWarmup(workWeight: number, isCompound: boolean): { load: nu
   return warmups;
 }
 
+// fix E: реалистичные значения workMax по умолчанию (кг) — используются,
+// только если пользователь не ввёл свои рабочие максимумы. Убирает магический «80»
+// и даёт осмысленные веса в сгенерированном плане даже без ввода.
+const DEFAULT_WORKMAX: Record<string, number> = {
+  chest: 100, back: 120, shoulders: 70, arms: 50,
+  quads: 140, hamstrings: 100, glutes: 150, calves: 90, abs: 80, traps: 90,
+  delt_front: 70, delt_mid: 70, delt_rear: 70, forearms: 45,
+};
+const defaultWorkMax = (key: string): number => DEFAULT_WORKMAX[collapseKey(key)] ?? DEFAULT_WORKMAX[key] ?? 80;
+
 function buildSession(
   sched: ScheduleDay, dayInRotation: number, week: number,
   muscleVolumeRotation: Record<string, number>,
@@ -403,7 +413,7 @@ function buildSession(
     if (mrvRot > 0) sets = Math.max(1, Math.min(sets, mrvRot));
     const [rmin, rmax] = charReps(resolved);
     const rir = bbRir(resolved, phase, phaseWeek);
-    const wm = workMax[repKey] || PRO_WORKMAX_RATIO[repKey]?.(workMax) || 80;
+    const wm = workMax[repKey] || PRO_WORKMAX_RATIO[repKey]?.(workMax) || defaultWorkMax(repKey);
     const pct = PCT_FOR_RIR[rir] ?? 0.9;
     const reps = Math.round((rmin + rmax) / 2);
     let weight = Math.round(wm * pct * 10) / 10;
@@ -772,7 +782,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           .flatMap(s => s.exercises)
           .find(pe => pe.name === curEx.name && pe.muscle === curEx.muscle);
         if (!prevEx) continue;
-        const maxW = workMax[curEx.muscle] || 80;
+        const maxW = workMax[curEx.muscle] || defaultWorkMax(curEx.muscle);
         const prevWs = prevEx.workSets[0];
         if (!prevWs) continue;
         const prescr = prescribeLoad(
