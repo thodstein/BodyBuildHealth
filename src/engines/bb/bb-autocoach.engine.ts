@@ -5,6 +5,7 @@
  * Вынесено из BbAutoConstructor.tsx для чистоты UI.
  */
 import type { BBWeek, BBSession, BBExercise, BBSet, BBPlan } from './bb-builder.engine';
+import { defaultWorkMax } from './bb-builder.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { PHASE_CONFIGS, distributePhases } from '../../ui/screens/TrainingScreen_parts/TrainingConstructor/phase-periodization';
 import { PCT_FOR_RIR } from '../rir-table';
@@ -307,10 +308,10 @@ export function computeOverloadTargets(week: BBWeek, strategy: LoadStrategy, wor
   const targets: OverloadTarget[] = [];
   for (const s of week.sessions) {
     for (const e of s.exercises) {
-      const currentWeight = e.workSets[0]?.weight || 80;
+      const currentWeight = e.workSets[0]?.weight || defaultWorkMax(e.muscle);
       const currentReps = e.workSets[0]?.reps || 10;
       const currentRIR = e.rir;
-      const maxW = workMax[e.muscle] || 80;
+      const maxW = workMax[e.muscle] || defaultWorkMax(e.muscle);
       const prescr = prescribeLoad(strategy, currentWeight, currentReps, currentRIR, maxW, week.week, totalWeeks, phase);
       targets.push({
         exerciseName: e.name,
@@ -414,7 +415,7 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
     const charLabel = e.character === 'тяж' ? 'тяж' : e.character === 'памп' ? 'памп' : 'лёг';
     parts.push(`${phaseName}, RIR ${e.rir} (${charLabel})`);
     const reps = e.workSets[0]?.reps || 10;
-    const weight = e.workSets[0]?.weight || 80;
+    const weight = e.workSets[0]?.weight || defaultWorkMax(e.muscle);
     parts.push(`${e.sets}×${reps} @ ${weight} кг`);
     const tempo = e.workSets[0]?.tempo || '';
     const rest = e.workSets[0]?.restSeconds || 90;
@@ -477,7 +478,7 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
           }
 
           for (const ws of e.workSets) {
-            const maxW = workMax[e.muscle] || 80;
+            const maxW = workMax[e.muscle] || defaultWorkMax(e.muscle);
             // Используем вес из движка (уже учитывает PRO_WORKMAX_RATIO), не пересчитываем заново.
             // Это сохраняет дифференциацию: жим штанги ≠ жим гантелей ≠ наклонный.
             const engineWeight = ws.weight > 0 ? ws.weight : Math.round(maxW * (PCT_FOR_RIR[Math.min(5, e.rir)] ?? 0.9) * 10) / 10;

@@ -312,12 +312,12 @@ export function buildWarmup(workWeight: number, isCompound: boolean): { load: nu
 // fix E: реалистичные значения workMax по умолчанию (кг) — используются,
 // только если пользователь не ввёл свои рабочие максимумы. Убирает магический «80»
 // и даёт осмысленные веса в сгенерированном плане даже без ввода.
-const DEFAULT_WORKMAX: Record<string, number> = {
+export const DEFAULT_WORKMAX: Record<string, number> = {
   chest: 100, back: 120, shoulders: 70, arms: 50,
   quads: 140, hamstrings: 100, glutes: 150, calves: 90, abs: 80, traps: 90,
   delt_front: 70, delt_mid: 70, delt_rear: 70, forearms: 45,
 };
-const defaultWorkMax = (key: string): number => DEFAULT_WORKMAX[collapseKey(key)] ?? DEFAULT_WORKMAX[key] ?? 80;
+export const defaultWorkMax = (key: string): number => DEFAULT_WORKMAX[collapseKey(key)] ?? DEFAULT_WORKMAX[key] ?? 80;
 
 function buildSession(
   sched: ScheduleDay, dayInRotation: number, week: number,

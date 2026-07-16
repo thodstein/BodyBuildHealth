@@ -48,6 +48,10 @@
   - dedupeMuscles/trueMuscleOf/collapseKey + TAG_PRIMARY_MUSCLES — устранён PRO-key дубль/инфляция (внешний баг из Part 8)
 - **Fix E (impl):** bb-builder.engine.ts — добавлен DEFAULT_WORKMAX (реалистичные кг по группам) + defaultWorkMax(key); убраны магические || 80 (строки ~180-182 PRO_WORKMAX_RATIO, ~416 вес сета, ~785 прогрессия). Теперь веса осмыслены даже без ввода workMax.
 - **Fix H (impl):** manual-plan-builder.ts — weekSelectedIds.push(exSub.id) перенесён ПОСЛЕ блока замены по травме в изоляционной ветке (было до замены → дубль подставленного упражнения проскакивал cross-day дедуп). Ветка compounds (push на 416) уже корректна.
+- **Bug D cross-UI ЗАКРЫТ:** все 4 UI-точки MRV теперь из единого источника `getVolumeLandmarks`/`computeVolumeLandmarks`: PlanDisplay.tsx (строки 118/344), BbAutoConstructor.tsx (`builtPlan.volumeLandmarks` из `getBBVolumeLandmarks`), PlanPreviewStep5.tsx (per-muscle `mrvFor(g)` — ИСПРАВЛЕНО, было плоское `MRV_MAP`), index.tsx `analysisQuality` (per-group `getPerMuscleMrvFromLevel`). Плоский `MRV_MAP`/хардкод удалён из PlanPreviewStep5; caller передаёт `onCourse/courseIntensity/labMult`.
+- **Commits:** c84a7850 (AGENTS.md + bb-builder.engine.ts + manual-plan-builder.ts — A/B/C/D/E/H логика) и 44ce5dab7 (PlanPreviewStep5.tsx + index.tsx MRV-fix). Дизайнер закончил — визуал (G) готов.
+- **Fix E (finalized):** bb-builder.engine.ts — `DEFAULT_WORKMAX` + `defaultWorkMax(key)` экспортированы; bb-autocoach.engine.ts импортирует `defaultWorkMax` и заменяет все 4 магических `|| 80` (строки 310/313/417/480) на `defaultWorkMax(e.muscle)` → осмысленные веса в autocoach/preview без ввода workMax. Circular-import (bb-builder↔bb-autocoach уже существовал) runtime-safe (используется только внутри функций).
+- **Верификация (tsx):** buildBBPlan(bro_5, advanced, mass, 12w) → 0 дублей внутри сессии; плечи = единый `shoulders` 7-10 сетов (weakPoint→10, default 7), НЕ 4×72 — внешний баг Part 8 (PRO-key дубль/инфляция) ПОДТВЕРЖДЁН ЗАКРЫТЫМ. tsc --noEmit: 0 ошибок (весь проект). vite build: ✓ built in 21.40s (только pre-existing circular-chunk/chunk-size warnings).
 
 #### In Progress
 - (none)
@@ -62,37 +66,35 @@
 - F (injury date) — оставлен: buildPlanDays генерирует ОДНУ микроцикл-неделю за вызов, injury today уместен внутри недели; кросс-недельная несогласованность — на уровне caller (index.tsx), вне текущей задачи
 
 ### Next Steps
-- **D (cross-UI MRV):** PlanDisplay/BbAutoConstructor должны брать MRV из getVolumeLandmarks/computeVolumeLandmarks (единый источник) — ЭТО ДИСПЛЕЙ, домен отдельного агента (PlanPreviewStep5.tsx LEVEL_MRV_FLAT/MRV_MAP — убрать в пользу getVolumeLandmarks при редизайне)
-- **E в bb-autocoach.ts:** || 80 на строках 310/313/417/480 — preview/autocoach, домен дизайн-агента; можно заменить на defaultWorkMax при редизайне
-- **F (injury по плану):** опционально — передавать planStartWeek в buildPlanDays для per-week injury-оценки (caller-изменение)
-- Визуальные правки (G): шрифты ≥10px, единая тема, MRV-бейдж, radius 12–16 — отдельный агент
+- **D (cross-UI MRV):** DONE — PlanDisplay/BbAutoConstructor/PlanPreviewStep5/index.tsx все берут MRV из `getVolumeLandmarks`/`computeVolumeLandmarks` (канонический источник).
+- **E в bb-autocoach.ts:** DONE — все 4 `|| 80` → `defaultWorkMax(e.muscle)` (bb-autocoach.engine.ts:310/313/417/480), `DEFAULT_WORKMAX`/`defaultWorkMax` экспортированы из bb-builder.engine.ts.
+- **F (injury по плану):** ОТЛОЖЕНО — передавать planStartWeek в buildPlanDays для per-week injury-оценки (caller-изменение, вне задачи).
+- **G (визуал):** DONE — дизайнер закончил (шрифты ≥10px, единая тема, MRV-бейдж, radius 12–16).
 
 ### Critical Context
 - Приоритеты отчёта A–H:
   - A (buildBBPlan+distributePhases+phaseRIR+rirDrift) — DONE
   - B (убрать линейный rirForWeek) — DONE (bbRir)
   - C (isoCount 2 для delt/arms/calves/abs) — DONE (ACCESSORY_2X_GROUPS)
-  - D (единый MRV getVolumeLandmarks) — в BB-движке DONE; cross-UI консистентность — DISPLAY (отд. агент)
-  - E (magic 80) — DONE (DEFAULT_WORKMAX)
+  - D (единый MRV getVolumeLandmarks) — DONE (и BB-движок, и ВСЕ UI-точки: PlanDisplay/BbAutoConstructor/PlanPreviewStep5/index.tsx)
+  - E (magic 80) — DONE (DEFAULT_WORKMAX в bb-builder); residual `|| 80` в bb-autocoach.ts (display-домен, опционально)
   - F (injury today vs plan-relative) — ОТЛОЖЕНО (caller-level)
-  - G (визуал) — DELEGATED
+  - G (визуал) — DONE (designer finished)
   - H (dedup weekSelectedIds после substitution) — DONE
 - defaultWorkMax(key) использует collapseKey(key) (hoisted fn) → parent-group fallback
-- tsc --noEmit: 0 ошибок в моих файлах (bb-builder.engine.ts, manual-plan-builder.ts)
-- Известные блокеры сборки (НЕ мои правки, чужие/параллельные агенты):
-  - PlanDisplay.tsx:905,906 (TS1109) — файл ДИСПЛЕЯ, делегирован отдельному агенту
-  - BbAutoConstructor.tsx:975 — незакрытый/лишний </div> (ошибка параллельного агента, ББ-авто). Мои правки PL-авто к этому отношения не имеют.
+- tsc --noEmit: **0 ошибок (весь проект)** — включая ранее репортируемые блокеры BbAutoConstructor.tsx:975 (</div>) и PlanDisplay.tsx:905-906, которые были решены дизайнером/параллельным агентом.
+- SRCBBScreen.tsx оставлен НЕ закоммиченным: содержит смешанные правки (мой PL-авто weakpoint/phase-RIR + V7-блок прогресса 1ПМ параллельного агента) → правило «не коммитить файлы других агентов».
 - Директива пользователя: «дизайном … отдельный агент … создаст общий фаил для всех конструкторов (вывод программы итоговой в уи). начинай. начинай выполнение»
 
 ### Relevant Files
 - src/engines/bb/bb-builder.engine.ts: BB-генератор; DONE A-D; Fix E (DEFAULT_WORKMAX/defaultWorkMax, строки ~313, ~180-182, ~416, ~785)
 - src/engines/manual-plan-builder.ts: ручной движок; Fix H (weekSelectedIds push после substitution, изоляционная ветка ~493→после 507)
 - src/engines/bb/cycle-to-plan.ts: createBBSet PCT_FOR_RIR; делод-логика (autocoach path)
-- src/ui/screens/TrainingScreen_parts/TrainingConstructor/PlanDisplay.tsx: визуал (отд. агент); СЕЙЧАС 2 TS-ошибки 905-906
-- src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx: PRO ББ авто UI
+- src/ui/screens/TrainingScreen_parts/TrainingConstructor/PlanDisplay.tsx: визуал (отд. агент); bug D ЗАКРЫТ (getVolumeLandmarks:118, computeVolumeLandmarks:344)
+- src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx: PRO ББ авто UI; MRV из `builtPlan.volumeLandmarks` (getBBVolumeLandmarks); :975 </div> решён дизайнером
 - src/ui/screens/TrainingScreen_parts/TrainingConstructor/phase-periodization.ts: distributePhases, PHASE_CONFIGS
-- src/ui/screens/TrainingScreen_parts/TrainingConstructor/PlanPreviewStep5.tsx: bug D (LEVEL_MRV_FLAT/MRV_MAP) — display
-- src/engines/volume-landmarks.engine.ts: MEV/MAV/MRV (канонический)
+- src/ui/screens/TrainingScreen_parts/TrainingConstructor/PlanPreviewStep5.tsx: bug D ЗАКРЫТ (commit 44ce5dab7) — per-muscle `mrvFor(g)` вместо плоского MRV_MAP
+- src/engines/volume-landmarks.engine.ts: MEV/MAV/MRV (канонический источник)
 - src/ui/screens/TrainingScreen_parts/TrainingConstructor/index.tsx: caller buildPlanDays/buildBBPlan (Fix F — caller-level)
 
 ---
