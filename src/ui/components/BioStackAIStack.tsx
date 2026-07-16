@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
-import { buildStack, explainStack, findReplacement, findComplexForStack, type ReplacementResult, type ReplacementType, type ComplexMatch } from '../../engines/supplement-finder.engine';
+import { buildStack, explainStack, findReplacement, findSupplements, findComplexForStack, type ReplacementResult, type ReplacementType, type ComplexMatch } from '../../engines/supplement-finder.engine';
 import { buildSmartStack } from '../../engines/biostack-recommender.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS, ALL_SUBSTANCES } from '../../data/support-database';
 import { decodeGarbled } from '../../utils/text-sanitizer';
@@ -178,11 +178,35 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
   const openReplacePopup = useCallback((id: string, name: string) => {
     let fp;
     try { fp = toFinderProfile(profile || ({} as any)); } catch { fp = undefined as any; }
-    const allTypes = REPLACE_TYPES.map(rt => {
+    let allTypes = REPLACE_TYPES.map(rt => {
       const results = findReplacement(id, rt.key, fp);
       return { key: rt.key, label: rt.label, icon: rt.icon, results };
     });
-    const nonEmpty = allTypes.filter(t => t.results.length > 0);
+    let nonEmpty = allTypes.filter(t => t.results.length > 0);
+    if (nonEmpty.length === 0) {
+      // Резерв: если ID не резолвится в каталог (старый/повреждённый стек),
+      // подбираем функциональные аналоги по всему каталогу, чтобы попап замены не был пустым.
+      const fb: ReplacementResult[] = findSupplements({ profile: fp, maxResults: 15, excludeIds: [id] })
+        .filter(c => c.id.toLowerCase() !== id.toLowerCase())
+        .slice(0, 8)
+        .map<ReplacementResult>(c => ({
+          originalId: id,
+          replacementId: c.id,
+          replacementName: c.name,
+          type: 'functional',
+          reason: 'Альтернатива из подбора',
+          explanation: `Подобрано по профилю. ${(c.mechanisms || []).slice(0, 2).join(', ')}`,
+          tierLabel: c.tier || 'standard',
+          tierChange: 'same',
+          safetyNote: '',
+          bestForm: c.bestForm || '',
+          priceDelta: 'same',
+          safetyDelta: 0,
+          personalMatch: true,
+        }));
+      allTypes = allTypes.map(t => (t.key === 'functional' ? { ...t, results: fb } : t));
+      nonEmpty = allTypes.filter(t => t.results.length > 0);
+    }
     setReplacePopup({ id, type: nonEmpty[0]?.key || 'functional', results: allTypes, loading: false, name });
   }, [profile]);
 
@@ -1541,10 +1565,14 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
           }}>
             <div style={{ height: 3, background: 'linear-gradient(90deg,#8b5cf6,#6d28d9)', flexShrink: 0 }} />
             {/* Header */}
-            <div style={{ padding: '14px 18px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+            <div style={{ padding: '14px 18px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: '#c4b5fd' }}>
                 🔄 Замена: {replacePopup.name}
               </div>
+              <button onClick={(e) => { e.stopPropagation(); setReplacePopup(null); }} style={{
+                width: 30, height: 30, borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.12)',
+                background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.7)', fontSize: 16, fontWeight: 700, lineHeight: 1, flexShrink: 0,
+              }}>✕</button>
             </div>
             {/* Scrollable body */}
             <div style={{ padding: '12px 18px', overflowY: 'auto', flex: 1 }}>
