@@ -30,7 +30,7 @@ export function lmsPlanToSessions(plan: LMSBuildOutput): BridgeSession[] {
         let sn = 1;
         for (const ws of ex.workSets) {
           for (let s = 0; s < ws.sets; s++) {
-            sets.push({ setNumber: sn++, weightKg: ws.weight, reps: ws.reps, rpe: 0, rir: ws.rir ?? 0, isPR: false, notes: `${Math.round(ws.pct * 100)}% PM` });
+            sets.push({ setNumber: sn++, weightKg: ws.weight, reps: ws.reps, rpe: 10 - (ws.rir ?? 0), rir: ws.rir ?? 0, isPR: false, notes: `${Math.round(ws.pct * 100)}% PM · RIR ${ws.rir ?? 0}` });
           }
         }
         const totalVolume = sets.reduce((sum, s) => sum + s.weightKg * s.reps, 0);

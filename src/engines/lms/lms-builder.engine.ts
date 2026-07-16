@@ -13,8 +13,8 @@ import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catal
 import { selectExercisesSmart } from '../exercise-selector.engine';
 import { mesocyclePhaseForWeek, RIR_MATRIX, MesoPhaseConfigs, type MesocyclePhase } from '../rir-matrix.engine';
 import { diagnoseWeakPoint, type Lift, type WeakPoint } from './weakpoint-pl';
-import { getVolumeByMuscle } from '../training-methodology.engine';
-import { computeVolumeLandmarks } from '../volume-landmarks.engine';
+
+import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.engine';
 
 export interface LMSBuildInput {
   template: SRCycleTemplate;
@@ -96,6 +96,8 @@ function vrLevelKey(level: string): 'beginner' | 'intermediate' | 'advanced' {
 const RU_TO_EN: Record<string, string> = { 'Грудь': 'chest', 'Спина': 'back', 'Ноги': 'legs', 'Плечи': 'shoulders', 'Руки': 'arms', 'Кор': 'core' };
 const SENT_TO_RU: Record<string, string> = { 'ПР': 'Грудь', 'ЖМ': 'Ноги', 'ТГ': 'Спина' };
 const EN_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
+/** focusLift (английский ключ из UI) → русская подстрока для сопоставления с именем упражнения. */
+const FOCUS_RU: Record<string, string> = { squat: 'присед', bench: 'жим', deadlift: 'тяга' };
 
 /** Нормализовать группу упражнения (рус/сентимент) → английский ключ для volume-landmarks. */
 function exEnGroup(g: string | undefined): string | undefined {
@@ -189,14 +191,17 @@ function injectPLWeakPoints(
     const mainName = wp.lift === 'bench' ? 'Жим лёжа' : wp.lift === 'squat' ? 'Присед' : 'Становая тяга';
     let hostDay = days.find(d => d.exercises.some(e => norm(e.name).includes(norm(mainName)) || norm(mainName).includes(norm(e.name))));
     if (!hostDay) hostDay = days[0];
-    if (!hostDay || hostDay.exercises.some(e => norm(e.name) === norm(target))) continue;
-    const pm = pmRow[target] ?? pmRow[mainName] ?? 80;
+    // Предпочитаем ассистент, который реально есть в каталоге упражнений (корректный fatigueCost + лейбл в выполнении)
+    const catalogNames = new Set(EXERCISE_CATALOG.map(e => e.name));
+    const targetName = diag.assistance.find(n => catalogNames.has(n)) || target;
+    if (!hostDay || hostDay.exercises.some(e => norm(e.name) === norm(targetName))) continue;
+    const pm = pmRow[targetName] ?? pmRow[mainName] ?? 80;
     const sets = Math.max(2, Math.round(3 * phaseVolMod));
     const pct = diag.intensityPct;
     // MRV soft-cap: не превышаем восстанавливаемый объём группы (auto-циклы)
     const hostGroup = liftToEnGroup(wp.lift);
     if (hostGroup) {
-      const ref = getVolumeByMuscle(hostGroup)?.[vrLevel];
+      const ref = getVolumeLandmarks(vrLevel, hostGroup);
       if (ref) {
         const cur = days.reduce((s, d) => s + d.exercises
           .filter(e => exEnGroup(e.group) === hostGroup)
@@ -205,7 +210,7 @@ function injectPLWeakPoints(
       }
     }
     hostDay.exercises.push({
-      name: target,
+      name: targetName,
       group: wp.lift === 'bench' ? 'ПР' : wp.lift === 'squat' ? 'ЖМ' : 'ТГ',
       coef: 0.7,
       mnosz: 1,
@@ -284,9 +289,13 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           // Коррекция объёма по VolumeGoal + фазе мезоцикла (только для аксессуаров)
           if (!isMain) {
             const vMult = input.volumeGoal === 'mev' ? 0.8 : input.volumeGoal === 'mrv' ? 1.2 : 1.0;
-            const focusMult = (input.focusLift && spec.name.toLowerCase().includes(input.focusLift!)) ? 1.2 : 1.0;
-            sets = Math.round(sets * vMult * focusMult * phaseVolMod);
+            sets = Math.round(sets * vMult * phaseVolMod);
           }
+          // Акцент по focusLift: +20% объёма для ВСЕХ упражнений целевого лифта (включая основной).
+          // focusLift задан по-английски (UI) → маппим в RU-подстроку имени.
+          const focusRu = input.focusLift ? FOCUS_RU[input.focusLift] : undefined;
+          const focusMult = (focusRu && norm(spec.name).includes(focusRu)) ? 1.2 : 1.0;
+          sets = Math.round(sets * focusMult);
 
           // S-MRV floor: аксессуары не ниже 2 подходов (иначе < MEV — бесполезный объём)
           sets = Math.max(isMain ? 1 : 2, sets);
@@ -317,8 +326,8 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       return { exercises: planEx, metrics: calcSessionMetrics(metricsEx) };
     });
 
-    // Инъекция ассистентов по слабым точкам СРЦ-движений (только auto-прогрессирующие циклы)
-    if (input.plWeakPoints && input.plWeakPoints.length && !hasExplicitWeeks) {
+    // Инъекция ассистентов по слабым точкам СРЦ-движений (все циклы, включая faithful с полными weeks[])
+    if (input.plWeakPoints && input.plWeakPoints.length) {
       injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, pedMrvMult);
     }
 
