@@ -35,6 +35,15 @@ const DiagnosticsBiomechanicsCard: React.FC = () => {
   const phases = useMemo(() => stickingPhases(diagLift), [diagLift]);
   const [diagPhase, setDiagPhase] = useState('');
   const [barIssues, setBarIssues] = useState<BarPathIssue[]>([]);
+
+  // RU-лейблы для bar-path проблем (вместо английских issue-ключей)
+  const BAR_PATH_RU: Record<BarPathIssue, string> = {
+    forward_drift: 'Уход штанги вперёд',
+    hips_shoot_up: 'Таз выстреливает вверх',
+    good_morning: 'Good-morning присед',
+    bar_loops: 'Петлеобразная траектория',
+    asymmetric: 'Асимметрия сторон',
+  };
   const diag = useMemo(() => diagPhase ? diagnoseLift(diagLift, diagPhase as any) : null, [diagLift, diagPhase]);
   const barPath = useMemo(() => barIssues.length > 0 ? barPathAnalysis(diagLift, barIssues) : null, [diagLift, barIssues]);
 
@@ -79,12 +88,12 @@ const DiagnosticsBiomechanicsCard: React.FC = () => {
               border: barIssues.includes(iss) ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.08)',
               background: barIssues.includes(iss) ? 'rgba(168,85,247,0.12)' : 'transparent',
               color: barIssues.includes(iss) ? '#a855f7' : DIM
-            }}>{iss.replace(/_/g, ' ')}</button>
+            }}>{BAR_PATH_RU[iss]}</button>
           ))}
         </div>
         {barPath?.diagnoses.map((d, i) => (
           <div key={i} style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>
-            <b style={{ color: '#a855f7' }}>{d.issue.replace(/_/g, ' ')}:</b> {d.cause} <span style={{ color: ACCENT }}>→ {d.correction}</span>
+             <b style={{ color: '#a855f7' }}>{BAR_PATH_RU[d.issue]}:</b> {d.cause} <span style={{ color: ACCENT }}>→ {d.correction}</span>
           </div>
         ))}
       </div>

@@ -23,8 +23,19 @@ export const RIRCalibrationCard: React.FC = () => {
     try {
       clearCalibrationData();
       const sessions = loadSessions();
-      const planFallback = { exercises: [] as { name: string; targetSets: { rir: number }[] }[] };
-      sessions.forEach(s => { try { recordSessionRIR(s, planFallback); } catch { /* skip */ } });
+      sessions.forEach(s => {
+        try {
+          // План-заглушка: запланированный RIR = 2 (базовый) для каждого подхода.
+          // Это позволяет пересчитать калибровку из истории (bias = запланир.2 − факт.из RPE).
+          const planFallback = {
+            exercises: (s.exercises || []).map(ex => ({
+              name: ex.exerciseName || ex.exerciseId || '',
+              targetSets: (ex.sets || []).map(() => ({ rir: 2 })),
+            })),
+          };
+          recordSessionRIR(s, planFallback);
+        } catch { /* skip */ }
+      });
       setRefresh(v => v + 1);
     } finally { setReprocessing(false); }
   };

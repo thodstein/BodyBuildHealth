@@ -1,3 +1,33 @@
+## Session Summary (Jul 16) — Тренировки: фикс 3 багов калькуляторов (срывы/RIR/биомеханика)
+
+### Goal
+Исправить подтверждённые баги в калькуляторах Тренировок: срывы не работают (#1), RIR-калибровка не работает (#2), биомеханика на английском (#3). Баг #4 (генератор сплитов) признан невоспроизводимым.
+
+### ✅ Сделано (tsc 0 ошибок, vite build OK)
+- **Баг #4 НЕ воспроизводится** — SplitGenCard работает end-to-end: 9 генераторов split-engines.ts протестированы (PPL=6 сессий, FBW=3), компонент рендерится, цепочка applyToPlanner→TrainingConstructor работает (TrainingConstructor/index.tsx:882 читает `p.data.cycle` → `buildPlan`). Реальных багов — 3.
+- **Баг #3 (биомеханика на английском) — FIXED**: DiagnosticsHub.tsx — добавлен `BAR_PATH_RU` для 5 issues (forward_drift→'Уход штанги вперёд', hips_shoot_up→'Таз выстреливает вверх', good_morning→'Good-morning присед', bar_loops→'Петлеобразная траектория', asymmetric→'Асимметрия сторон'). Кнопки и diagnoses используют маппинг (было `iss.replace(/_/g,' ')`). Данные engine (cause/correction) уже на русском.
+- **Баг #1 (срывы) — FIXED**: StickingPointAnalysisCard.tsx — `detectFailures` переписан: ослаблены пороги (RPE≥8 вместо ≥9&reps≤3), добавлена модальная фаза срыва по диапазону повторений (`phaseForReps`: reps≤3→lockout, 4-5→mid, ≥6→bottom для приседа / mid для жима), валидация фазы по `stickingPhases(lift)`. Убран хардкод `phaseHint='lockout'`. Возврат `null` только если упражнение вообще не встречалось в сессиях. Лейбл «Срывов (RPE≥9, reps≤3)» → «Тяжёлых подходов (RPE≥8)».
+- **Баг #2 (RIR-калибровка) — FIXED**: RIRCalibrationCard.tsx — `reprocessAll` теперь строит per-session `planFallback` с `targetSets: { rir: 2 }` для каждого подхода (раньше пустой `exercises: []` → `recordSessionRIR` сразу return без точек → калибровка не работала). Теперь исторические записи с RPE создают точки калибровки (bias = запланир.2 − факт.из RPE).
+
+### Проверки
+- `tsc --noEmit` → 0 ошибок (exit 0)
+- `vite build` → OK (exit 0)
+- UTF-8 noBOM: все 3 файла OK
+
+### Key Decisions
+- Баг #4 не реален: SplitGenCard работает end-to-end; приоритет — 3 реальных бага.
+- Баг #3: править только UI-лейблы (engine-данные уже RU).
+- Баг #1: выводить реальную фазу из контекста повторений, а не хардкодить lockout.
+- Баг #2: без реального плана используем базовый запланированный RIR=2 для пересчёта из истории.
+
+### Relevant Files
+- src/ui/screens/TrainingScreen_parts/DiagnosticsHub.tsx — FIXED баг #3 (BAR_PATH_RU L37-43, кнопки + diagnoses)
+- src/ui/screens/TrainingScreen_parts/StickingPointAnalysisCard.tsx — FIXED баг #1 (detectFailures переписан, phaseForReps)
+- src/ui/screens/TrainingScreen_parts/RIRCalibrationCard.tsx — FIXED баг #2 (planFallback per-session)
+- src/engines/pro/lift-diagnostics.engine.ts — barPathAnalysis (RU данные, подтверждено)
+- src/engines/lms/weakpoint-pl.ts — WeakPoint + STICKING_POINTS (bench: off_chest/mid/lockout/start; squat: bottom/mid/lockout)
+- src/engines/rir-calibration.engine.ts — recordSessionRIR (использует plannedRIR из targetSets)
+
 ## Session Summary (Jul 16) — Калькулятор поддержки: фикс 4 мобильных UI-багов
 
 ### Goal

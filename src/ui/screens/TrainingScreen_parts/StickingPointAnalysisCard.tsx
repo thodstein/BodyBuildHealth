@@ -14,30 +14,54 @@ interface LiftFailureData {
   diagnosis: any;
 }
 
+// Фаза по диапазону повторений (валидируется по доступным фазам конкретного движения)
+function phaseForReps(reps: number, lift: Lift): WeakPoint {
+  const phases = stickingPhases(lift);
+  let cand: WeakPoint;
+  if (reps <= 3) cand = 'lockout';
+  else if (reps <= 5) cand = 'mid';
+  else cand = lift === 'squat' ? 'bottom' : 'mid';
+  if (phases.includes(cand)) return cand;
+  return phases.includes('mid') ? 'mid' : (phases[0] || 'mid');
+}
+
 function detectFailures(sessions: WorkoutLog[], lift: Lift, aliases: string[]): LiftFailureData | null {
-  const failedSets: { phaseHint: string; set: any; exerciseName: string }[] = [];
+  const failedSets: { phaseHint: WeakPoint; set: any; exerciseName: string }[] = [];
   let currentMax = 0;
+  let hasLift = false;
   sessions.forEach((w: any) => (w.exercises || []).forEach((e: any) => {
     const en = (e.exerciseName || e.exerciseId || '').toLowerCase();
     if (!aliases.some(a => en.includes(a))) return;
+    hasLift = true;
     (e.sets || []).forEach((s: any) => {
       const weight = s.weight || 0;
       const reps = s.reps || 0;
       const rpe = s.rpe || 0;
       const e1rm = weight * (1 + reps / 30);
       if (e1rm > currentMax) currentMax = Math.round(e1rm);
-      // Failure indicators: high RPE (>=9) with low reps (<=3), or low reps relative to weight
-      if (rpe >= 9 && reps <= 3 && weight > 0) {
-        failedSets.push({ phaseHint: 'lockout', set: s, exerciseName: e.exerciseName || '' });
-      } else if (rpe >= 8 && reps <= 2 && weight > 0) {
-        failedSets.push({ phaseHint: 'lockout', set: s, exerciseName: e.exerciseName || '' });
+      // Индикаторы близкого срыва / срыва:
+      //  - RPE ≥ 8 (тяжёлый подход, ≤2 повторений в запасе)
+      //  - явная отметка failed
+      //  - низкие повторы при отсутствии RPE (max-попытка)
+      const isHard = (rpe >= 8 && weight > 0) || (rpe === 0 && reps > 0 && reps <= 2 && weight > 0) || (!!s.failed);
+      if (isHard) {
+        const phaseHint = phaseForReps(reps, lift);
+        failedSets.push({ phaseHint, set: s, exerciseName: e.exerciseName || '' });
       }
     });
   }));
-  if (failedSets.length === 0 && currentMax === 0) return null;
+  if (!hasLift) return null;
+  // Наиболее вероятная слабая фаза = модальная фаза по зафиксированным срывам
+  const phaseCounts: Record<string, number> = {};
+  failedSets.forEach(f => { phaseCounts[f.phaseHint] = (phaseCounts[f.phaseHint] || 0) + 1; });
   const phases = stickingPhases(lift);
-  // Determine most likely weak phase based on failure patterns
-  const likelyPhase: WeakPoint | null = phases.length > 0 ? phases[1] || phases[0] : null;
+  let likelyPhase: WeakPoint | null;
+  if (failedSets.length > 0) {
+    const top = Object.entries(phaseCounts).sort((a, b) => b[1] - a[1])[0];
+    likelyPhase = (phases.includes(top[0] as WeakPoint) ? top[0] : (phases[0] || null)) as WeakPoint | null;
+  } else {
+    likelyPhase = phases.length > 0 ? phases[0] : null;
+  }
   const diagnosis = likelyPhase ? diagnoseLift(lift, likelyPhase) : null;
   const totalSets = sessions.reduce((s, w: any) => s + (w.exercises || []).reduce((ss: number, e: any) => {
     const en = (e.exerciseName || e.exerciseId || '').toLowerCase();
@@ -105,7 +129,7 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
           </div>
           {active.totalFailedSets > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 10 }}>
-              <span style={{ color: 'var(--text-dim)' }}>Срывов (RPE≥9, reps≤3):</span>
+              <span style={{ color: 'var(--text-dim)' }}>Тяжёлых подходов (RPE≥8):</span>
               <span style={{ fontWeight: 600, color: '#ef4444' }}>{active.totalFailedSets} сетов ({active.failureRate}%)</span>
             </div>
           )}
