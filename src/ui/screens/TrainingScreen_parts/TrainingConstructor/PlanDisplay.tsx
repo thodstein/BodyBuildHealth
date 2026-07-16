@@ -32,6 +32,7 @@ interface Props {
   globalTempoStr?: string;
   mrvOverride?: number | null;
   labAnalysis?: any;
+  readinessSlider?: number;
 }
 
 const PHASE_COLORS: Record<string, string> = {
@@ -218,7 +219,7 @@ function getWarmup(exercises: any[], goal: string): { general: string[]; specifi
 
 export const PlanDisplay: React.FC<Props> = ({
   result, manualWorkMax, tprofile, goal, level, mesoLength, daysPerWeek,
-  setResult, onToRuntime, globalTempoStr, mrvOverride, labAnalysis,
+  setResult, onToRuntime, globalTempoStr, mrvOverride, labAnalysis, readinessSlider,
 }) => {
   const [subTarget, setSubTarget] = useState<{ dayIdx: number; exIdx: number } | null>(null);
   const [inlineEdit, setInlineEdit] = useState<{ dayIdx: number; exIdx: number; field: string; value: string } | null>(null);
