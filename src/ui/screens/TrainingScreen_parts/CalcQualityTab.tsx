@@ -9,13 +9,13 @@ type PlanEx = { name: string; sets: number; reps: string; rir: number; rest: num
 type PlanDay = { day: number; groups: string[]; exercises: PlanEx[] };
 type Plan = { splitName: string; corrections: string[]; days: PlanDay[] } | null;
 
-export const CalcQualityTab: React.FC<{ plan: Plan; level: string; goal?: string; onBuildPlan: () => void }> = ({ plan, level, goal = 'hypertrophy', onBuildPlan }) => {
+export const CalcQualityTab: React.FC<{ plan: Plan; level: string; goal?: string; readiness?: number; onBuildPlan: () => void }> = ({ plan, level, goal = 'hypertrophy', readiness, onBuildPlan }) => {
   const analysis = useMemo(() => {
     if (!plan) return null;
     const ws: Record<string, number> = {};
     plan.days.forEach(d => d.exercises.forEach(e => { ws[e.group] = (ws[e.group] || 0) + e.sets; }));
-    return calcQualityScore(plan.days, ws, level, goal);
-  }, [plan, level, goal]);
+    return calcQualityScore(plan.days, ws, level, goal, { readiness: readiness != null ? readiness : 100 });
+  }, [plan, level, goal, readiness]);
 
   if (!plan || !analysis) {
     return (
