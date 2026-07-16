@@ -1344,6 +1344,8 @@ export const ProfessionalReports: React.FC<{
   onSaveReport: (type: string, text: string) => void;
 }> = ({ data, reportTab, onTabChange, showCustomReport, onCustomReportToggle, onSaveReport }) => {
   const [activeReport, setActiveReport] = useState<'trainer' | 'doctor' | 'general' | 'custom' | 'usercustom' | null>(null);
+  const [blockOpen, setBlockOpen] = useState(false);
+  const [blockResult, setBlockResult] = useState<{ label: string; text: string } | null>(null);
 
   const copyReport = (text: string) => {
     navigator.clipboard?.writeText(text).then(() => {
@@ -1421,6 +1423,274 @@ export const ProfessionalReports: React.FC<{
               }}>{btn.key === 'custom' ? '🎨 Свой' : btn.key === 'usercustom' ? '👤 Пользов.' : `📄 ${btn.label}`}</button>
             ))}
           </div>
+
+          {/* ── Block report generators ── */}
+          {(() => {
+            const saveBlock = (type: string, text: string) => {
+              const rep = { id: Date.now().toString(), date: new Date().toISOString().slice(0, 10), type, text, timestamp: Date.now() };
+              try {
+                const archive = JSON.parse(localStorage.getItem('he_profile_reports') || '[]');
+                archive.unshift(rep);
+                localStorage.setItem('he_profile_reports', JSON.stringify(archive.slice(0, 30)));
+              } catch {}
+            };
+            const genBlock = (label: string, color: string, genFn: () => string) => {
+              const text = genFn();
+              const fullLabel = `📦 ${label}`;
+              setBlockResult({ label: fullLabel, text });
+              saveBlock(fullLabel, text);
+              onSaveReport(fullLabel, text);
+            };
+
+            const BLOCKS: { key: string; label: string; icon: string; color: string; genFn: () => string }[] = [
+              {
+                key: 'training', label: 'Тренировки', icon: '🏋️', color: '#3b82f6',
+                genFn: () => {
+                  const lines: string[] = [];
+                  lines.push(`📦 ОТЧЁТ: ТРЕНИРОВКИ · ${new Date().toLocaleDateString('ru')}`);
+                  lines.push('');
+                  lines.push(`▸ Цель: ${data.training.goal} · Уровень: ${data.training.level}`);
+                  lines.push(`▸ Спорт: ${data.training.sport} · Стаж: ${data.training.experience} лет`);
+                  lines.push(`▸ Частота: ${data.training.workoutsPerWeek}×/нед × ${data.training.avgWorkoutMinutes} мин`);
+                  lines.push(`▸ Программа: ${data.training.programName} · Сплит: ${data.training.currentSplit}`);
+                  lines.push(`▸ Объём за нед: ${data.training.weekVolume}`);
+                  lines.push(`▸ Посл. тренировка: ${data.training.lastWorkoutDate}`);
+                  try {
+                    const sessions = JSON.parse(localStorage.getItem('load_srpe_sessions') || '[]');
+                    if (sessions.length >= 3) {
+                      const now = Date.now(); const day = 86400000;
+                      const acute = sessions.filter((s: any) => now - new Date(s.date).getTime() < 7 * day);
+                      const chronic = sessions.filter((s: any) => now - new Date(s.date).getTime() < 28 * day);
+                      const aLoad = acute.reduce((s: number, se: any) => s + (se.rpe || 0) * (se.duration || 0), 0) / 7;
+                      const cLoad = chronic.reduce((s: number, se: any) => s + (se.rpe || 0) * (se.duration || 0), 0) / 28;
+                      const acwr = cLoad > 0 ? (aLoad / cLoad).toFixed(2) : '—';
+                      const zone = acwr === '—' ? '—' : Number(acwr) < 0.8 ? 'Недотрен' : Number(acwr) < 1.3 ? 'Оптимум' : Number(acwr) < 1.5 ? 'Повышена' : 'Опасная';
+                      lines.push(`▸ ACWR: ${acwr} (${zone}) · Сессий: ${chronic.length}`);
+                    }
+                  } catch {}
+                  lines.push('');
+                  lines.push(data.training.lastWorkouts);
+                  return lines.join('\n');
+                },
+              },
+              {
+                key: 'nutrition', label: 'Питание', icon: '🥗', color: '#22c55e',
+                genFn: () => {
+                  const lines: string[] = [];
+                  lines.push(`📦 ОТЧЁТ: ПИТАНИЕ · ${new Date().toLocaleDateString('ru')}`);
+                  lines.push('');
+                  lines.push(`▸ Тип: ${data.nutrition.dietType || '—'} · Приёмов: ${data.nutrition.mealsPerDay || '—'}/день`);
+                  if (data.nutrition.avgKcal) {
+                    lines.push(`▸ КБЖУ (ср.): ${data.nutrition.avgKcal} ккал · Б:${data.nutrition.avgProtein}г · Ж:${data.nutrition.avgFat}г · У:${data.nutrition.avgCarbs}г`);
+                  }
+                  try {
+                    const r = JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]')[0];
+                    if (r) {
+                      lines.push(`▸ Оценка: ${r.overallGrade || '—'} · Качество еды: ${r.foodQualityScore || '—'}/10`);
+                      if (r.weightDynamicsBasic) lines.push(`▸ Вес/нед: ${r.weightDynamicsBasic.direction === 'loss' ? '−' : r.weightDynamicsBasic.direction === 'gain' ? '+' : '∼'}${r.weightDynamicsBasic.weeklyKg || '0'} кг`);
+                      if (r.microDeficiencies?.length) lines.push(`▸ Дефициты: ${r.microDeficiencies.slice(0, 5).join(' · ')}`);
+                    }
+                  } catch {}
+                  return lines.join('\n');
+                },
+              },
+              {
+                key: 'pharma', label: 'Фарма/Курс', icon: '💊', color: '#ec4899',
+                genFn: () => {
+                  const lines: string[] = [];
+                  lines.push(`📦 ОТЧЁТ: ФАРМА/КУРС · ${new Date().toLocaleDateString('ru')}`);
+                  lines.push('');
+                  lines.push(`▸ Фаза: ${data.course.phase}${data.course.courseStartDate ? ` (с ${data.course.courseStartDate})` : ''}`);
+                  lines.push(`▸ Препараты: ${data.course.medsList || 'нет'}`);
+                  lines.push(`▸ БАДы: ${data.course.suppsList || 'нет'}`);
+                  try {
+                    const pharmaReports = JSON.parse(localStorage.getItem('he_pharma_reports') || '[]');
+                    const last = pharmaReports[0];
+                    if (last) {
+                      lines.push(`▸ Всего препаратов: ${last.compoundCount || 0} · Недель: ${last.totalWeeks || 0}`);
+                      lines.push(`▸ Риск курса: ${Math.round(last.risk || 0)}% · ПКТ: ${last.pctPlanned ? '✅' : '❌'}`);
+                    }
+                  } catch {}
+                  return lines.join('\n');
+                },
+              },
+              {
+                key: 'labs', label: 'Анализы', icon: '🩸', color: '#ef4444',
+                genFn: () => {
+                  const lines: string[] = [];
+                  lines.push(`📦 ОТЧЁТ: ЛАБОРАТОРИЯ · ${new Date().toLocaleDateString('ru')}`);
+                    lines.push('');
+                    try {
+                      const labPoints = JSON.parse(localStorage.getItem('labs_log') || '[]');
+                      lines.push(`▸ Всего маркеров: ${labPoints.length}`);
+                      const labAnalysis = JSON.parse(localStorage.getItem('he_lab_analysis') || '[]');
+                    const abn = labAnalysis.filter((l: any) => l.status === 'high' || l.status === 'low' || l.status === 'critical');
+                    if (abn.length > 0) {
+                      lines.push(`▸ Отклонений: ${abn.length}`);
+                      for (const l of abn.slice(0, 12)) {
+                        const flag = l.status === 'critical' ? '⚠' : l.status === 'high' ? '↑' : '↓';
+                        lines.push(`  ${flag} ${l.code || l.name}: ${l.value} ${l.unit}${l.date ? ` (${l.date})` : ''}`);
+                      }
+                    } else {
+                      lines.push('▸ Отклонений нет');
+                    }
+                  } catch {}
+                  return lines.join('\n');
+                },
+              },
+              {
+                key: 'risk', label: 'Риски', icon: '⚠️', color: '#f97316',
+                genFn: () => {
+                  const lines: string[] = [];
+                  lines.push(`📦 ОТЧЁТ: РИСКИ · ${new Date().toLocaleDateString('ru')}`);
+                  lines.push('');
+                  lines.push(`▸ Общий риск: ${data.risk?.overallNet ? Math.round(data.risk.overallNet) + '%' : '—'}`);
+                  lines.push(`▸ Без поддержки: ${data.risk?.overallRaw ? Math.round(data.risk.overallRaw) + '%' : '—'}`);
+                  lines.push(`▸ Покрытие поддержкой: ${data.risk?.totalSupport ? Math.round(data.risk.totalSupport) + '%' : '—'}`);
+                  if (data.risk?.systemBreakdown) {
+                    const SYS = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal'];
+                    const SL: Record<string,string> = { cardio:'ССС', hepatic:'Печень', renal:'Почки', neuro:'НС', endocrine:'Эндокр.', hematologic:'Кровь', reproductive:'Репрод.', musculoskeletal:'Опорно-дв.' };
+                    for (const s of SYS) {
+                      const v = data.risk.systemBreakdown[s];
+                      if (v?.net > 0) lines.push(`  ${SL[s] || s}: ${Math.round(v.net)}% (raw: ${Math.round(v.raw || 0)}%)`);
+                    }
+                  }
+                  return lines.join('\n');
+                },
+              },
+              {
+                key: 'support', label: 'Поддержка', icon: '🧪', color: '#06b6d4',
+                genFn: () => {
+                  const lines: string[] = [];
+                  lines.push(`📦 ОТЧЁТ: ПОДДЕРЖКА · ${new Date().toLocaleDateString('ru')}`);
+                  lines.push('');
+                  lines.push(`▸ БАДы: ${data.course.suppsList || 'нет'}`);
+                  lines.push(`▸ Покрытие: ${data.risk?.totalSupport ? Math.round(data.risk.totalSupport) + '%' : '—'}`);
+                  try {
+                    const sr = JSON.parse(localStorage.getItem('he_profile_support_reports') || '[]')[0];
+                    if (sr) lines.push(`▸ Отчёт поддержки: ${sr.grade || '—'} · ${sr.compoundsCount || sr.substanceCount || '—'} в-в`);
+                  } catch {}
+                  return lines.join('\n');
+                },
+              },
+              {
+                key: 'bp', label: 'Давление', icon: '❤️', color: '#f43f5e',
+                genFn: () => {
+                  const lines: string[] = [];
+                  lines.push(`📦 ОТЧЁТ: ДАВЛЕНИЕ · ${new Date().toLocaleDateString('ru')}`);
+                  lines.push('');
+                  try {
+                    const bpd = JSON.parse(localStorage.getItem('he_bp_diary') || '[]');
+                    if (bpd.length > 0) {
+                      const last = bpd[0];
+                      const sysArr = bpd.map((b: any) => b.systolic).filter(Boolean);
+                      const diaArr = bpd.map((b: any) => b.diastolic).filter(Boolean);
+                      const hrArr = bpd.map((b: any) => b.hr).filter(Boolean);
+                      const avgSys = sysArr.length > 0 ? (sysArr.reduce((s: number, v: number) => s + v, 0) / sysArr.length).toFixed(0) : '—';
+                      const avgDia = diaArr.length > 0 ? (diaArr.reduce((s: number, v: number) => s + v, 0) / diaArr.length).toFixed(0) : '—';
+                      const avgHr = hrArr.length > 0 ? (hrArr.reduce((s: number, v: number) => s + v, 0) / hrArr.length).toFixed(0) : '—';
+                      lines.push(`▸ Последнее: ${last.systolic}/${last.diastolic} мм · Пульс: ${last.hr || '—'} уд/мин (${last.date || '—'})`);
+                      lines.push(`▸ Среднее: ${avgSys}/${avgDia} мм · Пульс ср.: ${avgHr} уд/мин`);
+                      lines.push(`▸ Всего записей: ${bpd.length}`);
+                    } else {
+                      lines.push('▸ Нет записей АД');
+                    }
+                  } catch { lines.push('▸ Нет данных'); }
+                  return lines.join('\n');
+                },
+              },
+              {
+                key: 'sleep', label: 'Сон', icon: '🛌', color: '#8b5cf6',
+                genFn: () => {
+                  const lines: string[] = [];
+                  lines.push(`📦 ОТЧЁТ: СОН · ${new Date().toLocaleDateString('ru')}`);
+                  lines.push('');
+                  try {
+                    const sd = JSON.parse(localStorage.getItem('he_sleep_diary') || '[]');
+                    if (sd.length > 0) {
+                      const hours = sd.map((e: any) => Number(e.hours)).filter((v: number) => v > 0);
+                      const qual = sd.map((e: any) => Number(e.quality)).filter((v: number) => v > 0);
+                      const avgH = hours.length > 0 ? (hours.reduce((s: number, v: number) => s + v, 0) / hours.length).toFixed(1) : '—';
+                      const avgQ = qual.length > 0 ? (qual.reduce((s: number, v: number) => s + v, 0) / qual.length).toFixed(1) : '—';
+                      const last = sd[0];
+                      lines.push(`▸ Последний: ${last.hours || '—'}ч · Качество: ${last.quality || '—'}/5 · Пробуждений: ${last.awakenings ?? '—'}`);
+                      lines.push(`▸ Среднее: ${avgH} ч/ночь · Качество ср.: ${avgQ}/5`);
+                      lines.push(`▸ Всего записей: ${sd.length}`);
+                    } else {
+                      lines.push('▸ Нет записей сна');
+                    }
+                  } catch { lines.push('▸ Нет данных'); }
+                  return lines.join('\n');
+                },
+              },
+              {
+                key: 'measurements', label: 'Замеры', icon: '📏', color: '#14b8a6',
+                genFn: () => {
+                  const lines: string[] = [];
+                  lines.push(`📦 ОТЧЁТ: ЗАМЕРЫ · ${new Date().toLocaleDateString('ru')}`);
+                  lines.push('');
+                  lines.push(`▸ Вес: ${data.profile.weight} кг · Рост: ${data.profile.height} см`);
+                  lines.push(`▸ BMI: ${data.body.bmi} · FFMI: ${data.body.ffmi} · BF: ${data.profile.bodyFat}% · LBM: ${data.body.lbm} кг`);
+                  lines.push(`▸ Целевой вес: ${data.body.targetWeight} кг`);
+                  lines.push('');
+                  lines.push(data.last3Meas || 'Нет записей замеров');
+                  return lines.join('\n');
+                },
+              },
+            ];
+
+            return (
+              <div>
+                <button onClick={() => setBlockOpen(!blockOpen)} style={{
+                  width: '100%', padding: '10px 14px', borderRadius: 12, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  background: blockOpen ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${blockOpen ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)'}`,
+                  color: '#fff', fontSize: 11, fontWeight: 700, transition: 'all 0.2s',
+                }}>
+                  <span style={{ fontSize: 14 }}>📦</span>
+                  <span>Отчёты по модулям</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,0.4)', transition: 'transform 0.2s', transform: blockOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+                </button>
+                {blockOpen && (
+                  <div style={{
+                    marginTop: 8, padding: 14, borderRadius: 14,
+                    background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
+                  }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                      {BLOCKS.map(b => (
+                        <button key={b.key} onClick={() => genBlock(b.label, b.color, b.genFn)}
+                          style={{
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                            padding: '12px 6px', borderRadius: 12, cursor: 'pointer',
+                            background: b.color + '12', border: `1px solid ${b.color}22`,
+                            color: '#fff', fontSize: 9, fontWeight: 700, transition: 'all 0.15s',
+                          }}
+                          onMouseDown={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.95)'; }}
+                          onMouseUp={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
+                        >
+                          <span style={{ fontSize: 20 }}>{b.icon}</span>
+                          <span style={{ color: b.color }}>{b.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {blockResult && (
+                      <div style={{
+                        marginTop: 10, padding: 12, borderRadius: 10,
+                        background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0,230,138,0.15)',
+                        fontSize: 9, color: 'rgba(255,255,255,0.85)', whiteSpace: 'pre-wrap',
+                        lineHeight: 1.6, maxHeight: 200, overflowY: 'auto',
+                      }}>
+                        <div style={{ fontSize: 8, color: '#00e68a', fontWeight: 700, marginBottom: 6 }}>✓ {blockResult.label} сгенерирован</div>
+                        {blockResult.text.slice(0, 800)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Trainer Report */}
           {(!activeReport || activeReport === 'trainer') && (

@@ -144,7 +144,7 @@ export const ProfileDataHub: React.FC<ProfileDataHubProps> = ({
       key: 'personal', label: 'Персональные данные', icon: '👤', color: '#00e68a',
       filled: personalFields.length, total: 5,
       detail: personal.age ? `${personal.age} лет · ${personal.sex === 'female' ? 'ж' : 'м'} · ${personal.weight || '—'} кг` : 'Не заполнено',
-      go: () => onOpenProfileTab('anthropometry'),
+      go: () => onOpenProfileTab('overview'),
     },
     {
       key: 'training', label: 'Тренировки', icon: '🏋️', color: '#f59e0b',

@@ -421,3 +421,56 @@ export const SectionTitle: React.FC<{ icon?: string; title: string; subtitle?: s
 export const ValueChip: React.FC<{ children: React.ReactNode; color?: string }> = ({ children, color = theme.accent }) => (
   <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 9px', borderRadius:20, fontSize:11, fontWeight:700, color, background: color + '1a', border:`1px solid ${color}33` }}>{children}</span>
 );
+
+/* ── NavCard — navigation card for external diary transitions ── */
+interface NavCardProps {
+  icon: string;
+  label: string;
+  desc: string;
+  color: string;
+  onClick: () => void;
+}
+export const NavCard: React.FC<NavCardProps> = ({ icon, label, desc, color, onClick }) => (
+  <button
+    onClick={onClick}
+    style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+      width: '100%', padding: '16px 10px', borderRadius: 16, cursor: 'pointer',
+      textAlign: 'center', border: '1px solid rgba(255,255,255,0.06)',
+      background: 'rgba(255,255,255,0.04)', color: '#fff',
+      transition: 'all 0.2s cubic-bezier(0.2,0.9,0.4,1)',
+      backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+    }}
+    onMouseDown={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.96)'; (e.currentTarget as HTMLElement).style.background = color + '18'; }}
+    onMouseUp={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
+    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
+  >
+    <div style={{
+      width: 48, height: 48, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 22, background: color + '1a', border: `1px solid ${color}22`,
+      boxShadow: `0 4px 12px ${color}12`,
+    }}>{icon}</div>
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{label}</div>
+      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 3, lineHeight: 1.3 }}>{desc}</div>
+    </div>
+  </button>
+);
+
+/* ── MetricPill — colored metric badge with icon ── */
+interface MetricPillProps {
+  icon?: string;
+  value: string | number;
+  label: string;
+  color?: string;
+}
+export const MetricPill: React.FC<MetricPillProps> = ({ icon, value, label, color = theme.accent }) => (
+  <div style={{
+    flex: 1, padding: '10px 6px', borderRadius: 14, textAlign: 'center',
+    background: color + '0d', border: `1px solid ${color}1a`,
+  }}>
+    {icon && <div style={{ fontSize: 16, marginBottom: 2 }}>{icon}</div>}
+    <div style={{ fontSize: 16, fontWeight: 800, color, letterSpacing: '-0.3px', lineHeight: 1.1 }}>{value}</div>
+    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{label}</div>
+  </div>
+);

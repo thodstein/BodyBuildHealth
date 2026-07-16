@@ -18,7 +18,7 @@ import { ProfileContactsSection } from './ProfileScreen_parts/ProfileContactsSec
 import { ProfileDataHub } from './ProfileScreen_parts/ProfileDataHub';
 import { theme, SectionTitle } from './ProfileScreen_parts/ProfileComponents';
 
-type ProfileTab = 'overview' | 'anthropometry' | 'lifestyle' | 'diet' | 'health' | 'training' | 'diaries' | 'data' | 'analytics' | 'contacts';
+type ProfileTab = 'overview' | 'lifestyle' | 'diet' | 'health' | 'training' | 'diaries' | 'data' | 'analytics' | 'contacts';
 type ProfilePage = 'hero' | 'tabs';
 type MainTab = 'info' | 'analytics' | 'contacts';
 
@@ -147,7 +147,7 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
     { id: 'contacts', label: '📞 Контакты' },
   ];
   const infoSubTabs: { id: ProfileTab; label: string }[] = [
-    { id: 'overview', label: 'Общие сведения' }, { id: 'anthropometry', label: 'Антропометрия' },
+    { id: 'overview', label: 'Общие сведения' },
     { id: 'lifestyle', label: 'Образ жизни' }, { id: 'training', label: 'Тренировки' },
     { id: 'health', label: 'Здоровье' },
     { id: 'diet', label: 'Питание'},
@@ -156,13 +156,12 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
   ];
   const us = settings as UnifiedSettings;
   const sectionHeaders: Record<string, { icon: string; title: string; subtitle: string }> = {
-    overview: { icon: '👤', title: 'Общие сведения', subtitle: 'Персональные данные и профиль' },
-    anthropometry: { icon: '📏', title: 'Антропометрия', subtitle: 'Замеры тела и композиция' },
+    overview: { icon: '👤', title: 'Общие сведения', subtitle: 'Персональные данные · Антропометрия · Композиция тела' },
     lifestyle: { icon: '🌿', title: 'Образ жизни', subtitle: 'Сон, стресс, активность' },
     training: { icon: '🏋️', title: 'Тренировки', subtitle: 'Цель, уровень, сплит, фаза' },
     health: { icon: '🩺', title: 'Здоровье', subtitle: 'Хроника, аллергии, риски' },
     diet: { icon: '🥗', title: 'Питание', subtitle: 'Диета, аллергии, привычки' },
-    diaries: { icon: '📓', title: 'Дневники', subtitle: 'Сон, давление, замеры, инъекции' },
+    diaries: { icon: '📓', title: 'Дневники', subtitle: 'Все дневники приложения: сон, давление, питание, тренировки и др.' },
     data: { icon: '🗂️', title: 'Мои данные', subtitle: 'Агрегированные источники' },
   };
   useEffect(() => {
@@ -275,11 +274,9 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
               {tab === 'overview' && (
                 <InfoErrorBoundary label="Сведения о пользователе">
                   <ProfileBioSection settings={settings} save={save} calcData={calcData} upCalc={upCalc} onNavigate={onNavigate} />
-                </InfoErrorBoundary>
-              )}
-              {tab === 'anthropometry' && (
-                <InfoErrorBoundary label="Замеры">
-                  <ProfileBodySection settings={settings} save={save} />
+                  <div style={{ marginTop: 6 }}>
+                    <ProfileBodySection settings={settings} save={save} />
+                  </div>
                 </InfoErrorBoundary>
               )}
               {tab === 'lifestyle' && (
