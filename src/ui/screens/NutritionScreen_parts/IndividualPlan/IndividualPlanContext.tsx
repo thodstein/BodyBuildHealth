@@ -735,6 +735,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           mealsCount, isTrainingDay: !!trainingDays[offset % 7],
           trainStartMin: linkToTraining && trainingDays[offset % 7] ? toMin(trainStart) : undefined,
           allowIntraWorkout: trainIntensity === 'high',
+          trainDurationMin: (s?.avgWorkoutMinutes || 60),
           excludedIds, preferredIds: new Set(preferredFoods),
           lockedIds, recentFoodIds,
           budget, isVegetarian: dietPrefs.includes('vegetarian'),

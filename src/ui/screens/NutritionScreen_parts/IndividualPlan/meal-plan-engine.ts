@@ -66,6 +66,8 @@ export interface MealPlanInput {
   mealsCount: number;
   isTrainingDay: boolean;
   trainStartMin?: number;
+  // Д-8: session length in minutes — intra-workout only makes sense for sessions > ~75 min.
+  trainDurationMin?: number;
   allowIntraWorkout?: boolean;
   excludedIds?: Set<string>;
   preferredIds?: Set<string>;
@@ -638,7 +640,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const tBed = input.bedTime || '22:00';
   // Pre-sleep 30 min before bed
   const tPreSleep = (() => { const [h, m] = tBed.split(':').map(Number); const min = (h * 60 + m - 30 + 1440) % 1440; return String(Math.floor(min/60)).padStart(2,'0') + ':' + String(min%60).padStart(2,'0'); })();
-  const wantPreSleep = input.mealsCount >= 4; // only if user wants 4+ meals
+  // Д-14: pre-sleep only if there is a real gap (>=150 min) between dinner and bed, otherwise the
+  // dinner already covers the night MPS window and a second protein meal is redundant.
+  const _dinnerToBedGap = (() => { try { const [dh, dm] = tDinner.split(':').map(Number); const [bh, bm] = tBed.split(':').map(Number); return ((bh * 60 + bm) - (dh * 60 + dm) + 1440) % 1440; } catch { return 240; } })();
+  const wantPreSleep = input.mealsCount >= 4 && _dinnerToBedGap >= 150;
   // Snack time: midpoint between lunch and dinner
   const tSnack = (() => { const [lh, lm] = tLunch.split(':').map(Number); const [dh, dm] = tDinner.split(':').map(Number); const mid = Math.round(((lh*60+lm) + (dh*60+dm)) / 2); return String(Math.floor(mid/60)).padStart(2,'0') + ':' + String(mid%60).padStart(2,'0'); })();
   const variety = input.variety ?? 'max';
@@ -662,7 +667,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // ─── Распределение макросов по приёмам (MPS-based) ───────────────────
   const ptm = input.planTypeMod || { pMult: 1.0, fMult: 1.0, cMult: 1.0 };
-  const mpsPerMeal = Math.round(input.lbmKg * MPS_LBM_LOW * (ptm.pMult || 1.0));
+  // Д-13: MPS per meal scales with the cycle phase. Advanced/androgenic phases (course, recovery)
+  // raise nitrogen retention and benefit from a higher per-meal MPS dose (0.4 g/kg LBM); default 0.3.
+  const mpsLbm = (input.cyclePhase === 'course' || input.cyclePhase === 'recovery' || input.cyclePhase === 'pct')
+    ? MPS_LBM_HIGH : MPS_LBM_LOW;
+  const mpsPerMeal = Math.round(input.lbmKg * mpsLbm * (ptm.pMult || 1.0));
   const trainWindow = input.isTrainingDay && !!input.trainStartMin;
   // Carb periodization: тренировка → 25% pre+30% post+15% lunch; отдых → 30/30/20
   // Apply plan type multipliers (keto: low carb high fat, highcarb: high carb, etc.)
@@ -797,7 +806,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
 
   // 4. Intra-workout (тяжёлый training, allowIntraWorkout=true) ─────────
-  if (trainWindow && input.allowIntraWorkout && input.trainStartMin) {
+  // Д-8: intra-workout (EAA + cyclic dextrin) only for long sessions (>75 min). Short HIIT sessions
+  // don't deplete glycogen enough to justify intra carbs; the rationale text already says ">60 мин".
+  const intraEligible = trainWindow && input.allowIntraWorkout && (!input.trainDurationMin || input.trainDurationMin >= 75);
+  if (intraEligible && input.trainStartMin) {
     const intraTime = fmtTime(input.trainStartMin + 30);
     const intra = buildIntraWorkout(intraTime, seedBase + 4, pool);
     meals.push(intra);
@@ -913,7 +925,23 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     if (!impossibleGoal && devK > 0.10 && totals.f < fatTotal * 1.10) {
       const kcalNeed = input.goalKcal - totals.kcal;
       const fatCap = fatTotal * 1.10 - totals.f;
-      const fatItems = meals.flatMap(m => m.items.filter(it => it.role === 'fat').map(it => ({ meal: m, item: it })));
+      let fatItems = meals.flatMap(m => m.items.filter(it => it.role === 'fat').map(it => ({ meal: m, item: it })));
+      // Д-11: if no fat item exists in any meal (e.g. all fats excluded), inject one from pool.fats
+      // into dinner so the kcal deficit can actually be closed instead of being left silently.
+      if (fatItems.length === 0 && pool.fats.length > 0 && fatCap > 2) {
+        const dinnerMeal = meals.find(m => m.type === 'dinner') || meals[meals.length - 1];
+        if (dinnerMeal) {
+          const fatFood = pool.fats[Math.floor(seededRandom(seedBase + 77) * pool.fats.length)];
+          if (fatFood) {
+            const startG = Math.min(15, Math.max(5, Math.round(fatCap)));
+            const newItem = makeItem(fatFood, startG, 'fat');
+            dinnerMeal.items.push(newItem);
+            dinnerMeal.totals = dinnerMeal.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+            allFoodsUsed.push(fatFood.id); usedTodayIds.add(fatFood.id);
+            fatItems = [{ meal: dinnerMeal, item: newItem }];
+          }
+        }
+      }
       if (fatItems.length > 0 && fatCap > 2) {
         const kcalPerItem = Math.min(kcalNeed / fatItems.length, fatCap * 9 / fatItems.length);
         fatItems.forEach(({ meal, item }) => {
