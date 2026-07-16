@@ -451,6 +451,7 @@ function buildPostWorkout(
   pool: ReturnType<typeof buildFoodPools>,
   preferredIds?: Set<string>,
   opts?: { lockedIds?: Set<string>; recentIds?: Set<string> },
+  carbG: number = POSTW_FAST_CARB_G,
 ): Meal {
   const fastProtein = pool.fastProtein.find(f => f.id === 'whey_isolate') ?? pool.fastProtein.find(f => f.id === 'whey_concentrate') ?? pool.fastProtein.find(f => f.id === 'whey_protein') ?? pool.fastProtein[0];
   const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbFast.filter(f => preferredIds.has(f.id)) : [];
@@ -462,7 +463,7 @@ function buildPostWorkout(
     items.push(makeItem(fastProtein, grams, 'fast_protein'));
   }
   if (fastCarb) {
-    const grams = gramsForMacro(fastCarb, POSTW_FAST_CARB_G, 'carbs');
+    const grams = gramsForMacro(fastCarb, carbG, 'carbs');
     items.push(makeItem(fastCarb, grams, 'carb_fast'));
   }
 
@@ -631,13 +632,29 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const adjustedCarbsG = Math.round(input.goalCarbsG * ptm.cMult);
   const adjustedFatG = Math.round(input.goalFatG * ptm.fMult);
   const adjustedProteinG = Math.round(input.goalProteinG * ptm.pMult);
-  const carbsTotal = Math.max(CARB_FLOOR_G * ptm.cMult, adjustedCarbsG);
-  const breakC = Math.round(carbsTotal * 0.22);
-  const trainCarbLunch = Math.round(carbsTotal * 0.18);
-  const restCarbLunch = Math.round(carbsTotal * 0.30);
-  const trainCarbDinner = Math.round(carbsTotal * 0.12);
-  const restCarbDinner = Math.round(carbsTotal * 0.20);
-  const fatTotal = Math.max(Math.round(input.weightKg * FAT_FLOOR_PER_KG), adjustedFatG || input.goalFatG);
+  // Д-7: Detect physiologically-impossible kcal goals (below protein + min fat/carb floors).
+  // When impossible, lower the fat/carb floors toward safe minimums so the plan gets as close
+  // to the user's goal as possible WITHOUT sacrificing protein (protein is always preserved).
+  const _goalP = adjustedProteinG || input.goalProteinG;
+  const _floorFatG = Math.round(input.weightKg * FAT_FLOOR_PER_KG);
+  const _floorCarbG = Math.max(50, Math.round(CARB_FLOOR_G * ptm.cMult));
+  const _minKcal = Math.round(_goalP * 4 + _floorFatG * 9 + _floorCarbG * 4);
+  const impossibleGoal = input.goalKcal < _minKcal * 0.9;
+  const fatFloorG = impossibleGoal ? Math.round(input.weightKg * 0.5) : _floorFatG;   // 0.5 g/kg floor on hard cut
+  const carbFloorG = impossibleGoal ? 50 : _floorCarbG;                                // ketogenic-ish floor on hard cut
+  const carbsTotal = Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG);
+  // Д-2: Peri-workout carbs must SCALE with the daily carb budget (not hardcoded 40/60g),
+  // otherwise high-carb (insulin/mass) days overload dinner instead of the pre/post window.
+  // Pre = 20% of carbs, Post = 25% of carbs (with floors); breakfast/lunch/dinner share the rest.
+  const breakC = Math.round(carbsTotal * 0.18);
+  const trainCarbLunch = Math.round(carbsTotal * 0.14);
+  const restCarbLunch = Math.round(carbsTotal * 0.28);
+  const trainCarbDinner = Math.round(carbsTotal * 0.10);
+  const restCarbDinner = Math.round(carbsTotal * 0.22);
+  // Pre/post carb targets scale with carbsTotal; floors keep them meaningful on low-carb days.
+  const prewCarbG = trainWindow ? Math.max(PREW_CARB_SLOW_G, Math.round(carbsTotal * 0.20)) : PREW_CARB_SLOW_G;
+  const postwCarbG = trainWindow ? Math.max(POSTW_FAST_CARB_G, Math.round(carbsTotal * 0.25)) : POSTW_FAST_CARB_G;
+  const fatTotal = Math.max(fatFloorG, adjustedFatG || input.goalFatG);
 
   // P1.4: Snack on non-training days to fill MPS gap (lunch 12:30 → dinner 19:00 = 6.5h)
   const snackP = Math.max(15, Math.round(mpsPerMeal * 0.6));
@@ -649,8 +666,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     breakfast: { p: Math.max(30, Math.round(mpsPerMeal * 1.2)), c: breakC, f: Math.round(fatTotal * 0.20) },
     lunch: { p: Math.max(30, Math.round(mpsPerMeal * 1.2)), c: (input.eveningLowCarb ? Math.round((trainWindow ? trainCarbLunch : restCarbLunch - snackC) * 1.3) : (trainWindow ? trainCarbLunch : restCarbLunch - snackC)), f: Math.round(fatTotal * 0.15) },
     dinner: { p: Math.max(30, Math.round(mpsPerMeal * 1.2)), c: input.eveningLowCarb ? Math.round((trainWindow ? trainCarbDinner : restCarbDinner) * 0.5) : (trainWindow ? trainCarbDinner : restCarbDinner), f: Math.round(fatTotal * 0.22) },
-    prew: trainWindow ? { p: PREW_PROTEIN_G, c: PREW_CARB_SLOW_G, f: PREW_FAT_MAX_G } : null,
-    postw: trainWindow ? { p: POSTW_FAST_PROTEIN_G, c: POSTW_FAST_CARB_G, f: 0 } : null,
+    prew: trainWindow ? { p: PREW_PROTEIN_G, c: prewCarbG, f: PREW_FAT_MAX_G } : null,
+    postw: trainWindow ? { p: POSTW_FAST_PROTEIN_G, c: postwCarbG, f: 0 } : null,
     snack: hasSnack ? { p: snackP, c: snackC, f: snackF } : null,
   };
 
@@ -731,7 +748,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // 3. Pre-workout (если тренировка) — за 90 мин до старта ─────────────
   if (trainWindow && mealBudget.prew && input.trainStartMin) {
     const preTime = fmtTime(input.trainStartMin - 90);
-    const prew = buildPreWorkout(preTime, 'Предтрен', seedBase + 3, pool, input.budget, effectivePreferred, { lockedIds: input.lockedIds, recentIds: input.recentFoodIds });
+    const prew = buildPreWorkout(preTime, 'Предтрен', seedBase + 3, pool, input.budget, effectivePreferred, { lockedIds: input.lockedIds, recentIds: input.recentFoodIds }, prewCarbG);
     meals.push(prew);
     prew.items.forEach(i => allFoodsUsed.push(i.id));
     notes.push('Pre-workout: белок + медленные углеводы за 90 мин (как минимум 1 прием пищи до тренировки)');
@@ -748,7 +765,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // 5. Post-workout (+60 мин) ──────────────────────────────────────────
   if (trainWindow && mealBudget.postw && input.trainStartMin) {
     const postTime = fmtTime(input.trainStartMin + 60);
-    const postw = buildPostWorkout(postTime, 'Пост-трен', seedBase + 5, pool, effectivePreferred, { lockedIds: input.lockedIds, recentIds: input.recentFoodIds });
+    const postw = buildPostWorkout(postTime, 'Пост-трен', seedBase + 5, pool, effectivePreferred, { lockedIds: input.lockedIds, recentIds: input.recentFoodIds }, postwCarbG);
     meals.push(postw);
     postw.items.forEach(i => allFoodsUsed.push(i.id));
     notes.push('Post-workout: сыворотка + быстрые углеводы в течение 60 мин (анаболическое окно)');
@@ -813,13 +830,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     categories[cat] = (categories[cat] || 0) + 1;
   });
 
-  // Warn if goal kcal is too low to preserve protein + minimum macros
-  const minKcal = Math.round((adjustedProteinG || input.goalProteinG) * 4 + input.weightKg * FAT_FLOOR_PER_KG * 9 + CARB_FLOOR_G * 4);
-  if (input.goalKcal < minKcal * 0.9) {
-    notes.push(`⚠ Цель ${input.goalKcal} ккал ниже минимальной (${minKcal} ккал = белок + минимум жиров/углеводов). Белок сохранён, но план не может достичь цели без ущерба для MPS.`);
+  // Д-7: Warn if goal kcal is too low to preserve protein + minimum macros.
+  // impossibleGoal (computed earlier) already lowered fat/carb floors toward safe minimums so the
+  // delivered plan gets as close to goal as possible; protein is always preserved.
+  if (impossibleGoal) {
+    notes.push(`⚠ Цель ${input.goalKcal} ккал физиологически невозможна (минимум без ущерба белку: ${_minKcal} ккал). Белок сохранён, жиры/углеводы снижены до безопасных этажей (0.5 г/кг жир, ≥50 г углеводы). План неизбежно превысит цель — снизите белок или пересмотрите дефицит.`);
   }
-
-
   // Omega-3 boost: ensure at least one omega-3 source per day
   {
     const omega3Ids = new Set(['salmon','mackerel','sardines','red_fish','flaxseed','chia_seeds','walnuts']);
@@ -848,10 +864,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
   }
-  // KBJU fine-tune: if kcal >10% under goal, add fat (capped at fatTotal*1.10)
+  // KBJU fine-tune: if kcal >10% under goal, add fat (capped at fatTotal*1.10).
+  // Д-7: Skip this kcal-UP pass when the goal is physiologically impossible (don't inflate kcal above an impossible goal).
   {
     const devK = (input.goalKcal - totals.kcal) / Math.max(1, input.goalKcal);
-    if (devK > 0.10 && totals.f < fatTotal * 1.10) {
+    if (!impossibleGoal && devK > 0.10 && totals.f < fatTotal * 1.10) {
       const kcalNeed = input.goalKcal - totals.kcal;
       const fatCap = fatTotal * 1.10 - totals.f;
       const fatItems = meals.flatMap(m => m.items.filter(it => it.role === 'fat').map(it => ({ meal: m, item: it })));
@@ -908,11 +925,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
 
 
-  // Fat deficit correction — if fat >10% under goal, increase fat items (capped at +100% per item)
+  // Fat deficit correction — if fat >10% under goal, increase fat items (capped at +100% per item).
+  // Д-7: Skip when impossibleGoal (fat floor already reduced; don't force fat back up).
   {
     const goalF = fatTotal;
     const devF = (goalF - totals.f) / Math.max(1, goalF);
-    if (devF > 0.10) {
+    if (!impossibleGoal && devF > 0.10) {
       const fatDeficit = goalF - totals.f;
       const fatItems = meals.flatMap(m => m.items.filter(it => it.role === 'fat').map(it => ({ meal: m, item: it })));
       if (fatItems.length > 0) {
