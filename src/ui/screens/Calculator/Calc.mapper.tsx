@@ -675,6 +675,21 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
   const synergyDesc = finalRec ? buildStackSynergyDescription(finalRec) : [];
 
+  // РУЧНОЙ РЕЖИМ: план строится НАПРЯМУЮ из выбранных стеков (независимо от движка).
+  // Это гарантирует, что выбранные стеки всегда видны, даже если resolvePlan упадёт.
+  const manualResultSubs = useMemo(() => {
+    if (level !== 'manual') return [];
+    const map = new Map<string, { id: string; dose?: string; timing?: string; stack: string }>();
+    for (const stId of selectedStacks) {
+      const st = (ALL_STACKS as any[]).find(s => s.id === stId);
+      if (!st) continue;
+      for (const sd of (st.substances || [])) {
+        if (!map.has(sd.id)) map.set(sd.id, { id: sd.id, dose: sd.dose, timing: sd.timing, stack: st.name || stId });
+      }
+    }
+    return Array.from(map.values());
+  }, [level, selectedStacks]);
+
   return (
     <div style={{ ...GLASS, padding: 10, marginBottom: 8, border: '2px solid rgba(0,230,138,0.2)' }}>
       <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)', marginBottom: 6 }}>
@@ -695,7 +710,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             <span style={{ fontSize:10, color:'#00e68a' }}>›</span>
           </div>
         </div>
-        <div onClick={() => setShowManualPopup(true)} style={{ borderRadius:14, background:'linear-gradient(135deg,rgba(99,102,241,0.06),rgba(59,130,246,0.03))', border:'1.5px solid rgba(99,102,241,0.15)', padding:'12px 12px 10px', cursor:'pointer' }}>
+        <div                         onClick={() => { setLevel('manual'); setShowManualPopup(true); }} style={{ borderRadius:14, background:'linear-gradient(135deg,rgba(99,102,241,0.06),rgba(59,130,246,0.03))', border:'1.5px solid rgba(99,102,241,0.15)', padding:'12px 12px 10px', cursor:'pointer' }}>
           <div style={{ display:'flex', alignItems:'center', gap:6 }}>
             <span style={{ fontSize:16 }}>⚙️</span>
             <div style={{ flex:1 }}>
@@ -741,11 +756,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       , document.body)}
 
       {/* ── Попап ручного режима ── */}
-      {showManualPopup && ReactDOM.createPortal(
-        <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setShowManualPopup(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'88vh', display:'flex', flexDirection:'column' }}>
-            <div style={{ height:3, background:'linear-gradient(90deg,#818cf8,#6366f1)' }} />
-            <div style={{ flex:1, overflowY:'auto', padding:'16px 14px 12px' }}>
+      {showManualPopup && (
+        <div style={{ margin:'10px 0', borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.12)', overflow:'hidden' }}>
+          <div style={{ height:3, background:'linear-gradient(90deg,#818cf8,#6366f1)' }} />
+          <div style={{ padding:'16px 14px 12px', maxHeight:'72vh', overflowY:'auto' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
                 <span style={{ fontSize:13, fontWeight:800, color:'#818cf8' }}>⚙️ Ручной режим</span>
                 <button onClick={() => setShowManualPopup(false)} style={{ padding:'5px 12px', borderRadius:6, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:12, fontWeight:600 }}>✕</button>
@@ -877,8 +891,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               </button>
             </div>
           </div>
-        </div>
-      , document.body)}
+      )}
 
       {/* ===== УСИЛЕНИЕ: все стеки каталога ===== */}
       {level !== 'manual' && (
@@ -1644,6 +1657,29 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {rec && !rec.stopCourse && rec.alerts && rec.alerts.length > 0 && (
         <div style={{ margin:'5px 0', padding:'7px 9px', borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)' }}>
           {rec.alerts.map((a, i) => <div key={i} style={{ fontSize:8, color:'#fbbf24', marginBottom:1, lineHeight:1.4 }}>⚠ {a.message}</div>)}
+        </div>
+      )}
+
+      {/* ===== РУЧНОЙ РЕЖИМ: всегда видимый план из выбранных стеков ===== */}
+      {level === 'manual' && manualResultSubs.length > 0 && (
+        <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.22)' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+            <span style={{ fontSize:12, fontWeight:800, color:'#c084fc' }}>📦 Ручной план: {manualResultSubs.length} препарат(ов) из {selectedStacks.length} стеков</span>
+            <button onClick={() => setShowManualPopup(true)} style={{ fontSize:11, fontWeight:700, cursor:'pointer', padding:'4px 9px', borderRadius:6, background:'rgba(168,85,247,0.14)', border:'1px solid rgba(168,85,247,0.3)', color:'#c084fc' }}>⚙️ Изменить</button>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+            {manualResultSubs.map((ms) => {
+              const cat = SUPPORT_CATALOG_DATA[ms.id];
+              return (
+                <div key={ms.id} style={{ fontSize:11, padding:'3px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ fontWeight:600, color:'var(--text-light)' }}>{cat?.nameRu || cat?.name || ms.id}</span>
+                  {ms.dose && <span style={{ color:'#00e68a', marginLeft:4 }}>{ms.dose}</span>}
+                  {ms.timing && <span style={{ color:'var(--text-dim)', marginLeft:4 }}>{ms.timing}</span>}
+                  <span style={{ color:'rgba(255,255,255,0.3)', marginLeft:4, fontSize:10 }}>· {ms.stack}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
