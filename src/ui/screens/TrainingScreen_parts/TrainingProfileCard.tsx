@@ -218,6 +218,15 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
                 </div>
               </div>
             </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 13, color: 'rgba(235,235,245,0.7)', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={!!profile.avoidAxialLoad}
+                onChange={e => update({ avoidAxialLoad: e.target.checked })}
+                style={{ width: 18, height: 18, accentColor: ACCENT }}
+              />
+              🦴 Убрать осевую нагрузку (присед/становая/жим стоя)
+            </label>
           </div>
         );
       })()}

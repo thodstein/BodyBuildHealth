@@ -192,6 +192,7 @@ export interface BuildPlanInput {
   addDeloadWeek?: boolean; // Добавить финальную разгрузочную неделю (объём −50%, RIR 3)
   favoriteExercises?: string[]; // Любимые упражнения — получают +15 приоритет
   excludedExercises?: string[]; // Нелюбимые/исключённые упражнения — полностью исключаются
+  avoidAxialLoad?: boolean; // Убрать осевую нагрузку (присед/становая/жим стоя/гудморнинг)
 }
 
 /**
@@ -206,6 +207,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
   const { cycle, mrv, mrvOverride, goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, currentReadiness = 100, targetTonnage, sequenceStrategy = 'classic', preferEquipment: prefEqOverride, courseIntensity, workMaxOverride } = input;
   const favoriteIds = input.favoriteExercises || [];
   const excludeIds = input.excludedExercises || [];
+  const avoidAxial = input.avoidAxialLoad || false;
 
   // Полный per-group workMax: override (ПМ из калькулятора) > workMax > manualWorkMax
   const workMaxFull = { ...workMax, ...manualWorkMax, ...(workMaxOverride || {}) };
@@ -336,6 +338,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
         preferEquipment,
         preferBB: goal === 'mass' || goal === 'bulk' || goal === 'cut',
         favoriteIds, excludeIds,
+        avoidAxialLoad: avoidAxial,
       });
       const compsSafe = compounds.length === 0 ? poolFinal.slice(0, Math.min(compoundCount, poolFinal.length)) : compounds;
 
@@ -478,6 +481,7 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
         preferEquipment,
         preferBB: goal === 'mass' || goal === 'bulk' || goal === 'cut',
         favoriteIds, excludeIds,
+        avoidAxialLoad: avoidAxial,
       });
       const isosSafe = isolations.length === 0 ? poolFinal.filter(e => e.type === 'isolation').slice(0, Math.min(isoCount, poolFinal.length)) : isolations;
 

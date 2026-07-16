@@ -7,6 +7,11 @@
  */
 import type { Exercise } from '../core/types';
 import { getExerciseById } from '../core/exercise-catalog';
+import { EXERCISE_BIOMECHANICS_DB } from '../data/exercise-biomechanics-db';
+
+/** Быстрый индекс биомеханики по id упражнения */
+const BIO_MAP = new Map<string, typeof EXERCISE_BIOMECHANICS_DB[number]>();
+EXERCISE_BIOMECHANICS_DB.forEach(b => { if (b && b.id) BIO_MAP.set(b.id, b); });
 
 export interface SelectorInput {
   candidates: Exercise[];
@@ -29,6 +34,41 @@ export interface SelectorInput {
   favoriteIds?: string[];
   /** Исключённые упражнения (ID) — полностью исключаются из пула */
   excludeIds?: string[];
+  /** Убрать осевую нагрузку (нагрузку на позвоночник): присед/становая/жим стоя/гудморнинг */
+  avoidAxialLoad?: boolean;
+}
+
+/**
+ * Детект осевой (компрессионной) нагрузки на позвоночник.
+ * Источники: (1) БД биомеханики — spineLoad === 'high', (2) паттерны классических
+ * осевых лифтов (присед со штангой, становая/мёртвая, жим стоя/армейский/OHP, гудморнинг).
+ * НЕ осевые (допустимые): жим ног/лег-пресс, болгарский/гоблет присед, машинные приседы,
+ * тяги (гориз/вертик), жимы сидя с гантелями.
+ */
+function isAxialLoadExercise(ex: Exercise): boolean {
+  const n = (ex.name || '').toLowerCase();
+  const id = (ex.id || '').toLowerCase();
+
+  // Биомеханика БД: высокая нагрузка на позвоночник
+  const b = BIO_MAP.get(ex.id);
+  if (b && b.spineLoad === 'high') return true;
+
+  // Присед (barbell/фронт на спине плечах) — осевой. Исключаем безопасные варианты.
+  if (n.includes('присед') || n.includes('squat')) {
+    if (n.includes('жим ног') || n.includes('leg press') || n.includes('пресс ног')
+      || n.includes('болгар') || n.includes('bulgarian') || n.includes('гоблет')
+      || n.includes('goblet') || n.includes('машина') || n.includes('machine') || n.includes('хак')) return false;
+    return true;
+  }
+  // Становая / мёртвая / румын / гудморнинг — осевой (наклон со штангой)
+  if (n.includes('станов') || n.includes('мёртв') || n.includes('мертв') || n.includes('deadlift')
+    || n.includes('рум') || n.includes('гудморнинг') || n.includes('good morning')) return true;
+  // Жим стоя / армейский / overhead (штанга над головой) — осевой
+  if (n.includes('жим') && (n.includes('стоя') || n.includes('армей') || n.includes('overhead') || n.includes('над голов'))) return true;
+  if (id.includes('ohp') || id.includes('overhead') || id.includes('standing_press')) return true;
+  // За головой (behind the neck) — осевой + риск
+  if (n.includes('за голов')) return true;
+  return false;
 }
 
 export interface SelectedExercise extends Exercise {
@@ -222,10 +262,11 @@ function pushPullScore(ex: Exercise, selected: Exercise[]): number {
 
 /** Главная функция: интеллектуальный отбор N упражнений */
 export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
-  const { candidates, muscleGroup, count, selectedIds, selectedNames, equipment, weakZones, level, injuryProfile, type, preferEquipment, targetRir, preferBB, favoriteIds, excludeIds } = input;
+  const { candidates, muscleGroup, count, selectedIds, selectedNames, equipment, weakZones, level, injuryProfile, type, preferEquipment, targetRir, preferBB, favoriteIds, excludeIds, avoidAxialLoad } = input;
   const _selNames = selectedNames || [];
   const _exclIds = new Set(excludeIds || []);
   const _favIds = new Set(favoriteIds || []);
+  const _avoidAxial = !!avoidAxialLoad;
 
   let pool = candidates.filter(ex => {
     if (!ex || !ex.id) return false;
@@ -233,10 +274,11 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     if (_selNames.includes(ex.name)) return false;
     if (_exclIds.has(ex.id)) return false;
     if (type && type !== 'any' && ex.type !== type) return false;
+    if (_avoidAxial && isAxialLoadExercise(ex)) return false;
     return true;
   });
 
-  // Если пул пуст — возвращаем candidates без фильтра
+  // Если пул пуст (например, все кандидаты — осевые) — возвращаем candidates без фильтра
   if (pool.length === 0) pool = candidates.filter(ex => ex && ex.id && !selectedIds.includes(ex.id) && !_selNames.includes(ex.name));
 
   // Скоринг
@@ -448,7 +490,7 @@ export function selectTopN(
   exercises: Exercise[],
   group: string,
   n: number,
-  opts: { selectedIds?: string[]; equipment?: string[]; weakZones?: string[]; level?: string; injuryProfile?: string[]; type?: 'compound' | 'isolation' | 'any'; favoriteIds?: string[]; excludeIds?: string[] } = {}
+  opts: { selectedIds?: string[]; equipment?: string[]; weakZones?: string[]; level?: string; injuryProfile?: string[]; type?: 'compound' | 'isolation' | 'any'; favoriteIds?: string[]; excludeIds?: string[]; avoidAxialLoad?: boolean } = {}
 ): SelectedExercise[] {
   return selectExercisesSmart({
     candidates: exercises,
@@ -462,6 +504,7 @@ export function selectTopN(
     type: opts.type || 'any',
     favoriteIds: opts.favoriteIds,
     excludeIds: opts.excludeIds,
+    avoidAxialLoad: opts.avoidAxialLoad,
   });
 }
 

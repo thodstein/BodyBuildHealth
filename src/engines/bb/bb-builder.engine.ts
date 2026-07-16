@@ -17,7 +17,7 @@ import { getAllVolumeLandmarks, landmarksForRotation, normLevel, type TrainingLe
 import { tempoFor, REST_BY_CHARACTER, type TempoSpec } from './bb-tempo-rest';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { selectExercisesSmart } from '../exercise-selector.engine';
-import { trueMuscleOf, musclesForRole } from '../movement-pattern';
+import { trueMuscleOf, musclesForRole, derivePattern } from '../movement-pattern';
 import { PCT_FOR_RIR, S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
@@ -29,6 +29,8 @@ import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landma
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
 import { distributePhases, PHASE_CONFIGS, getPhaseVolumeMult, type BBPhase } from '../../ui/screens/TrainingScreen_parts/TrainingConstructor/phase-periodization';
+import { loadSRPESessions } from '../../engines/pro/srpe-store';
+import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
 export type BBVolumeGoal = 'mev' | 'mav' | 'mrv';
@@ -47,6 +49,7 @@ export interface BBBuilderInput {
   planStartWeek?: string;        // ISO-дата начала мезоцикла (неделя 1) — для per-week оценки травм (fix F)
   favoriteExercises?: string[];  // Любимые упражнения — +15 приоритет при отборе
   excludedExercises?: string[];  // Нелюбимые упражнения — полностью исключаются из пула
+  avoidAxialLoad?: boolean;      // Убрать осевую нагрузку (присед/становая/жим стоя/гудморнинг)
 }
 
 export interface BBSet {
@@ -344,6 +347,7 @@ function buildSession(
   rotationBlockIds: string[] = [],
   favoriteIds: string[] = [],
   excludeIds: string[] = [],
+  avoidAxialLoad: boolean = false,
 ): BBSession {
   const character = sched.character as DayCharacter;
   const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles);
@@ -467,6 +471,7 @@ function buildSession(
       targetRir: rir,
       preferBB: true,
       favoriteIds, excludeIds,
+      avoidAxialLoad,
     });
     for (const s of selected) { if (s && s.id) sessionSelectedIds.push(s.id); if (s && s.name) sessionSelectedNames.push(s.name); }
     let exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5 }];
@@ -650,6 +655,23 @@ function addDaysISO(from: string, days: number): string {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
+// fix N: реальный auto-deload по ACWR. Читаем sRPE-сессии пользователя и вычисляем
+// acute:chronic ratio. При перетренированности (ratio > 1.5) разгрузочные недели
+// назначаются чаще, а в коротких планах (≥3 нед) — гарантированно появляется deload.
+function computeAcwr(): number {
+  try {
+    const sessions = loadSRPESessions();
+    console.error('[computeAcwr] firstSess=', JSON.stringify(sessions[0]));
+    if (!sessions || sessions.length < 2) return 1;
+    const daily = toDailyLoads(sessions as any);
+    const r = acuteChronicRatio(daily);
+    console.error('[computeAcwr] sessions=', sessions.length, 'ratio=', r && r.ratio);
+    return r && isFinite(r.ratio) ? r.ratio : 1;
+  } catch {
+    return 1;
+  }
+}
+
 export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BBPlan {
   const pattern = getPattern(input.patternId) || SPLIT_PATTERNS[0];
   const level = normLevel(input.level) as TrainingLevel;
@@ -660,6 +682,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const injuries = input.injuries || [];
   const favIds = input.favoriteExercises || [];
   const exclIds = input.excludedExercises || [];
+  const avAxial = input.avoidAxialLoad || false;
 
   const today = todayStr();
   const excludedMuscles = getExcludedMuscles(injuries, today);
@@ -711,7 +734,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   }
 
   // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/deload (fix A)
-  const deloadFreq = input.weeks >= 6 ? 4 : 0;
+  // fix N: deload-частота зависит от реальной нагрузки (ACWR). При ratio>1.5 —
+  // учащаем разгрузку (каждые 3 нед) и гарантируем deload даже в коротких планах (≥3 нед).
+  // ACWR вычисляется ДО distributePhases и подаётся в неё (иначе deloadFreq мёртв).
+  const acwrRatio = computeAcwr();
+  let deloadFreq = input.weeks >= 6 ? 4 : 0;
+  if (acwrRatio > 1.5 && input.weeks >= 3) {
+    deloadFreq = Math.min(deloadFreq || 3, 3);
+  }
   const phaseDist = distributePhases(input.weeks, deloadFreq, input.goal === 'strength_mass' ? 'mass' : (input.goal || 'mass'));
   const phaseByWeek = new Map<number, BBPhase>();
   for (const pd of phaseDist) phaseByWeek.set(pd.startWeek, pd.phase);
@@ -722,12 +752,17 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // чтобы selectExercisesSmart выбирал свежие упражнения (предотвращает аккомодацию).
   const ROTATION_INTERVAL = 4;
   const rotationUsedByMuscle = new Map<string, string[]>(); // muscle → [exerciseName, ...]
+  // fix L: паттерны движений, уже задействованные для отстающих групп внутри текущей недели.
+  // Сбрасывается каждую неделю; позволяет не повторять один и тот же паттерн на разных днях.
+  const weekWeakPatterns = new Map<string, Set<string>>(); // weakMuscle → Set<pattern>
 
   for (let w = 1; w <= input.weeks; w++) {
     // Сброс ротации каждые ROTATION_INTERVAL недель (новая фаза → свежий пул)
     if (w > 1 && (w - 1) % ROTATION_INTERVAL === 0) {
       rotationUsedByMuscle.clear();
     }
+    // fix L: паттерны отстающих групп сбрасываются раз в неделю (свежий выбор движений)
+    weekWeakPatterns.clear();
     const musclePrimaryAssigned = new Set<string>(); // ← сбрасывается КАЖДУЮ неделю
     const weekSessions: BBSession[] = [];
     const phase = phaseByWeek.get(w) || 'accumulation';
@@ -774,7 +809,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const weekExcluded = getExcludedMuscles(injuries, weekDate);
       const weekGraded = getGradedInjuries(injuries, weekDate);
       const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
-      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], isFB ? fbUsedNames : [], rotationIds, favIds, exclIds);
+      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], isFB ? fbUsedNames : [], rotationIds, favIds, exclIds, avAxial);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {
@@ -786,6 +821,18 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         if (!rotationUsedByMuscle.has(m)) rotationUsedByMuscle.set(m, []);
         const arr = rotationUsedByMuscle.get(m)!;
         if (ex.exerciseName && !arr.includes(ex.exerciseName)) arr.push(ex.exerciseName);
+      }
+      // fix L: фиксируем паттерны основных упражнений отстающих групп этой недели,
+      // чтобы фидер-сеты (fix J) и добивки не повторяли тот же паттерн движения.
+      for (const ex of sess.exercises) {
+        const exm = collapseKey(ex.muscle);
+        if (isWeak(exm, weakPoints) && !Array.from(weekExcluded).includes(exm)) {
+          const cat = (EXERCISE_CATALOG as any[]).find((c: any) => c.name === ex.exerciseName);
+          if (cat) {
+            if (!weekWeakPatterns.has(exm)) weekWeakPatterns.set(exm, new Set());
+            weekWeakPatterns.get(exm)!.add(derivePattern(cat));
+          }
+        }
       }
       // fix J: фидер-сеты для отстающих групп — изоляция высоким повторением (grease-the-groove
       // финишер) в дни, где слабая группа уже тренируется. Добивочное кровенаполнение без роста fatigue.
@@ -802,14 +849,19 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           return (raw === wm || mg === wm) && (e.exerciseType === 'isolation' || e.type === 'isolation');
         });
         if (!feederPool.length) continue;
+        // fix L: паттерны, уже использованные для этой отстающей группы на текущей неделе.
+        if (!weekWeakPatterns.has(wm)) weekWeakPatterns.set(wm, new Set());
+        const usedPatterns = weekWeakPatterns.get(wm)!;
         // Ранжируем: приоритет — изоляции именно этой группы (плечо/грудь/спина...),
-        // штраф — «чужие» тяговые движения, ошибочно помеченные как эта группа.
+        // штраф — «чужие» тяговые движения, ошибочно помеченные как эта группа,
+        // и — критично — повтор уже задействованного паттерна внутри недели (fix L).
         const scoreFeeder = (e: any): number => {
           const nm = (e.name || '').toLowerCase();
           let s = 0;
           if (/(плеч|дельт|латерал|отвод|мах|развод|fly|raise|lateral|rear|face ?pull|передняя|задняя)/.test(nm)) s += 3;
           if (/(тяга|pull|row|наклон|присед|жим|станов|отжим)/.test(nm)) s -= 3;
           if (e.exerciseType === 'isolation' || e.type === 'isolation') s += 1;
+          if (usedPatterns.has(derivePattern(e))) s -= 100;
           return s;
         };
         feederPool.sort((a, b) => scoreFeeder(b) - scoreFeeder(a));
@@ -831,6 +883,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         });
         addedFeeders.add(wm);
         addedFeeders.add(fName);
+        usedPatterns.add(derivePattern(fData));
       }
       // fix K: памп-финишер для первичных групп, у которых день — толко «тяж» (без метаболического стресса).
       // bro-split (1 группа/день) иначе = только тяжёлые сеты. Добавляем 1 изоляцию высоким повторением.

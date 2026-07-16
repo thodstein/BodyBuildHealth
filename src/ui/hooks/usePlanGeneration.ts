@@ -14,6 +14,7 @@ export interface PlanGenDeps {
   courseIntensity?: 'none' | 'mild' | 'moderate' | 'heavy';
   favoriteExercises?: string[];
   excludedExercises?: string[];
+  avoidAxialLoad?: boolean;
 }
 
 export interface PlanGenResult {
@@ -37,7 +38,7 @@ export interface PlanGenOpts {
  * генерирующую дни плана ручного конструктора. Чистое ядро — в engine buildPlanDays (тестируется).
  */
 export function usePlanGeneration(deps: PlanGenDeps) {
-  const { goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, courseIntensity, favoriteExercises, excludedExercises } = deps;
+  const { goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, courseIntensity, favoriteExercises, excludedExercises, avoidAxialLoad } = deps;
   return useCallback(
     (cycle: string[][], mrv: number, opts?: PlanGenOpts): PlanGenResult =>
       buildPlanDays({
@@ -51,7 +52,8 @@ export function usePlanGeneration(deps: PlanGenDeps) {
         courseIntensity,
         addDeloadWeek: opts?.addDeloadWeek,
         favoriteExercises, excludedExercises,
+        avoidAxialLoad,
       }),
-    [goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, courseIntensity, favoriteExercises, excludedExercises]
+    [goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, courseIntensity, favoriteExercises, excludedExercises, avoidAxialLoad]
   );
 }

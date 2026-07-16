@@ -22,6 +22,7 @@ export interface TrainingProfile {
   equipment: string[];
   favoriteExercises: string[];
   excludedExercises: string[];
+  avoidAxialLoad: boolean;
   pmSquat: number;
   pmBench: number;
   pmDead: number;
@@ -52,6 +53,7 @@ export const DEFAULT_PROFILE: TrainingProfile = {
   equipment: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'],
   favoriteExercises: [],
   excludedExercises: [],
+  avoidAxialLoad: false,
   pmSquat: 120,
   pmBench: 100,
   pmDead: 140,
@@ -99,6 +101,7 @@ export function saveTrainingProfile(p: TrainingProfile): void {
       if (p.weakPoints?.length) tr.weakPoints = p.weakPoints;
       if (p.favoriteExercises?.length) tr.favoriteExercises = p.favoriteExercises;
       if (p.excludedExercises?.length) tr.excludedExercises = p.excludedExercises;
+      if (p.avoidAxialLoad !== undefined) tr.avoidAxialLoad = p.avoidAxialLoad;
       if (p.equipment?.length) tr.equipment = p.equipment;
       if (p.loadStrategy) tr.loadStrategy = p.loadStrategy;
       if (p.pmSquat) tr.pmSquat = p.pmSquat;

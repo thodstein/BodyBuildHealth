@@ -327,6 +327,7 @@ export const BbAutoConstructor: React.FC = () => {
         planStartWeek: new Date().toISOString().slice(0, 10),
         favoriteExercises: prof.favoriteExercises || [],
         excludedExercises: prof.excludedExercises || [],
+        avoidAxialLoad: prof.avoidAxialLoad || false,
       }, pedAdapt);
     }
 
@@ -1014,7 +1015,7 @@ export const BbAutoConstructor: React.FC = () => {
         {/* Validation banners */}
         {(() => {
           const ws = weeklySetsFromBBPlan(W);
-          const b = validatePlan({ weeklySets: ws, level: bbLevel, goal: bbGoal, daysPerWeek: bbDays, weakPoints, readiness: prof.recovery });
+          const b = validatePlan({ weeklySets: ws, level: bbLevel, goal: bbGoal, daysPerWeek: bbDays, weakPoints, readiness: ((prof.recovery ?? 7) * 10) });
           if (b.length === 0) return null;
           return (
             <div style={{ ...CARD, marginBottom:8, background:'rgba(220,38,38,0.04)', border:'1px solid rgba(220,38,38,0.15)' }}>
