@@ -529,7 +529,11 @@ export const TrainingConstructor: React.FC<Props> = ({
 
     return { 
       days: methodResult.days, 
-      weeklySets: built.weeklySets, 
+      weeklySets: (() => {
+        const ws: Record<string, number> = {};
+        methodResult.days.forEach(d => d.exercises.forEach(e => { ws[e.group] = (ws[e.group] || 0) + e.sets; }));
+        return ws;
+      })(), 
       groupCorrections: finalCorrections, 
       patternBalance: built.patternBalance 
     };
@@ -1675,6 +1679,7 @@ export const TrainingConstructor: React.FC<Props> = ({
             globalTempoStr={globalTempoStr}
             mrvOverride={mrvOverride}
             labAnalysis={labAnalysis}
+            readinessSlider={readinessSlider}
           />
 
           {manualResult && (
