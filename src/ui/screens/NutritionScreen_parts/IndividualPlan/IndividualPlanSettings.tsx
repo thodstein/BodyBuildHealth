@@ -1049,7 +1049,7 @@ export const IndividualPlanSettings: React.FC = () => {
               padding: '10px 8px', borderRadius: 12, cursor: 'pointer', textAlign: 'center',
               background: variety === v.id ? `${v.color}18` : '#202023',
               border: variety === v.id ? `2px solid ${v.color}` : '1px solid rgba(255,255,255,0.06)',
-              color: variety === v.id ? v.color : 'rgba(255,255,255,0.85)',
+              color: variety === v.id ? '#fff' : 'rgba(255,255,255,0.7)',
               fontWeight: variety === v.id ? 700 : 500, fontSize: 10,
             }}>
               <div style={{ fontSize: 14, marginBottom: 2 }}>{v.label.split(' ')[0]}</div>
@@ -1071,10 +1071,10 @@ export const IndividualPlanSettings: React.FC = () => {
           {NUTRITION_LEVELS.map(n => (
             <button key={n.id} onClick={() => setNutrLevel(n.id)} style={{
               padding: '10px 6px', borderRadius: 12, cursor: 'pointer', textAlign: 'center',
-              background: nutrLevel === n.id ? 'rgba(0,230,138,0.15)' : '#202023',
+              background: nutrLevel === n.id ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
               border: nutrLevel === n.id ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-              color: nutrLevel === n.id ? '#00e68a' : 'rgba(255,255,255,0.85)',
-              fontWeight: nutrLevel === n.id ? 700 : 500, fontSize: 10,
+              color: nutrLevel === n.id ? '#000' : 'rgba(255,255,255,0.7)',
+              fontWeight: nutrLevel === n.id ? 800 : 500, fontSize: 10,
               transition: 'all 0.2s',
             }}>
               <div style={{ fontSize: 14, marginBottom: 2 }}>{n.icon}</div>
