@@ -537,6 +537,8 @@ export const TrainingConstructor: React.FC<Props> = ({
     const workMaxMerged = { chest: 100, back: 110, legs: 140, quads: 130, hamstrings: 80, glutes: 80, calves: 60, shoulders: 60, arms: 50, biceps: 40, triceps: 40, core: 60, abs: 60, traps: 50, forearms: 30, ...tprofile.workMax, ...manualWorkMax };
 
     // ─── BB-авто режим ───
+    try {
+
     if (manualCfg.generator === 'bb' || manualCfg.generator === 'bb_split') {
       const bbSplitId = manualCfg.bbSplit || SPLIT_PATTERNS[0]?.id || 'upper_lower_4';
       const bbLoadStrategy = (manualCfg.bbLoad || 'double_progression') as LoadStrategy;
@@ -692,6 +694,12 @@ export const TrainingConstructor: React.FC<Props> = ({
         bbMeta: { generator: 'bb_cycle', bbPatternId: manualCfg.cycle || '', bbLoadStrategy: bbLoadStrategy },
       });
       setWizardStep(6);
+      return;
+    }
+
+    } catch (e: any) {
+      console.error('[Manual constructor] Ошибка BB-генерации:', e);
+      alert('Ошибка при генерации BB-плана: ' + (e?.message || String(e)) + '. Проверьте параметры и попробуйте снова.');
       return;
     }
 

@@ -21,6 +21,7 @@ import { trueMuscleOf, musclesForRole } from '../movement-pattern';
 import { PCT_FOR_RIR, S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
+import { prescribeLoad, type LoadStrategy } from './bb-autocoach.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findSubstitutions } from '../exercise-substitution.engine';
 import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landmarks.engine';
@@ -354,6 +355,7 @@ function buildSession(
   mrvRot: number = 0,
   preSelectedIds: string[] = [],
   preSelectedNames: string[] = [],
+  rotationBlockIds: string[] = [],
 ): BBSession {
   const character = sched.character as DayCharacter;
   const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles);
@@ -374,7 +376,7 @@ function buildSession(
   }
   const plans: MusclePlan[] = [];
   let totalExpectedFatigue = 0;
-  const sessionSelectedIds: string[] = [...preSelectedIds];
+  const sessionSelectedIds: string[] = [...preSelectedIds, ...rotationBlockIds];
   const sessionSelectedNames: string[] = [...preSelectedNames];
   
   for (const mp of musclePlans) {
@@ -431,7 +433,10 @@ function buildSession(
     const wm = workMax[repKey] || PRO_WORKMAX_RATIO[repKey]?.(workMax) || 80;
     const pct = PCT_FOR_RIR[rir] ?? 0.9;
     const reps = Math.round((rmin + rmax) / 2);
-    const weight = Math.round(wm * pct * 10) / 10;
+    let weight = Math.round(wm * pct * 10) / 10;
+    // FIX-3: делод должен быть лёгким (55% интенсивности — активное восстановление)
+    // Без этого fix PCT_FOR_RIR[4]=0.84 → делод-вес 84% workMax вместо 55%
+    if (phase === 'deload') weight = Math.round(weight * (PHASE_CONFIGS.deload.intensityMultiplier || 0.55) * 10) / 10;
     const accessoryCount = ACCESSORY_2X_GROUPS.has(muscle) ? 2 : 1;
     const exerciseCount = role === 'primary'
       ? (['back', 'quads', 'chest', 'shoulders'].includes(muscle) ? 3 : 2)
@@ -714,7 +719,16 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const phaseWeekCounter: Record<string, number> = { accumulation: 0, intensification: 0, deload: 0, peaking: 0 };
 
   const weeks: BBWeek[] = [];
+  // FIX-1: Ротация упражнений — каждые ROTATION_INTERVAL недель сбрасываем пул использованных ID,
+  // чтобы selectExercisesSmart выбирал свежие упражнения (предотвращает аккомодацию).
+  const ROTATION_INTERVAL = 4;
+  const rotationUsedByMuscle = new Map<string, string[]>(); // muscle → [exerciseName, ...]
+
   for (let w = 1; w <= input.weeks; w++) {
+    // Сброс ротации каждые ROTATION_INTERVAL недель (новая фаза → свежий пул)
+    if (w > 1 && (w - 1) % ROTATION_INTERVAL === 0) {
+      rotationUsedByMuscle.clear();
+    }
     const musclePrimaryAssigned = new Set<string>(); // ← сбрасывается КАЖДУЮ неделю
     const weekSessions: BBSession[] = [];
     const phase = phaseByWeek.get(w) || 'accumulation';
@@ -743,14 +757,27 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       }
       // fix Z: sessMuscles по collapseKey (delt heads→shoulders) для mrvByMuscle-lookup
       const sessMuscles = [...new Set(musclesForTag(s.sessionTag).map(m => collapseKey(m)))];
+      // Ротация: собираем ID упражнений, использованных ранее для этих мышц
+      const rotationIds: string[] = [];
+      for (const m of sessMuscles) {
+        const prevIds = rotationUsedByMuscle.get(m) || [];
+        rotationIds.push(...prevIds);
+      }
       // Solo-дни (1-2 группы мышц): увеличиваем бюджет на 50% — вся энергия дня идёт на эти мышцы
       const sessDailyCap = sessMuscles.length <= 2 ? Math.round(dailyCap * 1.5) : dailyCap;
       const mrvRot = Math.max(12, ...sessMuscles.map(m => mrvByMuscle[m] || 0));
-      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, injuryProfile, new Set(injuryProfile), excludedMuscles, gradedInjuries, today, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], isFB ? fbUsedNames : []);
+      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, injuryProfile, new Set(injuryProfile), excludedMuscles, gradedInjuries, today, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], isFB ? fbUsedNames : [], rotationIds);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {
         if (ex.exerciseName) { fbUsedIds.push(ex.exerciseName); fbUsedNames.push(ex.exerciseName); }
+      }
+      // Ротация: запоминаем использованные упражнения для следующих недель
+      for (const ex of sess.exercises) {
+        const m = collapseKey(ex.muscle);
+        if (!rotationUsedByMuscle.has(m)) rotationUsedByMuscle.set(m, []);
+        const arr = rotationUsedByMuscle.get(m)!;
+        if (ex.exerciseName && !arr.includes(ex.exerciseName)) arr.push(ex.exerciseName);
       }
       weekSessions.push(sess);
     }
@@ -759,12 +786,42 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     weeks.push({ week: w, sessions: weekSessions });
   }
 
+  // FIX-2: Прогрессия весов (double_progression) — реальный прогресс от недели к неделе.
+  // До fix веса менялись ТОЛЬКО от сжатия RIR (3→0 = +14% за 8 нед), без истинной перегрузки.
+  // Теперь каждая следующая неделя берёт вес предыдущей и применяет prescribeLoad.
+  for (let wi = 1; wi < weeks.length; wi++) {
+    const prevWeek = weeks[wi - 1];
+    const curWeek = weeks[wi];
+    const curPhase = phaseByWeek.get(curWeek.week) || 'accumulation';
+    for (const curSess of curWeek.sessions) {
+      for (const curEx of curSess.exercises) {
+        const prevEx = prevWeek.sessions
+          .flatMap(s => s.exercises)
+          .find(pe => pe.name === curEx.name && pe.muscle === curEx.muscle);
+        if (!prevEx) continue;
+        const maxW = workMax[curEx.muscle] || 80;
+        const prevWs = prevEx.workSets[0];
+        if (!prevWs) continue;
+        const prescr = prescribeLoad(
+          'double_progression',
+          prevWs.weight, prevWs.reps, prevEx.rir,
+          maxW, curWeek.week, input.weeks, curPhase
+        );
+        for (const ws of curEx.workSets) {
+          ws.weight = Math.round(prescr.nextWeight * 10) / 10;
+        }
+      }
+    }
+  }
+
   const rationale: string[] = [
     `Сплит «${pattern.name}» (${pattern.rotationDays}дн ротация, ${pattern.sessionsPerRotation} сессий)`,
     `Уровень ${level}, цель ${input.goal}, ${input.weeks} нед`,
     `Объём ${input.volumeGoal || 'MAV'}: ` + Object.entries(muscleVolumeRotation).map(([m, v]) => `${m}=${v}`).join(', '),
     `Специализация: ${focusGroup || 'нет'}`,
     `Фазовая периодизация (distributePhases): накопление → интенсификация${deloadFreq > 0 ? ' → разгрузка (deload)' : ''} (RIR по фазе + волна); вес = workMax×%1RM(RIR)`,
+    `Прогрессия весов: double_progression (prescribeLoad) — еженедельный рост от недели к неделе с учётом фазы.`,
+    `Ротация упражнений: каждые ${ROTATION_INTERVAL} нед — свежий пул (запрет повторов из предыдущего блока).`,
     `S-MRV: автоматический кап объёма на основе бюджета утомления сессии + потолок по MRV мышцы.`,
     ...(pedAdapt ? [`PED-адаптация: MRV×${pedAdapt.combinedMrvMultiplier.toFixed(2)}, восстановление×${pedAdapt.combinedRecoveryMultiplier.toFixed(2)}`] : []),
     ...(excludedMuscles.size > 0 ? [`Травмы: исключены ${[...excludedMuscles].join(', ')} — упражнения на эти группы не назначаются.`] : []),

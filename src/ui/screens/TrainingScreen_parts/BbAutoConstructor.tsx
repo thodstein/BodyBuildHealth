@@ -327,6 +327,8 @@ export const BbAutoConstructor: React.FC = () => {
   const buildBb = () => {
     let plan: BBPlan;
 
+    try {
+
     if (planMode === 'bb_cycle' && selectedCycleId) {
       const cycle = getCycleById(selectedCycleId) as SRCycleTemplate | undefined;
       if (!cycle) { alert('Цикл не найден'); return; }
@@ -394,6 +396,12 @@ export const BbAutoConstructor: React.FC = () => {
       })));
       localStorage.setItem('he_pl_runtime', JSON.stringify(sessions));
     } catch {}
+
+    } catch (e: any) {
+      console.error('[BB-auto] Ошибка генерации плана:', e);
+      alert('Ошибка при генерации плана: ' + (e?.message || String(e)) + '. Проверьте параметры и попробуйте снова.');
+      return;
+    }
   };
 
   const handleSavePlan = () => {
