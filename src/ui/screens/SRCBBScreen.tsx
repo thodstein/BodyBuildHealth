@@ -63,14 +63,14 @@ type Mode = 'pl' | 'bb' | 'manual';
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: '12px', margin: '6px 0' };
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 10, lineHeight: 1.4 };
 const cardBg = CARD;
-const ACCENT = '#00e68a';
+const ACCENT = 'var(--accent)';
 const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 12, minHeight: 40, cursor: 'pointer' };
 const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: `1px solid ${ACCENT}20` };
-const PILL = (active: boolean) => ({ padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight: active ? 700 : 500, cursor:'pointer', border: active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: active ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#18181b', color: active ? '#000' : '#fff', flexShrink:0 } as React.CSSProperties);
+const PILL = (active: boolean) => ({ padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight: active ? 700 : 500, cursor:'pointer', border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)', background: active ? 'linear-gradient(135deg,var(--accent),#00c8a0)' : '#18181b', color: active ? '#000' : '#fff', flexShrink:0 } as React.CSSProperties);
 const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 40, width: '100%', outline: 'none', boxSizing: 'border-box' };
 const IN: React.CSSProperties = { ...SEL, padding: '10px' };
 const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 10, margin: '6px 0 3px' };
-const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: '#00e68a', marginBottom: 8 };
+const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 };
 
 export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
@@ -519,14 +519,49 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       try { localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: runFocus, week: srcWeek, track: mainTab })); } catch { /* ignore */ }
     }
   }, [playerDays, runFocus, srcWeek, mainTab]);
+
+  // V7: прогресс 1ПМ из дневника тренировок (StrengthDiary), Epley-оценка из реальных подходов
+  const [strengthLogs, setStrengthLogs] = useState<any[]>([]);
+  useEffect(() => {
+    let m = true;
+    try { new StrengthDiary().getWorkoutLogs().then((l: any) => { if (m) setStrengthLogs(l || []); }); } catch { /* ignore */ }
+    return () => { m = false; };
+  }, []);
+  const e1rmSeries = useMemo(() => {
+    if (!strengthLogs.length) return [];
+    const LIFT_KW: Record<string, string[]> = { squat: ['присед'], bench: ['жим лёжа', 'жим лёж'], deadlift: ['становая'] };
+    const byLift: Record<string, Map<string, number>> = { squat: new Map(), bench: new Map(), deadlift: new Map() };
+    for (const log of strengthLogs) {
+      for (const ex of (log.exercises || [])) {
+        const nm = (ex.exerciseName || '').toLowerCase();
+        for (const [lift, kws] of Object.entries(LIFT_KW)) {
+          if (!kws.some(k => nm.includes(k))) continue;
+          let best = 0;
+          for (const st of (ex.sets || [])) {
+            const w = +st.weight || 0, r = +st.reps || 0;
+            if (w > 0) { const e1 = r <= 1 ? w : Math.round(w * (1 + r / 30) * 10) / 10; if (e1 > best) best = e1; }
+          }
+          if (best > 0) { const cur = byLift[lift].get(log.date) || 0; if (best > cur) byLift[lift].set(log.date, best); }
+          break;
+        }
+      }
+    }
+    const COL: Record<string, string> = { squat: 'var(--accent)', bench: '#60a5fa', deadlift: '#f59e0b' };
+    const LBL: Record<string, string> = { squat: 'Присед', bench: 'Жим', deadlift: 'Становая' };
+    return Object.keys(byLift).map(lift => {
+      const pts = [...byLift[lift].entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([date, val]) => ({ date, val }));
+      return { lift, color: COL[lift], label: LBL[lift], pts };
+    }).filter(s => s.pts.length > 0);
+  }, [strengthLogs]);
+
   return (
     <div key={mainTab} style={{ padding: 12, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
       {/* Заголовок текущего режима планирования (выбор режима — в навигации блока) */}
-      <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)', textAlign: 'center' }}>
-        <span style={{ fontSize: 13, fontWeight: 800, color: '#00e68a' }}>{mainTab === 'pl' ? '🏆 Силовой цикл (ПЛ)' : mainTab === 'bb' ? '💪 Бодибилдинг (ББ)' : '🛠 Ручной конструктор'}</span>
+      <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 12, background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)', textAlign: 'center' }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)' }}>{mainTab === 'pl' ? '🏆 Силовой цикл (ПЛ)' : mainTab === 'bb' ? '💪 Бодибилдинг (ББ)' : '🛠 Ручной конструктор'}</span>
       </div>
       {applyPayload && (
-        <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.25)', marginBottom: 10, fontSize: 11, color: '#00e68a', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--accent-dim)', border: '1px solid rgba(0,230,138,0.25)', marginBottom: 10, fontSize: 11, color: 'var(--accent)', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>✓ Применено: {applyPayload.label}</span>
           <button onClick={() => { clearPlannerApply(); setApplyPayload(null); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: 10, cursor: 'pointer' }}>✕</button>
         </div>
@@ -550,7 +585,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             <PopupNumber label="Дней в неделю" value={days} min={2} max={7} suffix="" onChange={v => setDays(v)} />
             <PopupNumber label="Вес тела" value={bw} min={40} max={200} suffix=" кг" onChange={v => setBw(v)} />
           </div>
-          {best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { setSelectedCycleId(best.cycle.meta.id); setTimeout(buildSrc, 0); }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,#00e68a,#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
+          {best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { setSelectedCycleId(best.cycle.meta.id); setTimeout(buildSrc, 0); }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,var(--accent),#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
           <div style={H}>📂 Каталог силовых циклов ({plCycles.length})</div>
           <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={plCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${({ powerlifting: 'Троеборье', bench: 'Жим лёжа', deadlift_bench: 'Тяга+Жим', armwrestling: 'Армрестлинг' } as Record<string,string>)[c.meta.direction] || c.meta.direction} · ${c.meta.period} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
           {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
@@ -571,7 +606,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     <PopupNumber label="Становая тяга" value={pmDead} min={20} max={500} suffix=" кг" onChange={v => setPmDead(v)} />
                   </div>
                   {exs.length > 3 && (
-                    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.1)' }}>
+                    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid var(--accent-dim)' }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🔧 Дополнительные ПМ по упражнениям цикла</div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr ' + (cols > 3 ? '1fr' : ''), gap: 6 }}>
                         {exs.filter(e => {
@@ -609,7 +644,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             <PopupSelect label="Длина мезоцикла" value={String(cycleWeeks)} onChange={v => setCycleWeeks(+v)} options={[['12','12 недель'],['16','16 недель'],['20','20 недель'],['24','24 недели']].map(([id,label]) => ({ id, label }))} />
           </div>
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: ACCENT }}>🎯 Слабые группы (акцент, сохраняются в профиль)</div>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6 }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: "pointer", border: on ? "1px solid #00e68a" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "#00e68a" : "rgba(255,255,255,0.6)" }}>{l}{on ? " ✓" : ""}</button>; })}</div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6 }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)" }}>{l}{on ? " ✓" : ""}</button>; })}</div>
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: '#8b5cf6' }}>🎯 Слабые точки СРЦ-движений (диагностика weakpoint-pl)</div>
           {(() => {
             const WP_LABELS: Record<string, string> = {
@@ -658,7 +693,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 <span style={{ fontSize:10, fontWeight:700, color: PH_COLOR[phase], background: PH_COLOR[phase]+'22', padding:'3px 8px', borderRadius:10 }}>{PH_RU[phase]}</span>
               </div>
               <div style={{ ...SMALL, marginTop:4 }}>{builtSrc.progressionRationale}</div>
-              {methodHints.label && <div style={{ marginTop:4, fontSize:10, color:'#00e68a', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', padding:'3px 8px', borderRadius:8, display:'inline-block' }}>🧩 {methodHints.label}{methodHints.volumeMult !== 1 ? ' · объём×' + methodHints.volumeMult : ''}{methodHints.technique ? ' · ' + methodHints.technique : ''}</div>}
+              {methodHints.label && <div style={{ marginTop:4, fontSize:10, color:'var(--accent)', background:'var(--accent-dim)', border:'1px solid rgba(0,230,138,0.2)', padding:'3px 8px', borderRadius:8, display:'inline-block' }}>🧩 {methodHints.label}{methodHints.volumeMult !== 1 ? ' · объём×' + methodHints.volumeMult : ''}{methodHints.technique ? ' · ' + methodHints.technique : ''}</div>}
               {plWeakPoints.length > 0 && (
                 <div style={{ marginTop:8, fontSize:10, color:'#c4b5fd', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.25)', padding:'6px 8px', borderRadius:8 }}>
                   <div style={{ fontWeight:700, marginBottom:4 }}>🎯 Слабые точки СРЦ (добавлены ассистенты в план):</div>
@@ -702,25 +737,25 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', background:'rgba(0,0,0,0.9)' }} onClick={() => setPickerDay(null)}>
                   <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#18181b', display:'flex', flexDirection:'column' }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 12px 0' }}>
-                      <span style={{ fontSize:14, fontWeight:700, color:'#00e68a' }}>＋ Упражнение в день</span>
+                      <span style={{ fontSize:14, fontWeight:700, color:'var(--accent)' }}>＋ Упражнение в день</span>
                       <button onClick={() => setPickerDay(null)} style={{ fontSize:10, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', padding:'4px 8px' }}>✕</button>
                     </div>
                     <div style={{ flex:1, overflowY:'auto', padding:'8px 12px 80px' }}>
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>{CAT_GROUPS.map(g => <button key={g} onClick={() => { setPickerGroup(g); setPickerExName(''); }} style={{ padding:'5px 10px', borderRadius:16, fontSize:9, cursor:'pointer', border: pickerGroup===g?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: pickerGroup===g?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.03)', color: pickerGroup===g?'#00e68a':'rgba(255,255,255,0.7)' }}>{GRP_RU[g]||g}</button>)}</div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>{CAT_GROUPS.map(g => <button key={g} onClick={() => { setPickerGroup(g); setPickerExName(''); }} style={{ padding:'5px 10px', borderRadius:16, fontSize:10, cursor:'pointer', border: pickerGroup===g?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.08)', background: pickerGroup===g?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.03)', color: pickerGroup===g?'var(--accent)':'rgba(255,255,255,0.7)' }}>{GRP_RU[g]||g}</button>)}</div>
                       <select value={pickerExName} onChange={e => setPickerExName(e.target.value)} style={{ ...SEL, marginBottom:8 }}>
                         <option value=''>— выберите упражнение —</option>
                         {getExercisesByGroup(pickerGroup).map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
                       </select>
                       <div style={{ display:'flex', gap:6, alignItems:'center', marginBottom:8 }}>
-                        <span style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>Подходы</span>
+                        <span style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>Подходы</span>
                         <input type='number' value={pickerScheme.sets} onChange={e => setPickerScheme(s => ({ ...s, sets: +e.target.value }))} style={{ width:48, ...IN, padding:'4px', fontSize:10 }} />
-                        <span style={{ fontSize:9 }}>×</span>
+                        <span style={{ fontSize:10 }}>×</span>
                         <input type='number' value={pickerScheme.reps} onChange={e => setPickerScheme(s => ({ ...s, reps: +e.target.value }))} style={{ width:48, ...IN, padding:'4px', fontSize:10 }} />
-                        <span style={{ fontSize:9 }}>×</span>
+                        <span style={{ fontSize:10 }}>×</span>
                         <input type='number' value={pickerScheme.weight} onChange={e => setPickerScheme(s => ({ ...s, weight: +e.target.value }))} style={{ width:56, ...IN, padding:'4px', fontSize:10 }} />
-                        <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>кг</span>
+                        <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>кг</span>
                       </div>
-                      <button onClick={() => addExToDay(pickerDay)} disabled={!pickerExName} style={{ width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer', fontWeight:700, fontSize:11, background: pickerExName ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(255,255,255,0.1)', color: pickerExName ? '#000' : 'rgba(255,255,255,0.3)' }}>Добавить в день</button>
+                      <button onClick={() => addExToDay(pickerDay)} disabled={!pickerExName} style={{ width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer', fontWeight:700, fontSize:11, background: pickerExName ? 'linear-gradient(135deg,var(--accent),#00c8a0)' : 'rgba(255,255,255,0.1)', color: pickerExName ? '#000' : 'rgba(255,255,255,0.3)' }}>Добавить в день</button>
                     </div>
                   </div>
                 </div>
@@ -731,7 +766,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   <span style={{ fontSize:11, fontWeight:700, color:PH_COLOR[phase], background:PH_COLOR[phase]+'22', padding:'2px 10px', borderRadius:8 }}>{PH_RU[phase]}</span>
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(40px, 1fr))', gap:4 }}>
-                  {W.map(w => { const ph = mesocyclePhaseForWeek(w.week, totalW); const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+PH_RU[ph]} style={{ padding:'8px 0', borderRadius:8, border: active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: active ? PH_COLOR[ph] : PH_COLOR[ph]+'1a', color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:38 }}>{w.week}</button>; })}
+                  {W.map(w => { const ph = mesocyclePhaseForWeek(w.week, totalW); const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+PH_RU[ph]} style={{ padding:'8px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? PH_COLOR[ph] : PH_COLOR[ph]+'1a', color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:38 }}>{w.week}</button>; })}
                 </div>
               </div>
               {/* Визуальный календарь мезоцикла: недели × дни с тоннажём и фазой */}
@@ -739,8 +774,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>📅 Календарь мезоцикла (нед × дни, тоннаж)</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {W.map(w => { const ph = mesocyclePhaseForWeek(w.week, totalW); const active = w.week === wk.week; const maxT = Math.max(1, ...W.map(ww => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0))); const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0); return (
-                    <div key={w.week} onClick={() => setSrcWeek(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', background: active ? 'rgba(0,230,138,0.08)' : 'transparent', border: active ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent' }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: active ? '#00e68a' : 'rgba(255,255,255,0.7)', minWidth: 26 }}>Н{w.week}</span>
+                    <div key={w.week} onClick={() => setSrcWeek(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', background: active ? 'var(--accent-dim)' : 'transparent', border: active ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent' }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: active ? 'var(--accent)' : 'rgba(255,255,255,0.7)', minWidth: 26 }}>Н{w.week}</span>
                       <span style={{ width: 4, height: 14, borderRadius: 2, background: PH_COLOR[ph], flexShrink: 0 }} title={PH_RU[ph]} />
                       <div style={{ flex: 1, display: 'flex', gap: 2 }}>
                         {w.days.map((d, di) => { const t = d.metrics.tonnage; return <div key={di} title={'Д' + (di+1) + ': ' + t.toFixed(0) + ' кг·пов'} style={{ flex: 1, height: 14, borderRadius: 3, background: t > 0 ? `linear-gradient(180deg, ${PH_COLOR[ph]}, ${PH_COLOR[ph]}88)` : 'rgba(255,255,255,0.04)', opacity: 0.4 + 0.6 * (t / maxT) }} />; })}
@@ -761,7 +796,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 const allVals = builtSrc.weeks.flatMap(w => exNames.map(n => w.pmRow[n] || 0));
                 const minV = Math.min(...allVals), maxV = Math.max(...allVals);
                 const W2 = builtSrc.weeks.length;
-                const colors = ['#00e68a', '#60a5fa', '#a855f7'];
+                const colors = ['var(--accent)', '#60a5fa', '#a855f7'];
                 const px = (i: number) => 24 + (i / Math.max(1, W2 - 1)) * 280;
                 const py = (v: number) => 70 - ((v - minV) / Math.max(1, maxV - minV)) * 56;
                 return <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.15)' }}>
@@ -773,6 +808,26 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   </svg>
                   <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>{exNames.map((n, ei) => <span key={n} style={{ fontSize: 9, color: colors[ei] }}>● {n}</span>)}</div>
                 </div>;
+              })()}
+              {e1rmSeries.length > 0 && (() => {
+                const W = 300, H = 120, PADX = 26, PADY = 16;
+                const allVals = e1rmSeries.flatMap(s => s.pts.map(p => p.val));
+                const minV = Math.min(...allVals, pmSquat, pmBench, pmDead);
+                const maxV = Math.max(...allVals, pmSquat, pmBench, pmDead);
+                const maxPts = Math.max(...e1rmSeries.map(s => s.pts.length), 1);
+                const px = (i: number) => PADX + (maxPts <= 1 ? 0 : (i / (maxPts - 1)) * (W - PADX - 8));
+                const py = (v: number) => H - PADY - ((v - minV) / ((maxV - minV) || 1)) * (H - PADY - 14);
+                return (
+                  <MetricCard title={'Прогресс 1ПМ (дневник тренировок)'} icon="📈">
+                    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+                      {[0, 1, 2, 3].map(g => <line key={g} x1={PADX} x2={W - 8} y1={14 + g * ((H - PADY - 14) / 3)} y2={14 + g * ((H - PADY - 14) / 3)} stroke="rgba(255,255,255,0.06)" strokeWidth={0.5} />)}
+                      {e1rmSeries.map(s => <polyline key={s.lift} points={s.pts.map((p, i) => `${px(i)},${py(p.val)}`).join(' ')} fill="none" stroke={s.color} strokeWidth={1.6} />)}
+                      {e1rmSeries.map(s => s.pts.map((p, i) => <circle key={s.lift + i} cx={px(i)} cy={py(p.val)} r={2} fill={s.color} />))}
+                    </svg>
+                    <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>{e1rmSeries.map(s => <span key={s.lift} style={{ fontSize: 11, color: s.color }}>● {s.label} {s.pts[s.pts.length - 1].val} кг</span>)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>PM0 плана: присед {pmSquat} · жим {pmBench} · становая {pmDead} кг</div>
+                  </MetricCard>
+                );
               })()}
               <div style={{ marginTop:8 }}>
                 <SaveButton label="💾 Сохранить программу" savedLabel="✓ Программа сохранена" onSave={() => { try { const cycle = LMS_CYCLES.find(c => c.meta.id === selectedCycleId); const data = { name: `PL ${cycle?.meta.title || selectedCycleId || 'цикл'}`, date: new Date().toISOString().slice(0,10), goal: level, weekCount: totalW, cycleWeeks, generatedAt: Date.now() }; const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); existing.unshift(data); localStorage.setItem('myTrainingPlans', JSON.stringify(existing.slice(0,30))); } catch {} }} />
@@ -796,18 +851,18 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                             <div key={ei} style={{ background:'rgba(255,255,255,0.02)', borderRadius:8, padding:'6px 8px', marginBottom:4, border:'1px solid rgba(255,255,255,0.04)' }}>
                               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
                                 <span style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{e.name}</span>
-                                <span style={{ fontSize:9, color:e.load === 'main' ? '#00e68a' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.4)', fontWeight:600, padding:'1px 6px', borderRadius:4, background: e.load === 'main' ? 'rgba(0,230,138,0.1)' : e.load === 'additional' ? 'rgba(245,158,11,0.1)' : 'transparent' }}>
+                                <span style={{ fontSize:10, color:e.load === 'main' ? 'var(--accent)' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.4)', fontWeight:600, padding:'1px 6px', borderRadius:4, background: e.load === 'main' ? 'var(--accent-dim)' : e.load === 'additional' ? 'rgba(245,158,11,0.1)' : 'transparent' }}>
                                   {e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}
                                 </span>
                               </div>
                               <div style={{ display:'flex', flexDirection:'column', gap:2, marginTop:4 }}>
-                                {e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); const es = effSet(wk.week, di, ei, si, ws); const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'2px 4px', fontSize:9, textAlign:'center' }; return (
+                                {e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); const es = effSet(wk.week, di, ei, si, ws); const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'2px 4px', fontSize:10, textAlign:'center' }; return (
                                   <div key={si} style={{ display:'flex', gap:3, alignItems:'center' }}>
-                                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)' }}>С{si+1}</span>
+                                    <span style={{ fontSize:10, color:'rgba(255,255,255,0.3)' }}>С{si+1}</span>
                                     <input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], weight: +ev.target.value } }))} style={{ ...INM, width:44 }} />
-                                    <span style={{ fontSize:9 }}>×</span>
+                                    <span style={{ fontSize:10 }}>×</span>
                                     <input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:32 }} />
-                                    <span style={{ fontSize:9 }}>×</span>
+                                    <span style={{ fontSize:10 }}>×</span>
                                     <input type='number' value={es.sets} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], sets: +ev.target.value } }))} style={{ ...INM, width:28 }} />
                                     <input type='text' value={srcEdits[k]?.tempo || ''} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], tempo: ev.target.value } }))} style={{ ...INM, width:56, textAlign:'center', color:'#a855f7', fontWeight:700 }} placeholder='3-1-1-0' />
                                   </div>
@@ -816,8 +871,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                             </div>
                           ))}
                           {(srcAdditions[dk] || []).map(a => (
-                            <div key={a.uid} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:4, padding:'5px 0', borderBottom:'1px solid rgba(0,230,138,0.1)' }}>
-                              <div style={{ fontSize:11, color:'#00e68a', fontWeight:600 }}>{a.name} <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>＋ добавлено</span> <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:9, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', marginLeft:4 }}>✕</button></div>
+                            <div key={a.uid} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:4, padding:'5px 0', borderBottom:'1px solid var(--accent-dim)' }}>
+                              <div style={{ fontSize:11, color:'var(--accent)', fontWeight:600 }}>{a.name} <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>＋ добавлено</span> <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:10, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', marginLeft:4 }}>✕</button></div>
                               <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', textAlign:'right' }}>
                                 <div style={{ display:'flex', gap:3, alignItems:'center' }}>
                                   <input type='number' value={a.sets} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, sets: +ev.target.value } : x) }; })} style={{ width:30, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'3px', fontSize:10, textAlign:'center' }} aria-label='подходы'/>
@@ -829,7 +884,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                               </div>
                             </div>
                           ))}
-                          <button onClick={() => { setPickerDay(dk); setPickerExName(''); }} style={{ marginTop:6, padding:'5px 10px', borderRadius:6, fontSize:10, fontWeight:600, border:'1px dashed rgba(0,230,138,0.4)', background:'rgba(0,230,138,0.06)', color:'#00e68a', cursor:'pointer' }}>＋ Добавить упражнение из каталога</button>
+                          <button onClick={() => { setPickerDay(dk); setPickerExName(''); }} style={{ marginTop:6, padding:'5px 10px', borderRadius:6, fontSize:10, fontWeight:600, border:'1px dashed rgba(0,230,138,0.4)', background:'var(--accent-dim)', color:'var(--accent)', cursor:'pointer' }}>＋ Добавить упражнение из каталога</button>
                         </>
                       ),
                     }} />
@@ -849,7 +904,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     detail: a.sets + 'x' + a.reps + 'x' + a.weight + 'кг',
                     note: '＋ добавлено',
                     highlighted: true,
-                    actions: <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:9, color:'#ef4444', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', borderRadius:5, padding:'4px 8px', cursor:'pointer' }}>✕ Удалить</button>,
+                    actions: <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:10, color:'#ef4444', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', borderRadius:5, padding:'4px 8px', cursor:'pointer' }}>✕ Удалить</button>,
                   });
                 });
                 return (
@@ -858,10 +913,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               })}
               <MetricCard title={'Итоги мезоцикла ('+totalW+' нед)'} icon="📊">
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>Тоннаж: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.tonnage.toFixed(0)}</b> кг·пов</div>
-                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>КПШ: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.kpsh}</b></div>
-                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>Инт. отн: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.relIntensity.toFixed(3)}</b></div>
-                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>УОИ: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.uoi.toFixed(3)}</b></div>
+                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Тоннаж: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.tonnage.toFixed(0)}</b> кг·пов</div>
+                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>КПШ: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.kpsh}</b></div>
+                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Инт. отн: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.relIntensity.toFixed(3)}</b></div>
+                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>УОИ: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.uoi.toFixed(3)}</b></div>
                 </div>
               </MetricCard>
               {builtSrc && builtSrc.plVolumeLandmarks && builtSrc.plVolumeLandmarks.length > 0 && (
@@ -973,7 +1028,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   return true;
                 };
                 return <MetricCard title='🎯 Рекомендации тренера: ПЛ-ассистенты по слабым группам' icon='🎯' accent='#ff9100'>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:6 }}>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginBottom:6 }}>
                     Фаза: <b style={{color:'#ff9100'}}>{PH_RU[phase]}</b> · схема: <b style={{color:'#ff9100'}}>{scheme.label}</b> (вес ≈ {Math.round(scheme.pct*100)}% workMax)
                   </div>
                   {weakPoints.map(g => {
@@ -989,7 +1044,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                       </div>
                       {pool.map(ex => (
                         <button key={ex.name} onClick={() => addAccessory(dk, ex.name, g)}
-                          style={{ display:'block', width:'100%', marginBottom:3, padding:'5px 8px', borderRadius:6, fontSize:9, cursor:'pointer', textAlign:'left',
+                          style={{ display:'block', width:'100%', marginBottom:3, padding:'5px 8px', borderRadius:6, fontSize:10, cursor:'pointer', textAlign:'left',
                             border:'1px solid rgba(255,145,0,0.25)', background:'rgba(255,145,0,0.06)', color:'#ff9100', transition:'all 0.15s' }}>
                           <span style={{fontWeight:700}}>＋ {ex.name}</span>
                           <span style={{fontSize:8, color:'rgba(255,255,255,0.45)', marginLeft:6}}>— {ex.note}</span>
@@ -1030,7 +1085,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               <PopupSelect label="Группа фокуса" value={bbFocus} onChange={setBbFocus} options={[{ id: '', label: 'Нет' }, ...WEAK_GROUPS.map(([id,l]) => ({ id, label: l }))]} />
            </div>
 
-          {bbBest && <ExpandableCard title={'🏆 Рекомендован: ' + bbBest.pattern.name} icon='🏆' short={bbBest.pattern.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот сплит:</b> {explainBBSelection(bbBest)}</div><button onClick={buildBb} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 700, fontSize: 12 }}>✅ Применить сплит и собрать план</button></>} />}
+          {bbBest && <ExpandableCard title={'🏆 Рекомендован: ' + bbBest.pattern.name} icon='🏆' short={bbBest.pattern.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот сплит:</b> {explainBBSelection(bbBest)}</div><button onClick={buildBb} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,var(--accent),#00c853)', color: '#000', fontWeight: 700, fontSize: 12 }}>✅ Применить сплит и собрать план</button></>} />}
           <div style={H}>💉 Фармакология (PED-адаптация объёмов)</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {(['AAS','insulin','MGF','IGF1','GH'] as PED[]).map(p => <button key={p} style={peds.includes(p) ? BTN : BTN_GHOST} onClick={() => togglePed(p)}>{p}{peds.includes(p) ? ' ✓' : ''}</button>)}
@@ -1041,13 +1096,13 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             {BB_WM_KEYS.map(k => <PopupNumber key={k} label={BB_WM_RU[k]} value={bbWorkMax[k] || 80} min={10} max={400} suffix=' кг' onChange={v => setBbWm(k, v)} />)}
           </div>
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: ACCENT }}>🎯 Слабые группы (акцент, сохраняются в профиль)</div>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6 }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: "pointer", border: on ? "1px solid #00e68a" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "#00e68a" : "rgba(255,255,255,0.6)" }}>{l}{on ? " ✓" : ""}</button>; })}</div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6 }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)" }}>{l}{on ? " ✓" : ""}</button>; })}</div>
           <button style={{ ...BTN, width: '100%', marginTop: 10 }} onClick={buildBb}>Сгенерировать BB-план ({bbWeeks} нед)</button>
           {builtBb && (() => {
             const W = builtBb.weeks;
             const wk = W[Math.min(bbWeekSel, W.length) - 1] || W[0];
             const m = calcBBPlanMetrics(builtBb, pedAdapt.combinedMrvMultiplier);
-            return <div style={{ ...CARD, borderLeft: `3px solid ${ACCENT}`, boxShadow: '0 0 0 1px rgba(0,230,138,0.08)' }}>
+            return <div style={{ ...CARD, borderLeft: `3px solid ${ACCENT}`, boxShadow: '0 0 0 1px var(--accent-dim)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8 }}>
                 <div style={{ ...H, margin:0 }}>📋 План: {builtBb.pattern.name}</div>
                 <span style={{ fontSize:10, fontWeight:700, color: ACCENT, background:'rgba(0,230,138,0.12)', padding:'3px 8px', borderRadius:8 }}>{W.length} нед</span>
@@ -1082,7 +1137,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               <div style={{ marginTop: 10 }}>
                 <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginBottom:6, fontWeight:700 }}>Неделя {wk.week} из {W.length}</div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
-                  {W.map(w => { const active = w.week === wk.week; return <button key={w.week} onClick={() => setBbWeekSel(w.week)} style={{ padding:'7px 0', borderRadius:7, border: active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: active ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.02)', color: active ? '#000' : '#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>{w.week}</button>; })}
+                  {W.map(w => { const active = w.week === wk.week; return <button key={w.week} onClick={() => setBbWeekSel(w.week)} style={{ padding:'7px 0', borderRadius:7, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? 'linear-gradient(135deg,var(--accent),#00c853)' : 'rgba(255,255,255,0.02)', color: active ? '#000' : '#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>{w.week}</button>; })}
                 </div>
               </div>
               {/* Визуальный календарь ББ: недели × дни (объём по сетам) */}
@@ -1090,10 +1145,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>📅 Календарь мезоцикла (нед × дни, объём сетов)</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {W.map(w => { const active = w.week === wk.week; const daySets = w.sessions.map(s => s.exercises.reduce((ss, e) => ss + e.sets, 0)); const maxD = Math.max(1, ...W.flatMap(ww => ww.sessions.map(s => s.exercises.reduce((ss, e) => ss + e.sets, 0)))); return (
-                    <div key={w.week} onClick={() => setBbWeekSel(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 6px', borderRadius: 6, cursor: 'pointer', background: active ? 'rgba(0,230,138,0.08)' : 'transparent', border: active ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent' }}>
-                      <span style={{ fontSize: 9, fontWeight: 700, color: active ? '#00e68a' : 'rgba(255,255,255,0.7)', minWidth: 26 }}>Н{w.week}</span>
+                    <div key={w.week} onClick={() => setBbWeekSel(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 6px', borderRadius: 6, cursor: 'pointer', background: active ? 'var(--accent-dim)' : 'transparent', border: active ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent' }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, color: active ? 'var(--accent)' : 'rgba(255,255,255,0.7)', minWidth: 26 }}>Н{w.week}</span>
                       <div style={{ flex: 1, display: 'flex', gap: 2 }}>
-                        {daySets.map((ds, di) => <div key={di} title={'Д' + (di+1) + ': ' + ds + ' сетов'} style={{ flex: 1, height: 14, borderRadius: 3, background: ds > 0 ? 'linear-gradient(180deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.04)', opacity: 0.35 + 0.65 * (ds / maxD) }} />)}
+                        {daySets.map((ds, di) => <div key={di} title={'Д' + (di+1) + ': ' + ds + ' сетов'} style={{ flex: 1, height: 14, borderRadius: 3, background: ds > 0 ? 'linear-gradient(180deg,var(--accent),#00c853)' : 'rgba(255,255,255,0.04)', opacity: 0.35 + 0.65 * (ds / maxD) }} />)}
                       </div>
                       <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', minWidth: 30, textAlign: 'right' }}>{daySets.reduce((a, b) => a + b, 0)}</span>
                     </div>
@@ -1104,12 +1159,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               <div style={{ marginTop: 10, display:'flex', flexDirection:'column', gap: 8 }}>
                 {wk.sessions.map((s, si) => (
                   <div key={si} style={{ background:'rgba(255,255,255,0.02)', borderRadius:10, border:'1px solid rgba(255,255,255,0.06)', overflow:'hidden' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', background:'rgba(0,230,138,0.06)', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', background:'var(--accent-dim)', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
                       <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>🏋️ День {si + 1} · {s.character}</span>
-                      <span style={{ fontSize:9, color:ACCENT, fontWeight:700 }}>{s.sessionTag}</span>
+                      <span style={{ fontSize:10, color:ACCENT, fontWeight:700 }}>{s.sessionTag}</span>
                     </div>
                     <div style={{ padding: '4px 0', overflowX:'auto', WebkitOverflowScrolling:'touch', scrollbarWidth:'none' }}>
-                      <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr', gap:2, padding:'4px 10px', fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', minWidth:340 }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr', gap:2, padding:'4px 10px', fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', minWidth:340 }}>
                         <span>Мышца</span><span>Характер</span><span>Сеты×повт</span><span>RIR</span><span>Вес</span><span>Темп</span>
                       </div>
                       {s.exercises.map((e, ei) => {
@@ -1125,7 +1180,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                           <span>{adjSets}×{e.workSets[0].reps}</span>
                           <span style={{ color:'#f59e0b' }}>{peakRirTarget != null ? peakRirTarget : Math.max(0, e.rir + bridgeRir)}{autoRegOn && autoRegResult?.rirShift ? `+${autoRegResult.rirShift}` : ''}</span>
                           <span style={{ color: adjW !== rawW ? '#f59e0b' : ACCENT, fontWeight:700 }}>{adjW} кг{adjW !== rawW ? ' ⚡' : ''}</span>
-                          <span style={{ fontSize:9, color:'#a855f7', fontWeight:700, background:'rgba(168,85,247,0.1)', padding:'2px 6px', borderRadius:4, textAlign:'center' }}>{tempoStr || tmpo.tempo.toString}</span>
+                          <span style={{ fontSize:10, color:'#a855f7', fontWeight:700, background:'rgba(168,85,247,0.1)', padding:'2px 6px', borderRadius:4, textAlign:'center' }}>{tempoStr || tmpo.tempo.toString}</span>
                         </div>
                         );
                       })}
@@ -1136,16 +1191,16 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               {/* Итоги мезоцикла */}
               <MetricCard title={`Итоги мезоцикла (${W.length} нед)`} icon="📊">
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>Всего сетов/ротация: <b style={{ color:'#fff' }}>{m.totalSets}</b></div>
-                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>Тяжёлых: <b style={{ color:'#fff' }}>{(m.тяжPct * 100).toFixed(0)}%</b></div>
-                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>Памп: <b style={{ color:'#fff' }}>{(m.пампPct * 100).toFixed(0)}%</b></div>
-                  <div style={{ ...SMALL, background:'rgba(0,230,138,0.06)', padding:'6px 8px', borderRadius:8 }}>Средний RIR: <b style={{ color:'#fff' }}>{m.avgRir.toFixed(1)}</b></div>
+                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Всего сетов/ротация: <b style={{ color:'#fff' }}>{m.totalSets}</b></div>
+                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Тяжёлых: <b style={{ color:'#fff' }}>{(m.тяжPct * 100).toFixed(0)}%</b></div>
+                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Памп: <b style={{ color:'#fff' }}>{(m.пампPct * 100).toFixed(0)}%</b></div>
+                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Средний RIR: <b style={{ color:'#fff' }}>{m.avgRir.toFixed(1)}</b></div>
                 </div>
               </MetricCard>
               {/* Объём по мышцам */}
               <MetricCard title="Объём по мышцам (сетов/нед)" icon="🏋️" accent="#a855f7">
               <div style={{ overflowX:'auto', WebkitOverflowScrolling:'touch', scrollbarWidth:'none' }}>
-                <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', padding:'2px 0', minWidth:340 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', padding:'2px 0', minWidth:340 }}>
                   <span>Мышца</span><span>Сетов</span><span>Тяж</span><span>Памп</span><span>MRV</span>
                 </div>
                 {m.perMuscle.map(mm => { const over = mm.totalSets > (mm.mrv || 999); return (
@@ -1171,9 +1226,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       {mainTab === 'manual' && (
         <div style={{ ...CARD, padding: 20, textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🛠️</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#00e68a', marginBottom: 8 }}>Ручной конструктор переехал</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)', marginBottom: 8 }}>Ручной конструктор переехал</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 16, lineHeight: 1.6 }}>
-            Полный ручной конструктор теперь доступен в разделе <b style={{ color: '#00e68a' }}>📐 Планирование → 🛠️ Ручной конструктор</b>.<br />
+            Полный ручной конструктор теперь доступен в разделе <b style={{ color: 'var(--accent)' }}>📐 Планирование → 🛠️ Ручной конструктор</b>.<br />
             Там вас ждёт: авто-подбор сплита, генерация плана, оценка качества, MRV-guardrails,<br />
             применение методик, экспорт в PDF, выполнение через SessionPlayer и многое другое.
           </div>
@@ -1184,7 +1239,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             }
           }} style={{
             padding: '12px 24px', borderRadius: 10, border: 'none', cursor: 'pointer',
-            background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000',
+            background: 'linear-gradient(135deg,var(--accent),#00c853)', color: '#000',
             fontWeight: 800, fontSize: 13,
           }}>
             🚀 Открыть полный конструктор
@@ -1219,7 +1274,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                           title={`Неделя ${w}: ${PH_RU_B[ph] || ''}`}
                           style={{
                             padding: '7px 0', borderRadius: 7,
-                            border: active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                            border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
                             background: active ? PH_COLOR_B[ph] : (PH_COLOR_B[ph] || '#22c55e') + '1a',
                             color: active ? '#000' : '#fff',
                             fontSize: 10, fontWeight: 700, cursor: 'pointer'
@@ -1256,7 +1311,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                             {e.sets.map((set, si) => (
                               <span key={si} style={{
                                 display: 'inline-block', padding: '2px 6px', borderRadius: 4, fontSize: 9,
-                                background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.12)',
+                                background: 'var(--accent-dim)', border: '1px solid rgba(0,230,138,0.12)',
                                 color: 'rgba(255,255,255,0.8)'
                               }}>
                                 {set.reps}×{set.weightKg}кг
@@ -1301,12 +1356,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       {subView === 'autoreg' && <AutoregPanel />}
       {subView === 'peak' && <PeakingPanel />}
       {subView === 'peak_bb' && <PeakingPanel defaultKind="bb" />}
-      {subView === 'recovery' && (<><RecoveryPanel /><div style={{ marginTop: 10 }}><div style={{ fontSize: 14, fontWeight: 700, color: '#00e68a', margin: '10px 0 6px' }}>🧮 Training Score Engine</div><TrainingScoreCard workoutsPerWeek={mainTab === 'pl' ? days : bbDays} avgMinutes={75} intensity={autoRegResult.deload ? 'low' : 'moderate'} goal={mainTab === 'pl' ? 'strength' : 'hypertrophy'} experience={(mainTab === 'pl' ? (level === 'novice' ? 'beginner' : level === 'intermediate' ? 'intermediate' : 'advanced') : (bbLevel === 'beginner' ? 'beginner' : bbLevel === 'intermediate' ? 'intermediate' : 'advanced')) as 'beginner' | 'intermediate' | 'advanced'} sleepHours={(linked.readiness?.sleep ?? 7) as number} stressLevel={Math.round((linked.readiness?.stress ?? 3) as number)} jointPain={[]} deloadWeeksAgo={autoRegResult.deload ? 0 : 99} weight={mainTab === 'pl' ? bw : 80} age={30} sex={'male'} /></div><ReadinessForecastCard /></>)}
+      {subView === 'recovery' && (<><RecoveryPanel /><div style={{ marginTop: 10 }}><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', margin: '10px 0 6px' }}>🧮 Training Score Engine</div><TrainingScoreCard workoutsPerWeek={mainTab === 'pl' ? days : bbDays} avgMinutes={75} intensity={autoRegResult.deload ? 'low' : 'moderate'} goal={mainTab === 'pl' ? 'strength' : 'hypertrophy'} experience={(mainTab === 'pl' ? (level === 'novice' ? 'beginner' : level === 'intermediate' ? 'intermediate' : 'advanced') : (bbLevel === 'beginner' ? 'beginner' : bbLevel === 'intermediate' ? 'intermediate' : 'advanced')) as 'beginner' | 'intermediate' | 'advanced'} sleepHours={(linked.readiness?.sleep ?? 7) as number} stressLevel={Math.round((linked.readiness?.stress ?? 3) as number)} jointPain={[]} deloadWeeksAgo={autoRegResult.deload ? 0 : 99} weight={mainTab === 'pl' ? bw : 80} age={30} sex={'male'} /></div><ReadinessForecastCard /></>)}
       {subView === 'safety' && <ExerciseSafetyPanel />}
       {subView === 'demo' && <ExerciseDemoPanel />}
       {subView === 'programs' && <ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} onAddToMyTraining={() => {}} />}
       {subView === 'methods' && (<>
-        {methodNote && <div style={{ ...CARD, borderColor:'rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color:'#00e68a', fontSize:11 }}>{methodNote}</div>}
+        {methodNote && <div style={{ ...CARD, borderColor:'rgba(0,230,138,0.3)', background:'var(--accent-dim)', color:'var(--accent)', fontSize:11 }}>{methodNote}</div>}
         <MethodsTab linked={linked} trainingOutput={null} diaryStats={[] as any} historyWorkouts={[] as any} goal={mainTab === 'pl' ? goal : bbGoal} level={mainTab === 'pl' ? level : bbLevel} daysPerWeek={mainTab === 'pl' ? days : bbDays} recovery={linked.readiness?.recovery ?? 80} fatigue={linked.readiness?.fatigue ?? 30} appliedMethods={appliedMethods} onToggleMethod={(name, cat) => setAppliedMethods(prev => { const n = { ...prev }; if (n[cat] === name) delete n[cat]; else n[cat] = name; return n; })} onApplyComposition={() => { const keys = Object.keys(appliedMethods); if (keys.length > 0) { const h = deriveHints(appliedMethods); setMethodHints(h); setMethodNote(`✓ Применена методология: ${h.label}${h.volumeMult !== 1 ? ' · объём×' + h.volumeMult : ''}${h.technique ? ' · техн: ' + h.technique : ''}`); } else { setMethodHints({ volumeMult: 1, technique: null, label: '' }); setMethodNote('Выберите методики (по одной из категории)'); } }} />
       </>)}
       {subView === 'analytics' && (<><AnalyticsTab sessions={historyWorkouts} /><VisualTab sessions={historyWorkouts} /></>)}
