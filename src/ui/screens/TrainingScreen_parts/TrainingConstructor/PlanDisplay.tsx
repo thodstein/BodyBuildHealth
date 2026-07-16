@@ -100,7 +100,7 @@ export function calcQualityScore(
   weeklySets: Record<string, number>,
   level: string,
   goal: string,
-  opts?: { mrvOverride?: number | null; onCourse?: boolean; courseIntensity?: 'none' | 'mild' | 'moderate' | 'heavy'; labMult?: number }
+  opts?: { mrvOverride?: number | null; onCourse?: boolean; courseIntensity?: 'none' | 'mild' | 'moderate' | 'heavy'; labMult?: number; readiness?: number }
 ): {
   score: number; color: string;
   breakdown: { label: string; ok: boolean; detail: string }[];
@@ -113,6 +113,12 @@ export function calcQualityScore(
   const recommendations: string[] = [];
   const perMuscle: { muscle: string; sets: number; mev: number; mav: number; mrv: number; status: 'недотрен' | 'оптимум' | 'перегруз'; pct: number }[] = [];
   let score = 100;
+
+  // Готовность пользователя влияет на толерантность к объёму. При высокой готовности
+  // (readiness 80-100/100) программа под высокую готовность штрафуется мягче за недотрен;
+  // при низкой — недотрен серьёзно снижает качество (риск недовосстановления).
+  const readiness = opts?.readiness != null ? Math.max(0, Math.min(100, opts.readiness)) : 100;
+  const readinessFactor = readiness >= 80 ? 0.4 : readiness >= 60 ? 0.7 : 1.0;
 
   // Per-muscle analysis using composed volume landmarks (consistency with generation + mrvOverride)
   for (const [g, sets] of Object.entries(weeklySets)) {
@@ -128,7 +134,7 @@ export function calcQualityScore(
     if (opts?.labMult) { mrv = Math.round(mrv * opts.labMult); mev = Math.round(mev * opts.labMult); mav = Math.round(mav * opts.labMult); }
     let status: 'недотрен' | 'оптимум' | 'перегруз' = 'оптимум';
     const pct = mrv > 0 ? (sets / mrv) * 100 : 0;
-    if (sets < mev) { status = 'недотрен'; score -= 8; }
+    if (sets < mev) { status = 'недотрен'; score -= Math.round(8 * readinessFactor); }
     else if (sets > mrv) { status = 'перегруз'; score -= 6; }
     perMuscle.push({ muscle: g, sets, mev, mav, mrv, status, pct: Math.round(pct) });
   }
@@ -349,6 +355,7 @@ export const PlanDisplay: React.FC<Props> = ({
     onCourse: tprofile.onCourse,
     courseIntensity: tprofile.courseIntensity,
     labMult: labAnalysis ? labTrainingAdjust(labAnalysis).mrvMultiplier : 1,
+    readiness: readinessSlider != null ? readinessSlider : (tprofile.recovery ?? 7) * 10,
   });
   const load = calcLoadAnalysis(result.days);
 
@@ -479,7 +486,8 @@ export const PlanDisplay: React.FC<Props> = ({
 
       {result && (() => {
         const ws = weeklySetsFromManualResult(result);
-        const banners = validatePlan({ weeklySets: ws, level, goal, daysPerWeek, weakPoints: tprofile.weakPoints || [], readiness: tprofile.recovery });
+        const readinessValue = readinessSlider != null ? readinessSlider : (tprofile.recovery ?? 7) * 10;
+        const banners = validatePlan({ weeklySets: ws, level, goal, daysPerWeek, weakPoints: tprofile.weakPoints || [], readiness: readinessValue });
         if (banners.length === 0) return null;
         return (
           <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(220,38,38,0.04)', border: '1px solid rgba(220,38,38,0.15)' }}>
