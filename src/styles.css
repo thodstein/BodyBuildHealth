@@ -2260,23 +2260,44 @@ input[type="range"]:active {
 
 } /* end @media (max-width: 480px) */
 
-/* ═══ GLOBAL PREMIUM DESIGN SYSTEM (mobile-first, ALL screens) ═══
-   Robust frosted-glass: catches var(--glass-bg) AND both rgba glass
-   families (24,24,27 / 20,22,30) AND both spacing forms
-   (browser may serialize inline rgba WITH spaces). Applied globally,
-   not scoped to .training-screen, so every screen gets the same
-   modern card treatment. */
+/* ═══ UNIFIED DESIGN SYSTEM (ALL screens, mobile-first) ═══
+   Force ONE card look everywhere. Catches every dark/glass card
+   family used across screens — var(--glass-bg), rgba(24,24,27),
+   rgba(20,22,30) (planner), white-tint rgba(255,255,255,0.0x)
+   (Articles tables), solid-dark hex #18181b/#1a1a1a — AND both
+   spacing forms (browser may serialize inline rgba WITH spaces).
+   All are forced to the SAME base color + SAME chrome so no screen
+   looks different. Accent / light / print-overlay backgrounds are
+   intentionally excluded. */
 div[style*="var(--glass-bg)"],
 div[style*="background"][style*="rgba(24,24,27,"],
 div[style*="background"][style*="rgba(24, 24, 27,"],
 div[style*="background"][style*="rgba(20,22,30,"],
-div[style*="background"][style*="rgba(20, 22, 30,"] {
+div[style*="background"][style*="rgba(20, 22, 30,"],
+div[style*="background"][style*="rgba(255,255,255,0.0"],
+div[style*="background"][style*="rgba(255, 255, 255, 0.0"],
+div[style*="background"][style*="#18181b"],
+div[style*="background"][style*="#1a1a1a"],
+div[style*="background"][style*="#1A1A1A"],
+table[style*="background"][style*="rgba(255,255,255,0.0"],
+table[style*="background"][style*="rgba(255, 255, 255, 0.0"] {
+  background: var(--glass-bg) !important;
   -webkit-backdrop-filter: blur(18px) saturate(160%) !important;
   backdrop-filter: blur(18px) saturate(160%) !important;
+  border: 1px solid var(--glass-border) !important;
   border-radius: 16px !important;
   box-shadow: 0 8px 24px rgba(0,0,0,0.22) !important;
 }
-/* Accent-tinted small blocks (both spacing forms) */
+/* PharmaCourse scoped card class → same unified look */
+.pc-card {
+  background: var(--glass-bg) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(160%) !important;
+  backdrop-filter: blur(18px) saturate(160%) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.22) !important;
+}
+/* Accent-tinted small blocks (both spacing forms) — keep accent hue */
 div[style*="background"][style*="rgba(0,230,138,"],
 div[style*="background"][style*="rgba(0, 230, 138,"] {
   -webkit-backdrop-filter: blur(12px) saturate(140%) !important;
