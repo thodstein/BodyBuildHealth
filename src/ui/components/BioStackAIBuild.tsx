@@ -15,6 +15,12 @@ import {
 import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
 import type { LinkedData } from '../../core/data-link';
 import { ClinicalResultCard } from './BioStackAIClinicalCard';
+import { TzCascadePopup, type TzCascadeResult } from './BioStackAITzCascade';
+import {
+  ALL_TZ_ORGANS,
+  type TzOrganId,
+} from '../../engines/tz-bridge-marker';
+import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../../data/support-db';
 
 type LMState = Record<string, 'off' | 'maintain' | 'correct'>;
 
@@ -51,6 +57,17 @@ const BRANCHES: { key: Branch; icon: string; label: string; desc: string; color:
   { key: 'neurotox', icon: '☣️', label: 'Нейротоксичность', desc: 'Защита и детокс ЦНС', color: '#a78bfa' },
   { key: 'ready', icon: '📦', label: 'Готовые стеки', desc: 'Шаблоны и готовые стеки', color: '#60a5fa' },
 ];
+
+/* ═══ TZ-28 cascade button — отдельный 3-шаговый попап ═══ */
+const TZ_CASCADE_BTN = {
+  key: 'tzCascade' as const,
+  icon: '🧪',
+  label: 'Сборка по органу/механизму/анализу',
+  desc: 'ТЗ-28: 6 органов → 28 механизмов → ~85 маркёров',
+  color: '#a78bfa',
+  gradient: 'linear-gradient(135deg, rgba(167,139,250,0.18), rgba(139,92,246,0.08))',
+  border: 'rgba(167,139,250,0.35)',
+};
 
 const TPL_GOAL_MAP: Record<string, GoalType> = {
   liver_health: 'detox', kidney: 'detox',
@@ -333,6 +350,8 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
   const [multiLoading, setMultiLoading] = useState(false);
   const [gates, setGates] = useState<ReturnType<typeof selectStack> | null>(null);
   const [branch, setBranch] = useState<Branch | null>(null);
+  const [tzCascadeOpen, setTzCascadeOpen] = useState(false);
+  const [tzCascadeBuilding, setTzCascadeBuilding] = useState(false);
 
   const mergedStacks = useMemo(() => {
     const templates: ExtStackItem[] = STACK_TEMPLATES.map(t => ({
@@ -497,6 +516,73 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
   const handleLoadIds = useCallback((ids: string[]) => {
     setStackIds(ids);
   }, [setStackIds]);
+
+  /* ─── TZ-cascade build (орган → механизм → маркер) ─── */
+  const handleTzCascadeBuild = useCallback((cascade: TzCascadeResult) => {
+    setTzCascadeOpen(false);
+    setTzCascadeBuilding(true);
+    setTimeout(() => {
+      /* 1) подготовить query: 1 орган + 1 механизм + маркер в 'correct' */
+      const queryOrgans = [cascade.organ];
+      const queryMechs = [cascade.mech];
+      const nextLm: LMState = {};
+      nextLm[cascade.marker] = 'correct';
+      const fp = toFinderProfile(profile);
+      const conflictFilter = avoidConflicts ? (id: string) => {
+        const hasConflict = stackIds.some(existing => {
+          const isCaution = ALL_INTERACTIONS.some(inx =>
+            ((inx.substanceA === id && inx.substanceB === existing) ||
+             (inx.substanceA === existing && inx.substanceB === id)) &&
+            (inx.type === 'conflict' || inx.type === 'caution') &&
+            (inx.severity === 'HIGH' || inx.severity === 'MEDIUM')
+          );
+          return isCaution;
+        });
+        return !hasConflict;
+      } : undefined;
+      const built = buildStack({
+        baseIds: stackIds,
+        targetSize,
+        organs: queryOrgans,
+        mechanisms: queryMechs,
+        autoFill: true,
+        profile: fp,
+        avoidIds: conflictFilter ? stackIds.filter(id => !conflictFilter(id)) : undefined,
+      });
+      let filteredStack = built.stack;
+      let drugSafetyNote = '';
+      if (profile.currentMeds?.length) {
+        const { safe, excluded } = getSafeStackRecommendations(filteredStack, profile.currentMeds);
+        if (excluded.length > 0) {
+          const excludedNames = excluded.map(e => e.substanceName).slice(0, 3).join(', ');
+          drugSafetyNote = `💊 Лекарственная безопасность: исключено ${excluded.length} БАДов из-за HIGH-взаимодействий с вашими препаратами (${excludedNames}${excluded.length > 3 ? '...' : ''})`;
+          filteredStack = safe;
+        }
+      }
+      const gate = selectStack(filteredStack, profile, 'comprehensive', (labAnalysis as LabCompositeResult) || null);
+      filteredStack = gate.ids;
+      let gateNote = '';
+      if (gate.hardStops.length > 0) {
+        const st = gate.hardStops.map(h => `${h.substanceName}: ${h.reason}`).slice(0, 4).join('; ');
+        gateNote += `\n🛑 Абсолютные противопоказания (исключены): ${st}`;
+      }
+      /* header note (which cascade) */
+      const cascadeNote = `🧪 Каскад: ${TZ_SYSTEM_LABELS[cascade.organ] || cascade.organ} → ${TZ_MECH_LABELS[cascade.mech] || cascade.mech} (маркёр: ${cascade.marker})`;
+      const exp = explainStack(filteredStack, fp);
+      setGates(gate);
+      setResult({
+        stack: filteredStack,
+        explanation: exp,
+        budgetNote: cascadeNote + (drugSafetyNote ? '\n' + drugSafetyNote : '') + gateNote,
+      });
+      /* визуально — обновить локальные селекторы, чтобы UI был консистентен */
+      setSelOrgans(queryOrgans);
+      setSelMechanisms(queryMechs);
+      setLmState(nextLm);
+      showToast(`🧩 Собрано ${filteredStack.length} БАДов по каскаду`, 'success');
+      setTzCascadeBuilding(false);
+    }, 100);
+  }, [profile, stackIds, avoidConflicts, targetSize, labAnalysis]);
 
   const enterBranch = (key: Branch) => {
     if (key === 'cns') setGoals(g => Array.from(new Set([...g, 'brain', 'concentration', 'mood'])) as GoalType[]);
