@@ -249,6 +249,32 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         }}>{t === 'add' ? '➕ Добавить' : '📋 День'}</button>)}
       </div>
 
+      {/* Today's KBJU summary cards */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4 }}>
+        {[
+          { l:'Ккал', v:Math.round(dayTotals.kcal), t:targets?.kcal || 2500, u:'', c:'#00e68a', icon:'🔥', bg:'rgba(0,230,138,0.08)', border:'rgba(0,230,138,0.15)' },
+          { l:'Белки', v:Math.round(dayTotals.p), t:targets?.protein || 160, u:'г', c:'#3b82f6', icon:'🥩', bg:'rgba(59,130,246,0.08)', border:'rgba(59,130,246,0.15)' },
+          { l:'Жиры', v:Math.round(dayTotals.f), t:targets?.fats || 70, u:'г', c:'#f59e0b', icon:'🧈', bg:'rgba(245,158,11,0.08)', border:'rgba(245,158,11,0.15)' },
+          { l:'Углев.', v:Math.round(dayTotals.c), t:targets?.carbs || 300, u:'г', c:'#f97316', icon:'🍞', bg:'rgba(249,115,22,0.08)', border:'rgba(249,115,22,0.15)' },
+        ].map(m => {
+          const pct = m.t > 0 ? Math.min(100, Math.round(m.v / m.t * 100)) : 0;
+          return (
+            <div key={m.l} style={{ padding:'8px 6px', borderRadius:12, background:m.bg, border:`1px solid ${m.border}`, display:'flex', flexDirection:'column', gap:3 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontSize:8, color:m.c, fontWeight:600 }}>{m.icon} {m.l}</span>
+                <span style={{ fontSize:8, color:'rgba(255,255,255,0.5)', fontWeight:500 }}>{pct}%</span>
+              </div>
+              <div style={{ fontSize:13, fontWeight:800, color:'#fff', lineHeight:1 }}>
+                {m.v}<span style={{ fontSize:8, color:'rgba(255,255,255,0.4)', fontWeight:400 }}>/{m.t}{m.u}</span>
+              </div>
+              <div style={{ height:3, borderRadius:2, background:'rgba(255,255,255,0.06)', overflow:'hidden' }}>
+                <div style={{ height:'100%', width:`${Math.min(100, pct)}%`, borderRadius:2, background:m.c, transition:'width 0.4s' }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {tab === 'add' && (
         <>
           <div style={{ padding:14, borderRadius:18, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', boxShadow:'0 2px 12px rgba(0,0,0,0.15)' }}>
