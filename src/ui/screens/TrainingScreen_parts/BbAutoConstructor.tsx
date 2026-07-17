@@ -33,7 +33,7 @@ import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
 import { InjurySelectCard } from './InjurySelectCard';
 import type { InjurySelectEntry } from './InjurySelectCard';
-import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, applyPostPhaseProcessing, type LoadStrategy, type DeloadType } from '../../../engines/bb/bb-autocoach.engine';
+import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, applyPostPhaseProcessing, type LoadStrategy, type DeloadType, INTENSITY_TECHNIQUES, DEFAULT_TECHNIQUE_BY_PHASE, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { PCT_FOR_RIR } from '../../../engines/rir-table';
 import { getCyclesByDirection, getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 import { convertCycleToBBPlan } from '../../../engines/bb/cycle-to-plan';
@@ -160,6 +160,8 @@ export const BbAutoConstructor: React.FC = () => {
   const [loadStrategy, setLoadStrategy] = useState<LoadStrategy>((prof.loadStrategy as LoadStrategy) || 'double_progression');
   const [autoDeload, setAutoDeload] = useState<boolean>(true);
   const [deloadType, setDeloadType] = useState<DeloadType>('pump');
+  // P6: выбор intensity technique (если не выбрана — дефолт по фазе)
+  const [intensityTech, setIntensityTech] = useState<IntensityTechnique>('none');
 
   const [peds, setPeds] = useState<PED[]>((prof.bbPeds?.length ? prof.bbPeds : (prof.onCourse ? ['AAS'] : [])) as PED[]);
   const [pedDoses, setPedDoses] = useState<Record<string, number>>({ AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
@@ -315,6 +317,11 @@ export const BbAutoConstructor: React.FC = () => {
     const srpe = loadSRPESessions();
     const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : null;
 
+    const autoRegPayload = (autoRegOn && autoRegResult) ? {
+      volumeMultiplier: autoRegResult.volumeMultiplier,
+      topSetPctMultiplier: autoRegResult.topSetPctMultiplier,
+      rirShift: autoRegResult.rirShift,
+    } : undefined;
     const processedPlan = applyPostPhaseProcessing({
       plan,
       totalWeeks: bbWeeks,
@@ -323,12 +330,12 @@ export const BbAutoConstructor: React.FC = () => {
       autoDeload,
       deloadType,
       acwrRatio: acwr?.ratio,
-      autoRegResult: autoRegOn && autoRegResult ? {
-        volumeMultiplier: autoRegResult.volumeMultiplier,
-        topSetPctMultiplier: autoRegResult.topSetPctMultiplier,
-        rirShift: autoRegResult.rirShift,
-      } : undefined,
+      autoRegResult: autoRegPayload,
       skipPhaseRedistribution: true,   // FIX-5: buildBBPlan уже распределил фазы
+      // P6: дефолтная техника по фазе (если UI не переопределяет явно)
+      intensityTechnique: intensityTech,
+      // P8: auto-feeder для слабых групп
+      weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
     });
 
     const modeLabel = planMode === 'bb_cycle' ? `BB-цикл: ${getCycleById(selectedCycleId)?.meta.title || selectedCycleId}` : 'Generic-сплит';
@@ -496,6 +503,20 @@ export const BbAutoConstructor: React.FC = () => {
           </div>
         </div>
       )}
+      {/* P6: intensity technique (применяется к primary упражнениям) */}
+      <div style={{ marginTop:8 }}>
+        <PopupSelect label="🎯 Intensity-техника (P6)" value={intensityTech} onChange={v => setIntensityTech(v as IntensityTechnique)} options={[
+          { id:'none', label:'Авто (по фазе): accumulation→pause_rep, intensification/peaking→rest_pause' },
+          { id:'rest_pause', label:'⏸ Rest-pause: финальный сет 1×8 + 15с + 1×3-4 + 15с + 1×3-4' },
+          { id:'drop_set', label:'⤵ Drop-set: финал 1×10 → -20% → 1×6 → -20% → 1×4' },
+          { id:'myo_reps', label:'🔁 Myo-reps: 1×12-15 + 4 mini × 4 reps × 5с' },
+          { id:'pause_rep', label:'🛑 Pause-rep: пауза 2-3с в нижней точке каждого повторения' },
+          { id:'mechanical_drop', label:'🔄 Mechanical drop: смена угла/хвата без отдыха' },
+        ]} />
+        <div style={{ marginTop:4, fontSize:10, color:'rgba(255,255,255,0.5)' }}>
+          {INTENSITY_TECHNIQUES[intensityTech]?.description || 'Без техники'}
+        </div>
+      </div>
       {/* Карточка травм */}
       <div style={{ marginTop:8 }}>
         <InjurySelectCard

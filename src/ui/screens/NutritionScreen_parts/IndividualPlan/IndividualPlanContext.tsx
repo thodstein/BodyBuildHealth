@@ -691,6 +691,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
 
     // ─── Pro Engine path (MPS-based, professional bodybuilding dietology) ───
     if (useProEngine) {
+      try {
       const toMin = (t: string) => t?.includes(':') ? parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]) : 0;
       const bfPct = bodyFatPct > 3 ? bodyFatPct : (sex === 'male' ? 15 : 22);
       const lbmKg = weight * (1 - bfPct / 100);
@@ -808,7 +809,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       setGenerated(true);
       generateRecommendations();
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-      return; // early return — Pro Engine завершён, старый код не выполняется
+      } catch (v2Err: any) {
+        // V2 упал (например, не нашлось ни одного подходящего продукта в пуле) —
+        // логируем ошибку, показываем пользователю понятное сообщение и фоллбэк на старый движок.
+        try { console.error('[IndividualPlan] V2 engine failed:', v2Err); } catch {}
+        try { setErrorMsg('V2-движок не смог собрать план (возможно слишком жёсткие исключения). Попробуйте расширить фильтры или переключитесь на «Классический движок».'); } catch {}
+        return; // early return — V2 упал, старый код НЕ выполняется
+      }
     }
     const nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
     const budgetFilter = (id: BudgetLevel): number[] => { const map: Record<string, number[]> = { low:[0,5],medium:[5,8],max:[8,10],enhanced:[9,15] }; return map[id] || [5,10]; };
