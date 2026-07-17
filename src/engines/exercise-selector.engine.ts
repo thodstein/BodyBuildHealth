@@ -60,7 +60,9 @@ function isAxialLoadExercise(ex: Exercise): boolean {
     || n.includes('ходьб') || n.includes('осо') || n.includes('sled') || n.includes('walk') || n.includes('carry')) return false;
 
   // Биомеханика БД: высокая нагрузка на позвоночник
-  const b = BIO_MAP.get(ex.id);
+  // AUDIT-FIX: catalog-id ≠ biomech-id — резолвим через getMappedBioId
+  const bioId = getMappedBioId(ex.id) || ex.id;
+  const b = BIO_MAP.get(bioId);
   if (b && b.spineLoad === 'high') return true;
 
   // Присед (barbell/фронт на плечах) — осевой
@@ -277,6 +279,7 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
   const { candidates, muscleGroup, count, selectedIds, selectedNames, equipment, weakZones, level, injuryProfile, type, preferEquipment, targetRir, preferBB, favoriteIds, excludeIds, avoidAxialLoad } = input;
   const _selNames = selectedNames || [];
   const _selIds = selectedIds || [];
+  const _equip = equipment || [];
   const _exclIds = new Set(excludeIds || []);
   const _favIds = new Set(favoriteIds || []);
   const _avoidAxial = !!avoidAxialLoad;
@@ -314,7 +317,7 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
   });
 
   // Если пул пуст (например, все кандидаты — осевые) — возвращаем candidates без фильтра
-  if (pool.length === 0) pool = candidates.filter(ex => ex && ex.id && !selectedIds.includes(ex.id) && !_selNames.includes(ex.name));
+  if (pool.length === 0) pool = candidates.filter(ex => ex && ex.id && !_selIds.includes(ex.id) && !_selNames.includes(ex.name));
 
   // Скоринг
   const scored = pool.map(ex => {
@@ -328,7 +331,7 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
 
     // 2. Разнообразие углов (-5..+10)
     // Нам нужны уже выбранные упражнения — берём из selectedIds
-    const alreadySelected = selectedIds.map(id => candidates.find(c => c.id === id)).filter(Boolean) as Exercise[];
+    const alreadySelected = _selIds.map(id => candidates.find(c => c.id === id)).filter(Boolean) as Exercise[];
     const ad = angleDiversityScore(ex, alreadySelected, muscleGroup);
     score += ad;
     if (ad > 0) rationales.push(`Новый угол +${ad}`);
@@ -357,11 +360,11 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     }
 
     // 6. Оборудование: предпочитаем доступное
-    if (equipment.length > 0) {
+    if (_equip.length > 0) {
       // AUDIT-FIX: в каталоге equipment может быть строкой ('barbell'), а не массивом — нормализуем.
       const rawEq = (ex as any).equipment;
       const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
-      const hasEquipment = exEq.length === 0 || exEq.some((eq: string) => equipment.includes(eq));
+      const hasEquipment = exEq.length === 0 || exEq.some((eq: string) => _equip.includes(eq));
       if (!hasEquipment) {
         score -= 5;
         rationales.push(`Нет оборудования -5`);
