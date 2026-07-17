@@ -5,7 +5,7 @@ import { buildStack, explainStack, findReplacement, findSupplements, findComplex
 import { buildSmartStack } from '../../engines/biostack-recommender.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS, ALL_SUBSTANCES } from '../../data/support-database';
 import { decodeGarbled } from '../../utils/text-sanitizer';
-import { GlassCard, StatBox, ORGANS, toFinderProfile, ConfirmModal, showToast, PRICE_RUB, estCost, SubstanceMechanismCard } from './BioStackAIConstants';
+import { GlassCard, StatBox, ORGANS, toFinderProfile, ConfirmModal, showToast, PRICE_RUB, estCost, SubstanceMechanismCard, SubstanceTzCard } from './BioStackAIConstants';
 import { SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX } from '../../data/support-meta';
 import type { LinkedData } from '../../core/data-link';
 import { checkStackToxicity, checkNutrientConflicts, optimizeTiming, findAbsorptionEnhancers, getReminderConfig, saveReminderConfig, scheduleTelegramReminder } from '../../engines/biostack-safety.engine';
@@ -340,7 +340,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
         setTimeout(() => {
           const fp = toFinderProfile(profile);
           const lab = (linked as any)?.labAnalysis || null;
-          const r = buildStack({ baseIds: [], targetSize: profile.maxStackSize || 10, autoFill: true, profile: fp });
+          const r = buildStack({ baseIds: [], targetSize: 10, autoFill: true, profile: fp });
           // Клинический шлюз безопасности (как в buildClinicalStack) — единый safety-путь
           const gate = selectStack(r.stack, profile, 'comprehensive', lab);
           const finalStack = gate.ids;
@@ -633,10 +633,10 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
             if (profile.healthConditions?.includes('kidney' as any) && organs.some((o: string) => ['KIDNEY', 'RENAL'].includes(o))) {
               issues.push(`• ${cat.nameRu || cat.name} — нагрузка на почки. Требуется контроль креатинина.`);
             }
-            if (organs.some((o: string) => ['LIVER'].includes(o)) && profile.goals?.includes('liver_health' as any)) {
+            if (organs.some((o: string) => ['LIVER'].includes(o))) {
               goods.push(`• ${cat.nameRu || cat.name} — ✅ поддерживает печень`);
             }
-            if (organs.some((o: string) => ['HEART', 'CARDIO'].includes(o)) && profile.goals?.includes('cardio_health' as any)) {
+            if (organs.some((o: string) => ['HEART', 'CARDIO'].includes(o))) {
               goods.push(`• ${cat.nameRu || cat.name} — ✅ поддерживает ССС`);
             }
             if (!cat.dosage) {
@@ -792,9 +792,9 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
           <StatBox label="Покрытие" value={`${explanation?.completeness ?? 0}%`} color="#60a5fa" />
           <StatBox label="С дозой" value={`${explanation?.totalDoseCount ?? 0}/${stackIds.length}`} color="#f59e0b" />
         </div>
-        {stackIds.length > (profile.maxStackSize || 8) && (
+        {stackIds.length > 8 && (
           <div style={{ fontSize: 8, color: '#f59e0b', padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.1)', marginBottom: 6 }}>
-            ⚠ Превышен лимит ({profile.maxStackSize || 8}) — рекомендуется сократить стек
+            ⚠ Превышен лимит (8) — рекомендуется сократить стек
           </div>
         )}
         <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
@@ -811,7 +811,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
         </div>
         <div style={{ display: 'flex', gap: 2, marginTop: 4, justifyContent: 'flex-end' }}>
           <button onClick={() => {
-            const data = JSON.stringify({ stackIds, date: new Date().toISOString(), profile: { goals: profile.goals, aasStatus: profile.aasStatus } });
+            const data = JSON.stringify({ stackIds, date: new Date().toISOString(), profile: {} });
             const blob = new Blob([data], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -1050,6 +1050,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
                 <div key={id} style={{ padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ fontSize: 8, fontWeight: 600, color: '#fff', marginBottom: 2 }}>{cat?.nameRu || cat?.name || id}</div>
                   <SubstanceMechanismCard id={id} />
+                  <SubstanceTzCard id={id} />
                 </div>
               );
             })}
@@ -1182,7 +1183,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
 
       {/* 📊 Эффективность стека (feedback loop) */}
       {(() => {
-        const feedback = getStackEffectiveness(stackIds, profile.goals || [], 14);
+        const feedback = getStackEffectiveness(stackIds, [], 14);
         if (!feedback || feedback.symptomTrends.length === 0) return null;
         return (
           <GlassCard title={`📊 Эффективность стека · ${feedback.overallScore}/100`} icon="📊" color={feedback.overallScore >= 60 ? '#22c55e' : feedback.overallScore >= 40 ? '#f59e0b' : '#ef4444'}>
@@ -1335,7 +1336,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
 
                   <button onClick={() => {
                     setActOpen(false);
-                    const r = buildSmartStack(profile.goals as any || [], { maxSubstances: stackIds.length }, profile);
+                    const r = buildSmartStack([], { maxSubstances: stackIds.length }, profile);
                     const curNames = stackIds.map(id => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id);
                     const altNames = r.substances.map(s => s.nameRu || s.name);
                     const common = curNames.filter(n => altNames.includes(n));

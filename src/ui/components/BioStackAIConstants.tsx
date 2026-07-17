@@ -62,6 +62,22 @@ export function SubstanceMechanismCard({ id }: { id: string }) {
   );
 }
 
+// Карточка описания препарата в ТЗ-стиле (как organMechanisms в Calc.mapper.tsx, purple #a78bfa)
+export function SubstanceTzCard({ id }: { id: string }) {
+  const entry = SUPPORT_CATALOG_DATA[id];
+  const desc = entry?.description;
+  if (!desc) return null;
+  return (
+    <div style={{
+      marginTop: 4, padding: '5px 8px', borderRadius: 8,
+      background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.18)',
+    }}>
+      <div style={{ fontSize: 7, fontWeight: 700, color: '#a78bfa', marginBottom: 1 }}>📋 Описание (ТЗ)</div>
+      <div style={{ fontSize: 8, color: 'rgba(233,213,255,0.85)', lineHeight: 1.35 }}>{desc}</div>
+    </div>
+  );
+}
+
 export type BSTab = 'profile' | 'select' | 'stack' | 'reports';
 
 export const SUB_TABS: { id: BSTab; label: string }[] = [
@@ -310,10 +326,10 @@ export function toFinderProfile(bp: BioStackProfile): FinderProfile {
   return {
     age: bp.age, weight: bp.weight, height: bp.height, sex: bp.sex,
     experience: bp.experience,
-    goals: bp.goals.filter(g => g !== undefined) as FinderGoal[],
-    aasStatus: bp.aasStatus,
+    goals: [],
+    aasStatus: 'none',
     healthConditions: bp.healthConditions,
-    budget: bp.budget, avoidIds: bp.avoidIds, maxStackSize: bp.maxStackSize,
+    budget: 'medium', avoidIds: bp.avoidIds, maxStackSize: 8,
   };
 }
 

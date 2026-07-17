@@ -1,3 +1,34 @@
+## Session Summary (Jul 17 — Part X) — BioStack: backlog DONE (RU-лейблы + TZ-карточка + краш 2-го стека)
+
+### Goal
+Закрыть backlog из предыдущей сводки: (1) починить падение при сборке 2-го стека, (2) добавить 189 недостающих RU-лейблов в `MECHANISM_LABELS`, (3) карточка описания препарата в ТЗ-стиле (purple #a78bfa, как `Calc.mapper.tsx` organMechanisms) в сборку стека.
+
+### ✅ Сделано и проверено
+- **Краш 2-го стека — НЕ ВОСПРОИЗВОДИТСЯ**: `buildSmartStackMulti`/`buildSmartStack`/`searchBioStack` (biostack-recommender.engine.ts) запущены через `npx tsx` с реалистичным и экстремальными профилями (REPEAT×3, EMPTY_GOALS, WEIRD_GOALS, SINGLE_2NDSTACK, SINGLE_1STSTACK, POPULATED_PROFILE, MANY_GOALS) — все ветви `maxSize` 5/8/12/18 и `economy`/`balanced`/`maximum` отработали без падения. Фикс краша, вероятно, уже применён в коммите `6e78784b3` (последнее касание движка). Запись в AGENTS о «падении» — устаревшая.
+- **189 RU-лейблов добавлено**: `MECHANISM_LABELS` в `src/data/support-meta.ts` расширен на 189 канонических кода из `BRIDGE_MECH_TO_CATALOG` (HMG_COA_REDUCTION, FATTY_ACID_OXIDATION, PPAR_ACTIVATION, NO_PATHWAY, ARB_AGONISM, AT1_BLOCKADE, CARDIOPROTECTION, SIRTUIN_ACTIVATION, TELOMERASE_ACTIVATION, AROMATASE_INHIBITION, ERYTHROPOIESIS, IGA_BOOST, HYALURONAN_SYNTHESIS и др.). Скрипт `bmiss.ts` подтвердил: total=386, withLabel=386, missing=0, value===key (raw)=0. Все механизмы теперь резолвятся в русский текст (раньше render raw-код).
+- **TZ-карточка описания препарата**: в `BioStackAIConstants.tsx` добавлен `SubstanceTzCard({id})` — рендерит `SUPPORT_CATALOG_DATA[id].description` в фиолетовой карточке (bg `rgba(167,139,250,0.06)`, border `rgba(167,139,250,0.18)`, заголовок «📋 Описание (ТЗ)», цвет `#a78bfa`) — стиль как `Calc.mapper.tsx` organMechanisms. Подключена в `BioStackAIBuild.tsx` (result-панель, каждое вещество — после `SubstanceMechanismCard`) и `BioStackAIStack.tsx` (сворачиваемая секция «🧬 Механизмы веществ» — каждое вещество активного стека).
+- **Верификация**: esbuild-трансформ `BioStackAIConstants.tsx` / `BioStackAIBuild.tsx` / `BioStackAIStack.tsx` — все OK; UTF-8 noBOM — garbled=0; `bmiss.ts` COUNT=0.
+
+### ❌ Остаётся
+- Визуальная проверка в браузере (TZ-карточка описания + RU-лейблы в чипсах).
+- Коммит изменений (labels + TZ-карточка) — не закоммичено (требуется явная просьба пользователя).
+- Предсуществующая ошибка `tsc`: `src/ui/screens/TrainingScreen_parts/TrainingConstructor/index.tsx:1703` TS2322 (вне BioStack, не тронута).
+
+### Key Decisions
+- RU-лейблы пишутся рядом с существующими (`'SUPPORT': 'Поддержка',` → перед `};`), без перезаписи старых.
+- TZ-карточка — аддитивная (не заменяет `SubstanceMechanismCard`), даёт клиническое описание рядом с механизмами.
+- «Краш 2-го стека» признан устаревшим: движок структурно безопасен и проверен исполнением.
+
+### Relevant Files
+- `src/data/support-meta.ts` — `MECHANISM_LABELS` +189 RU (386 total, 0 missing)
+- `src/data/mechanism-code-bridge.ts` — `BRIDGE_MECH_TO_CATALOG` (386, НЕ редактировался)
+- `src/ui/components/BioStackAIConstants.tsx` — `SubstanceTzCard` (new) + `SubstanceMechanismCard`
+- `src/ui/components/BioStackAIBuild.tsx` — импорт + `<SubstanceTzCard id={s.id} />` в result-панели (~789)
+- `src/ui/components/BioStackAIStack.tsx` — импорт + `<SubstanceTzCard id={id} />` в секции механизмов (~1053)
+- `src/engines/biostack-recommender.engine.ts` — `buildSmartStackMulti` (проверен, краш не воспроизводится)
+
+---
+
 ## Session Summary (Jul 17) — BioStack: механизм-ориентированная модель веществ (как в калькуляторе поддержки)
 
 ### Goal

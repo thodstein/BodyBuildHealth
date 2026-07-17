@@ -6,7 +6,7 @@ import { ORGAN_LABELS, SYSTEM_LABELS_CATALOG } from '../../data/support-database
 import { LAB_MARKER_MAP, type LabMarkerMap } from '../../data/lab-marker-map';
 import { STACK_TEMPLATES, type BioStackTemplate } from '../../engines/biostack-templates';
 import { SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX, MECHANISM_LABELS, COMPLEX_NAMES } from '../../data/support-meta';
-import { GlassCard, PillBtn, StatBox, ORGANS, SYSTEMS, PURE_GOALS, TARGET_SYSTEMS, SYMPTOMS, toFinderProfile, showToast, estCost, SubstanceMechanismCard } from './BioStackAIConstants';
+import { GlassCard, PillBtn, StatBox, ORGANS, SYSTEMS, PURE_GOALS, TARGET_SYSTEMS, SYMPTOMS, toFinderProfile, showToast, estCost, SubstanceMechanismCard, SubstanceTzCard } from './BioStackAIConstants';
 import { buildSmartStackMulti, type BuildVariant } from '../../engines/biostack-recommender.engine';
 import { getSafeStackRecommendations } from '../../engines/biostack-safety.engine';
 import {
@@ -299,12 +299,12 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
   labAnalysis?: LabCompositeResult | null;
   linked?: LinkedData;
 }) {
-  const [goals, setGoals] = useState<GoalType[]>(profile.goals);
+  const [goals, setGoals] = useState<GoalType[]>([]);
   const [selOrgans, setSelOrgans] = useState<string[]>(profile.targetOrgans || []);
   const [selSystems, setSelSystems] = useState<string[]>(profile.targetSystems || []);
   const [selMechanisms, setSelMechanisms] = useState<string[]>([]);
   const [selTargets, setSelTargets] = useState<GoalType[]>([]);
-  const [targetSize, setTargetSize] = useState(() => profile.stackComplexity === 'minimal' ? 5 : profile.stackComplexity === 'balanced' ? 10 : 18);
+  const [targetSize, setTargetSize] = useState(10);
   const [lmState, setLmState] = useState<LMState>(() => {
     const init: LMState = {};
     if (labAnalysis?.interpretations) {
@@ -407,7 +407,7 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
         }
       }
     });
-    const allGoals = [...new Set([...goals, ...selTargets, ...profile.goals])];
+    const allGoals = [...new Set([...goals, ...selTargets])];
     const firstGoal = allGoals[0] || undefined;
     const fp = toFinderProfile(profile);
 
@@ -432,20 +432,9 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
       autoFill: true, profile: fp,
       avoidIds: conflictFilter ? stackIds.filter(id => !conflictFilter(id)) : undefined,
     });
-    // Budget filter: economy → only core/standard
+    // Budget tier filter removed: profile no longer carries a budget field
     let filteredStack = built.stack;
     let budgetNote = '';
-    if (profile.budget === 'economy') {
-      const tierEd = filteredStack.filter(id => {
-        const c = SUPPORT_CATALOG_DATA[id];
-        return c && (c.tier === 'core' || c.tier === 'standard');
-      });
-      const removed = filteredStack.length - tierEd.length;
-      if (removed > 0) {
-        budgetNote = `💰 Бюджетный режим: убрано ${removed} препаратов тира advanced/specialty`;
-        filteredStack = tierEd;
-      }
-    }
     // Drug-safety filter: exclude HIGH-severity drug interactions
     let drugSafetyNote = '';
     if (profile.currentMeds?.length) {
@@ -485,7 +474,7 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
   }, [result]);
 
   const handleMultiBuild = useCallback(() => {
-    const allGoals = [...new Set([...goals, ...selTargets, ...profile.goals])] as GoalType[];
+    const allGoals = [...new Set([...goals, ...selTargets])] as GoalType[];
     if (allGoals.length === 0) { showToast('Выберите хотя бы одну цель', 'error'); return; }
     setMultiLoading(true);
     setTimeout(() => {
@@ -798,6 +787,7 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
                 <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3 }}>🧬 {s.mechanism}</div>
                 {s.dose && <div style={{ fontSize: 8, color: '#60a5fa' }}>💊 {s.dose}</div>}
                 <SubstanceMechanismCard id={s.id} />
+                <SubstanceTzCard id={s.id} />
               </div>
               );
             })}
