@@ -2282,8 +2282,6 @@ div[style*="background"][style*="#1A1A1A"],
 table[style*="background"][style*="rgba(255,255,255,0.0"],
 table[style*="background"][style*="rgba(255, 255, 255, 0.0"] {
   background: var(--glass-bg) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(160%) !important;
-  backdrop-filter: blur(18px) saturate(160%) !important;
   border: 1px solid var(--glass-border) !important;
   border-radius: 16px !important;
   box-shadow: 0 8px 24px rgba(0,0,0,0.22) !important;
