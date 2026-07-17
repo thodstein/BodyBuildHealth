@@ -110,6 +110,77 @@ export const PopupSelect: React.FC<{
   );
 };
 
+/**
+ * PopupSelectSmart — PopupSelect с подсветкой ★ рекомендованных вариантов.
+ * suggestedIds: Set<string> — id рекомендованных вариантов (подсвечиваются ★ и рамкой).
+ * suggestionReason: string — почему эти варианты рекомендованы (показывается в шапке попапа).
+ */
+export const PopupSelectSmart: React.FC<{
+  label: string;
+  value: string;
+  options: { id: string; label: string; desc?: string }[];
+  hint?: string;
+  suggestedIds?: Set<string>;
+  suggestionReason?: string;
+  onChange: (v: string) => void;
+}> = ({ label, value, options, hint, suggestedIds, suggestionReason, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const sel = options.find(o => o.id === value);
+  const isSuggested = suggestedIds && suggestedIds.size > 0;
+  return (
+    <>
+      <button onClick={() => setOpen(true)} style={cardBtnStyle(!!value)}>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 2 }}>
+          {label}{isSuggested && value && suggestedIds!.has(value) && <span style={{ color: '#f59e0b', marginLeft: 4 }}>★</span>}
+        </div>
+        <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{sel ? sel.label : 'Выбрать…'}</div>
+      </button>
+      {open && (
+        <div style={overlay} onClick={() => setOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={sheet(420)}>
+            <div style={topBar} />
+            <div style={sheetBody}>
+              <div style={titleStyle}>{label}</div>
+              {hint && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
+              {isSuggested && suggestionReason && (
+                <div style={{ fontSize: 10, color: '#f59e0b', marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)', lineHeight: 1.4 }}>
+                  ★ Рекомендовано: {suggestionReason}
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {options.map(o => {
+                  const isSelected = value === o.id;
+                  const isSug = isSuggested && suggestedIds!.has(o.id);
+                  return (
+                    <button 
+                      key={o.id} 
+                      onClick={() => { onChange(o.id); setOpen(false); }}
+                      style={{ 
+                        display: 'block', width: '100%', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                        fontSize: 11, fontWeight: isSelected ? 700 : isSug ? 600 : 400,
+                        background: isSelected ? 'rgba(0,230,138,0.12)' : isSug ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.03)',
+                        border: isSelected ? '1px solid rgba(0,230,138,0.3)' : isSug ? '1px solid rgba(245,158,11,0.25)' : '1px solid rgba(255,255,255,0.06)',
+                        color: isSelected ? ACCENT : isSug ? '#f59e0b' : 'rgba(255,255,255,0.85)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>{isSug && !isSelected ? '★ ' : ''}{o.label}</span>
+                        {isSelected && <span style={{ fontSize: 10 }}>✓</span>}
+                      </div>
+                      {o.desc && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>}
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={() => setOpen(false)} style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
 export const PopupText: React.FC<{
   label: string; value: string; placeholder?: string;
   hint?: string; onChange: (v: string) => void;

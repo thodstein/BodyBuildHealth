@@ -13,7 +13,7 @@
  *  - 3D эволюция объёма/интенсивности/частоты по неделям
  *  - Цветная индикация фазы в календаре и плане
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useDataLink } from '../../../core/data-link';
 import { EXERCISE_CATALOG, getExercisesByGroup, getSubstitutes, getExerciseById } from '../../../core/exercise-catalog';
 import { SubstitutionPopup } from './SubstitutionPopup';
@@ -30,7 +30,7 @@ import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
 import { applyToPlanner, subscribePlannerApply } from './planner-bridge';
 import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN, Chip, panelStyle } from './training-ui';
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
-import { PopupNumber, PopupSelect, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
+import { PopupNumber, PopupSelect, PopupSelectSmart, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
 import { InjurySelectCard } from './InjurySelectCard';
 import type { InjurySelectEntry } from './InjurySelectCard';
 import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, type LoadStrategy, type DeloadType, INTENSITY_TECHNIQUES, DEFAULT_TECHNIQUE_BY_PHASE, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
@@ -46,6 +46,7 @@ import { validatePlanQuality, bbPlanToQualityInput, type PlanQualityResult } fro
 import { PlanExportCard } from './PlanExportCard';
 import { DayCard, ExerciseRow, PhaseBanner, WeekStrip, PHASE_COLORS, PHASE_LABELS, type PlanDayView, type PlanExerciseView, type PhaseKey } from './PlanOutput';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
+import { getBBSuggestions } from './bb-compat';
 
 type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -194,6 +195,39 @@ export const BbAutoConstructor: React.FC = () => {
   const [showCompare, setShowCompare] = useState(false);
   const refreshSavedPlans = useCallback(() => setSavedPlans(loadSavedBBPlans()), []);
   useEffect(() => { refreshSavedPlans(); }, [refreshSavedPlans]);
+
+  // Smart suggestions: матрица совместимости параметров (цепочка выборов)
+  const bbSuggest = useMemo(() => getBBSuggestions(bbGoal, bbLevel), [bbGoal, bbLevel]);
+  // Авто-применение рекомендаций при первой настройке (цепочка): если значение не рекомендовано
+  // и пользователь не менял его явно — переключить на лучшее рекомендованное.
+  const userTouched = useRef<Record<string, boolean>>({});
+  useEffect(() => {
+    // Авто-применить volumeGoal если не рекомендован и не тронут пользователем
+    if (!userTouched.current.volGoal && !bbSuggest.volumeGoal.has(bbVolGoal) && bbSuggest.volumeGoal.size > 0) {
+      const best = Array.from(bbSuggest.volumeGoal)[0];
+      setBbVolGoal(best);
+    }
+    // Авто-применить loadStrategy
+    if (!userTouched.current.loadStrategy && !bbSuggest.loadStrategy.has(loadStrategy) && bbSuggest.loadStrategy.size > 0) {
+      const best = Array.from(bbSuggest.loadStrategy)[0];
+      setLoadStrategy(best as LoadStrategy);
+    }
+    // Авто-применить deloadType
+    if (!userTouched.current.deloadType && !bbSuggest.deloadType.has(deloadType) && bbSuggest.deloadType.size > 0) {
+      const best = Array.from(bbSuggest.deloadType)[0];
+      setDeloadType(best as DeloadType);
+    }
+    // Авто-применить intensityTechnique
+    if (!userTouched.current.intensityTech && !bbSuggest.intensityTechnique.has(intensityTech) && bbSuggest.intensityTechnique.size > 0) {
+      const best = Array.from(bbSuggest.intensityTechnique)[0];
+      setIntensityTech(best as IntensityTechnique);
+    }
+  }, [bbSuggest]);
+  // Обёртки onChange с пометкой userTouched
+  const onUserVolGoal = (v: string) => { userTouched.current.volGoal = true; setBbVolGoal(v); };
+  const onUserLoadStrategy = (v: string) => { userTouched.current.loadStrategy = true; setLoadStrategy(v as LoadStrategy); };
+  const onUserDeloadType = (v: string) => { userTouched.current.deloadType = true; setDeloadType(v as DeloadType); };
+  const onUserIntensityTech = (v: string) => { userTouched.current.intensityTech = true; setIntensityTech(v as IntensityTechnique); };
 
   // Подписка на planner-bridge: приём программ из библиотеки
   useEffect(() => {
@@ -566,18 +600,28 @@ export const BbAutoConstructor: React.FC = () => {
       )}
 
       {planMode === 'generic_split' && (
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+      <div>
+        {/* Smart suggestions info banner */}
+        <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>★ Smart-подбор (цепочка)</div>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', lineHeight:1.5 }}>
+            <div><b style={{ color:'#f59e0b' }}>Цель «{bbGoal === 'mass' ? 'Масса' : bbGoal === 'cut' ? 'Сушка' : bbGoal === 'recomp' ? 'Рекомпозиция' : bbGoal === 'maintenance' ? 'Поддержание' : 'Сила+Масса'}»:</b> {bbSuggest.goalDesc}</div>
+            <div style={{ marginTop:3 }}><b style={{ color:'#f59e0b' }}>Уровень «{bbLevel === 'beginner' ? 'Новичок' : bbLevel === 'intermediate' ? 'Средний' : bbLevel === 'advanced' ? 'Опытный' : 'Enhanced'}»:</b> {bbSuggest.levelDesc}</div>
+          </div>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
         <PopupSelect label="Уровень" value={bbLevel} onChange={setBbLevel} options={[['beginner','Новичок'],['intermediate','Средний'],['advanced','Опытный'],['enhanced','Enhanced (PED)']].map(([id,label]) => ({ id, label }))} />
         <PopupSelect label="Цель" value={bbGoal} onChange={setBbGoal} options={[['mass','Мышечная масса'],['cut','Сушка'],['recomp','Рекомпозиция'],['maintenance','Поддержание'],['strength_mass','Сила + Масса']].map(([id,label]) => ({ id, label }))} />
         <PopupNumber label="Дней/нед" value={bbDays} min={3} max={6} onChange={v => setBbDays(v)} />
         <PopupNumber label="Недель мезо" value={bbWeeks} min={4} max={24} suffix=" нед" onChange={v => setBbWeeks(v)} />
-        <PopupSelect label="Цель объёма" value={bbVolGoal} onChange={setBbVolGoal} options={[['mev','Минимум (MEV)'],['mav','Оптимум (MAV)'],['mrv','Максимум (MRV)']].map(([id,label]) => ({ id, label }))} />
+        <PopupSelectSmart label="Цель объёма" value={bbVolGoal} onChange={onUserVolGoal} suggestedIds={bbSuggest.volumeGoal} suggestionReason="По цели и уровню" options={[['mev','Минимум (MEV)'],['mav','Оптимум (MAV)'],['mrv','Максимум (MRV)']].map(([id,label]) => ({ id, label }))} />
         <PopupSelect label="Фокус-группа" value={bbFocus} onChange={setBbFocus} options={[{ id:'', label:'Нет' }, ...WEAK_GROUPS.map(([id,l]) => ({ id, label: l }))]} />
+        </div>
       </div>
       )}
       <div style={{ marginTop:12, padding:10, borderRadius:10, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
         <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>📈 Стратегия прогрессии</div>
-        <PopupSelect label="" value={loadStrategy} onChange={v => setLoadStrategy(v as LoadStrategy)} options={[
+        <PopupSelectSmart label="" value={loadStrategy} onChange={onUserLoadStrategy} suggestedIds={bbSuggest.loadStrategy} suggestionReason={bbSuggest.goalDesc.split('.')[0]} options={[
           { id:'double_progression', label:'🔄 Двойная прогрессия: сначала повторы → потом вес (рекоменд.)' },
           { id:'linear', label:'📈 Линейная: +2.5 кг/нед для compounds, +1 кг для изоляции' },
           { id:'wave', label:'🌊 Волновая: 3-нед микроциклы (тяж/ср/лёг)' },
@@ -598,7 +642,7 @@ export const BbAutoConstructor: React.FC = () => {
       </div>
       {autoDeload && (
         <div style={{ marginTop:6 }}>
-          <PopupSelect label="Тип разгрузки" value={deloadType} onChange={v => setDeloadType(v as DeloadType)} options={[
+          <PopupSelectSmart label="Тип разгрузки" value={deloadType} onChange={onUserDeloadType} suggestedIds={bbSuggest.deloadType} suggestionReason="По цели" options={[
             { id:'pump', label:'🩸 Pump-разгрузка: лёгкие веса, высокие повторы (рекоменд.)' },
             { id:'neural', label:'🧠 Нейральная: низкий объём, умеренный вес, долгий отдых' },
             { id:'full_rest', label:'😴 Полный отдых: минимальная активность, только при перетрене' },
@@ -610,7 +654,7 @@ export const BbAutoConstructor: React.FC = () => {
       )}
       {/* P6: intensity technique (применяется к primary упражнениям) */}
       <div style={{ marginTop:8 }}>
-        <PopupSelect label="🎯 Intensity-техника (P6)" value={intensityTech} onChange={v => setIntensityTech(v as IntensityTechnique)} options={[
+        <PopupSelectSmart label="🎯 Intensity-техника (P6)" value={intensityTech} onChange={onUserIntensityTech} suggestedIds={bbSuggest.intensityTechnique} suggestionReason="По цели и уровню (цепочка)" options={[
           { id:'none', label:'Авто (по фазе): accumulation→pause_rep, intensification/peaking→rest_pause' },
           { id:'rest_pause', label:'⏸ Rest-pause: финальный сет 1×8 + 15с + 1×3-4 + 15с + 1×3-4' },
           { id:'drop_set', label:'⤵ Drop-set: финал 1×10 → -20% → 1×6 → -20% → 1×4' },
@@ -792,13 +836,15 @@ export const BbAutoConstructor: React.FC = () => {
         {ranked.map(r => {
           const sel = selectedSplitId === r.pattern.id;
           const mf = getMuscleFrequencies(r.pattern);
+          const isSugSplit = bbSuggest.splitHints.has(r.pattern.id);
           return <div key={r.pattern.id} onClick={() => setSelectedSplitId(r.pattern.id)}
-            style={{ padding:'10px 12px', borderRadius:10, cursor:'pointer', border:sel?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background:sel?'rgba(0,230,138,0.08)':'rgba(255,255,255,0.02)' }}>
+            style={{ padding:'10px 12px', borderRadius:10, cursor:'pointer', border:sel?'1px solid #00e68a':isSugSplit?'1px solid rgba(245,158,11,0.25)':'1px solid rgba(255,255,255,0.06)', background:sel?'rgba(0,230,138,0.08)':isSugSplit?'rgba(245,158,11,0.04)':'rgba(255,255,255,0.02)' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <span style={{ fontWeight:700, fontSize:12, color:sel?'#00e68a':'#fff' }}>{r.pattern.name}</span>
+              <span style={{ fontWeight:700, fontSize:12, color:sel?'#00e68a':isSugSplit?'#f59e0b':'#fff' }}>{isSugSplit ? '★ ' : ''}{r.pattern.name}</span>
               <span style={{ fontSize:11, color:ACCENT, fontWeight:700, background:'rgba(0,230,138,0.12)', padding:'2px 8px', borderRadius:8 }}>скор {r.score}</span>
             </div>
             <div style={{ ...SMALL, marginTop:4 }}>{r.pattern.description}</div>
+            {isSugSplit && !sel && <div style={{ fontSize:10, color:'#f59e0b', marginTop:2 }}>★ Рекомендован для цели «{bbGoal}» + уровня «{bbLevel}»</div>}
             {sel && <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.7)' }}>{r.rationale.map((x,i) => <div key={i}>✓ {x}</div>)}</div>}
             <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:4 }}>
               {mf.map(f => (
