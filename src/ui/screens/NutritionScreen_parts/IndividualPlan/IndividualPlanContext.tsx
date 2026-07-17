@@ -721,9 +721,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           if (isTrain) { dayKcalMod = 1.15; dayCarbMod = 1.3; }
           else { dayKcalMod = 0.85; dayCarbMod = 0.7; }
         } else if (cyclingMode === 'butch') {
-          // 3 days high carb + 1 day low carb, repeat
-          const cyclePos = offset % 4;
-          if (cyclePos < 3) { dayKcalMod = 1.1; dayCarbMod = 1.4; }
+          // Д-9: BUTCH aligned to training days (matches UI text "3 дня ВУ (тренировочные) + 1 день НУ (отдых)"
+          // and the legacy buildDay path). High carb on training days, low carb on rest days — the previous
+          // time-based cyclePos%4 could put a low-carb day on a training day, underfueling the session.
+          if (isTrain) { dayKcalMod = 1.1; dayCarbMod = 1.4; }
           else { dayKcalMod = 0.85; dayCarbMod = 0.4; }
         }
         const input: MealPlanInput = {
