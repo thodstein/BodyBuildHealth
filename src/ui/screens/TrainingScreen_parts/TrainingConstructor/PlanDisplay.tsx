@@ -7,7 +7,7 @@ import { labTrainingAdjust } from '../lab-training-adjust';
 import { tempoFor } from '../../../../engines/bb/bb-tempo-rest';
 import { PCT_FOR_RIR, GROUP_RU, ACCENT, DIM, SET_TEMPLATES, type ManualResult, type ManualWeek } from './types';
 import { H, SMALL, panelStyle, R, ACCENT_SOFT, BTN_GHOST } from '../training-ui';
-import { DayCard, type PhaseKey } from '../PlanOutput';
+import { DayCard, PhaseBanner, type PhaseKey } from '../PlanOutput';
 import type { TrainingProfile } from '../training-profile';
 import { PHASE_LABELS, type BBPhase } from './phase-periodization';
 import { getPlanFeedback } from '../../../../engines/plan-execution-feedback.engine';
@@ -41,6 +41,13 @@ const PHASE_COLORS: Record<string, string> = {
   intensification: '#f59e0b',
   deload: '#60a5fa',
   peaking: '#ef4444',
+};
+
+const PHASE_GOAL: Record<string, string> = {
+  accumulation: 'объём и гипертрофия — нарастающая нагрузка',
+  intensification: 'механическое натяжение и плотность',
+  peaking: 'максимальная сила и пик формы',
+  deload: 'активное восстановление и спад объёма',
 };
 
 // Синхронизация правок дней с текущей неделей мезоцикла (иначе изменения
@@ -664,6 +671,10 @@ export const PlanDisplay: React.FC<Props> = ({
         );
       })()}
 
+      {hasWeeks && currentWeekMeta && (
+        <PhaseBanner phase={currentWeekMeta.phase as PhaseKey} desc={PHASE_GOAL[currentWeekMeta.phase]} />
+      )}
+
       <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.03em', textTransform: 'uppercase', minWidth: 40 }}>⚖️ Вес</span>
         <button onClick={() => massEditWeight(5)} style={massBtnStyle(ACCENT)}>+5%</button>
@@ -766,13 +777,22 @@ export const PlanDisplay: React.FC<Props> = ({
   )}
 
       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {result.days.map((d, di) => (
+        {result.days.map((d, di) => {
+          const daySets = d.exercises.reduce((s, e) => s + (e.sets || 0), 0);
+          const mp = currentWeekMeta?.phase;
+          const mpc = mp ? (PHASE_COLORS[mp] || '#a855f7') : '#a855f7';
+          const mpl = mp ? (PHASE_LABELS[mp as BBPhase] || mp) : '';
+          return (
           <DayCard key={d.day} day={{
             key: String(d.day),
             title: '🏋️ День ' + d.day,
-            phase: currentWeekMeta ? (currentWeekMeta.phase as PhaseKey) : undefined,
+            phase: mp as PhaseKey | undefined,
+            volumeTag: d.exercises.length + ' упр · ' + daySets + ' сет',
             headerActions: (
               <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                {mpl && (
+                  <span style={{ fontSize: 9, fontWeight: 700, color: mpc, background: mpc + '22', border: '1px solid ' + mpc + '55', borderRadius: 10, padding: '3px 9px', whiteSpace: 'nowrap' }}>{mpl}</span>
+                )}
                 <span style={{ fontSize: 9, color: ACCENT, fontWeight: 700 }}>{d.groups.map(g => GROUP_RU[g] || g).join(' · ')}</span>
                 <button onClick={() => copyDay(di)} title="Копировать день" style={{ padding: '1px 6px', borderRadius: 4, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', fontSize: 9, fontWeight: 700 }}>📋</button>
               </span>
@@ -913,7 +933,8 @@ export const PlanDisplay: React.FC<Props> = ({
             })}
             </div>
           </>)} } />
-        ))}
+        );
+        })}
       </div>
 
       <button onClick={onToRuntime} style={{ width: '100%', marginTop: 10, padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13 }}>

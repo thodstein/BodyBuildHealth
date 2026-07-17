@@ -8,6 +8,7 @@ import { S_MRV_FACTOR } from './rir-table';
 import { findSubstitutions } from './exercise-substitution.engine';
 import { isBodyweightExercise, isCarryExercise, derivePattern } from './movement-pattern';
 import { getVolumeLandmarks } from './volume-landmarks.engine';
+import { suggestFeeders, INTENSITY_TECHNIQUES, type IntensityTechnique } from './bb/bb-autocoach.engine';
 
 export { derivePattern };
 
@@ -193,6 +194,45 @@ export interface BuildPlanInput {
   favoriteExercises?: string[]; // Любимые упражнения — получают +15 приоритет
   excludedExercises?: string[]; // Нелюбимые/исключённые упражнения — полностью исключаются
   avoidAxialLoad?: boolean; // Убрать осевую нагрузку (присед/становая/жим стоя/гудморнинг)
+  intensityTechnique?: IntensityTechnique; // P6: intensity technique для основных упражнений
+}
+
+/**
+ * P6: применить intensity technique к плоскому PlanEx (адаптация под flat-структуру
+ * ручного конструктора: sets/reps/rir/rest/weight вместо workSets[] как в BB).
+ * Меняет только reps/комментарий/technique-поле — не нарушает фазо-корректные sets/rir.
+ */
+function applyTechniqueToPlanEx(p: PlanEx, technique: IntensityTechnique): void {
+  if (technique === 'none') return;
+  const meta = INTENSITY_TECHNIQUES[technique];
+  p.technique = meta.label;
+  const repsNums = (p.reps.match(/\d+/g) || []).map(Number);
+  const lastReps = repsNums.length ? repsNums[repsNums.length - 1] : 10;
+  let add = '';
+  switch (technique) {
+    case 'rest_pause':
+      add = `Rest-pause: финальный сет ${lastReps} → 15с → ${Math.max(2, lastReps - 4)}-${lastReps - 3} → 15с → ${Math.max(2, lastReps - 4)}-${lastReps - 3}.`;
+      break;
+    case 'drop_set':
+      add = `Drop-set: финальный сет ${lastReps} → -20% → ${Math.round(lastReps * 0.8)} → -20% → ${Math.round(lastReps * 0.64)}.`;
+      break;
+    case 'myo_reps':
+      add = `Myo-reps: 1×${lastReps} (активация) → 5с × 3-5 mini-сетов по 3-5.`;
+      break;
+    case 'pause_rep': {
+      const tParts = (p.tempo || '2-1-1-0').split('-');
+      if (tParts.length === 4) {
+        tParts[1] = String(Math.max(1, parseInt(tParts[1] || '1') + 2));
+        p.tempo = tParts.join('-');
+      }
+      add = `Pause-rep: пауза ${tParts[1]}с в нижней точке.`;
+      break;
+    }
+    case 'mechanical_drop':
+      add = `Mechanical drop: смена угла/хвата без отдыха.`;
+      break;
+  }
+  p.comments = (p.comments ? p.comments + ' ' : '') + '🎯 ' + add;
 }
 
 /**
@@ -204,7 +244,7 @@ export interface BuildPlanInput {
  * Возвращает дни, недельные сеты по группам и список правок-комментариев.
  */
 export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklySets: Record<string, number>; groupCorrections: string[]; patternBalance: Record<string, number> } {
-  const { cycle, mrv, mrvOverride, goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, currentReadiness = 100, targetTonnage, sequenceStrategy = 'classic', preferEquipment: prefEqOverride, courseIntensity, workMaxOverride } = input;
+  const { cycle, mrv, mrvOverride, goal, level, mesoLength, weakPoints, equipment, workMax, manualWorkMax, injuries, pctForRir, currentReadiness = 100, targetTonnage, sequenceStrategy = 'classic', preferEquipment: prefEqOverride, courseIntensity, workMaxOverride, intensityTechnique } = input;
   const favoriteIds = input.favoriteExercises || [];
   const excludeIds = input.excludedExercises || [];
   const avoidAxial = input.avoidAxialLoad || false;
@@ -431,6 +471,13 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
 
     });
 
+    // P6: intensity technique — применить к основным (main) упражнениям
+    if (intensityTechnique && intensityTechnique !== 'none') {
+      for (const ex of exs) {
+        if (ex.role === 'main') applyTechniqueToPlanEx(ex, intensityTechnique);
+      }
+    }
+
     // Isolation фаза: пропорциональный остаток isoBudget
     const groupIsoBudget: Record<string, number> = {};
     const groupIsoExpected: Record<string, number> = {};
@@ -573,6 +620,28 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
         }
 
     });
+
+    // P8: Feeder-сеты для слабых групп (ежедневная низкообъёмная высокочастотная добивка)
+    if (weakPoints.length > 0) {
+      const feeders = suggestFeeders(weakPoints, equipment);
+      for (const f of feeders) {
+        const grp = catalogGroupFor(f.muscle) || f.muscle;
+        exs.push({
+          name: f.exercise, sets: f.sets, reps: String(f.reps), rir: 3, rest: 30, group: grp, weight: 0, weightNote: 'feeder',
+          role: 'accessory',
+          pattern: derivePattern({ group: grp, name: f.exercise } as any),
+          tempo: tempoFor('памп').notation,
+          forceVec: forceVector(grp, 'isolation', f.exercise),
+          technique: 'feeder',
+          comments: '🍼 ' + f.notes,
+          progressionNote: '',
+          fatigueCost: 1,
+          substitutions: [],
+        });
+        weeklySets[grp] = (weeklySets[grp] || 0) + f.sets;
+        daySets[grp] = (daySets[grp] || 0) + f.sets;
+      }
+    }
 
 
     // Оптимизация порядка: базовые по убыванию утомления, изоляции по возрастанию

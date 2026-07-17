@@ -33,7 +33,7 @@ import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
 import { InjurySelectCard } from './InjurySelectCard';
 import type { InjurySelectEntry } from './InjurySelectCard';
-import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, applyPostPhaseProcessing, type LoadStrategy, type DeloadType, INTENSITY_TECHNIQUES, DEFAULT_TECHNIQUE_BY_PHASE, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
+import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, type LoadStrategy, type DeloadType, INTENSITY_TECHNIQUES, DEFAULT_TECHNIQUE_BY_PHASE, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { PCT_FOR_RIR } from '../../../engines/rir-table';
 import { getCyclesByDirection, getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 import { convertCycleToBBPlan } from '../../../engines/bb/cycle-to-plan';
@@ -282,6 +282,13 @@ export const BbAutoConstructor: React.FC = () => {
   const buildBb = () => {
     let plan: BBPlan;
 
+    // AutoReg-пейлоад (для buildBBPlan → applyPostPhaseProcessing)
+    const autoRegPayload = (autoRegOn && autoRegResult) ? {
+      volumeMultiplier: autoRegResult.volumeMultiplier,
+      topSetPctMultiplier: autoRegResult.topSetPctMultiplier,
+      rirShift: autoRegResult.rirShift,
+    } : undefined;
+
     try {
 
     if (planMode === 'bb_cycle' && selectedCycleId) {
@@ -310,42 +317,24 @@ export const BbAutoConstructor: React.FC = () => {
         favoriteExercises: prof.favoriteExercises || [],
         excludedExercises: prof.excludedExercises || [],
         avoidAxialLoad: prof.avoidAxialLoad || false,
+        intensityTechnique: intensityTech,
+        autoDeload,
+        deloadType,
+        loadStrategy,
+        autoRegResult: autoRegPayload,
       }, pedAdapt);
     }
 
-    // Единая пост-обработка (фазы, темп, повторы, стратегия, делод, autoReg)
+    const modeLabel = planMode === 'bb_cycle' ? `BB-цикл: ${getCycleById(selectedCycleId)?.meta.title || selectedCycleId}` : 'Generic-сплит';
     const srpe = loadSRPESessions();
     const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : null;
-
-    const autoRegPayload = (autoRegOn && autoRegResult) ? {
-      volumeMultiplier: autoRegResult.volumeMultiplier,
-      topSetPctMultiplier: autoRegResult.topSetPctMultiplier,
-      rirShift: autoRegResult.rirShift,
-    } : undefined;
-    const processedPlan = applyPostPhaseProcessing({
-      plan,
-      totalWeeks: bbWeeks,
-      workMax: bbWorkMax,
-      loadStrategy: loadStrategy as LoadStrategy,
-      autoDeload,
-      deloadType,
-      acwrRatio: acwr?.ratio,
-      autoRegResult: autoRegPayload,
-      skipPhaseRedistribution: true,   // FIX-5: buildBBPlan уже распределил фазы
-      // P6: дефолтная техника по фазе (если UI не переопределяет явно)
-      intensityTechnique: intensityTech,
-      // P8: auto-feeder для слабых групп
-      weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
-    });
-
-    const modeLabel = planMode === 'bb_cycle' ? `BB-цикл: ${getCycleById(selectedCycleId)?.meta.title || selectedCycleId}` : 'Generic-сплит';
     const deloadNote = autoDeload && acwr && acwr.ratio > 1.3
       ? `🔄 Делод: ${DELOAD_PROTOCOLS[deloadType].description}`
       : 'Делод: нет';
 
     setBuiltPlan({
-      ...processedPlan,
-      rationale: [...processedPlan.rationale,
+      ...plan,
+      rationale: [...plan.rationale,
         `📌 Источник: ${modeLabel}`,
         `📈 Стратегия: ${loadStrategy}`,
         deloadNote,
@@ -355,7 +344,7 @@ export const BbAutoConstructor: React.FC = () => {
     setBbWeekSel(1);
     setStep('plan');
     try {
-      const sessions = processedPlan.weeks.flatMap(w => w.sessions.map((s, si) => ({
+      const sessions = plan.weeks.flatMap(w => w.sessions.map((s, si) => ({
         label: 'Нед' + w.week + ' Д' + (si+1),
         exercises: s.exercises.map(e => ({ name: e.name, muscleGroup: e.muscle, sets: e.sets, reps: e.workSets[0]?.reps || 10, weight: e.workSets[0]?.weight || 60, rir: e.rir })),
       })));
