@@ -2,7 +2,7 @@
  * TrainingProfileCard.tsx — единая карточка «Профиль тренированности».
  * Реальные входные данные, общие для ПЛ/ББ/ручного конструктора/калькуляторов.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { PopupNumber, PopupSelect, PopupExerciseList } from '../SRCBBScreen_parts/TrainingPopups';
 import { EQUIPMENT_OPTIONS, WEAK_GROUP_OPTIONS, type TrainingProfile } from './training-profile';
 

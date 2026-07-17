@@ -4,7 +4,7 @@ import { loadBioStackProfile, autoFillFromMainProfile, getProfileCompleteness } 
 import { SUB_TABS, SUB_TAB_GROUPS, DEFAULT_SUB, BIO_ANIM_CSS, type BSTab, initBioToast, SkeletonLoader, showToast } from './BioStackAIConstants';
 import { useDataLink, type LinkedData } from '../../core/data-link';
 import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
-  import { ProfileTab } from './BioStackAIProfile';
+  import ProfileTab from './BioStackAIProfile';
   import { SearchTab } from './BioStackAISearch';
   import { BuildTab } from './BioStackAIBuild';
   import { ComplexTab } from './BioStackAIComplexes';

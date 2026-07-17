@@ -942,7 +942,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             </div>
           )}
         </div>
-      }
+      )}
 
       {/* ── Попап полного каталога стеков (Усиление) — ВСЕ 55 стеков из ALL_STACKS ── */}
       {showEnhancementPopup && (

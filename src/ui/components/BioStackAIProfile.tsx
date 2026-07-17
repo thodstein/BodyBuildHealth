@@ -142,15 +142,26 @@ type Patch = Partial<ReturnType<typeof getDefaultBioStackProfile>>;
 function ProfileTab(props: {
   onAppliedToRun?: () => void; onToRun?: () => void;
   onShowToast?: (msg: string) => void; onToast?: (msg: string) => void;
+  // Optional controlled-mode props (BioStackAIScreen passes these). When provided, the parent owns
+  // the profile state and ProfileTab keeps it in sync (other tabs read the parent's profile).
+  profile?: ReturnType<typeof getDefaultBioStackProfile>;
+  setProfile?: (p: ReturnType<typeof getDefaultBioStackProfile>) => void;
+  setStackIds?: (ids: string[]) => void;
 }) {
-  const [p, setP] = useState<ReturnType<typeof getDefaultBioStackProfile>>(loadBioStackProfile());
+  const [internalP, setInternalP] = useState<ReturnType<typeof getDefaultBioStackProfile>>(loadBioStackProfile());
+  const p = props.profile ?? internalP;
+  const setP = (np: ReturnType<typeof getDefaultBioStackProfile>) => {
+    setInternalP(np);
+    saveBioStackProfile(np);
+    props.setProfile?.(np);
+  };
   const [open, setOpen] = useState<string | null>(null);
   const [lab, setLab] = useState(getLabDiary());
 
-  const u = (patch: Patch) => { const np = { ...p, ...patch } as typeof p; setP(np); saveBioStackProfile(np); };
+  const u = (patch: Patch) => { const np = { ...p, ...patch } as typeof p; setP(np); };
   const autoFill = () => {
     const { patch, autoKeys } = autoFillFromMainProfile();
-    const np = { ...p, ...patch } as typeof p; setP(np); saveBioStackProfile(np);
+    const np = { ...p, ...patch } as typeof p; setP(np);
     showToast(`Автозаполнено из профиля: ${autoKeys.length} полей`);
   };
   const quickStart = () => {
@@ -159,7 +170,7 @@ function ProfileTab(props: {
       budget: d.budget, stackComplexity: d.stackComplexity, healthConditions: d.healthConditions,
       targetOrgans: d.targetOrgans, targetSystems: d.targetSystems, sex: p.sex || 'male',
       age: p.age || 30, weight: p.weight || 80, height: p.height || 175 } as typeof p;
-    setP(np); saveBioStackProfile(np); showToast('Быстрый старт применён');
+    setP(np); showToast('Быстрый старт применён');
   };
 
   const comp = useMemo(() => getProfileCompleteness(p), [p]);
