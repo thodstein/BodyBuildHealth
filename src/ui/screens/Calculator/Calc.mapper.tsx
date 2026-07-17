@@ -895,8 +895,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         </div>
       , document.body)}
       
-      {/* ===== УСИЛЕНИЕ: все стеки каталога ===== */}
-      {level !== 'manual' && (
+      {/* ===== УСИЛЕНИЕ: все стеки каталога (видно во ВСЕХ режимах, включая ручной) ===== */}
+      {(
         <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:12, background:'rgba(24,24,27,0.3)', border:'1px solid rgba(255,255,255,0.04)' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
             <span style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', letterSpacing:'0.3px' }}>Усиление ({ALL_STACKS.length} стеков)</span>
@@ -942,7 +942,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             </div>
           )}
         </div>
-      )}
+      }
 
       {/* ── Попап полного каталога стеков (Усиление) — ВСЕ 55 стеков из ALL_STACKS ── */}
       {showEnhancementPopup && (
