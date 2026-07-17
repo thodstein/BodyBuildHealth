@@ -81,7 +81,8 @@ export function derivePattern(ex: any): string {
 const MP_TO_MUSCLE: Record<string, string | null> = {
   horizontal_push: 'chest', incline_push: 'chest', dip_push: 'chest', decline_push: 'chest', vertical_push: 'chest',
   isolation_chest: 'chest',
-  vertical_pull: 'back', horizontal_pull: 'back', isolation_back: 'back',
+  vertical_pull: 'back', horizontal_pull: 'back',
+  // isolation_back — НЕ здесь; обрабатывается ниже (traps vs back по targetMuscle)
   isolation_shoulders: 'shoulders',
   squat: 'quads', lunge: 'quads', isolation_legs_quad: 'quads',
   isolation_legs_ham: 'hamstrings',
@@ -105,6 +106,11 @@ export function trueMuscleOf(ex: any): string | null {
   if (mp === 'hinge') return null;
   const base = MP_TO_MUSCLE[mp];
   if (base) return base;
+  // isolation_back: шраги → traps, остальное → back
+  if (mp === 'isolation_back') {
+    if (/трапеци/.test(tgt)) return 'traps';
+    return 'back';
+  }
   if (mp === 'isolation_arms') {
     if (/трицепс/.test(tgt)) return 'triceps';
     if (/предплеч|хват/.test(tgt)) return 'forearms';
