@@ -443,7 +443,7 @@ function deriveAnalogsByMechanism(
     for (const c of cats) if (origCats.has(c)) { sharedCat = true; break; }
     if (shared === 0 && !sharedCat) continue;
     // не предлагать диагностические маркеры-заглушки и гормоны в качестве замен
-    const candCats = (e.category || []) as string[];
+    const candCats = ((e as any).category || []) as string[];
     if (candCats.includes('marker') || candCats.includes('hormonal')) continue;
     results.push({
       id,
@@ -486,7 +486,7 @@ export function findMeaningfulReplacement(
     const c = cat(cid);
     if (!c) continue;
     // замена строго по терапевтическому классу: не предлагать маркеры/гормоны
-    const candCats = (c.category || []) as string[];
+    const candCats = ((c as any).category || []) as string[];
     if (candCats.includes('marker') || candCats.includes('hormonal')) continue;
     // reject if the candidate is itself absolutely contraindicated
     const ci = c.contraindications || [];
