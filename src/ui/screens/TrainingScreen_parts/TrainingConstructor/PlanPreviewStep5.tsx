@@ -42,7 +42,7 @@ export const PlanPreviewStep5: React.FC<Props> = ({ generatedDays, weeklySets, m
   return (
     <>
       {/* Ключевые метрики */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(92px, 1fr))', gap: 6, marginBottom: 8 }}>
         {[
           { label: 'Упражнений', value: totalEx, unit: 'всего', color: '#60a5fa' },
           { label: 'Сетов/нед', value: totalSets, unit: '', color: ACCENT },

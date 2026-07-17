@@ -991,7 +991,7 @@ const MacroPreview: React.FC<{ result: ManualResult; mesoLength: number; level: 
             const heat = isDeload ? 0.25 : Math.min(1, (wi < mesoLength / 2 ? 65 + wi : 85 - (wi - mesoLength / 2)) / 100);
             const acColor = isDeload ? '#60a5fa' : '#a855f7';
             return (
-              <div key={wi} style={{ padding: '4px 6px', borderRadius: 8, background: isDeload ? 'rgba(96,165,250,0.1)' : 'rgba(168,85,247,' + (0.04 + heat * 0.1) + ')', border: '1px solid ' + (isDeload ? 'rgba(96,165,250,0.3)' : 'rgba(168,85,247,' + (0.1 + heat * 0.2) + ')'), minWidth: 72 }}>
+              <div key={wi} style={{ padding: '4px 6px', borderRadius: 8, background: isDeload ? 'rgba(96,165,250,0.1)' : 'rgba(168,85,247,' + (0.04 + heat * 0.1) + ')', border: '1px solid ' + (isDeload ? 'rgba(96,165,250,0.3)' : 'rgba(168,85,247,' + (0.1 + heat * 0.2) + ')'), minWidth: Math.max(72, result.days.length * 46) }}>
                 <div style={{ fontSize: 8, fontWeight: 700, color: acColor, textAlign: 'center', marginBottom: 3 }}>{isDeload ? '🔄 Делод' : 'Нед ' + wk}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + result.days.length + ', 1fr)', gap: 2 }}>
                   {result.days.map((_, di2) => (

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { PopupSelect, cardBtnStyle } from '../../SRCBBScreen_parts/TrainingPopups';
+import { PopupSelect } from '../../SRCBBScreen_parts/TrainingPopups';
+import { R, CARD } from '../training-ui';
 import { TRAINING_SPLITS } from '../../../../engines/training.engine';
 import { LMS_CYCLES, normalizeCycleDirection } from '../../../../data/lms-cycles/lms-cycle-index';
 import { FULL_PROGRAM_LIBRARY } from '../../../../engines/complete-program-library.engine';
@@ -26,6 +27,25 @@ const topBar: React.CSSProperties = { height: 3, background: 'linear-gradient(90
 const sheetBody: React.CSSProperties = { padding: '14px 16px', maxHeight: 'calc(78vh - 3px)', overflowY: 'auto' };
 const titleStyle: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: ACCENT, marginBottom: 10 };
 
+const panelBase: React.CSSProperties = {
+  background: 'rgba(26,28,38,0.55)',
+  backdropFilter: 'blur(18px) saturate(150%)',
+  WebkitBackdropFilter: 'blur(18px) saturate(150%)',
+  border: '1px solid rgba(255,255,255,0.09)',
+  borderRadius: 16,
+  boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+};
+const PANEL: React.CSSProperties = { ...panelBase, padding: 14, margin: '8px 0' };
+const PANEL_TITLE: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 8, textTransform: 'uppercase' };
+const cardBtn = (active: boolean): React.CSSProperties => ({
+  width: '100%', textAlign: 'left', cursor: 'pointer',
+  padding: '8px 10px', borderRadius: R.in, fontSize: 11, fontWeight: 700,
+  background: active ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.03)',
+  border: '1px solid ' + (active ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'),
+  color: active ? ACCENT : 'rgba(255,255,255,0.55)',
+  transition: 'all 0.2s',
+});
+
 interface Props {
   manualCfg: Record<string, string>;
   setManual: (k: string, v: string) => void;
@@ -35,12 +55,9 @@ interface Props {
 }
 
 const ConfigSection: React.FC<{ title: string; color: string; children: React.ReactNode }> = ({ title, color, children }) => (
-  <div style={{
-    background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, marginBottom: 6,
-    border: '1px solid rgba(255,255,255,0.04)',
-  }}>
-    <div style={{ fontSize: 10, fontWeight: 700, color, marginBottom: 6, letterSpacing: '-0.02em' }}>{title}</div>
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>{children}</div>
+  <div style={{ ...PANEL }}>
+    <div style={{ ...PANEL_TITLE, color }}>{title}</div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>{children}</div>
   </div>
 );
 
@@ -80,7 +97,7 @@ const CycleSelect: React.FC<{
     return nd === cat || nd === 'both';
   };
   return <>
-    <button onClick={() => { setCat('all'); setOpen(true); }} style={cardBtnStyle(!!value)}>
+    <button onClick={() => { setCat('all'); setOpen(true); }} style={cardBtn(!!value)}>
       <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{sel ? `[${catTag(sel.meta.id)}] ${sel.meta.title}` : 'Выбрать…'}</div>
     </button>
@@ -338,7 +355,7 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
       </ConfigSection>
 
       {/* ─── МЕТОДОЛОГИЯ ─── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
         <ConfigSection title="📈 ПРОГРЕССИЯ" color="#a78bfa">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {methodSel('periodization', 'periodization')}

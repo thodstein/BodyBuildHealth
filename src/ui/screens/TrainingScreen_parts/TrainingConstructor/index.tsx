@@ -38,6 +38,11 @@ import { MacrocyclePanel } from './MacrocyclePanel';
 import { subscribePlannerApply, getPlannerApply, clearPlannerApply, type PlannerApply } from '../planner-bridge';
 import { SplitSelectorCards } from './SplitSelectorCards';
 import { MethodSelector } from './MethodSelector';
+import { CARD, R, H, BTN, SMALL, ACCENT_SOFT, ACCENT_LINE } from '../training-ui';
+
+/** Фрост-гласс панель секции (вместо плоского rgba(24,24,27,0.12)). */
+const PANEL: React.CSSProperties = { ...CARD, padding: 10, marginBottom: 6 };
+const PANEL_TITLE: React.CSSProperties = { fontSize: 10, fontWeight: 800, letterSpacing: 0.3, marginBottom: 6, textTransform: 'uppercase' as const };
 import { WizardProgressBar } from './WizardProgressBar';
 import { PlanPreviewStep5 } from './PlanPreviewStep5';
 import { buildBBPlan, type BBPlan, type BBWeek } from '../../../../engines/bb/bb-builder.engine';
@@ -1312,7 +1317,7 @@ export const TrainingConstructor: React.FC<Props> = ({
       {/* ════════════════════════════════════════════════ */}
       {wizardStep === 2 && (
         <>
-          <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, marginBottom: 6, border: '1px solid rgba(255,255,255,0.04)' }}>
+          <div style={{ ...PANEL }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>🏗️ БАЗОВАЯ СТРУКТУРА</div>
             <div style={{ marginBottom: 6 }}>
               <SplitSelectorCards value={manualCfg.split || ''} onChange={v => setManual('split', v)} daysPerWeek={daysPerWeek} />
@@ -1332,7 +1337,7 @@ export const TrainingConstructor: React.FC<Props> = ({
               </button>
             )}
 
-          <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, marginBottom: 6, border: '1px solid rgba(255,255,255,0.04)' }}>
+          <div style={{ ...PANEL }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#00e68a', marginBottom: 6 }}>⚖️ ЦЕЛЕВОЙ ТОННАЖ (кг/нед)</div>
             {tonnageGroups.map(g => (
               <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
@@ -1371,15 +1376,15 @@ export const TrainingConstructor: React.FC<Props> = ({
       {/* ════════════════════════════════════════════════ */}
       {wizardStep === 3 && (
         <div key="step3" style={{ animation: 'fadeSlideIn 0.3s ease' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+            <div style={{ ...PANEL }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', marginBottom: 6 }}>📈 ПРОГРЕССИЯ</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <MethodSelector label="Периодизация" value={manualCfg.periodization || ''} onChange={v => setManual('periodization', v)} category="periodization" recommendedSet={combinedRecommended} />
                 <MethodSelector label="Прогрессия" value={manualCfg.progression || ''} onChange={v => setManual('progression', v)} category="progression" recommendedSet={combinedRecommended} />
               </div>
             </div>
-            <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ ...PANEL }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>🎯 ИНТЕНСИВНОСТЬ</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <MethodSelector label="Интенсивность" value={manualCfg.intensity || ''} onChange={v => setManual('intensity', v)} category="intensity" recommendedSet={combinedRecommended} />
@@ -1389,7 +1394,7 @@ export const TrainingConstructor: React.FC<Props> = ({
             </div>
           </div>
 
-          <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+          <div style={{ ...PANEL }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#ec4899', marginBottom: 6 }}>🎯 СПЕЦИАЛИЗАЦИЯ</div>
             <MethodSelector label="Метод специализации" value={manualCfg.specialization || ''} onChange={v => setManual('specialization', v)} category="specialization" recommendedSet={combinedRecommended} />
           </div>
@@ -1413,9 +1418,9 @@ export const TrainingConstructor: React.FC<Props> = ({
       {/* ════════════════════════════════════════════════ */}
       {wizardStep === 4 && (
         <div key="step4" style={{ animation: 'fadeSlideIn 0.3s ease' }}>
-          <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, marginBottom: 6, border: '1px solid rgba(255,255,255,0.04)' }}>
+          <div style={{ ...PANEL }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>🎵 ГЛОБАЛЬНЫЙ ТЕМП</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(86px, 1fr))', gap: 4 }}>
               {[
                 { l: 'Стандарт 2-0-1-0', v: '2-0-1-0' },
                 { l: 'Гипертрофия 3-1-1-0', v: '3-1-1-0' },
@@ -1444,7 +1449,7 @@ export const TrainingConstructor: React.FC<Props> = ({
           </div>
 
           {/* RIR-волна по четвертям мезоцикла */}
-          <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, marginBottom: 6, border: '1px solid rgba(255,255,255,0.04)' }}>
+          <div style={{ ...PANEL }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', marginBottom: 6 }}>🌊 ВОЛНА ИНТЕНСИВНОСТИ (RIR ПО НЕДЕЛЯМ)</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {Object.entries(RIR_WAVE_PATTERNS).map(([key, wave]) => (
@@ -1477,9 +1482,9 @@ export const TrainingConstructor: React.FC<Props> = ({
             )}
           </div>
 
-          <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, marginBottom: 6, border: '1px solid rgba(255,255,255,0.04)' }}>
+          <div style={{ ...PANEL }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>🔀 СТРАТЕГИЯ ПОСЛЕДОВАТЕЛЬНОСТИ</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 4 }}>
               {([
                 { l: 'Классическая', v: 'classic' as const, d: 'Compounds → изоляция' },
                 { l: 'Pre-Exhaust', v: 'preexhaust' as const, d: 'Изоляция → compounds' },
@@ -1495,7 +1500,7 @@ export const TrainingConstructor: React.FC<Props> = ({
             </div>
           </div>
 
-          <div style={{ background: 'rgba(24,24,27,0.12)', borderRadius: 10, padding: 8, marginBottom: 6, border: '1px solid rgba(255,255,255,0.04)' }}>
+          <div style={{ ...PANEL }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>⚙️ ДОПОЛНИТЕЛЬНО</div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
               <div style={{ flex: 1, minWidth: 120 }}>
