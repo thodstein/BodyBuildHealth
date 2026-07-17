@@ -683,6 +683,86 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     } catch {}
   }, []); // only on mount
 
+  // ── Supplement / Water timeline builders (подняты ВЫШЕ generatePlan во избежание TDZ) ──
+  const buildSupplementTimeline = (mealTimes: { time: string; label: string; pct: number }[], isTrainingDay: boolean) => {
+    const userSupps = takenSupplements.map(sid => ALL_SUBSTANCES.find(a => a.id === sid)).filter(Boolean);
+    const timeline: { time: string; items: { name: string; dose: string; note: string }[] }[] = [];
+    mealTimes.forEach(mt => {
+      const isMorning = mt.label === 'Завтрак';
+      const isEvening = mt.label === 'Ужин' || mt.label === 'Перекус';
+      const isPreW = mt.label === 'Предтрен';
+      const isPostW = mt.label === 'Пост-трен';
+      const isBed = mt.label === 'Ужин' || mt.label === 'Перекус';
+      const slotItems: { name: string; dose: string; note: string }[] = [];
+      if (isMorning) {
+        if (userSupps.some(s => (s?.id||'').includes('creatine'))) slotItems.push({name:'Креатин',dose:'5г',note:'С завтраком для лучшего усвоения'});
+        if (userSupps.some(s => (s?.id||'').includes('d3')||(s?.id||'').includes('vitamin_d'))) slotItems.push({name:'D3+K2',dose:'5000ME+100мкг',note:'С жирной пищей'});
+        if (userSupps.some(s => (s?.id||'').includes('omega')||(s?.id||'').includes('fish_oil'))) slotItems.push({name:'Омега-3',dose:'2-3г',note:'С едой для абсорбции'});
+        if (userSupps.some(s => (s?.id||'').includes('nac')||(s?.id||'').includes('n_acetyl'))) slotItems.push({name:'NAC',dose:'600-1200мг',note:'Защита печени'});
+        if (userSupps.some(s => (s?.id||'').includes('tudca'))) slotItems.push({name:'TUDCA',dose:'500мг',note:'С едой. Желчеотток'});
+      }
+      if (isPreW && isTrainingDay && userSupps.some(s => (s?.id||'').includes('bcaa')||(s?.id||'').includes('eaa'))) slotItems.push({name:'BCAA/EAA',dose:'10-15г',note:'За 30 мин до тренировки'});
+      if (isPostW && isTrainingDay) {
+        if (userSupps.some(s => (s?.id||'').includes('whey')||(s?.id||'').includes('protein'))) slotItems.push({name:'Протеин',dose:'30-50г',note:'После тренировки'});
+        if (userSupps.some(s => (s?.id||'').includes('creatine'))) slotItems.push({name:'Креатин',dose:'5г',note:'С пост-тренировочным приёмом'});
+      }
+      if (isEvening) {
+        if (userSupps.some(s => (s?.id||'').includes('omega')||(s?.id||'').includes('fish_oil'))) slotItems.push({name:'Омега-3',dose:'2-3г',note:'Второй приём за день'});
+        if (userSupps.some(s => (s?.id||'').includes('nac')||(s?.id||'').includes('n_acetyl'))) slotItems.push({name:'NAC',dose:'600-1200мг',note:'Вечерний приём'});
+        if (userSupps.some(s => (s?.id||'').includes('tudca'))) slotItems.push({name:'TUDCA',dose:'500мг',note:'Вечерний приём'});
+      }
+      if (isBed) {
+        if (userSupps.some(s => (s?.id||'').includes('magnesium')||(s?.id||'').includes('mg_'))) slotItems.push({name:'Магний',dose:'400мг',note:'За 30 мин до сна'});
+        if (userSupps.some(s => (s?.id||'').includes('zinc')||(s?.id||'').includes('zn_'))) slotItems.push({name:'Цинк',dose:'30мг',note:'С едой, не с кальцием'});
+        if (userSupps.some(s => (s?.id||'').includes('melatonin'))) slotItems.push({name:'Мелатонин',dose:'3-5мг',note:'За 30-60 мин до сна'});
+        if (userSupps.some(s => (s?.id||'').includes('casein'))) slotItems.push({name:'Казеин',dose:'30-40г',note:'Медленный белок на ночь'});
+      }
+      if (slotItems.length > 0) timeline.push({ time: mt.time, items: slotItems });
+    });
+    const phaseSupps: { name: string; dose: string; note: string }[] = [];
+    const aasOral = injections.some(i => i.type === 'ААС' && i.esterType !== 'long');
+    const aasAny = injections.some(i => i.type === 'ААС');
+    const hasInsulin = injections.some(i => i.type === 'инсулин');
+    const hasGH = injections.some(i => i.type === 'ГР');
+    if (phase === 'course') {
+      if (aasOral) { phaseSupps.push({name:'NAC',dose:'1200-1800мг',note:'Оральные ААС → удвоенная доза NAC'}); phaseSupps.push({name:'TUDCA',dose:'1000-1500мг',note:'Оральные ААС → повышенный желчеотток'}); }
+      if (aasAny) { phaseSupps.push({name:'Омега-3',dose:'3-6г EPA+DHA',note:'Кардиопротекция на курсе'}); phaseSupps.push({name:'CoQ10',dose:'200-300мг',note:'Митохондриальная защита миокарда'}); }
+      if (hasGH) { phaseSupps.push({name:'Берберин',dose:'500мг 3×/день',note:'Контроль глюкозы при ГР'}); phaseSupps.push({name:'R-ALA',dose:'300-600мг',note:'Инсулиносенситайзер при ГР'}); }
+      if (hasInsulin) { phaseSupps.push({name:'Берберин',dose:'500мг 3×/день',note:'Инсулиносенситайзер'}); phaseSupps.push({name:'Хром',dose:'400-600мкг',note:'Усиление действия инсулина'}); }
+    }
+    if (phase === 'pct') {
+      phaseSupps.push({name:'D3+K2',dose:'10000ME+200мкг',note:'Поддержка тестостерона на ПКТ'}); phaseSupps.push({name:'Цинк',dose:'50мг',note:'Ароматаза + тестостерон'}); phaseSupps.push({name:'Магний',dose:'500мг',note:'Сон + кортизол на ПКТ'}); phaseSupps.push({name:'Ашваганда',dose:'600мг',note:'Адаптоген: кортизол + тестостерон'});
+    }
+    if (phase === 'cutting') {
+      phaseSupps.push({name:'L-Карнитин',dose:'2-3г',note:'Липолиз + транспорт ЖК в митохондрии'}); phaseSupps.push({name:'Зелёный чай',dose:'500мг EGCG',note:'Термогенез + антиоксидант'}); phaseSupps.push({name:'Йохимбин',dose:'5-10мг',note:'α2-антагонист — stubborn fat'}); phaseSupps.push({name:'Клетчатка',dose:'10-15г',note:'Сытость + ЖКТ на дефиците'});
+    }
+    if (phaseSupps.length > 0) {
+      timeline.push({ time: '▸ Фаза', items: [{name:`Фаза «${phase}»`,dose:'—',note:phaseSupps.map(s=>`${s.name} ${s.dose}: ${s.note}`).join(' | ')}] });
+      timeline.push(...phaseSupps.map(s => ({ time: '', items: [s] })));
+    }
+    return timeline;
+  };
+  const buildWaterTimeline = (w: number, mealTimes: { time: string; label: string }[], isTrainingDay: boolean, trainStart: string) => {
+    const totalMl = Math.round(w * 40);
+    const slots = mealTimes.length;
+    const perSlot = Math.round(totalMl / (slots + 2));
+    const timeline: { time: string; ml: number; note: string }[] = [];
+    timeline.push({ time: '07:30', ml: 500, note: 'Утро: 500 мл сразу после пробуждения' });
+    mealTimes.forEach((mt, i) => {
+      const ml = i === 0 ? 300 : perSlot;
+      timeline.push({ time: mt.time, ml, note: `${mt.label}: ${ml} мл` });
+    });
+    if (isTrainingDay && trainStart) {
+      const tH = parseInt(trainStart.split(':')[0]);
+      const preH = Math.max(0, tH - 1);
+      const postH = Math.min(23, tH + 1);
+      timeline.push({ time: `${String(preH).padStart(2,'0')}:30`, ml: 400, note: 'За 60 мин до тренировки' });
+      timeline.push({ time: `${String(postH).padStart(2,'0')}:00`, ml: 500, note: 'После тренировки: восстановление' });
+    }
+    timeline.push({ time: '21:00', ml: 300, note: 'Вечер: не позже чем за 1-2ч до сна' });
+    return timeline;
+  };
+
   // ─── Generate Plan ───
   const generatePlan = (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number) => {
     try {
@@ -807,12 +887,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const totalWaterL = Math.max(1.5, Math.round((baseWaterMl / 1000 + trainBonusL + fiberBonusL + pharmaBonusL) * 10) / 10);
       setWaterCalc({ baseWater: Math.round(baseWaterMl / 10) / 10, pharmaBaseMl: 40, trainBonus: trainBonusL, fiberFactor: fiberBonusL, pharmaBonus: pharmaBonusL, total: totalWaterL, hasPharma, electrolytes: { sodiumMg: 3500, potassiumMg: 3500, magnesiumMg: 400, note: 'Стандарт' } });
       setGenerated(true);
+      try { setPlanTab('plan'); } catch {}
       generateRecommendations();
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
       } catch (v2Err: any) {
         // V2 упал (например, не нашлось ни одного подходящего продукта в пуле) —
         // логируем ошибку, показываем пользователю понятное сообщение и фоллбэк на старый движок.
-        try { console.error('[IndividualPlan] V2 engine failed:', v2Err); } catch {}
+        const errMsg = (v2Err && (v2Err.message || String(v2Err))) || 'Unknown error';
+        try { console.error('[IndividualPlan] V2 engine failed:', errMsg, v2Err); } catch {}
         try { setErrorMsg('V2-движок не смог собрать план (возможно слишком жёсткие исключения). Попробуйте расширить фильтры или переключитесь на «Классический движок».'); } catch {}
         return; // early return — V2 упал, старый код НЕ выполняется
       }
@@ -1027,86 +1109,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       note: phaseFoodBoost.note + (labBoosts.length > 0 ? ` | Лаб: ${labBoosts.slice(0,3).join(', ')}` : '')
     } : (labBoosts.length > 0 ? { priorityIds: labBoosts, avoidIds: labAvoids, note: `Лаб. коррекция: ${labBoosts.slice(0,4).join(', ')}` } : null);
     // ═══════════════════════════════════════════════════════════════════════
-    // ── Supplement timeline builder ──
-    const buildSupplementTimeline = (mealTimes: { time: string; label: string; pct: number }[], isTrainingDay: boolean) => {
-      const userSupps = takenSupplements.map(sid => ALL_SUBSTANCES.find(a => a.id === sid)).filter(Boolean);
-      const timeline: { time: string; items: { name: string; dose: string; note: string }[] }[] = [];
-      mealTimes.forEach(mt => {
-        const isMorning = mt.label === 'Завтрак';
-        const isEvening = mt.label === 'Ужин' || mt.label === 'Перекус';
-        const isPreW = mt.label === 'Предтрен';
-        const isPostW = mt.label === 'Пост-трен';
-        const isBed = mt.label === 'Ужин' || mt.label === 'Перекус';
-        const slotItems: { name: string; dose: string; note: string }[] = [];
-        if (isMorning) {
-          if (userSupps.some(s => (s?.id||'').includes('creatine'))) slotItems.push({name:'Креатин',dose:'5г',note:'С завтраком для лучшего усвоения'});
-          if (userSupps.some(s => (s?.id||'').includes('d3')||(s?.id||'').includes('vitamin_d'))) slotItems.push({name:'D3+K2',dose:'5000ME+100мкг',note:'С жирной пищей'});
-          if (userSupps.some(s => (s?.id||'').includes('omega')||(s?.id||'').includes('fish_oil'))) slotItems.push({name:'Омега-3',dose:'2-3г',note:'С едой для абсорбции'});
-          if (userSupps.some(s => (s?.id||'').includes('nac')||(s?.id||'').includes('n_acetyl'))) slotItems.push({name:'NAC',dose:'600-1200мг',note:'Защита печени'});
-          if (userSupps.some(s => (s?.id||'').includes('tudca'))) slotItems.push({name:'TUDCA',dose:'500мг',note:'С едой. Желчеотток'});
-        }
-        if (isPreW && isTrainingDay && userSupps.some(s => (s?.id||'').includes('bcaa')||(s?.id||'').includes('eaa'))) slotItems.push({name:'BCAA/EAA',dose:'10-15г',note:'За 30 мин до тренировки'});
-        if (isPostW && isTrainingDay) {
-          if (userSupps.some(s => (s?.id||'').includes('whey')||(s?.id||'').includes('protein'))) slotItems.push({name:'Протеин',dose:'30-50г',note:'После тренировки'});
-          if (userSupps.some(s => (s?.id||'').includes('creatine'))) slotItems.push({name:'Креатин',dose:'5г',note:'С пост-тренировочным приёмом'});
-        }
-        if (isEvening) {
-          if (userSupps.some(s => (s?.id||'').includes('omega')||(s?.id||'').includes('fish_oil'))) slotItems.push({name:'Омега-3',dose:'2-3г',note:'Второй приём за день'});
-          if (userSupps.some(s => (s?.id||'').includes('nac')||(s?.id||'').includes('n_acetyl'))) slotItems.push({name:'NAC',dose:'600-1200мг',note:'Вечерний приём'});
-          if (userSupps.some(s => (s?.id||'').includes('tudca'))) slotItems.push({name:'TUDCA',dose:'500мг',note:'Вечерний приём'});
-        }
-        if (isBed) {
-          if (userSupps.some(s => (s?.id||'').includes('magnesium')||(s?.id||'').includes('mg_'))) slotItems.push({name:'Магний',dose:'400мг',note:'За 30 мин до сна'});
-          if (userSupps.some(s => (s?.id||'').includes('zinc')||(s?.id||'').includes('zn_'))) slotItems.push({name:'Цинк',dose:'30мг',note:'С едой, не с кальцием'});
-          if (userSupps.some(s => (s?.id||'').includes('melatonin'))) slotItems.push({name:'Мелатонин',dose:'3-5мг',note:'За 30-60 мин до сна'});
-          if (userSupps.some(s => (s?.id||'').includes('casein'))) slotItems.push({name:'Казеин',dose:'30-40г',note:'Медленный белок на ночь'});
-        }
-        if (slotItems.length > 0) timeline.push({ time: mt.time, items: slotItems });
-      });
-      // T4.4 — Phase-specific supplement recommendations
-      const phaseSupps: { name: string; dose: string; note: string }[] = [];
-      const aasOral = injections.some(i => i.type === 'ААС' && i.esterType !== 'long');
-      const aasAny = injections.some(i => i.type === 'ААС');
-      const hasInsulin = injections.some(i => i.type === 'инсулин');
-      const hasGH = injections.some(i => i.type === 'ГР');
-      if (phase === 'course') {
-        if (aasOral) { phaseSupps.push({name:'NAC',dose:'1200-1800мг',note:'Оральные ААС → удвоенная доза NAC'}); phaseSupps.push({name:'TUDCA',dose:'1000-1500мг',note:'Оральные ААС → повышенный желчеотток'}); }
-        if (aasAny) { phaseSupps.push({name:'Омега-3',dose:'3-6г EPA+DHA',note:'Кардиопротекция на курсе'}); phaseSupps.push({name:'CoQ10',dose:'200-300мг',note:'Митохондриальная защита миокарда'}); }
-        if (hasGH) { phaseSupps.push({name:'Берберин',dose:'500мг 3×/день',note:'Контроль глюкозы при ГР'}); phaseSupps.push({name:'R-ALA',dose:'300-600мг',note:'Инсулиносенситайзер при ГР'}); }
-        if (hasInsulin) { phaseSupps.push({name:'Берберин',dose:'500мг 3×/день',note:'Инсулиносенситайзер'}); phaseSupps.push({name:'Хром',dose:'400-600мкг',note:'Усиление действия инсулина'}); }
-      }
-      if (phase === 'pct') {
-        phaseSupps.push({name:'D3+K2',dose:'10000ME+200мкг',note:'Поддержка тестостерона на ПКТ'}); phaseSupps.push({name:'Цинк',dose:'50мг',note:'Ароматаза + тестостерон'}); phaseSupps.push({name:'Магний',dose:'500мг',note:'Сон + кортизол на ПКТ'}); phaseSupps.push({name:'Ашваганда',dose:'600мг',note:'Адаптоген: кортизол + тестостерон'});
-      }
-      if (phase === 'cutting') {
-        phaseSupps.push({name:'L-Карнитин',dose:'2-3г',note:'Липолиз + транспорт ЖК в митохондрии'}); phaseSupps.push({name:'Зелёный чай',dose:'500мг EGCG',note:'Термогенез + антиоксидант'}); phaseSupps.push({name:'Йохимбин',dose:'5-10мг',note:'α2-антагонист — stubborn fat'}); phaseSupps.push({name:'Клетчатка',dose:'10-15г',note:'Сытость + ЖКТ на дефиците'});
-      }
-      if (phaseSupps.length > 0) {
-        timeline.push({ time: '▸ Фаза', items: [{name:`Фаза «${phase}»`,dose:'—',note:phaseSupps.map(s=>`${s.name} ${s.dose}: ${s.note}`).join(' | ')}] });
-        timeline.push(...phaseSupps.map(s => ({ time: '', items: [s] })));
-      }
-      return timeline;
-    };
-    const buildWaterTimeline = (w: number, mealTimes: { time: string; label: string }[], isTrainingDay: boolean, trainStart: string) => {
-      const totalMl = Math.round(w * 40);
-      const slots = mealTimes.length;
-      const perSlot = Math.round(totalMl / (slots + 2));
-      const timeline: { time: string; ml: number; note: string }[] = [];
-      timeline.push({ time: '07:30', ml: 500, note: 'Утро: 500 мл сразу после пробуждения' });
-      mealTimes.forEach((mt, i) => {
-        const ml = i === 0 ? 300 : perSlot;
-        timeline.push({ time: mt.time, ml, note: `${mt.label}: ${ml} мл` });
-      });
-      if (isTrainingDay && trainStart) {
-        const tH = parseInt(trainStart.split(':')[0]);
-        const preH = Math.max(0, tH - 1);
-        const postH = Math.min(23, tH + 1);
-        timeline.push({ time: `${String(preH).padStart(2,'0')}:30`, ml: 400, note: 'За 60 мин до тренировки' });
-        timeline.push({ time: `${String(postH).padStart(2,'0')}:00`, ml: 500, note: 'После тренировки: восстановление' });
-      }
-      timeline.push({ time: '21:00', ml: 300, note: 'Вечер: не позже чем за 1-2ч до сна' });
-      return timeline;
-    };
     // ── Nutrition logic builder — explains WHY each food was chosen ──
     const buildNutritionLogic = (dayOffset: number, isTraining: boolean, mealTimes: { time: string; label: string }[]) => {
       const isVeg = dietPrefs.includes('vegetarian');
