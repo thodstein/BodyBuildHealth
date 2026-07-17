@@ -3,87 +3,101 @@
  *
  * Все экраны планировщика (BbAutoConstructor, PlanDisplay/TrainingConstructor,
  * SRCBBScreen, MyTrainingTab) ОБЯЗАНЫ использовать эти токены вместо
- * собственных «магических чисел» (radius 6/8/10/12/16, шрифты 9/10/11/13),
- * чтобы вывод программы выглядел одинаково везде.
+ * собственных «магических чисел», чтобы вывод программы выглядел одинаково
+ * и современно (mobile-first, фрост-гласс).
  */
 import React from 'react';
 
 export const ACCENT = '#00e68a';
-export const ACCENT_SOFT = 'rgba(0,230,138,0.12)';
-export const ACCENT_LINE = 'rgba(0,230,138,0.35)';
-export const DIM = 'rgba(255,255,255,0.55)';
-export const DIM_STRONG = 'rgba(255,255,255,0.85)';
+export const ACCENT_SOFT = 'rgba(0,230,138,0.14)';
+export const ACCENT_LINE = 'rgba(0,230,138,0.45)';
+export const DIM = 'rgba(255,255,255,0.6)';
+export const DIM_STRONG = 'rgba(255,255,255,0.92)';
 
-/** Радиусы — единая шкала. */
-export const R = { card: 14, pill: 16, btn: 10, in: 8, chip: 8, bar: 4 } as const;
+/** Радиусы — единая шкала (крупнее для мобильных тап-зон). */
+export const R = { card: 16, pill: 18, btn: 12, in: 10, chip: 10, bar: 6 } as const;
 
-/** Базовая карточка (фон/рамка/радиус — одинаковы везде). */
+/** Общий фрост-гласс фон для карточек. */
+const GLASS: React.CSSProperties = {
+  background: 'rgba(26,28,38,0.55)',
+  backdropFilter: 'blur(18px) saturate(150%)',
+  WebkitBackdropFilter: 'blur(18px) saturate(150%)',
+  border: '1px solid rgba(255,255,255,0.09)',
+  boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+};
+
+/** Базовая карточка (фон/рамка/радиус/тень — одинаковы везде). */
 export const CARD: React.CSSProperties = {
-  background: 'rgba(24,24,27,0.55)',
+  ...GLASS,
   borderRadius: R.card,
-  border: '1px solid rgba(255,255,255,0.06)',
-  padding: '12px',
-  margin: '6px 0',
+  padding: '14px',
+  margin: '8px 0',
 };
 
 /** Вторичный текст. */
 export const SMALL: React.CSSProperties = {
-  color: DIM, fontSize: 11, lineHeight: 1.4,
+  color: DIM, fontSize: 12, lineHeight: 1.45,
 };
 
 /** Заголовок секции. */
 export const H: React.CSSProperties = {
-  fontSize: 14, fontWeight: 700, color: ACCENT, marginBottom: 8,
+  fontSize: 17, fontWeight: 800, color: ACCENT, marginBottom: 10, letterSpacing: -0.3,
 };
 
 /** Основная кнопка (акцентная). */
 export const BTN: React.CSSProperties = {
-  background: ACCENT, color: '#0a0a0a', border: 'none',
-  borderRadius: R.btn, padding: '10px 14px', fontWeight: 600,
-  fontSize: 12, minHeight: 40, cursor: 'pointer',
+  background: `linear-gradient(135deg,${ACCENT},#00c8a0)`,
+  color: '#06281c', border: 'none',
+  borderRadius: R.btn, padding: '12px 16px', fontWeight: 700,
+  fontSize: 13, minHeight: 44, cursor: 'pointer',
+  boxShadow: '0 6px 18px rgba(0,230,138,0.25)',
 };
 
 /** Призрачная кнопка (контур акцента). */
 export const BTN_GHOST: React.CSSProperties = {
-  ...BTN, background: 'transparent', color: ACCENT, border: `1px solid ${ACCENT_LINE}`,
+  ...BTN, background: 'transparent', color: ACCENT, border: `1px solid ${ACCENT_LINE}`, boxShadow: 'none',
 };
 
 /** Шаговая пилюля (активная / неактивная). */
 export const STEP_PILL = (active: boolean): React.CSSProperties => ({
-  padding: '5px 12px', borderRadius: R.pill, fontSize: 11,
-  fontWeight: active ? 700 : 500, cursor: 'pointer',
-  border: active ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.06)',
-  background: active ? `linear-gradient(135deg,${ACCENT},#00c8a0)` : '#18181b',
-  color: active ? '#000' : '#fff', flexShrink: 0,
+  padding: '7px 14px', borderRadius: R.pill, fontSize: 12,
+  fontWeight: active ? 800 : 500, cursor: 'pointer',
+  border: active ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.08)',
+  background: active ? `linear-gradient(135deg,${ACCENT},#00c8a0)` : 'rgba(24,24,27,0.6)',
+  color: active ? '#06281c' : '#fff', flexShrink: 0,
+  boxShadow: active ? '0 4px 14px rgba(0,230,138,0.3)' : 'none',
 });
 
 /** Поле ввода. */
 export const IN: React.CSSProperties = {
-  background: '#18181b', color: '#fff',
-  border: '1px solid rgba(255,255,255,0.08)', borderRadius: R.in,
-  padding: '6px 8px', fontSize: 11, outline: 'none',
-  boxSizing: 'border-box', minHeight: 32,
+  background: 'rgba(118,118,128,0.14)', color: '#fff',
+  border: '1px solid rgba(255,255,255,0.1)', borderRadius: R.in,
+  padding: '9px 10px', fontSize: 13, outline: 'none',
+  boxSizing: 'border-box', minHeight: 40,
 };
 
 /** Мини-чип параметра (label + value). */
 export const Chip: React.FC<{ label: string; value: string; color: string }> = ({ label, value, color }) => (
   <div style={{
-    padding: '5px 8px', borderRadius: R.chip,
-    background: color + '15',
-    border: `0.5px solid ${color}30`,
-    display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center',
-    minWidth: 50,
+    padding: '7px 10px', borderRadius: R.chip,
+    background: color + '1f',
+    border: `1px solid ${color}55`,
+    display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center',
+    minWidth: 56,
   }}>
-    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', fontWeight: 700 }}>{label}</span>
-    <span style={{ fontSize: 13, fontWeight: 800, color, lineHeight: 1.1 }}>{value}</span>
+    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.3 }}>{label}</span>
+    <span style={{ fontSize: 15, fontWeight: 800, color, lineHeight: 1.1 }}>{value}</span>
   </div>
 );
 
-/** Цветная панель-уведомление (используется вместо ad-hoc rgba-панелей). */
-export function panelStyle(color: string, bgAlpha = 0.05, borderAlpha = 0.18): React.CSSProperties {
+/** Цветная панель-уведомление (фрост-гласс с акцентной левой рамкой). */
+export function panelStyle(color: string, bgAlpha = 0.06, borderAlpha = 0.22): React.CSSProperties {
   return {
-    marginTop: 8, padding: 10, borderRadius: R.card,
-    background: color + Math.round(bgAlpha * 255).toString(16).padStart(2, '0'),
+    marginTop: 10, padding: 12, borderRadius: R.card,
+    background: `${color}${Math.round(bgAlpha * 255).toString(16).padStart(2, '0')}`,
     border: `1px solid ${color}${Math.round(borderAlpha * 255).toString(16).padStart(2, '0')}`,
+    borderLeft: `3px solid ${color}`,
+    backdropFilter: 'blur(12px) saturate(140%)',
+    WebkitBackdropFilter: 'blur(12px) saturate(140%)',
   };
 }
