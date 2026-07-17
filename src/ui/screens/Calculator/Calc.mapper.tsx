@@ -1239,8 +1239,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         </div>
       )}
 
-      {/* ── Попап анализа доп. модуля ── */}
-      {stackModulePopup && (() => {
+      {/* ── Попап анализа доп. модуля (ПОРТАЛ — экранирует backdrop-filter предка) ── */}
+      {stackModulePopup && ReactDOM.createPortal((() => {
         // Для articular_stack — новый попап с протоколами и выбором
         if (stackModulePopup === 'articular_stack') {
           const planIds = new Set((rec?.subs || []).map(s => canonIdLocal(s.substanceId)));
@@ -1573,7 +1573,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             </div>
           </div>
         );
-      })()}
+      })(), document.body)}
 
       {/* ── Карточка подтверждения для суставного модуля ── */}
       {articularConfirm && !stackModulePopup && (
