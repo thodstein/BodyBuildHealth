@@ -702,11 +702,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Д-2: Peri-workout carbs must SCALE with the daily carb budget (not hardcoded 40/60g),
   // otherwise high-carb (insulin/mass) days overload dinner instead of the pre/post window.
   // Pre = 20% of carbs, Post = 25% of carbs (with floors); breakfast/lunch/dinner share the rest.
-  const breakC = Math.round(carbsTotal * 0.18);
-  const trainCarbLunch = Math.round(carbsTotal * 0.14);
+  // Carb distribution must sum to ~100% per scenario — no residual to dump.
+  // Training day: break(20%) + lunch(16%) + dinner(19%) + pre(20%) + post(25%) = 100%
+  // Rest day:     break(22%) + lunch(28%) + dinner(40%) + snack(10%)          = 100%
+  const breakC = Math.round(carbsTotal * (trainWindow ? 0.20 : 0.22));
+  const trainCarbLunch = Math.round(carbsTotal * 0.16);
   const restCarbLunch = Math.round(carbsTotal * 0.28);
-  const trainCarbDinner = Math.round(carbsTotal * 0.10);
-  const restCarbDinner = Math.round(carbsTotal * 0.22);
+  const trainCarbDinner = Math.round(carbsTotal * 0.19);
+  const restCarbDinner = Math.round(carbsTotal * 0.40);
   // Pre/post carb targets scale with carbsTotal; floors keep them meaningful on low-carb days.
   const prewCarbG = trainWindow ? Math.max(PREW_CARB_SLOW_G, Math.round(carbsTotal * 0.20)) : PREW_CARB_SLOW_G;
   const postwCarbG = trainWindow ? Math.max(POSTW_FAST_CARB_G, Math.round(carbsTotal * 0.25)) : POSTW_FAST_CARB_G;
@@ -720,7 +723,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   const mealBudget = {
     breakfast: { p: Math.max(30, Math.round(mpsPerMeal * 1.2)), c: breakC, f: Math.round(fatTotal * 0.20) },
-    lunch: { p: Math.max(30, Math.round(mpsPerMeal * 1.2)), c: (input.eveningLowCarb ? Math.round((trainWindow ? trainCarbLunch : restCarbLunch - snackC) * 1.3) : (trainWindow ? trainCarbLunch : restCarbLunch - snackC)), f: Math.round(fatTotal * 0.15) },
+    lunch: { p: Math.max(30, Math.round(mpsPerMeal * 1.2)), c: (input.eveningLowCarb ? Math.round((trainWindow ? trainCarbLunch : restCarbLunch) * 1.3) : (trainWindow ? trainCarbLunch : restCarbLunch)), f: Math.round(fatTotal * 0.15) },
     dinner: { p: Math.max(30, Math.round(mpsPerMeal * 1.2)), c: input.eveningLowCarb ? Math.round((trainWindow ? trainCarbDinner : restCarbDinner) * 0.5) : (trainWindow ? trainCarbDinner : restCarbDinner), f: Math.round(fatTotal * 0.22) },
     prew: trainWindow ? { p: PREW_PROTEIN_G, c: prewCarbG, f: PREW_FAT_MAX_G } : null,
     postw: trainWindow ? { p: POSTW_FAST_PROTEIN_G, c: postwCarbG, f: 0 } : null,
@@ -731,6 +734,21 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const usedC = mealBudget.breakfast.c + mealBudget.lunch.c + mealBudget.dinner.c + (mealBudget.prew?.c || 0) + (mealBudget.postw?.c || 0) + (mealBudget.snack?.c || 0);
   const residualP = Math.max(25, (adjustedProteinG || input.goalProteinG) - usedP);
   const residualC = Math.max(0, carbsTotal - usedC);
+  // Distribute any residual carbs proportionally across breakfast/lunch/dinner (not just dinner).
+  if (residualC > 0) {
+    const carbMeals = [mealBudget.breakfast, mealBudget.lunch, mealBudget.dinner];
+    const carbSum = carbMeals.reduce((s, m) => s + m.c, 0);
+    if (carbSum > 0) {
+      let remaining = residualC;
+      for (let i = 0; i < carbMeals.length; i++) {
+        const share = i === carbMeals.length - 1
+          ? remaining
+          : Math.round(residualC * carbMeals[i].c / carbSum);
+        carbMeals[i].c += share;
+        remaining -= share;
+      }
+    }
+  }
 
   const allFoodsUsed: string[] = [];
   // Д-4: intra-day diversity — foods already used today are deprioritized for subsequent meals
@@ -840,7 +858,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const dinner = buildWholeMeal({
     label: 'Ужин', time: tDinner, type: 'dinner',
     proteinG: mealBudget.dinner.p,
-    carbG: mealBudget.dinner.c + (residualC > 0 ? Math.min(30, residualC) : 0),
+    carbG: mealBudget.dinner.c,
     fatG: mealBudget.dinner.f,
     pool, proteinRotationIds: dinnerRot.ids, seed: seedBase + 6,
     includeVeg: true, includeFruit: false,
