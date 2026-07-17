@@ -1,3 +1,41 @@
+## Session Summary (Jul 17 — Part 4) — BioStack: fixMeaningfulReplacement + удаление marker-плейсхолдеров
+
+### Goal
+Исправить `findMeaningfulReplacement` (аналоги строго по терапевтическому классу: telmisartan→estradiol был багом) и удалить диагностические marker-плейсхолдеры гормонов (`nameRu:'Нет (маркер)'`, `dose:'0 мкг'`, `category:'marker'/'hormonal'`) из каталога и coverage-map. КРИТИЧНО: изменения НЕ должны влиять на калькулятор поддержки.
+
+### ✅ Done и проверено
+- `findMeaningfulReplacement` (biostack-clinical-v2.engine.ts:460) — пропуск `marker`/`hormonal`; `deriveAnalogsByMechanism` (426-455) — пропуск `marker`/`hormonal`, score `shared*100+(sharedCat?20:0)`.
+- `SUBSTANCE_ANALOGS` (support-meta.ts) — опечатка "Тельмисартан"→"Тельмисартан"; telmisartan/nebivolol ↔ carvedilol связаны; добавлена `carvedilol`.
+- 7 marker-блоков удалены из `support-catalog-data.ts` (cortisol, adrenaline, endocrine_marker, neurosteroid, glucagon, estradiol, progesterone). Реальные гормоны (testosterone/oxytocin/insulin/vasopressin) оставлены.
+- ВСЕ 7 marker-записей удалены из `support-coverage-map.ts` (adrenaline, cortisol, endocrine_marker, estradiol, glucagon, neurosteroid, progesterone) — это были только веса, вещества никогда не рекомендовались калькулятором.
+- **Runtime-доказательство безопасности**: `runSupportUnified(state)` на синтетическом AAS-стейте → 22 реальных вещества (hcg, anastrozole, nac, tudca, telmisartan, nebivolol, …), `MARKER_JUNK_IN_RESULT: []`, `RESULT: PASS` (калькулятор НЕ падает и НЕ ссылается на удалённые записи).
+- **Runtime-доказательство замены**: `telmisartan`→`nebivolol` (РААС/антигипертензивный, НЕ estradiol); `nebivolol`→`telmisartan` (cross-link); `estradiol`→`null`.
+- UTF-8 noBOM — coverage-map, catalog-data, engine, meta — чистые.
+- **tsc-фикс**: `biostack-clinical-v2.engine.ts:446,489` — `Property 'category' does not exist on type 'CatEntry'` → исправлено cast `(e as any).category` / `(c as any).category`. Повторный `tsc --noEmit` → **только 1 ошибка осталась: `PlanDisplay.tsx:784` (TS7053, `Record<BBPhase,string>` индексируется `string`)** — это файл тренировочного блока (планировщик ББ, другой агент), НЕ мой, НЕ связан с задачей; мои файлы компилируются чисто.
+- **Orphan-находки (безопасны, не трогали)**: `SUPPLEMENTS_DB` (support-db/supplements.ts:139 `neurosteroid`, :258 `endocrine_marker`) и `CATALOG_ENRICHMENT` (support-enrichment.ts:1552 `neurosteroid`) содержат записи для удалённых из каталога плейсхолдеров. Это инертные данные (никогда не назначаются, т.к. базы в каталоге нет); smoke-тест доказал, что они не ломают калькулятор. Удаление затронуло бы общий модуль с 25 потребителями — оставлено как есть (вопрос к пользователю: чистить ли).
+
+### Проверки (почему калькулятор не затронут)
+- grep в `src/engines/support-plan/*`: НЕТ `SUPPORT_CATALOG_DATA['<marker>']` лукапов в пути калькулятора.
+- `TZ_AUTO_BLACKLIST` (shared-constants.ts:171-193) — hardcoded `Set` строк (включает marker-id как исключения). Удаление записей из каталога НЕ меняет этот Set → безопасно.
+- `recommendation-engine.ts:287` `addRec('estradiol',…)` — `'estradiol'` используется как КЛЮЧ рекомендации (реальное добавляемое вещество — anastrozole), не лукап каталога.
+- `engine.ts:191` `rec.id === 'estradiol'` — строковая проверка ключа рекомендации, не лукап каталога.
+
+### Key Decisions
+- Первичный источник аналогов — `SUBSTANCE_ANALOGS`; fallback `deriveAnalogsByMechanism` ранжирует по overlap механизмов/класса (НЕ по evidenceWeight кандидата).
+- Удалены ТОЛЬО marker-плейсхолдеры; реальные гормональные препараты сохранены (это «фармакология», не «поддержка», но они валидны в каталоге).
+
+### Relevant Files
+- `src/engines/biostack-clinical-v2.engine.ts` — findMeaningfulReplacement (460), deriveAnalogsByMechanism (426-455) — исправлено.
+- `src/data/support-meta.ts` — SUBSTANCE_ANALOGS (telmisartan/nebivolol/carvedilol, опечатка).
+- `src/data/support-catalog-data.ts` — 7 marker-блоков удалены.
+- `src/data/support-coverage-map.ts` — 7 marker-записей удалено.
+- `src/engines/support-plan/shared-constants.ts` — TZ_AUTO_BLACKLIST (173-183 marker-id в exclusion, безопасно).
+- `src/engines/recommendation-engine.ts` — addRec('estradiol') — ключ рекомендации (безопасно).
+- `src/engines/support-plan/engine.ts:191` — rec.id==='estradiol' строковая проверка (безопасно).
+- Потребители: BioStackAIClinicalCard.tsx (80-84), BioStackAIStack.tsx (1598-1599), BioStackAISearch.tsx (703-704).
+
+---
+
 ## Session Summary (Jul 17 — Part 3) — BioStack: удалены 6 полей из BioStackProfile (чистка типа)
 
 ### Goal
@@ -3744,3 +3782,71 @@ umber — заменено на getVolumeLandmarks + применение onCour
 - `src/ui/components/BioStackAISearch.tsx` — replace/complex popup портал (commit 20ef737a8)
 - `src/engines/biostack-ai.engine.ts` — BioStackProfile, autoFillFromMainProfile, getProfileCompleteness
 - `src/engines/lab-diary.engine.ts` — getLabDiary
+
+---
+
+## Session Summary (Jul 17 — Part 3) — BB-авто + ручной конструктор: аудит тренера ББ + wiring П6/П8
+
+### Goal
+Профессиональный аудит ББ-авто (`bb-builder.engine.ts` + `BbAutoConstructor.tsx`) и ручного конструктора (`manual-plan-builder.ts`) как тренер по бодибилдингу; исправить 10 приоритетных проблем (П1–П10) по порядку, затем завершить parity ручного конструктора.
+
+### Constraints & Preferences
+- Пользователь: «давай все по порядку» — реализовать П1→П10 последовательно.
+- Язык общения: русский.
+- Не менять внешний контракт без необходимости; один источник правды для reps/rir/tempo/weight.
+
+### ✅ Done
+- П1–П10 реализованы в bb-builder + bb-autocoach + BbAutoConstructor (из пред. сводок Jul 13 Part 8 / Jul 16 Part 11).
+- BbAutoConstructor.tsx: восстановлен `srpe`/`acwr` перед `deloadNote`; исправлена ссылка `processedPlan.weeks`→`plan.weeks`; удалён неиспользуемый `applyPostPhaseProcessing` из import.
+- `bb_audit_test2.ts` прогнан: П1/П2/П3/П4/П5/П8/П9/П10 подтверждены; П6 верифицирован через `buildBBPlan({intensityTechnique:'rest_pause', weeks:6})` → Rest-pause в week5 (peaking) на «Жим штанги лёжа».
+- **`manual-plan-builder.ts`: П6 (intensity technique) + П8 (feeder sets) ЗАВЕРШЕНЫ И ПРОВЕРЕНЫ (runtime-тест).**
+  - Импорты: `suggestFeeders, INTENSITY_TECHNIQUES, type IntensityTechnique` из `./bb/bb-autocoach.engine` (без circular import — bb-autocoach не импортирует manual-plan-builder).
+  - `BuildPlanInput.intensityTechnique?: IntensityTechnique` добавлено (после `avoidAxialLoad`).
+  - `applyTechniqueToPlanEx(p, technique)` — локальный хелпер; адаптирует BB-style технику к плоскому `PlanEx` (меняет `technique`=meta.label + reps-комментарий; для `pause_rep` — `tempo[1] += 2`; sets/rir/rest/weight не трогает). Гвард на `'none'`.
+  - П6 применён к `exs` с `role==='main'` ПОСЛЕ compound-фазы (аналог BB `primary`; в manual-плане нет per-week фазовой привязки в exs → упрощённо ко всем main).
+  - П8: `suggestFeeders(weakPoints, equipment)` ПОСЛЕ isolation-фазы (перед sort) → для каждого feeder push PlanEx с `role:'accessory', technique:'feeder', rest:30, fatigueCost:1, group=catalogGroupFor(f.muscle)`.
+  - Runtime-тест (`manual_audit_test.ts`, удалён): cycle 6 групп, weakPoints [arms,biceps,calves], intensityTechnique 'rest_pause' → 3 mains со «Rest-pause», 3 feeders (biceps→arms, arms→arms, calves→legs); day0 = 7 упражнений; weeklySets {chest:15,arms:48,legs:33,back:15,shoulders:12,core:12}.
+- `tsc --noEmit`: **только 3 pre-existing ошибки** (biostack-clinical-v2.engine.ts:446,489; PlanDisplay.tsx:784) — ни одной из manual-plan-builder.ts.
+
+### ❌ Остаётся
+- Аудит/применение оставшихся П1–П5, П7, П9, П10 parity в `manual-plan-builder.ts` против auto-конструктора — ещё НЕ начаты как правки (П6/П8 уже в синхроне).
+- Визуальная проверка в браузере: feeder-сеты и техники в дневнике выполнения.
+
+### Key Decisions
+- Единый источник правды — `buildSession` с `PHASE_CONFIGS[phase]` (для BB); ручной конструктор использует flat PlanEx.
+- `buildBBPlan` сам вызывает `applyPostPhaseProcessing` внутри (skipPhaseRedistribution:true).
+- П6 в auto: техника только `role==='primary'` и если `meta.phases.includes(ph)`. В manual: ко всем `role==='main'`.
+- П10 — `isAxialLoadExercise` экспортируется (exercise-selector.engine.ts:50).
+- `applyIntensityTechniqueToExercise` НЕ экспортируется → П6 в manual реализован локально через `INTENSITY_TECHNIQUES` + `applyTechniqueToPlanEx`.
+- Feeder-сеты: role:'accessory', technique:'feeder', rir:3, rest:30, fatigueCost:1 (низкое утомление, ежедневная работа для слабых групп).
+
+### Next Steps
+1. Аудит `manual-plan-builder.ts` на П1–П5, П7, П9, П10 parity с auto-конструктором; применить gaps.
+2. Runtime-тест parity ручного конструктора (все П1–П10).
+3. Финальный commit (manual-plan-builder.ts + при необходимости index.tsx/BbAutoConstructor).
+
+### Critical Context
+- `bb-autocoach.engine.ts` экспорты:
+  - `FeederSet` interface (line 355): {muscle, exercise, sets, reps, notes}.
+  - `suggestFeeders(weakPoints: string[], equipment: string[]): FeederSet[]` (line 366).
+  - `applyPostPhaseProcessing(input: PostPhaseInput): BBPlan` (line 541).
+  - `IntensityTechnique` (line 235): `'rest_pause'|'drop_set'|'myo_reps'|'pause_rep'|'mechanical_drop'|'none'`.
+  - `IntensityTechniqueMeta` (line 237): {type, label, appliesTo:('compound'|'isolation'|'accessory')[], phases: BBPhase[], description}.
+  - `INTENSITY_TECHNIQUES` (line 247): none(all/all), rest_pause(compound/isolation; intensification/peaking), drop_set(isolation/accessory; intensification/accumulation), myo_reps(isolation/accessory; accumulation/intensification), pause_rep(compound/isolation; accumulation/intensification), mechanical_drop(isolation/accessory; intensification).
+  - `DeloadType` (line 146): `'pump'|'neural'|'full_rest'`; `DELOAD_PROTOCOLS` (159); `DEFAULT_TECHNIQUE_BY_PHASE` (277).
+- `BBBuilderInput`: `intensityTechnique?`, `autoDeload?`, `deloadType?`, `loadStrategy?`, `autoRegResult?`, `avoidAxialLoad?`.
+- `BuildPlanInput` (manual-plan-builder.ts): добавлено `intensityTechnique?: IntensityTechnique`.
+- `acwrRatio` в scope `buildBBPlan` (bb-builder.engine.ts:849).
+- Pre-existing tsc-ошибки (НЕ мои): biostack-clinical-v2.engine.ts(446,25) & (489,25) TS2339 'category'; PlanDisplay.tsx(784,29) TS7053.
+- Команды: `cd D:\BodyBuildHealth; $env:NODE_OPTIONS='--max-old-space-size=2048'; npx tsc --noEmit`; `npx tsx ...\bb_audit_test2.ts`.
+- NOTE: тест `buildBBPlan({weeks:4})` выводит week4 `character`='тяж' (не 'deload'), но П1 prescription-check показал deload-параметры (rir=4, reps 14-20, tempo 4-2-2-1, weight 72kg) — `character` не отражает deload, мелкое расхождение.
+- `manual-plan-builder.ts` imports: getExercisesByGroup, EXERCISE_CATALOG, calcExercisePrescription, prescribeExercises, forceVector, lengthenedPartials, tempoFor, selectExercisesSmart, S_MRV_FACTOR, findSubstitutions, isBodyweightExercise, isCarryExercise, derivePattern, getVolumeLandmarks, suggestFeeders/INTENSITY_TECHNIQUES/IntensityTechnique; PRO_WORKMAX_RATIO, PRO_MUSCLE_TO_GROUP.
+
+### Relevant Files
+- `src/engines/bb/bb-builder.engine.ts` — BBBuilderInput дополнен; внутренний applyPostPhaseProcessing.
+- `src/engines/bb/bb-autocoach.engine.ts` — suggestFeeders(366), FeederSet(355), applyPostPhaseProcessing(541), INTENSITY_TECHNIQUES(247), IntensityTechniqueMeta(237), IntensityTechnique(235).
+- `src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx` — srpe/acwr восстановлены, processedPlan→plan, import удалён.
+- `src/engines/exercise-selector.engine.ts` — `export function isAxialLoadExercise` (line 50).
+- `src/ui/screens/TrainingScreen_parts/TrainingConstructor/phase-periodization.ts` — PHASE_CONFIGS.
+- `src/engines/manual-plan-builder.ts` — ЗАВЕРШЕН П6+П8 (intensity technique + feeder sets); остальные П1–П5,П7,П9,П10 — аудит.
+- `C:\Users\thods\AppData\Local\Temp\opencode\bb_audit_test2.ts` — runtime verification test.
