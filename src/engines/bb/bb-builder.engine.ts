@@ -661,11 +661,9 @@ function addDaysISO(from: string, days: number): string {
 function computeAcwr(): number {
   try {
     const sessions = loadSRPESessions();
-    console.error('[computeAcwr] firstSess=', JSON.stringify(sessions[0]));
     if (!sessions || sessions.length < 2) return 1;
     const daily = toDailyLoads(sessions as any);
     const r = acuteChronicRatio(daily);
-    console.error('[computeAcwr] sessions=', sessions.length, 'ratio=', r && r.ratio);
     return r && isFinite(r.ratio) ? r.ratio : 1;
   } catch {
     return 1;

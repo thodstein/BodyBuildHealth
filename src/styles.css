@@ -2259,3 +2259,59 @@ input[type="range"]:active {
 }
 
 } /* end @media (max-width: 480px) */
+
+/* ═══ GLOBAL PREMIUM DESIGN SYSTEM (mobile-first, ALL screens) ═══
+   Robust frosted-glass: catches var(--glass-bg) AND both rgba glass
+   families (24,24,27 / 20,22,30) AND both spacing forms
+   (browser may serialize inline rgba WITH spaces). Applied globally,
+   not scoped to .training-screen, so every screen gets the same
+   modern card treatment. */
+div[style*="var(--glass-bg)"],
+div[style*="background"][style*="rgba(24,24,27,"],
+div[style*="background"][style*="rgba(24, 24, 27,"],
+div[style*="background"][style*="rgba(20,22,30,"],
+div[style*="background"][style*="rgba(20, 22, 30,"] {
+  -webkit-backdrop-filter: blur(18px) saturate(160%) !important;
+  backdrop-filter: blur(18px) saturate(160%) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.22) !important;
+}
+/* Accent-tinted small blocks (both spacing forms) */
+div[style*="background"][style*="rgba(0,230,138,"],
+div[style*="background"][style*="rgba(0, 230, 138,"] {
+  -webkit-backdrop-filter: blur(12px) saturate(140%) !important;
+  backdrop-filter: blur(12px) saturate(140%) !important;
+  border-radius: 12px !important;
+  box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.06),
+    0 4px 16px rgba(0,230,138,0.08) !important;
+}
+/* Utility class — opt-in frosted glass for any element */
+.glass-card {
+  background: var(--glass-bg) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(160%) !important;
+  backdrop-filter: blur(18px) saturate(160%) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.22) !important;
+}
+
+/* ═══ GLOBAL MOBILE ADAPTATION (all screens, phone) ═══ */
+@media (max-width: 480px) {
+  html, body { overflow-x: hidden !important; max-width: 100% !important; }
+  img, video { max-width: 100% !important; height: auto !important; object-fit: contain !important; }
+  input, select, textarea { font-size: 16px !important; }
+  button { min-height: 38px; min-width: 38px; }
+  /* collapse dense 3/4-col hardcoded grids to 2-col for phone readability */
+  div[style*="grid-template-columns: 1fr 1fr 1fr"],
+  div[style*="grid-template-columns:1fr 1fr 1fr"],
+  div[style*="grid-template-columns: 1fr 1fr 1fr 1fr"],
+  div[style*="grid-template-columns:1fr 1fr 1fr 1fr"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+@media (max-width: 360px) {
+  /* very narrow phones: 2-col grids → 1-col to avoid cramped cells */
+  div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}

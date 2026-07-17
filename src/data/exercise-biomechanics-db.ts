@@ -205,7 +205,7 @@ export const EXERCISE_BIOMECHANICS_DB: ExerciseBio[] = [
   {
     id: 'barbell_row', name: 'Тяга штанги в наклоне', pattern: 'horizontal_pull', category: 'bodybuilding',
     jointStress: { knee: 1, hip: 2, spine: 5, shoulder: 3, elbow: 5, ankle: 1 },
-    torqueProfile: 'midrange_peak', spineLoad: 'medium', kneeLoad: 'low', shoulderLoad: 'medium',
+    torqueProfile: 'midrange_peak', spineLoad: 'high', kneeLoad: 'low', shoulderLoad: 'medium',
     cnsDemand: 3, difficulty: 2,
     primaryMuscles: ['Широчайшие', 'Ромбовидные', 'Бицепс'], secondaryMuscles: ['Задние дельты', 'Трапеции'],
     stabilizers: ['Разгибатели спины', 'Кор'],

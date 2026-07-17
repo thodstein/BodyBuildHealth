@@ -8,6 +8,7 @@
 import type { Exercise } from '../core/types';
 import { getExerciseById } from '../core/exercise-catalog';
 import { EXERCISE_BIOMECHANICS_DB } from '../data/exercise-biomechanics-db';
+import { getMappedBioId } from '../data/exercise-id-mapping';
 
 /** Быстрый индекс биомеханики по id упражнения */
 const BIO_MAP = new Map<string, typeof EXERCISE_BIOMECHANICS_DB[number]>();
@@ -41,33 +42,44 @@ export interface SelectorInput {
 /**
  * Детект осевой (компрессионной) нагрузки на позвоночник.
  * Источники: (1) БД биомеханики — spineLoad === 'high', (2) паттерны классических
- * осевых лифтов (присед со штангой, становая/мёртвая, жим стоя/армейский/OHP, гудморнинг).
+ * осевых лифтов (присед со штангой, становая/мёртвая, жим стоя/армейский/OHP, гудморнинг),
+ * (3) ТЯГИ В НАКЛОНЕ (штанга/гантели/T-гриф/Pendlay) — торс в сгибании под весом = осевая.
  * НЕ осевые (допустимые): жим ног/лег-пресс, болгарский/гоблет присед, машинные приседы,
- * тяги (гориз/вертик), жимы сидя с гантелями.
+ * тяги БЛОК/СИДЯ/ГРУДЬЮ К СКАМЬЕ (chest-supported), landmine, жимы сидя с гантелями.
  */
 function isAxialLoadExercise(ex: Exercise): boolean {
   const n = (ex.name || '').toLowerCase();
   const id = (ex.id || '').toLowerCase();
 
+  // Безопасные (НЕ осевые): машины, сидя, грудью к скамье, блоки, landmine, оси, кардио/ходьба/носилки
+  if (n.includes('жим ног') || n.includes('leg press') || n.includes('пресс ног')
+    || n.includes('болгар') || n.includes('bulgarian') || n.includes('гоблет')
+    || n.includes('goblet') || n.includes('машина') || n.includes('machine') || n.includes('хак')
+    || n.includes('сидя') || n.includes('грудью') || n.includes('chest_supported')
+    || n.includes('блок') || n.includes('landmine') || n.includes('кардио')
+    || n.includes('ходьб') || n.includes('осо') || n.includes('sled') || n.includes('walk') || n.includes('carry')) return false;
+
   // Биомеханика БД: высокая нагрузка на позвоночник
   const b = BIO_MAP.get(ex.id);
   if (b && b.spineLoad === 'high') return true;
 
-  // Присед (barbell/фронт на спине плечах) — осевой. Исключаем безопасные варианты.
-  if (n.includes('присед') || n.includes('squat')) {
-    if (n.includes('жим ног') || n.includes('leg press') || n.includes('пресс ног')
-      || n.includes('болгар') || n.includes('bulgarian') || n.includes('гоблет')
-      || n.includes('goblet') || n.includes('машина') || n.includes('machine') || n.includes('хак')) return false;
-    return true;
-  }
+  // Присед (barbell/фронт на плечах) — осевой
+  if (n.includes('присед') || n.includes('squat')) return true;
+
   // Становая / мёртвая / румын / гудморнинг — осевой (наклон со штангой)
   if (n.includes('станов') || n.includes('мёртв') || n.includes('мертв') || n.includes('deadlift')
     || n.includes('рум') || n.includes('гудморнинг') || n.includes('good morning')) return true;
+
   // Жим стоя / армейский / overhead (штанга над головой) — осевой
   if (n.includes('жим') && (n.includes('стоя') || n.includes('армей') || n.includes('overhead') || n.includes('над голов'))) return true;
   if (id.includes('ohp') || id.includes('overhead') || id.includes('standing_press')) return true;
   // За головой (behind the neck) — осевой + риск
   if (n.includes('за голов')) return true;
+
+  // Тяги В НАКЛОНЕ (штанга/гантели/T-гриф/Pendlay) — осевая нагрузка позвоночника в сгибании под весом
+  if (n.includes('тяга') && (n.includes('в наклоне') || n.includes('наклон') || n.includes('гантел') || n.includes('pendlay') || n.includes('bent'))) return true;
+  if (/t[\s_-]*гриф/i.test(n)) return true;
+
   return false;
 }
 
@@ -264,13 +276,36 @@ function pushPullScore(ex: Exercise, selected: Exercise[]): number {
 export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
   const { candidates, muscleGroup, count, selectedIds, selectedNames, equipment, weakZones, level, injuryProfile, type, preferEquipment, targetRir, preferBB, favoriteIds, excludeIds, avoidAxialLoad } = input;
   const _selNames = selectedNames || [];
+  const _selIds = selectedIds || [];
   const _exclIds = new Set(excludeIds || []);
   const _favIds = new Set(favoriteIds || []);
   const _avoidAxial = !!avoidAxialLoad;
 
-  let pool = candidates.filter(ex => {
+  // "Убрать осевую нагрузку": осевые упражнения (тяги в наклоне,
+  // гудморнинг, присед/становая) заменяем на их не-осевые
+  // аналоги из цепочки substitutions (грудью-к-скамье / блочные / сидя),
+  // сохраняя ту же мышечную группу. Без замены — отсеются ниже.
+  let _cands: Exercise[] = candidates;
+  if (_avoidAxial) {
+    _cands = candidates.map(ex => {
+      if (!ex || !ex.id) return ex;
+      if (!isAxialLoadExercise(ex)) return ex;
+      const bioId = getMappedBioId(ex.id) || ex.id;
+      const b = BIO_MAP.get(bioId);
+      const subs: string[] = (b && (b as any).substitutions) || [];
+      for (const sid of subs) {
+        // 1) прямое совпадение catalog-id  2) biomech-id → catalog через маппинг
+        let alt = candidates.find(c => c && c.id === sid);
+        if (!alt) alt = candidates.find(c => c && (getMappedBioId(c.id) || c.id) === sid);
+        if (alt && !isAxialLoadExercise(alt)) return alt;
+      }
+      return ex;
+    });
+  }
+
+  let pool = _cands.filter(ex => {
     if (!ex || !ex.id) return false;
-    if (selectedIds.includes(ex.id)) return false;
+    if (_selIds.includes(ex.id)) return false;
     if (_selNames.includes(ex.name)) return false;
     if (_exclIds.has(ex.id)) return false;
     if (type && type !== 'any' && ex.type !== type) return false;

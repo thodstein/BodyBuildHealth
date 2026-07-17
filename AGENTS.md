@@ -3457,3 +3457,67 @@ umber — заменено на getVolumeLandmarks + применение onCour
 
 ### Коммит
 - 0e011b79 — MRV/volume-landmark validation + UI panels для BB-auto и ручного (3 файла: volume-landmarks.engine, lms-builder.engine, PlanDisplay.tsx). bb-builder.engine + BbAutoConstructor уже закоммичены ранее (94057b876 и др.).
+
+---
+
+## Session Summary (Jul 15 — Part 14) — Профиль: Любимые/Исключённые упражнения + «убрать осевую нагрузку»
+
+### Goal
+Расширить тренировочный профиль пользовательскими предпочтениями по упражнениям: (1) «Любимые» (приоритет при отборе) и «Исключённые» (полное удаление из пула генерации), (2) переключатель «убрать осевую нагрузку» (исключить присед со штангой/становую/жим стоя/гудморнинг из генерации планов). Обе фичи завершены и закоммичены.
+
+### ✅ Сделано и проверено (esbuild на всех изменённых файлах — 0 ошибок; runtime-тест tsx подтверждает фильтрацию; UTF-8 noBOM)
+
+**Фавориты/исключения (коммит `27259ec0`, 8 файлов, +235/−9):**
+- `training-profile.ts`: поля `favoriteExercises: string[]` / `excludedExercises: string[]` в `TrainingProfile` + `DEFAULT_PROFILE`, синхронизация в UnifiedSettings (`tr.favoriteExercises = p.favoriteExercises`, `tr.excludedExercises = p.excludedExercises`).
+- `exercise-selector.engine.ts`: `SelectorInput.favoriteIds?` / `excludeIds?`; в `selectExercisesSmart` исключённые вырезаются из пула (до pool fallback), любимым `+15` к `selectionScore`; обновлён `selectTopN`.
+- `manual-plan-builder.ts`: `BuildPlanInput.favoriteExercises?` / `excludedExercises?` → проброшены в оба вызова `selectExercisesSmart`.
+- `bb-builder.engine.ts`: `BBBuilderInput.favoriteExercises?` / `excludedExercises?`; `buildSession(... favoriteIds = [], excludeIds = [])`; `buildBBPlan` считывает `favIds`/`exclIds`.
+- `usePlanGeneration.ts`: `PlanGenDeps.favoriteExercises?` / `excludedExercises?` → `buildPlanDays`.
+- `TrainingProfileCard.tsx`: секция «⭐ Любимые и исключённые упражнения» — поиск по `EXERCISE_CATALOG`, кнопки ⭐/✕, колонки чипсов.
+- `TrainingConstructor/index.tsx` (2 места) + `BbAutoConstructor.tsx`: читают из профиля и передают.
+
+**Убрать осевую нагрузку (коммит `0f068d9c`, 8 файлов, +127/−10):**
+- `exercise-selector.engine.ts`: импорт `EXERCISE_BIOMECHANICS_DB` + построение `BIO_MAP` (Map id→ExerciseBio); `SelectorInput.avoidAxialLoad?`; экспортируемая `isAxialLoadExercise(ex)` — детект по `BIO_MAP.get(ex.id)?.spineLoad === 'high'` ИЛИ паттернам имён (присед/становая/мёртвая/гудморнинг/рум/жим стоя/армейский/за головой) с исключением безопасных вариантов (жим ног/лег-пресс/болгар/гоблет/машина/хак/сидя); в `selectExercisesSmart` осевые исключаются из пула (до pool fallback); `selectTopN.opts.avoidAxialLoad` проброшен.
+- `training-profile.ts`: поле `avoidAxialLoad: boolean` (+ default `false`, миграция `if (p.avoidAxialLoad !== undefined) tr.avoidAxialLoad = p.avoidAxialLoad;`).
+- `manual-plan-builder.ts`: `BuildPlanInput.avoidAxialLoad?`; `const avoidAxial = input.avoidAxialLoad || false;` → оба `selectExercisesSmart` (~341, ~484).
+- `bb-builder.engine.ts`: `BBBuilderInput.avoidAxialLoad?`; `buildSession(... avoidAxialLoad: boolean = false)` (~350) → `selectExercisesSmart` (~474); `buildBBPlan` `const avAxial = input.avoidAxialLoad || false;` (~684) → `buildSession` (~808).
+- `usePlanGeneration.ts`: `PlanGenDeps.avoidAxialLoad?` → `buildPlanDays` + dependency array.
+- `TrainingProfileCard.tsx`: чекбокс «🦴 Убрать осевую нагрузку (присед/становая/жим стоя)» в секции фаворитов.
+- `TrainingConstructor/index.tsx` (~196, ~586) + `BbAutoConstructor.tsx` (~330): `tprofile.avoidAxialLoad || false` / `prof.avoidAxialLoad || false`.
+
+**Runtime-тест (tsx):** при `avoidAxialLoad:true` осевые (Присед со штангой, Фронтальный присед, Гудморнинг, Румынская тяга) исключаются и заменяются безопасными (Выпады с гантелями, Болгарские сплит-приседания, Нордик).
+
+### ❌ Остаётся
+- `vite build` полный не запускался (медленный в этом окружении); корректность подтверждена esbuild-per-file + runtime-тестом. `tsc --noEmit` превышает 180с таймаут.
+
+### Key Decisions
+- Любимые: бонус `+15` к скору (приоритет, не гарантия). Исключённые: полное удаление из кандидат-пула (до pool fallback).
+- Осевая: детект по `spineLoad==='high'` ИЛИ имя/id-паттернам; Румынская тяга считается осевой (нагруженный наклон со штангой). Безопасные варианты (болгар/гоблет/лег-пресс/машина/хак/сидя) явно исключены из фильтра.
+- `convertCycleToBBPlan` (cycle-to-plan.ts) НЕ трогали — шаблонные циклы с явными упражнениями.
+- `BbAutoConstructor` читает профиль через `loadTrainingProfile()` один раз в `useMemo` (`prof`) — не реактивно к правкам профиля до перезагрузки (предсуществующее поведение).
+
+### Next Steps
+- (none) — обе фичи завершены и закоммичены.
+
+### Critical Context
+- `exercise-biomechanics-db.ts`: интерфейс `ExerciseBio` (line 19-41) содержит `spineLoad: 'low' | 'medium' | 'high'` (line 26); БД экспортирована как `EXERCISE_BIOMECHANICS_DB: ExerciseBio[]`.
+- `exercise-selector.engine.ts` импортирует `EXERCISE_BIOMECHANICS_DB` и строит `BIO_MAP` (Map<string, ExerciseBio>); экспортирует `isAxialLoadExercise`.
+- `Exercise.group` (а не `muscleGroup`) — поле группы в `core/types.ts` (Exercise interface, ~line 1042).
+- Профиль в `localStorage('he_training_profile')`; поля опциональны, чтение через `|| []` / `|| false`.
+- `rg` недоступен в shell (использовать grep).
+
+### Relevant Files
+- `src/ui/screens/TrainingScreen_parts/training-profile.ts` — поля профиля (favoriteExercises/excludedExercises/avoidAxialLoad) + синхронизация UnifiedSettings.
+- `src/engines/exercise-selector.engine.ts` — ядро скоринга/фильтрации (favorites/excluded/avoidAxialLoad + isAxialLoadExercise + BIO_MAP).
+- `src/data/exercise-biomechanics-db.ts` — источник `spineLoad` для детекта осевой нагрузки.
+- `src/engines/manual-plan-builder.ts` — `BuildPlanInput` + передача в `selectExercisesSmart`.
+- `src/engines/bb/bb-builder.engine.ts` — `BBBuilderInput`, `buildSession`, `buildBBPlan`.
+- `src/ui/hooks/usePlanGeneration.ts` — `PlanGenDeps` + проброс.
+- `src/ui/screens/TrainingScreen_parts/TrainingProfileCard.tsx` — UI управления фаворитами/исключениями + чекбокс осевой нагрузки.
+- `src/ui/screens/TrainingScreen_parts/TrainingConstructor/index.tsx` — интеграция ручной конструктор + ББ (2 точки передачи).
+- `src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx` — интеграция ББ-авто.
+- `src/engines/bb/cycle-to-plan.ts` — намеренно НЕ изменён (шаблонные циклы).
+
+### Коммиты сессии
+- 27259ec0 — Profile: favorite & excluded exercises in training profile + plan generation
+- 0f068d9c — Training profile: add 'remove axial load' (avoidAxialLoad) filter for plan generation

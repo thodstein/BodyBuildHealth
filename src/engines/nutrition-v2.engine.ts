@@ -60,8 +60,9 @@ export function calcNutritionV2(input: NutritionV2Input): NutritionV2Output {
   const trend = calcTrend(v2);
   let adjustment = 0;
   if (v2.weightHistory.length >= 3 && Math.abs(trend) > 0.05) {
-    if (input.goal === 'deficit' || input.goal === 'mini_cut') {
-      const expectedLoss = input.goal === 'deficit' ? -0.5 : -0.7;
+    // Д-16: 'cut' is the caller's mapping for fat_loss/cutting — treat as a deficit for adaptive features.
+    if (input.goal === 'deficit' || input.goal === 'mini_cut' || input.goal === 'cut') {
+      const expectedLoss = input.goal === 'mini_cut' ? -0.7 : -0.5;
       const diff = trend - expectedLoss;
       adjustment = Math.round(diff * 770);  // B6: 1kg fat ≈ 7700 kcal → 770 kcal / 0.1 kg/нед
       adjustment = Math.max(-500, Math.min(500, adjustment));
@@ -76,7 +77,8 @@ export function calcNutritionV2(input: NutritionV2Input): NutritionV2Output {
   // 5. Metabolic adaptation — continuous, not stepped (B5 fix)
   const dietWeeks = v2.dietWeeks;
   let metaAdapt = 0;
-  if ((input.goal === 'deficit' || input.goal === 'mini_cut') && dietWeeks > 2) {
+  // Д-16: include 'cut' so long cutting phases accrue metabolic adaptation too.
+  if ((input.goal === 'deficit' || input.goal === 'mini_cut' || input.goal === 'cut') && dietWeeks > 2) {
     metaAdapt = Math.min(0.15, dietWeeks * 0.012);  // B5: ~1.2%/нед непрерывно, кап 15%
   }
   const metaKcal = Math.round(baseTDEE * metaAdapt);
@@ -145,7 +147,8 @@ export function calcNutritionV2(input: NutritionV2Input): NutritionV2Output {
   }
 
   // Refeed recommendation (B7 fix)
-  const refeedRecommended = dietWeeks > 4 && (input.goal === 'deficit' || input.goal === 'mini_cut')
+  // Д-16: include 'cut' so cutting users also get refeed guidance on plateau / long diet.
+const refeedRecommended = dietWeeks > 4 && (input.goal === 'deficit' || input.goal === 'mini_cut' || input.goal === 'cut')
     && (trend > -0.2 || dietWeeks >= 6);  // B7: plateau OR prophylactic refeed every 6+ weeks
 
   return {
