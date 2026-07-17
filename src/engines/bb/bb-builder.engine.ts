@@ -1098,10 +1098,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
 
   const basePlan = { pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale };
   let finalPlan = basePlan;
-  // П6/П8: применяем intensity-technique и feeder-сеты прямо внутри buildBBPlan,
+  // Применяем пост-обработку (техники/фидеры/авто-делод/загрузка/авторег) внутри buildBBPlan,
   // чтобы оба вызывающих пути (BbAutoConstructor и TrainingConstructor) получали результат.
-  // skipPhaseRedistribution=true — распределение фаз уже сделано в buildBBPlan через distributePhases.
-  if ((input.intensityTechnique && input.intensityTechnique !== 'none') || weakPoints.length > 0) {
+  // Условие покрывает ВСЕ признаки, а не только technique/weakPoints — иначе loadStrategy
+  // и autoDeload теряются (баг: dfa8842fb убрал дубль-вызов из BbAutoConstructor, но не расширил guard).
+  if ((input.intensityTechnique && input.intensityTechnique !== 'none') || weakPoints.length > 0 || input.loadStrategy || input.autoDeload || input.autoRegResult) {
     finalPlan = applyPostPhaseProcessing({
       plan: basePlan,
       totalWeeks: input.weeks,
