@@ -1,5 +1,5 @@
 import { SUPPORT_CATALOG_DATA, SYSTEM_LABELS_CATALOG, ORGAN_LABELS } from '../data/support-database';
-import { getProfile } from '../core/profile-manager';
+import { getProfile, updateProfile } from '../core/profile-manager';
 import type { UserProfile } from '../core/types';
 
 export type CognitiveTask = 'memory' | 'focus' | 'creativity' | 'reaction_speed' | 'learning';
@@ -29,6 +29,11 @@ export interface BioStackProfile {
   adClass: ADClass; stackComplexity: StackComplexity;
   targetOrgans: string[]; targetSystems: string[];
   currentMeds: string[]; drugAllergies: string[];
+  jointSymptoms: string[];
+  neuroSymptoms: string[];
+  cnsSymptoms: string[];
+  injuries: string[];
+  currentSupplements: string[];
   autoFilledFields: string[];
 }
 
@@ -52,10 +57,13 @@ const FIELD_GROUPS: Record<string, string[]> = {
   systems: ['targetSystems'],
   lifestyle: ['avoidIds', 'avoidMeds'],
   clinical: ['currentMeds','drugAllergies','adClass'],
+  symptoms: ['jointSymptoms','neuroSymptoms','cnsSymptoms','injuries'],
+  supplements: ['currentSupplements'],
 };
 
 const AUTO_FILLABLE_KEYS = new Set([
   'age','weight','height','sex','experience','goals','healthConditions','currentMeds','drugAllergies',
+  'injuries','neuroSymptoms','cnsSymptoms','jointSymptoms','currentSupplements',
 ]);
 
 export function getProfileCompleteness(p: BioStackProfile): ProfileCompleteness {
@@ -112,6 +120,8 @@ export function getDefaultBioStackProfile(): BioStackProfile {
     adClass: 'none', stackComplexity: 'balanced',
     targetOrgans: [], targetSystems: [],
     currentMeds: [], drugAllergies: [],
+    jointSymptoms: [], neuroSymptoms: [], cnsSymptoms: [],
+    injuries: [], currentSupplements: [],
     autoFilledFields: [],
   };
 }
@@ -158,12 +168,59 @@ export function autoFillFromMainProfile(): { patch: Partial<BioStackProfile>; au
       filled.drugAllergies = ss.health.drugAllergies;
       keys.push('drugAllergies');
     }
+    const mainInj = (ss.health?.injuries || (s as any).injuries || []) as any[];
+    if (mainInj.length) {
+      const inj = mainInj.map(i => i.location || i.name || String(i)).filter(Boolean);
+      if (inj.length > 0) { filled.injuries = inj; keys.push('injuries'); }
+    }
+    if (ss.nutrition?.currentSupplements?.length) {
+      const sups = (ss.nutrition.currentSupplements as any[]).map(su => su.id || String(su)).filter(Boolean);
+      if (sups.length > 0) { filled.currentSupplements = sups; keys.push('currentSupplements'); }
+    }
     return { patch: filled, autoKeys: keys };
   } catch { return { patch: {}, autoKeys: [] }; }
 }
 
+/** Дублировать заполненные данные BioStack-профиля в основной профиль (подвкладки Профиль) */
+export function syncBioStackToMain(p: BioStackProfile): void {
+  try {
+    const prof = getProfile(); if (!prof) return;
+    const s = prof.settings as any; if (!s) return;
+    if (p.age) s.personal = { ...(s.personal || {}), age: p.age };
+    if (p.weight) s.personal = { ...s.personal, weight: p.weight };
+    if (p.height) s.personal = { ...s.personal, height: p.height };
+    if (p.sex) s.personal = { ...s.personal, sex: p.sex };
+    if (p.experience) s.training = { ...(s.training || {}), level: p.experience };
+    if (p.goals?.length) {
+      const gMap: Record<string, string> = { muscel_gain: 'bulk', fat_loss: 'cut', recovery: 'maintenance', endurance: 'endurance', immunity: 'health' };
+      const g = gMap[p.goals[0]]; if (g) s.training = { ...s.training, primaryGoal: g };
+    }
+    if (p.healthConditions?.length) s.health = { ...(s.health || {}), chronicConditions: p.healthConditions };
+    if (p.drugAllergies?.length) s.health = { ...s.health, drugAllergies: p.drugAllergies };
+    if (p.injuries?.length) {
+      const existing: any[] = s.health?.injuries || [];
+      const mapped = p.injuries
+        .filter(loc => !existing.some(e => (e.location || '') === loc))
+        .map(loc => ({ id: 'bs_' + loc, type: 'joint', location: loc, painLevel: 0, movementLimit: 'none', side: 'both', chronic: true }));
+      if (mapped.length) s.health = { ...s.health, injuries: [...existing, ...mapped] };
+    }
+    if (p.currentMeds?.length) {
+      s.nutrition = { ...(s.nutrition || {}), currentMedications: p.currentMeds.map(m => ({ id: m, name: m, doseMg: 0, doseUnit: 'mg' as const, frequency: 'daily' as const })) };
+    }
+    if (p.currentSupplements?.length) {
+      const supDb = SUPPORT_CATALOG_DATA as any;
+      s.nutrition = { ...s.nutrition, currentSupplements: p.currentSupplements.map(id => ({ id, name: supDb[id]?.name || id, doseMg: 0, doseUnit: 'mg' as const })) };
+    }
+    prof.settings = s;
+    updateProfile({ settings: s });
+  } catch {}
+}
+
 export function saveBioStackProfile(p: BioStackProfile): void {
-  try { localStorage.setItem('he_biostack_profile', JSON.stringify(p)); } catch {}
+  try {
+    localStorage.setItem('he_biostack_profile', JSON.stringify(p));
+    syncBioStackToMain(p);
+  } catch {}
 }
 
 export function loadBioStackProfile(): BioStackProfile {

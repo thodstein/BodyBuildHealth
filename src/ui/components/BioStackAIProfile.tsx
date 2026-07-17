@@ -1,934 +1,371 @@
-import React, { useState } from 'react';
-import { type BioStackProfile } from '../../engines/biostack-ai.engine';
-import { autoFillFromMainProfile, saveBioStackProfile, loadBioStackProfile, getProfileCompleteness, type ProfileCompleteness } from '../../engines/biostack-ai.engine';
-import { buildStack } from '../../engines/supplement-finder.engine';
-import { PillBtn, Slider, toFinderProfile, PURE_GOALS, ORGANS, SYSTEMS, HEALTH_CONDS, TOP_MECHANISMS } from './BioStackAIConstants';
-import { type GoalType, type AASStatus, type BudgetLevel, type StackComplexity, type ExperienceLevel, type HealthCondition, type ADClass, type BioStackProfile as BSP } from '../../engines/biostack-ai.engine';
-import { OnboardingWizard } from './BioStackAIOnboarding';
+import React, { useMemo, useState } from 'react';
+import {
+  loadBioStackProfile, saveBioStackProfile, autoFillFromMainProfile,
+  getProfileCompleteness, getDefaultBioStackProfile,
+} from '../../engines/biostack-ai.engine';
+import { getLabDiary } from '../../engines/lab-diary.engine';
+import { SUPPORT_CATALOG_DATA, SYSTEM_LABELS_CATALOG, ORGAN_LABELS } from '../../data/support-database';
+import { showToast } from './BioStackAIConstants';
 
-/* ─── Popup Overlay ─── */
-function PopupOverlay({ title, icon, color, children, onClose }: { title: string; icon: string; color: string; children: React.ReactNode; onClose: () => void }) {
-  return <div style={{ position:'fixed', inset:0, zIndex:250, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.87)' }} onClick={onClose}>
-    <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, maxHeight:'80vh', borderRadius:14, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden' }}>
-      <div style={{ height:3, background:`linear-gradient(90deg, ${color}, ${color}66, transparent)` }} />
-      <div style={{ padding:'12px 14px', maxHeight:'calc(80vh - 3px)', overflowY:'auto' }}>
-        <div style={{ fontSize:13, fontWeight:700, color, marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
-          <span>{icon}</span>{title}
+/* ============================ Справочники ============================ */
+
+const JOINT_SYMPTOMS = [
+  'Боль в суставах', 'Скованность по утрам', 'Отёк сустава', 'Хруст',
+  'Сниженная подвижность', 'Воспаление (артрит)', 'Боль при нагрузке',
+];
+const NEURO_SYMPTOMS = [
+  'Тревожность', 'Бессонница', 'Раздражительность', 'Упадок сил',
+  'Трудности с концентрацией', 'Депрессия', 'Эмоциональная нестабильность',
+];
+const CNS_SYMPTOMS = [
+  'Головокружение', 'Спутанность сознания', 'Судороги', 'Тремор',
+  'Парестезия (онемение)', 'Нарушение координации', 'Мигрень', 'Помутнение зрения',
+];
+
+const SEX_OPTS = [{ v: 'male', l: 'Муж' }, { v: 'female', l: 'Жен' }];
+const EXP_OPTS = [{ v: 'beginner', l: 'Новичок' }, { v: 'intermediate', l: 'Средний' }, { v: 'advanced', l: 'Продвинутый' }];
+const GOAL_OPTS = [
+  { v: 'muscle_gain', l: 'Набор массы' }, { v: 'fat_loss', l: 'Жиросжигание' },
+  { v: 'recovery', l: 'Восстановление' }, { v: 'endurance', l: 'Выносливость' },
+  { v: 'immunity', l: 'Иммунитет' }, { v: 'cognitive', l: 'Когнитивно' }, { v: 'longevity', l: 'Долголетие' },
+];
+const AAS_OPTS = [{ v: 'none', l: 'Нет' }, { v: 'trt', l: 'TRT' }, { v: 'cycle', l: 'Курс' }, { v: 'pct', l: 'PCT' }, { v: 'bridge', l: 'Мост' }];
+const BUDGET_OPTS = [{ v: 'low', l: 'Низкий' }, { v: 'medium', l: 'Средний' }, { v: 'high', l: 'Высокий' }];
+const COMPLEXITY_OPTS = [{ v: 'minimal', l: 'Минимальный' }, { v: 'balanced', l: 'Сбалансированный' }, { v: 'comprehensive', l: 'Полный' }];
+const ADCLASS_OPTS = [{ v: 'none', l: 'Нет' }, { v: 'sarm', l: 'SARM' }, { v: 'peptide', l: 'Пептиды' }, { v: 'prohormone', l: 'Прогормоны' }];
+const HEALTH_OPTS = [
+  { v: 'liver', l: 'Печень' }, { v: 'kidney', l: 'Почки' }, { v: 'heart', l: 'Сердце' },
+  { v: 'thyroid', l: 'Щитовидная' }, { v: 'stomach', l: 'ЖКТ' }, { v: 'diabetes', l: 'Диабет' },
+  { v: 'autoimmune', l: 'Аутоиммунное' }, { v: 'pressure_high', l: 'Гипертония' },
+];
+
+const SUPP_OPTS = Object.keys(SUPPORT_CATALOG_DATA).map(id => ({ v: id, l: ((SUPPORT_CATALOG_DATA as any)[id]?.name) || id }));
+const ORGAN_OPTS = Object.entries(ORGAN_LABELS as Record<string, string>).map(([v, l]) => ({ v, l }));
+const SYSTEM_OPTS = Object.entries(SYSTEM_LABELS_CATALOG as Record<string, string>).map(([v, l]) => ({ v, l }));
+
+/* ============================ UI-примитивы ============================ */
+
+const GLASS: React.CSSProperties = {
+  background: 'rgba(28,28,32,0.55)', backdropFilter: 'blur(20px) saturate(160%)',
+  WebkitBackdropFilter: 'blur(20px) saturate(160%)', borderRadius: 16,
+  border: '0.5px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.22)', padding: 16,
+};
+const cardBtn: React.CSSProperties = {
+  ...GLASS, display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+  justifyContent: 'space-between', cursor: 'pointer', minHeight: 88, width: '100%',
+  transition: 'transform 0.12s ease, box-shadow 0.12s ease', textAlign: 'left',
+};
+const modalOverlay: React.CSSProperties = {
+  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 14,
+};
+const modalBox: React.CSSProperties = {
+  ...GLASS, width: '100%', maxWidth: 460, maxHeight: '88vh', overflowY: 'auto', padding: 20,
+};
+const dim = { color: 'rgba(235,235,245,0.6)', fontSize: 13 };
+const sel = (on: boolean): React.CSSProperties => ({
+  ...GLASS, padding: '9px 12px', borderRadius: 12, cursor: 'pointer', fontSize: 13,
+  border: on ? '1.5px solid #00e68a' : '0.5px solid rgba(255,255,255,0.1)',
+  background: on ? 'rgba(0,230,138,0.12)' : 'rgba(118,118,128,0.12)', flex: '1 1 calc(50% - 6px)',
+});
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div style={modalOverlay} onClick={onClose}>
+      <div style={modalBox} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ fontSize: 17, fontWeight: 700 }}>{title}</div>
+          <div style={{ ...cardBtn, minHeight: 0, width: 'auto', padding: '6px 12px', fontSize: 13, background: 'rgba(118,118,128,0.18)' }} onClick={onClose}>Готово</div>
         </div>
         {children}
-        <button onClick={onClose} style={{ width:'100%', padding:'8px 0', borderRadius:8, marginTop:8, cursor:'pointer', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.4)', fontSize:9, fontWeight:600 }}>
-          Закрыть
-        </button>
       </div>
     </div>
-  </div>;
+  );
 }
 
-/* ─── Source Badge ─── */
-function SourceBadge({ source }: { source: 'auto' | 'manual' | 'empty' }) {
-  if (source === 'empty') return null;
-  return <span style={{
-    fontSize: 6.5, fontWeight: 700, padding: '2px 6px', borderRadius: 5,
-    background: source === 'auto' ? 'rgba(0,230,138,0.1)' : 'rgba(139,92,246,0.1)',
-    color: source === 'auto' ? '#00e68a' : '#8b5cf6',
-    border: `1px solid ${source === 'auto' ? 'rgba(0,230,138,0.2)' : 'rgba(139,92,246,0.2)'}`,
-  }}>{source === 'auto' ? '🔄 Авто' : '✋ Вручную'}</span>;
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ ...dim, marginBottom: 7, textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{children}</div>
+    </div>
+  );
 }
 
-/* ─── Data Chip ─── */
-function DataChip({ children, color, dim }: { children: React.ReactNode; color?: string; dim?: boolean }) {
-  return <span style={{
-    fontSize: 8.5, padding: '3px 8px', borderRadius: 6, fontWeight: 600,
-    background: dim ? 'rgba(255,255,255,0.04)' : `${color || '#60a5fa'}15`,
-    color: dim ? 'rgba(255,255,255,0.5)' : (color || '#fff'),
-    border: `1px solid ${dim ? 'rgba(255,255,255,0.06)' : `${color || '#60a5fa'}22`}`,
-    whiteSpace: 'nowrap',
-  }}>{children}</span>;
-}
-
-/* ─── Summary Card (read-only display for filled groups) ─── */
-function SummaryCard({ icon, title, color, source, children, onEdit }: {
-  icon: string; title: string; color: string; source: 'auto' | 'manual' | 'empty';
-  children: React.ReactNode; onEdit: () => void;
-}) {
-  const stripeColor = source === 'auto' ? '#00e68a' : '#8b5cf6';
-  return <div style={{
-    padding: '10px 12px', borderRadius: 10, marginBottom: 5,
-    background: 'rgba(24,24,27,0.7)', border: `1px solid rgba(255,255,255,0.05)`,
-    borderLeft: `3px solid ${stripeColor}`,
-  }}>
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: children ? 6 : 0 }}>
-      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-        <span style={{ fontSize: 14 }}>{icon}</span>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{title}</span>
-        <SourceBadge source={source} />
-      </div>
-      <button onClick={onEdit} style={{
-        padding: '3px 8px', borderRadius: 6, border: 'none', cursor: 'pointer',
-        background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)', fontSize: 8,
-        fontWeight: 600,
-      }}>✏️ Изменить</button>
-    </div>
-    {children ? <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginTop:4 }}>{children}</div> : null}
-  </div>;
-}
-
-/* ─── Completeness Bar ─── */
-function ProfileCompletenessBar({ comp }: { comp: ProfileCompleteness }) {
-  const barColor = comp.percent >= 80 ? '#00e68a' : comp.percent >= 50 ? '#f59e0b' : '#ef4444';
-  return <div style={{
-    padding: '10px 12px', borderRadius: 10, marginBottom: 6,
-    background: 'rgba(24,24,27,0.7)', border: '1px solid rgba(255,255,255,0.05)',
-  }}>
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 4 }}>
-      <div style={{ display:'flex', alignItems:'center', gap: 6 }}>
-        <span style={{ fontSize: 14 }}>🧬</span>
-        <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>Профиль BioStack</span>
-      </div>
-      <span style={{ fontSize: 9, fontWeight: 700, color: barColor }}>{comp.percent}%</span>
-    </div>
-    <div style={{
-      height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.05)', marginBottom: 4,
-      overflow: 'hidden',
-    }}>
-      <div style={{
-        height: '100%', borderRadius: 3, width: `${comp.percent}%`,
-        background: `linear-gradient(90deg, ${barColor}, ${barColor}88)`,
-        transition: 'width 0.3s',
-      }} />
-    </div>
-    <div style={{ display:'flex', gap: 8, fontSize: 7, color: 'rgba(255,255,255,0.4)' }}>
-      <span style={{ display:'flex', alignItems:'center', gap: 3 }}>
-        <span style={{ width: 6, height: 6, borderRadius: 3, background: '#00e68a', display:'inline-block' }} />
-        🔄 {comp.autoFilledCount} из профиля
-      </span>
-      <span style={{ display:'flex', alignItems:'center', gap: 3 }}>
-        <span style={{ width: 6, height: 6, borderRadius: 3, background: '#8b5cf6', display:'inline-block' }} />
-        ✋ {comp.manualFilledCount} вручную
-      </span>
-      <span style={{ display:'flex', alignItems:'center', gap: 3 }}>
-        <span style={{ width: 6, height: 6, borderRadius: 3, background: '#f59e0b', display:'inline-block' }} />
-        ⚠ {comp.totalFields - comp.filledFields} не заполнено
-      </span>
-    </div>
-  </div>;
-}
-
-/* ─── Card Button ─── */
-function CardBtn({ icon, title, subtitle, color, onClick, count, badge }: {
-  icon: string; title: string; subtitle?: string; color: string; onClick: () => void; count?: number;
-  badge?: { text: string; source: 'auto' | 'manual' | 'empty' };
-}) {
-  const badgeColor = badge?.source === 'auto' ? '#00e68a' : badge?.source === 'manual' ? '#8b5cf6' : '#f59e0b';
-  return <button onClick={onClick} style={{
-    width:'100%', padding:'10px 12px', borderRadius:10, cursor:'pointer', textAlign:'left',
-    background:'rgba(24,24,27,0.7)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:5,
-    transition:'all 0.15s',
-    display:'flex', alignItems:'center', gap:8,
-  }}>
-    <div style={{ width:32, height:32, borderRadius:10, background:`${color}15`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, flexShrink:0 }}>
-      {icon}
-    </div>
-    <div style={{ flex:1, minWidth:0 }}>
-      <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginBottom:1, display:'flex', alignItems:'center', gap:6 }}>
-        {title}
-        {badge && <span style={{ fontSize: 6.5, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: `${badgeColor}18`, color: badgeColor, border: `1px solid ${badgeColor}28` }}>{badge.text}</span>}
-      </div>
-      {subtitle && <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{subtitle}</div>}
-    </div>
-    {count !== undefined && count > 0 && <div style={{ padding:'2px 6px', borderRadius:8, background:`${color}20`, color, fontSize:8, fontWeight:700 }}>{count}</div>}
-    <div style={{ fontSize:9, color:'rgba(255,255,255,0.2)' }}>›</div>
-  </button>;
-}
-
-function SmallBtn({ icon, title, subtitle, color, onClick, count }: { icon: string; title: string; subtitle?: string; color: string; onClick: () => void; count?: number }) {
-  return <button onClick={onClick} style={{
-    flex:1, padding:'8px 6px', borderRadius:10, cursor:'pointer', textAlign:'center',
-    background:'rgba(24,24,27,0.7)', border:'1px solid rgba(255,255,255,0.06)',
-    transition:'all 0.15s',
-  }}>
-    <div style={{ fontSize:14, marginBottom:2 }}>{icon}</div>
-    <div style={{ fontSize:8, fontWeight:700, color:'#fff', marginBottom:1 }}>{title}</div>
-    {subtitle && <div style={{ fontSize:6, color:'rgba(255,255,255,0.35)' }}>{subtitle}</div>}
-    {count !== undefined && <div style={{ marginTop:1, padding:'1px 5px', borderRadius:6, background:`${color}20`, color, fontSize:7, fontWeight:700, display:'inline-block' }}>{count}</div>}
-  </button>;
-}
-
-/* ─── Popup: Личные данные ─── */
-function PopupPersonal({ profile, u, onClose }: { profile: BioStackProfile; u: (p: Partial<BioStackProfile>) => void; onClose: () => void }) {
-  const [age, setAge] = useState(profile.age);
-  const [weight, setWeight] = useState(profile.weight);
-  const [height, setHeight] = useState(profile.height);
-  const [sex, setSex] = useState(profile.sex);
-  const [exp, setExp] = useState(profile.experience);
-  const save = () => { u({ age, weight, height, sex, experience: exp }); onClose(); };
-  return <PopupOverlay title="Личные данные" icon="👤" color="#60a5fa" onClose={onClose}>
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:10 }}>
-      <div><label style={{fontSize:8,color:'rgba(255,255,255,0.5)',marginBottom:2,display:'block'}}>Возраст</label>
-        <input type="number" value={age} onChange={e => setAge(+e.target.value||0)}
-          style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:13,textAlign:'center',boxSizing:'border-box'}} /></div>
-      <div><label style={{fontSize:8,color:'rgba(255,255,255,0.5)',marginBottom:2,display:'block'}}>Вес (кг)</label>
-        <input type="number" value={weight} onChange={e => setWeight(+e.target.value||0)}
-          style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:13,textAlign:'center',boxSizing:'border-box'}} /></div>
-      <div><label style={{fontSize:8,color:'rgba(255,255,255,0.5)',marginBottom:2,display:'block'}}>Рост (см)</label>
-        <input type="number" value={height} onChange={e => setHeight(+e.target.value||0)}
-          style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:13,textAlign:'center',boxSizing:'border-box'}} /></div>
-    </div>
-    <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:10 }}>
-      <PillBtn active={sex === 'male'} onClick={() => setSex('male')} color="#60a5fa">♂ Мужской</PillBtn>
-      <PillBtn active={sex === 'female'} onClick={() => setSex('female')} color="#f472b6">♀ Женский</PillBtn>
-      <span style={{fontSize:8,color:'rgba(255,255,255,0.2)',alignSelf:'center',margin:'0 4px'}}>|</span>
-      {(['beginner','intermediate','advanced'] as const).map(l => (
-        <PillBtn key={l} active={exp === l} onClick={() => setExp(l)}>
-          {l==='beginner'?'🌱 Новичок':l==='intermediate'?'💪 Средний':'🔥 Продвинутый'}
-        </PillBtn>
+function Tags({ options, selected, onToggle }: { options: { v: string; l: string }[]; selected: string[]; onToggle: (v: string) => void }) {
+  return (
+    <>
+      {options.map(o => (
+        <div key={o.v} style={sel(selected.includes(o.v))} onClick={() => onToggle(o.v)}>{o.l}</div>
       ))}
-    </div>
-    <button onClick={save} style={{width:'100%',padding:'10px 0',borderRadius:10,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#60a5fa,#3b82f6)',color:'#fff',fontWeight:700,fontSize:12}}>✅ Применить</button>
-  </PopupOverlay>;
+    </>
+  );
 }
 
-/* ─── Popup: Здоровье (aasStatus + healthConditions + budget + stackComplexity) ─── */
-function PopupHealth({ profile, u, onClose }: { profile: BioStackProfile; u: (p: Partial<BioStackProfile>) => void; onClose: () => void }) {
-  const [aas, setAas] = useState(profile.aasStatus);
-  const [budget, setBudget] = useState(profile.budget);
-  const [compl, setCompl] = useState(profile.stackComplexity);
-  const [maxSize, setMaxSize] = useState(profile.maxStackSize || 8);
-  const [conds, setConds] = useState<typeof profile.healthConditions>([...profile.healthConditions]);
-  const save = () => { u({ aasStatus: aas, healthConditions: conds, budget, stackComplexity: compl, maxStackSize: maxSize }); onClose(); };
-  return <PopupOverlay title="Здоровье и режим" icon="🫀" color="#ef4444" onClose={onClose}>
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:6 }}>
-      <select value={aas} onChange={e => setAas(e.target.value as AASStatus)}
-        style={{padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:10,appearance:'none'}}>
-        <option value="none">✖ Без ААС</option><option value="trt">💉 TRT</option><option value="course">💊 Курс</option><option value="pct">🔄 ПКТ</option>
-        <option value="bridge">🌉 Бридж</option><option value="fertility">🧬 Фертильность</option>
-      </select>
-      <select value={budget} onChange={e => setBudget(e.target.value as BudgetLevel)}
-        style={{padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:10,appearance:'none'}}>
-        <option value="economy">💰 Эконом</option><option value="medium">💵 Средний</option><option value="premium">💎 Премиум</option>
-      </select>
-    </div>
-    <div style={{marginBottom:6}}>
-      <select value={compl} onChange={e => setCompl(e.target.value as StackComplexity)}
-        style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:10,appearance:'none'}}>
-        <option value="minimal">🔵 Минимальный стек (3-5 БАДов)</option><option value="balanced">🟢 Средний стек (5-10)</option><option value="maximum">🔴 Максимальный (10-20)</option>
-      </select>
-    </div>
-    <div style={{marginBottom:6}}>
-      <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',marginBottom:2,display:'block'}}>📦 Макс. размер стека (число веществ):</label>
-      <input type="number" value={maxSize} min={1} max={30} onChange={e => setMaxSize(Math.max(1, Math.min(30, Number(e.target.value) || 1)))}
-        style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:11,textAlign:'center',boxSizing:'border-box'}} />
-    </div>
-    <div style={{fontSize:9,color:'rgba(255,255,255,0.5)',marginBottom:4}}>🩺 Состояния здоровья:</div>
-    <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:4 }}>
-      {HEALTH_CONDS.map(h => (
-        <PillBtn key={h.key} small active={conds.includes(h.key)}
-          onClick={() => setConds(conds.includes(h.key) ? conds.filter(x => x !== h.key) : [...conds, h.key])}>
-          {h.label}
-        </PillBtn>
+function Checklist({ options, selected, onToggle }: { options: string[]; selected: string[]; onToggle: (v: string) => void }) {
+  return (
+    <>
+      {options.map(o => (
+        <div key={o} style={sel(selected.includes(o))} onClick={() => onToggle(o)}>{o}</div>
       ))}
-    </div>
-    <button onClick={save} style={{width:'100%',padding:'10px 0',borderRadius:10,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#ef4444,#dc2626)',color:'#fff',fontWeight:700,fontSize:12}}>✅ Применить</button>
-  </PopupOverlay>;
+    </>
+  );
 }
 
-const GOAL_GROUPS: { title: string; keys: GoalType[] }[] = [
-  { title:'🏋️ Физическая форма', keys:['muscle_gain','fat_loss','endurance'] },
-  { title:'🔄 Восстановление', keys:['sleep','recovery'] },
-  { title:'⚡ Энергия и тонус', keys:['energy','libido'] },
-  { title:'🧠 Когнитивные функции', keys:['concentration','brain'] },
-  { title:'😊 Психоэмоциональное состояние', keys:['mood','stress'] },
-  { title:'❤️ Системное здоровье', keys:['cardio_health','immunity','hormones','joints','digestion','detox'] },
-  { title:'⏳ Долгосрочные', keys:['longevity'] },
-];
-const GOAL_LABEL: Record<string,string> = {};
-PURE_GOALS.forEach(g => { GOAL_LABEL[g.key] = g.label; });
-
-/* ─── Popup: Цели ─── */
-function PopupGoals({ profile, u, onClose }: { profile: BioStackProfile; u: (p: Partial<BioStackProfile>) => void; onClose: () => void }) {
-  const [goals, setGoals] = useState([...profile.goals]);
-  const toggle = (k: GoalType) => setGoals(goals.includes(k) ? goals.filter(x => x !== k) : [...goals, k]);
-  const save = () => { u({ goals }); onClose(); };
-  return <PopupOverlay title="Цели" icon="🎯" color="#f59e0b" onClose={onClose}>
-    <div style={{fontSize:9,color:'rgba(255,255,255,0.45)',marginBottom:8,lineHeight:1.3}}>
-      Выберите, чего хотите достичь. Цели влияют на подбор БАДов и приоритеты поддержки. Органы и системы настраиваются отдельно.
+function TagInput({ values, onChange, placeholder }: { values: string[]; onChange: (v: string[]) => void; placeholder: string }) {
+  const [t, setT] = useState('');
+  return (
+    <div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+        {values.map(v => (
+          <div key={v} style={{ ...GLASS, padding: '5px 10px', borderRadius: 10, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>{v}</span>
+            <span style={{ cursor: 'pointer', color: '#ff1744', fontWeight: 700 }} onClick={() => onChange(values.filter(x => x !== v))}>✕</span>
+          </div>
+        ))}
+      </div>
+      <input
+        value={t} placeholder={placeholder}
+        onChange={e => setT(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && t.trim()) { onChange([...values, t.trim()]); setT(''); } }}
+        style={{ width: '100%', padding: '10px 12px', borderRadius: 12, border: 'none', background: 'rgba(118,118,128,0.12)', color: '#fff', fontSize: 14, outline: 'none' }}
+      />
+      <div style={{ ...dim, fontSize: 12, marginTop: 5 }}>Нажмите Enter для добавления</div>
     </div>
-    {GOAL_GROUPS.map(group => (
-      <div key={group.title} style={{marginBottom:8}}>
-        <div style={{fontSize:8,color:'rgba(255,255,255,0.3)',marginBottom:4,letterSpacing:0.5}}>{group.title}</div>
-        <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
-          {group.keys.map(k => {
-            const label = GOAL_LABEL[k] || k;
-            return (
-              <PillBtn key={k} small active={goals.includes(k)} onClick={() => toggle(k)}>
-                {label}
-              </PillBtn>
-            );
-          })}
+  );
+}
+
+/* ============================ Карточки данных ============================ */
+
+type Patch = Partial<ReturnType<typeof getDefaultBioStackProfile>>;
+
+function ProfileTab(props: {
+  onAppliedToRun?: () => void; onToRun?: () => void;
+  onShowToast?: (msg: string) => void; onToast?: (msg: string) => void;
+}) {
+  const [p, setP] = useState<ReturnType<typeof getDefaultBioStackProfile>>(loadBioStackProfile());
+  const [open, setOpen] = useState<string | null>(null);
+  const [lab, setLab] = useState(getLabDiary());
+
+  const u = (patch: Patch) => { const np = { ...p, ...patch } as typeof p; setP(np); saveBioStackProfile(np); };
+  const autoFill = () => {
+    const { patch, autoKeys } = autoFillFromMainProfile();
+    const np = { ...p, ...patch } as typeof p; setP(np); saveBioStackProfile(np);
+    showToast(`Автозаполнено из профиля: ${autoKeys.length} полей`);
+  };
+  const quickStart = () => {
+    const d = getDefaultBioStackProfile();
+    const np = { ...p, experience: d.experience, goals: d.goals, aasStatus: d.aasStatus,
+      budget: d.budget, stackComplexity: d.stackComplexity, healthConditions: d.healthConditions,
+      targetOrgans: d.targetOrgans, targetSystems: d.targetSystems, sex: p.sex || 'male',
+      age: p.age || 30, weight: p.weight || 80, height: p.height || 175 } as typeof p;
+    setP(np); saveBioStackProfile(np); showToast('Быстрый старт применён');
+  };
+
+  const comp = useMemo(() => getProfileCompleteness(p), [p]);
+
+  const injuryCount = (p.injuries || []).length;
+  const supCount = (p.currentSupplements || []).length;
+  const medCount = (p.currentMeds || []).length;
+  const avoidSup = (p.avoidIds || []).length;
+  const avoidMed = (p.avoidMeds || []).length;
+  const labCount = (lab || []).length;
+  const jointCount = (p.jointSymptoms || []).length;
+  const neuroCount = (p.neuroSymptoms || []).length;
+  const cnsCount = (p.cnsSymptoms || []).length;
+
+  const card = (id: string, icon: string, title: string, preview: string, filled: boolean) => (
+    <div key={id} style={cardBtn} onClick={() => setOpen(id)}>
+      <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: 15, fontWeight: 600 }}>{icon} {title}</div>
+        <div style={{ width: 9, height: 9, borderRadius: 9, background: filled ? '#00e68a' : 'rgba(235,235,245,0.25)' }} />
+      </div>
+      <div style={{ ...dim, fontSize: 12.5, marginTop: 6, lineHeight: 1.35 }}>{preview}</div>
+    </div>
+  );
+
+  return (
+    <div style={{ padding: '14px 12px 40px' }}>
+      {/* HERO — Профиль */}
+      <div style={{ ...GLASS, marginBottom: 14, padding: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: -0.4 }}>🧬 Профиль</div>
+            <div style={{ ...dim, fontSize: 12.5, marginTop: 3 }}>
+              {p.sex === 'female' ? 'Жен' : 'Муж'} · {EXP_OPTS.find(e => e.v === p.experience)?.l || '—'} · {p.age || '?'} лет · {p.weight || '?'} кг · {p.height || '?'} см
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#00e68a' }}>{comp.percent}%</div>
+            <div style={{ ...dim, fontSize: 11 }}>заполнено</div>
+          </div>
+        </div>
+        <div style={{ height: 6, borderRadius: 6, background: 'rgba(118,118,128,0.18)', overflow: 'hidden', margin: '12px 0' }}>
+          <div style={{ height: '100%', width: `${comp.percent}%`, background: 'linear-gradient(90deg,#00e68a,#00b8ff)' }} />
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ ...cardBtn, minHeight: 0, flex: 1, padding: '10px 12px', background: 'linear-gradient(135deg,#00e68a,#00b8ff)', color: '#06281c', fontWeight: 700, fontSize: 13, justifyContent: 'center', alignItems: 'center' }}
+            onClick={autoFill}>⟳ Автозаполнить из профиля</div>
+          <div style={{ ...cardBtn, minHeight: 0, flex: 1, padding: '10px 12px', background: 'rgba(118,118,128,0.18)', justifyContent: 'center', alignItems: 'center', fontSize: 13, fontWeight: 600 }}
+            onClick={quickStart}>⚡ Быстрый старт</div>
         </div>
       </div>
-    ))}
-    <button onClick={save} style={{width:'100%',padding:'10px 0',borderRadius:10,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#f59e0b,#d97706)',color:'#fff',fontWeight:700,fontSize:12}}>✅ Применить ({goals.length})</button>
-  </PopupOverlay>;
-}
 
-/* ─── Popup: Органы ─── */
-function PopupOrgans({ profile, u, onClose }: { profile: BioStackProfile; u: (p: Partial<BioStackProfile>) => void; onClose: () => void }) {
-  const [organs, setOrgans] = useState([...profile.targetOrgans]);
-  const save = () => { u({ targetOrgans: organs }); onClose(); };
-  return <PopupOverlay title="Органы-мишени" icon="🫀" color="#60a5fa" onClose={onClose}>
-    <div style={{fontSize:9,color:'rgba(255,255,255,0.45)',marginBottom:6,lineHeight:1.3}}>
-      Анатомические органы, на которые хотите воздействовать. Выбор органа фокусирует подбор БАДов на ткань-мишень.
-    </div>
-    <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:10 }}>
-      {ORGANS.map(o => (
-        <PillBtn key={o.key} small active={organs.includes(o.key)}
-          onClick={() => setOrgans(organs.includes(o.key) ? organs.filter(x => x !== o.key) : [...organs, o.key])}>
-          {o.label}
-        </PillBtn>
-      ))}
-    </div>
-    <button onClick={save} style={{width:'100%',padding:'10px 0',borderRadius:10,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#60a5fa,#3b82f6)',color:'#fff',fontWeight:700,fontSize:12}}>✅ Применить ({organs.length})</button>
-  </PopupOverlay>;
-}
-
-/* ─── Popup: Системы ─── */
-function PopupSystems({ profile, u, onClose }: { profile: BioStackProfile; u: (p: Partial<BioStackProfile>) => void; onClose: () => void }) {
-  const [systems, setSystems] = useState([...profile.targetSystems]);
-  const save = () => { u({ targetSystems: systems }); onClose(); };
-  return <PopupOverlay title="Системы-мишени" icon="⚙️" color="#8b5cf6" onClose={onClose}>
-    <div style={{fontSize:9,color:'rgba(255,255,255,0.45)',marginBottom:6,lineHeight:1.3}}>
-      Физиологические системы организма. Выбор системы задаёт направление поддержки (сердечно-сосудистая, эндокринная, иммунная и т.д.).
-    </div>
-    <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:10 }}>
-      {SYSTEMS.map(s => (
-        <PillBtn key={s.key} small active={systems.includes(s.key)}
-          onClick={() => setSystems(systems.includes(s.key) ? systems.filter(x => x !== s.key) : [...systems, s.key])}>
-          {s.label}
-        </PillBtn>
-      ))}
-    </div>
-    <button onClick={save} style={{width:'100%',padding:'10px 0',borderRadius:10,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#8b5cf6,#7c3aed)',color:'#fff',fontWeight:700,fontSize:12}}>✅ Применить ({systems.length})</button>
-  </PopupOverlay>;
-}
-
-/* ─── Popup: Образ жизни (исключение БАДов и лекарств) ─── */
-function PopupLifestyle({ profile, u, onClose }: { profile: BioStackProfile; u: (p: Partial<BioStackProfile>) => void; onClose: () => void }) {
-  const [avoid, setAvoid] = useState(profile.avoidIds.join(', '));
-  const [avoidMed, setAvoidMed] = useState(profile.avoidMeds.join(', '));
-  const save = () => {
-    u({
-      avoidIds: avoid.split(',').map(s=>s.trim()).filter(Boolean),
-      avoidMeds: avoidMed.split(',').map(s=>s.trim()).filter(Boolean),
-    });
-    onClose();
-  };
-  return <PopupOverlay title="Образ жизни" icon="🧘" color="#8b5cf6" onClose={onClose}>
-    <div style={{fontSize:9,color:'rgba(255,255,255,0.45)',marginBottom:8,lineHeight:1.3}}>
-      Укажите, что исключить из подбора поддержки.
-    </div>
-    <div style={{marginBottom:8}}>
-      <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',marginBottom:2,display:'block'}}>🔴 Исключить БАДы (id через запятую):</label>
-      <input value={avoid} onChange={e => setAvoid(e.target.value)} placeholder="yohimbine, huperzine_a, dmaa"
-        style={{width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:11,boxSizing:'border-box'}} />
-    </div>
-    <div style={{marginBottom:8}}>
-      <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',marginBottom:2,display:'block'}}>💊 Исключить лекарства (id через запятую):</label>
-      <input value={avoidMed} onChange={e => setAvoidMed(e.target.value)} placeholder="telmisartan, nebivolol, anastrozole"
-        style={{width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:11,boxSizing:'border-box'}} />
-    </div>
-    <button onClick={save} style={{width:'100%',padding:'10px 0',borderRadius:10,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#8b5cf6,#7c3aed)',color:'#fff',fontWeight:700,fontSize:12}}>✅ Применить</button>
-  </PopupOverlay>;
-}
-
-/* ─── Popup: Клинические данные (currentMeds + drugAllergies + adClass) ─── */
-function PopupClinical({ profile, u, onClose }: { profile: BioStackProfile; u: (p: Partial<BioStackProfile>) => void; onClose: () => void }) {
-  const [meds, setMeds] = useState(profile.currentMeds.join(', '));
-  const [allergies, setAllergies] = useState(profile.drugAllergies.join(', '));
-  const [ad, setAd] = useState(profile.adClass);
-  const save = () => {
-    u({
-      currentMeds: meds.split(',').map(s=>s.trim()).filter(Boolean),
-      drugAllergies: allergies.split(',').map(s=>s.trim()).filter(Boolean),
-      adClass: ad,
-    });
-    onClose();
-  };
-  return <PopupOverlay title="Клинические данные" icon="🏥" color="#ef4444" onClose={onClose}>
-    <div style={{marginBottom:6}}>
-      <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',display:'block',marginBottom:2}}>💊 Лекарства (МНН, через запятую):</label>
-      <input value={meds} onChange={e=>setMeds(e.target.value)} placeholder="варфарин, метформин, аторвастатин..."
-        style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:10,boxSizing:'border-box'}} />
-    </div>
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4,marginBottom:6}}>
-      <div>
-        <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',display:'block',marginBottom:2}}>⚠ Аллергии:</label>
-        <input value={allergies} onChange={e=>setAllergies(e.target.value)} placeholder="пенициллин..."
-          style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:10,boxSizing:'border-box'}} />
+      {/* Сетка 10 карточек */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {card('labs', '🧪', 'Анализы', labCount ? `${labCount} записей в дневнике` : 'Нет данных', labCount > 0)}
+        {card('joint', '🦵', 'Симптомы суставов', jointCount ? `${jointCount} отмечено` : 'Боль, скованность…', jointCount > 0)}
+        {card('neuro', '🧠', 'Нейротоксичность', neuroCount ? `${neuroCount} отмечено` : 'Тревога, бессонница…', neuroCount > 0)}
+        {card('cns', '⚡', 'Симптомы ЦНС', cnsCount ? `${cnsCount} отмечено` : 'Головокружение, судороги…', cnsCount > 0)}
+        {card('injuries', '🚑', 'Травмы', injuryCount ? `${injuryCount} записано` : 'Локации травм', injuryCount > 0)}
+        {card('supps', '💊', 'Принимаю БАД', supCount ? `${supCount} позиций` : 'Текущие добавки', supCount > 0)}
+        {card('meds', '🏥', 'Принимаю аптеку', medCount ? `${medCount} позиций` : 'Лекарства', medCount > 0)}
+        {card('avoidSup', '🚫', 'Исключить БАД', avoidSup ? `${avoidSup} исключено` : 'Нежелательные', avoidSup > 0)}
+        {card('avoidMed', '⛔', 'Исключить аптеку', avoidMed ? `${avoidMed} исключено` : 'Нежелательные', avoidMed > 0)}
+        {card('params', '🎯', 'Цели и курс', (p.goals?.length ? 'Цели заданы' : 'Цели, PED, бюджет…'), !!p.goals?.length)}
       </div>
-      <div>
-        <label style={{fontSize:8,color:'rgba(255,255,255,0.5)',display:'block',marginBottom:2}}>💊 Антидепрессанты:</label>
-        <select value={ad} onChange={e=>setAd(e.target.value as ADClass)}
-          style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:10,appearance:'none'}}>
-          <option value="none">✖ Нет</option><option value="ssri">💊 СИОЗС</option><option value="snri">💊 СИОЗСиН</option>
-          <option value="maoi">💊 ИМАО</option><option value="tca">💊 ТЦА</option><option value="other">💊 Другие</option>
-        </select>
-      </div>
+
+      {open === 'labs' && <LabsPopup lab={lab} onClose={() => { setLab(getLabDiary()); setOpen(null); }} onAuto={autoFill} />}
+      {open === 'joint' && <SymptomPopup title="Симптомы суставов / связок" options={JOINT_SYMPTOMS} value={p.jointSymptoms} onSave={v => u({ jointSymptoms: v })} onClose={() => setOpen(null)} onAuto={autoFill} />}
+      {open === 'neuro' && <SymptomPopup title="Симптомы нейротоксичности" options={NEURO_SYMPTOMS} value={p.neuroSymptoms} onSave={v => u({ neuroSymptoms: v })} onClose={() => setOpen(null)} onAuto={autoFill} />}
+      {open === 'cns' && <SymptomPopup title="Симптомы ЦНС" options={CNS_SYMPTOMS} value={p.cnsSymptoms} onSave={v => u({ cnsSymptoms: v })} onClose={() => setOpen(null)} onAuto={autoFill} />}
+      {open === 'injuries' && <TagPopup title="Травмы" value={p.injuries} placeholder="Локация (напр. Плечо)" onSave={v => u({ injuries: v })} onClose={() => setOpen(null)} onAuto={autoFill} />}
+      {open === 'supps' && <SuppPopup title="Принимаю БАД" value={p.currentSupplements} onSave={v => u({ currentSupplements: v })} onClose={() => setOpen(null)} onAuto={autoFill} />}
+      {open === 'meds' && <TagPopup title="Принимаю аптеку" value={p.currentMeds} placeholder="Название препарата" onSave={v => u({ currentMeds: v })} onClose={() => setOpen(null)} onAuto={autoFill} />}
+      {open === 'avoidSup' && <SuppPopup title="Исключить БАД" value={p.avoidIds} onSave={v => u({ avoidIds: v })} onClose={() => setOpen(null)} onAuto={autoFill} />}
+      {open === 'avoidMed' && <TagPopup title="Исключить аптеку" value={p.avoidMeds} placeholder="Название препарата" onSave={v => u({ avoidMeds: v })} onClose={() => setOpen(null)} onAuto={autoFill} />}
+      {open === 'params' && <ParamsPopup p={p} u={u} onClose={() => setOpen(null)} onAuto={autoFill} />}
     </div>
-    <button onClick={save} style={{width:'100%',padding:'10px 0',borderRadius:10,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#ef4444,#dc2626)',color:'#fff',fontWeight:700,fontSize:12}}>✅ Применить</button>
-  </PopupOverlay>;
+  );
 }
 
-/* ─── Пресет: тип ─── */
-type PresetEntry = {
-  id: string; icon: string; name: string; desc: string;
-  category: 'male' | 'female' | 'goal' | 'aas';
-  p: Partial<BioStackProfile>;
+/* ============================ Попапы ============================ */
+
+function AutoBtn({ onAuto }: { onAuto: () => void }) {
+  return (
+    <div style={{ ...cardBtn, minHeight: 0, width: '100%', padding: '9px 12px', background: 'rgba(0,230,138,0.1)', border: '0.5px solid rgba(0,230,138,0.3)', color: '#00e68a', fontSize: 13, fontWeight: 600, justifyContent: 'center', alignItems: 'center', marginBottom: 14 }}
+      onClick={onAuto}>⟳ Заполнить из профиля</div>
+  );
+}
+
+function LabsPopup({ lab, onClose, onAuto }: { lab: any[]; onClose: () => void; onAuto: () => void }) {
+  return (
+    <Modal title="🧪 Анализы" onClose={onClose}>
+      <AutoBtn onAuto={onAuto} />
+      {!lab || lab.length === 0 && <div style={{ ...dim }}>Данные из дневника анализов отсутствуют. Заполните их на вкладке «Лаборатория».</div>}
+      {lab.map((d: any, i: number) => (
+        <div key={i} style={{ ...GLASS, marginBottom: 8, padding: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{d.date}</div>
+          <div style={{ ...dim, fontSize: 12.5 }}>{d.totalMarkers} маркеров · аномальных: {d.abnormalCount}</div>
+          {d.note && <div style={{ ...dim, fontSize: 12.5, marginTop: 4 }}>{d.note}</div>}
+        </div>
+      ))}
+    </Modal>
+  );
+}
+
+function SymptomPopup({ title, options, value, onSave, onClose, onAuto }: {
+  title: string; options: string[]; value: string[]; onSave: (v: string[]) => void;
+  onClose: () => void; onAuto: () => void;
+}) {
+  const [v, setV] = useState<string[]>(value || []);
+  return (
+    <Modal title={title} onClose={onClose}>
+      <AutoBtn onAuto={onAuto} />
+      <Checklist options={options} selected={v} onToggle={x => setV(v.includes(x) ? v.filter(y => y !== x) : [...v, x])} />
+      <div style={{ ...cardBtn, minHeight: 0, width: '100%', padding: '11px 12px', background: 'linear-gradient(135deg,#00e68a,#00b8ff)', color: '#06281c', fontWeight: 700, fontSize: 14, justifyContent: 'center', alignItems: 'center', marginTop: 14 }}
+        onClick={() => onSave(v)}>Сохранить</div>
+    </Modal>
+  );
+}
+
+function TagPopup({ title, value, placeholder, onSave, onClose, onAuto }: {
+  title: string; value: string[]; placeholder: string; onSave: (v: string[]) => void;
+  onClose: () => void; onAuto: () => void;
+}) {
+  return (
+    <Modal title={title} onClose={onClose}>
+      <AutoBtn onAuto={onAuto} />
+      <TagInput values={value || []} placeholder={placeholder} onChange={onSave} />
+    </Modal>
+  );
+}
+
+function SuppPopup({ title, value, onSave, onClose, onAuto }: {
+  title: string; value: string[]; onSave: (v: string[]) => void; onClose: () => void; onAuto: () => void;
+}) {
+  const [v, setV] = useState<string[]>(value || []);
+  return (
+    <Modal title={title} onClose={onClose}>
+      <AutoBtn onAuto={onAuto} />
+      <div style={{ ...dim, fontSize: 12.5, marginBottom: 8 }}>Выберите из каталога поддержки:</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <Tags options={SUPP_OPTS} selected={v} onToggle={x => setV(v.includes(x) ? v.filter(y => y !== x) : [...v, x])} />
+      </div>
+      <div style={{ ...cardBtn, minHeight: 0, width: '100%', padding: '11px 12px', background: 'linear-gradient(135deg,#00e68a,#00b8ff)', color: '#06281c', fontWeight: 700, fontSize: 14, justifyContent: 'center', alignItems: 'center', marginTop: 14 }}
+        onClick={() => onSave(v)}>Сохранить ({v.length})</div>
+    </Modal>
+  );
+}
+
+function ParamsPopup({ p, u, onClose, onAuto }: {
+  p: any; u: (patch: Patch) => void; onClose: () => void; onAuto: () => void;
+}) {
+  const toggle = (key: keyof Patch, v: string) => {
+    const cur = (p[key] as string[]) || [];
+    u({ [key]: cur.includes(v) ? cur.filter((x: string) => x !== v) : [...cur, v] } as Patch);
+  };
+  const setOne = (key: keyof Patch, v: string) => u({ [key]: v } as Patch);
+  const setVal = (key: keyof Patch, v: any) => u({ [key]: v } as Patch);
+
+  return (
+    <Modal title="🎯 Цели и параметры курса" onClose={onClose}>
+      <AutoBtn onAuto={onAuto} />
+      <Row label="Пол">
+        {SEX_OPTS.map(o => <div key={o.v} style={sel(p.sex === o.v)} onClick={() => setOne('sex', o.v)}>{o.l}</div>)}
+      </Row>
+      <Row label="Возраст / Вес / Рост">
+        <input value={p.age || ''} placeholder="Возраст" inputMode="numeric" onChange={e => setVal('age', Number(e.target.value) || 0)}
+          style={inp} />
+        <input value={p.weight || ''} placeholder="Вес, кг" inputMode="numeric" onChange={e => setVal('weight', Number(e.target.value) || 0)}
+          style={inp} />
+        <input value={p.height || ''} placeholder="Рост, см" inputMode="numeric" onChange={e => setVal('height', Number(e.target.value) || 0)}
+          style={inp} />
+      </Row>
+      <Row label="Уровень">
+        {EXP_OPTS.map(o => <div key={o.v} style={sel(p.experience === o.v)} onClick={() => setOne('experience', o.v)}>{o.l}</div>)}
+      </Row>
+      <Row label="Цели">
+        {GOAL_OPTS.map(o => <div key={o.v} style={sel((p.goals || []).includes(o.v))} onClick={() => toggle('goals', o.v)}>{o.l}</div>)}
+      </Row>
+      <Row label="Статус PED">
+        {AAS_OPTS.map(o => <div key={o.v} style={sel(p.aasStatus === o.v)} onClick={() => setOne('aasStatus', o.v)}>{o.l}</div>)}
+      </Row>
+      <Row label="Бюджет">
+        {BUDGET_OPTS.map(o => <div key={o.v} style={sel(p.budget === o.v)} onClick={() => setOne('budget', o.v)}>{o.l}</div>)}
+      </Row>
+      <Row label="Сложность стека">
+        {COMPLEXITY_OPTS.map(o => <div key={o.v} style={sel(p.stackComplexity === o.v)} onClick={() => setOne('stackComplexity', o.v)}>{o.l}</div>)}
+      </Row>
+      <Row label="Класс препаратов">
+        {ADCLASS_OPTS.map(o => <div key={o.v} style={sel(p.adClass === o.v)} onClick={() => setOne('adClass', o.v)}>{o.l}</div>)}
+      </Row>
+      <Row label="Состояния здоровья">
+        {HEALTH_OPTS.map(o => <div key={o.v} style={sel((p.healthConditions || []).includes(o.v))} onClick={() => toggle('healthConditions', o.v)}>{o.l}</div>)}
+      </Row>
+      <Row label="Органы-мишени">
+        {ORGAN_OPTS.map(o => <div key={o.v} style={sel((p.targetOrgans || []).includes(o.v))} onClick={() => toggle('targetOrgans', o.v)}>{o.l}</div>)}
+      </Row>
+      <Row label="Системы">
+        {SYSTEM_OPTS.map(o => <div key={o.v} style={sel((p.targetSystems || []).includes(o.v))} onClick={() => toggle('targetSystems', o.v)}>{o.l}</div>)}
+      </Row>
+    </Modal>
+  );
+}
+
+const inp: React.CSSProperties = {
+  width: 'calc(33% - 6px)', padding: '9px 10px', borderRadius: 10, border: 'none',
+  background: 'rgba(118,118,128,0.12)', color: '#fff', fontSize: 13, outline: 'none',
 };
 
-/* ─── Popup: Пресеты (расширенные) ─── */
-function PopupPresets({ profile, u, onClose }: { profile: BioStackProfile; u: (p: Partial<BioStackProfile>) => void; onClose: () => void }) {
-  const presets: PresetEntry[] = [
-    { id:'male_bodybuilder', icon:'🏋️', name:'Бодибилдер', desc:'Рост массы и силы. Полный стек поддержки для тяжёлых тренировок',
-      category:'male',
-      p: { goals:['muscle_gain','recovery','joints'] as GoalType[], experience:'advanced' as ExperienceLevel, budget:'premium' as BudgetLevel, stackComplexity:'maximum' as StackComplexity, targetSystems:['musculoskeletal','endocrine','cardio'] as string[], targetOrgans:['MUSCLES','BONES','JOINTS','HEART','LIVER'] as string[], maxStackSize: 20 }},
-    { id:'male_athlete', icon:'🏃', name:'Спортсмен', desc:'Выносливость, кардио, восстановление между тренировками',
-      category:'male',
-      p: { goals:['endurance','recovery','energy','cardio_health'] as GoalType[], experience:'advanced' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['cardio','musculoskeletal','metabolic'] as string[], targetOrgans:['HEART','VESSELS','MUSCLES','LUNGS'] as string[], maxStackSize: 12 }},
-    { id:'male_hormonal', icon:'⚖️', name:'Гормональный баланс', desc:'Поддержка тестостерона, либидо, щитовидной железы',
-      category:'male',
-      p: { goals:['hormones','libido','energy','sleep'] as GoalType[], experience:'intermediate' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['endocrine','reproductive','neuro'] as string[], targetOrgans:['ENDOCRINE','REPRODUCTIVE','THYROID','ADRENALS'] as string[], maxStackSize: 8 }},
-    { id:'female_fitness', icon:'💪', name:'Фитнес / Тонус', desc:'Жиросжигание, энергия, подтянутое тело, здоровье кожи',
-      category:'female',
-      p: { goals:['fat_loss','energy','skin','muscle_gain'] as GoalType[], sex:'female', experience:'intermediate' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['musculoskeletal','endocrine','metabolic'] as string[], targetOrgans:['MUSCLES','SKIN','THYROID'] as string[], maxStackSize: 8 }},
-    { id:'female_health', icon:'🧘', name:'ЗОЖ / Иммунитет', desc:'Профилактика, детокс, иммунитет, общее здоровье',
-      category:'female',
-      p: { goals:['immunity','detox','digestion','energy'] as GoalType[], sex:'female', experience:'beginner' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['immune','gastrointestinal','metabolic'] as string[], targetOrgans:['IMMUNE_SYSTEM','GUT','LIVER'] as string[], maxStackSize: 8 }},
-    { id:'female_hormonal', icon:'🌸', name:'Гормональный женский', desc:'Цикл, ПМС, кожа, волосы, настроение',
-      category:'female',
-      p: { goals:['hormones','mood','skin','hair','stress'] as GoalType[], sex:'female', experience:'intermediate' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['endocrine','reproductive','neuro'] as string[], targetOrgans:['ENDOCRINE','REPRODUCTIVE','SKIN','BRAIN'] as string[], maxStackSize: 8 }},
-    { id:'female_antistress', icon:'😌', name:'Антистресс / Сон', desc:'Снижение тревожности, улучшение сна, восстановление нервной системы',
-      category:'female',
-      p: { goals:['stress','sleep','mood','recovery'] as GoalType[], sex:'female', experience:'beginner' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'minimal' as StackComplexity, targetSystems:['neuro','endocrine'] as string[], targetOrgans:['BRAIN','NERVES','ADRENALS'] as string[], maxStackSize: 6 }},
-    { id:'goal_nootropic', icon:'🧠', name:'Ноотроп / Фокус', desc:'Память, концентрация, креативность, нейропластичность',
-      category:'goal',
-      p: { goals:['brain','concentration','mood','energy'] as GoalType[], experience:'beginner' as ExperienceLevel, budget:'premium' as BudgetLevel, stackComplexity:'minimal' as StackComplexity, targetSystems:['neuro'] as string[], targetOrgans:['BRAIN','NERVES'] as string[], maxStackSize: 6 }},
-    { id:'goal_immunity', icon:'🛡️', name:'Иммунитет', desc:'Укрепление защитных сил, профилактика, адаптогены',
-      category:'goal',
-      p: { goals:['immunity','recovery','energy'] as GoalType[], experience:'beginner' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['immune','metabolic'] as string[], targetOrgans:['IMMUNE_SYSTEM','BLOOD','GUT'] as string[], maxStackSize: 8 }},
-    { id:'goal_detox', icon:'🧪', name:'Детокс + Печень', desc:'Очищение организма, поддержка печени, антиоксиданты',
-      category:'goal',
-      p: { goals:['detox','liver_health','digestion'] as GoalType[], experience:'intermediate' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['hepatic','gastrointestinal','immune'] as string[], targetOrgans:['LIVER','GUT','KIDNEYS'] as string[], maxStackSize: 8, healthConditions:['liver'] as HealthCondition[] }},
-    { id:'goal_longevity', icon:'⏳', name:'Долголетие', desc:'Митохондрии, омега-3, антиоксиданты, кардиопротекция',
-      category:'goal',
-      p: { goals:['longevity','cardio_health','brain','energy'] as GoalType[], experience:'intermediate' as ExperienceLevel, budget:'premium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['cardio','neuro','metabolic','immune'] as string[], targetOrgans:['HEART','BRAIN','MITOCHONDRIA','CELLS','VESSELS'] as string[], maxStackSize: 10 }},
-    { id:'aas_course', icon:'💉', name:'Курс ААС', desc:'Максимальная поддержка на курсе: печень, сердце,давление, липиды',
-      category:'aas',
-      p: { goals:['liver_health','cardio_health','detox','kidney'] as GoalType[], aasStatus:'course' as AASStatus, experience:'advanced' as ExperienceLevel, budget:'premium' as BudgetLevel, stackComplexity:'maximum' as StackComplexity, targetSystems:['hepatic','cardio','renal','hematologic','endocrine'] as string[], targetOrgans:['LIVER','HEART','KIDNEYS','BLOOD','ENDOCRINE'] as string[], maxStackSize: 16, healthConditions:[] as HealthCondition[] }},
-    { id:'aas_pct', icon:'🔄', name:'ПКТ', desc:'Восстановление HPTA, антиэстрогены, гонадотропины, печень',
-      category:'aas',
-      p: { goals:['hormones','recovery','detox','mood'] as GoalType[], aasStatus:'pct' as AASStatus, experience:'advanced' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'maximum' as StackComplexity, targetSystems:['endocrine','reproductive','hepatic','neuro'] as string[], targetOrgans:['ENDOCRINE','REPRODUCTIVE','LIVER','BRAIN','PITUITARY'] as string[], maxStackSize: 12, healthConditions:[] as HealthCondition[] }},
-    { id:'aas_trt', icon:'♾️', name:'TRT', desc:'Долгосрочная поддержка на TRT: кардио, гематокрит, эстрадиол, простата',
-      category:'aas',
-      p: { goals:['cardio_health','hormones','liver_health','kidney'] as GoalType[], aasStatus:'trt' as AASStatus, experience:'advanced' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['cardio','hematologic','endocrine','reproductive'] as string[], targetOrgans:['HEART','BLOOD','ENDOCRINE','PROSTATE','KIDNEYS'] as string[], maxStackSize: 10, healthConditions:[] as HealthCondition[] }},
-    { id:'aas_fertility', icon:'🧬', name:'Фертильность', desc:'Подготовка к зачатию: сперматогенез, антиоксиданты, гормоны',
-      category:'aas',
-      p: { goals:['hormones','recovery','immunity','energy'] as GoalType[], aasStatus:'fertility' as AASStatus, experience:'beginner' as ExperienceLevel, budget:'premium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['reproductive','endocrine','immune'] as string[], targetOrgans:['REPRODUCTIVE','ENDOCRINE','TESTES','PITUITARY'] as string[], maxStackSize: 10, healthConditions:[] as HealthCondition[] }},
-    { id:'aas_bridge', icon:'🌉', name:'Бридж / Off-сезон', desc:'Поддержка между курсами: печень, кардио, общее здоровье',
-      category:'aas',
-      p: { goals:['recovery','liver_health','cardio_health','immunity'] as GoalType[], aasStatus:'bridge' as AASStatus, experience:'intermediate' as ExperienceLevel, budget:'medium' as BudgetLevel, stackComplexity:'balanced' as StackComplexity, targetSystems:['hepatic','cardio','immune','metabolic'] as string[], targetOrgans:['LIVER','HEART','IMMUNE_SYSTEM','KIDNEYS'] as string[], maxStackSize: 8, healthConditions:[] as HealthCondition[] }},
-  ];
-
-  const catLabels: Record<string, { label: string; color: string }> = {
-    male: { label: '🏋️ ♂ Мужские', color: '#60a5fa' },
-    female: { label: '🌸 ♀ Женские', color: '#f472b6' },
-    goal: { label: '🎯 По целям', color: '#f59e0b' },
-    aas: { label: '💉 По статусу ААС', color: '#ef4444' },
-  };
-  const catOrder = ['male', 'female', 'goal', 'aas'];
-
-  return <PopupOverlay title="🚀 Быстрые пресеты" icon="🚀" color="#00e68a" onClose={onClose}>
-    <div style={{fontSize:9,color:'rgba(255,255,255,0.45)',marginBottom:8,lineHeight:1.3}}>
-      Выберите пресет — цели, уровень, системы-мишени и органы заполнятся автоматически. 15 шаблонов в 4 категориях.
-    </div>
-    <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-      {catOrder.map(cat => {
-        const items = presets.filter(p => p.category === cat);
-        if (items.length === 0) return null;
-        return (
-          <div key={cat} style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: catLabels[cat].color, marginBottom: 4, padding: '4px 0', borderBottom: `1px solid ${catLabels[cat].color}15` }}>
-              {catLabels[cat].label}
-            </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-              {items.map(pre => (
-                <button key={pre.id} onClick={() => { u(pre.p); onClose(); }}
-                  style={{ padding:'10px 12px', borderRadius:10, cursor:'pointer', textAlign:'left',
-                    background:'rgba(255,255,255,0.015)', border:'1px solid rgba(255,255,255,0.04)',
-                    transition:'all 0.15s', display:'flex', alignItems:'center', gap:10 }}>
-                  <div style={{ fontSize:18, flexShrink:0 }}>{pre.icon}</div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:1 }}>{pre.name}</div>
-                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', lineHeight:1.3 }}>{pre.desc}</div>
-                    <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:2 }}>
-                      {(pre.p.goals as GoalType[] || []).slice(0,3).map(g => {
-                        const gl = PURE_GOALS.find(x => x.key === g);
-                        return gl ? <span key={g} style={{ fontSize:7,padding:'1px 5px',borderRadius:3,background:'rgba(0,230,138,0.08)',color:'#00e68a',whiteSpace:'nowrap' }}>{gl.label.replace(/^.{1,2}\s/,'')}</span> : null;
-                      })}
-                      {(pre.p.targetOrgans || []).slice(0,2).map(o => {
-                        const ol = ORGANS.find(x => x.key === o);
-                        return ol ? <span key={o} style={{ fontSize:7,padding:'1px 5px',borderRadius:3,background:'rgba(96,165,250,0.08)',color:'#60a5fa',whiteSpace:'nowrap' }}>{ol.label.replace(/^.{1,2}\s/,'')}</span> : null;
-                      })}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  </PopupOverlay>;
-}
-
-/* ─── Helpers for display ─── */
-function aasLabel(s: AASStatus): string {
-  return s === 'none' ? 'Без ААС' : s === 'trt' ? 'TRT' : s === 'course' ? 'Курс' : s === 'pct' ? 'ПКТ' : s === 'bridge' ? 'Бридж' : 'Фертильность';
-}
-function budgetLabel(b: BudgetLevel): string {
-  return b === 'economy' ? 'Эконом' : b === 'medium' ? 'Средний' : 'Премиум';
-}
-function complLabel(c: StackComplexity): string {
-  return c === 'minimal' ? 'Мин' : c === 'balanced' ? 'Средний' : 'Макс';
-}
-function expLabel(e: ExperienceLevel): string {
-  return e === 'beginner' ? 'Новичок' : e === 'intermediate' ? 'Средний' : 'Продвинутый';
-}
-function adLabel(a: ADClass): string {
-  return a === 'none' ? 'Нет' : a.toUpperCase();
-}
-
-/* ─── Main ProfileTab ─── */
-export function ProfileTab({ profile, setProfile, setStackIds }: { profile: BioStackProfile; setProfile: (p: BioStackProfile) => void; setStackIds?: (ids: string[]) => void }) {
-  const u = (patch: Partial<BioStackProfile>) => {
-    const editedKeys = Object.keys(patch).filter(k => k !== 'autoFilledFields');
-    const newAuto = (profile.autoFilledFields || []).filter(k => !editedKeys.includes(k));
-    const n = { ...profile, ...patch, autoFilledFields: newAuto };
-    setProfile(n); saveBioStackProfile(n);
-  };
-  const [popup, setPopup] = useState<string | null>(null);
-  const [quickLoading, setQuickLoading] = useState(false);
-  const [quickDone, setQuickDone] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-
-  const comp = getProfileCompleteness(profile);
-  const goalLabel = (g: string) => PURE_GOALS.find(x => x.key === g)?.label || g;
-  const organLabel = (o: string) => ORGANS.find(x => x.key === o)?.label || o;
-  const systemLabel = (s: string) => SYSTEMS.find(x => x.key === s)?.label || s;
-  const condLabel = (h: string) => HEALTH_CONDS.find(x => x.key === h)?.label || h;
-
-  const handleAutoFill = () => {
-    const { patch, autoKeys } = autoFillFromMainProfile();
-    if (Object.keys(patch).length > 0) {
-      const n = { ...profile, ...patch, autoFilledFields: [...new Set([...(profile.autoFilledFields || []), ...autoKeys])] };
-      setProfile(n); saveBioStackProfile(n);
-    }
-  };
-
-  const handleQuickStack = () => {
-    setQuickLoading(true); setQuickDone(false);
-    setTimeout(() => {
-      const fp = toFinderProfile(profile);
-      const result = buildStack({ baseIds: [], targetSize: 10, goal: profile.goals[0] || undefined, autoFill: true, profile: fp });
-      if (setStackIds) setStackIds(result.stack);
-      setQuickLoading(false); setQuickDone(true);
-      setTimeout(() => setQuickDone(false), 2500);
-    }, 400);
-  };
-
-  return (
-    <div style={{ paddingBottom: 80 }}>
-      <button onClick={() => setShowOnboarding(true)} style={{
-        width: '100%', padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer', marginBottom: 6,
-        background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 800, fontSize: 11,
-        boxShadow: '0 2px 12px rgba(0,230,138,0.15)',
-      }}>🧭 Быстрый старт — заполнить профиль за 3 шага</button>
-
-      {showOnboarding && (
-        <OnboardingWizard profile={profile}
-          onComplete={(patch, autoBuild) => {
-            u(patch);
-            if (autoBuild && setStackIds) {
-              setTimeout(() => {
-                const fp = toFinderProfile({ ...profile, ...patch });
-                const result = buildStack({ baseIds: [], targetSize: 8, autoFill: true, profile: fp });
-                setStackIds(result.stack);
-              }, 300);
-            }
-            setShowOnboarding(false);
-          }}
-          onSkip={() => setShowOnboarding(false)}
-        />
-      )}
-
-      {!showOnboarding && (<>
-      {/* ── Progress bar ── */}
-      <ProfileCompletenessBar comp={comp} />
-
-      {/* ── Personal ── */}
-      {comp.groupStatus.personal?.filled ? (
-        <SummaryCard icon="👤" title="Личные данные" color="#60a5fa" source={comp.groupStatus.personal.source} onEdit={() => setPopup('personal')}>
-          <DataChip color="#60a5fa">{profile.age} лет</DataChip>
-          <DataChip color="#60a5fa">{profile.weight} кг</DataChip>
-          <DataChip color="#60a5fa">{profile.height} см</DataChip>
-          <DataChip color={profile.sex === 'male' ? '#60a5fa' : '#f472b6'}>{profile.sex === 'male' ? '♂' : '♀'}</DataChip>
-          <DataChip color="#60a5fa">{expLabel(profile.experience)}</DataChip>
-        </SummaryCard>
-      ) : (
-        <CardBtn icon="👤" title="Личные данные" color="#60a5fa"
-          subtitle={`${profile.age} лет · ${profile.weight} кг · ${profile.height} см · ${profile.sex === 'male' ? '♂' : '♀'} · ${expLabel(profile.experience)}`}
-          onClick={() => setPopup('personal')}
-          badge={{ text: '⚠ Заполнить', source: 'empty' }} />
-      )}
-
-      {/* ── Health ── */}
-      {comp.groupStatus.health?.filled ? (
-        <SummaryCard icon="🫀" title="Здоровье и режим" color="#ef4444" source={comp.groupStatus.health.source} onEdit={() => setPopup('health')}>
-          <DataChip color="#ef4444">{aasLabel(profile.aasStatus)}</DataChip>
-          <DataChip color="#ef4444">{budgetLabel(profile.budget)}</DataChip>
-          <DataChip color="#ef4444">{complLabel(profile.stackComplexity)} стек</DataChip>
-          {profile.healthConditions.map(h => (
-            <DataChip key={h} color="#f87171">{condLabel(h)}</DataChip>
-          ))}
-        </SummaryCard>
-      ) : (
-        <CardBtn icon="🫀" title="Здоровье и режим" color="#ef4444"
-          subtitle={`${aasLabel(profile.aasStatus)} · ${budgetLabel(profile.budget)} · ${complLabel(profile.stackComplexity)} стек`}
-          count={profile.healthConditions.length}
-          onClick={() => setPopup('health')}
-          badge={{ text: '⚠ Заполнить', source: 'empty' }} />
-      )}
-
-      {/* ── Goals ── */}
-      {comp.groupStatus.goals?.filled ? (
-        <SummaryCard icon="🎯" title="Цели" color="#f59e0b" source={comp.groupStatus.goals.source} onEdit={() => setPopup('goals')}>
-          {profile.goals.map(g => (
-            <DataChip key={g} color="#f59e0b">{goalLabel(g)}</DataChip>
-          ))}
-        </SummaryCard>
-      ) : (
-        <CardBtn icon="🎯" title="Цели" color="#f59e0b"
-          subtitle={profile.goals.length ? profile.goals.map(g => goalLabel(g)).join(', ') : 'Не выбраны'}
-          count={profile.goals.length}
-          onClick={() => setPopup('goals')}
-          badge={{ text: '⚠ Заполнить', source: 'empty' }} />
-      )}
-
-      {/* ── Organs + Systems row ── */}
-      {comp.groupStatus.organs?.filled && comp.groupStatus.systems?.filled ? (
-        <div style={{ display:'flex', gap:4, marginBottom:5 }}>
-          <div style={{ flex:1 }}>
-            <div style={{
-              padding: '8px 10px', borderRadius: 10,
-              background: 'rgba(24,24,27,0.7)', border: `1px solid rgba(255,255,255,0.05)`,
-              borderLeft: `3px solid ${comp.groupStatus.organs.source === 'auto' ? '#00e68a' : '#8b5cf6'}`,
-            }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>🫀 Органы</span>
-                <div style={{ display:'flex', gap: 3, alignItems:'center' }}>
-                  <SourceBadge source={comp.groupStatus.organs.source} />
-                  <button onClick={() => setPopup('organs')} style={{ padding:'2px 6px', borderRadius: 4, border:'none', cursor:'pointer', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.35)', fontSize:7 }}>✏️</button>
-                </div>
-              </div>
-              <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                {profile.targetOrgans.map(o => <DataChip key={o} color="#60a5fa">{organLabel(o)}</DataChip>)}
-              </div>
-            </div>
-          </div>
-          <div style={{ flex:1 }}>
-            <div style={{
-              padding: '8px 10px', borderRadius: 10,
-              background: 'rgba(24,24,27,0.7)', border: `1px solid rgba(255,255,255,0.05)`,
-              borderLeft: `3px solid ${comp.groupStatus.systems.source === 'auto' ? '#00e68a' : '#8b5cf6'}`,
-            }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>⚙️ Системы</span>
-                <div style={{ display:'flex', gap: 3, alignItems:'center' }}>
-                  <SourceBadge source={comp.groupStatus.systems.source} />
-                  <button onClick={() => setPopup('systems')} style={{ padding:'2px 6px', borderRadius: 4, border:'none', cursor:'pointer', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.35)', fontSize:7 }}>✏️</button>
-                </div>
-              </div>
-              <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                {profile.targetSystems.map(s => <DataChip key={s} color="#8b5cf6">{systemLabel(s)}</DataChip>)}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div style={{ display:'flex', gap:4, marginBottom:5 }}>
-          <SmallBtn icon="🫀" title="Органы" color="#60a5fa"
-            subtitle={`${profile.targetOrgans.length} выбрано`}
-            count={profile.targetOrgans.length}
-            onClick={() => setPopup('organs')} />
-          <SmallBtn icon="⚙️" title="Системы" color="#8b5cf6"
-            subtitle={`${profile.targetSystems.length} выбрано`}
-            count={profile.targetSystems.length}
-            onClick={() => setPopup('systems')} />
-        </div>
-      )}
-
-      {/* ── Lifestyle ── */}
-      {comp.groupStatus.lifestyle?.filled ? (
-        <SummaryCard icon="🧘" title="Образ жизни" color="#8b5cf6" source={comp.groupStatus.lifestyle.source} onEdit={() => setPopup('lifestyle')}>
-          {profile.avoidIds.map(a => (
-            <DataChip key={a} color="#a78bfa" dim>🚫 {a}</DataChip>
-          ))}
-          {profile.avoidMeds.map(m => (
-            <DataChip key={m} color="#f87171" dim>💊 {m}</DataChip>
-          ))}
-        </SummaryCard>
-      ) : (
-        <CardBtn icon="🧘" title="Образ жизни" color="#8b5cf6"
-          subtitle={
-            profile.avoidIds.length || profile.avoidMeds.length
-              ? `${profile.avoidIds.length} БАД, ${profile.avoidMeds.length} лекарств`
-              : 'Не заданы'
-          }
-          count={profile.avoidIds.length + profile.avoidMeds.length}
-          onClick={() => setPopup('lifestyle')}
-          badge={(!profile.avoidIds.length && !profile.avoidMeds.length) ? { text: 'Не заданы', source: 'empty' } : undefined} />
-      )}
-
-      {/* ── Clinical ── */}
-      {comp.groupStatus.clinical?.filled ? (
-        <SummaryCard icon="🏥" title="Клинические данные" color="#ef4444" source={comp.groupStatus.clinical.source} onEdit={() => setPopup('clinical')}>
-          {profile.currentMeds.map(m => <DataChip key={m} color="#f87171">💊 {m}</DataChip>)}
-          {profile.drugAllergies.map(a => <DataChip key={a} color="#fca5a5" dim>⚠ {a}</DataChip>)}
-          {profile.adClass !== 'none' && <DataChip color="#ef4444">АД: {adLabel(profile.adClass)}</DataChip>}
-        </SummaryCard>
-      ) : (
-        <CardBtn icon="🏥" title="Клинические данные" color="#ef4444"
-          subtitle={`${profile.currentMeds.length ? profile.currentMeds.join(', ').slice(0,30)+(profile.currentMeds.length>1?'...':'') : 'Нет лекарств'}${profile.adClass !== 'none' ? ` · ${adLabel(profile.adClass)}` : ''}`}
-          count={profile.currentMeds.length}
-          onClick={() => setPopup('clinical')}
-          badge={{ text: 'Не заполнено', source: 'empty' }} />
-      )}
-
-      <CardBtn icon="🚀" title="Быстрые пресеты" color="#00e68a"
-        subtitle="Заполнить профиль по шаблону: Бодибилдер, ЗОЖ, Ноотроп, Спортсмен..."
-        onClick={() => setPopup('presets')} />
-
-      <div style={{ display:'flex', flexDirection:'column', gap:4, marginTop:4 }}>
-        <button onClick={handleAutoFill}
-          style={{ width:'100%', padding:'10px 0', borderRadius:10, border:'none', cursor:'pointer',
-            background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:11,
-            boxShadow:'0 2px 12px rgba(0,230,138,0.15)' }}>
-          📥 Заполнить из профиля
-        </button>
-        <button onClick={handleQuickStack} disabled={quickLoading} style={{
-          width:'100%', padding:'10px 0', borderRadius:10, cursor: quickLoading ? 'wait' : 'pointer',
-          background: quickDone ? 'rgba(0,230,138,0.1)' : 'rgba(139,92,246,0.1)',
-          border: `1px solid ${quickDone ? 'rgba(0,230,138,0.2)' : 'rgba(139,92,246,0.2)'}`,
-          color: quickDone ? '#00e68a' : '#8b5cf6', fontWeight:700, fontSize:11,
-        }}>
-          {quickLoading ? '⏳ Собираем стек...' : quickDone ? '✅ Стек собран! Откройте 📋 Мой стек' : '⚡ Быстрый стек по профилю'}
-        </button>
-      </div>
-      <div style={{ textAlign:'center', fontSize:8, color:'rgba(255,255,255,0.25)', marginTop:4 }}>
-        ⚡ Профиль сохраняется автоматически
-      </div>
-
-      {/* Popups */}
-      {popup === 'personal' && <PopupPersonal profile={profile} u={u} onClose={() => setPopup(null)} />}
-      {popup === 'health' && <PopupHealth profile={profile} u={u} onClose={() => setPopup(null)} />}
-      {popup === 'goals' && <PopupGoals profile={profile} u={u} onClose={() => setPopup(null)} />}
-      {popup === 'organs' && <PopupOrgans profile={profile} u={u} onClose={() => setPopup(null)} />}
-      {popup === 'systems' && <PopupSystems profile={profile} u={u} onClose={() => setPopup(null)} />}
-      {popup === 'lifestyle' && <PopupLifestyle profile={profile} u={u} onClose={() => setPopup(null)} />}
-      {popup === 'clinical' && <PopupClinical profile={profile} u={u} onClose={() => setPopup(null)} />}
-      {popup === 'presets' && <PopupPresets profile={profile} u={u} onClose={() => setPopup(null)} />}
-      </>)}
-    </div>
-  );
-}
-
-/* ─── BioStackAISettings — упрощённая версия ProfileTab для ProfileScreen (без пресетов и кнопки быстрого стека) ─── */
-export function BioStackAISettings({ onProfileChange }: { onProfileChange?: (p: BioStackProfile) => void }) {
-  const [profile, setProfile] = useState<BioStackProfile>(() => loadBioStackProfile());
-  const u = (patch: Partial<BioStackProfile>) => {
-    const editedKeys = Object.keys(patch).filter(k => k !== 'autoFilledFields');
-    const newAuto = (profile.autoFilledFields || []).filter(k => !editedKeys.includes(k));
-    const n = { ...profile, ...patch, autoFilledFields: newAuto };
-    setProfile(n);
-    saveBioStackProfile(n);
-    if (onProfileChange) onProfileChange(n);
-  };
-  const [popup, setPopup] = useState<string | null>(null);
-
-  const comp = getProfileCompleteness(profile);
-  const goalLabel = (g: string) => PURE_GOALS.find(x => x.key === g)?.label || g;
-  const organLabel = (o: string) => ORGANS.find(x => x.key === o)?.label || o;
-  const systemLabel = (s: string) => SYSTEMS.find(x => x.key === s)?.label || s;
-  const condLabel = (h: string) => HEALTH_CONDS.find(x => x.key === h)?.label || h;
-
-  return (
-    <div style={{ paddingBottom: 80 }}>
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 8, lineHeight: 1.4 }}>
-        🧬 Настройки профиля для BioStack AI. Данные сохраняются автоматически и используются при подборе БАДов.
-      </div>
-
-      {/* ── Progress bar ── */}
-      <ProfileCompletenessBar comp={comp} />
-
-      {/* ── Personal ── */}
-      {comp.groupStatus.personal?.filled ? (
-        <SummaryCard icon="👤" title="Личные данные" color="#60a5fa" source={comp.groupStatus.personal.source} onEdit={() => setPopup('personal')}>
-          <DataChip color="#60a5fa">{profile.age} лет</DataChip>
-          <DataChip color="#60a5fa">{profile.weight} кг</DataChip>
-          <DataChip color="#60a5fa">{profile.height} см</DataChip>
-          <DataChip color={profile.sex === 'male' ? '#60a5fa' : '#f472b6'}>{profile.sex === 'male' ? '♂' : '♀'}</DataChip>
-          <DataChip color="#60a5fa">{expLabel(profile.experience)}</DataChip>
-        </SummaryCard>
-      ) : (
-        <CardBtn icon="👤" title="Личные данные" color="#60a5fa"
-          subtitle={`${profile.age} лет · ${profile.weight} кг · ${profile.height} см · ${profile.sex === 'male' ? '♂' : '♀'} · ${expLabel(profile.experience)}`}
-          onClick={() => setPopup('personal')}
-          badge={{ text: '⚠ Заполнить', source: 'empty' }} />
-      )}
-
-      {/* ── Health ── */}
-      {comp.groupStatus.health?.filled ? (
-        <SummaryCard icon="🫀" title="Здоровье и режим" color="#ef4444" source={comp.groupStatus.health.source} onEdit={() => setPopup('health')}>
-          <DataChip color="#ef4444">{aasLabel(profile.aasStatus)}</DataChip>
-          <DataChip color="#ef4444">{budgetLabel(profile.budget)}</DataChip>
-          <DataChip color="#ef4444">{complLabel(profile.stackComplexity)} стек</DataChip>
-          {profile.healthConditions.map(h => (
-            <DataChip key={h} color="#f87171">{condLabel(h)}</DataChip>
-          ))}
-        </SummaryCard>
-      ) : (
-        <CardBtn icon="🫀" title="Здоровье и режим" color="#ef4444"
-          subtitle={`${aasLabel(profile.aasStatus)} · ${budgetLabel(profile.budget)} · ${complLabel(profile.stackComplexity)} стек`}
-          count={profile.healthConditions.length}
-          onClick={() => setPopup('health')}
-          badge={{ text: '⚠ Заполнить', source: 'empty' }} />
-      )}
-
-      {/* ── Goals ── */}
-      {comp.groupStatus.goals?.filled ? (
-        <SummaryCard icon="🎯" title="Цели" color="#f59e0b" source={comp.groupStatus.goals.source} onEdit={() => setPopup('goals')}>
-          {profile.goals.map(g => (
-            <DataChip key={g} color="#f59e0b">{goalLabel(g)}</DataChip>
-          ))}
-        </SummaryCard>
-      ) : (
-        <CardBtn icon="🎯" title="Цели" color="#f59e0b"
-          subtitle={profile.goals.length ? profile.goals.map(g => goalLabel(g)).join(', ') : 'Не выбраны'}
-          count={profile.goals.length}
-          onClick={() => setPopup('goals')}
-          badge={{ text: '⚠ Заполнить', source: 'empty' }} />
-      )}
-
-      {/* ── Organs + Systems row ── */}
-      {comp.groupStatus.organs?.filled && comp.groupStatus.systems?.filled ? (
-        <div style={{ display:'flex', gap:4, marginBottom:5 }}>
-          <div style={{ flex:1 }}>
-            <div style={{
-              padding: '8px 10px', borderRadius: 10,
-              background: 'rgba(24,24,27,0.7)', border: `1px solid rgba(255,255,255,0.05)`,
-              borderLeft: `3px solid ${comp.groupStatus.organs.source === 'auto' ? '#00e68a' : '#8b5cf6'}`,
-            }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>🫀 Органы</span>
-                <div style={{ display:'flex', gap: 3, alignItems:'center' }}>
-                  <SourceBadge source={comp.groupStatus.organs.source} />
-                  <button onClick={() => setPopup('organs')} style={{ padding:'2px 6px', borderRadius: 4, border:'none', cursor:'pointer', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.35)', fontSize:7 }}>✏️</button>
-                </div>
-              </div>
-              <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                {profile.targetOrgans.map(o => <DataChip key={o} color="#60a5fa">{organLabel(o)}</DataChip>)}
-              </div>
-            </div>
-          </div>
-          <div style={{ flex:1 }}>
-            <div style={{
-              padding: '8px 10px', borderRadius: 10,
-              background: 'rgba(24,24,27,0.7)', border: `1px solid rgba(255,255,255,0.05)`,
-              borderLeft: `3px solid ${comp.groupStatus.systems.source === 'auto' ? '#00e68a' : '#8b5cf6'}`,
-            }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>⚙️ Системы</span>
-                <div style={{ display:'flex', gap: 3, alignItems:'center' }}>
-                  <SourceBadge source={comp.groupStatus.systems.source} />
-                  <button onClick={() => setPopup('systems')} style={{ padding:'2px 6px', borderRadius: 4, border:'none', cursor:'pointer', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.35)', fontSize:7 }}>✏️</button>
-                </div>
-              </div>
-              <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                {profile.targetSystems.map(s => <DataChip key={s} color="#8b5cf6">{systemLabel(s)}</DataChip>)}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div style={{ display:'flex', gap:4, marginBottom:5 }}>
-          <SmallBtn icon="🫀" title="Органы" color="#60a5fa"
-            subtitle={`${profile.targetOrgans.length} выбрано`}
-            count={profile.targetOrgans.length}
-            onClick={() => setPopup('organs')} />
-          <SmallBtn icon="⚙️" title="Системы" color="#8b5cf6"
-            subtitle={`${profile.targetSystems.length} выбрано`}
-            count={profile.targetSystems.length}
-            onClick={() => setPopup('systems')} />
-        </div>
-      )}
-
-      {/* ── Lifestyle ── */}
-      {comp.groupStatus.lifestyle?.filled ? (
-        <SummaryCard icon="🧘" title="Образ жизни" color="#8b5cf6" source={comp.groupStatus.lifestyle.source} onEdit={() => setPopup('lifestyle')}>
-          {profile.avoidIds.map(a => (
-            <DataChip key={a} color="#a78bfa" dim>🚫 {a}</DataChip>
-          ))}
-          {profile.avoidMeds.map(m => (
-            <DataChip key={m} color="#f87171" dim>💊 {m}</DataChip>
-          ))}
-        </SummaryCard>
-      ) : (
-        <CardBtn icon="🧘" title="Образ жизни" color="#8b5cf6"
-          subtitle={
-            profile.avoidIds.length || profile.avoidMeds.length
-              ? `${profile.avoidIds.length} БАД, ${profile.avoidMeds.length} лекарств`
-              : 'Не заданы'
-          }
-          count={profile.avoidIds.length + profile.avoidMeds.length}
-          onClick={() => setPopup('lifestyle')}
-          badge={(!profile.avoidIds.length && !profile.avoidMeds.length) ? { text: 'Не заданы', source: 'empty' } : undefined} />
-      )}
-
-      {/* ── Clinical ── */}
-      {comp.groupStatus.clinical?.filled ? (
-        <SummaryCard icon="🏥" title="Клинические данные" color="#ef4444" source={comp.groupStatus.clinical.source} onEdit={() => setPopup('clinical')}>
-          {profile.currentMeds.map(m => <DataChip key={m} color="#f87171">💊 {m}</DataChip>)}
-          {profile.drugAllergies.map(a => <DataChip key={a} color="#fca5a5" dim>⚠ {a}</DataChip>)}
-          {profile.adClass !== 'none' && <DataChip color="#ef4444">АД: {adLabel(profile.adClass)}</DataChip>}
-        </SummaryCard>
-      ) : (
-        <CardBtn icon="🏥" title="Клинические данные" color="#ef4444"
-          subtitle={`${profile.currentMeds.length ? profile.currentMeds.join(', ').slice(0,30)+(profile.currentMeds.length>1?'...':'') : 'Нет лекарств'}${profile.adClass !== 'none' ? ` · ${adLabel(profile.adClass)}` : ''}`}
-          count={profile.currentMeds.length}
-          onClick={() => setPopup('clinical')}
-          badge={{ text: 'Не заполнено', source: 'empty' }} />
-      )}
-
-      <div style={{ textAlign:'center', fontSize:8, color:'rgba(255,255,255,0.25)', marginTop:4 }}>
-        ⚡ Профиль BioStack сохраняется автоматически
-      </div>
-      {popup === 'personal' && <PopupPersonal profile={profile} u={u} onClose={() => setPopup(null)} />}
-      {popup === 'health' && <PopupHealth profile={profile} u={u} onClose={() => setPopup(null)} />}
-      {popup === 'goals' && <PopupGoals profile={profile} u={u} onClose={() => setPopup(null)} />}
-      {popup === 'organs' && <PopupOrgans profile={profile} u={u} onClose={() => setPopup(null)} />}
-      {popup === 'systems' && <PopupSystems profile={profile} u={u} onClose={() => setPopup(null)} />}
-      {popup === 'lifestyle' && <PopupLifestyle profile={profile} u={u} onClose={() => setPopup(null)} />}
-      {popup === 'clinical' && <PopupClinical profile={profile} u={u} onClose={() => setPopup(null)} />}
-    </div>
-  );
-}
+export default ProfileTab;
