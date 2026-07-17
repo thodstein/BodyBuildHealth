@@ -31,6 +31,8 @@ function phaseForCycleWeek(week: number, cycle: import('../../../../data/lms-cyc
 import { ConstructorProfile } from './ConstructorProfile';
 import { PlanDisplay } from './PlanDisplay';
 import { ToolsPanel } from './ToolsPanel';
+import { MesocycleProgressionCard } from '../MesocycleProgressionCard';
+import { PHASE_TECHNIQUES } from '../BbAutoConstructor';
 import { getMethodsByCategory, type TrainingMethod } from '../../../../engines/training-methodology.engine';
 import { MacrocyclePanel } from './MacrocyclePanel';
 import { subscribePlannerApply, getPlannerApply, clearPlannerApply, type PlannerApply } from '../planner-bridge';
@@ -549,7 +551,9 @@ export const TrainingConstructor: React.FC<Props> = ({
     if (manualCfg.generator === 'bb' || manualCfg.generator === 'bb_split') {
       const bbSplitId = manualCfg.bbSplit || SPLIT_PATTERNS[0]?.id || 'upper_lower_4';
       const bbLoadStrategy = (manualCfg.bbLoad || 'double_progression') as LoadStrategy;
-      const bbPeds: PED[] = (tprofile as any).bbPeds?.length ? (tprofile as any).bbPeds : (tprofile.onCourse ? ['AAS'] : []);
+      const bbPeds: PED[] = manualCfg.pedDoses && manualCfg.pedDoses.split(',').filter(Boolean).length
+        ? manualCfg.pedDoses.split(',').filter(Boolean) as PED[]
+        : ((tprofile as any).bbPeds?.length ? (tprofile as any).bbPeds : (tprofile.onCourse ? ['AAS'] : []));
       const allLandmarks = getAllVolumeLandmarks(level);
       const pedAdapt = adaptForPEDs(bbPeds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv])));
 
@@ -654,7 +658,9 @@ export const TrainingConstructor: React.FC<Props> = ({
       const cycle = getCycleById(bbCycleId);
       if (!cycle) { alert('BB-цикл не выбран'); return; }
       const bbLoadStrategy = (manualCfg.bbLoad || 'double_progression') as LoadStrategy;
-      const bbPeds: PED[] = (tprofile as any).bbPeds?.length ? (tprofile as any).bbPeds : (tprofile.onCourse ? ['AAS'] : []);
+      const bbPeds: PED[] = manualCfg.pedDoses && manualCfg.pedDoses.split(',').filter(Boolean).length
+        ? manualCfg.pedDoses.split(',').filter(Boolean) as PED[]
+        : ((tprofile as any).bbPeds?.length ? (tprofile as any).bbPeds : (tprofile.onCourse ? ['AAS'] : []));
       const cycleWeeks = cycle.meta.weeks;
       if (cycleWeeks !== mesoLength) setMesoLength(cycleWeeks);
       const plan = convertCycleToBBPlan({
@@ -1683,6 +1689,35 @@ export const TrainingConstructor: React.FC<Props> = ({
             labAnalysis={labAnalysis}
             readinessSlider={readinessSlider}
           />
+
+          {manualResult && manualResult.bbMeta && manualResult.bbMeta.generator !== 'manual' && (
+            <>
+              <div style={{ marginTop: 14, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.14)' }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: ACCENT, marginBottom: 8 }}>📈 Мезоцикл: прогрессия объёма и интенсивности</div>
+                <MesocycleProgressionCard
+                  weeks={mesoLength}
+                  startVolumeSets={Math.round((manualResult.days.reduce((s, d) => s + d.exercises.length, 0) || 18) / Math.max(1, manualResult.days.length))}
+                  startIntensityPct={75}
+                  startRIR={3}
+                  goal={(goal === 'mass' ? 'hypertrophy' : (goal as 'strength' | 'hypertrophy' | 'power'))}
+                  fatigueTrajectory="moderate"
+                />
+              </div>
+              <div style={{ marginTop: 10, padding: 12, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#f97316', marginBottom: 8 }}>🎛 Техники по фазам мезоцикла (BB)</div>
+                {(Object.keys(PHASE_TECHNIQUES) as Array<keyof typeof PHASE_TECHNIQUES>).map(phase => (
+                  <div key={String(phase)} style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: DIM, marginBottom: 4 }}>{String(phase)}</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {PHASE_TECHNIQUES[phase].map((t, i) => (
+                        <span key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', padding: '3px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)' }}>{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           {manualResult && (
             <ToolsPanel

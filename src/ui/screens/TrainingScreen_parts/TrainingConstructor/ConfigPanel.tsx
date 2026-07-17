@@ -6,6 +6,7 @@ import { FULL_PROGRAM_LIBRARY } from '../../../../engines/complete-program-libra
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from '../programs-data';
 import { getMethodsByCategory, type TrainingMethod } from '../../../../engines/training-methodology.engine';
 import { SPLIT_PATTERNS } from '../../../../engines/bb/bb-split-patterns';
+import { PED } from '../../../../engines/bb/bb-ped-adaptation.engine';
 import { ACCENT, DIM, CONFIG_LABELS } from './types';
 import { DIRECTION_METHOD_MAP, getRecommendedMethods, getRecommendedMethodsForSplit, getRecommendedForMethods } from '../../../../engines/cycle-method-map';
 
@@ -442,6 +443,26 @@ export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgr
                 {manualCfg.bbSpecialization === 'on' ? '✓ ВКЛ' : '✗ ВЫКЛ'}
               </button>
             </div>
+            {(manualCfg.generator === 'bb_split' || manualCfg.generator === 'bb_cycle') && (
+              <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: 9, fontWeight: 600, color: DIM, marginBottom: 4 }}>💉 PED-курс (переопределяет профиль):</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {(['AAS', 'GH', 'insulin', 'IGF1', 'MGF'] as PED[]).map(p => {
+                    const cur = (manualCfg.pedDoses ? manualCfg.pedDoses.split(',').filter(Boolean) : []) as PED[];
+                    const active = cur.includes(p);
+                    return (
+                      <button key={p} onClick={() => {
+                        const next = cur.includes(p) ? cur.filter(x => x !== p) : [...cur, p];
+                        setManual('pedDoses', next.join(','));
+                      }}
+                        style={{ padding: '6px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid ' + (active ? 'rgba(0,230,138,0.4)' : 'rgba(255,255,255,0.1)'), background: active ? 'rgba(0,230,138,0.12)' : 'transparent', color: active ? ACCENT : 'rgba(255,255,255,0.6)' }}>
+                        {p}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </>
         )}
       </ConfigSection>
