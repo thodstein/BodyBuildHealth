@@ -263,7 +263,7 @@ function DomainSymptomMap({ domains, checked, onToggle }: { domains: DomainCfg[]
   const active = scores.filter(x => x.score >= 6).sort((a, b) => b.score - a.score);
   return (
     <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text)', marginBottom: 5 }}>🩺 Карта симптомов (по клиническим доменам)</div>
+      <div style={{ fontSize: 9, fontWeight: 700, color: '#ffffff', marginBottom: 5 }}>🩺 Карта симптомов (по клиническим доменам)</div>
       {domains.map(d => (
         <div key={d.id} style={{ marginBottom: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
@@ -744,7 +744,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                     <span style={{ fontSize:18 }}>{icon}</span>
                     <div style={{ flex:1 }}>
-                      <div style={{ fontSize:10, fontWeight:700, color: level === lv ? '#00e68a' : 'var(--text)' }}>{label} {level === lv && '✓'}</div>
+                      <div style={{ fontSize:10, fontWeight:700, color: level === lv ? '#00e68a' : '#ffffff' }}>{label} {level === lv && '✓'}</div>
                       <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:1 }}>{desc}</div>
                     </div>
                   </div>
@@ -978,9 +978,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                           background: active ? 'rgba(168,85,247,0.12)' : 'rgba(255,255,255,0.03)',
                           border: active ? '1px solid rgba(168,85,247,0.3)' : '1px solid rgba(255,255,255,0.06)' }}>
                         <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                          <span style={{ fontSize:11, minWidth:14, color: active ? '#c084fc' : 'var(--text-dim)' }}>{active ? '✓' : '○'}</span>
+                          <span style={{ fontSize:11, minWidth:14, color: active ? '#c084fc' : 'rgba(255,255,255,0.55)' }}>{active ? '✓' : '○'}</span>
                           <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:12, fontWeight:700, color: active ? '#c084fc' : 'var(--text-light)', lineHeight:1.25 }}>{g.stackName}</div>
+                            <div style={{ fontSize:12, fontWeight:700, color: active ? '#c084fc' : 'rgba(240,240,245,0.9)', lineHeight:1.25 }}>{g.stackName}</div>
                             <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', lineHeight:1.35, marginTop:2 }}>
                               {g.organLabels.join(', ')} · закрывает: {g.mechLabels.join(', ')}
                             </div>
@@ -1140,7 +1140,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                           <div style={{ display:'flex', alignItems:'flex-start', gap:6 }}>
                             <span style={{ fontSize:11, minWidth:14, color: active ? '#f87171' : 'var(--text-dim)', marginTop:1 }}>{active ? '✓' : '○'}</span>
                             <div style={{ flex:1, minWidth:0 }}>
-                              <div style={{ fontSize:10, fontWeight:700, color: active ? '#fca5a5' : 'var(--text-light)', lineHeight:1.2 }}>
+                              <div style={{ fontSize:10, fontWeight:700, color: active ? '#fca5a5' : 'rgba(240,240,245,0.9)', lineHeight:1.2 }}>
                                 {subNameRu(s.substanceId)}
                               </div>
                               <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', lineHeight:1.3, marginTop:2 }}>
@@ -1253,7 +1253,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                           <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                             <span style={{ fontSize:14 }}>{p.icon}</span>
                             <div style={{ flex:1 }}>
-                              <div style={{ fontSize:9, fontWeight:700, color: active ? p.color : 'var(--text)' }}>{p.name} {active && '✓'}</div>
+                              <div style={{ fontSize:9, fontWeight:700, color: active ? p.color : '#ffffff' }}>{p.name} {active && '✓'}</div>
                               <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>{p.desc}</div>
                             </div>
                           </div>
@@ -1295,7 +1295,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                           </div>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
-                              <span style={{ fontSize:9, fontWeight:600, color: inPlan ? 'rgba(255,255,255,0.4)' : 'var(--text)' }}>{item.nameRu}</span>
+                              <span style={{ fontSize:9, fontWeight:600, color: inPlan ? 'rgba(255,255,255,0.4)' : '#ffffff' }}>{item.nameRu}</span>
                               <span style={{ fontSize:7, fontWeight:600, color:'rgba(255,255,255,0.4)', padding:'0px 3px', borderRadius:3, background:'rgba(255,255,255,0.04)' }}>{item.dose}</span>
                               {isRecommended && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(99,102,241,0.15)', color:'#a5b4fc', fontWeight:700 }}>рек.</span>}
                               {inPlan && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.15)', color:'#00e68a', fontWeight:700 }}>в плане</span>}
@@ -1386,7 +1386,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                           <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                             <span style={{ fontSize:14 }}>{p.icon}</span>
                             <div style={{ flex:1 }}>
-                              <div style={{ fontSize:9, fontWeight:700, color: active ? p.color : 'var(--text)' }}>{p.name} {active && '✓'}</div>
+                              <div style={{ fontSize:9, fontWeight:700, color: active ? p.color : '#ffffff' }}>{p.name} {active && '✓'}</div>
                               <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>{p.desc}</div>
                             </div>
                           </div>
@@ -1428,7 +1428,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                           </div>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
-                              <span style={{ fontSize:9, fontWeight:600, color: inPlan ? 'rgba(255,255,255,0.4)' : 'var(--text)' }}>{item.nameRu}</span>
+                              <span style={{ fontSize:9, fontWeight:600, color: inPlan ? 'rgba(255,255,255,0.4)' : '#ffffff' }}>{item.nameRu}</span>
                               <span style={{ fontSize:7, fontWeight:600, color:'rgba(255,255,255,0.4)', padding:'0px 3px', borderRadius:3, background:'rgba(255,255,255,0.04)' }}>{item.dose}</span>
                               {isRecommended && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(99,102,241,0.15)', color:'#a5b4fc', fontWeight:700 }}>рек.</span>}
                               {inPlan && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.15)', color:'#00e68a', fontWeight:700 }}>в плане</span>}
@@ -1512,7 +1512,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   <button onClick={() => {
                     if (!alreadyActive) setSelectedStacks(prev => [...prev, stackModulePopup]);
                     setStackModulePopup(null);
-                  }} style={{ flex:2, padding:'10px', borderRadius:10, fontSize:10, fontWeight:800, cursor:'pointer', background: alreadyActive ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg,${meta.col},${meta.col}cc)`, border:'none', color: alreadyActive ? 'var(--text-dim)' : '#000' }}>
+                  }} style={{ flex:2, padding:'10px', borderRadius:10, fontSize:10, fontWeight:800, cursor:'pointer', background: alreadyActive ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg,${meta.col},${meta.col}cc)`, border:'none', color: alreadyActive ? 'rgba(255,255,255,0.55)' : '#000' }}>
                     {alreadyActive ? '✓ Уже добавлен' : `Добавить модуль (${recommendedCount} рек.)`}
                   </button>
                 </div>
@@ -1617,7 +1617,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               const active = symptoms.includes(sym);
               return (
                 <button key={sym} onClick={() => setSymptoms(prev => active ? prev.filter(s => s !== sym) : [...prev, sym])}
-                  style={{ padding:'3px 7px', borderRadius:6, fontSize:8, fontWeight:600, cursor:'pointer', border:`1px solid ${active ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.06)'}`, background: active ? 'rgba(99,102,241,0.15)' : 'transparent', color: active ? '#a5b4fc' : 'var(--text-dim)' }}>
+                  style={{ padding:'3px 7px', borderRadius:6, fontSize:8, fontWeight:600, cursor:'pointer', border:`1px solid ${active ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.06)'}`, background: active ? 'rgba(99,102,241,0.15)' : 'transparent', color: active ? '#a5b4fc' : 'rgba(255,255,255,0.55)' }}>
                   {active ? '✓' : ''} {label}
                 </button>
               );
@@ -2182,7 +2182,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     <div key={panel.id} style={{ padding:'5px 7px', borderRadius:6, marginBottom:3, background: panel.active ? `${panel.color}08` : 'rgba(255,255,255,0.01)', border:`1px solid ${panel.active ? panel.color+'18' : 'rgba(255,255,255,0.04)'}`, opacity: panel.active ? 1 : 0.6 }}>
                       <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
                         <span style={{ fontSize:11 }}>{panel.icon}</span>
-                        <span style={{ fontSize:8, fontWeight:700, color: panel.active ? panel.color : 'var(--text-dim)' }}>{panel.name}</span>
+                        <span style={{ fontSize:8, fontWeight:700, color: panel.active ? panel.color : 'rgba(255,255,255,0.55)' }}>{panel.name}</span>
                         {!panel.active && <span style={{ fontSize:6, color:'rgba(255,255,255,0.3)', padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.04)' }}>плановая</span>}
                       </div>
                       <div style={{ fontSize:6, color:'rgba(255,255,255,0.5)', lineHeight:1.5, marginLeft:16 }}>
