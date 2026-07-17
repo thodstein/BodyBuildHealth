@@ -4,7 +4,7 @@
  * Позволяет BbAutoConstructor и TrainingConstructor использовать
  * готовые ПРОФ-циклы с конкретными упражнениями вместо generic-генерации.
  */
-import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
+import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec, SRDirection, SRLevel, SRPeriod } from '../../data/lms-cycles/lms-types';
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
 import { getBBVolumeLandmarks } from './bb-builder.engine';
 import { PCT_FOR_RIR } from '../rir-table';
@@ -14,9 +14,76 @@ import { adaptForPEDs, type PED, type CourseIntensity } from './bb-ped-adaptatio
 import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-plan-builder';
 import { applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
+import type { FullProgram } from '../../engines/complete-program-library.engine';
 
 export type CycleSourceCycle = SRCycleTemplate;
 export type BBVolumeGoal = 'mev' | 'mav' | 'mrv';
+
+/**
+ * Конвертер программы из библиотеки (FullProgram) → SRCycleTemplate.
+ * Позволяет загружать программы (Starting Strength, 5/3/1, PPL, Arnold, и др.)
+ * в ББ-авто как цикл — с применением всех PRO-фич (PED-дозы, intensity, deload, и т.д.).
+ */
+export function programToCycleTemplate(program: FullProgram): SRCycleTemplate {
+  const goalToDirection: Record<string, SRDirection> = {
+    strength: 'powerlifting', hypertrophy: 'bodybuilding', powerlifting: 'powerlifting',
+    bodybuilding: 'bodybuilding', athletic: 'bodybuilding', rehab: 'bodybuilding', peaking: 'powerlifting',
+  };
+  const levelToSRLevel: Record<string, SRLevel> = {
+    beginner: 'novice', intermediate: 'intermediate', advanced: 'KMS-MS',
+  };
+  const goalToPeriod: Record<string, SRPeriod> = {
+    strength: 'strength', hypertrophy: 'mass', powerlifting: 'strength',
+    bodybuilding: 'mass', athletic: 'mixed', rehab: 'mixed', peaking: 'peak',
+  };
+
+  // Берём неделю 1 как шаблон ротации
+  const week1 = program.weeks[0];
+  const deloadWeeks = program.weeks.filter(w => w.deload).map(w => w.week);
+
+  // Конвертировать день программы → SRDaySpec
+  const days: SRDaySpec[] = week1.days.map(day => ({
+    exercises: day.exercises.map(ex => {
+      const reps = parseInt(String(ex.reps)) || 10;
+      const rir = ex.rir ?? 2;
+      const pct = PCT_FOR_RIR[rir] ?? 0.72;
+      const group = muscleGroupFromExName(ex.name, EXERCISE_CATALOG);
+      const spec: SRExerciseSpec = {
+        name: ex.name,
+        group: group === 'chest' ? 'Грудь' : group === 'back' ? 'Спина' : group === 'shoulders' ? 'Плечи'
+          : group === 'quads' || group === 'hamstrings' || group === 'glutes' || group === 'calves' ? 'Ноги'
+          : group === 'biceps' || group === 'triceps' || group === 'forearms' ? 'Руки'
+          : group === 'abs' || group === 'core' ? 'Кор' : 'Грудь',
+        coef: 1.0,
+        mnosz: 1,
+        load: rir <= 1 ? 'Тяжелая' : rir <= 3 ? 'Тяжелая' : 'Средняя',
+        sets: [{ pct, reps, sets: ex.sets, rir }] as SRSetSpec[],
+      };
+      return spec;
+    }),
+  }));
+
+  return {
+    meta: {
+      id: 'prog_' + program.id,
+      title: program.name,
+      direction: goalToDirection[program.goal] || 'bodybuilding',
+      level: levelToSRLevel[program.level] || 'intermediate',
+      period: goalToPeriod[program.goal] || 'mass',
+      sessionsPerWeek: program.daysPerWeek,
+      weeks: program.durationWeeks,
+      correctionPct: 0.005,
+      description: program.description,
+      howItWorks: `Программа «${program.name}» (${program.author}). ${program.progressionModel}. ${program.deloadProtocol}.`,
+      conditions: program.warnings || [],
+      tags: ['program'],
+      targetFocus: 'mixed',
+      deloadWeeks: deloadWeeks.length > 0 ? deloadWeeks : undefined,
+      rirProgression: { start: 3, end: 1 },
+    },
+    week1: days,
+  };
+}
 
 export interface CycleToPlanInput {
   cycle: SRCycleTemplate;
@@ -53,6 +120,8 @@ export interface CycleToPlanInput {
   focusGroup?: string;
   /** Уровень атлета (для volume-landmarks валидации). */
   level?: string;
+  /** Доступное оборудование — фильтр отбора упражнений. */
+  equipment?: string[];
 }
 
 function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG): string {
@@ -234,7 +303,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     intensityTechnique, autoDeload, deloadType, autoRegResult,
     favoriteExercises = [], excludedExercises = [], avoidAxialLoad = false,
     volumeGoal = 'mav', specialization = false, focusGroup = '',
-    level = 'advanced',
+    level = 'advanced', equipment = [],
   } = input;
   const meta = cycle.meta;
   const totalWeeks = meta.weeks;
@@ -332,6 +401,15 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         if (avoidAxialLoad && catEntry && isAxialLoadExercise(catEntry)) {
           const rep = findReplacementForCycle(bbExName, muscleGroupFromExName(bbExName, EXERCISE_CATALOG), favNames, favIdSet);
           if (rep) { finalExName = rep.name; }
+        }
+        // Проверка: оборудование (если указано) → замена если упражнение требует недоступного оборудования
+        if (equipment.length > 0 && catEntry) {
+          const rawEq = (catEntry as any).equipment;
+          const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
+          if (exEq.length > 0 && !exEq.some(eq => equipment.includes(eq))) {
+            const rep = findReplacementForCycle(bbExName, muscleGroupFromExName(bbExName, EXERCISE_CATALOG), favNames, favIdSet);
+            if (rep) { finalExName = rep.name; }
+          }
         }
         const exRir = computeRirForEx(w, totalWeeks, rirProg, phases);
         const isPrimary = isPrimaryByLoad(exSpec.load);
@@ -503,5 +581,20 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const pedMrvMult = pedAdapt.combinedMrvMultiplier ?? 1;
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, pedMrvMult);
 
-  return { ...finalPlan, volumeLandmarks };
+  // muscleFrequency: вычислить из дней недели 1 — сколько раз каждая мышца тренируется
+  const muscleFrequency: Record<string, number> = {};
+  for (const day of week1Days) {
+    const dayMuscles = new Set<string>();
+    for (const exSpec of day.exercises) {
+      const bbRep = replacePLForBB(exSpec.name, exSpec.group || muscleGroupFromExName(exSpec.name, EXERCISE_CATALOG));
+      if (!bbRep) continue;
+      const muscle = muscleGroupFromExName(bbRep.name, EXERCISE_CATALOG);
+      if (!excludedMuscles.has(muscle)) dayMuscles.add(muscle);
+    }
+    for (const m of dayMuscles) {
+      muscleFrequency[m] = (muscleFrequency[m] || 0) + 1;
+    }
+  }
+
+  return { ...finalPlan, volumeLandmarks, muscleFrequency };
 }

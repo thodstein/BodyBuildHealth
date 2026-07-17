@@ -72,6 +72,8 @@ export interface BBBuilderInput {
   pedDoses?: Record<string, number>;
   /** Интенсивность курса — дополнительный MRV boost (mild 1.0 / moderate 1.04 / heavy 1.08). */
   courseIntensity?: CourseIntensity;
+  /** Доступное оборудование (штанга/гантели/блок/машина/гири/свой вес) — фильтр отбора упражнений. */
+  equipment?: string[];
 }
 
 export interface BBSet {
@@ -120,6 +122,8 @@ export interface BBPlan {
   rationale: string[];
   /** Volume-landmarks (MEV/MAV/MRV) по пиковой неделе — единый источник, как в PL/ручном. */
   volumeLandmarks?: VolumeLandmarkRow[];
+  /** Частота тренировок каждой мышцы в неделю (1×/2×/3×) — ключевой фактор гипертрофии. */
+  muscleFrequency?: Record<string, number>;
 }
 
 /**
@@ -400,6 +404,7 @@ function buildSession(
   favoriteIds: string[] = [],
   excludeIds: string[] = [],
   avoidAxialLoad: boolean = false,
+  equipmentList: string[] = [],
 ): BBSession {
   const character = sched.character as DayCharacter;
   const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles);
@@ -504,6 +509,12 @@ function buildSession(
       if (tm === null || !roleMuscles.includes(tm)) return false;
       // BB-junk фильтр: реабилитация/кор-стабильность/изометрика не для гипертрофии
       if (isBBJunk(ex)) return false;
+      // Equipment hard filter: если указано оборудование — исключить упражнения без него
+      if (equipmentList.length > 0) {
+        const rawEq = ex.equipment;
+        const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
+        if (exEq.length > 0 && !exEq.some(eq => equipmentList.includes(eq))) return false;
+      }
       return true;
     });
     // Фильтр по контексту сессии (доп. страховка, в основном инертен после
@@ -527,12 +538,13 @@ function buildSession(
       const tm = trueMuscleOf(ex);
       if (tm === null || !roleMuscles.includes(tm)) return false;
       if (isBBJunk(ex)) return false;
+      // Equipment fallback: не фильтруем по оборудованию (лучше хоть что-то, чем пусто)
       return true;
     });
     const selected = selectExercisesSmart({
       candidates: pool, muscleGroup: muscle, count: exerciseCount,
       selectedIds: sessionSelectedIds, selectedNames: sessionSelectedNames,
-      equipment: [], weakZones: weakPoints, level, injuryProfile, type: selType,
+      equipment: equipmentList, weakZones: weakPoints, level, injuryProfile, type: selType,
       targetRir: rir,
       preferBB: true,
       favoriteIds, excludeIds,
@@ -818,6 +830,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const favIds = input.favoriteExercises || [];
   const exclIds = input.excludedExercises || [];
   const avAxial = input.avoidAxialLoad || false;
+  const eqList = input.equipment || [];
 
   const today = todayStr();
   const excludedMuscles = getExcludedMuscles(injuries, today);
@@ -959,7 +972,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const weekExcluded = getExcludedMuscles(injuries, weekDate);
       const weekGraded = getGradedInjuries(injuries, weekDate);
       const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
-      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], isFB ? fbUsedNames : [], rotationIds, favIds, exclIds, avAxial);
+      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], isFB ? fbUsedNames : [], rotationIds, favIds, exclIds, avAxial, eqList);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {
@@ -1153,5 +1166,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   }
   const pedMrvMult = (pedAdapt?.combinedMrvMultiplier ?? 1);
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, pedMrvMult);
-  return { ...finalPlan, volumeLandmarks };
+  // muscleFrequency: muscleSessionCount содержит число сессий на мышцу за ротацию (= неделя для 7-дн паттернов)
+  const muscleFrequency: Record<string, number> = {};
+  for (const [m, count] of Object.entries(muscleSessionCount)) {
+    muscleFrequency[collapseKey(m)] = count;
+  }
+  return { ...finalPlan, volumeLandmarks, muscleFrequency };
 }

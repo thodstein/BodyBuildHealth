@@ -33,6 +33,8 @@ import {
   GOAL_FILTER_OPTIONS, WOMENS_PROGRAMS, CUSTOM_PROGRAMS,
   PROGRAM_LEVEL_MAP, PROGRAM_GOAL_MAP, PROGRAM_EQUIP_MAP,
 } from './programs-data';
+import { applyToPlanner } from './planner-bridge';
+import { programToCycleTemplate } from '../../../engines/bb/cycle-to-plan';
 
 export const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelectedProgram: (id: string | null) => void; onAddToMyTraining?: (exercises: { name: string; sets: number; reps: number; rir: number }[]) => void }> = ({ selectedProgram: selectedId, setSelectedProgram: setSelectedId, onAddToMyTraining }) => {
   const [goalFilter, setGoalFilter] = React.useState('all');
@@ -54,6 +56,19 @@ export const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelected
   const [loadedMsg, setLoadedMsg] = useState('');
   const [myProgMsg, setMyProgMsg] = useState('');
   const [myTrainingMsg, setMyTrainingMsg] = useState('');
+  const [bbMsg, setBbMsg] = useState('');
+  const handleSendToBbAuto = () => {
+    if (!selected) return;
+    try {
+      const cycleTpl = programToCycleTemplate(selected);
+      applyToPlanner({ kind: 'program', label: selected.name, data: cycleTpl });
+      setBbMsg('✅ Отправлено в ББ-авто! Перейдите в Планировщик → ББ-авто.');
+      setTimeout(() => setBbMsg(''), 4000);
+    } catch (e: any) {
+      setBbMsg('❌ Ошибка конвертации: ' + (e?.message || String(e)));
+      setTimeout(() => setBbMsg(''), 4000);
+    }
+  };
   const handleLoadProgram = () => {
     if (!selected) return;
     try {
@@ -214,6 +229,14 @@ export const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelected
             }}>
             ⭐ В мою тренировку
           </button>
+          <button onClick={handleSendToBbAuto}
+            style={{
+              width: '100%', padding: 10, borderRadius: 10, border: '1px solid #00e68a', cursor: 'pointer',
+              background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontWeight: 700, fontSize: 12, marginBottom: 6,
+            }}>
+            📥 В ББ-авто (с PED/делод/техниками)
+          </button>
+          {bbMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontSize:10, marginBottom:6, textAlign:'center' }}>{bbMsg}</div>}
           {loadedMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontSize:10, marginBottom:6, textAlign:'center' }}>{loadedMsg}</div>}
           {myProgMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontSize:10, marginBottom:6, textAlign:'center' }}>{myProgMsg}</div>}
           {myTrainingMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(255,215,0,0.1)', border:'1px solid rgba(255,215,0,0.3)', color:'#ffd700', fontSize:10, marginBottom:6, textAlign:'center' }}>{myTrainingMsg}</div>}
