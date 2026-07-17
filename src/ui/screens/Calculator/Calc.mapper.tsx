@@ -997,7 +997,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       )}
 
       {/* ── Попап полного каталога стеков (Усиление) — ВСЕ 55 стеков из ALL_STACKS ── */}
-      {showEnhancementPopup && (
+      {showEnhancementPopup && ReactDOM.createPortal(
          <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setShowEnhancementPopup(false)}>
            <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
              <div style={{ height:3, background:'linear-gradient(90deg,#f87171,#ef4444)' }} />
@@ -1146,10 +1146,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
       {/* ── Попап Мега-усиления (умный подбор по gaps + синергии) ── */}
-      {showMegaPopup && (
+      {showMegaPopup && ReactDOM.createPortal(
          <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setShowMegaPopup(false)}>
            <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:400, borderRadius:18, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'88vh', display:'flex', flexDirection:'column' }}>
              <div style={{ height:3, background:'linear-gradient(90deg,#f87171,#ef4444)' }} />
@@ -1237,7 +1237,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             )}
           </div>
         </div>
-      )}
+      , document.body)}
 
       {/* ── Попап анализа доп. модуля (ПОРТАЛ — экранирует backdrop-filter предка) ── */}
       {stackModulePopup && ReactDOM.createPortal((() => {
