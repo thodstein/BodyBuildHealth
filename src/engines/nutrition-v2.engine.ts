@@ -7,7 +7,7 @@ export interface NutritionV2Input {
   sex: 'male' | 'female';
   bodyFatPercent?: number;
   pal: number;
-  goal: 'deficit' | 'maintenance' | 'bulk' | 'mini_cut';
+  goal: 'deficit' | 'maintenance' | 'bulk' | 'mini_cut' | 'cut';
   trainingDaysPerWeek?: number;
   avgTrainingMinutes?: number;
 }
