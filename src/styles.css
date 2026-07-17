@@ -2288,6 +2288,12 @@ table[style*="background"][style*="rgba(255, 255, 255, 0.0"] {
   border-radius: 16px !important;
   box-shadow: 0 8px 24px rgba(0,0,0,0.22) !important;
 }
+/* Exclude: popup inner containers must NOT have backdrop-filter (containing-block bug) */
+div[style*="position:fixed"] div[style*="background"][style*="#18181b"],
+div[style*="position:fixed"] div[style*="background"][style*="#16161a"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
 /* PharmaCourse scoped card class → same unified look */
 .pc-card {
   background: var(--glass-bg) !important;
