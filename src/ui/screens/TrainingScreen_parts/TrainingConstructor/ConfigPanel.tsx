@@ -36,13 +36,19 @@ const panelBase: React.CSSProperties = {
   boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
 };
 const PANEL: React.CSSProperties = { ...panelBase, padding: 14, margin: '8px 0' };
-const PANEL_TITLE: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 8, textTransform: 'uppercase' };
+const PANEL_TITLE = (color: string): React.CSSProperties => ({
+  fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 8,
+  background: color + '22', borderLeft: `3px solid ${color}`, borderRadius: 8,
+  padding: '7px 10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  letterSpacing: 0.2,
+});
 const cardBtn = (active: boolean): React.CSSProperties => ({
   width: '100%', textAlign: 'left', cursor: 'pointer',
-  padding: '8px 10px', borderRadius: R.in, fontSize: 11, fontWeight: 700,
-  background: active ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.03)',
-  border: '1px solid ' + (active ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'),
-  color: active ? ACCENT : 'rgba(255,255,255,0.55)',
+  padding: '11px 10px', borderRadius: R.in, fontSize: 12, fontWeight: 700,
+  background: active ? 'rgba(0,230,138,0.22)' : 'rgba(255,255,255,0.03)',
+  border: (active ? '2px solid ' : '1px solid ') + (active ? ACCENT : 'rgba(255,255,255,0.08)'),
+  color: active ? '#ffffff' : 'rgba(255,255,255,0.7)',
+  boxShadow: active ? `0 0 0 1px ${ACCENT}55, 0 2px 10px rgba(0,0,0,0.25)` : 'none',
   transition: 'all 0.2s',
 });
 
@@ -56,7 +62,7 @@ interface Props {
 
 const ConfigSection: React.FC<{ title: string; color: string; children: React.ReactNode }> = ({ title, color, children }) => (
   <div style={{ ...PANEL }}>
-    <div style={{ ...PANEL_TITLE, color }}>{title}</div>
+    <div style={{ ...PANEL_TITLE(color) }}>{title}</div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>{children}</div>
   </div>
 );

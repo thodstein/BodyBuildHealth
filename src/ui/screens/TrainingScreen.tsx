@@ -566,12 +566,12 @@ export const TrainingScreen: React.FC = () => {
       {zone === 'planner' && (
         <InfoErrorBoundary label="Планировщик">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display:'flex', gap:4, padding:'6px', borderRadius:12, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ display:'flex', gap:4, padding:'6px', borderRadius:12, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', overflowX:'auto', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' }}>
               {PLANNER_MODES.map(m => (
-                <button key={m.id} onClick={() => { hapticImpact('medium'); switchPlanningTrack(m.id); }} style={{ flex:1, padding:'8px 4px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer', border: planningTrack === m.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)', background: planningTrack === m.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)', color: planningTrack === m.id ? 'var(--accent)' : 'var(--text-dim)', display:'flex', flexDirection:'column', alignItems:'center', gap:2, whiteSpace:'normal', wordBreak:'break-word' }}>
+                <button key={m.id} onClick={() => { hapticImpact('medium'); switchPlanningTrack(m.id); }} style={{ flex:'0 0 auto', minWidth:104, padding:'8px 10px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', border: planningTrack === m.id ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)', background: planningTrack === m.id ? 'rgba(0,230,138,0.20)' : 'rgba(255,255,255,0.02)', color: planningTrack === m.id ? '#ffffff' : 'var(--text-dim)', display:'flex', flexDirection:'column', alignItems:'center', gap:2, whiteSpace:'nowrap', boxShadow: planningTrack === m.id ? '0 0 0 1px rgba(0,230,138,0.4), 0 2px 10px rgba(0,0,0,0.25)' : 'none' }}>
                   <span style={{ fontSize:16 }}>{m.icon}</span>
                   <span>{m.label}</span>
-                  <span style={{ fontSize:9, fontWeight:400, opacity:0.7, lineHeight:1.2 }}>{m.hint}</span>
+                  <span style={{ fontSize:9, fontWeight:400, opacity:0.75, lineHeight:1.2, maxWidth:'100%', overflow:'hidden', textOverflow:'ellipsis' }}>{m.hint}</span>
                 </button>
               ))}
             </div>
