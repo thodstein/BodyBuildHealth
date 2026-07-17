@@ -24,15 +24,6 @@ const CNS_SYMPTOMS = [
 
 const SEX_OPTS = [{ v: 'male', l: 'Муж' }, { v: 'female', l: 'Жен' }];
 const EXP_OPTS = [{ v: 'beginner', l: 'Новичок' }, { v: 'intermediate', l: 'Средний' }, { v: 'advanced', l: 'Продвинутый' }];
-const GOAL_OPTS = [
-  { v: 'muscle_gain', l: 'Набор массы' }, { v: 'fat_loss', l: 'Жиросжигание' },
-  { v: 'recovery', l: 'Восстановление' }, { v: 'endurance', l: 'Выносливость' },
-  { v: 'immunity', l: 'Иммунитет' }, { v: 'cognitive', l: 'Когнитивно' }, { v: 'longevity', l: 'Долголетие' },
-];
-const AAS_OPTS = [{ v: 'none', l: 'Нет' }, { v: 'trt', l: 'TRT' }, { v: 'cycle', l: 'Курс' }, { v: 'pct', l: 'PCT' }, { v: 'bridge', l: 'Мост' }];
-const BUDGET_OPTS = [{ v: 'low', l: 'Низкий' }, { v: 'medium', l: 'Средний' }, { v: 'high', l: 'Высокий' }];
-const COMPLEXITY_OPTS = [{ v: 'minimal', l: 'Минимальный' }, { v: 'balanced', l: 'Сбалансированный' }, { v: 'comprehensive', l: 'Полный' }];
-const ADCLASS_OPTS = [{ v: 'none', l: 'Нет' }, { v: 'sarm', l: 'SARM' }, { v: 'peptide', l: 'Пептиды' }, { v: 'prohormone', l: 'Прогормоны' }];
 const HEALTH_OPTS = [
   { v: 'liver', l: 'Печень' }, { v: 'kidney', l: 'Почки' }, { v: 'heart', l: 'Сердце' },
   { v: 'thyroid', l: 'Щитовидная' }, { v: 'stomach', l: 'ЖКТ' }, { v: 'diabetes', l: 'Диабет' },
@@ -248,37 +239,6 @@ function ProfileTab(props: {
         <div>
           <div style={rowLabel}>Уровень подготовки</div>
           <Selector options={EXP_OPTS} value={p.experience} onChange={v => setOne('experience', v)} />
-        </div>
-      </Section>
-
-      {/* Цели и курс */}
-      <Section icon="🎯" title="Цели и курс" filled={!!(p.goals?.length)} onAuto={autoFill}>
-        <div style={{ marginBottom: 14 }}>
-          <div style={rowLabel}>Цели{((p.goals || []).length) ? ` · ${(p.goals || []).length}` : ''}</div>
-          <Chips options={GOAL_OPTS} selected={p.goals || []} onToggle={v => toggle('goals', v)} />
-        </div>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 130 }}>
-            <div style={rowLabel}>Статус PED</div>
-            <Selector options={AAS_OPTS} value={p.aasStatus} onChange={v => setOne('aasStatus', v)} />
-          </div>
-          <div style={{ flex: 1, minWidth: 130 }}>
-            <div style={rowLabel}>Бюджет</div>
-            <Selector options={BUDGET_OPTS} value={p.budget} onChange={v => setOne('budget', v)} />
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 14 }}>
-          <div style={{ flex: 1, minWidth: 130 }}>
-            <div style={rowLabel}>Сложность стека</div>
-            <Selector options={COMPLEXITY_OPTS} value={p.stackComplexity} onChange={v => setOne('stackComplexity', v)} />
-          </div>
-          <div style={{ flex: 1, minWidth: 130 }}>
-            <div style={rowLabel}>Класс препаратов</div>
-            <Selector options={ADCLASS_OPTS} value={p.adClass} onChange={v => setOne('adClass', v)} />
-          </div>
-        </div>
-        <div style={{ marginTop: 14, maxWidth: 160 }}>
-          <NumRow label="Макс. размер стека" value={p.maxStackSize} placeholder="8" onChange={v => setNum('maxStackSize', v)} />
         </div>
       </Section>
 
