@@ -120,6 +120,7 @@ export const IndividualPlanSettings: React.FC = () => {
   const [showSpecialMealModal, setShowSpecialMealModal] = useState(false);
   const [showPrefFoodModal, setShowPrefFoodModal] = useState(false);
   const [showExclFoodModal, setShowExclFoodModal] = useState(false);
+  const [showMetaModal, setShowMetaModal] = useState(false);
   const [prefSearch, setPrefSearch] = useState('');
   const [exclSearch, setExclSearch] = useState('');
   const [showSpecialMealPopup, setShowSpecialMealPopup] = useState(false);
@@ -1658,7 +1659,6 @@ export const IndividualPlanSettings: React.FC = () => {
 
         {/* Metabolic adaptation */}
         {(() => {
-          const [showMetaModal, setShowMetaModal] = React.useState(false);
           return <>
             <div style={{ marginTop:12, padding:12, borderRadius:12, background: metabolicAdaptEnabled ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.02)', border: metabolicAdaptEnabled ? '1px solid rgba(245,158,11,0.15)' : '1px solid rgba(255,255,255,0.04)' }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>

@@ -53,6 +53,8 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
   createStack: () => void; deleteStack: (i: number) => void; renameStack: (i: number, name: string) => void;
   linked?: LinkedData;
 }) {
+  // Stack actions popup state (must be at top level — Rules of Hooks)
+  const [actOpen, setActOpen] = useState(false);
   const explanation = useMemo(() => {
     if (stackIds.length === 0) return null;
     const fp = toFinderProfile(profile);
@@ -1283,7 +1285,6 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
 
       {/* 🚀 Действия со стеком — компактная кнопка-попап */}
       {(() => {
-        const [actOpen, setActOpen] = useState(false);
         return (
           <>
             <button onClick={() => setActOpen(true)} style={{

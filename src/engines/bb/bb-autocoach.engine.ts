@@ -33,6 +33,9 @@ export interface LoadStrategyPrescription {
  * @param week — неделя мезоцикла (1-based)
  * @param totalWeeks — всего недель
  * @param phase — текущая фаза
+ * @param exType — тип упражнения ('compound' | 'isolation' | 'accessory' | 'machine' | 'cable')
+ *                  для P4: linear-прогрессия масштабируется по типу.
+ * @param role — роль в сессии ('primary' | 'accessory') — для P4-корректировки.
  */
 export function prescribeLoad(
   strategy: LoadStrategy,
@@ -43,6 +46,8 @@ export function prescribeLoad(
   week: number,
   totalWeeks: number,
   phase: string,
+  exType?: string,
+  role?: 'primary' | 'accessory',
 ): LoadStrategyPrescription {
   switch (strategy) {
     case 'double_progression': {
@@ -64,13 +69,24 @@ export function prescribeLoad(
       };
     }
     case 'linear': {
-      // +2.5 кг для compounds, +1 кг для изоляции каждую неделю
-      const increment = week < totalWeeks * 0.75 ? 2.5 : 1.25;
+      // P4: разделение increment по типу упражнения. Изоляция +1кг/нед = перетрен трицепса.
+      // Compound +2.5кг, machine_compound +1.5кг, isolation +1кг, accessory +0.5кг.
+      const phaseMult = week < totalWeeks * 0.75 ? 1.0 : 0.5; // ramp down в последней четверти
+      const typeBase: Record<string, number> = {
+        compound: 2.5,
+        machine_compound: 1.5,
+        cable: 1.25,
+        machine: 1.0,
+        isolation: 1.0,
+        accessory: 0.5,
+      };
+      const baseIncr = typeBase[exType || 'compound'] ?? (role === 'accessory' ? 0.5 : 1.5);
+      const increment = baseIncr * phaseMult;
       return {
         nextWeight: Math.round((currentWeight + increment) * 10) / 10,
         nextReps: currentReps,
         nextRIR: Math.max(0, currentRIR - 1),
-        label: `Добавьте +${increment} кг (линейная прогрессия, нед ${week})`,
+        label: `Линейная ${exType || 'compound'}: +${increment.toFixed(1)} кг/нед (нед ${week}${phaseMult < 1 ? ' — ramp down' : ''})`,
       };
     }
     case 'wave': {
@@ -86,12 +102,39 @@ export function prescribeLoad(
       };
     }
     case 'rpe_based': {
-      // RPE-базированная: спортсмен выбирает вес по ощущению
+      // P3: реальный RPE-алгоритм.
+      // Target RPE нарастает от accumulation (7) к peaking (9.5): linear по фазе + неделя внутри фазы.
+      // Если currentRIR (фактический RPE) отклоняется от targetRIR — корректируем вес.
+      // RPE 10 = отказ (RIR 0), RPE 9 = RIR 1, ..., RPE 5 = RIR 5.
+      // Целевой RIR по неделе: accumulation week 1 → RIR 3 (RPE 7), peaking last week → RIR 0 (RPE 10).
+      const phaseStartRir: Record<string, [number, number]> = {
+        accumulation: [3, 1],   // нед 1: RIR 3, нед N: RIR 1
+        intensification: [2, 0], // нед 1: RIR 2, нед N: RIR 0
+        peaking: [1, 0],
+        deload: [4, 4],
+      };
+      const rirRange = phaseStartRir[phase] || [2, 0];
+      const phaseProgress = totalWeeks > 1 ? (week - 1) / (totalWeeks - 1) : 0;
+      const targetRir = Math.max(0, Math.round(rirRange[0] - phaseProgress * (rirRange[0] - rirRange[1])));
+      // Корректировка: если фактический RIR > targetRIR (легче, чем нужно) → вес ↑,
+      // если < targetRIR (тяжелее) → вес ↓.
+      const rirDelta = currentRIR - targetRir;
+      let weightMult = 1.0;
+      let direction = '';
+      if (rirDelta >= 1) {
+        weightMult = 1.025;  // +2.5% — наращиваем нагрузку
+        direction = `RIR ${currentRIR} > target ${targetRir}: +2.5% веса (наращивание)`;
+      } else if (rirDelta <= -1) {
+        weightMult = 0.97;   // -3% — снижаем, был перебор
+        direction = `RIR ${currentRIR} < target ${targetRir}: -3% веса (восстановление)`;
+      } else {
+        direction = `RIR ${currentRIR} ≈ target ${targetRir}: удержание веса`;
+      }
       return {
-        nextWeight: currentWeight,
+        nextWeight: Math.round(currentWeight * weightMult * 10) / 10,
         nextReps: currentReps,
-        nextRIR: currentRIR,
-        label: `RPE-ориентир: подберите вес на RIR ${Math.max(0, currentRIR - 1)} (${week === totalWeeks ? 'пик' : 'прогрессия'})`,
+        nextRIR: targetRir,
+        label: `RPE-стратегия: ${direction}`,
       };
     }
     default:
@@ -176,6 +219,136 @@ export function rirDrift(baseRir: [number, number], weekInPhase: number, phaseWe
   if (phaseWeeks <= 1) return start;
   const drift = Math.floor((weekInPhase - 1) / 2); // снижение на 1 каждые 2 недели
   return Math.max(end, start - drift);
+}
+
+/* ──────────── Intensity techniques (P6) ──────────── */
+/**
+ * Реальные intensity techniques, применяемые к финальному подходу упражнения.
+ * Каждая техника модифицирует reps/tempo/weight/notes упражнения.
+ *
+ * rest_pause: 1×8+15s+1×3-4+15s+1×3-4 = 1 «сет» из 14-16 reps
+ * drop_set: 1×10+30s+1×6(-20%)+30s+1×4(-20%) = 1 «сет» из 20 reps
+ * myo_reps: 1×12-15+3-5 mini-сетов × 3-5 reps (5с отдых) = 21-30 reps
+ * pause_rep: +2-3с пауза в нижней точке (модифицирует tempo)
+ * mechanical_drop: смена угла без отдыха
+ */
+export type IntensityTechnique = 'rest_pause' | 'drop_set' | 'myo_reps' | 'pause_rep' | 'mechanical_drop' | 'none';
+
+export interface IntensityTechniqueMeta {
+  type: IntensityTechnique;
+  label: string;
+  appliesTo: ('compound' | 'isolation' | 'accessory')[];
+  /** Фазы, в которых техника уместна */
+  phases: BBPhase[];
+  /** Описание для UI */
+  description: string;
+}
+
+export const INTENSITY_TECHNIQUES: Record<IntensityTechnique, IntensityTechniqueMeta> = {
+  none: { type: 'none', label: 'Без техники', appliesTo: ['compound','isolation','accessory'], phases: ['accumulation','intensification','deload','peaking'], description: 'Стандартное выполнение.' },
+  rest_pause: {
+    type: 'rest_pause', label: 'Rest-pause', appliesTo: ['compound','isolation'],
+    phases: ['intensification','peaking'],
+    description: 'Финальный сет: 1×8 → 15с отдых → 1×3-4 → 15с → 1×3-4. Итого 14-16 reps в 1 «сете».',
+  },
+  drop_set: {
+    type: 'drop_set', label: 'Drop-set', appliesTo: ['isolation','accessory'],
+    phases: ['intensification','accumulation'],
+    description: 'Финальный сет: 1×10 → -20% веса → 1×6 → -20% → 1×4. 3 дропа без полного отдыха.',
+  },
+  myo_reps: {
+    type: 'myo_reps', label: 'Myo-reps', appliesTo: ['isolation','accessory'],
+    phases: ['accumulation','intensification'],
+    description: '1×12-15 (активация) → 5с × 3-5 mini-сетов по 3-5 reps. Итого 21-30 reps.',
+  },
+  pause_rep: {
+    type: 'pause_rep', label: 'Pause-rep', appliesTo: ['compound','isolation'],
+    phases: ['accumulation','intensification','peaking'],
+    description: 'Пауза 1-3с в нижней точке каждого повторения (модифицирует tempo).',
+  },
+  mechanical_drop: {
+    type: 'mechanical_drop', label: 'Mechanical drop', appliesTo: ['compound','isolation'],
+    phases: ['intensification','peaking'],
+    description: 'Смена угла/хвата без отдыха: наклон → горизонт → снизу (для жима).',
+  },
+};
+
+/** Дефолтные техники по фазам (для primary упражнений) */
+export const DEFAULT_TECHNIQUE_BY_PHASE: Record<BBPhase, IntensityTechnique> = {
+  accumulation: 'pause_rep',
+  intensification: 'rest_pause',
+  peaking: 'rest_pause',
+  deload: 'none',
+};
+
+/**
+ * Применить intensity technique к упражнению. Модифицирует workSets + comments.
+ * Не меняет sets/rir (они фазо-корректные из buildSession) — только reps/tempo/notes.
+ */
+function applyIntensityTechniqueToExercise(
+  e: { workSets: BBSet[]; comment?: string; role: string; muscle: string },
+  technique: IntensityTechnique,
+  _phase: BBPhase,
+): void {
+  if (technique === 'none' || e.workSets.length === 0) return;
+  const lastSet = e.workSets[e.workSets.length - 1];
+  const baseWeight = lastSet.weight;
+  const baseReps = lastSet.reps;
+
+  switch (technique) {
+    case 'rest_pause': {
+      // 1×8+15s+1×3-4+15s+1×3-4 — добавляем 2 mini-сета
+      e.workSets.push({ reps: 3, rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 15 });
+      e.workSets.push({ reps: 3, rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 15 });
+      if (!e.comment || !e.comment.includes('Rest-pause')) {
+        e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🎯 Rest-pause финальный сет';
+      }
+      break;
+    }
+    case 'drop_set': {
+      // 1×10 → -20% → 1×6 → -20% → 1×4
+      e.workSets.push({ reps: 6, rir: lastSet.rir, weight: Math.round(baseWeight * 0.8 * 10) / 10, tempo: '2-0-1-0', restSeconds: 30 });
+      e.workSets.push({ reps: 4, rir: lastSet.rir, weight: Math.round(baseWeight * 0.64 * 10) / 10, tempo: '2-0-1-0', restSeconds: 30 });
+      if (!e.comment || !e.comment.includes('Drop-set')) {
+        e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🎯 Drop-set (-20%×2)';
+      }
+      break;
+    }
+    case 'myo_reps': {
+      // 1×12-15 (активация — последний set) + 4 mini-сета × 4 reps × 5с отдых
+      const miniCount = 4;
+      for (let i = 0; i < miniCount; i++) {
+        e.workSets.push({ reps: 4, rir: lastSet.rir, weight: baseWeight, tempo: '1-0-1-0', restSeconds: 5 });
+      }
+      if (!e.comment || !e.comment.includes('Myo-reps')) {
+        e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + `🎯 Myo-reps (×${miniCount} mini)`;
+      }
+      break;
+    }
+    case 'pause_rep': {
+      // Модифицируем tempo всех подходов: +2с в нижней точке (tempo[1])
+      for (const ws of e.workSets) {
+        const tParts = (ws.tempo || '2-1-1-0').split('-');
+        if (tParts.length === 4) {
+          tParts[1] = String(Math.max(1, parseInt(tParts[1] || '1') + 2));
+          ws.tempo = tParts.join('-');
+        }
+      }
+      if (!e.comment || !e.comment.includes('Pause-rep')) {
+        e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🎯 Pause-rep (пауза 2-3с в нижней точке)';
+      }
+      break;
+    }
+    case 'mechanical_drop': {
+      // 2 сета с той же нагрузкой но сменой угла (пометка в комменте)
+      e.workSets.push({ reps: Math.max(6, baseReps - 2), rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 0 });
+      e.workSets.push({ reps: Math.max(6, baseReps - 4), rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 0 });
+      if (!e.comment || !e.comment.includes('Mechanical drop')) {
+        e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🎯 Mechanical drop (смена угла)';
+      }
+      break;
+    }
+  }
 }
 
 /* ──────────── Feeder sets ──────────── */
@@ -345,6 +518,11 @@ export interface PostPhaseInput {
    *  но НЕ пересчитывает distributePhases и НЕ перезаписывает prescribeLoad (buildBBPlan).
    */
   skipPhaseRedistribution?: boolean;
+  /** P6: применять intensity technique к primary упражнениям (rest_pause, drop_set, etc.).
+   *  Если не задано — берётся из DEFAULT_TECHNIQUE_BY_PHASE[phase] автоматически. */
+  intensityTechnique?: IntensityTechnique;
+  /** P8: слабые группы для auto-feeder (ежедневные добивки). */
+  weakPoints?: string[];
 }
 
 /**
@@ -408,23 +586,14 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
   const weeks = structuredClone(plan.weeks);
 
   /** Обновить комментарий упражнения после пост-обработки. */
+  // P1: упрощено — не переписываем, только дополняем фазой (buildSession уже выставил всё).
   const rebuildComment = (e: BBExercise, phaseName: string) => {
-    const parts: string[] = [];
-    const label = e.role === 'primary' ? '🎯 Основное' : '📌 Добивочное';
-    parts.push(`${label}: ${e.muscle}`);
-    const charLabel = e.character === 'тяж' ? 'тяж' : e.character === 'памп' ? 'памп' : 'лёг';
-    parts.push(`${phaseName}, RIR ${e.rir} (${charLabel})`);
-    const reps = e.workSets[0]?.reps || 10;
-    const weight = e.workSets[0]?.weight || defaultWorkMax(e.muscle);
-    parts.push(`${e.sets}×${reps} @ ${weight} кг`);
-    const tempo = e.workSets[0]?.tempo || '';
-    const rest = e.workSets[0]?.restSeconds || 90;
-    if (tempo) parts.push(`Темп ${tempo}, отдых ${rest}с`);
-    // Сохраняем ⚠ предупреждения из оригинального комментария движка
+    // Сохраняем оригинальный комментарий из buildSession, только добавляем метку фазы
     const oldComment = e.comment || '';
-    const riskIdx = oldComment.indexOf('⚠');
-    if (riskIdx >= 0) parts.push(oldComment.substring(riskIdx));
-    e.comment = parts.join('. ');
+    const phaseTag = `[${phaseName}]`;
+    if (!oldComment.includes(phaseTag)) {
+      e.comment = oldComment ? `${oldComment} · ${phaseTag}` : phaseTag;
+    }
   };
 
   for (const w of weeks) {
@@ -438,66 +607,107 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
     const phaseWeeksTotal = phaseWeekTotals[ph] || 1;
 
     if (needsDeload && ph === 'deload' && deloadProtocol) {
-      // Структурированный делод-протокол
+      // Структурированный делод-протокол (если ACWR>1.3). Поверх делода фазы.
+      // P1: НЕ перезаписывать reps/rir/tempo (buildSession уже выставил по фазе).
+      // Только дополнительное снижение веса/сетов по протоколу.
       for (const s of w.sessions) {
         for (const e of s.exercises) {
           const baseSets = Math.round(e.sets / Math.max(0.3, cfg.volumeMultiplier));
           e.sets = Math.max(1, Math.round(baseSets * deloadProtocol.volumeMultiplier));
-          e.rir = deloadProtocol.rirTarget;
-          e.repsRange = [deloadProtocol.repRange[0], deloadProtocol.repRange[1]];
           for (const ws of e.workSets) {
-            const engineWeight = ws.weight > 0 ? ws.weight : 40;
-            ws.reps = Math.round((deloadProtocol.repRange[0] + deloadProtocol.repRange[1]) / 2);
-            ws.rir = deloadProtocol.rirTarget;
-            ws.tempo = cfg.tempo;
-            ws.weight = Math.round(engineWeight * deloadProtocol.intensityMultiplier * 10) / 10;
-            ws.restSeconds = deloadProtocol.restSeconds;
-          }
-          rebuildComment(e, cfg.label);
-        }
-      }
-    } else {
-      // Фазо-специфичная полировка (повторы, RIR-дрейф, темп, отдых, стратегия)
-      const driftedRir = rirDrift(cfg.rirRange, weeksInPhase, phaseWeeksTotal);
-
-      for (const s of w.sessions) {
-        for (const e of s.exercises) {
-          const isPrimary = e.role === 'primary';
-          const isCalvesAbs = ['calves', 'abs'].includes(e.muscle);
-
-          // RIR: primary ближе к отказу, accessory легче
-          e.rir = isPrimary ? driftedRir : Math.min(5, driftedRir + 1);
-
-          // Фазо-специфичные повторы (точнее character-базированных charReps)
-          if (isCalvesAbs) {
-            e.repsRange = [15, 25];
-          } else if (isPrimary) {
-            e.repsRange = [cfg.repRange[0], cfg.repRange[1]];
-          } else {
-            e.repsRange = [cfg.repRange[0] + 2, cfg.repRange[1] + 5];
-          }
-
-          for (const ws of e.workSets) {
-            const maxW = workMax[e.muscle] || defaultWorkMax(e.muscle);
-            // Используем вес из движка (уже учитывает PRO_WORKMAX_RATIO), не пересчитываем заново.
-            // Это сохраняет дифференциацию: жим штанги ≠ жим гантелей ≠ наклонный.
-            const engineWeight = ws.weight > 0 ? ws.weight : Math.round(maxW * (PCT_FOR_RIR[Math.min(5, e.rir)] ?? 0.9) * 10) / 10;
-
-            ws.reps = Math.round((e.repsRange[0] + e.repsRange[1]) / 2);
-            ws.rir = e.rir;
-            ws.tempo = cfg.tempo;
-            ws.restSeconds = cfg.restBase;
-
-            // Стратегия прогрессии нагрузки поверх движкового веса
-            if (loadStrategy) {
-              const prescr = prescribeLoad(loadStrategy, engineWeight, ws.reps, e.rir, maxW, w.week, totalWeeks, ph);
-              ws.weight = Math.round(prescr.nextWeight * 10) / 10;
-            } else {
-              // Оставляем движковый вес без изменений
+            // Дополнительное снижение веса (если протокол требует интенсивность < фаза)
+            const protocolMult = deloadProtocol.intensityMultiplier / cfg.intensityMultiplier;
+            if (protocolMult < 1) {
+              ws.weight = Math.round(ws.weight * protocolMult * 10) / 10;
+            }
+            // Сокращённый отдых по протоколу
+            if (ws.restSeconds != null && deloadProtocol.restSeconds < ws.restSeconds) {
+              ws.restSeconds = deloadProtocol.restSeconds;
             }
           }
           rebuildComment(e, cfg.label);
         }
+      }
+    } else if (loadStrategy) {
+      // P1: стратегия прогрессии нагрузки (если выбрана) — модифицирует ВЕС относительно
+      // базового из buildSession. reps/rir/tempo НЕ трогаем (они уже фазо-корректные).
+      // P3: RPE-based стратегия теперь реально работает (targetRPE-корректировка).
+      // P4: передаём exType + role в prescribeLoad для разделения linear-increment.
+      for (const s of w.sessions) {
+        for (const e of s.exercises) {
+          for (const ws of e.workSets) {
+            if (ws.weight <= 0) continue;
+            const maxW = workMax[e.muscle] || defaultWorkMax(e.muscle);
+            const prescr = prescribeLoad(
+              loadStrategy, ws.weight, ws.reps, e.rir, maxW, w.week, totalWeeks, ph,
+              (e as any).exerciseType,
+              e.role,
+            );
+            ws.weight = Math.round(prescr.nextWeight * 10) / 10;
+          }
+        }
+      }
+    }
+
+    // P6: intensity-techniques (применяется к primary упражнениям фазо-уместными техниками).
+    // Если intensityTechnique задана явно — применяем ко всем primary; иначе — дефолт по фазе.
+    const techniqueChoice = (input as any).intensityTechnique;
+    const technique = techniqueChoice || DEFAULT_TECHNIQUE_BY_PHASE[ph] || 'none';
+    if (technique !== 'none') {
+      for (const s of w.sessions) {
+        for (const e of s.exercises) {
+          // Только primary упражнения получают intensity-технику
+          if (e.role !== 'primary') continue;
+          // Проверка meta.phases — избегаем неуместных применений
+          const meta = INTENSITY_TECHNIQUES[technique as IntensityTechnique];
+          if (meta && !meta.phases.includes(ph)) continue;
+          applyIntensityTechniqueToExercise(e, technique, ph);
+        }
+      }
+    }
+  }
+
+  // P8: auto-feeder — для слабых групп добавляем «ежедневные добивки» в подходящую сессию недели.
+  // Feeder = изоляция 15-20 reps, ~30% workMax, в конце основной тренировки (grease-the-groove).
+  const weakPoints = (input as any).weakPoints as string[] | undefined;
+  if (weakPoints && weakPoints.length > 0) {
+    const feeders = suggestFeeders(weakPoints, []);
+    for (const f of feeders) {
+      // Найти хотя бы одну неделю/сессию, где тренируется эта мышца
+      for (const w of weeks) {
+        let added = false;
+        for (const s of w.sessions) {
+          if (added) break;
+          // Сессия содержит нужную мышцу?
+          const hasMuscle = s.exercises.some(e => {
+            const m = (e.muscle || '').toLowerCase();
+            const fm = f.muscle.toLowerCase();
+            return m === fm || m.includes(fm) || fm.includes(m);
+          });
+          if (!hasMuscle) continue;
+          // Добавить feeder как отдельное упражнение
+          const fWeight = Math.max(5, Math.round((workMax[f.muscle] || 30) * 0.3 * 10) / 10);
+          s.exercises.push({
+            muscle: f.muscle,
+            name: f.exercise,
+            role: 'accessory',
+            character: 'памп' as any,
+            sets: f.sets,
+            repsRange: [Math.max(8, f.reps - 3), f.reps + 2] as [number, number],
+            rir: 3,
+            workSets: Array.from({ length: f.sets }, () => ({
+              reps: f.reps, rir: 3, weight: fWeight, tempo: '2-0-1-0', restSeconds: 30,
+            })),
+            exerciseName: f.exercise,
+            tempoSpec: '2-0-1-0',
+            restSeconds: 30,
+            comment: `🎯 Auto-feeder (${f.notes})`,
+            warmupSets: [],
+            rationale: 'P8: автоматическая ежедневная добивка для отстающей группы.',
+          } as any);
+          added = true;
+        }
+        if (added) break; // только в первую подходящую неделю
       }
     }
   }

@@ -151,7 +151,7 @@ export function CompareTab({ profile, stackIds, setStackIds, linked }: { profile
       const fp = toFinderProfile(profile);
       const result = buildStack({
         baseIds: stackIds, targetSize: Math.max(stackIds.length, 8),
-        goal: profile.goals[0] || undefined,
+        goal: undefined,
         autoFill: true, profile: fp,
       });
       setStackBAndSave(result.stack);

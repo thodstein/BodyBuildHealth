@@ -442,12 +442,15 @@ function deriveAnalogsByMechanism(
     let sharedCat = false;
     for (const c of cats) if (origCats.has(c)) { sharedCat = true; break; }
     if (shared === 0 && !sharedCat) continue;
+    // не предлагать диагностические маркеры-заглушки и гормоны в качестве замен
+    const candCats = (e.category || []) as string[];
+    if (candCats.includes('marker') || candCats.includes('hormonal')) continue;
     results.push({
       id,
       name: nameOf(id),
       group: sharedCat ? 'категория' : 'механизм',
       note: `сходный механизм (${shared})`,
-      score: shared * 10 + mech.length,
+      score: shared * 100 + (sharedCat ? 20 : 0),
     });
   }
   results.sort((a, b) => b.score - a.score);
@@ -475,11 +478,16 @@ export function findMeaningfulReplacement(
   let best: MeaningfulReplacement | null = null;
   let bestScore = -1;
 
+  const origMechSet = new Set(normalizeMechanisms((cat(originalId)?.mechanisms) || []));
+  const origCatsSet = new Set((cat(originalId) as any)?.category || []);
   for (const cand of analogs) {
     const cid = cand?.id || cand;
     if (!cid || cid.toLowerCase() === originalId.toLowerCase() || avoidSet.has(cid.toLowerCase())) continue;
     const c = cat(cid);
     if (!c) continue;
+    // замена строго по терапевтическому классу: не предлагать маркеры/гормоны
+    const candCats = (c.category || []) as string[];
+    if (candCats.includes('marker') || candCats.includes('hormonal')) continue;
     // reject if the candidate is itself absolutely contraindicated
     const ci = c.contraindications || [];
     let forbidden = false;
@@ -490,9 +498,15 @@ export function findMeaningfulReplacement(
     }
     if (forbidden) continue;
 
+    const cMech = normalizeMechanisms(c.mechanisms || []);
+    let shared = 0;
+    for (const m of cMech) if (origMechSet.has(m)) shared++;
+    let sharedCat = false;
+    for (const catName of candCats) if (origCatsSet.has(catName)) { sharedCat = true; break; }
     const gOrig = evidenceWeight(getEvidenceGrade(originalId));
     const gCand = evidenceWeight(getEvidenceGrade(cid));
-    const score = gCand * 10 + (c.mechanisms?.length || 0);
+    // приоритет — совпадение механизмов/класса с оригиналом, а не общая «накачанность» кандидата
+    const score = shared * 100 + (sharedCat ? 20 : 0) + gCand;
     if (score > bestScore) {
       bestScore = score;
       best = {
@@ -550,7 +564,7 @@ export function selectStack(
 
   // 3. budget cap
   if (strategy === 'budget') {
-    const max = { economy: 3000, medium: 7000, premium: 20000 }[profile.budget] ?? 7000;
+    const max = 7000; // бюджетный лимит (поле budget удалено из профиля — фиксированный потолок)
     const costById: Record<string, number> = {};
     for (const id of ids) costById[id] = getCost(id) || 300;
     const sorted = [...ids].sort((a, b) => costById[a] - costById[b]);
@@ -572,7 +586,7 @@ export function selectStack(
   // 6. schedule / redundancy / cycling
   const schedule = buildDailySchedule(ids);
   const redundancy = checkPathwayRedundancy(ids);
-  const cycling = getStackCyclingAdvice(ids, profile.aasStatus);
+  const cycling = getStackCyclingAdvice(ids, 'none');
 
   return {
     ids,

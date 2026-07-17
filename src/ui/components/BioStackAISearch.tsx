@@ -147,17 +147,14 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
 
   const profileRelevantIds = useMemo(() => {
     if (!profileOnly) return null;
-    const recGoals = profile.goals.map(g => {
-      const m: Record<string, RecGoal> = {
-        muscle_gain: 'performance', fat_loss: 'energy', endurance: 'performance', sleep: 'sleep',
-        recovery: 'recovery', energy: 'energy', immunity: 'immunity', liver_health: 'detox',
-        cardio_health: 'longevity', joints: 'joints',
-        hormones: 'libido', stress: 'stress', longevity: 'longevity', detox: 'detox',
-        libido: 'libido', mood: 'stress', brain: 'focus', concentration: 'focus',
-        digestion: 'digestion', kidney: 'detox',
-      };
-      return m[g] || 'immunity';
-    }).filter(g => g) as RecGoal[];
+    const m: Record<string, RecGoal> = {
+      cardio: 'longevity', hepatic: 'detox', renal: 'detox', neuro: 'focus',
+      endocrine: 'libido', hematologic: 'recovery', reproductive: 'libido', musculoskeletal: 'joints',
+    };
+    const recGoals = [
+      ...(profile.targetSystems || []).map(s => m[s] || 'immunity'),
+      ...(profile.targetOrgans || []).map(o => m[o] || 'immunity'),
+    ].filter(Boolean) as RecGoal[];
     if (recGoals.length === 0) return null;
     const results = searchBioStack({ goals: recGoals, limit: 200 }, profile);
     const scores = new Map<string, number>();

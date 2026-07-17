@@ -113,6 +113,8 @@ export const SupportInteractionsView: React.FC<{ s: Record<string, any> }> = ({ 
   // pair synergy state
   const [pairAId, setPairAId] = useState(PAIR_DB.idList[0]?.id || '');
   const [pairBId, setPairBId] = useState(PAIR_DB.idList[1]?.id || '');
+  // Per-substance accordion state (must be at top level — Rules of Hooks)
+  const [openSubs, setOpenSubs] = useState<Record<string, boolean>>({});
   const pairSubById = useMemo(() => { const m: Record<string, SubstanceEntry> = {}; PAIR_DB.substances.forEach(s => m[s.id] = s); return m; }, []);
   const pairResult: SynergyResult | null = useMemo(() => {
     const a = pairSubById[pairAId], b = pairSubById[pairBId];
@@ -396,7 +398,8 @@ export const SupportInteractionsView: React.FC<{ s: Record<string, any> }> = ({ 
                   {ids.map((id:string, idx:number) => {
                     const entry = SUPPORT_CATALOG_DATA[id];
                     if (!entry) return null;
-                    const [open, setOpen] = React.useState(false);
+                    const open = !!openSubs[id];
+                    const setOpen = (v: boolean) => setOpenSubs(prev => ({ ...prev, [id]: v }));
                     const name = entry.nameRu || entry.name || id;
                     const tierColor = ({ core:'#00e68a', standard:'#60a5fa', advanced:'#a78bfa', specialty:'#f59e0b' })[entry.tier||''] || 'rgba(255,255,255,0.4)';
                     return (

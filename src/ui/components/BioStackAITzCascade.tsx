@@ -172,7 +172,7 @@ export const TzCascadePopup: React.FC<{
 
   /* Reset when reopened */
   React.useEffect(() => {
-    if (open) { setStep('organ'); setOrgan(null); setMch(null); setMarker(null); }
+    if (open) { setStep('organ'); setOrgan(null); setMech(null); setMarker(null); }
   }, [open]);
 
   const mechsForOrgan = useMemo(() => {
@@ -301,7 +301,7 @@ export const TzCascadePopup: React.FC<{
                       <span style={{
                         fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 4,
                         background: TZ_ORGAN_META[organ].accent + '22',
-                        color: TZ_ORGAN_META[organ].accent,
+                      color: TZ_ORGAN_META[organ!].accent,
                       }}>{m}</span>
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>
                         {TZ_MECH_LABELS[m] || m}
@@ -330,10 +330,10 @@ export const TzCascadePopup: React.FC<{
                   style={{
                     padding: '10px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
                     background: marker === mk.marker
-                      ? TZ_ORGAN_META[organ].tone
+                      ? TZ_ORGAN_META[organ!].tone
                       : 'rgba(255,255,255,0.03)',
                     border: marker === mk.marker
-                      ? '2px solid ' + TZ_ORGAN_META[organ].accent
+                      ? '2px solid ' + TZ_ORGAN_META[organ!].accent
                       : '1px solid rgba(255,255,255,0.06)',
                     transition: 'all 0.15s',
                   }}>
@@ -352,7 +352,7 @@ export const TzCascadePopup: React.FC<{
                     </div>
                     <span style={{
                       fontSize: 16,
-                      color: TZ_ORGAN_META[organ].accent,
+                      color: TZ_ORGAN_META[organ!].accent,
                     }}>→</span>
                   </div>
                 </button>

@@ -1,3 +1,49 @@
+## Session Summary (Jul 17 — Part 3) — BioStack: удалены 6 полей из BioStackProfile (чистка типа)
+
+### Goal
+Полностью удалить 6 полей (`goals`, `aasStatus`, `budget`, `stackComplexity`, `adClass`, `maxStackSize`) из `BioStackProfile` (interface + engine + все потребители БИОСТАК), т.к. они ломали качество сборки стеков (нерелевантные диалоги целей/курса/бюджета).
+
+### ✅ Done и проверено
+- `BioStackProfile` interface (biostack-ai.engine.ts:24) — **6 полей УДАЛЕНЫ**. Остались: age/weight/height/sex/experience/healthConditions/avoidIds/avoidMeds/targetOrgans/targetSystems/currentMeds/drugAllergies/jointSymptoms/neuroSymptoms/cnsSymptoms/injuries/currentSupplements/autoFilledFields.
+- `getDefaultBioStackProfile` — не задаёт удалённые поля (консистентно с интерфейсом).
+- `FIELD_GROUPS` (biostack-ai.engine.ts:50) — очищен: `health: ['healthConditions']` (убраны aasStatus/budget/stackComplexity).
+- `toFinderProfile` (BioStackAIConstants.tsx) — возвращает нейтральные значения для FinderProfile: `goals: []`, `aasStatus: 'none'`, `budget: 'medium'`, `maxStackSize: 8`.
+- `biostack-clinical-recommender.ts` — `mapGoalsToModes` переписан: режимы из `targetSystems` (не из goals); `buildClinicalStack` lines 319-320: `boostEnabled: false`, `powerLevel: opts.powerLevel ?? 'mid'`; `function complexityToPower` УДАЛЕНА.
+- `biostack-clinical-v2.engine.ts` — line 553 `const max = 7000` (убран profile.budget), line 575 `getStackCyclingAdvice(ids, 'none')` (убран profile.aasStatus).
+- `BioStackAIExport.tsx` line 28 — `profile.experience` + `profile.targetSystems` (убраны goals/budget).
+- `BioStackAIReports.tsx` lines 141-143 — `targetSystems`/`healthConditions`/`currentMeds` (убраны goals/aasStatus).
+- `BioStackAIBuild/Search/Stack/Compare/Onboarding/Profile.tsx` — очищены от 6 полей (Onboarding переписан на 2 шага: здоровье + уровень).
+- `supplement-finder.engine.ts` — НЕ трогался (свой FinderProfile, легитимные поля).
+
+### Проверки
+- grep по `*.tsx` на `profile.(goals|aasStatus|budget|stackComplexity|adClass|maxStackSize)` — 0 совпадений (5 совпадений `goals` — все локальные переменные/coverage, НЕ profile).
+- `tsc --noEmit` — **0 ошибок типов в BioStack-файлах** (фильтр вывода по "biostack"/"BioStack" — пусто).
+- UTF-8 noBOM — все файлы корректны.
+
+### ❌ Остаётся (вне задачи)
+- Неиспользуемые type-алиасы `ADClass`/`StackComplexity`/`AASStatus`/`BudgetLevel` (GoalType ещё используется локально) — экспортируются, но не ломают компиляцию; можно удалить отдельным коммитом.
+- Мёртвый лейбл `goals: 'цели'` в label-map BioStackAIScreen.tsx:192 (группа 'goals' больше нет в FIELD_GROUPS) — безвредно.
+- Визуальная проверка в браузере (сборка стека без диалогов целей/курса/бюджета).
+
+### Key Decisions
+- Полное удаление из типа/движка/потребителей, не только UI.
+- `toFinderProfile` возвращает нейтральные значения (FinderProfile обязывает).
+- Onboarding: только healthConditions + experience.
+- `mapGoalsToModes` выводит режимы из targetSystems.
+- `v2.engine`: фиксированный бюджет 7000, cycling 'none'.
+
+### Relevant Files
+- `src/engines/biostack-ai.engine.ts` — interface (очищен) + FIELD_GROUPS (очищен) + getDefaultBioStackProfile
+- `src/engines/biostack-clinical-recommender.ts` — mapGoalsToModes + buildClinicalStack 319-320
+- `src/engines/biostack-clinical-v2.engine.ts` — 553, 575
+- `src/ui/components/BioStackAIExport.tsx` — 28
+- `src/ui/components/BioStackAIReports.tsx` — 141-143
+- `src/ui/components/BioStackAIConstants.tsx` — toFinderProfile
+- `src/ui/components/BioStackAIBuild/Search/Stack/Compare/Onboarding/Profile.tsx` — очищены
+- `src/engines/supplement-finder.engine.ts` — НЕ трогать (FinderProfile)
+
+---
+
 ## Session Summary (Jul 17 — Part X) — BioStack: backlog DONE (RU-лейблы + TZ-карточка + краш 2-го стека)
 
 ### Goal

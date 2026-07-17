@@ -229,32 +229,16 @@ function mapProfileToContraindications(
   return out;
 }
 
-/** Приоритет цели BioStack → режимы подбора калькулятора */
+/** Приоритет цели BioStack → режимы подбора калькулятора.
+ *  Цели (goals) удалены из профиля — режимы выводятся из выбранных систем организма. */
 function mapGoalsToModes(profile: BioStackProfile): {
   jointMode: boolean;
   neuroMode: boolean;
 } {
-  const goals = profile.goals || [];
-  const joint = goals.some((g) =>
-    ['joints', 'joint', 'connective', 'tendon', 'mobility'].includes(g.toLowerCase()),
-  );
-  const neuro = goals.some((g) =>
-    ['focus', 'sleep', 'stress', 'mood', 'neuro', 'cognitive', 'anxiety'].includes(g.toLowerCase()),
-  );
+  const systems = profile.targetSystems || [];
+  const joint = systems.includes('musculoskeletal');
+  const neuro = systems.some((s) => ['neuro', 'nero', 'endocrine'].includes(s));
   return { jointMode: joint, neuroMode: neuro };
-}
-
-/** Сложность стека BioStack → powerLevel калькулятора */
-function complexityToPower(p: BioStackProfile['stackComplexity']): CalculatorState['powerLevel'] {
-  switch (p) {
-    case 'minimal':
-      return 'basic';
-    case 'maximum':
-      return 'max';
-    case 'balanced':
-    default:
-      return 'mid';
-  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -332,8 +316,8 @@ export function buildClinicalStack(
     contraindications: mapProfileToContraindications(profile, DEFAULT_STATE.contraindications),
     jointMode: modes.jointMode,
     neuroMode: modes.neuroMode,
-    boostEnabled: profile.stackComplexity === 'maximum',
-    powerLevel: opts.powerLevel ?? complexityToPower(profile.stackComplexity),
+    boostEnabled: false,
+    powerLevel: opts.powerLevel ?? 'mid',
     courseWeek,
   } as CalculatorState;
 

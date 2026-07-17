@@ -88,6 +88,8 @@ export const IndividualPlanResults: React.FC = () => {
   const [calcResults, setCalcResults] = useState<{ id: string; name: string; score: MealScoreV2; diaas: { diaas: number; limitingAA: string } }[] | null>(null);
   const [recipeDetail, setRecipeDetail] = useState<any | null>(null);
   const [calcDailyReport, setCalcDailyReport] = useState<DailyDietReport | null>(null);
+  // 🟠8 — Checked shopping items state (must be at top level — Rules of Hooks)
+  const [checked, setChecked] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('he_shopping_checked') || '[]')); } catch { return new Set<string>(); } });
 
   const [showCorrectPopup, setShowCorrectPopup] = useState(false);
   const [correctIssues, setCorrectIssues] = useState<{ mealIdx: number; mealName: string; issues: { type: string; text: string; severity: 'low' | 'medium' | 'high'; suggestion?: { foodId: string; name: string; reason: string }[] }[] }[] | null>(null);
@@ -937,8 +939,7 @@ export const IndividualPlanResults: React.FC = () => {
             const pricePerKg: Record<string, number> = { low: 4, medium: 7, max: 12, enhanced: 18 };
             const estCost = Math.round(totalGrams / 1000 * (pricePerKg[budget] || 7));
             const exportText = allItems.map((i: any) => `${i.name} — ${i.amount >= 1000 ? `${(i.amount/1000).toFixed(1)} кг` : `${Math.round(i.amount)} г`}`).join('\n');
-            // 🟠8 — Checked items state
-            const [checked, setChecked] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('he_shopping_checked') || '[]')); } catch { return new Set<string>(); } });
+            // 🟠8 — Checked items state (already declared at top of component)
             const toggleChecked = (id: string) => { setChecked(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); localStorage.setItem('he_shopping_checked', JSON.stringify([...n])); return n; }); };
             const checkedCount = allItems.filter((i: any) => checked.has(i.id)).length;
             // 🟡13 — Pack estimates

@@ -763,7 +763,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           <div style={{ padding:'16px 14px 12px', maxHeight:'72vh', overflowY:'auto' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
                 <span style={{ fontSize:13, fontWeight:800, color:'#818cf8' }}>⚙️ Ручной режим</span>
-                <button onClick={() => setShowManualPopup(false)} style={{ padding:'5px 12px', borderRadius:6, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:12, fontWeight:600 }}>✕</button>
+                <button onClick={() => setShowManualPopup(false)} style={{ padding:'5px 12px', borderRadius:6, border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'rgba(255,255,255,0.55)', cursor:'pointer', fontSize:12, fontWeight:600 }}>✕</button>
               </div>
               {onOpenManualPicker && (
                 <button onClick={() => { setShowManualPopup(false); setTimeout(onOpenManualPicker, 200); }} style={{ width:'100%', marginBottom:8, padding:'11px', borderRadius:10, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.25)', color:'#00e68a', fontWeight:700, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
@@ -772,7 +772,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               )}
               {manualSubs.length > 0 && (
                 <div style={{ marginBottom:8 }}>
-                  <div style={{ fontSize:12, fontWeight:700, color:'var(--text-dim)', marginBottom:4 }}>💊 Препараты из ручного ввода ({manualSubs.length}) — откройте каталог для выбора</div>
+                  <div style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.55)', marginBottom:4 }}>💊 Препараты из ручного ввода ({manualSubs.length}) — откройте каталог для выбора</div>
                   <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
                     {manualSubs.map((sid, i) => (
                       <span key={sid+i} style={{ fontSize:11, padding:'3px 8px', borderRadius:6, fontWeight:600, background:'rgba(99,102,241,0.12)', color:'#818cf8', display:'inline-flex', alignItems:'center', gap:4, margin:1 }}>
@@ -799,9 +799,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   </div>
                 </div>
               )}
-              <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:4, marginTop:4 }}>📦 Добавить стек из {ALL_STACKS.length} готовых</div>
+              <div style={{ fontSize:13, fontWeight:700, color:'#ffffff', marginBottom:4, marginTop:4 }}>📦 Добавить стек из {ALL_STACKS.length} готовых</div>
               <input value={manualStackSearch} onChange={e => setManualStackSearch(e.target.value)} placeholder="🔍 Поиск стека..." style={{
-                width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid var(--border)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:13, boxSizing:'border-box', marginBottom:6, outline:'none',
+                width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:13, boxSizing:'border-box', marginBottom:6, outline:'none',
               }} />
               <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'40vh', overflowY:'auto', marginBottom:10 }}>
                 {(ALL_STACKS as any[])
@@ -824,25 +824,25 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                           <span style={{ fontSize:13, minWidth:14, color: active ? '#c084fc' : 'var(--text-dim)', marginTop:1 }}>{active ? '✓' : '○'}</span>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontSize:13, fontWeight:700, color: active ? '#c084fc' : 'var(--text-light)', lineHeight:1.25 }}>{st.name || st.id.replace(/_stack|_support|_35/g,'').replace(/_/g,' ')}</div>
-                            <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2, lineHeight:1.35 }}>{st.system || ''} · {subCount} веществ{st.synergyScore ? ` · син: ${st.synergyScore}` : ''}</div>
+                            <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', marginTop:2, lineHeight:1.35 }}>{st.system || ''} · {subCount} веществ{st.synergyScore ? ` · син: ${st.synergyScore}` : ''}</div>
                           </div>
                           <span onClick={(e) => { e.stopPropagation(); setExpandedManualStack(isExpanded ? null : st.id); }}
-                            style={{ fontSize:13, color:'var(--text-dim)', cursor:'pointer', marginTop:1, padding:'0 2px', flexShrink:0 }}>{isExpanded ? '▲' : '▼'}</span>
+                            style={{ fontSize:13, color:'rgba(255,255,255,0.55)', cursor:'pointer', marginTop:1, padding:'0 2px', flexShrink:0 }}>{isExpanded ? '▲' : '▼'}</span>
                         </div>
                         {isExpanded && (
                           <div style={{ padding:'0 8px 8px', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
                             {st.anatomicalMapping?.organMechanisms && (
-                              <div style={{ fontSize:11, color:'var(--text-light)', lineHeight:1.45, marginTop:6 }}>
+                              <div style={{ fontSize:11, color:'rgba(240,240,245,0.9)', lineHeight:1.45, marginTop:6 }}>
                                 <b style={{ color:'#a78bfa' }}>🧬 Механизм действия:</b> {st.anatomicalMapping.organMechanisms}
                               </div>
                             )}
                             {st.synergyPrinciple && (
-                              <div style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.45, marginTop:3 }}>
+                              <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', lineHeight:1.45, marginTop:3 }}>
                                 <b>Принцип синергии:</b> {st.synergyPrinciple}
                               </div>
                             )}
                             {st.anatomicalMapping?.finalEffect && (
-                              <div style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.45, marginTop:3 }}>
+                              <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', lineHeight:1.45, marginTop:3 }}>
                                 <b>Итоговый эффект:</b> {st.anatomicalMapping.finalEffect}
                               </div>
                             )}
@@ -859,10 +859,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                                 const cat = SUPPORT_CATALOG_DATA[sd.id];
                                 return (
                                   <div key={sd.id} style={{ fontSize:11, padding:'4px 8px', borderRadius:6, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.12)' }}>
-                                    <span style={{ fontWeight:600, color:'var(--text-light)' }}>{cat?.nameRu || cat?.name || sd.id}</span>
+                                    <span style={{ fontWeight:600, color:'rgba(240,240,245,0.9)' }}>{cat?.nameRu || cat?.name || sd.id}</span>
                                     {sd.dose && <span style={{ color:'#00e68a', marginLeft:4 }}>{sd.dose}</span>}
-                                    {sd.timing && <span style={{ color:'var(--text-dim)', marginLeft:4 }}>{sd.timing}</span>}
-                                    {sd.mechanism && <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.35, marginTop:2 }}>— {sd.mechanism}</div>}
+                                    {sd.timing && <span style={{ color:'rgba(255,255,255,0.55)', marginLeft:4 }}>{sd.timing}</span>}
+                                    {sd.mechanism && <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', lineHeight:1.35, marginTop:2 }}>— {sd.mechanism}</div>}
                                   </div>
                                 );
                               })}
@@ -952,10 +952,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
              <div style={{ padding:'14px 14px 10px' }}>
                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
                  <span style={{ fontSize:13, fontWeight:800, color:'#f87171' }}>🚀 Усиление: все стеки ({ALL_STACKS.length})</span>
-                <button onClick={() => setShowEnhancementPopup(false)} style={{ padding:'5px 12px', borderRadius:6, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:12, fontWeight:600 }}>✕</button>
+                <button onClick={() => setShowEnhancementPopup(false)} style={{ padding:'5px 12px', borderRadius:6, border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'rgba(255,255,255,0.55)', cursor:'pointer', fontSize:12, fontWeight:600 }}>✕</button>
               </div>
               <input value={enhancementSearch} onChange={e => setEnhancementSearch(e.target.value)} placeholder="🔍 Поиск стека по названию, системе или проблеме..." style={{
-                width:'100%', padding:'9px 11px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:13, boxSizing:'border-box', marginBottom:8,
+                width:'100%', padding:'9px 11px', borderRadius:8, border:'1px solid rgba(255,255,255,0.12)', background:'#26262b', color:'#ffffff', fontSize:13, boxSizing:'border-box', marginBottom:8,
               }} />
             </div>
 
@@ -1023,7 +1023,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                         <span style={{ fontSize:13, minWidth:14, color: active ? '#c084fc' : 'var(--text-dim)', marginTop:1 }}>{active ? '✓' : '○'}</span>
                         <div style={{ flex:1, minWidth:0 }}>
                           <div style={{ fontSize:13, fontWeight:700, color: active ? '#c084fc' : 'var(--text-light)', lineHeight:1.25 }}>{st.name || st.id.replace(/_stack|_support|_35/g,'').replace(/_/g,' ')}</div>
-                          <div style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.35, marginTop:2 }}>{st.problem || st.system || ''}</div>
+                          <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', lineHeight:1.35, marginTop:2 }}>{st.problem || st.system || ''}</div>
                           <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginTop:3, display:'flex', gap:5, flexWrap:'wrap' }}>
                             <span>{subCount} веществ</span>
                             {st.synergyScore ? <span>· синергия: {st.synergyScore}</span> : null}
@@ -1032,22 +1032,22 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                           </div>
                         </div>
                         <span onClick={(e) => { e.stopPropagation(); setExpandedManualStack(isExpanded ? null : st.id); }}
-                          style={{ fontSize:13, color:'var(--text-dim)', cursor:'pointer', marginTop:1, padding:'0 2px', flexShrink:0 }}>{isExpanded ? '▲' : '▼'}</span>
+                          style={{ fontSize:13, color:'rgba(255,255,255,0.55)', cursor:'pointer', marginTop:1, padding:'0 2px', flexShrink:0 }}>{isExpanded ? '▲' : '▼'}</span>
                       </div>
                       {isExpanded && (
                         <div style={{ padding:'0 10px 10px', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
                           {st.anatomicalMapping?.organMechanisms && (
-                            <div style={{ fontSize:11, color:'var(--text-light)', lineHeight:1.45, marginTop:6 }}>
+                            <div style={{ fontSize:11, color:'rgba(240,240,245,0.9)', lineHeight:1.45, marginTop:6 }}>
                               <b style={{ color:'#a78bfa' }}>🧬 Механизм действия:</b> {st.anatomicalMapping.organMechanisms}
                             </div>
                           )}
                           {st.synergyPrinciple && (
-                            <div style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.45, marginTop:3 }}>
+                            <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', lineHeight:1.45, marginTop:3 }}>
                               <b>Принцип синергии:</b> {st.synergyPrinciple}
                             </div>
                           )}
                           {st.anatomicalMapping?.finalEffect && (
-                            <div style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.45, marginTop:3 }}>
+                            <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', lineHeight:1.45, marginTop:3 }}>
                               <b>Итоговый эффект:</b> {st.anatomicalMapping.finalEffect}
                             </div>
                           )}
@@ -1064,10 +1064,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                               const cat = SUPPORT_CATALOG_DATA[sd.id];
                               return (
                                 <div key={sd.id} style={{ fontSize:11, padding:'4px 8px', borderRadius:6, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.12)' }}>
-                                  <span style={{ fontWeight:600, color:'var(--text-light)' }}>{cat?.nameRu || cat?.name || sd.id}</span>
+                                  <span style={{ fontWeight:600, color:'rgba(240,240,245,0.9)' }}>{cat?.nameRu || cat?.name || sd.id}</span>
                                   {sd.dose && <span style={{ color:'#00e68a', marginLeft:4 }}>{sd.dose}</span>}
-                                  {sd.timing && <span style={{ color:'var(--text-dim)', marginLeft:4 }}>{sd.timing}</span>}
-                                  {sd.mechanism && <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.35, marginTop:2 }}>— {sd.mechanism}</div>}
+                                  {sd.timing && <span style={{ color:'rgba(255,255,255,0.55)', marginLeft:4 }}>{sd.timing}</span>}
+                                  {sd.mechanism && <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', lineHeight:1.35, marginTop:2 }}>— {sd.mechanism}</div>}
                                 </div>
                               );
                             })}
@@ -1104,7 +1104,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
              <div style={{ padding:'14px 14px 10px', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                  <span style={{ fontSize:13, fontWeight:800, color:'#f87171' }}>🚀 Мега-усиление</span>
-                <button onClick={() => setShowMegaPopup(false)} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid var(--border)', background:'transparent', color:'var(--text-dim)', cursor:'pointer', fontSize:10, fontWeight:600 }}>✕</button>
+                <button onClick={() => setShowMegaPopup(false)} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'rgba(255,255,255,0.55)', cursor:'pointer', fontSize:10, fontWeight:600 }}>✕</button>
               </div>
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginTop:4, lineHeight:1.3 }}>
                 Умный подбор по непокрытым механизмам ТЗ ({finalRec?.gaps?.length || 0} gaps) и синергии с текущими препаратами ({finalRec?.subs?.length || 0})
@@ -1165,7 +1165,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               <div style={{ padding:'10px 14px', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ display:'flex', gap:6 }}>
                   <button onClick={() => { setMegaSelected(new Set()); setShowMegaPopup(false); }}
-                    style={{ flex:1, padding:'10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'var(--text)' }}>
+                    style={{ flex:1, padding:'10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#ffffff' }}>
                     Отмена
                   </button>
                   <button onClick={() => {
@@ -1273,7 +1273,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   </div>
 
                   {/* Список веществ */}
-                  <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4 }}>💊 Выберите вещества ({articularSelected.size} из {JOINT_CATALOG.length})</div>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#ffffff', marginBottom:4 }}>💊 Выберите вещества ({articularSelected.size} из {JOINT_CATALOG.length})</div>
                   <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:8 }}>
                     {JOINT_CATALOG.map(item => {
                       const selected = articularSelected.has(item.id);
@@ -1316,7 +1316,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
                   {/* Кнопки действий */}
                   <div style={{ display:'flex', gap:6 }}>
-                    <button onClick={() => { setStackModulePopup(null); setArticularConfirm(false); }} style={{ flex:1, padding:'10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'var(--text)' }}>Отмена</button>
+                    <button onClick={() => { setStackModulePopup(null); setArticularConfirm(false); }} style={{ flex:1, padding:'10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#ffffff' }}>Отмена</button>
                <button onClick={() => {
                        if (articularSelected.size === 0) return;
                        setArticularConfirm(true);
@@ -1406,7 +1406,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   </div>
 
                   {/* Вещества */}
-                  <div style={{ fontSize:9, fontWeight:700, color:'var(--text)', marginBottom:4 }}>💊 Выберите вещества ({neuroSelected.size} из {NEURO_CATALOG.length})</div>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#ffffff', marginBottom:4 }}>💊 Выберите вещества ({neuroSelected.size} из {NEURO_CATALOG.length})</div>
                   <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:8 }}>
                     {NEURO_CATALOG.map(item => {
                       const selected = neuroSelected.has(item.id);
@@ -1453,7 +1453,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   </div>
 
                   <div style={{ display:'flex', gap:6 }}>
-                    <button onClick={() => { setStackModulePopup(null); setNeuroConfirm(false); }} style={{ flex:1, padding:'10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'var(--text)' }}>Отмена</button>
+                    <button onClick={() => { setStackModulePopup(null); setNeuroConfirm(false); }} style={{ flex:1, padding:'10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#ffffff' }}>Отмена</button>
                      <button onClick={() => {
                        if (neuroSelected.size === 0) return;
                        setNeuroConfirm(true);
@@ -1486,16 +1486,16 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                <div style={{ flex:'1 1 0%', minHeight:0, padding:'16px 14px 16px', overflowY:'auto' }}>
                 <div style={{ fontSize:13, fontWeight:800, color:meta.col, marginBottom:6 }}>{meta.icon} {stackMeta?.name || stackModulePopup}</div>
                 <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', lineHeight:1.5, marginBottom:8 }}>{stackMeta?.problem || ''}</div>
-                <div style={{ fontSize:10, fontWeight:700, color:'var(--text)', marginBottom:4 }}>📊 Анализ контекста</div>
+                <div style={{ fontSize:10, fontWeight:700, color:'#ffffff', marginBottom:4 }}>📊 Анализ контекста</div>
                 <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.5, marginBottom:10, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
                   {contextSummary || 'Нет активных показаний'}
                 </div>
-                <div style={{ fontSize:10, fontWeight:700, color:'var(--text)', marginBottom:6 }}>💊 Вещества в модуле ({analysis.length})</div>
+                <div style={{ fontSize:10, fontWeight:700, color:'#ffffff', marginBottom:6 }}>💊 Вещества в модуле ({analysis.length})</div>
                 <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:10 }}>
                   {analysis.map((a, i) => (
                     <div key={i} style={{ padding:'6px 8px', borderRadius:8, fontSize:8, background: a.inPlan ? 'rgba(0,230,138,0.06)' : a.recommended ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.02)', border:`1px solid ${a.inPlan ? 'rgba(0,230,138,0.15)' : a.recommended ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)'}` }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                        <span style={{ fontWeight:700, color:'var(--text)' }}>{a.subName} <span style={{ color:'rgba(255,255,255,0.4)', fontWeight:500 }}>{a.dose}</span></span>
+                        <span style={{ fontWeight:700, color:'#ffffff' }}>{a.subName} <span style={{ color:'rgba(255,255,255,0.4)', fontWeight:500 }}>{a.dose}</span></span>
                         <div style={{ display:'flex', gap:3 }}>
                           {a.inPlan && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.15)', color:'#00e68a', fontWeight:700 }}>в плане</span>}
                           {a.recommended && !a.inPlan && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(99,102,241,0.15)', color:'#a5b4fc', fontWeight:700 }}>рекоменд.</span>}
@@ -1508,7 +1508,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   ))}
                 </div>
                 <div style={{ display:'flex', gap:6 }}>
-                  <button onClick={() => setStackModulePopup(null)} style={{ flex:1, padding:'10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'var(--text)' }}>Отмена</button>
+                  <button onClick={() => setStackModulePopup(null)} style={{ flex:1, padding:'10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#ffffff' }}>Отмена</button>
                   <button onClick={() => {
                     if (!alreadyActive) setSelectedStacks(prev => [...prev, stackModulePopup]);
                     setStackModulePopup(null);
@@ -1544,7 +1544,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           </div>
           <div style={{ display:'flex', gap:6 }}>
             <button onClick={() => { setArticularConfirm(false); setArticularPreset(null); setArticularSelected(new Set()); setStackModulePopup('articular_stack'); }}
-              style={{ flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'var(--text)' }}>
+              style={{ flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#ffffff' }}>
               ✕ Отмена
             </button>
             <button onClick={() => {
@@ -1581,7 +1581,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           </div>
           <div style={{ display:'flex', gap:6 }}>
             <button onClick={() => { setNeuroConfirm(false); setNeuroPreset(null); setNeuroSelected(new Set()); setStackModulePopup('neuroprotection_stack'); }}
-              style={{ flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'var(--text)' }}>
+              style={{ flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#ffffff' }}>
               ✕ Отмена
             </button>
             <button onClick={() => {
@@ -1603,7 +1603,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           <span style={{ fontSize:9, fontWeight:700, color:'#818cf8' }}>
             🩺 Симптомы (отметьте актуальные) {symptoms.length > 0 ? `(${symptoms.length})` : ''}
           </span>
-          <span style={{ fontSize:8, color:'var(--text-dim)' }}>{showSymptoms ? '▲ скрыть' : '▼ показать'}</span>
+          <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showSymptoms ? '▲ скрыть' : '▼ показать'}</span>
         </div>
         {showSymptoms && (
           <div style={{ padding:'7px 9px', background:'rgba(99,102,241,0.03)', border:'1px solid rgba(99,102,241,0.1)', borderTop:'none', borderRadius:'0 0 10px 10px', display:'flex', flexWrap:'wrap', gap:3 }}>
@@ -1641,7 +1641,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
       {/* Summary */}
       {rec && (
-        <div style={{ fontSize:8, fontWeight:500, color:'var(--text-dim)', marginBottom:6, lineHeight:1.4 }}>
+        <div style={{ fontSize:8, fontWeight:500, color:'rgba(255,255,255,0.55)', marginBottom:6, lineHeight:1.4 }}>
           {rec.summary}
         </div>
       )}
@@ -1674,9 +1674,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               const cat = SUPPORT_CATALOG_DATA[ms.id];
               return (
                 <div key={ms.id} style={{ fontSize:11, padding:'3px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)' }}>
-                  <span style={{ fontWeight:600, color:'var(--text-light)' }}>{cat?.nameRu || cat?.name || ms.id}</span>
+                  <span style={{ fontWeight:600, color:'rgba(240,240,245,0.9)' }}>{cat?.nameRu || cat?.name || ms.id}</span>
                   {ms.dose && <span style={{ color:'#00e68a', marginLeft:4 }}>{ms.dose}</span>}
-                  {ms.timing && <span style={{ color:'var(--text-dim)', marginLeft:4 }}>{ms.timing}</span>}
+                  {ms.timing && <span style={{ color:'rgba(255,255,255,0.55)', marginLeft:4 }}>{ms.timing}</span>}
                   <span style={{ color:'rgba(255,255,255,0.3)', marginLeft:4, fontSize:10 }}>· {ms.stack}</span>
                 </div>
               );
@@ -1689,13 +1689,13 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {finalRec && finalRec.subs.length > 0 && (
         <div>
           <div onClick={() => setShowPrescription(!showPrescription)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', marginBottom:4 }}>
-            <span style={{ fontSize:11, fontWeight:700, color:'var(--text)', display:'flex', alignItems:'center', gap:4 }}>
+            <span style={{ fontSize:11, fontWeight:700, color:'#ffffff', display:'flex', alignItems:'center', gap:4 }}>
               💊 Назначено {finalRec.subs.length} препаратов
               {finalRec.titrationFactors && finalRec.titrationFactors.size > 0 && (
                 <span style={{ fontSize:8, fontWeight:600, color:'#f59e0b', padding:'1px 5px', borderRadius:4, background:'rgba(245,158,11,0.15)' }}>↑{finalRec.titrationFactors.size}</span>
               )}
             </span>
-            <span style={{ fontSize:8, color:'var(--text-dim)' }}>{showPrescription ? '▲ скрыть' : '▼ показать'}</span>
+            <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showPrescription ? '▲ скрыть' : '▼ показать'}</span>
           </div>
 
           {showPrescription && (
@@ -1774,7 +1774,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               <div key={i} style={{ margin:'3px 0', padding:'6px 8px', borderRadius:8, background:bg, border:`1px solid ${bd}` }}>
                 <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:2 }}>
                   <span style={{ fontSize:7, fontWeight:800, color:col, padding:'1px 5px', borderRadius:4, background:bg, border:`1px solid ${bd}` }}>{tag}</span>
-                  <span style={{ fontSize:9, fontWeight:700, color:'var(--text)' }}>{subNameRu(w.substanceId)}</span>
+                  <span style={{ fontSize:9, fontWeight:700, color:'#ffffff' }}>{subNameRu(w.substanceId)}</span>
                 </div>
                 <div style={{ fontSize:8, color:col, lineHeight:1.4 }}>{w.message}</div>
                 {w.percentUL > 0 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.55)', marginTop:2, lineHeight:1.4 }}>→ {w.percentUL}% от {isTitr ? 'оптимума' : 'UL'} ({w.totalDose} / {w.ul} мг)</div>}
@@ -1790,7 +1790,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         <div style={{ marginTop:8 }}>
           <div onClick={() => setShowSynergy(!showSynergy)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', marginBottom:4 }}>
             <span style={{ fontSize:10, fontWeight:700, color:'#a78bfa' }}>🧬 Синергия стека поддержки</span>
-            <span style={{ fontSize:7, color:'var(--text-dim)' }}>{showSynergy ? '▲' : '▼'}</span>
+            <span style={{ fontSize:7, color:'rgba(255,255,255,0.55)' }}>{showSynergy ? '▲' : '▼'}</span>
           </div>
           {showSynergy && (
             <div style={{ padding:'6px 10px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.12)' }}>
@@ -1819,7 +1819,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               🥗 Питание по анализам ({total})
               {hasHigh && <span style={{ fontSize:7, fontWeight:600, color:'#f59e0b', padding:'1px 5px', borderRadius:4, background:'rgba(245,158,11,0.12)' }}>требует коррекции</span>}
             </span>
-            <span style={{ fontSize:8, color:'var(--text-dim)' }}>{showNutrition ? '▲ скрыть' : '▼ показать'}</span>
+            <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showNutrition ? '▲ скрыть' : '▼ показать'}</span>
           </div>
           {showNutrition && (
             <div style={{ padding:'6px 9px', background:'rgba(0,0,0,0.15)', border:'1px solid ' + (hasHigh ? 'rgba(245,158,11,0.1)' : 'rgba(0,230,138,0.08)'), borderTop:'none', borderRadius:'0 0 8px 8px' }}>
@@ -1836,15 +1836,15 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 return (
                   <div key={marker} style={{ marginBottom:5, padding:'5px 7px', borderRadius:6, background:tierBg, border:`1px solid ${tierBorder}` }}>
                     <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:3 }}>
-                      <span style={{ fontSize:8, fontWeight:700, color:'var(--text)' }}>{marker.toUpperCase()}</span>
+                      <span style={{ fontSize:8, fontWeight:700, color:'#ffffff' }}>{marker.toUpperCase()}</span>
                       <span style={{ fontSize:7, fontWeight:600, color:tierColor, padding:'1px 4px', borderRadius:3, background:`${tierColor}15` }}>{tierLabel}</span>
                     </div>
                     <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
                       {tips.map((t, i) => (
-                        <div key={i} style={{ fontSize:8, color:'var(--text-light)', lineHeight:1.4, display:'flex', gap:4 }}>
+                        <div key={i} style={{ fontSize:8, color:'rgba(240,240,245,0.9)', lineHeight:1.4, display:'flex', gap:4 }}>
                           <span style={{ color:tierColor, flexShrink:0, fontWeight:700 }}>{maxTier >= 2 ? '⚠' : '•'}</span>
                           <span>
-                            <span style={{ fontWeight:600, color:'var(--text)' }}>{t.action}</span>
+                            <span style={{ fontWeight:600, color:'#ffffff' }}>{t.action}</span>
                             <span style={{ opacity:0.6, marginLeft:4 }}>→ {t.target}</span>
                           </span>
                         </div>
@@ -1922,7 +1922,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   {groups.monitor.length > 0 && `🔬${groups.monitor.length}`}
                 </span>
               </span>
-              <span style={{ fontSize:8, color:'var(--text-dim)' }}>{showInteractions ? '▲ скрыть' : '▼ показать'}</span>
+              <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showInteractions ? '▲ скрыть' : '▼ показать'}</span>
             </div>
             {showInteractions && (
               <div style={{ padding:'6px 9px', background:'rgba(0,0,0,0.12)', border:'1px solid ' + (hasBlock ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.08)'), borderTop:'none', borderRadius:'0 0 8px 8px' }}>
@@ -2024,7 +2024,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               <span style={{ fontSize:10, fontWeight:700, color: hasAbs ? '#ef4444' : '#f59e0b' }}>
                 {hasAbs ? '⛔ Противопоказания' : '⚠ Противопоказания и осторожности'} ({total})
               </span>
-              <span style={{ fontSize:8, color:'var(--text-dim)' }}>{showContraindications ? '▲ скрыть' : '▼ показать'}</span>
+              <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showContraindications ? '▲ скрыть' : '▼ показать'}</span>
             </div>
             {showContraindications && (
               <div style={{ padding:'6px 9px 8px', background: hasAbs ? 'rgba(239,68,68,0.04)' : 'rgba(245,158,11,0.03)', border:'1px solid ' + (hasAbs ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.1)'), borderTop:'none', borderRadius:'0 0 8px 8px' }}>
@@ -2032,7 +2032,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   const all = [...g.abs, ...g.rel];
                   return (
                     <div key={id} style={{ marginBottom: all.length > 0 ? 4 : 0 }}>
-                      <div style={{ fontSize:8, fontWeight:700, color:'var(--text)', marginBottom:2, marginTop:1 }}>{subNameRu(id)}</div>
+                      <div style={{ fontSize:8, fontWeight:700, color:'#ffffff', marginBottom:2, marginTop:1 }}>{subNameRu(id)}</div>
                       {g.abs.map((f, i) => (
                         <div key={i} style={{ fontSize:7, color:'#fca5a5', marginBottom:1, lineHeight:1.4, marginLeft:6 }}>
                           ⛔ {f.label}
@@ -2098,7 +2098,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 🩻 Мониторинг анализов и показателей
                 <span style={{ fontSize:7, fontWeight:600, color:'rgba(96,165,250,0.5)', padding:'1px 5px', borderRadius:4, background:'rgba(96,165,250,0.1)' }}>врачебный протокол</span>
               </span>
-              <span style={{ fontSize:8, color:'var(--text-dim)' }}>{showMonitoring ? '▲ скрыть' : '▼ показать'}</span>
+              <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showMonitoring ? '▲ скрыть' : '▼ показать'}</span>
             </div>
             {showMonitoring && (
               <div style={{ padding:'8px 9px', background:'rgba(96,165,250,0.03)', border:'1px solid rgba(96,165,250,0.1)', borderTop:'none', borderRadius:'0 0 8px 8px' }}>
@@ -2166,7 +2166,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
                 {/* ── Панели по системам (с привязкой к веществам) ── */}
                 <div style={{ marginBottom:7 }}>
-                  <div style={{ fontSize:8, fontWeight:700, color:'var(--text)', marginBottom:4 }}>📋 Системные панели ({subs.length} веществ в плане)</div>
+                  <div style={{ fontSize:8, fontWeight:700, color:'#ffffff', marginBottom:4 }}>📋 Системные панели ({subs.length} веществ в плане)</div>
 
                   {[{ id:'hep', icon:'🫁', name:'Печёночная панель', color:'#f59e0b', active:hasHepatic, markers:'АЛТ, АСТ, ГГТ, ЩФ, билирубин общий/прямой, альбумин, ПТИ', freq:'Каждые 4 нед', targets:'АЛТ/АСТ <40 Ед/л, ГГТ <55, билирубин <21 мкмоль/л', alert:'АЛТ >80 → снижение доз · >200 → СТОП' },
                     { id:'cardio', icon:'❤️', name:'Кардио-липидная панель', color:'#f87171', active:hasCardio, markers:'ЛПНП, ЛПВП, ТГ, АпоВ, Лп(а), hs-СРБ, Д-димер, тропонин I (при боли)', freq:'Каждые 4 нед', targets:'ЛПНП <2.6, ЛПВП >1.0, ТГ <1.7, hs-СРБ <1.0', alert:'ЛПНП >4.0 → статины · Д-димер >0.5 → УЗДГ вен' },

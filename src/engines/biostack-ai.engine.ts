@@ -23,10 +23,8 @@ export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 
 export interface BioStackProfile {
   age: number; weight: number; height: number; sex: 'male' | 'female';
-  experience: ExperienceLevel; goals: GoalType[]; aasStatus: AASStatus;
-  healthConditions: HealthCondition[]; budget: BudgetLevel; avoidIds: string[]; avoidMeds: string[];
-  maxStackSize: number;
-  adClass: ADClass; stackComplexity: StackComplexity;
+  experience: ExperienceLevel;
+  healthConditions: HealthCondition[]; avoidIds: string[]; avoidMeds: string[];
   targetOrgans: string[]; targetSystems: string[];
   currentMeds: string[]; drugAllergies: string[];
   jointSymptoms: string[];
@@ -51,18 +49,17 @@ export interface ProfileCompleteness {
 
 const FIELD_GROUPS: Record<string, string[]> = {
   personal: ['age','weight','height','sex','experience'],
-  health: ['aasStatus','healthConditions','budget','stackComplexity'],
-  goals: ['goals'],
+  health: ['healthConditions'],
   organs: ['targetOrgans'],
   systems: ['targetSystems'],
   lifestyle: ['avoidIds', 'avoidMeds'],
-  clinical: ['currentMeds','drugAllergies','adClass'],
+  clinical: ['currentMeds','drugAllergies'],
   symptoms: ['jointSymptoms','neuroSymptoms','cnsSymptoms','injuries'],
   supplements: ['currentSupplements'],
 };
 
 const AUTO_FILLABLE_KEYS = new Set([
-  'age','weight','height','sex','experience','goals','healthConditions','currentMeds','drugAllergies',
+  'age','weight','height','sex','experience','healthConditions','currentMeds','drugAllergies',
   'injuries','neuroSymptoms','cnsSymptoms','jointSymptoms','currentSupplements',
 ]);
 
@@ -114,10 +111,9 @@ export function getProfileCompleteness(p: BioStackProfile): ProfileCompleteness 
 export function getDefaultBioStackProfile(): BioStackProfile {
   return {
     age: 30, weight: 80, height: 175, sex: 'male',
-    experience: 'intermediate', goals: ['muscle_gain'],
-    aasStatus: 'none', healthConditions: [], budget: 'medium',
-    avoidIds: [], avoidMeds: [], maxStackSize: 8,
-    adClass: 'none', stackComplexity: 'balanced',
+    experience: 'intermediate',
+    healthConditions: [],
+    avoidIds: [], avoidMeds: [],
     targetOrgans: [], targetSystems: [],
     currentMeds: [], drugAllergies: [],
     jointSymptoms: [], neuroSymptoms: [], cnsSymptoms: [],
@@ -140,10 +136,6 @@ export function autoFillFromMainProfile(): { patch: Partial<BioStackProfile>; au
     if (ss.training?.level) {
       filled.experience = ss.training.level === 'beginner' ? 'beginner' : ss.training.level === 'intermediate' ? 'intermediate' : 'advanced';
       keys.push('experience');
-    }
-    if (ss.training?.primaryGoal) {
-      const g: Record<string, GoalType> = { bulk: 'muscle_gain', cut: 'fat_loss', maintenance: 'recovery', strength: 'muscle_gain', endurance: 'endurance', health: 'immunity' };
-      if (g[ss.training.primaryGoal]) { filled.goals = [g[ss.training.primaryGoal]]; keys.push('goals'); }
     }
     if (ss.health?.chronicConditions?.length) {
       const hc: HealthCondition[] = [];
@@ -191,10 +183,6 @@ export function syncBioStackToMain(p: BioStackProfile): void {
     if (p.height) s.personal = { ...s.personal, height: p.height };
     if (p.sex) s.personal = { ...s.personal, sex: p.sex };
     if (p.experience) s.training = { ...(s.training || {}), level: p.experience };
-    if (p.goals?.length) {
-      const gMap: Record<string, string> = { muscel_gain: 'bulk', fat_loss: 'cut', recovery: 'maintenance', endurance: 'endurance', immunity: 'health' };
-      const g = gMap[p.goals[0]]; if (g) s.training = { ...s.training, primaryGoal: g };
-    }
     if (p.healthConditions?.length) s.health = { ...(s.health || {}), chronicConditions: p.healthConditions };
     if (p.drugAllergies?.length) s.health = { ...s.health, drugAllergies: p.drugAllergies };
     if (p.injuries?.length) {

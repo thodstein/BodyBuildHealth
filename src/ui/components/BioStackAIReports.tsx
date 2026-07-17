@@ -138,9 +138,9 @@ export function ReportsTab({ profile, stackIds, linked }: { profile: BioStackPro
       lines.push(`  • Пол: ${profile.sex === 'male' ? 'Мужской' : profile.sex === 'female' ? 'Женский' : '—'}`);
       lines.push(`  • Вес: ${profile.weight || '—'} кг • Рост: ${profile.height || '—'} см`);
       lines.push(`  • Стаж: ${profile.experience || '—'} лет`);
-      lines.push(`  • Цели: ${(profile.goals || []).filter(Boolean).join(', ') || '—'}`);
+      lines.push(`  • Системы организма: ${(profile.targetSystems || []).join(', ') || '—'}`);
       lines.push(`  • Состояния: ${(profile.healthConditions || []).join(', ') || '—'}`);
-      lines.push(`  • ААС-статус: ${profile.aasStatus || '—'}`);
+      lines.push(`  • Принимаемые препараты: ${(profile.currentMeds || []).join(', ') || '—'}`);
       lines.push('');
       lines.push('💊 ТЕКУЩИЙ СТЕК ПОДДЕРЖКИ:');
       lines.push(`  Всего компонентов: ${stackIds.length}`);

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
-import { buildStack } from '../../engines/supplement-finder.engine';
-import { toFinderProfile, PURE_GOALS, HEALTH_CONDS } from './BioStackAIConstants';
-import type { GoalType, HealthCondition, ExperienceLevel, AASStatus } from '../../engines/biostack-ai.engine';
+import { toFinderProfile, HEALTH_CONDS } from './BioStackAIConstants';
+import type { HealthCondition, ExperienceLevel } from '../../engines/biostack-ai.engine';
 
 const STEP_STYLES = {
   container: { maxWidth: 400, margin: '0 auto', paddingBottom: 80 } as React.CSSProperties,
@@ -33,28 +32,10 @@ const STEP_STYLES = {
   }),
 };
 
-const GOAL_CARDS: Array<{ key: GoalType; icon: string; title: string; desc: string; color: string }> = [
-  { key: 'muscle_gain', icon: '💪', title: 'Набор массы', desc: 'Рост мышц, сила, восстановление', color: '#ef4444' },
-  { key: 'fat_loss', icon: '🔥', title: 'Жиросжигание', desc: 'Сушка, метаболизм, энергия', color: '#f59e0b' },
-  { key: 'endurance', icon: '🏃', title: 'Выносливость', desc: 'Кардио, дыхалка, stamina', color: '#60a5fa' },
-  { key: 'energy', icon: '⚡', title: 'Энергия', desc: 'Тонус, бодрость, продуктивность', color: '#f59e0b' },
-  { key: 'recovery', icon: '🔄', title: 'Восстановление', desc: 'Сон, регенерация, DOMS', color: '#8b5cf6' },
-  { key: 'immunity', icon: '🛡️', title: 'Иммунитет', desc: 'Защита, антиоксиданты', color: '#22c55e' },
-  { key: 'brain', icon: '🧠', title: 'Мозг / Фокус', desc: 'Память, концентрация, ноотропы', color: '#a78bfa' },
-  { key: 'longevity', icon: '⏳', title: 'Долголетие', desc: 'Митохондрии, anti-age, NAD+', color: '#ec4899' },
-];
-
 const EXP_CARDS: Array<{ key: ExperienceLevel; icon: string; title: string; desc: string }> = [
   { key: 'beginner', icon: '🌱', title: 'Новичок', desc: '<1 года тренировок. Базовый стек БАДов' },
   { key: 'intermediate', icon: '💪', title: 'Средний', desc: '1-3 года. Расширенный стек' },
   { key: 'advanced', icon: '🔥', title: 'Продвинутый', desc: '3+ лет. Полный стек + спец. поддержка' },
-];
-
-const AAS_CARDS: Array<{ key: AASStatus; icon: string; title: string; desc: string }> = [
-  { key: 'none', icon: '🚫', title: 'Без ААС', desc: 'Натуральный тренинг. Базовый стек' },
-  { key: 'trt', icon: '💉', title: 'TRT', desc: 'Заместительная терапия тестостероном' },
-  { key: 'course', icon: '💊', title: 'Курс ААС', desc: 'Активный курс. Макс. защита органов' },
-  { key: 'pct', icon: '🔄', title: 'ПКТ', desc: 'Восстановление после курса' },
 ];
 
 interface OnboardingProps {
@@ -65,56 +46,26 @@ interface OnboardingProps {
 
 export const OnboardingWizard: React.FC<OnboardingProps> = ({ profile, onComplete, onSkip }) => {
   const [step, setStep] = useState(0);
-  const [goals, setGoals] = useState<GoalType[]>(profile.goals || []);
   const [healthConds, setHealthConds] = useState<HealthCondition[]>(profile.healthConditions || []);
   const [experience, setExperience] = useState<ExperienceLevel>(profile.experience || 'intermediate');
-  const [aasStatus, setAasStatus] = useState<AASStatus>(profile.aasStatus || 'none');
 
-  const toggleGoal = (g: GoalType) => {
-    setGoals(goals.includes(g) ? goals.filter(x => x !== g) : [...goals, g]);
-  };
   const toggleHealth = (h: HealthCondition) => {
     setHealthConds(healthConds.includes(h) ? healthConds.filter(x => x !== h) : [...healthConds, h]);
   };
 
   const finish = (autoBuild: boolean) => {
-    onComplete({ goals, healthConditions: healthConds, experience, aasStatus }, autoBuild);
+    onComplete({ healthConditions: healthConds, experience }, autoBuild);
   };
 
   return (
     <div style={STEP_STYLES.container}>
       {/* Progress dots */}
       <div style={STEP_STYLES.progress}>
-        {[0, 1, 2].map(i => <div key={i} style={STEP_STYLES.dot(step >= i)} />)}
+        {[0, 1].map(i => <div key={i} style={STEP_STYLES.dot(step >= i)} />)}
       </div>
 
-      {/* Step 0: Goals */}
+      {/* Step 0: Health conditions */}
       {step === 0 && (
-        <>
-          <div style={STEP_STYLES.title}>🎯 Какая у вас цель?</div>
-          <div style={STEP_STYLES.subtitle}>Выберите 1-3 цели. Это определит направленность стека БАДов</div>
-          <div style={STEP_STYLES.cardGrid}>
-            {GOAL_CARDS.map(g => {
-              const active = goals.includes(g.key);
-              return (
-                <div key={g.key} onClick={() => toggleGoal(g.key)} style={STEP_STYLES.card(active, g.color)}>
-                  <div style={STEP_STYLES.cardIcon}>{g.icon}</div>
-                  <div style={{ ...STEP_STYLES.cardTitle, color: active ? g.color : '#fff' }}>{g.title}</div>
-                  <div style={STEP_STYLES.cardDesc}>{g.desc}</div>
-                </div>
-              );
-            })}
-          </div>
-          <button onClick={() => setStep(1)} disabled={goals.length === 0}
-            style={{ ...STEP_STYLES.nextBtn('#00e68a'), opacity: goals.length === 0 ? 0.4 : 1 }}>
-            Далее ({goals.length} выбрано) →
-          </button>
-          <button onClick={onSkip} style={STEP_STYLES.backBtn}>Пропустить — заполню позже</button>
-        </>
-      )}
-
-      {/* Step 1: Health conditions */}
-      {step === 1 && (
         <>
           <div style={STEP_STYLES.title}>🫀 Есть ли особенности здоровья?</div>
           <div style={STEP_STYLES.subtitle}>Это поможет исключить нежелательные БАДы и подобрать безопасный стек</div>
@@ -132,22 +83,21 @@ export const OnboardingWizard: React.FC<OnboardingProps> = ({ profile, onComplet
             })}
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
-            <button onClick={() => setStep(0)} style={STEP_STYLES.backBtn}>← Назад</button>
-            <button onClick={() => setStep(2)} style={{ ...STEP_STYLES.nextBtn('#ef4444'), flex: 1 }}>
+            <button onClick={() => setStep(1)} style={{ ...STEP_STYLES.nextBtn('#ef4444'), flex: 1 }}>
               Далее {healthConds.length > 0 ? `(${healthConds.length})` : ''} →
             </button>
           </div>
+          <button onClick={onSkip} style={STEP_STYLES.backBtn}>Пропустить — заполню позже</button>
         </>
       )}
 
-      {/* Step 2: Experience + AAS status + Build */}
-      {step === 2 && (
+      {/* Step 1: Experience + Build */}
+      {step === 1 && (
         <>
-          <div style={STEP_STYLES.title}>💪 Ваш уровень и режим</div>
+          <div style={STEP_STYLES.title}>💪 Ваш уровень тренировок</div>
           <div style={STEP_STYLES.subtitle}>Это влияет на размер и сложность стека</div>
 
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontWeight: 600 }}>ОПЫТ ТРЕНИРОВОК</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 14 }}>
             {EXP_CARDS.map(e => (
               <div key={e.key} onClick={() => setExperience(e.key)}
                 style={{ ...STEP_STYLES.card(experience === e.key, '#60a5fa'), padding: '10px 8px' }}>
@@ -158,20 +108,8 @@ export const OnboardingWizard: React.FC<OnboardingProps> = ({ profile, onComplet
             ))}
           </div>
 
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontWeight: 600 }}>СТАТУС ААС</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 14 }}>
-            {AAS_CARDS.map(a => (
-              <div key={a.key} onClick={() => setAasStatus(a.key)}
-                style={{ ...STEP_STYLES.card(aasStatus === a.key, '#8b5cf6'), padding: '12px 10px' }}>
-                <div style={{ fontSize: 20, marginBottom: 2 }}>{a.icon}</div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: aasStatus === a.key ? '#8b5cf6' : '#fff' }}>{a.title}</div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{a.desc}</div>
-              </div>
-            ))}
-          </div>
-
           <div style={{ display: 'flex', gap: 4 }}>
-            <button onClick={() => setStep(1)} style={STEP_STYLES.backBtn}>← Назад</button>
+            <button onClick={() => setStep(0)} style={STEP_STYLES.backBtn}>← Назад</button>
             <button onClick={() => finish(false)} style={{ ...STEP_STYLES.nextBtn('#8b5cf6'), flex: 1 }}>
               ✅ Сохранить профиль
             </button>

@@ -47,7 +47,7 @@ export interface SelectorInput {
  * НЕ осевые (допустимые): жим ног/лег-пресс, болгарский/гоблет присед, машинные приседы,
  * тяги БЛОК/СИДЯ/ГРУДЬЮ К СКАМЬЕ (chest-supported), landmine, жимы сидя с гантелями.
  */
-function isAxialLoadExercise(ex: Exercise): boolean {
+export function isAxialLoadExercise(ex: Exercise): boolean {
   const n = (ex.name || '').toLowerCase();
   const id = (ex.id || '').toLowerCase();
 
@@ -78,9 +78,27 @@ function isAxialLoadExercise(ex: Exercise): boolean {
   // За головой (behind the neck) — осевой + риск
   if (n.includes('за голов')) return true;
 
-  // Тяги В НАКЛОНЕ (штанга/гантели/T-гриф/Pendlay) — осевая нагрузка позвоночника в сгибании под весом
-  if (n.includes('тяга') && (n.includes('в наклоне') || n.includes('наклон') || n.includes('гантел') || n.includes('pendlay') || n.includes('bent'))) return true;
-  if (/t[\s_-]*гриф/i.test(n)) return true;
+  // P10: Тяги в наклоне — НЕ все осевые. Уточнение:
+  //   - chest_supported (грудью к скамье) / с опорой на скамью / single-arm с опорой — НЕ осевая
+  //   - landmine (один конец штанги в петле) — НЕ осевая
+  //   - тяга нижнего блока сидя (трос из-под ног к поясу) — НЕ осевая
+  //   - Pendlay / штанга в наклоне без опоры / T-гриф без опоры — ОСЕВАЯ
+  if (n.includes('тяга') && (n.includes('в наклоне') || n.includes('наклон') || n.includes('pendlay') || n.includes('bent'))) {
+    // P10: исключаем chest-supported и с опорой
+    if (n.includes('грудью') || n.includes('chest') || n.includes('опор') || n.includes('скам') || n.includes('bench') || n.includes('landmine') || n.includes('сидя')) {
+      // не осевая
+    } else {
+      return true;
+    }
+  }
+  // Тяга гантели в наклоне с опорой на скамью — НЕ осевая
+  if (n.includes('тяга') && n.includes('гантел') && (n.includes('опор') || n.includes('скам') || n.includes('bench'))) {
+    // не осевая — пропускаем
+  } else if (n.includes('тяга') && n.includes('гантел') && n.includes('наклон')) {
+    return true;
+  }
+  // T-гриф без опоры — осевая
+  if (/t[\s_-]*гриф/i.test(n) && !n.includes('опор') && !n.includes('скам')) return true;
 
   return false;
 }

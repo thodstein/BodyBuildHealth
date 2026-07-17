@@ -21,7 +21,7 @@ import { trueMuscleOf, musclesForRole, derivePattern } from '../movement-pattern
 import { PCT_FOR_RIR, S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
-import { prescribeLoad, type LoadStrategy } from './bb-autocoach.engine';
+import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findSubstitutions } from '../exercise-substitution.engine';
 import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landmarks.engine';
@@ -31,6 +31,14 @@ import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landma
 import { distributePhases, PHASE_CONFIGS, getPhaseVolumeMult, type BBPhase } from '../../ui/screens/TrainingScreen_parts/TrainingConstructor/phase-periodization';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
+
+// P7: приоритет equipment по фазе (формирует пропорцию compound/isolation/cable/machine из PHASE_CONFIGS)
+export const PHASE_EQUIPMENT_PREF: Record<string, string[]> = {
+  accumulation: ['cable', 'dumbbell', 'machine', 'barbell'],
+  intensification: ['barbell', 'machine', 'dumbbell', 'cable'],
+  peaking: ['barbell', 'machine', 'dumbbell', 'cable'],
+  deload: ['cable', 'bodyweight', 'dumbbell', 'machine'],
+};
 
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
 export type BBVolumeGoal = 'mev' | 'mav' | 'mrv';
@@ -50,6 +58,15 @@ export interface BBBuilderInput {
   favoriteExercises?: string[];  // Любимые упражнения — +15 приоритет при отборе
   excludedExercises?: string[];  // Нелюбимые упражнения — полностью исключаются из пула
   avoidAxialLoad?: boolean;      // Убрать осевую нагрузку (присед/становая/жим стоя/гудморнинг)
+  intensityTechnique?: IntensityTechnique; // П6: техника интенсивности для каждого primary
+  autoDeload?: boolean;          // авто-делод по ACWR
+  deloadType?: DeloadType;       // тип делода (pump/strength/rest)
+  loadStrategy?: LoadStrategy;   // стратегия прогрессии нагрузки
+  autoRegResult?: {              // результат авторегуляции (объём/вес/RIR)
+    volumeMultiplier: number;
+    topSetPctMultiplier: number;
+    rirShift: number;
+  };
 }
 
 export interface BBSet {
@@ -222,13 +239,25 @@ const ACCESSORY_2X_GROUPS = new Set<string>([
   'shoulders', 'arms', 'calves', 'abs',
 ]);
 /**
- * Доля объёма мышцы на ОДНУ сессию (fix C):
- * - 1 сессия/нед → вся цель на эту сессию (было 65% — терялись 35%);
- * - ≥2 сессии → primary забирает бОльшую долю, accessory — меньшую.
+ * Доля объёма мышцы на ОДНУ сессию (fix C + P5):
+ * - 1 сессия/нед → вся цель на эту сессию, но cap MAV×1.3 (анти-перетрен).
+ *   Раньше: 1.5× MAV → для chest=21 сет/день, что в 1.5 раза выше нормы для 1×/нед группы.
+ *   Schoenfeld BJ et al. (2016, J Sports Sci): 1×/нед chest 12-16 сетов оптимум, >20 — нет данных.
+ * - 2 сессии/нед → primary 1.4×, accessory 0.6× (сбалансировано).
+ * - ≥3 сессии/нед → primary 1.5×, accessory 0.75× (compound щедро, изоляция 3-4×N).
  * Итоговый недельный объём дополнительно капается по MRV в normalizeWeekMrv.
  */
 function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary' | 'accessory'): number {
-  if (sessionsPerWeek <= 1) return Math.round(mavRot);
+  if (sessionsPerWeek <= 1) {
+    // P5: cap на 1×/нед — не более MAV×1.3. Иначе bro-split chest=25+ сетов.
+    return Math.min(Math.round(mavRot), Math.round(mavRot * 1.3));
+  }
+  if (sessionsPerWeek === 2) {
+    const base = mavRot / 2;
+    const factor = role === 'primary' ? 1.4 : 0.6;
+    return Math.max(1, Math.round(base * factor));
+  }
+  // 3+ сессии/нед
   const base = mavRot / sessionsPerWeek;
   const factor = role === 'primary' ? 1.5 : 0.75;
   return Math.max(1, Math.round(base * factor));
@@ -365,6 +394,7 @@ function buildSession(
     sets: number; exerciseCount: number; rir: number;
     reps: number; weight: number; pool: any[]; exDatas: any[]; selType: string;
     rationaleMap: Map<string, string>;
+    phaseEquip?: string[];
   }
   const plans: MusclePlan[] = [];
   let totalExpectedFatigue = 0;
@@ -420,15 +450,22 @@ function buildSession(
     sets = Math.round(sets * getPhaseVolumeMult(phase));
     // MRV-кап: одна сессия не превышает недельный MRV мышцы (fix D)
     if (mrvRot > 0) sets = Math.max(1, Math.min(sets, mrvRot));
-    const [rmin, rmax] = charReps(resolved);
+    // P1: reps/tempo/rest берутся из PHASE_CONFIGS[phase] — единый источник правды.
+    // (Ранее дубль: buildSession ставил charReps → applyPostPhaseProcessing перезаписывал).
+    const phaseCfg = PHASE_CONFIGS[phase];
+    const isAccessory = role === 'accessory';
+    const [baseMin, baseMax] = phaseCfg.repRange;
+    // Базовые reps: primary = cfg.repRange; accessory = +2 к мин, +5 к макс (пампинг)
+    const repMin = isAccessory ? baseMin + 2 : baseMin;
+    const repMax = isAccessory ? baseMax + 5 : baseMax;
+    const reps = Math.round((repMin + repMax) / 2);
+    // RIR: bbRir (учитывает phase + phaseWeek + характер). Делод → RIR 3-4.
     const rir = bbRir(resolved, phase, phaseWeek);
     const wm = workMax[repKey] || PRO_WORKMAX_RATIO[repKey]?.(workMax) || defaultWorkMax(repKey);
+    // P1: вес = workMax × phaseConfig.intensityMultiplier × PCT_FOR_RIR[rir]
+    // intensityMultiplier уже включает понижение для делода (0.55) и пика (0.95).
     const pct = PCT_FOR_RIR[rir] ?? 0.9;
-    const reps = Math.round((rmin + rmax) / 2);
-    let weight = Math.round(wm * pct * 10) / 10;
-    // FIX-3: делод должен быть лёгким (55% интенсивности — активное восстановление)
-    // Без этого fix PCT_FOR_RIR[4]=0.84 → делод-вес 84% workMax вместо 55%
-    if (phase === 'deload') weight = Math.round(weight * (PHASE_CONFIGS.deload.intensityMultiplier || 0.55) * 10) / 10;
+    let weight = Math.round(wm * phaseCfg.intensityMultiplier * pct * 10) / 10;
     const accessoryCount = ACCESSORY_2X_GROUPS.has(muscle) ? 2 : 1;
     const exerciseCount = role === 'primary'
       ? (['back', 'quads', 'chest', 'shoulders'].includes(muscle) ? 3 : 2)
@@ -472,6 +509,8 @@ function buildSession(
       preferBB: true,
       favoriteIds, excludeIds,
       avoidAxialLoad,
+      // P7: equipment приоритезируется по фазе (cable для accumulation, barbell для peaking)
+      preferEquipment: PHASE_EQUIPMENT_PREF[phase],
     });
     for (const s of selected) { if (s && s.id) sessionSelectedIds.push(s.id); if (s && s.name) sessionSelectedNames.push(s.name); }
     let exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5 }];
@@ -515,6 +554,56 @@ function buildSession(
       }
     }
 
+    // P9: diversity для chest, back, quads, hamstrings, glutes — разные паттерны/углы.
+    // Без этого для chest=3 получаем «жим штанги / жим гантелей / жим гантелей на наклонной» — 2 жима подряд.
+    // Логика: 1 horizontal_compound + 1 vertical/angle + 1 isolation/cable.
+    if (exerciseCount >= 2 && pool.length >= 2 && muscle !== 'shoulders') {
+      const isChest = muscle === 'chest';
+      const isBack = muscle === 'back';
+      const isQuads = muscle === 'quads';
+      const isHam = muscle === 'hamstrings';
+      const isGlutes = muscle === 'glutes';
+      const isCalves = muscle === 'calves';
+      const isArms = muscle === 'arms' || muscle === 'biceps' || muscle === 'triceps';
+      if (isChest || isBack || isQuads || isHam || isGlutes || isCalves || isArms) {
+        // Классификаторы упражнений
+        const isPress = (e: any) => /(жим|press|жимов)/i.test(e.name || '');
+        const isRow = (e: any) => /(тяга|row)/i.test(e.name || '');
+        const isSquat = (e: any) => /(присед|squat|жим.*ног|hack|leg.*press|выпад|болгар)/i.test(e.name || '');
+        const isHinge = (e: any) => /(станов|мёртв|рум|good.?morning|hip.?thrust|ягодичн.*мост)/i.test(e.name || '');
+        const isCurl = (e: any) => /(сгибан|curl)/i.test(e.name || '');
+        const isExtension = (e: any) => /(разгибан|extension)/i.test(e.name || '');
+        const isFlyOrLateral = (e: any) => /(развод|fly|crossover|бабоч|кроссов|отвед|lateral|raise)/i.test(e.name || '');
+        const isPullupOrPulldown = (e: any) => /(подтяг|тяга.*верх|pull.?up|lat.?pull.?down|верх)/i.test(e.name || '');
+        const isCable = (e: any) => /(блок|кроссов|кабель|cable)/i.test(e.name || '');
+
+        let primaryType: (e: any) => boolean;
+        let secondaryType: (e: any) => boolean;
+        if (isChest) { primaryType = isPress; secondaryType = isFlyOrLateral; }
+        else if (isBack) { primaryType = isRow; secondaryType = isPullupOrPulldown; }
+        else if (isQuads) { primaryType = isSquat; secondaryType = isExtension; }
+        else if (isHam) { primaryType = isHinge; secondaryType = isCurl; }
+        else if (isGlutes) { primaryType = isHinge; secondaryType = isSquat; }
+        else if (isCalves) { primaryType = (e: any) => /(подъем.*носк|calf)/i.test(e.name || ''); secondaryType = isCable; }
+        else { primaryType = isCurl; secondaryType = isExtension; }
+
+        const primaries = pool.filter(e => primaryType(e));
+        const secondaries = pool.filter(e => secondaryType(e) && !primaryType(e));
+        const others = pool.filter(e => !primaryType(e) && !secondaryType(e));
+        const diverse: any[] = [];
+        if (primaries.length > 0) diverse.push(primaries[0]);
+        if (secondaries.length > 0) diverse.push(secondaries[0]);
+        // Добрать до exerciseCount из others
+        for (const e of [...primaries.slice(1), ...secondaries.slice(1), ...others]) {
+          if (diverse.length >= exerciseCount) break;
+          if (!diverse.some(d => d.id === e.id)) diverse.push(e);
+        }
+        if (diverse.length >= Math.min(2, exerciseCount)) {
+          exDatas = diverse.slice(0, exerciseCount);
+        }
+      }
+    }
+
     // Per-exercise weight modifier (гантели 80%, наклон 85%, блок 70% etc.)
     function weightModFor(exName: string): number {
       const n = (exName || '').toLowerCase();
@@ -527,13 +616,24 @@ function buildSession(
     }
     for (const d of exDatas) (d as any)._weightMod = weightModFor((d as any).name || '');
 
+    // P1: DUP-волна повторений внутри фазы (недельная вариация).
+    // Ранние недели фазы → больше повторений (метаболический стресс),
+    // поздние → меньше (механическое натяжение). Аналог getDupReps в phase-periodization.
+    const dupRepsOffset = phaseCfg && phaseWeek > 1 ? -Math.floor((phaseWeek - 1) * 1.5) : 0;
+    const adjReps = Math.max(repMin, Math.min(repMax, reps + dupRepsOffset));
+
+    // P7: phaseExerciseMix — приоритет equipment по фазе (accumulation→cable, peaking→barbell).
+    // Это формирует пропорцию compound/isolation/cable/machine, заявленную в PHASE_CONFIGS.
+    const phaseEquip = PHASE_EQUIPMENT_PREF[phase] || ['barbell', 'dumbbell', 'machine', 'cable'];
+
     const expectedFatigue = exerciseCount * (sets / exerciseCount) * (((exDatas[0] as any)?.fatigueCost || 5));
     totalExpectedFatigue += expectedFatigue;
-    plans.push({ muscle, resolved, role, sets, exerciseCount, rir, reps, weight, pool, exDatas, selType, rationaleMap });
+    plans.push({ muscle, resolved, role, sets, exerciseCount, rir, reps, weight, pool, exDatas, selType, rationaleMap, phaseEquip });
   }
 
   // Apply substitution for graded injuries: replace exercises and adjust loads
   for (const pl of plans) {
+    const phaseCfg = PHASE_CONFIGS[phase];
     const isGraded = gradedInjuries.some(inj => collapseKey(inj.muscle) === pl.muscle);
     const injuryFactor = gradedInjuries.find(inj => collapseKey(inj.muscle) === pl.muscle);
     if (isGraded && injuryFactor) {
@@ -570,6 +670,14 @@ function buildSession(
 
   // Process each muscle with proportional budget
   for (const pl of plans) {
+    const phaseCfg = PHASE_CONFIGS[phase];
+    const [adjMin, adjMax] = phaseCfg.repRange;
+    const adjReps = phase === 'peaking' && phaseWeek > 1
+      ? Math.max(adjMin, Math.round((adjMin + adjMax) / 2) - Math.floor((phaseWeek - 1) * 1.5))
+      : Math.round((adjMin + adjMax) / 2);
+    const isAcc = pl.role === 'accessory';
+    const repMin = isAcc ? adjMin + 2 : adjMin;
+    const repMax = isAcc ? adjMax + 5 : adjMax;
     const muscleBudget = totalExpectedFatigue > 0
       ? Math.floor(dayFatigueBudget * pl.exerciseCount * Math.max(1, Math.round(pl.sets / pl.exerciseCount)) * ((pl.exDatas[0] as any)?.fatigueCost || 5) / totalExpectedFatigue)
       : Math.floor(dayFatigueBudget / Math.max(1, plans.length));
@@ -586,45 +694,46 @@ function buildSession(
       const exWeight = (exData as any)._effWeight ?? pl.weight;
       const finalRir = isSubstituted ? Math.min(pl.rir + 1, 4) : ((exData as any)._deltRir ?? pl.rir);
       const cost = ((exData as any)?.fatigueCost || 5) * exSets;
+      // P1: tempo/rest/reps берутся из PHASE_CONFIGS[phase] (не charReps/REST_BY_CHARACTER).
+      // Accessory получает чуть меньше отдыха (минус 30с), primary — базу.
+      const tempoStr = phaseCfg.tempo;
+      const baseRest = phaseCfg.restBase;
+      const exRest = pl.role === 'accessory' ? Math.max(45, baseRest - 30) : baseRest;
       if (remainingBudget < cost) {
         const reduced = Math.max(2, Math.floor(remainingBudget / ((exData as any)?.fatigueCost || 5)));
         const adjustedSets = Math.min(exSets, reduced);
         const adjCost = ((exData as any)?.fatigueCost || 5) * adjustedSets;
         remainingBudget -= adjCost;
-        const tempoSpec = tempoFor(pl.resolved as DayCharacter);
-        const restSeconds = REST_BY_CHARACTER[pl.resolved as DayCharacter];
         const workSets: BBSet[] = Array.from({ length: adjustedSets }, () => ({
-          reps: Math.round(Math.min(pl.reps, repsCap)), rir: finalRir,
+          reps: Math.min(adjReps, repsCap), rir: finalRir,
           weight: Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10,
-          tempo: tempoSpec.notation, restSeconds,
+          tempo: tempoStr, restSeconds: exRest,
         }));
         exercises.push({
           muscle: trueMuscleOf(exData) || pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: pl.resolved as DayCharacter,
-          sets: adjustedSets, repsRange: [Math.round(Math.min(pl.reps - 2, repsCap)), Math.round(Math.min(pl.reps + 2, repsCap))],
+          sets: adjustedSets, repsRange: [Math.min(Math.max(repMin, adjReps - 2), repsCap), Math.min(repMax, repsCap)],
           rir: finalRir,
           workSets, exerciseName: (exData as any).name || (exData as any).id,
-          tempoSpec: tempoSpec.notation, restSeconds,
-          comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.round(Math.min(pl.reps, repsCap)), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoSpec.notation, restSeconds, isSubstituted),
+          tempoSpec: tempoStr, restSeconds: exRest,
+          comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted),
           warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary'),
           rationale: pl.rationaleMap.get((exData as any).name) || '',
         });
         continue;
       }
       remainingBudget -= cost;
-      const tempoSpec = tempoFor(pl.resolved as DayCharacter);
-      const restSeconds = REST_BY_CHARACTER[pl.resolved as DayCharacter];
       const workSets: BBSet[] = Array.from({ length: exSets }, () => ({
-        reps: Math.round(Math.min(pl.reps, repsCap)), rir: finalRir,
+        reps: Math.min(adjReps, repsCap), rir: finalRir,
         weight: Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10,
-        tempo: tempoSpec.notation, restSeconds,
+        tempo: tempoStr, restSeconds: exRest,
       }));
       exercises.push({
         muscle: pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: pl.resolved as DayCharacter,
-        sets: exSets, repsRange: [Math.round(Math.min(pl.reps - 2, repsCap)), Math.round(Math.min(pl.reps + 2, repsCap))],
+        sets: exSets, repsRange: [Math.min(Math.max(repMin, adjReps - 2), repsCap), Math.min(repMax, repsCap)],
         rir: finalRir,
         workSets, exerciseName: (exData as any).name || (exData as any).id,
-        tempoSpec: tempoSpec.notation, restSeconds,
-        comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, exSets, Math.round(Math.min(pl.reps, repsCap)), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoSpec.notation, restSeconds, isSubstituted),
+        tempoSpec: tempoStr, restSeconds: exRest,
+        comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, exSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted),
         warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary'),
         rationale: pl.rationaleMap.get((exData as any).name) || '',
       });
@@ -734,13 +843,28 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/deload (fix A)
   // fix N: deload-частота зависит от реальной нагрузки (ACWR). При ratio>1.5 —
   // учащаем разгрузку (каждые 3 нед) и гарантируем deload даже в коротких планах (≥3 нед).
-  // ACWR вычисляется ДО distributePhases и подаётся в неё (иначе deloadFreq мёртв).
+  // P2: для планов 4-5 нед — последняя неделя = делод (4-нед план без разгрузки = перетрен).
+  // Для ≥6 нед — стандартная частота каждые 4 нед.
+  // Для <4 нед — делода нет (слишком короткий цикл).
   const acwrRatio = computeAcwr();
-  let deloadFreq = input.weeks >= 6 ? 4 : 0;
+  let deloadFreq = 0;
+  let forceFinalDeload = false;
+  if (input.weeks >= 6) {
+    deloadFreq = 4;
+  } else if (input.weeks >= 4) {
+    forceFinalDeload = true;
+  }
   if (acwrRatio > 1.5 && input.weeks >= 3) {
-    deloadFreq = Math.min(deloadFreq || 3, 3);
+    deloadFreq = Math.max(1, Math.min(deloadFreq || 3, 3));
   }
   const phaseDist = distributePhases(input.weeks, deloadFreq, input.goal === 'strength_mass' ? 'mass' : (input.goal || 'mass'));
+  // P2: принудительный финальный делод для 4-5 нед планов (через замену последней недели)
+  if (forceFinalDeload && input.weeks >= 4) {
+    const lastIdx = phaseDist.findIndex(pd => pd.startWeek === input.weeks);
+    if (lastIdx >= 0) {
+      phaseDist[lastIdx] = { phase: 'deload', startWeek: input.weeks, endWeek: input.weeks, weeks: [input.weeks], config: PHASE_CONFIGS.deload };
+    }
+  }
   const phaseByWeek = new Map<number, BBPhase>();
   for (const pd of phaseDist) phaseByWeek.set(pd.startWeek, pd.phase);
   const phaseWeekCounter: Record<string, number> = { accumulation: 0, intensification: 0, deload: 0, peaking: 0 };
@@ -948,7 +1072,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         const prescr = prescribeLoad(
           'double_progression',
           prevWs.weight, prevWs.reps, prevEx.rir,
-          maxW, curWeek.week, input.weeks, curPhase
+          maxW, curWeek.week, input.weeks, curPhase,
+          (curEx as any).exerciseType,
+          curEx.role,
         );
         for (const ws of curEx.workSets) {
           ws.weight = Math.round(prescr.nextWeight * 10) / 10;
@@ -970,7 +1096,27 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     ...(injuries.length > 0 ? [`Травмы (per-week по дате плана${input.planStartWeek ? ` со старта ${input.planStartWeek}` : ''}): исключены ${[...new Set(injuries.filter(i => i.exclude !== false).map(i => i.muscle))].join(', ') || '—'}; градация ${[...new Set(injuries.filter(i => i.exclude === false).map(i => i.muscle))].join(', ') || '—'} — упражнения заменяются на безопасные альтернативы с пониженным весом/объёмом.`] : []),
   ];
 
+  const basePlan = { pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale };
+  let finalPlan = basePlan;
+  // П6/П8: применяем intensity-technique и feeder-сеты прямо внутри buildBBPlan,
+  // чтобы оба вызывающих пути (BbAutoConstructor и TrainingConstructor) получали результат.
+  // skipPhaseRedistribution=true — распределение фаз уже сделано в buildBBPlan через distributePhases.
+  if ((input.intensityTechnique && input.intensityTechnique !== 'none') || weakPoints.length > 0) {
+    finalPlan = applyPostPhaseProcessing({
+      plan: basePlan,
+      totalWeeks: input.weeks,
+      workMax,
+      loadStrategy: input.loadStrategy,
+      autoDeload: input.autoDeload,
+      deloadType: input.deloadType,
+      acwrRatio,
+      autoRegResult: input.autoRegResult,
+      skipPhaseRedistribution: true,
+      intensityTechnique: input.intensityTechnique && input.intensityTechnique !== 'none' ? input.intensityTechnique : undefined,
+      weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
+    });
+  }
   const pedMrvMult = (pedAdapt?.combinedMrvMultiplier ?? 1);
-  const volumeLandmarks = getBBVolumeLandmarks({ pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale }, level, pedMrvMult);
-  return { pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale, volumeLandmarks };
+  const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, pedMrvMult);
+  return { ...finalPlan, volumeLandmarks };
 }

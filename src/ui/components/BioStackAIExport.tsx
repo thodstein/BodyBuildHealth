@@ -25,7 +25,7 @@ export function ExportTab({ profile, stackIds, setStackIds, linked }: { profile:
     const L: string[] = [];
     L.push(`💊 БИОСТАК — ПЛАН ПОДДЕРЖКИ`);
     L.push(`Дата: ${new Date().toLocaleDateString('ru-RU')}`);
-    L.push(`Профиль: ${(profile.goals || []).join(', ') || '—'} · бюджет: ${profile.budget || '—'}`);
+    L.push(`Профиль: уровень ${profile.experience || '—'} · системы: ${(profile.targetSystems || []).join(', ') || '—'}`);
     if (profile.healthConditions?.length) L.push(`Здоровье: ${profile.healthConditions.join(', ')}`);
     L.push(``);
     L.push(`📋 СОСТАВ (${stackIds.length} в-в, ~${total}₽/мес):`);

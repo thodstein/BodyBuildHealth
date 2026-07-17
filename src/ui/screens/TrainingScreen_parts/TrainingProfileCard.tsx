@@ -17,6 +17,15 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
   };
   const wm = profile.workMax;
   const setWm = (k: string, v: number) => update({ workMax: { [k]: v } });
+  // Injury form state (must be at top level — Rules of Hooks)
+  const [injMuscle, setInjMuscle] = useState('chest');
+  const [injFrom, setInjFrom] = useState('');
+  const [injTo, setInjTo] = useState('');
+  const [injGraded, setInjGraded] = useState(false);
+  const [injExclude, setInjExclude] = useState(false);
+  const [injWeightPct, setInjWeightPct] = useState(80);
+  const [injVolPct, setInjVolPct] = useState(80);
+  const [injRepsCap, setInjRepsCap] = useState(12);
   return (
     <div style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(0,230,138,0.2)', padding: 12, margin: '0 0 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -75,14 +84,6 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
       </div>
       <div style={LABEL}>🩹 Травмы / ограничения</div>
       {(() => {
-        const [injMuscle, setInjMuscle] = useState('chest');
-        const [injFrom, setInjFrom] = useState('');
-        const [injTo, setInjTo] = useState('');
-        const [injGraded, setInjGraded] = useState(false);
-        const [injExclude, setInjExclude] = useState(false);
-        const [injWeightPct, setInjWeightPct] = useState(80);
-        const [injVolPct, setInjVolPct] = useState(80);
-        const [injRepsCap, setInjRepsCap] = useState(12);
         const INJ_GROUPS: [string, string][] = [['chest','Грудь'],['back','Спина'],['legs','Ноги'],['shoulders','Плечи'],['arms','Руки'],['core','Кор']];
         return (
           <div>
