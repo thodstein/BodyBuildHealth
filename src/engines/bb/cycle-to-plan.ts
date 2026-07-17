@@ -14,6 +14,7 @@ import { adaptForPEDs, type PED, type CourseIntensity } from './bb-ped-adaptatio
 import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-plan-builder';
 import { applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
+import { trueMuscleOf } from '../movement-pattern';
 import type { FullProgram } from '../../engines/complete-program-library.engine';
 
 export type CycleSourceCycle = SRCycleTemplate;
@@ -41,15 +42,28 @@ export function programToCycleTemplate(program: FullProgram): SRCycleTemplate {
   const week1 = program.weeks[0];
   const deloadWeeks = program.weeks.filter(w => w.deload).map(w => w.week);
 
-  // Конвертировать день программы → SRDaySpec
-  const days: SRDaySpec[] = week1.days.map(day => ({
-    exercises: day.exercises.map(ex => {
+  // Конвертировать день программы → SRDaySpec с BB-фильтрацией и дедупликацией
+  const days: SRDaySpec[] = week1.days.map(day => {
+    const seenNames = new Set<string>(); // дедупликация по имени
+    const exercises: SRExerciseSpec[] = [];
+    for (const ex of day.exercises) {
+      // BB-фильтр: заменить ПЛ/олимпийские на ББ-альтернативы
+      const muscle = muscleGroupFromExName(ex.name, EXERCISE_CATALOG);
+      const bbRep = replacePLForBB(ex.name, muscle === 'chest' ? 'Грудь' : muscle === 'back' ? 'Спина' : muscle === 'shoulders' ? 'Плечи' : muscle === 'quads' || muscle === 'hamstrings' || muscle === 'glutes' || muscle === 'calves' ? 'Ноги' : muscle === 'biceps' || muscle === 'triceps' || muscle === 'forearms' ? 'Руки' : 'Кор');
+      if (!bbRep) continue; // пропустить ПЛ/мусор без ББ-аналога
+      // Дедупликация: если упражнение уже есть в дне — пропустить
+      if (seenNames.has(bbRep.name)) continue;
+      seenNames.add(bbRep.name);
+      // Проверка trueMuscleOf — пропустить если null (hinge/carry/junk)
+      const cat = EXERCISE_CATALOG.find(e => e.name === bbRep.name);
+      if (cat && trueMuscleOf(cat) === null) continue;
+
       const reps = parseInt(String(ex.reps)) || 10;
       const rir = ex.rir ?? 2;
       const pct = PCT_FOR_RIR[rir] ?? 0.72;
-      const group = muscleGroupFromExName(ex.name, EXERCISE_CATALOG);
+      const group = muscleGroupFromExName(bbRep.name, EXERCISE_CATALOG);
       const spec: SRExerciseSpec = {
-        name: ex.name,
+        name: bbRep.name,
         group: group === 'chest' ? 'Грудь' : group === 'back' ? 'Спина' : group === 'shoulders' ? 'Плечи'
           : group === 'quads' || group === 'hamstrings' || group === 'glutes' || group === 'calves' ? 'Ноги'
           : group === 'biceps' || group === 'triceps' || group === 'forearms' ? 'Руки'
@@ -59,9 +73,10 @@ export function programToCycleTemplate(program: FullProgram): SRCycleTemplate {
         load: rir <= 1 ? 'Тяжелая' : rir <= 3 ? 'Тяжелая' : 'Средняя',
         sets: [{ pct, reps, sets: ex.sets, rir }] as SRSetSpec[],
       };
-      return spec;
-    }),
-  }));
+      exercises.push(spec);
+    }
+    return { exercises };
+  });
 
   return {
     meta: {
@@ -278,19 +293,54 @@ function validateReplacement(rep: { name: string; group: string }): { name: stri
   return { name: 'Тяга штанги в наклоне', group: 'Спина' };
 }
 
-/** Найти замену для исключённого/осевого упражнения из той же группы. */
-function findReplacementForCycle(exName: string, muscle: string, favNames: Set<string>, favIdSet: Set<string>): { name: string; group: string } | null {
+/** Найти замену для исключённого/осевого упражнения из той же группы, с учётом угла.
+ *  Пытается выбрать упражнение с ДРУГИМ углом, чем уже есть в дне (diversity). */
+function findReplacementForCycle(exName: string, muscle: string, favNames: Set<string>, favIdSet: Set<string>, alreadyInDay: Set<string>): { name: string; group: string } | null {
   const cat = EXERCISE_CATALOG.find(e => e.name === exName);
   const group = cat?.group || 'chest';
-  // Пул упражнений той же группы
-  const pool = EXERCISE_CATALOG.filter(e => e.group === group && e.name !== exName);
+  // Пул упражнений той же группы, не в дне
+  const pool = EXERCISE_CATALOG.filter(e => e.group === group && e.name !== exName && !alreadyInDay.has(e.name));
   if (pool.length === 0) return null;
-  // Приоритет: любимые → compound → isolation
+  // Приоритет 1: любимое
   const favMatch = pool.find(e => favNames.has(e.name) || favIdSet.has(e.id));
   if (favMatch) return { name: favMatch.name, group };
+  // Приоритет 2: compound с ДРУГИМ углом/паттерном
+  const exAngle = classifyAngle(exName);
+  const diffAngle = pool.find(e => e.type === 'compound' && classifyAngle(e.name) !== exAngle);
+  if (diffAngle) return { name: diffAngle.name, group };
+  // Приоритет 3: compound
   const compound = pool.find(e => e.type === 'compound');
   if (compound) return { name: compound.name, group };
+  // Приоритет 4: любое
   return { name: pool[0].name, group };
+}
+
+/** Классифицировать угол/паттерн упражнения (для diversity). */
+function classifyAngle(exName: string): string {
+  const n = (exName || '').toLowerCase();
+  // Грудь
+  if (/жим.*(лёжа|лежа|гориз)|bench.*press/i.test(n) && !/наклон|incline|decline/i.test(n)) return 'hor_press';
+  if (/жим.*(наклон|incline|верх)/i.test(n) || /incline.*press/i.test(n)) return 'inc_press';
+  if (/развод|fly|crossover|кроссов/i.test(n)) return 'fly';
+  // Спина
+  if (/подтяг|pull.?up|тяга.*верх|lat.?pull|пуллдаун/i.test(n)) return 'vert_pull';
+  if (/тяга.*(наклон|блок|гантел|штанг|к пояс)/i.test(n) && !/верх/i.test(n)) return 'hor_row';
+  // Ноги
+  if (/присед.*штанг|squat/i.test(n) && !/гантел|фронт|гоблет|болгар/i.test(n)) return 'bb_squat';
+  if (/жим.*ног|leg.?press|хак/i.test(n)) return 'leg_press';
+  if (/сгибан.*ног|leg.?curl/i.test(n)) return 'leg_curl';
+  if (/ягодичн.*мост|hip.?thrust/i.test(n)) return 'hip_thrust';
+  // Плечи
+  if (/жим.*(стоя|сидя|армей)/i.test(n)) return 'ohp';
+  if (/мах|подъём.*стороны|lateral|raise/i.test(n)) return 'lateral';
+  if (/наклон.*дельт|rear|лиц.*тяга|face.?pull/i.test(n)) return 'rear_delt';
+  // Руки
+  if (/сгибан.*штанг|barbell.*curl/i.test(n)) return 'bb_curl';
+  if (/сгибан.*гантел|dumbbell.*curl/i.test(n) && !/молот/i.test(n)) return 'db_curl';
+  if (/молот|hammer/i.test(n)) return 'hammer';
+  if (/разгибан.*блок|pushdown/i.test(n)) return 'pushdown';
+  if (/француз|french|overhead.*triceps/i.test(n)) return 'french';
+  return 'other';
 }
 
 /**
@@ -377,6 +427,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const weeks: BBWeek[] = [];
   for (let w = 1; w <= totalWeeks; w++) {
     const sessions: BBSession[] = week1Days.map((daySpec, dayIdx) => {
+      const seenNames = new Set<string>(); // дедупликация по имени внутри дня
       const exercises: BBExercise[] = daySpec.exercises.map((exSpec) => {
         // BB-ФИЛЬТР: заменить ПЛ/олимпийские упражнения на ББ-альтернативы
         const exGroup = exSpec.group || muscleGroupFromExName(exSpec.name, EXERCISE_CATALOG);
@@ -386,6 +437,11 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
           return null as any;
         }
         const bbExName = bbReplaced.name;
+        // Дедупликация: если упражнение уже есть в этом дне — пропустить
+        if (seenNames.has(bbExName)) return null as any;
+        // JUNK-фильтр: проверить trueMuscleOf — пропустить если null (hinge/carry/junk)
+        const catCheck = EXERCISE_CATALOG.find(e => e.name === bbExName);
+        if (catCheck && trueMuscleOf(catCheck) === null) return null as any;
         const bbExGroup = bbReplaced.group;
         // Проверка: исключённое упражнение (по ID, имени или partial-match) → замена
         let finalExName = bbExName;
@@ -394,12 +450,12 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         const isExcluded = exclNameSet.has(bbExName) || exclIdSet.has(catId)
           || exclPartial.some(n => n.includes(bbExName) || bbExName.includes(n));
         if (isExcluded) {
-          const rep = findReplacementForCycle(bbExName, muscleGroupFromExName(bbExName, EXERCISE_CATALOG), favNames, favIdSet);
+          const rep = findReplacementForCycle(bbExName, muscleGroupFromExName(bbExName, EXERCISE_CATALOG), favNames, favIdSet, seenNames);
           if (rep) { finalExName = rep.name; } else { return null as any; }
         }
         // Проверка: осевая нагрузка (если avoidAxialLoad) → замена на не-осевую
         if (avoidAxialLoad && catEntry && isAxialLoadExercise(catEntry)) {
-          const rep = findReplacementForCycle(bbExName, muscleGroupFromExName(bbExName, EXERCISE_CATALOG), favNames, favIdSet);
+          const rep = findReplacementForCycle(bbExName, muscleGroupFromExName(bbExName, EXERCISE_CATALOG), favNames, favIdSet, seenNames);
           if (rep) { finalExName = rep.name; }
         }
         // Проверка: оборудование (если указано) → замена если упражнение требует недоступного оборудования
@@ -407,7 +463,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
           const rawEq = (catEntry as any).equipment;
           const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
           if (exEq.length > 0 && !exEq.some(eq => equipment.includes(eq))) {
-            const rep = findReplacementForCycle(bbExName, muscleGroupFromExName(bbExName, EXERCISE_CATALOG), favNames, favIdSet);
+            const rep = findReplacementForCycle(bbExName, muscleGroupFromExName(bbExName, EXERCISE_CATALOG), favNames, favIdSet, seenNames);
             if (rep) { finalExName = rep.name; }
           }
         }
@@ -418,6 +474,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         const muscle = muscleGroupFromExName(finalExName, EXERCISE_CATALOG);
         // Пропускаем упражнения на исключённые мышцы (травмы)
         if (excludedMuscles.has(muscle)) return null as any;
+        // Добавить в seen (дедупликация)
+        seenNames.add(finalExName);
         const isWeak = weakPoints.includes(muscle);
         const isFocus = focusGroup === muscle || (focusGroup && isWeak && weakPoints.includes(focusGroup));
         const isSubstituted = finalExName !== exSpec.name;

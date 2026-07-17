@@ -594,49 +594,82 @@ function buildSession(
       }
     }
 
-    // P9: diversity для chest, back, quads, hamstrings, glutes — разные паттерны/углы.
-    // Без этого для chest=3 получаем «жим штанги / жим гантелей / жим гантелей на наклонной» — 2 жима подряд.
-    // Логика: 1 horizontal_compound + 1 vertical/angle + 1 isolation/cable.
+    // P9: MULTI-ANGLE diversity — гарантированное покрытие разных углов/паттернов.
+    // Для каждой мышцы — 3-4 разных угла/паттерна, не просто "compound + isolation".
+    // Это устраняет "3 жима лёжа подряд" и обеспечивает полноценное развитие.
     if (exerciseCount >= 2 && pool.length >= 2 && muscle !== 'shoulders') {
-      const isChest = muscle === 'chest';
-      const isBack = muscle === 'back';
-      const isQuads = muscle === 'quads';
-      const isHam = muscle === 'hamstrings';
-      const isGlutes = muscle === 'glutes';
-      const isCalves = muscle === 'calves';
-      const isArms = muscle === 'arms' || muscle === 'biceps' || muscle === 'triceps';
-      if (isChest || isBack || isQuads || isHam || isGlutes || isCalves || isArms) {
-        // Классификаторы упражнений
-        const isPress = (e: any) => /(жим|press|жимов)/i.test(e.name || '');
-        const isRow = (e: any) => /(тяга|row)/i.test(e.name || '');
-        const isSquat = (e: any) => /(присед|squat|жим.*ног|hack|leg.*press|выпад|болгар)/i.test(e.name || '');
-        const isHinge = (e: any) => /(станов|мёртв|рум|good.?morning|hip.?thrust|ягодичн.*мост)/i.test(e.name || '');
-        const isCurl = (e: any) => /(сгибан|curl)/i.test(e.name || '');
-        const isExtension = (e: any) => /(разгибан|extension)/i.test(e.name || '');
-        const isFlyOrLateral = (e: any) => /(развод|fly|crossover|бабоч|кроссов|отвед|lateral|raise)/i.test(e.name || '');
-        const isPullupOrPulldown = (e: any) => /(подтяг|тяга.*верх|pull.?up|lat.?pull.?down|верх)/i.test(e.name || '');
-        const isCable = (e: any) => /(блок|кроссов|кабель|cable)/i.test(e.name || '');
-
-        let primaryType: (e: any) => boolean;
-        let secondaryType: (e: any) => boolean;
-        if (isChest) { primaryType = isPress; secondaryType = isFlyOrLateral; }
-        else if (isBack) { primaryType = isRow; secondaryType = isPullupOrPulldown; }
-        else if (isQuads) { primaryType = isSquat; secondaryType = isExtension; }
-        else if (isHam) { primaryType = isHinge; secondaryType = isCurl; }
-        else if (isGlutes) { primaryType = isHinge; secondaryType = isSquat; }
-        else if (isCalves) { primaryType = (e: any) => /(подъем.*носк|calf)/i.test(e.name || ''); secondaryType = isCable; }
-        else { primaryType = isCurl; secondaryType = isExtension; }
-
-        const primaries = pool.filter(e => primaryType(e));
-        const secondaries = pool.filter(e => secondaryType(e) && !primaryType(e));
-        const others = pool.filter(e => !primaryType(e) && !secondaryType(e));
+      // Классификаторы углов/паттернов по мышцам
+      type AngleClass = { name: string; match: (e: any) => boolean };
+      const ANGLE_CLASSES: Record<string, AngleClass[]> = {
+        chest: [
+          { name: 'horizontal_press', match: (e) => /жим.*(лёжа|лежа|гориз)|bench.*(press|жим)|жим штанги/i.test(e.name) && !/наклон|incline|decline|сниз|отриц/i.test(e.name) },
+          { name: 'incline_press', match: (e) => /жим.*(наклон|incline|верх)/i.test(e.name) || /incline.*(press|жим)/i.test(e.name) },
+          { name: 'fly_cable', match: (e) => /развод|fly|crossover|кроссов|сведен|пек.?дек|бабоч/i.test(e.name) },
+          { name: 'dips_press', match: (e) => /отжим.*(брус|dip|параллел)|брусь/i.test(e.name) },
+        ],
+        back: [
+          { name: 'vertical_pull', match: (e) => /подтяг|pull.?up|тяга.*верх|lat.?pull|пуллдаун|верхн.*блок/i.test(e.name) },
+          { name: 'horizontal_row', match: (e) => /тяга.*(наклон|блок|гантел|штанг|груд)|row|тяга к пояс/i.test(e.name) && !/верх|вертик|подтяг/i.test(e.name) },
+          { name: 'rear_delt_facepull', match: (e) => /лиц.*тяга|face.?pull|тяга к лиц|задн.*дельт|rear.?delt|обратн.*бабоч/i.test(e.name) },
+          { name: 'shrugs', match: (e) => /шраг/i.test(e.name) },
+        ],
+        quads: [
+          { name: 'barbell_squat', match: (e) => /присед.*(штанг|спин|на спин)|squat/i.test(e.name) && !/гантел|фронт|гоблет|болгар|выпад|машина|хак/i.test(e.name) },
+          { name: 'leg_press_hack', match: (e) => /жим.*ног|leg.?press|хак|hack.*squat|машина.*присед/i.test(e.name) },
+          { name: 'extension', match: (e) => /разгибан.*ног|leg.?extension/i.test(e.name) },
+          { name: 'lunge_bulgarian', match: (e) => /выпад|lunge|болгар|bulgarian|гоблет|goblet/i.test(e.name) },
+        ],
+        hamstrings: [
+          { name: 'curl', match: (e) => /сгибан.*ног|leg.?curl|сгибания ног/i.test(e.name) },
+          { name: 'rdl_bridge', match: (e) => /румын|rdl|ягодичн.*мост|hip.?thrust|glute.?bridge/i.test(e.name) },
+          { name: 'lunge', match: (e) => /выпад|lunge/i.test(e.name) },
+        ],
+        glutes: [
+          { name: 'hip_thrust', match: (e) => /ягодичн.*мост|hip.?thrust|glute.?bridge/i.test(e.name) },
+          { name: 'squat_variant', match: (e) => /присед|squat|выпад|lunge|болгар/i.test(e.name) },
+          { name: 'kickback', match: (e) => /отведен.*ног|kick.?back|мах.*ног|glute.?kick/i.test(e.name) },
+        ],
+        calves: [
+          { name: 'standing_calf', match: (e) => /подъём.*носки.*стоя|подъем.*носки.*стоя|standing.*calf|calf.*stand/i.test(e.name) },
+          { name: 'seated_calf', match: (e) => /подъём.*носки.*сидя|подъем.*носки.*сидя|seated.*calf|calf.*seat/i.test(e.name) },
+          { name: 'donkey_calf', match: (e) => /ослин|donkey.*calf|наклон.*носки/i.test(e.name) },
+        ],
+        biceps: [
+          { name: 'barbell_curl', match: (e) => /сгибан.*штанг|barbell.*curl|подъём.*штанг.*бицепс|подъем.*штанг.*бицепс/i.test(e.name) },
+          { name: 'dumbbell_curl', match: (e) => /сгибан.*гантел|dumbbell.*curl|бицепс.*гантел/i.test(e.name) && !/молот/i.test(e.name) },
+          { name: 'hammer_curl', match: (e) => /молот|hammer.*curl/i.test(e.name) },
+          { name: 'cable_curl', match: (e) => /сгибан.*блок|cable.*curl|бицепс.*блок/i.test(e.name) },
+        ],
+        triceps: [
+          { name: 'press_closegrip', match: (e) => /жим.*узк|close.?grip|француз.*жим/i.test(e.name) },
+          { name: 'extension_overhead', match: (e) => /разгибан.*из.?за|overhead.*triceps|француз|french/i.test(e.name) },
+          { name: 'pushdown', match: (e) => /разгибан.*блок|pushdown|трицепс.*блок|канат.*рукоят/i.test(e.name) },
+          { name: 'dips_triceps', match: (e) => /отжим.*брус|dip|брусь/i.test(e.name) },
+        ],
+        abs: [
+          { name: 'crunch', match: (e) => /скручиван|crunch|пресс.*скручив/i.test(e.name) },
+          { name: 'leg_raise', match: (e) => /подъём.*ног|подъем.*ног|leg.?raise|подниман.*ног/i.test(e.name) },
+          { name: 'cable_crunch', match: (e) => /пресс.*блок|cable.*crunch|скручиван.*блок/i.test(e.name) },
+        ],
+      };
+      const classes = ANGLE_CLASSES[muscle];
+      if (classes && classes.length > 0) {
         const diverse: any[] = [];
-        if (primaries.length > 0) diverse.push(primaries[0]);
-        if (secondaries.length > 0) diverse.push(secondaries[0]);
-        // Добрать до exerciseCount из others
-        for (const e of [...primaries.slice(1), ...secondaries.slice(1), ...others]) {
+        const usedIds = new Set<string>();
+        // Берём по 1 упражнению из каждого угла, пока не наберём exerciseCount
+        for (const ac of classes) {
           if (diverse.length >= exerciseCount) break;
-          if (!diverse.some(d => d.id === e.id)) diverse.push(e);
+          const candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id));
+          if (candidates.length > 0) {
+            // Из кандидатов — взять первое (selectExercisesSmart уже отсортировал по скору)
+            diverse.push(candidates[0]);
+            usedIds.add(candidates[0].id);
+          }
+        }
+        // Добрать из остатка пула, если не набрали
+        for (const e of pool) {
+          if (diverse.length >= exerciseCount) break;
+          if (!usedIds.has(e.id)) { diverse.push(e); usedIds.add(e.id); }
         }
         if (diverse.length >= Math.min(2, exerciseCount)) {
           exDatas = diverse.slice(0, exerciseCount);
@@ -779,12 +812,14 @@ function buildSession(
       });
     }
   }
-  // Кап упражнений в сессии: максимум 10 (реалистичная тренировка)
-  if (exercises.length > 10) {
-    // Сохраняем primary (первые 8), обрезаем accessory
-    const kept = exercises.filter(e => e.role === 'primary').slice(0, 8);
+  // Кап упражнений в сессии: максимум 8 (реалистичная ББ-тренировка 60-75 мин)
+  // ВАЖНО: кап применяется ЗДЕСЬ, но feeder/pump-финишеры добавляются ПОЗЖЕ в buildBBPlan.
+  // Финальный кап (с учётом feeders) — в buildBBPlan после добавления feeders.
+  if (exercises.length > 7) {
+    // Сохраняем primary (максимум 5), обрезаем accessory — оставляем место для 1 feeder
+    const kept = exercises.filter(e => e.role === 'primary').slice(0, 5);
     const acc = exercises.filter(e => e.role === 'accessory');
-    const maxAcc = Math.max(0, 10 - kept.length);
+    const maxAcc = Math.max(0, 7 - kept.length);
     exercises.length = 0;
     exercises.push(...kept, ...acc.slice(0, maxAcc));
   }
@@ -1094,6 +1129,16 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         addedFeeders.add(pName);
       }
       weekSessions.push(sess);
+    }
+    // Финальный кап упражнений в каждой сессии (с учётом feeder/pump-финишеров)
+    for (const sess of weekSessions) {
+      if (sess.exercises.length > 8) {
+        const kept = sess.exercises.filter(e => e.role === 'primary').slice(0, 5);
+        const acc = sess.exercises.filter(e => e.role === 'accessory');
+        const maxAcc = Math.max(0, 8 - kept.length);
+        sess.exercises.length = 0;
+        sess.exercises.push(...kept, ...acc.slice(0, maxAcc));
+      }
     }
     // fix D: капаем недельный объём каждой мышцы по её истинному MRV
     normalizeWeekMrv(weekSessions, mrvByMuscle);

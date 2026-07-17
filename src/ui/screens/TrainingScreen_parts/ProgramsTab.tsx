@@ -229,13 +229,21 @@ export const ProgramsTab: React.FC<{ selectedProgram: string | null; setSelected
             }}>
             ⭐ В мою тренировку
           </button>
-          <button onClick={handleSendToBbAuto}
-            style={{
-              width: '100%', padding: 10, borderRadius: 10, border: '1px solid #00e68a', cursor: 'pointer',
-              background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontWeight: 700, fontSize: 12, marginBottom: 6,
-            }}>
-            📥 В ББ-авто (с PED/делод/техниками)
-          </button>
+          {/* Кнопка "В ББ-авто" — только для BB/hypertrophy программ (не ПЛ!) */}
+          {(selected.goal === 'hypertrophy' || selected.goal === 'bodybuilding' || selected.direction === 'bodybuilding' || selected.goal === 'athletic') && (
+            <button onClick={handleSendToBbAuto}
+              style={{
+                width: '100%', padding: 10, borderRadius: 10, border: '1px solid #00e68a', cursor: 'pointer',
+                background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontWeight: 700, fontSize: 12, marginBottom: 6,
+              }}>
+              📥 В ББ-авто (с PED/делод/техниками)
+            </button>
+          )}
+          {(selected.goal === 'strength' || selected.goal === 'powerlifting' || selected.direction === 'strength') && (
+            <div style={{ width:'100%', padding:10, borderRadius:10, border:'1px solid rgba(245,158,11,0.2)', background:'rgba(245,158,11,0.06)', color:'#f59e0b', fontWeight:600, fontSize:11, marginBottom:6, textAlign:'center' }}>
+              ⚠ Это силовая программа — используйте ПЛ-авто (Планировщик → ПЛ-авто)
+            </div>
+          )}
           {bbMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontSize:10, marginBottom:6, textAlign:'center' }}>{bbMsg}</div>}
           {loadedMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontSize:10, marginBottom:6, textAlign:'center' }}>{loadedMsg}</div>}
           {myProgMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontSize:10, marginBottom:6, textAlign:'center' }}>{myProgMsg}</div>}
