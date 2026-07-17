@@ -763,7 +763,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)', overflowY:'auto', padding:'20px 0' }} onClick={() => setShowManualPopup(false)}>
         <div style={{ width:'90%', maxWidth:420, margin:'0 auto', borderRadius:16, background:'#16161a', border:'1px solid rgba(255,255,255,0.12)', overflow:'hidden' }} onClick={e => e.stopPropagation()}>
           <div style={{ height:3, background:'linear-gradient(90deg,#818cf8,#6366f1)' }} />
-          <div style={{ padding:'16px 14px 12px', maxHeight:'72vh', overflowY:'auto' }}>
+          <div style={{ padding:'16px 14px 12px' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
                 <span style={{ fontSize:13, fontWeight:800, color:'#818cf8' }}>⚙️ Ручной режим</span>
                 <button onClick={() => setShowManualPopup(false)} style={{ padding:'5px 12px', borderRadius:6, border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'rgba(255,255,255,0.55)', cursor:'pointer', fontSize:12, fontWeight:600 }}>✕</button>
@@ -853,7 +853,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               <input value={manualStackSearch} onChange={e => setManualStackSearch(e.target.value)} placeholder="🔍 Поиск стека..." style={{
                 width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:13, boxSizing:'border-box', marginBottom:6, outline:'none',
               }} />
-              <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'40vh', overflowY:'auto', marginBottom:10 }}>
+              <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'55vh', overflowY:'auto', marginBottom:10 }}>
                 {(ALL_STACKS as any[])
                   .filter((st: any) => {
                     if (!manualStackSearch) return true;
@@ -866,7 +866,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     const isExpanded = expandedManualStack === st.id;
                     return (
                       <div key={st.id}
-                        style={{ borderRadius:7, overflow:'hidden',
+                        style={{ borderRadius:7,
                           background: active ? 'rgba(168,85,247,0.1)' : 'rgba(255,255,255,0.02)',
                           border: active ? '1px solid rgba(168,85,247,0.25)' : '1px solid rgba(255,255,255,0.04)' }}>
                         <div onClick={() => setSelectedStacks(prev => active ? prev.filter(s => s !== st.id) : [...prev, st.id])}
