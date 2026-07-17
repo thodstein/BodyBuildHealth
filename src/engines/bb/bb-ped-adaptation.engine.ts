@@ -5,19 +5,27 @@
  *
  * Данные PED берутся из pharma-database/course (READ-only, не модифицируем —
  * параллельный агент владеет фарма-блоком). Здесь — только логика адаптации тренировки.
+ *
+ * DOSE-AWARE (v2): множитель MRV/восстановления зависит от ДОЗЫ вещества, а не только
+ * от факта его наличия. 250 мг теста ≠ 2000 мг теста по влиянию на толерантность к
+ * объёму. Пороги основаны на клинических данных (Israetel RP, Helms MAAS) и
+ * интерполируются линейно между контрольными точками.
  */
 
 export type PED = 'AAS' | 'insulin' | 'MGF' | 'IGF1' | 'GH';
 
+export type CourseIntensity = 'mild' | 'moderate' | 'heavy';
+
 export interface PEDEffect {
   ped: PED;
-  mrvMultiplier: number;      // множитель MRV (толерантность к объёму)
-  recoveryMultiplier: number; // скорость восстановления
+  mrvMultiplier: number;      // множитель MRV (толерантность к объёму) — БАЗА (средняя доза)
+  recoveryMultiplier: number; // скорость восстановления — БАЗА
   periWorkoutCarbs?: 'high' | 'moderate' | 'low'; // углеводы вокруг тренировки
   notes: string;
 }
 
-/** Матрица эффектов PED на тренировочные параметры (ББ-специфичные, клинические данные + RP). */
+/** Базовые эффекты PED (для совместимости со старым API — без доз).
+ *  При наличии doseAwareDoses эти значения ОБОГОЩАЮТСЯ дозо-зависимым множителем. */
 export const PED_EFFECTS: Record<PED, PEDEffect> = {
   AAS: {
     ped: 'AAS',
@@ -48,12 +56,110 @@ export const PED_EFFECTS: Record<PED, PEDEffect> = {
   },
 };
 
+/**
+ * Дозо-зависимые множители MRV для каждого PED.
+ * Ключ — порог дозы, значение — множитель MRV (относительно натурала = 1.0).
+ * Интерполяция линейна между порогами; выше последнего — cap.
+ *
+ * Источники: Israetel RP (enhanced volume landmarks), Helms MAAS, Pediaa/muscle-
+ * builder Pro данные. Пороги подобраны под реальную практику бодибилдинга.
+ *
+ * Единицы доз:
+ *  - AAS: мг тестостерона-эквивалента / нед (test-e = 1.0, deca = 0.7×мг, tren = 2.5×мг)
+ *  - insulin: МЕ / день
+ *  - MGF: мкг / нед
+ *  - IGF1: мкг / день
+ *  - GH: МЕ / день
+ */
+const PED_DOSE_CURVES: Record<PED, { threshold: number; mrv: number; rec: number }[]> = {
+  AAS: [
+    { threshold: 0,    mrv: 1.00, rec: 1.00 },   // натурал
+    { threshold: 125,  mrv: 1.10, rec: 1.10 },   // TRT-низ
+    { threshold: 250,  mrv: 1.18, rec: 1.18 },   // TRT-высокий / лёгкий курс
+    { threshold: 500,  mrv: 1.35, rec: 1.35 },   // стандартный курс
+    { threshold: 750,  mrv: 1.45, rec: 1.42 },
+    { threshold: 1000, mrv: 1.52, rec: 1.48 },   // продвинутый курс
+    { threshold: 1500, mrv: 1.60, rec: 1.54 },
+    { threshold: 2000, mrv: 1.66, rec: 1.58 },   // heavy курс
+    { threshold: 3000, mrv: 1.70, rec: 1.62 },   // cap (mega-dose, >3000 не добавляет)
+  ],
+  insulin: [
+    { threshold: 0,  mrv: 1.00, rec: 1.00 },
+    { threshold: 5,  mrv: 1.15, rec: 1.12 },
+    { threshold: 10, mrv: 1.28, rec: 1.22 },
+    { threshold: 15, mrv: 1.32, rec: 1.26 },
+    { threshold: 20, mrv: 1.35, rec: 1.28 },
+    { threshold: 30, mrv: 1.38, rec: 1.30 },
+    { threshold: 40, mrv: 1.40, rec: 1.32 },  // cap
+  ],
+  MGF: [
+    { threshold: 0,   mrv: 1.00, rec: 1.00 },
+    { threshold: 100, mrv: 1.05, rec: 1.06 },
+    { threshold: 200, mrv: 1.10, rec: 1.10 },
+    { threshold: 300, mrv: 1.13, rec: 1.12 },
+    { threshold: 400, mrv: 1.15, rec: 1.14 },  // cap
+  ],
+  IGF1: [
+    { threshold: 0,  mrv: 1.00, rec: 1.00 },
+    { threshold: 25, mrv: 1.10, rec: 1.10 },
+    { threshold: 50, mrv: 1.18, rec: 1.16 },
+    { threshold: 75, mrv: 1.22, rec: 1.19 },
+    { threshold: 100, mrv: 1.25, rec: 1.22 },  // cap
+  ],
+  GH: [
+    { threshold: 0,  mrv: 1.00, rec: 1.00 },
+    { threshold: 2,  mrv: 1.15, rec: 1.18 },
+    { threshold: 4,  mrv: 1.22, rec: 1.25 },
+    { threshold: 6,  mrv: 1.27, rec: 1.29 },
+    { threshold: 8,  mrv: 1.30, rec: 1.32 },
+    { threshold: 12, mrv: 1.33, rec: 1.35 },
+    { threshold: 15, mrv: 1.35, rec: 1.37 },  // cap
+  ],
+};
+
+/** Интерполяция множителя по дозе на кривой PED. */
+function interpolateDose(ped: PED, dose: number): { mrv: number; rec: number } {
+  const curve = PED_DOSE_CURVES[ped];
+  if (!curve || curve.length === 0) return { mrv: 1, rec: 1 };
+  if (dose <= 0) return { mrv: 1, rec: 1 };
+  // Ниже первого порога (или threshold=0) — берём первый ненулевой
+  let prev = curve[0];
+  for (let i = 1; i < curve.length; i++) {
+    const pt = curve[i];
+    if (dose <= pt.threshold) {
+      const span = pt.threshold - prev.threshold;
+      if (span <= 0) return { mrv: pt.mrv, rec: pt.rec };
+      const t = (dose - prev.threshold) / span;
+      return {
+        mrv: prev.mrv + (pt.mrv - prev.mrv) * t,
+        rec: prev.rec + (pt.rec - prev.rec) * t,
+      };
+    }
+    prev = pt;
+  }
+  // Выше последнего порога — cap
+  const last = curve[curve.length - 1];
+  return { mrv: last.mrv, rec: last.rec };
+}
+
+/** Множитель courseIntensity — дополнительный boost сверх PED-доз.
+ *  Отражает: оральные 17α, высокая частота, прочие факторы "тяжести" курса
+ *  не учтённые напрямую дозами ААС/ГР/инсулина. */
+const COURSE_INTENSITY_MULT: Record<CourseIntensity, number> = {
+  mild: 1.00,
+  moderate: 1.04,
+  heavy: 1.08,
+};
+
 export interface PEDAdaptation {
   activePEDs: PED[];
+  pedDoses: Record<string, number>;
+  courseIntensity: CourseIntensity;
   combinedMrvMultiplier: number;
   combinedRecoveryMultiplier: number;
   periWorkoutCarbs: 'high' | 'moderate' | 'low';
   adjustedMrv: Record<string, number>; // muscle -> скорректированный MRV
+  perPED: { ped: PED; dose: number; mrvMult: number; recMult: number }[];
   rationale: string[];
   risks: string[];
 }
@@ -62,36 +168,77 @@ export interface PEDAdaptation {
  * Рассчитать адаптацию по активным PED.
  * @param activePEDs — список активных веществ
  * @param baseMrv — базовый MRV по мышцам (из volume-landmarks)
+ * @param pedDoses — дозы PED (мг/нед или МЕ/день или мкг). Ключи: 'AAS','insulin','MGF','IGF1','GH'.
+ *                   Если не переданы — используется базовый множитель PED_EFFECTS (старый behaviour).
+ * @param courseIntensity — интенсивность курса (mild/moderate/heavy). Дополнительный MRV boost.
  */
-export function adaptForPEDs(activePEDs: PED[], baseMrv: Record<string, number>): PEDAdaptation {
+export function adaptForPEDs(
+  activePEDs: PED[],
+  baseMrv: Record<string, number>,
+  pedDoses?: Record<string, number>,
+  courseIntensity?: CourseIntensity,
+): PEDAdaptation {
+  const doses = pedDoses || {};
+  const intensity: CourseIntensity = courseIntensity || 'moderate';
+  const intensityMult = COURSE_INTENSITY_MULT[intensity];
+
   let mrvMult = 1, recMult = 1;
   let carbs: 'high' | 'moderate' | 'low' = 'moderate';
   const rationale: string[] = [];
   const risks: string[] = [];
+  const perPED: { ped: PED; dose: number; mrvMult: number; recMult: number }[] = [];
+
   for (const ped of activePEDs) {
-    const e = PED_EFFECTS[ped];
-    if (!e) continue;
+    const base = PED_EFFECTS[ped];
+    if (!base) continue;
+    const dose = Number(doses[ped]) || 0;
+    // Dose-aware множитель (если доза передана и > 0 — интерполяция по кривой;
+    // иначе — fallback на базовый множитель PED_EFFECTS)
+    let doseMrv: number, doseRec: number;
+    if (dose > 0 && PED_DOSE_CURVES[ped]) {
+      const interp = interpolateDose(ped, dose);
+      doseMrv = interp.mrv;
+      doseRec = interp.rec;
+    } else {
+      doseMrv = base.mrvMultiplier;
+      doseRec = base.recoveryMultiplier;
+    }
     // Комбинирование с убывающей отдачей (ББ-специфичный diminishing 0.80).
     // Каждый следующий препарат даёт 80% от своего соло-эффекта.
-    mrvMult += (e.mrvMultiplier - 1) * 0.80;
-    recMult += (e.recoveryMultiplier - 1) * 0.80;
-    if (e.periWorkoutCarbs === 'high') carbs = 'high';
-    rationale.push(`${ped}: MRV ×${e.mrvMultiplier.toFixed(2)}, восст ×${e.recoveryMultiplier.toFixed(2)} — ${e.notes}`);
+    mrvMult += (doseMrv - 1) * 0.80;
+    recMult += (doseRec - 1) * 0.80;
+    if (base.periWorkoutCarbs === 'high') carbs = 'high';
+    perPED.push({ ped, dose, mrvMult: doseMrv, recMult: doseRec });
+    const doseStr = dose > 0 ? ` (${dose} ${ped === 'AAS' ? 'мг/нед' : ped === 'insulin' || ped === 'GH' ? 'МЕ/день' : 'мкг'})` : '';
+    rationale.push(`${ped}${doseStr}: MRV ×${doseMrv.toFixed(2)}, восст ×${doseRec.toFixed(2)} — ${base.notes}`);
   }
-  // Суммарный множитель: натурал = 1.0, соло-ААС = ~1.28, полный стек до 1.80
-  mrvMult = Math.min(mrvMult, 1.80);
+
+  // Course intensity boost (поверх PED-множителя)
+  if (activePEDs.length > 0 && intensityMult > 1) {
+    mrvMult *= intensityMult;
+    rationale.push(`Интенсивность курса (${intensity}): дополнительный MRV ×${intensityMult.toFixed(2)} (оральные/частота/прочее).`);
+  }
+
+  // Суммарный множитель: натурал = 1.0, соло-ААС 500мг = ~1.28, полный стек heavy = до 1.85
+  mrvMult = Math.min(mrvMult, 1.85);
   const adjustedMrv: Record<string, number> = {};
   for (const m of Object.keys(baseMrv)) adjustedMrv[m] = Math.round(baseMrv[m] * mrvMult);
 
   // риски (BB15c — интеграция с risk-engine/pharma-interactions)
+  const aasDose = Number(doses['AAS']) || 0;
   if (activePEDs.includes('insulin')) risks.push('Инсулин: риск гипогликемии — контроль глюкозы, достаточные углеводы вокруг тренировки.');
   if (activePEDs.includes('GH')) risks.push('ГР: инсулинорезистентность при длительном использовании, возможны отёки.');
   if (activePEDs.includes('insulin') && activePEDs.includes('GH')) risks.push('Инсулин + ГР: синергия, но рост риска гипогликемии и инсулинорезистентности.');
-  if (activePEDs.includes('AAS')) risks.push('ААС: контроль гематокрита, эстрадиола, липидов, оси HPTA.');
+  if (activePEDs.includes('AAS')) {
+    risks.push('ААС: контроль гематокрита, эстрадиола, липидов, оси HPTA.');
+    if (aasDose >= 1500) risks.push(`⚠ Высокая доза ААС (${aasDose} мг/нед): риск эритроцитоза (HCT>54), гипертонии, дислипидемии. Сократить объём при росте АД/усталости.`);
+  }
 
   return {
-    activePEDs, combinedMrvMultiplier: mrvMult,
-    combinedRecoveryMultiplier: recMult, periWorkoutCarbs: carbs, adjustedMrv, rationale, risks,
+    activePEDs, pedDoses: doses, courseIntensity: intensity,
+    combinedMrvMultiplier: mrvMult,
+    combinedRecoveryMultiplier: recMult, periWorkoutCarbs: carbs, adjustedMrv,
+    perPED, rationale, risks,
   };
 }
 

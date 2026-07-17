@@ -561,7 +561,7 @@ export const TrainingConstructor: React.FC<Props> = ({
         ? bbPedsFromUi
         : ((tprofile as any).bbPeds?.length ? (tprofile as any).bbPeds : (tprofile.onCourse ? ['AAS' as PED] : []));
       const allLandmarks = getAllVolumeLandmarks(level);
-      const pedAdapt = adaptForPEDs(bbPeds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv])));
+      const pedAdapt = adaptForPEDs(bbPeds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv])), undefined, (tprofile.courseIntensity as any) || 'moderate');
 
       // Фокус-группа: отдельно от слабых групп (matched engine focusGroup)
       const bbFocusGroup = manualCfg.bbFocusGroup || '';
@@ -594,6 +594,7 @@ export const TrainingConstructor: React.FC<Props> = ({
         favoriteExercises: tprofile.favoriteExercises || [],
         excludedExercises: tprofile.excludedExercises || [],
         avoidAxialLoad: tprofile.avoidAxialLoad || false,
+        courseIntensity: (tprofile.courseIntensity as any) || 'moderate',
       }, pedAdapt);
 
       // FIX-9: Фазы через distributePhases (единый источник) вместо хардкода

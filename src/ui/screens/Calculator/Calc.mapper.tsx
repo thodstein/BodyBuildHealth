@@ -593,6 +593,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [selectedStacks, setSelectedStacks] = useState<string[]>([]);
   const [showIntellPopup, setShowIntellPopup] = useState(false);
   const [showManualPopup, setShowManualPopup] = useState(false);
+  const [manualTab, setManualTab] = useState<'stacks' | 'catalog' | 'saved' | 'favorites'>('stacks');
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [savedSearch, setSavedSearch] = useState('');
   const [manualSubInput] = useState('');
   const [manualStackSearch, setManualStackSearch] = useState('');
   const [expandedManualStack, setExpandedManualStack] = useState<string | null>(null);
@@ -765,11 +768,58 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 <span style={{ fontSize:13, fontWeight:800, color:'#818cf8' }}>⚙️ Ручной режим</span>
                 <button onClick={() => setShowManualPopup(false)} style={{ padding:'5px 12px', borderRadius:6, border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'rgba(255,255,255,0.55)', cursor:'pointer', fontSize:12, fontWeight:600 }}>✕</button>
               </div>
-              {onOpenManualPicker && (
-                <button onClick={() => { setShowManualPopup(false); setTimeout(onOpenManualPicker, 200); }} style={{ width:'100%', marginBottom:8, padding:'11px', borderRadius:10, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.25)', color:'#00e68a', fontWeight:700, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                  📂 Открыть полный каталог препаратов ({catalogSubsCount})
-                </button>
+              {/* Tab bar */}
+              <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', flexWrap:'wrap' }}>
+                {['stacks','catalog','saved','favorites'].map((id) => (
+                  <button key={id} onClick={() => { setManualTab(id as any); setCatalogSearch(''); setSavedSearch(''); setManualStackSearch(''); }}
+                    style={{
+                      padding:'6px 10px', borderRadius:8, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
+                      background: manualTab === id ? '#818cf8' : 'rgba(255,255,255,0.05)',
+                      color: manualTab === id ? '#000' : 'rgba(255,255,255,0.6)',
+                      border: '1px solid ' + (manualTab === id ? '#818cf8' : 'rgba(255,255,255,0.1)'),
+                    }}>{id === 'stacks' ? '📦 Стеки' : id === 'catalog' ? '📋 Каталог' : id === 'saved' ? '💾 Сохранённые' : '⭐ Избранное'}</button>
+                ))}
+              </div>
+              {manualTab === 'catalog' && (
+                <>
+                  <input value={catalogSearch} onChange={e => setCatalogSearch(e.target.value)} placeholder="🔍 Поиск препарата..." style={{
+                    width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:13, boxSizing:'border-box', marginBottom:6, outline:'none',
+                  }} />
+                  <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'45vh', overflowY:'auto', marginBottom:10 }}>
+                    {Object.entries(SUPPORT_CATALOG_DATA)
+                      .filter(([id, entry]: [string, any]) => {
+                        if (!catalogSearch) return true;
+                        const q = catalogSearch.toLowerCase();
+                        return (entry.nameRu||'').toLowerCase().includes(q) || (entry.name||'').toLowerCase().includes(q) || id.toLowerCase().includes(q);
+                      })
+                      .map(([id, entry]: [string, any]) => (
+                        <CalcSubstanceDetail
+                          key={id}
+                          sub={{ substanceId: id, category: 'other' as const, k: 0, reason: 'Ручной выбор', mechsCovered: entry.mechanisms || [], q: 'B' }}
+                          rec={{ subs: [], suppression: [], coverage: [], gaps: [], conflicts: [], guardrails: [], boosters: [], activatedMechs: [], summary: '', rationale: '', level: 'medium', phase: 'on', phaseLabel: 'На курсе' } as any}
+                          subNameRu={(id: string) => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id}
+                          subDosage={(id: string) => SUPPORT_CATALOG_DATA[id]?.dosage || { mg: 0, timing: '' }}
+                          subTier={(id: string) => SUPPORT_CATALOG_DATA[id]?.tier || 'standard'}
+                          canonIdLocal={(id: string) => id}
+                        />
+                      ))}
+                  </div>
+                </>
               )}
+              {manualTab === 'saved' && (
+                <div style={{ padding:30, textAlign:'center', color:'rgba(255,255,255,0.4)', fontSize:11 }}>
+                  <div style={{ fontSize:28, marginBottom:8 }}>💾</div>
+                  Здесь будут сохранённые планы и стеки.
+                </div>
+              )}
+              {manualTab === 'favorites' && (
+                <div style={{ padding:30, textAlign:'center', color:'rgba(255,255,255,0.4)', fontSize:11 }}>
+                  <div style={{ fontSize:28, marginBottom:8 }}>⭐</div>
+                  Здесь будут избранные препараты.
+                </div>
+              )}
+              {manualTab === 'stacks' && (
+                <>
               {manualSubs.length > 0 && (
                 <div style={{ marginBottom:8 }}>
                   <div style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.55)', marginBottom:4 }}>💊 Препараты из ручного ввода ({manualSubs.length}) — откройте каталог для выбора</div>
@@ -887,6 +937,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     );
                   })}
               </div>
+                </>
+              )}
               <button onClick={() => { setLevel('manual'); setShowManualPopup(false); }} style={{ width:'100%', padding:'10px', borderRadius:10, background:'linear-gradient(135deg,#818cf8,#6366f1)', border:'none', color:'#000', fontWeight:700, fontSize:11, cursor:'pointer' }}>
                 ✅ Применить ручной выбор
               </button>

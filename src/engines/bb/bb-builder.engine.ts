@@ -19,7 +19,7 @@ import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { selectExercisesSmart } from '../exercise-selector.engine';
 import { trueMuscleOf, musclesForRole, derivePattern } from '../movement-pattern';
 import { PCT_FOR_RIR, S_MRV_FACTOR } from '../rir-table';
-import type { PEDAdaptation } from './bb-ped-adaptation.engine';
+import type { PEDAdaptation, CourseIntensity } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
 import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
@@ -67,6 +67,11 @@ export interface BBBuilderInput {
     topSetPctMultiplier: number;
     rirShift: number;
   };
+  /** Дозы PED (мг/нед или МЕ/день или мкг). Ключи: 'AAS','insulin','MGF','IGF1','GH'.
+   *  Dose-aware: 250 мг ААС ≠ 2000 мг ААС по влиянию на MRV. */
+  pedDoses?: Record<string, number>;
+  /** Интенсивность курса — дополнительный MRV boost (mild 1.0 / moderate 1.04 / heavy 1.08). */
+  courseIntensity?: CourseIntensity;
 }
 
 export interface BBSet {
@@ -143,6 +148,24 @@ export function getBBVolumeLandmarks(plan: BBPlan, level: string, pedMrvMult = 1
 
 /** Для каких мышц в BB-контексте ВСЕГДА брать только изоляцию (нет compound аналогов). */
 const ALWAYS_ISOLATION: Set<string> = new Set(['calves', 'forearms', 'abs']);
+/**
+ * BB-JUNK: упражнения, не подходящие для гипертрофийного бодибилдинга.
+ * Реабилитация/кор-стабильность/функционалка: pallof, bird dog, monster walks,
+ * планки (изометрика), copenhagen, spiderman, jack, walkout, superman.
+ * Эти упражнения не дают механического натяжения/метаболического стресса для роста мышц.
+ * Разрешены: скручивания (crunch), подъём ног, гиперэкстензия (ягодицы/разгибатели спины).
+ */
+const BB_JUNK_PATTERNS: RegExp = /паллоф|pallof|bird.?dog|птиц.*собак|monster.?walk|резин.*ходьб|band.?walk|планк|plank|copenhagen|копенгаген|spiderman|человек.?паук|plank.?jack|планк.*прыжк|walkout|шагающ.*планк|супермен|superman|gator.?walk|аллигатор|inchworm|гусениц|dead.?bug|мёртв.*жук|мертв.*жук/;
+
+/** Проверить, является ли упражнение BB-мусором (не для гипертрофии). */
+function isBBJunk(ex: any): boolean {
+  const n = (ex.name || '').toLowerCase();
+  const id = (ex.id || '').toLowerCase();
+  if (BB_JUNK_PATTERNS.test(n) || BB_JUNK_PATTERNS.test(id)) return true;
+  // Изометрические планки/уголки — не для гипертрофии (но подъём ног в висе — OK для abs)
+  if (/планк|plank|уголок|l[\s_-]?sit|hollow.?hold|лодочк|boat/.test(n) && !/подъём ног|leg.?raise|скручиван|crunch|пресс.*маши|паук/.test(n)) return true;
+  return false;
+}
 /** Маппинг PRO-мышц в group каталога для getExercisesByGroup(). */
 const PRO_MUSCLE_TO_GROUP: Record<string, string> = {
   delt_front: 'shoulders', delt_mid: 'shoulders', delt_rear: 'shoulders',
@@ -478,7 +501,10 @@ function buildSession(
     const roleMuscles = musclesForRole(repKey);
     let pool = EXERCISE_CATALOG.filter((ex: any) => {
       const tm = trueMuscleOf(ex);
-      return tm !== null && roleMuscles.includes(tm);
+      if (tm === null || !roleMuscles.includes(tm)) return false;
+      // BB-junk фильтр: реабилитация/кор-стабильность/изометрика не для гипертрофии
+      if (isBBJunk(ex)) return false;
+      return true;
     });
     // Фильтр по контексту сессии (доп. страховка, в основном инертен после
     // фильтрации по истинной мышце)
@@ -499,7 +525,9 @@ function buildSession(
     // Если после фильтра пул опустел — fallback на тот же истинный-мышечный пул
     if (pool.length === 0) pool = EXERCISE_CATALOG.filter((ex: any) => {
       const tm = trueMuscleOf(ex);
-      return tm !== null && roleMuscles.includes(tm);
+      if (tm === null || !roleMuscles.includes(tm)) return false;
+      if (isBBJunk(ex)) return false;
+      return true;
     });
     const selected = selectExercisesSmart({
       candidates: pool, muscleGroup: muscle, count: exerciseCount,
@@ -966,9 +994,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         // Точное совпадение по сырому muscle (или collapseKey) + изоляция: исключаем
         // «чужие» тяговые движения, ошибочно помеченные как эта группа.
         const feederPool = (EXERCISE_CATALOG as any[]).filter((e: any) => {
-          const raw = e.muscle;
+          const raw = e.group;
           const mg = collapseKey(trueMuscleOf(e) || raw);
-          return (raw === wm || mg === wm) && (e.exerciseType === 'isolation' || e.type === 'isolation');
+          if (raw !== wm && mg !== wm) return false;
+          if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
+          if (isBBJunk(e)) return false;
+          return true;
         });
         if (!feederPool.length) continue;
         // fix L: паттерны, уже использованные для этой отстающей группы на текущей неделе.
@@ -1014,9 +1045,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         if (Array.from(weekExcluded).includes(pm)) continue;
         if (sess.exercises.some(e => (e.muscle === pm || collapseKey(e.muscle) === pm) && (e as any).character === 'памп')) continue;
         const pumpPool = (EXERCISE_CATALOG as any[]).filter((e: any) => {
-          const raw = e.muscle;
+          const raw = e.group;
           const mg = collapseKey(trueMuscleOf(e) || raw);
-          return (raw === pm || mg === pm) && (e.exerciseType === 'isolation' || e.type === 'isolation');
+          if (raw !== pm && mg !== pm) return false;
+          if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
+          if (isBBJunk(e)) return false;
+          return true;
         });
         if (!pumpPool.length) continue;
         pumpPool.sort((a: any, b: any) => {
@@ -1092,7 +1126,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     `Прогрессия весов: double_progression (prescribeLoad) — еженедельный рост от недели к неделе с учётом фазы.`,
     `Ротация упражнений: каждые ${ROTATION_INTERVAL} нед — свежий пул (запрет повторов из предыдущего блока).`,
     `S-MRV: автоматический кап объёма на основе бюджета утомления сессии + потолок по MRV мышцы.`,
-    ...(pedAdapt ? [`PED-адаптация: MRV×${pedAdapt.combinedMrvMultiplier.toFixed(2)}, восстановление×${pedAdapt.combinedRecoveryMultiplier.toFixed(2)}`] : []),
+    ...(pedAdapt ? [`PED-адаптация: MRV×${pedAdapt.combinedMrvMultiplier.toFixed(2)}, восстановление×${pedAdapt.combinedRecoveryMultiplier.toFixed(2)}${pedAdapt.activePEDs.length > 0 ? ' (' + pedAdapt.perPED.map(p => `${p.ped}${p.dose > 0 ? ' ' + p.dose : ''}`).join(' + ') + (pedAdapt.courseIntensity !== 'moderate' ? ', ' + pedAdapt.courseIntensity : '') + ')' : ''}`] : []),
     ...(injuries.length > 0 ? [`Травмы (per-week по дате плана${input.planStartWeek ? ` со старта ${input.planStartWeek}` : ''}): исключены ${[...new Set(injuries.filter(i => i.exclude !== false).map(i => i.muscle))].join(', ') || '—'}; градация ${[...new Set(injuries.filter(i => i.exclude === false).map(i => i.muscle))].join(', ') || '—'} — упражнения заменяются на безопасные альтернативы с пониженным весом/объёмом.`] : []),
   ];
 

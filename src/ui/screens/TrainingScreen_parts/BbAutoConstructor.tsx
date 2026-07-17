@@ -201,7 +201,7 @@ export const BbAutoConstructor: React.FC = () => {
   useEffect(() => { if (bestSplit && !selectedSplitId) setSelectedSplitId(bestSplit.pattern.id); }, [bestSplit]);
 
   const allLandmarks = useMemo(() => getAllVolumeLandmarks(bbLevel), [bbLevel]);
-  const pedAdapt = useMemo(() => adaptForPEDs(peds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv]))), [peds, allLandmarks]);
+  const pedAdapt = useMemo(() => adaptForPEDs(peds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv])), pedDoses, courseIntensity), [peds, allLandmarks, pedDoses, courseIntensity]);
 
   const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan, pedAdapt.combinedMrvMultiplier) : null, [builtPlan, pedAdapt]);
   // FIX-6: Единый источник качества — validatePlanQuality (канонический движок)
@@ -322,6 +322,8 @@ export const BbAutoConstructor: React.FC = () => {
         deloadType,
         loadStrategy,
         autoRegResult: autoRegPayload,
+        pedDoses,
+        courseIntensity,
       }, pedAdapt);
     }
 

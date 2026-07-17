@@ -97,8 +97,10 @@ export function trueMuscleOf(ex: any): string | null {
   const nm: string = (ex?.name || '').toLowerCase();
   // Переноски (фермерская/официанта) — не мышечная группа ББ
   if (isCarryExercise(ex)) return null;
-  // Соревновательные/ПЛ движения — не принадлежат ББ-плану
-  if (/станов|рывок|толчок|пендл|подъём на грудь|взятие на грудь|армлифт|конвой|удержание штанг|олимп/.test(nm)) return null;
+  // Соревновательные/ПЛ/олимпийские движения — не принадлежат ББ-плану
+  // Включая: становая, рывок, толчок, пендл, взятие на грудь, швунг (жимовой/толчковый),
+  // armlift, конвой, удержание штанги, олимпийские подъёмы.
+  if (/станов|рывок|толчок|пендл|подъём на грудь|взятие на грудь|армлифт|конвой|удержание штанг|олимп|швунг|push.?press|push.?jerk|clean.?pull|muscle.?snatch|power.?clean|power.?snatch|hang.?clean/.test(nm)) return null;
   // Hinge (good morning / deadlift / RDL) — ПЛ-движение, не ББ
   if (mp === 'hinge') return null;
   const base = MP_TO_MUSCLE[mp];

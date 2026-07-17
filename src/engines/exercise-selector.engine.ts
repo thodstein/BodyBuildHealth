@@ -115,9 +115,11 @@ export interface SelectedExercise extends Exercise {
  * 'жим штанги лёжа','жимовой'), т.к. они штрафовали валидные ББ-лифты
  * (тяга штанги в наклоне — king спины, Смит, армейский жим, жим лёжа).
  */
-const COMP_LIFT_PATTERNS = ['становая', 'рывок', 'толчок', 'пендл', 'тяга рывковая', 'тяга пендл', 'спот', 'доски', 'цепи', 'ленты', 'пины', 'конвой', 'подъём на грудь', 'взятие на грудь'];
+const COMP_LIFT_PATTERNS = ['становая', 'рывок', 'толчок', 'пендл', 'тяга рывковая', 'тяга пендл', 'спот', 'доски', 'цепи', 'ленты', 'пины', 'конвой', 'подъём на грудь', 'взятие на грудь', 'швунг', 'push press', 'push jerk', 'clean pull', 'muscle snatch', 'power clean', 'power snatch', 'hang clean'];
 function isCompetitionLift(ex: Exercise): boolean {
-  if (ex.movementType === 'competition_lift') return true;
+  // Поле в каталоге — movementPattern (НЕ movementType). Значений 'competition_lift' нет,
+  // но проверка оставлена для будущих расширений.
+  if ((ex as any).movementType === 'competition_lift' || (ex as any).movementPattern === 'competition_lift') return true;
   const n = (ex.name || '').toLowerCase();
   const id = (ex.id || '').toLowerCase();
   return COMP_LIFT_PATTERNS.some(p => n.includes(p) || id.includes(p));
