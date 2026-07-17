@@ -51,7 +51,7 @@ export interface SessionMetricsResult {
 }
 
 export function computeSessionMetrics(session: WorkoutSession | null, day: { exercises: PlayerExercise[] } | null): SessionMetricsResult | null {
-  if (!session || !day) return null;
+  if (!session || !day || !Array.isArray(session.exercises)) return null;
   const sr: SRExercise[] = [];
   session.exercises.forEach((se, i) => {
     const pe = day.exercises[i] || day.exercises.find(e => e.name === se.exerciseName);

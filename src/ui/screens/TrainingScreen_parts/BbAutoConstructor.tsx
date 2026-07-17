@@ -433,11 +433,14 @@ export const BbAutoConstructor: React.FC = () => {
     setBbWeekSel(1);
     setStep('plan');
     try {
-      const sessions = plan.weeks.flatMap(w => w.sessions.map((s, si) => ({
+      const playerDays = plan.weeks.flatMap(w => w.sessions.map((s, si) => ({
         label: 'Нед' + w.week + ' Д' + (si+1),
-        exercises: s.exercises.map(e => ({ name: e.name, muscleGroup: e.muscle, sets: e.sets, reps: e.workSets[0]?.reps || 10, weight: e.workSets[0]?.weight || 60, rir: e.rir })),
+        exercises: s.exercises.map(e => {
+          const tgt: { weight: number; reps: number; rir: number } = { weight: e.workSets[0]?.weight || 60, reps: e.workSets[0]?.reps || 10, rir: e.rir ?? 2 };
+          return { name: e.name, muscleGroup: e.muscle, targetSets: Array.from({ length: e.sets || 3 }, () => ({ ...tgt })), restSec: 90 };
+        }),
       })));
-      localStorage.setItem('he_pl_runtime', JSON.stringify(sessions));
+      localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: plan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
     } catch {}
 
     } catch (e: any) {
@@ -522,11 +525,14 @@ export const BbAutoConstructor: React.FC = () => {
   const handleSendToExecution = () => {
     if (!builtPlan) return;
     try {
-      const sessions = builtPlan.weeks.flatMap(w => w.sessions.map((s, si) => ({
+      const playerDays = builtPlan.weeks.flatMap(w => w.sessions.map((s, si) => ({
         label: 'Нед' + w.week + ' Д' + (si+1),
-        exercises: s.exercises.map(e => ({ name: e.name, muscleGroup: e.muscle, sets: e.sets, reps: e.workSets[0]?.reps || 10, weight: e.workSets[0]?.weight || 60, rir: e.rir })),
+        exercises: s.exercises.map(e => {
+          const tgt: { weight: number; reps: number; rir: number } = { weight: e.workSets[0]?.weight || 60, reps: e.workSets[0]?.reps || 10, rir: e.rir ?? 2 };
+          return { name: e.name, muscleGroup: e.muscle, targetSets: Array.from({ length: e.sets || 3 }, () => ({ ...tgt })), restSec: 90 };
+        }),
       })));
-      localStorage.setItem('he_pl_runtime', JSON.stringify(sessions));
+      localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: builtPlan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
       // FIX-12: Авто-переход на вкладку «Тренировка» (как ручной конструктор)
       localStorage.setItem('he_training_tab', 'runtime');
       window.dispatchEvent(new StorageEvent('storage', { key: 'he_training_tab' }));

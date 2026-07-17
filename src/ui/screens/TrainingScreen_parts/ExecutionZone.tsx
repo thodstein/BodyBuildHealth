@@ -38,9 +38,11 @@ interface Props {
 export const ExecutionZone: React.FC<Props> = (p) => {
   const { tab, goal, level, recovery, trainingOutput, macrocycle, selectedWeek, currentMicrocycle,
     runtimeDay, setRuntimeDay, runtimeExIdx, setRuntimeExIdx, runtimeLogs, setRuntimeLogs,
-    runtimeStarted, setRuntimeStarted, plRuntime, plRunOpen, setPlRunOpen,
+    runtimeStarted, setRuntimeStarted, plRuntime: _plRuntime, plRunOpen, setPlRunOpen,
     runtimeSetW, setRuntimeSetW, runtimeSetR, setRuntimeSetR, runtimeSetRP, setRuntimeSetRP, runtimeSetRI, setRuntimeSetRI,
     diary, onRefresh: loadDiaryStats } = p;
+  // Защита от старого кэша: если plRuntime — массив (старый формат BbAutoConstructor), игнорируем
+  const plRuntime = (_plRuntime && !Array.isArray(_plRuntime) && Array.isArray((_plRuntime as any).days)) ? _plRuntime : null;
   // Безопасные производные: если currentMicrocycle null или days пустой — fallback на [].
   // Это предотвращает падения "Cannot read 'filter' of undefined" в UI при пустом/неполном плане.
   const trainingDaysList: any[] = (() => {

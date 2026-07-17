@@ -182,9 +182,19 @@ export const TrainingScreen: React.FC = () => {
   const [runtimeExIdx, setRuntimeExIdx] = useState(0);
   const [runtimeLogs, setRuntimeLogs] = useState<Record<string, { sets: { weight: number; reps: number; rpe: number; rir: number }[]; completed: boolean }>>({});
   const [runtimeStarted, setRuntimeStarted] = useState(false);
-  const [plRuntime, setPlRuntime] = useState<{ days: PlayerDay[]; focus: string; week: number; track: string } | null>(() => { try { const v = localStorage.getItem('he_pl_runtime'); return v ? JSON.parse(v) : null; } catch { return null; } });
+  const safeParsePlRuntime = (raw: string | null): { days: PlayerDay[]; focus: string; week: number; track: string } | null => {
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.days) && parsed.days.length > 0) {
+        return parsed;
+      }
+      return null;
+    } catch { return null; }
+  };
+  const [plRuntime, setPlRuntime] = useState<{ days: PlayerDay[]; focus: string; week: number; track: string } | null>(() => safeParsePlRuntime(localStorage.getItem('he_pl_runtime')));
   const [plRunOpen, setPlRunOpen] = useState(false);
-  useEffect(() => { if (tab === 'runtime') { try { const v = localStorage.getItem('he_pl_runtime'); setPlRuntime(v ? JSON.parse(v) : null); } catch { /* ignore */ } } }, [tab]);
+  useEffect(() => { if (tab === 'runtime') { setPlRuntime(safeParsePlRuntime(localStorage.getItem('he_pl_runtime'))); } }, [tab]);
   useEffect(() => { if (linked.readiness) appendReadinessToday(linked.readiness.recovery ?? 70, linked.readiness.fatigue ?? 30); }, [linked.readiness]);
   // Open diary tab directly when navigated from Profile → diaries → Тренировки
   useEffect(() => {

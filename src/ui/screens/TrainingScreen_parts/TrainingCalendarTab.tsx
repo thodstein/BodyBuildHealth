@@ -194,7 +194,7 @@ export const TrainingCalendarTab: React.FC = () => {
         <div style={{ fontSize: 10, color: DIM }}>Сохранить журнал тренировок (he_workout_log_v2) в CSV/JSON для анализа или передачи тренеру.</div>
         <div style={{ display:'flex', gap: 6, flexWrap:'wrap' }}>
           <button onClick={() => download('workouts.csv', exportWorkoutsToCSV(), 'text/csv')} style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color: ACCENT, cursor:'pointer', fontSize:12, fontWeight:700 }}>⬇ Экспорт CSV</button>
-          <button onClick={() => download('workouts.json', exportToJSON(JSON.parse(localStorage.getItem('he_workout_log_v2') || '[]')), 'application/json')} style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.05)', color: '#fff', cursor:'pointer', fontSize:12, fontWeight:700 }}>⬇ Экспорт JSON</button>
+          <button onClick={() => { try { const raw = localStorage.getItem('he_workout_log_v2') || '[]'; const data = JSON.parse(raw); download('workouts.json', exportToJSON(data), 'application/json'); } catch { alert('Ошибка чтения журнала тренировок'); } }} style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.05)', color: '#fff', cursor:'pointer', fontSize:12, fontWeight:700 }}>⬇ Экспорт JSON</button>
         </div>
       </div>
       {/* Header */}

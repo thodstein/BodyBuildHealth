@@ -182,10 +182,13 @@ export function getWorkoutStats(): WorkoutStats {
   const exerciseFreq: Record<string, number> = {};
 
   for (const sess of sessions) {
+    if (!Array.isArray(sess.exercises)) continue;
     for (const ex of sess.exercises) {
+      if (!ex || !ex.exerciseName) continue;
       exerciseFreq[ex.exerciseName] = (exerciseFreq[ex.exerciseName] || 0) + 1;
-
+      if (!Array.isArray(ex.sets)) continue;
       for (const set of ex.sets) {
+        if (!set) continue;
         if (set.isPR) prCount++;
         const key = ex.exerciseName;
         const estRM = set.reps > 0 ? set.weightKg * (1 + set.reps / 30) : set.weightKg;
@@ -236,9 +239,11 @@ export function getRecentPRs(limit: number = 5): { exercise: string; weight: num
   const prs: { exercise: string; weight: number; reps: number; date: string }[] = [];
 
   for (const sess of sessions) {
+    if (!Array.isArray(sess.exercises)) continue;
     for (const ex of sess.exercises) {
+      if (!ex || !Array.isArray(ex.sets)) continue;
       for (const set of ex.sets) {
-        if (set.isPR) prs.push({ exercise: ex.exerciseName, weight: set.weightKg, reps: set.reps, date: sess.date });
+        if (set && set.isPR) prs.push({ exercise: ex.exerciseName, weight: set.weightKg, reps: set.reps, date: sess.date });
       }
     }
   }
@@ -252,8 +257,11 @@ export function exportToCSV(): WorkoutCSV {
   const rows: string[][] = [];
 
   for (const sess of sessions) {
+    if (!Array.isArray(sess.exercises)) continue;
     for (const ex of sess.exercises) {
+      if (!ex || !Array.isArray(ex.sets)) continue;
       for (const set of ex.sets) {
+        if (!set) continue;
         const estRM = set.reps > 0 ? Math.round(set.weightKg * (1 + set.reps / 30)) : set.weightKg;
         rows.push([
           sess.date, ex.exerciseName, String(set.setNumber),

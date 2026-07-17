@@ -43,6 +43,8 @@ class HealthDB {
   async init() {
     return new Promise<void>((res, rej) => {
       const r = indexedDB.open(DB_NAME, DB_VERSION);
+      let settled = false;
+      const done = (fn: () => void) => { if (!settled) { settled = true; fn(); } };
       r.onupgradeneeded = e => {
         const d = (e.target as IDBOpenDBRequest).result;
         STORES.forEach(s => {
@@ -62,8 +64,11 @@ class HealthDB {
           }
         });
       };
-      r.onsuccess = () => { this.db = r.result; res(); };
-      r.onerror = () => rej(r.error);
+      r.onsuccess = () => { this.db = r.result; done(() => res()); };
+      r.onerror = () => done(() => rej(r.error));
+      r.onblocked = () => done(() => rej(new Error('IndexedDB blocked — close other tabs and reload')));
+      // Safety timeout: if neither success/error/blocked fires within 5s, reject
+      setTimeout(() => done(() => rej(new Error('IndexedDB init timeout'))), 5000);
     });
   }
 

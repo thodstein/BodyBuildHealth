@@ -150,7 +150,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     : 0;
 
   const begin = () => {
-    if (!day) return;
+    if (!day || !Array.isArray(day.exercises)) return;
     
     const riskFlags: Record<string, string> = {};
     if (profile.injuries?.length) {
@@ -179,7 +179,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   };
 
   const startMain = () => {
-    if (!day) return;
+    if (!day || !Array.isArray(day.exercises)) return;
     let s = startSession(focus || day.label, weekNumber);
     day.exercises.forEach(ex => {
       s = addExerciseToSession(s, { id: ex.name, name: ex.name, pattern: ex.muscleGroup, muscleGroup: ex.muscleGroup });
@@ -191,7 +191,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   };
 
   const finish = () => {
-    if (!session) return;
+    if (!session || !day || !Array.isArray(day.exercises)) return;
     hapticNotify('success');
     const finished = finishSession(session, `${focus} — ${day?.label}`);
     
@@ -253,9 +253,12 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   const keyFor = (ei: number, si: number) => `${ei}_${si}`;
 
   const logOne = (ei: number, si: number) => {
-    if (!session || !day) return;
+    if (!session || !day || !Array.isArray(day.exercises)) return;
     hapticImpact('light');
-    const t = day.exercises[ei].targetSets[si];
+    const ex = day.exercises[ei];
+    if (!ex) return;
+    const ts = Array.isArray(ex.targetSets) ? ex.targetSets[si] : null;
+    const t = ts || { weight: weightFor(ex) || 60, reps: repsFor(ex) || 10, rir: rirFor(ex) ?? 2 };
     const a = actual[keyFor(ei, si)] || { weight: t.weight, reps: t.reps, rpe: 0 };
     let s = logSet(session, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe || 0, rir: t.rir, notes: '' });
     setSession(s);
@@ -263,6 +266,11 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     // авто-старт таймера отдыха после подхода
     startRestTimer(ei);
   };
+
+  // Fallback helpers when targetSets is missing (legacy cache)
+  const weightFor = (ex: any) => ex?.targetSets?.[0]?.weight ?? ex?.weight ?? 60;
+  const repsFor = (ex: any) => ex?.targetSets?.[0]?.reps ?? ex?.reps ?? 10;
+  const rirFor = (ex: any) => ex?.targetSets?.[0]?.rir ?? ex?.rir ?? 2;
 
   // Плановые метрики дня
   const planned = useMemo(() => {

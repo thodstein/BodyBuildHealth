@@ -251,7 +251,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [bbVolGoal, setBbVolGoal] = useState<string>(_bbSaved?.bbVolGoal || 'mav');
   const [bbFocus, setBbFocus] = useState<string>(_bbSaved?.bbFocus || '');
   const [peds, setPeds] = useState<PED[]>(_bbSaved?.peds ?? (_profPL.onCourse ? (['AAS'] as PED[]) : []));
-  const [builtBb, setBuiltBb] = useState<BBPlan | null>(_bbSaved?.builtBb ?? null);
+  const _validateBBPlan = (plan: any): BBPlan | null => {
+    if (!plan || !Array.isArray(plan.weeks) || !plan.weeks.length) return null;
+    return plan;
+  };
+  const [builtBb, setBuiltBb] = useState<BBPlan | null>(_validateBBPlan(_bbSaved?.builtBb));
   const [bbWeekSel, setBbWeekSel] = useState<number>(_bbSaved?.bbWeekSel ?? 1);
   const WEAK_GROUPS = [['chest','Грудь'],['back','Спина'],['legs','Ноги'],['shoulders','Плечи'],['arms','Руки'],['core','Кор']] as const;
   const [weakPoints, setWeakPoints] = useState<string[]>(_profPL.weakPoints || []);
@@ -450,7 +454,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
 
   const togglePed = (p: PED) => setPeds(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
   const srcDays: PlayerDay[] = useMemo(() => {
-    if (!builtSrc) return [];
+    if (!builtSrc || !Array.isArray(builtSrc.weeks) || !builtSrc.weeks.length) return [];
     const wk0 = builtSrc.weeks[0]; const w0 = wk0.week;
     return wk0.days.map((d, i) => ({
       label: `Д${i + 1}`,
@@ -470,7 +474,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   }, [builtSrc, srcEdits, srcAdditions, autoRegOn, autoRegResult, priAdjust, tempoAdjust, rirShiftAdjust, deloadAdjust, peakAdjust]);
 
   const bbDaysArr: PlayerDay[] = useMemo(() => {
-    if (!builtBb) return [];
+    if (!builtBb || !Array.isArray(builtBb.weeks) || !builtBb.weeks.length) return [];
     const wk = builtBb.weeks[0];
     return wk.sessions.map((sess, i) => ({
       label: `Д${i + 1} ${sess.character}`,
@@ -502,7 +506,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   }, [mainTab, builtSrc, builtBb]);
   const runFocus = mainTab === 'pl' ? (getCycleById(selectedCycleId)?.meta.title || 'Силовой цикл') : 'BB';
   const lmsChart: LMSWeekMetric[] = useMemo(() => {
-    if (!builtSrc) return [];
+    if (!builtSrc || !Array.isArray(builtSrc.weeks) || !builtSrc.weeks.length) return [];
     return builtSrc.weeks.map(wk => {
       const t = wk.days.reduce((s, d) => s + d.metrics.tonnage, 0);
       const k = wk.days.reduce((s, d) => s + d.metrics.kpsh, 0);
@@ -513,7 +517,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     });
   }, [builtSrc]);
   const bbChart: BBMuscleMetric[] = useMemo(() => {
-    if (!builtBb) return [];
+    if (!builtBb || !Array.isArray(builtBb.weeks) || !builtBb.weeks.length) return [];
     const mult = methodHints.volumeMult;
     return calcBBPlanMetrics(builtBb, pedAdapt.combinedMrvMultiplier).perMuscle.map(p => ({ muscle: p.muscle, sets: Math.round(p.totalSets * mult), тяж: Math.round(p.тяжSets * mult), памп: Math.round(p.пампSets * mult), mrv: p.mrv }));
   }, [builtBb]);
@@ -844,7 +848,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>{Object.entries(wk.pmRow).map(([n, pm]) => <span key={n} style={{ ...SMALL, color:'#fff', background:'rgba(96,165,250,0.08)', padding:'3px 8px', borderRadius:6, border:'1px solid rgba(96,165,250,0.15)' }}><b>{n}:</b> {pm.toFixed(1)} кг</span>)}</div>
               </MetricCard>
               {/* График прогрессии ПМ по неделям */}
-              {(() => {
+              {builtSrc && Array.isArray(builtSrc.weeks) && builtSrc.weeks.length > 0 && (() => {
                 const exNames = Object.keys(builtSrc.weeks[0]?.pmRow || {}).slice(0, 3);
                 if (exNames.length === 0) return null;
                 const allVals = builtSrc.weeks.flatMap(w => exNames.map(n => w.pmRow[n] || 0));
@@ -1213,7 +1217,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: ACCENT }}>🎯 Слабые группы (акцент, сохраняются в профиль)</div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6 }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)" }}>{l}{on ? " ✓" : ""}</button>; })}</div>
           <button style={{ ...BTN, width: '100%', marginTop: 10 }} onClick={buildBb}>Сгенерировать BB-план ({bbWeeks} нед)</button>
-          {builtBb && (() => {
+          {builtBb && Array.isArray(builtBb.weeks) && builtBb.weeks.length > 0 && (() => {
             const W = builtBb.weeks;
             const wk = W[Math.min(bbWeekSel, W.length) - 1] || W[0];
             const m = calcBBPlanMetrics(builtBb, pedAdapt.combinedMrvMultiplier);
