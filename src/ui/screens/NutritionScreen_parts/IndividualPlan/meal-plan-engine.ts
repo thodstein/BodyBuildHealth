@@ -704,12 +704,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Pre = 20% of carbs, Post = 25% of carbs (with floors); breakfast/lunch/dinner share the rest.
   // Carb distribution must sum to ~100% per scenario — no residual to dump.
   // Training day: break(20%) + lunch(16%) + dinner(19%) + pre(20%) + post(25%) = 100%
-  // Rest day:     break(22%) + lunch(28%) + dinner(40%) + snack(10%)          = 100%
-  const breakC = Math.round(carbsTotal * (trainWindow ? 0.20 : 0.22));
+  // Rest day:     break(25%) + lunch(35%) + dinner(30%) + snack(10%)          = 100%
+  const breakC = Math.round(carbsTotal * (trainWindow ? 0.20 : 0.25));
   const trainCarbLunch = Math.round(carbsTotal * 0.16);
-  const restCarbLunch = Math.round(carbsTotal * 0.28);
+  const restCarbLunch = Math.round(carbsTotal * 0.35);
   const trainCarbDinner = Math.round(carbsTotal * 0.19);
-  const restCarbDinner = Math.round(carbsTotal * 0.40);
+  const restCarbDinner = Math.round(carbsTotal * 0.30);
   // Pre/post carb targets scale with carbsTotal; floors keep them meaningful on low-carb days.
   const prewCarbG = trainWindow ? Math.max(PREW_CARB_SLOW_G, Math.round(carbsTotal * 0.20)) : PREW_CARB_SLOW_G;
   const postwCarbG = trainWindow ? Math.max(POSTW_FAST_CARB_G, Math.round(carbsTotal * 0.25)) : POSTW_FAST_CARB_G;
