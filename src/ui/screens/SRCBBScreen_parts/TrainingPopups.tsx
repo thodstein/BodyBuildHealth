@@ -246,4 +246,79 @@ export const CalcResult: React.FC<{
   </div>
 );
 
+// ═══ PopupExerciseList — управление списком упражнений (карточка-кнопка → попап) ═══
+import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
+
+export const PopupExerciseList: React.FC<{
+  label: string; ids: string[]; onChange: (ids: string[]) => void;
+  accent?: string; placeholder?: string;
+}> = ({ label, ids, onChange, accent = ACCENT, placeholder = 'Поиск упражнения…' }) => {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const isFilled = ids.length > 0;
+  const nameOf = (id: string): string => {
+    const e = (EXERCISE_CATALOG as any)[id] || (EXERCISE_CATALOG as any)[id.toUpperCase()];
+    return e?.name || id;
+  };
+  const results = (() => {
+    const ql = q.trim().toLowerCase();
+    const all = Object.values(EXERCISE_CATALOG as any) as any[];
+    return all
+      .filter(e => !ids.includes(e.id) && (!ql || (e.name || '').toLowerCase().includes(ql) || (e.id || '').toLowerCase().includes(ql)))
+      .slice(0, 40);
+  })();
+  const remove = (id: string) => onChange(ids.filter(x => x !== id));
+  const add = (id: string) => { if (!ids.includes(id)) onChange([...ids, id]); setQ(''); };
+  return <>
+    <button onClick={() => { setQ(''); setOpen(true); }} style={{
+      display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left',
+      background: 'rgba(255,255,255,0.04)', border: `1px solid ${accent}33`, borderLeft: `3px solid ${accent}`, color: '#fff',
+      transition: 'all 0.15s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+    }}
+      onMouseDown={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.98)'; }}
+      onMouseUp={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
+    >
+      <span style={{ fontSize: 18, flexShrink: 0 }}>⭐</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.3px' }}>{label}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: isFilled ? accent : 'rgba(255,255,255,0.35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isFilled ? `${ids.length} выбрано` : 'Не выбрано'}</div>
+      </div>
+      <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: isFilled ? accent : 'rgba(255,255,255,0.15)' }} />
+    </button>
+    {open && (
+      <div onClick={() => setOpen(false)} style={overlay}>
+        <div onClick={e => e.stopPropagation()} style={sheet()}>
+          <div style={topBar} />
+          <div style={sheetBody}>
+            <div style={titleStyle}>{label}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10, minHeight: 4 }}>
+              {ids.length === 0 && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Список пуст — добавьте упражнения ниже</div>}
+              {ids.map(id => (
+                <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 8, background: `${accent}1f`, border: `1px solid ${accent}4d`, fontSize: 11, color: accent, fontWeight: 600 }}>
+                  {nameOf(id)}
+                  <button onClick={() => remove(id)} style={{ background: 'none', border: 'none', color: accent, cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: 0 }}>✕</button>
+                </span>
+              ))}
+            </div>
+            <input type="text" value={q} placeholder={placeholder}
+              onChange={e => setQ(e.target.value)} autoFocus
+              style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 14, boxSizing: 'border-box', marginBottom: 10 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {results.map(e => (
+                <button key={e.id} onClick={() => add(e.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.9)' }}>
+                  <span>{e.name}</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>+ добавить</span>
+                </button>
+              ))}
+              {results.length === 0 && q.trim() && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Ничего не найдено</div>}
+            </div>
+            <button onClick={() => setOpen(false)} style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Готово</button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>;
+};
+
 export default { PopupNumber, PopupSelect, PopupText, ExpandableCard, MetricCard, SaveButton, CalcSection, PopupToggle, CalcResult };

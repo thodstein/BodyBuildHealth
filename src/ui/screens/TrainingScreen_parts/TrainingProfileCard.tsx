@@ -2,10 +2,9 @@
  * TrainingProfileCard.tsx — единая карточка «Профиль тренированности».
  * Реальные входные данные, общие для ПЛ/ББ/ручного конструктора/калькуляторов.
  */
-import React, { useState, useMemo } from 'react';
-import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
+import React from 'react';
+import { PopupNumber, PopupSelect, PopupExerciseList } from '../SRCBBScreen_parts/TrainingPopups';
 import { EQUIPMENT_OPTIONS, WEAK_GROUP_OPTIONS, type TrainingProfile } from './training-profile';
-import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 
 const ACCENT = '#00e68a';
 const H: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' };
@@ -143,93 +142,34 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
       </div>
       {profile.onCourse && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>На курсе MRV повышается (~+20-30%), восстановление учитывается в готовности.</div>}
 
-      <div style={{ ...LABEL, marginTop: 10 }}>⭐ Любимые и исключённые упражнения</div>
-      {(() => {
-        const [exSearch, setExSearch] = useState('');
-        const favIds = profile.favoriteExercises || [];
-        const exclIds = profile.excludedExercises || [];
-        const filtered = useMemo(() => {
-          const q = exSearch.toLowerCase().trim();
-          if (!q) return [];
-          return EXERCISE_CATALOG.filter(ex =>
-            !favIds.includes(ex.id) && !exclIds.includes(ex.id) &&
-            (ex.name.toLowerCase().includes(q) || ex.id.toLowerCase().includes(q))
-          ).slice(0, 15);
-        }, [exSearch, favIds, exclIds]);
-        const addFav = (id: string) => update({ favoriteExercises: [...favIds, id] });
-        const addExcl = (id: string) => update({ excludedExercises: [...exclIds, id] });
-        const rmFav = (id: string) => update({ favoriteExercises: favIds.filter(x => x !== id) });
-        const rmExcl = (id: string) => update({ excludedExercises: exclIds.filter(x => x !== id) });
-        const exName = (id: string) => EXERCISE_CATALOG.find(e => e.id === id)?.name || id;
+      {/* ⭐ Любимые и не любимые упражнения — карточки-кнопки с попапом */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+        <PopupExerciseList
+          label="⭐ Любимые упражнения"
+          ids={profile.favoriteExercises || []}
+          onChange={ids => update({ favoriteExercises: ids })}
+          accent="#00e68a"
+        />
+        <PopupExerciseList
+          label="✕ Не любимые"
+          ids={profile.excludedExercises || []}
+          onChange={ids => update({ excludedExercises: ids })}
+          accent="#ef4444"
+        />
+      </div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+        Любимые получают приоритет при отборе упражнений. Не любимые полностью исключаются из генерации плана.
+      </div>
 
-        const toggleArrPref = (key: 'favoriteExercises' | 'excludedExercises', id: string) => {
-          const arr = profile[key] || [];
-          update({ [key]: arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id] } as Partial<TrainingProfile>);
-        };
-
-        return (
-          <div>
-            <input
-              placeholder="🔍 Найти упражнение..."
-              value={exSearch}
-              onChange={e => setExSearch(e.target.value)}
-              style={{
-                width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: 8,
-                border: '1px solid rgba(255,255,255,0.1)', background: '#18181b', color: '#fff',
-                fontSize: 12, outline: 'none', marginBottom: 6,
-              }}
-            />
-            {filtered.length > 0 && (
-              <div style={{ maxHeight: 180, overflowY: 'auto', marginBottom: 6, borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', padding: 4 }}>
-                {filtered.map(ex => (
-                  <div key={ex.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', borderRadius: 6, fontSize: 11 }}>
-                    <span style={{ color: 'rgba(255,255,255,0.8)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.name}</span>
-                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                      <button onClick={() => addFav(ex.id)} style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}>⭐</button>
-                      <button onClick={() => addExcl(ex.id)} style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}>✕</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#00e68a', marginBottom: 4 }}>Любимые ({favIds.length})</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, maxHeight: 100, overflowY: 'auto' }}>
-                  {favIds.length === 0 && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>Нет</span>}
-                  {favIds.map(id => (
-                    <span key={id} style={{ padding: '3px 7px', borderRadius: 10, fontSize: 10, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.25)', color: '#00e68a', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      {exName(id)}
-                      <span onClick={(e) => { e.stopPropagation(); rmFav(id); }} style={{ fontWeight: 700, fontSize: 11, color: 'rgba(0,230,138,0.5)' }}>×</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>Исключены ({exclIds.length})</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, maxHeight: 100, overflowY: 'auto' }}>
-                  {exclIds.length === 0 && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>Нет</span>}
-                  {exclIds.map(id => (
-                    <span key={id} style={{ padding: '3px 7px', borderRadius: 10, fontSize: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#fca5a5', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      {exName(id)}
-                      <span onClick={(e) => { e.stopPropagation(); rmExcl(id); }} style={{ fontWeight: 700, fontSize: 11, color: 'rgba(239,68,68,0.5)' }}>×</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 13, color: 'rgba(235,235,245,0.7)', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={!!profile.avoidAxialLoad}
-                onChange={e => update({ avoidAxialLoad: e.target.checked })}
-                style={{ width: 18, height: 18, accentColor: ACCENT }}
-              />
-              🦴 Убрать осевую нагрузку (присед/становая/жим стоя)
-            </label>
-          </div>
-        );
-      })()}
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 13, color: 'rgba(235,235,245,0.7)', cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={!!profile.avoidAxialLoad}
+          onChange={e => update({ avoidAxialLoad: e.target.checked })}
+          style={{ width: 18, height: 18, accentColor: ACCENT }}
+        />
+        🦴 Убрать осевую нагрузку (присед/становая/жим стоя)
+      </label>
 
       <div style={{ ...LABEL, marginTop: 10 }}>📊 Фармакологическая история</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
