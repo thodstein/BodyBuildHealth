@@ -871,9 +871,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                           border: active ? '1px solid rgba(168,85,247,0.25)' : '1px solid rgba(255,255,255,0.04)' }}>
                         <div onClick={() => setSelectedStacks(prev => active ? prev.filter(s => s !== st.id) : [...prev, st.id])}
                           style={{ padding:'8px 10px', cursor:'pointer', display:'flex', alignItems:'flex-start', gap:6 }}>
-                          <span style={{ fontSize:13, minWidth:14, color: active ? '#c084fc' : 'var(--text-dim)', marginTop:1 }}>{active ? '✓' : '○'}</span>
+                          <span style={{ fontSize:13, minWidth:14, color: active ? '#c084fc' : 'rgba(255,255,255,0.4)', marginTop:1 }}>{active ? '✓' : '○'}</span>
                           <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:13, fontWeight:700, color: active ? '#c084fc' : 'var(--text-light)', lineHeight:1.25 }}>{st.name || st.id.replace(/_stack|_support|_35/g,'').replace(/_/g,' ')}</div>
+                            <div style={{ fontSize:13, fontWeight:700, color: active ? '#c084fc' : 'rgba(255,255,255,0.9)', lineHeight:1.25 }}>{st.name || st.id.replace(/_stack|_support|_35/g,'').replace(/_/g,' ')}</div>
                             <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', marginTop:2, lineHeight:1.35 }}>{st.system || ''} · {subCount} веществ{st.synergyScore ? ` · син: ${st.synergyScore}` : ''}</div>
                           </div>
                           <span onClick={(e) => { e.stopPropagation(); setExpandedManualStack(isExpanded ? null : st.id); }}
@@ -1072,9 +1072,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                       }}>
                       <div onClick={() => setSelectedStacks(prev => active ? prev.filter(s => s !== st.id) : [...prev, st.id])}
                         style={{ padding:'9px 11px', cursor:'pointer', display:'flex', alignItems:'flex-start', gap:6 }}>
-                        <span style={{ fontSize:13, minWidth:14, color: active ? '#c084fc' : 'var(--text-dim)', marginTop:1 }}>{active ? '✓' : '○'}</span>
+                        <span style={{ fontSize:13, minWidth:14, color: active ? '#c084fc' : 'rgba(255,255,255,0.4)', marginTop:1 }}>{active ? '✓' : '○'}</span>
                         <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:13, fontWeight:700, color: active ? '#c084fc' : 'var(--text-light)', lineHeight:1.25 }}>{st.name || st.id.replace(/_stack|_support|_35/g,'').replace(/_/g,' ')}</div>
+                          <div style={{ fontSize:13, fontWeight:700, color: active ? '#c084fc' : 'rgba(255,255,255,0.9)', lineHeight:1.25 }}>{st.name || st.id.replace(/_stack|_support|_35/g,'').replace(/_/g,' ')}</div>
                           <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', lineHeight:1.35, marginTop:2 }}>{st.problem || st.system || ''}</div>
                           <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginTop:3, display:'flex', gap:5, flexWrap:'wrap' }}>
                             <span>{subCount} веществ</span>
@@ -1190,7 +1190,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                             background: active ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.02)',
                             border: active ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(255,255,255,0.05)' }}>
                           <div style={{ display:'flex', alignItems:'flex-start', gap:6 }}>
-                            <span style={{ fontSize:11, minWidth:14, color: active ? '#f87171' : 'var(--text-dim)', marginTop:1 }}>{active ? '✓' : '○'}</span>
+                            <span style={{ fontSize:11, minWidth:14, color: active ? '#f87171' : 'rgba(255,255,255,0.4)', marginTop:1 }}>{active ? '✓' : '○'}</span>
                             <div style={{ flex:1, minWidth:0 }}>
                               <div style={{ fontSize:10, fontWeight:700, color: active ? '#fca5a5' : 'rgba(240,240,245,0.9)', lineHeight:1.2 }}>
                                 {subNameRu(s.substanceId)}
@@ -1275,7 +1275,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   <div style={{ height:3, background:'linear-gradient(90deg,#4ade80,#22c55e)' }} />
                  <div style={{ flex:'1 1 0%', minHeight:0, padding:'14px 14px 16px', overflowY:'auto' }}>
                   {/* Заголовок + контекст */}
-                  <div style={{ fontSize:13, fontWeight:800, color:'#4ade80', marginBottom:4 }}>🦴 Суставы/Связки — подбор поддержки</div>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                   <span style={{ fontSize:13, fontWeight:800, color:'#4ade80' }}>🦴 Суставы/Связки — подбор поддержки</span>
+                   <button onClick={() => { setStackModulePopup(null); setArticularConfirm(false); }} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'rgba(255,255,255,0.55)', cursor:'pointer', fontSize:11, fontWeight:600 }}>✕</button>
+                  </div>
                   <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', lineHeight:1.4, marginBottom:8, padding:'5px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
                     {jointScore < 20 ? '🟢 Низкий риск — профилактика' : jointScore < 40 ? '🟡 Умеренный риск — базовая поддержка' : jointScore < 60 ? '🟠 Высокий риск — усиленная защита' : '🔴 Критический — максимальная защита'}
                     {hasJointSymptom ? ' · боль в суставах' : ''}{crp && crp > 3 ? ` · CRP ${crp}` : ''}
@@ -1413,7 +1416,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'90vh', display:'flex', flexDirection:'column' }}>
                   <div style={{ height:3, background:'linear-gradient(90deg,#818cf8,#6366f1)' }} />
                  <div style={{ flex:'1 1 0%', minHeight:0, padding:'14px 14px 16px', overflowY:'auto' }}>
-                  <div style={{ fontSize:13, fontWeight:800, color:'#818cf8', marginBottom:4 }}>🧠 Нейропротекция — подбор поддержки</div>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                   <span style={{ fontSize:13, fontWeight:800, color:'#818cf8' }}>🧠 Нейропротекция — подбор поддержки</span>
+                   <button onClick={() => { setStackModulePopup(null); setNeuroConfirm(false); }} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'rgba(255,255,255,0.55)', cursor:'pointer', fontSize:11, fontWeight:600 }}>✕</button>
+                  </div>
                   <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', lineHeight:1.4, marginBottom:8, padding:'5px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
                     {neuroScore < 20 ? '🟢 Низкий риск — профилактика' : neuroScore < 40 ? '🟡 Умеренный риск — базовая поддержка' : neuroScore < 60 ? '🟠 Высокий риск — усиленная защита' : '🔴 Критический — максимальная защита'}
                     {hasInsomnia ? ' · бессонница' : ''}{hasAnxiety ? ' · тревога' : ''}{sleepHours < 7 ? ` · сон ${sleepHours}ч` : ''}{stressLevel > 7 ? ` · стресс ${stressLevel}/10` : ''}
@@ -1536,7 +1542,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
              <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:360, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
                 <div style={{ height:3, background:`linear-gradient(90deg,${meta.col},${meta.col}88)` }} />
                <div style={{ flex:'1 1 0%', minHeight:0, padding:'16px 14px 16px', overflowY:'auto' }}>
-                <div style={{ fontSize:13, fontWeight:800, color:meta.col, marginBottom:6 }}>{meta.icon} {stackMeta?.name || stackModulePopup}</div>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                 <span style={{ fontSize:13, fontWeight:800, color:meta.col }}>{meta.icon} {stackMeta?.name || stackModulePopup}</span>
+                 <button onClick={() => setStackModulePopup(null)} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'rgba(255,255,255,0.55)', cursor:'pointer', fontSize:11, fontWeight:600 }}>✕</button>
+                </div>
                 <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', lineHeight:1.5, marginBottom:8 }}>{stackMeta?.problem || ''}</div>
                 <div style={{ fontSize:10, fontWeight:700, color:'#ffffff', marginBottom:4 }}>📊 Анализ контекста</div>
                 <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.5, marginBottom:10, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
