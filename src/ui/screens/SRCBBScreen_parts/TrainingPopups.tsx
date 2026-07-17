@@ -4,8 +4,19 @@
  * Экспортирует: PopupNumber, PopupSelect, ExpandableCard, MetricCard, SaveButton.
  */
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 
 const ACCENT = '#00e68a';
+
+/** Portal-обёртка для overlay — рендерит в document.body, обходит containing-block bug
+ *  (предок с backdrop-filter/transform ломает position:fixed). */
+const PortalOverlay: React.FC<{ onClose: () => void; children: React.ReactNode }> = ({ onClose, children }) => {
+  if (typeof document === 'undefined') return null;
+  return ReactDOM.createPortal(
+    <div style={overlay} onClick={onClose}>{children}</div>,
+    document.body,
+  );
+};
 
 const overlay: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 250, display: 'flex',
@@ -39,7 +50,7 @@ export const PopupNumber: React.FC<{
       <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 14, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{display}</div>
     </button>
-    {open && <div style={overlay} onClick={() => setOpen(false)}>
+    {open && <PortalOverlay onClose={() => setOpen(false)}>
       <div onClick={e => e.stopPropagation()} style={sheet()}>
         <div style={topBar} />
         <div style={sheetBody}>
@@ -54,7 +65,7 @@ export const PopupNumber: React.FC<{
           </div>
         </div>
       </div>
-    </div>}
+    </PortalOverlay>}
   </>;
 };
 
@@ -74,7 +85,7 @@ export const PopupSelect: React.FC<{
         <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{sel ? sel.label : 'Выбрать…'}</div>
       </button>
       {open && (
-        <div style={overlay} onClick={() => setOpen(false)}>
+        <PortalOverlay onClose={() => setOpen(false)}>
           <div onClick={e => e.stopPropagation()} style={sheet(420)}>
             <div style={topBar} />
             <div style={sheetBody}>
@@ -104,7 +115,7 @@ export const PopupSelect: React.FC<{
               <button onClick={() => setOpen(false)} style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
             </div>
           </div>
-        </div>
+        </PortalOverlay>
       )}
     </>
   );
@@ -136,7 +147,7 @@ export const PopupSelectSmart: React.FC<{
         <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{sel ? sel.label : 'Выбрать…'}</div>
       </button>
       {open && (
-        <div style={overlay} onClick={() => setOpen(false)}>
+        <PortalOverlay onClose={() => setOpen(false)}>
           <div onClick={e => e.stopPropagation()} style={sheet(420)}>
             <div style={topBar} />
             <div style={sheetBody}>
@@ -175,7 +186,7 @@ export const PopupSelectSmart: React.FC<{
               <button onClick={() => setOpen(false)} style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
             </div>
           </div>
-        </div>
+        </PortalOverlay>
       )}
     </>
   );
@@ -192,7 +203,7 @@ export const PopupText: React.FC<{
       <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{value || 'Введите...'}</div>
     </button>
-    {open && <div style={overlay} onClick={() => setOpen(false)}>
+    {open && <PortalOverlay onClose={() => setOpen(false)}>
       <div onClick={e => e.stopPropagation()} style={sheet()}>
         <div style={topBar} />
         <div style={sheetBody}>
@@ -207,7 +218,7 @@ export const PopupText: React.FC<{
           </div>
         </div>
       </div>
-    </div>}
+    </PortalOverlay>}
   </>;
 };
 

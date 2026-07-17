@@ -541,7 +541,7 @@ function buildSession(
       // Equipment fallback: не фильтруем по оборудованию (лучше хоть что-то, чем пусто)
       return true;
     });
-    const selected = selectExercisesSmart({
+    let selected = selectExercisesSmart({
       candidates: pool, muscleGroup: muscle, count: exerciseCount,
       selectedIds: sessionSelectedIds, selectedNames: sessionSelectedNames,
       equipment: equipmentList, weakZones: weakPoints, level, injuryProfile, type: selType,
@@ -656,20 +656,39 @@ function buildSession(
       if (classes && classes.length > 0) {
         const diverse: any[] = [];
         const usedIds = new Set<string>();
-        // Берём по 1 упражнению из каждого угла, пока не наберём exerciseCount
+        // Берём по 1 упражнению из каждого угла, пока не наберём exerciseCount.
+        // Учитываем ротацию: исключаем уже использованные (sessionSelectedIds + sessionSelectedNames).
         for (const ac of classes) {
           if (diverse.length >= exerciseCount) break;
-          const candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id));
+          const candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id)
+            && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name));
           if (candidates.length > 0) {
             // Из кандидатов — взять первое (selectExercisesSmart уже отсортировал по скору)
             diverse.push(candidates[0]);
             usedIds.add(candidates[0].id);
+            // Добавить в sessionSelectedIds чтобы следующие мышцы/классы не повторили
+            sessionSelectedIds.push(candidates[0].id);
+            sessionSelectedNames.push(candidates[0].name);
+          }
+        }
+        // Fallback: если класс пуст (все исключены ротацией) — взять из класса без фильтра ротации
+        for (const ac of classes) {
+          if (diverse.length >= exerciseCount) break;
+          const candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id));
+          if (candidates.length > 0) {
+            diverse.push(candidates[0]);
+            usedIds.add(candidates[0].id);
+            sessionSelectedIds.push(candidates[0].id);
+            sessionSelectedNames.push(candidates[0].name);
           }
         }
         // Добрать из остатка пула, если не набрали
         for (const e of pool) {
           if (diverse.length >= exerciseCount) break;
-          if (!usedIds.has(e.id)) { diverse.push(e); usedIds.add(e.id); }
+          if (!usedIds.has(e.id) && !sessionSelectedIds.includes(e.id)) {
+            diverse.push(e); usedIds.add(e.id);
+            sessionSelectedIds.push(e.id); sessionSelectedNames.push(e.name);
+          }
         }
         if (diverse.length >= Math.min(2, exerciseCount)) {
           exDatas = diverse.slice(0, exerciseCount);
@@ -946,19 +965,19 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const phaseWeekCounter: Record<string, number> = { accumulation: 0, intensification: 0, deload: 0, peaking: 0 };
 
   const weeks: BBWeek[] = [];
-  // FIX-1: Ротация упражнений — каждые ROTATION_INTERVAL недель сбрасываем пул использованных ID,
-  // чтобы selectExercisesSmart выбирал свежие упражнения (предотвращает аккомодацию).
-  const ROTATION_INTERVAL = 4;
+  // FIX-1: Ротация упражнений — НАКАПЛИВАЕТ использованные упражнения весь план.
+  // НЕ сбрасываем каждые 4 нед — вместо этого selectExercisesSmart исключает
+  // все ранее использованные → недели получают РАЗНЫЕ упражнения (ротация).
+  // Fallback: если пул исчерпан (все исключены) — selectExercisesSmart вернёт 0,
+  // тогда buildSession очистит rotationIds для этой мышцы и пересоберёт.
   const rotationUsedByMuscle = new Map<string, string[]>(); // muscle → [exerciseName, ...]
   // fix L: паттерны движений, уже задействованные для отстающих групп внутри текущей недели.
   // Сбрасывается каждую неделю; позволяет не повторять один и тот же паттерн на разных днях.
   const weekWeakPatterns = new Map<string, Set<string>>(); // weakMuscle → Set<pattern>
 
   for (let w = 1; w <= input.weeks; w++) {
-    // Сброс ротации каждые ROTATION_INTERVAL недель (новая фаза → свежий пул)
-    if (w > 1 && (w - 1) % ROTATION_INTERVAL === 0) {
-      rotationUsedByMuscle.clear();
-    }
+    // Ротация: НЕ сбрасываем — накапливаем все использованные упражнения
+    // (каждая неделя получает новые упражнения, пока пул не исчерпан)
     // fix L: паттерны отстающих групп сбрасываются раз в неделю (свежий выбор движений)
     weekWeakPatterns.clear();
     const musclePrimaryAssigned = new Set<string>(); // ← сбрасывается КАЖДУЮ неделю
@@ -989,11 +1008,18 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       }
       // fix Z: sessMuscles по collapseKey (delt heads→shoulders) для mrvByMuscle-lookup
       const sessMuscles = [...new Set(musclesForTag(s.sessionTag).map(m => collapseKey(m)))];
-      // Ротация: собираем ID упражнений, использованных ранее для этих мышц
+      // Ротация: собираем ID упражнений, использованных ранее для этих мышц.
+      // rotationUsedByMuscle хранит exerciseName (имена) → конвертируем в IDs для selectExercisesSmart.
       const rotationIds: string[] = [];
+      const rotationNames: string[] = [];
       for (const m of sessMuscles) {
-        const prevIds = rotationUsedByMuscle.get(m) || [];
-        rotationIds.push(...prevIds);
+        const prevNames = rotationUsedByMuscle.get(m) || [];
+        rotationNames.push(...prevNames);
+        // Конвертировать имена в IDs через каталог
+        for (const name of prevNames) {
+          const cat = EXERCISE_CATALOG.find((e: any) => e.name === name);
+          if (cat && cat.id) rotationIds.push(cat.id);
+        }
       }
       // Solo-дни (1-2 группы мышц): увеличиваем бюджет на 50% — вся энергия дня идёт на эти мышцы
       // fix I: фазовая модуляция объёма — deload/peak реально снижают число сетов (не только RIR).
@@ -1007,7 +1033,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const weekExcluded = getExcludedMuscles(injuries, weekDate);
       const weekGraded = getGradedInjuries(injuries, weekDate);
       const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
-      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], isFB ? fbUsedNames : [], rotationIds, favIds, exclIds, avAxial, eqList);
+      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {
@@ -1182,7 +1208,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     `Специализация: ${focusGroup || 'нет'}`,
     `Фазовая периодизация (distributePhases): накопление → интенсификация${deloadFreq > 0 ? ' → разгрузка (deload)' : ''} (RIR по фазе + волна); вес = workMax×%1RM(RIR)`,
     `Прогрессия весов: double_progression (prescribeLoad) — еженедельный рост от недели к неделе с учётом фазы.`,
-    `Ротация упражнений: каждые ${ROTATION_INTERVAL} нед — свежий пул (запрет повторов из предыдущего блока).`,
+    `Ротация упражнений: накапливает использованные весь план — недели получают РАЗНЫЕ упражнения (пока пул не исчерпан, затем fallback).`,
     `S-MRV: автоматический кап объёма на основе бюджета утомления сессии + потолок по MRV мышцы.`,
     ...(pedAdapt ? [`PED-адаптация: MRV×${pedAdapt.combinedMrvMultiplier.toFixed(2)}, восстановление×${pedAdapt.combinedRecoveryMultiplier.toFixed(2)}${pedAdapt.activePEDs.length > 0 ? ' (' + pedAdapt.perPED.map(p => `${p.ped}${p.dose > 0 ? ' ' + p.dose : ''}`).join(' + ') + (pedAdapt.courseIntensity !== 'moderate' ? ', ' + pedAdapt.courseIntensity : '') + ')' : ''}`] : []),
     ...(injuries.length > 0 ? [`Травмы (per-week по дате плана${input.planStartWeek ? ` со старта ${input.planStartWeek}` : ''}): исключены ${[...new Set(injuries.filter(i => i.exclude !== false).map(i => i.muscle))].join(', ') || '—'}; градация ${[...new Set(injuries.filter(i => i.exclude === false).map(i => i.muscle))].join(', ') || '—'} — упражнения заменяются на безопасные альтернативы с пониженным весом/объёмом.`] : []),
