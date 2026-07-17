@@ -782,13 +782,17 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               </div>
               {manualTab === 'catalog' && (
                 <>
-                  <input value={catalogSearch} onChange={e => setCatalogSearch(e.target.value)} placeholder="🔍 Поиск препарата..." style={{
+                  <input value={catalogSearch} onChange={e => setCatalogSearch(e.target.value)} placeholder="🔍 Поиск препарата (минимум 2 символа)..." style={{
                     width:'100%', padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:13, boxSizing:'border-box', marginBottom:6, outline:'none',
                   }} />
+                  {!catalogSearch || catalogSearch.length < 2 ? (
+                    <div style={{ padding:30, textAlign:'center', color:'rgba(255,255,255,0.4)', fontSize:11 }}>
+                      Введите минимум 2 символа для поиска по {Object.keys(SUPPORT_CATALOG_DATA).length} препаратам
+                    </div>
+                  ) : (
                   <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'45vh', overflowY:'auto', marginBottom:10 }}>
                     {Object.entries(SUPPORT_CATALOG_DATA)
                       .filter(([id, entry]: [string, any]) => {
-                        if (!catalogSearch) return true;
                         const q = catalogSearch.toLowerCase();
                         return (entry.nameRu||'').toLowerCase().includes(q) || (entry.name||'').toLowerCase().includes(q) || id.toLowerCase().includes(q);
                       })
@@ -804,6 +808,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                         />
                       ))}
                   </div>
+                  )}
                 </>
               )}
               {manualTab === 'saved' && (
