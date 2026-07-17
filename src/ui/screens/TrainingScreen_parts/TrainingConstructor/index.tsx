@@ -1701,7 +1701,6 @@ export const TrainingConstructor: React.FC<Props> = ({
                   startIntensityPct={75}
                   startRIR={3}
                   goal={(goal === 'mass' ? 'hypertrophy' : (goal as 'strength' | 'hypertrophy' | 'power'))}
-                  fatigueTrajectory="moderate"
                 />
               </div>
               <div style={{ marginTop: 10, padding: 12, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
