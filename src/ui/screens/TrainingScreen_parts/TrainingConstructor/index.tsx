@@ -551,9 +551,10 @@ export const TrainingConstructor: React.FC<Props> = ({
     if (manualCfg.generator === 'bb' || manualCfg.generator === 'bb_split') {
       const bbSplitId = manualCfg.bbSplit || SPLIT_PATTERNS[0]?.id || 'upper_lower_4';
       const bbLoadStrategy = (manualCfg.bbLoad || 'double_progression') as LoadStrategy;
-      const bbPeds: PED[] = manualCfg.pedDoses && manualCfg.pedDoses.split(',').filter(Boolean).length
-        ? manualCfg.pedDoses.split(',').filter(Boolean) as PED[]
-        : ((tprofile as any).bbPeds?.length ? (tprofile as any).bbPeds : (tprofile.onCourse ? ['AAS'] : []));
+      const bbPedsFromUi: PED[] = (manualCfg.pedDoses ? (manualCfg.pedDoses.split(',').filter(Boolean) as unknown as PED[]) : []);
+      const bbPeds: PED[] = bbPedsFromUi.length
+        ? bbPedsFromUi
+        : ((tprofile as any).bbPeds?.length ? (tprofile as any).bbPeds : (tprofile.onCourse ? ['AAS' as PED] : []));
       const allLandmarks = getAllVolumeLandmarks(level);
       const pedAdapt = adaptForPEDs(bbPeds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv])));
 

@@ -41,6 +41,13 @@ export const ExecutionZone: React.FC<Props> = (p) => {
     runtimeStarted, setRuntimeStarted, plRuntime, plRunOpen, setPlRunOpen,
     runtimeSetW, setRuntimeSetW, runtimeSetR, setRuntimeSetR, runtimeSetRP, setRuntimeSetRP, runtimeSetRI, setRuntimeSetRI,
     diary, onRefresh: loadDiaryStats } = p;
+  // Безопасные производные: если currentMicrocycle null или days пустой — fallback на [].
+  // Это предотвращает падения "Cannot read 'filter' of undefined" в UI при пустом/неполном плане.
+  const trainingDaysList: any[] = (() => {
+    try { return ((currentMicrocycle?.days || []) as any[]).filter((d: any) => d && d.isTraining); }
+    catch { return []; }
+  })();
+  const safeRuntimeDay = trainingDaysList.length === 0 ? 0 : Math.min(runtimeDay, trainingDaysList.length - 1);
   return (
     <>
       {tab === 'runtime' && (
@@ -69,34 +76,34 @@ export const ExecutionZone: React.FC<Props> = (p) => {
               <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px' }}>
                 Выберите день из плана для отслеживания подходов в реальном времени.
               </p>
-              {macrocycle && currentMicrocycle ? (
+              {macrocycle && currentMicrocycle && trainingDaysList.length > 0 ? (
                 <>
                   <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
-                    {(() => { const _td = currentMicrocycle.days.filter((d: any) => d.isTraining); const _todayIdx = (((new Date().getDay() + 6) % 7)) % Math.max(1, _td.length); return (
+                    {(() => { const _todayIdx = (((new Date().getDay() + 6) % 7)) % Math.max(1, trainingDaysList.length); return (
                       <button onClick={() => setRuntimeDay(_todayIdx)} title="Сегодня (по дню недели)" style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: 'rgba(0,230,138,0.12)', color: 'var(--accent)', border: '1px solid rgba(0,230,138,0.4)' }}>📅 Сегодня</button>
                     ); })()}
-                    {currentMicrocycle.days.filter((d: any) => d.isTraining).map((day: any, di: number) => (
+                    {trainingDaysList.map((day: any, di: number) => (
                       <button key={di} onClick={() => setRuntimeDay(di)} style={{
-                        padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: runtimeDay === di ? 700 : 400, cursor: 'pointer',
-                        background: runtimeDay === di ? 'var(--accent)' : 'var(--bg-secondary)',
-                        color: runtimeDay === di ? '#000' : 'var(--text)', border: '1px solid ' + (runtimeDay === di ? 'var(--accent)' : 'var(--border)'),
-                      }}>{day.day}</button>
+                        padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: safeRuntimeDay === di ? 700 : 400, cursor: 'pointer',
+                        background: safeRuntimeDay === di ? 'var(--accent)' : 'var(--bg-secondary)',
+                        color: safeRuntimeDay === di ? '#000' : 'var(--text)', border: '1px solid ' + (safeRuntimeDay === di ? 'var(--accent)' : 'var(--border)'),
+                      }}>{day.day || `День ${di+1}`}</button>
                     ))}
                   </div>
             <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: 8, marginBottom: 8 }}>
               <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.exercises?.length || 0} упражнений • {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.duration || 60} мин
+                {trainingDaysList[safeRuntimeDay]?.exercises?.length || 0} упражнений • {trainingDaysList[safeRuntimeDay]?.duration || 60} мин
               </div>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-                Интенсивность: {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.intensity || 'средняя'} | Схема: {currentMicrocycle.mesocycleType || ''}
+                Интенсивность: {trainingDaysList[safeRuntimeDay]?.intensity || 'средняя'} | Схема: {currentMicrocycle.mesocycleType || ''}
               </div>
               <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2, fontWeight: 600 }}>
-                Расчётный тоннаж: {currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.exercises?.reduce((sum: number, ex: any) => sum + (ex.sets || 0) * (Number(ex.reps) || 0) * (ex.weight || 0), 0) || 0} кг
+                Расчётный тоннаж: {trainingDaysList[safeRuntimeDay]?.exercises?.reduce((sum: number, ex: any) => sum + (ex.sets || 0) * (Number(ex.reps) || 0) * (ex.weight || 0), 0) || 0} кг
               </div>
             </div>
                   {/* Session difficulty estimate */}
                   {(() => {
-                    const dayExercises = currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay]?.exercises || [];
+                    const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
                     const totalSets = dayExercises.reduce((s: number, e: any) => s + (e.sets || 0), 0);
                     const avgIntensity = dayExercises.length > 0
                       ? dayExercises.reduce((s: number, e: any) => s + (e.intensity || 70), 0) / dayExercises.length
@@ -128,8 +135,8 @@ export const ExecutionZone: React.FC<Props> = (p) => {
           ) : (
             <>
               {/* Active workout */}
-              {currentMicrocycle && (() => {
-                const day = currentMicrocycle.days.filter((d: any) => d.isTraining)[runtimeDay];
+              {currentMicrocycle && trainingDaysList.length > 0 && (() => {
+                const day = trainingDaysList[safeRuntimeDay];
                 if (!day) return null;
                 const exercises = day.exercises || [];
                 const ex = exercises[runtimeExIdx];

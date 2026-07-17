@@ -118,7 +118,7 @@ export const NutritionOverview: React.FC<{
                 <div style={{ background: 'rgba(249,115,22,0.08)', padding: 6, borderRadius: 6, textAlign: 'center' }}>
                   <div style={{ color: 'var(--text-dim)' }}>Mg/Zn/D3/C</div>
                   <div style={{ fontWeight: 600, fontSize: 10 }}>
-                    {nutritionTargets.micros.Mg}/{nutritionTargets.micros.Zn}/{nutritionTargets.micros.VitD}/{nutritionTargets.micros.VitC}
+                    {nutritionTargets.micros?.Mg ?? 0}/{nutritionTargets.micros?.Zn ?? 0}/{nutritionTargets.micros?.VitD ?? 0}/{nutritionTargets.micros?.VitC ?? 0}
                   </div>
                 </div>
               </div>

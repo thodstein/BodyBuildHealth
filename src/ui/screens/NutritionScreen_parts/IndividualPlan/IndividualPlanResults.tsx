@@ -323,63 +323,63 @@ export const IndividualPlanResults: React.FC = () => {
       {generated && (<>
         <MealQuickControls />
         <GlassCard title="Выбор дней" icon="📅" color="#00e68a">
-          <div style={{ color:'rgba(255,255,255,0.8)', fontSize:7, marginBottom:4, textAlign:'center' }}>Нажмите на день для плана на 1 день</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:3, marginBottom:8 }}>
+          <div style={{ color:'rgba(255,255,255,0.7)', fontSize:10, marginBottom:6, textAlign:'center' }}>Нажмите на день для плана на 1 день</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4, marginBottom:8 }}>
             {DAY_LABELS.map((label, idx) => {
               const isTrain = trainingDays[idx];
               const isSelected = planDays === 1 && selectedDayIndex === idx;
               return (
                 <button key={idx} onClick={() => { setPlanDays(1); setSelectedDayIndex(idx); generatePlan(1, undefined, idx); }} style={{
-                  display:'flex', flexDirection:'column', alignItems:'center', gap:2,
-                  padding:'6px 2px', borderRadius:10, cursor:'pointer',
+                  display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+                  padding:'8px 4px', borderRadius:10, cursor:'pointer', minHeight: 44,
                   background: isSelected ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : isTrain ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.03)',
                   border: isSelected ? 'none' : isTrain ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.06)',
                   color: isSelected ? '#000' : isTrain ? '#22c55e' : 'rgba(255,255,255,0.7)',
                   fontWeight: isSelected ? 800 : isTrain ? 600 : 400,
-                  fontSize:9, transition:'all 0.15s',
+                  fontSize:10, transition:'all 0.15s',
                 }}>
-                  <span style={{ fontSize:7, opacity:0.6 }}>{label}</span>
-                  <span style={{ fontSize:10 }}>{isTrain ? '🏋️' : '🛌'}</span>
+                  <span style={{ fontSize:9, opacity:0.7 }}>{label}</span>
+                  <span style={{ fontSize:13 }}>{isTrain ? '🏋️' : '🛌'}</span>
                 </button>
               );
             })}
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:6 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:6 }}>
             <button onClick={() => { setPlanDays(1); generatePlan(1); }} style={{
-              padding:'10px', borderRadius:10, cursor:'pointer', textAlign:'center',
+              padding:'11px', borderRadius:10, cursor:'pointer', textAlign:'center', minHeight: 40,
               background: planDays === 1 ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
               border: planDays === 1 ? 'none' : '1px solid rgba(255,255,255,0.06)',
               color: planDays === 1 ? '#000' : 'rgba(255,255,255,0.85)',
-              fontWeight:700, fontSize:10,
+              fontWeight:700, fontSize:11,
             }}>📅 1 день</button>
             <button onClick={() => { setPlanDays(3); generatePlan(3); }} style={{
-              padding:'10px', borderRadius:10, cursor:'pointer', textAlign:'center',
+              padding:'11px', borderRadius:10, cursor:'pointer', textAlign:'center', minHeight: 40,
               background: planDays === 3 ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
               border: planDays === 3 ? 'none' : '1px solid rgba(255,255,255,0.06)',
               color: planDays === 3 ? '#000' : 'rgba(255,255,255,0.85)',
-              fontWeight:700, fontSize:10,
+              fontWeight:700, fontSize:11,
             }}>📅 3 дня</button>
             <button onClick={() => { setPlanDays(7); setPlanView('calendar'); generatePlan(7); }} style={{
-              padding:'10px', borderRadius:10, cursor:'pointer', textAlign:'center',
+              padding:'11px', borderRadius:10, cursor:'pointer', textAlign:'center', minHeight: 40,
               background: planDays === 7 && !monthPlanMode ? 'linear-gradient(135deg,#8b5cf6,#7c3aed)' : '#202023',
               border: planDays === 7 && !monthPlanMode ? 'none' : '1px solid rgba(255,255,255,0.06)',
               color: planDays === 7 && !monthPlanMode ? '#fff' : 'rgba(255,255,255,0.85)',
-              fontWeight:700, fontSize:10,
+              fontWeight:700, fontSize:11,
             }}>📆 Неделя</button>
           </div>
           {planDays === 1 && generated && (
-            <button onClick={() => generatePlan(1, undefined, selectedDayIndex)} style={{ width:'100%', padding:'10px', borderRadius:10, cursor:'pointer', fontSize:10, fontWeight:700, marginTop:4, marginBottom:4, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>
+            <button onClick={() => generatePlan(1, undefined, selectedDayIndex)} style={{ width:'100%', padding:'11px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, marginTop:4, marginBottom:6, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>
               🔄 Перегенерировать день
             </button>
           )}
           {/* --- Month block --- */}
           <div style={{ marginBottom:6 }}>
             <button onClick={runMonthPlan} style={{
-              padding:'10px', borderRadius:10, cursor:'pointer', textAlign:'center', width:'100%',
+              padding:'11px', borderRadius:10, cursor:'pointer', textAlign:'center', width:'100%', minHeight: 40,
               background: monthPlanMode ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : 'rgba(139,92,246,0.08)',
               border: monthPlanMode ? 'none' : '1px solid rgba(139,92,246,0.25)',
               color: monthPlanMode ? '#fff' : '#a78bfa',
-              fontWeight:700, fontSize:10,
+              fontWeight:700, fontSize:11,
             }}>
               📅 План на месяц (4 недели)
             </button>
@@ -389,7 +389,7 @@ export const IndividualPlanResults: React.FC = () => {
               if (monthPlanMode) { setMonthPlanMode(false); setPlanDays(7); }
               else { setMonthPlanMode(true); setPlanDays(7); setSelectedWeek(0); if (monthPlan[0]) setWeekPlan(monthPlan[0]); }
             }} style={{
-              marginBottom:6, padding:'8px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600, width:'100%',
+              marginBottom:6, padding:'10px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:600, width:'100%', minHeight: 36,
               background: monthPlanMode ? 'rgba(139,92,246,0.15)' : '#202023',
               border: monthPlanMode ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
               color: monthPlanMode ? '#a78bfa' : 'rgba(255,255,255,0.85)',

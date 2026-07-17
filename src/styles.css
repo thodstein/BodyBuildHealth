@@ -2336,3 +2336,44 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* === NUTRITION / DIARY: enforce readable text on phones ===
+   Ранее многие карточки дневника/IndividualPlan использовали fontSize:6-8px,
+   что делало их нечитаемыми. Поднимаем минимумы через селекторы по инлайн-стилям,
+   не ломая layout (применяется только к .nutrition-screen обёртке). */
+.nutrition-screen div[style*="fontSize: 6"],
+.nutrition-screen div[style*="fontSize:6"],
+.nutrition-screen span[style*="fontSize: 6"],
+.nutrition-screen span[style*="fontSize:6"],
+.nutrition-screen div[style*="fontSize: 7"],
+.nutrition-screen div[style*="fontSize:7"],
+.nutrition-screen span[style*="fontSize: 7"],
+.nutrition-screen span[style*="fontSize:7"] {
+  font-size: 10px !important;
+  line-height: 1.35 !important;
+}
+.nutrition-screen div[style*="fontSize: 8"],
+.nutrition-screen div[style*="fontSize:8"],
+.nutrition-screen span[style*="fontSize: 8"],
+.nutrition-screen span[style*="fontSize:8"] {
+  font-size: 11px !important;
+  line-height: 1.35 !important;
+}
+.nutrition-screen div[style*="fontSize: 9"],
+.nutrition-screen div[style*="fontSize:9"],
+.nutrition-screen span[style*="fontSize: 9"],
+.nutrition-screen span[style*="fontSize:9"] {
+  font-size: 11.5px !important;
+  line-height: 1.4 !important;
+}
+/* Кнопки в nutrition/individual-plan: видимый шрифт + tap-target */
+.nutrition-screen button[style*="fontSize: 7"],
+.nutrition-screen button[style*="fontSize:7"],
+.nutrition-screen button[style*="fontSize: 8"],
+.nutrition-screen button[style*="fontSize:8"],
+.nutrition-screen button[style*="fontSize: 9"],
+.nutrition-screen button[style*="fontSize:9"] {
+  font-size: 11px !important;
+  min-height: 36px !important;
+  padding: 8px 10px !important;
+}

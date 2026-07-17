@@ -1610,7 +1610,7 @@ export const NutritionScreen: React.FC = () => {
   }
 
   return (
-    <div className="screen nutrition" style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'auto', padding:0 }}>
+    <div className="screen nutrition nutrition-screen" style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'auto', padding:0 }}>
       <div style={{
         display:'flex', alignItems:'center', gap:8, padding:'8px 12px', flexShrink:0,
         background:'#18181b',
