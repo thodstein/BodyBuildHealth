@@ -6,6 +6,7 @@ import { getVolumeLandmarks, computeVolumeLandmarks, type VolumeLandmarkRow } fr
 import { labTrainingAdjust } from '../lab-training-adjust';
 import { tempoFor } from '../../../../engines/bb/bb-tempo-rest';
 import { PCT_FOR_RIR, GROUP_RU, ACCENT, DIM, SET_TEMPLATES, type ManualResult, type ManualWeek } from './types';
+import { H, SMALL, panelStyle, R, ACCENT_SOFT, BTN_GHOST } from '../training-ui';
 import { DayCard, type PhaseKey } from '../PlanOutput';
 import type { TrainingProfile } from '../training-profile';
 import { PHASE_LABELS, type BBPhase } from './phase-periodization';
@@ -364,18 +365,18 @@ export const PlanDisplay: React.FC<Props> = ({
   const currentWeekMeta = result.weeks?.find(w => w.weekNumber === currentWeekNum);
 
   return (
-    <div style={{ marginTop: 10, padding: 10, borderRadius: 12, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.05)' }}>
+    <div style={{ ...panelStyle('#00e68a', 0.05, 0.25) }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-        <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>📋 {result.splitName}</div>
-        <span style={{ fontSize: 10, fontWeight: 700, color: ACCENT, background: 'rgba(0,230,138,0.12)', padding: '3px 8px', borderRadius: 8 }}>
+        <div style={{ ...H, fontWeight: 800, marginBottom: 0 }}>📋 {result.splitName}</div>
+        <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, background: ACCENT_SOFT, padding: '3px 8px', borderRadius: R.chip }}>
           {result.days.length} дн/нед · {result.mesoLength || mesoLength} нед
         </span>
       </div>
 
       {/* ═══ ОБЪЁМ vs MRV (volume-landmarks, единый источник) ═══ */}
       {volumeRows.length > 0 && (
-        <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.18)' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>
+        <div style={{ ...panelStyle('#00e68a', 0.04, 0.18) }}>
+          <div style={{ ...SMALL, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>
             📊 Объём vs MRV {labMult !== 1 && <span style={{ opacity: 0.7, fontWeight: 600 }}>(MRV×{labMult.toFixed(2)})</span>}
           </div>
           {volumeRows.map(r => {
@@ -403,7 +404,7 @@ export const PlanDisplay: React.FC<Props> = ({
       {hasWeeks && (() => {
         const wks = result.weeks!;
         return (
-        <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.15)' }}>
+        <div style={{ ...panelStyle('#a855f7', 0.04, 0.15) }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
             <span>📅 Фазы мезоцикла</span>
             {currentWeekMeta && (
@@ -447,20 +448,20 @@ export const PlanDisplay: React.FC<Props> = ({
           <div style={{ display: 'flex', gap: 4, marginTop: 6, justifyContent: 'center' }}>
             <button onClick={() => { const p = wks.findIndex(w => w.weekNumber === currentWeekNum); if (p > 0) goToWeek(wks[p - 1].weekNumber); }}
               disabled={wks[0]?.weekNumber === currentWeekNum}
-              style={{ padding: '3px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: DIM, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>◀</button>
+              style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11 }}>◀</button>
             <span style={{ fontSize: 9, color: DIM, padding: '3px 8px', alignSelf: 'center' }}>
               Нед {currentWeekNum} / {result.mesoLength || mesoLength}
             </span>
             <button onClick={() => { const p = wks.findIndex(w => w.weekNumber === currentWeekNum); if (p < wks.length - 1) goToWeek(wks[p + 1].weekNumber); }}
               disabled={wks[wks.length - 1]?.weekNumber === currentWeekNum}
-              style={{ padding: '3px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: DIM, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>▶</button>
+              style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11 }}>▶</button>
           </div>
         </div>
         );
       })()}
 
       {result.corrections?.length > 0 && (
-        <div style={{ marginTop: 6, padding: 10, borderRadius: 10, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)' }}>
+        <div style={{ ...panelStyle('#3b82f6', 0.05, 0.15) }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>📝 Комментарии к плану</div>
           {result.corrections.map((c, i) => (
             <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 3, paddingLeft: 4, borderLeft: '2px solid rgba(59,130,246,0.4)' }}>{c}</div>
@@ -471,7 +472,7 @@ export const PlanDisplay: React.FC<Props> = ({
       {(() => {
         const fb = getPlanFeedback();
         return fb.avgRpe > 0 ? (
-          <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)' }}>
+          <div style={{ ...panelStyle('#8b5cf6', 0.06, 0.2) }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', marginBottom: 6 }}>📊 Фидбэк план→выполнение</div>
             {fb.deloadRecommended && <div style={{ padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontSize: 9, fontWeight: 700, marginBottom: 6 }}>⛔ РЕКОМЕНДОВАНА РАЗГРУЗКА</div>}
             {fb.reasons.map((r, i) => <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginBottom: 2, paddingLeft: 4 }}>{r}</div>)}
@@ -490,7 +491,7 @@ export const PlanDisplay: React.FC<Props> = ({
         const banners = validatePlan({ weeklySets: ws, level, goal, daysPerWeek, weakPoints: tprofile.weakPoints || [], readiness: readinessValue });
         if (banners.length === 0) return null;
         return (
-          <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(220,38,38,0.04)', border: '1px solid rgba(220,38,38,0.15)' }}>
+          <div style={{ ...panelStyle('#dc2626', 0.04, 0.15) }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#f87171', marginBottom: 6 }}>🛡 Валидация плана</div>
             {banners.map((b, i) => (
               <div key={i} style={{ fontSize: 9, color: b.level === 'error' ? '#f87171' : b.level === 'warning' ? '#fbbf24' : 'rgba(255,255,255,0.6)', marginBottom: 4, padding: '4px 6px', borderRadius: 4, background: b.level === 'error' ? 'rgba(248,113,113,0.08)' : b.level === 'warning' ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.03)', borderLeft: '2px solid ' + (b.level === 'error' ? '#f87171' : b.level === 'warning' ? '#fbbf24' : 'rgba(255,255,255,0.2)'), lineHeight: 1.4 }}>
@@ -975,7 +976,7 @@ const MacroPreview: React.FC<{ result: ManualResult; mesoLength: number; level: 
   for (let w = deloadFreq; w <= mesoLength; w += deloadFreq) deloadWeeks.add(w);
 
   return (
-    <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.15)' }}>
+    <div style={{ ...panelStyle('#a855f7', 0.04, 0.15) }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>
         📅 Макроцикл: {mesoLength} нед × {result.days.length} дн/нед
       </div>

@@ -124,12 +124,12 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
 
   return (
     <div>
-      <div style={{fontSize:14,fontWeight:700,color:'var(--accent)',marginBottom:4}}>⭐ Моя тренировка</div>
-      <div style={{fontSize:10,color:'var(--text-dim)',marginBottom:8}}>Пользовательские упражнения, планы и циклы</div>
+      <div style={{fontSize:14,fontWeight:700,color:'#00e68a',marginBottom:4}}>⭐ Моя тренировка</div>
+      <div style={{fontSize:11,color:'rgba(255,255,255,0.55)',marginBottom:8}}>Пользовательские упражнения, планы и циклы</div>
 
       <div style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
         {(['exercises','plans','cycles','progress'] as const).map(t => (
-          <button key={t} onClick={()=>setSubTab(t)} style={{padding:'6px 12px',borderRadius:8,fontSize:10,fontWeight:600,cursor:'pointer',background:subTab===t?'var(--accent)':'var(--bg-secondary)',color:subTab===t?'#000':'var(--text-dim)',border:subTab===t?'1px solid var(--accent)':'1px solid var(--border)'}}>
+          <button key={t} onClick={()=>setSubTab(t)} style={{padding:'6px 12px',borderRadius:8,fontSize:11,fontWeight:600,cursor:'pointer',background:subTab===t?'#00e68a':'rgba(24,24,27,0.55)',color:subTab===t?'#000':'rgba(255,255,255,0.55)',border:subTab===t?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)'}}>
             {t==='exercises'?'🏋️ Упражнения':t==='plans'?'📋 Планы':t==='cycles'?'🔄 Циклы':'📊 Прогресс'}
           </button>
         ))}
@@ -140,22 +140,22 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
           <div className="card" style={{padding:10,marginBottom:8}}>
             <h4 style={{margin:'0 0 6px',fontSize:12}}>➕ Добавить упражнение</h4>
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:4,marginBottom:4}}>
-              <div style={{fontSize:10,color:'var(--text-dim)',paddingLeft:2}}>Упражнение</div>
-              <div style={{fontSize:10,color:'var(--text-dim)',paddingLeft:2}}>Сеты</div>
-              <div style={{fontSize:10,color:'var(--text-dim)',paddingLeft:2}}>Повторы</div>
-              <div style={{fontSize:10,color:'var(--text-dim)',paddingLeft:2}}>RIR</div>
+              <div style={{fontSize:11,color:'rgba(255,255,255,0.55)',paddingLeft:2}}>Упражнение</div>
+              <div style={{fontSize:11,color:'rgba(255,255,255,0.55)',paddingLeft:2}}>Сеты</div>
+              <div style={{fontSize:11,color:'rgba(255,255,255,0.55)',paddingLeft:2}}>Повторы</div>
+              <div style={{fontSize:11,color:'rgba(255,255,255,0.55)',paddingLeft:2}}>RIR</div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:4,marginBottom:6}}>
-              <input value={newExName} onChange={e=>setNewExName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addExercise()} placeholder="Название упражнения" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
-              <input type="number" min="1" max="10" value={newExSets} onChange={e=>setNewExSets(parseFloat(e.target.value) || 0)} placeholder="Напр. 3" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box',textAlign:'center'}} />
-              <input type="number" min="1" max="30" value={newExReps} onChange={e=>setNewExReps(parseFloat(e.target.value) || 0)} placeholder="Напр. 10" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box',textAlign:'center'}} />
-              <input type="number" min="0" max="4" value={newExRir} onChange={e=>setNewExRir(parseFloat(e.target.value) || 0)} placeholder="0-4" style={{padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box',textAlign:'center'}} />
+              <input value={newExName} onChange={e=>setNewExName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addExercise()} placeholder="Название упражнения" style={{padding:'6px 8px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(24,24,27,0.55)',color:'#fff',fontSize:11,boxSizing:'border-box'}} />
+              <input type="number" min="1" max="10" value={newExSets} onChange={e=>setNewExSets(parseFloat(e.target.value) || 0)} placeholder="Напр. 3" style={{padding:'6px 8px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(24,24,27,0.55)',color:'#fff',fontSize:11,boxSizing:'border-box',textAlign:'center'}} />
+              <input type="number" min="1" max="30" value={newExReps} onChange={e=>setNewExReps(parseFloat(e.target.value) || 0)} placeholder="Напр. 10" style={{padding:'6px 8px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(24,24,27,0.55)',color:'#fff',fontSize:11,boxSizing:'border-box',textAlign:'center'}} />
+              <input type="number" min="0" max="4" value={newExRir} onChange={e=>setNewExRir(parseFloat(e.target.value) || 0)} placeholder="0-4" style={{padding:'6px 8px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(24,24,27,0.55)',color:'#fff',fontSize:11,boxSizing:'border-box',textAlign:'center'}} />
             </div>
             <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:6}}>
-              <span style={{fontSize:10,color:'var(--text-dim)',padding:'2px 4px',alignSelf:'center'}}>Категория:</span>
-              {groupOptions.slice(0,12).map(g=><button key={g} onClick={()=>setNewExName(g+' → ')} style={{padding:'2px 6px',borderRadius:4,fontSize:10,cursor:'pointer',background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text-dim)'}}>{GROUP_LABELS[g] || g}</button>)}
+              <span style={{fontSize:11,color:'rgba(255,255,255,0.55)',padding:'2px 4px',alignSelf:'center'}}>Категория:</span>
+              {groupOptions.slice(0,12).map(g=><button key={g} onClick={()=>setNewExName(g+' → ')} style={{padding:'2px 6px',borderRadius:8,fontSize:11,cursor:'pointer',background:'rgba(24,24,27,0.55)',border:'1px solid rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.55)'}}>{GROUP_LABELS[g] || g}</button>)}
             </div>
-            <button onClick={addExercise} style={{width:'100%',padding:6,borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:11}}>Добавить</button>
+            <button onClick={addExercise} style={{width:'100%',padding:6,borderRadius:8,border:'none',cursor:'pointer',background:'#00e68a',color:'#000',fontWeight:600,fontSize:11}}>Добавить</button>
           </div>
 
           {customExercises.length > 0 ? (
@@ -163,48 +163,48 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
               <h4 style={{margin:'0 0 6px',fontSize:12}}>📝 Мои упражнения ({customExercises.length})</h4>
               <div style={{display:'flex',flexDirection:'column',gap:4}}>
                 {customExercises.map((ex,i) => (
-                  <div key={i} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 8px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 8px',borderRadius:8,background:'rgba(24,24,27,0.55)',border:'1px solid rgba(255,255,255,0.06)'}}>
                     <div style={{flex:1}}>
-                      <div style={{fontSize:10,fontWeight:600,color:'var(--text-light)'}}>{ex.name}</div>
-                      <div style={{fontSize:10,color:'var(--text-dim)'}}>{ex.sets}×{ex.reps} @ RIR {ex.rir}</div>
+                      <div style={{fontSize:11,fontWeight:600,color:'#fff'}}>{ex.name}</div>
+                      <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>{ex.sets}×{ex.reps} @ RIR {ex.rir}</div>
                     </div>
-                    <button onClick={()=>setCustomExercises(prev=>prev.filter((_,j)=>j!==i))} style={{padding:'2px 6px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:10,cursor:'pointer'}}>✕</button>
+                    <button onClick={()=>setCustomExercises(prev=>prev.filter((_,j)=>j!==i))} style={{padding:'2px 6px',borderRadius:8,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:11,cursor:'pointer'}}>✕</button>
                   </div>
                 ))}
               </div>
               <div style={{display:'flex',gap:4,marginTop:6}}>
-                <input value={planName} onChange={e=>setPlanName(e.target.value)} placeholder="Название плана..." style={{flex:1,padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:10,boxSizing:'border-box'}} />
-                <button onClick={savePlan} style={{padding:'6px 12px',borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:10}}>💾 Сохранить план</button>
-                <button onClick={()=>setCustomExercises([])} style={{padding:'6px 12px',borderRadius:6,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:10,cursor:'pointer'}}>Очистить</button>
+                <input value={planName} onChange={e=>setPlanName(e.target.value)} placeholder="Название плана..." style={{flex:1,padding:'6px 8px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(24,24,27,0.55)',color:'#fff',fontSize:11,boxSizing:'border-box'}} />
+                <button onClick={savePlan} style={{padding:'6px 12px',borderRadius:8,border:'none',cursor:'pointer',background:'#00e68a',color:'#000',fontWeight:600,fontSize:11}}>💾 Сохранить план</button>
+                <button onClick={()=>setCustomExercises([])} style={{padding:'6px 12px',borderRadius:8,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:11,cursor:'pointer'}}>Очистить</button>
               </div>
             </div>
           ) : null}
         </div>
       ) : subTab === 'plans' ? (
         <div>
-          {savedPlans.length === 0 && <div className="card" style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Нет сохранённых планов</div>}
+          {savedPlans.length === 0 && <div className="card" style={{padding:20,textAlign:'center',color:'rgba(255,255,255,0.55)',fontSize:11}}>Нет сохранённых планов</div>}
           {savedPlans.map(plan => (
             <div key={plan.id} className="card" style={{padding:10,marginBottom:6}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
                 <div>
-                  <div style={{fontSize:11,fontWeight:700,color:'var(--text-light)'}}>{plan.name}</div>
-                  <div style={{fontSize:10,color:'var(--text-dim)'}}>{new Date(plan.date).toLocaleDateString('ru')} · {plan.exercises.length} упр.</div>
+                  <div style={{fontSize:11,fontWeight:700,color:'#fff'}}>{plan.name}</div>
+                  <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>{new Date(plan.date).toLocaleDateString('ru')} · {plan.exercises.length} упр.</div>
                 </div>
                 <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                  <button onClick={()=>loadPlan(plan)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(0,230,138,0.2)',background:'rgba(0,230,138,0.08)',color:'var(--accent)',fontSize:10,cursor:'pointer'}}>Загрузить</button>
-                  <button onClick={()=>setCustomExercises(prev=>[...prev, ...plan.exercises])} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(139,92,246,0.2)',background:'rgba(139,92,246,0.08)',color:'#8b5cf6',fontSize:10,cursor:'pointer'}}>➕ В мою</button>
+                  <button onClick={()=>loadPlan(plan)} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(0,230,138,0.2)',background:'rgba(0,230,138,0.08)',color:'#00e68a',fontSize:11,cursor:'pointer'}}>Загрузить</button>
+                  <button onClick={()=>setCustomExercises(prev=>[...prev, ...plan.exercises])} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(139,92,246,0.2)',background:'rgba(139,92,246,0.08)',color:'#8b5cf6',fontSize:11,cursor:'pointer'}}>➕ В мою</button>
                   <button onClick={() => {
                     const exs = Array.isArray((plan as any).exercises) ? (plan as any).exercises : (Array.isArray((plan as any).days) ? (plan as any).days.flatMap((d:any)=>d.exercises||[]) : []);
                     const data = exs.map((e:any) => ({ name: e.name, sets: e.sets || e.sets || 3, reps: e.reps || 10, rir: e.rir ?? 2 }));
                     applyToPlanner({ kind: 'split', label: plan.name, data });
                     if (onLoadToConstructor) onLoadToConstructor({ name: plan.name, exercises: exs });
-                  }} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(168,85,247,0.2)',background:'rgba(168,85,247,0.08)',color:'#a855f7',fontSize:10,cursor:'pointer',fontWeight:700}}>📥 В конструктор</button>
-                  <button onClick={()=>deletePlan(plan.id)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:10,cursor:'pointer'}}>Удалить</button>
+                  }} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(168,85,247,0.2)',background:'rgba(168,85,247,0.08)',color:'#a855f7',fontSize:11,cursor:'pointer',fontWeight:700}}>📥 В конструктор</button>
+                  <button onClick={()=>deletePlan(plan.id)} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:11,cursor:'pointer'}}>Удалить</button>
                 </div>
               </div>
               <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
                 {plan.exercises.map((ex,i) => (
-                  <span key={i} style={{fontSize:10,padding:'2px 6px',borderRadius:4,background:'rgba(0,230,138,0.06)',border:'1px solid rgba(0,230,138,0.12)',color:'var(--text-light)'}}>{ex.name} {ex.sets}×{ex.reps}</span>
+                  <span key={i} style={{fontSize:11,padding:'2px 6px',borderRadius:8,background:'rgba(0,230,138,0.06)',border:'1px solid rgba(0,230,138,0.12)',color:'#fff'}}>{ex.name} {ex.sets}×{ex.reps}</span>
                 ))}
               </div>
             </div>
@@ -215,20 +215,20 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
           <div className="card" style={{padding:10,marginBottom:8}}>
             <h4 style={{margin:'0 0 6px',fontSize:12}}>🔄 Новый цикл</h4>
             <div style={{display:'flex',gap:4,marginBottom:6}}>
-              <input value={cycleName} onChange={e=>setCycleName(e.target.value)} placeholder="Название цикла..." style={{flex:1,padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:11,boxSizing:'border-box'}} />
-              <button onClick={saveCycle} style={{padding:'6px 12px',borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:10}}>💾 Сохранить</button>
+              <input value={cycleName} onChange={e=>setCycleName(e.target.value)} placeholder="Название цикла..." style={{flex:1,padding:'6px 8px',borderRadius:8,border:'1px solid rgba(255,255,255,0.06)',background:'rgba(24,24,27,0.55)',color:'#fff',fontSize:11,boxSizing:'border-box'}} />
+              <button onClick={saveCycle} style={{padding:'6px 12px',borderRadius:8,border:'none',cursor:'pointer',background:'#00e68a',color:'#000',fontWeight:600,fontSize:11}}>💾 Сохранить</button>
             </div>
-            <div style={{fontSize:10,color:'var(--text-dim)'}}>Цикл создаётся на основе текущих настроек плана</div>
+            <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>Цикл создаётся на основе текущих настроек плана</div>
           </div>
-          {savedCycles.length === 0 && <div className="card" style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Нет сохранённых циклов</div>}
+          {savedCycles.length === 0 && <div className="card" style={{padding:20,textAlign:'center',color:'rgba(255,255,255,0.55)',fontSize:11}}>Нет сохранённых циклов</div>}
           {savedCycles.map(cycle => (
             <div key={cycle.id} className="card" style={{padding:10,marginBottom:6}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <div>
-                  <div style={{fontSize:11,fontWeight:700,color:'var(--text-light)'}}>{cycle.name}</div>
-                  <div style={{fontSize:10,color:'var(--text-dim)'}}>{new Date(cycle.date).toLocaleDateString('ru')} · {cycle.weeks} нед · {cycle.days} д/н</div>
+                  <div style={{fontSize:11,fontWeight:700,color:'#fff'}}>{cycle.name}</div>
+                  <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>{new Date(cycle.date).toLocaleDateString('ru')} · {cycle.weeks} нед · {cycle.days} д/н</div>
                 </div>
-                <button onClick={()=>deleteCycle(cycle.id)} style={{padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:10,cursor:'pointer'}}>Удалить</button>
+                <button onClick={()=>deleteCycle(cycle.id)} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:11,cursor:'pointer'}}>Удалить</button>
               </div>
             </div>
           ))}
@@ -237,29 +237,29 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
         <div>
           <div style={{fontSize:12,fontWeight:700,color:'rgba(96,165,250,0.9)',marginBottom:6}}>📊 Прогресс из дневника</div>
           {!progressData || progressData.noData ? (
-            <div className="card" style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>
+            <div className="card" style={{padding:20,textAlign:'center',color:'rgba(255,255,255,0.55)',fontSize:11}}>
               Нет данных. Запишите тренировку во вкладке «Тренировка → Дневник», чтобы увидеть прогресс.
             </div>
           ) : (
             <>
               <div className="card" style={{padding:10,marginBottom:6}}>
-                <div style={{fontSize:10,fontWeight:700,color:'var(--text-dim)',marginBottom:4,textTransform:'uppercase'}}>Сводка</div>
+                <div style={{fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.55)',marginBottom:4,textTransform:'uppercase'}}>Сводка</div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                  <div style={{padding:6,borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
-                    <div style={{fontSize:10,color:'var(--text-dim)'}}>Тренировок</div>
+                  <div style={{padding:6,borderRadius:8,background:'rgba(24,24,27,0.55)',border:'1px solid rgba(255,255,255,0.06)'}}>
+                    <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>Тренировок</div>
                     <div style={{fontSize:14,fontWeight:700,color:'rgba(96,165,250,0.9)'}}>{progressData.total}</div>
                   </div>
-                  <div style={{padding:6,borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)'}}>
-                    <div style={{fontSize:10,color:'var(--text-dim)'}}>Тоннаж</div>
+                  <div style={{padding:6,borderRadius:8,background:'rgba(24,24,27,0.55)',border:'1px solid rgba(255,255,255,0.06)'}}>
+                    <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>Тоннаж</div>
                     <div style={{fontSize:14,fontWeight:700,color:'rgba(96,165,250,0.9)'}}>{Math.round(progressData.totalTonnageAll / 1000).toFixed(1)}k кг</div>
                   </div>
                 </div>
               </div>
 
               <div className="card" style={{padding:10,marginBottom:6}}>
-                <div style={{fontSize:10,fontWeight:700,color:'var(--text-dim)',marginBottom:6,textTransform:'uppercase'}}>Топ-3 упражнения: расчётный 1ПМ</div>
+                <div style={{fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.55)',marginBottom:6,textTransform:'uppercase'}}>Топ-3 упражнения: расчётный 1ПМ</div>
                 {progressData.topExercises.length === 0 ? (
-                  <div style={{fontSize:10,color:'var(--text-dim)'}}>Недостаточно данных</div>
+                  <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>Недостаточно данных</div>
                 ) : (
                   progressData.topExercises.map((ex: any, i: number) => {
                     const max = Math.max(...ex.history.map((d: any) => d.e1rm));
@@ -267,14 +267,14 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
                     const spread = max - low;
                     const SHOWchied = ex.history.length > 1 ? Math.round(((max - ex.history[0].e1rm) / Math.max(1, ex.history[0].e1rm)) * 100) : 0;
                     return (
-                      <div key={i} style={{marginBottom:6,padding:8,borderRadius:6,background:'var(--bg-secondary)',border:'1px solid rgba(255,255,255,0.04)'}}>
+                      <div key={i} style={{marginBottom:6,padding:8,borderRadius:8,background:'rgba(24,24,27,0.55)',border:'1px solid rgba(255,255,255,0.04)'}}>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
-                          <div style={{fontSize:10,fontWeight:600,color:'var(--text-light)'}}>{i+1}. {ex.exercise}</div>
-                          <div style={{fontSize:10,fontWeight:700,color:SHOWchied>0?'var(--accent)':'var(--text-dim)'}}>
+                          <div style={{fontSize:11,fontWeight:600,color:'#fff'}}>{i+1}. {ex.exercise}</div>
+                          <div style={{fontSize:11,fontWeight:700,color:SHOWchied>0?'#00e68a':'rgba(255,255,255,0.55)'}}>
                             {SHOWchied > 0 ? '+':''}{SHOWchied}% · лучший {ex.best}кг ({ex.count} тренировок)
                           </div>
                         </div>
-                        <div style={{height:24,position:'relative',background:'rgba(255,255,255,0.03)',borderRadius:4,overflow:'hidden'}}>
+                        <div style={{height:24,position:'relative',background:'rgba(255,255,255,0.03)',borderRadius:8,overflow:'hidden'}}>
                           <svg viewBox={`0 0 ${ex.history.length * 20} 24`} preserveAspectRatio="none" style={{width:'100%',height:'100%'}}>
                             {(() => {
                               if (ex.history.length < 2) return null;
@@ -292,7 +292,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
                           </svg>
                         </div>
                         {ex.history.length > 1 ? (
-                          <div style={{fontSize:10,color:'var(--text-dim)',marginTop:2,display:'flex',justifyContent:'space-between'}}>
+                          <div style={{fontSize:11,color:'rgba(255,255,255,0.55)',marginTop:2,display:'flex',justifyContent:'space-between'}}>
                             <span>{ex.history[0].date.slice(5)}</span>
                             <span>Спред: {spread}кг</span>
                             <span>{ex.history[ex.history.length-1].date.slice(5)}</span>
@@ -305,16 +305,16 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
               </div>
 
               <div className="card" style={{padding:10,marginBottom:6}}>
-                <div style={{fontSize:10,fontWeight:700,color:'var(--text-dim)',marginBottom:6,textTransform:'uppercase'}}>Тоннаж по неделям (8 нед)</div>
+                <div style={{fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.55)',marginBottom:6,textTransform:'uppercase'}}>Тоннаж по неделям (8 нед)</div>
                 {progressData.weeks.length === 0 ? (
-                  <div style={{fontSize:10,color:'var(--text-dim)'}}>Нет данных</div>
+                  <div style={{fontSize:11,color:'rgba(255,255,255,0.55)'}}>Нет данных</div>
                 ) : (
                   (() => {
                     const maxT = Math.max(...progressData.weeks.map((w: any) => w[1]), 1);
                     return (
                       <div style={{display:'flex',flexDirection:'column',gap:3}}>
                         {progressData.weeks.map((w: any, i: number) => (
-                          <div key={i} style={{display:'flex',alignItems:'center',gap:4,fontSize:10,color:'var(--text-dim)'}}>
+                          <div key={i} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'rgba(255,255,255,0.55)'}}>
                             <span style={{minWidth:72}}>{w[0]}</span>
                             <div style={{height:8,background:'rgba(96,165,250,0.3)',borderRadius:2,width:Math.round((w[1] / maxT) * 150)+'px',minWidth:4}}></div>
                             <span style={{minWidth:50}}>{Math.round(w[1]).toLocaleString()} кг</span>

@@ -28,6 +28,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-l
 import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
 import { applyToPlanner } from './planner-bridge';
+import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN, Chip, panelStyle } from './training-ui';
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
 import { InjurySelectCard } from './InjurySelectCard';
@@ -52,7 +53,6 @@ type PlanMode = 'generic_split' | 'bb_cycle';
 const WEAK_GROUPS = [['chest','Грудь'],['back','Спина'],['legs','Ноги'],['shoulders','Плечи'],['arms','Руки'],['core','Кор']] as const;
 const BB_WM_KEYS = ['chest','back','quads','hamstrings','shoulders','biceps','triceps','glutes','calves','abs'] as const;
 const BB_WM_RU: Record<string,string> = { chest:'Грудь', back:'Спина', quads:'Квадрицепсы', hamstrings:'Бицепс бедра', shoulders:'Плечи', biceps:'Бицепс', triceps:'Трицепс', glutes:'Ягодичные', calves:'Икры', abs:'Пресс' };
-const ACCENT = '#00e68a';
 const TAG_LABELS_RU: Record<string, string> = {
   Push: 'Толкающие', Pull: 'Тянущие', Legs: 'Ноги', Upper: 'Верх', Lower: 'Низ',
   FullBody: 'Всё тело', Chest: 'Грудь', Back: 'Спина', Shoulders: 'Плечи', Arms: 'Руки',
@@ -65,14 +65,6 @@ const PHASE_TECHNIQUES: Record<BBPhase, string[]> = {
   deload: ['Медленные негативы', 'Стрейч-пауза'],
   peaking: ['Околопредельные веса (RIR 0)', 'Кластеры 5×2'],
 };
-
-const CARD: React.CSSProperties = { background:'rgba(24,24,27,0.6)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'12px', margin:'6px 0' };
-const SMALL: React.CSSProperties = { color:'rgba(255,255,255,0.55)', fontSize:10, lineHeight:1.4 };
-const BTN: React.CSSProperties = { background:ACCENT, color:'#0a0a0a', border:'none', borderRadius:8, padding:'10px 14px', fontWeight:600, fontSize:12, minHeight:40, cursor:'pointer' };
-const BTN_GHOST: React.CSSProperties = { ...BTN, background:'transparent', color:ACCENT, border:`1px solid ${ACCENT}20` };
-const H: React.CSSProperties = { fontSize:13, fontWeight:700, color:ACCENT, marginBottom:8 };
-const STEP_PILL = (active:boolean) => ({ padding:'5px 12px', borderRadius:16, fontSize:10, fontWeight:active?700:500, cursor:'pointer', border:active?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background:active?'linear-gradient(135deg,#00e68a,#00c8a0)':'#18181b', color:active?'#000':'#fff', flexShrink:0 } as React.CSSProperties);
-const IN: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.08)', borderRadius:6, padding:'4px 8px', fontSize:11, outline:'none', boxSizing:'border-box', minHeight:30 };
 
 const _phaseMapCache = new Map<string, Map<number, BBPhase>>();
 function getPhaseMap(totalWeeks: number): Map<number, BBPhase> {
@@ -106,19 +98,7 @@ function isWeakMuscle(muscle: string, weakPoints: string[]): boolean {
   return weakPoints.includes(PARENT[muscle] ?? '');
 }
 
-/** Мини-чип для параметров упражнения. */
-const Chip: React.FC<{ label: string; value: string; color: string }> = ({ label, value, color }) => (
-  <div style={{
-    padding: '5px 8px', borderRadius: 7,
-    background: color.replace(')', ',0.08)').replace('rgb', 'rgba').replace(/rgba\([\d,.\s]+\)/, color + '15'),
-    border: '0.5px solid ' + color + '30',
-    display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center',
-    minWidth: 50,
-  }}>
-    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', fontWeight: 700 }}>{label}</span>
-    <span style={{ fontSize: 13, fontWeight: 800, color, lineHeight: 1.1 }}>{value}</span>
-  </div>
-);
+/** Мини-чип для параметров упражнения (общий из training-ui). */
 
 function computePhases(totalWeeks: number): { week: number; phase: BBPhase }[] {
   const phases: { week: number; phase: BBPhase }[] = [];
