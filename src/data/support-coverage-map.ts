@@ -98,13 +98,6 @@ export const SUPPORT_COVERAGE_MAP: Record<string, Record<string, Record<number, 
     cardio: { 1: 0.11, 2: 0.14, 3: 0.13, 4: 0.11, 5: 0.14, 6: 0.08, 7: 0.11 },
     vessels: { 1: 0.06, 2: 0.08, 3: 0.08, 4: 0.06, 5: 0.08, 6: 0.05, 7: 0.06 }
   },
-  adrenaline: {
-    endocrine: { 1: 0.11, 2: 0.14, 3: 0.08, 4: 0.07, 6: 0.07 },
-    ghigf: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    ins_axis: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    metabolic: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    reproductive: { 1: 0.07, 2: 0.07, 5: 0.06 }
-  },
   agmatine: {
     musculoskeletal: { 1: 0.11, 6: 0.07 },
     neuro: { 1: 0.11, 2: 0.08, 3: 0.11, 4: 0.11, 5: 0.13, 6: 0.07, 7: 0.08 },
@@ -510,13 +503,6 @@ export const SUPPORT_COVERAGE_MAP: Record<string, Record<string, Record<number, 
     neuro: { 1: 0.11, 2: 0.07, 3: 0.07, 4: 0.07, 5: 0.11, 6: 0.06, 7: 0.07 },
     neuro_toxicity: { 1: 0.06, 2: 0.04, 3: 0.04, 4: 0.04, 5: 0.06, 6: 0.03, 7: 0.04 }
   },
-  cortisol: {
-    endocrine: { 1: 0.11, 2: 0.14, 3: 0.08, 4: 0.07, 6: 0.07 },
-    ghigf: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    ins_axis: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    metabolic: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    reproductive: { 1: 0.07, 2: 0.07, 5: 0.06 }
-  },
   cranberry: {
     cardio: { 5: 0.11 },
     hepatic: { 3: 0.13, 7: 0.08 },
@@ -616,20 +602,6 @@ export const SUPPORT_COVERAGE_MAP: Record<string, Record<string, Record<number, 
     neuro_toxicity: { 5: 0.08 },
     renal: { 5: 0.07 },
     vessels: { 5: 0.06 }
-  },
-  endocrine_marker: {
-    endocrine: { 1: 0.11, 2: 0.14, 3: 0.08, 4: 0.07, 6: 0.07 },
-    ghigf: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    ins_axis: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    metabolic: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    reproductive: { 1: 0.07, 2: 0.07, 5: 0.06 }
-  },
-  estradiol: {
-    endocrine: { 1: 0.11, 2: 0.14, 3: 0.08, 4: 0.07, 6: 0.07 },
-    ghigf: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    ins_axis: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    metabolic: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    reproductive: { 1: 0.07, 2: 0.07, 5: 0.06 }
   },
   fadogia: {
     endocrine: { 1: 0.11, 2: 0.14, 3: 0.08, 4: 0.07, 6: 0.11 },
@@ -736,13 +708,6 @@ export const SUPPORT_COVERAGE_MAP: Record<string, Record<string, Record<number, 
     metabolic: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.06 },
     neuro: { 1: 0.07, 3: 0.11, 7: 0.07 },
     neuro_toxicity: { 1: 0.04, 3: 0.06, 7: 0.04 },
-    reproductive: { 1: 0.07, 2: 0.07, 5: 0.06 }
-  },
-  glucagon: {
-    endocrine: { 1: 0.11, 2: 0.14, 3: 0.08, 4: 0.07, 6: 0.07 },
-    ghigf: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    ins_axis: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    metabolic: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
     reproductive: { 1: 0.07, 2: 0.07, 5: 0.06 }
   },
   glucosamine: {
@@ -1102,15 +1067,6 @@ export const SUPPORT_COVERAGE_MAP: Record<string, Record<string, Record<number, 
     cardio: { 1: 0.11, 2: 0.14, 3: 0.13, 4: 0.11, 5: 0.14, 6: 0.08, 7: 0.11 },
     vessels: { 1: 0.06, 2: 0.08, 3: 0.08, 4: 0.06, 5: 0.08, 6: 0.05, 7: 0.06 }
   },
-  neurosteroid: {
-    endocrine: { 1: 0.11, 2: 0.14, 3: 0.08, 4: 0.07, 6: 0.07 },
-    ghigf: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    ins_axis: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    metabolic: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    neuro: { 1: 0.11, 2: 0.08, 3: 0.11, 4: 0.11, 5: 0.13, 6: 0.07, 7: 0.08 },
-    neuro_toxicity: { 1: 0.06, 2: 0.05, 3: 0.06, 4: 0.06, 5: 0.08, 6: 0.04, 7: 0.05 },
-    reproductive: { 1: 0.07, 2: 0.07, 5: 0.06 }
-  },
   nicotinamide_riboside: {
     blood: { 5: 0.02 },
     endocrine: { 1: 0.03, 5: 0.06 },
@@ -1273,13 +1229,6 @@ export const SUPPORT_COVERAGE_MAP: Record<string, Record<string, Record<number, 
     immunity: { 1: 0.11, 2: 0.07 },
     neuro: { 4: 0.07 },
     neuro_toxicity: { 4: 0.04 }
-  },
-  progesterone: {
-    endocrine: { 1: 0.11, 2: 0.14, 3: 0.08, 4: 0.07, 6: 0.07 },
-    ghigf: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    ins_axis: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    metabolic: { 1: 0.06, 2: 0.08, 3: 0.05, 4: 0.04, 6: 0.04 },
-    reproductive: { 1: 0.07, 2: 0.07, 5: 0.06 }
   },
   proline: {
     musculoskeletal: { 1: 0.11, 2: 0.11, 3: 0.14, 4: 0.11, 5: 0.08, 6: 0.07, 7: 0.07 },

@@ -2975,8 +2975,9 @@ export const SUBSTANCE_ANALOGS: Record<string, { id: string; name: string; reaso
   probiotics: [{ id: 'probiotics', name: 'Пробиотики', reason: 'Оригинал', form: 'капсулы', mg: 20, timing: 'натощак (млрд КОЕ)' }],
   vitamin_b12: [{ id: 'vitamin_b12', name: 'B12 метилкобаламин', reason: 'Оригинал', form: 'метилкобаламин', mg: 1000, timing: 'утро (мкг)' }],
   folate: [{ id: 'folate', name: 'Фолат 5-MTHF', reason: 'Оригинал', form: '5-MTHF', mg: 800, timing: 'с едой (мкг)' }],
-  telmisartan: [{ id: 'telmisartan', name: 'Тельмисартан', reason: 'Оригинал', form: 'таблетки', mg: 40, timing: 'утро' }],
-  nebivolol: [{ id: 'nebivolol', name: 'Небиволол', reason: 'Оригинал', form: 'таблетки', mg: 5, timing: 'утро' }],
+  telmisartan: [{ id: 'telmisartan', name: 'Телмисартан', reason: 'Оригинал', form: 'таблетки', mg: 40, timing: 'утро' }, { id: 'nebivolol', name: 'Небиволол', reason: 'Альтернатива по АД (β1+NO)', form: 'таблетки', mg: 5, timing: 'утро' }, { id: 'carvedilol', name: 'Карведилол', reason: 'Альтернатива по АД (α+β)', form: 'таблетки', mg: 12.5, timing: 'утро' }],
+  nebivolol: [{ id: 'nebivolol', name: 'Небиволол', reason: 'Оригинал', form: 'таблетки', mg: 5, timing: 'утро' }, { id: 'telmisartan', name: 'Телмисартан', reason: 'Альтернатива по АД (АРБ)', form: 'таблетки', mg: 40, timing: 'утро' }, { id: 'carvedilol', name: 'Карведилол', reason: 'Альтернатива по АД (α+β)', form: 'таблетки', mg: 12.5, timing: 'утро' }],
+  carvedilol: [{ id: 'carvedilol', name: 'Карведилол', reason: 'Оригинал', form: 'таблетки', mg: 12.5, timing: 'утро' }, { id: 'nebivolol', name: 'Небиволол', reason: 'Альтернатива по АД (β1+NO)', form: 'таблетки', mg: 5, timing: 'утро' }, { id: 'telmisartan', name: 'Телмисартан', reason: 'Альтернатива по АД (АРБ)', form: 'таблетки', mg: 40, timing: 'утро' }],
   saw_palmetto: [{ id: 'saw_palmetto', name: 'Сабаль пальметто', reason: 'Оригинал', form: 'капсулы', mg: 640, timing: 'с едой, 2x/д' }],
   hcg: [{ id: 'hcg', name: 'ХГЧ', reason: '500 МЕ 2р/нед, схема 3/1 (3 нед приема, 1 нед отдых)', form: 'инъекции', mg: 500, timing: '2x/нед (МЕ)' }],
 };
