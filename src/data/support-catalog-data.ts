@@ -642,7 +642,7 @@ probiotics: {
     ],
     organs: ['INTESTINES', 'LIVER', 'IMMUNE_SYSTEM', 'SMALL_INTESTINE'],
     systems: ['hepatic', 'immune', 'hematologic'],
-    mechanisms: ['GUT_MICROBIOME_MODULATION', 'GUT_BARRIER_INTEGRITY', 'SHORT_CHAIN_FATTY_ACID_PRODUCTION', 'PATHOGEN_EXCLUSION', 'MICROBIOME_RESTORATION', 'GUT_BARRIER_PROTECTION', 'IGA_PRODUCTION', 'TREG_EXPANSION'],
+    mechanisms: ['MICROBIOME_RESTORATION', 'GUT_BARRIER_PROTECTION', 'IGA_PRODUCTION', 'TREG_EXPANSION'],
     description: 'Пробиотики — живые микроорганизмы, улучшающие микробиом кишечника. Укрепляют кишечный барьер, модулируют иммунитет, подавляют патогенную флору. Обязательны на курсе ААС.',
     synergies: [
       { with: 'prebiotics', effect: 'Синергия пребиотик + пробиотик', mechanism: 'Пребиотики обеспечивают питание для пробиотиков', severity: 'HIGH' },
@@ -763,7 +763,7 @@ telmisartan: {
     ],
     organs: ['HEART', 'VESSELS', 'KIDNEYS'],
     systems: ['cardio', 'renal', 'endocrine'],
-    mechanisms: ['ANGIOTENSIN_RECEPTOR_BLOCKADE', 'PPAR_GAMMA_ACTIVATION', 'BP_REDUCTION', 'ARB_AGONISM', 'VASODILATION', 'ALDOSTERONE_BLOCKADE', 'NO_PRODUCTION', 'ANTIFIBROTIC'],
+    mechanisms: ['ANGIOTENSIN_RECEPTOR_BLOCKADE', 'BP_REDUCTION', 'ARB_AGONISM', 'VASODILATION', 'NO_PRODUCTION', 'ANTIFIBROTIC'],
     description: 'Тельмисартан — сартан с уникальным PPAR-γ эффектом. Снижает давление, защищает почки, улучшает инсулиновую чувствительность. Препарат выбора на курсе ААС для контроля давления.',
     synergies: [
       { with: 'omega3', effect: 'Кардиопротекция', mechanism: 'Разные механизмы снижения давления и воспаления', severity: 'MEDIUM' },
@@ -803,7 +803,7 @@ nebivolol: {
     ],
     organs: ['HEART', 'VESSELS'],
     systems: ['cardio'],
-    mechanisms: ['BETA1_BLOCKADE', 'NO_RELEASE', 'VASODILATION', 'B1_BLOCKADE', 'NO_PRODUCTION', 'ANTIARRHYTHMIC', 'ANTIFIBROTIC'],
+    mechanisms: ['NO_RELEASE', 'VASODILATION', 'B1_BLOCKADE', 'NO_PRODUCTION', 'ANTIARRHYTHMIC', 'ANTIFIBROTIC'],
     description: 'Небиволол — кардиоселективный бета-блокатор с уникальным NO-модулирующим эффектом. Снижает ЧСС и давление, улучшает эндотелиальную функцию. Препарат выбора для контроля ЧСС на курсе ААС.',
     synergies: [
       { with: 'telmisartan', effect: 'Контроль давления и ЧСС', mechanism: 'Бета-блокатор + сартан = аддитивный эффект', severity: 'MEDIUM' },
@@ -884,7 +884,7 @@ copper: {
     ],
     organs: ['LIVER', 'BLOOD', 'BONES', 'JOINTS', 'CARTILAGE'],
     systems: ['hepatic', 'hematologic', 'musculoskeletal'],
-    mechanisms: ['IRON_METABOLISM', 'CERULOPLASMIN', 'COLLAGEN_CROSS_LINKING', 'COPPER_DELIVERY', 'COPPER_TRANSPORT', 'HEME_SYNTHESIS', 'CONNECTIVE_TISSUE', 'DOPAMINE_SYNTHESIS'],
+    mechanisms: ['IRON_METABOLISM', 'COPPER_DELIVERY', 'COPPER_TRANSPORT', 'HEME_SYNTHESIS', 'CONNECTIVE_TISSUE', 'DOPAMINE_SYNTHESIS'],
     description: 'Медь — кофактор церулоплазмина, критична для метаболизма железа и перекрёстных связей коллагена. На курсе ААС поддерживает кроветворение и прочность связок.',
     synergies: [
       { with: 'iron', effect: 'Мобилизация железа из депо', mechanism: 'Медь через церулоплазмин окисляет Fe2+ и обеспечивает транспорт', severity: 'HIGH' },
@@ -1054,7 +1054,7 @@ vitamin_a: {
     ],
     organs: ['EYES', 'SKIN', 'IMMUNE_SYSTEM'],
     systems: ['neuro', 'endocrine'],
-    mechanisms: ['RETINOID_RECEPTOR', 'VISION_CYCLE', 'EPITHELIAL_MAINTENANCE', 'IGA_PRODUCTION', 'TCELL_PROLIFERATION', 'BONE_MINERALIZATION', 'IRON_ABSORPTION', 'IMMUNE_FUNCTION'],
+    mechanisms: ['IGA_PRODUCTION', 'TCELL_PROLIFERATION', 'BONE_MINERALIZATION', 'IRON_ABSORPTION', 'IMMUNE_FUNCTION'],
     description: 'Ретинол — жирорастворимый витамин, критичный для зрения и иммунитета. На курсе ААС помогает кожным проблемам.',
     synergies: [
       { with: 'zinc', effect: 'Транспорт ретинола', mechanism: 'Zn — кофактор RBP (ретинол-связывающий белок) для транспорта вит.A', severity: 'HIGH' },
@@ -1098,7 +1098,7 @@ vitamin_b1: {
     ],
     organs: ['BRAIN', 'NERVES', 'HEART'],
     systems: ['neuro', 'cardio'],
-    mechanisms: ['THIAMINE_PYROPHOSPHATE', 'GLUCOSE_METABOLISM', 'NERVE_CONDUCTION', 'COENZYME', 'CARDIAC_FUEL', 'ATP_PRODUCTION', 'NEUROMETABOLISM', 'GLUCOSE_UPTAKE'],
+    mechanisms: ['NERVE_CONDUCTION', 'COENZYME', 'CARDIAC_FUEL', 'ATP_PRODUCTION', 'NEUROMETABOLISM', 'GLUCOSE_UPTAKE'],
     description: 'Тиамин — кофермент пируватдегидрогеназы. Критичен для метаболизма глюкозы и нервной проводимости. Дефицит на курсе ведёт к нейропатии.',
     synergies: [
       { with: 'magnesium', effect: 'Кофактор тиаминзависимых ферментов', mechanism: 'Mg — кофактор пируватдегидрогеназы и α-KGDH', severity: 'HIGH' },
@@ -1140,7 +1140,7 @@ vitamin_b2: {
     ],
     organs: ['EYES', 'SKIN', 'LIVER'],
     systems: ['hepatic', 'neuro'],
-    mechanisms: ['FAD_COENZYME', 'ELECTRON_TRANSPORT', 'GLUTATHIONE_RECYCLING', 'IRON_ABSORPTION', 'GPX_ACTIVATION', 'COENZYME', 'ELECTRON_TRANSPORT_CHAIN', 'FATTY_ACID_OXIDATION'],
+    mechanisms: ['GLUTATHIONE_RECYCLING', 'IRON_ABSORPTION', 'GPX_ACTIVATION', 'COENZYME', 'ELECTRON_TRANSPORT_CHAIN', 'FATTY_ACID_OXIDATION'],
     description: 'Рибофлавин — предшественник FAD и FMN. Участвует в рециклинге глутатиона и метаболизме железа.',
     synergies: [
       { with: 'vitamin_b3', effect: 'FAD+NAD', mechanism: 'B2 → FAD, B3 → NAD — синергия в ЭТЦ', severity: 'MEDIUM' },
@@ -1179,7 +1179,7 @@ vitamin_b3: {
     ],
     organs: ['LIVER', 'HEART', 'VESSELS', 'SKIN'],
     systems: ['cardio', 'hepatic', 'endocrine'],
-    mechanisms: ['NAD_PRECURSOR', 'LIPID_LOWERING', 'VASODILATION', 'TRIGLYCERIDE_LOWERING', 'CHOLESTEROL_LOWERING', 'HMG_COA_REDUCTION', 'FATTY_ACID_OXIDATION', 'LIPID_METABOLISM'],
+    mechanisms: ['LIPID_LOWERING', 'VASODILATION', 'TRIGLYCERIDE_LOWERING', 'CHOLESTEROL_LOWERING', 'HMG_COA_REDUCTION', 'FATTY_ACID_OXIDATION', 'LIPID_METABOLISM'],
     description: 'Ниацин — предшественник NAD+, снижает ЛПНП и ТГ, повышает ЛПВП. На курсе ААС помогает контролировать липидный профиль.',
     synergies: [
       { with: 'vitamin_b2', effect: 'NAD+FAD — ЭТЦ', mechanism: 'B3 → NAD, B2 → FAD — коферменты ЭТЦ', severity: 'MEDIUM' },
@@ -1220,7 +1220,7 @@ vitamin_b5: {
     ],
     organs: ['ADRENALS', 'SKIN', 'LIVER'],
     systems: ['endocrine', 'hepatic'],
-    mechanisms: ['COENZYME_A_SYNTHESIS', 'ACETYLATION', 'STEROIDOGENESIS', 'FATTY_ACID_TRANSPORT', 'FATTY_ACID_OXIDATION', 'LIPID_METABOLISM', 'KERATIN_SYNTHESIS', 'PROTEIN_SYNTHESIS'],
+    mechanisms: ['STEROIDOGENESIS', 'FATTY_ACID_TRANSPORT', 'FATTY_ACID_OXIDATION', 'LIPID_METABOLISM', 'KERATIN_SYNTHESIS', 'PROTEIN_SYNTHESIS'],
     description: 'Пантотеновая кислота — предшественник Коэнзима А, критичного для стероидогенеза. Поддерживает надпочечники.',
     synergies: [
       { with: 'vitamin_b7', effect: 'КоА+карбоксилазы', mechanism: 'B5 → КоА, биотин → карбоксилазы — метаболическая синергия', severity: 'MEDIUM' },
@@ -1260,7 +1260,7 @@ biotin: {
     ],
     organs: ['SKIN', 'MUSCLES'],
     systems: ['endocrine', 'metabolic'],
-    mechanisms: ['CARBOXYLASE_COENZYME', 'KERATIN_SYNTHESIS', 'GLUCONEOGENESIS', 'FATTY_ACID_SYNTHESIS', 'FATTY_ACID_TRANSPORT', 'LIPID_METABOLISM', 'PROTEIN_SYNTHESIS', 'AMINO_ACID_METABOLISM'],
+    mechanisms: ['KERATIN_SYNTHESIS', 'FATTY_ACID_TRANSPORT', 'LIPID_METABOLISM', 'PROTEIN_SYNTHESIS', 'AMINO_ACID_METABOLISM'],
     description: 'Биотин — кофермент карбоксилаз, критичен для синтеза кератина. На курсе ААС поддерживает кожу и волосы.',
     synergies: [
       { with: 'vitamin_b5', effect: 'КоА+биотин — метаболизм', mechanism: 'B5 → КоА, биотин → карбоксилазы — синтез ЖК и глюконеогенез', severity: 'MEDIUM' },
@@ -1347,7 +1347,7 @@ vitamin_e: {
     ],
     organs: ['HEART', 'VESSELS', 'SKIN', 'LIVER'],
     systems: ['cardio', 'hepatic'],
-    mechanisms: ['LIPID_PEROXIDATION_INHIBITION', 'MEMBRANE_STABILIZATION', 'ANTIATHEROGENIC', 'GPX_PROTECTION', 'PLATELET_AGGREGATION_INHIBITION'],
+    mechanisms: ['LIPID_PEROXIDATION_INHIBITION', 'MEMBRANE_STABILIZATION', 'GPX_PROTECTION', 'PLATELET_AGGREGATION_INHIBITION'],
     description: 'Витамин Е — главный жирорастворимый антиоксидант. На курсе ААС защищает сердце и печень от окислительного стресса.',
     synergies: [
       { with: 'vitamin_c', effect: 'Антиоксидантный каскад', mechanism: 'Вит.C регенерирует окисленный токоферол', severity: 'HIGH' },
@@ -1432,7 +1432,7 @@ inositol: {
     ],
     organs: ['BRAIN', 'LIVER', 'REPRODUCTIVE'],
     systems: ['neuro', 'endocrine', 'reproductive'],
-    mechanisms: ['INSULIN_SIGNALING', 'SEROTONIN_MODULATION', 'LIPID_SIGNALING', 'OOCYTE_MATURATION', 'INSULIN_SENSITIVITY', 'IRS1_PHOSPHORYLATION', 'IRS1_PI3K', 'GLUCOSE_UPTAKE', 'GLUT4_TRANSLOCATION', 'AMPK_ACTIVATION', 'LIPID_METABOLISM', 'MEMBRANE_PHOSPHOLIPID', 'APOPTOSIS_REGULATION', 'LIVER_LIPID_METABOLISM', 'CEREBRAL_BLOOD_FLOW', 'COGNITION_ENHANCEMENT', 'ANXIOLYTIC'],
+    mechanisms: ['SEROTONIN_MODULATION', 'OOCYTE_MATURATION', 'INSULIN_SENSITIVITY', 'IRS1_PHOSPHORYLATION', 'IRS1_PI3K', 'GLUCOSE_UPTAKE', 'GLUT4_TRANSLOCATION', 'AMPK_ACTIVATION', 'LIPID_METABOLISM', 'MEMBRANE_PHOSPHOLIPID', 'APOPTOSIS_REGULATION', 'LIVER_LIPID_METABOLISM', 'CEREBRAL_BLOOD_FLOW', 'COGNITION_ENHANCEMENT', 'ANXIOLYTIC'],
     description: 'Инозитол — второй мессенджер инсулина и серотонина. Улучшает чувствительность к инсулину. На курсе поддерживает инсулиновую чувствительность.',
     synergies: [
         {with: "vitamin_b_complex", effect: "Сигнальные пути", mechanism: "Инозитол — вторичный мессенджер", severity: "MEDIUM"},
@@ -1473,7 +1473,7 @@ betaine: {
     ],
     organs: ['LIVER', 'HEART'],
     systems: ['hepatic', 'cardio', 'metabolic'],
-    mechanisms: ['METHYL_DONATION', 'HOMOCYSTEINE_LOWERING', 'OSMOPROTECTION', 'LIPID_REDUCTION', 'METHYLATION', 'METHYLATION_CYCLE', 'BHMT_ACTIVATION', 'SAM_SYNTHESIS', 'LIPID_LOWERING', 'FATTY_ACID_TRANSPORT', 'LIVER_LIPID_METABOLISM', 'LIVER_REGENERATION', 'MEMBRANE_STABILIZATION', 'FAT_METABOLISM'],
+    mechanisms: ['METHYL_DONATION', 'HOMOCYSTEINE_LOWERING', 'LIPID_REDUCTION', 'METHYLATION', 'METHYLATION_CYCLE', 'BHMT_ACTIVATION', 'SAM_SYNTHESIS', 'LIPID_LOWERING', 'FATTY_ACID_TRANSPORT', 'LIVER_LIPID_METABOLISM', 'LIVER_REGENERATION', 'MEMBRANE_STABILIZATION', 'FAT_METABOLISM'],
     description: 'Бетаин — донор метильных групп, снижает гомоцистеин и защищает печень. На курсе ААС поддерживает метилирование.',
     synergies: [
       { with: 'folate', effect: 'Цикл метилирования', mechanism: 'Бетаин донирует CH3 через BHMT, фолат — через метионинсинтазу', severity: 'HIGH' },
@@ -1558,7 +1558,7 @@ pterostilbene: {
     ],
     organs: ['HEART', 'BRAIN', 'LIVER'],
     systems: ['cardio', 'neuro', 'hepatic'],
-    mechanisms: ['SIRT1_ACTIVATION', 'LIPID_LOWERING', 'AMPK_ACTIVATION', 'CHOLESTEROL_LOWERING', 'TRIGLYCERIDE_LOWERING', 'HMG_COA_REDUCTION', 'PPAR_ACTIVATION', 'GLUCOSE_UPTAKE', 'INSULIN_SENSITIVITY', 'NO_PRODUCTION', 'VASODILATION', 'LIPID_METABOLISM', 'NFKB_INHIBITION'],
+    mechanisms: ['LIPID_LOWERING', 'AMPK_ACTIVATION', 'CHOLESTEROL_LOWERING', 'TRIGLYCERIDE_LOWERING', 'HMG_COA_REDUCTION', 'PPAR_ACTIVATION', 'GLUCOSE_UPTAKE', 'INSULIN_SENSITIVITY', 'NO_PRODUCTION', 'VASODILATION', 'LIPID_METABOLISM', 'NFKB_INHIBITION'],
     description: 'Птеростильбен — диметиловый аналог ресвератрола с биодоступностью 80%. Активирует SIRT1, снижает холестерин.',
     synergies: [
       { with: 'resveratrol', effect: 'Сиртуины + антиоксиданты', mechanism: 'Птеростильбен + ресвератрол = SIRT1 + NRF2', severity: 'HIGH' },
@@ -1599,7 +1599,7 @@ saw_palmetto: {
     ],
     organs: ['PROSTATE', 'REPRODUCTIVE'],
     systems: ['reproductive', 'endocrine'],
-    mechanisms: ['5AR_INHIBITION', 'DHT_REDUCTION', 'PROSTATE_SHRINKAGE', 'ANTI_ANDROGENIC', 'PROSTATE_PROTECTION', 'ZINC_COFACTOR', 'SEBUM_REGULATION', 'KERATIN_SYNTHESIS', 'NFKB_INHIBITION', 'PSA_LOWERING', 'COX_INHIBITION'],
+    mechanisms: ['5AR_INHIBITION', 'DHT_REDUCTION', 'PROSTATE_SHRINKAGE', 'PROSTATE_PROTECTION', 'ZINC_COFACTOR', 'SEBUM_REGULATION', 'KERATIN_SYNTHESIS', 'NFKB_INHIBITION', 'PSA_LOWERING', 'COX_INHIBITION'],
     description: 'Сереноа — ингибитор 5-альфа-редуктазы, снижает DHT локально в простате. На курсе ААС защищает простату от гипертрофии.',
     synergies: [
       { with: 'zinc', effect: 'Поддержка простаты', mechanism: 'Zn — ингибитор 5AR, пальметто — блокатор DHT-рецепторов', severity: 'MEDIUM' },
@@ -1641,7 +1641,7 @@ hcg: {
     ],
     organs: ['REPRODUCTIVE', 'TESTES'],
     systems: ['reproductive', 'endocrine'],
-    mechanisms: ['LH_MIMIC', 'TESTOSTERONE_PRODUCTION', 'SPERMATOGENESIS_RESTORE', 'TESTICULAR_VOLUME_PRESERVATION', 'STEROIDOGENESIS', 'CHOLESTEROL_TRANSPORT', 'LEYDIG_CELL_STIMULATION', 'HSD_ACTIVATION', 'AROMATASE_MODULATION', 'E2_UP', 'SERTOLI_CELL', 'FOLLICLE_STIMULATION', 'GNRH_UP', 'HPTA_RESTORATION', 'T_LH_UP', 'FERTILITY_IMPROVEMENT', 'GONADOTROPIN_AGONISM'],
+    mechanisms: ['TESTOSTERONE_PRODUCTION', 'SPERMATOGENESIS_RESTORE', 'TESTICULAR_VOLUME_PRESERVATION', 'STEROIDOGENESIS', 'HPTA_RESTORATION'],
     description: 'ХГЧ — мимик ЛГ, стимулирует клетки Лейдига к продукции тестостерона. Стандартная схема: 500 МЕ 2 раза в неделю, 3 недели приема, 1 неделя отдыха (3/1).',
     synergies: [
       { with: 'zinc', effect: 'Синергия стероидогенеза', mechanism: 'Zn — кофактор StAR и 3β-HSD, ХГЧ ↑ активность клеток Лейдига', severity: 'MEDIUM' },
@@ -1685,7 +1685,7 @@ l_carnitine: {
     ],
     organs: ['HEART', 'MUSCLES', 'LIVER'],
     systems: ['cardio', 'metabolic', 'hepatic'],
-    mechanisms: ['FATTY_ACID_TRANSPORT', 'MITOCHONDRIAL_BETA_OXIDATION', 'CARDIAC_FUEL', 'MITOCHONDRIAL_SUPPORT', 'BETA_OXIDATION', 'FAT_METABOLISM', 'LIPID_METABOLISM', 'LIPOLYSIS', 'CPT1_ACTIVATION', 'ACETYLCHOLINE_SYNTHESIS', 'NEUROTRANSMITTER_SYNTHESIS', 'CHOLINE_DONOR', 'MEMBRANE_SYNTHESIS', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE'],
+    mechanisms: ['FATTY_ACID_TRANSPORT', 'CARDIAC_FUEL', 'MITOCHONDRIAL_SUPPORT', 'FAT_METABOLISM', 'LIPID_METABOLISM', 'ACETYLCHOLINE_SYNTHESIS', 'NEUROTRANSMITTER_SYNTHESIS', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE'],
     description: 'Л-Карнитин — транспортировщик жирных кислот в митохондрии. АЛК дополнительно повышает ацетилхолин. На курсе — кардиопротектор.',
     synergies: [
       { with: 'coq10', effect: 'Митохондриальная энергия', mechanism: 'L-карнитин транспортирует жирные кислоты, CoQ10 — дыхательная цепь', severity: 'HIGH' },
@@ -1729,7 +1729,7 @@ phosphatidylcholine: {
     ],
     organs: ['LIVER', 'BRAIN'],
     systems: ['hepatic', 'neuro'],
-    mechanisms: ['MEMBRANE_SYNTHESIS', 'BILE_FLOW', 'LIPID_TRANSPORT', 'ACETYLCHOLINE_PRECURSOR'],
+    mechanisms: ['BILE_FLOW'],
     description: 'Фосфатидилхолин — главный компонент мембран и желчи. В форме PPC защищает печень от жировой инфильтрации. На курсе — препарат выбора для гепатопротекции.',
     synergies: [
       { with: 'milk_thistle', effect: 'Гепатопротекция', mechanism: 'PPC восстанавливает мембраны, силимарин стабилизирует их', severity: 'HIGH' },
@@ -1771,7 +1771,7 @@ prebiotics: {
     ],
     organs: ['INTESTINES', 'SMALL_INTESTINE'],
     systems: ['hepatic', 'immune', 'metabolic'],
-    mechanisms: ['PROBIOTIC_GROWTH', 'SHORT_CHAIN_FATTY_ACID_PRODUCTION', 'GUT_BARRIER_INTEGRITY', 'SCFA_PRODUCTION', 'BUTYRATE_PRODUCTION', 'GUT_FLORA_MODULATION', 'GUT_HEALING', 'TIGHT_JUNCTION', 'LPS_REDUCTION', 'NFKB_INHIBITION', 'SHORT_CHAIN_FATTY_ACIDS', 'GLUCAGON_LIKE_PEPTIDE_1', 'GLP1_AGONISM', 'BLOOD_SUGAR_REGULATION', 'CHOLESTEROL_BINDING', 'MINERAL_ABSORPTION'],
+    mechanisms: ['NFKB_INHIBITION'],
     description: 'Пребиотики — неперевариваемые пищевые волокна, питающие полезную микрофлору. На курсе ААС поддерживают микробиом.',
     synergies: [
       { with: "probiotics", effect: "Синбиотик — пребиотики питают пробиотики", mechanism: "Пребиотики (инулин/ФОС) → субстрат для бифидобактерий → КЦЖК", severity: "MEDIUM" },
@@ -1811,7 +1811,7 @@ glutamine: {
     ],
     organs: ['INTESTINES', 'IMMUNE_SYSTEM', 'MUSCLES', 'SMALL_INTESTINE'],
     systems: ['immune', 'hepatic', 'metabolic'],
-    mechanisms: ['INTESTINAL_CELL_FUEL', 'IMMUNE_CELL_PROLIFERATION', 'GLUTATHIONE_PRECURSOR', 'NITROGEN_TRANSPORT', 'GUT_HEALING', 'GUT_BARRIER_INTEGRITY', 'TIGHT_JUNCTION', 'MUCOSAL_HEALING', 'IMMUNE_SUPPORT', 'IMMUNE_CELL_FUEL', 'LYMPHOCYTE_PROLIFERATION', 'MACROPHAGE_ACTIVATION', 'AMINO_ACID_TRANSPORT', 'NITROGEN_BALANCE', 'GLUTATHIONE_SYNTHESIS', 'PROTEIN_SYNTHESIS', 'ANTICATABOLIC'],
+    mechanisms: ['IMMUNE_CELL_PROLIFERATION', 'GLUTATHIONE_PRECURSOR', 'IMMUNE_SUPPORT', 'NITROGEN_BALANCE', 'GLUTATHIONE_SYNTHESIS', 'PROTEIN_SYNTHESIS'],
     description: 'Глутамин — условно-незаменимая аминокислота, топливо для энтероцитов. Предшественник глутатиона. На курсе поддерживает кишечный барьер и иммунитет.',
     synergies: [
         {with: "probiotics", effect: "Здоровье кишечника", mechanism: "Глутамин — топливо энтероцитов", severity: "HIGH"},
@@ -1851,7 +1851,7 @@ molybdenum: {
     ],
     organs: ['LIVER', 'KIDNEYS'],
     systems: ['hepatic', 'renal', 'metabolic'],
-    mechanisms: ['SULFITE_OXIDASE', 'XANTHINE_OXIDASE', 'HEPATIC_DETOXIFICATION', 'PHASE_II', 'SULFATION', 'COPPER_CHELATION', 'LEAD_CHELATION', 'PURINE_METABOLISM', 'URIC_ACID_REGULATION', 'ALCOHOL_METABOLISM', 'CYP450_MODULATION', 'SULFUR_METABOLISM', 'ALDEHYDE_DETOXIFICATION', 'XENOBIOTIC_CLEARANCE'],
+    mechanisms: ['SULFATION'],
     description: 'Молибден — кофактор сульфитоксидазы и ксантиноксидазы, критичен для детоксикации сульфитов.',
     synergies: [
         {with: "sulfur_compounds", effect: "Метаболизм сульфитов", mechanism: "Молибден — кофактор сульфитоксидазы", severity: "MEDIUM"},
@@ -1887,7 +1887,7 @@ boron: {
     ],
     organs: ['BONES', 'REPRODUCTIVE', 'ENDOCRINE'],
     systems: ['endocrine', 'musculoskeletal'],
-    mechanisms: ['BONE_MINERALIZATION', 'FREE_TESTOSTERONE_INCREASE', 'VITAMIN_D_ACTIVATION', 'ESTROGEN_MODULATION', 'SHBG_REDUCTION', 'AROMATASE_INHIBITION', 'TESTOSTERONE_UP', 'BONE_DENSITY', 'OSTEOCALCIN_ACTIVATION', 'OSTEOBLAST_STIMULATION', 'CALCIUM_METABOLISM', 'MAGNESIUM_ABSORPTION', 'PHOSPHORUS_METABOLISM', 'COX_INHIBITION', 'BRAIN_HEALTH'],
+    mechanisms: ['BONE_MINERALIZATION', 'FREE_TESTOSTERONE_INCREASE', 'VITAMIN_D_ACTIVATION', 'ESTROGEN_MODULATION', 'SHBG_REDUCTION', 'AROMATASE_INHIBITION', 'TESTOSTERONE_UP', 'BONE_DENSITY', 'OSTEOCALCIN_ACTIVATION', 'COX_INHIBITION'],
     description: 'Бор — следовой минерал, повышает свободный тестостерон и активирует витамин D. На курсе ААС поддерживает костную ткань.',
     synergies: [
       { with: "zinc", effect: "Бор + Цинк — свободный тестостерон", mechanism: "Бор ↓ SHBG, цинк ↓ ароматазу — ↑ свободный T", severity: "MEDIUM" },
@@ -1966,7 +1966,7 @@ boron: {
     ],
     organs: ['BONES', 'MUSCLES', 'HEART'],
     systems: ['musculoskeletal', 'cardio', 'hematologic'],
-    mechanisms: ['BONE_MINERALIZATION', 'MUSCLE_CONTRACTION', 'BLOOD_CLOTTING', 'BONE_DENSITY', 'CALCIUM_ABSORPTION', 'CALCIUM_REGULATION', 'MUSCLE_FUNCTION', 'NERVE_CONDUCTION', 'ELECTROLYTE_BALANCE', 'HEART_RHYTHM', 'VDR_AGONISM', 'PTH_SUPPRESSION', 'OSTEOCLAST_INHIBITION', 'OXYGEN_TRANSPORT', 'PROTEIN_SYNTHESIS'],
+    mechanisms: ['BONE_MINERALIZATION', 'MUSCLE_CONTRACTION', 'BONE_DENSITY', 'CALCIUM_ABSORPTION', 'CALCIUM_REGULATION', 'MUSCLE_FUNCTION', 'NERVE_CONDUCTION', 'ELECTROLYTE_BALANCE', 'HEART_RHYTHM', 'VDR_AGONISM', 'PTH_SUPPRESSION', 'OSTEOCLAST_INHIBITION', 'OXYGEN_TRANSPORT', 'PROTEIN_SYNTHESIS'],
     description: 'Кальций — основной минерал костной ткани. На курсе ААС поддерживает плотность костей, особенно при ИА.',
     synergies: [
       { with: 'vitamin_d3', effect: 'Кальциевый треугольник', mechanism: 'D3 ↑ всасывание Ca в кишечнике через кальбиндин', severity: 'HIGH' },
@@ -2009,7 +2009,7 @@ sodium: {
     ],
     organs: ['KIDNEYS', 'HEART', 'MUSCLES'],
     systems: ['renal', 'cardio', 'metabolic'],
-    mechanisms: ['ELECTROLYTE_BALANCE', 'MUSCLE_CONTRACTION', 'MUSCLE_FUNCTION', 'NERVE_CONDUCTION', 'OSMOREGULATION', 'PH_BALANCE', 'BLOOD_PRESSURE_REGULATION', 'BLOOD_RHEOLOGY', 'ATP_PRODUCTION', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH', 'GLUCOSE_UPTAKE', 'POTENTIAL_ACTION'],
+    mechanisms: ['ELECTROLYTE_BALANCE', 'MUSCLE_CONTRACTION', 'MUSCLE_FUNCTION', 'NERVE_CONDUCTION', 'OSMOREGULATION', 'PH_BALANCE', 'BLOOD_PRESSURE_REGULATION', 'BLOOD_RHEOLOGY', 'ATP_PRODUCTION', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH', 'GLUCOSE_UPTAKE'],
     description: 'Натрий — основной внеклеточный электролит. На курсе ААС важен для электролитного баланса.',
     synergies: [
         {with: "potassium", effect: "Электролитный баланс", mechanism: "Натрий/Калий насос — основа клетки", severity: "HIGH"},
@@ -2083,7 +2083,7 @@ iodine: {
     ],
     organs: ['THYROID', 'REPRODUCTIVE'],
     systems: ['endocrine', 'reproductive'],
-    mechanisms: ['THYROID_STIMULATION', 'THYROID_SUPPORT', 'THYROID_SYNTHESIS', 'ESTROGEN_METABOLISM', 'LIVER_DETOXIFICATION', 'APOPTOSIS_REGULATION', 'MYELIN_SYNTHESIS', 'ENERGY_METABOLISM', 'MITOCHONDRIAL_FUNCTION', 'ATP_PRODUCTION', 'FERTILITY_SUPPORT', 'STEROID_HORMONE_SYNTHESIS', 'ANTIMICROBIAL_PEPTIDES', 'DNA_SYNTHESIS', 'NEUROTRANSMITTER_SYNTHESIS'],
+    mechanisms: ['THYROID_STIMULATION', 'THYROID_SUPPORT', 'THYROID_SYNTHESIS', 'ESTROGEN_METABOLISM', 'LIVER_DETOXIFICATION', 'APOPTOSIS_REGULATION', 'MYELIN_SYNTHESIS', 'MITOCHONDRIAL_FUNCTION', 'ATP_PRODUCTION', 'FERTILITY_SUPPORT', 'STEROID_HORMONE_SYNTHESIS', 'ANTIMICROBIAL_PEPTIDES', 'DNA_SYNTHESIS', 'NEUROTRANSMITTER_SYNTHESIS'],
     description: 'Йод — ключевой элемент синтеза тиреоидных гормонов. На курсе ААС поддерживает функцию щитовидной железы.',
     synergies: [
       { with: 'selenium', effect: 'Синтез T4 + антиоксидантная защита', mechanism: 'I — субстрат TPO, Se — дейодиназа (T4→T3) и GPx', severity: 'HIGH' },
@@ -2161,7 +2161,7 @@ vanadium: {
     ],
     organs: ['LIVER', 'PANCREAS', 'MUSCLES'],
     systems: ['hepatic', 'endocrine', 'metabolic'],
-    mechanisms: ['INSULIN_SENSITIVITY', 'GLUCONEOGENESIS_INHIBITION', 'GLYCOGEN_SYNTHESIS', 'IRS1_PI3K', 'IRS1_PHOSPHORYLATION', 'GLUT4_TRANSLOCATION', 'GLUCOSE_UPTAKE', 'AMPK_ACTIVATION', 'AMPK_UP', 'PPAR_ACTIVATION', 'LIPID_METABOLISM', 'FATTY_ACID_OXIDATION', 'PROTEIN_SYNTHESIS', 'MUSCLE_PROTEIN_SYNTHESIS'],
+    mechanisms: ['INSULIN_SENSITIVITY', 'GLUCONEOGENESIS_INHIBITION', 'IRS1_PI3K', 'IRS1_PHOSPHORYLATION', 'GLUT4_TRANSLOCATION', 'GLUCOSE_UPTAKE', 'AMPK_ACTIVATION', 'AMPK_UP', 'PPAR_ACTIVATION', 'LIPID_METABOLISM', 'FATTY_ACID_OXIDATION', 'PROTEIN_SYNTHESIS', 'MUSCLE_PROTEIN_SYNTHESIS'],
     description: 'Ванадий — инсулиномиметик. На курсе ААС поддерживает углеводный обмен.',
     synergies: [
         {with: "chromium", effect: "Метаболизм глюкозы", mechanism: "Оба имитируют инсулин", severity: "MEDIUM"},
@@ -2198,7 +2198,7 @@ vanadium: {
     ],
     organs: ['BONES', 'KIDNEYS', 'MUSCLES'],
     systems: ['musculoskeletal', 'renal', 'metabolic'],
-    mechanisms: ['BONE_MINERALIZATION', 'ATP_PRODUCTION', 'ENERGY_METABOLISM', 'PROTEIN_SYNTHESIS', 'DNA_SYNTHESIS', 'MEMBRANE_PHOSPHOLIPID', 'MUSCLE_CONTRACTION', 'MUSCLE_FUNCTION', 'NERVE_CONDUCTION', 'ELECTROLYTE_BALANCE', 'PH_BALANCE', 'OXYGEN_TRANSPORT', 'BONE_DENSITY', 'COENZYME', 'AMINO_ACID_METABOLISM'],
+    mechanisms: ['BONE_MINERALIZATION', 'ATP_PRODUCTION', 'PROTEIN_SYNTHESIS', 'DNA_SYNTHESIS', 'MEMBRANE_PHOSPHOLIPID', 'MUSCLE_CONTRACTION', 'MUSCLE_FUNCTION', 'NERVE_CONDUCTION', 'ELECTROLYTE_BALANCE', 'PH_BALANCE', 'OXYGEN_TRANSPORT', 'BONE_DENSITY', 'COENZYME', 'AMINO_ACID_METABOLISM'],
     description: 'Фосфор — ключевой компонент костей и АТФ. На курсе ААС поддерживает костную ткань.',
     synergies: [
         {with: "calcium", effect: "Костная минерализация", mechanism: "Кальций:Фосфор = 2:1 для костей", severity: "HIGH"},
@@ -2273,7 +2273,7 @@ msm: {
     ],
     organs: ['LIVER', 'IMMUNE_SYSTEM'],
     systems: ['hepatic', 'immune', 'metabolic'],
-    mechanisms: ['ANTIOXIDANT_DEFENSE', 'ANTIOXIDANT_ENZYME', 'GLUTATHIONE_SYNTHESIS', 'GPX_ACTIVATION', 'IMMUNE_FUNCTION', 'IMMUNE_CELL_FUNCTION', 'TCELL_PROLIFERATION', 'HORMONE_SYNTHESIS', 'STEROIDOGENESIS', 'TESTOSTERONE_SUPPORT', 'THYROID_SUPPORT', 'T4_T3_CONVERSION', 'DIO1_ACTIVATION', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'GLUCONEOGENESIS_INHIBITION', 'LIPID_METABOLISM', 'FATTY_ACID_OXIDATION', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'BONE_MINERALIZATION', 'ENERGY_METABOLISM', 'ATP_PRODUCTION', 'ELECTROLYTE_BALANCE', 'OSMOREGULATION', 'PHASE_II_DETOX', 'CHELATION', 'ENZYME_COFACTOR'],
+    mechanisms: ['ANTIOXIDANT_ENZYME', 'GLUTATHIONE_SYNTHESIS', 'GPX_ACTIVATION', 'IMMUNE_FUNCTION', 'IMMUNE_CELL_FUNCTION', 'TCELL_PROLIFERATION', 'STEROIDOGENESIS', 'TESTOSTERONE_SUPPORT', 'THYROID_SUPPORT', 'T4_T3_CONVERSION', 'DIO1_ACTIVATION', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'GLUCONEOGENESIS_INHIBITION', 'LIPID_METABOLISM', 'FATTY_ACID_OXIDATION', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'BONE_MINERALIZATION', 'ATP_PRODUCTION', 'ELECTROLYTE_BALANCE', 'OSMOREGULATION', 'PHASE_II_DETOX', 'CHELATION'],
     description: 'Комплекс микроэлементов (Se, Mn, Mo, Cr, V, B, Si) — обеспечивает работу 300+ ферментов.',
     synergies: [
         {with: "vitamin_complex", effect: "Полный спектр", mechanism: "Следовые элементы — кофакторы", severity: "MEDIUM"},
@@ -2312,7 +2312,7 @@ msm: {
     ],
     organs: ['PANCREAS', 'MUSCLES', 'LIVER'],
     systems: ['endocrine', 'metabolic'],
-    mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'GLUT4_TRANSLOCATION', 'GLUCOSE_METABOLISM', 'GLYCOGEN_SYNTHESIS', 'IRS1_PHOSPHORYLATION', 'IRS1_PI3K', 'PPAR_ACTIVATION', 'LIPID_METABOLISM', 'CHOLESTEROL_LOWERING', 'TRIGLYCERIDE_LOWERING', 'FATTY_ACID_OXIDATION', 'AMPK_ACTIVATION', 'ADIPONECTIN_UP', 'MUSCLE_PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH', 'ANTI_CATABOLIC', 'CHROMIUM_COFACTOR', 'ENERGY_METABOLISM', 'LEAN_MASS_GAIN', 'APPETITE_CONTROL'],
+    mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'GLUT4_TRANSLOCATION', 'IRS1_PHOSPHORYLATION', 'IRS1_PI3K', 'PPAR_ACTIVATION', 'LIPID_METABOLISM', 'CHOLESTEROL_LOWERING', 'TRIGLYCERIDE_LOWERING', 'FATTY_ACID_OXIDATION', 'AMPK_ACTIVATION', 'ADIPONECTIN_UP', 'MUSCLE_PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH', 'ANTI_CATABOLIC', 'CHROMIUM_COFACTOR'],
     description: 'Хром — усиливает действие инсулина через хромодулин. На курсе ААС поддерживает инсулиновую чувствительность.',
     synergies: [
         {with: "vitamin_b3", effect: "Метаболизм глюкозы", mechanism: "Хром + ниацин — толерантность к глюкозе", severity: "MEDIUM"},
@@ -2353,7 +2353,7 @@ colloidal_minerals: {
     ],
     organs: ['BONES', 'LIVER', 'KIDNEYS'],
     systems: ['hepatic', 'renal', 'musculoskeletal'],
-    mechanisms: ['MINERAL_REPLETION', 'ENZYME_COFACTOR', 'ENZYME_ACTIVATION', 'ANTIOXIDANT_DEFENSE', 'ANTIOXIDANT_ENZYME', 'GPX_ACTIVATION', 'ELECTROLYTE_BALANCE', 'PH_BALANCE', 'OSMOREGULATION', 'BONE_MINERALIZATION', 'BONE_DENSITY', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'ENERGY_METABOLISM', 'ATP_PRODUCTION', 'IMMUNE_FUNCTION', 'IMMUNE_CELL_FUNCTION', 'THYROID_SUPPORT', 'THYROID_SYNTHESIS', 'CHELATION', 'IMMUNE_SUPPORT', 'NERVE_CONDUCTION', 'MUSCLE_CONTRACTION', 'ELECTROLYTE_SUPPORT'],
+    mechanisms: ['ANTIOXIDANT_ENZYME', 'GPX_ACTIVATION', 'ELECTROLYTE_BALANCE', 'PH_BALANCE', 'OSMOREGULATION', 'BONE_MINERALIZATION', 'BONE_DENSITY', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'ATP_PRODUCTION', 'IMMUNE_FUNCTION', 'IMMUNE_CELL_FUNCTION', 'THYROID_SUPPORT', 'THYROID_SYNTHESIS', 'CHELATION', 'IMMUNE_SUPPORT', 'NERVE_CONDUCTION', 'MUSCLE_CONTRACTION'],
     description: 'Коллоидные минералы — жидкая форма 70+ микроэлементов с высокой биодоступностью.',
     synergies: [
         {with: "vitamin_complex", effect: "Полный минеральный спектр", mechanism: "Коллоидные минералы — наноразмерные", severity: "MEDIUM"},
@@ -2429,7 +2429,7 @@ omega6: {
     ],
     organs: ['SKIN', 'REPRODUCTIVE'],
     systems: ['endocrine', 'reproductive'],
-    mechanisms: ['LIPID_PEROXIDATION_INHIBITION', 'MEMBRANE_PHOSPHOLIPID', 'SKIN_BARRIER', 'FATTY_ACID_TRANSPORT', 'FATTY_ACID_OXIDATION', 'FERTILITY_SUPPORT', 'SPERMATOGENESIS', 'STEROID_HORMONE_SYNTHESIS', 'ESTROGEN_METABOLISM', 'PROSTAGLANDIN_BALANCE', 'LIPID_METABOLISM', 'FATTY_ACID_OXIDATION', 'LIPID_LOWERING'],
+    mechanisms: ['LIPID_PEROXIDATION_INHIBITION', 'MEMBRANE_PHOSPHOLIPID', 'FATTY_ACID_TRANSPORT', 'FATTY_ACID_OXIDATION', 'FERTILITY_SUPPORT', 'SPERMATOGENESIS', 'STEROID_HORMONE_SYNTHESIS', 'ESTROGEN_METABOLISM', 'LIPID_METABOLISM', 'LIPID_LOWERING'],
     description: 'Омега-6 (гамма-линоленовая кислота) — из энотеры и бурачника. Противовоспалительная через PGE1.',
     synergies: [
       { with: 'omega3', effect: 'Баланс О3/О6', mechanism: 'GLA ↓ арахидоновую кислоту, EPA ↓ воспаление', severity: 'MEDIUM' },
@@ -2466,7 +2466,7 @@ omega7: {
     ],
     organs: ['SKIN', 'MUCOSA', 'LIVER'],
     systems: ['hepatic', 'metabolic'],
-    mechanisms: ['LIPID_METABOLISM', 'INSULIN_SENSITIVITY', 'LIVER_LIPID_METABOLISM', 'MEMBRANE_PHOSPHOLIPID', 'GUT_BARRIER_PROTECTION', 'TISSUE_REPAIR', 'SKIN_BARRIER', 'PPAR_ACTIVATION', 'FATTY_ACID_OXIDATION', 'NF_KB_INHIBITION', 'GLUCOSE_UPTAKE', 'ADIPONECTIN_UP'],
+    mechanisms: ['LIPID_METABOLISM', 'INSULIN_SENSITIVITY', 'LIVER_LIPID_METABOLISM', 'MEMBRANE_PHOSPHOLIPID', 'GUT_BARRIER_PROTECTION', 'TISSUE_REPAIR', 'PPAR_ACTIVATION', 'FATTY_ACID_OXIDATION', 'NF_KB_INHIBITION', 'GLUCOSE_UPTAKE', 'ADIPONECTIN_UP'],
     description: 'Омега-7 — из облепихи. Защищает слизистые и кожу. На курсе ААС — поддержка слизистых ЖКТ.',
     synergies: [
         {with: "omega3", effect: "Комплексная ЖК поддержка", mechanism: "Омега-7 — слизистые, омега-3 — воспаление", severity: "MEDIUM"},
@@ -2577,7 +2577,7 @@ mct: {
     ],
     organs: ['LIVER', 'MUSCLES', 'BRAIN'],
     systems: ['hepatic', 'metabolic', 'neuro'],
-    mechanisms: ['MITOCHONDRIAL_FUNCTION', 'ATP_PRODUCTION', 'FATTY_ACID_TRANSPORT', 'FATTY_ACID_OXIDATION', 'LIPID_METABOLISM', 'LIVER_LIPID_METABOLISM', 'ADIPONECTIN_UP', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'NEUROMETABOLISM', 'COGNITIVE_ENHANCEMENT', 'AMPK_ACTIVATION', 'APPETITE_CONTROL'],
+    mechanisms: ['MITOCHONDRIAL_FUNCTION', 'ATP_PRODUCTION', 'FATTY_ACID_TRANSPORT', 'FATTY_ACID_OXIDATION', 'LIPID_METABOLISM', 'LIVER_LIPID_METABOLISM', 'ADIPONECTIN_UP', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'NEUROMETABOLISM', 'COGNITIVE_ENHANCEMENT', 'AMPK_ACTIVATION'],
     description: 'МСТ масло — среднецепочечные триглицериды, быстро конвертируются в кетоны. На курсе обеспечивает быструю энергию.',
     synergies: [
         {with: "l_carnitine", effect: "Производство кетонов", mechanism: "МСТ → кетоны, L-карнитин — транспорт", severity: "MEDIUM"},
@@ -2614,7 +2614,7 @@ ceramides: {
     ],
     organs: ['SKIN', 'JOINTS', 'MUSCLES'],
     systems: ['musculoskeletal'],
-    mechanisms: ['MEMBRANE_PHOSPHOLIPID', 'APOPTOSIS_REGULATION', 'ANTIAPOPTOTIC', 'LIPID_PEROXIDATION_INHIBITION', 'JOINT_PROTECTION', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'PROTEOGLYCAN_SYNTHESIS', 'GAG_SYNTHESIS', 'CARTILAGE_PROTECTION', 'SKIN_BARRIER', 'TISSUE_REPAIR', 'FATTY_ACID_TRANSPORT', 'FATTY_ACID_OXIDATION'],
+    mechanisms: ['MEMBRANE_PHOSPHOLIPID', 'APOPTOSIS_REGULATION', 'ANTIAPOPTOTIC', 'LIPID_PEROXIDATION_INHIBITION', 'JOINT_PROTECTION', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'PROTEOGLYCAN_SYNTHESIS', 'GAG_SYNTHESIS', 'CARTILAGE_PROTECTION', 'TISSUE_REPAIR', 'FATTY_ACID_TRANSPORT', 'FATTY_ACID_OXIDATION'],
     description: 'Церамиды — сфинголипиды, ключевые компоненты кожного барьера и суставной жидкости.',
     synergies: [
         {with: "hyaluronic", effect: "Увлажнение кожи", mechanism: "Церамиды — барьер, гиалуронка — увлажнение", severity: "MEDIUM"},
@@ -2803,7 +2803,7 @@ tryptophan: {
     ],
     organs: ['BRAIN', 'INTESTINES'],
     systems: ['neuro', 'metabolic'],
-     mechanisms: ['SEROTONIN_SYNTHESIS', 'SEROTONIN_PRECURSOR', 'SEROTONIN_MODULATION', 'NEUROTRANSMITTER_SYNTHESIS', 'MELATONIN_SYNTHESIS', 'SLEEP_IMPROVEMENT', 'SLEEP_QUALITY', 'SLEEP_REGULATION', 'SLEEP_PROMOTION', 'CIRCADIAN_RHYTHM', 'CIRCADIAN_SYNCHRONIZATION', 'MOOD_ENHANCEMENT', 'ANXIOLYTIC', 'STRESS_REDUCTION', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH'],
+     mechanisms: ['SEROTONIN_SYNTHESIS', 'SEROTONIN_PRECURSOR', 'SEROTONIN_MODULATION', 'NEUROTRANSMITTER_SYNTHESIS', 'MELATONIN_SYNTHESIS', 'SLEEP_IMPROVEMENT', 'SLEEP_QUALITY', 'SLEEP_REGULATION', 'SLEEP_PROMOTION', 'CIRCADIAN_RHYTHM', 'CIRCADIAN_SYNCHRONIZATION', 'ANXIOLYTIC', 'STRESS_REDUCTION', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH'],
     description: 'Л-Триптофан — предшественник серотонина и мелатонина. Улучшает сон и настроение.',
     synergies: [
         {with: "vitamin_b6", effect: "Синтез серотонина", mechanism: "B6 — кофактор декарбоксилазы", severity: "HIGH"},
@@ -2841,7 +2841,7 @@ x5htp: {
     ],
     organs: ['BRAIN', 'INTESTINES'],
     systems: ['neuro', 'metabolic'],
-     mechanisms: ['SEROTONIN_SYNTHESIS', 'SEROTONIN_PRECURSOR', 'SEROTONIN_MODULATION', 'NEUROTRANSMITTER_SYNTHESIS', 'MELATONIN_SYNTHESIS', 'MOOD_ENHANCEMENT', 'ANXIOLYTIC', 'STRESS_REDUCTION', 'SLEEP_IMPROVEMENT', 'SLEEP_QUALITY', 'SLEEP_REGULATION', 'SLEEP_PROMOTION', 'CIRCADIAN_RHYTHM', 'APPETITE_CONTROL', 'PAIN_RELIEF', 'CORTISOL_REDUCTION', 'HPA_MODULATION'],
+     mechanisms: ['SEROTONIN_SYNTHESIS', 'SEROTONIN_PRECURSOR', 'SEROTONIN_MODULATION', 'NEUROTRANSMITTER_SYNTHESIS', 'MELATONIN_SYNTHESIS', 'ANXIOLYTIC', 'STRESS_REDUCTION', 'SLEEP_IMPROVEMENT', 'SLEEP_QUALITY', 'SLEEP_REGULATION', 'SLEEP_PROMOTION', 'CIRCADIAN_RHYTHM', 'PAIN_RELIEF', 'CORTISOL_REDUCTION', 'HPA_MODULATION'],
     description: '5-HTP — прямой предшественник серотонина, эффективнее триптофана. Улучшает настроение и сон.',
     synergies: [
       { with: 'vitamin_b6', effect: 'Кофактор декарбоксилазы', mechanism: 'B6 — AADC — конверсия 5-HTP→5-HT', severity: 'HIGH' },
@@ -3062,7 +3062,7 @@ agmatine: {
     ],
     organs: ['BRAIN', 'NERVES', 'MUSCLES'],
     systems: ['neuro', 'metabolic'],
-     mechanisms: ['NO_MODULATION', 'NO_PRODUCTION', 'NO_PATHWAY', 'NMDA_BLOCKADE', 'NMDA_MODULATION', 'NMDA_ANTAGONISM', 'GLUTAMATE_MODULATION', 'GLUTAMATE_BLOCK', 'EXCITOTOXICITY_PREVENTION', 'ANXIOLYTIC', 'STRESS_REDUCTION', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'AMPK_ACTIVATION', 'VASODILATION', 'BLOOD_PRESSURE_LOWERING'],
+     mechanisms: ['NO_PRODUCTION', 'NO_PATHWAY', 'NMDA_BLOCKADE', 'NMDA_MODULATION', 'NMDA_ANTAGONISM', 'GLUTAMATE_MODULATION', 'GLUTAMATE_BLOCK', 'EXCITOTOXICITY_PREVENTION', 'ANXIOLYTIC', 'STRESS_REDUCTION', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'AMPK_ACTIVATION', 'VASODILATION', 'BLOOD_PRESSURE_LOWERING'],
     description: 'Агматин — метаболит аргинина, нейромодулятор. Регулирует оксид азота и NMDA-рецепторы. Улучшает памп и настроение.',
     synergies: [
         {with: "creatine", effect: "Производительность", mechanism: "Агматин модулирует NMDA", severity: "MEDIUM"},
@@ -3099,7 +3099,7 @@ bcaa: {
     ],
     organs: ['MUSCLES', 'LIVER'],
     systems: ['musculoskeletal', 'hepatic', 'metabolic'],
-     mechanisms: ['MUSCLE_PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH', 'MUSCLE_BREAKDOWN_PREVENTION', 'ANTI_CATABOLIC', 'PROTEIN_SYNTHESIS', 'AMINO_ACID_METABOLISM', 'MTOR_ACTIVATION', 'NITROGEN_BALANCE', 'GLUTAMINE', 'ENERGY_METABOLISM', 'ATP_PRODUCTION', 'GLUCONEOGENESIS_INHIBITION', 'GLUCOSE_UPTAKE', 'LIPID_METABOLISM', 'INSULIN_SENSITIVITY', 'IMMUNE_FUNCTION'],
+     mechanisms: ['MUSCLE_PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH', 'MUSCLE_BREAKDOWN_PREVENTION', 'ANTI_CATABOLIC', 'PROTEIN_SYNTHESIS', 'AMINO_ACID_METABOLISM', 'MTOR_ACTIVATION', 'NITROGEN_BALANCE', 'GLUTAMINE', 'ATP_PRODUCTION', 'GLUCONEOGENESIS_INHIBITION', 'GLUCOSE_UPTAKE', 'LIPID_METABOLISM', 'INSULIN_SENSITIVITY', 'IMMUNE_FUNCTION'],
     description: 'BCAA (лейцин, изолейцин, валин) — стимулируют синтез белка через mTOR. Предотвращают катаболизм на курсе ААС.',
     synergies: [
         {with: "creatine", effect: "Антикатаболическое действие", mechanism: "BCAA + креатин — мышцы", severity: "MEDIUM"},
@@ -3172,7 +3172,7 @@ glutathione: {
     ],
     organs: ['LIVER', 'BRAIN', 'IMMUNE_SYSTEM'],
     systems: ['hepatic', 'neuro', 'immune'],
-     mechanisms: ['GLUTATHIONE_SYNTHESIS', 'GLUTATHIONE_RECYCLING', 'GLUTATHIONE_PRECURSOR', 'GLUTATHIONE_CONJUGATION', 'ANTIOXIDANT_DEFENSE', 'ANTIOXIDANT_ENZYME', 'GPX_ACTIVATION', 'GPX_PROTECTION', 'LIPID_PEROXIDATION_INHIBITION', 'DETOXIFICATION_PHASE_II', 'LIVER_DETOXIFICATION', 'MITOCHONDRIAL_SUPPORT'],
+     mechanisms: ['GLUTATHIONE_SYNTHESIS', 'GLUTATHIONE_RECYCLING', 'GLUTATHIONE_PRECURSOR', 'GLUTATHIONE_CONJUGATION', 'ANTIOXIDANT_ENZYME', 'GPX_ACTIVATION', 'GPX_PROTECTION', 'LIPID_PEROXIDATION_INHIBITION', 'DETOXIFICATION_PHASE_II', 'LIVER_DETOXIFICATION', 'MITOCHONDRIAL_SUPPORT'],
     description: 'Глутатион — главный внутриклеточный антиоксидант и детоксикант. На курсе ААС критичен для защиты печени. Липосомальная форма предпочтительнее.',
     synergies: [
       { with: 'alpha_lipoic', effect: 'Регенерация GSH', mechanism: 'АЛЬК регенерирует окисленный глутатион через Nrf2', severity: 'HIGH' },
@@ -3210,7 +3210,7 @@ eaa: {
     ],
     organs: ['MUSCLES', 'LIVER'],
     systems: ['musculoskeletal', 'metabolic'],
-     mechanisms: ['MUSCLE_PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH', 'MUSCLE_BREAKDOWN_PREVENTION', 'ANTI_CATABOLIC', 'PROTEIN_SYNTHESIS', 'AMINO_ACID_METABOLISM', 'MTOR_ACTIVATION', 'NITROGEN_BALANCE', 'GLUTAMINE', 'ENERGY_METABOLISM', 'ATP_PRODUCTION', 'GLUCONEOGENESIS_INHIBITION', 'GLUCOSE_UPTAKE', 'LIPID_METABOLISM', 'INSULIN_SENSITIVITY', 'IMMUNE_FUNCTION'],
+     mechanisms: ['MUSCLE_PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH', 'MUSCLE_BREAKDOWN_PREVENTION', 'ANTI_CATABOLIC', 'PROTEIN_SYNTHESIS', 'AMINO_ACID_METABOLISM', 'MTOR_ACTIVATION', 'NITROGEN_BALANCE', 'GLUTAMINE', 'ATP_PRODUCTION', 'GLUCONEOGENESIS_INHIBITION', 'GLUCOSE_UPTAKE', 'LIPID_METABOLISM', 'INSULIN_SENSITIVITY', 'IMMUNE_FUNCTION'],
     description: 'EAA — полный набор незаменимых аминокислот для синтеза белка. Альтернатива протеину с быстрой абсорбцией.',
     synergies: [
         { with: 'creatine', effect: 'Полный анаболический стимул', mechanism: 'EAA — субстрат, креатин — АТФ для синтеза белка', severity: 'HIGH' },
@@ -3356,7 +3356,7 @@ alanine: {
     ],
     organs: ['LIVER', 'MUSCLES'],
     systems: ['hepatic', 'metabolic'],
-     mechanisms: ['AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS', 'GLUTAMINE', 'AMMONIA_DETOXIFICATION', 'UREA_CYCLE', 'GLUCONEOGENESIS_INHIBITION', 'GLUCOSE_UPTAKE', 'INSULIN_SENSITIVITY', 'ATP_PRODUCTION', 'NITROGEN_BALANCE', 'MUSCLE_BREAKDOWN_PREVENTION', 'ANTI_CATABOLIC', 'ENERGY_METABOLISM'],
+     mechanisms: ['AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS', 'GLUTAMINE', 'AMMONIA_DETOXIFICATION', 'UREA_CYCLE', 'GLUCONEOGENESIS_INHIBITION', 'GLUCOSE_UPTAKE', 'INSULIN_SENSITIVITY', 'ATP_PRODUCTION', 'NITROGEN_BALANCE', 'MUSCLE_BREAKDOWN_PREVENTION', 'ANTI_CATABOLIC'],
     description: 'Аланин — заменимая аминокислота, ключевой субстрат глюконеогенеза в печени. Поддерживает уровень глюкозы.',
     synergies: [
         {with: "glycine", effect: "Метаболическая поддержка", mechanism: "Оба — заменимые аминокислоты", severity: "LOW"},
@@ -3542,7 +3542,7 @@ ginseng: {
     ],
     organs: ['BRAIN', 'ADRENALS', 'REPRODUCTIVE', 'ENDOCRINE'],
     systems: ['neuro', 'endocrine', 'reproductive'],
-     mechanisms: ['ADAPTOGEN', 'STRESS_ADAPTATION', 'CORTISOL_REGULATION', 'CORTISOL_REDUCTION', 'HPA_MODULATION', 'NO_SYNTHESIS', 'NO_PRODUCTION', 'VASODILATION', 'ENERGY_METABOLISM', 'ATP_PRODUCTION', 'COGNITIVE_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'LIBIDO_ENHANCEMENT'],
+     mechanisms: ['ADAPTOGEN', 'STRESS_ADAPTATION', 'CORTISOL_REGULATION', 'CORTISOL_REDUCTION', 'HPA_MODULATION', 'NO_SYNTHESIS', 'NO_PRODUCTION', 'VASODILATION', 'ATP_PRODUCTION', 'COGNITIVE_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'LIBIDO_ENHANCEMENT'],
      description: 'Женьшень — король адаптогенов, повышает энергетику, снижает кортизол, улучшает когницию и либидо. На курсе ААС помогает с восстановлением.',
     synergies: [
       { with: "ginkgo", effect: "Женьшень + Гинкго — энергия + кровоток", mechanism: "Женьшень ↑ NO, гинкго ↑ мозговой кровоток через PAF-антагонизм", severity: "MEDIUM" },
@@ -3579,7 +3579,7 @@ rhodiola: {
     ],
     organs: ['BRAIN', 'ADRENALS', 'HEART', 'ENDOCRINE'],
     systems: ['neuro', 'endocrine', 'cardio'],
-     mechanisms: ['ADAPTOGEN', 'STRESS_ADAPTATION', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', 'CORTISOL_REGULATION', 'HPA_MODULATION', 'FOCUS_ENHANCEMENT', 'COGNITIVE_ENHANCEMENT', 'MAO_INHIBITION', 'PHYSICAL_ENDURANCE', 'MUSCLE_RECOVERY', 'NO_PRODUCTION', 'SEROTONIN_MODULATION'],
+     mechanisms: ['ADAPTOGEN', 'STRESS_ADAPTATION', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', 'CORTISOL_REGULATION', 'HPA_MODULATION', 'FOCUS_ENHANCEMENT', 'COGNITIVE_ENHANCEMENT', 'NO_PRODUCTION', 'SEROTONIN_MODULATION'],
      description: 'Родиола розовая — адаптоген, снижает кортизол и утомление, повышает фокус и выносливость. На курсе ААС помогает с восстановлением.',
     synergies: [
       { with: 'ashwagandha', effect: 'Двойной адаптоген — кортизол + стресс', mechanism: 'Родиола стимулирует, ашваганда расслабляет', severity: 'MEDIUM' },
@@ -3654,7 +3654,7 @@ bacopa: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-     mechanisms: ['NGF_STIMULATION', 'NGF_INCREASE', 'BDNF_INCREASE', 'NEUROGENESIS', 'NEUROPLASTICITY', 'MYELIN_REPAIR', 'MYELINATION', 'MEMORY_IMPROVEMENT', 'COGNITIVE_ENHANCEMENT', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'MOTONEURON_PROTECTION', 'DIGESTION_ENHANCEMENT'],
+     mechanisms: ['NGF_STIMULATION', 'BDNF_INCREASE', 'NEUROGENESIS', 'NEUROPLASTICITY', 'MYELIN_REPAIR', 'MEMORY_IMPROVEMENT', 'COGNITIVE_ENHANCEMENT', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'MOTONEURON_PROTECTION'],
      description: 'Ежовик гребенчатый — стимулирует фактор роста нервов (NGF), восстанавливает миелин. На курсе ААС нейропротектор.',
     synergies: [
       { with: 'bacopa', effect: 'Когнитивная нейропротекция', mechanism: 'Ежовик ↑ NGF, бакопа ↑ ацетилхолин', severity: 'MEDIUM' },
@@ -3692,7 +3692,7 @@ cordyceps: {
     ],
     organs: ['LUNGS', 'MUSCLES', 'KIDNEYS'],
     systems: ['cardio', 'renal', 'immune', 'metabolic'],
-     mechanisms: ['ATP_PRODUCTION', 'ATP_SYNTHESIS', 'ENERGY_METABOLISM', 'OXYGEN_UTILIZATION', 'AMPK_ACTIVATION', 'O2_CONSUMPTION', 'ENDURANCE', 'PHYSICAL_PERFORMANCE', 'ADAPTOGEN', 'STRESS_ADAPTATION', 'CORTISOL_REGULATION', 'TESTOSTERONE_SUPPORT', 'LUNG_FUNCTION'],
+     mechanisms: ['ATP_PRODUCTION', 'AMPK_ACTIVATION', 'ADAPTOGEN', 'STRESS_ADAPTATION', 'CORTISOL_REGULATION', 'TESTOSTERONE_SUPPORT'],
      description: 'Кордицепс — адаптоген, повышает VO2max и продукцию АТФ. Улучшает кислородное снабжение. На курсе поддерживает выносливость.',
     synergies: [
       { with: 'l_carnitine', effect: 'Митохондриальная энергия', mechanism: 'Кордицепс ↑ АТФ через AMPK, L-карнитин ↑ транспорт ЖК', severity: 'MEDIUM' },
@@ -3731,7 +3731,7 @@ cordyceps: {
     ],
     organs: ['REPRODUCTIVE', 'ADRENALS', 'ENDOCRINE'],
     systems: ['reproductive', 'endocrine'],
-     mechanisms: ['LIBIDO_ENHANCEMENT', 'SEXUAL_FUNCTION', 'ENERGY_METABOLISM', 'ATP_PRODUCTION', 'HORMONE_BALANCE', 'TESTOSTERONE_SUPPORT', 'TESTOSTERONE_PRODUCTION', 'FERTILITY_SUPPORT', 'SPERMATOGENESIS', 'SPERMATOGENESIS_RESTORE', 'ADAPTOGEN', 'STRESS_ADAPTATION', 'HPA_MODULATION', 'CORTISOL_REGULATION', 'MOOD_ENHANCEMENT'],
+     mechanisms: ['LIBIDO_ENHANCEMENT', 'ATP_PRODUCTION', 'TESTOSTERONE_SUPPORT', 'TESTOSTERONE_PRODUCTION', 'FERTILITY_SUPPORT', 'SPERMATOGENESIS', 'SPERMATOGENESIS_RESTORE', 'ADAPTOGEN', 'STRESS_ADAPTATION', 'HPA_MODULATION', 'CORTISOL_REGULATION'],
      description: 'Мака — перуанский адаптоген, повышает либидо и энергетику. Не влияет на гормоны напрямую, но балансирует ГГЯ ось.',
     synergies: [
       { with: 'zinc', effect: 'Фертильность', mechanism: 'Мака ↑ сперматогенез, Zn — кофактор StAR', severity: 'MEDIUM' },
@@ -3805,7 +3805,7 @@ gotu_kola: {
     ],
     organs: ['BRAIN', 'SKIN', 'JOINTS'],
     systems: ['neuro', 'musculoskeletal'],
-     mechanisms: ['COLLAGEN_SYNTHESIS', 'COLLAGEN_PRODUCTION', 'FIBROBLAST_STIMULATION', 'TISSUE_REPAIR', 'NEUROGENESIS', 'COGNITIVE_ENHANCEMENT', 'ANXIOLYTIC', 'GABA_MODULATION', 'CIRCULATION_ENHANCEMENT', 'MICROCIRCULATION', 'VASODILATION', 'NO_PRODUCTION', 'VENOTONIC'],
+     mechanisms: ['COLLAGEN_SYNTHESIS', 'TISSUE_REPAIR', 'NEUROGENESIS', 'COGNITIVE_ENHANCEMENT', 'ANXIOLYTIC', 'GABA_MODULATION', 'MICROCIRCULATION', 'VASODILATION', 'NO_PRODUCTION', 'VENOTONIC'],
      description: 'Готу Кола — ноотропный адаптоген, стимулирует синтез коллагена, улучшает кровообращение и память.',
     synergies: [
         {with: "bacopa", effect: "Когнитивная функция", mechanism: "Оба — ноотропы", severity: "MEDIUM"},
@@ -3843,7 +3843,7 @@ ecdysterone: {
     ],
     organs: ['MUSCLES', 'LIVER'],
     systems: ['musculoskeletal', 'metabolic'],
-     mechanisms: ['MUSCLE_PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH', 'PROTEIN_SYNTHESIS', 'MTOR_ACTIVATION', 'LEAN_MASS_GAIN', 'NITROGEN_BALANCE', 'ANTI_CATABOLIC', 'MUSCLE_BREAKDOWN_PREVENTION', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'AMPK_ACTIVATION', 'ENERGY_METABOLISM', 'ATP_PRODUCTION', 'RECOVERY_ENHANCEMENT', 'MUSCLE_RECOVERY'],
+     mechanisms: ['MUSCLE_PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH', 'PROTEIN_SYNTHESIS', 'MTOR_ACTIVATION', 'NITROGEN_BALANCE', 'ANTI_CATABOLIC', 'MUSCLE_BREAKDOWN_PREVENTION', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'AMPK_ACTIVATION', 'ATP_PRODUCTION'],
      description: 'Экдистерон — фитостероид из левзеи, стимулирует синтез белка через mTOR без андрогенных эффектов. Улучшает композицию тела.',
     synergies: [
         {with: "vitamin_d3", effect: "Сигнальные пути роста", mechanism: "Экдистерон + D3", severity: "MEDIUM"},
@@ -3880,7 +3880,7 @@ shilajit: {
     ],
     organs: ['BRAIN', 'MUSCLES', 'KIDNEYS'],
     systems: ['neuro', 'renal', 'metabolic'],
-     mechanisms: ['FULVIC_ACID', 'MINERAL_TRANSPORT', 'MINERAL_REPLETION', 'ELECTROLYTE_BALANCE', 'ATP_PRODUCTION', 'MITOCHONDRIAL_ENHANCEMENT', 'ENERGY_METABOLISM', 'TESTOSTERONE_SUPPORT', 'TESTOSTERONE_PRODUCTION', 'LEYDIG_CELL_FUNCTION', 'ADAPTOGEN', 'STRESS_ADAPTATION', 'ANTIOXIDANT_ENZYME', 'CHELATION'],
+     mechanisms: ['ELECTROLYTE_BALANCE', 'ATP_PRODUCTION', 'TESTOSTERONE_SUPPORT', 'TESTOSTERONE_PRODUCTION', 'LEYDIG_CELL_FUNCTION', 'ADAPTOGEN', 'STRESS_ADAPTATION', 'ANTIOXIDANT_ENZYME', 'CHELATION'],
      description: 'Шиладжит — минеральная смола из Гималаев, содержит фульвокислоты и 80+ минералов. Повышает тестостерон и энергетику.',
     synergies: [
         {with: "coq10", effect: "Усиление АТФ", mechanism: "Мумиё повышает биодоступность CoQ10", severity: "MEDIUM"},
@@ -3918,7 +3918,7 @@ schisandra: {
     ],
     organs: ['LIVER', 'BRAIN', 'ADRENALS', 'ENDOCRINE'],
     systems: ['hepatic', 'neuro', 'endocrine'],
-     mechanisms: ['ADAPTOGEN', 'STRESS_ADAPTATION', 'CORTISOL_REGULATION', 'CORTISOL_REDUCTION', 'HPA_MODULATION', 'NRF2_ACTIVATION', 'ANTIOXIDANT_ENZYME', 'NFKB_INHIBITION', 'ENERGY_METABOLISM', 'PHYSICAL_ENDURANCE', 'LUNG_FUNCTION', 'COGNITIVE_ENHANCEMENT'],
+     mechanisms: ['ADAPTOGEN', 'STRESS_ADAPTATION', 'CORTISOL_REGULATION', 'CORTISOL_REDUCTION', 'HPA_MODULATION', 'NRF2_ACTIVATION', 'ANTIOXIDANT_ENZYME', 'NFKB_INHIBITION', 'COGNITIVE_ENHANCEMENT'],
      description: 'Шизандра — адаптоген и гепатопротектор, содержит схизандрины. Защищает печень и повышает выносливость.',
     synergies: [
       { with: 'ashwagandha', effect: 'Адаптогенная синергия', mechanism: 'Шизандра стимулирует, ашваганда расслабляет', severity: 'MEDIUM' },
@@ -3955,7 +3955,7 @@ ginger: {
     ],
     organs: ['STOMACH', 'INTESTINES', 'MUSCLES'],
     systems: ['hepatic', 'metabolic'],
-     mechanisms: ['NFKB_INHIBITION', 'COX_INHIBITION', 'ANTIOXIDANT_ENZYME', 'DIGESTION_ENHANCEMENT', 'GUT_HEALTH', 'GASTROPROTECTION', 'NAUSEA_RELIEF', 'MUSCLE_RECOVERY', 'MUSCLE_FUNCTION', 'ANTI_EMETIC', 'CIRCULATION_ENHANCEMENT', 'LIPID_METABOLISM', 'GLUCOSE_REGULATION'],
+     mechanisms: ['NFKB_INHIBITION', 'COX_INHIBITION', 'ANTIOXIDANT_ENZYME', 'MUSCLE_FUNCTION', 'LIPID_METABOLISM'],
      description: 'Имбирь — противовоспалительное и противорвотное. Джинджеролы ингибируют COX-2 и LOX. На курсе помогает с тошнотой.',
     synergies: [
       { with: 'curcumin', effect: 'Двойное противовоспалительное', mechanism: 'Имбирь ↓ COX-2, куркумин ↓ NF-κB', severity: 'MEDIUM' },
@@ -3992,7 +3992,7 @@ astaxanthin: {
     ],
     organs: ['SKIN', 'EYES', 'HEART', 'MUSCLES'],
     systems: ['cardio', 'neuro'],
-     mechanisms: ['SINGLET_OXYGEN_QUENCH', 'LIPID_PEROXIDATION_INHIBITION', 'MITOCHONDRIAL_PROTECTION', 'NFKB_INHIBITION', 'COX_INHIBITION', 'UV_PROTECTION', 'SKIN_PROTECTION', 'ENDURANCE', 'PHYSICAL_PERFORMANCE', 'MUSCLE_RECOVERY', 'EYE_PROTECTION'],
+     mechanisms: ['LIPID_PEROXIDATION_INHIBITION', 'MITOCHONDRIAL_PROTECTION', 'NFKB_INHIBITION', 'COX_INHIBITION'],
      description: 'Астаксантин — в 6000 раз сильнее витамина С. Защищает кожу от UV и мышцы от окисления.',
     synergies: [
       { with: 'omega3', effect: 'Защита Омега-3 от окисления', mechanism: 'Астаксантин предотвращает перекисное окисление ПНЖК', severity: 'MEDIUM' },
@@ -4030,7 +4030,7 @@ resveratrol: {
     ],
     organs: ['HEART', 'BRAIN', 'LIVER'],
     systems: ['cardio', 'neuro', 'hepatic'],
-     mechanisms: ['SIRT1_ACTIVATION', 'NAD_METABOLISM', 'MITOPHAGY', 'AUTOPHAGY', 'NRF2_ACTIVATION', 'ANTIOXIDANT_ENZYME', 'NFKB_INHIBITION', 'COX_INHIBITION', 'VASODILATION', 'NO_PRODUCTION', 'BDNF_INCREASE', 'AMPK_ACTIVATION'],
+     mechanisms: ['NRF2_ACTIVATION', 'ANTIOXIDANT_ENZYME', 'NFKB_INHIBITION', 'COX_INHIBITION', 'VASODILATION', 'NO_PRODUCTION', 'BDNF_INCREASE', 'AMPK_ACTIVATION'],
      description: 'Ресвератрол — активатор SIRT1 и NRF2. Биодоступность около 20 процентов, птеростильбен предпочтительнее.',
     synergies: [
       { with: 'nmn', effect: 'NAD+ + сиртуины', mechanism: 'Ресвератрол ↑ SIRT1, NMN ↑ NAD+', severity: 'MEDIUM' },
@@ -4067,7 +4067,7 @@ quercetin: {
     ],
     organs: ['HEART', 'LUNGS', 'BRAIN', 'IMMUNE_SYSTEM', 'JOINTS', 'CARTILAGE'],
     systems: ['cardio', 'neuro', 'hepatic'],
-     mechanisms: ['NFKB_INHIBITION', 'COX_INHIBITION', 'ANTIHISTAMINE', 'MAST_CELL_STABILIZATION', 'SENOLYTIC', 'APOPTOSIS_INDUCTION', 'NRF2_ACTIVATION', 'NRF2_UPREGULATION', 'ANTIOXIDANT_ENZYME', 'PI3K_INHIBITION', 'CARDIO_PROTECTION', 'VASODILATION', 'CHELATION'],
+     mechanisms: ['NFKB_INHIBITION', 'COX_INHIBITION', 'MAST_CELL_STABILIZATION', 'NRF2_ACTIVATION', 'ANTIOXIDANT_ENZYME', 'VASODILATION', 'CHELATION'],
     description: 'Кверцетин — флавоноид с противовоспалительным и антигистаминным действием. Сенолитик.',
     synergies: [
       { with: 'vitamin_c', effect: 'Антиоксидантная синергия', mechanism: 'Кверцетин хелатирует Fe, вит.C регенерирует', severity: 'MEDIUM' },
@@ -4105,7 +4105,7 @@ egcg: {
     ],
     organs: ['LIVER', 'BRAIN', 'HEART'],
     systems: ['hepatic', 'neuro', 'metabolic'],
-     mechanisms: ['ANTIOXIDANT_ENZYME', 'LIPID_PEROXIDATION_INHIBITION', 'FAT_OXIDATION', 'LIPOLYSIS', 'THERMOGENESIS', 'FAT_BURNING', 'WEIGHT_LOSS', 'NFKB_INHIBITION', 'AMPK_ACTIVATION', 'COMT_INHIBITION', 'HMGCR_INHIBITION', 'LIVER_DETOXIFICATION', 'CHELATION'],
+     mechanisms: ['ANTIOXIDANT_ENZYME', 'LIPID_PEROXIDATION_INHIBITION', 'NFKB_INHIBITION', 'AMPK_ACTIVATION', 'LIVER_DETOXIFICATION', 'CHELATION'],
     description: 'EGCG — главный катехин зелёного чая. Активирует AMPK, стимулирует жиросжигание.',
     synergies: [
       { with: 'vitamin_d3', effect: 'AMPK + VDR', mechanism: 'EGCG ↑ AMPK, вит.D3 ↑ VDR — метаболическая синергия', severity: 'MEDIUM' },
@@ -4142,7 +4142,7 @@ sulforaphane: {
     ],
     organs: ['LIVER', 'LUNGS', 'INTESTINES'],
     systems: ['hepatic', 'immune', 'metabolic'],
-     mechanisms: ['NRF2_ACTIVATION', 'NRF2_UPREGULATION', 'KEAP1_MODULATION', 'PHASE2_DETOXIFICATION', 'GST_INDUCTION', 'NQO1_INDUCTION', 'HO1_INDUCTION', 'ANTIOXIDANT_ENZYME', 'NFKB_INHIBITION', 'HDAC_INHIBITION', 'LUNG_PROTECTION', 'GLUCOSE_REGULATION', 'INSULIN_SENSITIVITY'],
+     mechanisms: ['NRF2_ACTIVATION', 'ANTIOXIDANT_ENZYME', 'NFKB_INHIBITION', 'INSULIN_SENSITIVITY'],
     description: 'Сульфорафан — мощнейший активатор NRF2. Из брокколи. На курсе — ключевая гепатопротекция.',
     synergies: [
       { with: 'curcumin', effect: 'NRF2 + NF-κB', mechanism: 'Сульфорафан ↑ NRF2, куркумин ↓ NF-κB', severity: 'MEDIUM' },
@@ -4179,7 +4179,7 @@ dim: {
     ],
     organs: ['LIVER', 'ENDOCRINE'],
     systems: ['hepatic', 'endocrine', 'reproductive'],
-    mechanisms: ['ESTROGEN_METABOLISM', 'PHASE2_DETOXIFICATION', 'CYP1A1_INDUCTION', 'AROMATASE_MODULATION'],
+    mechanisms: ['ESTROGEN_METABOLISM'],
     description: 'DIM — метаболит индол-3-карбинола из крестоцветных. Сдвигает метаболизм эстрадиола в сторону слабого 2-гидроксиэстрона. На ПКТ — нутрициональная поддержка клиренса эстрогенов.',
     synergies: [
       { with: 'calcium_d_glucarate', effect: 'Полный цикл клиренса эстрогенов', mechanism: 'DIM ↑2-OH метаболизм (фаза I/II), CDG ↓β-глюкуронидазу (экскреция)', severity: 'MEDIUM' },
@@ -4215,7 +4215,7 @@ calcium_d_glucarate: {
     ],
     organs: ['LIVER', 'INTESTINES', 'ENDOCRINE'],
     systems: ['hepatic', 'endocrine', 'reproductive'],
-    mechanisms: ['ESTROGEN_METABOLISM', 'PHASE2_DETOXIFICATION', 'GLUCURONIDATION_SUPPORT', 'BETA_GLUCURONIDASE_INHIBITION'],
+    mechanisms: ['ESTROGEN_METABOLISM'],
     description: 'Кальция D-глюкарат — источник D-глюкаровой кислоты, ингибитор β-глюкуронидазы. Предотвращает деконъюгацию эстрогенов в кишечнике, усиливая их экскрецию. На ПКТ — поддержка клиренса эстрогенов.',
     synergies: [
       { with: 'dim', effect: 'Полный цикл клиренса эстрогенов', mechanism: 'DIM ↑2-OH метаболизм, CDG ↓реабсорбции конъюгатов', severity: 'MEDIUM' },
@@ -4252,7 +4252,7 @@ melatonin: {
     ],
     organs: ['BRAIN', 'IMMUNE_SYSTEM', 'INTESTINES', 'ENDOCRINE'],
     systems: ['neuro', 'immune', 'metabolic', 'endocrine'],
-     mechanisms: ['SLEEP_REGULATION', 'SLEEP_PROMOTION', 'SLEEP_QUALITY', 'CIRCADIAN_RHYTHM', 'MT1_AGONIST', 'MT2_AGONIST', 'SINGLET_OXYGEN_QUENCH', 'ROS_SCAVENGING', 'ANTIOXIDANT_ENZYME', 'IMMUNE_FUNCTION', 'APOPTOSIS_INHIBITION', 'MITOCHONDRIAL_PROTECTION', 'CORTISOL_REGULATION', 'HPA_MODULATION', 'GUT_HEALTH'],
+     mechanisms: ['SLEEP_REGULATION', 'SLEEP_PROMOTION', 'SLEEP_QUALITY', 'CIRCADIAN_RHYTHM', 'ANTIOXIDANT_ENZYME', 'IMMUNE_FUNCTION', 'APOPTOSIS_INHIBITION', 'MITOCHONDRIAL_PROTECTION', 'CORTISOL_REGULATION', 'HPA_MODULATION'],
     description: 'Мелатонин — гормон сна, мощный антиоксидант. На курсе улучшает восстановление.',
     synergies: [
       { with: 'magnesium', effect: 'Расслабление + сон', mechanism: 'Mg ↓ кортизол, мелатонин ↑ MT1/MT2', severity: 'MEDIUM' },
@@ -4289,7 +4289,7 @@ ginkgo: {
     ],
     organs: ['BRAIN', 'VESSELS', 'EYES'],
     systems: ['neuro', 'cardio'],
-     mechanisms: ['CEREBRAL_BLOOD_FLOW', 'CEREBRAL_CIRCULATION', 'VASODILATION', 'NO_PRODUCTION', 'NO_SYNTHESIS', 'PLATELET_AGGREGATION_INHIBITION', 'ANTI_COAGULANT', 'PAF_INHIBITION', 'ANTIOXIDANT_ENZYME', 'MEMORY_IMPROVEMENT', 'COGNITIVE_ENHANCEMENT', 'EYE_PROTECTION', 'MICROCIRCULATION', 'DOPAMINE_MODULATION'],
+     mechanisms: ['CEREBRAL_BLOOD_FLOW', 'VASODILATION', 'NO_PRODUCTION', 'NO_SYNTHESIS', 'PLATELET_AGGREGATION_INHIBITION', 'ANTIOXIDANT_ENZYME', 'MEMORY_IMPROVEMENT', 'COGNITIVE_ENHANCEMENT', 'MICROCIRCULATION', 'DOPAMINE_MODULATION'],
     description: 'Гинкго — улучшает мозговой кровоток и память.',
     synergies: [
       { with: 'bacopa', effect: 'Кровоток + память', mechanism: 'Гинкго ↑ мозговой кровоток (NO), бакопа ↑ ацетилхолин', severity: 'MEDIUM' },
@@ -4326,7 +4326,7 @@ cjc1295: {
     ],
     organs: ['REPRODUCTIVE', 'BRAIN'],
     systems: ['reproductive', 'endocrine'],
-     mechanisms: ['GH_RELEASE', 'GH_INCREASE', 'GHRH_AGONIST', 'GH_PULSATILITY', 'SOMATOTROPH_STIMULATION', 'RELEASING_HORMONE_ANALOG', 'IGF1_INCREASE', 'IGF1_STIMULATION', 'MUSCLE_GROWTH', 'PROTEIN_SYNTHESIS', 'MTOR_ACTIVATION', 'FAT_LOSS', 'LIPOLYSIS', 'FAT_OXIDATION', 'RECOVERY_ENHANCEMENT', 'COLLAGEN_SYNTHESIS', 'BONE_GROWTH'],
+     mechanisms: ['MUSCLE_GROWTH', 'PROTEIN_SYNTHESIS', 'MTOR_ACTIVATION', 'COLLAGEN_SYNTHESIS'],
     description: 'CJC-1295 с модагриком — пептид GHRH-аналог, стимулирует выброс ГР и ИФР-1. Улучшает композицию тела и восстановление.',
     synergies: [
         {with: "ipamorelin", effect: "Максимальная стимуляция GH", mechanism: "CJC-1295 + ипаморелин — GHRH+GHRP", severity: "HIGH"},
@@ -4362,7 +4362,7 @@ ipamorelin: {
     ],
     organs: ['REPRODUCTIVE', 'BRAIN'],
     systems: ['reproductive', 'endocrine'],
-     mechanisms: ['GH_RELEASE', 'GHSR_AGONIST', 'GHRELIN_RECEPTOR_AGONIST', 'GH_PULSATILITY', 'IGF1_INCREASE', 'IGF1_STIMULATION', 'MUSCLE_RECOVERY', 'MUSCLE_PROTEIN_SYNTHESIS', 'PROTEIN_SYNTHESIS', 'FAT_LOSS', 'LIPOLYSIS', 'FAT_OXIDATION', 'CORTISOL_SPARING', 'APPETITE_REGULATION', 'ENERGY_METABOLISM', 'RECOVERY_ENHANCEMENT', 'BONE_GROWTH'],
+     mechanisms: ['MUSCLE_PROTEIN_SYNTHESIS', 'PROTEIN_SYNTHESIS'],
     description: 'Ипаморелин — селективный секретагог ГР, не повышает кортизол и пролактин. На курсе — восстановление и жиросжигание.',
     synergies: [
       { with: 'cjc1295', effect: 'GHRH+GHRP синергия', mechanism: 'CJC ↑ GHRH, ипаморелин ↑ GHS-R — пульсация GH', severity: 'HIGH' },
@@ -4397,7 +4397,7 @@ ghrp2: {
     ],
     organs: ['REPRODUCTIVE', 'BRAIN'],
     systems: ['reproductive', 'endocrine'],
-     mechanisms: ['GH_RELEASE', 'GHSR_AGONIST', 'GHRELIN_RECEPTOR_AGONIST', 'GH_PULSATILITY', 'IGF1_INCREASE', 'IGF1_STIMULATION', 'MUSCLE_RECOVERY', 'PROTEIN_SYNTHESIS', 'CORTISOL_MODULATION', 'CORTISOL_INCREASE', 'APPETITE_STIMULATION', 'APPETITE_INCREASE', 'NPY_ACTIVATION', 'MUSCLE_GROWTH', 'RECOVERY_ENHANCEMENT', 'FAT_LOSS', 'LIPOLYSIS', 'ENERGY_METABOLISM'],
+     mechanisms: ['PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH'],
     description: 'GHRP-2 — секретагог ГР, стимулирует аппетит и восстановление. Менее селективный чем ипаморелин.',
     synergies: [
         {with: "cjc1295", effect: "Максимальная стимуляция GH", mechanism: "GHRH+GHRP = синергия GH", severity: "HIGH"},
@@ -4433,7 +4433,7 @@ ghrp6: {
     ],
     organs: ['REPRODUCTIVE', 'BRAIN'],
     systems: ['reproductive', 'endocrine'],
-     mechanisms: ['GH_RELEASE', 'GH_PULSATILITY', 'GHSR_AGONIST', 'GHRELIN_RECEPTOR_AGONIST', 'IGF1_INCREASE', 'IGF1_STIMULATION', 'APPETITE_STIMULATION', 'APPETITE_INCREASE', 'NPY_ACTIVATION', 'AGRP_ACTIVATION', 'CORTISOL_INCREASE', 'PROLACTIN_INCREASE', 'MUSCLE_RECOVERY', 'PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH', 'FAT_LOSS', 'LIPOLYSIS', 'ENERGY_METABOLISM'],
+     mechanisms: ['PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH'],
     description: 'GHRP-6 — секретагог ГР с сильным стимулирующим аппетит действием. На курсе — набор массы.',
     synergies: [
         {with: "cjc1295", effect: "Максимальная стимуляция GH", mechanism: "GHRH+GHRP = синергия GH", severity: "HIGH"},
@@ -4469,7 +4469,7 @@ follistatin: {
     ],
     organs: ['MUSCLES', 'REPRODUCTIVE'],
     systems: ['reproductive', 'endocrine'],
-     mechanisms: ['MYOSTATIN_INHIBITION', 'MYOSTATIN_BLOCKADE', 'ACTIVIN_INHIBITION', 'GDF8_INHIBITION', 'MUSCLE_GROWTH', 'MUSCLE_PROTEIN_SYNTHESIS', 'PROTEIN_SYNTHESIS', 'MTOR_ACTIVATION', 'MUSCLE_FUNCTION', 'LEAN_MASS_GAIN', 'FOLLICLE_REGULATION', 'FOLLICLE_STIMULATION', 'FERTILITY_SUPPORT', 'LIPOLYSIS', 'FAT_LOSS', 'METABOLIC_REGULATION'],
+     mechanisms: ['MUSCLE_GROWTH', 'MUSCLE_PROTEIN_SYNTHESIS', 'PROTEIN_SYNTHESIS', 'MTOR_ACTIVATION', 'MUSCLE_FUNCTION', 'FERTILITY_SUPPORT'],
     description: 'Фоллистатин — белок-ингибитор миостатина, блокирует ограничитель роста мышц. Потенцирует гипертрофию на курсе.',
     synergies: [
         {with: "cjc1295", effect: "Рост мышц: миостатин+GH", mechanism: "Фоллистатин + CJC-1295", severity: "HIGH"},
@@ -4506,7 +4506,7 @@ semax: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-     mechanisms: ['NGF_STIMULATION', 'NGF_INCREASE', 'BDNF_INCREASE', 'TRKB_ACTIVATION', 'NEUROGENESIS', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'COGNITION_ENHANCEMENT', 'COGNITIVE_ENHANCEMENT', 'MEMORY_IMPROVEMENT', 'FOCUS_ENHANCEMENT', 'DOPAMINE_MODULATION', 'SEROTONIN_MODULATION', 'APOPTOSIS_INHIBITION', 'MOTONEURON_PROTECTION', 'LONG_TERM_POTENTIATION'],
+     mechanisms: ['NGF_STIMULATION', 'BDNF_INCREASE', 'NEUROGENESIS', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'COGNITION_ENHANCEMENT', 'COGNITIVE_ENHANCEMENT', 'MEMORY_IMPROVEMENT', 'FOCUS_ENHANCEMENT', 'DOPAMINE_MODULATION', 'SEROTONIN_MODULATION', 'APOPTOSIS_INHIBITION', 'MOTONEURON_PROTECTION'],
     description: 'Семакс — нейропептид, стимулирует синтез NGF и BDNF, улучшает память, внимание и нейропротекцию. Обязателен на курсе ААС.',
     synergies: [
         {with: "selank", effect: "Комплексная нейропротекция", mechanism: "Семакс — BDNF, Селанк — GABA", severity: "MEDIUM"},
@@ -4544,7 +4544,7 @@ selank: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['nero'],
-     mechanisms: ['GABA_MODULATION', 'GABA_BENZODIAZEPINE_MODULATION', 'ANXIOLYTIC', 'STRESS_REDUCTION', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'MOOD_REGULATION', 'MOOD_ENHANCEMENT', 'SEROTONIN_MODULATION', 'DOPAMINE_MODULATION', 'STRESS_ADAPTATION', 'SLEEP_PROMOTION', 'SLEEP_QUALITY', 'ENKEPHALINASE_INHIBITION', 'COGNITIVE_ENHANCEMENT', 'APOPTOSIS_INHIBITION'],
+     mechanisms: ['GABA_MODULATION', 'ANXIOLYTIC', 'STRESS_REDUCTION', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'SEROTONIN_MODULATION', 'DOPAMINE_MODULATION', 'STRESS_ADAPTATION', 'SLEEP_PROMOTION', 'SLEEP_QUALITY', 'COGNITIVE_ENHANCEMENT', 'APOPTOSIS_INHIBITION'],
     description: 'Селанк — анксиолитический пептид, модулирует ГАМК-систему, снижает тревожность и улучшает сон. На курсе — антистресс.',
     synergies: [
         {with: "semax", effect: "Нейропротекция + антистресс", mechanism: "Семакс — BDNF/NGF, Селанк — GABA", severity: "MEDIUM"},
@@ -4582,7 +4582,7 @@ dsip: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['nero'],
-     mechanisms: ['SLEEP_REGULATION', 'SLEEP_PROMOTION', 'DELTA_SLEEP_INDUCTION', 'SLEEP_QUALITY', 'DEEP_SLEEP', 'ANALGESIC', 'PAIN_MODULATION', 'OPIOID_MODULATION', 'CORTISOL_REDUCTION', 'CORTISOL_REGULATION', 'HPA_MODULATION', 'STRESS_REDUCTION', 'GABA_MODULATION', 'SEROTONIN_MODULATION', 'MUSCLE_RELAXATION', 'RECOVERY_ENHANCEMENT', 'APOPTOSIS_INHIBITION'],
+     mechanisms: ['SLEEP_REGULATION', 'SLEEP_PROMOTION', 'SLEEP_QUALITY', 'CORTISOL_REDUCTION', 'CORTISOL_REGULATION', 'HPA_MODULATION', 'STRESS_REDUCTION', 'GABA_MODULATION', 'SEROTONIN_MODULATION', 'MUSCLE_RELAXATION', 'APOPTOSIS_INHIBITION'],
     description: 'DSIP — дельта-сон-индуцирующий пептид, нормализует структуру сна, снижает кортизол. На курсе — улучшение восстановления.',
     synergies: [
         {with: "melatonin", effect: "Глубокий сон", mechanism: "DSIP — дельта-сон, мелатонин — циркадный", severity: "MEDIUM"},
@@ -4618,7 +4618,7 @@ p21: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-     mechanisms: ['NEUROGENESIS', 'HIPPOCAMPAL_NEUROGENESIS', 'BDNF_INCREASE', 'NGF_INCREASE', 'MEMORY_IMPROVEMENT', 'COGNITIVE_ENHANCEMENT', 'COGNITION_ENHANCEMENT', 'LEARNING_ENHANCEMENT', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'LONG_TERM_POTENTIATION', 'NMDA_MODULATION', 'GLUTAMATE_MODULATION', 'APOPTOSIS_INHIBITION', 'MOTONEURON_PROTECTION', 'DOPAMINE_MODULATION'],
+     mechanisms: ['NEUROGENESIS', 'BDNF_INCREASE', 'MEMORY_IMPROVEMENT', 'COGNITIVE_ENHANCEMENT', 'COGNITION_ENHANCEMENT', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'NMDA_MODULATION', 'GLUTAMATE_MODULATION', 'APOPTOSIS_INHIBITION', 'MOTONEURON_PROTECTION', 'DOPAMINE_MODULATION'],
     description: 'P21 — ноотропный пептид, стимулирует нейрогенез и BDNF. Улучшает память и обучение на курсе.',
     synergies: [
         {with: "semax", effect: "Нейропластичность", mechanism: "Оба стимулируют нейрогенез", severity: "MEDIUM"},
@@ -4653,7 +4653,7 @@ mots_c: {
     ],
     organs: ['MUSCLES', 'LIVER', 'BRAIN'],
     systems: ['hepatic', 'metabolic'],
-     mechanisms: ['AMPK_ACTIVATION', 'NAD_METABOLISM', 'MITOCHONDRIAL_BIOGENESIS', 'FAT_OXIDATION', 'FAT_BURNING', 'LIPOLYSIS', 'WEIGHT_LOSS', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'GLUCOSE_REGULATION', 'MUSCLE_FUNCTION', 'MUSCLE_REGULATION', 'MUSCLE_METABOLISM', 'ENERGY_METABOLISM', 'ATP_PRODUCTION', 'EXERCISE_MIMETIC', 'ANTI_AGING'],
+     mechanisms: ['AMPK_ACTIVATION', 'MITOCHONDRIAL_BIOGENESIS', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'MUSCLE_FUNCTION', 'ATP_PRODUCTION'],
     description: 'MOTS-c — митохондриальный пептид, активирует AMPK, улучшает инсулиновую чувствительность и жиросжигание.',
     synergies: [
         {with: "nmn", effect: "Митохондриальная функция", mechanism: "MOTS-c + NMN — путь NAD+", severity: "MEDIUM"},
@@ -4689,7 +4689,7 @@ humanin: {
     ],
     organs: ['BRAIN', 'MUSCLES', 'HEART'],
     systems: ['neuro', 'cardio'],
-     mechanisms: ['NEUROGENESIS', 'APOPTOSIS_INHIBITION', 'BAX_INHIBITION', 'CASPASE_INHIBITION', 'MITOCHONDRIAL_PROTECTION', 'MITOCHONDRIAL_STABILITY', 'MITOCHONDRIAL_MEMBRANE_PROTECTION', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'ANTI_AGING', 'GPCR_ACTIVATION', 'PI3K_ACTIVATION', 'AKT_ACTIVATION', 'ERK_ACTIVATION', 'ANTIOXIDANT_ENZYME'],
+     mechanisms: ['NEUROGENESIS', 'APOPTOSIS_INHIBITION', 'MITOCHONDRIAL_PROTECTION', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'ANTIOXIDANT_ENZYME'],
     description: 'Хьюманин — митохондриальный пептид, подавляет апоптоз, нейропротекция и защита митохондрий. Анти-возрастной.',
     synergies: [
         {with: "mots_c", effect: "Митохондриальная защита", mechanism: "Оба — митохондриальные пептиды", severity: "MEDIUM"},
@@ -4726,7 +4726,7 @@ ss31: {
     ],
     organs: ['MUSCLES', 'HEART', 'KIDNEYS'],
     systems: ['cardio', 'renal'],
-     mechanisms: ['MITOCHONDRIAL_PROTECTION', 'MITOCHONDRIAL_MEMBRANE_PROTECTION', 'MITOCHONDRIAL_ROS_REDUCTION', 'MPTP_INHIBITION', 'ATP_PRODUCTION', 'ATP_SYNTHESIS', 'ENERGY_METABOLISM', 'ANTIOXIDANT_ENZYME', 'MUSCLE_RECOVERY', 'MUSCLE_FUNCTION', 'CARDIO_PROTECTION', 'APOPTOSIS_INHIBITION'],
+     mechanisms: ['MITOCHONDRIAL_PROTECTION', 'ATP_PRODUCTION', 'ANTIOXIDANT_ENZYME', 'MUSCLE_FUNCTION', 'APOPTOSIS_INHIBITION'],
     description: 'SS-31 — митохондриальный пептид, защищает внутреннюю мембрану митохондрий, снижает окислительный стресс.',
     synergies: [
       { with: 'coq10', effect: 'Митохондриальная защита', mechanism: 'SS-31 ↓ митохондриальный ROS, CoQ10 ↑ ЭТЦ', severity: 'MEDIUM' },
@@ -4761,7 +4761,7 @@ thymosin_alpha1: {
     ],
     organs: ['THYMUS', 'IMMUNE_SYSTEM'],
     systems: ['immune'],
-     mechanisms: ['IMMUNE_REGULATION', 'IMMUNE_STIMULATION', 'T_CELL_ACTIVATION', 'T_CELL_ACTIVATION_NK', 'NK_CELL_ACTIVATION', 'TH1_IMMUNITY', 'ANTI_INFECTIOUS', 'INFECTION_RESISTANCE', 'VIRAL_RESISTANCE', 'THYMUS_FUNCTION', 'IMMUNE_RECOVERY', 'IMMUNE_BALANCE', 'DENDRITIC_CELL_ACTIVATION', 'MACROPHAGE_ACTIVATION', 'LYMPHOCYTE_PROLIFERATION'],
+     mechanisms: ['IMMUNE_MODULATION', 'IMMUNE_FUNCTION'],
     description: 'Тимозин Альфа-1 — иммуномодулирующий пептид, активирует Т-клетки и NK-клетки. На курсе — защита от инфекций.',
     synergies: [
         {with: "vitamin_d3", effect: "Иммунная модуляция", mechanism: "Оба усиливают Th1-иммунитет", severity: "MEDIUM"},
@@ -4797,7 +4797,7 @@ ghk_cu: {
     ],
     organs: ['SKIN', 'JOINTS', 'HAIR'],
     systems: ['musculoskeletal'],
-     mechanisms: ['COLLAGEN_SYNTHESIS', 'COLLAGEN_PRODUCTION', 'FIBROBLAST_STIMULATION', 'TISSUE_REPAIR', 'TISSUE_REGENERATION', 'SKIN_REPAIR', 'ANGIOGENESIS', 'VEGF_STIMULATION', 'ANTIOXIDANT_ENZYME', 'COPPER_TRANSPORT', 'COPPER_DELIVERY', 'METALLOTHIONEIN_ACTIVATION', 'DNA_REPAIR', 'HAIR_GROWTH'],
+     mechanisms: ['COLLAGEN_SYNTHESIS', 'TISSUE_REPAIR', 'ANGIOGENESIS', 'ANTIOXIDANT_ENZYME', 'COPPER_TRANSPORT', 'COPPER_DELIVERY'],
     description: 'GHK-Cu — медный пептид, стимулирует синтез коллагена, заживление ран, антиоксидант. На курсе — кожа, связки, волосы.',
     synergies: [
         {with: "vitamin_c", effect: "Синтез коллагена", mechanism: "GHK-Медь стимулирует синтез", severity: "HIGH"},
@@ -4836,7 +4836,7 @@ bpc157: {
     ],
     organs: ['JOINTS', 'GUT', 'MUSCLES'],
     systems: ['musculoskeletal', 'gastrointestinal'],
-     mechanisms: ['WOUND_REPAIR', 'TISSUE_REPAIR', 'TISSUE_REGENERATION', 'ANGIOGENESIS', 'VEGF_STIMULATION', 'VEGF_INCREASE', 'GUT_PROTECTION', 'GUT_HEALING', 'GASTROPROTECTION', 'ULCER_HEALING', 'NFKB_INHIBITION', 'TENDON_REPAIR', 'LIGAMENT_REPAIR', 'MUSCLE_RECOVERY', 'EGFR_ACTIVATION'],
+     mechanisms: ['TISSUE_REPAIR', 'ANGIOGENESIS', 'NFKB_INHIBITION'],
     description: 'BPC-157 — пептид защиты тела, ускоряет заживление связок, сухожилий, кишки. На курсе — защита суставов и ЖКТ.',
     synergies: [
         {with: "tb500", effect: "Максимальное заживление", mechanism: "BPC-157 — ангиогенез, TB-500 — миграция", severity: "HIGH"},
@@ -4875,7 +4875,7 @@ tb500: {
     ],
     organs: ['JOINTS', 'MUSCLES', 'HEART'],
     systems: ['musculoskeletal'],
-     mechanisms: ['ACTIN_REGULATION', 'ACTIN_SEQUESTRATION', 'CYTOSKELETON_REGULATION', 'CELL_MIGRATION', 'ANGIOGENESIS', 'VEGF_STIMULATION', 'TISSUE_REPAIR', 'TISSUE_REGENERATION', 'MUSCLE_RECOVERY', 'MUSCLE_REPAIR', 'MUSCLE_FUNCTION', 'TENDON_REPAIR', 'LIGAMENT_REPAIR', 'ANTI_APOPTOTIC', 'PI3K_ACTIVATION', 'AKT_ACTIVATION'],
+     mechanisms: ['ANGIOGENESIS', 'TISSUE_REPAIR', 'MUSCLE_FUNCTION'],
     description: 'TB-500 — пептид на основе тимозина бета-4, регулирует актин, ускоряет заживление мышц и связок. На курсе — восстановление.',
     synergies: [
         {with: "bpc157", effect: "Максимальное заживление", mechanism: "TB-500 — актин, BPC-157 — ангиогенез", severity: "HIGH"},
@@ -4912,7 +4912,7 @@ melanotan1: {
     ],
     organs: ['SKIN', 'REPRODUCTIVE'],
     systems: ['reproductive'],
-     mechanisms: ['MELANOGENESIS', 'MELANIN_SYNTHESIS', 'MC1R_AGONIST', 'PIGMENTATION', 'EUMELANIN_STIMULATION', 'SKIN_PROTECTION', 'SKIN_PIGMENTATION', 'UV_PROTECTION', 'PHOTOPROTECTION', 'MC4R_AGONIST', 'APHRODISIAC_EFFECT', 'APPETITE_SUPPRESSION', 'LIBIDO_ENHANCEMENT', 'MELANOCORTIN_AGONIST', 'NO_MODULATION'],
+     mechanisms: ['LIBIDO_ENHANCEMENT'],
     description: 'Меланотан-1 — пептид, стимулирующий меланогенез, защиту кожи от УФ. Минимальные побочные эффекты.',
     synergies: [
         {with: "vitamin_d3", effect: "Пигментация и синтез витамина D", mechanism: "Меланотан → меланин → D3", severity: "LOW"},
@@ -4947,7 +4947,7 @@ melanotan2: {
     ],
     organs: ['SKIN', 'REPRODUCTIVE'],
     systems: ['reproductive'],
-     mechanisms: ['MELANOGENESIS', 'MELANIN_SYNTHESIS', 'MC1R_AGONIST', 'PIGMENTATION', 'EUMELANIN_STIMULATION', 'APHRODISIAC_EFFECT', 'LIBIDO_ENHANCEMENT', 'APPETITE_SUPPRESSION', 'MC4R_AGONIST', 'MC3R_AGONIST', 'UV_PROTECTION', 'PHOTOPROTECTION', 'SKIN_PROTECTION', 'NO_SYNTHESIS', 'VASODILATION', 'MELANOCORTIN_AGONIST', 'NEUROPEPTIDE_MOD'],
+     mechanisms: ['LIBIDO_ENHANCEMENT', 'NO_SYNTHESIS', 'VASODILATION'],
     description: 'Меланотан-2 — сильнее МТ1, стимулирует загар и либидо, но с больше побочными. На курсе — защита кожи.',
     synergies: [
         {with: "vitamin_d3", effect: "Пигментация и синтез витамина D", mechanism: "Меланотан → меланин → D3", severity: "LOW"},
@@ -4982,7 +4982,7 @@ pt141: {
     ],
     organs: ['REPRODUCTIVE', 'BRAIN'],
     systems: ['reproductive'],
-     mechanisms: ['MELANOCORTIN_ACTIVATION', 'MC3R_AGONIST', 'MC4R_AGONIST', 'APHRODISIAC_EFFECT', 'LIBIDO_ENHANCEMENT', 'SEXUAL_FUNCTION', 'SEXUAL_AROUSAL', 'ERECTILE_FUNCTION', 'NO_SYNTHESIS', 'NO_PRODUCTION', 'VASODILATION', 'DOPAMINE_MODULATION', 'OXYTOCIN_MODULATION', 'NEUROPEPTIDE_MOD', 'HYPOTHALAMUS_MODULATION', 'SEROTONIN_MODULATION', 'MELANOCORTIN_AGONIST'],
+     mechanisms: ['LIBIDO_ENHANCEMENT', 'NO_SYNTHESIS', 'NO_PRODUCTION', 'VASODILATION', 'DOPAMINE_MODULATION', 'SEROTONIN_MODULATION'],
     description: 'PT-141 — пептид для лечения сексуальной дисфункции, активирует меланокортиновые рецепторы. На курсе — либидо.',
     synergies: [
         {with: "melanotan2", effect: "Усиление эффекта", mechanism: "PT-141 — метаболит меланотана II", severity: "MEDIUM"},
@@ -5016,7 +5016,7 @@ gonadorelin: {
     ],
     organs: ['REPRODUCTIVE', 'BRAIN'],
     systems: ['reproductive', 'endocrine'],
-     mechanisms: ['GNRH_AGONIST', 'GNRH_STIMULATION', 'GNRH_PULSE', 'HPTA_RESTORATION', 'LH_RELEASE', 'LH_STIMULATION', 'FSH_RELEASE', 'FSH_STIMULATION', 'LH_FSH_REGULATION', 'TESTOSTERONE_RESTORE', 'TESTOSTERONE_UP', 'TESTOSTERONE_SYNTHESIS', 'STEROIDOGENESIS', 'PCT_SUPPORT', 'PCT_RECOVERY', 'LEYDIG_CELL_FUNCTION', 'SPERMATOGENESIS_RESTORE', 'GONADOTROPIN_RELEASE'],
+     mechanisms: ['GNRH_STIMULATION', 'HPTA_RESTORATION', 'LH_RELEASE', 'LH_STIMULATION', 'FSH_STIMULATION', 'TESTOSTERONE_RESTORE', 'TESTOSTERONE_UP', 'TESTOSTERONE_SYNTHESIS', 'STEROIDOGENESIS', 'LEYDIG_CELL_FUNCTION', 'SPERMATOGENESIS_RESTORE'],
     description: 'Гонадорелин — стимулятор ГнРГ, восстанавливает ось ГРГ-ЛГ-ФСГ. Для ПКТ и восстановления после курса.',
     synergies: [
         {with: "hcg", effect: "Стимуляция HPG-оси", mechanism: "Гонадорелин — GnRH, ХГЧ — LH-аналог", severity: "MEDIUM"},
@@ -5051,7 +5051,7 @@ kisspeptin: {
     ],
     organs: ['REPRODUCTIVE', 'BRAIN'],
     systems: ['reproductive', 'endocrine'],
-     mechanisms: ['KISS1R_AGONIST', 'GPR54_ACTIVATION', 'GNRH_STIMULATION', 'GNRH_PULSE', 'HPTA_RESTORATION', 'LH_FSH_STIMULATION', 'LH_RELEASE', 'FSH_RELEASE', 'PUBERTY_REGULATION', 'REPRODUCTIVE_RECOVERY', 'REPRODUCTIVE_AXIS', 'GNRH_NEURON_MODULATION', 'HYPOTHALAMUS_ACTIVATION', 'FERTILITY_SUPPORT', 'SPERMATOGENESIS_RESTORE', 'TESTOSTERONE_UP', 'GONADOTROPIN_RELEASE', 'NEUROPEPTIDE_MOD'],
+     mechanisms: ['GNRH_STIMULATION', 'HPTA_RESTORATION', 'LH_FSH_STIMULATION', 'LH_RELEASE', 'FERTILITY_SUPPORT', 'SPERMATOGENESIS_RESTORE', 'TESTOSTERONE_UP'],
     description: 'Киссептин — пептид, стимулирующий выброс ГнРГ, восстанавливает репродуктивную ось. Для ПКТ и восстановления.',
     synergies: [
         {with: "gonadorelin", effect: "Стимуляция HPG-оси", mechanism: "Кисспептин → GnRH → LH/FSH", severity: "HIGH"},
@@ -5086,7 +5086,7 @@ glp1: {
     ],
     organs: ['PANCREAS', 'BRAIN', 'GUT'],
     systems: ['metabolic', 'gastrointestinal'],
-     mechanisms: ['GLP1_AGONIST', 'INCRETIN_EFFECT', 'INSULIN_SECRETION', 'INSULIN_RELEASE', 'GLUCOSE_REGULATION', 'GLUCOSE_LOWERING', 'GLUCOSE_DEPENDENT_INSULIN', 'APPETITE_SUPPRESSION', 'APPETITE_REDUCTION', 'WEIGHT_LOSS', 'SATIETY_ENHANCEMENT', 'GASTRIC_EMPTYING_SLOW', 'GLUCAGON_INHIBITION', 'BETA_CELL_PROTECTION', 'PANCREATIC_FUNCTION', 'LIPID_METABOLISM'],
+     mechanisms: ['INSULIN_SECRETION', 'LIPID_METABOLISM'],
     description: 'ГПП-1 — инкретиновый пептид, стимулирует инсулин, подавляет аппетит. На курсе — контроль глюкозы и веса.',
     synergies: [
         {with: "berberine", effect: "Контроль глюкозы и аппетита", mechanism: "Оба снижают аппетит и глюкозу — двойной метаболический контроль", severity: "MEDIUM"},
@@ -5124,7 +5124,7 @@ gip: {
     ],
     organs: ['PANCREAS', 'GUT', 'BONES'],
     systems: ['metabolic'],
-     mechanisms: ['GIP_AGONIST', 'INCRETIN_EFFECT', 'INSULIN_SECRETION', 'INSULIN_RELEASE', 'GLUCOSE_REGULATION', 'GLUCOSE_DEPENDENT_INSULIN', 'BONE_FORMATION', 'BONE_DENSITY', 'BONE_METABOLISM', 'FAT_METABOLISM', 'LIPID_METABOLISM', 'LIPOPROTEIN_LIPASE', 'LIPOLYSIS', 'APPETITE_REGULATION', 'BETA_CELL_PROTECTION', 'PANCREATIC_FUNCTION', 'ENERGY_METABOLISM', 'INSULIN_SENSITIVITY'],
+     mechanisms: ['INSULIN_SECRETION', 'BONE_DENSITY', 'FAT_METABOLISM', 'LIPID_METABOLISM', 'INSULIN_SENSITIVITY'],
     description: 'ГИП — инкретиновый пептид, стимулирует инсулин и формирование кости. Дополнение к ГПП-1.',
     synergies: [
         {with: "glp1", effect: "Двойной инкретиновый эффект", mechanism: "GLP-1 + GIP — двойной инкретин: GLP-1 ↓ глюкагон, GIP ↑ инсулин и кость", severity: "MEDIUM"},
@@ -5163,7 +5163,7 @@ cerebrolysin: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-     mechanisms: ['NEUROTROPHIC_STIMULATION', 'NEUROTROPHIC_FACTORS', 'BDNF_INCREASE', 'NGF_INCREASE', 'GDNF_INCREASE', 'NEUROGENESIS', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'SYNAPTOGENESIS', 'MEMORY_IMPROVEMENT', 'COGNITIVE_ENHANCEMENT', 'COGNITION_ENHANCEMENT', 'LONG_TERM_POTENTIATION', 'GLUTAMATE_MODULATION', 'NMDA_MODULATION', 'EXCITOTOXICITY_INHIBITION'],
+     mechanisms: ['BDNF_INCREASE', 'NEUROGENESIS', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'MEMORY_IMPROVEMENT', 'COGNITIVE_ENHANCEMENT', 'COGNITION_ENHANCEMENT', 'GLUTAMATE_MODULATION', 'NMDA_MODULATION'],
     description: 'Церебролизин — комплекс нейропептидов, нейротрофическая активность, улучшает память и когницию. На курсе — нейропротекция.',
     synergies: [
         {with: "semax", effect: "Нейропротекция", mechanism: "Оба стимулируют нейротрофические факторы", severity: "HIGH"},
@@ -5200,7 +5200,7 @@ cortexin: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-     mechanisms: ['NEUROMETABOLIC_REGULATION', 'NEUROPEPTIDE_MODULATION', 'COGNITION_ENHANCEMENT', 'COGNITIVE_ENHANCEMENT', 'MEMORY_IMPROVEMENT', 'BDNF_INCREASE', 'NGF_INCREASE', 'GABA_MODULATION', 'DOPAMINE_MODULATION', 'SEROTONIN_MODULATION', 'SYNAPTIC_TRANSMISSION', 'LIPID_PEROXIDATION_INHIBITION', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'MOTONEURON_PROTECTION'],
+     mechanisms: ['COGNITION_ENHANCEMENT', 'COGNITIVE_ENHANCEMENT', 'MEMORY_IMPROVEMENT', 'BDNF_INCREASE', 'GABA_MODULATION', 'DOPAMINE_MODULATION', 'SEROTONIN_MODULATION', 'LIPID_PEROXIDATION_INHIBITION', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'MOTONEURON_PROTECTION'],
     description: 'Кортексин — комплекс корковых пептидов, нейропротектор и ноотроп. Улучшает память и внимание на курсе.',
     synergies: [
         {with: "cerebrolysin", effect: "Нейропротекция", mechanism: "Оба содержат нейропептиды", severity: "MEDIUM"},
@@ -5236,7 +5236,7 @@ elastin: {
     ],
     organs: ['SKIN', 'JOINTS', 'MUSCLES'],
     systems: ['musculoskeletal'],
-     mechanisms: ['ELASTIN_SYNTHESIS', 'ELASTIN_PRODUCTION', 'TROPOELASTIN', 'FIBRILLIN_SYNTHESIS', 'ELASTICITY_RESTORATION', 'SKIN_ELASTICITY', 'SKIN_TURGOR', 'JOINT_FUNCTION', 'JOINT_SUPPORT', 'LIGAMENT_SUPPORT', 'TENDON_SUPPORT', 'COLLAGEN_COMPONENT', 'ANTI_AGING', 'TISSUE_REPAIR', 'CONNECTIVE_TISSUE', 'VASCULAR_ELASTICITY'],
+     mechanisms: ['JOINT_FUNCTION', 'COLLAGEN_COMPONENT', 'TISSUE_REPAIR', 'CONNECTIVE_TISSUE'],
     description: 'Эластин — структурный белок соединительной ткани, обеспечивает упругость кожи и связок. На курсе — поддержка связок.',
     synergies: [
         {with: "collagen", effect: "Структурная поддержка", mechanism: "Эластин + коллаген — полный каркас соединительной ткани", severity: "MEDIUM"},
@@ -5274,7 +5274,7 @@ histidine: {
     ],
     organs: ['MUSCLES', 'BLOOD', 'SKIN'],
     systems: ['musculoskeletal', 'hematologic'],
-     mechanisms: ['HISTAMINE_SYNTHESIS', 'HISTAMINE_PRODUCTION', 'DECARBOXYLASE', 'CARNOSINE_PRECURSOR', 'CARNOSINE_SYNTHESIS', 'METAL_CHELATION', 'COPPER_CHELATION', 'IMMUNE_FUNCTION', 'SKIN_PROTECTION', 'SKIN_HEALTH', 'PH_BUFFER', 'MUSCLE_FUNCTION', 'NITROGEN_BALANCE', 'PROTEIN_SYNTHESIS', 'DIGESTION_ENHANCEMENT'],
+     mechanisms: ['IMMUNE_FUNCTION', 'MUSCLE_FUNCTION', 'NITROGEN_BALANCE', 'PROTEIN_SYNTHESIS'],
     description: 'Гистидин — незаменимая аминокислота, предшественник гистамина и карнозина. Хелатирует тяжёлые металлы, поддерживает иммунитет.',
     synergies: [
         {with: "zinc", effect: "Иммунная функция", mechanism: "Гистидин — предшественник гистамина, Zn — кофактор иммунных клеток", severity: "LOW"},
@@ -5313,7 +5313,7 @@ cysteine: {
     ],
     organs: ['LIVER', 'KIDNEYS', 'SKIN'],
     systems: ['hepatic', 'renal'],
-     mechanisms: ['CYSTEINE', 'CYSTEINE_METABOLISM', 'GLUTATHIONE_SYNTHESIS', 'GLUTATHIONE_PRECURSOR', 'THIOL_DONATION', 'LIVER_DETOXIFICATION', 'PHASE2_DETOXIFICATION', 'METAL_CHELATION', 'SKIN_HEALTH', 'KERATIN_SYNTHESIS', 'HAIR_GROWTH', 'ANTIOXIDANT_ENZYME', 'GLUTATHIONE_PEROXIDASE', 'IMMUNE_FUNCTION', 'AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS'],
+     mechanisms: ['GLUTATHIONE_SYNTHESIS', 'GLUTATHIONE_PRECURSOR', 'LIVER_DETOXIFICATION', 'KERATIN_SYNTHESIS', 'ANTIOXIDANT_ENZYME', 'IMMUNE_FUNCTION', 'AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS'],
     description: 'Цистеин — серосодержащая аминокислота, предшественник глутатиона. Защищает печень, хелатирует тяжёлые металлы.',
     synergies: [
         {with: "nac", effect: "Синтез глутатиона", mechanism: "Цистеин — лимитирующий предшественник GSH, NAC — ацетилированная форма — аддитивное ↑ GSH", severity: "HIGH"},
@@ -5351,7 +5351,7 @@ serine: {
     ],
     organs: ['BRAIN', 'NERVES', 'MUSCLES'],
     systems: ['neuro'],
-     mechanisms: ['SERINE_METABOLISM', 'AMINO_ACID_METABOLISM', 'PHOSPHOLIPID_PRECURSOR', 'PHOSPHATIDYLSERINE_SYNTHESIS', 'MEMBRANE_PHOSPHOLIPID', 'CELL_MEMBRANE_SYNTHESIS', 'MEMBRANE_SYNTHESIS', 'SPHINGOLIPID_SYNTHESIS', 'FOLATE_CYCLE', 'ONE_CARBON_METABOLISM', 'PURINE_SYNTHESIS', 'PYRIMIDINE_SYNTHESIS', 'MEMORY_SUPPORT', 'COGNITIVE_FUNCTION', 'NEUROTRANSMITTER_SYNTHESIS', 'GLYCINE_REGULATION', 'D_SERINE_MODULATION'],
+     mechanisms: ['AMINO_ACID_METABOLISM', 'MEMBRANE_PHOSPHOLIPID', 'FOLATE_CYCLE', 'NEUROTRANSMITTER_SYNTHESIS'],
     description: 'Серин — заменимая аминокислота, предшественник фосфолипидов и сериновых протеаз. Поддержка мозга и нервной системы.',
     synergies: [
         {with: "vitamin_b_complex", effect: "Фосфолипидный обмен", mechanism: "Серин — предшественник фосфатидилсерина, B-комплекс — кофакторы метилирования", severity: "LOW"},
@@ -5389,7 +5389,7 @@ proline: {
     ],
     organs: ['SKIN', 'JOINTS', 'MUSCLES'],
     systems: ['musculoskeletal'],
-     mechanisms: ['COLLAGEN_SYNTHESIS', 'HYDROXYPROLINE_SYNTHESIS', 'PROLYL_HYDROXYLASE', 'COLLAGEN_TRIPLE_HELIX', 'JOINT_SUPPORT', 'JOINT_FUNCTION', 'CARTILAGE_PROTECTION', 'SKIN_HEALTH', 'SKIN_TURGOR', 'TISSUE_REPAIR', 'TENDON_SUPPORT', 'LIGAMENT_SUPPORT', 'BONE_FORMATION', 'ARTERIAL_HEALTH', 'ANTI_AGING', 'AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS'],
+     mechanisms: ['COLLAGEN_SYNTHESIS', 'JOINT_FUNCTION', 'CARTILAGE_PROTECTION', 'TISSUE_REPAIR', 'AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS'],
     description: 'Пролин — заменимая аминокислота, ключевой компонент коллагена. Поддержка суставов, связок и кожи на курсе.',
     synergies: [
       { with: 'lysine', effect: 'Сборка коллагена', mechanism: 'Пролин + лизин — две ключевые АК тройной спирали коллагена', severity: 'HIGH' },
@@ -5427,7 +5427,7 @@ aspartate: {
     ],
     organs: ['MUSCLES', 'LIVER', 'BRAIN'],
     systems: ['hepatic', 'metabolic'],
-     mechanisms: ['UREA_CYCLE', 'UREA_SYNTHESIS', 'AMMONIA_DETOX', 'AMMONIA_DETOXIFICATION', 'AMINO_ACID_METABOLISM', 'MALATE_ASPARTATE_SHUTTLE', 'NADH_SHUTTLE', 'ENERGY_METABOLISM', 'ATP_PRODUCTION', 'GLUCONEOGENESIS_INHIBITION', 'NITROGEN_BALANCE', 'MUSCLE_FUNCTION', 'NEUROTRANSMITTER_SYNTHESIS', 'GLUTAMATE_PRECURSOR', 'NMDA_MODULATION', 'GLUTATHIONE_PRECURSOR'],
+     mechanisms: ['UREA_CYCLE', 'AMMONIA_DETOX', 'AMMONIA_DETOXIFICATION', 'AMINO_ACID_METABOLISM', 'ATP_PRODUCTION', 'GLUCONEOGENESIS_INHIBITION', 'NITROGEN_BALANCE', 'MUSCLE_FUNCTION', 'NEUROTRANSMITTER_SYNTHESIS', 'NMDA_MODULATION', 'GLUTATHIONE_PRECURSOR'],
     description: 'Аспартат — заменимая аминокислота, участвует в цикле мочевины и малат-аспартатном челноке. Детоксикация аммиака.',
     synergies: [
       { with: 'ornithine', effect: 'Цикл мочевины', mechanism: 'Аспартат + орнитин — два ключевых субстрата цикла мочевины', severity: 'MEDIUM' },
@@ -5466,7 +5466,7 @@ ornithine: {
     ],
     organs: ['LIVER', 'MUSCLES'],
     systems: ['hepatic'],
-     mechanisms: ['UREA_CYCLE', 'UREA_SYNTHESIS', 'AMMONIA_DETOX', 'AMMONIA_DETOXIFICATION', 'NITROGEN_TRANSPORT', 'GH_RELEASE', 'GH_STIMULATION', 'MUSCLE_RECOVERY', 'POLYAMINE_SYNTHESIS', 'PUTRESCINE_SYNTHESIS', 'SPERMIDINE_SYNTHESIS', 'AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS', 'NITROGEN_BALANCE'],
+     mechanisms: ['UREA_CYCLE', 'AMMONIA_DETOX', 'AMMONIA_DETOXIFICATION', 'AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS', 'NITROGEN_BALANCE'],
     description: 'Орнитин — заменимая аминокислота, участвует в цикле мочевины, снижает аммиак, стимулирует выброс ГР. На курсе — защита печени.',
     synergies: [
         {with: "arginine", effect: "Цикл мочевины", mechanism: "Орнитин + аргинин — ключевые компоненты цикла мочевины", severity: "MEDIUM"},
@@ -5504,7 +5504,7 @@ threonine: {
     ],
     organs: ['LIVER', 'GUT', 'IMMUNE_SYSTEM'],
     systems: ['hepatic', 'immune'],
-     mechanisms: ['THREONINE_METABOLISM', 'MUCIN_SYNTHESIS', 'MUCIN_PRODUCTION', 'GUT_LINING_PROTECTION', 'IMMUNE_FUNCTION', 'IMMUNOGLOBULIN_SYNTHESIS', 'LIVER_LIPID_REGULATION', 'LIVER_METABOLISM', 'COLLAGEN_SYNTHESIS', 'COLLAGEN_COMPONENT', 'ANTI_AGING', 'TISSUE_REPAIR', 'GUT_HEALTH', 'DIGESTION_ENHANCEMENT', 'AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS', 'GLYCOGEN_SYNTHESIS', 'SERINE_PRECURSOR'],
+     mechanisms: ['IMMUNE_FUNCTION', 'LIVER_LIPID_REGULATION', 'COLLAGEN_SYNTHESIS', 'COLLAGEN_COMPONENT', 'TISSUE_REPAIR', 'AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS'],
     description: 'Треонин — незаменимая аминокислота, важна для синтеза муцина (защита ЖКТ) и иммунных белков. На курсе — защита ЖКТ.',
     synergies: [
         {with: "vitamin_b6", effect: "Метаболизм треонина", mechanism: "B6 — кофактор треонин-дегидразы и треонин-альдолазы", severity: "LOW"},
@@ -5543,7 +5543,7 @@ lysine: {
     ],
     organs: ['MUSCLES', 'BONES', 'IMMUNE_SYSTEM'],
     systems: ['musculoskeletal', 'immune'],
-     mechanisms: ['COLLAGEN_CROSS_LINKING', 'COLLAGEN_SYNTHESIS', 'HYDROXYLYSINE_SYNTHESIS', 'LYSYL_HYDROXYLASE', 'TISSUE_REPAIR', 'ANTI_VIRAL', 'HSV_INHIBITION', 'ANTIVIRAL_IMMUNITY', 'CALCIUM_ABSORPTION', 'BONE_DENSITY', 'BONE_FORMATION', 'CARNITINE_SYNTHESIS', 'MUSCLE_RECOVERY', 'MUSCLE_FUNCTION', 'CARNITINE_PRECURSOR', 'AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS'],
+     mechanisms: ['COLLAGEN_SYNTHESIS', 'TISSUE_REPAIR', 'CALCIUM_ABSORPTION', 'BONE_DENSITY', 'MUSCLE_FUNCTION', 'CARNITINE_PRECURSOR', 'AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS'],
     description: 'Лизин — незаменимая аминокислота, необходима для кросс-линкинга коллагена и усвоения кальция. Антивирусная защита.',
     synergies: [
       { with: 'proline', effect: 'Коллагеновые сшивки', mechanism: 'Лизин + пролин — гидроксилирование и кросс-линкинг', severity: 'HIGH' },
@@ -5578,7 +5578,7 @@ phenylalanine: {
     ],
     organs: ['BRAIN', 'NERVES', 'THYROID'],
     systems: ['neuro', 'endocrine'],
-     mechanisms: ['CATECHOLAMINE_SYNTHESIS', 'DOPAMINE_PRECURSOR', 'DOPAMINE_SYNTHESIS', 'DOPAMINE_MODULATION', 'NOREPINEPHRINE_SYNTHESIS', 'NOREPINEPHRINE_PRECURSOR', 'EPINEPHRINE_SYNTHESIS', 'PAIN_MODULATION', 'ENKEPHALINASE_INHIBITION', 'MOOD_REGULATION', 'MOOD_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'COGNITIVE_ENHANCEMENT', 'THYROID_HORMONE_SYNTHESIS', 'TYROSINE_HYDROXYLASE', 'NEUROTRANSMITTER_SYNTHESIS', 'ANTI_DEPRESSANT', 'SEROTONIN_MODULATION'],
+     mechanisms: ['DOPAMINE_PRECURSOR', 'DOPAMINE_SYNTHESIS', 'DOPAMINE_MODULATION', 'FOCUS_ENHANCEMENT', 'COGNITIVE_ENHANCEMENT', 'TYROSINE_HYDROXYLASE', 'NEUROTRANSMITTER_SYNTHESIS', 'SEROTONIN_MODULATION'],
     description: 'Фенилаланин — незаменимая аминокислота, предшественник дофамина и норадреналина. Улучшает настроение и концентрацию.',
     synergies: [
         {with: "vitamin_b6", effect: "Синтез дофамина", mechanism: "Фенилаланин → тирозин → дофамин", severity: "MEDIUM"},
@@ -5613,7 +5613,7 @@ glutamate: {
     ],
     organs: ['BRAIN', 'NERVES', 'MUSCLES'],
     systems: ['neuro'],
-     mechanisms: ['NEUROTRANSMITTER_SYNTHESIS', 'NEUROTRANSMISSION', 'EXCITATORY_NEUROTRANSMITTER', 'NMDA_AGONIST', 'AMPA_AGONIST', 'MGluR_MODULATION', 'AMMONIA_DETOX', 'AMMONIA_DETOXIFICATION', 'GABA_PRECURSOR', 'GABA_SYNTHESIS', 'GLUTAMINE_CYCLE', 'ENERGY_METABOLISM', 'KREBS_CYCLE', 'ALPHA_KETOGLUTARATE', 'NITROGEN_TRANSPORT', 'MUSCLE_FUNCTION', 'AMINO_ACID_METABOLISM'],
+     mechanisms: ['NEUROTRANSMITTER_SYNTHESIS', 'AMMONIA_DETOX', 'AMMONIA_DETOXIFICATION', 'GABA_SYNTHESIS', 'MUSCLE_FUNCTION', 'AMINO_ACID_METABOLISM'],
     description: 'Глутамат — заменимая аминокислота, главный возбуждающий нейромедиатор. В избытке — эксайтотоксичность.',
     synergies: [
         {with: "magnesium", effect: "Блокировка эксайтотоксичности", mechanism: "Магний блокирует NMDA при избытке глутамата", severity: "HIGH"},
@@ -5647,7 +5647,7 @@ alpha_ketoglutarate: {
     ],
     organs: ['MUSCLES', 'LIVER', 'KIDNEYS'],
     systems: ['hepatic', 'renal'],
-     mechanisms: ['KREBS_CYCLE_INTERMEDIATE', 'KREBS_CYCLE', 'TCA_CYCLE', 'ANAplerotic_REACTION', 'ENERGY_METABOLISM', 'ATP_PRODUCTION', 'AMMONIA_DETOX', 'AMMONIA_DETOXIFICATION', 'NITROGEN_TRANSPORT', 'GLUTAMATE_PRECURSOR', 'GLUTAMINE_PRECURSOR', 'PROLINE_SYNTHESIS', 'ANTI_CATABOLIC', 'MUSCLE_RECOVERY', 'PROTEIN_SYNTHESIS'],
+     mechanisms: ['ATP_PRODUCTION', 'AMMONIA_DETOX', 'AMMONIA_DETOXIFICATION', 'ANTI_CATABOLIC', 'PROTEIN_SYNTHESIS'],
     description: 'Альфа-кетоглутарат — интермедиат цикла Кребса, снижает аммиак и поддерживает энергообмен. На курсе — детокс.',
     synergies: [
       { with: 'glutamine', effect: 'Цикл Кребса + глутамин', mechanism: 'AKG → глутамат → глутамин — замкнутый цикл', severity: 'MEDIUM' },
@@ -5683,7 +5683,7 @@ reishi: {
     ],
     organs: ['LIVER', 'IMMUNE_SYSTEM', 'BRAIN'],
     systems: ['hepatic', 'immune', 'neuro'],
-     mechanisms: ['ADAPTOGEN', 'STRESS_ADAPTATION', 'IMMUNE_REGULATION', 'MACROPHAGE_ACTIVATION', 'NK_CELL_ACTIVATION', 'BETA_GLUCAN_IMMUNITY', 'NFKB_INHIBITION', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', 'CORTISOL_REGULATION', '5AR_INHIBITION', 'NRF2_ACTIVATION', 'SLEEP_PROMOTION'],
+     mechanisms: ['ADAPTOGEN', 'STRESS_ADAPTATION', 'NFKB_INHIBITION', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', 'CORTISOL_REGULATION', '5AR_INHIBITION', 'NRF2_ACTIVATION', 'SLEEP_PROMOTION'],
     description: 'Рейши — король грибов, иммуномодулятор и адаптоген. Защищает печень, снижает воспаление и стресс на курсе.',
     synergies: [
         {with: "ashwagandha", effect: "Адаптогенный и иммунный", mechanism: "Оба модулируют стресс и иммунитет", severity: "MEDIUM"},
@@ -5720,7 +5720,7 @@ chaga: {
     ],
     organs: ['IMMUNE_SYSTEM', 'LIVER', 'GUT'],
     systems: ['hepatic', 'immune', 'gastrointestinal'],
-     mechanisms: ['MELANIN_ANTIOXIDANT', 'ROS_SCAVENGING', 'HIGH_ORAC', 'IMMUNE_REGULATION', 'NK_CELL_ACTIVATION', 'BETA_GLUCAN_IMMUNITY', 'MACROPHAGE_ACTIVATION', 'NFKB_INHIBITION', 'DNA_PROTECTION', 'DNA_REPAIR', 'GUT_HEALTH', 'PREBIOTIC', 'GLUCOSE_REGULATION'],
+     mechanisms: ['NFKB_INHIBITION'],
     description: 'Чага — мощный антиоксидант с высоким ORAC. Поддерживает иммунитет и защищает ДНК от повреждений на курсе.',
     synergies: [
       { with: 'turmeric', effect: 'Антиоксидант + противовоспаление', mechanism: 'Чага ↑ SOD, куркумин ↓ NF-κB', severity: 'MEDIUM' },
@@ -5757,7 +5757,7 @@ chaga: {
     ],
     organs: ['IMMUNE_SYSTEM', 'PANCREAS', 'GUT'],
     systems: ['immune', 'metabolic'],
-     mechanisms: ['IMMUNE_ACTIVATION', 'IMMUNE_STIMULATION', 'DENDRITIC_CELL_ACTIVATION', 'MACROPHAGE_ACTIVATION', 'NK_CELL_ACTIVATION', 'BETA_GLUCAN_IMMUNITY', 'GLUCOSE_REGULATION', 'GLUCOSE_LOWERING', 'INSULIN_SENSITIVITY', 'ALPHA_GLUCOSIDASE_INHIBITION', 'PPARG_ACTIVATION', 'METABOLIC_REGULATION', 'LIPID_METABOLISM', 'GUT_HEALTH', 'PREBIOTIC'],
+     mechanisms: ['INSULIN_SENSITIVITY', 'ALPHA_GLUCOSIDASE_INHIBITION', 'LIPID_METABOLISM'],
     description: 'Майтаке — гриб с высоким содержанием бета-глюканов, активирует иммунитет и регулирует глюкозу. На курсе — метаболическая поддержка.',
     synergies: [
         {with: "vitamin_d3", effect: "Иммунитет", mechanism: "Майтаке-D-фракция + D3", severity: "MEDIUM"},
@@ -5793,7 +5793,7 @@ chaga: {
     ],
     organs: ['IMMUNE_SYSTEM', 'HEART', 'LIVER'],
     systems: ['immune', 'cardio', 'hepatic'],
-     mechanisms: ['IMMUNE_REGULATION', 'BETA_GLUCAN_IMMUNITY', 'MACROPHAGE_ACTIVATION', 'NK_CELL_ACTIVATION', 'PERFORIN_STIMULATION', 'CHOLESTEROL_LOWERING', 'HMGCR_INHIBITION', 'LIPID_METABOLISM', 'B_VITAMIN_SOURCE', 'VITAMIN_B_COMPLEX', 'ERGOTHIONEINE'],
+     mechanisms: ['CHOLESTEROL_LOWERING', 'LIPID_METABOLISM'],
     description: 'Шиитаке — гриб с лентинаном, снижает холестерин и поддерживает иммунитет. Источник витаминов группы В.',
     synergies: [
         {with: "reishi", effect: "Комплексная грибная поддержка", mechanism: "Разные полисахариды", severity: "MEDIUM"},
@@ -5828,7 +5828,7 @@ chaga: {
     ],
     organs: ['IMMUNE_SYSTEM', 'LIVER', 'GUT'],
     systems: ['immune', 'hepatic', 'gastrointestinal'],
-     mechanisms: ['IMMUNE_ACTIVATION', 'IMMUNE_STIMULATION', 'NK_CELL_ACTIVATION', 'MACROPHAGE_ACTIVATION', 'TLR4_STIMULATION', 'BETA_GLUCAN_IMMUNITY', 'NFKB_INHIBITION', 'GUT_HEALTH', 'INSULIN_SENSITIVITY', 'GLUCOSE_REGULATION', 'PI3K_ACTIVATION', 'AKT_ACTIVATION'],
+     mechanisms: ['NFKB_INHIBITION', 'INSULIN_SENSITIVITY'],
     description: 'Агарикус — бразильский гриб с мощными бета-глюканами, активирует NK-клетки и макрофаги. Поддержка иммунитета на курсе.',
     synergies: [
         {with: "reishi", effect: "Иммуномодуляция", mechanism: "Оба — мощные иммуномодуляторы", severity: "MEDIUM"},
@@ -5863,7 +5863,7 @@ chaga: {
     ],
     organs: ['IMMUNE_SYSTEM', 'GUT', 'LIVER'],
     systems: ['immune', 'gastrointestinal', 'hepatic'],
-     mechanisms: ['IMMUNE_REGULATION', 'BETA_GLUCAN_IMMUNITY', 'DENDRITIC_CELL_ACTIVATION', 'MACROPHAGE_ACTIVATION', 'CD8_STIMULATION', 'NK_CELL_ACTIVATION', 'PSP_DELIVERY', 'PSK_DELIVERY', 'GUT_MICROBIOME_SUPPORT', 'PREBIOTIC', 'GUT_HEALTH', 'CYTOKINE_MODULATION', 'IL2_STIMULATION', 'IFN_GAMMA_STIMULATION', 'IMMUNE_BALANCE'],
+     mechanisms: ['CYTOKINE_MODULATION'],
     description: 'Хвост индейки — мощный иммуномодулятор с PSP и PSK полисахаридами. Поддержка кишечника и иммунитета на курсе.',
     synergies: [
         {with: "reishi", effect: "Комплексная иммуномодуляция", mechanism: "Оба — бета-глюканы разных типов", severity: "HIGH"},
@@ -5900,7 +5900,7 @@ lutein: {
     ],
     organs: ['EYES', 'BRAIN', 'SKIN'],
     systems: ['neuro'],
-     mechanisms: ['MACULA_PROTECTION', 'RETINAL_PROTECTION', 'BLUE_LIGHT_FILTER', 'PHOTOPROTECTION', 'SINGLET_OXYGEN_QUENCH', 'LIPID_PEROXIDATION_INHIBITION', 'SKIN_HEALTH', 'SKIN_ELASTICITY', 'BRAIN_HEALTH', 'COGNITIVE_FUNCTION', 'EYE_HEALTH', 'VISION_SUPPORT', 'MACULAR_PIGMENT', 'RPE_PROTECTION'],
+     mechanisms: ['LIPID_PEROXIDATION_INHIBITION'],
     description: 'Лютеин — каротиноид, защищает макулу глаза от синего света и окислительного стресса. На курсе — защита зрения.',
     synergies: [
       { with: 'zeaxanthin', effect: 'Макулярный пигмент', mechanism: 'Лютеин + зеаксантин — полная защита макулы', severity: 'HIGH' },
@@ -5936,7 +5936,7 @@ lycopene: {
     ],
     organs: ['HEART', 'PROSTATE', 'SKIN'],
     systems: ['cardio', 'reproductive'],
-     mechanisms: ['SINGLET_OXYGEN_QUENCH', 'LIPID_PEROXIDATION_INHIBITION', 'PROSTATE_PROTECTION', 'PROSTATE_HEALTH', '5AR_INHIBITION', 'DHT_INHIBITION', 'PSA_LOWERING', 'UV_PROTECTION', 'SKIN_PROTECTION', 'CHOLESTEROL_LOWERING', 'LIPID_METABOLISM', 'IGF1_MODULATION', 'PPARG_ACTIVATION', 'BONE_HEALTH'],
+     mechanisms: ['LIPID_PEROXIDATION_INHIBITION', 'PROSTATE_PROTECTION', '5AR_INHIBITION', 'PSA_LOWERING', 'CHOLESTEROL_LOWERING', 'LIPID_METABOLISM'],
     description: 'Ликопин — каротиноид из томатов, мощный антиоксидант. Защищает простату и сердце, снижает окислительный стресс.',
     synergies: [
       { with: 'vitamin_e', effect: 'Защита ликопина', mechanism: 'Вит.E предотвращает окисление ликопина', severity: 'MEDIUM' },
@@ -5974,7 +5974,7 @@ anthocyanins: {
     ],
     organs: ['EYES', 'HEART', 'BRAIN'],
     systems: ['cardio', 'neuro'],
-     mechanisms: ['ANTHOCYANIN_ACTIVITY', 'ROS_SCAVENGING', 'MICROCIRCULATION_IMPROVEMENT', 'MICROCIRCULATION', 'VASODILATION', 'NO_SYNTHESIS', 'ENOS_ACTIVATION', 'VISION_SUPPORT', 'VISION_PROTECTION', 'RETINAL_HEALTH', 'NFKB_INHIBITION', 'COX_INHIBITION', 'PI3K_ACTIVATION', 'AKT_ACTIVATION', 'AMPK_ACTIVATION'],
+     mechanisms: ['MICROCIRCULATION_IMPROVEMENT', 'MICROCIRCULATION', 'VASODILATION', 'NO_SYNTHESIS', 'NFKB_INHIBITION', 'COX_INHIBITION', 'AMPK_ACTIVATION'],
     description: 'Антоцианы — флавоноиды из ягод, улучшают микроциркуляцию и защищают сосуды сетчатки. На курсе — зрение и сосуды.',
     synergies: [
       { with: 'vitamin_c', effect: 'Стабилизация антоцианов', mechanism: 'Вит.C предотвращает окисление антоцианов', severity: 'MEDIUM' },
@@ -6011,7 +6011,7 @@ grape_seed_extract: {
     ],
     organs: ['HEART', 'VESSELS', 'SKIN'],
     systems: ['cardio'],
-     mechanisms: ['PROANTHOCYANIDIN', 'ROS_SCAVENGING', 'ENDOTHELIAL_PROTECTION', 'VASODILATION', 'ENOS_ACTIVATION', 'COLLAGEN_SYNTHESIS', 'COLLAGEN_STABILIZATION', 'MMP_INHIBITION', 'MICROCIRCULATION', 'SKIN_HEALTH', 'SKIN_ELASTICITY', 'NFKB_INHIBITION', 'CHELATION', 'VASCULAR_HEALTH'],
+     mechanisms: ['ENDOTHELIAL_PROTECTION', 'VASODILATION', 'COLLAGEN_SYNTHESIS', 'MICROCIRCULATION', 'NFKB_INHIBITION', 'CHELATION'],
     description: 'Экстракт косточек винограда — богат проантоцианидинами, защищает эндотелий и коллаген. На курсе — сосуды и кожа.',
     synergies: [
         {with: "vitamin_c", effect: "Антиоксидантная активность", mechanism: "Проантоцианидины + C", severity: "MEDIUM"},
@@ -6047,7 +6047,7 @@ pycnogenol: {
     ],
     organs: ['HEART', 'VESSELS', 'SKIN'],
     systems: ['cardio', 'neuro'],
-     mechanisms: ['PROCYANIDIN', 'TAXIFOLIN', 'ENDOTHELIAL_PROTECTION', 'VASODILATION', 'ENOS_ACTIVATION', 'NO_PRODUCTION', 'COLLAGEN_PROTECTION', 'COLLAGEN_STABILIZATION', 'MMP_INHIBITION', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'COX_INHIBITION', 'LOX_INHIBITION', 'AGE_INHIBITION', 'CHELATION'],
+     mechanisms: ['ENDOTHELIAL_PROTECTION', 'VASODILATION', 'NO_PRODUCTION', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'COX_INHIBITION', 'CHELATION'],
     description: 'Пикногенол — экстракт коры приморской сосны, мощный антиоксидант. Защищает сосуды, кожу и эндотелий.',
     synergies: [
         {with: "vitamin_c", effect: "Регенерация витамина C", mechanism: "Пикногенол + C", severity: "MEDIUM"},
@@ -6082,7 +6082,7 @@ cocoa_flavanols: {
     ],
     organs: ['HEART', 'BRAIN', 'VESSELS'],
     systems: ['cardio', 'neuro'],
-     mechanisms: ['FLAVANOL', 'NO_PRODUCTION', 'NITRIC_OXIDE_PRODUCTION', 'ENOS_ACTIVATION', 'VASODILATION', 'BLOOD_FLOW_IMPROVEMENT', 'CEREBRAL_BLOOD_FLOW', 'COGNITION_ENHANCEMENT', 'COGNITIVE_ENHANCEMENT', 'PLATELET_AGGREGATION_INHIBITION', 'INSULIN_SENSITIVITY', 'BLOOD_PRESSURE_REGULATION'],
+     mechanisms: ['NO_PRODUCTION', 'NITRIC_OXIDE_PRODUCTION', 'VASODILATION', 'BLOOD_FLOW_IMPROVEMENT', 'CEREBRAL_BLOOD_FLOW', 'COGNITION_ENHANCEMENT', 'COGNITIVE_ENHANCEMENT', 'PLATELET_AGGREGATION_INHIBITION', 'INSULIN_SENSITIVITY', 'BLOOD_PRESSURE_REGULATION'],
     description: 'Какао-флаванолы — улучшают производство NO, кровоток мозга и сердца. На курсе — кардио- и нейропротекция.',
     synergies: [
         {with: "omega3", effect: "Кардиопротекция", mechanism: "Оба улучшают эндотелий", severity: "MEDIUM"},
@@ -6118,7 +6118,7 @@ c60: {
     ],
     organs: ['CELLS', 'MITOCHONDRIA', 'LIVER'],
     systems: ['hepatic'],
-     mechanisms: ['FULLERENE_ANTIOXIDANT', 'ROS_SCAVENGING', 'MITOCHONDRIAL_PROTECTION', 'MITOCHONDRIAL_MEMBRANE_PROTECTION', 'NFKB_INHIBITION', 'ANTI_AGING', 'NRF2_ACTIVATION', 'HO1_INDUCTION', 'AUTOPHAGY', 'DNA_PROTECTION', 'SKIN_PROTECTION', 'ENERGY_METABOLISM'],
+     mechanisms: ['MITOCHONDRIAL_PROTECTION', 'NFKB_INHIBITION', 'NRF2_ACTIVATION'],
     description: 'C60 фуллерен — наночастица с мощнейшей антиоксидантной активностью, защищает митохондрии. Экспериментальный анти-возрастной.',
     synergies: [
         {with: "olive_oil", effect: "Усиление антиоксидантного эффекта", mechanism: "C60 в масле — лучшая доставка", severity: "MEDIUM"},
@@ -6153,7 +6153,7 @@ nrf2_activator: {
     ],
     organs: ['LIVER', 'CELLS', 'BRAIN'],
     systems: ['hepatic', 'neuro'],
-     mechanisms: ['NRF2_ACTIVATION', 'NRF2_UPREGULATION', 'KEAP1_MODIFICATION', 'ANTIOXIDANT_ENZYME_INDUCTION', 'HO1_INDUCTION', 'NQO1_INDUCTION', 'GST_INDUCTION', 'PHASE2_DETOXIFICATION', 'NFKB_INHIBITION', 'GLUTATHIONE_SYNTHESIS', 'MITOCHONDRIAL_BIOGENESIS', 'PGC1A_ACTIVATION', 'CYTOTOXICITY_PROTECTION'],
+     mechanisms: ['NRF2_ACTIVATION', 'NFKB_INHIBITION', 'GLUTATHIONE_SYNTHESIS', 'MITOCHONDRIAL_BIOGENESIS'],
     description: 'Nrf2-активатор (сульфорафан+куркумин) — индуцирует антиоксидантные ферменты через Nrf2-путь. Мощная гепатопротекция.',
     synergies: [
         {with: "sulforaphane", effect: "Максимальная активация Nrf2", mechanism: "Оба активируют Nrf2", severity: "HIGH"},
@@ -6189,7 +6189,7 @@ olive_extract: {
     ],
     organs: ['HEART', 'VESSELS', 'SKIN'],
     systems: ['cardio'],
-     mechanisms: ['HYDROXYTYROSOL', 'OLEUROPEIN', 'ENDOTHELIAL_PROTECTION', 'VASODILATION', 'NO_PRODUCTION', 'ENOS_ACTIVATION', 'NFKB_INHIBITION', 'COX_INHIBITION', 'LIPID_IMPROVEMENT', 'LDL_OXIDATION_INHIBITION', 'ACE_INHIBITION', 'BLOOD_PRESSURE_REGULATION', 'MITOCHONDRIAL_PROTECTION', 'ANTI_AGING'],
+     mechanisms: ['ENDOTHELIAL_PROTECTION', 'VASODILATION', 'NO_PRODUCTION', 'NFKB_INHIBITION', 'COX_INHIBITION', 'ACE_INHIBITION', 'BLOOD_PRESSURE_REGULATION', 'MITOCHONDRIAL_PROTECTION'],
     description: 'Экстракт оливы с гидрокситирозолом — мощный антиоксидант, защищает эндотелий и снижает окисление ЛПНП.',
     synergies: [
       { with: 'vitamin_e', effect: 'Антиоксидантный синергизм', mechanism: 'Гидрокситирозол + вит.E = защита мембран', severity: 'MEDIUM' },
@@ -6226,7 +6226,7 @@ citrus_bioflavonoids: {
     ],
     organs: ['VESSELS', 'EYES', 'SKIN'],
     systems: ['cardio'],
-     mechanisms: ['BIOFLAVONOID_COMPLEX', 'VITAMIN_C_POTENTIATION', 'VITAMIN_C_STABILIZATION', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'CAPILLARY_PROTECTION', 'VASCULAR_PROTECTION', 'VENOTONIC', 'NFKB_INHIBITION', 'MMP_INHIBITION', 'CYP3A4_INHIBITION', 'VENOUS_TONE', 'ANTIOXIDANT_ENZYME', 'SKIN_PROTECTION', 'EDEMA_REDUCTION'],
+     mechanisms: ['MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'VENOTONIC', 'NFKB_INHIBITION', 'CYP3A4_INHIBITION', 'ANTIOXIDANT_ENZYME'],
     description: 'Цитрусовые биофлавоноиды — гесперидин, рутин, нарингенин. Усиливают витамин С, защищают сосуды.',
     synergies: [
         {with: "vitamin_c", effect: "Флавоноиды ↑ усвоение витамина C", mechanism: "Флавоноиды ингибируют окисление и ↑ утилизацию вит.C", severity: "HIGH"},
@@ -6261,7 +6261,7 @@ flavonoids: {
     ],
     organs: ['HEART', 'BRAIN', 'VESSELS'],
     systems: ['cardio', 'neuro'],
-     mechanisms: ['POLYPHENOL', 'ROS_SCAVENGING', 'CHELATION', 'NFKB_INHIBITION', 'COX_INHIBITION', 'LOX_INHIBITION', 'VASCULAR_PROTECTION', 'NO_PRODUCTION', 'COGNITION_SUPPORT', 'COGNITIVE_ENHANCEMENT', 'NRF2_ACTIVATION', 'PI3K_ACTIVATION', 'AKT_ACTIVATION'],
+     mechanisms: ['CHELATION', 'NFKB_INHIBITION', 'COX_INHIBITION', 'NO_PRODUCTION', 'COGNITIVE_ENHANCEMENT', 'NRF2_ACTIVATION'],
     description: 'Флавоноиды — класс полифенолов с антиоксидантным и противовоспалительным действием. Защита сосудов и мозга.',
     synergies: [
       { with: 'vitamin_c', effect: 'Усиление антиоксидантной защиты', mechanism: 'Флавоноиды ↑ усвоение вит.C и защищают от окисления', severity: 'MEDIUM' },
@@ -6298,7 +6298,7 @@ ellagic_acid: {
     ],
     organs: ['LIVER', 'CELLS', 'GUT'],
     systems: ['hepatic', 'gastrointestinal'],
-     mechanisms: ['ELLAGIC_TANNIN', 'UROLITHIN_PRECURSOR', 'LIVER_DETOXIFICATION', 'PHASE2_DETOXIFICATION', 'DNA_PROTECTION', 'NFKB_INHIBITION', 'APOPTOSIS_MODULATION', 'CASPASE_ACTIVATION', 'GUT_HEALTH', 'MICROBIOTA_METABOLISM', 'ANTI_AGING', 'ANTI_CARCINOGENIC', 'SKIN_PROTECTION'],
+     mechanisms: ['LIVER_DETOXIFICATION', 'NFKB_INHIBITION'],
     description: 'Эллаговая кислота — полифенол из граната и малины, гепатопротектор и антимутаген. Защищает печень и ДНК.',
     synergies: [
         {with: "vitamin_c", effect: "Антиоксидант", mechanism: "Оба — антиоксиданты", severity: "LOW"},
@@ -6334,7 +6334,7 @@ ursolic_acid: {
     ],
     organs: ['MUSCLES', 'LIVER', 'SKIN'],
     systems: ['musculoskeletal', 'hepatic'],
-     mechanisms: ['NFKB_INHIBITION', 'ANTI_CATABOLIC', 'ANTI_CATABOLIC_MUSCLE', 'MUSCLE_GROWTH', 'MYOSTATIN_INHIBITION', 'ATROGIN_INHIBITION', 'MURF1_INHIBITION', 'PROTEASOME_INHIBITION', 'MTOR_ACTIVATION', 'AKT_ACTIVATION', 'LIPID_LOWERING', 'LIPID_METABOLISM', 'CORTISOL_REDUCTION', 'SKIN_HEALTH', 'AMPK_ACTIVATION'],
+     mechanisms: ['NFKB_INHIBITION', 'ANTI_CATABOLIC', 'MUSCLE_GROWTH', 'MTOR_ACTIVATION', 'LIPID_LOWERING', 'LIPID_METABOLISM', 'CORTISOL_REDUCTION', 'AMPK_ACTIVATION'],
     description: 'Урсоловая кислота — тритерпен из яблочных шкурок, антикатаболическое и антивоспалительное действие. Поддержка мышц.',
     synergies: [
         {with: "creatine", effect: "Анаболическая поддержка", mechanism: "Урсоловая кислота + mTOR", severity: "MEDIUM"},
@@ -6371,7 +6371,7 @@ magnolia: {
     ],
     organs: ['BRAIN', 'NERVES', 'LIVER'],
     systems: ['neuro', 'hepatic'],
-     mechanisms: ['ANXIOLYTIC', 'ANXIOLYTIC_GABA', 'GABA_A_AGONIST', 'GABA_MODULATION', 'MUSCLE_RELAXATION', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', '11BHSD_INHIBITION', 'NFKB_INHIBITION', 'COX_INHIBITION', 'SLEEP_PROMOTION', 'SLEEP_QUALITY', 'MOOD_ENHANCEMENT'],
+     mechanisms: ['ANXIOLYTIC', 'GABA_MODULATION', 'MUSCLE_RELAXATION', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', 'NFKB_INHIBITION', 'COX_INHIBITION', 'SLEEP_PROMOTION', 'SLEEP_QUALITY'],
     description: 'Магнолия (хонокиол) — анксиолитик и нейропротектор, расслабляет мышцы и улучшает сон. На курсе — антистресс.',
     synergies: [
         {with: "theanine", effect: "Расслабление", mechanism: "Оба усиливают GABA", severity: "MEDIUM"},
@@ -6406,7 +6406,7 @@ gentian: {
     ],
     organs: ['LIVER', 'GUT', 'STOMACH'],
     systems: ['hepatic', 'gastrointestinal'],
-     mechanisms: ['DIGESTION_STIMULATION', 'BILE_SECRETION', 'APPETITE_IMPROVEMENT', 'LIVER_DETOXIFICATION', 'NFKB_INHIBITION', 'CHOLERETIC', 'GUT_HEALTH', 'GUT_BARRIER_PROTECTION', 'GASTRIC_PROTECTION', 'AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS', 'DIGESTION_ENHANCEMENT', 'GI_PROTECTION'],
+     mechanisms: ['BILE_SECRETION', 'LIVER_DETOXIFICATION', 'NFKB_INHIBITION', 'CHOLERETIC', 'GUT_BARRIER_PROTECTION', 'AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS'],
     description: 'Горечавка — горький тоник, стимулирует пищеварение и желчеотток. Улучшает аппетит и усвоение на курсе.',
     synergies: [
         {with: "digestive_enzymes", effect: "Улучшение пищеварения", mechanism: "Горечи стимулируют секрецию", severity: "MEDIUM"},
@@ -6446,7 +6446,7 @@ artichoke: {
     ],
     organs: ['LIVER', 'GALLBLADDER', 'GUT'],
     systems: ['hepatic', 'gastrointestinal'],
-     mechanisms: ['BILE_SECRETION', 'CHOLESTEROL_LOWERING', 'CHOLERETIC', 'HMGCOA_REDUCTASE_INHIBITION', 'NRF2_ACTIVATION', 'PHASE2_DETOXIFICATION', 'GI_PROTECTION', 'NFKB_INHIBITION', 'DIGESTIVE_STIMULATION', 'LIPID_METABOLISM', 'GUT_MICROBIOTA', 'GALLBLADDER_STIMULATION', 'FXR_ACTIVATION'],
+     mechanisms: ['BILE_SECRETION', 'CHOLESTEROL_LOWERING', 'CHOLERETIC', 'NRF2_ACTIVATION', 'NFKB_INHIBITION', 'LIPID_METABOLISM'],
     description: 'Артишок — гепатопротектор и холеретик, стимулирует желчеотток и защищает печень. На курсе — защита печени.',
     synergies: [
       { with: "milk_thistle", effect: "Артишок + Расторопша — двойная гепатопротекция", mechanism: "Артишок стимулирует желчеотток (холерез), силимарин стабилизирует мембраны гепатоцитов", severity: "MEDIUM" }
@@ -6483,7 +6483,7 @@ garlic: {
     ],
     organs: ['HEART', 'VESSELS', 'IMMUNE_SYSTEM'],
     systems: ['cardio', 'immune'],
-     mechanisms: ['CHOLESTEROL_LOWERING', 'ANTIMICROBIAL', 'BLOOD_PRESSURE_REGULATION', 'ACE_INHIBITION', 'VASODILATATION', 'NO_PRODUCTION', 'PLATELET_AGGREGATION_INHIBITION', 'IMMUNE_REGULATION', 'GLUTATHIONE_SYNTHESIS', 'HMGCOA_REDUCTASE_INHIBITION', 'FIBRINOLYSIS', 'LIPID_METABOLISM', 'METABOLIC_BOOST'],
+     mechanisms: ['CHOLESTEROL_LOWERING', 'ANTIMICROBIAL', 'BLOOD_PRESSURE_REGULATION', 'ACE_INHIBITION', 'NO_PRODUCTION', 'PLATELET_AGGREGATION_INHIBITION', 'GLUTATHIONE_SYNTHESIS', 'FIBRINOLYSIS', 'LIPID_METABOLISM'],
     description: 'Чеснок (аллицин) — кардиопротектор, снижает холестерин и АД, антимикробное действие. На курсе — сосуды и иммунитет.',
     synergies: [
         {with: "vitamin_c", effect: "Иммунитет", mechanism: "Аллицин + C", severity: "MEDIUM"},
@@ -6518,7 +6518,7 @@ mangosteen: {
     ],
     organs: ['SKIN', 'IMMUNE_SYSTEM', 'GUT'],
     systems: ['immune', 'gastrointestinal'],
-     mechanisms: ['SKIN_HEALTH', 'IMMUNE_REGULATION', 'NFKB_INHIBITION', 'COX_INHIBITION', 'XANTHONE_MODULATION', 'PI3K_ACTIVATION', 'AKT_ACTIVATION', 'ROS_SCAVENGING', 'CHELATION', 'ANTIBACTERIAL', 'GUT_HEALTH', 'HISTAMINE_REGULATION', 'COGNITION_SUPPORT', 'DNA_PROTECTION'],
+     mechanisms: ['NFKB_INHIBITION', 'COX_INHIBITION', 'CHELATION'],
     description: 'Мангостин — источник ксантонов, мощных антиоксидантов. Противовоспалительное и антиоксидантное действие.',
     synergies: [
         {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба подавляют NF-kB и COX-2", severity: "MEDIUM"},
@@ -6555,7 +6555,7 @@ nattokinase: {
     ],
     organs: ['HEART', 'VESSELS', 'BRAIN'],
     systems: ['cardio'],
-     mechanisms: ['FIBRINOLYSIS', 'MICROCIRCULATION', 'THROMBUS_PREVENTION', 'PLASMINOGEN_ACTIVATION', 'TISSUE_PLASMINOGEN_ACTIVATOR', 'PAI1_INHIBITION', 'PLATELET_AGGREGATION_INHIBITION', 'NATTOKINASE_ACTIVITY', 'ANTICOAGULATION', 'FIBRIN_DEGRADATION', 'VASCULAR_PROTECTION', 'BLOOD_VISCOSITY_REDUCTION', 'BLOOD_PRESSURE_REGULATION', 'NO_PRODUCTION'],
+     mechanisms: ['FIBRINOLYSIS', 'MICROCIRCULATION', 'THROMBUS_PREVENTION', 'PLASMINOGEN_ACTIVATION', 'PAI1_INHIBITION', 'PLATELET_AGGREGATION_INHIBITION', 'BLOOD_PRESSURE_REGULATION', 'NO_PRODUCTION'],
     description: 'Наттокиназа — фермент из натто, растворяет фибрин и предотвращает тромбы. На курсе — защита сосудов.',
     synergies: [
         {with: "omega3", effect: "Антитромботическое", mechanism: "Оба снижают риск тромбов", severity: "MEDIUM"},
@@ -6589,7 +6589,7 @@ grapefruit_seed: {
     ],
     organs: ['GUT', 'IMMUNE_SYSTEM', 'SKIN'],
     systems: ['gastrointestinal', 'immune'],
-     mechanisms: ['ANTIMICROBIAL', 'IMMUNE_REGULATION', 'GUT_FLORA_BALANCE', 'CANDIDA_INHIBITION', 'HPYLORI_INHIBITION', 'ANTIFUNGAL', 'CYP3A4_INHIBITION', 'NARINGIN_MODULATION', 'MEMBRANE_DISRUPTION', 'CHELATION', 'GUT_MICROBIOTA', 'BIOFILM_DISRUPTION', 'BLOOD_PRESSURE_REGULATION', 'PHENOLIC_ACID_MODULATION'],
+     mechanisms: ['ANTIMICROBIAL', 'CYP3A4_INHIBITION', 'CHELATION', 'BLOOD_PRESSURE_REGULATION'],
     description: 'Экстракт грейпфрутовых косточек — мощный антимикробный агент, поддерживает микрофлору кишечника и иммунитет.',
     synergies: [
         {with: "probiotics", effect: "Антимикробное + пробиотическое", mechanism: "Экстракт грейпфрута — антимикробное", severity: "LOW"},
@@ -6623,7 +6623,7 @@ nobiletin: {
     ],
     organs: ['LIVER', 'BRAIN', 'CELLS'],
     systems: ['hepatic', 'metabolic'],
-    mechanisms: ['CIRCADIAN_RHYTHM_REGULATION', 'METABOLIC_IMPROVEMENT', 'AMPK_ACTIVATION', 'NFKB_INHIBITION', 'PPAR_ACTIVATION', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'LIPID_METABOLISM', 'BDNF_INCREASE', 'COGNITION_ENHANCEMENT', 'CYTOKINE_MODULATION', 'MAPK_INHIBITION'],
+    mechanisms: ['AMPK_ACTIVATION', 'NFKB_INHIBITION', 'PPAR_ACTIVATION', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'LIPID_METABOLISM', 'BDNF_INCREASE', 'COGNITION_ENHANCEMENT', 'CYTOKINE_MODULATION'],
     description: 'Нобилетин — флавоноид из цитрусовых, регулирует циркадные ритмы и метаболизм. Антивоспалительное действие.',
     synergies: [
         {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба подавляют NF-kB и COX-2 — аддитивный противовоспалительный эффект", severity: "MEDIUM"},
@@ -6662,7 +6662,7 @@ fisetin: {
     ],
     organs: ['BRAIN', 'CELLS', 'KIDNEYS'],
     systems: ['neuro', 'renal'],
-     mechanisms: ['SENOLYTIC', 'BCL2_INHIBITION', 'NRF2_ACTIVATION', 'NFKB_INHIBITION', 'AMPK_ACTIVATION', 'SIRT1_ACTIVATION', 'ROS_SCAVENGING', 'CHELATION', 'COGNITION_ENHANCEMENT', 'MITOCHONDRIAL_PROTECTION', 'GLUCOSE_LOWERING', 'INSULIN_SENSITIVITY', 'HO1_INDUCTION'],
+     mechanisms: ['NRF2_ACTIVATION', 'NFKB_INHIBITION', 'AMPK_ACTIVATION', 'CHELATION', 'COGNITION_ENHANCEMENT', 'MITOCHONDRIAL_PROTECTION', 'INSULIN_SENSITIVITY'],
     description: 'Физетин — флавоноид с сенолитической активностью, избирательно удаляет стареющие клетки. Анти-возрастной.',
     synergies: [
         {with: "quercetin", effect: "Сенолитическая активность", mechanism: "Оба удаляют стареющие клетки", severity: "HIGH"},
@@ -6699,7 +6699,7 @@ baicalin: {
     ],
     organs: ['LIVER', 'BRAIN', 'NERVES'],
     systems: ['hepatic', 'neuro'],
-     mechanisms: ['ANXIOLYTIC', 'TLR4_INHIBITION', 'NFKB_INHIBITION', 'MAPK_INHIBITION', 'NRF2_ACTIVATION', 'GABA_A_AGONIST', 'GABA_MODULATION', 'ROS_SCAVENGING', 'ANTIVIRAL', 'COGNITION_ENHANCEMENT', 'RNASYNTHESIS', 'BLOOD_BRAIN_BARRIER_PROTECTION'],
+     mechanisms: ['ANXIOLYTIC', 'NFKB_INHIBITION', 'NRF2_ACTIVATION', 'GABA_MODULATION', 'COGNITION_ENHANCEMENT'],
     description: 'Байкалин — флавоноид из шлемника байкальского, нейропротектор и гепатопротектор. Успокаивает и защищает.',
     synergies: [
         {with: "curcumin", effect: "Противовоспалительное", mechanism: "Оба подавляют NF-kB и COX-2", severity: "MEDIUM"},
@@ -6736,7 +6736,7 @@ taxifolin: {
     ],
     organs: ['HEART', 'LIVER', 'VESSELS'],
     systems: ['cardio', 'hepatic'],
-     mechanisms: ['VASCULAR_PROTECTION', 'MITOCHONDRIAL_PROTECTION', 'SOD_ACTIVATION', 'GPX_ACTIVATION', 'CATALASE_ACTIVATION', 'HYALURONIDASE_INHIBITION', 'ELASTASE_INHIBITION', 'COLLAGEN_STABILIZATION', 'CAPILLARY_PROTECTION', 'CHELATION', 'NRF2_ACTIVATION', 'NFKB_INHIBITION', 'THROMBIN_INHIBITION', 'EDEMA_REDUCTION', 'GLUCOSE_UPTAKE'],
+     mechanisms: ['MITOCHONDRIAL_PROTECTION', 'GPX_ACTIVATION', 'CHELATION', 'NRF2_ACTIVATION', 'NFKB_INHIBITION', 'GLUCOSE_UPTAKE'],
     description: 'Таксифолин (дигидрокверцетин) — флавоноид из лиственницы, мощный антиоксидент. Защищает сосуды и митохондрии.',
     synergies: [
         {with: "vitamin_c", effect: "Антиоксидантная сеть", mechanism: "Оба — флавоноиды", severity: "MEDIUM"},
@@ -6772,7 +6772,7 @@ soy_isoflavones: {
     ],
     organs: ['REPRODUCTIVE', 'HEART', 'BONES'],
     systems: ['reproductive', 'cardio'],
-     mechanisms: ['PHYTOESTROGEN', 'BONE_PROTECTION', 'CHOLESTEROL_LOWERING', 'HOT_FLASH_REDUCTION', 'ER_BETA_AGONISM', 'TYROSINE_KINASE_INHIBITION', 'BMP2_STIMULATION', 'OSTEOBLAST_ACTIVATION', 'LIPID_METABOLISM', 'THYROID_REGULATION', 'APOPTOSIS_MODULATION', 'MENOPAUSAL_SUPPORT', 'VASOMOTOR_SYMPTOM_RELIEF', 'COGNITION_SUPPORT'],
+     mechanisms: ['CHOLESTEROL_LOWERING', 'LIPID_METABOLISM'],
     description: 'Соевые изофлавоны — фитоэстрогены, облегчают симптомы менопаузы и защищают кости. На курсе — гормональный баланс.',
     synergies: [
       { with: 'vitamin_d3', effect: 'Костная защита', mechanism: 'Изофлавоны + D3 = синергия для костной плотности', severity: 'MEDIUM' },
@@ -6807,7 +6807,7 @@ rosemary: {
     ],
     organs: ['BRAIN', 'LIVER', 'HEART'],
     systems: ['neuro', 'hepatic'],
-     mechanisms: ['COX2_INHIBITION', '5LOX_INHIBITION', 'NRF2_ACTIVATION', 'ROS_SCAVENGING', 'ACETYLCHOLINESTERASE_INHIBITION', 'COGNITION_ENHANCEMENT', 'CHELATION', 'IMMUNE_REGULATION', 'ANTIMICROBIAL', 'GUT_HEALTH', 'SKIN_PROTECTION', 'MUSCLE_RECOVERY'],
+     mechanisms: ['COX2_INHIBITION', 'NRF2_ACTIVATION', 'COGNITION_ENHANCEMENT', 'CHELATION', 'ANTIMICROBIAL'],
     description: 'Розмарин (карнозиновая кислота) — мощный антиоксидант и нейропротектор. Улучшает память и защищает мозг.',
     synergies: [
         {with: "curcumin", effect: "Нейропротекция", mechanism: "Карнозная кислота + куркумин", severity: "MEDIUM"},
@@ -6845,7 +6845,7 @@ cinnamon: {
     ],
     organs: ['PANCREAS', 'LIVER', 'VESSELS'],
     systems: ['metabolic', 'hepatic'],
-    mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_LOWERING', 'ANTIMICROBIAL', 'AMPK_ACTIVATION', 'PPAR_ACTIVATION', 'NFKB_INHIBITION', 'GLUT4_TRANSLOCATION', 'IRS1_PI3K', 'GLUCONEOGENESIS_INHIBITION', 'ALPHA_GLUCOSIDASE_INHIBITION', 'GLYCATION_INHIBITION', 'LIPID_METABOLISM', 'TRIGLYCERIDE_LOWERING', 'CHOLESTEROL_LOWERING'],
+    mechanisms: ['INSULIN_SENSITIVITY', 'ANTIMICROBIAL', 'AMPK_ACTIVATION', 'PPAR_ACTIVATION', 'NFKB_INHIBITION', 'GLUT4_TRANSLOCATION', 'IRS1_PI3K', 'GLUCONEOGENESIS_INHIBITION', 'ALPHA_GLUCOSIDASE_INHIBITION', 'LIPID_METABOLISM', 'TRIGLYCERIDE_LOWERING', 'CHOLESTEROL_LOWERING'],
     description: 'Корица — улучшает чувствительность к инсулину и снижает глюкозу. На курсе — метаболическая поддержка.',
     synergies: [
       { with: "berberine", effect: "Корица + Берберин — инсулиновая чувствительность", mechanism: "Берберин ↑ AMPK, корица ↑ PPARγ — два пути ↑ чувствительности к инсулину", severity: "MEDIUM" },
@@ -6884,7 +6884,7 @@ pomegranate: {
     ],
     organs: ['HEART', 'VESSELS', 'REPRODUCTIVE'],
     systems: ['cardio', 'reproductive'],
-    mechanisms: ['NITRIC_OXIDE_PRODUCTION', 'PROSTATE_PROTECTION', 'ELLAGIC_TANNIN', 'UROLITHIN_PRECURSOR', 'ENOS_ACTIVATION', 'VASODILATION', 'ACE_INHIBITION', '5AR_INHIBITION', 'PSA_LOWERING', 'BLOOD_PRESSURE_REGULATION', 'PLATELET_AGGREGATION_INHIBITION', 'NFKB_INHIBITION', 'LIPID_METABOLISM', 'MICROBIOTA_METABOLISM'],
+    mechanisms: ['NITRIC_OXIDE_PRODUCTION', 'PROSTATE_PROTECTION', 'VASODILATION', 'ACE_INHIBITION', '5AR_INHIBITION', 'PSA_LOWERING', 'BLOOD_PRESSURE_REGULATION', 'PLATELET_AGGREGATION_INHIBITION', 'NFKB_INHIBITION', 'LIPID_METABOLISM'],
     description: 'Гранат — богат эллаготаннинами, улучшает NO-продукцию и защищает простату. Кардиопротекция на курсе.',
     synergies: [
         {with: "vitamin_c", effect: "Антиоксидант + усвоение", mechanism: "Эллаговая кислота + C — взаимная стабилизация и усиление", severity: "MEDIUM"},
@@ -6924,7 +6924,7 @@ cranberry: {
     ],
     organs: ['KIDNEYS', 'HEART', 'GUT'],
     systems: ['renal', 'cardio'],
-    mechanisms: ['UTI_PREVENTION', 'MICROCIRCULATION', 'PROANTHOCYANIDIN', 'BACTERIAL_ADHESION_INHIBITION', 'ANTIMICROBIAL', 'GUT_HEALTH', 'GUT_BARRIER_PROTECTION', 'VASODILATION', 'NO_PRODUCTION', 'PH_BALANCE', 'PLATELET_AGGREGATION_INHIBITION', 'CHELATION'],
+    mechanisms: ['UTI_PREVENTION', 'MICROCIRCULATION', 'ANTIMICROBIAL', 'GUT_BARRIER_PROTECTION', 'VASODILATION', 'NO_PRODUCTION', 'PH_BALANCE', 'PLATELET_AGGREGATION_INHIBITION', 'CHELATION'],
     description: 'Клюква — проантоцианидины предотвращают ИМП, антиоксидантная и противовоспалительная защита. На курсе — почки и МП.',
     synergies: [
       { with: "d_mannose", effect: "Клюква + D-манноза — синергия ИМП", mechanism: "ПАЦ ↓ адгезию, манноза ↓ E.coli — разные механизмы антиадгезии", severity: "MEDIUM" },
@@ -6962,7 +6962,7 @@ urolithin_a: {
     ],
     organs: ['MUSCLES', 'MITOCHONDRIA', 'BRAIN'],
     systems: ['musculoskeletal', 'neuro'],
-    mechanisms: ['MITOPHAGY_ACTIVATION', 'MITOCHONDRIAL_BIOGENESIS', 'MUSCLE_FUNCTION', 'ANTI_AGING', 'MITOCHONDRIAL_SUPPORT', 'COENZYME', 'COENZYME_ELECTRON_TRANSPORT', 'ATP_PRODUCTION', 'AMPK_ACTIVATION', 'AUTOPHAGY_INDUCER', 'SIRTUIN_ACTIVATION', 'NFKB_INHIBITION', 'MUSCLE_PROTEIN_SYNTHESIS'],
+    mechanisms: ['MITOCHONDRIAL_BIOGENESIS', 'MUSCLE_FUNCTION', 'MITOCHONDRIAL_SUPPORT', 'COENZYME', 'COENZYME_ELECTRON_TRANSPORT', 'ATP_PRODUCTION', 'AMPK_ACTIVATION', 'AUTOPHAGY_INDUCER', 'SIRTUIN_ACTIVATION', 'NFKB_INHIBITION', 'MUSCLE_PROTEIN_SYNTHESIS'],
     description: 'Уролитин А — метаболит эллаготаннинов, активирует митофагию (очистку митохондрий). Анти-возрастной и мышечная поддержка.',
     synergies: [
         {with: "nmn", effect: "Митофагия + NAD+", mechanism: "Уролитин A ↑ PINK1/Parkin-митофагию, NMN ↑ NAD+ — два разных пути митохондриального обновления", severity: "HIGH"},
@@ -7002,7 +7002,7 @@ bile_acids: {
     ],
     organs: ['LIVER', 'GALLBLADDER', 'GUT'],
     systems: ['hepatic', 'gastrointestinal'],
-    mechanisms: ['BILE_FLOW_STIMULATION', 'CHOLESTEROL_SOLUBILIZATION', 'GALLSTONE_PREVENTION', 'CHOLERETIC', 'BILE_ACID_MODULATION', 'BILE_ACID_CONJUGATION', 'FXR_ACTIVATION', 'TGR5_ACTIVATION', 'LIPID_METABOLISM', 'CHOLESTEROL_LOWERING', 'LIVER_LIPID_METABOLISM', 'LIVER_DETOXIFICATION', 'MEMBRANE_PHOSPHOLIPID', 'GUT_MICROBIOTA', 'ER_STRESS_REDUCTION'],
+    mechanisms: ['BILE_FLOW_STIMULATION', 'GALLSTONE_PREVENTION', 'CHOLERETIC', 'BILE_ACID_MODULATION', 'BILE_ACID_CONJUGATION', 'LIPID_METABOLISM', 'CHOLESTEROL_LOWERING', 'LIVER_LIPID_METABOLISM', 'LIVER_DETOXIFICATION', 'MEMBRANE_PHOSPHOLIPID', 'ER_STRESS_REDUCTION'],
     description: 'Жёлчные кислоты (УДХК) — стимулируют желчеотток, растворяют камни, защищают печень. На курсе — гепатопротекция.',
     synergies: [
         {with: "tudca", effect: "Желчеотток + ER-стресс", mechanism: "Оба — желчные кислоты: УДХК ↓ холестерин, TUDCA ↓ ER-стресс — полная гепатопротекция", severity: "MEDIUM"},
@@ -7042,7 +7042,7 @@ piracetam: {
     ],
     organs: ['BRAIN', 'NERVES', 'BLOOD'],
     systems: ['neuro'],
-    mechanisms: ['ACETYLCHOLINE_MODULATION', 'MICROCIRCULATION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'CHOLINERGIC', 'ACHE_INHIBITION', 'NEUROTRANSMITTER_SYNTHESIS', 'GLUTAMATE_REGULATION', 'AMPA_MODULATION', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'CEREBRAL_BLOOD_FLOW', 'PLATELET_AGGREGATION_INHIBITION', 'BLOOD_RHEOLOGY', 'ENERGY_METABOLISM', 'ATP_PRODUCTION'],
+    mechanisms: ['MICROCIRCULATION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'CHOLINERGIC', 'ACHE_INHIBITION', 'NEUROTRANSMITTER_SYNTHESIS', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'CEREBRAL_BLOOD_FLOW', 'PLATELET_AGGREGATION_INHIBITION', 'BLOOD_RHEOLOGY', 'ATP_PRODUCTION'],
     description: 'Пирацетам — классический ноотроп, улучшает память, концентрацию и мозговой кровоток. На курсе — нейропротекция.',
     synergies: [
       { with: "caffeine", effect: "Пирацетам + кофеин — энергия + фокус", mechanism: "Пирацетам ↑ холинергию, кофеин — стимуляцию — аддитивная энергия", severity: "MEDIUM" },
@@ -7081,7 +7081,7 @@ aniracetam: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-    mechanisms: ['ACETYLCHOLINE_MODULATION', 'ANXIOLYTIC', 'CREATIVITY_BOOST', 'AMPA_MODULATION', 'CHOLINERGIC', 'ACHE_INHIBITION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'DOPAMINE_MODULATION', 'SEROTONIN_MODULATION', 'NEUROTRANSMITTER_SYNTHESIS', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'CEREBRAL_BLOOD_FLOW', 'MOOD_ENHANCEMENT', 'CORTISOL_REDUCTION'],
+    mechanisms: ['ANXIOLYTIC', 'CHOLINERGIC', 'ACHE_INHIBITION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'DOPAMINE_MODULATION', 'SEROTONIN_MODULATION', 'NEUROTRANSMITTER_SYNTHESIS', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'CEREBRAL_BLOOD_FLOW', 'CORTISOL_REDUCTION'],
     description: 'Анирацетам — ноотроп с анксиолитическим действием, улучшает память и снижает тревожность. На курсе — антистресс.',
     synergies: [
         {with: "citicoline", effect: "Холинэргическая синергия", mechanism: "Анирацетам ↑ AMPA-рецепторы, цитиколин ↑ ACh — двойной холинэргический эффект", severity: "HIGH"},
@@ -7120,7 +7120,7 @@ oxiracetam: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-    mechanisms: ['FOCUS_IMPROVEMENT', 'ENERGY_BOOST', 'ACETYLCHOLINE_MODULATION', 'AMPA_MODULATION', 'CHOLINERGIC', 'ACHE_INHIBITION', 'COGNITION_ENHANCEMENT', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'NOREPINEPHRINE_MODULATION', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'CEREBRAL_BLOOD_FLOW', 'ATP_PRODUCTION'],
+    mechanisms: ['CHOLINERGIC', 'ACHE_INHIBITION', 'COGNITION_ENHANCEMENT', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'CEREBRAL_BLOOD_FLOW', 'ATP_PRODUCTION'],
     description: 'Оксирацетам — стимулирующий ноотроп, улучшает память и фокус. На курсе — концентрация при тренировках.',
     synergies: [
         {with: "citicoline", effect: "Когнитивная функция", mechanism: "Оксирацетам ↑ метаболизм нейронов, цитиколин ↑ ACh и фосфолипиды — полная когнитивная поддержка", severity: "MEDIUM"},
@@ -7159,7 +7159,7 @@ pramiracetam: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-    mechanisms: ['FOCUS_IMPROVEMENT', 'ACETYLCHOLINE_MODULATION', 'LEARNING_BOOST', 'AMPA_MODULATION', 'CHOLINERGIC', 'ACHE_INHIBITION', 'COGNITION_ENHANCEMENT', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'NOREPINEPHRINE_MODULATION', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'CEREBRAL_BLOOD_FLOW', 'MEMBRANE_PHOSPHOLIPID', 'ATP_PRODUCTION'],
+    mechanisms: ['CHOLINERGIC', 'ACHE_INHIBITION', 'COGNITION_ENHANCEMENT', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'CEREBRAL_BLOOD_FLOW', 'MEMBRANE_PHOSPHOLIPID', 'ATP_PRODUCTION'],
     description: 'Прамирацетам — мощный ноотроп, в 10-30 раз сильнее пирацетама. Улучшает память и обучение на курсе.',
     synergies: [
         {with: "citicoline", effect: "Память и фокус", mechanism: "Прамирацетам ↑ плотность M1-рецепторов, цитиколин ↑ ACh — сильнейшая холинэргическая комбинация", severity: "HIGH"},
@@ -7198,7 +7198,7 @@ fasoracetam: {
     ],
     organs: ['BRAIN', 'NERVES', 'ADRENALS'],
     systems: ['neuro', 'endocrine'],
-    mechanisms: ['GLUTAMATE_MODULATION', 'ANXIOLYTIC', 'ADRENAL_RECOVERY', 'GABA_MODULATION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'NOREPINEPHRINE_MODULATION', 'BDNF_INCREASE', 'CORTISOL_REGULATION', 'CEREBRAL_BLOOD_FLOW'],
+    mechanisms: ['GLUTAMATE_MODULATION', 'ANXIOLYTIC', 'GABA_MODULATION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'BDNF_INCREASE', 'CORTISOL_REGULATION', 'CEREBRAL_BLOOD_FLOW'],
     description: 'Фасорацетам — ноотроп нового поколения, модулирует глутаматные рецепторы и восстанавливает надпочечники.',
     synergies: [
         {with: "magnesium", effect: "GABA-B модуляция", mechanism: "Фасорацетам — GABA-B агонист, магний — кофактор GABA-рецепторов", severity: "MEDIUM"},
@@ -7236,7 +7236,7 @@ coluracetam: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-    mechanisms: ['CHOLINE_UPTAKE_ENHANCEMENT', 'VISION_IMPROVEMENT', 'ACETYLCHOLINE_SYNTHESIS', 'CHOLINERGIC', 'ACHE_INHIBITION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'NOREPINEPHRINE_MODULATION', 'MEMBRANE_PHOSPHOLIPID', 'CEREBRAL_BLOOD_FLOW', 'BDNF_INCREASE'],
+    mechanisms: ['ACETYLCHOLINE_SYNTHESIS', 'CHOLINERGIC', 'ACHE_INHIBITION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'MEMBRANE_PHOSPHOLIPID', 'CEREBRAL_BLOOD_FLOW', 'BDNF_INCREASE'],
     description: 'Колурацетам — усиливает захват холина, улучшает память и зрение. На курсе — нейропротекция и фокус.',
     synergies: [
         {with: "citicoline", effect: "Холинэргическая синергия", mechanism: "Колурацетам ↓ CHT1 ↑ захват холина, цитиколин — экзогенный холин", severity: "MEDIUM"},
@@ -7274,7 +7274,7 @@ noopept: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-    mechanisms: ['BDNF_INCREASE', 'NGF_STIMULATION', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'ACETYLCHOLINE_SYNTHESIS', 'CHOLINERGIC', 'ACHE_INHIBITION', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'NOREPINEPHRINE_MODULATION', 'GLUTAMATE_REGULATION', 'CEREBRAL_BLOOD_FLOW'],
+    mechanisms: ['BDNF_INCREASE', 'NGF_STIMULATION', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'ACETYLCHOLINE_SYNTHESIS', 'CHOLINERGIC', 'ACHE_INHIBITION', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'CEREBRAL_BLOOD_FLOW'],
     description: 'Ноопепт — ноотроп нового поколения, увеличивает BDNF и NGF, улучшает память и нейропротекцию.',
     synergies: [
       { with: "citicoline", effect: "Ноопепт + Цитиколин — BDNF + ацетилхолин", mechanism: "Ноопепт ↑ BDNF/NGF, цитиколин → холин → ACh — разные оси нейропластичности", severity: "MEDIUM" },
@@ -7313,7 +7313,7 @@ citicoline: {
     ],
     organs: ['BRAIN', 'NERVES', 'LIVER'],
     systems: ['neuro', 'hepatic'],
-    mechanisms: ['ACETYLCHOLINE_SYNTHESIS', 'PHOSPHOLIPID_SYNTHESIS', 'CHOLINERGIC', 'ACHE_INHIBITION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'SYNAPSE_FORMATION', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'MEMBRANE_PHOSPHOLIPID', 'FATTY_ACID_TRANSPORT', 'METHYLATION', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'NOREPINEPHRINE_MODULATION', 'CEREBRAL_BLOOD_FLOW'],
+    mechanisms: ['ACETYLCHOLINE_SYNTHESIS', 'CHOLINERGIC', 'ACHE_INHIBITION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'SYNAPSE_FORMATION', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'MEMBRANE_PHOSPHOLIPID', 'FATTY_ACID_TRANSPORT', 'METHYLATION', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'CEREBRAL_BLOOD_FLOW'],
     description: 'Цитиколин — предшественник ацетилхолина и фосфолипидов, улучшает память и нейропротекцию. На курсе — мозг.',
     synergies: [
       { with: "alpha_gpc", effect: "Цитиколин + Альфа-ГФХ — двойной источник холина", mechanism: "Цитиколин → CDP-холин, АГФХ напрямую ↑ ACh — разные пути доставки холина", severity: "MEDIUM" },
@@ -7355,7 +7355,7 @@ alpha_gpc: {
     ],
     organs: ['BRAIN', 'NERVES', 'MUSCLES'],
     systems: ['neuro', 'musculoskeletal'],
-    mechanisms: ['ACETYLCHOLINE_SYNTHESIS', 'POWER_OUTPUT', 'CHOLINERGIC', 'ACHE_INHIBITION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'GH_RELEASE', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'NOREPINEPHRINE_MODULATION', 'SYNAPSE_FORMATION', 'SYNAPTIC_PLASTICITY', 'MEMBRANE_PHOSPHOLIPID', 'METHYLATION', 'CEREBRAL_BLOOD_FLOW'],
+    mechanisms: ['ACETYLCHOLINE_SYNTHESIS', 'CHOLINERGIC', 'ACHE_INHIBITION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'SYNAPSE_FORMATION', 'SYNAPTIC_PLASTICITY', 'MEMBRANE_PHOSPHOLIPID', 'METHYLATION', 'CEREBRAL_BLOOD_FLOW'],
     description: 'Альфа-ГФХ — лучший источник холина, увеличивает ацетилхолин, улучшает память и силовой выход. На курсе — мозг и сила.',
     synergies: [
       { with: "citicoline", effect: "Цитиколин + Альфа-ГФХ — двойной источник холина", mechanism: "АГФХ напрямую ↑ ACh, цитиколин — пролонгированная доставка холина", severity: "MEDIUM" },
@@ -7393,7 +7393,7 @@ vinpocetine: {
     ],
     organs: ['BRAIN', 'VESSELS', 'HEART'],
     systems: ['neuro', 'cardio'],
-    mechanisms: ['CEREBRAL_BLOOD_FLOW', 'VASODILATATION', 'NO_ENHANCEMENT', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'NEUROTRANSMITTER_SYNTHESIS', 'ACETYLCHOLINE_SYNTHESIS', 'ACHE_INHIBITION', 'GLUTAMATE_REGULATION', 'SYNAPTIC_PLASTICITY', 'CEREBROVASCULAR_PERFUSION', 'ENERGY_METABOLISM', 'CEREBRAL_OXYGENATION'],
+    mechanisms: ['CEREBRAL_BLOOD_FLOW', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'NEUROTRANSMITTER_SYNTHESIS', 'ACETYLCHOLINE_SYNTHESIS', 'ACHE_INHIBITION', 'SYNAPTIC_PLASTICITY'],
     description: 'Винпоцетин — улучшает мозговой кровоток и память. Нейропротектор с сосудорасширяющим действием.',
     synergies: [
       { with: "ginkgo", effect: "Винпоцетин + Гинкго — мозговой кровоток", mechanism: "Винпоцетин ↓ ФДЭ1 + блокада Ca-каналов, гинкго — PAF-антагонизм + NO", severity: "MEDIUM" },
@@ -7431,7 +7431,7 @@ modafinil: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-    mechanisms: ['WAKEFULNESS', 'PROMOTING', 'FOCUS_ENHANCEMENT', 'DOPAMINE_MODULATION', 'NOREPINEPHRINE_MODULATION', 'SEROTONIN_MODULATION', 'COGNITION_ENHANCEMENT', 'NEUROTRANSMITTER_SYNTHESIS', 'GLUTAMATE_REGULATION', 'GABA_MODULATION', 'CEREBRAL_BLOOD_FLOW', 'BDNF_INCREASE', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'ANXIOLYTIC'],
+    mechanisms: ['FOCUS_ENHANCEMENT', 'DOPAMINE_MODULATION', 'SEROTONIN_MODULATION', 'COGNITION_ENHANCEMENT', 'NEUROTRANSMITTER_SYNTHESIS', 'GABA_MODULATION', 'CEREBRAL_BLOOD_FLOW', 'BDNF_INCREASE', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'ANXIOLYTIC'],
     description: 'Модафинил — стимулятор бодрствования, улучшает фокус и снижает усталость. На курсе — при тренировках в 5 утра.',
     synergies: [
         {with: "l_tyrosine", effect: "Бодрость и фокус", mechanism: "Модафинил ↑ дофамин, тирозин — субстрат синтеза — аддитивный фокус", severity: "MEDIUM"},
@@ -7467,7 +7467,7 @@ selegiline: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-    mechanisms: ['MAO_B_INHIBITION', 'DOPAMINE_PROTECTION', 'ANTI_AGING', 'DOPAMINE_SYNTHESIS_UPREGULATION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'BDNF_INCREASE', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'CEREBRAL_BLOOD_FLOW', 'MITOCHONDRIAL_SUPPORT', 'GLUTAMATE_REGULATION', 'NOREPINEPHRINE_MODULATION', 'GABA_MODULATION', 'ACETYLCHOLINE_SYNTHESIS'],
+    mechanisms: ['DOPAMINE_PROTECTION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'BDNF_INCREASE', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'CEREBRAL_BLOOD_FLOW', 'MITOCHONDRIAL_SUPPORT', 'GABA_MODULATION', 'ACETYLCHOLINE_SYNTHESIS'],
     description: 'Селегилин — ингибитор МАО-Б, защищает дофамин и обладает нейропротекторным действием. Анти-возрастной.',
     synergies: [
         {with: "l_tyrosine", effect: "Дофаминергическая синергия", mechanism: "Селегилин ↓ MAO-B, тирозин ↑ субстрат дофамина — двойное усиление", severity: "HIGH"},
@@ -7505,7 +7505,7 @@ memantine: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-    mechanisms: ['NMDA_ANTAGONISM', 'MEMORY_PRESERVATION', 'NEUROPLASTICITY', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'BDNF_INCREASE', 'SYNAPTIC_PLASTICITY', 'GLUTAMATE_REGULATION', 'GABA_MODULATION', 'CEREBRAL_BLOOD_FLOW', 'DOPAMINE_MODULATION', 'NOREPINEPHRINE_MODULATION', 'SEROTONIN_MODULATION', 'NEUROTRANSMITTER_SYNTHESIS', 'ANXIOLYTIC'],
+    mechanisms: ['NMDA_ANTAGONISM', 'NEUROPLASTICITY', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'BDNF_INCREASE', 'SYNAPTIC_PLASTICITY', 'GABA_MODULATION', 'CEREBRAL_BLOOD_FLOW', 'DOPAMINE_MODULATION', 'SEROTONIN_MODULATION', 'NEUROTRANSMITTER_SYNTHESIS', 'ANXIOLYTIC'],
     description: 'Мемантин — антагонист NMDA-рецепторов, нейропротектор. Предотвращает эксайтотоксичность на курсе.',
     synergies: [
         {with: "magnesium", effect: "Нейропротекция", mechanism: "Оба блокируют NMDA — аддитивная защита от эксайтотоксичности", severity: "MEDIUM"},
@@ -7544,7 +7544,7 @@ bromantane: {
     ],
     organs: ['BRAIN', 'NERVES', 'ADRENALS'],
     systems: ['neuro', 'endocrine'],
-    mechanisms: ['DOPAMINE_SYNTHESIS_UPREGULATION', 'ANXIOLYTIC', 'STRESS_ADAPTATION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'SEROTONIN_MODULATION', 'NOREPINEPHRINE_MODULATION', 'GABA_MODULATION', 'CORTISOL_REGULATION', 'BDNF_INCREASE', 'NEUROPLASTICITY', 'ADRENAL_RECOVERY', 'CEREBRAL_BLOOD_FLOW', 'ACETYLCHOLINE_SYNTHESIS'],
+    mechanisms: ['ANXIOLYTIC', 'STRESS_ADAPTATION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'SEROTONIN_MODULATION', 'GABA_MODULATION', 'CORTISOL_REGULATION', 'BDNF_INCREASE', 'NEUROPLASTICITY', 'CEREBRAL_BLOOD_FLOW', 'ACETYLCHOLINE_SYNTHESIS'],
     description: 'Бромантан — ноотроп и адаптоген, стимулирует синтез дофамина и снижает тревожность. На курсе — антистресс и фокус.',
     synergies: [
         {with: "l_tyrosine", effect: "Синтез дофамина", mechanism: "Бромантан ↑ TH, тирозин — субстрат для дофамина — аддитивный синтез", severity: "MEDIUM"},
@@ -7582,7 +7582,7 @@ tianeptine: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-    mechanisms: ['SEROTONIN_REUPTAKE_ENHANCEMENT', 'BDNF_INCREASE', 'ANXIOLYTIC', 'ANTIDEPRESSANT', 'COGNITION_ENHANCEMENT', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'GLUTAMATE_REGULATION', 'CORTISOL_REGULATION', 'GABA_MODULATION', 'DOPAMINE_MODULATION', 'NOREPINEPHRINE_MODULATION', 'CEREBRAL_BLOOD_FLOW', 'NEUROTRANSMITTER_SYNTHESIS', 'ADAPTOGEN'],
+    mechanisms: ['BDNF_INCREASE', 'ANXIOLYTIC', 'COGNITION_ENHANCEMENT', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'CORTISOL_REGULATION', 'GABA_MODULATION', 'DOPAMINE_MODULATION', 'CEREBRAL_BLOOD_FLOW', 'NEUROTRANSMITTER_SYNTHESIS', 'ADAPTOGEN'],
     description: 'Тианептин — антидепрессант с нейропротекторным действием, увеличивает BDNF. На курсе — настроение и мозг.',
     synergies: [
         {with: "omega3", effect: "Нейропротекция", mechanism: "Оба поддерживают нейропластичность", severity: "LOW"},
@@ -7619,7 +7619,7 @@ huperzine_a: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-    mechanisms: ['ACETYLCHOLINESTERASE_INHIBITION', 'NMDA_MODULATION', 'CHOLINERGIC', 'ACHE_INHIBITION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'ACETYLCHOLINE_SYNTHESIS', 'GLUTAMATE_REGULATION', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'BDNF_INCREASE', 'CEREBRAL_BLOOD_FLOW', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'GABA_MODULATION'],
+    mechanisms: ['NMDA_MODULATION', 'CHOLINERGIC', 'ACHE_INHIBITION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'ACETYLCHOLINE_SYNTHESIS', 'SYNAPTIC_PLASTICITY', 'NEUROPLASTICITY', 'BDNF_INCREASE', 'CEREBRAL_BLOOD_FLOW', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_MODULATION', 'GABA_MODULATION'],
     description: 'Гуперзин А — ингибитор ацетилхолинэстеразы, усиливает память и нейропротекцию. Циклический приём 4 нед/2 нед.',
     synergies: [
       { with: "phosphatidylcholine", effect: "Субстрат для ацетилхолина", mechanism: "Гуперзин А ↑ ACh, фосфатидилхолин — донор холина", severity: "MEDIUM" },
@@ -7695,7 +7695,7 @@ lemon_balm: {
     ],
     organs: ['BRAIN', 'NERVES', 'GUT'],
     systems: ['neuro', 'gastrointestinal'],
-    mechanisms: ['GABA_MODULATION', 'ANXIOLYTIC', 'DIGESTION_IMPROVEMENT', 'SLEEP_REGULATION', 'COGNITION_ENHANCEMENT', 'CORTISOL_REGULATION', 'SEROTONIN_MODULATION', 'ADAPTOGEN', 'ACETYLCHOLINE_SYNTHESIS', 'CHOLINERGIC', 'ACHE_INHIBITION', 'BDNF_INCREASE', 'NEUROPLASTICITY', 'THYROID_REGULATION'],
+    mechanisms: ['GABA_MODULATION', 'ANXIOLYTIC', 'SLEEP_REGULATION', 'COGNITION_ENHANCEMENT', 'CORTISOL_REGULATION', 'SEROTONIN_MODULATION', 'ADAPTOGEN', 'ACETYLCHOLINE_SYNTHESIS', 'CHOLINERGIC', 'ACHE_INHIBITION', 'BDNF_INCREASE', 'NEUROPLASTICITY'],
     description: 'Мелисса — анксиолитик с ГАМК-модулирующим действием, улучшает сон и пищеварение. На курсе — антистресс.',
     synergies: [
         {with: "magnesium", effect: "Анксиолитический эффект", mechanism: "Оба усиливают GABA", severity: "MEDIUM"},
@@ -7732,7 +7732,7 @@ saffron: {
     ],
     organs: ['BRAIN', 'NERVES', 'EYES'],
     systems: ['neuro'],
-    mechanisms: ['SEROTONIN_MODULATION', 'ANTIDEPRESSANT', 'VISION_PROTECTION', 'COGNITION_ENHANCEMENT', 'BDNF_INCREASE', 'NEUROPLASTICITY', 'CORTISOL_REGULATION', 'ADAPTOGEN', 'DOPAMINE_MODULATION', 'NOREPINEPHRINE_MODULATION', 'GABA_MODULATION', 'ANXIOLYTIC', 'CEREBRAL_BLOOD_FLOW', 'SYNAPTIC_PLASTICITY', 'GLUTAMATE_REGULATION'],
+    mechanisms: ['SEROTONIN_MODULATION', 'COGNITION_ENHANCEMENT', 'BDNF_INCREASE', 'NEUROPLASTICITY', 'CORTISOL_REGULATION', 'ADAPTOGEN', 'DOPAMINE_MODULATION', 'GABA_MODULATION', 'ANXIOLYTIC', 'CEREBRAL_BLOOD_FLOW', 'SYNAPTIC_PLASTICITY'],
     description: 'Шафран — антидепрессант и ноотроп, модулирует серотонин и защищает зрение. На курсе — настроение.',
     synergies: [
         {with: "omega3", effect: "Антидепрессивный эффект", mechanism: "Оба улучшают настроение", severity: "MEDIUM"},
@@ -7771,7 +7771,7 @@ metformin: {
     ],
     organs: ['LIVER', 'PANCREAS', 'MUSCLES'],
     systems: ['hepatic', 'metabolic'],
-    mechanisms: ['AMPK_ACTIVATION', 'INSULIN_SENSITIVITY', 'GLUCOSE_LOWERING', 'MITOCHONDRIAL_PROTECTION', 'METABOLIC_BOOST', 'FATTY_ACID_OXIDATION', 'LIPOLYSIS_ACTIVATION', 'LIVER_REGENERATION', 'GLUTATHIONE_UP', 'NFKB_INHIBITION', 'CARDIO_PROTECTION', 'GLYCATION_INHIBITION', 'COENZYME_ELECTRON_TRANSPORT'],
+    mechanisms: ['AMPK_ACTIVATION', 'INSULIN_SENSITIVITY', 'MITOCHONDRIAL_PROTECTION', 'FATTY_ACID_OXIDATION', 'LIVER_REGENERATION', 'NFKB_INHIBITION', 'COENZYME_ELECTRON_TRANSPORT'],
     description: 'Метформин — препарат первой линии при инсулинорезистентности, активирует AMPK. На курсе — метаболическая защита.',
     synergies: [
       { with: "berberine", effect: "Метформин + Берберин — двойная АМПК активация", mechanism: "Метформин ↓ комплекс I митохондрий, берберин ↑ AMP/ATP — два пути ↑ AMPK", severity: "MEDIUM" },
@@ -7810,7 +7810,7 @@ semaglutide: {
     ],
     organs: ['PANCREAS', 'BRAIN', 'GUT'],
     systems: ['metabolic'],
-    mechanisms: ['GLP1_RECEPTOR_AGONISM', 'APPETITE_SUPPRESSION', 'GLUCOSE_REGULATION', 'WEIGHT_LOSS', 'INSULIN_SENSITIVITY', 'AMPK_ACTIVATION', 'METABOLIC_BOOST', 'LIPOLYSIS_ACTIVATION', 'FATTY_ACID_OXIDATION', 'CARDIO_PROTECTION', 'NFKB_INHIBITION', 'BDNF_INCREASE', 'GLYCATION_INHIBITION', 'PANCREATIC_BETA_CELL_PROTECTION'],
+    mechanisms: ['INSULIN_SENSITIVITY', 'AMPK_ACTIVATION', 'FATTY_ACID_OXIDATION', 'NFKB_INHIBITION', 'BDNF_INCREASE'],
     description: 'Семаглутид — агонист ГПП-1 рецепторов, мощное снижение аппетита и веса. На курсе — контроль метаболизма.',
     synergies: [
         {with: "berberine", effect: "Контроль глюкозы и веса", mechanism: "Оба снижают аппетит и ↑ AMPK — синергия метаболизма", severity: "MEDIUM"},
@@ -7848,7 +7848,7 @@ finasteride: {
     ],
     organs: ['PROSTATE', 'HAIR', 'REPRODUCTIVE'],
     systems: ['reproductive'],
-    mechanisms: ['DHT_INHIBITION_5AR', 'PROSTATE_PROTECTION', 'HAIR_LOSS_PREVENTION', 'PSA_LOWERING', 'ANDROGENIC_EFFECT', 'HORMONE_REGULATION', 'ENDOCRINE_BALANCE', 'SHBG_MODULATION', 'TESTOSTERONE_REGULATION', 'AR_MODULATION', 'CYP450_MODULATION', 'ANTIANDROGEN', 'METABOLIC_BOOST', 'LIPID_METABOLISM', 'CARDIO_PROTECTION', 'INSULIN_SENSITIVITY', 'HCT_MANAGEMENT'],
+    mechanisms: ['PROSTATE_PROTECTION', 'PSA_LOWERING', 'LIPID_METABOLISM', 'INSULIN_SENSITIVITY'],
     description: 'Финастерид — ингибитор 5-альфа-редуктазы, снижает ДГТ на 70%. Защита простаты и волос на курсе.',
     synergies: [
       { with: "testosterone", effect: "Тестостерон + Финастерид — ДГТ контроль", mechanism: "Финастерид блокирует 5αR → ↓ ДГТ без ↓ тестостерона", severity: "MEDIUM" },
@@ -7884,7 +7884,7 @@ cabergoline: {
     ],
     organs: ['PITUITARY', 'REPRODUCTIVE'],
     systems: ['reproductive', 'endocrine'],
-    mechanisms: ['PROLACTIN_INHIBITION', 'DOPAMINE_D2_AGONISM', 'LH_PULSE_RESTORE', 'LIBIDO_RECOVERY', 'DOPAMINE_MODULATION', 'NOREPINEPHRINE_MODULATION', 'SEROTONIN_MODULATION', 'HORMONE_REGULATION', 'ENDOCRINE_BALANCE', 'TESTOSTERONE_REGULATION', 'GNRH_MODULATION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'MOOD_ENHANCEMENT', 'NEUROTRANSMITTER_SYNTHESIS', 'ANXIOLYTIC', 'ADRENAL_RECOVERY'],
+    mechanisms: ['PROLACTIN_INHIBITION', 'LIBIDO_RECOVERY', 'DOPAMINE_MODULATION', 'SEROTONIN_MODULATION', 'COGNITION_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'NEUROTRANSMITTER_SYNTHESIS', 'ANXIOLYTIC'],
     description: 'Каберголин — агонист D2-рецепторов, подавляет пролактин. Восстанавливает ЛГ и либидо на курсе.',
     synergies: [
         {with: "vitamin_b6", effect: "Снижение пролактина", mechanism: "Каберголин — D2-агонист, B6 (P5P) — кофактор дофамина — аддитивно ↓ пролактин", severity: "MEDIUM"},
@@ -7921,7 +7921,7 @@ testosterone: {
     ],
     organs: ['REPRODUCTIVE', 'MUSCLES', 'BRAIN'],
     systems: ['reproductive', 'musculoskeletal', 'endocrine'],
-    mechanisms: ['ANABOLIC_EFFECT', 'ANDROGENIC_EFFECT', 'PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH', 'TESTOSTERONE_REGULATION', 'HORMONE_REGULATION', 'ENDOCRINE_BALANCE', 'AR_MODULATION', 'SHBG_MODULATION', 'AROMATASE_MODULATION', 'ERYTHROPOIESIS', 'LIPOLYSIS_ACTIVATION', 'FATTY_ACID_OXIDATION', 'LIVER_REGENERATION', 'CARDIO_PROTECTION', 'BONE_DENSITY', 'COLLAGEN_SYNTHESIS', 'MUSCLE_RECOVERY'],
+    mechanisms: ['PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH', 'ERYTHROPOIESIS', 'FATTY_ACID_OXIDATION', 'LIVER_REGENERATION', 'BONE_DENSITY', 'COLLAGEN_SYNTHESIS'],
     description: 'Тестостерон — основной андроген, увеличивает мышечную массу, силу и либидо. Основа курса ААС.',
     synergies: [
       { with: 'finasteride', effect: 'Контроль ДГТ', mechanism: 'Тестостерон → ДГТ, финастерид ↓ 5α-редуктазу', severity: 'MEDIUM' },
@@ -7961,7 +7961,7 @@ caffeine: {
     ],
     organs: ['BRAIN', 'HEART', 'MUSCLES'],
     systems: ['neuro', 'cardio'],
-    mechanisms: ['ADENOSINE_ANTAGONISM', 'CNS_STIMULATION', 'FAT_OXIDATION', 'POWER_OUTPUT', 'FOCUS_ENHANCEMENT', 'COGNITION_ENHANCEMENT', 'DOPAMINE_MODULATION', 'NOREPINEPHRINE_MODULATION', 'NEUROTRANSMITTER_SYNTHESIS', 'LIPOLYSIS_ACTIVATION', 'FATTY_ACID_OXIDATION', 'METABOLIC_BOOST', 'CEREBRAL_BLOOD_FLOW', 'GLYCOGEN_SPARING', 'BLOOD_FLOW_ENHANCEMENT'],
+    mechanisms: ['FOCUS_ENHANCEMENT', 'COGNITION_ENHANCEMENT', 'DOPAMINE_MODULATION', 'NEUROTRANSMITTER_SYNTHESIS', 'FATTY_ACID_OXIDATION', 'CEREBRAL_BLOOD_FLOW'],
     description: 'Кофеин — стимулятор ЦНС, блокирует аденозин, повышает силу и жиросжигание. На курсе — предтренировочный буст.',
     synergies: [
       { with: 'theanine', effect: 'Теанин сглаживает стимуляцию', mechanism: 'Кофеин ↑ возбуждение, теанин ↑ α-волны — баланс', severity: 'MEDIUM' },
@@ -7998,7 +7998,7 @@ diclofenac: {
     ],
     organs: ['JOINTS', 'MUSCLES', 'KIDNEYS'],
     systems: ['musculoskeletal', 'renal'],
-    mechanisms: ['COX_INHIBITION', 'ANALGESIC', 'ANTIPYRETIC', 'NFKB_INHIBITION', 'PROSTAGLANDIN_INHIBITION', 'PLATELET_AGGREGATION_INHIBITION', 'CARTILAGE_PROTECTION', 'MUSCLE_RECOVERY', 'TISSUE_REPAIR', 'SEROTONIN_MODULATION', 'ENDOCANNABINOID_MODULATION', 'CORTISOL_REGULATION', 'GLUTATHIONE_UP', 'HCT_MANAGEMENT', 'BONE_METABOLISM', 'COLLAGEN_SYNTHESIS'],
+    mechanisms: ['COX_INHIBITION', 'NFKB_INHIBITION', 'PLATELET_AGGREGATION_INHIBITION', 'CARTILAGE_PROTECTION', 'TISSUE_REPAIR', 'SEROTONIN_MODULATION', 'CORTISOL_REGULATION', 'COLLAGEN_SYNTHESIS'],
     description: 'Диклофенак — НПВС, ингибитор ЦОГ-1/2, мощное противовоспалительное и обезболивающее. На курсе — суставы (краткосрочно).',
     synergies: [
         {with: "omeprazole", effect: "Защита желудка при НПВС", mechanism: "ИПП предотвращает НПВС-гастропатию", severity: "HIGH"},
@@ -8036,7 +8036,7 @@ meloxicam: {
     ],
     organs: ['JOINTS', 'MUSCLES', 'KIDNEYS'],
     systems: ['musculoskeletal', 'renal'],
-    mechanisms: ['COX2_SELECTIVE_INHIBITION', 'ANALGESIC', 'JOINT_PROTECTION', 'NFKB_INHIBITION', 'PROSTAGLANDIN_INHIBITION', 'CARTILAGE_PROTECTION', 'MUSCLE_RECOVERY', 'TISSUE_REPAIR', 'ENDOCANNABINOID_MODULATION', 'CORTISOL_REGULATION', 'COLLAGEN_SYNTHESIS', 'BONE_METABOLISM', 'GASTRO_PROTECTION', 'HCT_MANAGEMENT'],
+    mechanisms: ['JOINT_PROTECTION', 'NFKB_INHIBITION', 'CARTILAGE_PROTECTION', 'TISSUE_REPAIR', 'CORTISOL_REGULATION', 'COLLAGEN_SYNTHESIS'],
     description: 'Мелоксикам — селективный ингибитор ЦОГ-2, меньше гастротоксичности чем диклофенак. На курсе — суставы.',
     synergies: [
         {with: "omeprazole", effect: "Защита ЖКТ", mechanism: "ИПП при НПВС", severity: "MEDIUM"},
@@ -8073,7 +8073,7 @@ ppi_drugs: {
     ],
     organs: ['STOMACH', 'GUT'],
     systems: ['gastrointestinal'],
-    mechanisms: ['PROTON_PUMP_INHIBITION', 'GASTRIC_PROTECTION', 'ACID_REDUCTION', 'ULCER_PREVENTION', 'GI_PROTECTION', 'GASTRO_PROTECTION', 'MUCOSAL_PROTECTION', 'HEALING_STIMULATION', 'GASTRIN_MODULATION', 'ACID_SUPPRESSION', 'PEPSIN_INHIBITION', 'HELICOBACTER_ERADICATION', 'PARIETAL_CELL_BLOCKADE', 'HCL_SUPPRESSION', 'GUT_BARRIER_PROTECTION', 'CYTOPROTECTION'],
+    mechanisms: ['ACID_REDUCTION', 'GUT_BARRIER_PROTECTION'],
     description: 'Омепразол — ингибитор протонной помпы, снижает кислотность желудка. На курсе — защита ЖКТ от НПВП и ААС.',
     synergies: [
       { with: "probiotics", effect: "Омепразол ↑ pH желудка = больше пробиотиков выживает", mechanism: "Снижение кислотности ↑ выживаемость лактобактерий и бифидобактерий", severity: "MEDIUM" },
@@ -8114,7 +8114,7 @@ spironolactone: {
     ],
     organs: ['KIDNEYS', 'HEART', 'REPRODUCTIVE'],
     systems: ['renal', 'cardio'],
-    mechanisms: ['ALDOSTERONE_ANTAGONISM', 'POTASSIUM_SPARING', 'ANTI_ANDROGEN', 'EDEMA_REDUCTION', 'BLOOD_PRESSURE_LOWERING', 'BP_REDUCTION', 'DIURETIC', 'ANTIFIBROTIC', 'FIBROSIS_REDUCTION', 'TGF_BETA_INHIBITION', '5AR_INHIBITION', 'DHT_REDUCTION', 'SEBUM_REGULATION', 'ELECTROLYTE_BALANCE', 'OSMOREGULATION', 'HCT_MANAGEMENT'],
+    mechanisms: ['POTASSIUM_SPARING', 'ANTI_ANDROGEN', 'BLOOD_PRESSURE_LOWERING', 'BP_REDUCTION', 'ANTIFIBROTIC', 'FIBROSIS_REDUCTION', 'TGF_BETA_INHIBITION', '5AR_INHIBITION', 'DHT_REDUCTION', 'SEBUM_REGULATION', 'ELECTROLYTE_BALANCE', 'OSMOREGULATION'],
     description: 'Спиронолактон — антагонист альдостерона, калийсберегающий диуретик с антиандрогенным действием. На курсе — отёки и калий.',
     synergies: [
         {with: "saw_palmetto", effect: "Антиандрогенный эффект", mechanism: "Оба подавляют андрогены: спиронолактон — блокада AR, пальметто — 5αR", severity: "MEDIUM"},
@@ -8154,7 +8154,7 @@ antidepressant_drugs: {
     ],
     organs: ['BRAIN', 'NERVES', 'ADRENALS'],
     systems: ['neuro'],
-    mechanisms: ['SEROTONIN_MODULATION', 'NOREPINEPHRINE_MODULATION', 'MOOD_REGULATION', 'ANXIOLYTIC', 'SERT_INHIBITION', 'NEUROTRANSMITTER_SYNTHESIS', 'BDNF_INCREASE', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'COGNITION_ENHANCEMENT', 'CORTISOL_REGULATION', 'HPA_MODULATION', 'ADAPTOGEN', 'STRESS_REDUCTION'],
+    mechanisms: ['SEROTONIN_MODULATION', 'ANXIOLYTIC', 'NEUROTRANSMITTER_SYNTHESIS', 'BDNF_INCREASE', 'NEUROPLASTICITY', 'SYNAPTIC_PLASTICITY', 'COGNITION_ENHANCEMENT', 'CORTISOL_REGULATION', 'HPA_MODULATION', 'ADAPTOGEN', 'STRESS_REDUCTION'],
     description: 'Флуоксетин — СИОЗС, ингибитор обратного захвата серотонина. На ПКТ — стабилизация настроения. Только по назначению врача.',
     synergies: [
       { with: 'omega3', effect: 'Синергия антидепрессивного эффекта', mechanism: 'EPA + СИОЗС — усиление нейропластичности', severity: 'MEDIUM' },
@@ -8196,7 +8196,7 @@ anxiolytic_drugs: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-     mechanisms: ['GABA_MODULATION', 'ANXIOLYTIC', 'MUSCLE_RELAXATION', 'SLEEP_REGULATION', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', 'HPA_MODULATION', 'GABA_AGONIST', 'GABA_RECEPTOR_AGONISM', '5HT1A_PARTIAL_AGONIST', 'SEROTONIN_MODULATION', 'DOPAMINE_MODULATION', 'ADAPTOGEN', 'ALPHA_WAVES'],
+     mechanisms: ['GABA_MODULATION', 'ANXIOLYTIC', 'MUSCLE_RELAXATION', 'SLEEP_REGULATION', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', 'HPA_MODULATION', 'GABA_AGONIST', 'GABA_RECEPTOR_AGONISM', 'SEROTONIN_MODULATION', 'DOPAMINE_MODULATION', 'ADAPTOGEN', 'ALPHA_WAVES'],
     description: 'Буспирон — анксиолитик, частичный агонист 5-HT1A. На курсе — снижение тревожности без седации. Только по назначению.',
     synergies: [
       { with: "melatonin", effect: "Буспирон + мелатонин — сон и релаксация", mechanism: "Буспирон ↓ тревогу, мелатонин ↑ сон — разные механизмы релаксации", severity: "MEDIUM" },
@@ -8233,7 +8233,7 @@ antipsychotic_drugs: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-     mechanisms: ['DOPAMINE_ANTAGONISM', 'PSYCHOSIS_PREVENTION', 'MOOD_STABILIZATION', 'PROLACTIN_INCREASE', 'SEROTONIN_MODULATION', 'HISTAMINE_BLOCKADE', 'ADRENERGIC_BLOCKADE', 'GLUTAMATE_MODULATION', 'CALCIUM_CHANNEL_BLOCKADE', 'GABA_MODULATION', 'SEDATION', 'GLYCOGEN_SYNTHASE_KINASE_INHIBITION', 'APOPTOSIS_REGULATION'],
+     mechanisms: ['SEROTONIN_MODULATION', 'GLUTAMATE_MODULATION', 'CALCIUM_CHANNEL_BLOCKADE', 'GABA_MODULATION', 'APOPTOSIS_REGULATION'],
     description: 'Кветиапин — атипичный антипсихотик. На курсе — контроль психотических симптомов. Только по назначению врача.',
     synergies: [
       { with: 'milk_thistle', effect: 'Гепатопротекция при метаболических эффектах', mechanism: 'Силимарин защищает печень от побочных эффектов антипсихотиков', severity: 'MEDIUM' },
@@ -8268,7 +8268,7 @@ anticonvulsant_drugs: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-     mechanisms: ['SEIZURE_PREVENTION', 'MOOD_STABILIZATION', 'NERVE_PAIN_RELIEF', 'GABA_MODULATION', 'CALCIUM_CHANNEL_BLOCKADE', 'GLUTAMATE_MODULATION', 'NMDA_MODULATION', 'EXCITOTOXICITY_PREVENTION', 'ANXIOLYTIC', 'SLEEP_PROMOTION', 'STRESS_REDUCTION', 'SEROTONIN_MODULATION', 'NOREPINEPHRINE_MODULATION', 'NEUROGENESIS'],
+     mechanisms: ['GABA_MODULATION', 'CALCIUM_CHANNEL_BLOCKADE', 'GLUTAMATE_MODULATION', 'NMDA_MODULATION', 'EXCITOTOXICITY_PREVENTION', 'ANXIOLYTIC', 'SLEEP_PROMOTION', 'STRESS_REDUCTION', 'SEROTONIN_MODULATION', 'NEUROGENESIS'],
     description: 'Габапентин — противоэпилептическое, аналог GABA. На курсе — нейропротекция и контроль нейропатии. Только по назначению.',
     synergies: [
       { with: 'magnesium', effect: 'Усиление нейропротекции и антиноцицепции', mechanism: 'Mg потенцирует GABA-ергический эффект габапентина', severity: 'MEDIUM' },
@@ -8303,7 +8303,7 @@ ketamine: {
     ],
     organs: ['BRAIN', 'NERVES'],
     systems: ['neuro'],
-     mechanisms: ['NMDA_ANTAGONISM', 'RAPID_ANTIDEPRESSANT', 'ANALGESIC', 'NEUROPLASTICITY', 'GLUTAMATE_MODULATION', 'BDNF_INCREASE', 'MTOR_ACTIVATION', 'SYNAPTOGENESIS', 'AMPA_MODULATION', 'DOPAMINE_MODULATION', 'SEROTONIN_MODULATION', 'OPIOID_MODULATION', 'MICROGLIAL_MODULATION', 'ANTIAPOPTOTIC', 'SYNAPTIC_PLASTICITY', 'CORTISOL_REDUCTION'],
+     mechanisms: ['NMDA_ANTAGONISM', 'NEUROPLASTICITY', 'GLUTAMATE_MODULATION', 'BDNF_INCREASE', 'MTOR_ACTIVATION', 'DOPAMINE_MODULATION', 'SEROTONIN_MODULATION', 'MICROGLIAL_MODULATION', 'ANTIAPOPTOTIC', 'SYNAPTIC_PLASTICITY', 'CORTISOL_REDUCTION'],
     description: 'Кетамин — NMDA-антагонист с быстрым антидепрессивным действием. Только в клинике под наблюдением.',
     synergies: [
       { with: 'magnesium', effect: 'Потенцирование NMDA-блокады', mechanism: 'Mg блокирует NMDA-рецепторы, усиливая эффект кетамина', severity: 'MEDIUM' },
@@ -8338,7 +8338,7 @@ antidiabetic_drugs: {
     ],
     organs: ['PANCREAS', 'LIVER', 'MUSCLES'],
     systems: ['metabolic', 'hepatic'],
-     mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_LOWERING', 'HBA1C_REDUCTION', 'METABOLIC_PROTECTION', 'AMPK_ACTIVATION', 'GLUCOSE_UPTAKE', 'GLUCONEOGENESIS_INHIBITION', 'LIVER_LIPID_METABOLISM', 'FATTY_ACID_OXIDATION', 'ADIPONECTIN_UP', 'NFKB_INHIBITION', 'PPAR_ACTIVATION', 'LIPID_METABOLISM', 'AUTOPHAGY_INDUCER'],
+     mechanisms: ['INSULIN_SENSITIVITY', 'AMPK_ACTIVATION', 'GLUCOSE_UPTAKE', 'GLUCONEOGENESIS_INHIBITION', 'LIVER_LIPID_METABOLISM', 'FATTY_ACID_OXIDATION', 'ADIPONECTIN_UP', 'NFKB_INHIBITION', 'PPAR_ACTIVATION', 'LIPID_METABOLISM', 'AUTOPHAGY_INDUCER'],
     description: 'Метформин — AMPK-активатор, снижает глюкозу и инсулинорезистентность. На курсе ААС контролирует метаболический профиль.',
     synergies: [
       { with: 'berberine', effect: 'Двойная AMPK-активация', mechanism: 'Метформин + берберин — аддитивное снижение глюкозы и инсулина', severity: 'MEDIUM' },
@@ -8375,7 +8375,7 @@ thyroid_drugs: {
     ],
     organs: ['THYROID', 'BRAIN', 'HEART'],
     systems: ['endocrine', 'cardio', 'neuro'],
-    mechanisms: ['THYROID_HORMONE_REGULATION', 'METABOLIC_RATE', 'T3_T4_BALANCE'],
+    mechanisms: ['THYROID_SUPPORT', 'THYROID_SYNTHESIS'],
     description: 'Тиреоидные препараты — левотироксин (Т4) и лиотиронин (Т3) для регуляции метаболизма. Только по назначению.',
     synergies: [
       { with: "selenium", effect: "Селен нужен для конверсии Т4→Т3", mechanism: "Селен — кофактор дейодиназ, превращающих Т4 в активный Т3", severity: "MEDIUM" }
@@ -8411,7 +8411,7 @@ corticosteroid_drugs: {
     ],
     organs: ['ADRENALS', 'JOINTS', 'IMMUNE_SYSTEM'],
     systems: ['endocrine', 'musculoskeletal', 'immune'],
-     mechanisms: ['IMMUNE_SUPPRESSION', 'CORTISOL_REPLACEMENT', 'EDEMA_REDUCTION', 'NFKB_INHIBITION', 'APOPTOSIS_REGULATION', 'OSTEOCLAST_INHIBITION', 'GLUCONEOGENESIS_INHIBITION', 'PROTEIN_CATABOLISM', 'BONE_DENSITY', 'CALCIUM_REGULATION', 'CYTOKINE_MODULATION', 'LYMPHOCYTE_MODULATION', 'ANTIAPOPTOTIC', 'MEMBRANE_STABILIZATION'],
+     mechanisms: ['NFKB_INHIBITION', 'APOPTOSIS_REGULATION', 'OSTEOCLAST_INHIBITION', 'GLUCONEOGENESIS_INHIBITION', 'BONE_DENSITY', 'CALCIUM_REGULATION', 'CYTOKINE_MODULATION', 'ANTIAPOPTOTIC', 'MEMBRANE_STABILIZATION'],
     description: 'Преднизолон — глюкокортикостероид. На курсе — краткосрочно при воспалении. Только по назначению.',
     synergies: [
       { with: "curcumin", effect: "Куркумин + преднизолон — аддитивная противовоспалительная", mechanism: "Куркумин ↓ NF-κB/COX-2, преднизолон ↓ фосфолипазу А2 — разные пути", severity: "MEDIUM" }
@@ -8448,7 +8448,7 @@ statin_drugs: {
     ],
     organs: ['LIVER', 'HEART', 'VESSELS'],
     systems: ['hepatic', 'cardio'],
-     mechanisms: ['HMG_COA_REDUCTION', 'CHOLESTEROL_LOWERING', 'PLAQUE_STABILIZATION', 'LIPID_METABOLISM', 'TRIGLYCERIDE_LOWERING', 'LIPID_LOWERING', 'NO_PRODUCTION', 'NFKB_INHIBITION', 'PLATELET_AGGREGATION_INHIBITION', 'VENTRICULAR_REMODELING', 'FIBROSIS_REDUCTION'],
+     mechanisms: ['HMG_COA_REDUCTION', 'CHOLESTEROL_LOWERING', 'LIPID_METABOLISM', 'TRIGLYCERIDE_LOWERING', 'LIPID_LOWERING', 'NO_PRODUCTION', 'NFKB_INHIBITION', 'PLATELET_AGGREGATION_INHIBITION', 'VENTRICULAR_REMODELING', 'FIBROSIS_REDUCTION'],
     description: 'Статины — аторвастатин/розувастатин, снижают холестерин и стабилизируют бляшки. На курсе — кардиопротекция.',
     synergies: [
       { with: "resveratrol", effect: "Ресвератрол усиливает кардиопротекцию статинов", mechanism: "Ресвератрол ↑ SIRT1/Nrf2 — аддитивно с плеотропными эффектами статинов", severity: "MEDIUM" },
@@ -8485,7 +8485,7 @@ antiplatelet_drugs: {
     ],
     organs: ['HEART', 'VESSELS', 'BLOOD'],
     systems: ['cardio', 'hematologic'],
-     mechanisms: ['PLATELET_AGGREGATION_INHIBITION', 'THROMBUS_PREVENTION', 'MICROCIRCULATION', 'STROKE_PREVENTION', 'ANTICOAGULANT', 'BLOOD_RHEOLOGY', 'COX_INHIBITION', 'VASODILATION', 'VISCOSITY_REDUCTION', 'FIBRINOLYSIS', 'NO_PRODUCTION', 'PAIN_RELIEF', 'ANTIPLATELET', 'ANTIPYRETIC'],
+     mechanisms: ['PLATELET_AGGREGATION_INHIBITION', 'THROMBUS_PREVENTION', 'MICROCIRCULATION', 'ANTICOAGULANT', 'BLOOD_RHEOLOGY', 'COX_INHIBITION', 'VASODILATION', 'VISCOSITY_REDUCTION', 'FIBRINOLYSIS', 'NO_PRODUCTION', 'PAIN_RELIEF', 'ANTIPLATELET'],
     description: 'Антиагреганты — аспирин/клопидогрел для предотвращения тромбов. На курсе — защита сосудов при эритроцитозе.',
     synergies: [
       { with: 'nattokinase', effect: 'Потенцирование фибринолиза', mechanism: 'Наттокиназа + антиагреганты — аддитивное снижение вязкости крови', severity: 'MEDIUM' },
@@ -8522,7 +8522,7 @@ anticoagulant_drugs: {
     ],
     organs: ['HEART', 'VESSELS', 'BLOOD'],
     systems: ['cardio', 'hematologic'],
-     mechanisms: ['THROMBUS_PREVENTION', 'DVT_PREVENTION', 'STROKE_PREVENTION', 'ANTICOAGULANT', 'BLOOD_RHEOLOGY', 'FIBRINOLYSIS', 'PLASMINOGEN_ACTIVATION', 'VISCOSITY_REDUCTION', 'MICROCIRCULATION', 'VENOTONIC', 'PLATELET_AGGREGATION_INHIBITION', 'THROMBUS_RESOLUTION'],
+     mechanisms: ['THROMBUS_PREVENTION', 'ANTICOAGULANT', 'BLOOD_RHEOLOGY', 'FIBRINOLYSIS', 'PLASMINOGEN_ACTIVATION', 'VISCOSITY_REDUCTION', 'MICROCIRCULATION', 'VENOTONIC', 'PLATELET_AGGREGATION_INHIBITION', 'THROMBUS_RESOLUTION'],
     description: 'Антикоагулянты — эноксапарин/ривароксабан для профилактики тромбозов. На курсе — при высоком гематокрите.',
     synergies: [
       { with: 'nattokinase', effect: 'Потенцирование фибринолиза (с осторожностью)', mechanism: 'Наттокиназа + антикоагулянты — аддитивный антитромботический эффект', severity: 'LOW' },
@@ -8566,7 +8566,7 @@ ace_inhibitor_drugs: {
     ],
     organs: ['HEART', 'VESSELS', 'KIDNEYS'],
     systems: ['cardio', 'renal'],
-     mechanisms: ['ACE_INHIBITION', 'BLOOD_PRESSURE_LOWERING', 'REMODELING_PREVENTION', 'VASODILATION', 'NO_PRODUCTION', 'ANTIFIBROTIC', 'FIBROSIS_REDUCTION', 'ELECTROLYTE_BALANCE', 'BLOOD_FLOW_IMPROVEMENT', 'VENTRICULAR_REMODELING'],
+     mechanisms: ['ACE_INHIBITION', 'BLOOD_PRESSURE_LOWERING', 'VASODILATION', 'NO_PRODUCTION', 'ANTIFIBROTIC', 'FIBROSIS_REDUCTION', 'ELECTROLYTE_BALANCE', 'BLOOD_FLOW_IMPROVEMENT', 'VENTRICULAR_REMODELING'],
     description: 'Эналаприл — ИАПФ, снижает АД, защищает почки. На курсе — кардиопротекция при гипертензии.',
     synergies: [
       { with: 'telmisartan', effect: 'Аддитивное снижение АД (с осторожностью)', mechanism: 'иАПФ + сартан — двойная блокада РААС', severity: 'MEDIUM' },
@@ -8638,7 +8638,7 @@ ccb_drugs: {
     ],
     organs: ['HEART', 'VESSELS'],
     systems: ['cardio'],
-     mechanisms: ['CALCIUM_CHANNEL_BLOCKADE', 'BLOOD_PRESSURE_LOWERING', 'VASODILATION', 'ANGINA_PREVENTION', 'HEART_RHYTHM', 'ARRHYTHMIA_PREVENTION', 'MUSCLE_RELAXATION', 'MICROCIRCULATION', 'BLOOD_FLOW_IMPROVEMENT', 'VENTRICULAR_REMODELING', 'ANTIFIBROTIC', 'ELECTROLYTE_BALANCE'],
+     mechanisms: ['CALCIUM_CHANNEL_BLOCKADE', 'BLOOD_PRESSURE_LOWERING', 'VASODILATION', 'HEART_RHYTHM', 'ARRHYTHMIA_PREVENTION', 'MUSCLE_RELAXATION', 'MICROCIRCULATION', 'BLOOD_FLOW_IMPROVEMENT', 'VENTRICULAR_REMODELING', 'ANTIFIBROTIC', 'ELECTROLYTE_BALANCE'],
     description: 'БКК — амлодипин/нифедипин, снижают АД и расширяют сосуды. На курсе — гипертензия.',
     synergies: [
       { with: 'magnesium', effect: 'Потенцирование вазодилатации', mechanism: 'Mg + БКК = аддитивное расслабление гладкой мускулатуры сосудов', severity: 'MEDIUM' },
@@ -8710,7 +8710,7 @@ diuretic_drugs: {
     ],
     organs: ['KIDNEYS', 'HEART'],
     systems: ['renal', 'cardio'],
-     mechanisms: ['FLUID_REMOVAL', 'POTASSIUM_SPARING', 'BLOOD_PRESSURE_LOWERING', 'EDEMA_REDUCTION', 'ELECTROLYTE_BALANCE', 'OSMOREGULATION', 'VENTRICULAR_REMODELING', 'BLOOD_FLOW_IMPROVEMENT', 'PH_BALANCE', 'CALCIUM_REGULATION', 'BP_REDUCTION', 'FIBROSIS_REDUCTION'],
+     mechanisms: ['POTASSIUM_SPARING', 'BLOOD_PRESSURE_LOWERING', 'ELECTROLYTE_BALANCE', 'OSMOREGULATION', 'VENTRICULAR_REMODELING', 'BLOOD_FLOW_IMPROVEMENT', 'PH_BALANCE', 'CALCIUM_REGULATION', 'BP_REDUCTION', 'FIBROSIS_REDUCTION'],
     description: 'Диуретики — фуросемид/гидрохлоротиазид для снятия отёков. На курсе — контроль АД и отёков.',
     synergies: [
       { with: "calcium", effect: "Тиазиды ↑ реабсорбцию Ca — защита костей", mechanism: "Тиазидные диуретики ↓ выведение Ca²⁺ почками", severity: "MEDIUM" }
@@ -8748,7 +8748,7 @@ immunosuppressant_drugs: {
     ],
     organs: ['IMMUNE_SYSTEM', 'KIDNEYS', 'HEART'],
     systems: ['immune', 'renal'],
-     mechanisms: ['IMMUNE_SUPPRESSION', 'AUTOIMMUNE_MODULATION', 'TRANSPLANT_PROTECTION', 'NFKB_INHIBITION', 'CYTOKINE_MODULATION', 'TCELL_PROLIFERATION', 'TREG_EXPANSION', 'APOPTOSIS_REGULATION', 'CALCINEURIN_INHIBITION', 'METHYLATION', 'NEPHROPROTECTION', 'ANTIFIBROTIC', 'ANTIOXIDANT_ENZYME'],
+     mechanisms: ['AUTOIMMUNE_MODULATION', 'NFKB_INHIBITION', 'CYTOKINE_MODULATION', 'TCELL_PROLIFERATION', 'TREG_EXPANSION', 'APOPTOSIS_REGULATION', 'METHYLATION', 'ANTIFIBROTIC', 'ANTIOXIDANT_ENZYME'],
     description: 'Иммунодепрессанты — циклоспорин/такролимус, подавляют иммунитет. Только по строгим показаниям.',
     synergies: [
       { with: 'corticosteroid_drugs', effect: 'Аддитивное иммуноподавление', mechanism: 'Комбинация с ГКС для усиления иммуносупрессии', severity: 'MEDIUM' },
@@ -8785,7 +8785,7 @@ antibiotic_drugs: {
     ],
     organs: ['GUT', 'IMMUNE_SYSTEM', 'REPRODUCTIVE'],
     systems: ['gastrointestinal', 'immune', 'reproductive'],
-     mechanisms: ['ANTIMICROBIAL', 'GUT_FLORA_DISRUPTION', 'INFECTION_PREVENTION', 'CYTOKINE_MODULATION', 'NEUTROPHIL_ACTIVATION', 'IMMUNE_FUNCTION', 'WHITE_BLOOD_CELL_SUPPORT', 'MICROBIOME_RESTORATION', 'GUT_BARRIER', 'ENTEROCYTE_HEALTH', 'LIVER_DETOXIFICATION', 'CHELATION', 'DETOXIFICATION_PHASE_II'],
+     mechanisms: ['ANTIMICROBIAL', 'CYTOKINE_MODULATION', 'NEUTROPHIL_ACTIVATION', 'IMMUNE_FUNCTION', 'WHITE_BLOOD_CELL_SUPPORT', 'MICROBIOME_RESTORATION', 'GUT_BARRIER', 'ENTEROCYTE_HEALTH', 'LIVER_DETOXIFICATION', 'CHELATION', 'DETOXIFICATION_PHASE_II'],
     description: 'Антибиотики — для лечения инфекций на курсе. Обязательно с пробиотиками для защиты микрофлоры.',
     synergies: [
       { with: 'probiotics', effect: 'Защита микрофлоры (раздельный приём)', mechanism: 'Пробиотики восстанавливают микробиом после антибиотиков', severity: 'HIGH' },
@@ -8826,7 +8826,7 @@ antihistamine_drugs: {
     ],
     organs: ['IMMUNE_SYSTEM', 'LUNGS', 'SKIN'],
     systems: ['immune'],
-     mechanisms: ['H1_RECEPTOR_BLOCKADE', 'ALLERGY_REDUCTION', 'ITCHING_RELIEF', 'SLEEP_IMPROVEMENT', 'MAST_CELL_STABILIZATION', 'VASODILATION', 'BRONCHODILATION', 'LEUKOTRIENE_INHIBITION', 'CYTOKINE_MODULATION', 'CAPILLARY_STRENGTHENING', 'MEMBRANE_STABILIZATION', 'SEROTONIN_MODULATION'],
+     mechanisms: ['SLEEP_IMPROVEMENT', 'MAST_CELL_STABILIZATION', 'VASODILATION', 'CYTOKINE_MODULATION', 'MEMBRANE_STABILIZATION', 'SEROTONIN_MODULATION'],
     description: 'Антигистаминные — цетиризин/лоратадин для снижения аллергических реакций на курсе.',
     synergies: [
       { with: "quercetin", effect: "Кверцетин — природный стабилизатор тучных клеток", mechanism: "Кверцетин ↓ гистамин через ↓ PLCγ/β-гексозаминидазу, аддитивно с H1-блокадой", severity: "MEDIUM" },
@@ -8863,7 +8863,7 @@ nsaid_drugs: {
     ],
     organs: ['JOINTS', 'MUSCLES', 'STOMACH'],
     systems: ['musculoskeletal', 'gastrointestinal'],
-     mechanisms: ['COX_INHIBITION', 'COX2_INHIBITION', 'ANALGESIC', 'ANTIPYRETIC', 'NFKB_INHIBITION', 'PAIN_RELIEF', 'PLATELET_AGGREGATION_INHIBITION', 'ANTICOAGULANT', 'CYTOKINE_MODULATION', 'CARTILAGE_PROTECTION', 'MEMBRANE_STABILIZATION', 'JOINT_FUNCTION'],
+     mechanisms: ['COX_INHIBITION', 'COX2_INHIBITION', 'NFKB_INHIBITION', 'PAIN_RELIEF', 'PLATELET_AGGREGATION_INHIBITION', 'ANTICOAGULANT', 'CYTOKINE_MODULATION', 'CARTILAGE_PROTECTION', 'MEMBRANE_STABILIZATION', 'JOINT_FUNCTION'],
     description: 'НПВС — ибупрофен/напроксен для снятия боли и воспаления. На курсе — краткосрочно для суставов.',
     synergies: [
       { with: "omega3", effect: "Омега-3 + НПВС — аддитивное противовоспалительное", mechanism: "Омега-3 → резольвины, НПВС ↓ COX — разные пути ↓ воспаления", severity: "MEDIUM" },
@@ -8902,7 +8902,7 @@ levothyroxine: {
     ],
     organs: ['THYROID', 'BRAIN', 'HEART'],
     systems: ['endocrine', 'cardio', 'neuro'],
-     mechanisms: ['T4_REPLACEMENT', 'THYROID_HORMONE_NORMALIZATION', 'METABOLIC_RATE', 'BMR_REGULATION', 'T4_T3_CONVERSION', 'THYROID_SUPPORT', 'TR_RECEPTOR_SENSITIVITY', 'BLOOD_PRESSURE_LOWERING', 'ATP_PRODUCTION', 'LIPID_METABOLISM', 'CHOLESTEROL_LOWERING', 'MYELIN_SYNTHESIS', 'COGNITIVE_ENHANCEMENT'],
+     mechanisms: ['T4_T3_CONVERSION', 'THYROID_SUPPORT', 'TR_RECEPTOR_SENSITIVITY', 'BLOOD_PRESSURE_LOWERING', 'ATP_PRODUCTION', 'LIPID_METABOLISM', 'CHOLESTEROL_LOWERING', 'MYELIN_SYNTHESIS', 'COGNITIVE_ENHANCEMENT'],
     description: 'Левотироксин — замещающая терапия при гипотиреозе. Нормализует ТТГ и метаболизм. Только по назначению.',
     synergies: [
         {with: "selenium", effect: "Конверсия T4→T3", mechanism: "Селен — кофактор дейодиназ", severity: "HIGH"},
@@ -8939,7 +8939,7 @@ antithyroid_drugs: {
     ],
     organs: ['THYROID'],
     systems: ['endocrine'],
-     mechanisms: ['THYROID_HORMONE_SYNTHESIS_INHIBITION', 'T3_T4_LOWERING', 'HYPERTHYROIDISM_TREATMENT', 'METABOLIC_RATE_REDUCTION', 'THYROID_SUPPORT', 'BONE_DENSITY', 'CALCIUM_REGULATION', 'ELECTROLYTE_BALANCE', 'GABA_MODULATION', 'ANXIOLYTIC', 'APOPTOSIS_REGULATION'],
+     mechanisms: ['THYROID_SUPPORT', 'BONE_DENSITY', 'CALCIUM_REGULATION', 'ELECTROLYTE_BALANCE', 'GABA_MODULATION', 'ANXIOLYTIC', 'APOPTOSIS_REGULATION'],
     description: 'Тиамазол — тиреостатик, ингибирует синтез тиреоидных гормонов. При гипертиреозе на курсе. Только по назначению.',
     synergies: [
       { with: 'selenium', effect: 'Защита щитовидной железы', mechanism: 'Se — кофактор дейодиназы, снижает побочные эффекты тиреостатиков', severity: 'MEDIUM' },
@@ -8974,7 +8974,7 @@ postbiotics: {
     ],
     organs: ['GUT', 'IMMUNE_SYSTEM', 'BRAIN'],
     systems: ['gastrointestinal', 'immune'],
-     mechanisms: ['GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'IMMUNE_REGULATION', 'MICROBIOME_RESTORATION', 'ENTEROCYTE_HEALTH', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'TREG_EXPANSION', 'SHORT_CHAIN_FATTY_ACIDS', 'BUTYRATE_PRODUCTION', 'MUCOUS_MEMBRANE_PROTECTION', 'DAOPRODUCTION', 'AUTOIMMUNE_MODULATION', 'GUT_BARRIER_STRENGTHENING'],
+     mechanisms: ['GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'MICROBIOME_RESTORATION', 'ENTEROCYTE_HEALTH', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'TREG_EXPANSION', 'AUTOIMMUNE_MODULATION'],
     description: 'Постбиотики — метаболиты пробиотиков (бутират, лактат, короткоцепочечные кислоты). Укрепляют кишечный барьер.',
     synergies: [
         {with: "probiotics", effect: "Комплексная поддержка микробиома", mechanism: "Постбиотики + пробиотики", severity: "MEDIUM"},
@@ -9009,7 +9009,7 @@ paraprobiotics: {
     ],
     organs: ['GUT', 'IMMUNE_SYSTEM'],
     systems: ['gastrointestinal', 'immune'],
-     mechanisms: ['IMMUNE_REGULATION', 'GUT_BARRIER_INTEGRITY', 'MICROBIOME_RESTORATION', 'GUT_BARRIER', 'TREG_EXPANSION', 'IGA_BOOST', 'GUT_BARRIER_PROTECTION', 'ANTIMICROBIAL_PEPTIDES', 'IMMUNE_FUNCTION', 'TLR_MODULATION', 'DAOPRODUCTION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'ENTEROCYTE_HEALTH'],
+     mechanisms: ['MICROBIOME_RESTORATION', 'GUT_BARRIER', 'TREG_EXPANSION', 'IGA_BOOST', 'GUT_BARRIER_PROTECTION', 'ANTIMICROBIAL_PEPTIDES', 'IMMUNE_FUNCTION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'ENTEROCYTE_HEALTH'],
     description: 'Парабиотики — инактивированные пробиотические штаммы, обладают иммуномодулирующим действием без риска для иммунокомпрометированных.',
     synergies: [
         {with: "probiotics", effect: "Иммуномодуляция", mechanism: "Парабиотики + живые пробиотики", severity: "MEDIUM"},
@@ -9045,7 +9045,7 @@ resistant_starch: {
     ],
     organs: ['GUT', 'LIVER', 'PANCREAS'],
     systems: ['gastrointestinal', 'metabolic'],
-     mechanisms: ['BUTYRATE_PRODUCTION', 'INSULIN_SENSITIVITY', 'GUT_BARRIER_PROTECTION', 'GUT_FLORA_SUPPORT', 'FAT_OXIDATION', 'SHORT_CHAIN_FATTY_ACIDS', 'AMPK_ACTIVATION', 'GLUCOSE_UPTAKE', 'GLUCONEOGENESIS_INHIBITION', 'ADIPONECTIN_UP', 'TREG_EXPANSION', 'MICROBIOME_RESTORATION', 'GUT_BARRIER', 'ENTEROCYTE_HEALTH', 'MUCOUS_MEMBRANE_PROTECTION'],
+     mechanisms: ['INSULIN_SENSITIVITY', 'GUT_BARRIER_PROTECTION', 'AMPK_ACTIVATION', 'GLUCOSE_UPTAKE', 'GLUCONEOGENESIS_INHIBITION', 'ADIPONECTIN_UP', 'TREG_EXPANSION', 'MICROBIOME_RESTORATION', 'GUT_BARRIER', 'ENTEROCYTE_HEALTH'],
     description: 'Резистентный крахмал — пребиотик, ферментируется кишечной микрофлорой с образованием бутирата. Улучшает инсулиновую чувствительность.',
     synergies: [
         {with: "probiotics", effect: "Пребиотический эффект", mechanism: "Резистентный крахмал — пища для пробиотиков", severity: "HIGH"},
@@ -9081,7 +9081,7 @@ beta_glucan: {
     ],
     organs: ['GUT', 'IMMUNE_SYSTEM', 'HEART'],
     systems: ['gastrointestinal', 'immune', 'cardio'],
-     mechanisms: ['IMMUNE_ACTIVATION', 'CHOLESTEROL_LOWERING', 'GUT_FLORA_SUPPORT', 'IMMUNE_FUNCTION', 'TCELL_PROLIFERATION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'LIPID_METABOLISM', 'LIPID_LOWERING', 'MACROPHAGE_ACTIVATION', 'NEUTROPHIL_ACTIVATION', 'GUT_BARRIER', 'MICROBIOME_RESTORATION', 'DETOXIFICATION_PHASE_II', 'PPAR_ACTIVATION'],
+     mechanisms: ['CHOLESTEROL_LOWERING', 'IMMUNE_FUNCTION', 'TCELL_PROLIFERATION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'LIPID_METABOLISM', 'LIPID_LOWERING', 'NEUTROPHIL_ACTIVATION', 'GUT_BARRIER', 'MICROBIOME_RESTORATION', 'DETOXIFICATION_PHASE_II', 'PPAR_ACTIVATION'],
     description: 'Бета-глюкан — полисахарид из овса/грибов, активирует иммунитет и снижает холестерин. На курсе — иммунитет и сосуды.',
     synergies: [
         {with: "vitamin_d3", effect: "Иммунная активация", mechanism: "Бета-глюканы + D3", severity: "MEDIUM"},
@@ -9117,7 +9117,7 @@ fiber: {
     ],
     organs: ['GUT', 'HEART', 'PANCREAS', 'SMALL_INTESTINE'],
     systems: ['gastrointestinal', 'metabolic', 'cardio'],
-     mechanisms: ['GUT_MOTILITY', 'CHOLESTEROL_LOWERING', 'INSULIN_SENSITIVITY', 'SATIETY', 'GLUCOSE_UPTAKE', 'GLUCONEOGENESIS_INHIBITION', 'LIPID_METABOLISM', 'BLOOD_RHEOLOGY', 'BIOFLAVONOID_BINDING', 'BILE_ACID_BINDING', 'SHORT_CHAIN_FATTY_ACIDS', 'BUTYRATE_PRODUCTION', 'GUT_BARRIER_PROTECTION', 'MICROBIOME_RESTORATION', 'FIBER_ABSORPTION'],
+     mechanisms: ['CHOLESTEROL_LOWERING', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'GLUCONEOGENESIS_INHIBITION', 'LIPID_METABOLISM', 'BLOOD_RHEOLOGY', 'GUT_BARRIER_PROTECTION', 'MICROBIOME_RESTORATION'],
     description: 'Клетчатка — пищевые волокна для нормализации моторики кишечника, снижения холестерина и контроля глюкозы.',
     synergies: [
         {with: "probiotics", effect: "Синбиотический эффект", mechanism: "Клетчатка — пребиотик", severity: "HIGH"},
@@ -9153,7 +9153,7 @@ hmo_prebiotics: {
     ],
     organs: ['GUT', 'IMMUNE_SYSTEM', 'BRAIN'],
     systems: ['gastrointestinal', 'immune', 'neuro'],
-     mechanisms: ['BIFIDOBACTERIA_GROWTH', 'GUT_BARRIER_STRENGTHENING', 'IMMUNE_REGULATION', 'BRAIN_GUT_AXIS', 'MICROBIOME_RESTORATION', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'IMMUNE_FUNCTION', 'IGA_BOOST', 'ENTEROCYTE_HEALTH', 'ANTIMICROBIAL', 'SHORT_CHAIN_FATTY_ACIDS', 'MUCOUS_MEMBRANE_PROTECTION', 'NFKB_INHIBITION', 'GABA_MODULATION'],
+     mechanisms: ['MICROBIOME_RESTORATION', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'IMMUNE_FUNCTION', 'IGA_BOOST', 'ENTEROCYTE_HEALTH', 'ANTIMICROBIAL', 'NFKB_INHIBITION', 'GABA_MODULATION'],
     description: 'Олигосахариды грудного молока (HMO) — пребиотики, стимулирующие рост бифидобактерий. Поддержка микробиома и иммунитета.',
     synergies: [
         {with: "probiotics", effect: "Рост бифидобактерий", mechanism: "HMO — специфический пребиотик", severity: "HIGH"},
@@ -9188,7 +9188,7 @@ lactate: {
     ],
     organs: ['MUSCLES', 'LIVER', 'GUT'],
     systems: ['musculoskeletal', 'gastrointestinal'],
-     mechanisms: ['GUT_FLORA_SUPPORT', 'MITOCHONDRIAL_FUNCTION', 'MUSCLE_RECOVERY', 'ATP_PRODUCTION', 'CREATINE_KINASE', 'ELECTROLYTE_BALANCE', 'PH_BALANCE', 'MUSCLE_CONTRACTION', 'MUSCLE_RELAXATION', 'GUT_BARRIER', 'ENTEROCYTE_HEALTH', 'MICROBIOME_RESTORATION', 'SHORT_CHAIN_FATTY_ACIDS'],
+     mechanisms: ['MITOCHONDRIAL_FUNCTION', 'ATP_PRODUCTION', 'CREATINE_KINASE', 'ELECTROLYTE_BALANCE', 'PH_BALANCE', 'MUSCLE_CONTRACTION', 'MUSCLE_RELAXATION', 'GUT_BARRIER', 'ENTEROCYTE_HEALTH', 'MICROBIOME_RESTORATION'],
     description: 'Лактат — молочная кислота, используется как энергетический субстрат. Улучшает восстановление и митохондриальную функцию.',
     synergies: [
         {with: "probiotics", effect: "Среда для пробиотиков", mechanism: "Лактат — метаболит лактобактерий", severity: "LOW"},
@@ -9224,7 +9224,7 @@ digestive_enzymes: {
     ],
     organs: ['STOMACH', 'PANCREAS', 'GUT', 'SMALL_INTESTINE'],
     systems: ['gastrointestinal'],
-     mechanisms: ['DIGESTION_IMPROVEMENT', 'PROTEIN_ABSORPTION', 'NUTRIENT_BIOAVAILABILITY', 'GUT_PROTECTION', 'AMINO_ACID_METABOLISM', 'GUT_BARRIER', 'ENTEROCYTE_HEALTH', 'MUCOUS_MEMBRANE_PROTECTION', 'NFKB_INHIBITION', 'MUSCLE_PROTEIN_SYNTHESIS', 'MICROBIOME_RESTORATION', 'FAT_METABOLISM'],
+     mechanisms: ['AMINO_ACID_METABOLISM', 'GUT_BARRIER', 'ENTEROCYTE_HEALTH', 'NFKB_INHIBITION', 'MUSCLE_PROTEIN_SYNTHESIS', 'MICROBIOME_RESTORATION', 'FAT_METABOLISM'],
     description: 'Пищеварительные ферменты — амилаза, протеаза, липаза для улучшения усвоения белка и нутриентов. На курсе — ЖКТ.',
     synergies: [
         {with: "probiotics", effect: "Улучшение пищеварения", mechanism: "Ферменты расщепляют, пробиотики усваивают", severity: "MEDIUM"},
@@ -9261,7 +9261,7 @@ zinc_carnosine: {
     ],
     organs: ['STOMACH', 'GUT', 'IMMUNE_SYSTEM', 'SMALL_INTESTINE'],
     systems: ['gastrointestinal', 'immune'],
-     mechanisms: ['GUT_BARRIER_STRENGTHENING', 'IMMUNE_SUPPORT', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH', 'GASTRIC_PROTECTION', 'MUCOUS_MEMBRANE_PROTECTION', 'ZINC_COFACTOR', 'APOPTOSIS_REGULATION', 'TISSUE_REPAIR', 'CARNOSINE_CHELATION', 'NFKB_INHIBITION', 'MEMBRANE_STABILIZATION'],
+     mechanisms: ['IMMUNE_SUPPORT', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH', 'ZINC_COFACTOR', 'APOPTOSIS_REGULATION', 'TISSUE_REPAIR', 'CARNOSINE_CHELATION', 'NFKB_INHIBITION', 'MEMBRANE_STABILIZATION'],
     description: 'Цинк-карнозин — комплекс цинка и карнозина, заживляет слизистую желудка и кишечника. На курсе — защита ЖКТ.',
     synergies: [
         {with: "probiotics", effect: "Заживление слизистой ЖКТ", mechanism: "Цинк-карнозин + пробиотики", severity: "HIGH"},
@@ -9298,7 +9298,7 @@ colostrum: {
     ],
     organs: ['GUT', 'IMMUNE_SYSTEM', 'MUSCLES'],
     systems: ['gastrointestinal', 'immune'],
-     mechanisms: ['IMMUNE_REGULATION', 'GUT_BARRIER_STRENGTHENING', 'GROWTH_FACTORS', 'IGA_BOOST', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH', 'TISSUE_REPAIR', 'ANTIMICROBIAL', 'ANTIMICROBIAL_PEPTIDES', 'MUSCLE_GROWTH', 'MUSCLE_PROTEIN_SYNTHESIS', 'NFKB_INHIBITION', 'IMMUNE_CELL_FUNCTION'],
+     mechanisms: ['IGA_BOOST', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH', 'TISSUE_REPAIR', 'ANTIMICROBIAL', 'ANTIMICROBIAL_PEPTIDES', 'MUSCLE_GROWTH', 'MUSCLE_PROTEIN_SYNTHESIS', 'NFKB_INHIBITION', 'IMMUNE_CELL_FUNCTION'],
     description: 'Молозиво — первый секрет молочных желёз, богат иммуноглобулинами и факторами роста. Поддержка иммунитета и ЖКТ.',
     synergies: [
         {with: "probiotics", effect: "Иммунитет кишечника", mechanism: "Молозиво + пробиотики", severity: "MEDIUM"},
@@ -9335,7 +9335,7 @@ ahcc: {
     ],
     organs: ['IMMUNE_SYSTEM', 'LIVER'],
     systems: ['immune', 'hepatic'],
-     mechanisms: ['IMMUNE_ACTIVATION', 'NK_CELL_INCREASE', 'IMMUNE_CELL_FUNCTION', 'TCELL_PROLIFERATION', 'NFKB_INHIBITION', 'LIVER_DETOXIFICATION', 'APOPTOSIS_REGULATION', 'CYTOKINE_MODULATION', 'MICROGLIAL_MODULATION', 'ADAPTOGEN', 'GLUTATHIONE_SYNTHESIS'],
+     mechanisms: ['IMMUNE_CELL_FUNCTION', 'TCELL_PROLIFERATION', 'NFKB_INHIBITION', 'LIVER_DETOXIFICATION', 'APOPTOSIS_REGULATION', 'CYTOKINE_MODULATION', 'MICROGLIAL_MODULATION', 'ADAPTOGEN', 'GLUTATHIONE_SYNTHESIS'],
     description: 'AHCC — экстракт грибов шиитаке, активирует NK-клетки и макрофаги. Поддержка иммунитета и печени на курсе.',
     synergies: [
         {with: "vitamin_d3", effect: "Иммунитет", mechanism: "Оба активируют NK-клетки", severity: "MEDIUM"},
@@ -9370,7 +9370,7 @@ cortisol: {
     ],
     organs: ['ADRENALS', 'MUSCLES', 'BRAIN'],
     systems: ['endocrine', 'musculoskeletal', 'neuro'],
-     mechanisms: ['STRESS_RESPONSE', 'CORTISOL_REDUCTION', 'METABOLIC_REGULATION', 'MORNING_CORTISOL_RHYTHM', 'HPA_MODULATION', 'NFKB_INHIBITION', 'IMMUNE_SUPPRESSION', 'GLUCONEOGENESIS_INHIBITION', 'PROTEIN_SYNTHESIS', 'ANTI_CATABOLIC', 'MUSCLE_BREAKDOWN_PREVENTION', 'BONE_DENSITY', 'LIVER_DETOXIFICATION', 'GLUCOSE_UPTAKE', 'INSULIN_SENSITIVITY', 'LIPID_METABOLISM', 'CIRCADIAN_RHYTHM'],
+     mechanisms: ['CORTISOL_REDUCTION', 'HPA_MODULATION', 'NFKB_INHIBITION', 'GLUCONEOGENESIS_INHIBITION', 'PROTEIN_SYNTHESIS', 'ANTI_CATABOLIC', 'MUSCLE_BREAKDOWN_PREVENTION', 'BONE_DENSITY', 'LIVER_DETOXIFICATION', 'GLUCOSE_UPTAKE', 'INSULIN_SENSITIVITY', 'LIPID_METABOLISM', 'CIRCADIAN_RHYTHM'],
     description: 'Кортизол — маркер стрессовой реакции надпочечников. Не добавка, а показатель для контроля на курсе.',
     synergies: [
       { with: "ashwagandha", effect: "Ашваганда снижает кортизол — помогает интерпретировать уровень стресса", mechanism: "Модуляция HPA-оси через снижение CRH", severity: "MEDIUM" },
@@ -9406,7 +9406,7 @@ adrenaline: {
     ],
     organs: ['ADRENALS', 'HEART'],
     systems: ['endocrine', 'cardio'],
-     mechanisms: ['FIGHT_OR_FLIGHT', 'HEART_RATE_INCREASE', 'BRONCHODILATION', 'GLUCOSE_ELEVATION', 'BLOOD_PRESSURE_LOWERING', 'VASODILATION', 'LIPOLYSIS_ACTIVATION', 'FATTY_ACID_OXIDATION', 'THERMOGENESIS', 'LIVER_DETOXIFICATION', 'GLYCOGENOLYSIS', 'MUSCLE_CONTRACTION', 'ALPHA_WAVES', 'ADAPTOGEN'],
+     mechanisms: ['BLOOD_PRESSURE_LOWERING', 'VASODILATION', 'FATTY_ACID_OXIDATION', 'LIVER_DETOXIFICATION', 'MUSCLE_CONTRACTION', 'ALPHA_WAVES', 'ADAPTOGEN'],
     description: 'Адреналин — маркер симпатической активации. Не добавка, а показатель стресс-реакции для контроля на курсе.',
     synergies: [
       { with: "magnesium", effect: "Магний снижает выделение адреналина — помогает оценить фоновую активность", mechanism: "Ингибиция высвобождения катехоламинов через Ca²⁺-каналы", severity: "MEDIUM" },
@@ -9441,7 +9441,7 @@ endocrine_marker: {
     ],
     organs: ['ADRENALS', 'PITUITARY', 'THYROID'],
     systems: ['endocrine'],
-     mechanisms: ['HORMONE_BALANCE', 'CORTISOL_REGULATION', 'THYROID_FUNCTION', 'REPRODUCTIVE_HORMONES', 'STEROIDOGENESIS', 'TESTOSTERONE_SYNTHESIS', 'LH_RELEASE', 'FSH_STIMULATION', 'HPTA_RESTORATION', 'SHBG_REDUCTION', 'FREE_TESTOSTERONE_INCREASE', 'AROMATASE_INHIBITION', 'ESTROGEN_MODULATION', 'PROLACTIN_REGULATION', 'SERM_ACTIVATION', 'T4_T3_CONVERSION', 'GNRH_STIMULATION', 'LEYDIG_CELL_FUNCTION'],
+     mechanisms: ['CORTISOL_REGULATION', 'STEROIDOGENESIS', 'TESTOSTERONE_SYNTHESIS', 'LH_RELEASE', 'FSH_STIMULATION', 'HPTA_RESTORATION', 'SHBG_REDUCTION', 'FREE_TESTOSTERONE_INCREASE', 'AROMATASE_INHIBITION', 'ESTROGEN_MODULATION', 'PROLACTIN_REGULATION', 'SERM_ACTIVATION', 'T4_T3_CONVERSION', 'GNRH_STIMULATION', 'LEYDIG_CELL_FUNCTION'],
     description: 'Эндокринный маркер — комплексный анализ: кортизол, ТТГ, тестостерон, эстрадиол, пролактин. Для контроля на курсе.',
     synergies: [
       { with: "dim", effect: "DIM помогает интерпретировать метаболизм эстрогенов в профиле", mechanism: "Модуляция 2-OH/16α-OH пути эстрогенов", severity: "LOW" },
@@ -9477,7 +9477,7 @@ neurosteroid: {
     ],
     organs: ['BRAIN', 'NERVES', 'ADRENALS'],
     systems: ['neuro', 'endocrine'],
-     mechanisms: ['GABA_MODULATION', 'STRESS_RESPONSE', 'MOOD_REGULATION', 'NEUROSTEROID_PRECURSOR', 'ANXIOLYTIC', 'CORTISOL_REDUCTION', 'SLEEP_REGULATION', 'NEUROGENESIS', 'MYELIN_SYNTHESIS', 'BDNF_INCREASE', 'HPA_MODULATION', 'STEROIDOGENESIS', 'APOPTOSIS_REGULATION', 'SYNAPTIC_PLASTICITY'],
+     mechanisms: ['GABA_MODULATION', 'NEUROSTEROID_PRECURSOR', 'ANXIOLYTIC', 'CORTISOL_REDUCTION', 'SLEEP_REGULATION', 'NEUROGENESIS', 'MYELIN_SYNTHESIS', 'BDNF_INCREASE', 'HPA_MODULATION', 'STEROIDOGENESIS', 'APOPTOSIS_REGULATION', 'SYNAPTIC_PLASTICITY'],
     description: 'Нейростероид — маркер нейроэндокринного баланса (ДГЭА, прегненолон, аллопрегнанолон). Для контроля на курсе.',
     synergies: [
         {with: "pregnenolone", effect: "Нейростероидный путь", mechanism: "Прегненолон — предшественник", severity: "MEDIUM"},
@@ -9512,7 +9512,7 @@ glucagon: {
     ],
     organs: ['PANCREAS', 'LIVER'],
     systems: ['metabolic', 'hepatic'],
-     mechanisms: ['GLUCOSE_ELEVATION', 'GLYCOGENOLYSIS', 'KETOGENESIS_REGULATION', 'INSULIN_COUNTER_REGULATION', 'GLUCONEOGENESIS_INHIBITION', 'FATTY_ACID_OXIDATION', 'LIPOLYSIS_ACTIVATION', 'LIVER_LIPID_METABOLISM', 'AMPK_ACTIVATION', 'THERMOGENESIS', 'ADIPONECTIN_UP', 'LIVER_DETOXIFICATION', 'AUTOPHAGY_INDUCER', 'METABOLIC_PROTECTION', 'GLUT4_TRANSLOCATION'],
+     mechanisms: ['GLUCONEOGENESIS_INHIBITION', 'FATTY_ACID_OXIDATION', 'LIVER_LIPID_METABOLISM', 'AMPK_ACTIVATION', 'ADIPONECTIN_UP', 'LIVER_DETOXIFICATION', 'AUTOPHAGY_INDUCER', 'GLUT4_TRANSLOCATION'],
     description: 'Глюкагон — маркер метаболизма, контр-инсулиновый гормон. Не добавка, а показатель для контроля на курсе.',
     synergies: [
         {with: "insulin", effect: "Баланс глюкозы", mechanism: "Антагонистическая регуляция", severity: "MEDIUM"},
@@ -9547,7 +9547,7 @@ nmn: {
     ],
     organs: ['MITOCHONDRIA', 'CELLS', 'BRAIN'],
     systems: ['metabolic', 'neuro'],
-     mechanisms: ['NAD_PRODUCTION', 'MITOCHONDRIAL_FUNCTION', 'ANTI_AGING', 'MITOCHONDRIAL_BIOGENESIS', 'COENZYME', 'COENZYME_ELECTRON_TRANSPORT', 'ELECTRON_TRANSPORT_CHAIN', 'ATP_PRODUCTION', 'SIRTUIN_ACTIVATION', 'LIPID_PEROXIDATION_INHIBITION', 'DNA_SYNTHESIS', 'FATTY_ACID_OXIDATION'],
+     mechanisms: ['MITOCHONDRIAL_FUNCTION', 'MITOCHONDRIAL_BIOGENESIS', 'COENZYME', 'COENZYME_ELECTRON_TRANSPORT', 'ELECTRON_TRANSPORT_CHAIN', 'ATP_PRODUCTION', 'SIRTUIN_ACTIVATION', 'LIPID_PEROXIDATION_INHIBITION', 'DNA_SYNTHESIS', 'FATTY_ACID_OXIDATION'],
     description: 'NMN — предшественник NAD+, улучшает митохондриальную функцию и продлевает жизнь клеток. Анти-возрастной.',
     synergies: [
       { with: "resveratrol", effect: "NMN + ресвератрол — NAD+ + сиртуины", mechanism: "NMN ↑ NAD+, ресвератрол ↑ SIRT1", severity: "MEDIUM" },
@@ -9585,7 +9585,7 @@ omega3: {
     ],
     organs: ['HEART', 'BRAIN', 'VESSELS'],
     systems: ['cardio', 'neuro'],
-    mechanisms: ['EPA_ANTI_INFLAMMATORY', 'DHA_BRAIN_STRUCTURE', 'TRIGLYCERIDE_LOWERING', 'BLOOD_PRESSURE_REGULATION'],
+    mechanisms: ['EPA_ANTI_INFLAMMATORY', 'TRIGLYCERIDE_LOWERING', 'BLOOD_PRESSURE_REGULATION'],
     description: 'Омега-3 клинически значима ТОЛЬКО как очищенный ЭПК (Омакор / икосапент этил) 2-4 г/сут при ТГ>2.3 ммоль/л и аритмии (REDUCE-IT: ↓MACE 25%). Дешёвый БАД «рыбий жир» 1000-1500 мг — слабый: низкая доля ЭПК, окисление, STRENGTH/ORIGIN не подтвердили снижение сердечно-сосудистых событий. ДГК — структура нейрональных мембран.',
     synergies: [
       { with: "vitamin_d3", effect: "Омега-3 усиливает рецепторы витамина Д", mechanism: "Омега-3 ↑ VDR-экспрессию в иммунных клетках", severity: "MEDIUM" },
@@ -9625,7 +9625,7 @@ astragalus: {
     ],
     organs: ['IMMUNE_SYSTEM', 'HEART', 'KIDNEYS'],
     systems: ['immune', 'cardio', 'renal'],
-     mechanisms: ['IMMUNE_ACTIVATION', 'ANTI_AGING', 'TELOMERE_SUPPORT', 'IMMUNE_FUNCTION', 'TCELL_PROLIFERATION', 'NATURAL_KILLER_CELL_ACTIVATION', 'ADAPTOGEN', 'APOPTOSIS_REGULATION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'SIRTUIN_ACTIVATION'],
+     mechanisms: ['IMMUNE_FUNCTION', 'TCELL_PROLIFERATION', 'ADAPTOGEN', 'APOPTOSIS_REGULATION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'SIRTUIN_ACTIVATION'],
     description: 'Астрагал — адаптоген и иммуномодулятор, поддерживает теломеры и защищает почки. На курсе — иммунитет и анти-возраст.',
     synergies: [
         {with: "vitamin_c", effect: "Иммунитет", mechanism: "Оба поддерживают иммунитет", severity: "MEDIUM"},
@@ -9658,7 +9658,7 @@ oxytocin: {
     ],
     organs: ['BRAIN', 'REPRODUCTIVE', 'HEART'],
     systems: ['neuro', 'reproductive'],
-     mechanisms: ['BONDING_ENHANCEMENT', 'ANXIOLYTIC', 'MUSCLE_REGENERATION', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', 'ANALGESIC', 'HPA_MODULATION', 'SOCIAL_BONDING', 'TISSUE_REPAIR', 'BDNF_INCREASE', 'GABA_MODULATION', 'SEROTONIN_MODULATION', 'DOPAMINE_MODULATION'],
+     mechanisms: ['ANXIOLYTIC', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', 'HPA_MODULATION', 'TISSUE_REPAIR', 'BDNF_INCREASE', 'GABA_MODULATION', 'SEROTONIN_MODULATION', 'DOPAMINE_MODULATION'],
     description: 'Окситоцин — гормон привязанности, снижает тревожность и улучшает восстановление мышц. На курсе — антистресс.',
     synergies: [
         {with: "magnesium", effect: "Расслабление", mechanism: "Оба способствуют расслаблению", severity: "LOW"},
@@ -9694,7 +9694,7 @@ dhea: {
     ],
     organs: ['ADRENALS', 'BRAIN', 'MUSCLES', 'ENDOCRINE'],
     systems: ['endocrine', 'neuro', 'musculoskeletal'],
-     mechanisms: ['DHEA_PRODUCTION', 'ANDROGEN_PRECURSOR', 'CORTISOL_BALANCE', 'ANTI_AGING', 'STEROIDOGENESIS', 'TESTOSTERONE_SYNTHESIS', 'TESTOSTERONE_SUPPORT', 'FREE_TESTOSTERONE_INCREASE', 'SHBG_REDUCTION', 'BONE_DENSITY', 'LIPID_METABOLISM', 'INSULIN_SENSITIVITY', 'APOPTOSIS_REGULATION'],
+     mechanisms: ['STEROIDOGENESIS', 'TESTOSTERONE_SYNTHESIS', 'TESTOSTERONE_SUPPORT', 'FREE_TESTOSTERONE_INCREASE', 'SHBG_REDUCTION', 'BONE_DENSITY', 'LIPID_METABOLISM', 'INSULIN_SENSITIVITY', 'APOPTOSIS_REGULATION'],
     description: 'ДГЭА — предшественник половых гормонов, снижается с возрастом. На курсе — гормональный баланс и анти-возраст.',
     synergies: [
         {with: "vitamin_d3", effect: "Гормональная поддержка", mechanism: "Оба поддерживают гормональный баланс", severity: "MEDIUM"},
@@ -9729,7 +9729,7 @@ estradiol: {
     ],
     organs: ['REPRODUCTIVE', 'BONES', 'HEART'],
     systems: ['reproductive', 'cardio'],
-     mechanisms: ['BONE_DENSITY_REGULATION', 'REPRODUCTIVE_FUNCTION', 'MOOD_REGULATION', 'STEROID_HORMONE_SYNTHESIS', 'AROMATASE_INHIBITION', 'ESTROGEN_MODULATION', 'NO_PRODUCTION', 'LIPID_METABOLISM', 'BONE_MINERALIZATION', 'CALCIUM_ABSORPTION', 'LH_RELEASE', 'FSH_STIMULATION', 'COLLAGEN_SYNTHESIS'],
+     mechanisms: ['STEROID_HORMONE_SYNTHESIS', 'AROMATASE_INHIBITION', 'ESTROGEN_MODULATION', 'NO_PRODUCTION', 'LIPID_METABOLISM', 'BONE_MINERALIZATION', 'CALCIUM_ABSORPTION', 'LH_RELEASE', 'FSH_STIMULATION', 'COLLAGEN_SYNTHESIS'],
     description: 'Эстрадиол — основной эстроген, маркер феминизации на курсе. Контроль для корректировки ПКТ и антиэстрогенов.',
     synergies: [
         {with: "progesterone", effect: "Гормональный баланс", mechanism: "Эстрадиол + прогестерон — цикл", severity: "MEDIUM"},
@@ -9763,7 +9763,7 @@ progesterone: {
     ],
     organs: ['REPRODUCTIVE', 'BRAIN'],
     systems: ['reproductive', 'neuro'],
-     mechanisms: ['PROGESTERONE_BALANCE', 'SLEEP_REGULATION', 'STEROIDOGENESIS', 'GABA_MODULATION', 'NEUROSTEROID_PRECURSOR', 'ANXIOLYTIC', 'MYELIN_SYNTHESIS', 'BONE_DENSITY', 'BREAST_TISSUE_PROTECTION', 'APOPTOSIS_REGULATION', 'DIURETIC_EFFECT', 'GNRH_STIMULATION', 'CORTISOL_REDUCTION'],
+     mechanisms: ['SLEEP_REGULATION', 'STEROIDOGENESIS', 'GABA_MODULATION', 'NEUROSTEROID_PRECURSOR', 'ANXIOLYTIC', 'MYELIN_SYNTHESIS', 'BONE_DENSITY', 'APOPTOSIS_REGULATION', 'GNRH_STIMULATION', 'CORTISOL_REDUCTION'],
     description: 'Прогестерон — маркер для контроля на курсе. У мужчин — маркер подавления оси ГРГ-ЛГ-ФСГ.',
     synergies: [
         {with: "estradiol", effect: "Баланс эстроген/прогестерон", mechanism: "Необходим для женского баланса", severity: "MEDIUM"},
@@ -9798,7 +9798,7 @@ insulin: {
     ],
     organs: ['PANCREAS', 'MUSCLES', 'LIVER'],
     systems: ['metabolic', 'musculoskeletal'],
-     mechanisms: ['GLUCOSE_UPTAKE', 'PROTEIN_SYNTHESIS', 'GLYCOGEN_STORAGE', 'ANABOLIC_EFFECT', 'INSULIN_SENSITIVITY', 'GLUT4_TRANSLOCATION', 'MTOR_ACTIVATION', 'MUSCLE_PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH', 'MUSCLE_BREAKDOWN_PREVENTION', 'ANTI_CATABOLIC', 'GLYCOGEN_SYNTHESIS', 'LIPID_METABOLISM', 'FATTY_ACID_TRANSPORT', 'ATP_PRODUCTION', 'NITROGEN_BALANCE'],
+     mechanisms: ['GLUCOSE_UPTAKE', 'PROTEIN_SYNTHESIS', 'INSULIN_SENSITIVITY', 'GLUT4_TRANSLOCATION', 'MTOR_ACTIVATION', 'MUSCLE_PROTEIN_SYNTHESIS', 'MUSCLE_GROWTH', 'MUSCLE_BREAKDOWN_PREVENTION', 'ANTI_CATABOLIC', 'LIPID_METABOLISM', 'FATTY_ACID_TRANSPORT', 'ATP_PRODUCTION', 'NITROGEN_BALANCE'],
     description: 'Инсулин — анаболический гормон, ускоряет транспорт глюкозы и аминокислот в мышцы. Только по назначению!',
     synergies: [
       { with: "ipamorelin", effect: "Инсулин + ипаморелин — анаболическая синергия", mechanism: "Инсулин ↑ транспорт, GHRP ↑ GH-IGF-1 ось", severity: "MEDIUM" }
@@ -9832,7 +9832,7 @@ vasopressin: {
     ],
     organs: ['KIDNEYS', 'BRAIN', 'VESSELS'],
     systems: ['renal', 'neuro'],
-     mechanisms: ['WATER_RETENTION', 'BLOOD_PRESSURE_REGULATION', 'SOCIAL_BONDING', 'VASODILATION', 'BLOOD_PRESSURE_LOWERING', 'OSMOREGULATION', 'ELECTROLYTE_BALANCE', 'MICROCIRCULATION', 'COGNITIVE_ENHANCEMENT', 'STRESS_REDUCTION', 'HPA_MODULATION', 'CORTISOL_REDUCTION', 'FOCUS_ENHANCEMENT', 'CEREBRAL_BLOOD_FLOW', 'SYNAPTIC_PLASTICITY'],
+     mechanisms: ['BLOOD_PRESSURE_REGULATION', 'VASODILATION', 'BLOOD_PRESSURE_LOWERING', 'OSMOREGULATION', 'ELECTROLYTE_BALANCE', 'MICROCIRCULATION', 'COGNITIVE_ENHANCEMENT', 'STRESS_REDUCTION', 'HPA_MODULATION', 'CORTISOL_REDUCTION', 'FOCUS_ENHANCEMENT', 'CEREBRAL_BLOOD_FLOW', 'SYNAPTIC_PLASTICITY'],
     description: 'Вазопрессин — антидиуретический гормон, регулирует водный баланс и память. На курсе — контроль гидратации.',
     synergies: [
         {with: "sodium", effect: "Водный баланс", mechanism: "Вазопрессин регулирует воду", severity: "MEDIUM"},
@@ -9867,7 +9867,7 @@ endocannabinoid: {
     ],
     organs: ['BRAIN', 'IMMUNE_SYSTEM', 'GUT'],
     systems: ['neuro', 'immune', 'gastrointestinal'],
-     mechanisms: ['PAIN_MODULATION', 'APPETITE_REGULATION', 'MOOD_REGULATION', 'PPAR_ACTIVATION', 'ANXIOLYTIC', 'STRESS_REDUCTION', 'ENDOCANNABINOID_MODULATION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'MICROGLIAL_MODULATION', 'SLEEP_REGULATION', 'CORTISOL_REDUCTION', 'GABA_MODULATION', 'NEUROPLASTICITY'],
+     mechanisms: ['PPAR_ACTIVATION', 'ANXIOLYTIC', 'STRESS_REDUCTION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'MICROGLIAL_MODULATION', 'SLEEP_REGULATION', 'CORTISOL_REDUCTION', 'GABA_MODULATION', 'NEUROPLASTICITY'],
     description: 'PEA — эндогенный амид жирной кислоты, агонист PPAR-α. Модулирует эндоканнабиноидную систему, снижает боль и воспаление.',
     synergies: [
         {with: "omega3", effect: "Эндоканнабиноидная система", mechanism: "Омега-3 — предшественник", severity: "MEDIUM"},
@@ -9903,7 +9903,7 @@ pectin: {
     ],
     organs: ['GUT', 'LIVER', 'BLOOD'],
     systems: ['gastrointestinal', 'hepatic'],
-     mechanisms: ['CHOLESTEROL_LOWERING', 'BILE_ACID_BINDING', 'GUT_FLORA_SUPPORT', 'LIPID_METABOLISM', 'LIPID_LOWERING', 'CHELATION', 'DETOXIFICATION_PHASE_II', 'GUT_BARRIER', 'ENTEROCYTE_HEALTH', 'MICROBIOME_RESTORATION', 'BLOOD_RHEOLOGY', 'GUT_BARRIER_PROTECTION', 'MUCOUS_MEMBRANE_PROTECTION', 'SHORT_CHAIN_FATTY_ACIDS'],
+     mechanisms: ['CHOLESTEROL_LOWERING', 'LIPID_METABOLISM', 'LIPID_LOWERING', 'CHELATION', 'DETOXIFICATION_PHASE_II', 'GUT_BARRIER', 'ENTEROCYTE_HEALTH', 'MICROBIOME_RESTORATION', 'BLOOD_RHEOLOGY', 'GUT_BARRIER_PROTECTION'],
     description: 'Пектин — растворимое пищевое волокно, связывает токсины и желчные кислоты в кишечнике. На курсе — детокс.',
     synergies: [
         {with: "probiotics", effect: "Пребиотический эффект", mechanism: "Пектин — растворимая клетчатка", severity: "MEDIUM"},
@@ -9937,7 +9937,7 @@ fadogia: {
     ],
     organs: ['REPRODUCTIVE', 'MUSCLES', 'ENDOCRINE'],
     systems: ['reproductive', 'musculoskeletal', 'endocrine'],
-     mechanisms: ['TESTOSTERONE_SYNTHESIS', 'LH_STIMULATION', 'LIBIDO_ENHANCEMENT', 'MUSCLE_RECOVERY', 'STEROIDOGENESIS', 'HPTA_RESTORATION', 'FSH_STIMULATION', 'GNRH_STIMULATION', 'FREE_TESTOSTERONE_INCREASE', 'SHBG_REDUCTION', 'LEYDIG_CELL_FUNCTION', 'MUSCLE_PROTEIN_SYNTHESIS', 'ANTI_CATABOLIC', 'NITRIC_OXIDE_PRODUCTION', 'PDE5_INHIBITION', 'CORTISOL_REDUCTION'],
+     mechanisms: ['TESTOSTERONE_SYNTHESIS', 'LH_STIMULATION', 'LIBIDO_ENHANCEMENT', 'STEROIDOGENESIS', 'HPTA_RESTORATION', 'FSH_STIMULATION', 'GNRH_STIMULATION', 'FREE_TESTOSTERONE_INCREASE', 'SHBG_REDUCTION', 'LEYDIG_CELL_FUNCTION', 'MUSCLE_PROTEIN_SYNTHESIS', 'ANTI_CATABOLIC', 'NITRIC_OXIDE_PRODUCTION', 'PDE5_INHIBITION', 'CORTISOL_REDUCTION'],
     description: 'Фадогия агрестис — африканское растение, стимулирует ЛГ и тестостерон. На курсе — либидо и восстановление.',
     synergies: [
         {with: "zinc", effect: "Поддержка тестостерона", mechanism: "Оба способствуют тестостерону", severity: "MEDIUM"},
@@ -9974,7 +9974,7 @@ pregnenolone: {
     ],
     organs: ['ADRENALS', 'BRAIN', 'REPRODUCTIVE', 'ENDOCRINE'],
     systems: ['endocrine', 'neuro'],
-     mechanisms: ['NEUROSTEROID_PRECURSOR', 'CORTISOL_BALANCE', 'ANTI_AGING', 'STEROIDOGENESIS', 'TESTOSTERONE_SYNTHESIS', 'DHEA_PRODUCTION', 'MYELIN_SYNTHESIS', 'GABA_MODULATION', 'ANXIOLYTIC', 'BDNF_INCREASE', 'SYNAPTIC_PLASTICITY', 'NEUROGENESIS', 'COGNITIVE_ENHANCEMENT', 'HPA_MODULATION', 'SLEEP_REGULATION'],
+     mechanisms: ['NEUROSTEROID_PRECURSOR', 'STEROIDOGENESIS', 'TESTOSTERONE_SYNTHESIS', 'MYELIN_SYNTHESIS', 'GABA_MODULATION', 'ANXIOLYTIC', 'BDNF_INCREASE', 'SYNAPTIC_PLASTICITY', 'NEUROGENESIS', 'COGNITIVE_ENHANCEMENT', 'HPA_MODULATION', 'SLEEP_REGULATION'],
     description: 'Прегненолон — прегормон, предшественник всех стероидных гормонов. Улучшает память и снижает кортизол на курсе.',
     synergies: [
         {with: "dhea", effect: "Нейростероидный каскад", mechanism: "Прегненолон → DHEA → гормоны", severity: "HIGH"},
@@ -10009,7 +10009,7 @@ immune_support: {
     ],
     organs: ['IMMUNE_SYSTEM', 'LIVER', 'BLOOD'],
     systems: ['immune', 'hepatic', 'hematologic'],
-     mechanisms: ['IMMUNE_REGULATION', 'WHITE_BLOOD_CELL_SUPPORT', 'INFECTION_RESISTANCE', 'IMMUNE_FUNCTION', 'TCELL_PROLIFERATION', 'IGA_BOOST', 'NEUTROPHIL_ACTIVATION', 'MACROPHAGE_ACTIVATION', 'CYTOKINE_MODULATION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'VITAMIN_D', 'ZINC_COFACTOR', 'ADAPTOGEN'],
+     mechanisms: ['WHITE_BLOOD_CELL_SUPPORT', 'IMMUNE_FUNCTION', 'TCELL_PROLIFERATION', 'IGA_BOOST', 'NEUTROPHIL_ACTIVATION', 'CYTOKINE_MODULATION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'VITAMIN_D', 'ZINC_COFACTOR', 'ADAPTOGEN'],
     description: 'Иммунная поддержка — комплекс витаминов С, D, цинка, селена и пробиотиков для защиты иммунитета на курсе.',
     synergies: [
         {with: "vitamin_c", effect: "Иммунитет", mechanism: "Оба поддерживают иммунитет", severity: "MEDIUM"},
@@ -10045,7 +10045,7 @@ andrographis: {
     ],
     organs: ['LIVER', 'IMMUNE_SYSTEM', 'BLOOD'],
     systems: ['hepatic', 'immune'],
-     mechanisms: ['IMMUNE_ACTIVATION', 'FEVER_REDUCTION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'NRF2_ACTIVATION', 'CYTOKINE_MODULATION', 'TCELL_PROLIFERATION', 'NATURAL_KILLER_CELL_ACTIVATION', 'APOPTOSIS_REGULATION', 'LIVER_DETOXIFICATION', 'GUT_BARRIER_PROTECTION'],
+     mechanisms: ['NFKB_INHIBITION', 'NLRP3_INHIBITION', 'NRF2_ACTIVATION', 'CYTOKINE_MODULATION', 'TCELL_PROLIFERATION', 'APOPTOSIS_REGULATION', 'LIVER_DETOXIFICATION', 'GUT_BARRIER_PROTECTION'],
     description: 'Андографис — иммуномодулятор и гепатопротектор, активирует NK-клетки и защищает печень. На курсе — иммунитет.',
     synergies: [
         {with: "vitamin_c", effect: "Иммунитет при простуде", mechanism: "Оба — иммуномодуляторы", severity: "MEDIUM"},
@@ -10081,7 +10081,7 @@ boswellia: {
     ],
     organs: ['JOINTS', 'LUNGS', 'BRAIN', 'CARTILAGE'],
     systems: ['musculoskeletal', 'respiratory', 'neuro'],
-     mechanisms: ['JOINT_PROTECTION', '5_LOX_INHIBITION', 'PAIN_RELIEF', 'COX2_INHIBITION', 'NFKB_INHIBITION', 'LEUKOTRIENE_INHIBITION', 'CYTOKINE_MODULATION', 'NLRP3_INHIBITION', 'CARTILAGE_PROTECTION', 'CARTILAGE_REPAIR', 'MMP_REGULATION', 'BRONCHODILATION', 'BLOOD_BRAIN_BARRIER_PROTECTION', 'MEMBRANE_STABILIZATION'],
+     mechanisms: ['JOINT_PROTECTION', '5_LOX_INHIBITION', 'PAIN_RELIEF', 'COX2_INHIBITION', 'NFKB_INHIBITION', 'CYTOKINE_MODULATION', 'NLRP3_INHIBITION', 'CARTILAGE_PROTECTION', 'CARTILAGE_REPAIR', 'MMP_REGULATION', 'MEMBRANE_STABILIZATION'],
     description: 'Босвеллия — мощный ингибитор 5-ЛОГ, противовоспалительное для суставов и лёгких. На курсе — суставы.',
     synergies: [
         {with: "curcumin", effect: "Двойное подавление воспаления", mechanism: "Босвеллия — 5-LOX, куркумин — COX-2", severity: "HIGH"},
@@ -10119,7 +10119,7 @@ cissus: {
     ],
     organs: ['JOINTS', 'BONES', 'MUSCLES', 'CARTILAGE'],
     systems: ['musculoskeletal'],
-     mechanisms: ['BONE_HEALING', 'JOINT_PROTECTION', 'COLLAGEN_SYNTHESIS', 'TISSUE_REPAIR', 'BONE_MINERALIZATION', 'BONE_DENSITY', 'CARTILAGE_REPAIR', 'CARTILAGE_PROTECTION', 'CONNECTIVE_TISSUE', 'MMP_REGULATION', 'TENDON_STRENGTH', 'NFKB_INHIBITION', 'CALCIUM_REGULATION', 'ANTI_CATABOLIC', 'MUSCLE_PROTEIN_SYNTHESIS'],
+     mechanisms: ['JOINT_PROTECTION', 'COLLAGEN_SYNTHESIS', 'TISSUE_REPAIR', 'BONE_MINERALIZATION', 'BONE_DENSITY', 'CARTILAGE_REPAIR', 'CARTILAGE_PROTECTION', 'CONNECTIVE_TISSUE', 'MMP_REGULATION', 'TENDON_STRENGTH', 'NFKB_INHIBITION', 'CALCIUM_REGULATION', 'ANTI_CATABOLIC', 'MUSCLE_PROTEIN_SYNTHESIS'],
     description: 'Циссус — растение для заживления костей и суставов, стимулирует синтез коллагена. На курсе — связки и кости.',
     synergies: [
         {with: "vitamin_c", effect: "Заживление костей и связок", mechanism: "Оба поддерживают коллаген", severity: "MEDIUM"},
@@ -10156,7 +10156,7 @@ licorice: {
     ],
     organs: ['LIVER', 'ADRENALS', 'GUT'],
     systems: ['hepatic', 'endocrine', 'gastrointestinal'],
-     mechanisms: ['ADRENAL_SUPPORT', 'MUCUS_PROTECTION', 'GASTRIC_PROTECTION', 'MUCOUS_MEMBRANE_PROTECTION', 'CORTISOL_REDUCTION', 'HPA_MODULATION', 'ADAPTOGEN', 'NFKB_INHIBITION', 'GLUTATHIONE_SYNTHESIS', 'LIVER_DETOXIFICATION', 'MEMBRANE_STABILIZATION'],
+     mechanisms: ['CORTISOL_REDUCTION', 'HPA_MODULATION', 'ADAPTOGEN', 'NFKB_INHIBITION', 'GLUTATHIONE_SYNTHESIS', 'LIVER_DETOXIFICATION', 'MEMBRANE_STABILIZATION'],
     description: 'Солодка — гепатопротектор и адаптоген, поддерживает надпочечники и защищает слизистую ЖКТ.',
     synergies: [
         {with: "milk_thistle", effect: "Гепатопротекция", mechanism: "Оба защищают печень", severity: "MEDIUM"},
@@ -10192,7 +10192,7 @@ antacid: {
     ],
     organs: ['STOMACH', 'GUT'],
     systems: ['gastrointestinal'],
-     mechanisms: ['ACID_NEUTRALIZATION', 'GASTRIC_PROTECTION', 'HEARTBURN_RELIEF', 'ESOPHAGUS_PROTECTION', 'MUCOUS_MEMBRANE_PROTECTION', 'ELECTROLYTE_BALANCE', 'PH_BALANCE', 'GUT_BARRIER', 'ENTEROCYTE_HEALTH', 'MEMBRANE_STABILIZATION', 'SOOTHING_ACTION', 'GUT_BARRIER_PROTECTION', 'TISSUE_REPAIR', 'PEPSIN_INHIBITION'],
+     mechanisms: ['ELECTROLYTE_BALANCE', 'PH_BALANCE', 'GUT_BARRIER', 'ENTEROCYTE_HEALTH', 'MEMBRANE_STABILIZATION', 'GUT_BARRIER_PROTECTION', 'TISSUE_REPAIR'],
     description: 'Антацид — нейтрализует желудочную кислоту, снимает изжогу и защищает пищевод. На курсе — ЖКТ защита при НПВС.',
     synergies: [
         {with: "zinc_carnosine", effect: "Защита желудка", mechanism: "Антацид + цинк-карнозин", severity: "MEDIUM"},
@@ -10227,7 +10227,7 @@ igf1: {
     ],
     organs: ['MUSCLES', 'BONES', 'BRAIN'],
     systems: ['musculoskeletal', 'endocrine', 'neuro'],
-     mechanisms: ['MUSCLE_GROWTH', 'BONE_DENSITY', 'NERVE_REGENERATION', 'ANABOLIC_EFFECT', 'MUSCLE_PROTEIN_SYNTHESIS', 'MTOR_ACTIVATION', 'PROTEIN_SYNTHESIS', 'ANTI_CATABOLIC', 'NITROGEN_BALANCE', 'TISSUE_REPAIR', 'COLLAGEN_SYNTHESIS', 'SYNAPSE_FORMATION', 'MYELIN_SYNTHESIS', 'CARTILAGE_REPAIR', 'BONE_MINERALIZATION'],
+     mechanisms: ['MUSCLE_GROWTH', 'BONE_DENSITY', 'NERVE_REGENERATION', 'MUSCLE_PROTEIN_SYNTHESIS', 'MTOR_ACTIVATION', 'PROTEIN_SYNTHESIS', 'ANTI_CATABOLIC', 'NITROGEN_BALANCE', 'TISSUE_REPAIR', 'COLLAGEN_SYNTHESIS', 'SYNAPSE_FORMATION', 'MYELIN_SYNTHESIS', 'CARTILAGE_REPAIR', 'BONE_MINERALIZATION'],
     description: 'ИФР-1 — инсулиноподобный фактор роста, анаболический гормон для мышц и костей. Маркер ГР на курсе.',
     synergies: [
         {with: "cjc1295", effect: "GH-IGF-1 каскад", mechanism: "CJC-1295 стимулирует GH → IGF-1", severity: "MEDIUM"},
@@ -10263,7 +10263,7 @@ mgf: {
     ],
     organs: ['MUSCLES', 'BONES'],
     systems: ['musculoskeletal'],
-     mechanisms: ['MUSCLE_REGENERATION', 'SATELLITE_CELL_ACTIVATION', 'HYPERTROPHY', 'RECOVERY', 'MUSCLE_GROWTH', 'MUSCLE_PROTEIN_SYNTHESIS', 'PROTEIN_SYNTHESIS', 'MTOR_ACTIVATION', 'TISSUE_REPAIR', 'ANTI_CATABOLIC', 'IGF1_SIGNALING', 'COLLAGEN_SYNTHESIS', 'NITROGEN_BALANCE'],
+     mechanisms: ['MUSCLE_GROWTH', 'MUSCLE_PROTEIN_SYNTHESIS', 'PROTEIN_SYNTHESIS', 'MTOR_ACTIVATION', 'TISSUE_REPAIR', 'ANTI_CATABOLIC', 'COLLAGEN_SYNTHESIS', 'NITROGEN_BALANCE'],
     description: 'MGF — механо-фактор роста, вариант ИФР-1, стимулирует сателлитные клетки и гипертрофию мышц. На курсе — восстановление.',
     synergies: [
         {with: "igf1", effect: "Рост и восстановление мышц", mechanism: "MGF — изоформа IGF-1", severity: "MEDIUM"},
@@ -10297,7 +10297,7 @@ kpv: {
     ],
     organs: ['GUT', 'IMMUNE_SYSTEM', 'SKIN'],
     systems: ['gastrointestinal', 'immune'],
-     mechanisms: ['GUT_BARRIER_STRENGTHENING', 'IMMUNE_REGULATION', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH', 'TISSUE_REPAIR', 'ANTIMICROBIAL', 'IGA_BOOST', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'MUCOUS_MEMBRANE_PROTECTION', 'MICROBIOME_RESTORATION', 'APOPTOSIS_REGULATION'],
+     mechanisms: ['GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH', 'TISSUE_REPAIR', 'ANTIMICROBIAL', 'IGA_BOOST', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'MICROBIOME_RESTORATION', 'APOPTOSIS_REGULATION'],
     description: 'KPV — противовоспалительный пептид, заживляет слизистую кишечника и кожу. На курсе — защита ЖКТ.',
     synergies: [
         {with: "bpc157", effect: "Заживление кишечника", mechanism: "Оба — пептиды для ЖКТ", severity: "MEDIUM"},
@@ -10327,7 +10327,7 @@ kpv: {
     forms: [{ id: 'pharma_anastrozole', name: 'Anastrozole', nameRu: 'Анастразол 1 мг', dose: '1 мг 1x/д', best: true }],
     organs: ['ENDOCRINE', 'REPRODUCTIVE', 'LIVER'],
     systems: ['endocrine', 'reproductive', 'hepatic'],
-     mechanisms: ['AROMATASE_INHIBITION', 'E2_SUPPRESSION', 'LIPID_PROFILE_ALTERATION', 'ESTROGEN_MODULATION', 'LIPID_METABOLISM', 'CHOLESTEROL_LOWERING', 'LIPID_LOWERING', 'BONE_DENSITY', 'BONE_MINERALIZATION', 'CALCIUM_REGULATION', 'LH_RELEASE', 'FSH_STIMULATION', 'TESTOSTERONE_SYNTHESIS', 'STEROIDOGENESIS', 'HPTA_RESTORATION', 'GNRH_STIMULATION', 'APOPTOSIS_REGULATION'],
+     mechanisms: ['AROMATASE_INHIBITION', 'ESTROGEN_MODULATION', 'LIPID_METABOLISM', 'CHOLESTEROL_LOWERING', 'LIPID_LOWERING', 'BONE_DENSITY', 'BONE_MINERALIZATION', 'CALCIUM_REGULATION', 'LH_RELEASE', 'FSH_STIMULATION', 'TESTOSTERONE_SYNTHESIS', 'STEROIDOGENESIS', 'HPTA_RESTORATION', 'GNRH_STIMULATION', 'APOPTOSIS_REGULATION'],
     description: 'Ингибитор ароматазы — снижает конверсию андрогенов в эстрогены. Применяется для контроля E2 на курсе ААС. Взаимодействие с липидным профилем.',
     dosage: { mg: 1, timing: '1x/д', form: 'таб' },
     bestForCourse: true,
@@ -10350,7 +10350,7 @@ kpv: {
     forms: [{ id: 'pharma_letrozole', name: 'Letrozole', nameRu: 'Летрозол 2.5 мг', dose: '2.5 мг 1x/д', best: true }],
     organs: ['ENDOCRINE', 'REPRODUCTIVE', 'LIVER', 'BONES'],
     systems: ['endocrine', 'reproductive', 'hepatic', 'musculoskeletal'],
-     mechanisms: ['AROMATASE_INHIBITION', 'E2_SUPPRESSION', 'IGF1_DECREASE', 'ESTROGEN_MODULATION', 'LIPID_METABOLISM', 'CHOLESTEROL_LOWERING', 'LIPID_LOWERING', 'BONE_DENSITY', 'BONE_MINERALIZATION', 'CALCIUM_REGULATION', 'OSTEOCLAST_INHIBITION', 'LH_RELEASE', 'FSH_STIMULATION', 'TESTOSTERONE_SYNTHESIS', 'STEROIDOGENESIS', 'HYPERCALCEMIA_MODULATION', 'LIVER_LIPID_METABOLISM', 'APOPTOSIS_REGULATION'],
+     mechanisms: ['AROMATASE_INHIBITION', 'ESTROGEN_MODULATION', 'LIPID_METABOLISM', 'CHOLESTEROL_LOWERING', 'LIPID_LOWERING', 'BONE_DENSITY', 'BONE_MINERALIZATION', 'CALCIUM_REGULATION', 'OSTEOCLAST_INHIBITION', 'LH_RELEASE', 'FSH_STIMULATION', 'TESTOSTERONE_SYNTHESIS', 'STEROIDOGENESIS', 'LIVER_LIPID_METABOLISM', 'APOPTOSIS_REGULATION'],
     description: 'Мощный ингибитор ароматазы III поколения. Блокирует превращение андрогенов в эстрогены в жировой и мышечной ткани. Применяется при гинекомастии и контроле E2.',
     dosage: { mg: 2.5, timing: '1x/д', form: 'таб' },
     bestForCourse: true,
@@ -10422,7 +10422,7 @@ kpv: {
     forms: [{ id: 'immune_lactoferrin', name: 'Lactoferrin', nameRu: 'Лактоферрин 500 мг', dose: '500 мг 2x/д', best: true }],
     organs: ['IMMUNE_SYSTEM', 'GUT', 'BLOOD'],
     systems: ['immune', 'gastrointestinal', 'hematologic'],
-    mechanisms: ['IRON_CHELATION', 'ANTIMICROBIAL', 'GUT_BARRIER_STRENGTHENING', 'IMMUNE_SUPPORT', 'IGA_BOOST', 'IGA_PRODUCTION', 'ANTIMICROBIAL_PEPTIDES', 'MICROBIOME_RESTORATION', 'ENTEROCYTE_HEALTH', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION'],
+    mechanisms: ['ANTIMICROBIAL', 'IMMUNE_SUPPORT', 'IGA_BOOST', 'IGA_PRODUCTION', 'ANTIMICROBIAL_PEPTIDES', 'MICROBIOME_RESTORATION', 'ENTEROCYTE_HEALTH', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION'],
     description: 'Железосвязывающий гликопротеин из молозива. Связывает свободное железо → подавляет рост патогенов. Модулирует иммунный ответ, снижает системное воспаление, защищает барьер кишечника.',
     dosage: { mg: 1000, timing: '2x/д', form: 'капс' },
     bestForCourse: true,
@@ -10452,7 +10452,7 @@ kpv: {
     ],
     organs: ['LIVER', 'LUNGS', 'BLOOD', 'KIDNEYS'],
     systems: ['hepatic', 'respiratory', 'hematologic', 'renal'],
-    mechanisms: ['GLUTATHIONE_PRECURSOR', 'GLUTATHIONE_SYNTHESIS', 'GLUTATHIONE_CONJUGATION', 'MUCUS_REGULATION', 'LIVER_DETOXIFICATION', 'DETOXIFICATION_PHASE_II', 'CHELATION', 'NRF2_ACTIVATION', 'MEMBRANE_STABILIZATION', 'NFKB_INHIBITION', 'GLUTAMATE_MODULATION', 'NMDA_MODULATION', 'LIPID_PEROXIDATION_INHIBITION', 'METHYLATION'],
+    mechanisms: ['GLUTATHIONE_PRECURSOR', 'GLUTATHIONE_SYNTHESIS', 'GLUTATHIONE_CONJUGATION', 'LIVER_DETOXIFICATION', 'DETOXIFICATION_PHASE_II', 'CHELATION', 'NRF2_ACTIVATION', 'MEMBRANE_STABILIZATION', 'NFKB_INHIBITION', 'GLUTAMATE_MODULATION', 'NMDA_MODULATION', 'LIPID_PEROXIDATION_INHIBITION', 'METHYLATION'],
     description: 'N-Ацетилцистеин — предшественник глутатиона, мощный антиоксидант и гепатопротектор. Снижает окислительный стресс, защищает печень при приёме ААС, разжижает мокроту.',
     dosage: { mg: 1200, timing: 'натощак, 2x/д', form: 'капс/шип' },
     bestForCourse: true,
@@ -10508,7 +10508,7 @@ kpv: {
     ],
     organs: ['LIVER', 'GALLBLADDER', 'PANCREAS'],
     systems: ['hepatic', 'gastrointestinal', 'metabolic'],
-    mechanisms: ['BILE_ACID_MODULATION', 'ANTIAPOPTOTIC', 'PROTEIN_FOLDING', 'CHOLERETIC', 'MITOCHONDRIAL_PROTECTION', 'ENDOPLASMIC_RETICULUM_STABILIZATION'],
+    mechanisms: ['BILE_ACID_MODULATION', 'ANTIAPOPTOTIC', 'CHOLERETIC', 'MITOCHONDRIAL_PROTECTION'],
     description: 'TUDCA — гидрофильная конъюгированная желчная кислота, защищает гепатоциты от токсического действия гидрофобных желчных кислот. Снижает ER-стресс, обладает антиапоптотическим действием.',
     dosage: { mg: 500, timing: 'перед едой, 2x/д', form: 'капс' },
     bestForCourse: true,
@@ -10555,7 +10555,7 @@ kpv: {
     category: ['flavonoid','cardioprotector','antioxidant'],
     forms: [{id:'diosmin_500',name:'Diosmin 500mg',nameRu:'Диосмин 500 мг',dose:'500 мг 2x/д',best:true},{id:'diosmin_1000',name:'Diosmin 1000mg',nameRu:'Диосмин 1000 мг',dose:'1000 мг/д',best:false}],
     organs: ['VESSELS','HEART','LIVER'], systems: ['vascular','cardio','hepatic'],
-     mechanisms: ['VENOTONIC', 'LYMPHATIC_DRAINAGE', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'CAPILLARY_STRENGTHENING', 'MEMBRANE_STABILIZATION', 'BLOOD_RHEOLOGY', 'VASODILATION', 'NO_PRODUCTION', 'NFKB_INHIBITION', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'GUT_PROTECTION'],
+     mechanisms: ['VENOTONIC', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'MEMBRANE_STABILIZATION', 'BLOOD_RHEOLOGY', 'VASODILATION', 'NO_PRODUCTION', 'NFKB_INHIBITION', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE'],
     description: 'Флавоноид, венотоник. Укрепляет стенки вен, улучшает лимфодренаж, снижает отёки. Синергия с гесперидином для лечения ХВН.',
     dosage: { mg: 1000, timing: '2x/д во время еды', form: 'таб' },
     bestForCourse: false,
@@ -10599,7 +10599,7 @@ kpv: {
     category: ['proteolytic','enzyme','anti_inflammatory'],
     forms: [{id:'serra_120k',name:'Serrapeptase 120k SPU',nameRu:'Серрапептаза 120 000 Ед',dose:'120 000 Ед 2x/д натощак',best:true},{id:'serra_80k',name:'Serrapeptase 80k SPU',nameRu:'Серрапептаза 80 000 Ед',dose:'80 000 Ед 2x/д',best:false}],
     organs: ['VESSELS','LUNGS','JOINTS','BLOOD'], systems: ['vascular','respiratory','musculoskeletal'],
-     mechanisms: ['PROTEOLYTIC', 'FIBRINOLYTIC', 'MUCOLYTIC', 'EDEMA_REDUCTION', 'PAIN_RELIEF', 'COX2_INHIBITION', 'NFKB_INHIBITION', 'PLASMIN_ACTIVATION', 'PLASMINOGEN_ACTIVATION', 'FIBRINOLYSIS', 'BLOOD_RHEOLOGY', 'MICROCIRCULATION', 'ANTICOAGULANT', 'CYTOKINE_MODULATION', 'TISSUE_REPAIR', 'JOINT_FUNCTION'],
+     mechanisms: ['FIBRINOLYTIC', 'PAIN_RELIEF', 'COX2_INHIBITION', 'NFKB_INHIBITION', 'PLASMIN_ACTIVATION', 'PLASMINOGEN_ACTIVATION', 'FIBRINOLYSIS', 'BLOOD_RHEOLOGY', 'MICROCIRCULATION', 'ANTICOAGULANT', 'CYTOKINE_MODULATION', 'TISSUE_REPAIR', 'JOINT_FUNCTION'],
     description: 'Протеолитический фермент из кишечной палочки (Serratia). Расщепляет фибрин, уменьшает воспаление и отёки, разжижает мокроту. Используется при синуситах, после операций, при варикозе.',
     dosage: { mg: 20, timing: '10-30 мг (120 000 ЕД) 2x/д натощак за 30 мин до еды', form: 'капс ЕС' },
     bestForCourse: false,
@@ -10621,7 +10621,7 @@ kpv: {
     category: ['proteolytic','enzyme','gut'],
     forms: [{id:'papain_500',name:'Papain 500mg',nameRu:'Папаин 500 мг',dose:'500 мг 2x/д',best:true}],
     organs: ['GUT','JOINTS'], systems: ['gastrointestinal','musculoskeletal'],
-     mechanisms: ['PROTEOLYTIC', 'DIGESTIVE_ENZYME', 'AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS', 'PAIN_RELIEF', 'EDEMA_REDUCTION', 'TISSUE_REPAIR', 'COX2_INHIBITION', 'NFKB_INHIBITION', 'CYTOKINE_MODULATION', 'MUCOLYTIC', 'BLOOD_RHEOLOGY', 'NUTRIENT_BIOAVAILABILITY', 'GUT_BARRIER', 'MICROCIRCULATION'],
+     mechanisms: ['AMINO_ACID_METABOLISM', 'PROTEIN_SYNTHESIS', 'PAIN_RELIEF', 'TISSUE_REPAIR', 'COX2_INHIBITION', 'NFKB_INHIBITION', 'CYTOKINE_MODULATION', 'BLOOD_RHEOLOGY', 'GUT_BARRIER', 'MICROCIRCULATION'],
     description: 'Протеолитический фермент из папайи. Улучшает переваривание белков, уменьшает воспаление. Используется в системной энзимотерапии при травмах и отёках.',
     dosage: { mg: 500, timing: '2x/д во время еды', form: 'таб' },
     bestForCourse: false,
@@ -10643,7 +10643,7 @@ kpv: {
     category: ['pharma','cardioprotector'],
     forms: [{id:'tadalafil_5',name:'Tadalafil 5mg',nameRu:'Тадалафил 5 мг',dose:'5 мг/д постоянно',best:true},{id:'tadalafil_20',name:'Tadalafil 20mg',nameRu:'Тадалафил 20 мг',dose:'20 мг по требованию',best:false}],
     organs: ['VESSELS','HEART','REPRODUCTIVE'], systems: ['vascular','cardio','reproductive'],
-     mechanisms: ['PDE5_INHIBITION', 'VASODILATION', 'CAMP_CGMP', 'NO_PRODUCTION', 'NO_RELEASE', 'NITRIC_OXIDE_PRODUCTION', 'BLOOD_PRESSURE_LOWERING', 'BP_REDUCTION', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'CEREBRAL_BLOOD_FLOW', 'PLATELET_AGGREGATION_INHIBITION', 'ENDOTHELIAL_NOS'],
+     mechanisms: ['PDE5_INHIBITION', 'VASODILATION', 'NO_PRODUCTION', 'NO_RELEASE', 'NITRIC_OXIDE_PRODUCTION', 'BLOOD_PRESSURE_LOWERING', 'BP_REDUCTION', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'CEREBRAL_BLOOD_FLOW', 'PLATELET_AGGREGATION_INHIBITION', 'ENDOTHELIAL_NOS'],
     description: 'Ингибитор ФДЭ5. Расширяет сосуды, улучшает кровоток. На курсе ААС — для профилактики гипертрофии ЛЖ, снижения давления и поддержки эректильной функции. Период полувыведения ~17.5 ч.',
     dosage: { mg: 5, timing: '1x/д утром', form: 'таб' },
     bestForCourse: true,
@@ -10665,7 +10665,7 @@ kpv: {
     category: ['proteolytic','enzyme','anticoagulant'],
     forms: [{id:'lumbro_40mg',name:'Lumbrokinase 40mg',nameRu:'Люмборкиназа 40 мг',dose:'40 мг 2x/д натощак',best:true}],
     organs: ['BLOOD','VESSELS','HEART'], systems: ['hematologic','vascular','cardio'],
-     mechanisms: ['FIBRINOLYTIC', 'ANTICOAGULANT', 'PLASMIN_ACTIVATION', 'THROMBUS_RESOLUTION', 'PLASMINOGEN_ACTIVATION', 'FIBRINOLYSIS', 'PLATELET_AGGREGATION_INHIBITION', 'BLOOD_RHEOLOGY', 'VISCOSITY_REDUCTION', 'MICROCIRCULATION', 'THROMBUS_PREVENTION', 'PAI1_INHIBITION', 'PROTEOLYTIC'],
+     mechanisms: ['FIBRINOLYTIC', 'ANTICOAGULANT', 'PLASMIN_ACTIVATION', 'THROMBUS_RESOLUTION', 'PLASMINOGEN_ACTIVATION', 'FIBRINOLYSIS', 'PLATELET_AGGREGATION_INHIBITION', 'BLOOD_RHEOLOGY', 'VISCOSITY_REDUCTION', 'MICROCIRCULATION', 'THROMBUS_PREVENTION', 'PAI1_INHIBITION'],
     description: 'Фибринолитический фермент из дождевого червя. Растворяет фибрин, предотвращает тромбозы. На курсе ААС — снижает риск тромбообразования, улучшает реологию крови.',
     dosage: { mg: 80, timing: '2x/д за 30 мин до еды', form: 'капс' },
     bestForCourse: true,
@@ -10687,7 +10687,7 @@ kpv: {
     category: ['herb','cardioprotector','antioxidant'],
     forms: [{id:'escin_100',name:'Escin 100mg',nameRu:'Эсцин 100 мг',dose:'100 мг 2x/д',best:true}],
     organs: ['VESSELS','LIVER','SKIN'], systems: ['vascular','hepatic','integumentary'],
-     mechanisms: ['VENOTONIC', 'ANTIEDEMA', 'CAPILLARY_STRENGTHENING', 'LYMPHATIC_STIMULATION', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'BLOOD_RHEOLOGY', 'VASODILATION', 'MEMBRANE_STABILIZATION', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'NFKB_INHIBITION', 'VENOUS_TONE', 'NO_PRODUCTION'],
+     mechanisms: ['VENOTONIC', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'BLOOD_RHEOLOGY', 'VASODILATION', 'MEMBRANE_STABILIZATION', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'NFKB_INHIBITION', 'NO_PRODUCTION'],
     description: 'Экстракт конского каштана (эсцин). Венотоник, уменьшает отёки и воспаление. Стандарт лечения ХВН. Укрепляет капилляры, улучшает венозный отток.',
     dosage: { mg: 200, timing: '2x/д после еды', form: 'капс' },
     bestForCourse: false,
@@ -10709,7 +10709,7 @@ kpv: {
     category: ['metabolic', 'cardioprotector'],
     forms: [{id:'inosine_500',name:'Inosine 500mg',nameRu:'Инозин 500 мг',dose:'500 мг 2x/д',best:true}],
     organs: ['HEART','LIVER','MUSCLES'], systems: ['cardio','hepatic','muscular'],
-     mechanisms: ['ATP_PRECURSOR', 'PURINE_METABOLISM', 'ERYTHROPOIESIS', 'ATP_PRODUCTION', 'COENZYME', 'MUSCLE_FUNCTION', 'MUSCLE_CONTRACTION', 'OXYGEN_TRANSPORT', 'HEMOGLOBIN_SYNTHESIS', 'RED_BLOOD_CELL_PRODUCTION', 'NUCLEIC_ACID_SYNTHESIS'],
+     mechanisms: ['ERYTHROPOIESIS', 'ATP_PRODUCTION', 'COENZYME', 'MUSCLE_FUNCTION', 'MUSCLE_CONTRACTION', 'OXYGEN_TRANSPORT', 'HEMOGLOBIN_SYNTHESIS', 'RED_BLOOD_CELL_PRODUCTION'],
     description: 'Предшественник АТФ, участвует в синтезе пуринов. Улучшает энергетический обмен в миокарде и мышцах. Синергия с креатином и рибозой для восстановления АТФ.',
     dosage: { mg: 1000, timing: '2x/д с едой', form: 'капс' },
     bestForCourse: false,
@@ -10731,7 +10731,7 @@ kpv: {
     category: ['flavonoid','antioxidant','cardioprotector','hepatoprotector'],
     forms: [{id:'naringin_250',name:'Naringin 250mg',nameRu:'Нарингин 250 мг',dose:'250-500 мг/д',best:true}],
     organs: ['LIVER','HEART','BLOOD','VESSELS'], systems: ['hepatic','cardio','vascular','metabolic'],
-     mechanisms: ['CYP3A4_INHIBITION', 'LIPID_METABOLISM', 'CHOLESTEROL_REDUCTION', 'CHOLESTEROL_LOWERING', 'LIPID_LOWERING', 'HMG_COA_REDUCTION', 'VASODILATION', 'NFKB_INHIBITION', 'NRF2_ACTIVATION', 'LIVER_LIPID_METABOLISM', 'FATTY_ACID_OXIDATION', 'INSULIN_SENSITIVITY', 'MATRIX_METALLOPROTEINASE_INHIBITION'],
+     mechanisms: ['CYP3A4_INHIBITION', 'LIPID_METABOLISM', 'CHOLESTEROL_REDUCTION', 'CHOLESTEROL_LOWERING', 'LIPID_LOWERING', 'HMG_COA_REDUCTION', 'VASODILATION', 'NFKB_INHIBITION', 'NRF2_ACTIVATION', 'LIVER_LIPID_METABOLISM', 'FATTY_ACID_OXIDATION', 'INSULIN_SENSITIVITY'],
     description: 'Флавоноид грейпфрута. Антиоксидант, ингибирует CYP3A4 (повышает биодоступность некоторых препаратов), снижает ЛПНП. Влияет на метаболизм ксенобиотиков.',
     dosage: { mg: 500, timing: '1x/д с едой', form: 'капс' },
     bestForCourse: false,
@@ -10753,7 +10753,7 @@ kpv: {
     category: ['pharma','hormonal'],
     forms: [{id:'cabergoline_0.5',name:'Cabergoline 0.5mg',nameRu:'Каберголин 0,5 мг',dose:'0.5 мг 2x/нед',best:true}],
     organs: ['BRAIN','PITUITARY','REPRODUCTIVE'], systems: ['neuro','endocrine','reproductive'],
-     mechanisms: ['DOPAMINE_AGONIST', 'DOPAMINE_AGONIST', 'PROLACTIN_INHIBITION', 'PROLACTIN_REGULATION', 'DOPAMINE_SYNTHESIS', 'DOPAMINE_MODULATION', 'DOPAMINE_PROTECTION', 'HPTA_RESTORATION', 'LH_RELEASE', 'TESTOSTERONE_SYNTHESIS', 'STEROIDOGENESIS', 'MOOD_MODULATION', 'FIBROSIS_REDUCTION', 'APOPTOSIS_REGULATION'],
+     mechanisms: ['DOPAMINE_AGONIST', 'PROLACTIN_INHIBITION', 'PROLACTIN_REGULATION', 'DOPAMINE_SYNTHESIS', 'DOPAMINE_MODULATION', 'DOPAMINE_PROTECTION', 'HPTA_RESTORATION', 'LH_RELEASE', 'TESTOSTERONE_SYNTHESIS', 'STEROIDOGENESIS', 'FIBROSIS_REDUCTION', 'APOPTOSIS_REGULATION'],
     description: 'Агонист дофамина, ингибитор пролактина. На курсе ААС — подавляет гиперпролактинемию (особенно от тренболона/нандролона), улучшает либидо и восстановление гонад.',
     dosage: { mg: 0.5, timing: '2x/нед (пн, чт)', form: 'таб' },
     bestForCourse: true,
@@ -10775,7 +10775,7 @@ kpv: {
     category: ['proteolytic','enzyme','anticoagulant'],
     forms: [{id:'natto_100mg',name:'Nattokinase 100mg',nameRu:'Наттокиназа 100 мг (2000 ФЕ)',dose:'100 мг 2x/д',best:true},{id:'natto_200mg',name:'Nattokinase 200mg',nameRu:'Наттокиназа 200 мг (4000 ФЕ)',dose:'200 мг/д',best:false}],
     organs: ['BLOOD','VESSELS','HEART'], systems: ['hematologic','vascular','cardio'],
-     mechanisms: ['FIBRINOLYTIC', 'PLASMIN_ACTIVATION', 'ANTICOAGULANT', 'PAF_ANTAGONIST', 'FIBRINOLYSIS', 'PLASMINOGEN_ACTIVATION', 'PLATELET_AGGREGATION_INHIBITION', 'THROMBUS_PREVENTION', 'THROMBUS_RESOLUTION', 'BLOOD_RHEOLOGY', 'VISCOSITY_REDUCTION', 'MICROCIRCULATION', 'PAI1_INHIBITION'],
+     mechanisms: ['FIBRINOLYTIC', 'PLASMIN_ACTIVATION', 'ANTICOAGULANT', 'FIBRINOLYSIS', 'PLASMINOGEN_ACTIVATION', 'PLATELET_AGGREGATION_INHIBITION', 'THROMBUS_PREVENTION', 'THROMBUS_RESOLUTION', 'BLOOD_RHEOLOGY', 'VISCOSITY_REDUCTION', 'MICROCIRCULATION', 'PAI1_INHIBITION'],
     description: 'Фибринолитический фермент из ферментированных соевых бобов (натто). Растворяет фибрин, снижает вязкость крови, предотвращает тромбозы. Естественная альтернатива аспирину для кардиопротекции.',
     dosage: { mg: 200, timing: '2x/д за 30 мин до еды', form: 'капс' },
     bestForCourse: true,
@@ -10797,7 +10797,7 @@ kpv: {
     category: ['flavonoid','cardioprotector','antioxidant'],
     forms: [{id:'hesperidin_500',name:'Hesperidin 500mg',nameRu:'Гесперидин 500 мг',dose:'500 мг/д',best:true}],
     organs: ['VESSELS','HEART','LIVER'], systems: ['vascular','cardio','hepatic'],
-     mechanisms: ['VENOTONIC', 'CAPILLARY_STRENGTHENING', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'VASODILATION', 'NO_PRODUCTION', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'MEMBRANE_STABILIZATION', 'LYMPHATIC_DRAINAGE', 'BLOOD_RHEOLOGY', 'NFKB_INHIBITION', 'VITAMIN_C_SYNERGY', 'BIOFLAVONOID_BINDING'],
+     mechanisms: ['VENOTONIC', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'VASODILATION', 'NO_PRODUCTION', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'MEMBRANE_STABILIZATION', 'BLOOD_RHEOLOGY', 'NFKB_INHIBITION'],
     description: 'Цитрусовый флавоноид. Укрепляет сосуды, улучшает микроциркуляцию. В комбинации с диосмином — стандарт лечения ХВН. Снижает проницаемость капилляров.',
     dosage: { mg: 500, timing: '1x/д', form: 'таб' },
     bestForCourse: false,
@@ -10819,7 +10819,7 @@ kpv: {
     category: ['flavonoid','antioxidant','cardioprotector'],
     forms: [{id:'citrus_bio_500',name:'Citrus Bioflavonoids 500mg',nameRu:'Биофлавоноиды 500 мг',dose:'500 мг/д',best:true}],
     organs: ['VESSELS','HEART','BLOOD'], systems: ['vascular','cardio','hematologic'],
-     mechanisms: ['CAPILLARY_STRENGTHENING', 'VITAMIN_C_SYNERGY', 'MICROCIRCULATION', 'VENOTONIC', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'MEMBRANE_STABILIZATION', 'BLOOD_RHEOLOGY', 'NFKB_INHIBITION', 'BIOFLAVONOID_BINDING', 'VASODILATION', 'NO_PRODUCTION', 'CHELATION'],
+     mechanisms: ['MICROCIRCULATION', 'VENOTONIC', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'MEMBRANE_STABILIZATION', 'BLOOD_RHEOLOGY', 'NFKB_INHIBITION', 'VASODILATION', 'NO_PRODUCTION', 'CHELATION'],
     description: 'Комплекс цитрусовых биофлавоноидов (гесперидин, нарингенин, рутин). Усиливает действие витамина С. Защищает капилляры, снижает окислительный стресс.',
     dosage: { mg: 500, timing: '1x/д с едой', form: 'капс' },
     bestForCourse: false,
@@ -10841,7 +10841,7 @@ kpv: {
     category: ['adaptogen','nootropic','stimulant'],
     forms: [{id:'bromantane_100',name:'Bromantane 100mg',nameRu:'Бромантан 100 мг',dose:'100-200 мг/д',best:true}],
     organs: ['BRAIN','ADRENALS'], systems: ['neuro','endocrine'],
-     mechanisms: ['DOPAMINE_SYNTHESIS', 'SEROTONIN_MODULATION', 'ADAPTOGEN', 'ANXIOLYTIC', 'FATIGUE_RESISTANCE', 'DOPAMINE_PRECURSOR', 'DOPAMINE_MODULATION', 'TYROSINE_HYDROXYLASE', 'CORTISOL_REDUCTION', 'HPA_MODULATION', 'STRESS_REDUCTION', 'COGNITIVE_ENHANCEMENT', 'FOCUS_ENHANCEMENT'],
+     mechanisms: ['DOPAMINE_SYNTHESIS', 'SEROTONIN_MODULATION', 'ADAPTOGEN', 'ANXIOLYTIC', 'DOPAMINE_PRECURSOR', 'DOPAMINE_MODULATION', 'TYROSINE_HYDROXYLASE', 'CORTISOL_REDUCTION', 'HPA_MODULATION', 'STRESS_REDUCTION', 'COGNITIVE_ENHANCEMENT', 'FOCUS_ENHANCEMENT'],
     description: 'Адаптоген с дофаминергической активностью. Повышает физическую выносливость, снижает утомляемость. Активирует синтез дофамина через тирозингидроксилазу, обладает противотревожным действием.',
     dosage: { mg: 100, timing: '1-2x/д утром', form: 'таб' },
     bestForCourse: false,
@@ -10863,7 +10863,7 @@ kpv: {
     category: ['nootropic','anxiolytic'],
     forms: [{id:'fasoracetam_50',name:'Fasoracetam 50mg',nameRu:'Фасорацетам 50 мг',dose:'50-100 мг/д',best:true}],
     organs: ['BRAIN'], systems: ['neuro'],
-     mechanisms: ['GLUTAMATE_MODULATION', 'GABA_B_AGONIST', 'NMDA_UPREGULATION', 'COGNITIVE_ENHANCEMENT', 'EXCITOTOXICITY_PREVENTION', 'SYNAPTIC_PLASTICITY', 'NEUROGENESIS', 'FOCUS_ENHANCEMENT', 'ANXIOLYTIC', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', 'HPA_MODULATION', 'NOOTROPIC', 'ADAPTOGEN', 'NEUROTRANSMITTER_SYNTHESIS', 'CEREBRAL_BLOOD_FLOW'],
+     mechanisms: ['GLUTAMATE_MODULATION', 'COGNITIVE_ENHANCEMENT', 'EXCITOTOXICITY_PREVENTION', 'SYNAPTIC_PLASTICITY', 'NEUROGENESIS', 'FOCUS_ENHANCEMENT', 'ANXIOLYTIC', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', 'HPA_MODULATION', 'ADAPTOGEN', 'NEUROTRANSMITTER_SYNTHESIS', 'CEREBRAL_BLOOD_FLOW'],
     description: 'Ноотроп из семейства рацетамов. Модулирует глутаматные рецепторы, повышает когнитивные функции. Уникален тем, что также действует как агонист ГАМК-Б (умеренный анксиолитик).',
     dosage: { mg: 100, timing: '1x/д утром', form: 'таб' },
     bestForCourse: false,
@@ -10885,7 +10885,7 @@ kpv: {
     category: ['amino','nootropic','cardioprotector'],
     forms: [{id:'agmatine_500',name:'Agmatine 500mg',nameRu:'Агматин 500 мг',dose:'500-1000 мг/д',best:true}],
     organs: ['BRAIN','BLOOD','MUSCLES'], systems: ['neuro','vascular','muscular'],
-     mechanisms: ['NO_SYNTHASE_INHIBITION', 'NMDA_BLOCKADE', 'INSULIN_SENSITIVITY', 'NEUROTRANSMITTER_MODULATION', 'VASODILATION', 'NMDA_MODULATION', 'GLUTAMATE_MODULATION', 'EXCITOTOXICITY_PREVENTION', 'ANXIOLYTIC', 'BLOOD_PRESSURE_LOWERING', 'BLOOD_FLOW_IMPROVEMENT', 'GLUCOSE_UPTAKE', 'MOOD_REGULATION', 'PAIN_RELIEF'],
+     mechanisms: ['NMDA_BLOCKADE', 'INSULIN_SENSITIVITY', 'VASODILATION', 'NMDA_MODULATION', 'GLUTAMATE_MODULATION', 'EXCITOTOXICITY_PREVENTION', 'ANXIOLYTIC', 'BLOOD_PRESSURE_LOWERING', 'BLOOD_FLOW_IMPROVEMENT', 'GLUCOSE_UPTAKE', 'PAIN_RELIEF'],
     description: 'Метаболит L-аргинина. Нейромодулятор: блокирует NMDA-рецепторы (снижение тревожности, нейропротекция), ингибирует NO-синтазу (вазодилатация). Улучшает чувствительность к инсулину, снижает нейропатическую боль.',
     dosage: { mg: 1000, timing: '1x/д натощак', form: 'капс' },
     bestForCourse: false,
@@ -10907,7 +10907,7 @@ kpv: {
     category: ['amino','methylation','metabolic'],
     forms: [{id:'tmg_500',name:'TMG 500mg',nameRu:'ТМГ 500 мг',dose:'500-1000 мг/д',best:true},{id:'tmg_1000',name:'TMG 1000mg',nameRu:'ТМГ 1000 мг',dose:'1000 мг/д',best:false}],
     organs: ['LIVER','BRAIN','BLOOD'], systems: ['hepatic','neuro','metabolic'],
-     mechanisms: ['METHYL_DONOR', 'METHYL_DONATION', 'METHYLATION', 'METHYLATION_CYCLE', 'HOMOCYSTEINE_LOWERING', 'OSMOLYTE', 'LIVER_DETOXIFICATION', 'BHMT_ACTIVATION', 'SAM_SYNTHESIS', 'APOPTOSIS_REGULATION', 'FOLATE_CYCLE', 'CBS_ACTIVATION'],
+     mechanisms: ['METHYL_DONATION', 'METHYLATION', 'METHYLATION_CYCLE', 'HOMOCYSTEINE_LOWERING', 'LIVER_DETOXIFICATION', 'BHMT_ACTIVATION', 'SAM_SYNTHESIS', 'APOPTOSIS_REGULATION', 'FOLATE_CYCLE', 'CBS_ACTIVATION'],
     description: 'Донор метильных групп. Снижает гомоцистеин (важно для сердечно-сосудистого здоровья на ААС), поддерживает метилирование ДНК. Также осмопротектор для клеток печени.',
     dosage: { mg: 1000, timing: '1x/д с едой', form: 'порошок/капс' },
     bestForCourse: true,
@@ -10929,7 +10929,7 @@ kpv: {
     category: ['amino','methylation','hepatoprotector'],
     forms: [{id:'same_400',name:'SAM-e 400mg',nameRu:'SAMe 400 мг',dose:'400-800 мг/д натощак',best:true}],
     organs: ['LIVER','BRAIN','JOINTS','CARTILAGE'], systems: ['hepatic','neuro','musculoskeletal'],
-     mechanisms: ['METHYL_DONOR', 'METHYL_DONATION', 'METHYLATION', 'GLUTATHIONE_PRECURSOR', 'NEUROTRANSMITTER_SYNTHESIS', 'LIVER_DETOX', 'METHYLATION_CYCLE', 'GLUTATHIONE_SYNTHESIS', 'LIVER_LIPID_METABOLISM', 'SAM_SYNTHESIS', 'HOMOCYSTEINE_LOWERING', 'DOPAMINE_SYNTHESIS', 'SEROTONIN_SYNTHESIS', 'JOINT_PROTECTION', 'CARTILAGE_PROTECTION'],
+     mechanisms: ['METHYL_DONATION', 'METHYLATION', 'GLUTATHIONE_PRECURSOR', 'NEUROTRANSMITTER_SYNTHESIS', 'LIVER_DETOX', 'METHYLATION_CYCLE', 'GLUTATHIONE_SYNTHESIS', 'LIVER_LIPID_METABOLISM', 'SAM_SYNTHESIS', 'HOMOCYSTEINE_LOWERING', 'DOPAMINE_SYNTHESIS', 'SEROTONIN_SYNTHESIS', 'JOINT_PROTECTION', 'CARTILAGE_PROTECTION'],
     description: 'Метилированный метаболин метионина. Главный донор метильных групп в организме. Поддерживает функцию печени, синтез нейромедиаторов (дофамин, серотонин). Эффективен при холестазе.',
     dosage: { mg: 800, timing: '1x/д натощак за 30 мин до еды', form: 'таб EC' },
     bestForCourse: true,
@@ -10951,7 +10951,7 @@ kpv: {
     category: ['vitamin','metabolic'],
     forms: [{id:'b1_100',name:'B1 100mg',nameRu:'Тиамин 100 мг',dose:'100 мг/д',best:true}],
     organs: ['BRAIN','HEART','LIVER'], systems: ['neuro','cardio','metabolic'],
-     mechanisms: ['CARBOHYDRATE_METABOLISM', 'NERVE_CONDUCTION', 'ATP_SYNTHESIS', 'COENZYME', 'ATP_PRODUCTION', 'COENZYME_ELECTRON_TRANSPORT', 'ELECTRON_TRANSPORT_CHAIN', 'MYELIN_SYNTHESIS', 'COGNITIVE_ENHANCEMENT', 'MUSCLE_CONTRACTION', 'HEART_RHYTHM'],
+     mechanisms: ['NERVE_CONDUCTION', 'COENZYME', 'ATP_PRODUCTION', 'COENZYME_ELECTRON_TRANSPORT', 'ELECTRON_TRANSPORT_CHAIN', 'MYELIN_SYNTHESIS', 'COGNITIVE_ENHANCEMENT', 'MUSCLE_CONTRACTION', 'HEART_RHYTHM'],
     description: 'Водорастворимый витамин B1. Кофермент энергетического метаболизма (декарбоксилирование кетокислот). Важен для нервной системы, сердечной функции. + Бенфотиамин для лучшей биодоступности.',
     dosage: { mg: 100, timing: '1x/д', form: 'таб' },
     bestForCourse: false,
@@ -10973,7 +10973,7 @@ kpv: {
     category: ['immunomodulator','gut'],
     forms: [{id:'colostrum_1000',name:'Colostrum 1000mg',nameRu:'Коллострум 1000 мг',dose:'1000 мг 2x/д',best:true}],
     organs: ['GUT','IMMUNE_SYSTEM','BLOOD'], systems: ['gastrointestinal','immune','hematologic'],
-     mechanisms: ['IGG_IGA', 'GUT_BARRIER_STRENGTHENING', 'GROWTH_FACTORS', 'ANTIMICROBIAL', 'IMMUNE_FUNCTION', 'IGA_BOOST', 'IGA_PRODUCTION', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH', 'ANTIMICROBIAL_PEPTIDES', 'TISSUE_REPAIR', 'MUSCLE_GROWTH', 'NFKB_INHIBITION', 'TCELL_PROLIFERATION'],
+     mechanisms: ['ANTIMICROBIAL', 'IMMUNE_FUNCTION', 'IGA_BOOST', 'IGA_PRODUCTION', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH', 'ANTIMICROBIAL_PEPTIDES', 'TISSUE_REPAIR', 'MUSCLE_GROWTH', 'NFKB_INHIBITION', 'TCELL_PROLIFERATION'],
     description: 'Молозиво крупного рогатого скота. Богато иммуноглобулинами (IgG), лактоферрином, ростовыми факторами. Укрепляет иммунитет, восстанавливает слизистую кишечника.',
     dosage: { mg: 2000, timing: '2x/д натощак', form: 'капс/порошок' },
     bestForCourse: true,
@@ -10995,7 +10995,7 @@ kpv: {
     category: ['antioxidant','cardioprotector','anti_inflammatory'],
     forms: [{id:'pycnogenol_100',name:'Pycnogenol 100mg',nameRu:'Пикногенол 100 мг',dose:'100-200 мг/д',best:true}],
     organs: ['VESSELS','SKIN','BRAIN','HEART'], systems: ['vascular','integumentary','neuro','cardio'],
-     mechanisms: ['VASODILATION', 'COLLAGEN_SYNTHESIS', 'ENDOTHELIAL_NOS', 'NO_PRODUCTION', 'NO_RELEASE', 'NOS_STIMULATION', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'BLOOD_PRESSURE_LOWERING', 'PLATELET_AGGREGATION_INHIBITION', 'CAPILLARY_STRENGTHENING', 'CONNECTIVE_TISSUE', 'NFKB_INHIBITION'],
+     mechanisms: ['VASODILATION', 'COLLAGEN_SYNTHESIS', 'ENDOTHELIAL_NOS', 'NO_PRODUCTION', 'NO_RELEASE', 'NOS_STIMULATION', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'BLOOD_PRESSURE_LOWERING', 'PLATELET_AGGREGATION_INHIBITION', 'CONNECTIVE_TISSUE', 'NFKB_INHIBITION'],
     description: 'Олигомерные проантоцианидины из коры французской морской сосны. Мощный антиоксидант (в 50x > вит.E, 20x > вит.C). Улучшает эндотелиальную функцию, снижает АД, защищает коллаген.',
     dosage: { mg: 150, timing: '1-2x/д', form: 'таб' },
     bestForCourse: true,
@@ -11017,7 +11017,7 @@ kpv: {
     category: ['proteolytic','enzyme','anti_inflammatory'],
     forms: [{id:'bromelain_500',name:'Bromelain 500mg',nameRu:'Бромелайн 500 мг',dose:'500 мг 2x/д натощак',best:true},{id:'bromelain_1000',name:'Bromelain 1000mg',nameRu:'Бромелайн 1000 мг',dose:'1000 мг/д',best:false}],
     organs: ['JOINTS','GUT','BLOOD'], systems: ['musculoskeletal','gastrointestinal','hematologic'],
-     mechanisms: ['PROTEOLYTIC', 'FIBRINOLYTIC', 'EDEMA_REDUCTION', 'FIBRINOLYSIS', 'PAIN_RELIEF', 'COX2_INHIBITION', 'NFKB_INHIBITION', 'CYTOKINE_MODULATION', 'PLATELET_AGGREGATION_INHIBITION', 'MICROCIRCULATION', 'TISSUE_REPAIR', 'MUCOLYTIC', 'BLOOD_RHEOLOGY', 'JOINT_PROTECTION', 'PLASMINOGEN_ACTIVATION'],
+     mechanisms: ['FIBRINOLYTIC', 'FIBRINOLYSIS', 'PAIN_RELIEF', 'COX2_INHIBITION', 'NFKB_INHIBITION', 'CYTOKINE_MODULATION', 'PLATELET_AGGREGATION_INHIBITION', 'MICROCIRCULATION', 'TISSUE_REPAIR', 'BLOOD_RHEOLOGY', 'JOINT_PROTECTION', 'PLASMINOGEN_ACTIVATION'],
     description: 'Протеолитический фермент из стебля ананаса. Уменьшает воспаление, отёки, разжижает кровь. Эффективен при остеоартрите, синусите, после травм. Синергия с куркумином и папаином.',
     dosage: { mg: 1000, timing: '2x/д натощак', form: 'капс' },
     bestForCourse: false,
@@ -11039,7 +11039,7 @@ kpv: {
     category: ['vitamin','methylation','hematologic'],
     forms: [{id:'mthf_400',name:'5-MTHF 400mcg',nameRu:'5-МТГФ 400 мкг',dose:'400 мкг/д',best:true},{id:'mthf_1000',name:'5-MTHF 1000mcg',nameRu:'5-МТГФ 1000 мкг',dose:'1000 мкг/д',best:false}],
     organs: ['BLOOD','LIVER','BRAIN'], systems: ['hematologic','hepatic','neuro'],
-    mechanisms: ['METHYL_DONOR', 'HOMOCYSTEINE_LOWERING', 'DNA_SYNTHESIS', 'NEURAL_TUBE_PROTECTION', 'METHYLATION', 'METHYLATION_CYCLE', 'METHYL_DONATION', 'FOLATE_CYCLE', 'RED_BLOOD_CELL_PRODUCTION', 'NEUROTRANSMITTER_SYNTHESIS', 'SEROTONIN_SYNTHESIS', 'DOPAMINE_SYNTHESIS', 'SAM_SYNTHESIS', 'BHMT_ACTIVATION', 'COGNITIVE_ENHANCEMENT'],
+    mechanisms: ['HOMOCYSTEINE_LOWERING', 'DNA_SYNTHESIS', 'METHYLATION', 'METHYLATION_CYCLE', 'METHYL_DONATION', 'FOLATE_CYCLE', 'RED_BLOOD_CELL_PRODUCTION', 'NEUROTRANSMITTER_SYNTHESIS', 'SEROTONIN_SYNTHESIS', 'DOPAMINE_SYNTHESIS', 'SAM_SYNTHESIS', 'BHMT_ACTIVATION', 'COGNITIVE_ENHANCEMENT'],
     description: 'Активная форма фолата (метилфолат). Не требует метаболической активации — подходит при MTHFR-мутациях. Донор метильных групп, снижает гомоцистеин, критичен для кроветворения.',
     dosage: { mg: 0.4, timing: '1x/д', form: 'таб' },
     bestForCourse: true,
@@ -11071,7 +11071,7 @@ kpv: {
     category: ['lipid','hepatoprotector','neuroprotector'],
     forms: [{id:'lecithin_1200',name:'Lecithin 1200mg',nameRu:'Лецитин 1200 мг',dose:'1200 мг 2x/д',best:true}],
     organs: ['LIVER','BRAIN','BLOOD'], systems: ['hepatic','neuro','hematologic'],
-     mechanisms: ['CHOLINE_SOURCE', 'LIPID_METABOLISM', 'MEMBRANE_STABILIZATION', 'LIPID_LOWERING', 'FATTY_ACID_TRANSPORT', 'LIVER_LIPID_METABOLISM', 'LIVER_LIPID_REGULATION', 'PHOSPHOLIPID_SYNTHESIS', 'MEMBRANE_PHOSPHOLIPID', 'ACETYLCHOLINE_SYNTHESIS', 'CHOLINERGIC', 'COGNITIVE_ENHANCEMENT', 'MYELIN_SYNTHESIS'],
+     mechanisms: ['LIPID_METABOLISM', 'MEMBRANE_STABILIZATION', 'LIPID_LOWERING', 'FATTY_ACID_TRANSPORT', 'LIVER_LIPID_METABOLISM', 'LIVER_LIPID_REGULATION', 'MEMBRANE_PHOSPHOLIPID', 'ACETYLCHOLINE_SYNTHESIS', 'CHOLINERGIC', 'COGNITIVE_ENHANCEMENT', 'MYELIN_SYNTHESIS'],
     description: 'Фосфолипид (фосфатидилхолин). Источник холина, поддерживает мембраны клеток, улучшает липидный обмен. На курсе ААС — гепатопротектор, снижает жировой гепатоз.',
     dosage: { mg: 2400, timing: '2x/д с едой', form: 'капс' },
     bestForCourse: true,
@@ -11093,7 +11093,7 @@ kpv: {
     category: ['nootropic','lipid'],
     forms: [{id:'ps_100',name:'PS 100mg',nameRu:'Фосфатидилсерин 100 мг',dose:'100-200 мг/д',best:true}],
     organs: ['BRAIN','ADRENALS'], systems: ['neuro','endocrine'],
-     mechanisms: ['CORTISOL_REDUCTION', 'MEMBRANE_FLUIDITY', 'NEUROTRANSMITTER_BALANCE', 'COGNITIVE_ENHANCEMENT', 'MEMBRANE_STABILIZATION', 'HPA_MODULATION', 'STRESS_REDUCTION', 'SYNAPTIC_PLASTICITY', 'FOCUS_ENHANCEMENT', 'BDNF_INCREASE', 'NEUROGENESIS', 'DOPAMINE_MODULATION', 'ACETYLCHOLINE_SYNTHESIS', 'CEREBRAL_BLOOD_FLOW'],
+     mechanisms: ['CORTISOL_REDUCTION', 'COGNITIVE_ENHANCEMENT', 'MEMBRANE_STABILIZATION', 'HPA_MODULATION', 'STRESS_REDUCTION', 'SYNAPTIC_PLASTICITY', 'FOCUS_ENHANCEMENT', 'BDNF_INCREASE', 'NEUROGENESIS', 'DOPAMINE_MODULATION', 'ACETYLCHOLINE_SYNTHESIS', 'CEREBRAL_BLOOD_FLOW'],
     description: 'Фосфолипид клеточных мембран. Снижает кортизол (важно на курсе), улучшает память и когнитивные функции. Синергия с DHA и гингко для нейропротекции.',
     dosage: { mg: 200, timing: '2x/д', form: 'капс' },
     bestForCourse: true,
@@ -11118,7 +11118,7 @@ kpv: {
     category: ['lipid','hepatoprotector','neuroprotector'],
     forms: [{id:'pc_500',name:'PC 500mg',nameRu:'Фосфатидилхолин 500 мг',dose:'500 мг 2x/д',best:true}],
     organs: ['LIVER','BRAIN','BLOOD'], systems: ['hepatic','neuro','hematologic'],
-     mechanisms: ['CHOLINE_SOURCE', 'LIPID_TRANSPORT', 'MEMBRANE_STABILIZATION', 'MEMBRANE_PHOSPHOLIPID', 'LIPID_METABOLISM', 'LIPID_LOWERING', 'FATTY_ACID_TRANSPORT', 'LIVER_LIPID_METABOLISM', 'PHOSPHOLIPID_SYNTHESIS', 'ACETYLCHOLINE_SYNTHESIS', 'CHOLINERGIC', 'COGNITIVE_ENHANCEMENT', 'MYELIN_SYNTHESIS'],
+     mechanisms: ['MEMBRANE_STABILIZATION', 'MEMBRANE_PHOSPHOLIPID', 'LIPID_METABOLISM', 'LIPID_LOWERING', 'FATTY_ACID_TRANSPORT', 'LIVER_LIPID_METABOLISM', 'ACETYLCHOLINE_SYNTHESIS', 'CHOLINERGIC', 'COGNITIVE_ENHANCEMENT', 'MYELIN_SYNTHESIS'],
     description: 'Концентрированный источник фосфатидилхолина (95%). Основной фосфолипид клеточных мембран. Гепатопротектор, улучшает липидный профиль, поддерживает когнитивные функции.',
     dosage: { mg: 1000, timing: '2x/д с едой', form: 'капс' },
     bestForCourse: true,
@@ -11140,7 +11140,7 @@ kpv: {
     category: ['hepatoprotector','choleretic','gut'],
     forms: [{id:'artichoke_500',name:'Artichoke 500mg',nameRu:'Артишок 500 мг',dose:'500 мг 2x/д',best:true}],
     organs: ['LIVER','GALLBLADDER','GUT'], systems: ['hepatic','gastrointestinal'],
-     mechanisms: ['CHOLERETIC', 'LIPID_METABOLISM', 'DIGESTIVE_STIMULATION', 'BILE_FLOW', 'BILE_FLOW_STIMULATION', 'BILE_ACID_MODULATION', 'LIVER_DETOXIFICATION', 'CHOLESTEROL_REDUCTION', 'CHOLESTEROL_LOWERING', 'LIPID_LOWERING', 'HMG_COA_REDUCTION', 'GUT_BARRIER'],
+     mechanisms: ['CHOLERETIC', 'LIPID_METABOLISM', 'BILE_FLOW', 'BILE_FLOW_STIMULATION', 'BILE_ACID_MODULATION', 'LIVER_DETOXIFICATION', 'CHOLESTEROL_REDUCTION', 'CHOLESTEROL_LOWERING', 'LIPID_LOWERING', 'HMG_COA_REDUCTION', 'GUT_BARRIER'],
     description: 'Экстракт артишока (цинарин + лютеолин). Желчегонное, гепатопротектор, снижает ЛПНП. Стимулирует регенерацию гепатоцитов. Синергия с расторопшей для защиты печени.',
     dosage: { mg: 1000, timing: '2x/д до еды', form: 'капс' },
     bestForCourse: true,
@@ -11162,7 +11162,7 @@ kpv: {
     category: ['vitamin','antioxidant','lipid'],
     forms: [{id:'vit_e_400',name:'Vitamin E 400 IU',nameRu:'Витамин Е 400 МЕ',dose:'400 МЕ/д (смешанные токоферолы)',best:true},{id:'vit_e_800',name:'Vitamin E 800 IU',nameRu:'Витамин Е 800 МЕ',dose:'800 МЕ/д',best:false}],
     organs: ['LIVER','HEART','SKIN','BRAIN'], systems: ['hepatic','cardio','integumentary','neuro'],
-    mechanisms: ['LIPID_PEROXIDATION_INHIBITION', 'ANTIOXIDANT_DEFENSE', 'LIPID_PEROXIDATION', 'GPX_ACTIVATION', 'MEMBRANE_STABILIZATION', 'ANTIPLATELET', 'PLATELET_AGGREGATION_INHIBITION', 'NFKB_INHIBITION', 'ENDOTHELIAL_PROTECTION', 'FATTY_ACID_TRANSPORT', 'LIPID_LOWERING', 'BLOOD_RHEOLOGY'],
+    mechanisms: ['LIPID_PEROXIDATION_INHIBITION', 'LIPID_PEROXIDATION', 'GPX_ACTIVATION', 'MEMBRANE_STABILIZATION', 'ANTIPLATELET', 'PLATELET_AGGREGATION_INHIBITION', 'NFKB_INHIBITION', 'ENDOTHELIAL_PROTECTION', 'FATTY_ACID_TRANSPORT', 'LIPID_LOWERING', 'BLOOD_RHEOLOGY'],
     description: 'Жирорастворимый антиоксидант. Защищает мембраны от перекисного окисления. На курсе ААС — снижает окислительный стресс, защищает печень и сердечно-сосудистую систему.',
     dosage: { mg: 268, timing: '1x/д с жирной едой', form: 'капс' },
     bestForCourse: true,
@@ -11195,7 +11195,7 @@ kpv: {
     category: ['metabolic','antioxidant','gut'],
     forms: [{id:'berberine_500',name:'Berberine 500mg',nameRu:'Берберин 500 мг',dose:'500 мг 2-3x/д',best:true}],
     organs: ['LIVER','PANCREAS','GUT','HEART'], systems: ['metabolic','hepatic','gastrointestinal','cardio'],
-    mechanisms: ['AMPK_ACTIVATION', 'AMPK_UP', 'INSULIN_SENSITIVITY', 'LIPID_METABOLISM', 'GLUCOSE_UPTAKE', 'GUT_FLORA_MODULATION', 'NFKB_INHIBITION', 'LIVER_LIPID_METABOLISM', 'GLUCONEOGENESIS_INHIBITION', 'PPAR_ACTIVATION', 'ADIPONECTIN_UP', 'FATTY_ACID_OXIDATION', 'FATTY_ACID_TRANSPORT', 'LIPID_LOWERING'],
+    mechanisms: ['AMPK_ACTIVATION', 'AMPK_UP', 'INSULIN_SENSITIVITY', 'LIPID_METABOLISM', 'GLUCOSE_UPTAKE', 'NFKB_INHIBITION', 'LIVER_LIPID_METABOLISM', 'GLUCONEOGENESIS_INHIBITION', 'PPAR_ACTIVATION', 'ADIPONECTIN_UP', 'FATTY_ACID_OXIDATION', 'FATTY_ACID_TRANSPORT', 'LIPID_LOWERING'],
     description: 'Алкалоид из барбариса. Активирует AMPK — «метаболический переключатель». Снижает глюкозу, инсулин, ЛПНП. Эффективен при метаболическом синдроме. Улучшает чувствительность к инсулину.',
     dosage: { mg: 1500, timing: '3x/д за 15-30 мин до еды', form: 'капс' },
     bestForCourse: true,
@@ -11228,7 +11228,7 @@ kpv: {
     category: ['amino','nootropic','anxiolytic'],
     forms: [{id:'theanine_200',name:'L-Theanine 200mg',nameRu:'L-Теанин 200 мг',dose:'200 мг 2x/д',best:true}],
     organs: ['BRAIN','ADRENALS'], systems: ['neuro','endocrine'],
-    mechanisms: ['GABA_AGONIST', 'SEROTONIN_MODULATION', 'ALPHA_WAVE_ENHANCEMENT', 'GLUTAMATE_MODULATION'],
+    mechanisms: ['GABA_AGONIST', 'SEROTONIN_MODULATION', 'GLUTAMATE_MODULATION'],
     description: 'Аминокислота из зелёного чая. Повышает альфа-волны (расслабление без сонливости), снижает тревожность, улучшает фокус. Синергия с магнием и ГАМК для сна и антистресса.',
     dosage: { mg: 400, timing: '2x/д утро+вечер', form: 'капс' },
     bestForCourse: false,
@@ -11258,7 +11258,7 @@ kpv: {
     category: ['amino','nootropic','sleep'],
     forms: [{id:'glycine_1000',name:'Glycine 1000mg',nameRu:'Глицин 1000 мг',dose:'1000 мг перед сном',best:true},{id:'glycine_3000',name:'Glycine 3000mg',nameRu:'Глицин 3000 мг',dose:'3000 мг перед сном',best:false}],
     organs: ['BRAIN','LIVER','MUSCLES'], systems: ['neuro','hepatic','muscular'],
-     mechanisms: ['NEUROTRANSMITTER', 'GLUTATHIONE_PRECURSOR', 'COLLAGEN_COMPONENT', 'SLEEP_PROMOTION', 'GLYCINERGIC', 'GABA_MODULATION', 'NMDA_MODULATION', 'SLEEP_REGULATION', 'SLEEP_QUALITY', 'GLUTATHIONE_SYNTHESIS', 'GLUTATHIONE_RECYCLING', 'LIVER_DETOXIFICATION', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE'],
+     mechanisms: ['GLUTATHIONE_PRECURSOR', 'COLLAGEN_COMPONENT', 'SLEEP_PROMOTION', 'GLYCINERGIC', 'GABA_MODULATION', 'NMDA_MODULATION', 'SLEEP_REGULATION', 'SLEEP_QUALITY', 'GLUTATHIONE_SYNTHESIS', 'GLUTATHIONE_RECYCLING', 'LIVER_DETOXIFICATION', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE'],
     description: 'Простейшая аминокислота. Нейромедиатор (глициновые рецепторы) — улучшает качество сна. Компонент синтеза глутатиона и коллагена. Снижает гомоцистеин.',
     dosage: { mg: 3000, timing: 'перед сном', form: 'порошок/капс' },
     bestForCourse: false,
@@ -11281,7 +11281,7 @@ kpv: {
     forms: [{id:'astragalus_500',name:'Astragalus 500mg',nameRu:'Астрагал 500 мг',dose:'500 мг 2x/д',best:true}],
     organs: ['IMMUNE_SYSTEM','HEART','LIVER','KIDNEYS'],
     systems: ['immune','cardio','hepatic','renal'],
-     mechanisms: ['TELOMERASE_ACTIVATION', 'ADAPTOGEN', 'CARDIO_PROTECTION', 'IMMUNE_FUNCTION', 'APOPTOSIS_REGULATION', 'SIRTUIN_ACTIVATION', 'ANTI_AGING', 'NFKB_INHIBITION', 'NLRP3_INHIBITION'],
+     mechanisms: ['TELOMERASE_ACTIVATION', 'ADAPTOGEN', 'IMMUNE_FUNCTION', 'APOPTOSIS_REGULATION', 'SIRTUIN_ACTIVATION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION'],
     description: 'Астрагал — королевский адаптоген китайской медицины. Активирует теломеразу (защита теломер), модулирует иммунитет, защищает сердце и почки. Снижает токсичность химиотерапии.',
     dosage: { mg: 1000, timing: '2x/д', form: 'капс' },
     bestForCourse: false,
@@ -11303,7 +11303,7 @@ kpv: {
     category: ['flavonoid','cardioprotector','antioxidant','anti_inflammatory'],
     forms: [{id:'rutin_500',name:'Rutin 500mg',nameRu:'Рутин 500 мг',dose:'500 мг 2x/д',best:true}],
     organs: ['VESSELS','HEART','BRAIN','SKIN'], systems: ['vascular','cardio','neuro','integumentary'],
-     mechanisms: ['VASCULAR_PROTECTION', 'CAPILLARY_STRENGTHENING', 'VENOTONIC', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'VASODILATION', 'NO_PRODUCTION', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'MEMBRANE_STABILIZATION', 'BLOOD_RHEOLOGY', 'NFKB_INHIBITION', 'CHELATION', 'VITAMIN_C_SYNERGY'],
+     mechanisms: ['VENOTONIC', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'VASODILATION', 'NO_PRODUCTION', 'COLLAGEN_SYNTHESIS', 'CONNECTIVE_TISSUE', 'MEMBRANE_STABILIZATION', 'BLOOD_RHEOLOGY', 'NFKB_INHIBITION', 'CHELATION'],
     description: 'Биофлавоноид (рутозид) — укрепляет стенки капилляров, уменьшает их проницаемость. Венопротектор, антиоксидант. Синергия с витамином C и гесперидином для сосудистой защиты.',
     dosage: { mg: 1000, timing: '2x/д', form: 'капс' },
     bestForCourse: false,
@@ -11364,7 +11364,7 @@ kpv: {
       {id:'heptral_tab',name:'Heptral 500mg',nameRu:'Гептрал 500 мг таблетки',dose:'500 мг 2x/д',best:false},
     ],
     organs: ['LIVER','BRAIN','JOINTS','GALLBLADDER','CARTILAGE'], systems: ['hepatic','neuro','musculoskeletal'],
-     mechanisms: ['ADEMETIONINE', 'METHYL_DONATION', 'METHYLATION', 'METHYLATION_CYCLE', 'LIVER_DETOX', 'CHOLERETIC', 'ANTIDEPRESSANT', 'GLUTATHIONE_PRECURSOR', 'LIVER_LIPID_METABOLISM', 'GLUTATHIONE_SYNTHESIS', 'SAM_SYNTHESIS', 'HOMOCYSTEINE_LOWERING', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_SYNTHESIS', 'SEROTONIN_SYNTHESIS'],
+     mechanisms: ['METHYL_DONATION', 'METHYLATION', 'METHYLATION_CYCLE', 'LIVER_DETOX', 'CHOLERETIC', 'GLUTATHIONE_PRECURSOR', 'LIVER_LIPID_METABOLISM', 'GLUTATHIONE_SYNTHESIS', 'SAM_SYNTHESIS', 'HOMOCYSTEINE_LOWERING', 'NEUROTRANSMITTER_SYNTHESIS', 'DOPAMINE_SYNTHESIS', 'SEROTONIN_SYNTHESIS'],
     description: 'Адеметионин (S-аденозил-L-метионин) — основной донор метильных групп. Гепатопротектор с холекинетическим (желчегонным) и антидепрессивным действием. Восстанавливает глутатион, поддерживает детоксикацию печени.',
     dosage: { mg: 500, timing: '400 мг в/в 1x/д (инъекции) / 500 мг 2x/д (таб)', form: 'инъекции/таб' },
     bestForCourse: true,
@@ -11399,7 +11399,7 @@ kpv: {
       {id:'legalon_forte',name:'Legalon Forte',nameRu:'Легалон Форте (140 мг силимарина)',dose:'1 капс 3x/д',best:true},
     ],
     organs: ['LIVER','KIDNEYS','SKIN','PANCREAS'], systems: ['hepatic','renal','integumentary','metabolic'],
-     mechanisms: ['LIVER_DETOX', 'HYPOGLYCEMIC', 'ANTIFIBROTIC', 'LIVER_DETOXIFICATION', 'MEMBRANE_STABILIZATION', 'NRF2_ACTIVATION', 'NFKB_INHIBITION', 'GLUTATHIONE_SYNTHESIS', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'GLUT4_TRANSLOCATION', 'FIBROSIS_REDUCTION'],
+     mechanisms: ['LIVER_DETOX', 'ANTIFIBROTIC', 'LIVER_DETOXIFICATION', 'MEMBRANE_STABILIZATION', 'NRF2_ACTIVATION', 'NFKB_INHIBITION', 'GLUTATHIONE_SYNTHESIS', 'INSULIN_SENSITIVITY', 'GLUCOSE_UPTAKE', 'GLUT4_TRANSLOCATION', 'FIBROSIS_REDUCTION'],
     description: 'Силимарин (расторопша пятнистая) — гепатопротектор с антиоксидантным и антифибротическим действием. Стабилизирует мембраны гепатоцитов, стимулирует синтез белка и регенерацию печени.',
     dosage: { mg: 420, timing: '420 мг/д (420-840 мг в Forte)', form: 'капс' },
     bestForCourse: true,
@@ -11433,7 +11433,7 @@ kpv: {
       {id:'ibudilast_20',name:'Ibudilast 20mg',nameRu:'Ибудиласт 20 мг',dose:'20 мг 2x/д',best:true},
     ],
     organs: ['BRAIN','NERVES','LUNGS','VESSELS'], systems: ['neuro','respiratory','vascular'],
-     mechanisms: ['PDE4_INHIBITION', 'PDE10_INHIBITION', 'GLIAL_MODULATION', 'NEUROTROPHIC', 'MICROGLIAL_MODULATION', 'CYTOKINE_MODULATION', 'BDNF_INCREASE', 'NGF_STIMULATION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'BRONCHODILATION', 'VASODILATION', 'CEREBRAL_BLOOD_FLOW', 'NEUROPLASTICITY', 'APOPTOSIS_REGULATION'],
+     mechanisms: ['MICROGLIAL_MODULATION', 'CYTOKINE_MODULATION', 'BDNF_INCREASE', 'NGF_STIMULATION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'VASODILATION', 'CEREBRAL_BLOOD_FLOW', 'NEUROPLASTICITY', 'APOPTOSIS_REGULATION'],
     description: 'Ингибитор PDE4/PDE10 — подавляет нейровоспаление через модуляцию микроглии. Повышает BDNF, защищает нейроны. Применяется при нейродегенеративных заболеваниях и астме.',
     dosage: { mg: 30, timing: '30-60 мг/д', form: 'таб' },
     bestForCourse: false,
@@ -11466,7 +11466,7 @@ kpv: {
       { id: 'lactoferrin_100', name: 'Lactoferrin 100mg', nameRu: 'Лактоферрин 100 мг', dose: '100 мг/д', best: false },
     ],
     organs: ['GUT', 'BLOOD', 'IMMUNE_SYSTEM'], systems: ['immune', 'hematologic', 'gi'],
-     mechanisms: ['IRON_CHELATION', 'ANTIMICROBIAL', 'IRON_TRANSPORT', 'HEPCIDIN_DOWN', 'FERROPORTIN_UP', 'IMMUNE_FUNCTION', 'IMMUNE_CELL_FUNCTION', 'ANTIMICROBIAL_PEPTIDES', 'IGA_BOOST', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'IRON_METABOLISM', 'HEME_SYNTHESIS'],
+     mechanisms: ['ANTIMICROBIAL', 'HEPCIDIN_DOWN', 'FERROPORTIN_UP', 'IMMUNE_FUNCTION', 'IMMUNE_CELL_FUNCTION', 'ANTIMICROBIAL_PEPTIDES', 'IGA_BOOST', 'GUT_BARRIER', 'GUT_BARRIER_PROTECTION', 'ENTEROCYTE_HEALTH', 'NFKB_INHIBITION', 'NLRP3_INHIBITION', 'IRON_METABOLISM', 'HEME_SYNTHESIS'],
     description: 'Железосвязывающий гликопротеин — иммуномодулятор с антимикробным и антиоксидантным действием. Связывает свободное железо, снижая окислительный стресс и рост патогенной флоры.',
     dosage: { mg: 250, timing: 'натощак за 30 мин до еды', form: 'капс' },
     bestForCourse: true,
@@ -11501,7 +11501,7 @@ kpv: {
       { id: 'l_histidine_500', name: 'L-Histidine 500mg', nameRu: 'L-Гистидин 500 мг', dose: '500 мг/д', best: true },
     ],
     organs: ['BRAIN', 'GUT', 'IMMUNE'], systems: ['neuro', 'gi', 'immune'],
-     mechanisms: ['AMINO_ACID', 'HISTAMINE_PRECURSOR', 'NEUROTRANSMITTER_PRECURSOR', 'CARNOSINE_SYNTHESIS', 'CARNOSINE_CHELATION', 'GASTRIC_PROTECTION', 'MUCOUS_MEMBRANE_PROTECTION', 'IMMUNE_FUNCTION', 'TCELL_PROLIFERATION', 'ALLERGY_MODULATION', 'TISSUE_REPAIR', 'GABA_MODULATION', 'SEROTONIN_MODULATION'],
+     mechanisms: ['CARNOSINE_CHELATION', 'IMMUNE_FUNCTION', 'TCELL_PROLIFERATION', 'TISSUE_REPAIR', 'GABA_MODULATION', 'SEROTONIN_MODULATION'],
     description: 'Незаменимая аминокислота — предшественник гистамина и карнозина. Участвует в иммунном ответе, пищеварении (стимуляция HCl), нейротрансмиссии и антиоксидантной защите.',
     dosage: { mg: 500, timing: 'между приёмами пищи', form: 'капс' },
     bestForCourse: true,
@@ -11533,7 +11533,7 @@ kpv: {
       { id: 'l_lysine_1000', name: 'L-Lysine 1000mg', nameRu: 'L-Лизин 1000 мг', dose: '1000 мг/д', best: false },
     ],
     organs: ['MUSCLES', 'BLOOD'], systems: ['musculoskeletal', 'hematologic'],
-     mechanisms: ['AMINO_ACID', 'COLLAGEN_SYNTHESIS', 'CARNITINE_PRECURSOR', 'CALCIUM_ABSORPTION', 'ANTIVIRAL', 'CONNECTIVE_TISSUE', 'TISSUE_REPAIR', 'TENDON_STRENGTH', 'LIPID_METABOLISM', 'FATTY_ACID_TRANSPORT', 'CARNITINE_SYNTHESIS', 'MUSCLE_FUNCTION', 'BONE_DENSITY', 'CALCIUM_REGULATION'],
+     mechanisms: ['COLLAGEN_SYNTHESIS', 'CARNITINE_PRECURSOR', 'CALCIUM_ABSORPTION', 'CONNECTIVE_TISSUE', 'TISSUE_REPAIR', 'TENDON_STRENGTH', 'LIPID_METABOLISM', 'FATTY_ACID_TRANSPORT', 'MUSCLE_FUNCTION', 'BONE_DENSITY', 'CALCIUM_REGULATION'],
     description: 'Незаменимая аминокислота — компонент коллагена, предшественник L-карнитина, улучшает усвоение кальция. Обладает противовирусной активностью (герпес).',
     dosage: { mg: 1000, timing: '500 мг 2x/д между едой', form: 'капс' },
     bestForCourse: true,
@@ -11566,7 +11566,7 @@ kpv: {
       { id: 'benfo_300', name: 'Benfotiamine 300mg', nameRu: 'Бенфотиамин 300 мг', dose: '300 мг/д', best: false },
     ],
     organs: ['NERVES', 'BRAIN', 'HEART'], systems: ['neuro', 'cardio'],
-     mechanisms: ['VITAMIN_B1', 'GLYCATION_INHIBITION', 'TRANSCETOLASE_ACTIVATION', 'ENDOTHELIAL_PROTECTION', 'COENZYME', 'COENZYME_ELECTRON_TRANSPORT', 'NERVE_CONDUCTION', 'MYELIN_SYNTHESIS', 'ANTI_GLYCATION', 'COGNITIVE_ENHANCEMENT', 'CEREBRAL_BLOOD_FLOW'],
+     mechanisms: ['ENDOTHELIAL_PROTECTION', 'COENZYME', 'COENZYME_ELECTRON_TRANSPORT', 'NERVE_CONDUCTION', 'MYELIN_SYNTHESIS', 'ANTI_GLYCATION', 'COGNITIVE_ENHANCEMENT', 'CEREBRAL_BLOOD_FLOW'],
     description: 'Жирорастворимая форма витамина B1 с высокой биодоступностью. Защищает нервную ткань, ингибирует гликирование белков, улучшает когнитивные функции и сердечную проводимость.',
     dosage: { mg: 300, timing: '150 мг 2x/д с едой', form: 'таб' },
     bestForCourse: true,
@@ -11602,7 +11602,7 @@ kpv: {
       { id: 'nr_300', name: 'NR 300mg', nameRu: 'NR 300 мг', dose: '300 мг/д', best: true },
     ],
     organs: ['BRAIN', 'MUSCLES', 'LIVER', 'HEART'], systems: ['neuro', 'metabolic', 'cardio'],
-     mechanisms: ['NAD_PRECURSOR', 'SIRTUIN_ACTIVATION', 'DNA_REPAIR', 'METABOLIC_MODULATION', 'MITOCHONDRIAL_BIOGENESIS', 'MITOCHONDRIAL_FUNCTION', 'COENZYME', 'COENZYME_ELECTRON_TRANSPORT', 'ATP_PRODUCTION', 'FATTY_ACID_OXIDATION', 'LIVER_LIPID_METABOLISM', 'INSULIN_SENSITIVITY'],
+     mechanisms: ['SIRTUIN_ACTIVATION', 'MITOCHONDRIAL_BIOGENESIS', 'MITOCHONDRIAL_FUNCTION', 'COENZYME', 'COENZYME_ELECTRON_TRANSPORT', 'ATP_PRODUCTION', 'FATTY_ACID_OXIDATION', 'LIVER_LIPID_METABOLISM', 'INSULIN_SENSITIVITY'],
     description: 'Предшественник NAD+ — ключевого кофермента митохондриального дыхания. Повышает уровень NAD+, активирует сиртуины, улучшает митохондриальный биогенез и снижает окислительный стресс.',
     dosage: { mg: 300, timing: '300 мг/д утром с едой', form: 'капс' },
     bestForCourse: true,
@@ -11636,7 +11636,7 @@ kpv: {
       { id: 'spermidine_10', name: 'Spermidine 10mg', nameRu: 'Спермидин 10 мг', dose: '10 мг/д', best: false },
     ],
     organs: ['BRAIN', 'HEART', 'LIVER'], systems: ['neuro', 'cardio', 'metabolic'],
-     mechanisms: ['AUTOPHAGY_INDUCER', 'MTOR_MODULATION', 'EPIGENETIC_MODULATION', 'SIRTUIN_ACTIVATION', 'APOPTOSIS_REGULATION', 'MITOCHONDRIAL_FUNCTION', 'ANTI_AGING', 'TELOMERASE_ACTIVATION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION'],
+     mechanisms: ['AUTOPHAGY_INDUCER', 'EPIGENETIC_MODULATION', 'SIRTUIN_ACTIVATION', 'APOPTOSIS_REGULATION', 'MITOCHONDRIAL_FUNCTION', 'TELOMERASE_ACTIVATION', 'NFKB_INHIBITION', 'NLRP3_INHIBITION'],
     description: 'Полиамин естественного происхождения — индуктор аутофагии. Замедляет клеточное старение, улучшает сердечно-сосудистое здоровье, защищает нейроны через активацию аутофагии и модуляцию mTOR.',
     dosage: { mg: 5, timing: 'утром натощак', form: 'капс' },
     bestForCourse: true,
@@ -11669,7 +11669,7 @@ kpv: {
       { id: 'ump_250', name: 'UMP 250mg', nameRu: 'UMP 250 мг', dose: '250 мг/д', best: true },
     ],
     organs: ['BRAIN'], systems: ['neuro'],
-     mechanisms: ['NEUROTRANSMITTER_PRECURSOR', 'MEMBRANE_SYNTHESIS', 'SYNAPSE_FORMATION', 'DOPAMINE_REGULATION', 'SLEEP_REGULATION', 'NEUROPLASTICITY', 'COGNITIVE_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'PHOSPHOLIPID_SYNTHESIS', 'MEMBRANE_PHOSPHOLIPID', 'DOPAMINE_SYNTHESIS', 'DOPAMINE_MODULATION', 'SYNAPTIC_PLASTICITY', 'CEREBRAL_BLOOD_FLOW', 'BDNF_INCREASE', 'NEUROGENESIS', 'ACETYLCHOLINE_SYNTHESIS'],
+     mechanisms: ['SYNAPSE_FORMATION', 'DOPAMINE_REGULATION', 'SLEEP_REGULATION', 'NEUROPLASTICITY', 'COGNITIVE_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'MEMBRANE_PHOSPHOLIPID', 'DOPAMINE_SYNTHESIS', 'DOPAMINE_MODULATION', 'SYNAPTIC_PLASTICITY', 'CEREBRAL_BLOOD_FLOW', 'BDNF_INCREASE', 'NEUROGENESIS', 'ACETYLCHOLINE_SYNTHESIS'],
     description: 'Нуклеотид — улучшает синаптическую пластичность, повышает уровень дофамина, улучшает память и качество сна. Является предшественником фосфолипидов нейрональных мембран.',
     dosage: { mg: 250, timing: '250 мг перед сном', form: 'капс' },
     bestForCourse: true,
@@ -11702,7 +11702,7 @@ kpv: {
       { id: 'choline_bt_1000', name: 'Choline Bitartrate 1000mg', nameRu: 'Холина битартрат 1000 мг', dose: '1000 мг/д', best: false },
     ],
     organs: ['BRAIN', 'LIVER'], systems: ['neuro', 'hepatic'],
-     mechanisms: ['ACETYLCHOLINE_PRECURSOR', 'CHOLINE_DONOR', 'MEMBRANE_PHOSPHOLIPID', 'LIVER_LIPID_METABOLISM', 'METHYLATION_SUPPORT', 'CHOLINERGIC', 'ACETYLCHOLINE_SYNTHESIS', 'ACHE_INHIBITION', 'COGNITIVE_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'MYELIN_SYNTHESIS', 'LIPID_METABOLISM', 'LIPID_LOWERING', 'METHYL_DONATION', 'METHYLATION'],
+     mechanisms: ['MEMBRANE_PHOSPHOLIPID', 'LIVER_LIPID_METABOLISM', 'CHOLINERGIC', 'ACETYLCHOLINE_SYNTHESIS', 'ACHE_INHIBITION', 'COGNITIVE_ENHANCEMENT', 'FOCUS_ENHANCEMENT', 'MYELIN_SYNTHESIS', 'LIPID_METABOLISM', 'LIPID_LOWERING', 'METHYL_DONATION', 'METHYLATION'],
     description: 'Соль холина — предшественник ацетилхолина и фосфатидилхолина. Улучшает когнитивные функции, память, передачу нервных импульсов, участвует в метаболизме липидов печени.',
     dosage: { mg: 500, timing: '500 мг/д с едой', form: 'капс' },
     bestForCourse: true,
@@ -11735,7 +11735,7 @@ kpv: {
       { id: 'chanterelle_tincture', name: 'Chanterelle Tincture', nameRu: 'Настойка лисичек', dose: '20-30 кап 2x/д', best: false },
     ],
     organs: ['IMMUNE', 'BONES', 'GUT'], systems: ['immune', 'musculoskeletal', 'gi'],
-     mechanisms: ['ANTIPARASITIC', 'VITAMIN_D', 'GUT_HEALTH', 'IMMUNE_FUNCTION', 'BONE_DENSITY', 'VITAMIN_D_ACTIVATION', 'CALCIUM_ABSORPTION', 'GUT_BARRIER_PROTECTION', 'GUT_BARRIER', 'MICROBIOME_RESTORATION', 'ANTIMICROBIAL', 'NFKB_INHIBITION', 'APOPTOSIS_REGULATION', 'ENTEROCYTE_HEALTH'],
+     mechanisms: ['VITAMIN_D', 'IMMUNE_FUNCTION', 'BONE_DENSITY', 'VITAMIN_D_ACTIVATION', 'CALCIUM_ABSORPTION', 'GUT_BARRIER_PROTECTION', 'GUT_BARRIER', 'MICROBIOME_RESTORATION', 'ANTIMICROBIAL', 'NFKB_INHIBITION', 'APOPTOSIS_REGULATION', 'ENTEROCYTE_HEALTH'],
     description: 'Грибы лисички — природный источник витамина D, антипаразитарное и иммуномодулирующее средство. Содержит хитинманнозу и эргостерол, стимулирует иммунитет и обладает антигельминтным действием.',
     dosage: { mg: 1000, timing: '500 мг 2x/д с едой', form: 'капс' },
     bestForCourse: false,
@@ -11785,7 +11785,7 @@ kpv: {
     tier: 'standard', category: ['mineral','nootropic','neuroprotector'],
     forms: [{id:'magtein_2000',name:'Magtein 2000mg',nameRu:'Магний L-треонат 2000 мг',dose:'2000 мг/д (144 мг Mg)',best:true},{id:'magtein_1000',name:'Magtein 1000mg',nameRu:'Магний L-треонат 1000 мг',dose:'1000 мг 2x/д',best:false}],
     organs: ['BRAIN','NERVES','MUSCLES'], systems: ['neuro','musculoskeletal'],
-     mechanisms: ['ELECTROLYTE', 'ENZYME_COFACTOR', 'NEUROTRANSMITTER_REGULATION', 'NMDA_MODULATION', 'LONG_TERM_POTENTIATION', 'SYNAPTIC_PLASTICITY', 'GABA_MODULATION', 'NMDA_BLOCKADE', 'GLUTAMATE_MODULATION', 'EXCITOTOXICITY_PREVENTION', 'CALCIUM_CHANNEL_BLOCKADE', 'MUSCLE_RELAXATION', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', 'SLEEP_REGULATION', 'COGNITIVE_ENHANCEMENT'],
+     mechanisms: ['NMDA_MODULATION', 'SYNAPTIC_PLASTICITY', 'GABA_MODULATION', 'NMDA_BLOCKADE', 'GLUTAMATE_MODULATION', 'EXCITOTOXICITY_PREVENTION', 'CALCIUM_CHANNEL_BLOCKADE', 'MUSCLE_RELAXATION', 'STRESS_REDUCTION', 'CORTISOL_REDUCTION', 'SLEEP_REGULATION', 'COGNITIVE_ENHANCEMENT'],
     description: 'Единственная форма магния, эффективно повышающая уровень Mg в мозге. Проходит ГЭБ благодаря треонат-транспортёру. Улучшает синаптическую пластичность, рабочую память и когнитивные функции. Снижает тревожность.',
     dosage: { mg: 2000, timing: '2000 мг/д (144 мг элементарного Mg) за 30 мин до сна', form: 'капс' },
     bestForCourse: true,
@@ -11813,7 +11813,7 @@ kpv: {
     tier: 'standard', category: ['bioenhancer','antioxidant','antiinflammatory'],
     forms: [{id:'piperine_5',name:'Bioperine 5mg',nameRu:'Биоперин 5 мг',dose:'5 мг 2x/д',best:true},{id:'piperine_10',name:'Bioperine 10mg',nameRu:'Биоперин 10 мг',dose:'10 мг/д',best:false}],
     organs: ['GUT','LIVER','BRAIN','VESSELS'], systems: ['gi','hepatic','neuro','vascular'],
-     mechanisms: ['CYP3A4_INHIBITION', 'P_GLYCOPROTEIN_INHIBITION', 'THERMOGENESIS', 'PPAR_ACTIVATION', 'NRF2_ACTIVATION', 'NFKB_INHIBITION', 'TRPV1_ACTIVATION', 'FAT_OXIDATION', 'METABOLIC_RATE', 'LIPID_METABOLISM', 'INSULIN_SENSITIVITY', 'GUT_ABSORPTION_ENHANCEMENT', 'DETOXIFICATION_PHASE_II'],
+     mechanisms: ['CYP3A4_INHIBITION', 'PPAR_ACTIVATION', 'NRF2_ACTIVATION', 'NFKB_INHIBITION', 'LIPID_METABOLISM', 'INSULIN_SENSITIVITY', 'DETOXIFICATION_PHASE_II'],
     description: 'Алкалоид чёрного перца — мощный усилитель биодоступности (+2000% для куркумина). Ингибирует CYP3A4 и P-гликопротеин в кишечнике, увеличивая всасывание многих БАД и лекарств. Обладает собственным антиоксидантным, термогенным и противовоспалительным действием.',
     dosage: { mg: 10, timing: '5 мг 2x/д с едой (в составе комплексов)', form: 'капс' },
     bestForCourse: true,

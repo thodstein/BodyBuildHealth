@@ -63,6 +63,53 @@
 
 ---
 
+## Session Summary (Jul 17) — BioStack: нормализация кодов механизмов каталога к каноническому словарю калькулятора поддержки
+
+### Goal
+Привести механизмы `SUPPORT_CATALOG_DATA` к каноническому словарю калькулятора поддержки (`BRIDGE_MECH_TO_CATALOG`, 386 кодов) и доказать, что НЕТ ни одного неканонического кода и ни одного пустого `mechanisms[]`.
+
+### ✅ Сделано и проверено (0 неканонических, 0 пустых, 377 веществ)
+- **`_verify.ts`** (скрипт-проверка): импортирует `SUPPORT_CATALOG_DATA` + `BRIDGE_MECH_TO_CATALOG`, строит Set канон-кодов, фильтрует `mechanisms`, не входящие в Set; пишет `verify.json = {remainingNonCanon, zeroMechanisms, totalSubs}`.
+- Первый прогон `_verify.ts`: **2 неканонических** вещества — `thymosin_alpha1`:`GENERAL_SUPPORT`, `thyroid_drugs`:`GENERAL_SUPPORT`; **0 пустых**; **377 всего**.
+- Найдено **5 строк `GENERAL_SUPPORT`**: `support-catalog-data.ts:4764,8378`; `support-catalog-supplement.ts:53,505,1149`.
+- Повторный запуск `_rewrite.ts` (отсекает неканон из `support-catalog-data.ts`) — **сохранился**: после него `verify` показал только 2 оставшихся `GENERAL_SUPPORT`.
+- **Исправлены 2 последние строки** (редактированием, коды подтверждены в `BRIDGE_MECH_TO_CATALOG`):
+  - `thymosin_alpha1` (data.ts:4764) → `['IMMUNE_MODULATION', 'IMMUNE_FUNCTION']`
+  - `thyroid_drugs` (data.ts:8378) → `['THYROID_SUPPORT', 'THYROID_SYNTHESIS']` (заменено с `THYROID_HORMONE_METABOLISM`, которого НЕТ в BRIDGE)
+- **Финальный `_verify.ts`**: `remainingNonCanon: 0`, `zeroMechanisms: []`, `totalSubs: 377` — **КАТАЛОГ ПОЛНОСТЬЮ НОРМАЛИЗОВАН**.
+- Удалены временные скрипты: `_verify.ts`, `_audit.ts`, `_audit2.ts`, `_rewrite.ts`, `_rewrite2.ts`, `_dbg2.ts`, `_debug.ts`, `_rep_test7.ts`, `_rpt.ts`.
+
+### ⚠️ Корректировка предыдущей сводки
+- Заявление в «Best initial attempt (Jul 17)» о «canonical-only rewrite без неканонических» было **НЕТОЧНЫМ**: проверка `_verify.ts` доказала, что неканонические коды оставались массово (исходно 738 из 1073 distinct; весь каталог в исходном состоянии). Реальная нормализация потребовала повторного запуска `_rewrite.ts` и ручной правки 2 fallback-строк.
+- `GENERAL_SUPPORT` сам по себе неканоничен (отсутствует в `BRIDGE_MECH_TO_CATALOG`) — использовался как fallback при пустом наборе и потому всплывал в verify.
+
+### ❌ Остаётся (вне задачи нормализации)
+- **Непересекающаяся TS-ошибка**: `src/ui/screens/TrainingScreen_parts/TrainingConstructor/index.tsx:1703` — `fatigueTrajectory="moderate"` (string) не совпадает с типом `number[]` пропа `MesocycleProgressionCard`. НЕ вызвана правками каталога (правились только массивы строк `mechanisms`); оставлена владельцу training-модуля.
+- **189 канонических кодов** не имеют RU-лейбла в `MECHANISM_LABELS` (render raw) — см. backlog.
+- **TZ-переписывание (backlog)**: краш сборки 2-го стека (`buildSmartStackMulti` ~335) не исправлен; карточка описания препарата в ТЗ-стиле не добавлена.
+
+### Key Decisions
+- Канонический словарь — ТОЛЬКО `BRIDGE_MECH_TO_CATALOG` (386 кодов); НЕ расширять до 3000 (указание пользователя).
+- `MECHANISM_LABELS` не правился (только добавление лейблов — отдельный backlog).
+- Проверка — скриптом `_verify.ts`, а не визуально.
+
+### Critical Context
+- `SUPPORT_CATALOG_DATA` = 377 веществ; `support-catalog-supplement.ts` — компаньон (часть того же объекта через side-effect import).
+- `BRIDGE_MECH_TO_CATALOG`: 386 канон-кодов — НЕ редактировать вручную.
+- Подтверждённые в BRIDGE коды для правки: `IMMUNE_MODULATION`, `IMMUNE_FUNCTION`, `THYROID_SUPPORT`, `THYROID_SYNTHESIS` (endocrine_2).
+- `THYROID_HORMONE_METABOLISM` используется в `lab-marker-map.ts`/`support-catalog-supplement.ts`, но **ОТСУТСТВУЕТ** в `BRIDGE_MECH_TO_CATALOG` → неканоничен.
+- BioStack читает `SUPPORT_CATALOG_DATA[id].mechanisms`/`.description` напрямую; теперь все коды резолвятся в `MECHANISM_LABELS` (или render raw для 189 без лейбла).
+
+### Relevant Files
+- `src/data/support-catalog-data.ts`: `SUPPORT_CATALOG_DATA` 377 веществ — **НОРМАЛИЗОВАНО** (0 неканон, 0 пустых)
+- `src/data/support-catalog-supplement.ts`: компаньон — нормализован через `_rewrite.ts`
+- `src/data/mechanism-code-bridge.ts`: `BRIDGE_MECH_TO_CATALOG` (386 канон) — НЕ редактировался
+- `src/data/support-meta.ts`: `MECHANISM_LABELS` (189 канон без RU-лейбла) — backlog
+- `src/ui/components/BioStackAIConstants.tsx`: `MECH_CATEGORY_META`, `CATALOG_TO_CATEGORY`, `SubstanceMechanismCard` (коммитировано ранее)
+- `src/engines/biostack-recommender.engine.ts`: `buildSmartStackMulti` (~335) — краш 2-го стека (backlog)
+
+---
+
 ## Session Summary (Jul 16 — Part 12) — Калькулятор поддержки: финал фикса шрифтов попапов (ручной + усиление)
 
 ### Goal
@@ -3586,3 +3633,37 @@ umber — заменено на getVolumeLandmarks + применение onCour
 ### Коммиты сессии
 - 27259ec0 — Profile: favorite & excluded exercises in training profile + plan generation
 - 0f068d9c — Training profile: add 'remove axial load' (avoidAxialLoad) filter for plan generation
+
+---
+
+## Session Summary (Jul 17 — Part 2) — BioStack: фикс кнопки «Замена» + переписывание Профиля
+
+### Goal
+- Починить кнопку «Замена» в БИОСТАК (попап не открывался) + переделать вкладку Профиль в развёрнутый редактируемый экран с автозаполнением (убрать «куски»/обрезки и «Быстрый старт»). Затем убрать бесполезную секцию «Цели и курс» (пользователь: «пресеты не работают один фиг»).
+
+### Constraints & Preferences
+- Язык общения: русский
+- Профиль: качественный, развёрнутый, с кнопками автозаполнения, без «Быстрого старта» и без бесполезной секции «Цели и курс»
+
+### ✅ Done
+- **Кнопка «Замена» (replace)**: корень — CSS containing-block bug (предок с `backdrop-filter` в styles.css делал `position:fixed` попапа спозиционированным относительно предка). Фикс: рендер попапов через **React portal в `document.body`** (`ReactDOM.createPortal`) в `BioStackAISearch.tsx` (replace/complex-popup) и `BioStackAIStack.tsx` (replace-popup). Закоммичено: `20ef737a8`.
+- **Профиль переписан** (`BioStackAIProfile.tsx`): развёрнутый `ProfileTab`, все поля `BioStackProfile` видимо и редактируемо. Секции: Личные данные, Здоровье, Симптомы и травмы, Органы и системы, Принимаю и исключаю, Лаборатория. Кнопки «⟳ Авто» в каждой секции + глобальное «Автозаполнить из основного профиля» (`autoFillFromMainProfile`). Сохранение через `saveBioStackProfile` при каждом изменении. Убран «Быстрый старт». Закоммичено: `5c7dbd14`.
+- **Секция «Цели и курс» УДАЛЕНА** (`BioStackAIProfile.tsx`): вместе с неиспользуемыми константами `GOAL_OPTS/AAS_OPTS/BUDGET_OPTS/COMPLEXITY_OPTS/ADCLASS_OPTS` (40 строк удалено). Поле `BioStackProfile` из типа не удалялось (остаётся в движке). Закоммичено: `8cde57af`.
+- **Импорт `BioStackProfile`** добавлен в `BioStackAIProfile.tsx` (раньше использовался в helper-сигнатурах, но не импортировался → tsc ошибка TS2304). Закоммичено в `b7877809`/`8cde57af`.
+- **Проверки**: `tsc --noEmit` → 0 ошибок; `esbuild` трансформ → OK; кодировка UTF-8 noBOM → OK.
+
+### ⚠️ Известные подводные камни
+- Файл `BioStackAIProfile.tsx` дважды «откатывался» между правками и коммитом (правки apply, но при commit попадала старая версия). Итоговый коммит `8cde57af` — верный (40 deletions). При дальнейших правках — перепроверять `git show HEAD`/`git diff` реальным содержимым (PowerShell `Select-String` неверно декодирует UTF-8 без BOM → ложные совпадения).
+- `src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx` — modified в working tree (другой агент), НЕ мой файл, не трогал.
+
+### Critical Context
+- `BioStackProfile` interface (biostack-ai.engine.ts): age, weight, height, sex, experience, goals[], aasStatus, healthConditions[], budget, avoidIds[], avoidMeds[], maxStackSize, adClass, stackComplexity, targetOrgans[], targetSystems[], currentMeds[], drugAllergies[], jointSymptoms[], neuroSymptoms[], cnsSymptoms[], injuries[], currentSupplements[], autoFilledFields[].
+- `autoFillFromMainProfile()` → {patch, autoKeys}; `getProfileCompleteness(p)`; `getLabDiary()` (lab-diary.engine) подтягивает анализы в раздел «Лаборатория».
+- `BioStackAIProfile.tsx` экспортирует `default ProfileTab` (props: onAppliedToRun, onToRun, onShowToast, onToast, profile, setProfile, setStackIds).
+
+### Relevant Files
+- `src/ui/components/BioStackAIProfile.tsx` — переписан (развёрнутый профиль, без «Цели и курс»)
+- `src/ui/components/BioStackAIStack.tsx` — replace-popup портал (commit 20ef737a8)
+- `src/ui/components/BioStackAISearch.tsx` — replace/complex popup портал (commit 20ef737a8)
+- `src/engines/biostack-ai.engine.ts` — BioStackProfile, autoFillFromMainProfile, getProfileCompleteness
+- `src/engines/lab-diary.engine.ts` — getLabDiary
