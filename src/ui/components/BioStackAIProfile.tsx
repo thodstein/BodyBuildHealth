@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   loadBioStackProfile, saveBioStackProfile, autoFillFromMainProfile,
-  getProfileCompleteness, getDefaultBioStackProfile,
+  getProfileCompleteness, getDefaultBioStackProfile, BioStackProfile,
 } from '../../engines/biostack-ai.engine';
 import { getLabDiary } from '../../engines/lab-diary.engine';
 import { SUPPORT_CATALOG_DATA, SYSTEM_LABELS_CATALOG, ORGAN_LABELS } from '../../data/support-database';
