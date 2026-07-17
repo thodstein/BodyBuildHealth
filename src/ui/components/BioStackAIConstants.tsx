@@ -2,6 +2,65 @@ import React from 'react';
 import { type GoalType, type HealthCondition, type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { type FinderProfile, type GoalType as FinderGoal } from '../../engines/supplement-finder.engine';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
+import { BRIDGE_MECH_TO_CATALOG } from '../../data/mechanism-code-bridge';
+import { MECHANISM_LABELS } from '../../data/support-meta';
+
+// ─── TZ / support-calculator mechanism model ───
+// Категории механизмов — те же, что в калькуляторе поддержки (BRIDGE_MECH_TO_CATALOG):
+// cardio / hepatic / renal / neuro / endocrine / hematologic / reproductive / musculoskeletal
+export const MECH_CATEGORY_META: Record<string, { label: string; color: string }> = {
+  cardio: { label: 'Сердечно-сосудистая', color: '#ef4444' },
+  hepatic: { label: 'Печень', color: '#22c55e' },
+  renal: { label: 'Почки', color: '#0ea5e9' },
+  neuro: { label: 'Нервная система', color: '#a855f7' },
+  endocrine: { label: 'Эндокринная', color: '#f59e0b' },
+  hematologic: { label: 'Кровь', color: '#ec4899' },
+  reproductive: { label: 'Репродуктивная', color: '#14b8a6' },
+  musculoskeletal: { label: 'Опорно-двигательная', color: '#84cc16' },
+};
+
+// catalog mechanism code → category (из BRIDGE_MECH_TO_CATALOG как в калькуляторе поддержки)
+const CATALOG_TO_CATEGORY: Record<string, string> = (() => {
+  const map: Record<string, string> = {};
+  for (const [bridgeKey, codes] of Object.entries(BRIDGE_MECH_TO_CATALOG)) {
+    const cat = bridgeKey.split('_')[0];
+    for (const code of codes) map[code] = cat;
+  }
+  return map;
+})();
+
+// Карточка механизмов вещества — модель ориентированная на механизмы из калькулятора поддержки
+// (группировка по органам/системам + механизмам, как в калькуляторе поддержки).
+export function SubstanceMechanismCard({ id }: { id: string }) {
+  const entry = SUPPORT_CATALOG_DATA[id];
+  const mechs = entry?.mechanisms || [];
+  if (mechs.length === 0) return null;
+  const grouped: Record<string, string[]> = {};
+  for (const code of mechs) {
+    const cat = CATALOG_TO_CATEGORY[code] || 'other';
+    (grouped[cat] ||= []).push(code);
+  }
+  return (
+    <div style={{ marginTop: 4 }}>
+      {Object.entries(grouped).map(([cat, codes]) => {
+        const meta = MECH_CATEGORY_META[cat] || { label: cat, color: '#64748b' };
+        return (
+          <div key={cat} style={{ marginBottom: 3 }}>
+            <div style={{ fontSize: 7, fontWeight: 700, color: meta.color, marginBottom: 1 }}>{meta.label}</div>
+            <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              {codes.map(c => (
+                <span key={c} style={{
+                  fontSize: 6, padding: '1px 5px', borderRadius: 4,
+                  background: `${meta.color}14`, color: meta.color, border: `1px solid ${meta.color}22`,
+                }}>{MECHANISM_LABELS[c] || c}</span>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export type BSTab = 'profile' | 'select' | 'stack' | 'reports';
 

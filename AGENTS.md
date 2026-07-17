@@ -1,3 +1,68 @@
+## Session Summary (Jul 17) — BioStack: механизм-ориентированная модель веществ (как в калькуляторе поддержки)
+
+### Goal
+- Переписать сборку стека BioStack под механизм-ориентированную модель ТЗ: вещества показывают механизмы сгруппированными по органам/системам (как в калькуляторе поддержки через `BRIDGE_MECH_TO_CATALOG`), устранить «кашу из механизмов» в карточках, починить падение при сборке 2-го стека, добавить описания препаратов как в калькуляторе поддержки.
+
+### Constraints & Preferences
+- Роль: ведущий инженер + ведущий дизайнер BioStack
+- Отвечать на русском
+- Использовать маппинг механизмов калькулятора поддержки (`BRIDGE_MECH_TO_CATALOG`)
+- Категории механизмов: cardio/hepatic/renal/neuro/endocrine/hematologic/reproductive/musculoskeletal (8, из bridge)
+- Полностью удалять старую реализацию, не патчить
+
+### Progress
+#### Done
+- BioStackAIProfile.tsx полностью переписан + закоммичен (42f555c62)
+- biostack-ai.engine.ts расширен (суставы/нейро/ЦНС-симптомы, травмы, добавки)
+- В BioStackAIConstants.tsx добавлено:
+  - `MECH_CATEGORY_META` (8 категорий: label + color)
+  - `CATALOG_TO_CATEGORY` мап (из `BRIDGE_MECH_TO_CATALOG`, ключ.split('_')[0])
+  - `SubstanceMechanismCard({id})` — группирует механизмы по категориям, рендерит цветные чипсы через `MECHANISM_LABELS`
+- BioStackAIBuild.tsx: импорт `SubstanceMechanismCard`; добавлен `<SubstanceMechanismCard id={s.id} />` в карточку вещества result-панели (~799); исправлена панель вариантов — `vr.substanceCount`→`vr.stack.length`, заменены несуществующие `vr.synergyScore`/`vr.coverage` на подсчёт механизмов через `vr.stack.reduce((n,id)=> n + (SUPPORT_CATALOG_DATA[id]?.mechanisms?.length || 0), 0)`
+- BioStackAIStack.tsx: импорт `SubstanceMechanismCard` + добавлена сворачиваемая секция «🧬 Механизмы веществ (по органам/системам)» после чек-листа активного стека (каждое вещество → `SubstanceMechanismCard`)
+- Верификация: esbuild-трансформ `BioStackAIConstants.tsx` / `BioStackAIBuild.tsx` / `BioStackAIStack.tsx` — все EXIT 0 (33.5kb / 71.3kb / 121.9kb)
+
+#### In Progress
+- (none)
+
+#### Blocked
+- (none)
+
+### Key Decisions
+- Модель категорий механизмов берётся из калькулятора поддержки (`BRIDGE_MECH_TO_CATALOG`, 8 орган/систем), а не из старой абстракции 28-мех/6-систем
+- Общий компонент карточки живёт в BioStackAIConstants.tsx для переиспользования во всех экранах
+- Панель вариантов: убраны несуществующие `vr.synergyScore`/`vr.coverage`, показан подсчёт механизмов
+- BioStackAIStack.tsx был переструктурирован параллельным агентом (удалены старые `cat.mechanisms.map` чипы) — механизмы добавлены через новую аддитивную секцию, без конфликта
+
+### Next Steps
+- Починить падение при сборке 2-го стека (`biostack-recommender.engine.ts`: `buildSmartStackMulti` ~335) — источник краша
+- Добавить карточку описания препарата в ТЗ-стиле (как в `Calc.mapper.tsx` organMechanisms, purple #a78bfa) в сборку стека
+- Проверить оба экрана в браузере (визуально)
+
+### Critical Context
+- `BRIDGE_MECH_TO_CATALOG` ключи типа `cardio_1`..`musculoskeletal_7` → коды механизмов каталога; категория = `key.split('_')[0]`
+- `SUPPORT_CATALOG_DATA[id].mechanisms` = массив кодов механизмов каталога
+- `MECHANISM_LABELS` из `../../data/support-meta` мапит код→RU-лейбл
+- `buildSmartStackMulti` возвращает `{ variant, stack, estCost }[]`; `BuildVariant` = 'economy'|'balanced'|'maximum'
+- Калькулятор поддержки рендерит `st.anatomicalMapping?.organMechanisms` (purple #a78bfa) в `Calc.mapper.tsx`:834,1039
+- BioStackAIConstants.tsx показывает искажённую кириллицу в терминале (артефакт кодировки, не баг)
+- `vr.substanceCount`/`vr.synergyScore`/`vr.coverage` были undefined → ломали рендер панели вариантов
+
+### Relevant Files
+- `src/ui/components/BioStackAIConstants.tsx`: добавлены `MECH_CATEGORY_META`, `CATALOG_TO_CATEGORY`, `SubstanceMechanismCard`
+- `src/ui/components/BioStackAIBuild.tsx`: импорт + result-панель (~799) + фикс панели вариантов (~887-895)
+- `src/ui/components/BioStackAIStack.tsx`: импорт + сворачиваемая секция механизмов после чек-листа (~1042)
+- `src/data/mechanism-code-bridge.ts`: `BRIDGE_MECH_TO_CATALOG` (источник)
+- `src/data/support-meta.ts`: `MECHANISM_LABELS`
+- `src/engines/biostack-recommender.engine.ts`: `buildSmartStackMulti` (~335) — источник краша 2-го стека (не исправлено)
+- `src/ui/screens/Calculator/Calc.mapper.tsx`: референс рендера organMechanisms (834,1039)
+- `src/engines/biostack-ai.engine.ts`: расширен суставы/нейро/ЦНС
+
+### Коммиты сессии
+- (pending — изменения uncommitted)
+
+---
+
 ## Session Summary (Jul 16 — Part 12) — Калькулятор поддержки: финал фикса шрифтов попапов (ручной + усиление)
 
 ### Goal

@@ -6,7 +6,7 @@ import { ORGAN_LABELS, SYSTEM_LABELS_CATALOG } from '../../data/support-database
 import { LAB_MARKER_MAP, type LabMarkerMap } from '../../data/lab-marker-map';
 import { STACK_TEMPLATES, type BioStackTemplate } from '../../engines/biostack-templates';
 import { SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX, MECHANISM_LABELS, COMPLEX_NAMES } from '../../data/support-meta';
-import { GlassCard, PillBtn, StatBox, ORGANS, SYSTEMS, PURE_GOALS, TARGET_SYSTEMS, SYMPTOMS, toFinderProfile, showToast, estCost } from './BioStackAIConstants';
+import { GlassCard, PillBtn, StatBox, ORGANS, SYSTEMS, PURE_GOALS, TARGET_SYSTEMS, SYMPTOMS, toFinderProfile, showToast, estCost, SubstanceMechanismCard } from './BioStackAIConstants';
 import { buildSmartStackMulti, type BuildVariant } from '../../engines/biostack-recommender.engine';
 import { getSafeStackRecommendations } from '../../engines/biostack-safety.engine';
 import {
@@ -797,6 +797,7 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
                 </div>
                 <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3 }}>🧬 {s.mechanism}</div>
                 {s.dose && <div style={{ fontSize: 8, color: '#60a5fa' }}>💊 {s.dose}</div>}
+                <SubstanceMechanismCard id={s.id} />
               </div>
               );
             })}
@@ -884,14 +885,12 @@ export function BuildTab({ profile, stackIds, setStackIds, labAnalysis, linked }
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>{vr.substanceCount} веществ</span>
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>{vr.stack.length} веществ</span>
                       <span style={{ fontSize: 8, fontWeight: 600, color: l.color }}>{vr.estCost.toLocaleString()} ₽</span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 4, fontSize: 7, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>
-                    <span>⭐ Синергия: <strong style={{ color: l.color }}>{vr.synergyScore}</strong></span>
-                    <span>•</span>
-                    <span>{vr.coverage}</span>
+                    <span>🧩 Механизмов: <strong style={{ color: l.color }}>{vr.stack.reduce((n, id) => n + (SUPPORT_CATALOG_DATA[id]?.mechanisms?.length || 0), 0)}</strong></span>
                   </div>
                   <div style={{ display: 'flex', gap: 3 }}>
                     <div style={{

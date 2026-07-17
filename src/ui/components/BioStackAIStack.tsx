@@ -5,7 +5,7 @@ import { buildStack, explainStack, findReplacement, findSupplements, findComplex
 import { buildSmartStack } from '../../engines/biostack-recommender.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS, ALL_SUBSTANCES } from '../../data/support-database';
 import { decodeGarbled } from '../../utils/text-sanitizer';
-import { GlassCard, StatBox, ORGANS, toFinderProfile, ConfirmModal, showToast, PRICE_RUB, estCost } from './BioStackAIConstants';
+import { GlassCard, StatBox, ORGANS, toFinderProfile, ConfirmModal, showToast, PRICE_RUB, estCost, SubstanceMechanismCard } from './BioStackAIConstants';
 import { SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX } from '../../data/support-meta';
 import type { LinkedData } from '../../core/data-link';
 import { checkStackToxicity, checkNutrientConflicts, optimizeTiming, findAbsorptionEnhancers, getReminderConfig, saveReminderConfig, scheduleTelegramReminder } from '../../engines/biostack-safety.engine';
@@ -1040,6 +1040,21 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
             );
           })}
         </div>
+        {/* Механизмы веществ — модель ориентированная на механизмы из калькулятора поддержки */}
+        <details style={{ marginTop: 6 }}>
+          <summary style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}>🧬 Механизмы веществ (по органам/системам)</summary>
+          <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {stackIds.map(id => {
+              const cat = SUPPORT_CATALOG_DATA[id];
+              return (
+                <div key={id} style={{ padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ fontSize: 8, fontWeight: 600, color: '#fff', marginBottom: 2 }}>{cat?.nameRu || cat?.name || id}</div>
+                  <SubstanceMechanismCard id={id} />
+                </div>
+              );
+            })}
+          </div>
+        </details>
         <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>
           Нажмите на препарат, чтобы отметить как принятый
         </div>
