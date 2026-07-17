@@ -6,23 +6,53 @@
  */
 import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
+import { getBBVolumeLandmarks } from './bb-builder.engine';
 import { PCT_FOR_RIR } from '../rir-table';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
-import { adaptForPEDs, type PED } from './bb-ped-adaptation.engine';
+import { adaptForPEDs, type PED, type CourseIntensity } from './bb-ped-adaptation.engine';
 import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-plan-builder';
+import { applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
+import { isAxialLoadExercise } from '../exercise-selector.engine';
 
 export type CycleSourceCycle = SRCycleTemplate;
+export type BBVolumeGoal = 'mev' | 'mav' | 'mrv';
 
 export interface CycleToPlanInput {
   cycle: SRCycleTemplate;
   workMax: Record<string, number>;
   weakPoints?: string[];
   peds?: PED[];
-  loadStrategy?: string;
+  /** Дозы PED (мг/нед, МЕ/день, мкг) — dose-aware адаптация MRV. */
+  pedDoses?: Record<string, number>;
+  /** Интенсивность курса — доп. MRV boost (mild/moderate/heavy). */
+  courseIntensity?: CourseIntensity;
+  loadStrategy?: LoadStrategy;
   autoRegVolumeMult?: number;
   autoRegRirShift?: number;
   injuries?: Injury[];
+  /** Техника интенсивности (rest_pause/drop_set/myo_reps/pause_rep/mechanical_drop/none). */
+  intensityTechnique?: IntensityTechnique;
+  /** Авто-делод по ACWR. */
+  autoDeload?: boolean;
+  /** Тип делода (pump/neural/full_rest). */
+  deloadType?: DeloadType;
+  /** Результат авторегуляции (объём/вес/RIR shift). */
+  autoRegResult?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number };
+  /** Любимые упражнения (ID) — приоритет при замене. */
+  favoriteExercises?: string[];
+  /** Исключённые упражнения (ID) — замена на альтернативу. */
+  excludedExercises?: string[];
+  /** Убрать осевую нагрузку (присед/становая/жим стоя/гудморнинг). */
+  avoidAxialLoad?: boolean;
+  /** Цель по объёму: MEV (минимум) | MAV (оптимум) | MRV (максимум). */
+  volumeGoal?: BBVolumeGoal;
+  /** Режим специализации: топ-2 слабые на MAV+10%, остальные на MEV. */
+  specialization?: boolean;
+  /** Фокус-группа (акцент +30% объём). */
+  focusGroup?: string;
+  /** Уровень атлета (для volume-landmarks валидации). */
+  level?: string;
 }
 
 function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG): string {
@@ -115,10 +145,97 @@ function isPrimaryByLoad(load: string | undefined): boolean {
 }
 
 /**
+ * BB-ФИЛЬТР: заменить ПЛ/олимпийские упражнения на ББ-альтернативы.
+ * Становая тяга (классическая/сумо) — ПЛ движение, не для ББ гипертрофии.
+ * Жим стоя/армейский/швунг — осевая, заменить на жим сидя.
+ * Рывок/толчок/взятие — олимпийские, заменить или пропустить.
+ *
+ * @returns { name, group } — новое имя + группа, или null если упражнение пропускается
+ */
+function replacePLForBB(exName: string, group: string): { name: string; group: string } | null {
+  const n = (exName || '').toLowerCase().trim();
+
+  // Становая тяга → Тяга штанги в наклоне (если спина) или Румынская (если бицепс бедра)
+  if (n === 'становая тяга' || n === 'становая тяга (классика)' || n === 'становая тяга сумо' || n === 'становая тяга классическая') {
+    const g = (group || '').toLowerCase();
+    if (g.includes('спин') || g === 'back') {
+      return { name: 'Тяга штанги в наклоне', group: 'Спина' };
+    }
+    return { name: 'Румынская тяга', group: 'Ноги' };
+  }
+  // Жим стоя / армейский / OHP → Жим гантелей сидя (не осевая)
+  if (n === 'жим стоя' || n === 'армейский жим' || n === 'жим над головой' || n === 'ohp'
+      || n.includes('швунг') || n.includes('push press') || n.includes('жимовой швунг')) {
+    return { name: 'Жим гантелей сидя', group: 'Плечи' };
+  }
+  // Олимпийские: рывок/толчок/взятие — пропустить (нет ББ-аналога в шаблоне)
+  if (n.includes('рывок') || n.includes('толчок') || n.includes('взятие на грудь')
+      || n.includes('подъём на грудь') || n.includes('подъем на грудь')
+      || n.includes('power clean') || n.includes('hang clean') || n.includes('power snatch')
+      || n.includes('clean pull') || n.includes('muscle snatch')) {
+    return null;
+  }
+  // Пендл → Тяга штанги в наклоне
+  if (n.includes('пендл') || n.includes('pendlay')) {
+    return { name: 'Тяга штанги в наклоне', group: 'Спина' };
+  }
+  // Good morning → Румынская тяга
+  if (n.includes('гудмор') || n.includes('good morning') || n.includes('наклоны со штангой')) {
+    return { name: 'Румынская тяга', group: 'Ноги' };
+  }
+  // Rack pull / тяга с плинт → Тяга штанги в наклоне
+  if (n.includes('rack pull') || n.includes('тяга с плинт') || n.includes('тяга с плинта')) {
+    return { name: 'Тяга штанги в наклоне', group: 'Спина' };
+  }
+  // Фермерская прогулка / переноска → пропустить (не ББ)
+  if (n.includes('фермерск') || n.includes('прогулка фермер') || n.includes('farmer walk')
+      || n.includes('прогулка официант') || n.includes('waiter walk')
+      || n.includes('yoke walk') || n.includes('прогулка с коромысл')) {
+    return null;
+  }
+  // Паллоф / bird dog / планка (изометрика) → пропустить
+  if (n.includes('паллоф') || n.includes('pallof') || n.includes('bird dog') || n.includes('птица-собака')
+      || n.includes('планк') && !n.includes('боков') || n.includes('plank') && !n.includes('side')) {
+    return null;
+  }
+  return { name: exName, group };
+}
+
+/** Проверить, что заменённое упражнение существует в каталоге (fallback). */
+function validateReplacement(rep: { name: string; group: string }): { name: string; group: string } {
+  const found = EXERCISE_CATALOG.find(e => e.name === rep.name);
+  if (found) return rep;
+  // Fallback: Тяга штанги в наклоне (всегда есть в каталоге)
+  return { name: 'Тяга штанги в наклоне', group: 'Спина' };
+}
+
+/** Найти замену для исключённого/осевого упражнения из той же группы. */
+function findReplacementForCycle(exName: string, muscle: string, favNames: Set<string>, favIdSet: Set<string>): { name: string; group: string } | null {
+  const cat = EXERCISE_CATALOG.find(e => e.name === exName);
+  const group = cat?.group || 'chest';
+  // Пул упражнений той же группы
+  const pool = EXERCISE_CATALOG.filter(e => e.group === group && e.name !== exName);
+  if (pool.length === 0) return null;
+  // Приоритет: любимые → compound → isolation
+  const favMatch = pool.find(e => favNames.has(e.name) || favIdSet.has(e.id));
+  if (favMatch) return { name: favMatch.name, group };
+  const compound = pool.find(e => e.type === 'compound');
+  if (compound) return { name: compound.name, group };
+  return { name: pool[0].name, group };
+}
+
+/**
  * Convert an SRCycleTemplate (BB cycle with concrete exercises) to a full BBPlan.
  */
 export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
-  const { cycle, workMax, weakPoints = [], peds = [], loadStrategy = 'double_progression', injuries = [] } = input;
+  const {
+    cycle, workMax, weakPoints = [], peds = [], pedDoses, courseIntensity,
+    loadStrategy = 'double_progression', injuries = [],
+    intensityTechnique, autoDeload, deloadType, autoRegResult,
+    favoriteExercises = [], excludedExercises = [], avoidAxialLoad = false,
+    volumeGoal = 'mav', specialization = false, focusGroup = '',
+    level = 'advanced',
+  } = input;
   const meta = cycle.meta;
   const totalWeeks = meta.weeks;
   const daysPerWeek = meta.sessionsPerWeek;
@@ -131,11 +248,34 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const excludedMuscles = getExcludedMuscles(injuries, today);
   const gradedInjuries = getGradedInjuries(injuries, today);
 
-  // PED adaptation
-  const allLandmarks = getAllVolumeLandmarks('advanced');
+  // PED adaptation — DOSE-AWARE (передаёт pedDoses + courseIntensity)
+  const allLandmarks = getAllVolumeLandmarks(level);
   const landmarks = Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv]));
-  const pedAdapt = adaptForPEDs(peds, landmarks);
+  const pedAdapt = adaptForPEDs(peds, landmarks, pedDoses, courseIntensity);
   const mrvMult = pedAdapt.combinedMrvMultiplier || 1.0;
+
+  // volumeGoal scaling: MEV=0.7, MAV=1.0, MRV=1.15 (поверх шаблона)
+  const volGoalMult = volumeGoal === 'mev' ? 0.70 : volumeGoal === 'mrv' ? 1.15 : 1.0;
+  // specialization: weak groups +10%, others на MEV (×0.7)
+  const specWeak = specialization ? weakPoints.slice(0, 2) : [];
+
+  // excludedExercises — Set для быстрого lookup по ID и имени
+  const exclIdSet = new Set(excludedExercises);
+  const exclNameSet = new Set(excludedExercises.map(id => {
+    const cat = EXERCISE_CATALOG.find(e => e.id === id);
+    return cat?.name || id;
+  }).filter(Boolean));
+  // partial-name matching: цикл-имена могут быть короче каталог-имён ("Жим лёжа" vs "Жим штанги лёжа")
+  const exclPartial = excludedExercises.map(id => {
+    const cat = EXERCISE_CATALOG.find(e => e.id === id);
+    return cat?.name || id;
+  }).filter(Boolean);
+  // favoriteExercises — Set для приоритета при замене
+  const favIdSet = new Set(favoriteExercises);
+  const favNames = new Set(favoriteExercises.map(id => {
+    const cat = EXERCISE_CATALOG.find(e => e.id === id);
+    return cat?.name || '';
+  }).filter(Boolean));
 
   const rationale: string[] = [];
   rationale.push(`📋 Цикл: ${meta.title}`);
@@ -149,30 +289,70 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     }
   }
   if (weakPoints.length > 0) rationale.push(`🔥 Слабые группы (акцент объёма): ${weakPoints.join(', ')}`);
-  if (peds.length > 0) rationale.push(`💉 PED-адаптация: MRV ×${mrvMult.toFixed(2)}`);
+  if (peds.length > 0) rationale.push(`💉 PED-адаптация (dose-aware): MRV ×${mrvMult.toFixed(2)}, восст ×${pedAdapt.combinedRecoveryMultiplier.toFixed(2)}${pedDoses ? ' (' + peds.map(p => `${p}${pedDoses[p] ? ' ' + pedDoses[p] : ''}`).join(' + ') + (courseIntensity && courseIntensity !== 'moderate' ? ', ' + courseIntensity : '') + ')' : ''}`);
   if (excludedMuscles.size > 0) rationale.push(`⚠ Травмы: исключены мышцы ${[...excludedMuscles].join(', ')}`);
   if (gradedInjuries.length > 0) rationale.push(`⚠ Градированные травмы: ${gradedInjuries.map(i => i.muscle).join(', ')} — сниженный объём`);
   rationale.push(`📈 Стратегия прогрессии: ${loadStrategy.replace(/_/g, ' ')}`);
+  if (intensityTechnique && intensityTechnique !== 'none') rationale.push(`⚡ Техника интенсивности: ${intensityTechnique.replace(/_/g, ' ')} (применяется к primary)`);
+  if (autoDeload) rationale.push(`🔋 Авто-делод: ${deloadType || 'pump'} (по ACWR)`);
+  if (avoidAxialLoad) rationale.push(`🦴 Осевая нагрузка убрана (присед/становая/жим стоя → безопасные альтернативы)`);
+  if (volumeGoal !== 'mav') rationale.push(`📊 Цель объёма: ${volumeGoal.toUpperCase()} (×${volGoalMult})`);
+  if (specialization) rationale.push(`🎯 Специализация: ${specWeak.join(', ')} на MAV+10%, остальные на MEV`);
+  if (focusGroup) rationale.push(`⭐ Фокус-группа: ${focusGroup} (+30% объём)`);
+  if (excludedExercises.length > 0) rationale.push(`🚫 Исключённые упражнения: ${excludedExercises.length} шт. — заменены на альтернативы`);
+  if (favoriteExercises.length > 0) rationale.push(`⭐ Любимые упражнения: ${favoriteExercises.length} шт. — приоритет при замене`);
   rationale.push(`🎯 Источник упражнений: ПРОФ-цикл с фиксированными упражнениями (не автоподбор)`);
+  rationale.push(`🛡 BB-фильтр: ПЛ/олимпийские упражнения автозаменены на ББ-альтернативы (становая→тяга в наклоне, жим стоя→жим сидя)`);
 
   // Build weeks
   const weeks: BBWeek[] = [];
   for (let w = 1; w <= totalWeeks; w++) {
     const sessions: BBSession[] = week1Days.map((daySpec, dayIdx) => {
       const exercises: BBExercise[] = daySpec.exercises.map((exSpec) => {
+        // BB-ФИЛЬТР: заменить ПЛ/олимпийские упражнения на ББ-альтернативы
+        const exGroup = exSpec.group || muscleGroupFromExName(exSpec.name, EXERCISE_CATALOG);
+        const bbReplaced = replacePLForBB(exSpec.name, exGroup);
+        if (bbReplaced === null) {
+          // Пропустить упражнение (ПЛ/мусор без ББ-аналога)
+          return null as any;
+        }
+        const bbExName = bbReplaced.name;
+        const bbExGroup = bbReplaced.group;
+        // Проверка: исключённое упражнение (по ID, имени или partial-match) → замена
+        let finalExName = bbExName;
+        const catEntry = EXERCISE_CATALOG.find(e => e.name === bbExName);
+        const catId = catEntry?.id || '';
+        const isExcluded = exclNameSet.has(bbExName) || exclIdSet.has(catId)
+          || exclPartial.some(n => n.includes(bbExName) || bbExName.includes(n));
+        if (isExcluded) {
+          const rep = findReplacementForCycle(bbExName, muscleGroupFromExName(bbExName, EXERCISE_CATALOG), favNames, favIdSet);
+          if (rep) { finalExName = rep.name; } else { return null as any; }
+        }
+        // Проверка: осевая нагрузка (если avoidAxialLoad) → замена на не-осевую
+        if (avoidAxialLoad && catEntry && isAxialLoadExercise(catEntry)) {
+          const rep = findReplacementForCycle(bbExName, muscleGroupFromExName(bbExName, EXERCISE_CATALOG), favNames, favIdSet);
+          if (rep) { finalExName = rep.name; }
+        }
         const exRir = computeRirForEx(w, totalWeeks, rirProg, phases);
         const isPrimary = isPrimaryByLoad(exSpec.load);
         const character = exSpec.load === 'Тяжелая' ? 'тяж' : 'памп';
-        const workMaxVal = calcWorkMaxForEx(exSpec.name, workMax);
-        const muscle = muscleGroupFromExName(exSpec.name, EXERCISE_CATALOG);
+        const workMaxVal = calcWorkMaxForEx(finalExName, workMax);
+        const muscle = muscleGroupFromExName(finalExName, EXERCISE_CATALOG);
         // Пропускаем упражнения на исключённые мышцы (травмы)
         if (excludedMuscles.has(muscle)) return null as any;
         const isWeak = weakPoints.includes(muscle);
+        const isFocus = focusGroup === muscle || (focusGroup && isWeak && weakPoints.includes(focusGroup));
+        const isSubstituted = finalExName !== exSpec.name;
 
-        // Volume boost: weak groups + PED adaptation.
+        // Volume boost: weak groups + PED adaptation + volumeGoal + specialization + focusGroup.
         // При активных PED: primary получает полный множитель, accessory — 80% множителя, минимум 2 сета.
         const pedFactor = peds.length > 0 ? (isPrimary ? mrvMult : Math.max(1.0, mrvMult * 0.8)) : 1.0;
-        const setMult = (isWeak ? 1.2 : 1.0) * pedFactor;
+        // specialization: слабые (топ-2) на +10%, остальные на MEV (×0.7)
+        const specFactor = specialization ? (specWeak.includes(muscle) ? 1.10 : 0.70) : 1.0;
+        // focusGroup: +30%
+        const focusFactor = isFocus ? 1.30 : 1.0;
+        // volumeGoal: MEV×0.7 / MAV×1.0 / MRV×1.15
+        const setMult = (isWeak ? 1.2 : 1.0) * pedFactor * volGoalMult * specFactor * focusFactor;
         const baseSets = exSpec.sets[0]?.sets || 3;
         let targetSets = Math.max(1, Math.round(baseSets * setMult));
         // Минимум 2 сета для любого упражнения (ББ-практика)
@@ -198,7 +378,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         if (workSets.length > 0) workSets[workSets.length - 1].restSeconds = restSeconds;
 
         const ex: BBExercise = {
-          name: exSpec.name,
+          name: finalExName,
           muscle,
           role: isPrimary ? 'primary' : 'accessory',
           character,
@@ -207,7 +387,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
           rir: effectiveRir,
           workSets,
           restSeconds,
-          comment: `${isPrimary ? '🎯 Основное' : '📌 Добивочное'}: ${muscle}. ${targetSets}×${targetReps} @${Math.round(workMaxVal * pct)}кг, RIR ${effectiveRir}.`,
+          comment: `${isPrimary ? '🎯 Основное' : '📌 Добивочное'}: ${muscle}. ${targetSets}×${targetReps} @${Math.round(workMaxVal * pct)}кг, RIR ${effectiveRir}.${isSubstituted ? ' ⚠ Замена (было: ' + exSpec.name + ').' : ''}${isFocus ? ' ⭐ Фокус.' : ''}`,
           warmupSets: isPrimary ? (() => {
             const w = Math.round(workMaxVal * pct);
             if (w <= 0) return [];
@@ -297,10 +477,31 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     schedule: week1Days.map((_, i) => ({ kind: 'тренировка' as const, character: null, sessionTag: ['Upper', 'Lower', 'Push', 'Pull', 'Legs', 'FullBody', 'Arms', 'Shoulders', 'ChestBack', 'ShouldersArms'][i % 10] })),
   };
 
-  return {
-    pattern,
-    weeks,
-    rotationMuscleVolume,
-    rationale,
-  };
+  let finalPlan: BBPlan = { pattern, weeks, rotationMuscleVolume, rationale };
+
+  // Применяем пост-обработку (техники/авто-делод/загрузка/авторег) — как в buildBBPlan.
+  // Условие покрывает ВСЕ признаки, а не только technique/weakPoints — иначе loadStrategy
+  // и autoDeload теряются (баг: dfa8842fb убрал дубль-вызов, но не расширил guard).
+  const acwrRatio = 1; // cycle mode не вычисляет ACWR (нет sRPE-интеграции); autoDeload работает по meta.deloadWeeks
+  if ((intensityTechnique && intensityTechnique !== 'none') || weakPoints.length > 0 || loadStrategy || autoDeload || autoRegResult) {
+    finalPlan = applyPostPhaseProcessing({
+      plan: finalPlan,
+      totalWeeks,
+      workMax,
+      loadStrategy: loadStrategy as LoadStrategy,
+      autoDeload,
+      deloadType,
+      acwrRatio,
+      autoRegResult,
+      skipPhaseRedistribution: true,
+      intensityTechnique: intensityTechnique && intensityTechnique !== 'none' ? intensityTechnique : undefined,
+      weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
+    });
+  }
+
+  // Volume-landmarks (единый источник, как в generic split)
+  const pedMrvMult = pedAdapt.combinedMrvMultiplier ?? 1;
+  const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, pedMrvMult);
+
+  return { ...finalPlan, volumeLandmarks };
 }

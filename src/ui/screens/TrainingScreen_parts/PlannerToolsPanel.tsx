@@ -35,7 +35,7 @@ import { VolumeOptimizerTab } from './VolumeOptimizerTab';
 
 interface ToolDef { id: string; title: string; icon: string; short: string; render: () => React.ReactNode; }
 
-const TOOLS: Record<'pl' | 'bb' | 'manual', ToolDef[]> = {
+const TOOLS: Record<'pl' | 'bb', ToolDef[]> = {
   // ═══ ПЛ-АВТО ═══
   pl: [
     { id: 'str', title: 'Аналитика силы', icon: '💪', short: 'Процентиль, уровень, соотношения, объёмные ориентиры.', render: () => <StrengthAnalyticsCard /> },
@@ -98,56 +98,15 @@ const TOOLS: Record<'pl' | 'bb' | 'manual', ToolDef[]> = {
     { id: 'whatif', title: 'What-if сценарий', icon: '🔮', short: 'Прогноз риск/готовность от калорий/сна/AAS.', render: () => <WhatIfCard baseRisk={20} baseReadiness={75} /> },
   ],
 
-  // ═══ РУЧНОЙ СБОР (все инструменты) ═══
-  manual: [
-    { id: 'split', title: 'Генератор сплитов', icon: '🧩', short: '9 типов сплитов под цель/дни/слабые группы.', render: () => <SplitGenCard /> },
-    { id: 'bb', title: 'ББ-инструменты', icon: '💪', short: 'Темп/отдых, техники, слабые группы, демография — объединены с Лабораторией упражнений.', render: () => (
-      <div style={{ padding: 12, fontSize: 11 }}>
-        <div style={{ color: 'rgba(255,255,255,0.6)', marginBottom: 8, lineHeight: 1.5 }}>
-          ББ-инструменты и Целевая мышца объединены с Лабораторией упражнений в единый ПРОФ-калькулятор.
-          Перейдите в зону «Калькуляторы» → «Лаборатория упражнений».
-        </div>
-        <button onClick={() => { const ev = new CustomEvent('he_training_nav', { detail: { zone: 'calculators', tab: 'exercise_lab' } }); window.dispatchEvent(ev); }}
-          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', cursor: 'pointer', fontWeight: 700, fontSize: 11 }}>
-          🧬 Открыть Лабораторию упражнений
-        </button>
-      </div>
-    ) },
-    { id: 'tempo', title: 'Темп повторений', icon: '⏱️', short: 'Темп по цели движения.', render: () => <TempoTab /> },
-    { id: 'weak', title: 'Слабые точки ПЛ', icon: '🎯', short: 'Диагностика мёртвой точки движения.', render: () => <PlWeakpointsCard /> },
-    { id: 'str', title: 'Аналитика силы', icon: '💪', short: 'Процентиль, уровень, соотношения, ориентиры.', render: () => <StrengthAnalyticsCard /> },
-    { id: '1rm', title: 'Калькулятор 1RM', icon: '🎯', short: 'Оценка максимума → ПМ планировщику.', render: () => <OneRmCalcTab /> },
-    { id: 'vbt', title: 'VBT / скорость', icon: '⚡', short: 'Скорость штанги → %1RM и e1RM → ПМ.', render: () => <VBTCalcTab /> },
-    { id: 'relstr', title: 'Относительная сила', icon: '⚖️', short: 'Wilks/DOTS/GL — слабейшее движение.', render: () => <RelativeStrengthCalcTab /> },
-    { id: 'sticking', title: 'Анализ срывов', icon: '🔬', short: 'Где «зависает» прогресс и какие мышцы отстают.', render: () => <StickingPointAnalysisCard sessions={[]} /> },
-    { id: 'pri', title: 'PRI / готовность', icon: '🧠', short: 'Готовность + RIR-корректировка.', render: () => <PriRepPatternCard /> },
-    { id: 'fatigue', title: 'Индекс усталости', icon: '📉', short: 'ACWR, монотонность, strain → объём.', render: () => <FatigueIndexTab /> },
-    { id: 'load', title: 'Нагрузка / авторег', icon: '🫀', short: 'Кардио, ортопедия, распределение недели, RPE.', render: () => <LoadSafetyCard /> },
-    { id: 'mrv', title: 'MRV-оценщик', icon: '📊', short: 'Индивидуальный MRV из истории.', render: () => <MRVEstimatorTab /> },
-    { id: 'volrec', title: 'Объём↔восстановление', icon: '🔄', short: 'Корреляция объёма и готовности → MRV.', render: () => <VolumeRecoveryCorrelationCard sessions={[]} /> },
-    { id: 'volopt', title: 'Оптимизатор объёма', icon: '📐', short: 'Полный анализ: per-muscle MEV/MAV/MRV, SFR.', render: () => <VolumeOptimizerTab /> },
-    { id: 'loadcalc', title: 'Калькулятор нагрузки', icon: '📊', short: 'sRPE/ACWR/Banister.', render: () => <TrainingLoadCalculator /> },
-    { id: 'meso', title: 'Прогрессия мезо', icon: '📈', short: 'Кривые V/I/RIR → стартовый объём.', render: () => <MesocycleProgressionCard weeks={8} startVolumeSets={16} startIntensityPct={0.72} startRIR={3} goal="hypertrophy" fatigueTrajectory={[]} /> },
-    { id: 'mesocorr', title: 'Коррекция мезо', icon: '🔧', short: 'Авто-корректировка объёма/RIR/deload.', render: () => {
-      const emptyProfileMan = { ...DEFAULT_PROFILE, goal: 'hypertrophy' as const, bodyWeight: 75, pmSquat: 80, pmBench: 60, pmDead: 100, workMax: {} };
-      return <MesoCorrectionCard profile={emptyProfileMan} acwr={1} monotony={1} avgReadiness={80} mesoWeeks={8} missedSessions={0} exercises={[]} currentVolume={16} currentRir={3} />;
-    } },
-    { id: 'peak', title: 'Пик-протокол', icon: '⚡', short: 'Пиковая фаза: объём ↓, RIR→0.', render: () => <PeakingProtocolTab /> },
-    { id: 'taper', title: 'Taper-планер', icon: '🏁', short: 'Тейпер к соревнованию.', render: () => <TaperPlannerTab /> },
-    { id: 'deload', title: 'Планировщик делода', icon: '🧘', short: 'Авто-расписание разгрузочных недель.', render: () => <DeloadSchedulerTab /> },
-    { id: 'period', title: 'Дизайнер периодизации', icon: '🔄', short: 'Блочный макроцикл: drag-and-drop фаз.', render: () => <PeriodizationDesignerTab /> },
-    { id: 'comp', title: 'Соревнование', icon: '🏆', short: 'Категория, стратегия, таймлайн.', render: () => <div style={{padding:12,fontSize:11,color:'var(--text-dim)'}}>🏋️ Соревнование перенесено в инструмент «Пиковая фаза» внутри ПЛ-авто (вкладка «Пик»).</div> },
-    { id: 'whatif', title: 'What-if сценарий', icon: '🔮', short: 'Прогноз риск/готовность.', render: () => <WhatIfCard baseRisk={20} baseReadiness={75} /> },
-  ],
+  // ═══ РУЧНОЙ СБОР убран — давал убогие программы. ПЛ-авто и ББ-авто покрывают все сценарии. ═══
 };
 
-const TITLE_RU: Record<'pl' | 'bb' | 'manual', string> = {
+const TITLE_RU: Record<'pl' | 'bb', string> = {
   pl: '🏆 ПЛ — инструменты планирования',
   bb: '💪 ББ — инструменты планирования',
-  manual: '🛠 Ручной сбор — инструменты планирования',
 };
 
-export const PlannerToolsPanel: React.FC<{ mode: 'pl' | 'bb' | 'manual' }> = ({ mode }) => {
+export const PlannerToolsPanel: React.FC<{ mode: 'pl' | 'bb' }> = ({ mode }) => {
   const [openId, setOpenId] = useState<string | null>(null);
   const tools = TOOLS[mode] || [];
   return (

@@ -730,7 +730,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {/* ── Попап интеллектуального выбора ── */}
       {showIntellPopup && ReactDOM.createPortal(
         <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setShowIntellPopup(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'88%', maxWidth:320, borderRadius:18, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'88%', maxWidth:320, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden' }}>
             <div style={{ height:3, background:'linear-gradient(90deg,#00e68a,#00c853)' }} />
             <div style={{ padding:'16px 14px 12px' }}>
               <div style={{ fontSize:13, fontWeight:800, color:'#00e68a', marginBottom:10 }}>🧠 Интеллектуальная поддержка</div>
@@ -761,7 +761,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {/* ── Попап ручного режима (портал в body, экранирует backdrop-filter предка) ── */}
       {showManualPopup && ReactDOM.createPortal(
         <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)', overflowY:'auto', padding:'20px 0' }} onClick={() => setShowManualPopup(false)}>
-        <div style={{ width:'90%', maxWidth:420, margin:'0 auto', borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.12)', overflow:'hidden' }} onClick={e => e.stopPropagation()}>
+        <div style={{ width:'90%', maxWidth:420, margin:'0 auto', borderRadius:16, background:'#16161a', border:'1px solid rgba(255,255,255,0.12)', overflow:'hidden' }} onClick={e => e.stopPropagation()}>
           <div style={{ height:3, background:'linear-gradient(90deg,#818cf8,#6366f1)' }} />
           <div style={{ padding:'16px 14px 12px', maxHeight:'72vh', overflowY:'auto' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
@@ -999,7 +999,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {/* ── Попап полного каталога стеков (Усиление) — ВСЕ 55 стеков из ALL_STACKS ── */}
       {showEnhancementPopup && ReactDOM.createPortal(
          <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setShowEnhancementPopup(false)}>
-           <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
+           <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
              <div style={{ height:3, background:'linear-gradient(90deg,#f87171,#ef4444)' }} />
              <div style={{ padding:'14px 14px 10px' }}>
                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
@@ -1151,7 +1151,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {/* ── Попап Мега-усиления (умный подбор по gaps + синергии) ── */}
       {showMegaPopup && ReactDOM.createPortal(
          <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setShowMegaPopup(false)}>
-           <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:400, borderRadius:18, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'88vh', display:'flex', flexDirection:'column' }}>
+           <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:400, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'88vh', display:'flex', flexDirection:'column' }}>
              <div style={{ height:3, background:'linear-gradient(90deg,#f87171,#ef4444)' }} />
              <div style={{ padding:'14px 14px 10px', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>

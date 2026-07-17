@@ -299,8 +299,21 @@ export const BbAutoConstructor: React.FC = () => {
         workMax: bbWorkMax,
         weakPoints,
         peds,
-        loadStrategy: loadStrategy as string,
+        pedDoses,
+        courseIntensity,
+        loadStrategy,
         injuries,
+        intensityTechnique: intensityTech,
+        autoDeload,
+        deloadType,
+        autoRegResult: autoRegPayload,
+        favoriteExercises: prof.favoriteExercises || [],
+        excludedExercises: prof.excludedExercises || [],
+        avoidAxialLoad: prof.avoidAxialLoad || false,
+        volumeGoal: bbVolGoal as any,
+        specialization: specializationMode,
+        focusGroup: bbFocus,
+        level: bbLevel,
       });
       const cycleWeeks = cycle.meta.sessionsPerWeek;
       if (bbDays !== cycleWeeks) setBbDays(cycleWeeks);

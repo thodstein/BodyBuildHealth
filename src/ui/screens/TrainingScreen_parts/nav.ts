@@ -25,7 +25,7 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     title: '🏗 Планировщик',
     icon: '🏗',
     color: '#00e68a',
-    subtitle: 'ПЛ-авто / ББ-авто / Ручной сбор — построение плана и макроцикла',
+    subtitle: 'ПЛ-авто / ББ-авто — построение плана и макроцикла',
     tabs: [],
   },
   training: {
@@ -78,10 +78,11 @@ export function zoneForTab(tab: TrainingTab): TrainingZone {
   return TAB_TO_ZONE[tab] ?? 'planner';
 }
 
-/** Режимы зоны 'planner' — сегментированный переключатель. */
-export type PlannerMode = 'pl' | 'bb' | 'manual';
+/** Режимы зоны 'planner' — сегментированный переключатель.
+ *  Ручной сбор убран: давал убогие программы (смешивал ПЛ+ББ, дубликаты, мусор).
+ *  ПЛ-авто (LMS-циклы) и ББ-авто (generic split + BB-циклы) покрывают все сценарии. */
+export type PlannerMode = 'pl' | 'bb';
 export const PLANNER_MODES: { id: PlannerMode; label: string; icon: string; hint: string }[] = [
   { id: 'pl', label: 'ПЛ-авто', icon: '🏆', hint: 'Пауэрлифтинг: силовые циклы, ПМ-прогрессия, пик' },
-  { id: 'bb', label: 'ББ-авто', icon: '💪', hint: 'Бодибилдинг: сплиты, объём по группам, прогрессия' },
-  { id: 'manual', label: 'Ручной сбор', icon: '🛠', hint: 'Конструктор с полным ручным выбором параметров' },
+  { id: 'bb', label: 'ББ-авто', icon: '💪', hint: 'Бодибилдинг: сплиты, объём по группам, PED-адаптация, прогрессия' },
 ];

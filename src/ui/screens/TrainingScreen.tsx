@@ -72,7 +72,7 @@ export const TrainingScreen: React.FC = () => {
     setPage('tabs');
   };
   // Переход в зону «Планировщик» → режим «Ручной сбор» (внешние ссылки setTab('constructor'))
-  const goPlannerManual = useCallback(() => { setZone('planner'); switchPlanningTrack('manual'); }, []);
+  const goPlannerManual = useCallback(() => { setZone('planner'); switchPlanningTrack('bb'); }, []);
   // Универсальный переход на вкладку с автоматическим выбором её зоны
   const goTab = useCallback((t: TrainingTab) => { setZone(zoneForTab(t)); setTab(t); }, []);
 
@@ -276,7 +276,7 @@ export const TrainingScreen: React.FC = () => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'he_training_planning_track') {
         const val = localStorage.getItem('he_training_planning_track');
-        const parsed = val === 'manual' || val === 'bb' ? val : 'pl';
+        const parsed = val === 'bb' ? val : 'pl';
         setPlanningTrack(parsed);
         setPlanningTrackState(parsed);
         setZone('planner'); setPage('tabs');
@@ -562,7 +562,7 @@ export const TrainingScreen: React.FC = () => {
 
       {/* ═══════════ PLAN TAB ═══════════ */}
       
-      {/* ═══════════ ПЛАНИРОВЩИК (зона) — сегментированный ПЛ/ББ/Ручной ═══════════ */}
+      {/* ═══════════ ПЛАНИРОВЩИК (зона) — сегментированный ПЛ/ББ ═══════════ */}
       {zone === 'planner' && (
         <InfoErrorBoundary label="Планировщик">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -577,23 +577,6 @@ export const TrainingScreen: React.FC = () => {
             </div>
             {planningTrack === 'pl' && <PlannerPlAuto />}
             {planningTrack === 'bb' && <PlannerBbAuto />}
-            {planningTrack === 'manual' && (
-              <TrainingConstructor
-                tprofile={tprofile} updateTProfile={updateTProfile}
-                goal={goal} setGoal={setGoal}
-                level={level} setLevel={setLevel}
-                daysPerWeek={daysPerWeek} setDaysPerWeek={setDaysPerWeek}
-                recovery={recovery} setRecovery={setRecovery}
-                fatigue={fatigue} setFatigue={setFatigue}
-                weakPoints={weakPoints} setWeakPoints={setWeakPoints}
-                bodyWeight={bodyWeight} setBodyWeight={setBodyWeight}
-                sleepHours={sleepHours} setSleepHours={setSleepHours}
-                stressLevel={stressLevel} setStressLevel={setStressLevel}
-                mesoLength={mesoLength} setMesoLength={setMesoLength}
-                labAnalysis={linked.labAnalysis}
-                setTab={goTab}
-              />
-            )}
           </div>
         </InfoErrorBoundary>
       )}
