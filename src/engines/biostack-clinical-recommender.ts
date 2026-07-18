@@ -33,6 +33,9 @@ import type { LabCompositeResult } from './lab-analysis.engine';
 
 import { getDrugTzMechanisms, TZ_MECH_LABELS } from '../data/support-db';
 import { SUPPORT_CATALOG_DATA } from '../data/support-database';
+import { getPrioritySubstances, type SeverityLevel } from '../data/lab-priority-map';
+import { SUPPLEMENTS_DB } from '../data/support-db/supplements';
+import { PHARMACY_DB } from '../data/support-db/pharmacy-db';
 
 /* ------------------------------------------------------------------ *
  *  Дефолтное состояние калькулятора (локальная копия, без импорта из UI).
@@ -299,6 +302,14 @@ export interface BuildClinicalStackOpts {
   courseWeek?: number;
   /** принудительный powerLevel (иначе из профиля) */
   powerLevel?: CalculatorState['powerLevel'];
+  /** мульти-выбор органов/систем ТЗ (напр. ['hepatic','cardio']) */
+  filterOrgans?: string[];
+  /** мульти-выбор механизмов ТЗ (напр. ['cv1','liv1']) */
+  filterMechanisms?: string[];
+  /** мульти-выбор лаб-маркеров (напр. ['ALT','CREATININE']) */
+  filterMarkers?: string[];
+  /** уровень доказательности: 'all' | 'A' | 'B' | 'C' (данные ТЗ содержат только A/B/C) */
+  evidenceLevel?: 'all' | 'A' | 'B' | 'C';
 }
 
 export function buildClinicalStack(
@@ -324,10 +335,45 @@ export function buildClinicalStack(
   // 2) Источник истины: движок калькулятора поддержки (канонические дозы + механизмы)
   const plan: PlanResult = runSupportUnified(state);
 
+  // 2a) Фильтры по органам / механизмам / маркерам / доказательности (до клинического шлюза)
+  let candidateIds = plan.substances.map((s) => s.id);
+
+  if (opts.filterMarkers && opts.filterMarkers.length) {
+    const markerSubs = new Set<string>();
+    const SEVERITIES: SeverityLevel[] = ['mild', 'moderate', 'severe'];
+    for (const mk of opts.filterMarkers) {
+      for (const sev of SEVERITIES) {
+        for (const e of getPrioritySubstances(mk, sev)) markerSubs.add(e.substanceId);
+      }
+    }
+    if (markerSubs.size) candidateIds = candidateIds.filter((id) => markerSubs.has(id));
+  }
+
+  if (opts.filterMechanisms && opts.filterMechanisms.length) {
+    candidateIds = candidateIds.filter((id) =>
+      (getDrugTzMechanisms(id) || []).some((m) => opts.filterMechanisms!.includes(m.mechId)),
+    );
+  }
+
+  if (opts.filterOrgans && opts.filterOrgans.length) {
+    candidateIds = candidateIds.filter((id) =>
+      (getDrugTzMechanisms(id) || []).some((m) => opts.filterOrgans!.includes(m.organId)),
+    );
+  }
+
+  if (opts.evidenceLevel && opts.evidenceLevel !== 'all') {
+    const allowed = opts.evidenceLevel;
+    candidateIds = candidateIds.filter((id) => {
+      const entries = [...(SUPPLEMENTS_DB[id] || []), ...(PHARMACY_DB[id] || [])];
+      if (!entries.length) return true; // нет данных доказательности → не отсеиваем
+      return entries.some((e) => e.q === allowed);
+    });
+  }
+
   // 3) Клинический шлюз безопасности (абсолютные противопоказания, ЛС, UL, лаб, редандантность)
   const strategy = opts.strategy ?? 'comprehensive';
   const gate = selectStack(
-    plan.substances.map((s) => s.id),
+    candidateIds,
     profile,
     strategy,
     opts.lab ?? null,

@@ -1,3 +1,52 @@
+## Session Summary (Jul 18) — BioStack clinical build: TZ alignment + мульти-фильтры (органы/механизмы/маркеры/доказательность)
+
+### Goal
+Согласовать клинический подбор БИОСТАК с моделью ТЗ калькулятора поддержки и добавить мульти-выбор фильтров (органы/механизмы/маркеры) + уровень доказательности (A/B/C/all) в движок и UI; собирать и БАДы, и аптечные препараты (pharmacy) по выбранным механизмам.
+
+### ✅ Done и проверено
+- **Движок `biostack-clinical-recommender.ts`:**
+  - Импорты добавлены: `getPrioritySubstances` + `type SeverityLevel` (../data/lab-priority-map); `SUPPLEMENTS_DB` (../data/support-db/supplements); `PHARMACY_DB` (../data/support-db/pharmacy-db).
+  - `BuildClinicalStackOpts` расширено: `filterOrgans?`, `filterMechanisms?`, `filterMarkers?`, `evidenceLevel?: 'all'|'A'|'B'|'C'`.
+  - Блок фильтрации (2a) ДО `selectStack`: `candidateIds = plan.substances.map(s=>s.id)`, затем intersect по маркерам (через `getPrioritySubstances` по всем 4 severity-уровням), механизмам (через `getDrugTzMechanisms(id).mechId` — читает SUPPLEMENTS+PHARMACY, т.е. ЛЕКАРСТВА тоже попадают), органам (`getDrugTzMechanisms(id).organId`), доказательности (`SUPPLEMENTS_DB[id]`+`PHARMACY_DB[id]` → min `.q === allowed`; нет данных → оставляем). `selectStack` получает `candidateIds`.
+  - esbuild трансформ → OK (NUL 5.2mb, 0 ошибок).
+- **UI `BioStackAIClinicalBuild.tsx`:**
+  - Импорты `TZ_SYSTEM_LABELS`, `TZ_MECH_LABELS` (../../data/support-db).
+  - Модульные списки: `ORGAN_OPTIONS` (из TZ_SYSTEM_LABELS), `MECH_OPTIONS` (из TZ_MECH_LABELS), `MARKER_OPTIONS` (12 лаб-маркеров: ALT/AST/GGT/BILIRUBIN/GLU/HOMOCYSTEINE/CRP/CREATININE/LDL/TRIGLYCERIDES/HCT/D_DIMER).
+  - Компонент `MultiChips` (мульти-тоггл чипсы с цветом).
+  - Состояние: `filterOrgans`, `filterMechanisms`, `filterMarkers`, `evidenceLevel` + тогглы `toggleOrgan/Mechanism/Marker` + `resetFilters`.
+  - Секция мульти-фильтров вставлена между пилюлями стратегии и кнопкой «Собрать клинический стек»: 🫀 Органы/системы (#00e68a), ⚙️ Механизмы ТЗ (#a78bfa), 🧪 Лаб-маркеры (#f59e0b), 📚 Уровень доказательности (#60a5fa, single-select Все/A/B/C) + «✕ Сбросить фильтры».
+  - `onBuild` передаёт новые опции в `buildClinicalStack` (undefined если пусто/Все).
+  - esbuild трансформ → OK (исправлен путь import с `../data/support-db` на `../../data/support-db`).
+- **Лекарства учтены**: мех- и орган-фильтры используют `getDrugTzMechanisms`, который читает и `PHARMACY_DB`; фильтр доказательности читает обе базы. Таким образом аптечные препараты (anastrozole, telmisartan, nebivolol…) проходят отбор наравне с БАДами.
+
+### Key Decisions
+- Модель ТЗ калькулятора поддержки (`support-db`) — единственный источник истины для систем/механизмов (6 систем, 28 механизмов); `TZ_SYSTEM_LABELS`/`TZ_MECH_LABELS` из support-db, НЕ `SYSTEM_LABELS_CATALOG` из support-catalog-data.
+- Маркер-фильтр — отдельный источник (`lab-priority-map.getPrioritySubstances`), не ТЗ.
+- Фильтр доказательности пересекает ВСЕ 4 severity-уровня для маркеров; для evidence оставляет вещества без данных (безопасное поведение, не «перепиливает»).
+- READ-ONLY на support-db (не трогали TZ-константы).
+
+### Critical Context
+- `TzSupportEntry.q` ∈ {A,B,C} (нет В).
+- `getDrugTzMechanisms(id)` → `{mechId, organId, ...}` из SUPPLEMENTS+PHARMACY.
+- `getPrioritySubstances(marker, severity)` → `LabPriorityEntry[]` с `.substanceId`; severity ∈ {mild,moderate,high,critical}.
+- `buildClinicalStack(profile, {strategy, lab, courseWeek, filterOrgans, filterMechanisms, filterMarkers, evidenceLevel})`.
+- `onBuild`: `buildClinicalStack(profile, {strategy, lab: labAnalysis ?? null, courseWeek, filterOrgans, filterMechanisms, filterMarkers, evidenceLevel})`.
+
+### Relevant Files
+- `src/engines/biostack-clinical-recommender.ts` — EDITED: импорты + BuildClinicalStackOpts + блок фильтрации (2a) перед selectStack.
+- `src/ui/components/BioStackAIClinicalBuild.tsx` — EDITED: MultiChips, ORGAN/MECH/MARKER_OPTIONS, состояние фильтров, секция UI, onBuild.
+- `src/data/support-db/index.ts` — TZ_SYSTEM_LABELS, TZ_MECH_LABELS, getDrugTzMechanisms.
+- `src/data/support-db/supplements.ts` — SUPPLEMENTS_DB; `src/data/support-db/pharmacy-db.ts` — PHARMACY_DB.
+- `src/data/lab-priority-map.ts` — getPrioritySubstances, SeverityLevel.
+- `src/engines/biostack-clinical-v2.engine.ts` — selectStack, StackStrategy.
+
+### Остаётся
+- Полный `tsc --noEmit` / `vite build` не запускался (медленно в этом окружении; проверено esbuild-трансформом обоих файлов — 0 ошибок).
+- Визуальная проверка в браузере: мульти-выбор чипсов, применение фильтров к результату.
+- Опционально: показать применённые фильтры чипсами в блоке результата (прозрачность).
+
+---
+
 ## Session Summary (Jul 17 — Part 4) — BioStack: fixMeaningfulReplacement + удаление marker-плейсхолдеров
 
 ### Goal

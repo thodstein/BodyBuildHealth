@@ -288,7 +288,7 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     proteinSolid: limitPoolByVariety(pSolid.length > 0 ? pSolid : anyProtein, 10001),
     proteinFatty: limitPoolByVariety(pFatty.length > 0 ? pFatty : anyProtein, 10003),
     proteinLean: limitPoolByVariety(pLean.length > 0 ? pLean : anyProtein, 10005),
-    fastProtein: FOOD_DB.filter(f => !excludedIds.has(f.id) && (f.id === 'whey_isolate' || f.id === 'whey_concentrate' || f.id === 'whey_protein' || f.id === 'egg_white')),
+    fastProtein: FOOD_DB.filter(f => !excludedIds.has(f.id) && (f.id === 'whey_isolate' || f.id === 'whey_concentrate' || f.id === 'whey_protein' || f.id === 'egg_white' || f.id === 'supp_pea_protein' || f.id === 'supp_soy_isolate' || f.id === 'supp_rice_protein')),
     slowProtein: FOOD_DB.filter(f => !excludedIds.has(f.id) && (f.id === 'casein' || f.id === 'casein_micellar' || f.id === 'cottage_cheese_5' || f.id === 'yogurt_greek')),
     carbSlow: limitPoolByVariety(cSlowBud.length > 0 ? cSlowBud : cSlowRaw.length > 0 ? cSlowRaw : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15), 10011),
     carbFast: limitPoolByVariety(cFastBud.length > 0 ? cFastBud : cFastRaw.length > 0 ? cFastRaw : cFruitBud.length > 0 ? cFruitBud : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15), 10013),
@@ -319,6 +319,7 @@ function buildWholeMeal(
     seed: number;
     includeVeg: boolean;
     includeFruit?: boolean;
+    isVegetarian?: boolean;
     rationales: string[];
     preferredIds?: Set<string>;
     lockedIds?: Set<string>;
@@ -326,7 +327,7 @@ function buildWholeMeal(
     vegColorIdx?: number; // which VEG_COLOR_GROUPS to prefer
   }
 ): Meal {
-  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, rationales, preferredIds, lockedIds, recentIds, vegColorIdx } = params;
+  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds, lockedIds, recentIds, vegColorIdx } = params;
   const items: MealItem[] = [];
   let remP = proteinG, remC = carbG, remF = fatG;
 
@@ -427,7 +428,9 @@ function buildWholeMeal(
         const curP = items.reduce((s, i) => s + i.p, 0);
         const curLeu = items.reduce((s, i) => s + (i.leucine_mg || 0), 0);
         if (curP < 25 && curLeu < LEU_THRESHOLD_MG && pool.fastProtein.length > 0) {
-          const whey = pool.fastProtein.find(f => f.id === 'whey_isolate') ?? pool.fastProtein.find(f => f.id === 'whey_concentrate') ?? pool.fastProtein[0];
+          const whey = isVegetarian
+      ? (pool.fastProtein.find(f => f.id === 'supp_pea_protein') ?? pool.fastProtein.find(f => f.id === 'supp_soy_isolate') ?? pool.fastProtein.find(f => f.id === 'supp_rice_protein') ?? pool.fastProtein[0])
+      : (pool.fastProtein.find(f => f.id === 'whey_isolate') ?? pool.fastProtein.find(f => f.id === 'whey_concentrate') ?? pool.fastProtein[0]);
           const needLeu = LEU_THRESHOLD_MG - curLeu;
           const wheyLeuPer100 = getLeucine(whey);
           const wheyGramsRaw = Math.round(needLeu / Math.max(1, wheyLeuPer100) * 100);
@@ -499,8 +502,11 @@ function buildPostWorkout(
   preferredIds?: Set<string>,
   opts?: { lockedIds?: Set<string>; recentIds?: Set<string> },
   carbG: number = POSTW_FAST_CARB_G,
+  isVegetarian: boolean = false,
 ): Meal {
-  const fastProtein = pool.fastProtein.find(f => f.id === 'whey_isolate') ?? pool.fastProtein.find(f => f.id === 'whey_concentrate') ?? pool.fastProtein.find(f => f.id === 'whey_protein') ?? pool.fastProtein[0];
+    const fastProtein = isVegetarian
+      ? (pool.fastProtein.find(f => f.id === 'supp_pea_protein') ?? pool.fastProtein.find(f => f.id === 'supp_soy_isolate') ?? pool.fastProtein.find(f => f.id === 'supp_rice_protein') ?? pool.fastProtein[0])
+      : (pool.fastProtein.find(f => f.id === 'whey_isolate') ?? pool.fastProtein.find(f => f.id === 'whey_concentrate') ?? pool.fastProtein.find(f => f.id === 'whey_protein') ?? pool.fastProtein[0]);
   const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbFast.filter(f => preferredIds.has(f.id)) : [];
   const fastCarb = pickPriority(prefCarb.length > 0 ? prefCarb : pool.carbFast, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds });
   const items: MealItem[] = [];
@@ -561,7 +567,7 @@ function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof build
   const caseinIdx = Math.floor(seededRandom(seed) * caseinPool.length) % caseinPool.length;
   const caseinSource = caseinPool[caseinIdx] || caseinPool[0];
   const items: MealItem[] = [];
-  const targetP = Math.max(30, Math.min(45, residualP));
+  const targetP = residualP <= 0 ? 0 : Math.max(20, Math.min(45, residualP));
   if (caseinSource) {
     // Д-1: casein powder protein% is low (~22/100), so supplement-capped grams may not reach the 30-45g night MPS target.
     // Use whole dairy (cottage cheese / greek yogurt) as a second slow-protein source to fill the gap.
@@ -593,13 +599,17 @@ function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof build
   }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
   void seed;
   return {
-    label: '🌙 Pre-sleep', time, items, totals, type: 'presleep', target: { p: Math.max(30, Math.min(45, residualP)), c: 0, f: 0 },
-    rationale: [
+    label: '🌙 Pre-sleep', time, items, totals, type: 'presleep', target: { p: targetP, c: 0, f: 0 },
+    rationale: targetP > 0 ? [
       'Казеин 30–40 г — медленный белок, ночная защита от катаболизма (6–8 ч)',
       'Mg (тыквенные семечки) 150 мг — релаксация мышц и нервной системы',
       'Киви/вишня — серотонин + антиоксиданты (+42% качество сна)',
+    ] : [
+      'Дневной белок достигнут — казеин не добавлен (без перебора белка)',
+      'Mg (тыквенные семечки) 150 мг — релаксация мышц и нервной системы',
+      'Киви/вишня — серотонин + антиоксиданты (+42% качество сна)',
     ],
-    mpsCheck: { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg) / 1000, triggers_mTOR: false },
+    mpsCheck: { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg) / 1000, triggers_mTOR: totals.leucine_mg >= 2500 && totals.p >= 25 },
   };
 }
 
@@ -696,7 +706,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const _floorCarbG = Math.max(50, Math.round(CARB_FLOOR_G * ptm.cMult));
   const _minKcal = Math.round(_goalP * 4 + _floorFatG * 9 + _floorCarbG * 4);
   const impossibleGoal = input.goalKcal < _minKcal * 0.9;
-  const fatFloorG = impossibleGoal ? Math.round(input.weightKg * 0.5) : _floorFatG;   // 0.5 g/kg floor on hard cut
+  const fatFloorG = impossibleGoal ? Math.round(input.weightKg * (input.sex === 'female' ? 0.6 : 0.5)) : _floorFatG;   // higher fat floor for women on hard cut
   const carbFloorG = impossibleGoal ? 50 : _floorCarbG;                                // ketogenic-ish floor on hard cut
   const carbsTotal = Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG);
   // Д-2: Peri-workout carbs must SCALE with the daily carb budget (not hardcoded 40/60g),
@@ -711,20 +721,21 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const trainCarbDinner = Math.round(carbsTotal * 0.19);
   const restCarbDinner = Math.round(carbsTotal * 0.30);
   // Pre/post carb targets scale with carbsTotal; floors keep them meaningful on low-carb days.
-  const prewCarbG = trainWindow ? Math.max(PREW_CARB_SLOW_G, Math.round(carbsTotal * 0.20)) : PREW_CARB_SLOW_G;
-  const postwCarbG = trainWindow ? Math.max(POSTW_FAST_CARB_G, Math.round(carbsTotal * 0.25)) : POSTW_FAST_CARB_G;
+  const lowCarbDay = (ptm.cMult ?? 1) < 0.4;
+  const prewCarbG = trainWindow ? (lowCarbDay ? Math.round(carbsTotal * 0.10) : Math.max(PREW_CARB_SLOW_G, Math.round(carbsTotal * 0.20))) : PREW_CARB_SLOW_G;
+  const postwCarbG = trainWindow ? (lowCarbDay ? Math.round(carbsTotal * 0.10) : Math.max(POSTW_FAST_CARB_G, Math.round(carbsTotal * 0.25))) : POSTW_FAST_CARB_G;
   const fatTotal = Math.max(fatFloorG, adjustedFatG || input.goalFatG);
 
   // P1.4: Snack on non-training days to fill MPS gap (lunch 12:30 → dinner 19:00 = 6.5h)
   const snackP = Math.max(15, Math.round(mpsPerMeal * 0.6));
   const snackC = Math.round(carbsTotal * 0.10);
   const snackF = Math.round(fatTotal * 0.10);
-  const hasSnack = !trainWindow && input.mealsCount >= 4;
+  const hasSnack = !trainWindow && input.mealsCount >= 3;
 
   const mealBudget = {
-    breakfast: { p: Math.max(30, Math.round(mpsPerMeal * 1.2)), c: breakC, f: Math.round(fatTotal * 0.20) },
-    lunch: { p: Math.max(30, Math.round(mpsPerMeal * 1.2)), c: (input.eveningLowCarb ? Math.round((trainWindow ? trainCarbLunch : restCarbLunch) * 1.3) : (trainWindow ? trainCarbLunch : restCarbLunch)), f: Math.round(fatTotal * 0.15) },
-    dinner: { p: Math.max(30, Math.round(mpsPerMeal * 1.2)), c: input.eveningLowCarb ? Math.round((trainWindow ? trainCarbDinner : restCarbDinner) * 0.5) : (trainWindow ? trainCarbDinner : restCarbDinner), f: Math.round(fatTotal * 0.22) },
+    breakfast: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: breakC, f: Math.round(fatTotal * 0.20) },
+    lunch: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: (input.eveningLowCarb ? Math.round((trainWindow ? trainCarbLunch : restCarbLunch) * 1.3) : (trainWindow ? trainCarbLunch : restCarbLunch)), f: Math.round(fatTotal * 0.15) },
+    dinner: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: input.eveningLowCarb ? Math.round((trainWindow ? trainCarbDinner : restCarbDinner) * 0.5) : (trainWindow ? trainCarbDinner : restCarbDinner), f: Math.round(fatTotal * 0.22) },
     prew: trainWindow ? { p: PREW_PROTEIN_G, c: prewCarbG, f: PREW_FAT_MAX_G } : null,
     postw: trainWindow ? { p: POSTW_FAST_PROTEIN_G, c: postwCarbG, f: 0 } : null,
     snack: hasSnack ? { p: snackP, c: snackC, f: snackF } : null,
@@ -732,7 +743,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   const usedP = mealBudget.breakfast.p + mealBudget.lunch.p + mealBudget.dinner.p + (mealBudget.prew?.p || 0) + (mealBudget.postw?.p || 0) + (mealBudget.snack?.p || 0);
   const usedC = mealBudget.breakfast.c + mealBudget.lunch.c + mealBudget.dinner.c + (mealBudget.prew?.c || 0) + (mealBudget.postw?.c || 0) + (mealBudget.snack?.c || 0);
-  const residualP = Math.max(25, (adjustedProteinG || input.goalProteinG) - usedP);
+  const goalProteinTarget = adjustedProteinG || input.goalProteinG;
+  const residualP = usedP >= goalProteinTarget ? 0 : Math.max(20, goalProteinTarget - usedP);
   const residualC = Math.max(0, carbsTotal - usedC);
   // Distribute any residual carbs proportionally across breakfast/lunch/dinner (not just dinner).
   if (residualC > 0) {
@@ -759,7 +771,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const rotLabels = [...new Set(mealRotations.map(r => r.label))].join(' / ');
   const notes: string[] = [
     `Ротация белка: ${rotLabels} — разные группы в каждый приём`,
-    `MPS per meal: ${Math.max(30, Math.round(mpsPerMeal * 1.2))} г (≈${MPS_LBM_LOW} г/кг LBM), интервал 3–5 ч для синтеза`,
+    `MPS per meal: ${Math.max(20, Math.round(mpsPerMeal * 1.2))} г (≈${MPS_LBM_LOW} г/кг LBM), интервал 3–5 ч для синтеза`,
   ];
 
   // 1. Завтрак — белок + медленные углеводы + жиры + ягоды ─────────────
@@ -944,6 +956,28 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           notes.push('🐟 Омега-3 буст: лосось заменяет белок в обеде (EPA/DHA ~2.2г) — противовоспалительный жир');
         }
       }
+    } else if (!hasOmega3 && input.isVegetarian) {
+      const vegOmega = FOOD_DB.find(f => f.id === 'flaxseed' && !(input.excludedIds||new Set()).has(f.id))
+        || FOOD_DB.find(f => f.id === 'chia_seeds' && !(input.excludedIds||new Set()).has(f.id))
+        || FOOD_DB.find(f => f.id === 'walnuts' && !(input.excludedIds||new Set()).has(f.id));
+      if (vegOmega) {
+        const lunchMeal = meals.find(m => m.type === 'lunch') || meals[1];
+        if (lunchMeal) {
+          const fatIdx = lunchMeal.items.findIndex(it => it.role === 'fat');
+          if (fatIdx >= 0) {
+            const oldItem = lunchMeal.items[fatIdx];
+            const vegGrams = oldItem.amount || 20;
+            lunchMeal.items[fatIdx] = makeItem(vegOmega, vegGrams, 'fat');
+            allFoodsUsed[allFoodsUsed.indexOf(oldItem.id)] = vegOmega.id;
+          } else {
+            lunchMeal.items.push(makeItem(vegOmega, 20, 'fat'));
+            allFoodsUsed.push(vegOmega.id);
+          }
+          lunchMeal.totals = lunchMeal.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+          totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + m.totals.fiber, 0); totals.leucine_mg = meals.reduce((s, m) => s + m.totals.leucine_mg, 0);
+          notes.push('🌱 Омега-3 буст (веган): семена льна заменяют жир в обеде (ALA ~4.5г) — растительный омега-3');
+        }
+      }
     }
   }
   // KBJU fine-tune: if kcal >10% under goal, add fat (capped at fatTotal*1.10).
@@ -1079,7 +1113,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // ─── Atwater kcal: totals.kcal = P*4 + C*4 + F*9 (соответствует макросам) ───
   totals.kcal = Math.round(totals.p * 4 + totals.c * 4 + totals.f * 9);
   meals.forEach(m => { m.totals.kcal = Math.round(m.totals.p * 4 + m.totals.c * 4 + m.totals.f * 9); });
-  const deficiencyClosure = closeFoodDeficiencies(meals, !!input.isVegetarian);
+  const deficiencyClosure = closeFoodDeficiencies(meals, !!input.isVegetarian, input.sex || 'male');
   if (deficiencyClosure.length > 0) notes.push(...deficiencyClosure);
   // P5: Phase-specific nutrition protocol (bodybuilder-specific)
   const phaseNotes: string[] = [];
@@ -1159,7 +1193,7 @@ function getMicroFromFood(food: FoodItem, field: string): number {
 }
 // Д-6: veg-aware. In vegetarian mode, deficiency recommendations use plant/dairy sources,
 // never suggesting meat/fish (salmon/oysters/beef_liver) which the user does not eat.
-function closeFoodDeficiencies(meals: Meal[], isVegetarian = false): string[] {
+function closeFoodDeficiencies(meals: Meal[], isVegetarian = false, sex: 'male'|'female'|'other' = 'male'): string[] {
   const allItems = meals.flatMap(m => m.items.map(it => ({ ...it, food: FOOD_DB.find(f => f.id === it.id) })));
   const totals: Record<string, number> = {};
   allItems.forEach(({ food, amount }) => {
@@ -1171,15 +1205,16 @@ function closeFoodDeficiencies(meals: Meal[], isVegetarian = false): string[] {
   });
   const notes: string[] = [];
   Object.entries(RDA_TARGETS).forEach(([key, cfg]) => {
+    const effRda = key === 'Fe' ? (sex === 'male' ? 8 : 18) : cfg.rda;
     const val = totals[key] || 0;
-    if (val < cfg.rda * 0.6) {
+    if (val < effRda * 0.6) {
       const sourceId = isVegetarian ? (cfg.vegFoodId || cfg.foodId) : cfg.foodId;
       const food = FOOD_DB.find(f => f.id === sourceId) || FOOD_DB.find(f => f.id === cfg.foodId);
       const name = food?.name || cfg.foodId;
-      const pct = Math.round(val / cfg.rda * 100);
+      const pct = Math.round(val / effRda * 100);
       const addG = cfg.foodG;
       const addMg = food ? Math.round(getMicroFromFood(food, key) * addG / 100) : 0;
-      notes.push(`⚠ Дефицит ${key}: ${pct}% RDA (${Math.round(val)}/${cfg.rda} ${cfg.unit}). Добавьте ${name} ${addG} г (ещё ${addMg} ${cfg.unit})`);
+      notes.push(`⚠ Дефицит ${key}: ${pct}% RDA (${Math.round(val)}/${effRda} ${cfg.unit}). Добавьте ${name} ${addG} г (ещё ${addMg} ${cfg.unit})`);
     }
   });
   return notes;

@@ -17,6 +17,7 @@ import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { buildClinicalStack, type ClinicalStackResult } from '../../engines/biostack-clinical-recommender';
 import type { StackStrategy } from '../../engines/biostack-clinical-v2.engine';
 import { showToast, initBioToast } from './BioStackAIConstants';
+import { TZ_SYSTEM_LABELS, TZ_MECH_LABELS } from '../../data/support-db';
 
 interface Props {
   profile: BioStackProfile;
@@ -32,6 +33,61 @@ const STRATEGIES: { id: StackStrategy; label: string }[] = [
   { id: 'budget', label: 'Бюджет' },
 ];
 
+const ORGAN_OPTIONS = Object.entries(TZ_SYSTEM_LABELS).map(([id, label]) => ({ id, label }));
+const MECH_OPTIONS = Object.entries(TZ_MECH_LABELS).map(([id, label]) => ({ id, label }));
+const MARKER_OPTIONS: { id: string; label: string }[] = [
+  { id: 'ALT', label: 'АЛТ (печень)' },
+  { id: 'AST', label: 'АСТ (печень)' },
+  { id: 'GGT', label: 'ГГТ (печень)' },
+  { id: 'BILIRUBIN', label: 'Билирубин' },
+  { id: 'GLU', label: 'Глюкоза' },
+  { id: 'HOMOCYSTEINE', label: 'Гомоцистеин' },
+  { id: 'CRP', label: 'СРБ (воспаление)' },
+  { id: 'CREATININE', label: 'Креатинин (почки)' },
+  { id: 'LDL', label: 'ЛПНП (липиды)' },
+  { id: 'TRIGLYCERIDES', label: 'Триглицериды' },
+  { id: 'HCT', label: 'Гематокрит' },
+  { id: 'D_DIMER', label: 'D-димер' },
+];
+
+function MultiChips({
+  options,
+  selected,
+  onToggle,
+  color,
+}: {
+  options: { id: string; label: string }[];
+  selected: string[];
+  onToggle: (id: string) => void;
+  color: string;
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+      {options.map((o) => {
+        const active = selected.includes(o.id);
+        return (
+          <button
+            key={o.id}
+            onClick={() => onToggle(o.id)}
+            style={{
+              fontSize: 11,
+              padding: '6px 10px',
+              borderRadius: 10,
+              cursor: 'pointer',
+              border: `1px solid ${active ? color : 'rgba(255,255,255,0.12)'}`,
+              background: active ? `${color}22` : 'rgba(255,255,255,0.04)',
+              color: active ? color : 'rgba(255,255,255,0.6)',
+              fontWeight: active ? 700 : 500,
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export const BioStackAIClinicalBuild: React.FC<Props> = ({
   profile,
   setStackIds,
@@ -41,7 +97,24 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
   const [strategy, setStrategy] = useState<StackStrategy>('comprehensive');
   const [result, setResult] = useState<ClinicalStackResult | null>(null);
   const [building, setBuilding] = useState(false);
+  const [filterOrgans, setFilterOrgans] = useState<string[]>([]);
+  const [filterMechanisms, setFilterMechanisms] = useState<string[]>([]);
+  const [filterMarkers, setFilterMarkers] = useState<string[]>([]);
+  const [evidenceLevel, setEvidenceLevel] = useState<'all' | 'A' | 'B' | 'C'>('all');
   initBioToast();
+
+  const toggleOrgan = (id: string) =>
+    setFilterOrgans((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const toggleMechanism = (id: string) =>
+    setFilterMechanisms((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const toggleMarker = (id: string) =>
+    setFilterMarkers((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const resetFilters = () => {
+    setFilterOrgans([]);
+    setFilterMechanisms([]);
+    setFilterMarkers([]);
+    setEvidenceLevel('all');
+  };
 
   // неделя курса из linked (если есть данные фармы)
   const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
@@ -51,11 +124,15 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
     // даём UI перерисоваться
     setTimeout(() => {
       try {
-        const r = buildClinicalStack(profile, {
-          strategy,
-          lab: labAnalysis ?? null,
-          courseWeek: typeof courseWeek === 'number' ? courseWeek : 1,
-        });
+    const r = buildClinicalStack(profile, {
+      strategy,
+      lab: labAnalysis ?? null,
+      courseWeek: typeof courseWeek === 'number' ? courseWeek : 1,
+      filterOrgans: filterOrgans.length ? filterOrgans : undefined,
+      filterMechanisms: filterMechanisms.length ? filterMechanisms : undefined,
+      filterMarkers: filterMarkers.length ? filterMarkers : undefined,
+      evidenceLevel: evidenceLevel !== 'all' ? evidenceLevel : undefined,
+    });
         setResult(r);
       } catch (e: any) {
         showToast('Ошибка подбора: ' + (e?.message || e), 'error');
@@ -100,6 +177,52 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
               {s.label}
             </PillBtn>
           ))}
+        </div>
+
+        {/* ── Мульти-фильтры по модели ТЗ калькулятора поддержки ── */}
+        <div style={{ marginTop:14,display:'flex',flexDirection:'column',gap:14 }}>
+          <div>
+            <div style={{ fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.82)',marginBottom:2 }}>
+              🫀 Органы / системы
+            </div>
+            <MultiChips options={ORGAN_OPTIONS} selected={filterOrgans} onToggle={toggleOrgan} color="#00e68a" />
+          </div>
+          <div>
+            <div style={{ fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.82)',marginBottom:2 }}>
+              ⚙️ Механизмы ТЗ
+            </div>
+            <MultiChips options={MECH_OPTIONS} selected={filterMechanisms} onToggle={toggleMechanism} color="#a78bfa" />
+          </div>
+          <div>
+            <div style={{ fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.82)',marginBottom:2 }}>
+              🧪 Лаб-маркеры
+            </div>
+            <MultiChips options={MARKER_OPTIONS} selected={filterMarkers} onToggle={toggleMarker} color="#f59e0b" />
+          </div>
+          <div>
+            <div style={{ fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.82)',marginBottom:2 }}>
+              📚 Уровень доказательности
+            </div>
+            <MultiChips
+              options={[
+                { id:'all', label:'Все' },
+                { id:'A', label:'A' },
+                { id:'B', label:'B' },
+                { id:'C', label:'C' },
+              ]}
+              selected={[evidenceLevel]}
+              onToggle={(id) => setEvidenceLevel(id as 'all'|'A'|'B'|'C')}
+              color="#60a5fa"
+            />
+          </div>
+          {(filterOrgans.length > 0 || filterMechanisms.length > 0 || filterMarkers.length > 0 || evidenceLevel !== 'all') && (
+            <button onClick={resetFilters} style={{
+              alignSelf:'flex-start',fontSize:11,padding:'4px 10px',borderRadius:8,cursor:'pointer',
+              background:'transparent',border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.5)',
+            }}>
+              ✕ Сбросить фильтры
+            </button>
+          )}
         </div>
 
         <button onClick={onBuild} disabled={building} style={{
