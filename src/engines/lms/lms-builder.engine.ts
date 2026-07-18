@@ -96,7 +96,7 @@ function vrLevelKey(level: string): 'beginner' | 'intermediate' | 'advanced' {
 }
 
 const RU_TO_EN: Record<string, string> = { 'Грудь': 'chest', 'Спина': 'back', 'Ноги': 'legs', 'Плечи': 'shoulders', 'Руки': 'arms', 'Кор': 'core' };
-const SENT_TO_RU: Record<string, string> = { 'ПР': 'Грудь', 'ЖМ': 'Ноги', 'ТГ': 'Спина' };
+const SENT_TO_RU: Record<string, string> = { 'ПР': 'Грудь', 'ЖМ': 'Ноги', 'ТГ': 'Спина', 'ЖИМ': 'Грудь', 'ТЯГА': 'Спина', 'ОФП': 'Кор', 'СФП': 'Кор' };
 const EN_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
 /** focusLift (английский ключ из UI) → русская подстрока для сопоставления с именем упражнения. */
 const FOCUS_RU: Record<string, string> = { squat: 'присед', bench: 'жим', deadlift: 'тяга' };
@@ -193,28 +193,31 @@ function findCatalogExerciseByLabel(label: string): Exercise | null {
   return ex || null;
 }
 
-/** Группа (английский ключ) упражнения по каталогу; fallback — если в каталоге нет. */
+/** Группа (английский ключ) упражнения по каталогу + фолбэк на тег шаблона. */
 function groupOfExercise(name: string, fallback: string): string {
   const ex = EXERCISE_CATALOG.find(e => norm(e.name) === norm(name));
   if (ex?.group) return ex.group as string;
+  // fuzzy match
+  const n = norm(name);
+  const fx = EXERCISE_CATALOG.find(e => {
+    const en = norm(e.name);
+    return en.length > 2 && (en.includes(n) || n.includes(en));
+  });
+  if (fx?.group) return fx.group as string;
   return fallback;
 }
 
 /**
  * Собрать список корректирующих упражнений для слабой точки.
- * Для классических лифтов (bench/squat/deadlift) берём до 4 corrections из lift-diagnostics
- * (биомеханическая диагностика по фазе движения). Для остальных лифтов — assistance из weakpoint-pl.
+ * Упражнения ВСЕГДА из diagnoseWeakPoint (проверенный каталог weakpoint-pl).
+ * diagnoseLift используется только для intensityPct классических лифтов (bench/squat/deadlift).
  */
 function collectPLCorrections(lift: Lift, weakPoint: WeakPoint): { name: string; pct: number }[] {
-  const diag = diagnoseLift(lift, weakPoint);
-  if (diag && diag.corrections.length) {
-    return diag.corrections.map(c => ({ name: c, pct: diag.assistanceIntensityPct }));
-  }
   const base = diagnoseWeakPoint(lift, weakPoint);
-  if (base.assistance.length) {
-    return base.assistance.map(a => ({ name: a, pct: base.intensityPct }));
-  }
-  return [];
+  if (!base.assistance.length) return [];
+  const diag = diagnoseLift(lift, weakPoint);
+  const pct = diag ? diag.assistanceIntensityPct : base.intensityPct;
+  return base.assistance.map(a => ({ name: a, pct }));
 }
 
 export interface PLWeakPointRecommendation {
@@ -224,22 +227,21 @@ export interface PLWeakPointRecommendation {
   pct: number;
 }
 
-/** Рекомендация для UI: какие упражнения и почему включить по диагностике слабой точки. */
+/** Рекомендация для UI: упражнения из проверенного каталога weakpoint-pl, rationale из lift-diagnostics (где доступно). */
 export function getPLWeakPointRecommendations(lift: Lift, weakPoint: WeakPoint): PLWeakPointRecommendation {
   const group = liftToEnGroup(lift);
-  const diag = diagnoseLift(lift, weakPoint);
-  if (diag) {
-    return { corrections: diag.corrections, rationale: diag.biomechanicalReason, group, pct: diag.assistanceIntensityPct };
-  }
   const base = diagnoseWeakPoint(lift, weakPoint);
-  return { corrections: base.assistance, rationale: base.rationale, group, pct: base.intensityPct };
+  const diag = diagnoseLift(lift, weakPoint);
+  const pct = diag ? diag.assistanceIntensityPct : base.intensityPct;
+  const rationale = diag ? diag.biomechanicalReason : base.rationale;
+  return { corrections: base.assistance, rationale, group, pct };
 }
 
 /**
  * Инъекция ассистентных упражнений по диагностике слабой точки СРЦ-движения.
- * Для каждого {lift, weakPoint} подбираем до MAX_CORRECTIONS корректирующих упражнений
- * (из lift-diagnostics для классики, иначе из weakpoint-pl), которые ещё не присутствуют в дне,
- * и добавляем их (3 подхода на %ПМ из диагностики) в день, содержащий основной лифт.
+ * Для каждого {lift, weakPoint} подбираем до MAX_CORRECTIONS упражнений из diagnoseWeakPoint
+ * (проверенный каталог weakpoint-pl), которые ещё не присутствуют в дне,
+ * и добавляем их (3 подхода на %ПМ) в день, содержащий основной лифт.
  * Не дублирует уже назначенные упражнения; соблюдает MRV soft-cap группы.
  */
 function injectPLWeakPoints(
@@ -255,7 +257,14 @@ function injectPLWeakPoints(
   const MAX_CORRECTIONS = 2;
   for (const wp of weakPoints) {
     const mainName = mainNameMap[wp.lift] || 'Жим';
-    let hostDayIdx = days.findIndex(d => d.exercises.some(e => norm(e.name) === norm(mainName)));
+    let hostDayIdx = -1;
+    let maxMainSets = -1;
+    for (let i = 0; i < days.length; i++) {
+      const mainSets = days[i].exercises
+        .filter(e => norm(e.name) === norm(mainName))
+        .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+      if (mainSets > maxMainSets) { maxMainSets = mainSets; hostDayIdx = i; }
+    }
     if (hostDayIdx < 0) hostDayIdx = 0;
     const hostDay = days[hostDayIdx];
     const existing = new Set(hostDay.exercises.map(e => norm(e.name)));
@@ -416,15 +425,17 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       const allWeekNames = new Set(days.flatMap(d => d.exercises.map(e => norm(e.name))));
       for (const wg of input.weakPoints) {
         const candidates = getExercisesByGroup(wg)
-          .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name))
-            && (!input.equipment || input.equipment.length === 0 || (Array.isArray(ex.equipment) ? ex.equipment : [ex.equipment]).some((eq: string) => input.equipment!.includes(eq))));
+          .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name)));
         if (candidates.length === 0) continue;
-        const pick = candidates[0]; // первое подходящее изолирующее
+        const pick = candidates[0];
         // найти день с наименьшим объёмом этой группы
         let bestDay = days[0];
         let bestCnt = Infinity;
         for (const d of days) {
-          const cnt = d.exercises.filter(e => groupOfExercise(e.name, '') === wg)
+          const cnt = d.exercises.filter(e => {
+            const g = groupOfExercise(e.name, exEnGroup(e.group) || '');
+            return g === wg;
+          })
             .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
           if (cnt < bestCnt) { bestCnt = cnt; bestDay = d; }
         }
