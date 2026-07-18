@@ -21,8 +21,7 @@ import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
   import { ClinicalPanel } from '../screens/SupplementClinicScreen_parts/ClinicalPanel';
   import { DrugCheckTab } from './BioStackAIDrugCheck';
   import { ExportTab } from './BioStackAIExport';
-  import { BioStackAIClinicalBuild } from './BioStackAIClinicalBuild';
-
+  
 const BIO_TAB_KEY = 'he_biostack_tab';
 const BIO_SUBTAB_KEY = 'he_biostack_subtab';
 
@@ -138,9 +137,6 @@ export const BioStackAIScreen: React.FC = () => {
       case 'select':
         if (activeSub === 'build') return <BuildTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} labAnalysis={labAnalysis} linked={linked} />;
         if (activeSub === 'complexes') return <ComplexTab stackIds={stackIds} setStackIds={setStackIdsAndSync} />;
-        if (activeSub === 'clinical') return (
-          <BioStackAIClinicalBuild profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} labAnalysis={labAnalysis} linked={linked} />
-        );
         if (activeSub === 'analog') return <BioStackAIAnalog profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} onToast={(m) => showToast(m, 'info')} />;
         return <SearchTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} />;
 

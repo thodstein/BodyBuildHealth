@@ -96,7 +96,6 @@ export const SUB_TAB_GROUPS: Record<string, { id: string; label: string }[]> = {
     { id: 'analog', label: '🔁 Аналог' },
     { id: 'build', label: '🧩 Сборка' },
     { id: 'complexes', label: '🧪 Комплексы' },
-    { id: 'clinical', label: '🔬 Клин.' },
   ],
   stack: [
     { id: 'mystack', label: '📋 Стек' },
