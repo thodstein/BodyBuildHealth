@@ -150,6 +150,16 @@ export function getBBVolumeLandmarks(plan: BBPlan, level: string, pedMrvMult = 1
 
 // sessionTag -> мышцы (канонические EN-ключи) — импортированы из bb-day-types (FIX-8, единый источник)
 
+/** Проверить, является ли упражнение задней дельтой (rear delt). */
+function isRearDeltExercise(name: string): boolean {
+  return /наклон.*дельт|rear|тяга.*лиц|face.*pull|бабочка|задн.*дельт|обратн.*сведен|обратн.*бабоч/i.test(name || '');
+}
+/** Проверить, является ли день Push/Chest/Shoulders (не Pull/Back). */
+function isPushDayTag(sessionTag: string): boolean {
+  const t = (sessionTag || '').toLowerCase();
+  return t.includes('push') || t === 'chest' || (t.includes('shoulders') && !t.includes('pull'));
+}
+
 /** Для каких мышц в BB-контексте ВСЕГДА брать только изоляцию (нет compound аналогов). */
 const ALWAYS_ISOLATION: Set<string> = new Set(['calves', 'forearms', 'abs']);
 /**
@@ -495,20 +505,37 @@ function buildSession(
     const pct = PCT_FOR_RIR[rir] ?? 0.9;
     let weight = Math.round(wm * phaseCfg.intensityMultiplier * pct * 10) / 10;
     const accessoryCount = ACCESSORY_2X_GROUPS.has(muscle) ? 2 : 1;
+    // exerciseCount зависит от уровня И PED — на курсе больше тяжёлых compounds.
+    // enhanced (PED MRV×1.5+): primary 4-5, intermediate: 3, beginner: 2.
+    // PED boost: +1 compound при MRV×1.3+, +2 при ×1.5+.
+    // Кап: chest/back/quads max 4 (5+ — перебор, бюджет не остаётся на arms/shoulders).
+    const pedBoost = pedAdapt ? Math.max(0, Math.round((pedAdapt.combinedMrvMultiplier - 1.0) / 0.2)) : 0;
+    const levelBase = level === 'beginner' ? 1 : level === 'intermediate' ? 0 : 1;
+    const primaryBase = ['back', 'quads', 'chest', 'shoulders'].includes(muscle) ? 3 : 2;
     const exerciseCount = role === 'primary'
-      ? (['back', 'quads', 'chest', 'shoulders'].includes(muscle) ? 3 : 2)
-      : accessoryCount;
-    const selType = ALWAYS_ISOLATION.has(muscle) ? 'isolation' : (role === 'primary' ? 'compound' : 'isolation');
+      ? Math.min(4, primaryBase + levelBase + pedBoost)
+      : Math.min(3, accessoryCount + Math.floor(pedBoost / 2) + (['triceps', 'biceps', 'shoulders'].includes(muscle) ? 1 : 0));
+    // selType: primary → compound; accessory → isolation (но на enhanced/курсе —
+    // accessory может быть compound для большего механического натяжения).
+    // triceps/biceps в Push/Pull-днях могут получить compound (жим узким хватом,
+    // подтягивания обратным хватом) при PED MRV×1.3+.
+    const allowAccessoryCompound = pedAdapt ? pedAdapt.combinedMrvMultiplier >= 1.3 : false;
+    const selType = ALWAYS_ISOLATION.has(muscle) ? 'isolation'
+      : (role === 'primary' ? 'compound' : (allowAccessoryCompound && (muscle === 'triceps' || muscle === 'biceps' || muscle === 'back') ? 'compound' : 'isolation'));
     // Корень фикса: пул строится по ИСТИННОЙ мышце упражнения (movementPattern +
     // targetMuscle), а не по композитной группе каталога. Это устраняет
     // неверную атрибуцию (leg curl → «calves», farmer walk → «biceps»,
     // good morning → «quads») и исключает ПЛ-движения (carry/hinge/становая).
     const roleMuscles = musclesForRole(repKey);
+    // Определить тип дня — для фильтрации rear delt (не нужна в Push/Chest-днях)
+    const pushDay = isPushDayTag(sched.sessionTag || '');
     let pool = EXERCISE_CATALOG.filter((ex: any) => {
       const tm = trueMuscleOf(ex);
       if (tm === null || !roleMuscles.includes(tm)) return false;
       // BB-junk фильтр: реабилитация/кор-стабильность/изометрика не для гипертрофии
       if (isBBJunk(ex)) return false;
+      // Rear delt НЕ в Push/Chest/Shoulders-днях (только в Pull/Back)
+      if (pushDay && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
       // Equipment hard filter: если указано оборудование — исключить упражнения без него
       if (equipmentList.length > 0) {
         const rawEq = ex.equipment;
@@ -560,23 +587,59 @@ function buildSession(
       if (s.selectionRationale?.length) rationaleMap.set(s.name, s.selectionRationale.join('; '));
     }
 
-    // Shoulders diversity: принудительно 1 жим (front) + 1 махи (mid) + 1 задняя (rear)
+    // Shoulders diversity: принудительно 1 жим (front) + 1 махи (mid) + опционально задняя (rear).
+    // Rear delt — ТОЛЬКО в Pull/Back-днях (где она естественно работает со спиной).
+    // В Push/Chest/Shoulders-днях — только press + lateral (mid delt), без rear.
     // СМЕЩЕНИЕ: разное упражнение из каждого пучка для разных сессий/недель
-    if (muscle === 'shoulders' && exerciseCount >= 3 && pool.length >= 3) {
+    if (muscle === 'shoulders' && exerciseCount >= 2 && pool.length >= 2) {
       const isPress = (e: any) => /жим|press|армей|overhead/i.test(e.name || '');
       const isLateral = (e: any) => /мах|подъем|отведение|lateral|raise|side/i.test(e.name || '');
-      const isRear = (e: any) => /наклон|rear|тяга.*лиц|face.*pull|бабочка/i.test(e.name || '');
+      const isRear = (e: any) => isRearDeltExercise(e.name || '');
+      // Rear delt только в Pull/Back-днях
+      const tag = (sched.sessionTag || '').toLowerCase();
+      const allowRear = tag.includes('pull') || tag.includes('back') || tag === 'back';
       const presses = pool.filter(e => isPress(e) && !isLateral(e) && !isRear(e) && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name));
       const laterals = pool.filter(e => isLateral(e) && !isPress(e) && !isRear(e) && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name));
-      const rears = pool.filter(e => isRear(e) && !isPress(e) && !isLateral(e) && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name));
+      const rears = allowRear ? pool.filter(e => isRear(e) && !isPress(e) && !isLateral(e) && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name)) : [];
       const diverse: any[] = [];
-      if (presses.length > 0) { const p = (week*31+dayInRotation*17)%presses.length; diverse.push(presses[p]); sessionSelectedIds.push(presses[p].id); sessionSelectedNames.push(presses[p].name); }
-      if (laterals.length > 0) { const p = (week*31+dayInRotation*17+7)%laterals.length; diverse.push(laterals[p]); sessionSelectedIds.push(laterals[p].id); sessionSelectedNames.push(laterals[p].name); }
-      if (rears.length > 0) { const p = (week*31+dayInRotation*17+13)%rears.length; diverse.push(rears[p]); sessionSelectedIds.push(rears[p].id); sessionSelectedNames.push(rears[p].name); }
-      // Добрать до exerciseCount если не хватило
+      // Press (front delt) — 1-2 упражнения если primary
+      if (presses.length > 0) {
+        const p1 = (week*31+dayInRotation*17) % presses.length;
+        diverse.push(presses[p1]); sessionSelectedIds.push(presses[p1].id); sessionSelectedNames.push(presses[p1].name);
+        // На enhanced — 2 жима (разные углы)
+        if (exerciseCount >= 4 && presses.length > 1) {
+          const p2 = (p1 + 1 + Math.floor(presses.length / 2)) % presses.length;
+          if (presses[p2] && !diverse.some(d => d.id === presses[p2].id)) {
+            diverse.push(presses[p2]); sessionSelectedIds.push(presses[p2].id); sessionSelectedNames.push(presses[p2].name);
+          }
+        }
+      }
+      // Lateral (mid delt) — 1-2 упражнения (всегда, mid delt нужна во всех днях плеч)
+      if (laterals.length > 0) {
+        const l1 = (week*31+dayInRotation*17+7) % laterals.length;
+        diverse.push(laterals[l1]); sessionSelectedIds.push(laterals[l1].id); sessionSelectedNames.push(laterals[l1].name);
+        // На enhanced — 2 маха (разные углы/снаряды)
+        if (exerciseCount >= 4 && laterals.length > 1) {
+          const l2 = (l1 + 2) % laterals.length;
+          if (laterals[l2] && !diverse.some(d => d.id === laterals[l2].id)) {
+            diverse.push(laterals[l2]); sessionSelectedIds.push(laterals[l2].id); sessionSelectedNames.push(laterals[l2].name);
+          }
+        }
+      }
+      // Rear delt — только в Pull/Back
+      if (allowRear && rears.length > 0) {
+        const r1 = (week*31+dayInRotation*17+13) % rears.length;
+        diverse.push(rears[r1]); sessionSelectedIds.push(rears[r1].id); sessionSelectedNames.push(rears[r1].name);
+      }
+      // Добрать до exerciseCount если не хватило.
+      // ВАЖНО: в Push/Chest-днях исключаем rear delt (она тренируется в Pull-дне).
       for (const e of pool) {
         if (diverse.length >= exerciseCount) break;
-        if (!diverse.some(d => d.id === e.id) && !sessionSelectedIds.includes(e.id)) { diverse.push(e); sessionSelectedIds.push(e.id); sessionSelectedNames.push(e.name); }
+        if (!diverse.some(d => d.id === e.id) && !sessionSelectedIds.includes(e.id)) {
+          // Запрет rear delt в не-Pull-днях
+          if (!allowRear && isRear(e)) continue;
+          diverse.push(e); sessionSelectedIds.push(e.id); sessionSelectedNames.push(e.name);
+        }
       }
       if (diverse.length >= exerciseCount) {
         exDatas = diverse.slice(0, exerciseCount);
@@ -781,8 +844,9 @@ function buildSession(
     const muscleBudget = totalExpectedFatigue > 0
       ? Math.floor(dayFatigueBudget * pl.exerciseCount * Math.max(1, Math.round(pl.sets / pl.exerciseCount)) * ((pl.exDatas[0] as any)?.fatigueCost || 5) / totalExpectedFatigue)
       : Math.floor(dayFatigueBudget / Math.max(1, plans.length));
-    // Solo-дни (1-2 мышцы): 90% бюджета; multi-дни: 50% (анти-хогинг)
-    const budgetCapPct = plans.length <= 2 ? 0.90 : 0.50;
+    // Solo-дни (1-2 мышцы): 90% бюджета; multi-дни: 60% (70% на PED — больше recovery).
+    // Раньше 50% → chest исчерпывал бюджет, triceps/shoulders получали 1 упражнение.
+    const budgetCapPct = plans.length <= 2 ? 0.90 : (pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 0.70 : 0.60);
     let remainingBudget = Math.max(1, Math.min(muscleBudget, Math.floor(dayFatigueBudget * budgetCapPct)));
     
     for (const exData of pl.exDatas) {
@@ -1081,6 +1145,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           if (raw !== wm && mg !== wm) return false;
           if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
           if (isBBJunk(e)) return false;
+          // Rear delt НЕ в Push/Chest-днях (только в Pull/Back)
+          if (isPushDayTag(s.sessionTag || '') && isRearDeltExercise(e.name)) return false;
           return true;
         });
         if (!feederPool.length) continue;
@@ -1132,6 +1198,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           if (raw !== pm && mg !== pm) return false;
           if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
           if (isBBJunk(e)) return false;
+          // Rear delt НЕ в Push/Chest-днях (только в Pull/Back)
+          if (isPushDayTag(s.sessionTag || '') && isRearDeltExercise(e.name)) return false;
           return true;
         });
         if (!pumpPool.length) continue;
