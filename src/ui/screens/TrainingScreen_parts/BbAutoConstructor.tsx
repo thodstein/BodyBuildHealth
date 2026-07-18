@@ -48,6 +48,7 @@ import { DayCard, ExerciseRow, PhaseBanner, WeekStrip, PHASE_COLORS, PHASE_LABEL
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
 import { getBBSuggestions } from './bb-compat';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
+import { WhatIfCard } from './WhatIfCard';
 
 type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -1755,6 +1756,15 @@ export const BbAutoConstructor: React.FC = () => {
             />
           </div>
         )}
+
+        {/* What-if прогноз (раскрывающаяся секция) */}
+        <ExpandableCard title="🔮 What-if прогноз (что если изменить параметры)" icon="🔮"
+          short="Δ калории / Δ сон / AAS множитель → прогноз риска и готовности"
+          full={
+            <WhatIfCard baseRisk={quality?.score ? 100 - quality.score : 20} baseReadiness={Math.round((linked.readiness?.recovery ?? 80))} />
+          }
+        />
+
         <div style={{ display:'flex', gap:8, marginTop:10 }}>
           <button style={{ ...BTN, flex:1 }} onClick={() => setStep('adjust')}>Далее: ручная коррекция →</button>
           <button style={BTN_GHOST} onClick={() => setStep('plan')}>← Назад</button>
