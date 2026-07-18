@@ -151,7 +151,7 @@ export function getBBVolumeLandmarks(plan: BBPlan, level: string, pedMrvMult = 1
 // sessionTag -> мышцы (канонические EN-ключи) — импортированы из bb-day-types (FIX-8, единый источник)
 
 /** Проверить, является ли упражнение задней дельтой (rear delt). */
-function isRearDeltExercise(name: string): boolean {
+export function isRearDeltExercise(name: string): boolean {
   return /наклон.*дельт|rear|тяга.*лиц|face.*pull|бабочка|задн.*дельт|обратн.*сведен|обратн.*бабоч/i.test(name || '');
 }
 /** Проверить, является ли день Push/Chest/Shoulders (не Pull/Back). */

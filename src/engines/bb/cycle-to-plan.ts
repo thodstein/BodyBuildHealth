@@ -7,6 +7,7 @@
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec, SRDirection, SRLevel, SRPeriod } from '../../data/lms-cycles/lms-types';
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
 import { getBBVolumeLandmarks } from './bb-builder.engine';
+import { isRearDeltExercise } from './bb-builder.engine';
 import { PCT_FOR_RIR } from '../rir-table';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
@@ -442,6 +443,13 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         // JUNK-фильтр: проверить trueMuscleOf — пропустить если null (hinge/carry/junk)
         const catCheck = EXERCISE_CATALOG.find(e => e.name === bbExName);
         if (catCheck && trueMuscleOf(catCheck) === null) return null as any;
+        // Rear delt фильтр: не ставить rear delt в Push/Chest/Shoulders-дни
+        const _tag = (daySpec as any)._sessionTag || '';
+        const sessionTagLower = _tag.toLowerCase() || muscleGroupFromExName(bbExName, EXERCISE_CATALOG).toLowerCase();
+        // Определить тип дня по упражнениям в дне
+        const dayMuscles = daySpec.exercises.map(ex => muscleGroupFromExName(ex.name, EXERCISE_CATALOG));
+        const isPushDay = dayMuscles.includes('chest') && !dayMuscles.includes('back');
+        if (isPushDay && isRearDeltExercise(bbExName)) return null as any;
         const bbExGroup = bbReplaced.group;
         // Проверка: исключённое упражнение (по ID, имени или partial-match) → замена
         let finalExName = bbExName;
@@ -535,8 +543,27 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         };
         return ex;
       }).filter(Boolean) as BBExercise[];
-      // Сортировка: primary первыми, accessory после
-      exercises.sort((a, b) => (a.role === 'primary' ? -1 : 1) - (b.role === 'primary' ? -1 : 1));
+      // Сортировка: primary первыми, accessory после.
+      // Внутри каждой группы — по strengthRank (barbell > dumbbell > machine > cable > one-arm).
+      const cycleStrengthRank = (ex: BBExercise): number => {
+        const cat = EXERCISE_CATALOG.find(e => e.name === ex.name);
+        if (!cat) return 5;
+        const n = (ex.name || '').toLowerCase();
+        const eq = String(cat.equipment || '').toLowerCase();
+        if (/одной рукой|одной руке|single.?arm|unilateral/i.test(n)) return 7;
+        if (cat.type !== 'compound') return 6;
+        if (eq.includes('barbell') || eq.includes('smith')) return 1;
+        if (eq.includes('dumbbell')) return 2;
+        if (eq.includes('machine')) return 3;
+        if (eq.includes('cable')) return 4;
+        if (eq.includes('bodyweight') || eq.includes('suspension')) return 5;
+        return 5;
+      };
+      exercises.sort((a, b) => {
+        const roleDiff = (a.role === 'primary' ? -1 : 1) - (b.role === 'primary' ? -1 : 1);
+        if (roleDiff !== 0) return roleDiff;
+        return cycleStrengthRank(a) - cycleStrengthRank(b);
+      });
 
       // Determine session character from exercises
       const hasHeavy = exercises.some(e => e.character === 'тяж');
