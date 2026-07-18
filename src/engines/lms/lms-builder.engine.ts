@@ -415,8 +415,9 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     if (input.weakPoints && input.weakPoints.length) {
       const allWeekNames = new Set(days.flatMap(d => d.exercises.map(e => norm(e.name))));
       for (const wg of input.weakPoints) {
-        const candidates = getExercisesByGroup(wg, 20, input.equipment)
-          .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name)));
+        const candidates = getExercisesByGroup(wg)
+          .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name))
+            && (!input.equipment || input.equipment.length === 0 || (Array.isArray(ex.equipment) ? ex.equipment : [ex.equipment]).some((eq: string) => input.equipment!.includes(eq))));
         if (candidates.length === 0) continue;
         const pick = candidates[0]; // первое подходящее изолирующее
         // найти день с наименьшим объёмом этой группы
