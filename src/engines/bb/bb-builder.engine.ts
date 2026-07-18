@@ -561,21 +561,22 @@ function buildSession(
     }
 
     // Shoulders diversity: принудительно 1 жим (front) + 1 махи (mid) + 1 задняя (rear)
+    // СМЕЩЕНИЕ: разное упражнение из каждого пучка для разных сессий/недель
     if (muscle === 'shoulders' && exerciseCount >= 3 && pool.length >= 3) {
       const isPress = (e: any) => /жим|press|армей|overhead/i.test(e.name || '');
       const isLateral = (e: any) => /мах|подъем|отведение|lateral|raise|side/i.test(e.name || '');
       const isRear = (e: any) => /наклон|rear|тяга.*лиц|face.*pull|бабочка/i.test(e.name || '');
-      const presses = pool.filter(e => isPress(e) && !isLateral(e) && !isRear(e));
-      const laterals = pool.filter(e => isLateral(e) && !isPress(e) && !isRear(e));
-      const rears = pool.filter(e => isRear(e) && !isPress(e) && !isLateral(e));
+      const presses = pool.filter(e => isPress(e) && !isLateral(e) && !isRear(e) && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name));
+      const laterals = pool.filter(e => isLateral(e) && !isPress(e) && !isRear(e) && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name));
+      const rears = pool.filter(e => isRear(e) && !isPress(e) && !isLateral(e) && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name));
       const diverse: any[] = [];
-      if (presses.length > 0) diverse.push(presses[0]);
-      if (laterals.length > 0) diverse.push(laterals[0]);
-      if (rears.length > 0) diverse.push(rears[0]);
+      if (presses.length > 0) { const p = (week*31+dayInRotation*17)%presses.length; diverse.push(presses[p]); sessionSelectedIds.push(presses[p].id); sessionSelectedNames.push(presses[p].name); }
+      if (laterals.length > 0) { const p = (week*31+dayInRotation*17+7)%laterals.length; diverse.push(laterals[p]); sessionSelectedIds.push(laterals[p].id); sessionSelectedNames.push(laterals[p].name); }
+      if (rears.length > 0) { const p = (week*31+dayInRotation*17+13)%rears.length; diverse.push(rears[p]); sessionSelectedIds.push(rears[p].id); sessionSelectedNames.push(rears[p].name); }
       // Добрать до exerciseCount если не хватило
       for (const e of pool) {
         if (diverse.length >= exerciseCount) break;
-        if (!diverse.some(d => d.id === e.id)) diverse.push(e);
+        if (!diverse.some(d => d.id === e.id) && !sessionSelectedIds.includes(e.id)) { diverse.push(e); sessionSelectedIds.push(e.id); sessionSelectedNames.push(e.name); }
       }
       if (diverse.length >= exerciseCount) {
         exDatas = diverse.slice(0, exerciseCount);
@@ -658,28 +659,35 @@ function buildSession(
         const usedIds = new Set<string>();
         // Берём по 1 упражнению из каждого угла, пока не наберём exerciseCount.
         // Учитываем ротацию: исключаем уже использованные (sessionSelectedIds + sessionSelectedNames).
-        for (const ac of classes) {
+        // СМЕЩЕНИЕ: выбираем не всегда candidates[0], а candidates[offset] —
+        // разное упражнение из каждого угла для разных сессий/недель/сплитов.
+        // offset = (week*31 + dayInRotation*17 + classIdx*7) — детерминированный pseudo-random.
+        for (let ci = 0; ci < classes.length; ci++) {
+          const ac = classes[ci];
           if (diverse.length >= exerciseCount) break;
           const candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id)
             && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name));
           if (candidates.length > 0) {
-            // Из кандидатов — взять первое (selectExercisesSmart уже отсортировал по скору)
-            diverse.push(candidates[0]);
-            usedIds.add(candidates[0].id);
-            // Добавить в sessionSelectedIds чтобы следующие мышцы/классы не повторили
-            sessionSelectedIds.push(candidates[0].id);
-            sessionSelectedNames.push(candidates[0].name);
+            const offset = (week * 31 + dayInRotation * 17 + ci * 7) % candidates.length;
+            const pick = candidates[offset];
+            diverse.push(pick);
+            usedIds.add(pick.id);
+            sessionSelectedIds.push(pick.id);
+            sessionSelectedNames.push(pick.name);
           }
         }
         // Fallback: если класс пуст (все исключены ротацией) — взять из класса без фильтра ротации
-        for (const ac of classes) {
+        for (let ci = 0; ci < classes.length; ci++) {
+          const ac = classes[ci];
           if (diverse.length >= exerciseCount) break;
           const candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id));
           if (candidates.length > 0) {
-            diverse.push(candidates[0]);
-            usedIds.add(candidates[0].id);
-            sessionSelectedIds.push(candidates[0].id);
-            sessionSelectedNames.push(candidates[0].name);
+            const offset = (week * 31 + dayInRotation * 17 + ci * 7 + 3) % candidates.length;
+            const pick = candidates[offset];
+            diverse.push(pick);
+            usedIds.add(pick.id);
+            sessionSelectedIds.push(pick.id);
+            sessionSelectedNames.push(pick.name);
           }
         }
         // Добрать из остатка пула, если не набрали
