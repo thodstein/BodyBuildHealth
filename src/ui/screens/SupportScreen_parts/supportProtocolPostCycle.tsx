@@ -32,7 +32,7 @@ export const SupportProtocolPostCycle: React.FC<{ s: Record<string, any> }> = ({
                 </div>
                 <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)' }}>
                   <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>ФАЗА 2 · ПКТ (4-8 нед)</div>
-                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>• SERM (ОДИН из): тамоксифен 20 мг/день ИЛИ энкломифен 12.5-25 мг/день ИЛИ кломифен 25-50 мг/день. Комбинация SERM не рекомендована — одинаковый механизм, ↑ риска побочных эффектов без дополнительной пользы<br/>• Поддержка: цинк 50 мг, Mg 400 мг, D3 5000 МЕ, B6 100 мг<br/>• Адаптогены: ашвагандха 600 мг, фосфатидилсерин 200 мг<br/>• Контроль: T, ЛГ, ФСГ, кортизол каждые 2 нед</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>• SERM (ОДИН из): тамоксифен 20 мг/день ИЛИ энкломифен 12.5-25 мг/день ИЛИ кломифен 25-50 мг/день. Комбинация SERM не рекомендована — одинаковый механизм, ↑ риска побочных эффектов без дополнительной пользы<br/>• Поддержка: цинк 50 мг, Mg 400 мг, D3 2000-4000 МЕ, B6 100 мг<br/>• Адаптогены: ашвагандха 600 мг, фосфатидилсерин 200 мг<br/>• Контроль: T, ЛГ, ФСГ, кортизол каждые 2 нед</div>
                 </div>
                 <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)' }}>
                   <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>ФАЗА 3 · ВОССТАНОВЛЕНИЕ (8-16 нед)</div>

@@ -44,7 +44,12 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
       {protocolView === 'menu' ? (
         <div>
           <div style={{ fontSize:14, fontWeight:800, color:'var(--text-light)', marginBottom:2 }}>📋 Выберите протокол поддержки</div>
-          <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:8, lineHeight:1.3 }}>Доступно протоколов: <b style={{color:'#22c55e'}}>{PROTOCOL_CARDS.length}</b> систем органов. Органные протоколы — фазовая модель (1→4) по лабораторным порогам; справочники (пептиды, инъекции, симптомы) — по показаниям.</div>
+          <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6, lineHeight:1.3 }}>Доступно протоколов: <b style={{color:'#22c55e'}}>{PROTOCOL_CARDS.length}</b> систем органов. Органные протоколы — фазовая модель (1→4) по лабораторным порогам; справочники (пептиды, инъекции, симптомы) — по показаниям.</div>
+          <div style={{ borderRadius:10, padding:'10px 12px', background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.25)', marginBottom:10 }}>
+            <div style={{ fontSize:9, fontWeight:700, color:'#ef4444', lineHeight:1.4 }}>
+              ⚠️ Все протоколы носят ПРИМЕРНЫЙ (ознакомительный) характер. Назначение препаратов, выбор схемы и метода лечения/коррекции — <b>ТОЛЬКО ВРАЧОМ</b>. Самолечение опасно для жизни.
+            </div>
+          </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             {PROTOCOL_CARDS.map(p => (
               <button key={p.id} onClick={() => { setProtocolTab(p.id); setProtocolView('detail'); }}
@@ -81,16 +86,28 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
             background:'var(--bg-secondary)', color:'var(--text-light)', border:'1px solid var(--border)'
           }}>← Назад к списку</button>
 
-          <div style={{ borderRadius:10, padding:10, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)', marginBottom:8 }}>
-            <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.3 }}>
-              <b style={{color:'#f59e0b'}}>⚠️ Информация ознакомительная.</b> Подбор — врачом. Без лаборатории — среднестатистические риски. 💊 = рецептурный, требует врача.
-            </div>
-            <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3, marginTop:4 }}>
-              {isReferenceModule ? (
-                <>Справочник: <b style={{color:'#22c55e'}}>{activeCard?.label ?? protocolTab}</b> · информация по показаниям, не является фазовым протоколом.</>
-              ) : (
-                <>Активный протокол: <b style={{color:'#22c55e'}}>{activeCard?.label ?? protocolTab}</b> · фазовая модель 1→4. Назначайте по лабораторным порогам из карточек выше.</>
-              )}
+          {/* ── ГЛОБАЛЬНЫЙ БАННЕР: ПРИМЕРНЫЕ ПРОТОКОЛЫ, ТОЛЬКО ВРАЧ ── */}
+          <div style={{ borderRadius:12, padding:'14px 16px', background:'rgba(239,68,68,0.08)', border:'2px solid rgba(239,68,68,0.35)', marginBottom:12 }}>
+            <div style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
+              <span style={{ fontSize:22, lineHeight:1, flexShrink:0 }}>⚠️</span>
+              <div>
+                <div style={{ fontSize:12, fontWeight:800, color:'#ef4444', marginBottom:4, lineHeight:1.3 }}>
+                  ВНИМАНИЕ: ПРОТОКОЛЫ НОСЯТ ИСКЛЮЧИТЕЛЬНО ОЗНАКОМИТЕЛЬНЫЙ (ПРИМЕРНЫЙ) ХАРАКТЕР
+                </div>
+                <div style={{ fontSize:10, fontWeight:700, color:'#fca5a5', marginBottom:6, lineHeight:1.4 }}>
+                  Назначение препаратов, выбор схемы и метода лечения/коррекции осуществляется <b style={{color:'#ef4444'}}>ТОЛЬКО ВРАЧОМ</b> на основании очного осмотра, сбора анамнеза и лабораторных данных.
+                </div>
+                <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4, marginBottom:6, padding:'6px 8px', borderRadius:6, background:'rgba(0,0,0,0.2)' }}>
+                  💊 = рецептурный препарат (отпускается по рецепту врача). 🛑 = критические пороги (требуют немедленной коррекции). Без лабораторных данных — расчёт на среднестатистические риски, индивидуальные значения могут отличаться. <b>Самолечение опасно для жизни.</b>
+                </div>
+                <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>
+                  {isReferenceModule ? (
+                    <>Справочник: <b style={{color:'#22c55e'}}>{activeCard?.label ?? protocolTab}</b> · информация по показаниям, не является фазовым протоколом.</>
+                  ) : (
+                    <>Активный протокол: <b style={{color:'#22c55e'}}>{activeCard?.label ?? protocolTab}</b> · фазовая модель 1→4. Назначайте по лабораторным порогам из карточек выше.</>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 

@@ -18,7 +18,7 @@ interface LiftFailureData {
 function phaseForReps(reps: number, lift: Lift): WeakPoint {
   const phases = stickingPhases(lift);
   let cand: WeakPoint;
-  if (reps <= 3) cand = 'lockout';
+  if (reps <= 3) cand = 'bottom';
   else if (reps <= 5) cand = 'mid';
   else cand = lift === 'squat' ? 'bottom' : 'mid';
   if (phases.includes(cand)) return cand;
@@ -33,17 +33,19 @@ function detectFailures(sessions: WorkoutLog[], lift: Lift, aliases: string[]): 
     const en = (e.exerciseName || e.exerciseId || '').toLowerCase();
     if (!aliases.some(a => en.includes(a))) return;
     hasLift = true;
-    (e.sets || []).forEach((s: any) => {
-      const weight = s.weight || 0;
-      const reps = s.reps || 0;
-      const rpe = s.rpe || 0;
-      const e1rm = weight * (1 + reps / 30);
-      if (e1rm > currentMax) currentMax = Math.round(e1rm);
-      // Индикаторы близкого срыва / срыва:
-      //  - RPE ≥ 8 (тяжёлый подход, ≤2 повторений в запасе)
-      //  - явная отметка failed
-      //  - низкие повторы при отсутствии RPE (max-попытка)
-      const isHard = (rpe >= 8 && weight > 0) || (rpe === 0 && reps > 0 && reps <= 2 && weight > 0) || (!!s.failed);
+      (e.sets || []).forEach((s: any) => {
+        const weight = s.weight || 0;
+        const reps = s.reps || 0;
+        // RPE может отсутствовать в логе (поле опционально), но RIR всегда есть.
+        // Конвертируем RIR→RPE (RPE = 10 − RIR), чтобы тяжёлые подходы определялись корректно.
+        const rpe = (s.rpe && s.rpe > 0) ? s.rpe : (s.rir != null ? 10 - s.rir : 0);
+        const e1rm = weight * (1 + reps / 30);
+        if (e1rm > currentMax) currentMax = Math.round(e1rm);
+        // Индикаторы близкого срыва / срыва:
+        //  - RPE ≥ 8 (тяжёлый подход, ≤2 повторений в запасе)
+        //  - явная отметка failed
+        //  - низкие повторы при отсутствии RPE (max-попытка)
+        const isHard = (rpe >= 8 && weight > 0) || (rpe === 0 && reps > 0 && reps <= 2 && weight > 0) || (!!s.failed);
       if (isHard) {
         const phaseHint = phaseForReps(reps, lift);
         failedSets.push({ phaseHint, set: s, exerciseName: e.exerciseName || '' });
@@ -105,7 +107,16 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
     return lifts.map(l => detectFailures(sessions, l, LIFT_ALIASES[l])).filter(Boolean) as LiftFailureData[];
   }, [sessions]);
 
-  if (!analysis.length) return null;
+  if (!analysis.length) return (
+    <div className="card" style={{ padding: '8px 10px', marginBottom: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
+        🔬 Анализ мёртвых точек (sticking points)
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
+        Нет данных по приседу, жиму лёжа или становой тяге. Чтобы рассчитать срывы, выполните эти упражнения через «▶ Проведение тренировки» — тяжёлые подходы (RPE≥8 по данным RIR) будут отмечены автоматически.
+      </div>
+    </div>
+  );
 
   const active = analysis.find(a => a.lift === selectedLift) || analysis[0];
 

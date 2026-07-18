@@ -221,8 +221,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 background: isSelected ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'transparent',
                 color: isSelected ? '#000' : 'rgba(255,255,255,0.6)', fontWeight: isSelected ? 800 : 500,
                 transition:'all 0.15s',
-              }}>
                 border: isSelected ? '2px solid #00e68a' : '1px solid transparent',
+              }}>
                 <span style={{ fontSize:14, fontWeight:700, color: isToday ? '#00e68a' : isSelected ? '#fff' : 'rgba(255,255,255,0.8)', marginTop:1 }}>{new Date(ds).getDate()}</span>
                 {hasData && <div style={{ width:5, height:5, borderRadius:'50%', background:'#00e68a', marginTop:2 }} />}
               </div>
