@@ -586,14 +586,14 @@ function buildSession(
     let weight = Math.round(wm * phaseCfg.intensityMultiplier * pct * 10) / 10;
     const accessoryCount = ACCESSORY_2X_GROUPS.has(muscle) ? 2 : 1;
     // exerciseCount зависит от уровня И PED — на курсе больше тяжёлых compounds.
-    // enhanced (PED MRV×1.5+): primary 4-5, intermediate: 3, beginner: 2.
-    // PED boost: +1 compound при MRV×1.3+, +2 при ×1.5+.
-    // Кап: chest/back/quads max 4 (5+ — перебор, бюджет не остаётся на arms/shoulders).
+    // В multi-днях (Push/Pull с 3+ мышцами) ограничить big muscle primary до 3 —
+    // оставить бюджет для arms. В solo-днях (Chest/Back) — 4 (вся сессия на одну мышцу).
+    const isMultiDay = musclePlans.length > 2;
     const pedBoost = pedAdapt ? Math.max(0, Math.round((pedAdapt.combinedMrvMultiplier - 1.0) / 0.2)) : 0;
     const levelBase = level === 'beginner' ? 1 : level === 'intermediate' ? 0 : 1;
-    const primaryBase = ['back', 'quads', 'chest', 'shoulders'].includes(muscle) ? 3 : 2;
+    const primaryBase = ['back', 'quads', 'chest', 'shoulders'].includes(muscle) ? (isMultiDay ? 3 : 4) : 2;
     const exerciseCount = role === 'primary'
-      ? Math.min(4, primaryBase + levelBase + pedBoost)
+      ? Math.min(isMultiDay ? 3 : 4, primaryBase + levelBase + pedBoost)
       : Math.min(3, accessoryCount + Math.floor(pedBoost / 2) + (['triceps', 'biceps', 'shoulders'].includes(muscle) ? 1 : 0));
     // selType: primary → compound; accessory → isolation (но на enhanced/курсе —
     // accessory может быть compound для большего механического натяжения).
@@ -937,16 +937,27 @@ function buildSession(
       ? Math.floor(dayFatigueBudget * pl.exerciseCount * Math.max(1, Math.round(pl.sets / pl.exerciseCount)) * ((pl.exDatas[0] as any)?.fatigueCost || 5) / totalExpectedFatigue)
       : Math.floor(dayFatigueBudget / Math.max(1, plans.length));
     // Solo-дни (1-2 мышцы): 90% бюджета; multi-дни: 60% (70% на PED — больше recovery).
-    // Раньше 50% → chest исчерпывал бюджет, triceps/shoulders получали 1 упражнение.
     const budgetCapPct = plans.length <= 2 ? 0.90 : (pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 0.70 : 0.60);
     let remainingBudget = Math.max(1, Math.min(muscleBudget, Math.floor(dayFatigueBudget * budgetCapPct)));
+    // Гарантированный минимум для arms/shoulders — на PED нужно минимум 3-4 сета
+    // даже если бюджет мал (chest забирал большую часть). Без этого triceps получает 1 сет.
+    // minBudget = fatigueCost(5) × minSets(3-4) × minExercises(2) = 30-40
+    const isArmMuscle = ['triceps', 'biceps', 'shoulders', 'forearms'].includes(pl.muscle);
+    const minSetsArms = isArmMuscle && pedAdapt && pedAdapt.combinedMrvMultiplier >= 1.3 ? 4 : 3;
+    const minExercisesArms = isArmMuscle && pedAdapt && pedAdapt.combinedMrvMultiplier >= 1.3 ? 2 : 1;
+    const minBudgetForArms = isArmMuscle ? minSetsArms * minExercisesArms * ((pl.exDatas[0] as any)?.fatigueCost || 5) : 0;
+    if (isArmMuscle && remainingBudget < minBudgetForArms) {
+      remainingBudget = minBudgetForArms;
+    }
+    // Для primary больших мышц (chest/back/quads) — ограничить per-exercise sets до 5
+    // чтобы не забирать весь бюджет (7 sets на жим = 35 fatigue = весь день)
     
     for (const exData of pl.exDatas) {
       const wPct = (exData as any).substitutionWeightPct ?? 1.0;
       const vPct = (exData as any).substitutionVolumePct ?? 1.0;
       const isSubstituted = (exData as any).substituted === true;
       const repsCap = (exData as any).repsCap ?? 20;
-      const exSets = Math.max(1, Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct));
+      const exSets = Math.max(1, Math.min(5, Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct)));
       const exWeight = (exData as any)._effWeight ?? pl.weight;
       const finalRir = isSubstituted ? Math.min(pl.rir + 1, 4) : ((exData as any)._deltRir ?? pl.rir);
       const cost = ((exData as any)?.fatigueCost || 5) * exSets;
@@ -996,15 +1007,18 @@ function buildSession(
     }
   }
   // Кап упражнений в сессии: максимум 8 (реалистичная ББ-тренировка 60-75 мин)
-  // ВАЖНО: кап применяется ЗДЕСЬ, но feeder/pump-финишеры добавляются ПОЗЖЕ в buildBBPlan.
+  // Кап упражнений в сессии: зависит от PED (натурал 8, enhanced 12).
   // Финальный кап (с учётом feeders) — в buildBBPlan после добавления feeders.
-  if (exercises.length > 7) {
-    // Сохраняем primary (максимум 5), обрезаем accessory — оставляем место для 1 feeder
-    const kept = exercises.filter(e => e.role === 'primary').slice(0, 5);
+  const exCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 12 : 8;
+  if (exercises.length > exCap) {
+    const kept = exercises.filter(e => e.role === 'primary').slice(0, 7);
     const acc = exercises.filter(e => e.role === 'accessory');
-    const maxAcc = Math.max(0, 7 - kept.length);
+    const maxAcc = Math.max(0, exCap - kept.length);
+    // Гарантировать arms accessory (triceps/biceps) — не обрезать их первыми
+    const armAcc = acc.filter(e => ['triceps', 'biceps', 'forearms'].includes(e.muscle));
+    const otherAcc = acc.filter(e => !['triceps', 'biceps', 'forearms'].includes(e.muscle));
     exercises.length = 0;
-    exercises.push(...kept, ...acc.slice(0, maxAcc));
+    exercises.push(...kept, ...armAcc.slice(0, Math.max(1, Math.floor(maxAcc / 2))), ...otherAcc.slice(0, Math.max(0, maxAcc - Math.max(1, Math.floor(maxAcc / 2)))));
   }
   return { day: dayInRotation, weekOffset: 0, character, sessionTag: sched.sessionTag, exercises };
 }
@@ -1325,13 +1339,16 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       weekSessions.push(sess);
     }
     // Финальный кап упражнений в каждой сессии (с учётом feeder/pump-финишеров)
+    const finalExCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 12 : 8;
     for (const sess of weekSessions) {
-      if (sess.exercises.length > 8) {
-        const kept = sess.exercises.filter(e => e.role === 'primary').slice(0, 5);
+      if (sess.exercises.length > finalExCap) {
+        const kept = sess.exercises.filter(e => e.role === 'primary').slice(0, 7);
         const acc = sess.exercises.filter(e => e.role === 'accessory');
-        const maxAcc = Math.max(0, 8 - kept.length);
+        const maxAcc = Math.max(0, finalExCap - kept.length);
+        const armAcc = acc.filter(e => ['triceps', 'biceps', 'forearms'].includes(e.muscle));
+        const otherAcc = acc.filter(e => !['triceps', 'biceps', 'forearms'].includes(e.muscle));
         sess.exercises.length = 0;
-        sess.exercises.push(...kept, ...acc.slice(0, maxAcc));
+        sess.exercises.push(...kept, ...armAcc.slice(0, Math.max(1, Math.floor(maxAcc / 2))), ...otherAcc.slice(0, maxAcc - Math.max(1, Math.floor(maxAcc / 2))));
       }
     }
     // fix D: капаем недельный объём каждой мышцы по её истинному MRV
