@@ -33,6 +33,10 @@ import { SupportProtocolProlactin } from './supportProtocolProlactin';
 import { SupportProtocolAdaptogen } from './supportProtocolAdaptogen';
 import { SupportProtocolPeptide } from './supportProtocolPeptide';
 import { SupportProtocolPostCycle } from './supportProtocolPostCycle';
+import { SupportProtocolEmergency } from './supportProtocolEmergency';
+import { SupportProtocolInteractions } from './supportProtocolInteractions';
+import { SupportProtocolCost } from './supportProtocolCost';
+import { SupportProtocolWomen } from './supportProtocolWomen';
 
 export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const { protocolTab, setProtocolTab, protocolView, setProtocolView } = s;
@@ -143,6 +147,10 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
           {protocolTab === 'adaptogen' && <SupportProtocolAdaptogen s={s} />}
           {protocolTab === 'peptide' && <SupportProtocolPeptide s={s} />}
           {protocolTab === 'postcycle' && <SupportProtocolPostCycle s={s} />}
+          {protocolTab === 'emergency' && <SupportProtocolEmergency s={s} />}
+          {protocolTab === 'interactions' && <SupportProtocolInteractions s={s} />}
+          {protocolTab === 'cost' && <SupportProtocolCost s={s} />}
+          {protocolTab === 'women' && <SupportProtocolWomen s={s} />}
 
 
           {protocolTab === 'symptoms' && (

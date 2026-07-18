@@ -93,6 +93,7 @@ export const SUB_TAB_GROUPS: Record<string, { id: string; label: string }[]> = {
   ],
   select: [
     { id: 'search', label: '🔍 Поиск' },
+    { id: 'analog', label: '🔁 Аналог' },
     { id: 'build', label: '🧩 Сборка' },
     { id: 'complexes', label: '🧪 Комплексы' },
     { id: 'clinical', label: '🔬 Клин.' },

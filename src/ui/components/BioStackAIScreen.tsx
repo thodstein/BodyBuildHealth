@@ -8,6 +8,7 @@ import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
   import { SearchTab } from './BioStackAISearch';
   import { BuildTab } from './BioStackAIBuild';
   import { ComplexTab } from './BioStackAIComplexes';
+  import BioStackAIAnalog from './BioStackAIAnalog';
   import { StackTab } from './BioStackAIStack';
   import { RisksTab } from './BioStackAIRisks';
   import { CompareTab } from './BioStackAICompare';
@@ -140,6 +141,7 @@ export const BioStackAIScreen: React.FC = () => {
         if (activeSub === 'clinical') return (
           <BioStackAIClinicalBuild profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} labAnalysis={labAnalysis} linked={linked} />
         );
+        if (activeSub === 'analog') return <BioStackAIAnalog profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} onToast={(m) => showToast(m, 'info')} />;
         return <SearchTab profile={profile} stackIds={stackIds} setStackIds={setStackIdsAndSync} linked={linked} />;
 
       case 'stack':

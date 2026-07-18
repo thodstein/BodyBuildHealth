@@ -324,6 +324,28 @@ export const SupportProtocolNeuro: React.FC<{ s: Record<string, any> }> = ({ s }
                   </div>
                 </div>
               )}
+
+              {/* C-SSRS — шкала суицидального риска */}
+              <div style={{ borderRadius:12, padding:12, background:'rgba(239,68,68,0.06)', border:'2px solid rgba(239,68,68,0.3)', marginTop:8 }}>
+                <div style={{ fontSize:11, fontWeight:800, color:'#ef4444', marginBottom:6 }}>⚠️ Шкала суицидального риска (C-SSRS) — ПКТ/постцикл</div>
+                <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Депрессия на ПКТ + доступ к препаратам = реальный риск. Columbia Suicide Severity Rating Scale — скрининг за 2 минуты.</p>
+                {[
+                  { q:'Были ли мысли о смерти или желание умереть?', pts:1 },
+                  { q:'Были ли мысли о нанесении себе вреда?', pts:2 },
+                  { q:'Думали ли вы о конкретном способе самоубийства?', pts:3 },
+                  { q:'Было ли намерение действовать или план?', pts:4 },
+                  { q:'Были ли приготовления или попытка за последнюю неделю?', pts:5 },
+                ].map((x: any, i: any) => (
+                  <div key={i} style={{ padding:'5px 8px', borderRadius:4, marginBottom:2, background:'rgba(255,255,255,0.03)', fontSize:8 }}>
+                    <span style={{ color:'#fca5a5', fontWeight:600 }}>{x.pts} балл{ x.pts>1 ? 'а' : '' }</span>
+                    <span style={{ color:'var(--text-dim)', marginLeft:6 }}>{x.q}</span>
+                  </div>
+                ))}
+                <div style={{ fontSize:9, fontWeight:700, color:'#ef4444', marginTop:8, lineHeight:1.4 }}>
+                  Сумма ≥3 баллов → 🛑 срочная консультация психиатра. Отменить все психоактивные вещества (тренболон, кленбутерол, стимуляторы). Наблюдение (не оставлять одного). При сумме ≥4 + план — госпитализация.
+                </div>
+              </div>
+
             </div>
           </InfoErrorBoundary>
   );

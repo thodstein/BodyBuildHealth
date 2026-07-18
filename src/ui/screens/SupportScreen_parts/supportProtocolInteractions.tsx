@@ -1,0 +1,101 @@
+// @ts-nocheck
+import React, { useState } from 'react';
+import { cardBg, pillActive, pillInactive, ContraBanner } from './supportProtocolsShared';
+import { InfoErrorBoundary } from './SupportScreenData';
+
+export const SupportProtocolInteractions: React.FC<{ s: Record<string, any> }> = ({ s }) => {
+  const [interactionsTab, setInteractionsTab] = useState('critical');
+  return (
+    <InfoErrorBoundary label="Взаимодействия">
+      <div style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
+        <div style={cardBg}>
+          <div style={{ fontSize:13, fontWeight:800, color:'#ef4444', marginBottom:2 }}>💬 Лекарственные взаимодействия — единая матрица</div>
+          <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Самые опасные комбинации препаратов и добавок на курсе ААС. Проверьте свой стек.</p>
+        </div>
+
+        <ContraBanner items={[
+          'Каждая комбинация проверена по механизму взаимодействия. При сомнении — консультация врача.',
+          'Сила: 🛑 CRITICAL (жизнеугрожающее) · 🔴 HIGH (госпитализация) · 🟡 MEDIUM (клинически значимое)',
+        ]} />
+
+        <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
+          {[{id:'critical',label:'🛑 Критические'},{id:'high',label:'🔴 Высокие'},{id:'medium',label:'🟡 Средние'},{id:'search',label:'🔍 По препарату'}].map((t:any)=>(
+            <button key={t.id} onClick={()=>setInteractionsTab(t.id)} style={interactionsTab===t.id?pillActive('#ef4444'):pillInactive()}>{t.label}</button>
+          ))}
+        </div>
+
+        {interactionsTab === 'critical' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {[
+              {pair:'ИПП (омепразол) + Клопидогрель', effect:'↓ антиагрегантного эффекта клопидогреля на 40-50% (CYP2C19). Риск тромбоза стента.', strength:'🛑 CRITICAL', action:'Заменить омепразол на пантопразол (слабее ингибирует CYP2C19) или рабепразол.'},
+              {pair:'Статины (аторвастатин) + 17α-алкилы (метандростенолон, оксиметолон)', effect:'Аддитивная гепатотоксичность. Статины метаболизируются CYP3A4, как и 17α-алкилы → конкуренция → ↑ концентрации обоих.', strength:'🛑 CRITICAL', action:'Избегать комбинации. При необходимости — розувастатин (минимальный CYP-метаболизм) + контроль АЛТ каждые 2 нед.'},
+              {pair:'НПВС (диклофенак, ибупрофен) + РААС-блокада (телмисартан)', effect:'Двойное снижение СКФ: НПВС ↓ простагландинов → ↓ афферентной вазодилатации + РААС-блокада ↓ эфферентной → ↓↓ СКФ. Риск ОПП.', strength:'🛑 CRITICAL', action:'Избегать комбинации >3 дней. При необходимости — контроль креатинина каждые 3 дня. Гидратация 2+ л/день.'},
+              {pair:'GLP-1 (семаглутид) + Инсулин', effect:'Синергетическая гипогликемия. GLP-1 ↑ секрецию инсулина + экзогенный инсулин → риск гипогликемии <3.0 ммоль/л.', strength:'🛑 CRITICAL', action:'Снизить дозу инсулина на 20-30% при старте GLP-1. Глюкометр 4-6×/день. Глюкагон в доступе.'},
+              {pair:'Каберголин + Метоклопрамид / Домперидон', effect:'Антагонизм: каберголин — агонист D2, метоклопрамид — блокатор D2. Полная отмена эффекта каберголина + ↑ PRL.', strength:'🛑 CRITICAL', action:'Никогда не комбинировать. При тошноте на каберголине — ондансетрон (5-HT3), НЕ метоклопрамид.'},
+              {pair:'Эплеренон + Добавки калия', effect:'Гиперкалиемия >6.0: эплеренон — калий-сберегающий + K⁺ цитрат → риск остановки сердца.', strength:'🛑 CRITICAL', action:'Отменить добавки K⁺ при старте эплеренона. Контроль K⁺ через 5-7 дн. K⁺ >5.0 → отмена эплеренона.'},
+              {pair:'Аспирин + Серрапептаза/Наттокиназа + Омега-3 >3 г', effect:'Тройной антикоагулянтный эффект → риск спонтанного кровотечения (ЖКТ, внутричерепное).', strength:'🛑 CRITICAL', action:'НЕ комбинировать. Выбрать ОДИН антиагрегант. При Hct >54% — флеботомия важнее аспирина.'},
+              {pair:'Финастерид/Дутастерид + Тестостерон', effect:'НЕ противопоказание, но финастерид блокирует 5α-редуктазу → меньше DHT. На ААС-курсе DHT и так повышен → финастерид компенсирует лишь частично.', strength:'🟡 MEDIUM', action:'Контроль DHT через 3 мес. При неэффективности → дутастерид. При алопеции — см. протокол Кожа/Волосы.'},
+            ].map((x:any,i:any)=>(
+              <div key={i} style={{ borderRadius:10, padding:'10px 12px', background:x.strength.includes('CRITICAL')?'rgba(239,68,68,0.08)':'rgba(245,158,11,0.06)', border:'1px solid '+(x.strength.includes('CRITICAL')?'rgba(239,68,68,0.3)':'rgba(245,158,11,0.2)') }}>
+                <div style={{ fontSize:10, fontWeight:800, color:x.strength.includes('CRITICAL')?'#ef4444':'#f59e0b', marginBottom:2 }}>{x.strength} {x.pair}</div>
+                <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4, lineHeight:1.3 }}>Механизм: {x.effect}</div>
+                <div style={{ fontSize:8, color:'#fca5a5', lineHeight:1.3, padding:'5px 8px', borderRadius:5, background:'rgba(239,68,68,0.06)' }}>💡 {x.action}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {interactionsTab === 'high' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {[
+              {pair:'Телмисартан + НПВС', effect:'↓ гипотензивного эффекта на 30-40%. Задержка Na⁺/H₂O от НПВС противодействует вазодилатации.', strength:'🔴 HIGH', action:'Контроль АД ежедневно. При АД >140/90 на телмисартане 80 мг — отменить НПВС, не повышать телмисартан.'},
+              {pair:'Метформин + Йодсодержащий контраст (КТ)', effect:'Риск лактат-ацидоза. Контраст + метформин → ↓ выведения лактата при снижении СКФ.', strength:'🔴 HIGH', action:'Отменить метформин за 48 ч до и 48 ч после КТ с контрастом. Возобновить только при СКФ >60.'},
+              {pair:'NAC >2400 мг + Антибиотики (тетрациклины, фторхинолоны)', effect:'NAC хелатирует антибиотики в ЖКТ → ↓ всасывания на 40-60%.', strength:'🔴 HIGH', action:'Интервал ≥2 ч между NAC и антибиотиками. Антибиотик первый, NAC — через 2 ч.'},
+              {pair:'Берберин + Метформин', effect:'Аддитивный гипогликемический эффект. Берберин активирует AMPK как метформин.', strength:'🔴 HIGH', action:'При комбинации — снизить метформин на 25-30%. Глюкоза натощак 1×/нед. Цель 4.0-5.6 ммоль/л.'},
+              {pair:'Витамин K2 (менахинон) + Варфарин', effect:'K2 — кофактор γ-карбоксилирования факторов свёртывания. Прямой антагонист варфарина.', strength:'🔴 HIGH', action:'Избегать K2 при приёме варфарина. МНО 2×/нед. При МНО <2.0 — повысить варфарин на 10-15%.'},
+              {pair:'Зверобой (Saint John\'s Wort) + Оральные контрацептивы', effect:'Индукция CYP3A4 → ↓ концентрации этинилэстрадиола на 40-50% → контрацептивный провал.', strength:'🔴 HIGH', action:'НЕ комбинировать. При необходимости антидепрессивного эффекта — альтернатива (теанин, ашвагандха).'},
+            ].map((x:any,i:any)=>(
+              <div key={i} style={{ borderRadius:10, padding:'10px 12px', background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+                <div style={{ fontSize:10, fontWeight:800, color:'#f59e0b', marginBottom:2 }}>{x.strength} {x.pair}</div>
+                <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4, lineHeight:1.3 }}>{x.effect}</div>
+                <div style={{ fontSize:8, color:'#fcd34d', lineHeight:1.3, padding:'5px 8px', borderRadius:5, background:'rgba(245,158,11,0.06)' }}>💡 {x.action}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {interactionsTab === 'medium' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {[
+              {pair:'Магний + Кальций', effect:'Конкурентное всасывание в кишечнике (общий транспортёр). ↓ биодоступности обоих на 20-30%.', strength:'🟡 MEDIUM', action:'Разделить приём на 2+ часа. Mg вечером, Ca — утром или днём.'},
+              {pair:'Цинк + Медь', effect:'Цинк ↑ металлотионеин в энтероцитах → связывание Cu → ↓ всасывания меди. При длительном приёме Zn >50 мг → дефицит Cu.', strength:'🟡 MEDIUM', action:'Zn на ночь, Cu утром. Интервал ≥4 ч. При Zn >3 мес — контроль церулоплазмина 1×/6 мес.'},
+              {pair:'Железо + Кальций / Цинк / Кофеин / Чай', effect:'Конкурентное всасывание. Танины чая хелатируют Fe → ↓ всасывания на 50-70%.', strength:'🟡 MEDIUM', action:'Fe натощак с витамином C (↑ всасывания ×2). Кофе/чай через ≥1 ч после Fe.'},
+              {pair:'L-тироксин + Кальций / Железо / Кофе', effect:'↓ всасывания тироксина на 30-40% при одновременном приёме.', strength:'🟡 MEDIUM', action:'Тироксин натощак за 30-60 мин до завтрака. Ca/Fe — не ранее чем через 4 ч.'},
+              {pair:'Креатин + Кофеин', effect:'Кофеин может снижать эргогенный эффект креатина (данные противоречивы). Возможен диуретический эффект → дегидратация.', strength:'🟡 MEDIUM', action:'Не критично. При приёме — достаточная гидратация (+500 мл воды на каждые 200 мг кофеина).'},
+              {pair:'Таурин + Стимуляторы (кленбутерол, кофеин)', effect:'Таурин ↓ тахикардию и тремор от β2-стимуляторов. Осморегуляция.', strength:'🟡 MEDIUM (защитный)', action:'Рекомендовано! Таурин 1-3 г/день на кленбутероле. Защищает миокард от катехоламиновой токсичности.'},
+            ].map((x:any,i:any)=>(
+              <div key={i} style={{ borderRadius:10, padding:'10px 12px', background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.12)' }}>
+                <div style={{ fontSize:10, fontWeight:800, color:'#f59e0b', marginBottom:2 }}>{x.strength} {x.pair}</div>
+                <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4, lineHeight:1.3 }}>{x.effect}</div>
+                <div style={{ fontSize:8, color:'#fcd34d', lineHeight:1.3, padding:'5px 8px', borderRadius:5, background:'rgba(245,158,11,0.06)' }}>💡 {x.action}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {interactionsTab === 'search' && (
+          <div style={cardBg}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🔍 Как проверить свои препараты</div>
+            <p style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>
+              1. Составьте список ВСЕХ принимаемых веществ (фарма + добавки).<br/>
+              2. Проверьте каждый против матрицы выше. Опасные пары — замените один из компонентов.<br/>
+              3. Особое внимание: НПВС + РААС-блокада, статины + 17α-алкилы, GLP-1 + инсулин, каберголин + метоклопрамид.<br/>
+              4. <b style={{color:'#ef4444'}}>При сомнении — консультация клинического фармаколога.</b> Взаимодействия могут быть отсроченными (CYP-индукция — 2-3 нед).<br/>
+              5. CYP-метаболизм: CYP3A4 (большинство ААС, статины), CYP2C19 (клопидогрель, омепразол), CYP2D6 (β-блокаторы). Индукторы (зверобой, рифампицин) ↓ эффект субстратов на 2-4 нед после отмены.
+            </p>
+          </div>
+        )}
+      </div>
+    </InfoErrorBoundary>
+  );
+};

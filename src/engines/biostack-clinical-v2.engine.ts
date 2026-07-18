@@ -423,7 +423,7 @@ export interface MeaningfulReplacement {
 // SUBSTANCE_ANALOGS entry, derive replacement candidates from any catalog
 // substance sharing normalized mechanisms or the same category. This lifts
 // analog coverage from the ~30 hand-curated entries to the entire catalog.
-function deriveAnalogsByMechanism(
+export function deriveAnalogsByMechanism(
   originalId: string,
   limit = 4,
 ): { id: string; name: string; group: string; note: string }[] {

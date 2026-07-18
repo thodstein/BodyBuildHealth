@@ -180,6 +180,16 @@ function findCatalogExerciseByLabel(label: string): Exercise | null {
     const en = norm(e.name);
     return en.length > 2 && (en.includes(n) || n.includes(en));
   });
+  if (ex) return ex;
+  // Fallback: извлечь ядро имени (до скобок, слэша, тире), убрать обёртки типа «(акцент ...)»
+  const core = label.split(/[\(\/—–\:\;]/)[0]?.trim();
+  if (core && core.length > 2 && core !== label) {
+    const cn = norm(core);
+    ex = EXERCISE_CATALOG.find(e => {
+      const en = norm(e.name);
+      return en.length > 2 && (en.includes(cn) || cn.includes(en));
+    });
+  }
   return ex || null;
 }
 
@@ -356,6 +366,11 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           const focusMult = (focusRu && norm(spec.name).includes(focusRu)) ? 1.2 : 1.0;
           sets = Math.round(sets * focusMult);
 
+          // Акцент по слабым группам мышц: +20% объёма для упражнений на отстающие группы.
+          const weakEn = exEnGroup(spec.group);
+          const weakMult = (input.weakPoints && weakEn && input.weakPoints.includes(weakEn)) ? 1.2 : 1.0;
+          sets = Math.round(sets * weakMult);
+
           // S-MRV floor: аксессуары не ниже 2 подходов (иначе < MEV — бесполезный объём)
           sets = Math.max(isMain ? 1 : 2, sets);
 
@@ -412,6 +427,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     rationale,
     input.volumeGoal ? `Объём аксессуаров: ${input.volumeGoal === 'mev' ? 'минимальный (MEV)' : input.volumeGoal === 'mrv' ? 'максимальный (MRV)' : 'оптимальный (MAV)'}.` : '',
     input.focusLift ? `Приоритет: акцент на ${input.focusLift === 'squat' ? 'присед' : input.focusLift === 'bench' ? 'жим' : 'тягу'} (+20% объёма).` : '',
+    input.weakPoints?.length ? `Слабые группы: ${input.weakPoints.join(', ')} (+20% объёма для упражнений на эти группы).` : '',
     `S-MRV: объём сессий автоматически ограничен бюджетом утомления (Ready: ${input.currentReadiness || 80}%).`,
   ].filter(Boolean).join(' ');
 
