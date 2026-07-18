@@ -96,8 +96,8 @@ export const TempoTab: React.FC = () => {
       const compoundInput = { goal: g, riskLevel: 'low' as const, difficultyLevel: 'medium' as const, techniqueIssues: [], isMainLift: true };
       const isolationInput = { ...compoundInput, isMainLift: false };
       base[g] = {
-        compound: generateRepTempo(compoundInput).tempo.toString,
-        isolation: generateRepTempo(isolationInput).tempo.toString,
+        compound: generateRepTempo(compoundInput).tempo.toString(),
+        isolation: generateRepTempo(isolationInput).tempo.toString(),
       };
     });
     return base;
@@ -276,7 +276,7 @@ export const TempoTab: React.FC = () => {
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 2 }}>{rp.nameRu}</div>
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1.3, marginBottom: 3 }}>{rp.desc}</div>
                 <div style={{ fontSize: 10, color: '#a855f7', fontFamily: 'monospace', background: 'rgba(168,85,247,0.1)', padding: '1px 5px', borderRadius: 4, display: 'inline-block' }}>
-                  {engineTempo.tempo.toString}
+                  {engineTempo.tempo.toString()}
                 </div>
               </div>
             );

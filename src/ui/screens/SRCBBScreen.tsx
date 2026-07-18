@@ -858,7 +858,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                         <option value=''>— выберите упражнение —</option>
                         {getExercisesByGroup(pickerGroup).map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
                       </select>
-                      <div style={{ display:'flex', gap:6, alignItems:'center', marginBottom:8 }}>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:6, alignItems:'center', marginBottom:8 }}>
                         <span style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>Подходы</span>
                         <input type='number' value={pickerScheme.sets} onChange={e => setPickerScheme(s => ({ ...s, sets: +e.target.value }))} style={{ width:48, ...IN, padding:'4px', fontSize:10 }} />
                         <span style={{ fontSize:10 }}>×</span>
@@ -1020,14 +1020,14 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                       volumeTag,
                       renderBody: (
                         <>
-                          {d.exercises.map((e, ei) => (
-                            <div key={ei} style={{ background:'rgba(255,255,255,0.02)', borderRadius:8, padding:'6px 8px', marginBottom:4, border:'1px solid rgba(255,255,255,0.04)' }}>
-                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                                <span style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{e.name}</span>
-                                <span style={{ fontSize:10, color:e.load === 'main' ? 'var(--accent)' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.4)', fontWeight:600, padding:'1px 6px', borderRadius:4, background: e.load === 'main' ? 'var(--accent-dim)' : e.load === 'additional' ? 'rgba(245,158,11,0.1)' : 'transparent' }}>
-                                  {e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}
-                                </span>
-                              </div>
+                           {d.exercises.map((e, ei) => (
+                             <div key={ei} style={{ background:'rgba(255,255,255,0.02)', borderRadius:8, padding:'6px 8px', marginBottom:4, border:'1px solid rgba(255,255,255,0.04)', overflow:'hidden' }}>
+                               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:2 }}>
+                                 <span style={{ fontSize:11, fontWeight:600, color:'#fff', flex:1, minWidth:0, overflowWrap:'break-word' }}>{e.name}</span>
+                                 <span style={{ fontSize:10, color:e.load === 'main' ? 'var(--accent)' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.4)', fontWeight:600, padding:'1px 6px', borderRadius:4, flexShrink:0, background: e.load === 'main' ? 'var(--accent-dim)' : e.load === 'additional' ? 'rgba(245,158,11,0.1)' : 'transparent' }}>
+                                   {e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}
+                                 </span>
+                               </div>
                               <div style={{ display:'flex', flexDirection:'column', gap:2, marginTop:4 }}>
                                 {e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); const es = effSet(wk.week, di, ei, si, ws); const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'2px 4px', fontSize:10, textAlign:'center' }; return (
                                   <div key={si} style={{ display:'flex', gap:3, alignItems:'center' }}>
@@ -1044,8 +1044,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                             </div>
                           ))}
                           {(srcAdditions[dk] || []).map(a => (
-                            <div key={a.uid} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:4, padding:'5px 0', borderBottom:'1px solid var(--accent-dim)' }}>
-                              <div style={{ fontSize:11, color:'var(--accent)', fontWeight:600 }}>{a.name} <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>＋ добавлено</span> <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:10, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', marginLeft:4 }}>✕</button></div>
+                             <div key={a.uid} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:4, padding:'5px 0', borderBottom:'1px solid var(--accent-dim)', alignItems:'center' }}>
+                               <div style={{ fontSize:11, color:'var(--accent)', fontWeight:600, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.name}</div>
+                               <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
+                                 <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>＋ добавлено</span>
+                                 <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:10, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', marginLeft:4 }}>✕</button>
+                               </div>
                               <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', textAlign:'right' }}>
                                 <div style={{ display:'flex', gap:3, alignItems:'center' }}>
                                   <input type='number' value={a.sets} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, sets: +ev.target.value } : x) }; })} style={{ flex:'1', minWidth:0, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'3px', fontSize:10, textAlign:'center' }} aria-label='подходы'/>
@@ -1066,7 +1070,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 const exercises: PlanExerciseView[] = d.exercises.map((e, ei) => {
                   const tmpo = getTempo(e.name, goal, e.load === 'main');
                   const detail = e.workSets.map((ws, si) => setStr(effSet(wk.week, di, ei, si, ws))).join('  ·  ');
-                  const tempo = tempoStr || e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); return srcEdits[k]?.tempo || tmpo.tempo.toString; })[0];
+                  const tempo = tempoStr || e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); return srcEdits[k]?.tempo || tmpo.tempo.toString(); })[0];
                   return { key: 'ex-' + di + '-' + ei, name: e.name, role: roleOf(e.load), detail, tempo } as PlanExerciseView;
                 });
                 (srcAdditions[dk] || []).forEach(a => {

@@ -568,7 +568,7 @@ export const TechniqueCalcTab: React.FC = () => {
                   )}
                   {progression.length > 0 && <p><b>Прогрессия:</b> {progression.join(' → ')}</p>}
                   {technique?.regression?.length && <p><b>Регрессия:</b> {technique!.regression!.join(' → ')}</p>}
-                  <p><b>Темпо:</b> {tempoRes.tempo.toString} · <b>RPE/RIR:</b> {tempoRes.targetRPE}/{tempoRes.targetRIR}</p>
+                  <p><b>Темпо:</b> {tempoRes.tempo.toString()} · <b>RPE/RIR:</b> {tempoRes.targetRPE}/{tempoRes.targetRIR}</p>
                   <p><b>Безопасность:</b> {safety.score}/100 · {safety.level === 'safe' ? 'Безопасно' : safety.level === 'moderate' ? 'Умеренно' : 'Рискованно'}</p>
                   {safety.contraindications.length > 0 && <p><b>Противопоказания:</b> {safety.contraindications.join('; ')}</p>}
                   {safety.precautions.length > 0 && <p><b>Предосторожности:</b> {safety.precautions.join('; ')}</p>}

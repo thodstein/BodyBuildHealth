@@ -503,6 +503,16 @@ export function findMeaningfulReplacement(
     for (const m of cMech) if (origMechSet.has(m)) shared++;
     let sharedCat = false;
     for (const catName of candCats) if (origCatsSet.has(catName)) { sharedCat = true; break; }
+    // ── same-family guard: skip candidates that are essentially the same active
+    //     ingredient (e.g. Legalon→milk_thistle, both silymarin) ──
+    const mechOverlap = origMechSet.size > 0 ? shared / origMechSet.size : 0;
+    let catOverlap = 0;
+    if (origCatsSet.size > 0) {
+      let sharedCats = 0;
+      for (const cc of candCats) if (origCatsSet.has(cc)) sharedCats++;
+      catOverlap = sharedCats / origCatsSet.size;
+    }
+    if (mechOverlap > 0.7 && catOverlap > 0.5) continue;
     const gOrig = evidenceWeight(getEvidenceGrade(originalId));
     const gCand = evidenceWeight(getEvidenceGrade(cid));
     // приоритет — совпадение механизмов/класса с оригиналом, а не общая «накачанность» кандидата

@@ -405,16 +405,18 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     if (ex.type === 'compound') score += 5;
 
     // 5b. Контекст бодибилдинга: штраф пауэрлифт-подъёмов
+    // Умеренный штраф (-5): compound (+5) всё ещё перевешивает изоляцию,
+    // но соревновательные подъёмы не доминируют над альтернативами.
     if (preferBB && isCompetitionLift(ex)) {
-      score -= 18;
-      rationales.push('Бодибилдинг: не соревновательный подъём −18');
+      score -= 5;
+      rationales.push('Бодибилдинг: не соревновательный подъём −5');
     }
 
     // 5c. ББ-спина: hinge/бицепс-бедра лифты (становая/мёртвая/румын/гудморнинг)
     // не принадлежат тренировке спины — только ногам. Штрафуем в пуле back.
     if (preferBB && muscleGroup === 'back' && isHingePattern(ex)) {
-      score -= 25;
-      rationales.push('Бодибилдинг: hinge (бицепс бедра), не спина −25');
+      score -= 10;
+      rationales.push('Бодибилдинг: hinge (бицепс бедра), не спина −10');
     }
 
     // 5d. Безопасность: опасные упражнения для новичков/средних

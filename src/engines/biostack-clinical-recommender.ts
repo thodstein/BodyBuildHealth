@@ -27,11 +27,11 @@ import {
   type PlanSubstance,
 } from './support-plan';
 
-import { selectStack, type StackStrategy } from './biostack-clinical-v2.engine';
+import { selectStack, getEvidenceGrade, type StackStrategy, type EvidenceGrade } from './biostack-clinical-v2.engine';
 import type { BioStackProfile } from './biostack-ai.engine';
 import type { LabCompositeResult } from './lab-analysis.engine';
 
-import { getDrugTzMechanisms, TZ_MECH_LABELS } from '../data/support-db';
+import { getDrugTzMechanisms, TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../data/support-db';
 import { SUPPORT_CATALOG_DATA } from '../data/support-database';
 import { getPrioritySubstances, type SeverityLevel } from '../data/lab-priority-map';
 import { SUPPLEMENTS_DB } from '../data/support-db/supplements';
@@ -265,6 +265,10 @@ export interface ClinicalSubstance {
 export interface ClinicalStackResult {
   /** итоговые вещества после клинического шлюза безопасности */
   substances: ClinicalSubstance[];
+  /** описание стека (авто-сгенерированное) */
+  stackDescription: string;
+  /** синергии внутри стека (пары веществ, которые работают вместе) */
+  stackSynergies: { ids: string[]; effect: string; strength: string }[];
   /** вещества, отсеянные шлюзом (для прозрачности) */
   excluded: {
     id: string;
@@ -308,8 +312,10 @@ export interface BuildClinicalStackOpts {
   filterMechanisms?: string[];
   /** мульти-выбор лаб-маркеров (напр. ['ALT','CREATININE']) */
   filterMarkers?: string[];
-  /** уровень доказательности: 'all' | 'A' | 'B' | 'C' (данные ТЗ содержат только A/B/C) */
+  /** уровень доказательности: 'all' | 'A' | 'B' | 'C' (кумулятивно: B включает A и B) */
   evidenceLevel?: 'all' | 'A' | 'B' | 'C';
+  /** максимальное число веществ в стеке (ограничение сверху) */
+  maxStackSize?: number;
 }
 
 export function buildClinicalStack(
@@ -362,11 +368,12 @@ export function buildClinicalStack(
   }
 
   if (opts.evidenceLevel && opts.evidenceLevel !== 'all') {
-    const allowed = opts.evidenceLevel;
+    const allowed: EvidenceGrade[] = opts.evidenceLevel === 'C' ? ['A','B','C'] : opts.evidenceLevel === 'B' ? ['A','B'] : ['A'];
+    const allowedSet = new Set(allowed);
     candidateIds = candidateIds.filter((id) => {
       const entries = [...(SUPPLEMENTS_DB[id] || []), ...(PHARMACY_DB[id] || [])];
       if (!entries.length) return true; // нет данных доказательности → не отсеиваем
-      return entries.some((e) => e.q === allowed);
+      return entries.some((e) => allowedSet.has(e.q));
     });
   }
 
@@ -407,6 +414,61 @@ export function buildClinicalStack(
     });
   }
 
+  // 3a) Кап количества: если задан maxStackSize, усекаем по грейду + широте покрытия
+  if (opts.maxStackSize && opts.maxStackSize > 0 && substances.length > opts.maxStackSize) {
+    substances.sort((a, b) => {
+      const ga = getEvidenceGrade(a.id);
+      const gb = getEvidenceGrade(b.id);
+      const wa = ga === 'A' ? 3 : ga === 'B' ? 2 : 1;
+      const wb = gb === 'A' ? 3 : gb === 'B' ? 2 : 1;
+      if (wa !== wb) return wb - wa; // A > B > C
+      const breadthDiff = (b.tzMechanisms?.length || 0) - (a.tzMechanisms?.length || 0);
+      if (breadthDiff !== 0) return breadthDiff;
+      return (b.tier === 'core' ? 1 : 0) - (a.tier === 'core' ? 1 : 0);
+    });
+    const trimmed = substances.slice(0, opts.maxStackSize);
+    substances.length = 0;
+    substances.push(...trimmed);
+  }
+
+  // 3b) Синергии внутри стека
+  const stackSynergies: ClinicalStackResult['stackSynergies'] = [];
+  const subIdSet = new Set(substances.map((s) => s.id.toLowerCase()));
+  const seenSynKeys = new Set<string>();
+  for (const s of substances) {
+    const cat_ = SUPPORT_CATALOG_DATA[s.id] || SUPPORT_CATALOG_DATA[s.id.toUpperCase()];
+    if (!(cat_ as any)?.synergies) continue;
+    for (const syn of (cat_ as any).synergies) {
+      const partnerId: string = (syn.with || '').toLowerCase();
+      if (!subIdSet.has(partnerId)) continue;
+      const key = [s.id.toLowerCase(), partnerId].sort().join('|');
+      if (seenSynKeys.has(key)) continue;
+      seenSynKeys.add(key);
+      stackSynergies.push({
+        ids: [s.id, partnerId],
+        effect: syn.effect || syn.mechanism || '',
+        strength: (syn.severity || syn.strength || 'MEDIUM').toUpperCase(),
+      });
+    }
+  }
+
+  // 3c) Описание стека
+  const coveredSystems = new Set<string>();
+  for (const s of substances) {
+    for (const tz of s.tzMechanisms || []) {
+      const prefixMap: Record<string, string> = { cv: 'cardio', liv: 'hepatic', ren: 'renal', cns: 'cns', rep: 'reproductive', hem: 'hematologic' };
+      const prefix = tz.mechId.match(/^[a-z]+/)?.[0];
+      if (prefix && prefixMap[prefix]) coveredSystems.add(prefixMap[prefix]);
+    }
+  }
+  const systemNames = [...coveredSystems].map((sys) => (TZ_SYSTEM_LABELS as any)[sys] || sys).join(', ');
+  const gradeCounts = substances.reduce((acc, s) => { const g = getEvidenceGrade(s.id); acc[g] = (acc[g] || 0) + 1; return acc; }, {} as Record<string, number>);
+  const gradeParts: string[] = [];
+  if (gradeCounts.A) gradeParts.push(`A:${gradeCounts.A}`);
+  if (gradeCounts.B) gradeParts.push(`B:${gradeCounts.B}`);
+  if (gradeCounts.C) gradeParts.push(`C:${gradeCounts.C}`);
+  const stackDescription = `Стек из ${substances.length} веществ (${gradeParts.join(', ')}). Грейд: ${opts.evidenceLevel || 'all'}. Покрытие систем: ${systemNames || 'не определено'}. Построено движком калькулятора поддержки (runSupportUnified).`;
+
   // 4) Отсеянные вещества (прозрачность)
   const excluded: ClinicalStackResult['excluded'] = [];
   const pushExcluded = (
@@ -440,6 +502,8 @@ export function buildClinicalStack(
 
   return {
     substances,
+    stackDescription,
+    stackSynergies,
     excluded,
     riskBefore: plan.overallRiskBefore,
     riskAfter: plan.overallRiskAfter,

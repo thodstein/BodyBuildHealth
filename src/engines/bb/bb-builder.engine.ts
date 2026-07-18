@@ -559,6 +559,13 @@ function buildSession(
     if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж') && isMainMuscle) {
       role = 'primary'; musclePrimaryAssigned.add(muscle);
     }
+    // Слабые группы (weakPoints): структурное повышение до primary —
+    // compound-первым + больше упражнений + объём, а не только +15 в скоринге.
+    // БЕЗ проверки musclePrimaryAssigned: слабые мышцы получают primary в КАЖДОЙ
+    // сессии (двойной стимул в неделю: тяж + памп → оба с compound-первым).
+    if (isMainMuscle && isWeak(muscle, weakPoints)) {
+      role = 'primary'; musclePrimaryAssigned.add(muscle);
+    }
     const mavRot = muscleVolumeRotation[muscle] || 0;
     const sessionsForMuscle = muscleSessionCount[muscle] || 1;
     let sets = sessionShareFor(mavRot, sessionsForMuscle, role, muscle, pedAdapt);
@@ -602,6 +609,10 @@ function buildSession(
     const allowAccessoryCompound = pedAdapt ? pedAdapt.combinedMrvMultiplier >= 1.3 : false;
     const selType = ALWAYS_ISOLATION.has(muscle) ? 'isolation'
       : (role === 'primary' ? 'compound' : (allowAccessoryCompound && (muscle === 'triceps' || muscle === 'biceps' || muscle === 'back') ? 'compound' : 'isolation'));
+    // ПАМП-дни: для главных мышц сессии разрешить compound в пуле,
+    // чтобы первое упражнение было базовым (compound-first порядок),
+    // даже если роль accessory. Без этого памп-день открывается изоляцией.
+    const effectiveSelType = (role === 'accessory' && character === 'памп' && isMainMuscle) ? 'any' : selType;
     // Корень фикса: пул строится по ИСТИННОЙ мышце упражнения (movementPattern +
     // targetMuscle), а не по композитной группе каталога. Это устраняет
     // неверную атрибуцию (leg curl → «calves», farmer walk → «biceps»,
@@ -651,7 +662,7 @@ function buildSession(
     let selected = selectExercisesSmart({
       candidates: pool, muscleGroup: muscle, count: exerciseCount,
       selectedIds: sessionSelectedIds, selectedNames: sessionSelectedNames,
-      equipment: equipmentList, weakZones: weakPoints, level, injuryProfile, type: selType,
+      equipment: equipmentList, weakZones: weakPoints, level, injuryProfile, type: effectiveSelType,
       targetRir: rir,
       preferBB: true,
       favoriteIds, excludeIds,
