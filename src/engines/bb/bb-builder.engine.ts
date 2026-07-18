@@ -746,10 +746,14 @@ function buildSession(
       type AngleClass = { name: string; match: (e: any) => boolean };
       const ANGLE_CLASSES: Record<string, AngleClass[]> = {
         chest: [
-          { name: 'horizontal_press', match: (e) => /жим.*(лёжа|лежа|гориз)|bench.*(press|жим)|жим штанги/i.test(e.name) && !/наклон|incline|decline|сниз|отриц/i.test(e.name) },
+          // ПРОФ-порядок: 1. тяжёлый жим (механическое натяжение)
+          //               2. разводка/fly (растяжение мышцы — критично для гипертрофии)
+          //               3. жим на наклонной (угол — верх груди)
+          //               4. отжимания на брусьях (нижняя часть + трицепс)
+          { name: 'horizontal_press', match: (e) => /жим.*(лёжа|лежа|гориз)|bench.*(press|жим)|жим штанги|жим в смите лёжа/i.test(e.name) && !/наклон|incline|decline|сниз|отриц|узк/i.test(e.name) },
+          { name: 'fly_cable', match: (e) => /развод|fly|crossover|кроссов|сведен|пек.?дек|бабоч|сведение/i.test(e.name) },
           { name: 'incline_press', match: (e) => /жим.*(наклон|incline|верх)/i.test(e.name) || /incline.*(press|жим)/i.test(e.name) },
-          { name: 'fly_cable', match: (e) => /развод|fly|crossover|кроссов|сведен|пек.?дек|бабоч/i.test(e.name) },
-          { name: 'dips_press', match: (e) => /отжим.*(брус|dip|параллел)|брусь/i.test(e.name) },
+          { name: 'dips_press', match: (e) => /отжим.*(брус|dip|параллел)|брусь/i.test(e.name) && !/трицепс/i.test(e.name) },
         ],
         back: [
           { name: 'vertical_pull', match: (e) => /подтяг|pull.?up|тяга.*верх|lat.?pull|пуллдаун|верхн.*блок/i.test(e.name) },

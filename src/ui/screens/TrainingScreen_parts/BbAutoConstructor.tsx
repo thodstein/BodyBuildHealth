@@ -154,6 +154,19 @@ function rotationSubstitutions(week: number, totalWeeks: number, muscle: string,
   return catalog.slice(0, 3).map(e => e.name);
 }
 
+/** ToolsToggle — раскрывающаяся секция инструментов тренера (не перегружает UI). */
+const ToolsToggle: React.FC = () => {
+  const [show, setShow] = useState(false);
+  return (
+    <div>
+      <button onClick={() => setShow(!show)} style={{ width:'100%', marginTop:8, padding:'8px 12px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background: show ? 'rgba(96,165,250,0.08)' : 'rgba(255,255,255,0.02)', color:'#60a5fa' }}>
+        {show ? '▲ Скрыть инструменты тренера' : '▼ Инструменты тренера (генератор сплитов, MRV, нагрузка, прогноз)'}
+      </button>
+      {show && <div style={{ marginTop:8 }}><PlannerToolsPanel mode="bb" /></div>}
+    </div>
+  );
+};
+
 export const BbAutoConstructor: React.FC = () => {
   const linked = useDataLink();
   const prof = useMemo(() => loadTrainingProfile(), []);
@@ -1230,8 +1243,8 @@ export const BbAutoConstructor: React.FC = () => {
           );
         })()}
 
-        {/* Инструменты тренера (inline) */}
-        <PlannerToolsPanel mode="bb" />
+        {/* Инструменты тренера — раскрывающаяся секция (не перегружает UI) */}
+        <ToolsToggle />
 
         {/* Summary */}
         <div style={{ display:'flex', gap:12, marginTop:10 }}>
