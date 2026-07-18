@@ -358,7 +358,9 @@ const ACCESSORY_2X_GROUPS = new Set<string>([
  * - ≥3 сессии/нед → primary 1.5×, accessory 0.75× (compound щедро, изоляция 3-4×N).
  * Итоговый недельный объём дополнительно капается по MRV в normalizeWeekMrv.
  */
-function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary' | 'accessory'): number {
+function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary' | 'accessory', muscle?: string, pedAdapt?: PEDAdaptation): number {
+  // PED boost для accessory arms/shoulders — на курсе нужен больший объём
+  const pedArmBoost = pedAdapt && pedAdapt.combinedMrvMultiplier >= 1.3 && muscle && ['triceps', 'biceps', 'shoulders', 'forearms'].includes(muscle) ? 1.4 : 1.0;
   if (sessionsPerWeek <= 1) {
     // P5: cap на 1×/нед — не более MAV×1.3. Иначе bro-split chest=25+ сетов.
     return Math.min(Math.round(mavRot), Math.round(mavRot * 1.3));
@@ -366,12 +368,12 @@ function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary
   if (sessionsPerWeek === 2) {
     const base = mavRot / 2;
     const factor = role === 'primary' ? 1.4 : 0.6;
-    return Math.max(1, Math.round(base * factor));
+    return Math.max(1, Math.round(base * factor * pedArmBoost));
   }
   // 3+ сессии/нед
   const base = mavRot / sessionsPerWeek;
   const factor = role === 'primary' ? 1.5 : 0.75;
-  return Math.max(1, Math.round(base * factor));
+  return Math.max(1, Math.round(base * factor * pedArmBoost));
 }
 
 /** fix D: недельный кап объёма каждой мышцы по её истинному MRV (после всех множителей).
@@ -559,7 +561,7 @@ function buildSession(
     }
     const mavRot = muscleVolumeRotation[muscle] || 0;
     const sessionsForMuscle = muscleSessionCount[muscle] || 1;
-    let sets = sessionShareFor(mavRot, sessionsForMuscle, role);
+    let sets = sessionShareFor(mavRot, sessionsForMuscle, role, muscle, pedAdapt);
     if (isWeak(muscle, weakPoints)) sets = Math.round(sets * 1.2);
     if (focusGroup === muscle || (focusGroup && isWeak(muscle, [focusGroup]))) sets = Math.round(sets * 1.3);
     // Фазовая модуляция объёма (deload/intensification/peaking снижают)

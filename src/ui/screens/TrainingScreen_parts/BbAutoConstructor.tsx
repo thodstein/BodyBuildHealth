@@ -47,6 +47,7 @@ import { PlanExportCard } from './PlanExportCard';
 import { DayCard, ExerciseRow, PhaseBanner, WeekStrip, PHASE_COLORS, PHASE_LABELS, type PlanDayView, type PlanExerciseView, type PhaseKey } from './PlanOutput';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
 import { getBBSuggestions } from './bb-compat';
+import { PlannerToolsPanel } from './PlannerToolsPanel';
 
 type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -1228,6 +1229,9 @@ export const BbAutoConstructor: React.FC = () => {
             } />
           );
         })()}
+
+        {/* Инструменты тренера (inline) */}
+        <PlannerToolsPanel mode="bb" />
 
         {/* Summary */}
         <div style={{ display:'flex', gap:12, marginTop:10 }}>
