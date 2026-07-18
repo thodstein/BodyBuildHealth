@@ -1070,7 +1070,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 const exercises: PlanExerciseView[] = d.exercises.map((e, ei) => {
                   const tmpo = getTempo(e.name, goal, e.load === 'main');
                   const detail = e.workSets.map((ws, si) => setStr(effSet(wk.week, di, ei, si, ws))).join('  ·  ');
-                  const tempo = tempoStr || e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); return srcEdits[k]?.tempo || tmpo.tempo.toString(); })[0];
+                  const tempo = tempoStr || e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); return srcEdits[k]?.tempo || tmpo.tempo.toString; })[0];
                   return { key: 'ex-' + di + '-' + ei, name: e.name, role: roleOf(e.load), detail, tempo } as PlanExerciseView;
                 });
                 (srcAdditions[dk] || []).forEach(a => {
