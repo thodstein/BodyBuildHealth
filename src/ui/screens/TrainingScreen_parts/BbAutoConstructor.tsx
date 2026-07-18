@@ -155,19 +155,6 @@ function rotationSubstitutions(week: number, totalWeeks: number, muscle: string,
   return catalog.slice(0, 3).map(e => e.name);
 }
 
-/** ToolsToggle — раскрывающаяся секция инструментов тренера (не перегружает UI). */
-const ToolsToggle: React.FC = () => {
-  const [show, setShow] = useState(false);
-  return (
-    <div>
-      <button onClick={() => setShow(!show)} style={{ width:'100%', marginTop:8, padding:'8px 12px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background: show ? 'rgba(96,165,250,0.08)' : 'rgba(255,255,255,0.02)', color:'#60a5fa' }}>
-        {show ? '▲ Скрыть инструменты тренера' : '▼ Инструменты тренера (генератор сплитов, MRV, нагрузка, прогноз)'}
-      </button>
-      {show && <div style={{ marginTop:8 }}><PlannerToolsPanel mode="bb" /></div>}
-    </div>
-  );
-};
-
 export const BbAutoConstructor: React.FC = () => {
   const linked = useDataLink();
   const prof = useMemo(() => loadTrainingProfile(), []);
@@ -215,6 +202,7 @@ export const BbAutoConstructor: React.FC = () => {
   // Мульти-планы: сохранённые варианты для сравнения
   const [savedPlans, setSavedPlans] = useState<SavedBBPlan[]>([]);
   const [showCompare, setShowCompare] = useState(false);
+  const [showTools, setShowTools] = useState(false);
   const refreshSavedPlans = useCallback(() => setSavedPlans(loadSavedBBPlans()), []);
   useEffect(() => { refreshSavedPlans(); }, [refreshSavedPlans]);
 
@@ -963,6 +951,34 @@ export const BbAutoConstructor: React.FC = () => {
           {autoRegOn && <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.7)' }}><div>Топ-сет ×{autoRegResult.topSetPctMultiplier} · объём ×{autoRegResult.volumeMultiplier} · RIR +{autoRegResult.rirShift}{autoRegResult.deload?' · 🔴 DELOAD':''}</div>{autoRegResult.decisions.slice(0,2).map((d,i) => <div key={i}>• {d}</div>)}</div>}
         </div>
 
+        {/* Слой 1: живой советник (на основе данных плана) */}
+        {(() => {
+          const lm = builtPlan.volumeLandmarks || [];
+          if (lm.length === 0) return null;
+          const MUSCLE_RU: Record<string, string> = { chest:'Грудь', back:'Спина', shoulders:'Плечи', quads:'Квадрицепс', hamstrings:'Бицепс бедра', glutes:'Ягодицы', calves:'Икры', biceps:'Бицепс', triceps:'Трицепс', forearms:'Предплечье', abs:'Пресс', traps:'Трапеции', arms:'Руки', legs:'Ноги', core:'Кор' };
+          const tips: string[] = [];
+          lm.forEach(r => {
+            const name = MUSCLE_RU[r.group] || r.label || r.group;
+            if (r.mrv && r.sets > r.mrv + 1) tips.push(`🔴 ${name}: ${r.sets} сет > MRV ${r.mrv} — снизьте на ${r.sets - r.mrv} сет.`);
+            else if (r.mev && r.sets < r.mev) tips.push(`🟡 ${name}: ${r.sets} сет < MEV ${r.mev} — доберите объём.`);
+          });
+          if (acwr) {
+            if (acwr.ratio > 1.3) tips.push(`🔴 ACWR ${acwr.ratio.toFixed(2)} — перетренированность, снизьте объём перед пиком.`);
+            else if (acwr.ratio < 0.8) tips.push(`🟡 ACWR ${acwr.ratio.toFixed(2)} — недогруз, можно добавить объём.`);
+            else tips.push(`✅ ACWR ${acwr.ratio.toFixed(2)} — баланс нагрузки.`);
+          }
+          if (weakPoints.length) tips.push(`🎯 Слабые группы (${weakPoints.join(', ')}) получают приоритет — проверьте feeder-сеты ниже.`);
+          if (tips.length === 0) tips.push('✅ План сбалансирован по объёму и восстановлению. Можно переходить к отчёту качества.');
+          return (
+            <div style={{ marginTop:6, padding:'10px 12px', borderRadius:12, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.18)' }}>
+              <div style={{ fontSize:12, fontWeight:800, color:'#00e68a', marginBottom:6 }}>💡 Советник плана</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                {tips.map((t,i) => <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.8)', lineHeight:1.4 }}>{t}</div>)}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Overload targets for this week */}
         {(() => {
           // Per-muscle частота и объём
@@ -1315,9 +1331,6 @@ export const BbAutoConstructor: React.FC = () => {
             } />
           );
         })()}
-
-        {/* Инструменты тренера — раскрывающаяся секция (не перегружает UI) */}
-        <ToolsToggle />
 
         {/* Summary */}
         <div style={{ display:'flex', gap:12, marginTop:10 }}>
@@ -1934,7 +1947,25 @@ export const BbAutoConstructor: React.FC = () => {
 
   return (
     <div>
-      {renderStepNav()}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10 }}>
+        <div style={{ flex:1 }}>{renderStepNav()}</div>
+        <button
+          onClick={() => setShowTools(true)}
+          title="Библиотека инструментов"
+          style={{ padding:'9px 12px', borderRadius:12, fontSize:16, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.8)', minWidth:38, minHeight:38, flexShrink:0 }}
+        >⚙️</button>
+      </div>
+      {showTools && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={() => setShowTools(false)}>
+          <div style={{ width:'100%', maxWidth:560, maxHeight:'85vh', overflowY:'auto', padding:16, borderRadius:16, background:'rgba(24,24,27,0.97)', border:'1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+              <div style={{ fontSize:14, fontWeight:800, color:'#00e68a' }}>📚 Библиотека инструментов</div>
+              <button onClick={() => setShowTools(false)} style={{ padding:'4px 10px', borderRadius:8, fontSize:12, cursor:'pointer', border:'none', background:'rgba(255,255,255,0.1)', color:'var(--text-dim)' }}>✕</button>
+            </div>
+            <PlannerToolsPanel mode="bb" />
+          </div>
+        </div>
+      )}
       {step === 'params' && renderParams()}
       {step === 'ped' && renderPedWorkMax()}
       {step === 'split' && renderSplit()}
