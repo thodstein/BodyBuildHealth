@@ -1044,6 +1044,78 @@ export const BbAutoConstructor: React.FC = () => {
           </div>
         </div>
 
+        {/* Фактическая нагрузка из дневника (sRPE/ACWR) */}
+        {(() => {
+          const srpeSessions = loadSRPESessions();
+          if (srpeSessions.length === 0) return null;
+          const acwrData = acuteChronicRatio(toDailyLoads(srpeSessions));
+          const last7 = srpeSessions.filter(s => {
+            const d = new Date(s.date || '');
+            const diff = (Date.now() - d.getTime()) / 86400000;
+            return diff <= 7;
+          });
+          const avgRPE = last7.length > 0 ? last7.reduce((s, x) => s + (x.sRPE || 7), 0) / last7.length : 0;
+          const zoneColor = acwrData.zone === 'dangerous' ? '#ef4444' : acwrData.zone === 'caution' ? '#f59e0b' : '#22c55e';
+          const zoneLabel = acwrData.zone === 'dangerous' ? '⛔ опасная' : acwrData.zone === 'caution' ? '⚠ осторожно' : '✅ оптимально';
+          return (
+            <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📊 Твоя фактическая нагрузка (из дневника)</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, fontSize:11 }}>
+                <div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(96,165,250,0.06)' }}>
+                  <div style={{ color:'rgba(255,255,255,0.5)', fontSize:10 }}>Сессий (7д)</div>
+                  <div style={{ fontWeight:700, color:'#60a5fa' }}>{last7.length}</div>
+                </div>
+                <div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(96,165,250,0.06)' }}>
+                  <div style={{ color:'rgba(255,255,255,0.5)', fontSize:10 }}>Средний RPE</div>
+                  <div style={{ fontWeight:700, color:'#60a5fa' }}>{avgRPE.toFixed(1)}</div>
+                </div>
+                <div style={{ textAlign:'center', padding:6, borderRadius:8, background: zoneColor + '10' }}>
+                  <div style={{ color:'rgba(255,255,255,0.5)', fontSize:10 }}>ACWR</div>
+                  <div style={{ fontWeight:700, color: zoneColor }}>{acwrData.ratio.toFixed(2)} <span style={{ fontSize:9 }}>{zoneLabel}</span></div>
+                </div>
+              </div>
+              {acwrData.ratio > 1.3 && <div style={{ marginTop:6, fontSize:10, color:'#f59e0b' }}>⚠ Восстановление недостаточно — план учитывает авторегуляцию.</div>}
+            </div>
+          );
+        })()}
+
+        {/* Сравнение недель — week 1 vs current week */}
+        {(() => {
+          const w1 = W[0];
+          const wCur = wk;
+          if (w1.week === wCur.week) return null;
+          const w1Sets = w1.sessions.reduce((s, sess) => s + sess.exercises.reduce((ss, e) => ss + e.sets, 0), 0);
+          const wCurSets = wCur.sessions.reduce((s, sess) => s + sess.exercises.reduce((ss, e) => ss + e.sets, 0), 0);
+          const w1Rir = w1.sessions.flatMap(s => s.exercises).reduce((s, e) => s + e.rir * e.sets, 0) / Math.max(1, w1Sets);
+          const wCurRir = wCur.sessions.flatMap(s => s.exercises).reduce((s, e) => s + e.rir * e.sets, 0) / Math.max(1, wCurSets);
+          const w1Wt = w1.sessions.flatMap(s => s.exercises).reduce((s, e) => s + (e.workSets[0]?.weight || 80) * e.sets, 0);
+          const wCurWt = wCur.sessions.flatMap(s => s.exercises).reduce((s, e) => s + (e.workSets[0]?.weight || 80) * e.sets, 0);
+          const setsDiff = wCurSets - w1Sets;
+          const rirDiff = wCurRir - w1Rir;
+          const wtDiff = wCurWt - w1Wt;
+          return (
+            <ExpandableCard title={`📋 Сравнение: неделя 1 vs неделя ${wCur.week}`} icon="📋"
+              short={`Сеты: ${w1Sets}→${wCurSets} (${setsDiff >= 0 ? '+' : ''}${setsDiff}) · RIR: ${w1Rir.toFixed(1)}→${wCurRir.toFixed(1)} · Тоннаж: ${wtDiff >= 0 ? '+' : ''}${Math.round(wtDiff)}кг`}
+              full={
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, fontSize:11 }}>
+                  <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>
+                    <div style={{ color:'rgba(255,255,255,0.5)', fontSize:10 }}>Объём (сеты)</div>
+                    <div style={{ fontWeight:700 }}>{w1Sets} → {wCurSets} <span style={{ color: setsDiff >= 0 ? '#22c55e' : '#ef4444' }}>({setsDiff >= 0 ? '+' : ''}{setsDiff})</span></div>
+                  </div>
+                  <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>
+                    <div style={{ color:'rgba(255,255,255,0.5)', fontSize:10 }}>Средний RIR</div>
+                    <div style={{ fontWeight:700 }}>{w1Rir.toFixed(1)} → {wCurRir.toFixed(1)} <span style={{ color: rirDiff <= 0 ? '#22c55e' : '#f59e0b' }}>({rirDiff >= 0 ? '+' : ''}{rirDiff.toFixed(1)})</span></div>
+                  </div>
+                  <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>
+                    <div style={{ color:'rgba(255,255,255,0.5)', fontSize:10 }}>Тоннаж (кг)</div>
+                    <div style={{ fontWeight:700 }}>{Math.round(w1Wt)} → {Math.round(wCurWt)} <span style={{ color: wtDiff >= 0 ? '#22c55e' : '#ef4444' }}>({wtDiff >= 0 ? '+' : ''}{Math.round(wtDiff)})</span></div>
+                  </div>
+                </div>
+              }
+            />
+          );
+        })()}
+
         {/* Progression chart across all weeks */}
         {(() => {
           const wkStats = W.map(w => {
