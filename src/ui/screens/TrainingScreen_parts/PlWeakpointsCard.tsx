@@ -2,6 +2,7 @@
  * REUSE lms/weakpoint-pl (diagnoseWeakPoint + WEAK_POINTS_BY_LIFT) — ранее 0% в UI. */
 import React, { useState, useMemo } from 'react';
 import { diagnoseWeakPoint, WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
+import { getPLWeakPointRecommendations } from '../../../engines/lms/lms-builder.engine';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
 import { applyToPlanner } from './planner-bridge';
 import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
@@ -45,14 +46,17 @@ export const PlWeakpointsCard: React.FC = () => {
         </div>
 
         <div style={H}>💪 Ассистентные упражнения</div>
-        {diag.assistance.length === 0
-          ? <div style={{ fontSize: 10, color: DIM }}>Нет данных.</div>
-          : diag.assistance.map((a, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', marginBottom: 4, borderRadius: 6, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.15)' }}>
-              <span style={{ fontSize: 11, color: '#fff' }}>{a}</span>
-              <span style={{ fontSize: 10, color: ACCENT }}>≈ {Math.round(diag.intensityPct * 100)}% ПМ</span>
-            </div>
-          ))}
+        {(() => {
+          const rec = getPLWeakPointRecommendations(lift, wp);
+          return rec.corrections.length === 0
+            ? <div style={{ fontSize: 10, color: DIM }}>Нет данных.</div>
+            : rec.corrections.map((a, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', marginBottom: 4, borderRadius: 6, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.15)' }}>
+                <span style={{ fontSize: 11, color: '#fff' }}>{a}</span>
+                <span style={{ fontSize: 10, color: ACCENT }}>≈ {Math.round(rec.pct * 100)}% ПМ</span>
+              </div>
+            ));
+        })()}
 
         <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)' }}>
           <div style={{ fontSize: 10, color: '#60a5fa', fontWeight: 700, marginBottom: 2 }}>📋 Обоснование</div>

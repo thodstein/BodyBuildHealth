@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, selectBestCycle, explainSelection, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
-import { buildLMSPlan, extractExercises, type LMSBuildOutput } from '../../engines/lms/lms-builder.engine';
+import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, type LMSBuildOutput } from '../../engines/lms/lms-builder.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
 import { mesocyclePhaseForWeek } from '../../engines/rir-matrix.engine';
 import { autoRegulate, shouldTrainToday, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
@@ -229,7 +229,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!pmMap['Жим лежа']) pmMap['Жим лежа'] = pmBench;
     if (!pmMap['Становая тяга']) pmMap['Становая тяга'] = pmDead;
     const plan = buildLMSPlan({ 
-      template: tpl, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: cycleWeeks,
+      template: tpl, pmMap, fallbackPm: 80, mode: peds.length ? 'on_course' : 'natural', courseIntensity, weeksOverride: cycleWeeks,
       volumeGoal: (linked.profile?.settings?.volumeGoal as any) || 'mav',
       focusLift: (linked.profile?.settings?.focusLift as any),
       currentReadiness: linked.readiness?.recovery,
@@ -251,6 +251,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [bbVolGoal, setBbVolGoal] = useState<string>(_bbSaved?.bbVolGoal || 'mav');
   const [bbFocus, setBbFocus] = useState<string>(_bbSaved?.bbFocus || '');
   const [peds, setPeds] = useState<PED[]>(_bbSaved?.peds ?? (_profPL.onCourse ? (['AAS'] as PED[]) : []));
+  const [pedDoses, setPedDoses] = useState<Record<string, number>>(_plSaved?.pedDoses ?? _bbSaved?.pedDoses ?? { AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
+  const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(_plSaved?.courseIntensity ?? _profPL.courseIntensity ?? 'moderate');
+  useEffect(() => { try { const cur = JSON.parse(localStorage.getItem('he_pl_session') || '{}'); localStorage.setItem('he_pl_session', JSON.stringify({ ...cur, peds, pedDoses, courseIntensity })); } catch { /* ignore */ } }, [peds, pedDoses, courseIntensity]);
   const _validateBBPlan = (plan: any): BBPlan | null => {
     if (!plan || !Array.isArray(plan.weeks) || !plan.weeks.length) return null;
     return plan;
@@ -676,7 +679,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             }
             return (
               <>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>
                   Цикл использует {exs.length} упражнений. Укажите ПМ для каждого:
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr ' + (cols > 3 ? '1fr' : ''), gap: 6 }}>
@@ -718,12 +721,63 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {opt.weakPoints.map((wp) => {
                   const on = plWeakPoints.some(x => x.lift === opt.lift && x.weakPoint === wp.id);
-                  return <button key={wp.id} onClick={() => togglePlWeak(opt.lift as Lift, wp.id as WeakPoint)} style={{ padding: "4px 8px", borderRadius: 12, fontSize: 9, fontWeight: 700, cursor: "pointer", border: on ? "1px solid #8b5cf6" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.02)", color: on ? "#8b5cf6" : "rgba(255,255,255,0.6)" }}>{wp.label}{on ? " ✓" : ""}</button>;
+                  return <button key={wp.id} onClick={() => togglePlWeak(opt.lift as Lift, wp.id as WeakPoint)} style={{ padding: "4px 8px", borderRadius: 12, fontSize: 10, fontWeight: 700, cursor: "pointer", border: on ? "1px solid #8b5cf6" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.02)", color: on ? "#8b5cf6" : "rgba(255,255,255,0.6)" }}>{wp.label}{on ? " ✓" : ""}</button>;
                 })}
               </div>
             </div>
             ));
           })()}
+          {/* 💉 PED-адаптация объёмов (как в ББ-авто) */}
+          <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>💉 PED / Курс — адаптация объёмов</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {(['AAS','insulin','MGF','IGF1','GH'] as PED[]).map(p => (
+                <button key={p} onClick={() => togglePed(p)}
+                  style={{ padding: '6px 12px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: peds.includes(p) ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: peds.includes(p) ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: peds.includes(p) ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>
+                  {['AAS: ААС','insulin: Инсулин','MGF: MGF','IGF1: IGF-1','GH: ГР'][['AAS','insulin','MGF','IGF1','GH'].indexOf(p)]}{peds.includes(p) ? ' ✓' : ''}
+                </button>
+              ))}
+            </div>
+            {peds.length > 0 && (
+              <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Дозировки (мг/нед или МЕ/нед)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                  {peds.map(p => {
+                    const labels: Record<string, string> = { AAS: 'ААС, мг/нед', insulin: 'Инсулин, МЕ/день', MGF: 'MGF, мкг/нед', IGF1: 'IGF-1, мкг/день', GH: 'ГР, МЕ/день' };
+                    return (
+                      <div key={p} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{labels[p] || p}</span>
+                        <input type="number" value={pedDoses[p] || 0} min={0} max={p === 'AAS' ? 3000 : p === 'insulin' ? 50 : 500}
+                          onChange={e => setPedDoses(d => ({ ...d, [p]: parseInt(e.target.value) || 0 }))}
+                          style={{ width: '100%', padding: '5px 8px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 11, fontWeight: 700, textAlign: 'center', boxSizing: 'border-box' }} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {peds.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>Интенсивность курса</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {([['mild','Лёгкая'],['moderate','Умеренная'],['heavy','Тяжёлая']] as const).map(([val,label]) => (
+                    <button key={val} onClick={() => setCourseIntensity(val)}
+                      style={{ padding: '5px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                        border: courseIntensity === val ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                        background: courseIntensity === val ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)',
+                        color: courseIntensity === val ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {peds.length > 0 && (
+              <div style={{ ...SMALL, marginTop: 6 }}>
+                Режим курса: MRV повышен ×{(courseIntensity === 'heavy' ? 1.35 : courseIntensity === 'moderate' ? 1.25 : 1.15).toFixed(2)} (как в ББ-авто). Дозировки: {peds.map(p => `${p} ${pedDoses[p] || 0}`).join(', ')}.
+              </div>
+            )}
+          </div>
           <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={buildSrc}>Сгенерировать план ({cycleWeeks} нед)</button>
           {builtSrc && (() => {
             const W = builtSrc.weeks;
@@ -755,11 +809,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 <div style={{ marginTop:8, fontSize:10, color:'#c4b5fd', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.25)', padding:'6px 8px', borderRadius:8 }}>
                   <div style={{ fontWeight:700, marginBottom:4 }}>🎯 Слабые точки СРЦ (добавлены ассистенты в план):</div>
                   {plWeakPoints.map((wp, i) => {
-                    const diag = diagnoseWeakPoint(wp.lift, wp.weakPoint);
+                    const rec = getPLWeakPointRecommendations(wp.lift, wp.weakPoint);
                     const liftLabelMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга верхнего блока', incline_press: 'Жим на наклонной' };
                     const liftLabel = liftLabelMap[wp.lift] || wp.lift;
-                    const assist = diag.assistance[0] || '—';
-                    return <div key={i} style={{ marginBottom:2 }}>• <b>{PL_WEAKPOINT_LABELS[wp.weakPoint]}</b> ({liftLabel}): + {assist} — {diag.rationale}</div>;
+                    const assists = rec.corrections.length ? rec.corrections : ['—'];
+                    return <div key={i} style={{ marginBottom:2 }}>• <b>{PL_WEAKPOINT_LABELS[wp.weakPoint]}</b> ({liftLabel}): + {assists.join(', ')} — {rec.rationale}</div>;
                   })}
                 </div>
               )}
@@ -978,12 +1032,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                                 {e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); const es = effSet(wk.week, di, ei, si, ws); const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'2px 4px', fontSize:10, textAlign:'center' }; return (
                                   <div key={si} style={{ display:'flex', gap:3, alignItems:'center' }}>
                                     <span style={{ fontSize:10, color:'rgba(255,255,255,0.3)' }}>С{si+1}</span>
-                                    <input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], weight: +ev.target.value } }))} style={{ ...INM, width:44 }} />
+                                    <input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], weight: +ev.target.value } }))} style={{ ...INM, flex:'1', minWidth:0 }} />
                                     <span style={{ fontSize:10 }}>×</span>
-                                    <input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:32 }} />
+                                    <input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, flex:'1', minWidth:0 }} />
                                     <span style={{ fontSize:10 }}>×</span>
-                                    <input type='number' value={es.sets} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], sets: +ev.target.value } }))} style={{ ...INM, width:28 }} />
-                                    <input type='text' value={srcEdits[k]?.tempo || ''} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], tempo: ev.target.value } }))} style={{ ...INM, width:56, textAlign:'center', color:'#a855f7', fontWeight:700 }} placeholder='3-1-1-0' />
+                                    <input type='number' value={es.sets} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], sets: +ev.target.value } }))} style={{ ...INM, flex:'1', minWidth:0 }} />
+                                    <input type='text' value={srcEdits[k]?.tempo || ''} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], tempo: ev.target.value } }))} style={{ ...INM, flex:'1', minWidth:0, textAlign:'center', color:'#a855f7', fontWeight:700 }} placeholder='3-1-1-0' />
                                   </div>
                                 ); })}
                               </div>
@@ -994,11 +1048,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                               <div style={{ fontSize:11, color:'var(--accent)', fontWeight:600 }}>{a.name} <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>＋ добавлено</span> <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:10, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', marginLeft:4 }}>✕</button></div>
                               <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', textAlign:'right' }}>
                                 <div style={{ display:'flex', gap:3, alignItems:'center' }}>
-                                  <input type='number' value={a.sets} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, sets: +ev.target.value } : x) }; })} style={{ width:30, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'3px', fontSize:10, textAlign:'center' }} aria-label='подходы'/>
+                                  <input type='number' value={a.sets} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, sets: +ev.target.value } : x) }; })} style={{ flex:'1', minWidth:0, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'3px', fontSize:10, textAlign:'center' }} aria-label='подходы'/>
                                   <span style={{ fontSize:8 }}>×</span>
-                                  <input type='number' value={a.reps} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, reps: +ev.target.value } : x) }; })} style={{ width:36, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'3px', fontSize:10, textAlign:'center' }} aria-label='повт'/>
+                                  <input type='number' value={a.reps} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, reps: +ev.target.value } : x) }; })} style={{ flex:'1', minWidth:0, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'3px', fontSize:10, textAlign:'center' }} aria-label='повт'/>
                                   <span style={{ fontSize:8 }}>×</span>
-                                  <input type='number' value={a.weight} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, weight: +ev.target.value } : x) }; })} style={{ width:50, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'3px', fontSize:10, textAlign:'center' }} aria-label='вес'/>
+                                  <input type='number' value={a.weight} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, weight: +ev.target.value } : x) }; })} style={{ flex:'1', minWidth:0, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'3px', fontSize:10, textAlign:'center' }} aria-label='вес'/>
                                 </div>
                               </div>
                             </div>

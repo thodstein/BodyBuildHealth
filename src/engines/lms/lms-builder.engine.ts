@@ -10,9 +10,11 @@ import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec } from '../../data/lms-
 import { pmProgression, workWeight, progressionRationale, type ProgressionMode, type PMProgressionInput } from './lms-progression.engine';
 import { calcSessionMetrics, type SRExercise, type SRSessionMetrics, type SRCycleMetrics } from './lms-metrics.engine';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
+import { type Exercise } from '../../core/types';
 import { selectExercisesSmart } from '../exercise-selector.engine';
 import { mesocyclePhaseForWeek, RIR_MATRIX, MesoPhaseConfigs, type MesocyclePhase } from '../rir-matrix.engine';
 import { diagnoseWeakPoint, type Lift, type WeakPoint } from './weakpoint-pl';
+import { diagnoseLift } from '../pro/lift-diagnostics.engine';
 
 import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.engine';
 
@@ -169,11 +171,66 @@ function rirLevelKey(level: string): keyof typeof RIR_MATRIX['strength'] {
   }
 }
 
+/** Найти упражнение в каталоге по метке коррекции (метка может быть более специфичной, чем имя в каталоге). */
+function findCatalogExerciseByLabel(label: string): Exercise | null {
+  const n = norm(label);
+  let ex = EXERCISE_CATALOG.find(e => norm(e.name) === n);
+  if (ex) return ex;
+  ex = EXERCISE_CATALOG.find(e => {
+    const en = norm(e.name);
+    return en.length > 2 && (en.includes(n) || n.includes(en));
+  });
+  return ex || null;
+}
+
+/** Группа (английский ключ) упражнения по каталогу; fallback — если в каталоге нет. */
+function groupOfExercise(name: string, fallback: string): string {
+  const ex = EXERCISE_CATALOG.find(e => norm(e.name) === norm(name));
+  if (ex?.group) return ex.group as string;
+  return fallback;
+}
+
+/**
+ * Собрать список корректирующих упражнений для слабой точки.
+ * Для классических лифтов (bench/squat/deadlift) берём до 4 corrections из lift-diagnostics
+ * (биомеханическая диагностика по фазе движения). Для остальных лифтов — assistance из weakpoint-pl.
+ */
+function collectPLCorrections(lift: Lift, weakPoint: WeakPoint): { name: string; pct: number }[] {
+  const diag = diagnoseLift(lift, weakPoint);
+  if (diag && diag.corrections.length) {
+    return diag.corrections.map(c => ({ name: c, pct: diag.assistanceIntensityPct }));
+  }
+  const base = diagnoseWeakPoint(lift, weakPoint);
+  if (base.assistance.length) {
+    return base.assistance.map(a => ({ name: a, pct: base.intensityPct }));
+  }
+  return [];
+}
+
+export interface PLWeakPointRecommendation {
+  corrections: string[];
+  rationale: string;
+  group: string;
+  pct: number;
+}
+
+/** Рекомендация для UI: какие упражнения и почему включить по диагностике слабой точки. */
+export function getPLWeakPointRecommendations(lift: Lift, weakPoint: WeakPoint): PLWeakPointRecommendation {
+  const group = liftToEnGroup(lift);
+  const diag = diagnoseLift(lift, weakPoint);
+  if (diag) {
+    return { corrections: diag.corrections, rationale: diag.biomechanicalReason, group, pct: diag.assistanceIntensityPct };
+  }
+  const base = diagnoseWeakPoint(lift, weakPoint);
+  return { corrections: base.assistance, rationale: base.rationale, group, pct: base.intensityPct };
+}
+
 /**
  * Инъекция ассистентных упражнений по диагностике слабой точки СРЦ-движения.
- * Для каждого {lift, weakPoint} подбираем 1 ассистент из weakpoint-pl, который ещё не
- * присутствует в дне, и добавляем его (3 подхода на %ПМ из DIAGNOSIS) в день, содержащий
- * основной лифт этого движения. Не дублирует уже назначенные упражнения.
+ * Для каждого {lift, weakPoint} подбираем до MAX_CORRECTIONS корректирующих упражнений
+ * (из lift-diagnostics для классики, иначе из weakpoint-pl), которые ещё не присутствуют в дне,
+ * и добавляем их (3 подхода на %ПМ из диагностики) в день, содержащий основной лифт.
+ * Не дублирует уже назначенные упражнения; соблюдает MRV soft-cap группы.
  */
 function injectPLWeakPoints(
   days: LMSPlanDay[],
@@ -184,44 +241,43 @@ function injectPLWeakPoints(
   vrLevel: 'beginner' | 'intermediate' | 'advanced',
   pedMrvMult: number,
 ): void {
+  const mainNameMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга', pulldown: 'Тяга', incline_press: 'Жим гантелей' };
+  const MAX_CORRECTIONS = 2;
   for (const wp of weakPoints) {
-    const diag = diagnoseWeakPoint(wp.lift, wp.weakPoint);
-    if (!diag.assistance.length) continue;
-    const target = diag.assistance[0];
-    // найти день, содержащий основной лифт (Присед/Жим лежа/Становая тяга/Жим стоя/Тяга/Жим гантелей)
-    const mainNameMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга', pulldown: 'Тяга', incline_press: 'Жим гантелей' };
     const mainName = mainNameMap[wp.lift] || 'Жим';
-    let hostDay = days.find(d => d.exercises.some(e => norm(e.name).includes(norm(mainName)) || norm(mainName).includes(norm(e.name))));
-    if (!hostDay) hostDay = days[0];
-    // Предпочитаем ассистент, который реально есть в каталоге упражнений (корректный fatigueCost + лейбл в выполнении)
-    const catalogNames = new Set(EXERCISE_CATALOG.map(e => e.name));
-    const targetName = diag.assistance.find(n => catalogNames.has(n)) || target;
-    if (!hostDay || hostDay.exercises.some(e => norm(e.name) === norm(targetName))) continue;
-    const pm = pmRow[targetName] ?? pmRow[mainName] ?? 80;
-    const sets = Math.max(2, Math.round(3 * phaseVolMod));
-    const pct = diag.intensityPct;
-    // MRV soft-cap: не превышаем восстанавливаемый объём группы (auto-циклы)
-    const hostGroup = liftToEnGroup(wp.lift);
-    if (hostGroup) {
-      const ref = getVolumeLandmarks(vrLevel, hostGroup);
+    let hostDayIdx = days.findIndex(d => d.exercises.some(e => norm(e.name) === norm(mainName)));
+    if (hostDayIdx < 0) hostDayIdx = 0;
+    const hostDay = days[hostDayIdx];
+    const existing = new Set(hostDay.exercises.map(e => norm(e.name)));
+    const liftGroup = liftToEnGroup(wp.lift);
+    const corrections = collectPLCorrections(wp.lift, wp.weakPoint).slice(0, MAX_CORRECTIONS);
+    for (const c of corrections) {
+      const ex = findCatalogExerciseByLabel(c.name);
+      const resolvedName = ex ? ex.name : c.name;
+      if (existing.has(norm(resolvedName))) continue;
+      const exGroup = ex ? (ex.group as string) : liftGroup;
+      const sets = Math.max(2, Math.round(3 * phaseVolMod));
+      const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? 80;
+      // MRV soft-cap: не превышаем восстанавливаемый объём группы (auto-циклы)
+      const ref = getVolumeLandmarks(vrLevel, exGroup);
       if (ref) {
         const cur = days.reduce((s, d) => s + d.exercises
-          .filter(e => exEnGroup(e.group) === hostGroup)
+          .filter(e => groupOfExercise(e.name, liftGroup) === exGroup)
           .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0), 0);
         if (cur + sets > Math.round(ref.mrv * pedMrvMult)) continue;
       }
+      hostDay.exercises.push({
+        name: resolvedName,
+        group: exGroup,
+        coef: 0.7,
+        mnosz: 1,
+        load: 'Средняя',
+        pm,
+        rir: rirBase,
+        workSets: [{ pct: c.pct, reps: 8, sets: Math.max(1, sets), weight: workWeight(pm, c.pct), rir: rirBase }],
+      });
+      existing.add(norm(resolvedName));
     }
-    const groupMap: Record<string, string> = { bench: 'ПР', squat: 'ЖМ', deadlift: 'ТГ', ohp: 'ПР', row: 'ТГ', pulldown: 'ТГ', incline_press: 'ПР' };
-    hostDay.exercises.push({
-      name: targetName,
-      group: groupMap[wp.lift] || 'ТГ',
-      coef: 0.7,
-      mnosz: 1,
-      load: 'Средняя',
-      pm,
-      rir: rirBase,
-      workSets: [{ pct, reps: 8, sets: Math.max(1, sets), weight: workWeight(pm, pct), rir: rirBase }],
-    });
   }
 }
 
