@@ -160,8 +160,74 @@ function isPushDayTag(sessionTag: string): boolean {
   return t.includes('push') || t === 'chest' || (t.includes('shoulders') && !t.includes('pull'));
 }
 
+/**
+ * Гранулярные слабые группы → конкретные упражнения для приоритета.
+ * При выборе weakPoint='delt_mid' — махи в стороны получают +20 к скору.
+ * При выборе weakPoint='back_width' — подтягивания/пуллдауны получают +20.
+ * При выборе weakPoint='chest_upper' — жимы на наклонной получают +20.
+ */
+const WEAK_EXERCISE_BONUS: Record<string, (name: string) => boolean> = {
+  chest_upper: (n) => /жим.*(наклон|incline|верх)|incline.*press/i.test(n),
+  chest_lower: (n) => /жим.*(сниз|decline|отриц)|decline.*press/i.test(n),
+  back_width: (n) => /подтяг|pull.?up|тяга.*верх|lat.?pull|пуллдаун/i.test(n),
+  back_thickness: (n) => /тяга.*(наклон|штанг|гантел|груд|пояс)|row/i.test(n) && !/верх|подтяг/i.test(n),
+  delt_front: (n) => /жим.*(стоя|сидя|армей|overhead)|кубическ/i.test(n),
+  delt_mid: (n) => /мах.*(сторону|гантел|блок|кроссов)|lateral.*raise|отведение/i.test(n),
+  delt_rear: (n) => isRearDeltExercise(n),
+  glutes: (n) => /ягодичн.*мост|hip.?thrust|glute.?bridge|отведен.*ног|kick.?back/i.test(n),
+  hamstrings: (n) => /сгибан.*ног|leg.?curl|румын|rdl/i.test(n),
+  quads: (n) => /присед|squat|жим.*ног|leg.?press|разгибан.*ног/i.test(n),
+  calves: (n) => /подъём.*носк|подъем.*носк|calf/i.test(n),
+  biceps: (n) => /сгибан.*рук|бицепс|curl|молот/i.test(n),
+  triceps: (n) => /разгибан.*рук|трицепс|pushdown|француз/i.test(n),
+  forearms: (n) => /запяст|предплеч|wrist|пронац/i.test(n),
+  traps: (n) => /шраг/i.test(n),
+  abs: (n) => /скручиван|crunch|пресс|подъём.*ног|подъем.*ног/i.test(n),
+};
+
+/** Получить бонус к скору для упражнения по гранулярной слабой группе. */
+function weakExerciseBonus(exName: string, weakPoints: string[]): number {
+  let bonus = 0;
+  for (const wp of weakPoints) {
+    const matcher = WEAK_EXERCISE_BONUS[wp];
+    if (matcher && matcher(exName)) bonus += 20;
+  }
+  return bonus;
+}
+
+/** Маппинг гранулярных слабых групп в канонические мышцы (для объёма/MRV). */
+const WEAK_TO_MUSCLE: Record<string, string> = {
+  chest: 'chest', chest_upper: 'chest', chest_lower: 'chest',
+  back: 'back', back_width: 'back', back_thickness: 'back',
+  shoulders: 'shoulders', delt_front: 'shoulders', delt_mid: 'shoulders', delt_rear: 'shoulders',
+  quads: 'quads', hamstrings: 'hamstrings', glutes: 'glutes', calves: 'calves',
+  biceps: 'biceps', triceps: 'triceps', forearms: 'forearms',
+  abs: 'abs', traps: 'traps',
+};
+
 /** Для каких мышц в BB-контексте ВСЕГДА брать только изоляцию (нет compound аналогов). */
 const ALWAYS_ISOLATION: Set<string> = new Set(['calves', 'forearms', 'abs']);
+
+/** Ранг упражнения по "тяжести" — определяет порядок внутри угла.
+ *  compound barbell (1) > compound dumbbell (2) > compound machine (3) >
+ *  compound cable (4) > compound bodyweight (5) > isolation (6) > one-arm (7).
+ *  Первое упражнение в дне должно быть самым тяжёлым (наибольшее механическое натяжение). */
+function strengthRank(ex: any): number {
+  const n = (ex.name || '').toLowerCase();
+  const eq = String(ex.equipment || '').toLowerCase();
+  const isOneArm = /одной рукой|одной руке|single.?arm|unilateral/i.test(n);
+  const isCompound = ex.type === 'compound';
+  if (isOneArm) return 7;
+  if (!isCompound) return 6;
+  if (eq.includes('barbell') || eq.includes('smith')) return 1;
+  if (eq.includes('dumbbell')) return 2;
+  if (eq.includes('machine')) return 3;
+  if (eq.includes('cable')) return 4;
+  if (eq.includes('bodyweight') || eq.includes('suspension')) return 5;
+  return 5;
+}
+
+/** Проверить, является ли упражнение задней дельтой (rear delt). */
 /**
  * BB-JUNK: упражнения, не подходящие для гипертрофийного бодибилдинга.
  * Реабилитация/кор-стабильность/функционалка: pallof, bird dog, monster walks,
@@ -197,6 +263,14 @@ const PARENT_MUSCLE: Record<string, string> = {
 };
 function isWeak(muscle: string, weakPoints: string[]): boolean {
   if (weakPoints.includes(muscle)) return true;
+  // Гранулярные: delt_mid → shoulders, chest_upper → chest, back_width → back
+  const parent = WEAK_TO_MUSCLE[muscle];
+  if (parent && weakPoints.includes(parent)) return true;
+  // Обратное: shoulders weak → delt_front/mid/rear тоже weak
+  for (const wp of weakPoints) {
+    const wpParent = WEAK_TO_MUSCLE[wp];
+    if (wpParent === muscle) return true;
+  }
   return weakPoints.includes(PARENT_MUSCLE[muscle] ?? '');
 }
 /** Развернуть родительские группы (shoulders→3 delt) для проверки специализации. */
@@ -458,13 +532,17 @@ function buildSession(
       Back: new Set(['back']),
       Shoulders: new Set(['shoulders']),
       Arms: new Set(['biceps', 'triceps', 'forearms']),
-      Legs: new Set(['quads', 'hamstrings', 'glutes', 'calves']),
+      // Legs: чередование quads/hamstrings как primary по номеру дня в ротации.
+      // 1-й Legs-день: quads primary (тяж), hams accessory (памп).
+      // 2-й Legs-день: hamstrings primary (тяж), quads accessory (памп).
+      // Это устраняет "всегда квадры тяж" — даёт баланс развития.
+      Legs: dayInRotation % 2 === 0 ? new Set(['hamstrings', 'glutes']) : new Set(['quads', 'glutes']),
       Push: new Set(['chest', 'shoulders', 'triceps']),
       Pull: new Set(['back', 'biceps', 'traps']),
       ChestBack: new Set(['chest', 'back']),
       ShouldersArms: new Set(['shoulders', 'biceps', 'triceps', 'forearms']),
       Upper: new Set(['chest', 'back', 'shoulders', 'biceps', 'triceps']),
-      Lower: new Set(['quads', 'hamstrings', 'glutes', 'calves']),
+      Lower: dayInRotation % 2 === 0 ? new Set(['hamstrings', 'glutes', 'calves']) : new Set(['quads', 'glutes', 'calves']),
       FullBody: new Set(['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'arms']),
       Torso: new Set(['chest', 'back', 'shoulders']),
       Limbs: new Set(['quads', 'hamstrings', 'glutes', 'biceps', 'triceps', 'calves']),
@@ -472,7 +550,7 @@ function buildSession(
       LowerPower: new Set(['quads', 'hamstrings', 'glutes', 'calves']),
       UpperHyp: new Set(['chest', 'back', 'shoulders', 'biceps', 'triceps']),
       LowerHyp: new Set(['quads', 'hamstrings', 'glutes', 'calves']),
-      LegsBiceps: new Set(['quads', 'hamstrings', 'calves', 'biceps']),
+      LegsBiceps: new Set(['quads', 'hamstrings', 'calves']),
     };
     const tagPrimaries = sched.sessionTag ? TAG_PRIMARY_MUSCLES[sched.sessionTag] : undefined;
     const isMainMuscle = !tagPrimaries || tagPrimaries.has(muscle);
@@ -721,17 +799,24 @@ function buildSession(
         const diverse: any[] = [];
         const usedIds = new Set<string>();
         // Берём по 1 упражнению из каждого угла, пока не наберём exerciseCount.
-        // Учитываем ротацию: исключаем уже использованные (sessionSelectedIds + sessionSelectedNames).
-        // СМЕЩЕНИЕ: выбираем не всегда candidates[0], а candidates[offset] —
-        // разное упражнение из каждого угла для разных сессий/недель/сплитов.
-        // offset = (week*31 + dayInRotation*17 + classIdx*7) — детерминированный pseudo-random.
+        // Сортировка внутри угла: compound barbell → dumbbell → machine → cable → one-arm.
+        // Первое упражнение мышцы = самое тяжёлое (максимальное механическое натяжение).
         for (let ci = 0; ci < classes.length; ci++) {
           const ac = classes[ci];
           if (diverse.length >= exerciseCount) break;
-          const candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id)
+          let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id)
             && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name));
+          // Сортировать по strengthRank (тяж compounds первыми) + weakExerciseBonus (слабые группы приоритет)
+          candidates = candidates.sort((a, b) => {
+            const rankDiff = strengthRank(a) - strengthRank(b);
+            if (rankDiff !== 0) return rankDiff;
+            const weakDiff = weakExerciseBonus(b.name || '', weakPoints) - weakExerciseBonus(a.name || '', weakPoints);
+            return weakDiff;
+          });
           if (candidates.length > 0) {
-            const offset = (week * 31 + dayInRotation * 17 + ci * 7) % candidates.length;
+            // Для первого упражнения (ci=0) — всегда брать самое тяжёлое (rank 1-2).
+            // Для последующих — offset для вариативности между неделями.
+            const offset = ci === 0 ? 0 : (week * 31 + dayInRotation * 17 + ci * 7) % Math.max(1, candidates.length);
             const pick = candidates[offset];
             diverse.push(pick);
             usedIds.add(pick.id);
@@ -743,9 +828,14 @@ function buildSession(
         for (let ci = 0; ci < classes.length; ci++) {
           const ac = classes[ci];
           if (diverse.length >= exerciseCount) break;
-          const candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id));
+          let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id));
+          candidates = candidates.sort((a, b) => {
+            const rankDiff = strengthRank(a) - strengthRank(b);
+            if (rankDiff !== 0) return rankDiff;
+            return weakExerciseBonus(b.name || '', weakPoints) - weakExerciseBonus(a.name || '', weakPoints);
+          });
           if (candidates.length > 0) {
-            const offset = (week * 31 + dayInRotation * 17 + ci * 7 + 3) % candidates.length;
+            const offset = ci === 0 ? 0 : (week * 31 + dayInRotation * 17 + ci * 7 + 3) % Math.max(1, candidates.length);
             const pick = candidates[offset];
             diverse.push(pick);
             usedIds.add(pick.id);

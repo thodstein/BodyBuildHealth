@@ -52,7 +52,14 @@ type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
 type PlanMode = 'generic_split' | 'bb_cycle';
 
-const WEAK_GROUPS = [['chest','Грудь'],['back','Спина'],['legs','Ноги'],['shoulders','Плечи'],['arms','Руки'],['core','Кор']] as const;
+const WEAK_GROUPS = [
+  ['chest','Грудь'],['chest_upper','Верх груди'],['chest_lower','Низ груди'],
+  ['back','Спина'],['back_width','Ширина спины'],['back_thickness','Толщина спины'],
+  ['shoulders','Плечи (общее)'],['delt_front','Передняя дельта'],['delt_mid','Средняя дельта'],['delt_rear','Задняя дельта'],
+  ['quads','Квадрицепс'],['hamstrings','Бицепс бедра'],['glutes','Ягодицы'],['calves','Икры'],
+  ['biceps','Бицепс'],['triceps','Трицепс'],['forearms','Предплечья'],
+  ['abs','Пресс'],['traps','Трапеции'],
+] as const;
 const BB_WM_KEYS = ['chest','back','quads','hamstrings','shoulders','biceps','triceps','glutes','calves','abs'] as const;
 const BB_WM_RU: Record<string,string> = { chest:'Грудь', back:'Спина', quads:'Квадрицепсы', hamstrings:'Бицепс бедра', shoulders:'Плечи', biceps:'Бицепс', triceps:'Трицепс', glutes:'Ягодичные', calves:'Икры', abs:'Пресс' };
 const TAG_LABELS_RU: Record<string, string> = {
