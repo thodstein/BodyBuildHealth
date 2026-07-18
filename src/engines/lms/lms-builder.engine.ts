@@ -268,12 +268,18 @@ function injectPLWeakPoints(
       const exGroup = ex ? (ex.group as string) : liftGroup;
       const sets = Math.max(2, Math.round(3 * phaseVolMod));
       const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? 80;
-      // MRV soft-cap: не превышаем восстанавливаемый объём группы (auto-циклы)
+      // MRV soft-cap: считаем только упражнения, реально присутствующие в каталоге
       const ref = getVolumeLandmarks(vrLevel, exGroup);
       if (ref) {
-        const cur = days.reduce((s, d) => s + d.exercises
-          .filter(e => groupOfExercise(e.name, liftGroup) === exGroup)
-          .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0), 0);
+        let cur = 0;
+        for (const d of days) {
+          for (const e of d.exercises) {
+            const eg = groupOfExercise(e.name, '');
+            if (eg === exGroup) {
+              cur += e.workSets.reduce((x, ws) => x + ws.sets, 0);
+            }
+          }
+        }
         if (cur + sets > Math.round(ref.mrv * pedMrvMult)) continue;
       }
       hostDay.exercises.push({
@@ -403,6 +409,37 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     // Инъекция ассистентов по слабым точкам СРЦ-движений (все циклы, включая faithful с полными weeks[])
     if (input.plWeakPoints && input.plWeakPoints.length) {
       injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, pedMrvMult);
+    }
+
+    // Инъекция изолирующих упражнений для слабых групп мышц (+1 упражнение на группу)
+    if (input.weakPoints && input.weakPoints.length) {
+      const allWeekNames = new Set(days.flatMap(d => d.exercises.map(e => norm(e.name))));
+      for (const wg of input.weakPoints) {
+        const candidates = getExercisesByGroup(wg, 20, input.equipment)
+          .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name)));
+        if (candidates.length === 0) continue;
+        const pick = candidates[0]; // первое подходящее изолирующее
+        // найти день с наименьшим объёмом этой группы
+        let bestDay = days[0];
+        let bestCnt = Infinity;
+        for (const d of days) {
+          const cnt = d.exercises.filter(e => groupOfExercise(e.name, '') === wg)
+            .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+          if (cnt < bestCnt) { bestCnt = cnt; bestDay = d; }
+        }
+        const wPm = pmRow[pick.name] ?? 80;
+        bestDay.exercises.push({
+          name: pick.name,
+          group: wg,
+          coef: 0.5,
+          mnosz: 1,
+          load: 'Средняя',
+          pm: wPm,
+          rir: rirBase,
+          workSets: [{ pct: 0.65, reps: 12, sets: 3, weight: workWeight(wPm, 0.65), rir: rirBase }],
+        });
+        allWeekNames.add(norm(pick.name));
+      }
     }
 
     // Пересчёт метрик сессий (после возможной инъекции слабых точек)

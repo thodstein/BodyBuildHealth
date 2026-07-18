@@ -562,17 +562,21 @@ function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof b
 
 // ─── МЕТОД: pre-sleep казеиновый приём ───────────────────────────────
 function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof buildFoodPools>, residualP: number, opts?: { lockedIds?: Set<string>; recentIds?: Set<string> }): Meal {
-  // Рандомизация источника казеина по seed (раньше — всегда первый)
-  const caseinPool = pool.slowProtein.length > 0 ? pool.slowProtein : FOOD_DB.filter(f => f.id === 'casein' || f.id.includes('cottage') || f.id === 'yogurt_greek');
-  const caseinIdx = Math.floor(seededRandom(seed) * caseinPool.length) % caseinPool.length;
-  const caseinSource = caseinPool[caseinIdx] || caseinPool[0];
+  // Prioritize low-carb casein: pure powder first (0g carbs), then cottage cheese, yogurt last.
+  // Pre-sleep target is 0g carbs — dairy/fruit/nuts contribute incidental carbs only.
+  const caseinPowder = pool.slowProtein.length > 0 ? pool.slowProtein.find(f => f.id === 'casein' || f.id === 'casein_micellar') : undefined;
+  const cottageCheese = pool.slowProtein.length > 0 ? pool.slowProtein.find(f => f.id.includes('cottage')) : undefined;
+  const greekYogurt = pool.slowProtein.length > 0 ? pool.slowProtein.find(f => f.id === 'yogurt_greek') : undefined;
+  const orderedCasein = [caseinPowder, cottageCheese, greekYogurt, ...pool.slowProtein].filter(Boolean) as FoodItem[];
+  const caseinSource = orderedCasein.length > 0 ? orderedCasein[Math.floor(seededRandom(seed) * Math.min(2, orderedCasein.length))] : undefined;
   const items: MealItem[] = [];
   const targetP = residualP <= 0 ? 0 : Math.max(20, Math.min(45, residualP));
   if (caseinSource) {
-    // Д-1: casein powder protein% is low (~22/100), so supplement-capped grams may not reach the 30-45g night MPS target.
-    // Use whole dairy (cottage cheese / greek yogurt) as a second slow-protein source to fill the gap.
     let grams = gramsForMacro(caseinSource, targetP, 'protein');
     let deliveredP = (caseinSource.protein || 0) * grams / 100;
+    // Cap dairy grams to limit incidental carbs from yogurt/cottage cheese
+    const dairyCarbG = (caseinSource.carbs || 0) * grams / 100;
+    if (dairyCarbG > 8) { grams = Math.floor(8 / ((caseinSource.carbs || 1) / 100)); }
     items.push(makeItem(caseinSource, grams, 'slow_protein'));
     if (deliveredP < targetP - 3) {
       const dairyPool = pool.slowProtein.filter(f => f.id !== caseinSource.id && (f.id.includes('cottage') || f.id === 'yogurt_greek' || f.id.includes('kefir')));
@@ -584,14 +588,14 @@ function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof build
       }
     }
   }
-  // Mg-источник: тыквенные семечки/миндаль/кешью — ротация по seed
+  // Mg-источник: тыквенные семечки/миндаль/кешью — ротация по seed, reduced to 10g (was 15g)
   const mgPool = FOOD_DB.filter(f => ['pumpkin_seeds','sunflower_seeds','almonds','cashew'].includes(f.id));
   const mgSource = pickPriority(mgPool as any as FoodItem[], seed + 1, { recentIds: opts?.recentIds, lockedIds: opts?.lockedIds }) as any || mgPool[0];
-  if (mgSource) items.push(makeItem(mgSource, 15, 'fat'));
-  // Мелатонин-источник: киви/вишня/ягоды — ротация
+  if (mgSource) items.push(makeItem(mgSource, 10, 'fat'));
+  // Мелатонин-источник: киви/вишня/ягоды — ротация, reduced to 50g (was 100g)
   const melPool = FOOD_DB.filter(f => f.id === 'kiwi' || f.id === 'cherry' || f.id.includes('berries'));
   const melSource = pickPriority(melPool as any as FoodItem[], seed + 2, { recentIds: opts?.recentIds, lockedIds: opts?.lockedIds }) as any || melPool[0];
-  if (melSource) items.push(makeItem(melSource, 100, 'fruit'));
+  if (melSource) items.push(makeItem(melSource, 50, 'fruit'));
 
   const totals = items.reduce((acc, it) => ({
     kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
@@ -713,13 +717,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // otherwise high-carb (insulin/mass) days overload dinner instead of the pre/post window.
   // Pre = 20% of carbs, Post = 25% of carbs (with floors); breakfast/lunch/dinner share the rest.
   // Carb distribution must sum to ~100% per scenario — no residual to dump.
-  // Training day: break(20%) + lunch(16%) + dinner(19%) + pre(20%) + post(25%) = 100%
-  // Rest day:     break(25%) + lunch(35%) + dinner(30%) + snack(10%)          = 100%
+  // Training day: break(20%) + lunch(21%) + dinner(14%) + pre(20%) + post(25%) = 100%
+  // Rest day:     break(25%) + lunch(47%) + dinner(18%) + snack(10%)          = 100%
+  // Carbs are front-loaded: lunch > dinner. Evening is low-carb for sleep quality & insulin sensitivity.
   const breakC = Math.round(carbsTotal * (trainWindow ? 0.20 : 0.25));
-  const trainCarbLunch = Math.round(carbsTotal * 0.16);
-  const restCarbLunch = Math.round(carbsTotal * 0.35);
-  const trainCarbDinner = Math.round(carbsTotal * 0.19);
-  const restCarbDinner = Math.round(carbsTotal * 0.30);
+  const trainCarbLunch = Math.round(carbsTotal * 0.21);
+  const restCarbLunch = Math.round(carbsTotal * 0.47);
+  const trainCarbDinner = Math.round(carbsTotal * 0.14);
+  const restCarbDinner = Math.round(carbsTotal * 0.18);
   // Pre/post carb targets scale with carbsTotal; floors keep them meaningful on low-carb days.
   const lowCarbDay = (ptm.cMult ?? 1) < 0.4;
   const prewCarbG = trainWindow ? (lowCarbDay ? Math.round(carbsTotal * 0.10) : Math.max(PREW_CARB_SLOW_G, Math.round(carbsTotal * 0.20))) : PREW_CARB_SLOW_G;
