@@ -1708,7 +1708,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   };
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [useProEngine, setUseProEngine] = useState(() => { try { return localStorage.getItem('he_use_pro_engine') !== 'false'; } catch { return true; } });
+  const [useProEngine, setUseProEngine] = useState(() => true);
   useEffect(() => { try { localStorage.setItem('he_use_pro_engine', useProEngine ? 'true' : 'false'); } catch {} }, [useProEngine]);
   const [planTab, setPlanTab] = useState<string>(() => { try { return localStorage.getItem('he_plan_active_tab') || 'settings'; } catch { return 'settings'; } });
   useEffect(() => { try { localStorage.setItem('he_plan_active_tab', planTab); } catch {} }, [planTab]);
