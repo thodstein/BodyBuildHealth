@@ -1209,7 +1209,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     const dk = dayKey(wk.week, di);
                     const pool = (PL_EXERCISES[g] || PL_EXERCISES.chest).filter(eqOk).slice(0, 3);
                     const dayLabel = `День ${di+1}`;
-                    const dayName = wk.days[di]?.day || `День ${di+1}`;
+                    const dayName = `День ${di+1}`;
                     return <div key={g} style={{ marginBottom: 8, padding:8, borderRadius:8, background:'rgba(255,145,0,0.04)', border:'1px solid rgba(255,145,0,0.1)' }}>
                       <div style={{ fontSize:10, fontWeight:700, color:'#ff9100', marginBottom:3, display:'flex', justifyContent:'space-between' }}>
                         <span>{GRP_RU[g] || g}</span>
