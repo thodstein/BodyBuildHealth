@@ -193,25 +193,11 @@ export const IndividualPlanSettings: React.FC = () => {
         ))}
       </div>
 
-      {/* Pro Engine переключатель + быстрая кнопка генерации */}
+      {/* Кнопка генерации (V2 Pro Engine — по умолчанию, без переключателя) */}
       {settingsSection === 'quick' && (
-      <GlassCard title="🧬 Движок генерации" icon="🧬" color="#00e68a">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <button onClick={() => setUseProEngine(!useProEngine)} style={{
-            width: 40, height: 22, borderRadius: 12, cursor: 'pointer', border: 'none',
-            background: useProEngine ? '#00e68a' : 'rgba(255,255,255,0.15)',
-            position: 'relative' as const, transition: 'background 0.2s', flexShrink: 0,
-          }}>
-            <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 2, left: useProEngine ? 20 : 2, transition: 'left 0.2s' }} />
-          </button>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: useProEngine ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>
-              {useProEngine ? '✅ Pro Engine (MPS, mTOR, пери-воркаут)' : '⚙️ Классический движок'}
-            </div>
-            {useProEngine && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
-              Порог лейцина 2.5г · LBM-based белок · carb periodization · pre/intra/post-W
-            </div>}
-          </div>
+      <GlassCard title="🧬 Генерация плана" icon="🧬" color="#00e68a">
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginBottom: 8, lineHeight: 1.5 }}>
+          ✅ Pro Engine: MPS · mTOR · лейцин 2.5г · LBM-белок · carb periodization · pre/intra/post-W · pre-sleep казеин
         </div>
         {errorMsg && <div style={{ fontSize: 9, color: '#ef4444', padding: '4px 8px', background: 'rgba(239,68,68,0.06)', borderRadius: 6, marginBottom: 6 }}>⚠️ {errorMsg}</div>}
         <button onClick={() => { setErrorMsg(null); generatePlan(1); }} style={{
