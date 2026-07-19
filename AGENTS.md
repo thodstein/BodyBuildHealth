@@ -3899,3 +3899,30 @@ umber — заменено на getVolumeLandmarks + применение onCour
 - `src/ui/screens/TrainingScreen_parts/TrainingConstructor/phase-periodization.ts` — PHASE_CONFIGS.
 - `src/engines/manual-plan-builder.ts` — ЗАВЕРШЕН П6+П8 (intensity technique + feeder sets); остальные П1–П5,П7,П9,П10 — аудит.
 - `C:\Users\thods\AppData\Local\Temp\opencode\bb_audit_test2.ts` — runtime verification test.
+
+## Session Summary (Jul 19) — PL-auto UI: mobile optimization (match BB-auto)
+
+### Goal
+Make PL-auto plan/cycle UI in SRCBBScreen.tsx phone-friendly, matching the earlier BB-auto mobile treatment (user: "как ББ-авто под телефон").
+
+### ✅ Done
+- **tsc baseline**: SRCBBScreen.tsx:1073 JSX bug fixed in this session; `tsc --noEmit` → 0 errors before edits.
+- **Mobile font/tap-target bumps applied to PL-auto section (SRCBBScreen.tsx)**:
+  - INM work-set inputs (exercise set-row inputs + detail text): fontSize 10→12, padding 2px4px→5px4px.
+  - Recommended cycle `howItWorks` detail text: fontSize 10→11.
+  - Weak-group toggle chips (PL line 703 + BB line 1276): fontSize 10→11 (padding kept 5px10px).
+  - Weak-point-PL (СРЦ) lift label + toggle chips: fontSize 10→11, padding 4px8px→5px9px.
+  - Added-exercise inputs (sets/reps/weight): fontSize 10→11, padding 3px→6px4px; `×` separators 10→11; `＋ добавлено` 8→10; remove `✕` 10→11; right-aligned label 10→11.
+  - "＋ Добавить упражнение из каталога" button: fontSize 10→11.
+- **Verify**: `esbuild` transform of SRCBBScreen.tsx → exit 0, 0 syntax errors.
+
+### ❌ Not done / notes
+- Full `tsc --noEmit` / `vite build` not re-run after edits (pre-existing timeout in this env); esbuild transform confirms no syntax errors introduced.
+- Visual browser check not performed.
+- PL control grid (637) and BB (1256) are already `1fr 1fr` (wrap on phone); no grid change needed.
+- AGENTS.md itself currently contains pre-existing mojibake (from a prior agent's Jul 17 Part 3 block) — NOT introduced here; flagged for separate cleanup.
+
+### Relevant Files
+- `src/ui/screens/SRCBBScreen.tsx` — PL/BB plan UI; tsc fix 1073; all mobile edits above.
+- `src/engines/exercise-selector.engine.ts` — Fix A (408–418) from prior session (verified).
+- `src/engines/bb/bb-builder.engine.ts` — Fix B (562–568), Fix C (612–614) (verified).

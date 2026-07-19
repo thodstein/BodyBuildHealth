@@ -641,7 +641,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             <PopupNumber label="Дней в неделю" value={days} min={2} max={7} suffix="" onChange={v => setDays(v)} />
             <PopupNumber label="Вес тела" value={bw} min={40} max={200} suffix=" кг" onChange={v => setBw(v)} />
           </div>
-          {best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { setSelectedCycleId(best.cycle.meta.id); setTimeout(buildSrc, 0); }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,var(--accent),#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
+          {best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { setSelectedCycleId(best.cycle.meta.id); setTimeout(buildSrc, 0); }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,var(--accent),#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
           <div style={H}>📂 Каталог силовых циклов ({plCycles.length})</div>
           <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={plCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${({ powerlifting: 'Троеборье', bench: 'Жим лёжа', deadlift_bench: 'Тяга+Жим', armwrestling: 'Армрестлинг' } as Record<string,string>)[c.meta.direction] || c.meta.direction} · ${c.meta.period} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
           {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
@@ -700,7 +700,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             <PopupSelect label="Длина мезоцикла" value={String(cycleWeeks)} onChange={v => setCycleWeeks(+v)} options={[['12','12 недель'],['16','16 недель'],['20','20 недель'],['24','24 недели']].map(([id,label]) => ({ id, label }))} />
           </div>
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: ACCENT }}>🎯 Слабые группы (акцент, сохраняются в профиль)</div>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6 }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)" }}>{l}{on ? " ✓" : ""}</button>; })}</div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6 }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)" }}>{l}{on ? " ✓" : ""}</button>; })}</div>
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: '#8b5cf6' }}>🎯 Слабые точки СРЦ-движений (диагностика weakpoint-pl)</div>
           {(() => {
             const WP_LABELS: Record<string, string> = {
@@ -717,11 +717,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             }));
             return PL_WEAKPOINT_OPTIONS.map((opt) => (
             <div key={opt.lift} style={{ marginTop: 4 }}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>{opt.lift === 'bench' ? 'Жим лёжа' : opt.lift === 'squat' ? 'Присед' : opt.lift === 'deadlift' ? 'Становая' : opt.lift === 'ohp' ? 'Жим стоя' : opt.lift === 'row' ? 'Тяга в наклоне' : opt.lift === 'pulldown' ? 'Тяга верхн. блока' : opt.lift === 'incline_press' ? 'Жим на наклонной' : opt.lift}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>{opt.lift === 'bench' ? 'Жим лёжа' : opt.lift === 'squat' ? 'Присед' : opt.lift === 'deadlift' ? 'Становая' : opt.lift === 'ohp' ? 'Жим стоя' : opt.lift === 'row' ? 'Тяга в наклоне' : opt.lift === 'pulldown' ? 'Тяга верхн. блока' : opt.lift === 'incline_press' ? 'Жим на наклонной' : opt.lift}</div>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {opt.weakPoints.map((wp) => {
                   const on = plWeakPoints.some(x => x.lift === opt.lift && x.weakPoint === wp.id);
-                  return <button key={wp.id} onClick={() => togglePlWeak(opt.lift as Lift, wp.id as WeakPoint)} style={{ padding: "4px 8px", borderRadius: 12, fontSize: 10, fontWeight: 700, cursor: "pointer", border: on ? "1px solid #8b5cf6" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.02)", color: on ? "#8b5cf6" : "rgba(255,255,255,0.6)" }}>{wp.label}{on ? " ✓" : ""}</button>;
+                  return <button key={wp.id} onClick={() => togglePlWeak(opt.lift as Lift, wp.id as WeakPoint)} style={{ padding: "5px 9px", borderRadius: 12, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid #8b5cf6" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.02)", color: on ? "#8b5cf6" : "rgba(255,255,255,0.6)" }}>{wp.label}{on ? " ✓" : ""}</button>;
                 })}
               </div>
             </div>
@@ -861,9 +861,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                       <div style={{ display:'flex', flexWrap:'wrap', gap:6, alignItems:'center', marginBottom:8 }}>
                         <span style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>Подходы</span>
                         <input type='number' value={pickerScheme.sets} onChange={e => setPickerScheme(s => ({ ...s, sets: +e.target.value }))} style={{ width:48, ...IN, padding:'4px', fontSize:10 }} />
-                        <span style={{ fontSize:10 }}>×</span>
+                        <span style={{ fontSize:11 }}>×</span>
                         <input type='number' value={pickerScheme.reps} onChange={e => setPickerScheme(s => ({ ...s, reps: +e.target.value }))} style={{ width:48, ...IN, padding:'4px', fontSize:10 }} />
-                        <span style={{ fontSize:10 }}>×</span>
+                        <span style={{ fontSize:11 }}>×</span>
                         <input type='number' value={pickerScheme.weight} onChange={e => setPickerScheme(s => ({ ...s, weight: +e.target.value }))} style={{ width:56, ...IN, padding:'4px', fontSize:10 }} />
                         <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>кг</span>
                       </div>
@@ -1029,13 +1029,13 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                                  </span>
                                </div>
                               <div style={{ display:'flex', flexDirection:'column', gap:2, marginTop:4 }}>
-                                {e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); const es = effSet(wk.week, di, ei, si, ws); const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'2px 4px', fontSize:10, textAlign:'center' }; return (
+                                {e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); const es = effSet(wk.week, di, ei, si, ws); const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'5px 4px', fontSize:12, textAlign:'center' }; return (
                                   <div key={si} style={{ display:'flex', gap:3, alignItems:'center' }}>
-                                    <span style={{ fontSize:10, color:'rgba(255,255,255,0.3)' }}>С{si+1}</span>
+                                    <span style={{ fontSize:11, color:'rgba(255,255,255,0.4)' }}>С{si+1}</span>
                                     <input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], weight: +ev.target.value } }))} style={{ ...INM, flex:'1', minWidth:0 }} />
-                                    <span style={{ fontSize:10 }}>×</span>
+                                    <span style={{ fontSize:11 }}>×</span>
                                     <input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, flex:'1', minWidth:0 }} />
-                                    <span style={{ fontSize:10 }}>×</span>
+                                    <span style={{ fontSize:11 }}>×</span>
                                     <input type='number' value={es.sets} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], sets: +ev.target.value } }))} style={{ ...INM, flex:'1', minWidth:0 }} />
                                     <input type='text' value={srcEdits[k]?.tempo || ''} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], tempo: ev.target.value } }))} style={{ ...INM, flex:'1', minWidth:0, textAlign:'center', color:'#a855f7', fontWeight:700 }} placeholder='3-1-1-0' />
                                   </div>
@@ -1047,21 +1047,21 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                              <div key={a.uid} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:4, padding:'5px 0', borderBottom:'1px solid var(--accent-dim)', alignItems:'center' }}>
                                <div style={{ fontSize:11, color:'var(--accent)', fontWeight:600, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.name}</div>
                                <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
-                                 <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>＋ добавлено</span>
-                                 <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:10, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', marginLeft:4 }}>✕</button>
+                                 <span style={{ fontSize:10, color:'rgba(255,255,255,0.4)' }}>＋ добавлено</span>
+                                 <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:11, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', marginLeft:4 }}>✕</button>
                                </div>
-                              <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', textAlign:'right' }}>
+                              <div style={{ fontSize:11, color:'rgba(255,255,255,0.75)', textAlign:'right' }}>
                                 <div style={{ display:'flex', gap:3, alignItems:'center' }}>
-                                  <input type='number' value={a.sets} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, sets: +ev.target.value } : x) }; })} style={{ flex:'1', minWidth:0, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'3px', fontSize:10, textAlign:'center' }} aria-label='подходы'/>
-                                  <span style={{ fontSize:8 }}>×</span>
-                                  <input type='number' value={a.reps} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, reps: +ev.target.value } : x) }; })} style={{ flex:'1', minWidth:0, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'3px', fontSize:10, textAlign:'center' }} aria-label='повт'/>
-                                  <span style={{ fontSize:8 }}>×</span>
-                                  <input type='number' value={a.weight} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, weight: +ev.target.value } : x) }; })} style={{ flex:'1', minWidth:0, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'3px', fontSize:10, textAlign:'center' }} aria-label='вес'/>
+                                  <input type='number' value={a.sets} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, sets: +ev.target.value } : x) }; })} style={{ flex:'1', minWidth:0, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'6px 4px', fontSize: 11, textAlign:'center' }} aria-label='подходы'/>
+                                  <span style={{ fontSize:11 }}>×</span>
+                                  <input type='number' value={a.reps} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, reps: +ev.target.value } : x) }; })} style={{ flex:'1', minWidth:0, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'6px 4px', fontSize: 11, textAlign:'center' }} aria-label='повт'/>
+                                  <span style={{ fontSize:11 }}>×</span>
+                                  <input type='number' value={a.weight} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, weight: +ev.target.value } : x) }; })} style={{ flex:'1', minWidth:0, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'6px 4px', fontSize: 11, textAlign:'center' }} aria-label='вес'/>
                                 </div>
                               </div>
                             </div>
                           ))}
-                          <button onClick={() => { setPickerDay(dk); setPickerExName(''); }} style={{ marginTop:6, padding:'5px 10px', borderRadius:6, fontSize:10, fontWeight:600, border:'1px dashed rgba(0,230,138,0.4)', background:'var(--accent-dim)', color:'var(--accent)', cursor:'pointer' }}>＋ Добавить упражнение из каталога</button>
+                          <button onClick={() => { setPickerDay(dk); setPickerExName(''); }} style={{ marginTop:6, padding:'5px 10px', borderRadius:6, fontSize:11, fontWeight:600, border:'1px dashed rgba(0,230,138,0.4)', background:'var(--accent-dim)', color:'var(--accent)', cursor:'pointer' }}>＋ Добавить упражнение из каталога</button>
                         </>
                       ),
                     }} />
@@ -1273,7 +1273,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             {BB_WM_KEYS.map(k => <PopupNumber key={k} label={BB_WM_RU[k]} value={bbWorkMax[k] || 80} min={10} max={400} suffix=' кг' onChange={v => setBbWm(k, v)} />)}
           </div>
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: ACCENT }}>🎯 Слабые группы (акцент, сохраняются в профиль)</div>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6 }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)" }}>{l}{on ? " ✓" : ""}</button>; })}</div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6 }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)" }}>{l}{on ? " ✓" : ""}</button>; })}</div>
           <button style={{ ...BTN, width: '100%', marginTop: 10 }} onClick={buildBb}>Сгенерировать BB-план ({bbWeeks} нед)</button>
           {builtBb && Array.isArray(builtBb.weeks) && builtBb.weeks.length > 0 && (() => {
             const W = builtBb.weeks;

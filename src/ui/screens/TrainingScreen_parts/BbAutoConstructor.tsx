@@ -36,8 +36,10 @@ import type { InjurySelectEntry } from './InjurySelectCard';
 import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, type LoadStrategy, type DeloadType, INTENSITY_TECHNIQUES, DEFAULT_TECHNIQUE_BY_PHASE, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { PCT_FOR_RIR } from '../../../engines/rir-table';
 import { getCyclesByDirection, getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
-import { convertCycleToBBPlan } from '../../../engines/bb/cycle-to-plan';
+import { convertCycleToBBPlan, programToCycleTemplate } from '../../../engines/bb/cycle-to-plan';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
+import { getAllPrograms } from '../../../engines/complete-program-library.engine';
+import type { FullProgram } from '../../../engines/complete-program-library.engine';
 import { getPlanFeedback } from '../../../engines/plan-execution-feedback.engine';
 import { validatePlan, weeklySetsFromBBPlan } from '../../../engines/plan-validator';
 import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } from './PlanCharts';
@@ -196,8 +198,10 @@ export const BbAutoConstructor: React.FC = () => {
   const [exSwapSearch, setExSwapSearch] = useState('');
   // Фаза 7: Фильтр оборудования
   const [bbEquipment, setBbEquipment] = useState<string[]>(() => prof.equipment || []);
-  // Кастомный цикл из библиотеки программ (через planner-bridge kind='program')
+  // Кастомный цикл из библиотеки программ (через planner-bridge kind='program' или прямой пикер)
   const [customCycle, setCustomCycle] = useState<SRCycleTemplate | null>(null);
+  const [bbSource, setBbSource] = useState<'cycle' | 'program'>(customCycle ? 'program' : 'cycle');
+  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(customCycle ? customCycle.meta.id.replace('prog_', '') : null);
   const [bridgeMsg, setBridgeMsg] = useState('');
   // Мульти-планы: сохранённые варианты для сравнения
   const [savedPlans, setSavedPlans] = useState<SavedBBPlan[]>([]);
@@ -246,6 +250,8 @@ export const BbAutoConstructor: React.FC = () => {
         const cycle = payload.data as SRCycleTemplate;
         setCustomCycle(cycle);
         setPlanMode('bb_cycle');
+        setBbSource('program');
+        setSelectedProgramId(cycle.meta.id.replace('prog_', ''));
         setSelectedCycleId(cycle.meta.id);
         setBbDays(cycle.meta.sessionsPerWeek);
         setBbWeeks(cycle.meta.weeks);
@@ -257,6 +263,23 @@ export const BbAutoConstructor: React.FC = () => {
       }
     });
     return () => { unsub(); };
+  }, []);
+
+  // Применение готовой программы из библиотеки (прямой пикер или bridge)
+  const applyProgramToBb = useCallback((program: FullProgram) => {
+    const cycle = programToCycleTemplate(program);
+    setCustomCycle(cycle);
+    setPlanMode('bb_cycle');
+    setBbSource('program');
+    setSelectedProgramId(program.id);
+    setSelectedCycleId(cycle.meta.id);
+    setBbDays(cycle.meta.sessionsPerWeek);
+    setBbWeeks(cycle.meta.weeks);
+    setBbLevel(cycle.meta.level === 'novice' ? 'beginner' : cycle.meta.level === 'KMS-MS' || cycle.meta.level === 'MS-MSMK' ? 'advanced' : 'intermediate');
+    setBbGoal(cycle.meta.period === 'strength' ? 'strength_mass' : 'mass');
+    setBridgeMsg(`🔗 Программа загружена: ${cycle.meta.title}`);
+    setTimeout(() => setBridgeMsg(''), 5000);
+    setStep('params');
   }, []);
 
   const phases = useMemo(() => computePhases(bbWeeks), [bbWeeks]);
@@ -590,28 +613,70 @@ export const BbAutoConstructor: React.FC = () => {
 
       {planMode === 'bb_cycle' && (
         <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'#00e68a', marginBottom:6 }}>📚 Выберите BB-цикл</div>
-          <PopupSelect label="BB-цикл" value={selectedCycleId} onChange={v => { setSelectedCycleId(v); const c = getCycleById(v); if (c) { setBbDays(c.meta.sessionsPerWeek); setBbWeeks(c.meta.weeks); } }} options={[
-            ...bbCyclesList.map(c => ({
-              id: c.meta.id,
-              label: `${c.meta.title} (${c.meta.weeks} нед, ${c.meta.sessionsPerWeek}×/нед)`,
-              description: c.meta.description?.slice(0, 120),
-            })),
-          ]} />
-          {selectedCycleId && (() => {
-            const c = getCycleById(selectedCycleId);
-            if (!c) return null;
-            return (
-              <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
-                <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Уровень:</span> {c.meta.level}</div>
-                <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Фокус:</span> {c.meta.targetFocus || '—'}</div>
-                {c.meta.deloadWeeks && c.meta.deloadWeeks.length > 0 && <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Разгрузка:</span> нед {c.meta.deloadWeeks.join(', ')}</div>}
-                {c.meta.rirProgression && <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>RIR:</span> {c.meta.rirProgression.start}→{c.meta.rirProgression.end}</div>}
-                {c.meta.phases && c.meta.phases.length > 0 && <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Фазы:</span> {c.meta.phases.map(ph => ph.title || `нед ${ph.weekStart}-${ph.weekEnd}`).join(', ')}</div>}
-                <div style={{ marginTop:4, padding:'4px 8px', borderRadius:8, background:'rgba(0,230,138,0.06)', fontSize:11, color:'rgba(255,255,255,0.7)' }}>{c.meta.description?.slice(0, 200)}</div>
-              </div>
-            );
-          })()}
+          {/* Под-источник: ПРОФ-цикл / Библиотека программ */}
+          <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+            <button onClick={() => setBbSource('cycle')} style={{
+              flex:1, padding:'7px 8px', borderRadius:9, cursor:'pointer', fontWeight:700, fontSize:11,
+              border: bbSource === 'cycle' ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+              background: bbSource === 'cycle' ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)',
+              color: bbSource === 'cycle' ? '#00e68a' : 'rgba(255,255,255,0.6)',
+            }}>📋 ПРОФ-цикл</button>
+            <button onClick={() => setBbSource('program')} style={{
+              flex:1, padding:'7px 8px', borderRadius:9, cursor:'pointer', fontWeight:700, fontSize:11,
+              border: bbSource === 'program' ? '2px solid #60a5fa' : '1px solid rgba(255,255,255,0.08)',
+              background: bbSource === 'program' ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.02)',
+              color: bbSource === 'program' ? '#60a5fa' : 'rgba(255,255,255,0.6)',
+            }}>📚 Из библиотеки</button>
+          </div>
+
+          {bbSource === 'cycle' && (
+            <>
+              <div style={{ fontSize:11, fontWeight:700, color:'#00e68a', marginBottom:6 }}>📚 Выберите BB-цикл</div>
+              <PopupSelect label="BB-цикл" value={selectedCycleId} onChange={v => { setSelectedCycleId(v); const c = getCycleById(v); if (c) { setBbDays(c.meta.sessionsPerWeek); setBbWeeks(c.meta.weeks); } }} options={[
+                ...bbCyclesList.map(c => ({
+                  id: c.meta.id,
+                  label: `${c.meta.title} (${c.meta.weeks} нед, ${c.meta.sessionsPerWeek}×/нед)`,
+                  description: c.meta.description?.slice(0, 120),
+                })),
+              ]} />
+              {selectedCycleId && (() => {
+                const c = getCycleById(selectedCycleId);
+                if (!c) return null;
+                return (
+                  <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                    <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Уровень:</span> {c.meta.level}</div>
+                    <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Фокус:</span> {c.meta.targetFocus || '—'}</div>
+                    {c.meta.deloadWeeks && c.meta.deloadWeeks.length > 0 && <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Разгрузка:</span> нед {c.meta.deloadWeeks.join(', ')}</div>}
+                    {c.meta.rirProgression && <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>RIR:</span> {c.meta.rirProgression.start}→{c.meta.rirProgression.end}</div>}
+                    {c.meta.phases && c.meta.phases.length > 0 && <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Фазы:</span> {c.meta.phases.map(ph => ph.title || `нед ${ph.weekStart}-${ph.weekEnd}`).join(', ')}</div>}
+                    <div style={{ marginTop:4, padding:'4px 8px', borderRadius:8, background:'rgba(0,230,138,0.06)', fontSize:11, color:'rgba(255,255,255,0.7)' }}>{c.meta.description?.slice(0, 200)}</div>
+                  </div>
+                );
+              })()}
+            </>
+          )}
+
+          {bbSource === 'program' && (
+            <>
+              <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📚 Готовая программа из библиотеки</div>
+              <PopupSelect label="Программа" value={selectedProgramId ?? ''} onChange={v => { const p = getAllPrograms().find(pr => pr.id === v); if (p) applyProgramToBb(p); }} options={[
+                ...getAllPrograms().map(p => ({
+                  id: p.id,
+                  label: `${p.name} (${p.durationWeeks} нед, ${p.daysPerWeek}×/нед, ${p.level})`,
+                  description: p.description?.slice(0, 120),
+                })),
+              ]} />
+              {bbSource === 'program' && customCycle && (
+                <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                  <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Программа:</span> {customCycle.meta.title}</div>
+                  <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Уровень:</span> {customCycle.meta.level}</div>
+                  <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Дней/нед:</span> {customCycle.meta.sessionsPerWeek}</div>
+                  <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Недель:</span> {customCycle.meta.weeks}</div>
+                  <div style={{ marginTop:4, padding:'4px 8px', borderRadius:8, background:'rgba(96,165,250,0.06)', fontSize:11, color:'rgba(255,255,255,0.7)' }}>{customCycle.meta.description?.slice(0, 200)}</div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
