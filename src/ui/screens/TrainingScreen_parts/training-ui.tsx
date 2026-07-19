@@ -90,14 +90,46 @@ export const Chip: React.FC<{ label: string; value: string; color: string }> = (
   </div>
 );
 
-/** Цветная панель-уведомление (фрост-гласс с акцентной левой рамкой). */
+/** Цветная панель-уведомление (фрост-гласс с акцентной левой рамкой) — Apple-style. */
 export function panelStyle(color: string, bgAlpha = 0.06, borderAlpha = 0.22): React.CSSProperties {
+  const hex = color.startsWith('#') ? color.slice(1) : color;
+  const bg = `${hex}${Math.round(bgAlpha * 255).toString(16).padStart(2, '0')}`;
+  const bd = `${hex}${Math.round(borderAlpha * 255).toString(16).padStart(2, '0')}`;
   return {
-    marginTop: 10, padding: 12, borderRadius: R.card,
-    background: `${color}${Math.round(bgAlpha * 255).toString(16).padStart(2, '0')}`,
-    border: `1px solid ${color}${Math.round(borderAlpha * 255).toString(16).padStart(2, '0')}`,
+    marginTop: 10, padding: 14, borderRadius: 16,
+    background: `rgba(${parseInt(hex.slice(0,2),16)}, ${parseInt(hex.slice(2,4),16)}, ${parseInt(hex.slice(4,6),16)}, ${bgAlpha})`,
+    border: `1px solid ${bd}`,
     borderLeft: `3px solid ${color}`,
-    backdropFilter: 'blur(12px) saturate(140%)',
-    WebkitBackdropFilter: 'blur(12px) saturate(140%)',
+    backdropFilter: 'blur(20px) saturate(160%)',
+    WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.05)',
+    transition: 'all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
   };
+}
+
+/** MRV-статус бейдж для таблицы объёмов. */
+export function mrvBadge(status: 'below_mev' | 'optimal' | 'approaching_mrv' | 'exceeding_mrv'): React.CSSProperties {
+  const colors = {
+    below_mev: { bg: '#f59e0b1a', bd: '#f59e0b44', text: '#f59e0b', label: '🟡 Недотрен' },
+    optimal:     { bg: '#22c55e1a', bd: '#22c55e44', text: '#22c55e', label: '🟢 Оптимум' },
+    approaching_mrv: { bg: '#ef44441a', bd: '#ef444444', text: '#ef4444', label: '🟠 Близко к MRV' },
+    exceeding_mrv:   { bg: '#ef44441a', bd: '#ef444444', text: '#ef4444', label: '🔴 > MRV' },
+  };
+  const c = colors[status];
+  return {
+    padding: '3px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700,
+    background: c.bg, border: `1px solid ${c.bd}`, color: c.text,
+    whiteSpace: 'nowrap',
+  };
+}
+
+/** Section title with accent bar. */
+export function SectionTitle({ label, icon }: { label: string; icon?: string }): React.ReactElement {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+      {icon && <span style={{ fontSize: 16 }}>{icon}</span>}
+      <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT, textTransform: 'uppercase', letterSpacing: 0.05 }}>{label}</span>
+      <div style={{ flex: 1, height: 1, background: ACCENT_LINE, borderRadius: 2 }} />
+    </div>
+  );
 }

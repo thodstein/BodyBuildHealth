@@ -1123,23 +1123,24 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               {/* ── ПРОФЕССИОНАЛЬНЫЕ ПЛ-РЕКОМЕНДАЦИИ для слабых групп ── */}
               {weakPoints.length > 0 && (() => {
                 const GRP_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' };
-                const GROUP_TO_LIFT: Record<string,string> = { chest:'bench', legs:'squat', back:'deadlift', shoulders:'bench', arms:'bench', core:'deadlift' };
-                // какой день недели соответствует какому движению:
-                const FIND_DAY = (mainName: string): number => {
-                  const kw: Record<string,string[]> = { bench:['жим'], squat:['присед'], deadlift:['становая','тяга'] };
-                  for (const [lift,kws] of Object.entries(kw)) {
-                    if (!kws.some(k => mainName.toLowerCase().includes(k))) continue;
-                    for (let di=0;di<wk.days.length;di++) {
-                      const first = wk.days[di].exercises[0]?.name.toLowerCase()||'';
-                      if (kws.some(k => first.includes(k))) return di;
-                    }
+                // какой день недели соответствует какой группе мышц (по главному упражнению дня)
+                const FIND_DAY_FOR_GROUP = (group: string): number => {
+                  const keywords: Record<string,string[]> = {
+                    chest: ['жим'],
+                    shoulders: ['жим стоя', 'overhead', 'army press', 'army-press', 'overhead press', 'army press'],
+                    arms: ['жим узким', 'close grip', 'французский', 'разгибание', 'скотт', 'бицепс', 'curl'],
+                    legs: ['присед'],
+                    back: ['становая', 'тяга'],
+                    core: ['становая', 'тяга'],
+                  };
+                  const kws = keywords[group] || [];
+                  for (let di = 0; di < wk.days.length; di++) {
+                    const firstEx = wk.days[di].exercises[0]?.name.toLowerCase() || '';
+                    const allEx = wk.days[di].exercises.map(e => e.name.toLowerCase()).join(' ');
+                    if (kws.some(k => firstEx.includes(k) || allEx.includes(k))) return di;
                   }
                   return 0;
                 };
-                const DAY_INDEX_FOR_LIFT: Record<string,number> = {};
-                for (const [g,l] of Object.entries(GROUP_TO_LIFT)) {
-                  if (DAY_INDEX_FOR_LIFT[l] === undefined) DAY_INDEX_FOR_LIFT[l] = FIND_DAY(l);
-                }
                 // схемы подходов по фазе цикла
                 const PHASE_SCHEMES: Record<string,{reps:number;pct:number;label:string}> = {
                   base: { reps:10, pct:0.67, label:'гипертрофия (10П)' },
@@ -1148,7 +1149,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   deload: { reps:12, pct:0.50, label:'восстановление (12П)' },
                 };
                 const scheme = PHASE_SCHEMES[phase] || PHASE_SCHEMES.base;
-                // ПЛ-специфичные ассистентные упражнения (не изоляция — вариации соревновательных движений)
+                // ПЛ-специфичные ассистентные упражнения (вариации соревновательных движений)
                 const PL_EXERCISES: Record<string,{name:string;note:string}[]> = {
                   chest: [
                     { name:'Жим с паузой 2 секунды', note:'убивает инерцию, усиливает старт' },
@@ -1157,29 +1158,24 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     { name:'Французский жим', note:'изоляция длинной головки трицепса' },
                     { name:'Жим гантелей лёжа', note:'дефицит стабильности → грудные+стабилизаторы' },
                   ],
-                  legs: [
-                    { name:'Присед на груди', note:'квадрицепсы, выход из ямы' },
-                    { name:'Присед в широкой постановке', note:'приводящие + ягодицы, дожим' },
-                    { name:'Приседания со штангой', note:'общий объём квадрицепсов' },
-                    { name:'Наклоны со штангой', note:'разгибатели спины, фиксация корпуса' },
-                    { name:'Гакк-приседания', note:'латеральная головка квадрицепса' },
+                  shoulders: [
+                    { name:'Армейский жим', note:'передняя/средняя дельта, локдаун' },
+                    { name:'Жим штанги за голову', note:'плечевой пояс + трапеции' },
+                    { name:'Жим гантелей сидя', note:'стабильность плечевого пояса' },
+                    { name:'Махи гантелями в стороны', note:'средняя дельта, ширина' },
+                    { name:'Тяга к подбородку', note:'передняя дельта + трапеции' },
+                  ],
+                  arms: [
+                    { name:'Французский жим лёжа', note:'длинная головка трицепса' },
+                    { name:'Разгибание на блоке', note:'латеральная головка трицепса' },
+                    { name:'Скотт-бенч', note:'бицепс, пик' },
+                    { name:'Молотки', note:'брахиалис + предплечья' },
+                    { name:'Жим узким хватом', note:'трицепс + локдаун' },
                   ],
                   back: [
-                    { name:'Становая тяга с плинтов', note:'дожим, работа выше колен' },
-                    { name:'Тяга на прямых ногах', note:'бицепс бедра + разгибатели, старт' },
                     { name:'Тяга штанги в наклоне', note:'центр спины, фиксация лопаток' },
                     { name:'Подтягивания (прямой хват)', note:'широчайшие, тянущая сила верха' },
                     { name:'Тяга из ямы', note:'дефицит старта, работа с пола ниже обычного' },
-                  ],
-                  shoulders: [
-                    { name:'Жим стоя', note:'передняя+средняя дельта, жимовая стабильность' },
-                    { name:'Тяга к лицу (face pull)', note:'здоровье плеч, задняя дельта, ротаторная манжета' },
-                    { name:'Разводка гантелей в стороны', note:'средняя дельта — объём плечевого пояса' },
-                  ],
-                  arms: [
-                    { name:'Французский жим', note:'длинная головка трицепса — жимовой дожим' },
-                    { name:'Бицепс стоя', note:'сгибатели — стабильность в становой/подтягиваниях' },
-                    { name:'Молотковые сгибания', note:'брахиалис, объём рук, предплечья' },
                   ],
                   core: [
                     { name:'Наклоны со штангой', note:'разгибатели спины, жёсткость корпуса в приседе' },
@@ -1209,15 +1205,15 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     Фаза: <b style={{color:'#ff9100'}}>{PH_RU[phase]}</b> · схема: <b style={{color:'#ff9100'}}>{scheme.label}</b> (вес ≈ {Math.round(scheme.pct*100)}% workMax)
                   </div>
                   {weakPoints.map(g => {
-                    const lift = GROUP_TO_LIFT[g] || 'bench';
-                    const di = DAY_INDEX_FOR_LIFT[lift] ?? 0;
+                    const di = FIND_DAY_FOR_GROUP(g);
                     const dk = dayKey(wk.week, di);
                     const pool = (PL_EXERCISES[g] || PL_EXERCISES.chest).filter(eqOk).slice(0, 3);
                     const dayLabel = `День ${di+1}`;
+                    const dayName = wk.days[di]?.day || `День ${di+1}`;
                     return <div key={g} style={{ marginBottom: 8, padding:8, borderRadius:8, background:'rgba(255,145,0,0.04)', border:'1px solid rgba(255,145,0,0.1)' }}>
                       <div style={{ fontSize:10, fontWeight:700, color:'#ff9100', marginBottom:3, display:'flex', justifyContent:'space-between' }}>
                         <span>{GRP_RU[g] || g}</span>
-                        <span style={{ fontSize:8, fontWeight:400, color:'rgba(255,255,255,0.45)' }}>→ {dayLabel} ({lift === 'bench' ? 'жимовой' : lift === 'squat' ? 'приседательный' : 'тяговый'} день)</span>
+                        <span style={{ fontSize:8, fontWeight:400, color:'rgba(255,255,255,0.45)' }}>→ {dayLabel} ({dayName})</span>
                       </div>
                       {pool.map(ex => (
                         <button key={ex.name} onClick={() => addAccessory(dk, ex.name, g)}

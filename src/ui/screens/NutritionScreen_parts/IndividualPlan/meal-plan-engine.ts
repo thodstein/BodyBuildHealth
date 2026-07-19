@@ -120,7 +120,7 @@ const SUPPLEMENT_MAX_G: Record<string, number> = {
 // Глобальный лимит на одну порцию любого продукта (г)
 const MAX_GRAM_PER_ITEM = 500;
 
-const MEAT_KEYWORDS = ['beef','pork','chicken','turkey','lamb','veal','duck','salmon','tuna','shrimp','cod','mackerel','trout','sardine','crab','lobster','squid','octopus','venison','rabbit','goose','pate','sausage','bacon','ham','pepperoni','salami','bologna','hot_dog','meatball','cutlet','steak','pollock','tilapia','herring','anchovy','clam','mussel','oyster','scallops','catfish','flounder','sole','white_fish','whelk','cockles','seafood_','fish_','_fish','mintai','mahi','trumpeter','shellfish','cockle','abalone','conch','snail','escargot','sea_urchin','sea_cucumber','caviar','roe','liver','kidney','heart_tripe','tongue','brain','sweetbread','gizzard'];
+const MEAT_KEYWORDS = ['beef','pork','chicken','turkey','lamb','veal','duck','salmon','tuna','shrimp','cod','mackerel','trout','sardine','crab','lobster','squid','octopus','venison','rabbit','goose','pate','sausage','bacon','ham','pepperoni','salami','bologna','hot_dog','meatball','cutlet','steak','pollock','tilapia','herring','anchovy','clam','mussel','oyster','scallops','catfish','flounder','sole','white_fish','whelk','cockles','seafood_','fish_','_fish','mintai','mahi','trumpeter','shellfish','cockle','abalone','conch','snail','escargot','sea_urchin','sea_cucumber','caviar','roe','liver','kidney','heart_tripe','tongue','brain','sweetbread','gizzard','bison','frog','elk','boar','quail','pheasant','goat','mutton','crayfish','krill','eel','sturgeon','halibut','perch','carp','pike','bream','bass','grouper','snapper','tongue','tripe','oxtail','trotters','wings','drumstick','thigh','breast_','_breast','mince','_minced'];
 const isMeatId = (id: string): boolean => MEAT_KEYWORDS.some(k => id.toLowerCase().includes(k));
 
 // Д-3: Premium / exotic / rare foods that should NOT appear in a low/medium-budget plan.
@@ -409,8 +409,8 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     carbFast: limitPoolByVariety(cFastBud.length > 0 ? cFastBud : cFastRaw.length > 0 ? cFastRaw : cFruitBud.length > 0 ? cFruitBud : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15), 10013),
     carbFruit: limitPoolByVariety(cFruitBud.length > 0 ? cFruitBud : cFruitRaw, 10015),
     fats: limitPoolByVariety(fatsBud.length > 0 ? fatsBud : fatsRaw, 10017),
-    vegGreen: basePool.filter(f => f.category === 'veg_fruit' && ['broccoli','spinach','cucumber','zucchini','asparagus','green_bean','celery','cabbage','kale','green_apple'].some(k => f.id.includes(k)) && (f.protein || 0) < 10),
-    vegColor: basePool.filter(f => f.category === 'veg_fruit' && ['tomato','pepper','carrot','beetroot','pumpkin','eggplant','pomegranate','citrus'].some(k => f.id.includes(k.toLowerCase())) && (f.protein || 0) < 10),
+    vegGreen: basePool.filter(f => f.category === 'veg_fruit' && ['broccoli','spinach','cucumber','zucchini','asparagus','green_bean','celery','cabbage','kale','green_apple'].some(k => f.id.includes(k)) && (f.protein || 0) < 5 && (f.fat || 0) < 2),
+    vegColor: basePool.filter(f => f.category === 'veg_fruit' && ['tomato','pepper','carrot','beetroot','pumpkin','eggplant','pomegranate','citrus'].some(k => f.id.includes(k.toLowerCase())) && (f.protein || 0) < 5 && (f.fat || 0) < 2),
     dairy: byBudget(basePool.filter(f => f.category === 'dairy' && (f.fat || 0) <= 10)),
     // Д-5: vegetarian protein pool — relaxed thresholds so tofu/tempeh/seitan and carb-category
     // legumes (lentils, chickpeas, edamame) actually enter the rotation (not only dairy).
@@ -546,9 +546,8 @@ function buildWholeMeal(
         const curP = items.reduce((s, i) => s + i.p, 0);
         const curLeu = items.reduce((s, i) => s + (i.leucine_mg || 0), 0);
         if (curP < 25 && curLeu < LEU_THRESHOLD_MG && pool.fastProtein.length > 0) {
-          const whey = isVegetarian
-      ? (pool.fastProtein.find(f => f.id === 'supp_pea_protein') ?? pool.fastProtein.find(f => f.id === 'supp_soy_isolate') ?? pool.fastProtein.find(f => f.id === 'supp_rice_protein') ?? pool.fastProtein[0])
-      : (pool.fastProtein.find(f => f.id === 'whey_isolate') ?? pool.fastProtein.find(f => f.id === 'whey_concentrate') ?? pool.fastProtein[0]);
+          // Lacto-ovo vegetarian допускает молочные продукты → whey подходит и для вег-режима
+          const whey = pool.fastProtein.find(f => f.id === 'whey_isolate') ?? pool.fastProtein.find(f => f.id === 'whey_protein') ?? pool.fastProtein[0];
           const needLeu = LEU_THRESHOLD_MG - curLeu;
           const wheyLeuPer100 = getLeucine(whey);
           const wheyGramsRaw = Math.round(needLeu / Math.max(1, wheyLeuPer100) * 100);
@@ -877,10 +876,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const snackF = Math.round(fatTotal * 0.10);
   const hasSnack = !trainWindow && input.mealsCount >= 3;
 
+  // P1.3: fat distribution учитывает pre-sleep (~6-8г жира из семечек/Мg-источника) —
+  // снижаем долю ужина, чтобы вечер не был перегружен жирами (тяжело для сна/ЖКТ).
+  const preSleepFatG = wantPreSleep ? 8 : 0;
   const mealBudget = {
     breakfast: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: breakC, f: Math.round(fatTotal * 0.20) },
     lunch: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: (input.eveningLowCarb ? Math.round((trainWindow ? trainCarbLunch : restCarbLunch) * 1.3) : (trainWindow ? trainCarbLunch : restCarbLunch)), f: Math.round(fatTotal * 0.15) },
-    dinner: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: input.eveningLowCarb ? Math.round((trainWindow ? trainCarbDinner : restCarbDinner) * 0.5) : (trainWindow ? trainCarbDinner : restCarbDinner), f: Math.round(fatTotal * 0.22) },
+    dinner: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: input.eveningLowCarb ? Math.round((trainWindow ? trainCarbDinner : restCarbDinner) * 0.5) : (trainWindow ? trainCarbDinner : restCarbDinner), f: Math.max(8, Math.round(fatTotal * 0.22) - preSleepFatG) },
     prew: trainWindow ? { p: PREW_PROTEIN_G, c: prewCarbG, f: PREW_FAT_MAX_G } : null,
     postw: trainWindow ? { p: POSTW_FAST_PROTEIN_G, c: postwCarbG, f: 0 } : null,
     snack: hasSnack ? { p: snackP, c: snackC, f: snackF } : null,

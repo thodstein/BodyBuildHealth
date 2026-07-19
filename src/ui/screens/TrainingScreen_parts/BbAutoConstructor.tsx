@@ -36,7 +36,7 @@ import type { InjurySelectEntry } from './InjurySelectCard';
 import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, type LoadStrategy, type DeloadType, INTENSITY_TECHNIQUES, DEFAULT_TECHNIQUE_BY_PHASE, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { PCT_FOR_RIR } from '../../../engines/rir-table';
 import { getCyclesByDirection, getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
-import { convertCycleToBBPlan, programToCycleTemplate } from '../../../engines/bb/cycle-to-plan';
+import { convertCycleToBBPlan, programToCycleTemplate, cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { getAllPrograms } from '../../../engines/complete-program-library.engine';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
@@ -364,6 +364,13 @@ export const BbAutoConstructor: React.FC = () => {
     return base;
   }, [customCycle]);
 
+  // BB-циклы как готовые программы (для выбора в "Программе")
+  const bbCyclePrograms = useMemo(() => {
+    return getCyclesByDirection('bodybuilding')
+      .filter(c => !c.meta.id.startsWith('embed-'))
+      .map(c => cycleTemplateToFullProgram(c));
+  }, []);
+
   const applyBbSubstitution = useCallback((newId: string) => {
     if (!subTarget || !builtPlan) return;
     const rep = getExerciseById(newId); if (!rep) { setSubTarget(null); return; }
@@ -485,6 +492,28 @@ export const BbAutoConstructor: React.FC = () => {
 
   const handleSavePlan = () => {
     try { localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: builtPlan, date: new Date().toISOString() })); alert('План сохранён'); } catch { alert('Ошибка сохранения'); }
+  };
+
+  /** Сохранить BB-план в "Мои тренировки" (myTrainingPlans) — унификация с ручным конструктором. */
+  const handleSaveToMyPlans = () => {
+    if (!builtPlan) return;
+    const name = prompt('Название плана:', `${builtPlan.pattern.name} ${bbWeeks}нед`);
+    if (!name) return;
+    // Конвертация BB-плана в flat-формат Моих тренировок: все упражнения недели 1
+    const week1 = builtPlan.weeks[0];
+    const exs = week1.sessions.flatMap(s => s.exercises.map(e => ({
+      name: e.name,
+      sets: e.sets,
+      reps: e.workSets[0]?.reps ?? 10,
+      rir: e.rir,
+    })));
+    const plan = { id: 'bbplan_' + Date.now(), name, date: new Date().toISOString(), exercises: exs };
+    try {
+      const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
+      const updated = [...existing, plan].slice(-20);
+      localStorage.setItem('myTrainingPlans', JSON.stringify(updated));
+      alert(`План «${name}» сохранён в Мои тренировки (${exs.length} упр.)`);
+    } catch { alert('Ошибка сохранения'); }
   };
 
   const handleSaveVariant = () => {
@@ -659,10 +688,15 @@ export const BbAutoConstructor: React.FC = () => {
           {bbSource === 'program' && (
             <>
               <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📚 Готовая программа из библиотеки</div>
-              <PopupSelect label="Программа" value={selectedProgramId ?? ''} onChange={v => { const p = getAllPrograms().find(pr => pr.id === v); if (p) applyProgramToBb(p); }} options={[
+              <PopupSelect label="Программа" value={selectedProgramId ?? ''} onChange={v => { const p = [...getAllPrograms(), ...bbCyclePrograms].find(pr => pr.id === v); if (p) applyProgramToBb(p); }} options={[
                 ...getAllPrograms().map(p => ({
                   id: p.id,
                   label: `${p.name} (${p.durationWeeks} нед, ${p.daysPerWeek}×/нед, ${p.level})`,
+                  description: p.description?.slice(0, 120),
+                })),
+                ...bbCyclePrograms.map(p => ({
+                  id: p.id,
+                  label: `🏋️ ${p.name} (${p.durationWeeks} нед, ${p.daysPerWeek}×/нед, ${p.level})`,
                   description: p.description?.slice(0, 120),
                 })),
               ]} />
@@ -675,6 +709,19 @@ export const BbAutoConstructor: React.FC = () => {
                   <div style={{ marginTop:4, padding:'4px 8px', borderRadius:8, background:'rgba(96,165,250,0.06)', fontSize:11, color:'rgba(255,255,255,0.7)' }}>{customCycle.meta.description?.slice(0, 200)}</div>
                 </div>
               )}
+              {bbSource === 'program' && selectedProgramId && !customCycle && (() => {
+                const p = [...getAllPrograms(), ...bbCyclePrograms].find(pr => pr.id === selectedProgramId);
+                if (!p) return null;
+                return (
+                  <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                    <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Программа:</span> {p.name}</div>
+                    <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Уровень:</span> {p.level}</div>
+                    <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Дней/нед:</span> {p.daysPerWeek}</div>
+                    <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Недель:</span> {p.durationWeeks}</div>
+                    <div style={{ marginTop:4, padding:'4px 8px', borderRadius:8, background:'rgba(96,165,250,0.06)', fontSize:11, color:'rgba(255,255,255,0.7)' }}>{p.description?.slice(0, 200)}</div>
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>
@@ -1883,6 +1930,7 @@ export const BbAutoConstructor: React.FC = () => {
             <button style={BTN_GHOST} onClick={() => adjustWeight(0.95)}>⚖ Вес -5%</button>
             <button style={BTN_GHOST} onClick={() => { setExerciseEdits({}); setStep('split'); }}>🔄 Перестроить план</button>
             <button style={BTN_GHOST} onClick={handleSavePlan}>💾 Сохранить план</button>
+            <button style={{ ...BTN_GHOST, borderColor:'#60a5fa', color:'#60a5fa' }} onClick={handleSaveToMyPlans}>💾 В Мои тренировки</button>
             <button style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e' }} onClick={handleSaveVariant}>💾 Вариант ({savedPlans.length})</button>
             <button style={{ ...BTN_GHOST, borderColor:'#f59e0b', color:'#f59e0b' }} onClick={() => setShowCompare(s => !s)}>⚖ Сравнить</button>
             <button style={{ ...BTN_GHOST, borderColor:'#a855f7', color:'#a855f7' }} onClick={handleSendToExecution}>▶ К выполнению</button>
