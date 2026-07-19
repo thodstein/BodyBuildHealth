@@ -25,6 +25,7 @@
 
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
 import type { FoodItem } from "../../../../core/nutrition-database";
+import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
 
 // ─── Публичные типы ────────────────────────────────────────────────────
 export interface MealItem {
@@ -91,6 +92,8 @@ export interface MealPlanInput {
   planTypeMod?: { pMult: number; fMult: number; cMult: number };
   // Evening low-carb: reduce dinner carbs, increase lunch carbs
   eveningLowCarb?: boolean;
+  // Lab values for dietary adjustments (key = lab code from REFERENCE_RANGES)
+  labValues?: Record<string, number>;
 }
 
 // ─── Константы (клинические ориентиры) ─────────────────────────────────
@@ -135,16 +138,128 @@ const isPremiumOrExotic = (id: string): boolean => {
   return PREMIUM_OR_EXOTIC.some(k => lid.includes(k)) || lid.startsWith('lamb');
 };
 
+// ─── Lab-driven dietary adjustments ─────────────────────────────────────
+interface LabDietAdjustment {
+  restrictFoodIds: Set<string>;
+  preferFoodIds: Set<string>;
+  notes: string[];
+  macroAdjustments: { proteinMult?: number; carbMult?: number; fatMult?: number };
+}
+
+function computeLabDietAdjustment(input: MealPlanInput): LabDietAdjustment {
+  const labs = input.labValues || {};
+  const restrict = new Set<string>();
+  const prefer = new Set<string>();
+  const notes: string[] = [];
+  const macroAdjustments: LabDietAdjustment['macroAdjustments'] = {};
+
+  // Helper: add food IDs by keyword
+  const restrictByKeyword = (...keywords: string[]) => {
+    FOOD_DB.forEach(f => {
+      if (keywords.some(k => f.id.toLowerCase().includes(k))) restrict.add(f.id);
+    });
+  };
+  const preferByKeyword = (...keywords: string[]) => {
+    FOOD_DB.forEach(f => {
+      if (keywords.some(k => f.id.toLowerCase().includes(k))) prefer.add(f.id);
+    });
+  };
+
+  // 🔴 POTASSIUM HIGH (hyperkalemia risk) — restrict K-rich foods
+  if (labs.POTASSIUM !== undefined && labs.POTASSIUM > 5.0) {
+    restrictByKeyword('avocado', 'potato', 'spinach', 'banana', 'tomato', 'salmon', 'mackerel', 'yogurt', 'coconut', 'dried', 'beet');
+    notes.push('⚠️ Калий >5.0 ммоль/л: ограничены авокадо, картофель, шпинат, бананы, помидоры, лосось, сухофрукты');
+  }
+
+  // 🔴 SODIUM HIGH / HYPERTENSION — restrict Na-rich foods
+  if (labs.SODIUM !== undefined && labs.SODIUM > 145) {
+    restrictByKeyword('salt', 'soy_sauce', 'pickles', 'olives', 'cheese', 'sausage', 'bacon', 'ham', 'canned', 'bouillon', 'processed');
+    notes.push('⚠️ Натрий >145 ммоль/л: исключены соль, соевый соус, консервы, колбасы, сыры, оливки');
+  }
+
+  // 🔴 GLUCOSE/INSULIN HIGH — lower carb, lower GI, add insulin sensitizers
+  if ((labs.GLUCOSE !== undefined && labs.GLUCOSE > 6.1) || (labs.INSULIN !== undefined && labs.INSULIN > 15) || (labs.HOMA_IR !== undefined && labs.HOMA_IR > 2.5)) {
+    macroAdjustments.carbMult = (macroAdjustments.carbMult || 1) * 0.85;
+    preferByKeyword('buckwheat', 'barley', 'oats', 'quinoa', 'lentils', 'chickpeas', 'beans', 'broccoli', 'spinach', 'cinnamon', 'berberine', 'chia', 'flax');
+    restrictByKeyword('rice_white', 'bread_white', 'pasta', 'potato', 'sugar', 'honey', 'juice', 'soda', 'cake', 'cookie');
+    notes.push('⚠️ Глюкоза/инсулин/ГИР повышены: углеводы ×0.85, низкий ГИ, добавлены клинча/бобовые/ягоды');
+  }
+
+  // 🟡 LIVER STRESS (ALT/AST/GGT) — liver support, lower fat
+  if ((labs.ALT !== undefined && labs.ALT > 40) || (labs.AST !== undefined && labs.AST > 40) || (labs.GGT !== undefined && labs.GGT > 55)) {
+    macroAdjustments.fatMult = (macroAdjustments.fatMult || 1) * 0.9;
+    preferByKeyword('nac', 'tudca', 'milk_thistle', 'artichoke', 'beetroot', 'turmeric', 'broccoli', 'cabbage', 'coffee');
+    restrictByKeyword('alcohol', 'fried', 'fast_food', 'pork', 'liver', 'cream', 'butter', 'margarine');
+    notes.push('⚠️ АЛТ/АСТ/ГГТ повышены: жиры ×0.9, гепатопротекторы (NAC, TUDCA, силмарин), исключен алкоголь/жирное');
+  }
+
+  // 🟡 KIDNEY STRESS (CREATININE/UREA) — moderate protein, kidney support
+  if ((labs.CREATININE !== undefined && labs.CREATININE > 110) || (labs.UREA !== undefined && labs.UREA > 8.3)) {
+    macroAdjustments.proteinMult = (macroAdjustments.proteinMult || 1) * 0.9;
+    preferByKeyword('cranberry', 'blueberry', 'pumpkin', 'watermelon', 'cucumber', 'cordyceps', 'astragalus');
+    restrictByKeyword('protein_powder', 'creatine', 'red_meat', 'organ_meat', 'sardines', 'anchovies');
+    notes.push('⚠️ Креатинин/мочевина повышены: белок ×0.9, почечная поддержка, ограничены добавки/красное мясо');
+  }
+
+  // 🟡 HEMATOCRIT HIGH — blood viscosity management
+  if (labs.HEMATOCRIT !== undefined && labs.HEMATOCRIT > 52) {
+    preferByKeyword('serrapeptase', 'nattokinase', 'bromelain', 'garlic', 'onion', 'omega3', 'fish_oil', 'ginger', 'cayenne');
+    restrictByKeyword('iron', 'red_meat', 'liver', 'spinach'); // avoid excess iron
+    notes.push('⚠️ Гематокрит >52%: фибринолитики (серрапептаза, наттокиназа), омега-3, ограничен Fe/красное мясо');
+  }
+
+  // 🟡 LIPIDS (LDL/APOB) — lower sat fat, add fiber/plant sterols
+  if ((labs.LDL !== undefined && labs.LDL > 3.5) || (labs.APOB !== undefined && labs.APOB > 1.0)) {
+    macroAdjustments.fatMult = (macroAdjustments.fatMult || 1) * 0.9;
+    preferByKeyword('oats', 'barley', 'psyllium', 'flax', 'chia', 'nuts', 'olive_oil', 'avocado', 'plant_sterol', 'bergamot');
+    restrictByKeyword('butter', 'cream', 'cheese_hard', 'fat_meat', 'coconut_oil', 'palm_oil', 'trans_fat');
+    notes.push('⚠️ ЛПНП/АпоБ повышены: насыщ. жиры ×0.9, бета-глюкан/фитостеролы/омега-3, исключено кокос/пальма');
+  }
+
+  // 🟡 THYROID (TSH HIGH) — selenium, zinc, iodine support
+  if (labs.TSH !== undefined && labs.TSH > 4.0) {
+    preferByKeyword('brazil_nuts', 'seafood', 'egg', 'seaweed', 'iodized_salt', 'pumpkin_seeds', 'beef', 'turkey');
+    restrictByKeyword('soy', 'raw_cruciferous', 'millet'); // goitrogens in excess
+    notes.push('⚠️ ТТГ >4 мМЕ/л: Se/Zn/I (бразильский орех, морепродукты, яйца), ограничены стритогенны');
+  }
+
+  // 🟡 VITAMIN D LOW — fatty fish, egg yolk, supplement
+  if (labs.VITAMIN_D !== undefined && labs.VITAMIN_D < 30) {
+    preferByKeyword('salmon', 'mackerel', 'sardines', 'egg_yolk', 'cod_liver', 'mushroom_uv');
+    notes.push('⚠️ Вит D <30 нг/мл: жирная рыба, желток, грибы UV, добавка D3+K2');
+  }
+
+  // 🟡 FERRITIN LOW — iron + vitamin C
+  if (labs.FERRITIN !== undefined && labs.FERRITIN < 30) {
+    preferByKeyword('beef_liver', 'red_meat', 'lentils', 'spinach', 'pumpkin_seeds', 'vitamin_c', 'pepper', 'citrus', 'kiwi');
+    notes.push('⚠️ Ферритин <30 мкг/л: гемовый Fe + вит C, растительный Fe + C, чай/кофе отдельно');
+  }
+
+  // 🟡 HOMOCYSTEINE HIGH — B6/B12/B9/betaine
+  if (labs.HOMOCYSTEINE !== undefined && labs.HOMOCYSTEINE > 12) {
+    preferByKeyword('beef_liver', 'egg', 'spinach', 'broccoli', 'asparagus', 'betaine', 'beetroot', 'b12', 'folate', 'b6');
+    notes.push('⚠️ Гомоцистеин >12 мкмоль/л: B6/B12/фолат/бетаин (печень, яйцо, шпинат, свекла)');
+  }
+
+  // 🟡 CRP HIGH — anti-inflammatory
+  if (labs.CRP !== undefined && labs.CRP > 5) {
+    preferByKeyword('omega3', 'fish_oil', 'curcumin', 'turmeric', 'berries', 'ginger', 'green_tea', 'boswellia', 'resveratrol');
+    notes.push('⚠️ CRP >5 мг/л: омега-3, куркумин, ягоды, имбирь, зеленый чай');
+  }
+
+  return { restrictFoodIds: restrict, preferFoodIds: prefer, notes, macroAdjustments };
+}
+
 // ─── Источники белковой ротации (только существующие ID в FOOD_DB) ──────
 const PROTEIN_ROTATION: { label: string; ids: string[]; note: string }[] = [
   { label: 'Птица', ids: ['chicken_breast','turkey_breast','chicken_thigh'], note: 'Низкожирный цельный белок, высокий DIAAS (≈1.18)' },
-  { label: 'Жирная рыба (Omega-3)', ids: ['salmon','mackerel','sardines','red_fish'], note: 'EPA/DHA + природный креатин, противовоспалительный эффект' },
-  { label: 'Постная рыба', ids: ['cod','pollock','white_fish_cod','white_fish_mintai','tuna_steak'], note: 'Самая высокая плотность белка, низкий жир, идеальна ночью' },
-  { label: 'Красное мясо', ids: ['beef_lean','beef_minced','beef_liver','rabbit'], note: 'Гемовое железо + Zn + B12, креатин 4–5 г/кг' },
+  { label: 'Жирная рыба (Omega-3)', ids: ['salmon','mackerel','sardines','tuna_steak'], note: 'EPA/DHA + природный креатин, противовоспалительный эффект' },
+  { label: 'Постная рыба', ids: ['cod','pollock','tuna_canned'], note: 'Самая высокая плотность белка, низкий жир, идеальна ночью' },
+  { label: 'Красное мясо', ids: ['beef_lean','beef_liver','rabbit'], note: 'Гемовое железо + Zn + B12, креатин 4–5 г/кг' },
   { label: 'Яйца/молоко', ids: ['egg_whole','egg_white','cottage_cheese_5','yogurt_greek'], note: 'Биологическая ценность яйца = 100, казеин = 77' },
   { label: 'Морепродукты', ids: ['shrimp','tuna_canned','cod','pollock'], note: 'Йод + таурин, низкокалорийно' },
   { label: 'Сыворотка/молоко', ids: ['whey_protein','whey_isolate','milk','kefir'], note: 'Сыворотка — самый быстрый белок, пик аминокислот 60 мин' },
-  { label: 'Веган/бобовые', ids: ['tofu','tempeh','lentils','chickpeas','seitan'], note: 'Растительный белок, дополнить сывороткой для лейцина' },
+  { label: 'Веган/бобовые', ids: ['tofu','tempeh','lentils','chickpeas','edamame'], note: 'Растительный белок, дополнить сывороткой для лейцина' },
 ];
 
 function pickRotation(dayOffset: number): { label: string; ids: string[]; note: string } {
@@ -152,7 +267,7 @@ function pickRotation(dayOffset: number): { label: string; ids: string[]; note: 
 }
 
 // ─── Preference: common bodybuilding carbs get selection bonus ───
-const COMMON_CARB_IDS = new Set(['rice','buck','potato','pasta','quinoa','barley','cereal','millet','cousc','noodle','spaghetti','udon','soba','bulgur','chickpea','lentil','beans','corn','bread']);
+const COMMON_CARB_IDS = new Set(['rice_white','rice_brown','buckwheat','potato_boiled','pasta_durum','quinoa','barley','cereal','millet','couscous','noodle','bulgur','chickpea','lentil','beans','corn','bread']);
 
 // ─── Утилиты: детерминированный выбор ─────────────────────────────────
 function seededRandom(seed: number): number {
@@ -242,7 +357,7 @@ function makeItem(food: FoodItem, grams: number, role: MealItem['role']): MealIt
 // ─── Пулы продуктов по ролям (с фильтром аллергенов и диеты) ───────────
 function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPlanInput['budget'], varietyPoolSize?: number) {
   const isMealFood = (f: FoodItem) =>
-    f.category !== 'supplement' && !['whey_protein','casein'].includes(f.id);
+    f.category !== 'supplement' || ['whey_protein', 'whey_isolate', 'whey_concentrate', 'casein', 'casein_micellar', 'supp_pea_protein', 'supp_soy_isolate', 'supp_rice_protein', 'supp_eaa', 'bcaa'].includes(f.id);
   // Д-3: build basePoolRaw first, then exclude premium/exotic at the source for low/medium budgets so
   // they cannot enter ANY pool via raw fallbacks (fatsRaw, cFruitRaw) which bypass byBudget.
   const basePoolRaw = FOOD_DB.filter(f => {
@@ -288,8 +403,8 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     proteinSolid: limitPoolByVariety(pSolid.length > 0 ? pSolid : anyProtein, 10001),
     proteinFatty: limitPoolByVariety(pFatty.length > 0 ? pFatty : anyProtein, 10003),
     proteinLean: limitPoolByVariety(pLean.length > 0 ? pLean : anyProtein, 10005),
-    fastProtein: FOOD_DB.filter(f => !excludedIds.has(f.id) && (f.id === 'whey_isolate' || f.id === 'whey_concentrate' || f.id === 'whey_protein' || f.id === 'egg_white' || f.id === 'supp_pea_protein' || f.id === 'supp_soy_isolate' || f.id === 'supp_rice_protein')),
-    slowProtein: FOOD_DB.filter(f => !excludedIds.has(f.id) && (f.id === 'casein' || f.id === 'casein_micellar' || f.id === 'cottage_cheese_5' || f.id === 'yogurt_greek')),
+    fastProtein: FOOD_DB.filter(f => !excludedIds.has(f.id) && (f.id === 'whey_isolate' || f.id === 'whey_protein' || f.id === 'egg_white')),
+    slowProtein: FOOD_DB.filter(f => !excludedIds.has(f.id) && (f.id === 'casein' || f.id === 'cottage_cheese_5' || f.id === 'yogurt_greek')),
     carbSlow: limitPoolByVariety(cSlowBud.length > 0 ? cSlowBud : cSlowRaw.length > 0 ? cSlowRaw : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15), 10011),
     carbFast: limitPoolByVariety(cFastBud.length > 0 ? cFastBud : cFastRaw.length > 0 ? cFastRaw : cFruitBud.length > 0 ? cFruitBud : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15), 10013),
     carbFruit: limitPoolByVariety(cFruitBud.length > 0 ? cFruitBud : cFruitRaw, 10015),
@@ -302,7 +417,7 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     vegProteinExtra: basePool.filter(f => !isPremiumOrExotic(f.id) && (
       (f.category === 'protein' && (f.protein || 0) >= 8) ||
       (f.id === 'tofu' || f.id === 'tempeh' || f.id === 'seitan' || f.id === 'edamame' ||
-       f.id === 'lentils' || f.id === 'chickpeas' || f.id === 'hummus' || f.id === 'falafel_pita')
+       f.id === 'lentils' || f.id === 'chickpeas' || f.id === 'hummus')
     )),
     eaa: FOOD_DB.find(f => !excludedIds.has(f.id) && f.id === 'supp_eaa') ?? FOOD_DB.find(f => !excludedIds.has(f.id) && f.id === 'bcaa'),
     dextrin: FOOD_DB.find(f => !excludedIds.has(f.id) && (f.id === 'amylopectin' || f.id === 'dextrose')),
@@ -678,12 +793,31 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const tSnack = (() => { const [lh, lm] = tLunch.split(':').map(Number); const [dh, dm] = tDinner.split(':').map(Number); const mid = Math.round(((lh*60+lm) + (dh*60+dm)) / 2); return String(Math.floor(mid/60)).padStart(2,'0') + ':' + String(mid%60).padStart(2,'0'); })();
   const variety = input.variety ?? 'max';
   const varietyPoolSize = variety === 'max' ? 20 : variety === 'medium' ? 10 : 5;
-  const pool = buildFoodPools(input.excludedIds || new Set(), !!input.isVegetarian, input.budget, varietyPoolSize);
+
+  // Early declarations needed for lab adjustments
+  const notes: string[] = [];
+  const ptm = input.planTypeMod || { pMult: 1.0, fMult: 1.0, cMult: 1.0 };
+
+  // 🧪 Lab-driven dietary adjustments (compute BEFORE building pools)
+  const labAdj = computeLabDietAdjustment(input);
+  if (labAdj.notes.length > 0) {
+    notes.push(...labAdj.notes);
+  }
+  // Apply macro multipliers from labs
+  if (labAdj.macroAdjustments.proteinMult) ptm.pMult = (ptm.pMult || 1) * labAdj.macroAdjustments.proteinMult;
+  if (labAdj.macroAdjustments.carbMult) ptm.cMult = (ptm.cMult || 1) * labAdj.macroAdjustments.carbMult;
+  if (labAdj.macroAdjustments.fatMult) ptm.fMult = (ptm.fMult || 1) * labAdj.macroAdjustments.fatMult;
+  // Merge lab restrictions/preferences with user's
+  const combinedExcluded = new Set([...(input.excludedIds || []), ...labAdj.restrictFoodIds]);
+  const combinedPreferred = new Set([...(input.preferredIds || []), ...labAdj.preferFoodIds]);
+
+  const pool = buildFoodPools(combinedExcluded, !!input.isVegetarian, input.budget, varietyPoolSize);
+
   // P5: PCT food preference boost — крестоцветные (DIM/I3C) + zinc-rich + flax
-  let effectivePreferred = input.preferredIds || new Set<string>();
+  let effectivePreferred = combinedPreferred;
   if (input.cyclePhase === 'pct') {
     const pctFoodIds = ['broccoli','cabbage','kale','cauliflower','brussels_sprouts','beef_lean','beef_liver','oysters','pumpkin_seeds','flaxseed','salmon'];
-    effectivePreferred = new Set([...(input.preferredIds || []), ...pctFoodIds.filter(id => FOOD_DB.some(fd => fd.id === id))]);
+    effectivePreferred = new Set([...combinedPreferred, ...pctFoodIds.filter(id => FOOD_DB.some(fd => fd.id === id))]);
   }
   const seedBase = (input.dayOffset + randomSalt) * 10007 + (input.isTrainingDay ? 3000 : 7000);
   // Ротация: разные группы белка в разные приёмы (раньше — одна на весь день)
@@ -696,7 +830,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const meals: Meal[] = [];
 
   // ─── Распределение макросов по приёмам (MPS-based) ───────────────────
-  const ptm = input.planTypeMod || { pMult: 1.0, fMult: 1.0, cMult: 1.0 };
+  // ptm уже объявлен выше (перед lab adjustments)
   // Д-13: MPS per meal scales with the cycle phase. Advanced/androgenic phases (course, recovery)
   // raise nitrogen retention and benefit from a higher per-meal MPS dose (0.4 g/kg LBM); default 0.3.
   const mpsLbm = (input.cyclePhase === 'course' || input.cyclePhase === 'recovery' || input.cyclePhase === 'pct')
@@ -780,10 +914,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const effRecentIds = (): Set<string> => new Set<string>([...(input.recentFoodIds || []), ...usedTodayIds]);
   const markUsed = (meal: Meal) => { meal.items.forEach(it => { allFoodsUsed.push(it.id); usedTodayIds.add(it.id); }); };
   const rotLabels = [...new Set(mealRotations.map(r => r.label))].join(' / ');
-  const notes: string[] = [
+  notes.push(
     `Ротация белка: ${rotLabels} — разные группы в каждый приём`,
     `MPS per meal: ${Math.max(20, Math.round(mpsPerMeal * 1.2))} г (≈${MPS_LBM_LOW} г/кг LBM), интервал 3–5 ч для синтеза`,
-  ];
+  );
 
   // 1. Завтрак — белок + медленные углеводы + жиры + ягоды ─────────────
   const breakfastRot = rotationForMeal(0);
@@ -1093,7 +1227,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
 
 
-  // ─── Итеративная коррекция макросов: точность ≤3% (макросы приоритет, ккал следует) ───
+  // ─── Этап 1: Грубая итеративная коррекция макросов (до ±5%) ───
   for (let iter = 0; iter < 8; iter++) {
     const gP = adjustedProteinG || input.goalProteinG, gC = carbsTotal, gF = fatTotal;
     const dP = (gP - totals.p) / Math.max(1, gP);
@@ -1119,6 +1253,128 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // Recalculate
     meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
     totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + m.totals.fiber, 0); totals.leucine_mg = meals.reduce((s, m) => s + m.totals.leucine_mg, 0);
+  }
+
+  // ─── Этап 2: Точная подгонка ≤2% — точечная коррекция одного гибкого item ───
+  // Для каждого макроса вычисляем точную граммовку самого подходящего item,
+  // чтобы довести макрос до цели с точностью ≤2%.
+  const preciseAdjust = (
+    roles: string[],
+    targetG: number,
+    currentG: number,
+    macro: 'protein' | 'carbs' | 'fat',
+    tolerance = 0.02
+  ): boolean => {
+    if (targetG <= 0) return false;
+    const dev = (targetG - currentG) / targetG;
+    if (Math.abs(dev) <= tolerance) return true; // уже в пределах
+    // Собираем кандидатов с их продуктами
+    const candidates: { meal: Meal; item: MealItem; food: FoodItem; per100: number }[] = [];
+    meals.forEach(m => m.items.forEach(it => {
+      if (!roles.includes(it.role)) return;
+      const food = FOOD_DB.find(f => f.id === it.id);
+      if (!food) return;
+      const per100 = macro === 'protein' ? (food.protein || 0) : macro === 'carbs' ? (food.carbs || 0) : (food.fat || 0);
+      if (per100 <= 0) return;
+      candidates.push({ meal: m, item: it, food, per100 });
+    }));
+    if (candidates.length === 0) {
+      // Fallback: нет items этой роли — вставляем новый из пула (для fat — в ужин/последний приём)
+      if (macro === 'fat' && needFallbackFat()) {
+        const fatPool = pool.fats.length > 0 ? pool.fats : FOOD_DB.filter(f => f.category === 'fat' && (f.fat || 0) >= 50 && !combinedExcluded.has(f.id));
+        if (fatPool.length > 0) {
+          const targetMeal = meals.find(m => m.type === 'dinner') || meals[meals.length - 1];
+          if (targetMeal) {
+            const fatFood = fatPool[Math.floor(seededRandom(seedBase + 88) * fatPool.length)];
+            if (fatFood) {
+              const startG = Math.min(20, Math.max(8, Math.round((targetG - currentG) / (fatFood.fat || 1) * 100)));
+              const newItem = makeItem(fatFood, startG, 'fat');
+              targetMeal.items.push(newItem);
+              targetMeal.totals = targetMeal.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+              totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + m.totals.fiber, 0); totals.leucine_mg = meals.reduce((s, m) => s + m.totals.leucine_mg, 0);
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
+    function needFallbackFat(): boolean { return macro === 'fat' && (targetG - currentG) > 5; }
+    // Выбираем лучшего кандидата:
+    // - при добавлении (dev > 0): самый высокий макро-плотность (меньше граммов добавить)
+    // - при убавлении (dev < 0): самый низкий макро-плотность, но amount достаточно большой
+    const needDeltaG = targetG - currentG; // граммы макроса, которые надо добавить/убрать
+    let best: typeof candidates[0] | null = null;
+    if (needDeltaG > 0) {
+      best = candidates.reduce((a, b) => {
+        const scoreA = a.per100 + (a.item.amount >= 20 ? 5 : 0);
+        const scoreB = b.per100 + (b.item.amount >= 20 ? 5 : 0);
+        return scoreB > scoreA ? b : a;
+      });
+    } else {
+      best = candidates.reduce((a, b) => {
+        const canLoseA = a.item.amount * a.per100 / 100;
+        const canLoseB = b.item.amount * b.per100 / 100;
+        // Предпочитаем item, у которого хватает запаса убрать needDeltaG без ухода ниже минимума
+        const minAmount = SUPPLEMENT_MAX_G[a.food.id] ? 5 : 10;
+        const minAmountB = SUPPLEMENT_MAX_G[b.food.id] ? 5 : 10;
+        const availA = canLoseA - minAmount * a.per100 / 100;
+        const availB = canLoseB - minAmountB * b.per100 / 100;
+        const okA = availA >= -needDeltaG ? 1 : 0;
+        const okB = availB >= -needDeltaG ? 1 : 0;
+        if (okA !== okB) return okB > okA ? b : a;
+        return b.item.amount > a.item.amount ? b : a;
+      });
+    }
+    if (!best) return false;
+    // Точная граммовка: нужно изменить макрос на needDeltaG
+    const deltaGrams = needDeltaG / best.per100 * 100;
+    const minAmount = SUPPLEMENT_MAX_G[best.food.id] ? 5 : 10;
+    const maxAmount = SUPPLEMENT_MAX_G[best.food.id] || MAX_GRAM_PER_ITEM;
+    let newAmount = best.item.amount + deltaGrams;
+    newAmount = Math.max(minAmount, Math.min(maxAmount, Math.round(newAmount)));
+    // Реальная дельта после округления и капов
+    const actualDeltaGrams = newAmount - best.item.amount;
+    if (Math.abs(actualDeltaGrams) < 1) return Math.abs(dev) <= 0.05; // не можем скорректировать, оставляем ±5%
+    const factor = newAmount / (best.item.amount || 1);
+    best.item.amount = newAmount;
+    best.item.kcal = Math.round(best.item.kcal * factor);
+    best.item.p = Math.round(best.item.p * factor);
+    best.item.f = Math.round(best.item.f * factor);
+    best.item.c = Math.round(best.item.c * factor);
+    best.item.fiber = Math.round(best.item.fiber * factor);
+    best.item.leucine_mg = Math.round((best.item.leucine_mg || 0) * factor);
+    // Пересчёт meal totals
+    best.meal.totals = best.meal.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+    // Пересчёт day totals
+    totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + m.totals.fiber, 0); totals.leucine_mg = meals.reduce((s, m) => s + m.totals.leucine_mg, 0);
+    return true;
+  };
+
+  // Применяем точную подгонку для каждого макроса (до 3 проходов)
+  const gPreciseP = adjustedProteinG || input.goalProteinG;
+  const gPreciseC = carbsTotal;
+  const gPreciseF = fatTotal;
+  for (let pass = 0; pass < 3; pass++) {
+    const doneP = preciseAdjust(['protein','fast_protein','slow_protein'], gPreciseP, totals.p, 'protein');
+    const doneC = preciseAdjust(['carb_slow','carb_fast','fruit'], gPreciseC, totals.c, 'carbs');
+    const doneF = preciseAdjust(['fat'], gPreciseF, totals.f, 'fat');
+    if (doneP && doneC && doneF) break;
+  }
+
+  // Отчёт о точности в notes
+  {
+    const dP = Math.abs(totals.p - gPreciseP) / Math.max(1, gPreciseP);
+    const dC = Math.abs(totals.c - gPreciseC) / Math.max(1, gPreciseC);
+    const dF = Math.abs(totals.f - gPreciseF) / Math.max(1, gPreciseF);
+    const maxDev = Math.max(dP, dC, dF);
+    if (maxDev <= 0.02) {
+      notes.push(`🎯 Точность рациона: Б ${totals.p}/${gPreciseP}г, Ж ${totals.f}/${gPreciseF}г, У ${totals.c}/${gPreciseC}г (отклонение ≤2%)`);
+    } else if (maxDev <= 0.05) {
+      notes.push(`✓ Точность рациона: отклонение ≤5% (Б ${Math.round(dP*100)}%, Ж ${Math.round(dF*100)}%, У ${Math.round(dC*100)}%)`);
+    } else {
+      notes.push(`⚠ Точность рациона: отклонение >5% (Б ${Math.round(dP*100)}%, Ж ${Math.round(dF*100)}%, У ${Math.round(dC*100)}%) — проверьте пулы продуктов`);
+    }
   }
 
   // ─── Atwater kcal: totals.kcal = P*4 + C*4 + F*9 (соответствует макросам) ───

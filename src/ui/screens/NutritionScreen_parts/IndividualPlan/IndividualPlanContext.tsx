@@ -794,6 +794,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       // Каждый вызов generatePlan → новый salt → разный набор продуктов
       const planRandomSalt = Math.floor(Math.random() * 1000000);
 
+      // 🧪 Собираем lab values из v2Labs (строки → числа) для диетической коррекции
+      const labValuesForPlan: Record<string, number> = {};
+      Object.entries(v2Labs).forEach(([key, val]) => {
+        const num = parseFloat(val as string);
+        if (!isNaN(num) && num > 0) labValuesForPlan[key.toUpperCase()] = num;
+      });
+
       const buildOneDay = (offset: number): any => {
         // Apply cycling mode adjustments per-day
         const isTrain = !!trainingDays[offset % 7];
@@ -828,6 +835,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           wakeTime, lunchTime, dinnerTime, bedTime,
           planTypeMod: (() => { const pt = PLAN_TYPES.find(p => p.id === (dietPrefs.includes('vegetarian') ? 'vegetarian' : planType)); return { pMult: pt?.pMult || 1.0, fMult: pt?.fMult || 1.0, cMult: pt?.cMult || 1.0 }; })(),
           eveningLowCarb,
+          labValues: Object.keys(labValuesForPlan).length > 0 ? labValuesForPlan : undefined,
         };
         const v2 = buildDayPlanV2(input);
         // Преобразуем DayPlanV2 → совместимый формат старого dayPlan
