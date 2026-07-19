@@ -401,13 +401,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [workScheduleType, setWorkScheduleType] = useState('standard');
   const [trainingDays, setTrainingDays] = useState<boolean[]>([true, false, true, false, true, true, false]);
   const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-  const [generated, setGenerated] = useState(() => { try { return localStorage.getItem("he_plan_generated") === "true"; } catch { return false; } });
+  const [generated, setGenerated] = useState(false);
   const [planDays, setPlanDays] = useState<1 | 3 | 7>(() => { try { const v = parseInt(localStorage.getItem("he_plan_days") || "1"); return (v === 3 || v === 7) ? v : 1; } catch { return 1; } });
   const [selectedDayIndex, setSelectedDayIndex] = useState(() => { try { return parseInt(localStorage.getItem("he_plan_day_idx") || "0") || 0; } catch { return 0; } });
   const [planView, setPlanView] = useState<'list' | 'calendar'>(() => { try { return (localStorage.getItem("he_plan_view") === "calendar") ? "calendar" : "list"; } catch { return "list"; } });
-  const [dayPlan, setDayPlan] = useState<any>(() => { try { return JSON.parse(localStorage.getItem("he_plan_day") || "null"); } catch { return null; } });
-  const [threeDayPlan, setThreeDayPlan] = useState<any>(() => { try { return JSON.parse(localStorage.getItem("he_plan_3day") || "null"); } catch { return null; } });
-  const [weekPlan, setWeekPlan] = useState<any>(() => { try { return JSON.parse(localStorage.getItem("he_plan_week") || "null"); } catch { return null; } });
+  const [dayPlan, setDayPlan] = useState<any>(null);
+  const [threeDayPlan, setThreeDayPlan] = useState<any>(null);
+  const [weekPlan, setWeekPlan] = useState<any>(null);
   const [shoppingList, setShoppingList] = useState<any>(() => { try { return JSON.parse(localStorage.getItem("he_plan_shopping") || "null"); } catch { return null; } });
   const [waterCalc, setWaterCalc] = useState<any>(() => { try { return JSON.parse(localStorage.getItem("he_plan_water") || "null"); } catch { return null; } });
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>(() => { try { return JSON.parse(localStorage.getItem('he_saved_nutrition_plans') || '[]'); } catch { return []; } });
