@@ -281,7 +281,7 @@ zinc: {
     ],
     contraindications: ['Гипертиреоз (с осторожностью)', 'Приём других селен-содержащих добавок'],
     sideEffects: ['Запах чеснока при передозировке', 'Выпадение волос при >400 мкг/д'],
-    dosage: { mg: 0.05, timing: 'с едой', form: 'селен-метионин' },
+    dosage: { mg: 0.2, timing: 'с едой', form: 'селен-метионин 200 мкг' },
     bestForCourse: true,
     specialInstructions: ['Принимать с едой', 'Не превышать 400 мкг/сут', 'Интервал с витамином C — 2 ч'],
     analog: ['zinc', 'vitamin_e'],
@@ -6550,8 +6550,8 @@ nattokinase: {
     tier: 'standard',
     category: ['cardioprotector', 'anticoagulant'],
     forms: [
-      { id: 'nattokinase', name: 'Nattokinase', nameRu: 'Наттокиназа 2000 FU', dose: '2 г 2x/д', best: true },
-      { id: 'nattokinase_2', name: 'Nattokinase', nameRu: 'Наттокиназа + Омега-3 комплекс', dose: '2 г', best: false }
+      { id: 'nattokinase', name: 'Nattokinase', nameRu: 'Наттокиназа 2000 FU', dose: '100 мг натощак 1x/д', best: true },
+      { id: 'nattokinase_2', name: 'Nattokinase', nameRu: 'Наттокиназа + Омега-3 комплекс', dose: '100 мг', best: false }
     ],
     organs: ['HEART', 'VESSELS', 'BRAIN'],
     systems: ['cardio'],
@@ -7880,7 +7880,7 @@ cabergoline: {
     tier: 'specialty',
     category: ['pharma', 'hormonal'],
     forms: [
-      { id: 'cabergoline', name: 'Cabergoline', nameRu: 'Каберголин 0.5 мг', dose: '0.5 мкг 2x/д', best: true }
+      { id: 'cabergoline', name: 'Cabergoline', nameRu: 'Каберголин 0.5 мг', dose: '0.5 мг 2x/нед', best: true }
     ],
     organs: ['PITUITARY', 'REPRODUCTIVE'],
     systems: ['reproductive', 'endocrine'],
@@ -10406,7 +10406,7 @@ kpv: {
     forms: [{id:'tadalafil_5',name:'Tadalafil 5mg',nameRu:'Тадалафил 5 мг',dose:'5 мг/д постоянно',best:true},{id:'tadalafil_20',name:'Tadalafil 20mg',nameRu:'Тадалафил 20 мг',dose:'20 мг по требованию',best:false}],
     organs: ['VESSELS','HEART','REPRODUCTIVE'], systems: ['vascular','cardio','reproductive'],
      mechanisms: ['PDE5_INHIBITION', 'VASODILATION', 'NO_PRODUCTION', 'NO_RELEASE', 'NITRIC_OXIDE_PRODUCTION', 'BLOOD_PRESSURE_LOWERING', 'BP_REDUCTION', 'MICROCIRCULATION', 'MICROCIRCULATION_IMPROVEMENT', 'CEREBRAL_BLOOD_FLOW', 'PLATELET_AGGREGATION_INHIBITION', 'ENDOTHELIAL_NOS'],
-    description: 'Ингибитор ФДЭ5. Расширяет сосуды, улучшает кровоток. На курсе ААС — для профилактики гипертрофии ЛЖ, снижения давления и поддержки эректильной функции. Период полувыведения ~17.5 ч.',
+    description: 'Ингибитор ФДЭ5. Расширяет сосуды, улучшает кровоток и эндотелиальную функцию. На курсе ААС — для профилактики гипертрофии ЛЖ, снижения АД и поддержки эректильной функции. Период полувыведения ~17.5 ч.',
     dosage: { mg: 5, timing: '1x/д утром', form: 'таб' },
     bestForCourse: true,
      synergies: [{with:'citrulline',effect:'Усиление вазодилатации',mechanism:'Цитруллин → аргинин → NO, тадалафил ↓ PDE5 — двойной путь',severity:'MEDIUM'},{with:'omega3',effect:'Эндотелиальная защита',mechanism:'Омега-3 ↓ воспаление эндотелия, тадалафил ↑ NO',severity:'LOW'},{with:'agmatine',effect:'NO-модуляция',mechanism:'Агматин ингибирует eNOS, тадалафил сохраняет цГМФ',severity:'MEDIUM'},{with:'pycnogenol',effect:'Эндотелиальная синергия',mechanism:'Пикногенол ↑ eNOS, тадалафил ↓ PDE5 — аддитивная вазодилатация',severity:'MEDIUM'}],

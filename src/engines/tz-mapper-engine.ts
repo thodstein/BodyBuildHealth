@@ -673,6 +673,19 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
     result.push({ substanceId: id, reason, trigger, category });
   };
 
+  // ─── 🛑 WINSTROL + ANADROL — ОБЯЗАТЕЛЬНЫЙ ПРОТОКОЛ (hard-stop combo, ПЕРВЫМ для приоритета) ───
+  // Крайне гепатотоксичная и липидно-разрушительная комбинация (↓HDL до 50%+).
+  // Требует обязательного протокола защиты: NAC + TUDCA (высокие дозы) + Omega-3 6 г + LFT каждые 2 нед.
+  // Размещён ДО базового протокола, чтобы «ОБЯЗАТЕЛЬНО»-причины добавлялись первыми (seen дедуплицирует поздние дубли).
+  if (flags.isWinnyPlusOxy) {
+    add('nac', 'NAC 1800 мг — ОБЯЗАТЕЛЬНО: глутатион (фаза II детокс) при Winny+Oxy', '🛑 Winny+Anadrol: обязательный протокол', 'hepatoprotector');
+    add('tudca', 'TUDCA 1000 мг — ОБЯЗАТЕЛЬНО: BSEP-желчеотток при Winny+Oxy (×2 защита)', '🛑 Winny+Anadrol: обязательный протокол', 'hepatoprotector');
+    add('omega3', 'Omega-3 6 г — ОБЯЗАТЕЛЬНО: ↓HDL до 50% на комбо, спасение липидного профиля', '🛑 Winny+Anadrol: обязательный протокол', 'cardioprotector');
+    add('milk_thistle', 'Milk thistle 600 мг — ОБЯЗАТЕЛЬНО: стабилизация мембран гепатоцитов', '🛑 Winny+Anadrol: обязательный протокол', 'hepatoprotector');
+    add('niacin', 'Niacin 1500 мг на ночь — ОБЯЗАТЕЛЬНО: ↑HDL (lipid disaster на комбо)', '🛑 Winny+Anadrol: обязательный протокол', 'vitamin');
+    add('coq10', 'CoQ10 200 мг — ОБЯЗАТЕЛЬНО: митохондрии миокарда/гепатоцитов', '🛑 Winny+Anadrol: обязательный протокол', 'antioxidant');
+  }
+
   // ─── УРОВЕНЬ 1: БАЗА (при любом AAS) — dose-aware через intensity ───
   if (flags.hasAAS || flags.hasSarm) {
     const telDose = Math.round(doseByIntensity(20, 80, intensity) / 10) * 10;
@@ -696,14 +709,21 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
   if (flags.hasTest) {
     const testP = peds.find(p => p.pClass === 'aas_test');
     const testMg = testP?.mgPerWeek ?? 500;
+    // total aromatizable AAS = test + nandrolone + boldenone + DHB + others
+    const aromAAS = peds.filter(p => 
+      p.pClass === 'aas_test' || 
+      p.pClass === 'aas_nandrolone' || 
+      p.pClass === 'aas_bold' || 
+      p.pClass === 'aas_dht_inject'
+    ).reduce((sum, p) => sum + (p.mgPerWeek || 0), 0);
     let aiDose = '0.5 мг 2р/нед';
-    if (testMg <= 250) aiDose = '0.25 мг 2р/нед (лишь при E2>40)';
-    else if (testMg <= 500) aiDose = '0.25 мг 2р/нед';
-    else if (testMg <= 1000) aiDose = '0.5 мг 2р/нед';
+    if (aromAAS <= 300) aiDose = '0.25 мг 2р/нед (лишь при E2>40)';
+    else if (aromAAS <= 600) aiDose = '0.25 мг 2р/нед';
+    else if (aromAAS <= 1000) aiDose = '0.5 мг 2р/нед';
     else aiDose = '1 мг/день (титровать)';
     const hasOxy = peds.some(p => p.pClass === 'aas_oral_oxy');
     const oxyNote = hasOxy ? ' ⚠ Anadrol: AI НЕ работает при гино — нужен Tamoxifen (через «Усилить»)' : '';
-    add('anastrozole', `Anastrozole ${aiDose} — титровать к E2 20-40 pg/mL, НЕ подавлять <15 (боль в суставах, либидо↓)${oxyNote}`, `Тестостерон ${testMg} мг/нед`, 'pharma');
+    add('anastrozole', `Anastrozole ${aiDose} — титровать к E2 20-40 pg/mL, НЕ подавлять <15 (боль в суставах, либидо↓, когнитивные)${oxyNote}`, `Σ Ароматизирующих ААС ${aromAAS} мг/нед (тест ${testMg})`, 'pharma');
     add('pycnogenol', 'Pycnogenol 150 мг — eNOS + защита эндотелия', 'Тестостерон', 'antioxidant');
     add('citrulline', 'Citrulline 6 г — NO-предшественник', 'Тестостерон', 'amino');
     add('bergamot', 'Bergamot 500 мг — HMG-CoA редуктаза (липиды)', 'Тестостерон', 'cardioprotector');
@@ -844,18 +864,21 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
     add('b_complex', 'B-Complex — метилирование (satellite proliferation)', 'MGF', 'vitamin');
   }
 
-  // ─── CLENBUTEROL — тратит таурин ───
+  // ─── CLENBUTEROL — тратит таурин + электролитный дисбаланс ───
   if (flags.hasClenbut) {
-    add('taurine', 'Taurine 5000 мг — ⚠ Clen истощает таурин (судороги!)', 'Clenbuterol', 'amino');
-    add('magnesium', 'Magnesium 600 мг — судороги', 'Clenbuterol', 'mineral');
-    add('potassium', 'Potassium 200 мг — ⚠ (электролиты)', 'Clenbuterol', 'mineral');
+    add('taurine', 'Taurine 5 г/сут, разделённо на 3 приёма (1.5+1.5+2 г) — ⚠ Clen истощает таурин (судороги, аритмия!)', 'Clenbuterol', 'amino');
+    add('magnesium', 'Magnesium 600-800 мг — судороги/аритмия (β2-агонист)', 'Clenbuterol', 'mineral');
+    add('potassium', 'Potassium 400-600 мг/сут — ⚠ электролиты (Clen ↓K+, риск аритмии)', 'Clenbuterol', 'mineral');
+    add('coq10', 'CoQ10 200 мг — митохондрии миокарда (Clen тахикардия/нагрузка)', 'Clenbuterol', 'antioxidant');
   }
 
-  // ─── T3/T4 (тиреоид) ───
+  // ─── T3/T4 (тиреоид) — кардиозащита + костная протекция ───
   if (flags.hasT3 || flags.hasT4) {
-    add('calcium', 'Calcium 1000 мг + D3+K2 — T3/T4 ↑ bone loss', 'Tireoid', 'mineral');
-    add('nebivolol', 'Nebivolol 2.5 мг — ⚠ при ЧСС>80 (T3↑HR)', 'Tireoid', 'pharma');
-    add('melatonin', 'Melatonin 0.3-1 мг — сон (T3 insomnia)', 'Tireoid', 'other');
+    add('nebivolol', 'Nebivolol 2.5-5 мг — ОБЯЗАТЕЛЬНО при ЧСС>80 в покое (T3/T4 ↑HR, риск тахиаритмии); контроль ЧСС ежедневно', 'Tireoid (тахикардия)', 'pharma');
+    add('calcium', 'Calcium 1000 мг + D3 2000 МЕ + K2 100 мкг — костная протекция (T3/T4 ↑ bone resorption)', 'Tireoid (кости)', 'mineral');
+    add('magnesium', 'Magnesium 400-600 мг — костная протекция + антиаритмический', 'Tireoid (кости/сердце)', 'mineral');
+    add('melatonin', 'Melatonin 0.3-1 мг — сон (T3 insomnia)', 'Tireoid (сон)', 'other');
+    add('coq10', 'CoQ10 200 мг — митохондрии миокарда (T3 ↑ метаболизм миокарда)', 'Tireoid (сердце)', 'antioxidant');
   }
 
   return result;
@@ -878,7 +901,7 @@ function computeProtocolWarnings(protocolIds: string[], flags?: ReturnType<typeo
   }
   // CRITICAL: Winstrol + Anadrol — токсичный дуэт (гепато-/нефро- + липидный коллапс, AI не работает при гино)
   if (flags?.isWinnyPlusOxy) {
-    w.push('🛑 WINSTROL + ANADROL: крайне гепатотоксичная и липидно-разрушительная комбинация (↓HDL до 50%+). Анастрозол НЕ работает при гинекомастии на оксиметолоне — нужен тамоксифен. Контроль АЛТ/АСТ каждые 2 нед, УЗИ печени, ЛНП/ЛПВП');
+    w.push('🛑 WINSTROL + ANADROL — КРИТИЧЕСКАЯ КОМБИНАЦИЯ: крайне гепатотоксична и разрушает липидный профиль (↓HDL до 50%+). ОБЯЗАТЕЛЬНЫЙ ПРОТОКОЛ: NAC 1800 мг + TUDCA 1000 мг + Omega-3 6 г + Силимарин 600 мг + Niacin 1500 мг + CoQ10 200 мг. Контроль АЛТ/АСТ КАЖДЫЕ 2 НЕД — при ALT>2×ULN немедленная отмена. Анастрозол НЕ работает при гинекомастии на оксиметолоне — нужен тамоксифен. НЕ рекомендуется держать комбо дольше 4 нед');
   }
   // CRITICAL: >1 орал 17α — кумулятивная гепатотоксичность
   if (flags?.isMultiOral) {
@@ -898,18 +921,23 @@ function computeProtocolWarnings(protocolIds: string[], flags?: ReturnType<typeo
 // ── H5: структурированный график лабораторного мониторинга ──
 function buildMonitoringPlan(ctx: MapperCtx, flags: ReturnType<typeof derivePEDFlags>, phase: PhaseKey): string {
   if (phase === 'pct') {
-    return 'Мониторинг ПКТ: ЛГ / ФСГ / общ. тестостерон / эстрадиол через 2 и 6 нед после отмены; при невосстановлении HPTA (>6 нед) — консультация врача';
+    return 'Мониторинг ПКТ:\n• Нед 2 после отмены: ЛГ, ФСГ, общ. тестостерон, эстрадиол, пролактин\n• Нед 6 после отмены: ЛГ, ФСГ, общ. тестостерон, эстрадиол\n• При невосстановлении HPTA (>6 нед, ТТГ/ЛГ < 50% нормы) — эндокринолог';
   }
   const onPED = flags.hasAAS || flags.hasSarm || flags.hasGH || flags.hasInsulin || flags.hasIGF;
   if (!onPED) return '';
   const lines: string[] = [];
-  lines.push('• 0 нед (исходно): ОАК+БХ (АЛТ/АСТ/ГГТ/билирубин/ЩФ), липидограмма, эстрадиол, пролактин, ТТГ, глюкоза/HbA1c, АД, ЧСС');
-  if (flags.hasOral17) lines.push('• каждые 2-4 нед: АЛТ/АСТ (орал 17α — гепатотоксичность)');
+  lines.push('• 0 нед (исходно): ОАК+БХ (АЛТ/АСТ/ГГТ/билирубин/ЩФ), липидограмма, эстрадиол, пролактин, ТТГ, глюкоза/HbA1c, креатинин/eGFR, АД, ЧСС, PSA (мужчины >40л или при наличии ААС)');
+  if (flags.hasOral17) lines.push('• каждые 2 нед: АЛТ/АСТ (орал 17α — гепатотоксичность). При ALT>2×ULN — снизить/отменить орал');
   else lines.push('• 4 нед: АД, ЧСС, HCT/гемоглобин, АЛТ/АСТ');
-  lines.push('• 8 нед: ОАК+БХ+липидограмма, эстрадиол, пролактин, ТТГ, УЗИ печени и предстательной железы');
-  lines.push('• 12 нед: как на 8 нед' + (flags.hasGH ? ' (+ глюкоза/HbA1c через 4 нед при GH)' : ''));
-  if (flags.hasInsulin || flags.hasGH) lines.push('• при GH/инсулине: глюкоза натощак + через 2 ч каждые 4 нед (риск гипер-/гипогликемии)');
-  lines.push('• внепланово при симптомах (головная боль, желтуха, отёки, гинекомастия, боль в груди, одышка)');
+  lines.push('• 4 нед: HCT, ферритин (управление эритроцитозом), эстрадиол (титрация AI), пролактин (nandrolone/tren)');
+  lines.push('• 8 нед: ОАК+БХ+липидограмма, эстрадиол, пролактин, ТТГ, УЗИ печени и предстательной железы, D-димер (при HCT>52%)');
+  lines.push('• 12 нед: как на 8 нед');
+  if (flags.hasGH) lines.push('• при GH: глюкоза натощак + HbA1c каждые 4 нед, IGF-1 каждые 6-8 нед (титрация дозы, цель — верхняя граница возрастной нормы)');
+  if (flags.hasInsulin) lines.push('• при инсулине: глюкоза натощак + через 2 ч после еды каждые 4 нед, K+ каждые 4 нед');
+  if (flags.hasIGF) lines.push('• при IGF-1: глюкоза 3р/сут в первую неделю (риск гипогликемии), далее натощак каждую нед');
+  if (flags.hasClenbut) lines.push('• при кленбутероле: K+, Na+, магний, креатинин каждые 2 нед (электролитный дисбаланс), ЧСС/АД ежедневно');
+  if (flags.hasT3 || flags.hasT4) lines.push('• при T3/T4: ТТГ, своб.T3, своб.T4 каждые 4 нед, кальций/PTH/вит.D (костная защита), ЧСС/АД');
+  lines.push('• внепланово при симптомах: головная боль, желтуха, отёки, гинекомастия, боль в груди, одышка, тахикардия >100, АД >160/100');
   return lines.join('\n');
 }
 

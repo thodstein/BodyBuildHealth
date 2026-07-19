@@ -1,6 +1,7 @@
 import { SUPPORT_CATALOG_DATA } from '../data/support-database';
 import type { LabCompositeResult } from './lab-analysis.engine';
 import { KNOWN_DRUG_SUP_INTERACTIONS } from './biostack-clinical';
+import { hasBlockingInteraction, getDDIForPair, getDDIForDrug } from '../data/drug-drug-interactions';
 
 /* ─── Daily Upper Limits (UL) in mg ─── */
 export const SUPPLEMENT_UPPER_LIMITS: Record<string, number> = {
@@ -722,10 +723,20 @@ export function getDrugSafetyExclusions(
   // Расширенные токены ЛС пользователя (en+ru алиасы) для точного матча
   const medTokens = userMeds.flatMap(m => expandDrug(m));
 
-  // ЛЕКАРСТВО-ЛЕКАРСТВО блэклист (оба ЛС в userMeds).
-  // КРИТИЧ: ранее эта проверка пушала исключение ВСЕМ кандидатам стека →
-  // при наличии ЛС-ЛС конфликта весь стек молча выбрасывался. Теперь это
-  // ОТДЕЛЬНОЕ drug-drug предупреждение (в titrations), не удаляющее добавки.
+  // 1. КОМПРЕХЕНСИВНАЯ проверка Drug-Drug взаимодействий (новый модуль)
+  const ddiBlocks = hasBlockingInteraction(userMeds, candidateIds);
+  for (const ddi of ddiBlocks) {
+    titrations.push({
+      substanceId: '__DRUG_DRUG_BLOCK__',
+      substanceName: `${ddi.drugA} + ${ddi.drugB}`,
+      drug: `${ddi.drugA} + ${ddi.drugB}`,
+      effect: ddi.clinicalEffect,
+      mechanism: ddi.mechanism,
+      recommendation: `🛑 ${ddi.severity === 'block' ? 'АБСОЛЮТНЫЙ ЗАПРЕТ' : 'КРИТИЧЕСКИЙ РИСК'}. ${ddi.management} Альтернативы: ${ddi.alternatives?.join(', ') || 'проконсультируйтесь с врачом'}.`,
+    });
+  }
+
+  // 2. Существующий DRUG_DRUG_BLACKLIST (для обратной совместимости)
   for (const dd of DRUG_DRUG_BLACKLIST) {
     const aTok = expandDrug(dd.a);
     const bTok = expandDrug(dd.b);
@@ -743,6 +754,27 @@ export function getDrugSafetyExclusions(
     }
   }
 
+  // 3. Проверка Drug-Drug для всех комбинаций userMeds × userMeds (новый модуль)
+  const allUserMeds = userMeds.map(m => m.toLowerCase());
+  for (let i = 0; i < allUserMeds.length; i++) {
+    for (let j = i + 1; j < allUserMeds.length; j++) {
+      const pairDDI = getDDIForPair(allUserMeds[i], allUserMeds[j]);
+      for (const ddi of pairDDI) {
+        if (ddi.severity === 'block' || ddi.severity === 'critical') {
+          titrations.push({
+            substanceId: '__DRUG_DRUG_PAIR__',
+            substanceName: `${ddi.drugA} + ${ddi.drugB}`,
+            drug: `${ddi.drugA} + ${ddi.drugB}`,
+            effect: ddi.clinicalEffect,
+            mechanism: ddi.mechanism,
+            recommendation: `🛑 ${ddi.severity === 'block' ? 'АБСОЛЮТНЫЙ ЗАПРЕТ' : 'КРИТИЧЕСКИЙ РИСК'}. ${ddi.management} Альтернативы: ${ddi.alternatives?.join(', ') || 'проконсультируйтесь с врачом'}.`,
+          });
+        }
+      }
+    }
+  }
+
+  // 4. Drug-Supplement interactions (existing logic)
   for (const subId of candidateIds) {
     const cat = SUPPORT_CATALOG_DATA[subId];
     if (!cat) continue;

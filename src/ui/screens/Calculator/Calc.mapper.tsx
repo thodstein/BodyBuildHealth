@@ -618,6 +618,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [applyFlash, setApplyFlash] = useState(false);
   const [showContraindications, setShowContraindications] = useState(false);
   const [showMonitoring, setShowMonitoring] = useState(false);
+  const [showMonitoringPlan, setShowMonitoringPlan] = useState(false);
   const [showSymptoms, setShowSymptoms] = useState(true);
   const [showNutrition, setShowNutrition] = useState(false);
   const [showInteractions, setShowInteractions] = useState(false);
@@ -1932,7 +1933,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         if (flags) {
           if (flags.isMultiOral) warnings.push('⚠ Более 1 орального 17α — резко ↑ гепатотоксичность');
           if (flags.isGHPlusInsulin) warnings.push('⚠ GH + Инсулин — высокий риск гипогликемии');
-          if (flags.isWinnyPlusOxy) warnings.push('⚠ Winstrol + Anadrol — нежелательная комбинация');
+          if (flags.isWinnyPlusOxy) warnings.push('🛑 WINSTROL + ANADROL — критическая комбинация (гепатотоксичность + ↓HDL до 50%). ОБЯЗАТЕЛЬНЫЙ протокол защиты включён. LFT каждые 2 нед, не дольше 4 нед');
           if (flags.has17AlphaAndGH) warnings.push('⚠ 17α-Орал + GH — синергичная гепатотоксичность');
         }
         if (warnings.length === 0) return null;
@@ -1943,6 +1944,29 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           </div>
         );
       })()}
+
+      {/* Динамический график мониторинга (из движка по PED/фазе) */}
+      {finalRec && finalRec.monitoringPlan && (
+        <div style={{ marginTop:6 }}>
+          <div onClick={() => setShowMonitoringPlan(!showMonitoringPlan)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showMonitoringPlan ? '8px 8px 0 0' : 8, background:'rgba(96,165,250,0.07)', border:'1px solid rgba(96,165,250,0.18)' }}>
+            <span style={{ fontSize:10, fontWeight:700, color:'#60a5fa', display:'flex', alignItems:'center', gap:5 }}>
+              🩻 График мониторинга анализов
+              <span style={{ fontSize:7, fontWeight:600, color:'rgba(96,165,250,0.5)', padding:'1px 5px', borderRadius:4, background:'rgba(96,165,250,0.1)' }}>по вашему курсу</span>
+            </span>
+            <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showMonitoringPlan ? '▲ скрыть' : '▼ показать'}</span>
+          </div>
+          {showMonitoringPlan && (
+            <div style={{ padding:'8px 9px', background:'rgba(96,165,250,0.03)', border:'1px solid rgba(96,165,250,0.1)', borderTop:'none', borderRadius:'0 0 8px 8px' }}>
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:5, lineHeight:1.4 }}>
+                Персональный график лабораторного контроля, сформированный по вашим препаратам и фазе курса.
+              </div>
+              {finalRec.monitoringPlan.split('\n').filter(Boolean).map((line, i) => (
+                <div key={i} style={{ fontSize:8, color:'rgba(240,240,245,0.9)', lineHeight:1.5, marginBottom:3, paddingLeft:8, borderLeft:'2px solid rgba(96,165,250,0.3)' }}>{line}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Взаимодействия — все пары (на русском) */}
       {finalRec && finalRec.subs.length > 1 && (() => {

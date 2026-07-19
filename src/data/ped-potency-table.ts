@@ -222,8 +222,8 @@ export function computeIntensityFactor(peds: PEDDose[]): number {
       intensityAAS += (mg / 500) * potency;
     }
   }
-  const total = 0.4 + intensityAAS + intensityGH + intensityInsulin + intensityOther;
-  return Math.max(0.5, Math.min(3.0, total));
+  const total = 0.35 + intensityAAS + intensityGH + intensityInsulin + intensityOther;
+  return Math.max(0.4, Math.min(3.0, total));
 }
 
 // ════════════════════════════════════════════════════════════════════════════

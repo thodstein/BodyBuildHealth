@@ -6,7 +6,7 @@ import { getVolumeLandmarks, computeVolumeLandmarks, type VolumeLandmarkRow } fr
 import { labTrainingAdjust } from '../lab-training-adjust';
 import { tempoFor } from '../../../../engines/bb/bb-tempo-rest';
 import { PCT_FOR_RIR, GROUP_RU, ACCENT, DIM, SET_TEMPLATES, type ManualResult, type ManualWeek } from './types';
-import { H, SMALL, panelStyle, R, ACCENT_SOFT, BTN_GHOST } from '../training-ui';
+import { H, SMALL, panelStyle, R, ACCENT_SOFT, BTN_GHOST, mrvBadge, SectionTitle } from '../training-ui';
 import { DayCard, PhaseBanner, type PhaseKey } from '../PlanOutput';
 import type { TrainingProfile } from '../training-profile';
 import { PHASE_LABELS, type BBPhase } from './phase-periodization';
@@ -403,7 +403,7 @@ export const PlanDisplay: React.FC<Props> = ({
               </div>
             );
           })}
-          <div style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>Белая линия — MAV · красная — MRV. Превышение MRV → риск перетренированности.</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>Белая линия — MAV · красная — MRV. Превышение MRV → риск перетренированности.</div>
         </div>
       )}
 
@@ -415,7 +415,7 @@ export const PlanDisplay: React.FC<Props> = ({
           <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
             <span>📅 Фазы мезоцикла</span>
             {currentWeekMeta && (
-              <span style={{ fontSize: 9, opacity: 0.7 }}>
+              <span style={{ fontSize: 10, opacity: 0.7 }}>
                 Нед {currentWeekNum}: {currentWeekMeta.phaseLabel} · RIR {currentWeekMeta.rir}
               </span>
             )}
@@ -435,10 +435,10 @@ export const PlanDisplay: React.FC<Props> = ({
                       background: isActive ? phaseColor + '18' : phaseColor + '08',
                       transition: 'all 0.15s',
                     }}>
-                    <span style={{ fontSize: 8, fontWeight: 700, color: isActive ? '#fff' : phaseColor }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: isActive ? '#fff' : phaseColor }}>
                       {isDeload ? '🔄' : w.weekNumber}
                     </span>
-                    <span style={{ fontSize: 6, fontWeight: 600, color: isActive ? phaseColor : phaseColor + 'aa', textTransform: 'uppercase', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: isActive ? phaseColor : phaseColor + 'aa', textTransform: 'uppercase', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
                       {w.phaseLabel}
                     </span>
                     <div style={{
@@ -456,7 +456,7 @@ export const PlanDisplay: React.FC<Props> = ({
             <button onClick={() => { const p = wks.findIndex(w => w.weekNumber === currentWeekNum); if (p > 0) goToWeek(wks[p - 1].weekNumber); }}
               disabled={wks[0]?.weekNumber === currentWeekNum}
               style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11 }}>◀</button>
-            <span style={{ fontSize: 9, color: DIM, padding: '3px 8px', alignSelf: 'center' }}>
+            <span style={{ fontSize: 10, color: DIM, padding: '3px 8px', alignSelf: 'center' }}>
               Нед {currentWeekNum} / {result.mesoLength || mesoLength}
             </span>
             <button onClick={() => { const p = wks.findIndex(w => w.weekNumber === currentWeekNum); if (p < wks.length - 1) goToWeek(wks[p + 1].weekNumber); }}
@@ -481,12 +481,12 @@ export const PlanDisplay: React.FC<Props> = ({
         return fb.avgRpe > 0 ? (
           <div style={{ ...panelStyle('#8b5cf6', 0.06, 0.2) }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', marginBottom: 6 }}>📊 Фидбэк план→выполнение</div>
-            {fb.deloadRecommended && <div style={{ padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontSize: 9, fontWeight: 700, marginBottom: 6 }}>⛔ РЕКОМЕНДОВАНА РАЗГРУЗКА</div>}
-            {fb.reasons.map((r, i) => <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginBottom: 2, paddingLeft: 4 }}>{r}</div>)}
+            {fb.deloadRecommended && <div style={{ padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontSize: 10, fontWeight: 700, marginBottom: 6 }}>⛔ РЕКОМЕНДОВАНА РАЗГРУЗКА</div>}
+            {fb.reasons.map((r, i) => <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 2, paddingLeft: 4 }}>{r}</div>)}
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              {fb.weightMultiplier !== 1 && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(96,165,250,0.1)', color: '#60a5fa' }}>Вес x{fb.weightMultiplier}</span>}
-              {fb.rirShift !== 0 && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>RIR {fb.rirShift > 0 ? '+' : ''}{fb.rirShift}</span>}
-              {fb.volumeMultiplier !== 1 && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>Объём x{fb.volumeMultiplier}</span>}
+              {fb.weightMultiplier !== 1 && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(96,165,250,0.1)', color: '#60a5fa' }}>Вес x{fb.weightMultiplier}</span>}
+              {fb.rirShift !== 0 && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>RIR {fb.rirShift > 0 ? '+' : ''}{fb.rirShift}</span>}
+              {fb.volumeMultiplier !== 1 && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>Объём x{fb.volumeMultiplier}</span>}
             </div>
           </div>
         ) : null;
@@ -501,7 +501,7 @@ export const PlanDisplay: React.FC<Props> = ({
           <div style={{ ...panelStyle('#dc2626', 0.04, 0.15) }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#f87171', marginBottom: 6 }}>🛡 Валидация плана</div>
             {banners.map((b, i) => (
-              <div key={i} style={{ fontSize: 9, color: b.level === 'error' ? '#f87171' : b.level === 'warning' ? '#fbbf24' : 'rgba(255,255,255,0.6)', marginBottom: 4, padding: '4px 6px', borderRadius: 4, background: b.level === 'error' ? 'rgba(248,113,113,0.08)' : b.level === 'warning' ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.03)', borderLeft: '2px solid ' + (b.level === 'error' ? '#f87171' : b.level === 'warning' ? '#fbbf24' : 'rgba(255,255,255,0.2)'), lineHeight: 1.4 }}>
+              <div key={i} style={{ fontSize: 10, color: b.level === 'error' ? '#f87171' : b.level === 'warning' ? '#fbbf24' : 'rgba(255,255,255,0.6)', marginBottom: 4, padding: '4px 6px', borderRadius: 4, background: b.level === 'error' ? 'rgba(248,113,113,0.08)' : b.level === 'warning' ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.03)', borderLeft: '2px solid ' + (b.level === 'error' ? '#f87171' : b.level === 'warning' ? '#fbbf24' : 'rgba(255,255,255,0.2)'), lineHeight: 1.4 }}>
                 <div style={{ fontWeight: 700 }}>{b.level === 'error' ? '⛔' : b.level === 'warning' ? '⚠' : 'ℹ'} {b.title}</div>
                 <div style={{ opacity: 0.7, marginTop: 1 }}>{b.detail}</div>
               </div>
@@ -520,7 +520,7 @@ export const PlanDisplay: React.FC<Props> = ({
         </div>
         {quality.breakdown.map((b, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontSize: 10, color: b.ok ? 'rgba(255,255,255,0.7)' : quality.color }}>
-            <span style={{ fontSize: 9 }}>{b.ok ? '✅' : '❌'}</span>
+            <span style={{ fontSize: 10 }}>{b.ok ? '✅' : '❌'}</span>
             <span style={{ fontWeight: 700, minWidth: 80 }}>{b.label}</span>
             <span style={{ opacity: 0.8 }}>{b.detail}</span>
           </div>
@@ -528,16 +528,18 @@ export const PlanDisplay: React.FC<Props> = ({
         {/* Per-muscle table */}
         {quality.perMuscle && quality.perMuscle.length > 0 && (
           <div style={{ marginTop: 8, overflowX: 'auto' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: 4 }}>Мышца · Сеты · MEV · MAV · MRV · %</div>
+            <SectionTitle label="Объём по мышцам vs MRV" icon="📊" />
             <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
               {quality.perMuscle.map(pm => {
-                const st = pm.status === 'недотрен' ? '#ef4444' : pm.status === 'перегруз' ? '#f59e0b' : '#22c55e';
+                const enStatus: 'below_mev' | 'optimal' | 'approaching_mrv' | 'exceeding_mrv' =
+                  pm.status === 'недотрен' ? 'below_mev' : pm.status === 'перегруз' ? 'exceeding_mrv' : 'optimal';
                 return (
-                  <div key={pm.muscle} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 6, background: st + '10', border: '1px solid ' + st + '30', fontSize: 9 }}>
-                    <span style={{ fontWeight: 700, color: '#fff' }}>{pm.muscle}</span>
-                    <span style={{ color: st, fontWeight: 700 }}>{pm.sets}</span>
-                    <span style={{ color: 'rgba(255,255,255,0.4)' }}>· MEV {pm.mev} · MAV {pm.mav} · MRV {pm.mrv} · {pm.pct}%</span>
-                  </div>
+                <div key={pm.muscle} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontWeight: 700, color: '#fff', minWidth: 80 }}>{pm.muscle}</span>
+                  <span style={{ fontWeight: 700, color: '#60a5fa' }}>{pm.sets} с</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>MEV {pm.mev} · MAV {pm.mav} · MRV {pm.mrv}</span>
+                  <span style={mrvBadge(enStatus)} />
+                </div>
                 );
               })}
             </div>
@@ -546,9 +548,9 @@ export const PlanDisplay: React.FC<Props> = ({
         {/* Recommendations */}
         {(quality as any).recommendations && (quality as any).recommendations.length > 0 && (
           <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>💡 Рекомендации</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>💡 Рекомендации</div>
             {(quality as any).recommendations.map((r: string, i: number) => (
-              <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 2, paddingLeft: 4, borderLeft: '2px solid #f59e0b' }}>{r}</div>
+              <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginBottom: 2, paddingLeft: 4, borderLeft: '2px solid #f59e0b' }}>{r}</div>
             ))}
           </div>
         )}
@@ -581,21 +583,21 @@ export const PlanDisplay: React.FC<Props> = ({
         <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>📊 Анализ нагрузки</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
           <div style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)' }}>
-            <div style={{ fontSize: 8, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Тоннаж/нед</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Тоннаж/нед</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{load.totalWeekly.toLocaleString()} кг</div>
           </div>
           <div style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)' }}>
-            <div style={{ fontSize: 8, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Ср/день</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Ср/день</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{Math.round(load.avgDaily).toLocaleString()} кг</div>
           </div>
           <div style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)' }}>
-            <div style={{ fontSize: 8, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Монотонность</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Монотонность</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: load.monotony > 1.5 ? '#ef4444' : load.monotony > 0.9 ? '#f59e0b' : '#22c55e' }}>{load.monotony.toFixed(2)}</div>
           </div>
         </div>
-        {load.monotony > 1.5 && <div style={{ fontSize: 9, color: '#ef4444', marginTop: 6 }}>⚠ Монотонность высокая — добавьте вариативность</div>}
-        {load.monotony > 0.9 && load.monotony <= 1.5 && <div style={{ fontSize: 9, color: '#f59e0b', marginTop: 6 }}>Монотонность в норме</div>}
-        {load.monotony <= 0.9 && <div style={{ fontSize: 9, color: '#22c55e', marginTop: 6 }}>✅ Монотонность низкая — разнообразие отличное</div>}
+        {load.monotony > 1.5 && <div style={{ fontSize: 10, color: '#ef4444', marginTop: 6 }}>⚠ Монотонность высокая — добавьте вариативность</div>}
+        {load.monotony > 0.9 && load.monotony <= 1.5 && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 6 }}>Монотонность в норме</div>}
+        {load.monotony <= 0.9 && <div style={{ fontSize: 10, color: '#22c55e', marginTop: 6 }}>✅ Монотонность низкая — разнообразие отличное</div>}
       </div>
 
       {/* ═══ BB-метрики (если план сгенерирован BB-движком) ═══ */}
@@ -613,30 +615,30 @@ export const PlanDisplay: React.FC<Props> = ({
             <div style={{ fontSize: 11, fontWeight: 800, color: '#ec4899', marginBottom: 6 }}>🏋️ BB-метрики плана</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
               <div style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                <div style={{ fontSize: 8, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Сетов/нед</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Сетов/нед</div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: '#ec4899' }}>{metrics.totalSets}</div>
               </div>
               <div style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                <div style={{ fontSize: 8, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Тяж %</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Тяж %</div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: '#ef4444' }}>{(metrics.тяжPct * 100).toFixed(0)}%</div>
               </div>
               <div style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                <div style={{ fontSize: 8, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Памп %</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Памп %</div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: '#f59e0b' }}>{(metrics.пампPct * 100).toFixed(0)}%</div>
               </div>
               <div style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                <div style={{ fontSize: 8, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Ср RIR</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: DIM, textTransform: 'uppercase' }}>Ср RIR</div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: '#22c55e' }}>{metrics.avgRir.toFixed(1)}</div>
               </div>
             </div>
             {explanation && (
               <div style={{ marginTop: 6 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 4 }}>Объём на мышцу</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 4 }}>Объём на мышцу</div>
                 {metrics.perMuscle.map((pm) => {
                   const stColor = pm.status === 'exceeding_mrv' ? '#ef4444' : pm.status === 'approaching_mrv' ? '#f59e0b' : pm.status === 'below_mev' ? '#3b82f6' : '#22c55e';
                   const stLabel = pm.status === 'exceeding_mrv' ? '⚠ перегруз' : pm.status === 'approaching_mrv' ? '⚠ у MRV' : pm.status === 'below_mev' ? 'недотрен' : '✅ оптимо';
                   return (
-                    <div key={pm.muscle} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>
+                    <div key={pm.muscle} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
                       <span style={{ fontWeight: 700, color: '#fff', minWidth: 60 }}>{GROUP_RU[pm.muscle] || pm.muscle}</span>
                       <span style={{ color: '#ec4899', fontWeight: 700 }}>{pm.totalSets}</span>
                       <span style={{ color: '#ef4444' }}>т{pm.тяжSets}</span>
@@ -664,7 +666,7 @@ export const PlanDisplay: React.FC<Props> = ({
             <div style={{ fontSize: 11, fontWeight: 800, color: isDanger ? '#ef4444' : '#f59e0b', marginBottom: 4 }}>
               {isDanger ? '🚨 ACWR ' + acwr.ratio.toFixed(2) + ' — опасная зона!' : '⚠ ACWR ' + acwr.ratio.toFixed(2) + ' — осторожно'}
             </div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>
               Острая нагрузка {Math.round(acwr.acute)} vs хроническая {Math.round(acwr.chronic)}. Рекомендуется разгрузочная неделя: объём −40%, RIR 4→5, убрать подходы до отказа.
             </div>
           </div>
@@ -676,13 +678,13 @@ export const PlanDisplay: React.FC<Props> = ({
       )}
 
       <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.03em', textTransform: 'uppercase', minWidth: 40 }}>⚖️ Вес</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.03em', textTransform: 'uppercase', minWidth: 40 }}>⚖️ Вес</span>
         <button onClick={() => massEditWeight(5)} style={massBtnStyle(ACCENT)}>+5%</button>
         <button onClick={() => massEditWeight(-5)} style={massBtnStyle(ACCENT)}>−5%</button>
-        <span style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.03em', textTransform: 'uppercase', marginLeft: 6, minWidth: 40 }}>📦 Объём</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.03em', textTransform: 'uppercase', marginLeft: 6, minWidth: 40 }}>📦 Объём</span>
         <button onClick={() => massEditVolume(-20)} style={massBtnStyle('#ef4444')}>−20%</button>
         <button onClick={() => massEditVolume(10)} style={massBtnStyle(ACCENT)}>+10%</button>
-        <span style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.03em', textTransform: 'uppercase', marginLeft: 6, minWidth: 40 }}>🗓️ План</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.03em', textTransform: 'uppercase', marginLeft: 6, minWidth: 40 }}>🗓️ План</span>
         <button onClick={() => setShowMacroPreview(v => !v)} style={massBtnStyle('#a855f7')}>
           {showMacroPreview ? '▲ Скрыть макроцикл' : '📅 Макроцикл'}
         </button>
@@ -741,7 +743,7 @@ export const PlanDisplay: React.FC<Props> = ({
                     border: w.weekNumber === currentWeekNum ? '1px solid ' + pc : '1px solid transparent',
                     background: w.weekNumber === currentWeekNum ? pc + '20' : 'transparent',
                     color: w.weekNumber === currentWeekNum ? '#fff' : 'rgba(255,255,255,0.6)',
-                    fontSize: 9, fontWeight: 700, textAlign: 'center',
+                    fontSize: 10, fontWeight: 700, textAlign: 'center',
                   }}>{w.weekNumber}</button>
                   <div style={{ fontSize: 10, fontWeight: 600, minWidth: 72, color: pc }}>{w.phaseLabel}</div>
                   <div style={{ fontSize: 10, fontWeight: 700, minWidth: 22, textAlign: 'center', color: w.rir <= 1 ? '#ef4444' : w.rir <= 2 ? '#f59e0b' : '#22c55e' }}>RIR{w.rir}</div>
@@ -751,7 +753,7 @@ export const PlanDisplay: React.FC<Props> = ({
                       background: totalSets > 0 ? pc : 'transparent', opacity: 0.7, minWidth: totalSets > 0 ? 4 : 0,
                       transition: 'width 0.5s',
                     }} />
-                    <span style={{ fontSize: 7, fontWeight: 600, color: 'rgba(255,255,255,0.5)', minWidth: 20 }}>{totalSets}</span>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.5)', minWidth: 20 }}>{totalSets}</span>
                   </div>
                   <div style={{ flex: 1, display: 'flex', gap: 2, alignItems: 'center' }}>
                     <div style={{
@@ -759,7 +761,7 @@ export const PlanDisplay: React.FC<Props> = ({
                       background: totalTonnage > 0 ? '#60a5fa' : 'transparent', opacity: 0.6, minWidth: totalTonnage > 0 ? 4 : 0,
                       transition: 'width 0.5s',
                     }} />
-                    <span style={{ fontSize: 7, fontWeight: 600, color: 'rgba(255,255,255,0.5)', minWidth: 30 }}>{(totalTonnage / 1000).toFixed(1)}k</span>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.5)', minWidth: 30 }}>{(totalTonnage / 1000).toFixed(1)}k</span>
                   </div>
                 </div>
               );
@@ -767,7 +769,7 @@ export const PlanDisplay: React.FC<Props> = ({
           </div>
         );
       })()}
-      <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 8, color: 'rgba(255,255,255,0.35)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 4 }}>
+      <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.35)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 4 }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: '#22c55e' }} /> сеты/нед</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: '#60a5fa' }} /> тоннаж (кг)</span>
         <span>RIR: 🟢3+ · 🟡1-2 · 🔴0</span>
@@ -791,31 +793,31 @@ export const PlanDisplay: React.FC<Props> = ({
             headerActions: (
               <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                 {mpl && (
-                  <span style={{ fontSize: 9, fontWeight: 700, color: mpc, background: mpc + '22', border: '1px solid ' + mpc + '55', borderRadius: 10, padding: '3px 9px', whiteSpace: 'nowrap' }}>{mpl}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: mpc, background: mpc + '22', border: '1px solid ' + mpc + '55', borderRadius: 10, padding: '3px 9px', whiteSpace: 'nowrap' }}>{mpl}</span>
                 )}
-                <span style={{ fontSize: 9, color: ACCENT, fontWeight: 700 }}>{d.groups.map(g => GROUP_RU[g] || g).join(' · ')}</span>
-                <button onClick={() => copyDay(di)} title="Копировать день" style={{ padding: '1px 6px', borderRadius: 4, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', fontSize: 9, fontWeight: 700 }}>📋</button>
+                <span style={{ fontSize: 10, color: ACCENT, fontWeight: 700 }}>{d.groups.map(g => GROUP_RU[g] || g).join(' · ')}</span>
+                <button onClick={() => copyDay(di)} title="Копировать день" style={{ padding: '1px 6px', borderRadius: 4, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>📋</button>
               </span>
             ),
             renderBody: (
               <>
             <details style={{ margin: '4px 10px' }}>
-              <summary style={{ fontSize: 9, fontWeight: 700, color: '#a855f7', cursor: 'pointer', padding: '4px 0', opacity: 0.7 }}>
+              <summary style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', cursor: 'pointer', padding: '4px 0', opacity: 0.7 }}>
                 🔥 Разминка ({goal === 'strength' || goal === 'powerlifting' ? 'силовой протокол' : 'гипертрофия'})
               </summary>
               <div style={{ padding: '6px 8px', marginBottom: 6, borderRadius: 6, background: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.1)' }}>
                 {(getWarmup(d.exercises, goal).general.map((g, gi) => (
-                  <div key={gi} style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, paddingLeft: 8, borderLeft: '2px solid rgba(168,85,247,0.2)', marginBottom: 2 }}>⚡ {g}</div>
+                  <div key={gi} style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, paddingLeft: 8, borderLeft: '2px solid rgba(168,85,247,0.2)', marginBottom: 2 }}>⚡ {g}</div>
                 )))}
                 {getWarmup(d.exercises, goal).specific.length > 0 && (
                   <div style={{ marginTop: 4, borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: 4 }}>
-                    <div style={{ fontSize: 8, fontWeight: 700, color: '#a855f7', marginBottom: 2, textTransform: 'uppercase' }}>Спец. подводка:</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 2, textTransform: 'uppercase' }}>Спец. подводка:</div>
                     {getWarmup(d.exercises, goal).specific.map((s, si) => (
-                      <div key={si} style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, paddingLeft: 8 }}>🎯 {s.ex}: {s.sets}</div>
+                      <div key={si} style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, paddingLeft: 8 }}>🎯 {s.ex}: {s.sets}</div>
                     ))}
                   </div>
                 )}
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>💡 Тренер: разминка обязательна перед первым рабочим подходом.</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>💡 Тренер: разминка обязательна перед первым рабочим подходом.</div>
               </div>
             </details>
              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 2px' }}>
@@ -868,10 +870,10 @@ export const PlanDisplay: React.FC<Props> = ({
                         <span style={{ ...chipVal, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                           {e.loadMode === 'velocity' ? (
                             <><span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'targetVelocity', value: String(e.targetVelocity || 0.5) }); }} style={{ color: '#a855f7' }}>{e.targetVelocity || 0.5} m/s</span>
-                            <span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'loadMode', value: 'weight' }); }} style={{ fontSize: 8, opacity: 0.6, cursor: 'pointer' }}>→ кг</span></>
+                            <span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'loadMode', value: 'weight' }); }} style={{ fontSize: 10, opacity: 0.6, cursor: 'pointer' }}>→ кг</span></>
                           ) : (
                              <>{fmtWt(e)}
-                             <span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'loadMode', value: 'velocity' }); }} style={{ fontSize: 8, opacity: 0.6, cursor: 'pointer' }}>→ m/s</span></>
+                             <span onClick={ev => { ev.stopPropagation(); setInlineEdit({ dayIdx: di, exIdx: ei, field: 'loadMode', value: 'velocity' }); }} style={{ fontSize: 10, opacity: 0.6, cursor: 'pointer' }}>→ m/s</span></>
                           )}
                         </span>
                       </div>
@@ -890,7 +892,7 @@ export const PlanDisplay: React.FC<Props> = ({
                     </div>
                   </div>
                   {note && (
-                    <div style={{ padding: '2px 10px 4px 10px', fontSize: 9, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4, borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <div style={{ padding: '2px 10px 4px 10px', fontSize: 10, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4, borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                       💡 {note}
                     </div>
                   )}
@@ -908,11 +910,11 @@ export const PlanDisplay: React.FC<Props> = ({
                             const next = new Set(expandedEx);
                             isExp ? next.delete(key) : next.add(key);
                             setExpandedEx(next);
-                          }} style={{ fontSize: 9, color: ACCENT, cursor: 'pointer', userSelect: 'none' }}>
+                          }} style={{ fontSize: 10, color: ACCENT, cursor: 'pointer', userSelect: 'none' }}>
                             {isExp ? '▲ Скрыть детали' : '▼ Подробнее'}
                           </span>
                           {isExp && (
-                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, padding: '4px 0 6px 4px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, padding: '4px 0 6px 4px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
                               {exData.rationale && <div>🎯 <b>Выбрано:</b> {exData.rationale}</div>}
                               {exData.technique && <div>📐 <b>Техника:</b> {exData.technique}</div>}
                               {exData.comments && <div>💬 {exData.comments}</div>}
@@ -985,7 +987,7 @@ export const PlanDisplay: React.FC<Props> = ({
 };
 
 function massBtnStyle(color: string): React.CSSProperties {
-  return { padding: '3px 8px', borderRadius: 6, border: '1px solid ' + color + '40', background: color + '10', color, cursor: 'pointer', fontSize: 9, fontWeight: 600 };
+  return { padding: '3px 8px', borderRadius: 6, border: '1px solid ' + color + '40', background: color + '10', color, cursor: 'pointer', fontSize: 10, fontWeight: 600 };
 }
 function actionBtnStyle(color: string): React.CSSProperties {
   return { padding: '2px 5px', borderRadius: 4, border: '1px solid ' + color + '50', background: color + '14', color, cursor: 'pointer', fontSize: 10, fontWeight: 700 };
@@ -1001,7 +1003,7 @@ const MacroPreview: React.FC<{ result: ManualResult; mesoLength: number; level: 
       <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>
         📅 Макроцикл: {mesoLength} нед × {result.days.length} дн/нед
       </div>
-      <div style={{ fontSize: 8, color: DIM, marginBottom: 4 }}>
+      <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>
         🟦 Делод каждые {deloadFreq} нед (нед: {[...deloadWeeks].join(', ')})
       </div>
       <div style={{ overflowX: 'auto' }}>
@@ -1013,11 +1015,11 @@ const MacroPreview: React.FC<{ result: ManualResult; mesoLength: number; level: 
             const acColor = isDeload ? '#60a5fa' : '#a855f7';
             return (
               <div key={wi} style={{ padding: '4px 6px', borderRadius: 8, background: isDeload ? 'rgba(96,165,250,0.1)' : 'rgba(168,85,247,' + (0.04 + heat * 0.1) + ')', border: '1px solid ' + (isDeload ? 'rgba(96,165,250,0.3)' : 'rgba(168,85,247,' + (0.1 + heat * 0.2) + ')'), minWidth: Math.max(72, result.days.length * 46) }}>
-                <div style={{ fontSize: 8, fontWeight: 700, color: acColor, textAlign: 'center', marginBottom: 3 }}>{isDeload ? '🔄 Делод' : 'Нед ' + wk}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: acColor, textAlign: 'center', marginBottom: 3 }}>{isDeload ? '🔄 Делод' : 'Нед ' + wk}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + result.days.length + ', 1fr)', gap: 2 }}>
                   {result.days.map((_, di2) => (
                     <div key={di2} style={{ height: 18, borderRadius: 3, background: isDeload ? 'rgba(96,165,250,0.3)' : 'rgba(0,230,138,' + (0.15 + heat * 0.35) + ')', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: 9, color: isDeload ? '#fff' : 'rgba(255,255,255,0.6)' }}>{isDeload ? '—' : 'Д' + (di2 + 1)}</span>
+                      <span style={{ fontSize: 10, color: isDeload ? '#fff' : 'rgba(255,255,255,0.6)' }}>{isDeload ? '—' : 'Д' + (di2 + 1)}</span>
                     </div>
                   ))}
                 </div>
