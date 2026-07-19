@@ -7,6 +7,7 @@ import { FULL_PROGRAM_LIBRARY } from '../../../../engines/complete-program-libra
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from '../programs-data';
 import { getMethodsByCategory, type TrainingMethod } from '../../../../engines/training-methodology.engine';
 import { SPLIT_PATTERNS } from '../../../../engines/bb/bb-split-patterns';
+import { cycleTemplateToFullProgram } from '../../../../engines/bb/cycle-to-plan';
 import { PED } from '../../../../engines/bb/bb-ped-adaptation.engine';
 import { ACCENT, DIM, CONFIG_LABELS } from './types';
 import { DIRECTION_METHOD_MAP, getRecommendedMethods, getRecommendedMethodsForSplit, getRecommendedForMethods } from '../../../../engines/cycle-method-map';
@@ -164,7 +165,14 @@ const CycleSelect: React.FC<{
 };
 
 export const ConfigPanel: React.FC<Props> = ({ manualCfg, setManual, onLoadProgram, targetTonnage, setTargetTonnage }) => {
-  const allPrograms = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS];
+  // Преобразовать BB-циклы в FullProgram для отображения в «Программа тренировок»
+  const bbCyclesAsPrograms = useMemo(() => {
+    return LMS_CYCLES
+      .filter(c => c.meta.direction === 'bodybuilding' || c.meta.tags?.includes('bodybuilding'))
+      .map(c => cycleTemplateToFullProgram(c));
+  }, []);
+
+  const allPrograms = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS, ...bbCyclesAsPrograms];
   const selectedList = Object.entries(manualCfg).filter(([, v]) => v);
 
   const [directionFilter, setDirectionFilter] = useState<DirFilter>('all');

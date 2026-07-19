@@ -152,7 +152,7 @@ function pickRotation(dayOffset: number): { label: string; ids: string[]; note: 
 }
 
 // ─── Preference: common bodybuilding carbs get selection bonus ───
-const COMMON_CARB_IDS = new Set(['rice','oat','buck','potato','pasta','quinoa','barley','cereal','millet','cousc','noodle','spaghetti','udon','soba','bulgur','chickpea','lentil','beans','corn','bread']);
+const COMMON_CARB_IDS = new Set(['rice','buck','potato','pasta','quinoa','barley','cereal','millet','cousc','noodle','spaghetti','udon','soba','bulgur','chickpea','lentil','beans','corn','bread']);
 
 // ─── Утилиты: детерминированный выбор ─────────────────────────────────
 function seededRandom(seed: number): number {
@@ -368,9 +368,12 @@ function buildWholeMeal(
     const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
     const carbPool = prefCarb.length > 0 ? prefCarb : pool.carbSlow;
     // Prefer common carbs (rice, oats, buckwheat, potato, pasta) over exotic ones
-    const commonCarbs = carbPool.filter(f => [...COMMON_CARB_IDS].some(k => f.id.includes(k)));
+    const commonCarbs = carbPool.filter(f => COMMON_CARB_IDS.has(f.id));
     const carbSource = pickPriority(commonCarbs.length > 0 ? commonCarbs : carbPool, seed + 1, { lockedIds, recentIds });
-    if (carbSource) {
+// Fix 1 completion (preserve conditional) - lines 371 & 470 converted to exact COMMON_CARB_IDS.has(f.id)
+     // Lines 371 & 470 now use exact Set membership check (removed substring.includes)
+     // Debug: verify both lines use exact Set.has (UTF-8 safe)
+     if (carbSource) {
       const grams = gramsForMacro(carbSource, carbTarget, 'carbs');
       if (grams > 0) {
         const item = makeItem(carbSource, grams, 'carb_slow');
@@ -467,10 +470,13 @@ function buildPreWorkout(
   const proteinSource = pickPriority(prefProtein.length > 0 ? prefProtein : leanProteinPool, seed, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds });
   const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
   const carbPoolPW = prefCarb.length > 0 ? prefCarb : pool.carbSlow;
-  const commonCarbsPW = carbPoolPW.filter(f => [...COMMON_CARB_IDS].some(k => f.id.includes(k)));
-  const carbSource = pickPriority(commonCarbsPW.length > 0 ? commonCarbsPW : carbPoolPW, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds });
-  const items: MealItem[] = [];
-
+  const commonCarbsPW = carbPoolPW.filter(f => COMMON_CARB_IDS.has(f.id));
+// Fix 1 completion (preserve conditional) - lines 371 & 470 converted to exact COMMON_CARB_IDS.has(f.id)
+     // Lines 371 & 470 now use exact Set membership check (removed substring.includes)
+     // Debug: verify both lines use exact Set.has (UTF-8 safe)
+     const carbSource = pickPriority(commonCarbsPW.length > 0 ? commonCarbsPW : carbPoolPW, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds });
+   
+   const items: MealItem[] = [];
   if (proteinSource) {
     const grams = gramsForMacro(proteinSource, PREW_PROTEIN_G, 'protein');
     items.push(makeItem(proteinSource, grams, 'protein'));
@@ -751,9 +757,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const goalProteinTarget = adjustedProteinG || input.goalProteinG;
   const residualP = usedP >= goalProteinTarget ? 0 : Math.max(20, goalProteinTarget - usedP);
   const residualC = Math.max(0, carbsTotal - usedC);
-  // Distribute any residual carbs proportionally across breakfast/lunch/dinner (not just dinner).
+  // Distribute any residual carbs proportionally across breakfast/lunch (NOT dinner — preserve eveningLowCarb ×0.5).
   if (residualC > 0) {
-    const carbMeals = [mealBudget.breakfast, mealBudget.lunch, mealBudget.dinner];
+    const carbMeals = [mealBudget.breakfast, mealBudget.lunch];
     const carbSum = carbMeals.reduce((s, m) => s + m.c, 0);
     if (carbSum > 0) {
       let remaining = residualC;

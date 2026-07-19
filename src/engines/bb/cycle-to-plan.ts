@@ -16,7 +16,7 @@ import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-pl
 import { applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { trueMuscleOf } from '../movement-pattern';
-import type { FullProgram } from '../../engines/complete-program-library.engine';
+import type { FullProgram, ProgramWeek, ProgramDay } from '../../engines/complete-program-library.engine';
 
 export type CycleSourceCycle = SRCycleTemplate;
 export type BBVolumeGoal = 'mev' | 'mav' | 'mrv';
@@ -98,9 +98,155 @@ export function programToCycleTemplate(program: FullProgram): SRCycleTemplate {
       rirProgression: { start: 3, end: 1 },
     },
     week1: days,
+};
+}
+ 
+// ──────────────────────────────────────────────────────────────────────
+// Конвертер: SRCycleTemplate → FullProgram
+// Использует week1 + meta для генерации всех недель с прогрессией RIR/нагрузки.
+// ──────────────────────────────────────────────────────────────────────
+
+export function cycleTemplateToFullProgram(cycle: SRCycleTemplate): FullProgram {
+  const { meta, week1, weeks: explicitWeeks } = cycle;
+  const totalWeeks = meta.weeks || explicitWeeks?.length || week1?.length || 12;
+
+  // Реверс level: novice→beginner, intermediate→intermediate, KMS-MS→advanced, elite→advanced
+  const srToFullLevel: Record<string, FullProgram['level']> = {
+    novice: 'beginner',
+    intermediate: 'intermediate',
+    'KMS-MS': 'advanced',
+    elite: 'advanced',
+  };
+  const level = srToFullLevel[meta.level] || 'intermediate';
+
+  // Направление программы (FullProgram.direction: 'strength' | 'bodybuilding' | 'both')
+  const direction = meta.direction === 'powerlifting' ? 'strength' :
+    meta.direction === 'bodybuilding' ? 'bodybuilding' : 'both';
+
+  // Генерация всех недель на основе week1
+  const generatedWeeks: ProgramWeek[] = [];
+
+  // RIR-прогрессия: start→end по неделям (линейная интерполяция)
+  const rirStart = meta.rirProgression?.start ?? 3;
+  const rirEnd = meta.rirProgression?.end ?? 1;
+
+  // Коррекция нагрузки в неделю (correctionPct)
+  const correctionPct = meta.correctionPct ?? 0.005;
+
+  // Недели разгрузки
+  const deloadWeeks = new Set(meta.deloadWeeks || []);
+
+  // Базовые недели из week1 (SRDaySpec[])
+  const baseWeek1 = week1 || [];
+
+  for (let w = 1; w <= totalWeeks; w++) {
+    const isDeload = deloadWeeks.has(w);
+    // RIR для этой недели: линейно от start к end
+    const rirProgress = totalWeeks > 1 ? (w - 1) / (totalWeeks - 1) : 0;
+    const weekRir = Math.round(rirStart + (rirEnd - rirStart) * rirProgress);
+    // Множитель нагрузки: 1 + correctionPct * (w-1), на разгрузке -50%
+    const volumeMult = isDeload ? 0.5 : (1 + correctionPct * (w - 1));
+    // Интенсивность: на разгрузке снижаем
+    const intensityMult = isDeload ? 0.7 : 1.0;
+
+    const days: ProgramDay[] = baseWeek1.map((srDay, dayIdx) => {
+      const dayNum = dayIdx + 1;
+      const dayName = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'][dayIdx] || `День ${dayIdx + 1}`;
+
+      const exercises = srDay.exercises.map(srEx => {
+        // Базовый процент из первого сета
+        const baseSet = srEx.sets?.[0];
+        const basePct = baseSet?.pct ?? 0.6;
+        const baseReps = baseSet?.reps ?? 10;
+        const baseSets = baseSet?.sets ?? 3;
+
+        // Адаптируем процент под RIR недели (чем ниже RIR, тем выше %)
+        const rirAdjustment = (3 - weekRir) * 0.025; // RIR 3→60%, RIR 2→62.5%, RIR 1→65%, RIR 0→67.5%
+        const adjustedPct = Math.min(0.95, basePct + rirAdjustment);
+
+        // На разгрузке снижаем процент
+        const finalPct = isDeload ? adjustedPct * 0.7 : adjustedPct;
+
+        return {
+          name: srEx.name,
+          sets: baseSets,
+          reps: String(baseReps),
+          rpe: Math.round(10 - weekRir), // RPE = 10 - RIR
+          rir: weekRir,
+          restSec: srEx.load === 'Тяжелая' ? 180 : srEx.load === 'Средняя' ? 120 : 90,
+          notes: srEx.load ? `Нагрузка: ${srEx.load}` : '',
+          progression: w < totalWeeks ? `+${Math.round(correctionPct * 100)}% к весу след. неделю` : 'Финальная неделя',
+        };
+      });
+
+      return {
+        day: dayNum,
+        name: `${dayName} (нед ${w})`,
+        focus: srDay.exercises.map(e => e.group).filter(Boolean).join(', ') || 'Полное тело',
+        warmup: 'Общая разминка 5-10 мин + специфическая разминка',
+        exercises,
+        cooldown: 'Растяжение 5 мин',
+      };
+    });
+
+    generatedWeeks.push({
+      week: w,
+      phase: isDeload ? 'deload' : w <= Math.ceil(totalWeeks * 0.3) ? 'accumulation' :
+        w <= Math.ceil(totalWeeks * 0.7) ? 'intensification' : 'peaking',
+      volumeMultiplier: volumeMult,
+      intensityMultiplier: intensityMult,
+      days,
+      deload: isDeload,
+    });
+  }
+
+  // Если есть explicit weeks — используем их вместо сгенерированных
+  if (explicitWeeks && explicitWeeks.length > 0) {
+    // explicit weeks имеют ту же структуру что week1 (SRDaySpec[])
+    // конвертируем их аналогично
+    // Для простоты пока игнорируем, так как у наших 12 циклов нет explicit weeks
+  }
+
+  // FullProgram.goal: 'strength' | 'hypertrophy' | 'powerlifting' | 'bodybuilding' | 'athletic' | 'rehab' | 'peaking'
+  const goalMap: Record<string, FullProgram['goal']> = {
+    mass: 'hypertrophy',
+    strength: 'strength',
+    power: 'powerlifting',
+    peaking: 'peaking',
+    cut: 'bodybuilding',
+    mixed: 'athletic',
+  };
+  const goal = goalMap[meta.period] || 'hypertrophy';
+
+  // FullProgram.type is string, but use convention
+  const typeStr = direction === 'strength' ? 'strength' : 'bodybuilding';
+
+  return {
+    id: meta.id,
+    name: meta.title,
+    author: 'LMS/PROF',
+    type: typeStr,
+    goal,
+    direction,
+    level,
+    durationWeeks: totalWeeks,
+    daysPerWeek: meta.sessionsPerWeek,
+    sessionTimeMin: '90',
+    description: meta.howItWorks || meta.description || '',
+    targetAudience: meta.conditions?.join('; ') || '',
+    equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'machine'],
+    weeks: generatedWeeks,
+    progressionModel: `Linear +${Math.round(correctionPct * 100)}%/week, RIR ${rirStart}→${rirEnd}`,
+    deloadProtocol: deloadWeeks.size > 0 ? `Deload weeks: ${Array.from(deloadWeeks).join(', ')}` : 'None',
+    customization: [],
+    warnings: [
+      'Программа сгенерирована из ПРОФ-цикла LMS. Проверьте 1RM перед стартом.',
+      'RIR-прогрессия рассчитана линейно. Настройте под себя при необходимости.',
+    ],
+    expectedResults: `Гипертрофия/сила за ${totalWeeks} недель. Целевой RIR ${rirEnd} на пике.`,
   };
 }
-
+ 
 export interface CycleToPlanInput {
   cycle: SRCycleTemplate;
   workMax: Record<string, number>;

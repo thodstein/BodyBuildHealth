@@ -3,25 +3,22 @@
  *
  * Вкладка «🔬 Клинический подбор» BioStack AI.
  *
- * НЕ гадает дозы и состав — вызывает buildClinicalStack (biostack-clinical-recommender),
- * который переиспользует движок калькулятора поддержки (runSupportUnified) как источник
- * истины, берёт канонические дозировки и пропускает кандидатов через клинический шлюз
- * безопасности selectStack. Отображает состав, дозы, механизмы ТЗ, риск до/после,
- * отсеянные (с причиной) и лаб-коррекции.
+ * Пошаговый сборщик стека:
+ *   1. Стартовая кнопка «Собрать стек»
+ *   2. Попап выбора органов (6 ТЗ + Суставы/связки + Нейротоксичность)
+ *   3. Попап механизмов (фильтруется по выбранным органам)
+ *   4. Попап лаб-маркеров
+ *   5. Строка параметров: Грейд + Стратегия + Макс. кол-во
+ *   6. Кнопка сборки → вызов buildClinicalStack
+ *   7. Результат: состав + механизмы + синергии + описание → риск/исключения/титрация/лаб/мониторинг
  *
- * Порядок (после аудита пользователя):
- *   1. Карточки грейда A/B/C
- *   2. Карточка количества препаратов (попап)
- *   3. Карточка органов (попап)
- *   4. Карточка механизмов выбранного органа (попап)
- *   5. Карточка анализов (попап)
- *   6. Кнопка сборки
- *   7. СНАЧАЛА: состав стека + механизмы + синергии + описание
- *   8. ПОТОМ: всё остальное (риск, отсеянные, титрация, лаб, мониторинг, конфликты)
+ * Убрана карточка «Клинический подбор» (была дубликатом заголовка).
+ * Стратегия перенесена под грейд.
+ * Органы расширены: joints (суставы/связки — вещества без TZ-механизмов) + neurotox (нейротоксичность — маппинг на CNS).
  */
 
-import React, { useState } from 'react';
-import { GlassCard, PillBtn, inputS, showToast, initBioToast, SubstanceMechanismCard, SubstanceTzCard } from './BioStackAIConstants';
+import React, { useState, useMemo } from 'react';
+import { GlassCard, PillBtn, showToast, initBioToast, SubstanceMechanismCard, SubstanceTzCard } from './BioStackAIConstants';
 import type { BioStackProfile } from '../../engines/biostack-ai.engine';
 import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { buildClinicalStack, type ClinicalStackResult } from '../../engines/biostack-clinical-recommender';
@@ -37,11 +34,23 @@ interface Props {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   Опции фильтров
+   Константы / опции
    ════════════════════════════════════════════════════════════════ */
 
-const ORGAN_OPTIONS = Object.entries(TZ_SYSTEM_LABELS).map(([id, label]) => ({ id, label }));
+// 6 ТЗ-систем + 2 псевдо-органа
+const ORGAN_OPTIONS: { id: string; label: string; icon: string; pseudo?: boolean }[] = [
+  { id: 'cardio', label: 'Сердечно-сосудистая', icon: '❤️' },
+  { id: 'hepatic', label: 'Печень', icon: '🟤' },
+  { id: 'renal', label: 'Почки', icon: '💧' },
+  { id: 'cns', label: 'ЦНС', icon: '🧠' },
+  { id: 'reproductive', label: 'Репродуктивная', icon: '🔬' },
+  { id: 'hematologic', label: 'Гематология/метаболизм', icon: '🩸' },
+  { id: 'joints', label: 'Суставы и связки', icon: '🦴', pseudo: true },
+  { id: 'neurotox', label: 'Нейротоксичность', icon: '☠️', pseudo: true },
+];
+
 const MECH_OPTIONS = Object.entries(TZ_MECH_LABELS).map(([id, label]) => ({ id, label }));
+
 const MARKER_OPTIONS: { id: string; label: string }[] = [
   { id: 'ALT', label: 'АЛТ (печень)' },
   { id: 'AST', label: 'АСТ (печень)' },
@@ -57,7 +66,7 @@ const MARKER_OPTIONS: { id: string; label: string }[] = [
   { id: 'D_DIMER', label: 'D-димер' },
 ];
 
-// Орган → механизмы (по префиксам TZ_MECH_LABELS)
+// Орган → механизмы (по префиксам)
 const MECH_BY_ORGAN: Record<string, string[]> = (() => {
   const map: Record<string, string[]> = {};
   const prefixToOrgan: Record<string, string> = {
@@ -69,6 +78,9 @@ const MECH_BY_ORGAN: Record<string, string[]> = (() => {
     const organ = prefix ? prefixToOrgan[prefix] : '';
     if (organ) (map[organ] = map[organ] || []).push(mechId);
   }
+  // Псевдо-органы: маппим на релевантные механизмы
+  map.joints = ['hem1', 'hem2', 'cns2', 'cns3', 'rep4']; // воспаление, коллаген, регенерация
+  map.neurotox = ['cns1', 'cns2', 'cns3', 'cns4', 'cns5', 'cns6']; // все CNS-механизмы
   return map;
 })();
 
@@ -87,7 +99,7 @@ const GRADE_OPTIONS = [
 const COUNT_PRESETS = [5, 8, 10, 12, 15, 20, 0];
 
 /* ════════════════════════════════════════════════════════════════
-   Многоразовые компоненты
+   UI примитивы
    ════════════════════════════════════════════════════════════════ */
 
 function MultiChips({
@@ -121,84 +133,51 @@ function MultiChips({
   );
 }
 
-function FilterPopupCard({
-  title, icon, color, options, selected, onToggle, popupId, show, setShow,
+function StepPopup({
+  title, icon, color, children, show, onClose,
 }: {
   title: string;
   icon: string;
   color: string;
-  options: { id: string; label: string }[];
-  selected: string[];
-  onToggle: (id: string) => void;
-  popupId: string;
+  children: React.ReactNode;
   show: boolean;
-  setShow: (v: boolean) => void;
+  onClose: () => void;
 }) {
+  if (!show) return null;
   return (
-    <>
-      <button
-        onClick={() => setShow(true)}
+    <div
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.7)', zIndex: 9999,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+      onClick={onClose}
+    >
+      <div
         style={{
-          width: '100%', padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
-          background: 'rgba(255,255,255,0.03)', border: `1px solid ${selected.length ? color : 'rgba(255,255,255,0.08)'}`,
-          textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          width: '92%', maxWidth: 480, maxHeight: '85vh', overflow: 'auto',
+          padding: 20, borderRadius: 18,
+          background: 'rgba(24,24,27,0.98)', border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
         }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <div>
-          <span style={{ fontSize: 13, fontWeight: 700, color: selected.length ? color : 'rgba(255,255,255,0.82)' }}>
-            {icon} {title}
-          </span>
-          {selected.length > 0 && (
-            <span style={{ marginLeft: 8, fontSize: 11, color: `${color}cc`, fontWeight: 600 }}>
-              ({selected.length})
-            </span>
-          )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color }}>{icon} {title}</div>
+          <button onClick={onClose} style={{
+            fontSize: 16, padding: '4px 8px', borderRadius: 8, cursor: 'pointer',
+            background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)',
+          }}>✕</button>
         </div>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>▼</span>
-      </button>
-
-      {show && (
-        <div
-          style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.7)', zIndex: 9999,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-          onClick={() => setShow(false)}
-        >
-          <div
-            style={{
-              width: '90%', maxWidth: 440, maxHeight: '80vh', overflow: 'auto',
-              padding: 20, borderRadius: 18,
-              background: 'rgba(24,24,27,0.98)', border: '1px solid rgba(255,255,255,0.1)',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color }}>
-                {icon} {title}
-              </div>
-              <button onClick={() => setShow(false)} style={{
-                fontSize: 16, padding: '4px 8px', borderRadius: 8, cursor: 'pointer',
-                background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)',
-              }}>✕</button>
-            </div>
-            <MultiChips options={options} selected={selected} onToggle={onToggle} color={color} />
-            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-              <button onClick={() => setShow(false)} style={{
-                flex: 1, padding: '10px 0', borderRadius: 10, border: 'none',
-                background: color, color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer',
-              }}>Готово</button>
-              <button onClick={() => { options.forEach((o) => selected.includes(o.id) && onToggle(o.id)); }} style={{
-                padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
-                background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', fontSize: 12,
-              }}>Сбросить</button>
-            </div>
-          </div>
+        {children}
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <button onClick={onClose} style={{
+            flex: 1, padding: '12px 0', borderRadius: 10, border: 'none',
+            background: color, color: '#000', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+          }}>Готово</button>
         </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 }
 
@@ -209,48 +188,147 @@ function FilterPopupCard({
 export const BioStackAIClinicalBuild: React.FC<Props> = ({
   profile, setStackIds, labAnalysis, linked,
 }) => {
-  const [grade, setGrade] = useState<'A' | 'B' | 'C'>('C');
-  const [maxStackSize, setMaxStackSize] = useState(0);
+  // Step state
+  const [step, setStep] = useState<0 | 1 | 2 | 3 | 4>(0); // 0 = start, 1 = organs, 2 = mechs, 3 = markers, 4 = params
   const [filterOrgans, setFilterOrgans] = useState<string[]>([]);
   const [filterMechanisms, setFilterMechanisms] = useState<string[]>([]);
   const [filterMarkers, setFilterMarkers] = useState<string[]>([]);
+  const [grade, setGrade] = useState<'A' | 'B' | 'C'>('C');
   const [strategy, setStrategy] = useState<StackStrategy>('comprehensive');
+  const [maxStackSize, setMaxStackSize] = useState(0);
   const [result, setResult] = useState<ClinicalStackResult | null>(null);
   const [building, setBuilding] = useState(false);
 
-  // попапы
-  const [showCount, setShowCount] = useState(false);
-  const [showOrgans, setShowOrgans] = useState(false);
-  const [showMechs, setShowMechs] = useState(false);
-  const [showLabs, setShowLabs] = useState(false);
-
   initBioToast();
 
-  const toggleOrgan = (id: string) =>
-    setFilterOrgans((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
-  const toggleMechanism = (id: string) =>
-    setFilterMechanisms((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
-  const toggleMarker = (id: string) =>
-    setFilterMarkers((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  // Хелперы переключения
+  const toggle = (arr: string[], id: string) =>
+    arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id];
 
-  // механизмы, отфильтрованные по выбранным органам
-  const filteredMechOptions = (() => {
+  // Шаг 1: Органы
+  const organChildren = (
+    <MultiChips
+      options={ORGAN_OPTIONS.map(o => ({ id: o.id, label: `${o.icon} ${o.label}` }))}
+      selected={filterOrgans}
+      onToggle={(id) => setFilterOrgans(toggle(filterOrgans, id))}
+      color="#00e68a"
+    />
+  );
+
+  // Шаг 2: Механизмы (фильтруются по выбранным органам)
+  const availableMechs = useMemo(() => {
     if (!filterOrgans.length) return MECH_OPTIONS;
     const allowed = new Set<string>();
     for (const org of filterOrgans) {
-      for (const mech of (MECH_BY_ORGAN[org] || [])) allowed.add(mech);
+      for (const mech of MECH_BY_ORGAN[org] || []) allowed.add(mech);
     }
-    return MECH_OPTIONS.filter((o) => allowed.has(o.id));
-  })();
+    return MECH_OPTIONS.filter(o => allowed.has(o.id));
+  }, [filterOrgans]);
+
+  const mechChildren = (
+    <MultiChips
+      options={availableMechs}
+      selected={filterMechanisms}
+      onToggle={(id) => setFilterMechanisms(toggle(filterMechanisms, id))}
+      color="#a78bfa"
+    />
+  );
+
+  // Шаг 3: Маркеры
+  const markerChildren = (
+    <MultiChips
+      options={MARKER_OPTIONS}
+      selected={filterMarkers}
+      onToggle={(id) => setFilterMarkers(toggle(filterMarkers, id))}
+      color="#f59e0b"
+    />
+  );
+
+  // Параметры сборки (грейд, стратегия, макс. кол-во)
+  const paramChildren = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Грейд */}
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.82)', marginBottom: 6 }}>
+          📚 Грейд доказательности
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {GRADE_OPTIONS.map((g) => (
+            <button
+              key={g.id}
+              onClick={() => setGrade(g.id)}
+              style={{
+                flex: 1, padding: '10px 0', borderRadius: 12, cursor: 'pointer', border: 'none',
+                background: grade === g.id ? `${g.color}22` : 'rgba(255,255,255,0.04)',
+                borderLeft: grade === g.id ? `3px solid ${g.color}` : '3px solid transparent',
+                transition: 'all 0.2s',
+              }}
+            >
+              <div style={{ fontSize: 18, fontWeight: 800, color: grade === g.id ? g.color : 'rgba(255,255,255,0.5)' }}>
+                {g.label}
+              </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+                {g.desc}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Стратегия под грейдом */}
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.82)', marginBottom: 6 }}>
+          ⚙️ Стратегия подбора
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {STRATEGIES.map((s) => (
+            <PillBtn key={s.id} active={strategy === s.id} onClick={() => setStrategy(s.id)} color="#00e68a" small>
+              {s.label}
+            </PillBtn>
+          ))}
+        </div>
+      </div>
+
+      {/* Макс. количество */}
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.82)', marginBottom: 6 }}>
+          📦 Макс. количество препаратов
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {COUNT_PRESETS.map((n) => (
+            <button
+              key={n}
+              onClick={() => setMaxStackSize(n)}
+              style={{
+                padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
+                background: maxStackSize === n ? '#e879f922' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${maxStackSize === n ? '#e879f9' : 'rgba(255,255,255,0.1)'}`,
+                color: maxStackSize === n ? '#e879f9' : 'rgba(255,255,255,0.7)',
+                fontWeight: maxStackSize === n ? 700 : 500, fontSize: 13,
+              }}
+            >
+              {n === 0 ? '∞' : n}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+          0 = без ограничений
+        </div>
+      </div>
+    </div>
+  );
 
   const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
 
   const resetAll = () => {
-    setGrade('C');
-    setMaxStackSize(0);
+    setStep(0);
     setFilterOrgans([]);
     setFilterMechanisms([]);
     setFilterMarkers([]);
+    setGrade('C');
+    setStrategy('comprehensive');
+    setMaxStackSize(0);
+    setResult(null);
   };
 
   const onBuild = () => {
@@ -287,7 +365,7 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
     showToast(`Клинический стек (${ids.length}) отправлен в план поддержки`, 'success');
   };
 
-  const hasFilters = filterOrgans.length > 0 || filterMechanisms.length > 0 || filterMarkers.length > 0 || grade !== 'C' || maxStackSize > 0;
+  const hasAnyFilter = filterOrgans.length > 0 || filterMechanisms.length > 0 || filterMarkers.length > 0 || grade !== 'C' || maxStackSize > 0;
 
   const SEV_META: Record<string, { title: string; icon: string; color: string; note: string }> = {
     hard: { title: 'Абсолютные противопоказания', icon: '🛑', color: '#f87171', note: 'Удалены полностью — приём недопустим' },
@@ -300,201 +378,147 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
 
   return (
     <div style={{ padding: 12 }}>
-      <GlassCard title="🔬 Клинический подбор" icon="🧬" color="#00e68a">
-        {/* ── Clinical header bar ── */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, marginBottom: 10,
-          background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.1)',
-        }}>
-          <span style={{ fontSize: 28 }}>⚕️</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>Стек строится движком поддержки</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4, marginTop: 2 }}>
-              Единый источник истины — калькулятор поддержки. Канонические дозы, механизмы ТЗ (28 кодов),
-              клинический шлюз безопасности: противопоказания, ЛС-конфликты, UL, лаб-коррекции.
-            </div>
+      {/* ── Заголовок-баннер ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, marginBottom: 10,
+        background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.1)',
+      }}>
+        <span style={{ fontSize: 28 }}>⚕️</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>Пошаговый клинический подбор стека</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4, marginTop: 2 }}>
+            Орган → Механизмы → Маркеры → Параметры → Сборка. Движок калькулятора поддержки, ТЗ-механизмы (28 кодов),
+            клинический шлюз: противопоказания, ЛС-конфликты, UL, лаб-коррекции.
           </div>
         </div>
+      </div>
 
-        {/* ── 1. Карточки грейда A/B/C ── */}
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.82)', marginBottom: 6, marginTop: 10 }}>
-          📚 Грейд доказательности
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {GRADE_OPTIONS.map((g) => (
-            <button
-              key={g.id}
-              onClick={() => setGrade(g.id)}
-              style={{
-                flex: 1, padding: '10px 0', borderRadius: 12, cursor: 'pointer', border: 'none',
-                background: grade === g.id ? `${g.color}22` : 'rgba(255,255,255,0.04)',
-                borderLeft: grade === g.id ? `3px solid ${g.color}` : '3px solid transparent',
-                transition: 'all 0.2s',
-              }}
-            >
-              <div style={{ fontSize: 18, fontWeight: 800, color: grade === g.id ? g.color : 'rgba(255,255,255,0.5)' }}>
-                {g.label}
-              </div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
-                {g.desc}
-              </div>
-            </button>
-          ))}
-        </div>
+      {/* ── Пошаговый UI ── */}
+      <GlassCard title="" icon="" color="#00e68a" style={{ padding: 0, background: 'transparent', border: 'none', boxShadow: 'none' }}>
 
-        {/* ── 2. Количество препаратов ── */}
-        <div style={{ marginTop: 12 }}>
-          <FilterPopupCard
-            title={maxStackSize > 0 ? `Количество препаратов: ${maxStackSize}` : 'Количество препаратов'}
-            icon="📦"
-            color="#e879f9"
-            options={[]}
-            selected={[]}
-            onToggle={() => {}}
-            popupId="count"
-            show={showCount}
-            setShow={setShowCount}
-          />
-          {showCount && (
-            <div
-              style={{
-                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                background: 'rgba(0,0,0,0.7)', zIndex: 9999,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-              onClick={() => setShowCount(false)}
-            >
-              <div
-                style={{
-                  width: '90%', maxWidth: 400, padding: 20, borderRadius: 18,
-                  background: 'rgba(24,24,27,0.98)', border: '1px solid rgba(255,255,255,0.1)',
-                  boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#e879f9' }}>📦 Количество препаратов</div>
-                  <button onClick={() => setShowCount(false)} style={{ fontSize: 16, padding: '4px 8px', borderRadius: 8, cursor: 'pointer', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)' }}>✕</button>
-                </div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 10 }}>
-                  Максимальное число веществ в стеке. 0 = без ограничений.
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {COUNT_PRESETS.map((n) => (
-                    <button
-                      key={n}
-                      onClick={() => { setMaxStackSize(n); setShowCount(false); }}
-                      style={{
-                        padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
-                        background: maxStackSize === n ? '#e879f922' : 'rgba(255,255,255,0.04)',
-                        border: `1px solid ${maxStackSize === n ? '#e879f9' : 'rgba(255,255,255,0.1)'}`,
-                        color: maxStackSize === n ? '#e879f9' : 'rgba(255,255,255,0.7)',
-                        fontWeight: maxStackSize === n ? 700 : 500, fontSize: 13,
-                      }}
-                    >
-                      {n === 0 ? '∞' : n}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── 3. Органы ── */}
-        <div style={{ marginTop: 8 }}>
-          <FilterPopupCard
-            title={filterOrgans.length ? `Органы: выбрано ${filterOrgans.length}` : 'Органы и системы'}
-            icon="🫀"
-            color="#00e68a"
-            options={ORGAN_OPTIONS}
-            selected={filterOrgans}
-            onToggle={toggleOrgan}
-            popupId="organs"
-            show={showOrgans}
-            setShow={setShowOrgans}
-          />
-        </div>
-
-        {/* ── 4. Механизмы выбранного органа ── */}
-        <div style={{ marginTop: 8 }}>
-          <FilterPopupCard
-            title={filterMechanisms.length ? `Механизмы: выбрано ${filterMechanisms.length}` : filterOrgans.length ? 'Механизмы выбранных органов' : 'Механизмы ТЗ (все)'}
-            icon="⚙️"
-            color="#a78bfa"
-            options={filteredMechOptions}
-            selected={filterMechanisms}
-            onToggle={toggleMechanism}
-            popupId="mechanisms"
-            show={showMechs}
-            setShow={setShowMechs}
-          />
-        </div>
-
-        {/* ── 5. Анализы ── */}
-        <div style={{ marginTop: 8 }}>
-          <FilterPopupCard
-            title={filterMarkers.length ? `Анализы: выбрано ${filterMarkers.length}` : 'Лаб-маркеры'}
-            icon="🧪"
-            color="#f59e0b"
-            options={MARKER_OPTIONS}
-            selected={filterMarkers}
-            onToggle={toggleMarker}
-            popupId="labs"
-            show={showLabs}
-            setShow={setShowLabs}
-          />
-        </div>
-
-        {/* ── Стратегия (компактно) ── */}
-        <details style={{ marginTop: 10 }}>
-          <summary style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}>
-            ⚙️ Стратегия: {STRATEGIES.find((s) => s.id === strategy)?.label}
-          </summary>
-          <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
-            {STRATEGIES.map((s) => (
-              <PillBtn key={s.id} active={strategy === s.id} onClick={() => setStrategy(s.id)} color="#00e68a" small>
-                {s.label}
-              </PillBtn>
-            ))}
-          </div>
-        </details>
-
-        {/* ── Сброс ── */}
-        {hasFilters && (
-          <button onClick={resetAll} style={{
-            marginTop: 10, alignSelf: 'flex-start', fontSize: 11, padding: '4px 10px',
-            borderRadius: 8, cursor: 'pointer', background: 'transparent',
-            border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)',
-          }}>
-            ✕ Сбросить фильтры
+        {/* Стартовая кнопка (шаг 0) */}
+        {step === 0 && (
+          <button
+            onClick={() => setStep(1)}
+            style={{
+              width: '100%', padding: '18px 0', borderRadius: 14, border: 'none',
+              background: 'linear-gradient(135deg,#00e68a,#00b4d8)',
+              color: '#00120c', fontWeight: 800, fontSize: 16, cursor: 'pointer',
+              boxShadow: '0 6px 20px rgba(0,230,138,0.2)',
+            }}
+          >
+            🚀 Начать сборку стека
           </button>
         )}
 
-        {/* ── 6. Кнопка сборки ── */}
-        <button onClick={onBuild} disabled={building} style={{
-          marginTop: 14, width: '100%', padding: '14px 0', borderRadius: 14, border: 'none',
-          background: building ? 'rgba(0,230,138,0.4)' : 'linear-gradient(135deg,#00e68a,#00b4d8)',
-          color: '#00120c', fontWeight: 800, fontSize: 15, cursor: 'pointer',
-          boxShadow: building ? 'none' : '0 6px 20px rgba(0,230,138,0.2)',
-        }}>
-          {building ? '⚙️ Собираю…' : '⚕️ Собрать клинический стек'}
-        </button>
+        {/* Шаги 1-3: попапы органов/механизмов/маркеров */}
+        {step >= 1 && step <= 3 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <StepPopup
+              title="Шаг 1 из 4: Органы и системы"
+              icon="🫀"
+              color="#00e68a"
+              show={step === 1}
+              onClose={() => setStep(0)}
+            >
+              {organChildren}
+              <button onClick={() => setStep(2)} style={{
+                marginTop: 8, width: '100%', padding: '12px', borderRadius: 10, border: 'none',
+                background: filterOrgans.length ? '#00e68a' : 'rgba(255,255,255,0.08)',
+                color: filterOrgans.length ? '#00120c' : 'rgba(255,255,255,0.5)',
+                fontWeight: 700, fontSize: 13, cursor: filterOrgans.length ? 'pointer' : 'not-allowed',
+              }} disabled={!filterOrgans.length}>
+                Далее: Механизмы {filterOrgans.length && `(${filterOrgans.length})`}
+              </button>
+            </StepPopup>
+
+            <StepPopup
+              title="Шаг 2 из 4: Механизмы ТЗ"
+              icon="⚙️"
+              color="#a78bfa"
+              show={step === 2}
+              onClose={() => setStep(1)}
+            >
+              {mechChildren}
+              <button onClick={() => setStep(3)} style={{
+                marginTop: 8, width: '100%', padding: '12px', borderRadius: 10, border: 'none',
+                background: filterMechanisms.length ? '#a78bfa' : 'rgba(255,255,255,0.08)',
+                color: filterMechanisms.length ? '#00120c' : 'rgba(255,255,255,0.5)',
+                fontWeight: 700, fontSize: 13, cursor: filterMechanisms.length ? 'pointer' : 'not-allowed',
+              }} disabled={!filterMechanisms.length}>
+                Далее: Лаб-маркеры {filterMechanisms.length && `(${filterMechanisms.length})`}
+              </button>
+            </StepPopup>
+
+            <StepPopup
+              title="Шаг 3 из 4: Лаб-маркеры"
+              icon="🧪"
+              color="#f59e0b"
+              show={step === 3}
+              onClose={() => setStep(2)}
+            >
+              {markerChildren}
+              <button onClick={() => setStep(4)} style={{
+                marginTop: 8, width: '100%', padding: '12px', borderRadius: 10, border: 'none',
+                background: '#f59e0b', color: '#00120c',
+                fontWeight: 700, fontSize: 13, cursor: 'pointer',
+              }}>
+                Далее: Параметры сборки {filterMarkers.length && `(${filterMarkers.length} маркеров)`}
+              </button>
+            </StepPopup>
+          </div>
+        )}
+
+        {/* Шаг 4: Параметры (грейд + стратегия + макс. кол-во) */}
+        {step === 4 && (
+          <div style={{ padding: '4px 0 0' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.82)', marginBottom: 10 }}>
+              Шаг 4 из 4: Параметры сборки
+            </div>
+            {paramChildren}
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button onClick={() => setStep(3)} style={{
+                flex: 1, padding: '12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)',
+                background: 'transparent', color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+              }}>Назад</button>
+              <button onClick={onBuild} disabled={building} style={{
+                flex: 1, padding: '12px', borderRadius: 10, border: 'none',
+                background: building ? 'rgba(0,230,138,0.4)' : 'linear-gradient(135deg,#00e68a,#00b4d8)',
+                color: '#00120c', fontWeight: 800, fontSize: 14, cursor: 'pointer',
+                boxShadow: building ? 'none' : '0 4px 16px rgba(0,230,138,0.2)',
+              }}>
+                {building ? '⚙️ Собираю…' : '⚕️ Собрать клинический стек'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Сброс фильтров (показывает выбранные значения) */}
+        {step > 0 && hasAnyFilter && (
+          <button onClick={resetAll} style={{
+            marginTop: 12, alignSelf: 'flex-start', fontSize: 11, padding: '6px 12px',
+            borderRadius: 8, cursor: 'pointer', background: 'transparent',
+            border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)',
+          }}>
+            ✕ Сбросить всё
+          </button>
+        )}
+
       </GlassCard>
 
       {/* ════════════════════════════════════════════════════════════════
-          7. СНАЧАЛА: состав стека + механизмы + синергии + описание
+          РЕЗУЛЬТАТ: СНАЧАЛА состав + механизмы + синергии + описание
           ════════════════════════════════════════════════════════════════ */}
       {result && (
         <>
-          {/* ── Описание стека ── */}
+          {/* Описание стека */}
           <GlassCard title="📋 Описание стека" icon="📝" color="#a78bfa" style={{ marginTop: 12 }}>
             <div style={{ fontSize: 12, color: 'rgba(235,235,245,0.8)', lineHeight: 1.5 }}>
               {result.stackDescription}
             </div>
           </GlassCard>
 
-          {/* ── Синергии в стеке ── */}
+          {/* Синергии в стеке */}
           {result.stackSynergies.length > 0 && (
             <GlassCard title={`🔗 Синергии в стеке (${result.stackSynergies.length})`} icon="⚡" color="#c084fc" style={{ marginTop: 8 }}>
               {result.stackSynergies.map((syn, i) => (
@@ -517,7 +541,7 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
             </GlassCard>
           )}
 
-          {/* ── Состав стека (вещества + механизмы + описание ТЗ) ── */}
+          {/* Состав стека + механизмы + ТЗ-описание */}
           <GlassCard title={`💊 Состав стека (${result.substances.length})`} icon="💊" color="#a78bfa" style={{ marginTop: 8 }}>
             {result.substances.map((s) => (
               <div key={s.id} style={{
@@ -564,7 +588,7 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
           </GlassCard>
 
           {/* ════════════════════════════════════════════════════════════════
-              8. ПОТОМ: всё остальное (риск, отсеянные, титрация, лаб, мониторинг, конфликты)
+              ПОТОМ: всё остальное (риск, отсеянные, титрация, лаб, мониторинг, конфликты)
               ════════════════════════════════════════════════════════════════ */}
 
           {/* Риск до/после */}
@@ -697,4 +721,3 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
 };
 
 export default BioStackAIClinicalBuild;
-export { BioStackAIClinicalBuild as BuildTab };

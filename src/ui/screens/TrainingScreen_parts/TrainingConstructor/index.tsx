@@ -52,6 +52,7 @@ import { adaptForPEDs, type PED } from '../../../../engines/bb/bb-ped-adaptation
 import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, phaseExerciseMix, type LoadStrategy, type DeloadType } from '../../../../engines/bb/bb-autocoach.engine';
 import { getAllVolumeLandmarks } from '../../../../engines/volume-landmarks.engine';
 import { convertCycleToBBPlan } from '../../../../engines/bb/cycle-to-plan';
+import { cycleTemplateToFullProgram } from '../../../../engines/bb/cycle-to-plan';
 import { getCycleById } from '../../../../data/lms-cycles/lms-cycle-index';
 import { acuteChronicRatio, toDailyLoads } from '../../../../engines/pro/training-load.engine';
 import { loadSRPESessions } from '../../../../engines/pro/srpe-store';
@@ -168,6 +169,13 @@ export const TrainingConstructor: React.FC<Props> = ({
     try { const s = JSON.parse(localStorage.getItem('he_manual_cfg') || '{}'); localStorage.setItem('he_manual_cfg', JSON.stringify({ ...s, manualCfg, wizardStep, selectedWeek, programData, programWeeks, addDeloadWeek })); } catch {}
   }, [manualCfg, wizardStep, selectedWeek, programData, programWeeks, addDeloadWeek]);
   const [currentMicrocycle, setCurrentMicrocycle] = useState<Microcycle | null>(null);
+
+  // Преобразовать BB-циклы в FullProgram для отображения в «Программа тренировок»
+  const bbCyclesAsPrograms = useMemo(() => {
+    return LMS_CYCLES
+      .filter(c => c.meta.direction === 'bodybuilding' || c.meta.tags?.includes('bodybuilding'))
+      .map(c => cycleTemplateToFullProgram(c));
+  }, []);
 
   const microcycleToManualResult = useCallback((mc: Microcycle, weekNum: number): ManualResult => {
     const wm: Record<string, number> = { chest: 100, back: 110, legs: 140, quads: 130, hamstrings: 80, glutes: 80, calves: 60, shoulders: 60, arms: 50, biceps: 40, triceps: 40, core: 60, abs: 60, traps: 50, forearms: 30, full: 80, ...manualWorkMax, ...tprofile.workMax };
@@ -852,7 +860,7 @@ export const TrainingConstructor: React.FC<Props> = ({
   }, [tprofile, manualWorkMax]);
 
   const loadProgramToConstructor = useCallback((programId: string) => {
-    const lib: FullProgram[] = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS];
+    const lib: FullProgram[] = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS, ...bbCyclesAsPrograms];
     const prog = lib.find(p => p.id === programId);
     if (!prog || !prog.weeks?.length) return;
     const pWeeks = buildProgramWeeks(prog);
@@ -874,7 +882,7 @@ export const TrainingConstructor: React.FC<Props> = ({
       mesoLength: prog.durationWeeks,
     });
     setWizardStep(6);
-  }, [buildProgramWeeks]);
+  }, [buildProgramWeeks, bbCyclesAsPrograms]);
 
   const manualToRuntime = useCallback(() => {
     if (!manualResult) return;
@@ -1135,7 +1143,8 @@ export const TrainingConstructor: React.FC<Props> = ({
     { id: 'chest', label: 'Грудь' }, { id: 'back', label: 'Спина' }, { id: 'legs', label: 'Ноги' },
     { id: 'shoulders', label: 'Плечи' }, { id: 'arms', label: 'Руки' }, { id: 'core', label: 'Кор' },
   ];
-  const allPrograms = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS];
+
+  const allPrograms = [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS, ...bbCyclesAsPrograms];
   const selectedList = Object.entries(manualCfg).filter(([, v]) => v);
 
   /* ─── Рекомендованные методы (подсветка ★) по направлению сплита/цикла + совместимость ─── */
