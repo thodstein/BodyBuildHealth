@@ -26,6 +26,7 @@ import { ALL_STACKS } from '../../../data/support-stacks';
 import { MECH_TRANSLATIONS_RU, MECH_LABELS } from '../SupportScreen_parts/SupportScreenData';
 import { CalcSubstanceManager } from './CalcSubstanceManager';
 import { checkStackToxicity, type ToxWarning } from '../../../engines/biostack-safety.engine';
+import { calculateReboundTrajectory, getReboundSummary, type ReboundInput } from '../../../engines/rebound-modeling.engine';
 
 // ── Конфигурация суставного модуля ──────────────────────────────────────────
 interface JointPreset {
@@ -619,6 +620,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [showContraindications, setShowContraindications] = useState(false);
   const [showMonitoring, setShowMonitoring] = useState(false);
   const [showMonitoringPlan, setShowMonitoringPlan] = useState(false);
+  const [showRebound, setShowRebound] = useState(false);
   const [showSymptoms, setShowSymptoms] = useState(true);
   const [showNutrition, setShowNutrition] = useState(false);
   const [showInteractions, setShowInteractions] = useState(false);
@@ -1963,12 +1965,127 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               {finalRec.monitoringPlan.split('\n').filter(Boolean).map((line, i) => (
                 <div key={i} style={{ fontSize:8, color:'rgba(240,240,245,0.9)', lineHeight:1.5, marginBottom:3, paddingLeft:8, borderLeft:'2px solid rgba(96,165,250,0.3)' }}>{line}</div>
               ))}
-            </div>
-          )}
-        </div>
+</div>
       )}
+    </div>
+  )}
 
-      {/* Взаимодействия — все пары (на русском) */}
+      {/* Прогноз ребаунда гормонов после отмены */}
+      {finalRec && (() => {
+        // Build ReboundInput from context
+        const peds = (ctx.pedDoses || ctx.aasIds?.map((id: string) => ({ id, pClass: 'aas_unknown' })) || []);
+        if (!peds.length) return null;
+        
+        // Lazy import to avoid circular deps
+        const { calculateReboundTrajectory, getReboundSummary } = require('../../../engines/rebound-modeling.engine');
+        
+        const cycleWeeks = state.goals?.cycleWeeks || 12;
+        const pctProtocol = rec?.pedFlags?.hasHCG ? 'hcg+clomid' : 
+                          rec?.pedFlags?.hasAI ? 'clomid+nolva' : 'nolva';
+        
+        const reboundInput: any = {
+          peds: peds.map((p: any) => ({ id: p.id, pClass: p.pClass, mgPerWeek: p.mgPerWeek, iuPerDay: p.iuPerDay, mcgPerDay: p.mcgPerDay })),
+          cycleWeeks,
+          pctProtocol,
+          pctStartWeek: undefined,
+          userProfile: {
+            age: state.profile?.age || 30,
+            baselineTT: state.labs?.fullPanel?.TESTOSTERONE || 650,
+            baselineE2: state.labs?.fullPanel?.ESTRADIOL || 28,
+            baselinePRL: state.labs?.fullPanel?.PROLACTIN || 14,
+            baselineCortisol: state.labs?.fullPanel?.CORTISOL || 450,
+            baselineSHBG: state.labs?.fullPanel?.SHBG || 30,
+            baselineLH: state.labs?.fullPanel?.LH || 5,
+            baselineFSH: state.labs?.fullPanel?.FSH || 4,
+          },
+        };
+        
+        try {
+          const rebound = calculateReboundTrajectory(reboundInput);
+          const summary = getReboundSummary(rebound);
+          
+          return (
+            <div style={{ marginTop:6 }}>
+              <div onClick={() => setShowRebound(!showRebound)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showRebound ? '8px 8px 0 0' : 8, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.18)' }}>
+                <span style={{ fontSize:10, fontWeight:700, color:'#f59e0b', display:'flex', alignItems:'center', gap:5 }}>
+                  📉 Прогноз ребаунда после отмены
+                  <span style={{ fontSize:7, fontWeight:600, color:'rgba(245,158,11,0.5)', padding:'1px 5px', borderRadius:4, background:'rgba(245,158,11,0.1)' }}>по вашему курсу</span>
+                </span>
+                <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showRebound ? '▲ скрыть' : '▼ показать'}</span>
+              </div>
+              {showRebound && (
+                <div style={{ padding:'8px 9px', background:'rgba(245,158,11,0.03)', border:'1px solid rgba(245,158,11,0.1)', borderTop:'none', borderRadius:'0 0 8px 8px' }}>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:5, lineHeight:1.4 }}>
+                    Прогноз восстановления гормонов за 24 недели после курса. Основан на ПК-фармакокинетике, ПКТ и клинических базах.
+                  </div>
+                  
+                  {/* Summary cards */}
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(120px, 1fr))', gap:6, marginBottom:8 }}>
+                    <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+                      <div style={{ fontSize:7, fontWeight:700, color:'#f59e0b' }}>Восстановление</div>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{rebound.overallRecoveryWeek || '?'} нед</div>
+                    </div>
+                    <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
+                      <div style={{ fontSize:7, fontWeight:700, color:'#22c55e' }}>HPTA (LH+FSH+TT)</div>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{rebound.hptaRecoveryWeek || '?'} нед</div>
+                    </div>
+                    <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
+                      <div style={{ fontSize:7, fontWeight:700, color:'#ef4444' }}>E2 ребаунд</div>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{rebound.e2.overshootWeek ? `пик нед ${rebound.e2.overshootWeek}` : 'нет'} / rec {rebound.e2.recoveredWeek || '?'} нед</div>
+                    </div>
+                  </div>
+                  
+                  {/* Per-marker mini cards */}
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                    {['tt','ft','e2','prl','lh','fsh','cortisol','shbg'].map(marker => {
+                      const t = rebound[marker as keyof typeof rebound];
+                      if (!t) return null;
+                      const recColor = t.recoveredWeek && t.recoveredWeek <= 12 ? '#22c55e' : t.recoveredWeek && t.recoveredWeek <= 20 ? '#f59e0b' : '#ef4444';
+                      return (
+                        <div key={marker} style={{ padding:'5px 7px', borderRadius:5, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)', minWidth:80 }}>
+                          <div style={{ fontSize:7, fontWeight:700, color:marker === 'e2' ? '#f59e0b' : marker === 'prl' ? '#ec4899' : marker === 'cortisol' ? '#ef4444' : '#fff' }}>
+                            {marker.toUpperCase()}
+                          </div>
+                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>
+                            {t.recoveredWeek ? `${t.recoveredWeek} нед` : '—'}
+                            {t.overshootWeek && <span style={{ color:'#f59e0b', marginLeft:2 }}>↑{t.overshootWeek}</span>}
+                          </div>
+                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>
+                            баз: {t.baseline.toFixed(1)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Risk flags */}
+                  {rebound.riskFlags.length > 0 && (
+                    <div style={{ marginTop:8, padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
+                      <div style={{ fontSize:7, fontWeight:700, color:'#ef4444', marginBottom:3 }}>⚠ Риск-факторы</div>
+                      {rebound.riskFlags.map((rf: string, i: number) => (
+                        <div key={i} style={{ fontSize:8, color:'#fca5a5', marginBottom:2, lineHeight:1.4, paddingLeft:10, borderLeft:'2px solid rgba(239,68,68,0.3)' }}>{rf}</div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Clinical notes */}
+                  <div style={{ marginTop:8, padding:'6px 8px', borderRadius:6, background:'rgba(96,165,250,0.04)', border:'1px solid rgba(96,165,250,0.12)' }}>
+                    <div style={{ fontSize:7, fontWeight:700, color:'#60a5fa', marginBottom:3 }}>📋 Клинические заметки</div>
+                    {['tt','ft','e2','prl','lh','fsh','cortisol','shbg'].flatMap(marker => {
+                      const t = rebound[marker as keyof typeof rebound];
+                      return t?.clinicalNotes?.map((note: string, i: number) => (
+                        <div key={`${marker}-${i}`} style={{ fontSize:8, color:'rgba(240,240,245,0.9)', marginBottom:1, lineHeight:1.4, paddingLeft:8, borderLeft:'2px solid rgba(96,165,250,0.3)' }}>{note}</div>
+                      )) || [];
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        } catch {
+          return null;
+        }
+      })()}
       {finalRec && finalRec.subs.length > 1 && (() => {
         const interactions = checkInteractions(finalRec.subs.map(s => s.substanceId));
         if (interactions.length === 0) return null;
