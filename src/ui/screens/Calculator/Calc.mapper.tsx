@@ -1980,9 +1980,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         const { calculateReboundTrajectory, getReboundSummary } = require('../../../engines/rebound-modeling.engine');
         
         const cycleWeeks = state.goals?.cycleWeeks || 12;
-        const pctProtocol = rec?.pedFlags?.hasHCG ? 'hcg+clomid' : 
-                          rec?.pedFlags?.hasAI ? 'clomid+nolva' : 'nolva';
-        
+        const pctProtocol = rec?.pedFlags?.hasTest ? 'hcg+clomid' : 'clomid+nolva';
+
+        const fp: any = state.labs?.fullPanel || {};
         const reboundInput: any = {
           peds: peds.map((p: any) => ({ id: p.id, pClass: p.pClass, mgPerWeek: p.mgPerWeek, iuPerDay: p.iuPerDay, mcgPerDay: p.mcgPerDay })),
           cycleWeeks,
@@ -1990,13 +1990,13 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           pctStartWeek: undefined,
           userProfile: {
             age: state.profile?.age || 30,
-            baselineTT: state.labs?.fullPanel?.TESTOSTERONE || 650,
-            baselineE2: state.labs?.fullPanel?.ESTRADIOL || 28,
-            baselinePRL: state.labs?.fullPanel?.PROLACTIN || 14,
-            baselineCortisol: state.labs?.fullPanel?.CORTISOL || 450,
-            baselineSHBG: state.labs?.fullPanel?.SHBG || 30,
-            baselineLH: state.labs?.fullPanel?.LH || 5,
-            baselineFSH: state.labs?.fullPanel?.FSH || 4,
+            baselineTT: fp.TESTOSTERONE || 650,
+            baselineE2: fp.ESTRADIOL || 28,
+            baselinePRL: fp.PROLACTIN || 14,
+            baselineCortisol: fp.CORTISOL || 450,
+            baselineSHBG: fp.SHBG || 30,
+            baselineLH: fp.LH || 5,
+            baselineFSH: fp.FSH || 4,
           },
         };
         

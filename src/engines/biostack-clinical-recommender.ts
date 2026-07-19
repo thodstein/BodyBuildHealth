@@ -324,6 +324,8 @@ export function buildClinicalStack(
 ): ClinicalStackResult {
   // 1) Полное состояние = дефолт ⊕ реальные данные из localStorage (pharma/labs/neuro/CI)
   const h = hydrateState();
+  console.log('[BioStack] hydrateState:', h);
+  console.log('[BioStack] profile:', profile);
   const modes = mapGoalsToModes(profile);
   const courseWeek = opts.courseWeek ?? 1;
 
@@ -340,9 +342,12 @@ export function buildClinicalStack(
 
   // 2) Источник истины: движок калькулятора поддержки (канонические дозы + механизмы)
   const plan: PlanResult = runSupportUnified(state);
+  console.log('[BioStack] plan.substances:', plan.substances.map(s => s.id));
+  console.log('[BioStack] plan.overallRiskBefore/After:', plan.overallRiskBefore, plan.overallRiskAfter);
 
   // 2a) Фильтры по органам / механизмам / маркерам / доказательности (до клинического шлюза)
   let candidateIds = plan.substances.map((s) => s.id);
+  console.log('[BioStack] initial candidateIds:', candidateIds);
 
   if (opts.filterMarkers && opts.filterMarkers.length) {
     const markerSubs = new Set<string>();
@@ -376,6 +381,7 @@ export function buildClinicalStack(
       return entries.some((e) => allowedSet.has(e.q));
     });
   }
+  console.log('[BioStack] candidateIds after filters:', candidateIds);
 
   // 3) Клинический шлюз безопасности (абсолютные противопоказания, ЛС, UL, лаб, редандантность)
   const strategy = opts.strategy ?? 'comprehensive';
@@ -385,6 +391,8 @@ export function buildClinicalStack(
     strategy,
     opts.lab ?? null,
   );
+  console.log('[BioStack] gate.ids:', gate.ids);
+  console.log('[BioStack] gate.excluded:', gate.hardStops.length + gate.drugExclusions.length + gate.ulWarnings.length);
 
   const gateIdSet = new Set(gate.ids);
   const byId = new Map<string, PlanSubstance>(plan.substances.map((s) => [s.id, s]));
@@ -495,6 +503,14 @@ export function buildClinicalStack(
 
   const coveragePercent =
     typeof plan.coveragePercent === 'number' ? plan.coveragePercent : 0;
+
+  console.log('[BioStack] FINAL result:', {
+    substancesCount: substances.length,
+    excludedCount: excluded.length,
+    riskBefore: plan.overallRiskBefore,
+    riskAfter: plan.overallRiskAfter,
+    coveragePercent,
+  });
 
   const conflictsAsText = (plan.conflicts || []).map(
     (c) => `${c.aName} + ${c.bName}: ${c.effect}`,

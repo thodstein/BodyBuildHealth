@@ -3,7 +3,7 @@
 //  Аналитическая модель восстановления гормонов после отмены ААС
 // ════════════════════════════════════════════════════════════════════════════
 
-import { derivePEDFlags } from './ped-potency-table';
+import { derivePEDFlags } from '../data/ped-potency-table';
 
 export type ReboundMarker = 'TT' | 'FT' | 'E2' | 'PRL' | 'LH' | 'FSH' | 'CORTISOL' | 'SHBG';
 
@@ -39,8 +39,8 @@ export interface ReboundProfile {
   fsh: ReboundTrajectory;
   cortisol: ReboundTrajectory;
   shbg: ReboundTrajectory;
-  overallRecoveryWeek: number;
-  hptaRecoveryWeek: number;
+  overallRecoveryWeek: number | null;
+  hptaRecoveryWeek: number | null;
   riskFlags: string[];
 }
 
@@ -497,7 +497,5 @@ export function getReboundSummary(profile: ReboundProfile): string {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-//  EXPORTS
+//  (functions already exported above)
 // ──────────────────────────────────────────────────────────────────────────────
-
-export type { ReboundInput, ReboundProfile, ReboundTrajectory, ReboundCurvePoint, ReboundMarker };

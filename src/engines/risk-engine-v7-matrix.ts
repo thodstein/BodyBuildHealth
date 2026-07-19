@@ -451,6 +451,24 @@ export const DRUG_THRESHOLDS_V7: Record<string, DrugThreshold> = {
   phosphatidylcholine: { dosePerWeek: 1800, androgenicity: 0, systems: {
     hepatic: { 3: -0.15, 5: -0.1 },
   }},
+  // === EXTENDED LIVER SUPPORT (Critical Additions) ===
+  sam_e: { dosePerWeek: 2800, androgenicity: 0, systems: {
+    hepatic: { 3: -0.25, 7: -0.2 },
+    neuro: { 5: -0.15, 4: -0.1 },
+    hematologic: { 5: -0.1 },
+  }},
+  alpha_lipoic: { dosePerWeek: 2100, androgenicity: 0, systems: {
+    hepatic: { 3: -0.2, 7: -0.15 },
+    neuro: { 5: -0.25 },
+  }},
+  glycyrrhizic_acid: { dosePerWeek: 350, androgenicity: 0, systems: {
+    hepatic: { 2: -0.2, 1: -0.15, 7: -0.1 },
+    endocrine: { 5: -0.1 },
+  }},
+  artichoke: { dosePerWeek: 3500, androgenicity: 0, systems: {
+    hepatic: { 2: -0.15, 7: -0.1 },
+    cardio: { 1: -0.1 },
+  }},
 
   // === OMEGA-3 / LIPID SUPPORT ===
   omega3: { dosePerWeek: 14000, androgenicity: 0, systems: {
@@ -499,10 +517,6 @@ export const DRUG_THRESHOLDS_V7: Record<string, DrugThreshold> = {
     cardio: { 5: -0.15, 6: -0.1 },
     neuro: { 5: -0.1 },
   }},
-  alpha_lipoic: { dosePerWeek: 2100, androgenicity: 0, systems: {
-    hepatic: { 3: -0.2, 7: -0.15 },
-    neuro: { 5: -0.25 },
-  }},
 
   // === ANTI-INFLAMMATORY / ADAPTOGENS ===
   aspirin: { dosePerWeek: 700, androgenicity: 0, systems: {
@@ -513,6 +527,21 @@ export const DRUG_THRESHOLDS_V7: Record<string, DrugThreshold> = {
     endocrine: { 4: -0.2 },
     cardio: { 1: -0.15 },
     hepatic: { 3: -0.05 },
+  }},
+  red_yeast_rice: { dosePerWeek: 1200, androgenicity: 0, systems: {
+    cardio: { 2: -0.3, 1: -0.15 },
+    hepatic: { 7: 0.1 },
+  }},
+  ezetimibe: { dosePerWeek: 70, androgenicity: 0, systems: {
+    cardio: { 2: -0.25, 1: -0.1 },
+    hepatic: { 7: 0.05 },
+  }},
+  niacin: { dosePerWeek: 3500, androgenicity: 0, systems: {
+    cardio: { 2: -0.2, 1: -0.15 },
+    endocrine: { 4: 0.05 },
+  }},
+  policosanol: { dosePerWeek: 140, androgenicity: 0, systems: {
+    cardio: { 2: -0.15, 1: -0.1 },
   }},
   curcumin_sup: { dosePerWeek: 3500, androgenicity: 0, systems: {
     hepatic: { 3: -0.15, 7: -0.1 },
@@ -548,6 +577,30 @@ export const DRUG_THRESHOLDS_V7: Record<string, DrugThreshold> = {
   }},
   probiotics_sup: { dosePerWeek: 7000, androgenicity: 0, systems: {
     hepatic: { 3: -0.1, 7: -0.1 },
+  }},
+  same: { dosePerWeek: 2800, androgenicity: 0, systems: {
+    hepatic: { 1: -0.15, 3: -0.1, 7: -0.15 },
+    neuro: { 3: -0.1, 4: -0.1 },
+  }},
+  glycyrrhizin: { dosePerWeek: 350, androgenicity: 0, systems: {
+    hepatic: { 2: -0.2, 3: -0.15, 7: -0.1 },
+    cardio: { 3: 0.1 },
+  }},
+  pentoxifylline: { dosePerWeek: 2800, androgenicity: 0, systems: {
+    hematologic: { 1: -0.2, 4: -0.15, 5: -0.1 },
+    cardio: { 7: -0.05 },
+  }},
+  enoxaparin: { dosePerWeek: 280, androgenicity: 0, systems: {
+    hematologic: { 4: -0.3, 5: -0.2 },
+    cardio: { 7: 0.1 },
+  }},
+  ketosteril: { dosePerWeek: 4200, androgenicity: 0, systems: {
+    renal: { 1: -0.2, 2: -0.15, 3: -0.1, 4: -0.1 },
+    hematologic: { 5: -0.05 },
+  }},
+  sodium_bicarbonate: { dosePerWeek: 21000, androgenicity: 0, systems: {
+    renal: { 2: -0.15, 4: -0.1 },
+    cardio: { 3: 0.05 },
   }},
 
   // === REGENERATIVE PEPTIDES ===
@@ -592,7 +645,7 @@ export const DRUG_THRESHOLDS_V7: Record<string, DrugThreshold> = {
   ss31: { dosePerWeek: 7, androgenicity: 0, systems: {
     cardio: { 5: -0.1, 6: -0.1 },
   }},
-  foxo4_dri: { dosePerWeek: 5, androgenicity: 0, systems: {} },
+  foxo4_dri: { dosePerWeek: 5, androgenicity: 0, systems: {} }
 };
 
 // --- Lab reference ranges ---
