@@ -27,7 +27,8 @@ import { MECH_TRANSLATIONS_RU, MECH_LABELS } from '../SupportScreen_parts/Suppor
 import { CalcSubstanceManager } from './CalcSubstanceManager';
 import { checkStackToxicity, type ToxWarning } from '../../../engines/biostack-safety.engine';
 import { calculateReboundTrajectory, getReboundSummary, type ReboundInput } from '../../../engines/rebound-modeling.engine';
-import { printProtocol, buildExportDataFromRec, ExportButton } from '../../../ui/components/ProtocolExport';
+import { printProtocol, buildExportDataFromRec } from '../../../ui/components/ProtocolExport';
+import { checkNotifications, type NotificationRule } from '../../../engines/notification-engine';
 
 // ── Конфигурация суставного модуля ──────────────────────────────────────────
 interface JointPreset {
@@ -697,8 +698,62 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
     return Array.from(map.values());
   }, [level, selectedStacks]);
 
+  // Проверка уведомлений по лабам/рискам при изменении rec
+  const [notifToast, setNotifToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!finalRec) return;
+    try {
+      const notifState: any = {
+        labs: {
+          lastLabDate: state.labs?.fullPanel?.date,
+          alt: state.labs?.fullPanel?.ALT,
+          ast: state.labs?.fullPanel?.AST,
+          e2: state.labs?.fullPanel?.ESTRADIOL,
+          prl: state.labs?.fullPanel?.PROLACTIN,
+          hct: state.labs?.fullPanel?.HEMATOCRIT,
+          ldl: state.labs?.fullPanel?.LDL,
+          egfr: state.labs?.fullPanel?.EGFR,
+          dDimer: state.labs?.fullPanel?.D_DIMER,
+        },
+        pharma: {
+          phase: rec?.phase || 'course',
+          courseStartDate: state.goals?.courseStartDate,
+          hasAI: rec?.subs?.some((s: any) => s.substanceId === 'anastrozole' || s.substanceId === 'anastro'),
+          hasOral17: rec?.pedFlags?.hasOral17 || false,
+        },
+        goals: { cycleWeeks: state.goals?.cycleWeeks || 12 },
+      };
+      const notifications = checkNotifications(notifState);
+      if (notifications.length > 0) {
+        const critCount = notifications.filter(n => n.priority === 'critical').length;
+        const first = notifications[0];
+        setNotifToast(critCount > 0 
+          ? `⛔ ${critCount} критических предупреждений. ${first.message}`
+          : `⚠ ${first.message}`
+        );
+        setTimeout(() => setNotifToast(null), 8000);
+      }
+    } catch {}
+  }, [finalRec, state.labs, rec?.phase]);
+
   return (
-    <div style={{ ...GLASS, padding: 10, marginBottom: 8, border: '2px solid rgba(0,230,138,0.2)' }}>
+    <React.Fragment>
+      {/* Toast-уведомления */}
+      {notifToast && (
+        <div style={{
+          position:'fixed', bottom: 20, left: 16, right: 16, zIndex: 9999,
+          padding: '10px 14px', borderRadius: 10,
+          background: notifToast.startsWith('⛔') ? 'rgba(239,68,68,0.95)' : 'rgba(245,158,11,0.95)',
+          color: '#fff', fontSize: 11, fontWeight: 600, lineHeight: 1.4,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+          cursor: 'pointer',
+        }} onClick={() => setNotifToast(null)}>
+          {notifToast}
+          <div style={{ fontSize: 8, opacity: 0.7, marginTop: 2 }}>(нажмите чтобы закрыть)</div>
+        </div>
+      )}
+
+      <div style={{ ...GLASS, padding: 10, marginBottom: 8, border: '2px solid rgba(0,230,138,0.2)' }}>
       <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)', marginBottom: 6 }}>
         🧬 Механизм-ориентированная модель (ТЗ-28)
       </div>
@@ -2497,6 +2552,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {/* CalcActions (сохранить/копировать/врачу) */}
       {finalRec && <CalcActions rec={finalRec} level={level} state={state} />}
     </div>
+    </React.Fragment>
   );
 };
 
