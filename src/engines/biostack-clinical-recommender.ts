@@ -33,6 +33,7 @@ import type { LabCompositeResult } from './lab-analysis.engine';
 
 import { getDrugTzMechanisms, TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../data/support-db';
 import { SUPPORT_CATALOG_DATA } from '../data/support-database';
+import { DEFAULT_DOSAGES } from '../data/support-meta';
 import { getPrioritySubstances, type SeverityLevel } from '../data/lab-priority-map';
 import { SUPPLEMENTS_DB } from '../data/support-db/supplements';
 import { PHARMACY_DB } from '../data/support-db/pharmacy-db';
@@ -298,6 +299,75 @@ export interface ClinicalStackResult {
 }
 
 /* ------------------------------------------------------------------ *
+ *  Каталоговый fallback: когда движок вернул 0 веществ,
+ *  строим пул кандидатов из SUPPORT_CATALOG_DATA + SUPPLEMENTS_DB + PHARMACY_DB,
+ *  сопоставляя с фильтрами органов/механизмов/маркеров.
+ * ------------------------------------------------------------------ */
+function buildCatalogFallback(
+  filterOrgans?: string[],
+  filterMechanisms?: string[],
+  filterMarkers?: string[],
+  profile?: BioStackProfile,
+): string[] {
+  const allIds = Object.keys(SUPPORT_CATALOG_DATA);
+  const scored: Array<{ id: string; score: number }> = [];
+
+  for (const id of allIds) {
+    // пропускаем pharma-only (лекарства) — они только из курса
+    const cat = SUPPORT_CATALOG_DATA[id];
+    if (!cat) continue;
+
+    // сопоставление TZ-органов
+    const tzOrgans = (getDrugTzMechanisms(id) || []).map(m => m.organId);
+    const tzMechs = (getDrugTzMechanisms(id) || []).map(m => m.mechId);
+
+    let score = 0;
+
+    // organs match
+    if (filterOrgans?.length) {
+      const organHits = filterOrgans.filter(o => tzOrgans.includes(o)).length;
+      score += organHits * 3;
+    }
+
+    // mechanisms match
+    if (filterMechanisms?.length) {
+      const mechHits = filterMechanisms.filter(m => tzMechs.includes(m)).length;
+      score += mechHits * 3;
+    }
+
+    // markers match
+    if (filterMarkers?.length) {
+      const SEVERITIES: SeverityLevel[] = ['mild', 'moderate', 'severe'];
+      for (const mk of filterMarkers) {
+        for (const sev of SEVERITIES) {
+          for (const e of getPrioritySubstances(mk, sev)) {
+            if (e.substanceId === id) score += 5;
+          }
+        }
+      }
+    }
+
+    // базовый score: core-вещества и broad-spectrum имеют приоритет
+    const isCore = (cat as any).tier === 'core';
+    if (isCore) score += 2;
+
+    // broad-spectrum (вещества с >4 TZ-механизмами)
+    if (tzMechs.length > 4) score += 2;
+
+    // если нет фильтров — всем дать базовый score, потом отберём топ
+    if (!filterOrgans?.length && !filterMechanisms?.length && !filterMarkers?.length) {
+      score += isCore ? 5 : 1;
+    }
+
+    if (score > 0) scored.push({ id, score });
+  }
+
+  // сортировка по score, топ-20
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, 20).map(s => s.id);
+}
+
+/* ------------------------------------------------------------------ *
  *  Основная функция
  * ------------------------------------------------------------------ */
 export interface BuildClinicalStackOpts {
@@ -358,14 +428,23 @@ export function buildClinicalStack(
   console.log('[BioStack] plan.substances:', plan.substances.map(s => s.id));
   console.log('[BioStack] plan.overallRiskBefore/After:', plan.overallRiskBefore, plan.overallRiskAfter);
 
-  // 2a) Фильтры по органам / механизмам / маркерам / доказательности (до клинического шлюза)
-  let candidateIds = plan.substances.map((s) => s.id);
-  console.log('[BioStack] initial candidateIds:', candidateIds);
-
   const filterOrgans = useProfile && opts.filterOrgans?.length ? opts.filterOrgans : undefined;
   const filterMechanisms = useProfile && opts.filterMechanisms?.length ? opts.filterMechanisms : undefined;
   const filterMarkers = useProfile && opts.filterMarkers?.length ? opts.filterMarkers : undefined;
   const evidenceLevel = opts.evidenceLevel;
+
+  // 2a) Фильтры по органам / механизмам / маркерам / доказательности (до клинического шлюза)
+  let candidateIds = plan.substances.map((s) => s.id);
+  console.log('[BioStack] initial candidateIds:', candidateIds);
+
+  // ── Каталоговый fallback: если движок вернул 0 веществ ──
+  if (!candidateIds.length) {
+    const fallbackSet = buildCatalogFallback(opts.filterOrgans, opts.filterMechanisms, opts.filterMarkers, profile);
+    if (fallbackSet.length) {
+      console.log('[BioStack] catalog fallback:', fallbackSet.length, 'candidates');
+      candidateIds = fallbackSet;
+    }
+  }
 
   if (filterMarkers && filterMarkers.length) {
     const markerSubs = new Set<string>();
@@ -418,26 +497,46 @@ export function buildClinicalStack(
   const substances: ClinicalSubstance[] = [];
   for (const id of gate.ids) {
     const s = byId.get(id);
-    if (!s) continue;
     const catalog = SUPPORT_CATALOG_DATA[id];
     const tz = (getDrugTzMechanisms(id) || []).map((m) => ({
       mechId: m.mechId,
       label: (TZ_MECH_LABELS as any)[m.mechId] || m.mechId,
     }));
-    substances.push({
-      id: s.id,
-      name: s.name,
-      doseMg: s.doseMg,
-      doseDisplay: s.doseDisplay,
-      timing: s.timing,
-      tier: s.tier,
-      categories: s.category || (catalog ? catalog.category || [] : []),
-      targetSystems: s.targetSystems || [],
-      mechanismReason: s.mechanismReason || '',
-      comment: s.comment || '',
-      tzMechanisms: tz,
-      brandName: s.brandName,
-    });
+
+    if (s) {
+      // вещество из движка калькулятора (канонические дозы)
+      substances.push({
+        id: s.id,
+        name: s.name,
+        doseMg: s.doseMg,
+        doseDisplay: s.doseDisplay,
+        timing: s.timing,
+        tier: s.tier,
+        categories: s.category || (catalog ? catalog.category || [] : []),
+        targetSystems: s.targetSystems || [],
+        mechanismReason: s.mechanismReason || '',
+        comment: s.comment || '',
+        tzMechanisms: tz,
+        brandName: s.brandName,
+      });
+    } else if (catalog) {
+      // fallback: вещество из каталога (дозы из DEFAULT_DOSAGES)
+      const dosage = (DEFAULT_DOSAGES as any)[id] || (catalog as any).dosage || { mg: 500, timing: 'с едой' };
+      substances.push({
+        id,
+        name: (catalog as any).nameRu || (catalog as any).name || id,
+        doseMg: dosage.mg || 500,
+        doseDisplay: `${dosage.mg || 500} мг`,
+        timing: dosage.timing || 'с едой',
+        tier: (catalog as any).tier || 'standard',
+        categories: (catalog as any).category || [],
+        targetSystems: (catalog as any).targetOrgans || [],
+        mechanismReason: tz.map(t => t.label).join(', ') || '',
+        comment: '',
+        tzMechanisms: tz,
+        brandName: undefined,
+      });
+    }
   }
 
   // 3a) Кап количества: если задан maxStackSize, усекаем по грейду + широте покрытия
