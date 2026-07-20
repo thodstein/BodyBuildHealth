@@ -410,6 +410,11 @@ export const DRUG_THRESHOLDS_V7: Record<string, DrugThreshold> = {
     reproductive: { 7: 0.15 },
     cardio: { 1: 0.15 },  // worsens lipid profile more
   }},
+  exemestane: { dosePerWeek: 12.5, androgenicity: 0, systems: {
+    endocrine: { 2: -0.4 },  // steroidal AI, irreversible
+    reproductive: { 7: 0.1 },
+    cardio: { 1: 0.1 },  // less lipid impact than letrozole
+  }},
 
   // === DOPAMINE AGONISTS ===
   caberg: { dosePerWeek: 0.5, androgenicity: 0, systems: {
