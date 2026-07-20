@@ -206,18 +206,6 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       allDb[id] = entries;
     }
 
-    // ── 2a. Базовые витамины/минералы (всегда в плане, независимо от риска) ──
-    const baseSupplements = [
-      'vitamin_d3', 'vitamin_k2', 'magnesium', 'zinc',
-      'omega3', 'vitamin_c', 'vitamin_e', 'coq10',
-    ];
-    for (const baseId of baseSupplements) {
-      if (isUsed(baseId)) continue;
-      if (!allDb[baseId]) continue;
-      substances.push(baseId);
-      markUsed(baseId);
-    }
-
     const sysCoverageCount: Record<string, number> = {};
     for (const subId of substances) {
       const entries = allDb[subId];
