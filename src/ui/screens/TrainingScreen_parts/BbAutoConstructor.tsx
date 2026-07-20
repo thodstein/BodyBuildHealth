@@ -902,7 +902,7 @@ export const BbAutoConstructor: React.FC = () => {
                   </button>
 
                   {/* Слабые группы (мульти-чипсы) */}
-                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>🔥 Слабые группы (акцент объёма)</div>
+                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>🔥 Слабые группы мышц (ББ-акцент)</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                     {WEAK_GROUPS.map(([id, l]) => {
                       const on = weakPoints.includes(id);

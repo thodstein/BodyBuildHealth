@@ -602,6 +602,11 @@ function buildSession(
     const exerciseCount = role === 'primary'
       ? Math.min(isMultiDay ? 3 : 4, primaryBase + levelBase + pedBoost)
       : Math.min(3, accessoryCount + Math.floor(pedBoost / 2) + (['triceps', 'biceps', 'shoulders'].includes(muscle) ? 1 : 0));
+    // A2: focusGroup — структурная специализация. Если мышца = focusGroup и primary
+    // → упражнений +1 (compound + 2 multi-angle isolation для полноценного покрытия).
+    if (focusGroup && muscle === focusGroup && role === 'primary') {
+      exerciseCount = Math.min(isMultiDay ? 4 : 5, exerciseCount + 1);
+    }
     // selType: primary → compound; accessory → isolation (но на enhanced/курсе —
     // accessory может быть compound для большего механического натяжения).
     // triceps/biceps в Push/Pull-днях могут получить compound (жим узким хватом,
@@ -1092,6 +1097,72 @@ function buildSession(
       seenNamesList.add(iso.name);
       SESSION_USED++;
     }
+  }
+
+  // ▓▓ A3: Финальная PRO-сортировка упражнений в сессии ▓▓
+  // Тренерский PRO-протокол порядка упражнений (Dr. Mike Israetel / RP Strength):
+  //   Слой 1: Primary тяжёлые compound (bench, squat, deadlift, row, OHP) — самое тяжёлое первым
+  //   Слой 2: Secondary compound вариации (incline DB, front squat, RDL)
+  //   Слой 3: Accessory isolations (multi-angle:chest upper/lower, delts front/mid/rear)
+  //   Слой 4: Pump-finisher (слабые группы, метаболический стресс)
+  //
+  // Внутри каждого слоя — compound по strength rank (барбелл > гантель > тренажёр > блок).
+  // Для слабых групп приоритет повышается (+1 слой → они идут раньше в аксессуарном блоке).
+  {
+    const exTypeRank = (e: BBExercise): number => {
+      const cat = EXERCISE_CATALOG.find((c: any) => c.name === e.name);
+      const n = (e.name || '').toLowerCase();
+      // Pump finisher — последний слой (определяем по темпу 2-1-2-0 и reps≥15)
+      if (e.repsRange[0] >= 15 && e.rir >= 4) return 4;
+      if (!cat) return 3;
+      // Compound
+      if ((cat as any).type === 'compound') {
+        // Primary compound = слой 1; accessory compound = слой 2
+        return e.role === 'primary' ? 1 : 2;
+      }
+      // Isolation → слой 3
+      return 3;
+    };
+    const eqRank = (e: BBExercise): number => {
+      const cat = EXERCISE_CATALOG.find((c: any) => c.name === e.name);
+      const n = (e.name || '').toLowerCase();
+      if (/одной рукой|одной руке|single.?arm|unilateral/i.test(n)) return 6;
+      if (!cat) return 5;
+      const eq = String((cat as any).equipment || '').toLowerCase();
+      if (eq.includes('barbell') || eq.includes('smith')) return 1;
+      if (eq.includes('dumbbell')) return 2;
+      if (eq.includes('machine')) return 3;
+      if (eq.includes('cable')) return 4;
+      if (eq.includes('bodyweight') || eq.includes('suspension') || eq.includes('band')) return 5;
+      return 5;
+    };
+    // Слабые группы: их primary идёт в начало слоя 1 (раньше других primary);
+    // их accessory — в начало слоя 3.
+    const weakBoost = (e: BBExercise): number => {
+      return isWeak(e.muscle, weakPoints) ? -1 : 0;
+    };
+    // Focus group: +ещё выше приоритет (в начало primary, в начало accessory)
+    const focusBoost = (e: BBExercise): number => {
+      if (!focusGroup) return 0;
+      return (e.muscle === focusGroup || isWeak(e.muscle, [focusGroup])) ? -2 : 0;
+    };
+    exercises.sort((a, b) => {
+      // Слой (1..4)
+      const sa = exTypeRank(a) + weakBoost(a) + focusBoost(a);
+      const sb = exTypeRank(b) + weakBoost(b) + focusBoost(b);
+      if (sa !== sb) return sa - sb;
+      // Внутри слоя: primary раньше accessory
+      const ra = a.role === 'primary' ? -1 : 1;
+      const rb = b.role === 'primary' ? -1 : 1;
+      if (ra !== rb) return ra - rb;
+      // Внутри роли: equipment rank (barbell → dumbbell → machine → cable)
+      const ea = eqRank(a), eb = eqRank(b);
+      if (ea !== eb) return ea - eb;
+      // Конечный tie-breaker: слабая группа раньше (structural: weak → first stimulus)
+      const wa = isWeak(a.muscle, weakPoints) ? -1 : 0;
+      const wb = isWeak(b.muscle, weakPoints) ? -1 : 0;
+      return wa - wb;
+    });
   }
 
   return { day: dayInRotation, weekOffset: 0, character, sessionTag: sched.sessionTag, exercises };

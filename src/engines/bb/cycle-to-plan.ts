@@ -864,8 +864,11 @@ export interface ProgramToBBPlanOpts {
 function parseReps(repsStr: string | undefined): number {
   if (!repsStr) return 8;
   const s = String(repsStr).trim();
-  if (/^(amrap|max|\d\+)$/i.test(s)) return 5; // AMRAP → берём средний расчёт
-  // "5-8" → среднее 6.5; "5/3/1" → 3 (наиболее «жёсткая» цифровая сессия); "10-12" → 11
+  if (/^(amrap|max|\d\+)$/i.test(s)) return 5;
+  const slash = s.match(/(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)/);
+  if (slash) return parseInt(slash[1], 10); // For 5/3/1 — primary rep = first (5)
+  const m = s.match(/(\d+)\s*[-–]\s*(\d+)/);
+  if (m) return Math.round((parseInt(m[1], 10) + parseInt(m[2], 10)) / 2);
   const first = s.match(/(\d+)/);
   if (first) return parseInt(first[1], 10);
   return 8;
@@ -882,6 +885,128 @@ function parseRepsRange(repsStr: string | undefined): [number, number] {
   const first = s.match(/(\d+)/);
   if (first) { const v = parseInt(first[1], 10); return [v, v]; }
   return [8, 12];
+}
+
+/**
+ * FAITHFUL-PARSER: парсит notes/reps/sets/rir/rpe упражнений из FullProgram
+ * и возвращает массив work-sets с явным pct (если найдено в notes) или fallback (PCT_FOR_RIR).
+ *
+ * Поддерживаемые форматы notes:
+ *   "65%×5, 75%×5, 85%×5+ (AMRAP)" — 3 разных подхода с разными pct/reps (5/3/1 style)
+ *   "50-60% TM", "40-60% TM"        — диапазон pct для BBB подсобки
+ *   "70% 1RM"                       — единый pct
+ * Если pct не найден — fallback к PCT_FOR_RIR[rir] × intMult недели.
+ *
+ * Возвращает work-sets массив (1-to-N) для прогрессивной或多-set одной схемой.
+ */
+interface WorkSetSpec {
+  pct: number;   // доля 1RM (0..1)
+  reps: number;  // повторения в сете
+  rir: number;   // RIR (если не указан — берём из упражнения)
+  amrap?: boolean;
+  restSec?: number;
+}
+
+function parseWorkSetSpecs(
+  ex: { name: string; sets: number; reps: string; rpe?: number; rir?: number; restSec?: number; notes?: string; progression?: string },
+  totalSets: number,
+  rirDefault: number,
+  intMultWeek: number,
+): WorkSetSpec[] {
+  const notes = (ex.notes || '') + ' ' + (ex.progression || '');
+  const result: WorkSetSpec[] = [];
+
+  // 1) Найти в notes явные pct-схемы: "65%×5", "75% × 5", "65% x 5", "65% 5,"
+  //    Поддерживаем "+AMRAP" / "5+" / "max" для финального подхода.
+  const pattern = /(\d+(?:\.\d+)?)\s*%\s*[×x*\-]\s*(\d+)(\+)?/gi;
+  const matches: { pct: number; reps: number; amrap: boolean }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(notes)) !== null) {
+    matches.push({
+      pct: parseFloat(m[1]) / 100,
+      reps: parseInt(m[2], 10),
+      amrap: !!m[3] || /amrap|max/i.test(notes.slice(m.index, m.index + 40)),
+    });
+  }
+  if (matches.length > 0) {
+    // Использовать pct-схему напрямую; если matches.length === totalSets — отлично.
+    // Если matches.length < totalSets — добить последним pct дополнительно.
+    for (let i = 0; i < totalSets; i++) {
+      const spec = matches[Math.min(i, matches.length - 1)];
+      result.push({
+        pct: spec.pct,
+        reps: spec.reps,
+        rir: ex.rir ?? Math.max(0, 10 - (ex.rpe ?? 8)) ?? rirDefault,
+        amrap: spec.amrap,
+        restSec: ex.restSec,
+      });
+    }
+    return result;
+  }
+
+  // 2) Диапазон pct в notes: "50-60% TM" → несколько подходов одинаковым pct (max из диапазона)
+  const rangePattern = /(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*%[^×x*\-]/i;
+  const rm = notes.match(rangePattern);
+  if (rm) {
+    const pctMax = parseFloat(rm[2]) / 100;
+    const reps = parseReps(ex.reps);
+    for (let i = 0; i < totalSets; i++) {
+      result.push({
+        pct: pctMax,
+        reps,
+        rir: ex.rir ?? Math.max(0, 10 - (ex.rpe ?? 7)) ?? rirDefault,
+        restSec: ex.restSec,
+      });
+    }
+    return result;
+  }
+
+  // 3) Простой pct: "70% 1RM", "60% TM"
+  const simplePct = notes.match(/(\d+(?:\.\d+)?)\s*%\s*(?:tm|1rm|1rm)?\b/i);
+  if (simplePct) {
+    const pct = parseFloat(simplePct[1]) / 100;
+    const reps = parseReps(ex.reps);
+    for (let i = 0; i < totalSets; i++) {
+      result.push({
+        pct,
+        reps,
+        rir: ex.rir ?? Math.max(0, 10 - (ex.rpe ?? 7)) ?? rirDefault,
+        restSec: ex.restSec,
+      });
+    }
+    return result;
+  }
+
+  // 4) Reps как схема: "5/3/1" → три подхода 5/3/1 с pct из rir (RIR-based)
+  const repsStr = String(ex.reps || '').trim();
+  const slashScheme = repsStr.match(/^(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)$/);
+  if (slashScheme && totalSets === 3) {
+    const repsArr = [parseInt(slashScheme[1], 10), parseInt(slashScheme[2], 10), parseInt(slashScheme[3], 10)];
+    // 5/3/1: RIR для схем — обычно RIR 1-2; веса же ~65/75/85/95% (используем прогрессию RIR-based)
+    const rirFor5 = ex.rir ?? 2;
+    const pctFor5 = PCT_FOR_RIR[rirFor5] ?? 0.90;
+    const pctProgress = [pctFor5 * 0.78, pctFor5 * 0.86, pctFor5 * 0.94]; // ≈ 70/77/85%
+    for (let i = 0; i < 3; i++) {
+      result.push({
+        pct: pctProgress[i],
+        reps: repsArr[i],
+        rir: Math.max(0, rirFor5 - (i === 2 ? 1 : 0)), // финальный подход — RIR 1
+        amrap: i === 2,
+        restSec: ex.restSec,
+      });
+    }
+    return result;
+  }
+
+  // 5) Fallback: единый pct из RIR (PCT_FOR_RIR[rir]) × intMult недели
+  const rir = ex.rir ?? Math.max(0, 10 - (ex.rpe ?? 8)) ?? rirDefault;
+  const pctBase = PCT_FOR_RIR[rir] ?? 0.82;
+  const pctFinal = Math.max(0.3, Math.min(1.0, pctBase * intMultWeek));
+  const reps = parseReps(ex.reps);
+  for (let i = 0; i < totalSets; i++) {
+    result.push({ pct: pctFinal, reps, rir, restSec: ex.restSec });
+  }
+  return result;
 }
 
 /** warmup parsing: "3 ramp-up sets per exercise" → ramp 30/60/80% */
@@ -1019,7 +1144,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           seenMusclesPrimary.add(muscle);
         }
 
-        // Weight calculation
+        // Weight calculation — faithful:_pct honour program's notes (5/3/1, BBB 50-60% TM), then RIR fallback.
         const workMaxVal = (function () {
           if (workMax[muscle]) return workMax[muscle];
           if (muscle === 'quads' && workMax['legs']) return workMax['legs'];
@@ -1027,38 +1152,41 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           if (workMax['chest']) return workMax['chest'];
           return 80;
         })();
-        const pctForRir = PCT_FOR_RIR[rir] ?? 0.82;
-        const baseWeight = workMaxVal * pctForRir * intMult;
-        const setDrift = 1; // faithful: neutral drift per set (program progress handles progression)
-        const weightPerSet = Math.round(baseWeight * setDrift * 10) / 10;
 
-        // Fade out reps per set slightly for multi-set work (program variance) — faithful: stay uniform
-        const workSets: BBSet[] = Array.from({ length: sets }, (_, si) => ({
-          reps,
-          rir,
-          weight: Math.round(weightPerSet * (1 + si * 0.02) * 10) / 10, // small top-set escalation
-          restSeconds: restSec,
+        // 📌 FAITHFUL: work set specs парсят notes/reps/sets/rpe/rir → конкретные pct/reps/amrap/rest
+        const wsSpecs = parseWorkSetSpecs(ex as any, sets, rir, intMult);
+        const workSets: BBSet[] = wsSpecs.map(spec => ({
+          reps: spec.reps,
+          rir: spec.rir,
+          weight: Math.round(workMaxVal * spec.pct * 10) / 10, // вес = workMax × pct (точные %)
+          restSeconds: spec.restSec || restSec,
           tempo: undefined,
         }));
 
-        // Adapt mode: weak group boost (+ sets), focus boost
+        // Adapt mode: weak/focus boost — добираем добавочные сеты (НЕ меняем faithfull %
+        // основной прогрессии). Apply к RIR слабой группы (стимул упорнее), увеличиваем sets.
         let adjSets = sets;
-        let adjRepsMin = repMin, adjRepsMax = repMax, adjRir = rir;
+        let adjRir = rir;
+        let usedSets = workSets;
         if (mode === 'adapt') {
           const isWeak = weakPoints.includes(muscle);
           const isFocus = focusGroup === muscle;
-          if (isWeak) adjSets = Math.round(adjSets * 1.15); // small boost, не раздуваю (есть добивка ниже)
+          if (isWeak) adjSets = Math.round(adjSets * 1.15);
           if (isFocus) adjSets = Math.round(adjSets * 1.30);
-          if (isWeak) adjRir = Math.max(0, rir - 1); // слабые → упорнее
+          if (isWeak) adjRir = Math.max(0, rir - 1);
+          if (adjSets !== sets) {
+            // Доп-сеты берут pct и rir последнего сета
+            usedSets = Array.from({ length: Math.max(1, adjSets) }, (_, si) => {
+              const spec = wsSpecs[Math.min(si, wsSpecs.length - 1)];
+              return {
+                reps: spec.reps,
+                rir: adjRir,
+                weight: Math.round(workMaxVal * spec.pct * 10) / 10,
+                restSeconds: spec.restSec || restSec,
+              };
+            });
+          }
         }
-        const usedSets = adjSets !== sets
-          ? Array.from({ length: Math.max(1, adjSets) }, (_, si) => ({
-              reps,
-              rir: adjRir,
-              weight: Math.round(weightPerSet * (1 + si * 0.02) * 10) / 10,
-              restSeconds: restSec,
-            }))
-          : workSets;
 
         // Graded injury adaptation
         const gradedInj = gradedInjuries.find(i => muscleGroupFromExName((i as any).muscle || i.muscle, EXERCISE_CATALOG) === muscle);
@@ -1070,14 +1198,14 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           usedSets.forEach(ws => { ws.weight = Math.round(ws.weight * wtPct * 10) / 10; ws.rir = Math.min(5, ws.rir + 1); });
         }
 
-        const workWeight = usedSets[0]?.weight || weightPerSet;
+        const workWeight = usedSets[0]?.weight || Math.round(workMaxVal * 0.80 * 10) / 10;
         exercises.push({
           name: finalExName,
           muscle,
           role,
           character: (ex.rpe || 7) >= 8 ? 'тяж' : 'памп',
           sets: usedSets.length,
-          repsRange: [Math.min(adjRepsMin, reps), Math.max(adjRepsMax, reps)],
+          repsRange: [Math.min(repMin, reps), Math.max(repMax, reps)],
           rir: adjRir,
           workSets: usedSets,
           restSeconds: restSec,
