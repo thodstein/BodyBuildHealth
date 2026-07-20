@@ -316,6 +316,12 @@ export interface BuildClinicalStackOpts {
   evidenceLevel?: 'all' | 'A' | 'B' | 'C';
   /** максимальное число веществ в стеке (ограничение сверху) */
   maxStackSize?: number;
+  /** учитывать курс (AAS/HCG/AI из localStorage) */
+  useCourse?: boolean;
+  /** учитывать анализы (лабораторные данные) */
+  useLabs?: boolean;
+  /** учитывать профиль (healthConditions, targetSystems, targetOrgans) */
+  useProfile?: boolean;
 }
 
 export function buildClinicalStack(
@@ -326,15 +332,22 @@ export function buildClinicalStack(
   const h = hydrateState();
   console.log('[BioStack] hydrateState:', h);
   console.log('[BioStack] profile:', profile);
+  console.log('[BioStack] opts:', opts);
   const modes = mapGoalsToModes(profile);
   const courseWeek = opts.courseWeek ?? 1;
+  const useCourse = opts.useCourse ?? true;
+  const useLabs = opts.useLabs ?? true;
+  const useProfile = opts.useProfile ?? true;
 
   const state: CalculatorState = {
     ...DEFAULT_STATE,
-    ...(h as Partial<CalculatorState>),
-    contraindications: mapProfileToContraindications(profile, DEFAULT_STATE.contraindications),
-    jointMode: modes.jointMode,
-    neuroMode: modes.neuroMode,
+    ...(useCourse ? (h as Partial<CalculatorState>) : { pharma: DEFAULT_STATE.pharma }),
+    ...(useLabs ? (h as Partial<CalculatorState>) : { labs: DEFAULT_STATE.labs }),
+    contraindications: useProfile
+      ? mapProfileToContraindications(profile, DEFAULT_STATE.contraindications)
+      : DEFAULT_STATE.contraindications,
+    jointMode: useProfile ? modes.jointMode : false,
+    neuroMode: useProfile ? modes.neuroMode : false,
     boostEnabled: false,
     powerLevel: opts.powerLevel ?? 'mid',
     courseWeek,
@@ -349,10 +362,15 @@ export function buildClinicalStack(
   let candidateIds = plan.substances.map((s) => s.id);
   console.log('[BioStack] initial candidateIds:', candidateIds);
 
-  if (opts.filterMarkers && opts.filterMarkers.length) {
+  const filterOrgans = useProfile && opts.filterOrgans?.length ? opts.filterOrgans : undefined;
+  const filterMechanisms = useProfile && opts.filterMechanisms?.length ? opts.filterMechanisms : undefined;
+  const filterMarkers = useProfile && opts.filterMarkers?.length ? opts.filterMarkers : undefined;
+  const evidenceLevel = opts.evidenceLevel;
+
+  if (filterMarkers && filterMarkers.length) {
     const markerSubs = new Set<string>();
     const SEVERITIES: SeverityLevel[] = ['mild', 'moderate', 'severe'];
-    for (const mk of opts.filterMarkers) {
+    for (const mk of filterMarkers) {
       for (const sev of SEVERITIES) {
         for (const e of getPrioritySubstances(mk, sev)) markerSubs.add(e.substanceId);
       }
@@ -360,19 +378,19 @@ export function buildClinicalStack(
     if (markerSubs.size) candidateIds = candidateIds.filter((id) => markerSubs.has(id));
   }
 
-  if (opts.filterMechanisms && opts.filterMechanisms.length) {
+  if (filterMechanisms && filterMechanisms.length) {
     candidateIds = candidateIds.filter((id) =>
-      (getDrugTzMechanisms(id) || []).some((m) => opts.filterMechanisms!.includes(m.mechId)),
+      (getDrugTzMechanisms(id) || []).some((m) => filterMechanisms!.includes(m.mechId)),
     );
   }
 
-  if (opts.filterOrgans && opts.filterOrgans.length) {
+  if (filterOrgans && filterOrgans.length) {
     candidateIds = candidateIds.filter((id) =>
-      (getDrugTzMechanisms(id) || []).some((m) => opts.filterOrgans!.includes(m.organId)),
+      (getDrugTzMechanisms(id) || []).some((m) => filterOrgans!.includes(m.organId)),
     );
   }
 
-  if (opts.evidenceLevel && opts.evidenceLevel !== 'all') {
+  if (evidenceLevel && evidenceLevel !== 'all') {
     const allowed: EvidenceGrade[] = opts.evidenceLevel === 'C' ? ['A','B','C'] : opts.evidenceLevel === 'B' ? ['A','B'] : ['A'];
     const allowedSet = new Set(allowed);
     candidateIds = candidateIds.filter((id) => {
@@ -389,7 +407,7 @@ export function buildClinicalStack(
     candidateIds,
     profile,
     strategy,
-    opts.lab ?? null,
+    useLabs ? (opts.lab ?? null) : null,
   );
   console.log('[BioStack] gate.ids:', gate.ids);
   console.log('[BioStack] gate.excluded:', gate.hardStops.length + gate.drugExclusions.length + gate.ulWarnings.length);

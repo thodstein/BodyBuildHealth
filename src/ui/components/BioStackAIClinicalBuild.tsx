@@ -38,32 +38,32 @@ interface Props {
    ════════════════════════════════════════════════════════════════ */
 
 // 6 ТЗ-систем + 2 псевдо-органа
-const ORGAN_OPTIONS: { id: string; label: string; icon: string; pseudo?: boolean }[] = [
-  { id: 'cardio', label: 'Сердечно-сосудистая', icon: '❤️' },
-  { id: 'hepatic', label: 'Печень', icon: '🟤' },
-  { id: 'renal', label: 'Почки', icon: '💧' },
-  { id: 'cns', label: 'ЦНС', icon: '🧠' },
-  { id: 'reproductive', label: 'Репродуктивная', icon: '🔬' },
-  { id: 'hematologic', label: 'Гематология/метаболизм', icon: '🩸' },
-  { id: 'joints', label: 'Суставы и связки', icon: '🦴', pseudo: true },
-  { id: 'neurotox', label: 'Нейротоксичность', icon: '☠️', pseudo: true },
+const ORGAN_OPTIONS: { id: string; label: string; icon: string; pseudo?: boolean; group?: string }[] = [
+  { id: 'cardio', label: 'Сердечно-сосудистая', icon: '❤️', group: 'tz' },
+  { id: 'hepatic', label: 'Печень', icon: '🟤', group: 'tz' },
+  { id: 'renal', label: 'Почки', icon: '💧', group: 'tz' },
+  { id: 'cns', label: 'ЦНС', icon: '🧠', group: 'tz' },
+  { id: 'reproductive', label: 'Репродуктивная', icon: '🔬', group: 'tz' },
+  { id: 'hematologic', label: 'Гематология/метаболизм', icon: '🩸', group: 'tz' },
+  { id: 'joints', label: 'Суставы и связки', icon: '🦴', pseudo: true, group: 'extra' },
+  { id: 'neurotox', label: 'Нейротоксичность', icon: '☠️', pseudo: true, group: 'extra' },
 ];
 
 const MECH_OPTIONS = Object.entries(TZ_MECH_LABELS).map(([id, label]) => ({ id, label }));
 
-const MARKER_OPTIONS: { id: string; label: string }[] = [
-  { id: 'ALT', label: 'АЛТ (печень)' },
-  { id: 'AST', label: 'АСТ (печень)' },
-  { id: 'GGT', label: 'ГГТ (печень)' },
-  { id: 'BILIRUBIN', label: 'Билирубин' },
-  { id: 'GLU', label: 'Глюкоза' },
-  { id: 'HOMOCYSTEINE', label: 'Гомоцистеин' },
-  { id: 'CRP', label: 'СРБ (воспаление)' },
-  { id: 'CREATININE', label: 'Креатинин (почки)' },
-  { id: 'LDL', label: 'ЛПНП (липиды)' },
-  { id: 'TRIGLYCERIDES', label: 'Триглицериды' },
-  { id: 'HCT', label: 'Гематокрит' },
-  { id: 'D_DIMER', label: 'D-димер' },
+const MARKER_OPTIONS: { id: string; label: string; organ?: string }[] = [
+  { id: 'ALT', label: 'АЛТ (печень)', organ: 'hepatic' },
+  { id: 'AST', label: 'АСТ (печень)', organ: 'hepatic' },
+  { id: 'GGT', label: 'ГГТ (печень)', organ: 'hepatic' },
+  { id: 'BILIRUBIN', label: 'Билирубин', organ: 'hepatic' },
+  { id: 'GLU', label: 'Глюкоза', organ: 'metabolic' },
+  { id: 'HOMOCYSTEINE', label: 'Гомоцистеин', organ: 'cardio' },
+  { id: 'CRP', label: 'СРБ (воспаление)', organ: 'immune' },
+  { id: 'CREATININE', label: 'Креатинин (почки)', organ: 'renal' },
+  { id: 'LDL', label: 'ЛПНП (липиды)', organ: 'cardio' },
+  { id: 'TRIGLYCERIDES', label: 'Триглицериды', organ: 'cardio' },
+  { id: 'HCT', label: 'Гематокрит', organ: 'hematologic' },
+  { id: 'D_DIMER', label: 'D-димер', organ: 'hematologic' },
 ];
 
 // Орган → механизмы (по префиксам)
@@ -148,17 +148,17 @@ function StepPopup({
     <div
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'rgba(0,0,0,0.7)', zIndex: 9999,
+        background: 'rgba(0,0,0,0.85)', zIndex: 9999,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
       onClick={onClose}
     >
       <div
         style={{
-          width: '92%', maxWidth: 480, maxHeight: '85vh', overflow: 'auto',
+          width: '94%', maxWidth: 520, maxHeight: '90vh', overflow: 'auto',
           padding: 20, borderRadius: 18,
-          background: 'rgba(24,24,27,0.98)', border: '1px solid rgba(255,255,255,0.1)',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          background: 'rgba(18,18,22,0.98)', border: '1px solid rgba(255,255,255,0.12)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -166,7 +166,7 @@ function StepPopup({
           <div style={{ fontSize: 15, fontWeight: 700, color }}>{icon} {title}</div>
           <button onClick={onClose} style={{
             fontSize: 16, padding: '4px 8px', borderRadius: 8, cursor: 'pointer',
-            background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)',
+            background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)',
           }}>✕</button>
         </div>
         {children}
@@ -199,25 +199,45 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
   const [result, setResult] = useState<ClinicalStackResult | null>(null);
   const [building, setBuilding] = useState(false);
 
+  // Toggles for data sources
+  const [useCourse, setUseCourse] = useState(true);
+  const [useLabs, setUseLabs] = useState(true);
+  const [useProfile, setUseProfile] = useState(true);
+
   initBioToast();
 
   // Хелперы переключения
   const toggle = (arr: string[], id: string) =>
     arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id];
 
-  // Шаг 1: Органы
+  // Шаг 1: Органы (группировка: ТЗ-системы + Дополнительно)
   const organChildren = (
-    <MultiChips
-      options={ORGAN_OPTIONS.map(o => ({ id: o.id, label: `${o.icon} ${o.label}` }))}
-      selected={filterOrgans}
-      onToggle={(id) => setFilterOrgans(toggle(filterOrgans, id))}
-      color="#00e68a"
-    />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 6, textTransform: 'uppercase' }}>Системы ТЗ (6)</div>
+        <MultiChips
+          options={ORGAN_OPTIONS.filter(o => o.group === 'tz').map(o => ({ id: o.id, label: `${o.icon} ${o.label}` }))}
+          selected={filterOrgans}
+          onToggle={(id) => setFilterOrgans(toggle(filterOrgans, id))}
+          color="#00e68a"
+        />
+      </div>
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 6, textTransform: 'uppercase' }}>Дополнительно</div>
+        <MultiChips
+          options={ORGAN_OPTIONS.filter(o => o.group === 'extra').map(o => ({ id: o.id, label: `${o.icon} ${o.label}` }))}
+          selected={filterOrgans}
+          onToggle={(id) => setFilterOrgans(toggle(filterOrgans, id))}
+          color="#f59e0b"
+        />
+      </div>
+    </div>
   );
 
-  // Шаг 2: Механизмы (фильтруются по выбранным органам)
-  const availableMechs = useMemo(() => {
-    if (!filterOrgans.length) return MECH_OPTIONS;
+  // Шаг 2: Механизмы (группировка по органам, фильтрация по выбранным органам)
+  const mechGroups = useMemo(() => {
+    if (!filterOrgans.length) return MECH_OPTIONS; // все механизмы если органы не выбраны
+    
     const allowed = new Set<string>();
     for (const org of filterOrgans) {
       for (const mech of MECH_BY_ORGAN[org] || []) allowed.add(mech);
@@ -225,23 +245,92 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
     return MECH_OPTIONS.filter(o => allowed.has(o.id));
   }, [filterOrgans]);
 
+  // Группировка механизмов по органам для отображения
+  const mechGroupsByOrgan = useMemo(() => {
+    const groups: Record<string, { id: string; label: string }[]> = {};
+    const prefixToOrgan: Record<string, string> = {
+      cv: 'cardio', liv: 'hepatic', ren: 'renal',
+      cns: 'cns', rep: 'reproductive', hem: 'hematologic',
+    };
+    const organLabels: Record<string, string> = {
+      cardio: '❤️ ССС', hepatic: '🟤 Печень', renal: '💧 Почки',
+      cns: '🧠 ЦНС', reproductive: '🔬 Репродуктивная', hematologic: '🩸 Гематология',
+    };
+    
+    for (const mech of mechGroups) {
+      const prefix = mech.id.match(/^[a-z]+/)?.[0];
+      const organ = prefix ? prefixToOrgan[prefix] : 'other';
+      const label = organLabels[organ] || organ;
+      (groups[label] = groups[label] || []).push(mech);
+    }
+    return groups;
+  }, [mechGroups]);
+
   const mechChildren = (
-    <MultiChips
-      options={availableMechs}
-      selected={filterMechanisms}
-      onToggle={(id) => setFilterMechanisms(toggle(filterMechanisms, id))}
-      color="#a78bfa"
-    />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {Object.entries(mechGroupsByOrgan).map(([organ, mechs]) => (
+        <div key={organ} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>{organ}</div>
+          <MultiChips
+            options={mechs}
+            selected={filterMechanisms}
+            onToggle={(id) => setFilterMechanisms(toggle(filterMechanisms, id))}
+            color="#a78bfa"
+          />
+        </div>
+      ))}
+    </div>
   );
 
-  // Шаг 3: Маркеры
+  // Шаг 3: Маркеры (фильтрация по выбранным органам)
+  const availableMarkers = useMemo(() => {
+    if (!filterOrgans.length) return MARKER_OPTIONS;
+    const allowedOrgans = new Set(filterOrgans);
+    // Маппинг маркер-органов к системным ID
+    const markerOrganMap: Record<string, string[]> = {
+      hepatic: ['hepatic'],
+      cardio: ['cardio'],
+      renal: ['renal'],
+      metabolic: ['metabolic'],
+      immune: ['immune'],
+      hematologic: ['hematologic'],
+    };
+    const allowed = new Set<string>();
+    for (const org of filterOrgans) {
+      const mapped = markerOrganMap[org] || [org];
+      for (const m of mapped) allowed.add(m);
+    }
+    return MARKER_OPTIONS.filter(m => allowed.has(m.organ || ''));
+  }, [filterOrgans]);
+
+  // Группировка маркеров по органам
+  const markerGroups = useMemo(() => {
+    const groups: Record<string, { id: string; label: string; organ?: string }[]> = {};
+    const organLabels: Record<string, string> = {
+      hepatic: '🟤 Печень', cardio: '❤️ ССС', renal: '💧 Почки',
+      metabolic: '⚡ Метаболизм', immune: '🛡️ Иммунная', hematologic: '🩸 Гематология',
+    };
+    for (const m of availableMarkers) {
+      const label = organLabels[m.organ || ''] || 'Другое';
+      (groups[label] = groups[label] || []).push(m);
+    }
+    return groups;
+  }, [availableMarkers]);
+
   const markerChildren = (
-    <MultiChips
-      options={MARKER_OPTIONS}
-      selected={filterMarkers}
-      onToggle={(id) => setFilterMarkers(toggle(filterMarkers, id))}
-      color="#f59e0b"
-    />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {Object.entries(markerGroups).map(([organ, markers]) => (
+        <div key={organ} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>{organ}</div>
+          <MultiChips
+            options={markers}
+            selected={filterMarkers}
+            onToggle={(id) => setFilterMarkers(toggle(filterMarkers, id))}
+            color="#f59e0b"
+          />
+        </div>
+      ))}
+    </div>
   );
 
   // Параметры сборки (грейд, стратегия, макс. кол-во)
@@ -315,11 +404,32 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
           0 = без ограничений
         </div>
       </div>
+
+      {/* Источники данных */}
+      <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.82)', marginBottom: 8 }}>
+          📊 Источники данных для подбора
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, background: useCourse ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${useCourse ? '#00e68a' : 'rgba(255,255,255,0.1)'}` }}>
+            <input type="checkbox" checked={useCourse} onChange={e => setUseCourse(e.target.checked)} style={{ accentColor: '#00e68a', width: 16, height: 16 }} />
+            <span style={{ fontSize: 13, fontWeight: 500, color: useCourse ? '#00e68a' : 'rgba(255,255,255,0.7)' }}>💉 Курс ААС</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, background: useLabs ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${useLabs ? '#f59e0b' : 'rgba(255,255,255,0.1)'}` }}>
+            <input type="checkbox" checked={useLabs} onChange={e => setUseLabs(e.target.checked)} style={{ accentColor: '#f59e0b', width: 16, height: 16 }} />
+            <span style={{ fontSize: 13, fontWeight: 500, color: useLabs ? '#f59e0b' : 'rgba(255,255,255,0.7)' }}>🧪 Анализы (лаборатория)</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, background: useProfile ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${useProfile ? '#a78bfa' : 'rgba(255,255,255,0.1)'}` }}>
+            <input type="checkbox" checked={useProfile} onChange={e => setUseProfile(e.target.checked)} style={{ accentColor: '#a78bfa', width: 16, height: 16 }} />
+            <span style={{ fontSize: 13, fontWeight: 500, color: useProfile ? '#a78bfa' : 'rgba(255,255,255,0.7)' }}>👤 Профиль (органы/цели/состояние)</span>
+          </label>
+        </div>
+      </div>
     </div>
   );
 
-  const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
-
+const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
+   
   const resetAll = () => {
     setStep(0);
     setFilterOrgans([]);
@@ -337,13 +447,16 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
       try {
         const r = buildClinicalStack(profile, {
           strategy,
-          lab: labAnalysis ?? null,
+          lab: useLabs ? (labAnalysis ?? null) : null,
           courseWeek: typeof courseWeek === 'number' ? courseWeek : 1,
-          filterOrgans: filterOrgans.length ? filterOrgans : undefined,
-          filterMechanisms: filterMechanisms.length ? filterMechanisms : undefined,
-          filterMarkers: filterMarkers.length ? filterMarkers : undefined,
+          filterOrgans: useProfile && filterOrgans.length ? filterOrgans : undefined,
+          filterMechanisms: useProfile && filterMechanisms.length ? filterMechanisms : undefined,
+          filterMarkers: useProfile && filterMarkers.length ? filterMarkers : undefined,
           evidenceLevel: grade !== 'C' ? grade : undefined,
           maxStackSize: maxStackSize > 0 ? maxStackSize : undefined,
+          useCourse,
+          useLabs,
+          useProfile,
         });
         setResult(r);
       } catch (e: any) {
@@ -398,17 +511,28 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
 
         {/* Стартовая кнопка (шаг 0) */}
         {step === 0 && (
-          <button
-            onClick={() => setStep(1)}
-            style={{
-              width: '100%', padding: '18px 0', borderRadius: 14, border: 'none',
-              background: 'linear-gradient(135deg,#00e68a,#00b4d8)',
-              color: '#00120c', fontWeight: 800, fontSize: 16, cursor: 'pointer',
-              boxShadow: '0 6px 20px rgba(0,230,138,0.2)',
-            }}
-          >
-            🚀 Начать сборку стека
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button
+              onClick={() => setStep(1)}
+              style={{
+                width: '100%', padding: '18px 0', borderRadius: 14, border: 'none',
+                background: 'linear-gradient(135deg,#00e68a,#00b4d8)',
+                color: '#00120c', fontWeight: 800, fontSize: 16, cursor: 'pointer',
+                boxShadow: '0 6px 20px rgba(0,230,138,0.2)',
+              }}
+            >
+              🚀 Начать сборку стека
+            </button>
+            <button
+              onClick={() => setStep(4)}
+              style={{
+                width: '100%', padding: '14px 0', borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)',
+                background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+              }}
+            >
+              ⏭ Пропустить к параметрам
+            </button>
+          </div>
         )}
 
         {/* Шаги 1-3: попапы органов/механизмов/маркеров */}
@@ -419,17 +543,25 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
               icon="🫀"
               color="#00e68a"
               show={step === 1}
-              onClose={() => setStep(0)}
+              onClose={() => setStep(4)}
             >
               {organChildren}
-              <button onClick={() => setStep(2)} style={{
-                marginTop: 8, width: '100%', padding: '12px', borderRadius: 10, border: 'none',
-                background: filterOrgans.length ? '#00e68a' : 'rgba(255,255,255,0.08)',
-                color: filterOrgans.length ? '#00120c' : 'rgba(255,255,255,0.5)',
-                fontWeight: 700, fontSize: 13, cursor: filterOrgans.length ? 'pointer' : 'not-allowed',
-              }} disabled={!filterOrgans.length}>
-                Далее: Механизмы {filterOrgans.length && `(${filterOrgans.length})`}
-              </button>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={() => setStep(2)} style={{
+                  flex: 1, padding: '12px', borderRadius: 10, border: 'none',
+                  background: filterOrgans.length ? '#00e68a' : 'rgba(255,255,255,0.08)',
+                  color: filterOrgans.length ? '#00120c' : 'rgba(255,255,255,0.5)',
+                  fontWeight: 700, fontSize: 13, cursor: filterOrgans.length ? 'pointer' : 'not-allowed',
+                }} disabled={!filterOrgans.length}>
+                  Далее: Механизмы {filterOrgans.length && `(${filterOrgans.length})`}
+                </button>
+                <button onClick={() => setStep(2)} style={{
+                  flex: 1, padding: '12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
+                  background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                }}>
+                  ⏭ Пропустить
+                </button>
+              </div>
             </StepPopup>
 
             <StepPopup
@@ -437,17 +569,25 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
               icon="⚙️"
               color="#a78bfa"
               show={step === 2}
-              onClose={() => setStep(1)}
+              onClose={() => setStep(3)}
             >
               {mechChildren}
-              <button onClick={() => setStep(3)} style={{
-                marginTop: 8, width: '100%', padding: '12px', borderRadius: 10, border: 'none',
-                background: filterMechanisms.length ? '#a78bfa' : 'rgba(255,255,255,0.08)',
-                color: filterMechanisms.length ? '#00120c' : 'rgba(255,255,255,0.5)',
-                fontWeight: 700, fontSize: 13, cursor: filterMechanisms.length ? 'pointer' : 'not-allowed',
-              }} disabled={!filterMechanisms.length}>
-                Далее: Лаб-маркеры {filterMechanisms.length && `(${filterMechanisms.length})`}
-              </button>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={() => setStep(3)} style={{
+                  flex: 1, padding: '12px', borderRadius: 10, border: 'none',
+                  background: filterMechanisms.length ? '#a78bfa' : 'rgba(255,255,255,0.08)',
+                  color: filterMechanisms.length ? '#00120c' : 'rgba(255,255,255,0.5)',
+                  fontWeight: 700, fontSize: 13, cursor: filterMechanisms.length ? 'pointer' : 'not-allowed',
+                }} disabled={!filterMechanisms.length}>
+                  Далее: Лаб-маркеры {filterMechanisms.length && `(${filterMechanisms.length})`}
+                </button>
+                <button onClick={() => setStep(3)} style={{
+                  flex: 1, padding: '12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
+                  background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                }}>
+                  ⏭ Пропустить
+                </button>
+              </div>
             </StepPopup>
 
             <StepPopup
@@ -458,13 +598,21 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
               onClose={() => setStep(2)}
             >
               {markerChildren}
-              <button onClick={() => setStep(4)} style={{
-                marginTop: 8, width: '100%', padding: '12px', borderRadius: 10, border: 'none',
-                background: '#f59e0b', color: '#00120c',
-                fontWeight: 700, fontSize: 13, cursor: 'pointer',
-              }}>
-                Далее: Параметры сборки {filterMarkers.length && `(${filterMarkers.length} маркеров)`}
-              </button>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={() => setStep(4)} style={{
+                  flex: 1, padding: '12px', borderRadius: 10, border: 'none',
+                  background: '#f59e0b', color: '#00120c',
+                  fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                }}>
+                  Далее: Параметры сборки {filterMarkers.length && `(${filterMarkers.length} маркеров)`}
+                </button>
+                <button onClick={() => setStep(4)} style={{
+                  flex: 1, padding: '12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
+                  background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                }}>
+                  ⏭ Пропустить
+                </button>
+              </div>
             </StepPopup>
           </div>
         )}
