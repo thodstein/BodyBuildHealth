@@ -34,6 +34,7 @@ import { PopupNumber, PopupSelect, PopupSelectSmart, ExpandableCard, MetricCard,
 import { InjurySelectCard } from './InjurySelectCard';
 import type { InjurySelectEntry } from './InjurySelectCard';
 import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, type LoadStrategy, type DeloadType, INTENSITY_TECHNIQUES, DEFAULT_TECHNIQUE_BY_PHASE, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
+import type { SessionMethodology } from '../../../engines/bb/bb-session-order.engine';
 import { PCT_FOR_RIR } from '../../../engines/rir-table';
 import { getCyclesByDirection, getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 import { convertCycleToBBPlan, programToCycleTemplate, cycleTemplateToFullProgram, programToBBPlan } from '../../../engines/bb/cycle-to-plan';
@@ -177,6 +178,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [deloadType, setDeloadType] = useState<DeloadType>('pump');
   // P6: выбор intensity technique (если не выбрана — дефолт по фазе)
   const [intensityTech, setIntensityTech] = useState<IntensityTechnique>('none');
+  const [bbMethodology, setBbMethodology] = useState<SessionMethodology>('compound_first');
 
   const [peds, setPeds] = useState<PED[]>((prof.bbPeds?.length ? prof.bbPeds : (prof.onCourse ? ['AAS'] : [])) as PED[]);
   const [pedDoses, setPedDoses] = useState<Record<string, number>>({ AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
@@ -537,6 +539,7 @@ export const BbAutoConstructor: React.FC = () => {
         pedDoses,
         courseIntensity,
         equipment: bbEquipment,
+        methodology: bbMethodology,
       }, pedAdapt);
     }
 
@@ -949,7 +952,11 @@ export const BbAutoConstructor: React.FC = () => {
         <PopupNumber label="Недель мезо" value={bbWeeks} min={4} max={24} suffix=" нед" onChange={v => setBbWeeks(v)} />
         <PopupSelectSmart label="Цель объёма" value={bbVolGoal} onChange={onUserVolGoal} suggestedIds={bbSuggest.volumeGoal} suggestionReason="По цели и уровню" options={[['mev','Минимум (MEV)'],['mav','Оптимум (MAV)'],['mrv','Максимум (MRV)']].map(([id,label]) => ({ id, label }))} />
         <PopupSelect label="Фокус-группа" value={bbFocus} onChange={setBbFocus} options={[{ id:'', label:'Нет' }, ...WEAK_GROUPS.map(([id,l]) => ({ id, label: l }))]} />
-        </div>
+        <PopupSelect label="🧩 Методика порядка" value={bbMethodology} onChange={v => setBbMethodology(v as SessionMethodology)} hint="compound_first — базовые раньше изоляции; pre_exhaust — изоляция основной мышцы ПЕРВОЙ (предутомление)" options={[
+          { id:'compound_first', label:'Базовые → изоляция (по умолчанию)' },
+          { id:'pre_exhaust', label:'Pre-exhaust: изоляция первой' },
+          { id:'post_exhaust', label:'Post-exhaust: базовые → изоляция' },
+        ]} />        </div>
       </div>
       )}
       <div style={{ marginTop:12, padding:10, borderRadius:10, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>

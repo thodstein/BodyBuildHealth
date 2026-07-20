@@ -29,7 +29,7 @@ import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landma
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
 import { distributePhases, PHASE_CONFIGS, getPhaseVolumeMult, type BBPhase } from '../../ui/screens/TrainingScreen_parts/phase-periodization';
-import { orderSessionExercises } from './bb-session-order.engine';
+import { orderSessionExercises, type SessionMethodology } from './bb-session-order.engine';
 import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
@@ -76,7 +76,10 @@ export interface BBBuilderInput {
   courseIntensity?: CourseIntensity;
   /** Доступное оборудование (штанга/гантели/блок/машина/гири/свой вес) — фильтр отбора упражнений. */
   equipment?: string[];
+  /** Методика порядка упражнений в сессии (compound_first по умолчанию; pre_exhaust — изоляция основной мышцы первой). */
+  methodology?: SessionMethodology;
 }
+
 
 export interface BBSet {
   reps: number;
@@ -493,6 +496,7 @@ function buildSession(
   excludeIds: string[] = [],
   avoidAxialLoad: boolean = false,
   equipmentList: string[] = [],
+  methodology: SessionMethodology = 'compound_first',
 ): BBSession {
   const character = sched.character as DayCharacter;
   const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles);
@@ -1038,7 +1042,7 @@ function buildSession(
   // ▓▓ Технически грамотный порядок упражнений (до обрезки по exCap) ▓▓
   // Базовые основной мышцы → базовые вторичных → изоляция (растяжка первой) → финиши.
   // Устраняет «жим стоя перед жимом лёжа» и подобные нарушения логики.
-  const _ordered = orderSessionExercises(exercises, { sessionTag: sched.sessionTag });
+  const _ordered = orderSessionExercises(exercises, { sessionTag: sched.sessionTag, methodology });
   exercises.length = 0; exercises.push(..._ordered);
 
   const exCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 12 : 8;
@@ -1369,7 +1373,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const weekExcluded = getExcludedMuscles(injuries, weekDate);
       const weekGraded = getGradedInjuries(injuries, weekDate);
       const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
-      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList);
+      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {
