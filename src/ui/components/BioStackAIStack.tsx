@@ -629,11 +629,11 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
             const cat = SUPPORT_CATALOG_DATA[id];
             if (!cat) continue;
             const organs = (cat as any).organs || (cat as any).targetOrgans || [];
-            if (profile.healthConditions?.includes('hypertension' as any) && organs.some((o: string) => ['HEART', 'VESSELS'].includes(o))) {
-              issues.push(`• ${cat.nameRu || cat.name} — влияет на ССС. При гипертонии — контроль давления.`);
+            if (profile.drugAllergies?.some(a => a.toLowerCase().includes('penicillin')) && organs.some((o: string) => ['HEART', 'VESSELS'].includes(o))) {
+              issues.push(`• ${cat.nameRu || cat.name} — влияет на ССС. При аллергии на пенициллины — контроль.`);
             }
-            if (profile.healthConditions?.includes('kidney' as any) && organs.some((o: string) => ['KIDNEY', 'RENAL'].includes(o))) {
-              issues.push(`• ${cat.nameRu || cat.name} — нагрузка на почки. Требуется контроль креатинина.`);
+            if (profile.drugAllergies?.some(a => a.toLowerCase().includes('sulfa')) && organs.some((o: string) => ['KIDNEY', 'RENAL'].includes(o))) {
+              issues.push(`• ${cat.nameRu || cat.name} — нагрузка на почки. При аллергии на сульфаниламиды — осторожно.`);
             }
             if (organs.some((o: string) => ['LIVER'].includes(o))) {
               goods.push(`• ${cat.nameRu || cat.name} — ✅ поддерживает печень`);

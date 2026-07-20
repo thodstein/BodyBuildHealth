@@ -1,126 +1,139 @@
 import React, { useState } from 'react';
-import { type BioStackProfile } from '../../engines/biostack-ai.engine';
-import { toFinderProfile, HEALTH_CONDS } from './BioStackAIConstants';
-import type { HealthCondition, ExperienceLevel } from '../../engines/biostack-ai.engine';
+import { loadBioStackProfile, saveBioStackProfile, getDefaultBioStackProfile, BioStackProfile } from '../../engines/biostack-ai.engine';
 
-const STEP_STYLES = {
-  container: { maxWidth: 400, margin: '0 auto', paddingBottom: 80 } as React.CSSProperties,
-  title: { fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 4, textAlign: 'center' as const },
-  subtitle: { fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 14, textAlign: 'center' as const, lineHeight: 1.4 },
-  cardGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 14 } as React.CSSProperties,
-  card: (active: boolean, color: string): React.CSSProperties => ({
-    padding: '14px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'center' as const,
-    background: active ? `${color}14` : 'rgba(24,24,27,0.7)',
-    border: active ? `2px solid ${color}` : '1px solid rgba(255,255,255,0.06)',
-    transition: 'all 0.15s',
-  }),
-  cardIcon: { fontSize: 26, marginBottom: 4 } as React.CSSProperties,
-  cardTitle: { fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 2 } as React.CSSProperties,
-  cardDesc: { fontSize: 9, color: 'rgba(255,255,255,0.4)', lineHeight: 1.3 } as React.CSSProperties,
-  nextBtn: (color: string): React.CSSProperties => ({
-    width: '100%', padding: '14px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
-    background: `linear-gradient(135deg,${color},${color}dd)`, color: '#000', fontWeight: 800, fontSize: 13,
-    boxShadow: `0 4px 16px ${color}28`,
-  }),
-  backBtn: { width: '100%', padding: '10px 0', borderRadius: 10, marginTop: 6, cursor: 'pointer',
-    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: 600 },
-  progress: { display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 14 } as React.CSSProperties,
-  dot: (active: boolean): React.CSSProperties => ({
-    width: 8, height: 8, borderRadius: 4,
-    background: active ? '#00e68a' : 'rgba(255,255,255,0.12)',
-    transition: 'all 0.2s',
-  }),
-};
-
-const EXP_CARDS: Array<{ key: ExperienceLevel; icon: string; title: string; desc: string }> = [
-  { key: 'beginner', icon: '🌱', title: 'Новичок', desc: '<1 года тренировок. Базовый стек БАДов' },
-  { key: 'intermediate', icon: '💪', title: 'Средний', desc: '1-3 года. Расширенный стек' },
-  { key: 'advanced', icon: '🔥', title: 'Продвинутый', desc: '3+ лет. Полный стек + спец. поддержка' },
+const JOINT_SYMPTOMS = [
+  'Боль в суставах', 'Скованность по утрам', 'Отёк сустава', 'Хруст',
+  'Сниженная подвижность', 'Воспаление (артрит)', 'Боль при нагрузке',
+];
+const NEURO_SYMPTOMS = [
+  'Тревожность', 'Бессонница', 'Раздражительность', 'Упадок сил',
+  'Трудности с концентрацией', 'Депрессия', 'Эмоциональная нестабильность',
+];
+const CNS_SYMPTOMS = [
+  'Головокружение', 'Спутанность сознания', 'Судороги', 'Тремор',
+  'Парестезия (онемение)', 'Нарушение координации', 'Мигрень', 'Помутнение зрения',
 ];
 
-interface OnboardingProps {
-  profile: BioStackProfile;
-  onComplete: (patch: Partial<BioStackProfile>, autoBuildStack?: boolean) => void;
-  onSkip: () => void;
-}
+const btnPrimary: React.CSSProperties = {
+  padding: '12px 14px', background: 'linear-gradient(135deg,#00e68a,#00b8ff)',
+  color: '#06281c', fontWeight: 700, fontSize: 14, textAlign: 'center', cursor: 'pointer',
+  borderRadius: 10, border: 'none',
+};
+const inputS: React.CSSProperties = {
+  width: '100%', padding: '8px 12px', borderRadius: 10, border: 'none',
+  background: 'rgba(118,118,128,0.14)', color: '#fff', fontSize: 14, outline: 'none',
+};
 
-export const OnboardingWizard: React.FC<OnboardingProps> = ({ profile, onComplete, onSkip }) => {
-  const [step, setStep] = useState(0);
-  const [healthConds, setHealthConds] = useState<HealthCondition[]>(profile.healthConditions || []);
-  const [experience, setExperience] = useState<ExperienceLevel>(profile.experience || 'intermediate');
+type Step = 'symptoms' | 'supplements';
 
-  const toggleHealth = (h: HealthCondition) => {
-    setHealthConds(healthConds.includes(h) ? healthConds.filter(x => x !== h) : [...healthConds, h]);
+export function BioStackOnboardingWizard(props: { onComplete: (p: BioStackProfile) => void }) {
+  const [step, setStep] = useState<Step>('symptoms');
+  const [symptoms, setSymptoms] = useState({ joint: [] as string[], neuro: [] as string[], cns: [] as string[] });
+  const [supplements, setSupplements] = useState({ current: [] as string[], meds: [] as string[] });
+
+  const base = loadBioStackProfile();
+
+  const toggle = (arr: string[], v: string) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v];
+
+  const finish = () => {
+    const profile: BioStackProfile = {
+      ...base,
+      jointSymptoms: symptoms.joint,
+      neuroSymptoms: symptoms.neuro,
+      cnsSymptoms: symptoms.cns,
+      currentSupplements: supplements.current,
+      currentMeds: supplements.meds,
+      drugAllergies: base.drugAllergies || [],
+      avoidIds: base.avoidIds || [],
+      avoidMeds: base.avoidMeds || [],
+      autoFilledFields: base.autoFilledFields || [],
+    };
+    saveBioStackProfile(profile);
+    props.onComplete(profile);
   };
 
-  const finish = (autoBuild: boolean) => {
-    onComplete({ healthConditions: healthConds, experience }, autoBuild);
-  };
-
-  return (
-    <div style={STEP_STYLES.container}>
-      {/* Progress dots */}
-      <div style={STEP_STYLES.progress}>
-        {[0, 1].map(i => <div key={i} style={STEP_STYLES.dot(step >= i)} />)}
+  const renderSymptoms = () => (
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 6 }}>СУСТАВЫ / СВЯЗКИ</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {JOINT_SYMPTOMS.map(s => (
+            <div key={s} onClick={() => setSymptoms({ ...symptoms, joint: toggle(symptoms.joint, s) })}
+              style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
+                background: symptoms.joint.includes(s) ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
+                border: symptoms.joint.includes(s) ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)' }}>
+              {s}
+            </div>
+          ))}
+        </div>
       </div>
-
-      {/* Step 0: Health conditions */}
-      {step === 0 && (
-        <>
-          <div style={STEP_STYLES.title}>🫀 Есть ли особенности здоровья?</div>
-          <div style={STEP_STYLES.subtitle}>Это поможет исключить нежелательные БАДы и подобрать безопасный стек</div>
-          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 12 }}>
-            {HEALTH_CONDS.map(h => {
-              const active = healthConds.includes(h.key);
-              return (
-                <button key={h.key} onClick={() => toggleHealth(h.key)} style={{
-                  padding: '8px 12px', borderRadius: 16, cursor: 'pointer', fontSize: 9, fontWeight: 600,
-                  background: active ? 'rgba(239,68,68,0.14)' : 'rgba(255,255,255,0.03)',
-                  border: active ? '2px solid rgba(239,68,68,0.35)' : '1px solid rgba(255,255,255,0.06)',
-                  color: active ? '#ef4444' : 'rgba(255,255,255,0.6)',
-                }}>{h.label}</button>
-              );
-            })}
-          </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <button onClick={() => setStep(1)} style={{ ...STEP_STYLES.nextBtn('#ef4444'), flex: 1 }}>
-              Далее {healthConds.length > 0 ? `(${healthConds.length})` : ''} →
-            </button>
-          </div>
-          <button onClick={onSkip} style={STEP_STYLES.backBtn}>Пропустить — заполню позже</button>
-        </>
-      )}
-
-      {/* Step 1: Experience + Build */}
-      {step === 1 && (
-        <>
-          <div style={STEP_STYLES.title}>💪 Ваш уровень тренировок</div>
-          <div style={STEP_STYLES.subtitle}>Это влияет на размер и сложность стека</div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 14 }}>
-            {EXP_CARDS.map(e => (
-              <div key={e.key} onClick={() => setExperience(e.key)}
-                style={{ ...STEP_STYLES.card(experience === e.key, '#60a5fa'), padding: '10px 8px' }}>
-                <div style={{ fontSize: 22, marginBottom: 2 }}>{e.icon}</div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: experience === e.key ? '#60a5fa' : '#fff' }}>{e.title}</div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{e.desc}</div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', gap: 4 }}>
-            <button onClick={() => setStep(0)} style={STEP_STYLES.backBtn}>← Назад</button>
-            <button onClick={() => finish(false)} style={{ ...STEP_STYLES.nextBtn('#8b5cf6'), flex: 1 }}>
-              ✅ Сохранить профиль
-            </button>
-          </div>
-          <button onClick={() => finish(true)} style={{
-            ...STEP_STYLES.nextBtn('#00e68a'), marginTop: 6,
-          }}>
-            🧩 Сохранить + собрать первый стек
-          </button>
-        </>
-      )}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 6 }}>НЕЙРОТОКСИЧНОСТЬ</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {NEURO_SYMPTOMS.map(s => (
+            <div key={s} onClick={() => setSymptoms({ ...symptoms, neuro: toggle(symptoms.neuro, s) })}
+              style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
+                background: symptoms.neuro.includes(s) ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
+                border: symptoms.neuro.includes(s) ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)' }}>
+              {s}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 6 }}>СИМПТОМЫ ЦНС</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {CNS_SYMPTOMS.map(s => (
+            <div key={s} onClick={() => setSymptoms({ ...symptoms, cns: toggle(symptoms.cns, s) })}
+              style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
+                background: symptoms.cns.includes(s) ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
+                border: symptoms.cns.includes(s) ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)' }}>
+              {s}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
-};
+
+  const renderSupplements = () => (
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 6 }}>ПРИНИМАЮ БАДЫ</div>
+        <input style={{ ...inputS, marginBottom: 8 }} placeholder="Название БАД, Enter для добавления"
+          onKeyDown={e => { if (e.key === 'Enter' && e.currentTarget.value.trim()) { setSupplements({ ...supplements, current: [...supplements.current, e.currentTarget.value.trim()] }); e.currentTarget.value = ''; }} } />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {supplements.current.map((s, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', background: 'rgba(0,230,138,0.1)', borderRadius: 6, fontSize: 11 }}>
+              {s} <span onClick={() => setSupplements({ ...supplements, current: supplements.current.filter((_, j) => j !== i) })} style={{ cursor: 'pointer', color: '#ff1744' }}>✕</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 6 }}>ПРИНИМАЮ ИЗ АПТЕКИ</div>
+        <input style={{ ...inputS, marginBottom: 8 }} placeholder="Название препарата, Enter для добавления"
+          onKeyDown={e => { if (e.key === 'Enter' && e.currentTarget.value.trim()) { setSupplements({ ...supplements, meds: [...supplements.meds, e.currentTarget.value.trim()] }); e.currentTarget.value = ''; }} } />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {supplements.meds.map((s, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', background: 'rgba(0,230,138,0.1)', borderRadius: 6, fontSize: 11 }}>
+              {s} <span onClick={() => setSupplements({ ...supplements, meds: supplements.meds.filter((_, j) => j !== i) })} style={{ cursor: 'pointer', color: '#ff1744' }}>✕</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ padding: '12px 8px 24px' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <button onClick={() => setStep('symptoms')} style={{ ...btnPrimary, flex: 1, opacity: step === 'symptoms' ? 1 : 0.5 }}>🤕 Симптомы</button>
+        <button onClick={() => setStep('supplements')} style={{ ...btnPrimary, flex: 1, opacity: step === 'supplements' ? 1 : 0.5 }}>💊 Приём</button>
+      </div>
+      {step === 'symptoms' && renderSymptoms()}
+      {step === 'supplements' && renderSupplements()}
+      <button onClick={finish} style={{ ...btnPrimary, width: '100%', marginTop: 16 }}>Завершить настройку</button>
+    </div>
+  );
+}

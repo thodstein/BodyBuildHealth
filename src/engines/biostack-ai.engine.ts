@@ -23,14 +23,11 @@ export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 
 export interface BioStackProfile {
   age: number; weight: number; height: number; sex: 'male' | 'female';
-  experience: ExperienceLevel;
-  healthConditions: HealthCondition[]; avoidIds: string[]; avoidMeds: string[];
-  targetOrgans: string[]; targetSystems: string[];
+  avoidIds: string[]; avoidMeds: string[];
   currentMeds: string[]; drugAllergies: string[];
   jointSymptoms: string[];
   neuroSymptoms: string[];
   cnsSymptoms: string[];
-  injuries: string[];
   currentSupplements: string[];
   autoFilledFields: string[];
 }
@@ -48,19 +45,16 @@ export interface ProfileCompleteness {
 }
 
 const FIELD_GROUPS: Record<string, string[]> = {
-  personal: ['age','weight','height','sex','experience'],
-  health: ['healthConditions'],
-  organs: ['targetOrgans'],
-  systems: ['targetSystems'],
+  personal: ['age','weight','height','sex'],
   lifestyle: ['avoidIds', 'avoidMeds'],
   clinical: ['currentMeds','drugAllergies'],
-  symptoms: ['jointSymptoms','neuroSymptoms','cnsSymptoms','injuries'],
+  symptoms: ['jointSymptoms','neuroSymptoms','cnsSymptoms'],
   supplements: ['currentSupplements'],
 };
 
 const AUTO_FILLABLE_KEYS = new Set([
-  'age','weight','height','sex','experience','healthConditions','currentMeds','drugAllergies',
-  'injuries','neuroSymptoms','cnsSymptoms','jointSymptoms','currentSupplements',
+  'age','weight','height','sex','currentMeds','drugAllergies',
+  'neuroSymptoms','cnsSymptoms','jointSymptoms','currentSupplements',
 ]);
 
 export function getProfileCompleteness(p: BioStackProfile): ProfileCompleteness {
@@ -111,13 +105,10 @@ export function getProfileCompleteness(p: BioStackProfile): ProfileCompleteness 
 export function getDefaultBioStackProfile(): BioStackProfile {
   return {
     age: 30, weight: 80, height: 175, sex: 'male',
-    experience: 'intermediate',
-    healthConditions: [],
     avoidIds: [], avoidMeds: [],
-    targetOrgans: [], targetSystems: [],
     currentMeds: [], drugAllergies: [],
     jointSymptoms: [], neuroSymptoms: [], cnsSymptoms: [],
-    injuries: [], currentSupplements: [],
+    currentSupplements: [],
     autoFilledFields: [],
   };
 }
@@ -133,25 +124,6 @@ export function autoFillFromMainProfile(): { patch: Partial<BioStackProfile>; au
     if (ss.personal?.weight) { filled.weight = ss.personal.weight; keys.push('weight'); }
     if (ss.personal?.height) { filled.height = ss.personal.height; keys.push('height'); }
     if (ss.personal?.sex) { filled.sex = ss.personal.sex; keys.push('sex'); }
-    if (ss.training?.level) {
-      filled.experience = ss.training.level === 'beginner' ? 'beginner' : ss.training.level === 'intermediate' ? 'intermediate' : 'advanced';
-      keys.push('experience');
-    }
-    if (ss.health?.chronicConditions?.length) {
-      const hc: HealthCondition[] = [];
-      for (const c of ss.health.chronicConditions) {
-        const cl = c.toLowerCase();
-        if (cl.includes('liver') || cl.includes('печень')) hc.push('liver');
-        if (cl.includes('kidney') || cl.includes('почк')) hc.push('kidney');
-        if (cl.includes('heart') || cl.includes('сердц')) hc.push('heart');
-        if (cl.includes('thyroid') || cl.includes('щитов')) hc.push('thyroid');
-        if (cl.includes('stomach') || cl.includes('желуд')) hc.push('stomach');
-        if (cl.includes('diabet') || cl.includes('диабет')) hc.push('diabetes');
-        if (cl.includes('autoim') || cl.includes('аутоим')) hc.push('autoimmune');
-        if (cl.includes('pressure') || cl.includes('давлен')) { hc.push('pressure_high'); }
-      }
-      if (hc.length > 0) { filled.healthConditions = hc; keys.push('healthConditions'); }
-    }
     if (ss.nutrition?.currentMedications?.length) {
       filled.currentMeds = ss.nutrition.currentMedications.map((m: any) => m.name || String(m));
       keys.push('currentMeds');
@@ -159,11 +131,6 @@ export function autoFillFromMainProfile(): { patch: Partial<BioStackProfile>; au
     if (ss.health?.drugAllergies?.length) {
       filled.drugAllergies = ss.health.drugAllergies;
       keys.push('drugAllergies');
-    }
-    const mainInj = (ss.health?.injuries || (s as any).injuries || []) as any[];
-    if (mainInj.length) {
-      const inj = mainInj.map(i => i.location || i.name || String(i)).filter(Boolean);
-      if (inj.length > 0) { filled.injuries = inj; keys.push('injuries'); }
     }
     if (ss.nutrition?.currentSupplements?.length) {
       const sups = (ss.nutrition.currentSupplements as any[]).map(su => su.id || String(su)).filter(Boolean);
@@ -182,16 +149,7 @@ export function syncBioStackToMain(p: BioStackProfile): void {
     if (p.weight) s.personal = { ...s.personal, weight: p.weight };
     if (p.height) s.personal = { ...s.personal, height: p.height };
     if (p.sex) s.personal = { ...s.personal, sex: p.sex };
-    if (p.experience) s.training = { ...(s.training || {}), level: p.experience };
-    if (p.healthConditions?.length) s.health = { ...(s.health || {}), chronicConditions: p.healthConditions };
     if (p.drugAllergies?.length) s.health = { ...s.health, drugAllergies: p.drugAllergies };
-    if (p.injuries?.length) {
-      const existing: any[] = s.health?.injuries || [];
-      const mapped = p.injuries
-        .filter(loc => !existing.some(e => (e.location || '') === loc))
-        .map(loc => ({ id: 'bs_' + loc, type: 'joint', location: loc, painLevel: 0, movementLimit: 'none', side: 'both', chronic: true }));
-      if (mapped.length) s.health = { ...s.health, injuries: [...existing, ...mapped] };
-    }
     if (p.currentMeds?.length) {
       s.nutrition = { ...(s.nutrition || {}), currentMedications: p.currentMeds.map(m => ({ id: m, name: m, doseMg: 0, doseUnit: 'mg' as const, frequency: 'daily' as const })) };
     }

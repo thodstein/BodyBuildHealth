@@ -23,16 +23,7 @@ const CNS_SYMPTOMS = [
 ];
 
 const SEX_OPTS = [{ v: 'male', l: 'Муж' }, { v: 'female', l: 'Жен' }];
-const EXP_OPTS = [{ v: 'beginner', l: 'Новичок' }, { v: 'intermediate', l: 'Средний' }, { v: 'advanced', l: 'Продвинутый' }];
-const HEALTH_OPTS = [
-  { v: 'liver', l: 'Печень' }, { v: 'kidney', l: 'Почки' }, { v: 'heart', l: 'Сердце' },
-  { v: 'thyroid', l: 'Щитовидная' }, { v: 'stomach', l: 'ЖКТ' }, { v: 'diabetes', l: 'Диабет' },
-  { v: 'autoimmune', l: 'Аутоиммунное' }, { v: 'pressure_high', l: 'Гипертония' },
-];
-
 const SUPP_OPTS = Object.keys(SUPPORT_CATALOG_DATA).map(id => ({ v: id, l: ((SUPPORT_CATALOG_DATA as any)[id]?.name) || id }));
-const ORGAN_OPTS = Object.entries(ORGAN_LABELS as Record<string, string>).map(([v, l]) => ({ v, l }));
-const SYSTEM_OPTS = Object.entries(SYSTEM_LABELS_CATALOG as Record<string, string>).map(([v, l]) => ({ v, l }));
 
 /* ============================ UI-примитивы ============================ */
 
@@ -193,12 +184,10 @@ function ProfileTab(props: {
 
   const comp = useMemo(() => getProfileCompleteness(p), [p]);
 
-  const injuryCount = (p.injuries || []).length;
   const supCount = (p.currentSupplements || []).length;
   const medCount = (p.currentMeds || []).length;
   const avoidSup = (p.avoidIds || []).length;
   const avoidMed = (p.avoidMeds || []).length;
-  const labCount = (lab || []).length;
   const jointCount = (p.jointSymptoms || []).length;
   const neuroCount = (p.neuroSymptoms || []).length;
   const cnsCount = (p.cnsSymptoms || []).length;
@@ -211,7 +200,7 @@ function ProfileTab(props: {
           <div>
             <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: -0.4 }}>🧬 Профиль BioStack</div>
             <div style={{ ...dim, fontSize: 12.5, marginTop: 3 }}>
-              {p.sex === 'female' ? 'Жен' : 'Муж'} · {EXP_OPTS.find(e => e.v === p.experience)?.l || '—'} · {p.age || '?'} лет · {p.weight || '?'} кг · {p.height || '?'} см
+              {p.sex === 'female' ? 'Жен' : 'Муж'} · {p.age || '?'} лет · {p.weight || '?'} кг · {p.height || '?'} см
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -226,7 +215,7 @@ function ProfileTab(props: {
       </div>
 
       {/* Личные данные */}
-      <Section icon="👤" title="Личные данные" filled={!!(p.age && p.weight && p.height && p.sex && p.experience)} onAuto={autoFill}>
+      <Section icon="👤" title="Личные данные" filled={!!(p.age && p.weight && p.height && p.sex)} onAuto={autoFill}>
         <div style={{ marginBottom: 14 }}>
           <div style={rowLabel}>Пол</div>
           <Selector options={SEX_OPTS} value={p.sex} onChange={v => setOne('sex', v)} />
@@ -236,26 +225,10 @@ function ProfileTab(props: {
           <NumRow label="Вес, кг" value={p.weight} placeholder="80" onChange={v => setNum('weight', v)} />
           <NumRow label="Рост, см" value={p.height} placeholder="175" onChange={v => setNum('height', v)} />
         </div>
-        <div>
-          <div style={rowLabel}>Уровень подготовки</div>
-          <Selector options={EXP_OPTS} value={p.experience} onChange={v => setOne('experience', v)} />
-        </div>
-      </Section>
-
-      {/* Здоровье */}
-      <Section icon="🩺" title="Здоровье" filled={!!(p.healthConditions?.length || p.drugAllergies?.length)} onAuto={autoFill}>
         <div style={{ marginBottom: 14 }}>
-          <div style={rowLabel}>Состояния здоровья{(p.healthConditions || []).length ? ` · ${p.healthConditions.length}` : ''}</div>
-          <Chips options={HEALTH_OPTS} selected={p.healthConditions || []} onToggle={v => toggle('healthConditions', v)} />
-        </div>
-        <div>
           <div style={rowLabel}>Аллергии на препараты{(p.drugAllergies || []).length ? ` · ${p.drugAllergies.length}` : ''}</div>
           <TagInput values={p.drugAllergies || []} onChange={v => u({ drugAllergies: v })} placeholder="Напр. Пенициллин" />
         </div>
-      </Section>
-
-      {/* Симптомы и травмы */}
-      <Section icon="🤕" title="Симптомы и травмы" filled={!!(jointCount || neuroCount || cnsCount || injuryCount)} onAuto={autoFill}>
         <div style={{ marginBottom: 14 }}>
           <div style={rowLabel}>Симптомы суставов / связок{jointCount ? ` · ${jointCount}` : ''}</div>
           <Checklist options={JOINT_SYMPTOMS} selected={p.jointSymptoms || []} onToggle={v => toggle('jointSymptoms', v)} />
@@ -268,22 +241,17 @@ function ProfileTab(props: {
           <div style={rowLabel}>Симптомы ЦНС{cnsCount ? ` · ${cnsCount}` : ''}</div>
           <Checklist options={CNS_SYMPTOMS} selected={p.cnsSymptoms || []} onToggle={v => toggle('cnsSymptoms', v)} />
         </div>
-        <div>
-          <div style={rowLabel}>Травмы{injuryCount ? ` · ${injuryCount}` : ''}</div>
-          <TagInput values={p.injuries || []} onChange={v => u({ injuries: v })} placeholder="Локация (напр. Плечо)" />
-        </div>
-      </Section>
-
-      {/* Органы и системы */}
-      <Section icon="🫀" title="Органы и системы" filled={!!(p.targetOrgans?.length || p.targetSystems?.length)} onAuto={autoFill}>
-        <div style={{ marginBottom: 14 }}>
-          <div style={rowLabel}>Органы-мишени{(p.targetOrgans || []).length ? ` · ${p.targetOrgans.length}` : ''}</div>
-          <Chips options={ORGAN_OPTS} selected={p.targetOrgans || []} onToggle={v => toggle('targetOrgans', v)} />
-        </div>
-        <div>
-          <div style={rowLabel}>Системы организма{(p.targetSystems || []).length ? ` · ${p.targetSystems.length}` : ''}</div>
-          <Chips options={SYSTEM_OPTS} selected={p.targetSystems || []} onToggle={v => toggle('targetSystems', v)} />
-        </div>
+        {!lab || lab.length === 0
+          ? <div style={{ ...dim }}>Данные анализов отсутствуют. Заполните их на вкладке «Лаборатория» — они подтянутся сюда автоматически и будут учтены при подборе.</div>
+          : <div>
+              {lab.map((d: any, i: number) => (
+                <div key={i} style={{ ...GLASS, marginBottom: 8, padding: 12 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{d.date}</div>
+                  <div style={{ ...dim, fontSize: 12.5 }}>{d.totalMarkers} маркеров · аномальных: {d.abnormalCount}</div>
+                  {d.note && <div style={{ ...dim, fontSize: 12.5, marginTop: 4 }}>{d.note}</div>}
+                </div>
+              ))}
+            </div>}
       </Section>
 
       {/* Препараты и ограничения */}
@@ -304,21 +272,6 @@ function ProfileTab(props: {
           <div style={rowLabel}>Исключить аптеку (нежелательна){avoidMed ? ` · ${avoidMed}` : ''}</div>
           <TagInput values={p.avoidMeds || []} onChange={v => u({ avoidMeds: v })} placeholder="Название препарата" />
         </div>
-      </Section>
-
-      {/* Лаборатория */}
-      <Section icon="🧪" title="Лаборатория" filled={labCount > 0} onAuto={autoFill}>
-        {!lab || lab.length === 0
-          ? <div style={{ ...dim }}>Данные анализов отсутствуют. Заполните их на вкладке «Лаборатория» — они подтянутся сюда автоматически и будут учтены при подборе.</div>
-          : <div>
-              {lab.map((d: any, i: number) => (
-                <div key={i} style={{ ...GLASS, marginBottom: 8, padding: 12 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{d.date}</div>
-                  <div style={{ ...dim, fontSize: 12.5 }}>{d.totalMarkers} маркеров · аномальных: {d.abnormalCount}</div>
-                  {d.note && <div style={{ ...dim, fontSize: 12.5, marginTop: 4 }}>{d.note}</div>}
-                </div>
-              ))}
-            </div>}
       </Section>
     </div>
   );

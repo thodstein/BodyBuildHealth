@@ -198,50 +198,27 @@ const DEFAULT_STATE: CalculatorState = {
 /* ------------------------------------------------------------------ *
  *  Маппинг профиля BioStack → contraindications калькулятора
  * ------------------------------------------------------------------ */
-const HEALTH_TO_CONTRA: Record<string, keyof CalculatorState['contraindications']> = {
-  heart: 'hasCVD',
-  cardiovascular: 'hasCVD',
-  cvd: 'hasCVD',
-  diabetes: 'hasDiabetes',
-  kidney: 'hasKidneyDisease',
-  renal: 'hasKidneyDisease',
-  liver: 'hasLiverDisease',
-  hepatic: 'hasLiverDisease',
-  gi: 'hasGI',
-  gastro: 'hasGI',
-  prostate: 'hasProstateIssues',
-  epilepsy: 'hasEpilepsy',
-  seizure: 'hasEpilepsy',
-  mental: 'hasMentalIllness',
-  psychiatric: 'hasMentalIllness',
-  thrombophilia: 'hasThrombophilia',
-  clotting: 'hasThrombophilia',
-};
-
 function mapProfileToContraindications(
   profile: BioStackProfile,
   base: CalculatorState['contraindications'],
 ): CalculatorState['contraindications'] {
   const out: CalculatorState['contraindications'] = { ...base };
-  for (const c of profile.healthConditions || []) {
-    const key = HEALTH_TO_CONTRA[c.toLowerCase()];
-    if (key) (out as any)[key] = true;
-  }
   if (profile.drugAllergies && profile.drugAllergies.length) {
     out.allergies = (out.allergies ? out.allergies + ', ' : '') + profile.drugAllergies.join(', ');
   }
   return out;
 }
 
-/** Приоритет цели BioStack → режимы подбора калькулятора.
- *  Цели (goals) удалены из профиля — режимы выводятся из выбранных систем организма. */
+/** Приоритет симптомов BioStack → режимы подбора калькулятора.
+ *  Суставной режим — при наличии суставных жалоб,
+ *  нейро-режим — при нейро-/ЦНС-симптомах. */
 function mapGoalsToModes(profile: BioStackProfile): {
   jointMode: boolean;
   neuroMode: boolean;
 } {
-  const systems = profile.targetSystems || [];
-  const joint = systems.includes('musculoskeletal');
-  const neuro = systems.some((s) => ['neuro', 'nero', 'endocrine'].includes(s));
+  const joint = (profile.jointSymptoms || []).some(s => !!s && s.trim().length > 0);
+  const neuro = (profile.neuroSymptoms || []).some(s => !!s && s.trim().length > 0)
+    || (profile.cnsSymptoms || []).some(s => !!s && s.trim().length > 0);
   return { jointMode: joint, neuroMode: neuro };
 }
 

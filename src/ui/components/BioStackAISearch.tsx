@@ -147,16 +147,15 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
 
   const profileRelevantIds = useMemo(() => {
     if (!profileOnly) return null;
-    const m: Record<string, RecGoal> = {
-      cardio: 'longevity', hepatic: 'detox', renal: 'detox', neuro: 'focus',
-      endocrine: 'libido', hematologic: 'recovery', reproductive: 'libido', musculoskeletal: 'joints',
-    };
-    const recGoals = [
-      ...(profile.targetSystems || []).map(s => m[s] || 'immunity'),
-      ...(profile.targetOrgans || []).map(o => m[o] || 'immunity'),
-    ].filter(Boolean) as RecGoal[];
-    if (recGoals.length === 0) return null;
-    const results = searchBioStack({ goals: recGoals, limit: 200 }, profile);
+    const goals: RecGoal[] = [];
+    if (profile.jointSymptoms?.length) goals.push('joints');
+    if (profile.neuroSymptoms?.length) goals.push('stress');
+    if (profile.cnsSymptoms?.length) goals.push('focus');
+    if (profile.drugAllergies?.length) goals.push('detox');
+    if (profile.currentMeds?.length) goals.push('recovery');
+    if (profile.currentSupplements?.length) goals.push('immunity');
+    if (goals.length === 0) return null;
+    const results = searchBioStack({ goals, limit: 200 }, profile);
     const scores = new Map<string, number>();
     results.forEach(r => scores.set(r.id, r.score));
     return scores;

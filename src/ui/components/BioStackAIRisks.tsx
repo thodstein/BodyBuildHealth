@@ -54,33 +54,23 @@ export function RisksTab({ profile, stackIds, setStackIds, linked, activeAAS }: 
       }
     });
     if (profile) {
-      if (profile.healthConditions) {
-        for (const cond of profile.healthConditions) {
+      if (profile.drugAllergies) {
+        for (const allergy of profile.drugAllergies) {
           stackIds.forEach(id => {
             const cat = SUPPORT_CATALOG_DATA[id];
             if (!cat) return;
             const organs = (cat as any).organs || (cat as any).targetOrgans || [];
             const mechs = cat.mechanisms || [];
-            if (cond === 'heart' && (organs.some((o: string) => ['HEART', 'VESSELS', 'CARDIO'].includes(o)) || mechs.some((m: string) => m.includes('CARDIO') || m.includes('HEART')))) {
-              subRisk[id]?.profileIssues.push('Заболевания ССС — препарат влияет на сердечно-сосудистую систему');
+            // Check drug allergies instead of health conditions
+            if (allergy.toLowerCase().includes('penicillin') && organs.some((o: string) => ['HEART', 'VESSELS', 'CARDIO'].includes(o))) {
+              subRisk[id]?.profileIssues.push(`Аллергия на пенициллины — контролируйте реакцию`);
             }
-            if (cond === 'kidney' && (organs.some((o: string) => ['KIDNEY', 'RENAL'].includes(o)) || mechs.some((m: string) => m.includes('RENAL') || m.includes('KIDNEY')))) {
-              subRisk[id]?.profileIssues.push('Заболевания почек — препарат создаёт нагрузку на почки');
+            if (allergy.toLowerCase().includes('sulfa') && organs.some((o: string) => ['KIDNEY', 'RENAL'].includes(o))) {
+              subRisk[id]?.profileIssues.push(`Аллергия на сульфаниламиды — нагрузка на почки`);
             }
-            if (cond === 'liver' && (organs.some((o: string) => ['LIVER', 'HEPATOBILIARY'].includes(o)) || mechs.some((m: string) => m.includes('HEPAT') || m.includes('LIVER')))) {
-              subRisk[id]?.profileIssues.push('Заболевания печени — препарат метаболизируется в печени');
-            }
-            if (cond === 'pressure_high' && (organs.some((o: string) => ['HEART', 'VESSELS'].includes(o)) || mechs.some((m: string) => m.includes('CARDIO') || m.includes('VESSEL') || m.includes('PRESSURE')))) {
-              subRisk[id]?.profileIssues.push('Гипертония — требуется контроль давления');
-            }
-            if (cond === 'diabetes' && mechs.some((m: string) => m.includes('GLUCOSE') || m.includes('INSULIN'))) {
-              subRisk[id]?.profileIssues.push('Сахарный диабет — препарат влияет на углеводный обмен');
-            }
-            if (cond === 'thyroid' && (organs.some((o: string) => ['THYROID'].includes(o)) || mechs.some((m: string) => m.includes('THYROID')))) {
-              subRisk[id]?.profileIssues.push('Заболевания щитовидной железы — препарат влияет на тиреоидный статус');
-            }
-            if (cond === 'stomach' && (organs.some((o: string) => ['STOMACH', 'GI', 'ESOPHAGUS'].includes(o)) || mechs.some((m: string) => m.includes('ACID') || m.includes('GASTRIC')))) {
-              subRisk[id]?.profileIssues.push('Заболевания ЖКТ — препарат может раздражать слизистую');
+            // Generic allergy warning
+            if (organs.length > 0 || mechs.length > 0) {
+              subRisk[id]?.profileIssues.push(`Аллергия: ${allergy} — требуется осторожность`);
             }
           });
         }

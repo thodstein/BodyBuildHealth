@@ -325,10 +325,10 @@ export function StatBox({ label, value, color, sub }: { label: string; value: st
 export function toFinderProfile(bp: BioStackProfile): FinderProfile {
   return {
     age: bp.age, weight: bp.weight, height: bp.height, sex: bp.sex,
-    experience: bp.experience,
+    experience: 'intermediate',
     goals: [],
     aasStatus: 'none',
-    healthConditions: bp.healthConditions,
+    healthConditions: [],
     budget: 'medium', avoidIds: bp.avoidIds, maxStackSize: 8,
   };
 }

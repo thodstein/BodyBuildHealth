@@ -77,17 +77,13 @@ function buildTimingAdvice(ids: string[]): string[] {
 
 function checkProfileContraindications(ids: string[], profile: BioStackProfile) {
   const issues: Array<{ id: string; name: string; issue: string }> = [];
-  if (!profile?.healthConditions?.length) return issues;
+  if (!profile?.drugAllergies?.length) return issues;
   ids.forEach(id => {
     const e = SUPPORT_CATALOG_DATA[id]; if (!e?.contraindications?.length) return;
     const name = e.nameRu || e.name || id;
     const c = e.contraindications.map((x: string) => x.toLowerCase());
-    profile.healthConditions!.forEach(cond => {
-      if (cond === 'heart' && c.some(x => x.includes('серд') || x.includes('cardio') || x.includes('pressure'))) issues.push({ id, name, issue: 'Противопоказан при заболеваниях ССС' });
-      if (cond === 'kidney' && c.some(x => x.includes('почк') || x.includes('kidney') || x.includes('renal'))) issues.push({ id, name, issue: 'Противопоказан при заболеваниях почек' });
-      if (cond === 'liver' && c.some(x => x.includes('печен') || x.includes('liver') || x.includes('hepat'))) issues.push({ id, name, issue: 'Противопоказан при заболеваниях печени' });
-      if (cond === 'diabetes' && c.some(x => x.includes('диабет') || x.includes('diabet') || x.includes('glucose'))) issues.push({ id, name, issue: 'Противопоказан при сахарном диабете' });
-      if (cond === 'stomach' && c.some(x => x.includes('желуд') || x.includes('ulcer') || x.includes('gastr'))) issues.push({ id, name, issue: 'Противопоказан при заболеваниях ЖКТ' });
+    profile.drugAllergies!.forEach(allergy => {
+      if (c.some(x => x.includes(allergy.toLowerCase()))) issues.push({ id, name, issue: `Противопоказан при аллергии на ${allergy}` });
     });
   });
   return issues;
@@ -827,9 +823,9 @@ export function CompareTab({ profile, stackIds, setStackIds, linked }: { profile
                   lines.push(`⚖ Стеки примерно равнозначны.`);
                   lines.push(`💡 Выберите по бюджету: A (${curCost}₽) vs B (${bCost}₽).`);
                 }
-                if (profile.healthConditions && profile.healthConditions.length > 0) {
+                if (profile.drugAllergies && profile.drugAllergies.length > 0) {
                   lines.push('');
-                  lines.push(`👤 Учитывая: ${profile.healthConditions.join(', ')} — проверьте на вкладке «Риски».`);
+                  lines.push(`👤 Учитывая аллергии: ${profile.drugAllergies.join(', ')} — проверьте на вкладке «Риски».`);
                 }
                 return lines.join('\n');
               })()}

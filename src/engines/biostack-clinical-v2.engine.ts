@@ -90,23 +90,6 @@ export interface AbsoluteContraindication {
   source: 'condition' | 'med' | 'allergy' | 'avoid';
 }
 
-const CONDITION_KEYWORDS: Record<string, string[]> = {
-  liver: ['печен', 'гепат', 'цироз', 'желч', 'холе', 'билиарн'],
-  kidney: ['почк', 'нефр', 'еГФР', 'хпн', 'клиренс', 'егфр'],
-  heart: ['серд', 'карди', 'сердечн', 'клапан', 'миокард', 'кардиомиопат'],
-  thyroid: ['щитов', 'тирео', 'гипертиреоз', 'гипотиреоз'],
-  stomach: ['желуд', 'язв', 'жкт', 'жкб', 'гастр'],
-  pressure_high: ['гипертенз', 'давлен выс', 'гипертони', 'гипертен'],
-  pressure_low: ['гипотенз', 'давлен низ', 'гипотони'],
-  diabetes: ['диабет', 'сахарн', 'гликем'],
-  autoimmune: ['аутоим', 'иммуносупр', 'иммуносупресс'],
-  pregnancy: ['беременн', 'лактац', 'кормлен', 'грудн', 'гестац'],
-  bipolar: ['биполяр', 'маниакальн', 'мани', 'психоз', 'аффективн'],
-  glaucoma: ['глауком', 'внутриглазн', 'офтальмотонус'],
-  asthma: ['астм', 'бронхоспазм', 'бронхиальн', 'обструктивн'],
-  epilepsy: ['эпилепс', 'судорог', 'припад', 'порог судорожн'],
-};
-
 function buildUserMedTokens(p: BioStackProfile): string[] {
   const meds = [...(p.currentMeds || []), ...(p.avoidMeds || [])];
   const tokens: string[] = [];
@@ -141,17 +124,7 @@ export function checkAbsoluteContraindications(
     let hit: AbsoluteContraindication | null = null;
     for (const line of ci) {
       const low = line.toLowerCase();
-      // condition match (structured by HealthCondition code):
-      // a catalog contraindication line maps to a condition code via the
-      // same keyword families used for user profiling, so detection is
-      // code-based rather than requiring a magic ABSOLUTE_MARKERS token.
-      for (const code of (profile.healthConditions || []) as string[]) {
-        const kws = CONDITION_KEYWORDS[code] || [];
-        if (kws.some(kw => low.includes(kw))) {
-          hit = { substanceId: id, substanceName: nameOf(id), reason: `Противопоказано при состоянии «${code}»: «${line}»`, source: 'condition' };
-          break;
-        }
-      }
+      // condition match removed: healthConditions исключён из профиля BioStack
       if (hit) break;
       // med match
       for (const tok of medTokens) {
@@ -470,9 +443,6 @@ export function findMeaningfulReplacement(
   if (!analogs.length) return null;
 
   const condKw = new Set<string>();
-  for (const code of (profile.healthConditions || []) as string[]) {
-    for (const kw of (CONDITION_KEYWORDS[code] || [])) condKw.add(kw);
-  }
   const medTokens = buildUserMedTokens(profile);
   const avoidSet = new Set([...(profile.avoidIds || []), ...excludedIds].map(a => a.toLowerCase()));
 

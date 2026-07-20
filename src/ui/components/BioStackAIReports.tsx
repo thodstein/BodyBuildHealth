@@ -137,9 +137,7 @@ export function ReportsTab({ profile, stackIds, linked }: { profile: BioStackPro
       lines.push(`  • Возраст: ${profile.age || '—'}`);
       lines.push(`  • Пол: ${profile.sex === 'male' ? 'Мужской' : profile.sex === 'female' ? 'Женский' : '—'}`);
       lines.push(`  • Вес: ${profile.weight || '—'} кг • Рост: ${profile.height || '—'} см`);
-      lines.push(`  • Стаж: ${profile.experience || '—'} лет`);
-      lines.push(`  • Системы организма: ${(profile.targetSystems || []).join(', ') || '—'}`);
-      lines.push(`  • Состояния: ${(profile.healthConditions || []).join(', ') || '—'}`);
+      lines.push(`  • Аллергии: ${(profile.drugAllergies || []).join(', ') || '—'}`);
       lines.push(`  • Принимаемые препараты: ${(profile.currentMeds || []).join(', ') || '—'}`);
       lines.push('');
       lines.push('💊 ТЕКУЩИЙ СТЕК ПОДДЕРЖКИ:');

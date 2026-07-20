@@ -25,8 +25,8 @@ export function ExportTab({ profile, stackIds, setStackIds, linked }: { profile:
     const L: string[] = [];
     L.push(`💊 БИОСТАК — ПЛАН ПОДДЕРЖКИ`);
     L.push(`Дата: ${new Date().toLocaleDateString('ru-RU')}`);
-    L.push(`Профиль: уровень ${profile.experience || '—'} · системы: ${(profile.targetSystems || []).join(', ') || '—'}`);
-    if (profile.healthConditions?.length) L.push(`Здоровье: ${profile.healthConditions.join(', ')}`);
+    L.push(`Профиль: пол ${profile.sex === 'female' ? 'Жен' : 'Муж'} · ${profile.age || '?'} лет · ${profile.weight || '?'} кг · ${profile.height || '?'} см`);
+    if (profile.drugAllergies?.length) L.push(`Аллергии: ${profile.drugAllergies.join(', ')}`);
     L.push(``);
     L.push(`📋 СОСТАВ (${stackIds.length} в-в, ~${total}₽/мес):`);
     stackIds.forEach((id, i) => {
