@@ -16,6 +16,7 @@ import { ProfileDiariesSection } from './ProfileScreen_parts/ProfileDiariesSecti
 import { ProfileAnalyticsSection } from './ProfileScreen_parts/ProfileAnalyticsSection';
 import { ProfileContactsSection } from './ProfileScreen_parts/ProfileContactsSection';
 import { ProfileDataHub } from './ProfileScreen_parts/ProfileDataHub';
+import { DataBackupSection } from './ProfileScreen_parts/DataBackupSection';
 import { theme, SectionTitle } from './ProfileScreen_parts/ProfileComponents';
 
 type ProfileTab = 'overview' | 'lifestyle' | 'diet' | 'health' | 'training' | 'diaries' | 'data' | 'analytics' | 'contacts';
@@ -242,16 +243,19 @@ export const ProfileScreen: React.FC<{ onNavigate?: (screen: string) => void }> 
       {tab === 'diet' && <ProfileDietSection settings={settings} save={save} />}
       {tab === 'training' && <ProfileTrainingSection settings={settings} save={save} calcData={calcData} upCalc={upCalc} toggleWeakPoint={toggleWeakPoint} />}
       {tab === 'diaries' && <ProfileDiariesSection settings={settings} save={save} labs={labs} workoutLogs={workoutLogs} onNavigate={onNavigate} />}
-      {tab === 'data' && (
-        <ProfileDataHub
-          settings={settings}
-          labs={labs}
-          workoutLogs={workoutLogs}
-          foodDiaryAvg={foodDiaryAvg}
-          onOpenProfileTab={(t: string) => openSection(t as ProfileTab)}
-          onNavigate={onNavigate}
-        />
-      )}
+       {tab === 'data' && (
+         <>
+           <ProfileDataHub
+             settings={settings}
+             labs={labs}
+             workoutLogs={workoutLogs}
+             foodDiaryAvg={foodDiaryAvg}
+             onOpenProfileTab={(t: string) => openSection(t as ProfileTab)}
+             onNavigate={onNavigate}
+           />
+           <DataBackupSection />
+         </>
+       )}
       {tab === 'analytics' && <ProfileAnalyticsSection settings={settings} save={save} labs={labs} workoutLogs={workoutLogs} foodDiaryAvg={foodDiaryAvg} profileName={profile.name} onNavigate={onNavigate} />}
       {tab === 'contacts' && <ProfileContactsSection settings={settings} profileName={profile.name} onNavigate={onNavigate} />}
     </InfoErrorBoundary>

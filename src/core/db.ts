@@ -1,7 +1,7 @@
 const DB_NAME = 'HealthEngineDB_v3';
 const DB_VERSION = 6;
 
-const STORES = ['users',
+export const STORES = ['users',
   'profile', 'readiness_log', 'risk_log', 'fertility_log', 'settings',
   'labs_log', 'diagnostics_log', 'phase_schedule', 'diary', 'articles',
   'gamification', 'marketplace_cart', 'food_diary', 'sync_queue',
