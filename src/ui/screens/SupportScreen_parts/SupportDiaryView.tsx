@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import { getSubstanceName } from '../../../engines/stack-optimizer.engine';
 import { ComplaintsTab } from './ComplaintsTab';
+import { SupplementComplianceCard } from './SupplementComplianceCard';
 
 const DIARY_KEY = 'he_support_diary';
 
@@ -374,7 +375,7 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
   const [complianceNotes, setComplianceNotes] = useState('');
   const [mood, setMood] = useState<MoodLevel>(3);
   const [viewDate, setViewDate] = useState(todayStr);
-  const [tab, setTab] = useState<'today' | 'week' | 'history' | 'stats' | 'complaints'>('today');
+  const [tab, setTab] = useState<'today' | 'week' | 'history' | 'stats' | 'complaints' | 'compliance'>('today');
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [filterText, setFilterText] = useState('');
   const [showSideEffects, setShowSideEffects] = useState<Record<string, boolean>>({});
@@ -573,6 +574,7 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
           ['history', '📊 История'],
           ['stats', '📈 Статистика'],
           ['complaints', '🩺 Жалобы'],
+          ['compliance', '📋 Комплаенс'],
         ].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id as any)} style={sx.pill(tab === id)}>{label}</button>
         ))}
@@ -1027,6 +1029,7 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
 
       {/* ═══════════════ COMPLAINTS TAB ═══════════════ */}
       {tab === 'complaints' && <ComplaintsTab onOpenSolver={onOpenSolver} />}
+      {tab === 'compliance' && <SupplementComplianceCard />}
 
       {addModal && <AddSubstanceModal onPick={addSubstance} onClose={() => setAddModal(false)} />}
     </div>
