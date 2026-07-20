@@ -124,6 +124,10 @@ const MAX_GRAM_PER_ITEM = 500;
 // buckwheat to ~700g portions (capped only at the global 500g) — an absurd single bowl.
 // Cap grains at 280g per meal; if the carb target needs more, a second carb source is added.
 const MAX_GRAIN_GRAM_PER_MEAL = 280;
+// D-21: realistic dry-grain portion ceiling. Grains/pasta are tracked DRY (~64-83g carbs/100g),
+// so a normal large portion is ~100-150g dry (~300-400g cooked). 150g dry ~ 90-120g carbs — a
+// big but sane single bowl; more than that splits into a second carb source (D-18b).
+const MAX_DRY_GRAIN_GRAM_PER_MEAL = 150;
 
 // D-18: realistic per-portion ceiling for a carb source. Low-density cooked starches
 // (grains ~12-28g/100g, potato ~17-21g, cooked pasta) need huge gram portions to hit a
@@ -132,7 +136,13 @@ const MAX_GRAIN_GRAM_PER_MEAL = 280;
 // global MAX_GRAM_PER_ITEM ceiling. Threshold: <30g carbs/100g = "cooked starch" bowl.
 function carbPortionCap(food: FoodItem): number {
   const carbPer100 = food.carbs || 0;
-  if (carbPer100 > 0 && carbPer100 < 30) return MAX_GRAIN_GRAM_PER_MEAL;
+  // D-18 + D-21: grains/pasta are now tracked DRY (bodybuilding rule) — carb density
+  // ~64-83g/100g. A realistic dry portion is ~150g (~400g cooked bowl), so cap dense
+  // dry cereals at 150g. Low-density cooked starches that are still cooked-weight
+  // (potato, corn on the cob ~17-21g/100g) keep the 280g cooked cap. Bread and other
+  // ready-to-eat medium-density carbs keep the global 500g ceiling.
+  if (carbPer100 >= 55) return MAX_DRY_GRAIN_GRAM_PER_MEAL;   // dry grains/pasta
+  if (carbPer100 > 0 && carbPer100 < 30) return MAX_GRAIN_GRAM_PER_MEAL; // cooked starch (potato)
   return MAX_GRAM_PER_ITEM;
 }
 
@@ -527,7 +537,15 @@ function buildWholeMeal(
     const carbPool = prefCarb.length > 0 ? prefCarb : pool.carbSlow;
     // Prefer common carbs (rice, oats, buckwheat, potato, pasta) over exotic ones
     const commonCarbs = carbPool.filter(f => COMMON_CARB_IDS.has(f.id));
-    const carbSource = pickPriority(commonCarbs.length > 0 ? commonCarbs : carbPool, seed + 1, { lockedIds, recentIds });
+    // GL-aware: при высокой углеводной цели (>=60g) выбираем источники с наименьшим GI,
+    // чтобы удержать пер-приёмную гликемическую нагрузку (GL = GI×carbs/100) в зелёной зоне (<25).
+    let carbPickPool = commonCarbs.length > 0 ? commonCarbs : carbPool;
+    if (carbTarget >= 60 && !lockedIds?.size) {
+      const byGI = [...carbPickPool].sort((a,b) => (a.gi||55) - (b.gi||55));
+      // берём 3 самых низко-GI (fallback на полный пул, если их мало)
+      carbPickPool = byGI.slice(0, 3).length >= 2 ? byGI.slice(0, 3) : carbPickPool;
+    }
+    const carbSource = pickPriority(carbPickPool, seed + 1, { lockedIds, recentIds });
 // Fix 1 completion (preserve conditional) - lines 371 & 470 converted to exact COMMON_CARB_IDS.has(f.id)
      // Lines 371 & 470 now use exact Set membership check (removed substring.includes)
      // Debug: verify both lines use exact Set.has (UTF-8 safe)
@@ -866,12 +884,16 @@ function pickRotationsForDay(dayOffset: number, randomSalt: number, count: numbe
   const vegValid = new Set([4, 6, 7]);
   if (isVegetarian) { result.push(PROTEIN_ROTATION[7]); used.add(7); }
   else { result.push(PROTEIN_ROTATION[1]); used.add(1); }
+  // D-20: legumes (index 7 = Веган/бобовые) are a vegetarian fallback only.
+  // For non-vegetarian bodybuilders, assigning legumes as a main protein rotation
+  // (esp. dinner) produces a low-DIAAS, carb-heavy "kasha" meal instead of quality
+  // animal protein. Exclude index 7 from the non-veg rotation candidate set entirely.
   for (let i = 1; i < count; i++) {
     const seed = Math.abs(dayOffset * 10007 + randomSalt * 777 + i * 31);
     let idx = Math.floor(seededRandom(seed) * PROTEIN_ROTATION.length) % PROTEIN_ROTATION.length;
     let attempts = 0;
-    while ((used.has(idx) || (isVegetarian && !vegValid.has(idx))) && attempts < PROTEIN_ROTATION.length) { idx = (idx + 1) % PROTEIN_ROTATION.length; attempts++; }
-    if (!used.has(idx) && (!isVegetarian || vegValid.has(idx))) {
+    while ((used.has(idx) || (isVegetarian && !vegValid.has(idx)) || (!isVegetarian && idx === 7)) && attempts < PROTEIN_ROTATION.length) { idx = (idx + 1) % PROTEIN_ROTATION.length; attempts++; }
+    if (!used.has(idx) && (!isVegetarian || vegValid.has(idx)) && !(idx === 7 && !isVegetarian)) {
       used.add(idx);
       result.push(PROTEIN_ROTATION[idx]);
     }
@@ -901,7 +923,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Д-14: pre-sleep only if there is a real gap (>=150 min) between dinner and bed, otherwise the
   // dinner already covers the night MPS window and a second protein meal is redundant.
   const _dinnerToBedGap = (() => { try { const [dh, dm] = tDinner.split(':').map(Number); const [bh, bm] = tBed.split(':').map(Number); return ((bh * 60 + bm) - (dh * 60 + dm) + 1440) % 1440; } catch { return 240; } })();
-  const wantPreSleep = input.mealsCount >= 4 && _dinnerToBedGap >= 150;
+  const wantPreSleep = input.mealsCount >= 3 && _dinnerToBedGap >= 60;
   // Snack time: midpoint between lunch and dinner
   const tSnack = (() => { const [lh, lm] = tLunch.split(':').map(Number); const [dh, dm] = tDinner.split(':').map(Number); const mid = Math.round(((lh*60+lm) + (dh*60+dm)) / 2); return String(Math.floor(mid/60)).padStart(2,'0') + ':' + String(mid%60).padStart(2,'0'); })();
   const variety = input.variety ?? 'max';
@@ -949,6 +971,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const mpsLbm = (input.cyclePhase === 'course' || input.cyclePhase === 'recovery' || input.cyclePhase === 'pct')
     ? MPS_LBM_HIGH : MPS_LBM_LOW;
   const mpsPerMeal = Math.round(input.lbmKg * mpsLbm * (ptm.pMult || 1.0));
+  // D-19: dedicated pre-sleep protein budget (~0.7x MPS per meal = casein scoop + dairy).
+  // Pulled OUT of dinner so dinner becomes lighter and pre-sleep is its own meal, not residual.
+  const preSleepP = wantPreSleep ? Math.max(20, Math.round(mpsPerMeal * 0.7)) : 0;
   const trainWindow = input.isTrainingDay && !!input.trainStartMin;
   // Carb periodization: тренировка → 25% pre+30% post+15% lunch; отдых → 30/30/20
   // Apply plan type multipliers (keto: low carb high fat, highcarb: high carb, etc.)
@@ -996,7 +1021,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const mealBudget = {
     breakfast: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: breakC, f: Math.round(fatTotal * 0.20) },
     lunch: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: (input.eveningLowCarb ? Math.round((trainWindow ? trainCarbLunch : restCarbLunch) * 1.3) : (trainWindow ? trainCarbLunch : restCarbLunch)), f: Math.round(fatTotal * 0.15) },
-    dinner: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: input.eveningLowCarb ? Math.round((trainWindow ? trainCarbDinner : restCarbDinner) * 0.5) : (trainWindow ? trainCarbDinner : restCarbDinner), f: Math.max(8, Math.round(fatTotal * 0.22) - preSleepFatG) },
+    dinner: { p: Math.max(20, Math.round(mpsPerMeal * 1.2) - preSleepP), c: input.eveningLowCarb ? Math.round((trainWindow ? trainCarbDinner : restCarbDinner) * 0.5) : (trainWindow ? trainCarbDinner : restCarbDinner), f: Math.max(8, Math.round(fatTotal * 0.22) - preSleepFatG) },
     prew: trainWindow ? { p: PREW_PROTEIN_G, c: prewCarbG, f: PREW_FAT_MAX_G } : null,
     postw: trainWindow ? { p: POSTW_FAST_PROTEIN_G, c: postwCarbG, f: 0 } : null,
     snack: hasSnack ? { p: snackP, c: snackC, f: snackF } : null,
@@ -1150,7 +1175,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // 7. Pre-sleep — казеин + Mg + мелатонин ───────────────────────────────
   const preSleepSeed = seedBase + 7 + randomSalt * 13;
-  const preSleep = wantPreSleep ? buildPreSleep(tPreSleep, preSleepSeed, pool, residualP, { lockedIds: input.lockedIds, recentIds: effRecentIds() }) : null;
+  const preSleep = wantPreSleep ? buildPreSleep(tPreSleep, preSleepSeed, pool, Math.max(residualP, preSleepP), { lockedIds: input.lockedIds, recentIds: effRecentIds() }) : null;
   if (preSleep) { meals.push(preSleep); markUsed(preSleep); notes.push('Pre-sleep: казеин + Mg + мелатонин-источник для ночного восстановления'); }
 
   // Sort meals by time (chronological order)

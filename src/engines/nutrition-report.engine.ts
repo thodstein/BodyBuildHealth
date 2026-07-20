@@ -41,6 +41,9 @@ export interface NutritionReport {
   mealTiming: { mealCount: number; longestGapHours: number; hasPreWorkout: boolean; hasPostWorkout: boolean; eveningCarbOk: boolean; proteinSpreadOk: boolean; gaps: string[]; recommendation: string };
   fiberAnalysis: { totalG: number; targetG: number; pct: number; status: 'ok' | 'low' | 'critical'; recommendation: string };
   calciumMagnesium: { caMg: number; mgMg: number; ratio: number; targetRatio: number; status: string; recommendation: string };
+  // PRAL — Potential Renal Acid Load (Remer & Manz). Ключевая метрика для высокобелковых диет:
+  // хронический положительный PRAL → закисление, риск камней/деминерализации костей.
+  pral: { mEq: number; status: 'ok' | 'mild' | 'moderate' | 'high'; targetMEq: number; recommendation: string };
 }
 
 const MICRO_TARGETS: Record<string, number> = {
@@ -505,6 +508,26 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
     recommendation: caMgRecs.join(' '),
   };
 
+  // ── 17. PRAL (Potential Renal Acid Load, Remer & Manz 1995) ──
+  // PRAL (mEq/день) = 0.4888×белок(г) + 0.1623×P(мэкв) − 0.8634×K(мэкв) − 0.3202×Ca(мэкв) − 0.4832×Mg(мэкв)
+  // минералы в мэкв: P/31, K/39.1, Ca/20.04, Mg/12.15. Положительный = закисление.
+  const pralProtein = totals.p || 0;
+  const pralP = (microTotals['P'] || 0) / 31;
+  const pralK = (microTotals['K'] || 0) / 39.1;
+  const pralCa = (microTotals['Ca'] || 0) / 20.04;
+  const pralMg = (microTotals['Mg'] || 0) / 12.15;
+  const pralMEq = Math.round((0.4888 * pralProtein + 0.1623 * pralP - 0.8634 * pralK - 0.3202 * pralCa - 0.4832 * pralMg) * 10) / 10;
+  let pralStatus: 'ok' | 'mild' | 'moderate' | 'high' = 'ok';
+  if (pralMEq > 60) pralStatus = 'high';
+  else if (pralMEq > 30) pralStatus = 'moderate';
+  else if (pralMEq > 0) pralStatus = 'mild';
+  let pralRec = '';
+  if (pralStatus === 'high') pralRec = `PRAL ${pralMEq} мэкв/день — сильное закисление. Риск камней/деминерализации костей. Добавьте ощелачивающие: овощи (300+г), фрукты, картофель, бананы; снизьте плотность животного белка, введите 1 раст. приём (бобовые/тофу).`;
+  else if (pralStatus === 'moderate') pralRec = `PRAL ${pralMEq} мэкв/день — умеренное закисление. Добавьте овощи/фрукты к каждому приёму, K из зелени (шпинат, банан).`;
+  else if (pralStatus === 'mild') pralRec = `PRAL ${pralMEq} мэкв/день — слабое закисление, в пределах нормы для силового спорта. Поддерживайте овощи/фрукты.`;
+  else pralRec = `PRAL ${pralMEq} мэкв/день — ощелачивающий рацион, отлично.`;
+  const pral = { mEq: pralMEq, status: pralStatus, targetMEq: 0, recommendation: pralRec };
+
   // ════════════════════════════════════════════════
   // OVERALL GRADE (expanded with all new metrics)
   // ════════════════════════════════════════════════
@@ -518,6 +541,7 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
   if (satPct > 15) gradePenalties += 0.5;
   if (totalGL > 120) gradePenalties += 0.5;
   if (omega6to3ratio !== null && omega6to3ratio > 8) gradePenalties += 0.5;
+  if (pralMEq > 60) gradePenalties += 0.5;
 
   let overallGrade: 'A' | 'B' | 'C' | 'D';
   if (targetPct >= 85 && targetPct <= 115 && deficitCount === 0 && foodQualityScore >= 7 && gradePenalties <= 0.5) overallGrade = 'A';
@@ -561,6 +585,7 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
   if (satPct > 15) recommendations.push(`🥓 ${fatQuality.recommendation}`);
   if (longestGap > 5 || !hasPostWorkout) recommendations.push(`🕐 ${mealTiming.recommendation}`);
   if (fiberStatus !== 'ok') recommendations.push(`🥬 ${fiberAnalysis.recommendation}`);
+  if (pralStatus === 'moderate' || pralStatus === 'high') recommendations.push(`🦴 ${pral.recommendation}`);
   recommendations.push(`🏷 Основная рекомендация: ${overallGradeLabel}`);
 
   return {
@@ -579,5 +604,6 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
     mealTiming,
     fiberAnalysis,
     calciumMagnesium,
+    pral,
   };
 }

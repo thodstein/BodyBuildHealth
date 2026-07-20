@@ -304,6 +304,26 @@ const ReportTab: React.FC = () => {
           </div>}
         </div>
 
+        {/* PRAL — кислотная нагрузка (Remer & Manz). Ключевая метрика для высокобелковых диет. */}
+        {r.pral && <div style={card}>
+          <div style={{ fontSize:9, fontWeight:600, color:'#06b6d4', marginBottom:4 }}>🦴 PRAL — кислотная нагрузка</div>
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>
+            {r.pral.mEq} мэкв/день (цель: ≤0, ощелачивающий)
+          </div>
+          <div style={{ ...barStyle(0), marginTop:2 }}>
+            <div style={{ width:`${Math.min(100, Math.max(0, r.pral.mEq / 100 * 100))}%`, height:'100%', borderRadius:2,
+              background: r.pral.status === 'high' ? '#ef4444' : r.pral.status === 'moderate' ? '#f59e0b' : r.pral.status === 'mild' ? '#22c55e' : '#06b6d4' }} />
+          </div>
+          <div style={{ marginTop:2 }}>
+            <span style={statusStyle(r.pral.status === 'ok' || r.pral.status === 'mild')}>
+              {r.pral.status === 'high' ? '🔴 Сильное закисление' : r.pral.status === 'moderate' ? '🟠 Умеренное закисление' : r.pral.status === 'mild' ? '✅ Слабое (норма для силового)' : '✅ Ощелачивающий'}
+            </span>
+          </div>
+          {r.pral.recommendation && (
+            <div style={{ fontSize:6, color:'rgba(255,255,255,0.6)', marginTop:2 }}>💡 {r.pral.recommendation}</div>
+          )}
+        </div>}
+
         {/* Weight dynamics */}
         <div style={card}>
           <div style={{ fontSize:9, fontWeight:600, color:'#06b6d4', marginBottom:4 }}>

@@ -13,6 +13,8 @@ import type { UserProfile, LabPoint } from "../../../../core/types";
 import { getContraindications, saveContraindications } from "../../../../core/contraindications";
 import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrition-v2-data";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
+import { computePlannerTargets } from "./planner-targets";
+import { safeWriteJSON } from "./planner-storage"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
 import { buildDayPlan as buildDayPlanV2, type DayPlanV2, type MealPlanInput } from "./meal-plan-engine";
@@ -305,37 +307,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
 
   const calcTargets = useMemo(() => {
     try {
-      const wpw = s?.workoutsPerWeek || 3; const awm = s?.avgWorkoutMinutes || 60;
-      let pal = 1.2 + wpw * 0.075; if (awm > 60) pal += 0.1; if (awm > 90) pal += 0.05; if (wpw >= 6) pal += 0.05;
-      if (dailySteps >= 15000) pal += 0.15; else if (dailySteps >= 10000) pal += 0.1; else if (dailySteps >= 7500) pal += 0.05;
-      if (householdActivity === 'active') pal += 0.15; else if (householdActivity === 'moderate') pal += 0.1; else if (householdActivity === 'light') pal += 0.05;
-      if (trainType === 'hiit') pal += 0.1; else if (trainType === 'cardio') pal += 0.05; else if (trainType === 'mixed') pal += 0.03;
-      if (trainIntensity === 'high') pal += 0.1; else if (trainIntensity === 'medium') pal += 0.05;
-      pal = Math.min(1.9, Math.max(1.2, Math.round(pal * 1000) / 1000));
-      const goalMap: Record<string, string> = { mass:'bulk',strength:'strength',fat_loss:'cut',cutting:'cut',post_cut:'maintenance',maintenance:'maintenance',recomposition:'recomp',rehab:'rehab' };
-      const engineGoal = goalMap[goal] || 'maintenance';
-      let weightAdj = 1.0;
-      if (weightAdaptMode && weightLogWeek.length >= 2) { const actualLoss = weightLogWeek[0] - weightLogWeek[weightLogWeek.length - 1]; const weeklyAvgLoss = actualLoss > 0 ? actualLoss / (weightLogWeek.length - 1) * 7 / Math.max(1, weightLogWeek.length - 1) : 0; if (expectedLossKgWeek > 0 && weeklyAvgLoss < expectedLossKgWeek * 0.7) weightAdj = 1 - (expectedLossKgWeek - Math.max(0, weeklyAvgLoss)) * 2 / Math.max(1, weight); else if (weeklyAvgLoss > expectedLossKgWeek * 1.3) weightAdj = 1 + (weeklyAvgLoss - expectedLossKgWeek) * 2 / Math.max(1, weight); weightAdj = Math.max(0.8, Math.min(1.2, weightAdj)); }
-      const targetsV2 = (() => { try { return calcNutritionV2({ weightKg: weight, heightCm: height, age, sex: sex || 'male', pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal as any, bodyFatPercent: bodyFatPct, trainingDaysPerWeek: wpw, avgTrainingMinutes: awm }); } catch { return null; } })();
-      const baseTdeeV2 = targetsV2?.baseTdee || 0; const adjV2 = targetsV2?.adjustment || 0;
-      let targets: any = targetsV2 ? { bmr: baseTdeeV2 > 0 ? Math.round(baseTdeeV2 / (pal || 1.2)) : 0, tdee: baseTdeeV2 || Math.round(targetsV2.kcal - adjV2), kcal: targetsV2.kcal, protein: targetsV2.proteinG, fats: targetsV2.fatG, carbs: targetsV2.carbsG, adjustment: adjV2 } : (() => { try { const r = calcNutrition({ weightKg: weight, heightCm: height, age, sex, pal: Math.min(1.9, Math.max(1.2, pal)), goal: engineGoal }); return { bmr: r.bmr, tdee: r.tdee, kcal: r.kcal, protein: r.protein, fats: r.fats, carbs: r.carbs, adjustment: r.kcal - r.tdee }; } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300, adjustment: 0 }; } })();
-      if (engineGoal === 'bulk' && surplusPct !== 10) { targets.kcal = Math.round((targets.tdee || targets.kcal) * (1 + surplusPct / 100)); targets.carbs = Math.round((targets.kcal - targets.protein * 4 - targets.fats * 9) / 4); }
-      const phaseMult: Record<string, { kcalMod: number; pAdd: number }> = { course:{kcalMod:1.0,pAdd:0.3},bridge:{kcalMod:0.95,pAdd:0},pct:{kcalMod:0.9,pAdd:0},recovery:{kcalMod:1.05,pAdd:0.3},cutting:{kcalMod:0.8,pAdd:0.2},maintenance:{kcalMod:1.0,pAdd:0},recomp:{kcalMod:0.9,pAdd:0.1},fat_loss:{kcalMod:0.75,pAdd:0.2},post_cut:{kcalMod:1.05,pAdd:0.1} };
-      const pm = phaseMult[phase] || { kcalMod: 1.0, pAdd: 0 };
-      targets.kcal = Math.round(targets.kcal * pm.kcalMod); targets.protein = Math.round(targets.protein + weight * pm.pAdd);
-      if (pm.kcalMod !== 1.0 || pm.pAdd !== 0) { const pKcal = targets.protein * 4; const remaining = Math.max(0, targets.kcal - pKcal); if (targets.fats > 0 || targets.carbs > 0) { const fRatio = (targets.fats * 9) / Math.max(1, targets.fats * 9 + targets.carbs * 4); targets.fats = Math.round((remaining * fRatio) / 9); targets.carbs = Math.round((remaining * (1 - fRatio)) / 4); } else { targets.fats = Math.round((remaining * 0.25) / 9); targets.carbs = Math.round((remaining * 0.75) / 4); } }
-      const hasAAS = injections.some(i => i.type === 'ААС'); const hasShortInsulin = injections.some(i => i.type === 'инсулин' && i.esterType !== 'long'); const hasInsulin = injections.some(i => i.type === 'инсулин'); const hasGLP = injections.some(i => i.type === 'семаглутид' || i.type === 'тирзепатид');
-      if (hasAAS) targets.protein = Math.round(targets.protein + weight * 0.3);
-      if (hasShortInsulin) { const totalInsulinDose = injections.filter(i => i.type === 'инсулин' && i.esterType !== 'long').reduce((s, i) => s + i.dose, 0); const minInsulinCarbs = totalInsulinDose * 10; if (targets.carbs < minInsulinCarbs) targets.carbs = Math.round(minInsulinCarbs * 1.2); const maxFat = Math.round(weight * 0.5); if (targets.fats > maxFat) targets.fats = maxFat; targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4; }
-      if (hasInsulin) { const maxFat = Math.round(weight * 0.5); if (targets.fats > maxFat) targets.fats = maxFat; targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4; }
-      if (hasGLP) { targets.fats = Math.min(targets.fats, Math.round(weight * 0.4)); targets.protein = Math.round(targets.protein + weight * 0.2); targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4; }
-      if (weightAdj !== 1.0) { targets.kcal = Math.round(targets.kcal * weightAdj); targets.protein = Math.round(targets.protein * weightAdj); targets.fats = Math.round(targets.fats * weightAdj); targets.carbs = Math.round(targets.carbs * weightAdj); }
-      if (metabolicAdaptEnabled && metabolicAdaptPct > 0) { const adaptFactor = 1 - metabolicAdaptPct / 100; targets.kcal = Math.round(targets.kcal * adaptFactor); targets.protein = Math.round(targets.protein * adaptFactor); targets.fats = Math.round(targets.fats * adaptFactor); targets.carbs = Math.round(targets.carbs * adaptFactor); }
-      if (manualGPerKg.protein > 0) targets.protein = Math.round(weight * manualGPerKg.protein);
-      if (manualGPerKg.fat > 0) targets.fats = Math.round(weight * manualGPerKg.fat);
-      if (manualGPerKg.carbs > 0) targets.carbs = Math.round(weight * manualGPerKg.carbs);
-      if (manualGPerKg.protein > 0 || manualGPerKg.fat > 0 || manualGPerKg.carbs > 0) targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
-      return targets;
+      return computePlannerTargets({
+        weightKg: weight, heightCm: height, age, sex, goal, phase, bodyFatPct,
+        workoutsPerWeek: s?.workoutsPerWeek || 3, avgWorkoutMinutes: s?.avgWorkoutMinutes || 60,
+        dailySteps, householdActivity, trainType, trainIntensity, surplusPct,
+        injections: injections.map(i => ({ type: i.type, dose: i.dose, esterType: i.esterType })),
+        weightAdaptMode, weightLogWeek, expectedLossKgWeek,
+        metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg: { protein: manualGPerKg.protein || 0, fat: manualGPerKg.fat || 0, carbs: manualGPerKg.carbs || 0 },
+      });
     } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300, adjustment: 0 }; }
   }, [weight, height, age, sex, goal, s?.workoutsPerWeek, s?.avgWorkoutMinutes, injections, phase, bodyFatPct, weightAdaptMode, weightLogWeek, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, dailySteps, householdActivity, trainType, trainIntensity]);
 
@@ -359,16 +338,22 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300 }; }
   }, [s?.weight, s?.height, s?.age, s?.sex, s?.workoutsPerWeek, s?.avgWorkoutMinutes, goal, dailySteps, householdActivity, trainType, trainIntensity]);
 
-  const effectiveKcal = kbjuMode === 'profile' ? profileTargets.kcal : (manualKcal ?? calcTargets.kcal);
-  const effectiveP = kbjuMode === 'profile' ? profileTargets.protein : (manualP ?? calcTargets.protein);
-  const effectiveF = kbjuMode === 'profile' ? profileTargets.fats : (manualF ?? calcTargets.fats);
-  const effectiveC = kbjuMode === 'profile' ? profileTargets.carbs : (() => { if (manualC !== null) return manualC; if (manualKcal !== null && manualP !== null && manualF !== null && manualC === null) { const fromPF = (manualP * 4) + (manualF * 9); return Math.max(0, Math.round((manualKcal - fromPF) / 4)); } return calcTargets.carbs; })();
+  // D-22: nutrition-level multiplier folded INTO effective* so the KБЖУ target shown and
+  // the goal passed to the engine are the SAME number. Previously the engine built at
+  // effectiveP*nutrMult while the UI displayed bare effectiveP -> at level 'Максимум' (1.5)
+  // the plan read +50% / ~+100g protein over the displayed target.
+  const [nutrLevel, setNutrLevel] = useState<NutritionLevel>('base');
+  const _nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
+  const effectiveKcal = Math.round((kbjuMode === 'profile' ? profileTargets.kcal : (manualKcal ?? calcTargets.kcal)) * _nutrMult);
+  const effectiveP = Math.round((kbjuMode === 'profile' ? profileTargets.protein : (manualP ?? calcTargets.protein)) * _nutrMult);
+  const effectiveF = Math.round((kbjuMode === 'profile' ? profileTargets.fats : (manualF ?? calcTargets.fats)) * _nutrMult);
+  const _effectiveCRaw = kbjuMode === 'profile' ? profileTargets.carbs : (() => { if (manualC !== null) return manualC; if (manualKcal !== null && manualP !== null && manualF !== null && manualC === null) { const fromPF = (manualP * 4) + (manualF * 9); return Math.max(0, Math.round((manualKcal - fromPF) / 4)); } return calcTargets.carbs; })();
+  const effectiveC = Math.round(_effectiveCRaw * _nutrMult);
 
   const switchKbjuMode = (mode: typeof kbjuMode) => { if (mode === 'manual' && kbjuMode !== 'manual') { setManualKcal(effectiveKcal); setManualP(effectiveP); setManualF(effectiveF); setManualC(effectiveC); } if (mode !== 'manual') { setManualKcal(null); setManualP(null); setManualF(null); setManualC(null); } setKbjuMode(mode); };
 
   const resultsRef = useRef<HTMLDivElement>(null);
   const [budget, setBudget] = useState<BudgetLevel>('medium');
-  const [nutrLevel, setNutrLevel] = useState<NutritionLevel>('base');
   const [variety, setVariety] = useState<'minimal' | 'medium' | 'max'>('max');
   const [wakeTime, setWakeTime] = useState('07:00');
   const [bedTime, setBedTime] = useState('23:00');
@@ -392,6 +377,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [dietPrefs, setDietPrefs] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_diet_preferences') || '[]'); } catch { return []; } });
   const [allergenExcludedCount, setAllergenExcludedCount] = useState(0);
   const [planTargets, setPlanTargets] = useState<{ kcal: number; protein: number; fats: number; carbs: number }>({ kcal: 2500, protein: 160, fats: 70, carbs: 300 });
+  // Bug-1 fix: planTargets must mirror effective* so the full nutrition report
+  // (generateFullNutritionReport uses `targets: planTargets`, `userTDEE: planTargets.kcal`)
+  // compares against the REAL planner targets, not the hardcoded default 2500/160/70/300.
+  useEffect(() => { setPlanTargets({ kcal: effectiveKcal, protein: effectiveP, fats: effectiveF, carbs: effectiveC }); }, [effectiveKcal, effectiveP, effectiveF, effectiveC]);
   const [cyclingMode, setCyclingMode] = useState<CycleType>('none');
   const [heavyTrainDay, setHeavyTrainDay] = useState('');
   const [workScheduleEnabled, setWorkScheduleEnabled] = useState(false);
@@ -408,8 +397,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [dayPlan, setDayPlan] = useState<any>(null);
   const [threeDayPlan, setThreeDayPlan] = useState<any>(null);
   const [weekPlan, setWeekPlan] = useState<any>(null);
-  const [shoppingList, setShoppingList] = useState<any>(() => { try { return JSON.parse(localStorage.getItem("he_plan_shopping") || "null"); } catch { return null; } });
-  const [waterCalc, setWaterCalc] = useState<any>(() => { try { return JSON.parse(localStorage.getItem("he_plan_water") || "null"); } catch { return null; } });
+  const [shoppingList, setShoppingList] = useState<any>(null); // Bug-3: не персистим — без плана это осиротевшие данные
+  const [waterCalc, setWaterCalc] = useState<any>(null); // Bug-3: не персистим — без плана это осиротевшие данные
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>(() => { try { return JSON.parse(localStorage.getItem('he_saved_nutrition_plans') || '[]'); } catch { return []; } });
   const [lockedFoodIds, setLockedFoodIds] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('he_locked_foods') || '[]')); } catch { return new Set<string>(); } });
   const toggleLockFood = (foodId: string) => { setLockedFoodIds(prev => { const next = new Set(prev); if (next.has(foodId)) next.delete(foodId); else next.add(foodId); localStorage.setItem('he_locked_foods', JSON.stringify([...next])); return next; }); };
@@ -441,17 +430,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { try { localStorage.setItem('he_nutrition_supps', JSON.stringify(takenSupplements)); } catch {} }, [takenSupplements]);
 
   // B1: Persist generated plan data so it survives tab switching / remounts
-  useEffect(() => { try { localStorage.setItem("he_plan_generated", generated ? "true" : "false"); } catch {} }, [generated]);
   useEffect(() => { try { localStorage.setItem("he_plan_days", String(planDays)); } catch {} }, [planDays]);
   useEffect(() => { try { localStorage.setItem("he_plan_day_idx", String(selectedDayIndex)); } catch {} }, [selectedDayIndex]);
   useEffect(() => { try { localStorage.setItem("he_plan_view", planView); } catch {} }, [planView]);
-  useEffect(() => { try { if (dayPlan) localStorage.setItem("he_plan_day", JSON.stringify(dayPlan)); else localStorage.removeItem("he_plan_day"); } catch {} }, [dayPlan]);
-  useEffect(() => { try { if (threeDayPlan) localStorage.setItem("he_plan_3day", JSON.stringify(threeDayPlan)); else localStorage.removeItem("he_plan_3day"); } catch {} }, [threeDayPlan]);
-  useEffect(() => { try { if (weekPlan) localStorage.setItem("he_plan_week", JSON.stringify(weekPlan)); else localStorage.removeItem("he_plan_week"); } catch {} }, [weekPlan]);
-  useEffect(() => { try { if (shoppingList) localStorage.setItem("he_plan_shopping", JSON.stringify(shoppingList)); else localStorage.removeItem("he_plan_shopping"); } catch {} }, [shoppingList]);
-  useEffect(() => { try { if (waterCalc) localStorage.setItem("he_plan_water", JSON.stringify(waterCalc)); else localStorage.removeItem("he_plan_water"); } catch {} }, [waterCalc]);
   useEffect(() => { try { localStorage.setItem("he_plan_month_mode", monthPlanMode ? "true" : "false"); } catch {} }, [monthPlanMode]);
-  useEffect(() => { try { if (monthPlan.length > 0) localStorage.setItem("he_plan_month", JSON.stringify(monthPlan)); else localStorage.removeItem("he_plan_month"); } catch {} }, [monthPlan]);
+  useEffect(() => { if (monthPlan.length > 0) { if (!safeWriteJSON("he_plan_month", monthPlan)) { try { console.warn("[Planner] he_plan_month not saved (quota?)"); } catch {} } } else { try { localStorage.removeItem("he_plan_month"); } catch {} } }, [monthPlan]);
 
   const saveUndo = () => {
     const snap: any = {};
@@ -817,10 +800,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         }
         const input: MealPlanInput = {
           weightKg: weight, lbmKg, bodyFatPct: bfPct, sex,
-          goalKcal: Math.round(Math.max(1200, effectiveKcal || weight * 30 || 2500) * nutrMult * dayKcalMod),
-          goalProteinG: Math.round(Math.max(80, effectiveP || weight * 2 || 160) * nutrMult),
-          goalFatG: Math.round(Math.max(30, effectiveF || weight * 0.8 || 70) * nutrMult),
-          goalCarbsG: Math.round(Math.max(50, effectiveC || weight * 3.5 || 300) * nutrMult * dayCarbMod),
+          // D-22: nutrMult already folded into effective* above — do NOT multiply again.
+          goalKcal: Math.round(Math.max(1200, effectiveKcal || weight * 30 || 2500) * dayKcalMod),
+          goalProteinG: Math.round(Math.max(80, effectiveP || weight * 2 || 160)),
+          goalFatG: Math.round(Math.max(30, effectiveF || weight * 0.8 || 70)),
+          goalCarbsG: Math.round(Math.max(50, effectiveC || weight * 3.5 || 300) * dayCarbMod),
           mealsCount, isTrainingDay: !!trainingDays[offset % 7],
           trainStartMin: linkToTraining && trainingDays[offset % 7] ? toMin(trainStart) : undefined,
           allowIntraWorkout: trainIntensity === 'high',
@@ -898,13 +882,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       try { setPlanTab('plan'); } catch {}
       generateRecommendations();
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+      return; // Bug-2 fix: Pro успешно — НЕ проваливаемся в классический путь (иначе classic перетирал Pro-план, и юзер всегда видел классический результат).
       } catch (v2Err: any) {
-        // V2 упал (например, не нашлось ни одного подходящего продукта в пуле) —
-        // логируем ошибку, показываем пользователю понятное сообщение и фоллбэк на старый движок.
+        // Bug-2 fix: Pro упал — РЕАЛЬНЫЙ фоллбэк на классический движок (раньше был return = тупик без плана и ложное сообщение «переключитесь вручную»).
         const errMsg = (v2Err && (v2Err.message || String(v2Err))) || 'Unknown error';
-        try { console.error('[IndividualPlan] V2 engine failed:', errMsg, v2Err); } catch {}
-        try { setErrorMsg('V2-движок не смог собрать план (возможно слишком жёсткие исключения). Попробуйте расширить фильтры или переключитесь на «Классический движок».'); } catch {}
-        return; // early return — V2 упал, старый код НЕ выполняется
+        try { console.warn('[IndividualPlan] V2 engine failed, falling back to classic:', errMsg, v2Err); } catch {}
+        try { setErrorMsg('Pro-движок не смог собрать план (возможно, слишком жёсткие исключения/фильтры). Собрано классическим движком — проверьте рацион.'); } catch {}
+        try { setDayPlan(null); setThreeDayPlan(null); setWeekPlan(null); } catch {}
+        // НЕ return — проваливаемся в классический путь ниже
       }
     }
     const nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
@@ -1247,7 +1232,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           mealTimes.sort((a, b) => toMin(a.time) - toMin(b.time));
         }
       });
-      const nMult = nutrMult || 1;
+      const nMult = 1; // D-22: nutrMult already folded into effective*
       const tKcal = Math.round((effectiveKcal || weight * 30) * nMult);
       let tP = Math.round(Math.max(50, (effectiveP || weight * 2) * nMult * (pMod || 1)));
       const tF = Math.round(Math.max(20, (effectiveF || weight * 0.8) * nMult * (fMod || 1)));
@@ -1258,7 +1243,26 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (cyclingMode === 'cheatmeal' && !isTrainingDay) { tKcalAdj = Math.round(tKcal * 0.85); }
       if (cyclingMode === 'carbload' && isTrainingDay) { tCAdj = Math.round(tC * 1.6); tKcalAdj = Math.round(tKcal * 1.1); }
       let mealCAdjust: Record<number, number> = {};
-      if (eveningLowCarb) { const dinnerIdx = mealTimes.findIndex(m => m.label === 'Ужин'); const lunchIdx = mealTimes.findIndex(m => m.label === 'Обед'); if (dinnerIdx >= 0) { const carbReduction = Math.round((tCAdj / mealTimes.length) * 0.6); mealCAdjust[dinnerIdx] = -carbReduction; if (lunchIdx >= 0) mealCAdjust[lunchIdx] = carbReduction; } }
+      {
+        // Carb periodization (как в Pro-движке): ужин — самое лёгкое углеводное окно,
+        // основная масса углеводов идёт в обед и peri-workout (pre/post). Без этого ужин
+        // получает 1/N всех углеводов = «куча углеводов на ужине, не разделена на перекусы».
+        const dinnerIdx = mealTimes.findIndex(m => m.label === 'Ужин');
+        const lunchIdx = mealTimes.findIndex(m => m.label === 'Обед');
+        if (dinnerIdx >= 0) {
+          const share = tCAdj / mealTimes.length;
+          const cutPct = eveningLowCarb ? 0.70 : 0.45; // ужин режем на 45% (или 70% при eveningLowCarb)
+          const carbReduction = Math.round(share * cutPct);
+          mealCAdjust[dinnerIdx] = -carbReduction;
+          // Срезанные углеводы — в обед + pre/post-workout (если есть); иначе всё в обед
+          const targets: number[] = [];
+          if (lunchIdx >= 0) targets.push(lunchIdx);
+          mealTimes.forEach((m, i) => { if (m.label === 'Предтрен' || m.label === 'Пост-трен') targets.push(i); });
+          if (targets.length === 0) targets.push(dinnerIdx); // fallback: вернуть в ужин
+          let remaining = carbReduction;
+          targets.forEach((ti, k) => { const part = k === targets.length - 1 ? remaining : Math.round(carbReduction / targets.length); mealCAdjust[ti] = (mealCAdjust[ti] || 0) + part; remaining -= part; });
+        }
+      }
       const foodSeed = dayOffset * 10007;
       const meals = mealTimes.map((mt, idx) => {
         const fatPct = FAT_TIMING[mt.label]?.pct ?? (1 / mealTimes.length);
@@ -1924,7 +1928,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
 
   useEffect(() => { if (generated && dayPlan) generateRecommendations(); }, [injections.length]);
 
-  const saveCurrentPlan = () => { const name = prompt('Название плана:', `${new Date().toLocaleDateString('ru-RU')} · ${Math.round(dayPlan?.totals?.kcal || 0)} ккал`); if (name === null) return; const plan: SavedPlan = { id: Date.now(), date: new Date().toISOString().split('T')[0], name, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc }; const updated = [plan, ...savedPlans.filter(p => p.id !== plan.id)].slice(0, 10); setSavedPlans(updated); localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated)); };
+  const saveCurrentPlan = () => { const name = prompt('Название плана:', `${new Date().toLocaleDateString('ru-RU')} · ${Math.round(dayPlan?.totals?.kcal || 0)} ккал`); if (name === null) return; const plan: SavedPlan = { id: Date.now(), date: new Date().toISOString().split('T')[0], name, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc }; const updated = [plan, ...savedPlans.filter(p => p.id !== plan.id)].slice(0, 10); setSavedPlans(updated); if (!safeWriteJSON('he_saved_nutrition_plans', updated)) { try { console.warn('[Planner] saved plans not saved (quota?)'); } catch {} } };
 
   const autoCorrectPlan = () => { if (!dayPlan || !dayPlan.meals) return; const remaining = { kcal: Math.max(0, effectiveKcal - (dayPlan.totals?.kcal || 0)), p: Math.max(0, effectiveP - (dayPlan.totals?.p || 0)), f: Math.max(0, effectiveF - (dayPlan.totals?.f || 0)), c: Math.max(0, effectiveC - (dayPlan.totals?.c || 0)) }; const futureMeals = dayPlan.meals.filter((m: any) => !m.label.includes('Завтрак') && !m.label.includes('Предтрен')); if (futureMeals.length === 0) return; const perMeal = { kcal: Math.round(remaining.kcal / futureMeals.length), p: Math.round(remaining.p / futureMeals.length), f: Math.round(remaining.f / futureMeals.length), c: Math.round(remaining.c / futureMeals.length) }; setDayPlan((prev: any) => { if (!prev) return prev; const meals = prev.meals.map((m: any) => { if (m.label.includes('Завтрак') || m.label.includes('Предтрен')) return m; const ratio = Math.max(0.3, Math.min(1.7, perMeal.kcal / Math.max(1, m.totals?.kcal || 1))); const items = m.items.map((it: any) => ({ ...it, amount: Math.round(it.amount * ratio), kcal: Math.round(it.kcal * ratio), p: Math.round(it.p * ratio), f: Math.round(it.f * ratio), c: Math.round(it.c * ratio) })); const totals = { kcal: items.reduce((s: number, i: any) => s + i.kcal, 0), p: items.reduce((s: number, i: any) => s + i.p, 0), f: items.reduce((s: number, i: any) => s + i.f, 0), c: items.reduce((s: number, i: any) => s + i.c, 0) }; return { ...m, items, totals }; }); const totals = { kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0) }; return { ...prev, meals, totals }; }); };
 
@@ -2094,7 +2098,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   if (warnings.length === 0) warnings.push('✅ Все препараты совместимы с планом питания');
   setDrugCompatReport({ interactions: [], warnings });
   setActiveReports(prev => prev.includes('drug')?prev:[...prev,'drug']); };
-  const generateFullNutritionReport = () => { if (!dayPlan) return; try { const rep = generateNutritionReport({ meals: dayPlan.meals.map((m:any)=>({ label:m.label, items:m.items.map((i:any)=>({name:i.name||'',id:i.id||'',amount:i.amount||100,kcal:i.kcal||0,p:i.p||0,f:i.f||0,c:i.c||0,fiber:i.fiber||0})), totals:m.totals||{kcal:0,p:0,f:0,c:0}, time:m.time||'' })), totals: dayPlan.totals||{kcal:0,p:0,f:0,c:0}, targets: planTargets, userWeight: getProfileSafe()?.settings?.weight||80, userTDEE: planTargets.kcal, healthIssues, planType, variety, budget, allergens, cyclingMode, goal: getProfileSafe()?.settings?.primaryGoal||'maintenance', waterMl: waterCalc?.total?Math.round(waterCalc.total*1000):0, injections: injections.map(i=>({type:i.type,dose:i.dose,name:i.name,time:i.time})), workoutTime: linkToTraining&&trainingDays.some(Boolean)?trainStart:undefined }); if (rep) { setNutritionReport(rep); setActiveReports(prev=>prev.includes('nutrition')?prev:[...prev,'nutrition']); try { const arch = JSON.parse(localStorage.getItem('he_nutrition_report_archive')||'[]'); arch.unshift(rep); localStorage.setItem('he_nutrition_report_archive', JSON.stringify(arch.slice(0,50))); localStorage.setItem('he_nutrition_report_current', JSON.stringify(rep)); try { localStorage.setItem('he_profile_nutrition_reports', JSON.stringify(arch.slice(0,20))); } catch {} } catch {} } } catch(e) { console.error('Report failed:', e); } };
+  const generateFullNutritionReport = () => { if (!dayPlan) return; try { const rep = generateNutritionReport({ meals: dayPlan.meals.map((m:any)=>({ label:m.label, items:m.items.map((i:any)=>({name:i.name||'',id:i.id||'',amount:i.amount||100,kcal:i.kcal||0,p:i.p||0,f:i.f||0,c:i.c||0,fiber:i.fiber||0})), totals:m.totals||{kcal:0,p:0,f:0,c:0}, time:m.time||'' })), totals: dayPlan.totals||{kcal:0,p:0,f:0,c:0}, targets: planTargets, userWeight: getProfileSafe()?.settings?.weight||80, userTDEE: planTargets.kcal, healthIssues, planType, variety, budget, allergens, cyclingMode, goal: getProfileSafe()?.settings?.primaryGoal||'maintenance', waterMl: waterCalc?.total?Math.round(waterCalc.total*1000):0, injections: injections.map(i=>({type:i.type,dose:i.dose,name:i.name,time:i.time})), workoutTime: linkToTraining&&trainingDays.some(Boolean)?trainStart:undefined }); if (rep) { setNutritionReport(rep); setActiveReports(prev=>prev.includes('nutrition')?prev:[...prev,'nutrition']); try { const arch = JSON.parse(localStorage.getItem('he_nutrition_report_archive')||'[]'); arch.unshift(rep); safeWriteJSON('he_nutrition_report_archive', arch.slice(0,50)); safeWriteJSON('he_nutrition_report_current', rep); try { safeWriteJSON('he_profile_nutrition_reports', arch.slice(0,20)); } catch {} } catch {} } } catch(e) { console.error('Report failed:', e); } };
 
   const renderMealList = (dayData: any, editable = false) => {
     if (!dayData) return null;
@@ -2106,19 +2110,36 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           <div style={{padding:'10px 12px',background:d.isTrainingDay?'linear-gradient(135deg, rgba(0,230,138,0.1), rgba(0,200,160,0.03))':'#202023'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
               <span style={{fontSize:20,filter:d.isTrainingDay?'none':'grayscale(0.5)'}}>{d.isTrainingDay?'🏋️':'😴'}</span>
-              <div style={{flex:1}}><div style={{fontSize:12,fontWeight:800,color:d.isTrainingDay?'#00e68a':'rgba(255,255,255,0.85)'}}>{d.isTrainingDay?'🏆 ТРЕНИРОВОЧНЫЙ ДЕНЬ':'😴 ДЕНЬ ОТДЫХА'}</div>
+              <div style={{flex:1}}><div style={{fontSize:12,fontWeight:800,color:d.isTrainingDay?'#00e68a':'rgba(255,255,255,0.85)'}}>{d.isTrainingDay?'🏆 ТРЕНИРОВОЧНЫЙ ДЕНЬ':'😴 ДЕНЬ ОТДЫХА'}</div> <span style={{fontSize:7,fontWeight:700,color:useProEngine?'#a78bfa':'#60a5fa',background:useProEngine?'rgba(167,139,250,0.12)':'rgba(96,165,250,0.12)',padding:'1px 5px',borderRadius:6,border:useProEngine?'1px solid rgba(167,139,250,0.25)':'1px solid rgba(96,165,250,0.25)',marginLeft:4,verticalAlign:'middle'}}>{useProEngine?'Pro':'Классический'} движок</span>
               {weightLogEntries.length >= 3 && (() => { const vals = weightLogEntries.map(e => e.weight); const min = Math.min(...vals); const max = Math.max(...vals); const range = max - min || 1; const h = 24; const w = 80; const pts = vals.map((v,i) => `${Math.round(i/(vals.length-1)*w)},${Math.round(h-(v-min)/range*h)}`).join(' '); const trend = vals.length >= 2 && vals[vals.length-1] < vals[0]; return (<div style={{display:'inline-flex',alignItems:'center',gap:3,marginLeft:6}}><svg width={w} height={h} style={{verticalAlign:'middle'}}><polyline points={pts} fill="none" stroke={trend?'#22c55e':'#ef4444'} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/></svg><span style={{fontSize:7,color:trend?'#22c55e':'#ef4444',fontWeight:600}}>{trend?'↓':'↑'} {Math.abs(vals[vals.length-1]-vals[0]).toFixed(1)} кг</span></div>); })()}</div>
               <div style={{padding:'4px 10px',borderRadius:8,background:d.isTrainingDay?'rgba(0,230,138,0.1)':'rgba(255,255,255,0.03)',border:d.isTrainingDay?'1px solid rgba(0,230,138,0.2)':'1px solid rgba(255,255,255,0.06)'}}>
                 <div style={{fontSize:16,fontWeight:900,color:Math.abs(totalKcal-(effectiveKcal||0))<=Math.max(50,(effectiveKcal||0)*0.08)?'#00e68a':'#f59e0b',lineHeight:1}}>{totalKcal}<span style={{fontSize:8,fontWeight:400,color:'rgba(255,255,255,0.5)'}}>/{effectiveKcal||'---'}</span></div>
+                {effectiveKcal>0 && (() => { const dk=Math.round(totalKcal-effectiveKcal); const dkp=Math.round((totalKcal-effectiveKcal)/effectiveKcal*100); const ok=Math.abs(dk)<=Math.max(50,Math.round(effectiveKcal*0.05)); return <div style={{fontSize:7,fontWeight:700,color:ok?'#22c55e':(dk>0?'#f59e0b':'#60a5fa')}}>Δ{dk>=0?'+':''}{dk} ({dk>=0?'+':''}{dkp}%)</div>; })()}
                 <div style={{fontSize:7,color:'rgba(255,255,255,0.85)',textAlign:'center'}}>ккал</div>
               </div>
             </div>
-            <div style={{display:'flex',gap:8,fontSize:9}}>
-              <span style={{color:'#3b82f6',fontWeight:600}}>💪 {totalP}г/{effectiveP||'—'} <span style={{fontSize:7,color:effectiveP?Math.abs(totalP-(effectiveP||0))<=5?'#22c55e':'#f59e0b':'rgba(255,255,255,0.5)'}}>{effectiveP>0?'('+Math.round(totalP/(effectiveP||1)*100)+'%)':''}</span></span>
-              <span style={{color:'#f59e0b',fontWeight:600}}>🧈 {totalF}г/{effectiveF||'—'}</span>
-              <span style={{color:'#f97316',fontWeight:600}}>🌾 {totalC}г/{effectiveC||'—'}</span>
-              {totalFiber > 0 && <span style={{color:'#22c55e',fontSize:8,fontWeight:600}}>🌱 {totalFiber}г</span>}
-              <span style={{marginLeft:'auto',color:'rgba(255,255,255,0.85)'}}>{weight>0?`${Math.round(totalP/weight)}г/кг`:''}</span>
+                        <div style={{display:'flex',gap:8,fontSize:9,flexWrap:'wrap',alignItems:'center'}}>
+              {(() => {
+                // КБЖУ: Цель/Факт/Δ явно — расхождение должно быть понятным, а не «непонятный перебор»
+                const fmt = (val:number, tgt:number, unit:string) => {
+                  if (!tgt) return `${val}${unit}`;
+                  const d = Math.round(val - tgt);
+                  const dp = Math.round((val - tgt) / tgt * 100);
+                  const ok = Math.abs(d) <= Math.max(5, Math.round(tgt * 0.05));
+                  const col = ok ? '#22c55e' : (d > 0 ? '#f59e0b' : '#60a5fa');
+                  return <><b style={{fontWeight:800}}>{val}{unit}</b><span style={{fontSize:7,color:'rgba(255,255,255,0.45)'}}>/{tgt}{unit}</span> <span style={{fontSize:7,color:col,fontWeight:700}}>Δ{d>=0?'+':''}{d}{unit} ({d>=0?'+':''}{dp}%)</span></>;
+                };
+                return <>
+                  <span style={{color:'#3b82f6',fontWeight:600}}>💪 Б {fmt(totalP, effectiveP||0, 'г')}</span>
+                  <span style={{color:'#f59e0b',fontWeight:600}}>🧈 Ж {fmt(totalF, effectiveF||0, 'г')}</span>
+                  <span style={{color:'#f97316',fontWeight:600}}>🌾 У {fmt(totalC, effectiveC||0, 'г')}</span>
+                  {totalFiber > 0 && <span style={{color:'#22c55e',fontSize:8,fontWeight:600}}>🌱 {totalFiber}г</span>}
+                  <span style={{marginLeft:'auto',color:'rgba(255,255,255,0.85)'}}>{weight>0?`${Math.round(totalP/weight)}г/кг`:''}</span>
+                </>;
+              })()}
+            </div>
+            <div style={{fontSize:7,color:'rgba(255,255,255,0.42)',marginTop:3,lineHeight:1.3}}>
+              Цель собрана из: база <b style={{color:'#3b82f6'}}>{calcTargets.protein}г</b> · множ. уровня <b style={{color:'#00e68a'}}>{(_nutrMult||1).toFixed(2)}×</b> · фаза «<b style={{color:'#a78bfa'}}>{phase}</b>»{injections.some(i=>i.type==='ААС')?(' · +AAS ' + Math.round(weight*0.3) + 'г'):''} → итого <b style={{color:'#fff'}}>{effectiveP}г</b> белка / <b style={{color:'#fff'}}>{effectiveKcal}</b> ккал
             </div>
           </div>
           <div style={{height:4,display:'flex'}}>

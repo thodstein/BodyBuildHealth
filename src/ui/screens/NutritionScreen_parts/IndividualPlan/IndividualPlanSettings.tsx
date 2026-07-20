@@ -745,11 +745,11 @@ export const IndividualPlanSettings: React.FC = () => {
         {kbjuMode !== 'manual' ? (
           <div>
             {(() => {
-              const nm = NUTRITION_LEVELS.find(n => n.id === nutrLevel)?.mult || 1.0;
-              const dispKcal = Math.round(effectiveKcal * nm);
-              const dispP = Math.round(effectiveP * nm);
-              const dispF = Math.round(effectiveF * nm);
-              const dispC = Math.round(effectiveC * nm);
+              // D-22: nutrMult already folded into effective* in IndividualPlanContext — do NOT multiply again.
+              const dispKcal = effectiveKcal;
+              const dispP = effectiveP;
+              const dispF = effectiveF;
+              const dispC = effectiveC;
               return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
                 {[
                   { l:'Калории', v: dispKcal, c:'#00e68a', unit:'ккал', perKg: Math.round(dispKcal / weight) },
@@ -787,10 +787,10 @@ export const IndividualPlanSettings: React.FC = () => {
               </div>
             )}
             {(() => {
-              const nm = NUTRITION_LEVELS.find(n => n.id === nutrLevel)?.mult || 1.0;
-              const pKcal = Math.round(effectiveP * nm) * 4;
-              const fKcal = Math.round(effectiveF * nm) * 9;
-              const cKcal = Math.round(effectiveC * nm) * 4;
+              // D-22: nutrMult already folded into effective* — do NOT multiply again.
+              const pKcal = effectiveP * 4;
+              const fKcal = effectiveF * 9;
+              const cKcal = effectiveC * 4;
               const total = pKcal + fKcal + cKcal || 1;
               const pPct = pKcal / total * 100;
               const fPct = fKcal / total * 100;
@@ -920,11 +920,11 @@ export const IndividualPlanSettings: React.FC = () => {
       {true && (
       <GlassCard title="Скользящие графики" icon="📊" color="#00e68a">
         {(() => {
-          const nm = NUTRITION_LEVELS.find(n => n.id === nutrLevel)?.mult || 1.0;
-          const tKcal = kbjuMode !== 'manual' ? Math.round(effectiveKcal * nm) : (manualKcal ?? Math.round(effectiveKcal * nm));
-          const tP = kbjuMode !== 'manual' ? Math.round(effectiveP * nm) : (manualP ?? Math.round(effectiveP * nm));
-          const tF = kbjuMode !== 'manual' ? Math.round(effectiveF * nm) : (manualF ?? Math.round(effectiveF * nm));
-          const tC = kbjuMode !== 'manual' ? Math.round(effectiveC * nm) : (manualC ?? Math.round(effectiveC * nm));
+          // D-22: nutrMult already folded into effective* — do NOT multiply again.
+          const tKcal = kbjuMode !== 'manual' ? effectiveKcal : (manualKcal ?? effectiveKcal);
+          const tP = kbjuMode !== 'manual' ? effectiveP : (manualP ?? effectiveP);
+          const tF = kbjuMode !== 'manual' ? effectiveF : (manualF ?? effectiveF);
+          const tC = kbjuMode !== 'manual' ? effectiveC : (manualC ?? effectiveC);
           const mockActual = { kcal: Math.round(tKcal * 0.87), p: Math.round(tP * 0.92), f: Math.round(tF * 0.78), c: Math.round(tC * 0.83) };
           const items = [
             { label:'Калории', target:tKcal, actual:mockActual.kcal, unit:'ккал', color:'#00e68a' },

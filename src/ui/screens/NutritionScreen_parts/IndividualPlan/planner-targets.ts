@@ -1,0 +1,220 @@
+/**
+ * planner-targets.ts — чистая функция расчёта КБЖУ-целей планировщика.
+ *
+ * Bug-4 fix: вынесено из IndividualPlanContext.calcTargets (useMemo с мутационной
+ * цепочкой из 10+ веток) в тестируемую чистую функцию. Контракт: чистая, детерминированная,
+ * один источник истины для целей. Порядок правил зафиксирован и задокументирован.
+ *
+ * Порядок применения правил (каждое последующее видит результат предыдущего):
+ *   1. PAL + BMR/TDEE через calcNutritionV2 (fallback calcNutrition)
+ *   2. Bulk surplus % (если не дефолт 10%)
+ *   3. Фаза курса (kcalMod + pAdd г/кг) с пересчётом Ж/У из остатка
+ *   4. AAS: +0.3 г/кг белка
+ *   5. Короткий инсулин: минимум углеводов по дозе, потолок жира
+ *   6. Любой инсулин: потолок жира 0.5 г/кг
+ *   7. GLP-1: потолок жира 0.4 г/кг, +0.2 г/кг белка
+ *   8. Weight-adapt (по логу веса): масштаб kcal/Б/Ж/У
+ *   9. Metabolic adaptation %: масштаб всего
+ *  10. Ручные г/кг (перезаписывают Б/Ж/У и пересчитывают kcal)
+ *
+ * Возвращает { bmr, tdee, kcal, protein, fats, carbs, adjustment }.
+ */
+
+import { calcNutrition } from "../../../../engines/nutrition.engine";
+import { calcNutritionV2 } from "../../../../engines/nutrition-v2.engine";
+
+export interface PlannerTargetInput {
+  weightKg: number;
+  heightCm: number;
+  age: number;
+  sex: 'male' | 'female' | '';
+  goal: string;            // mass/strength/fat_loss/cutting/post_cut/maintenance/recomposition/rehab
+  phase: string;           // course/bridge/pct/recovery/cutting/maintenance/recomp/fat_loss/post_cut
+  bodyFatPct: number;
+  workoutsPerWeek: number;
+  avgWorkoutMinutes: number;
+  dailySteps: number;
+  householdActivity: 'light' | 'moderate' | 'active' | '' | string;
+  trainType: 'hiit' | 'cardio' | 'mixed' | '' | string;
+  trainIntensity: 'low' | 'medium' | 'high' | '' | string;
+  surplusPct: number;
+  injections: { type: string; dose: number; esterType?: string }[];
+  weightAdaptMode: boolean;
+  weightLogWeek: number[];
+  expectedLossKgWeek: number;
+  metabolicAdaptEnabled: boolean;
+  metabolicAdaptPct: number;
+  manualGPerKg: { protein: number; fat: number; carbs: number };
+}
+
+export interface PlannerTargets {
+  bmr: number;
+  tdee: number;
+  kcal: number;
+  protein: number;
+  fats: number;
+  carbs: number;
+  adjustment: number;
+}
+
+const PHASE_MULT: Record<string, { kcalMod: number; pAdd: number }> = {
+  course: { kcalMod: 1.0, pAdd: 0.3 },
+  bridge: { kcalMod: 0.95, pAdd: 0 },
+  pct: { kcalMod: 0.9, pAdd: 0 },
+  recovery: { kcalMod: 1.05, pAdd: 0.3 },
+  cutting: { kcalMod: 0.8, pAdd: 0.2 },
+  maintenance: { kcalMod: 1.0, pAdd: 0 },
+  recomp: { kcalMod: 0.9, pAdd: 0.1 },
+  fat_loss: { kcalMod: 0.75, pAdd: 0.2 },
+  post_cut: { kcalMod: 1.05, pAdd: 0.1 },
+};
+
+const GOAL_MAP: Record<string, string> = {
+  mass: 'bulk', strength: 'strength', fat_loss: 'cut', cutting: 'cut',
+  post_cut: 'maintenance', maintenance: 'maintenance', recomposition: 'recomp', rehab: 'rehab',
+};
+
+export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets {
+  const {
+    weightKg: weight, heightCm: height, age, sex, goal, phase, bodyFatPct,
+    workoutsPerWeek: wpw, avgWorkoutMinutes: awm, dailySteps, householdActivity,
+    trainType, trainIntensity, surplusPct, injections,
+    weightAdaptMode, weightLogWeek, expectedLossKgWeek,
+    metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg,
+  } = input;
+
+  // 1. PAL + TDEE
+  let pal = 1.2 + (wpw || 3) * 0.075;
+  if (awm > 60) pal += 0.1;
+  if (awm > 90) pal += 0.05;
+  if (wpw >= 6) pal += 0.05;
+  if (dailySteps >= 15000) pal += 0.15; else if (dailySteps >= 10000) pal += 0.1; else if (dailySteps >= 7500) pal += 0.05;
+  if (householdActivity === 'active') pal += 0.15; else if (householdActivity === 'moderate') pal += 0.1; else if (householdActivity === 'light') pal += 0.05;
+  if (trainType === 'hiit') pal += 0.1; else if (trainType === 'cardio') pal += 0.05; else if (trainType === 'mixed') pal += 0.03;
+  if (trainIntensity === 'high') pal += 0.1; else if (trainIntensity === 'medium') pal += 0.05;
+  pal = Math.min(1.9, Math.max(1.2, Math.round(pal * 1000) / 1000));
+
+  const engineGoal = GOAL_MAP[goal] || 'maintenance';
+
+  // weight-adapt factor (computed from weight log)
+  let weightAdj = 1.0;
+  if (weightAdaptMode && weightLogWeek.length >= 2) {
+    const actualLoss = weightLogWeek[0] - weightLogWeek[weightLogWeek.length - 1];
+    const weeklyAvgLoss = actualLoss > 0 ? actualLoss / (weightLogWeek.length - 1) * 7 / Math.max(1, weightLogWeek.length - 1) : 0;
+    if (expectedLossKgWeek > 0 && weeklyAvgLoss < expectedLossKgWeek * 0.7) {
+      weightAdj = 1 - (expectedLossKgWeek - Math.max(0, weeklyAvgLoss)) * 2 / Math.max(1, weight);
+    } else if (weeklyAvgLoss > expectedLossKgWeek * 1.3) {
+      weightAdj = 1 + (weeklyAvgLoss - expectedLossKgWeek) * 2 / Math.max(1, weight);
+    }
+    weightAdj = Math.max(0.8, Math.min(1.2, weightAdj));
+  }
+
+  const targetsV2 = (() => {
+    try {
+      return calcNutritionV2({
+        weightKg: weight, heightCm: height, age, sex: sex || 'male',
+        pal, goal: engineGoal as any, bodyFatPercent: bodyFatPct,
+        trainingDaysPerWeek: wpw, avgTrainingMinutes: awm,
+      });
+    } catch { return null; }
+  })();
+
+  const baseTdeeV2 = targetsV2?.baseTdee || 0;
+  const adjV2 = targetsV2?.adjustment || 0;
+
+  let targets: any;
+  if (targetsV2) {
+    targets = {
+      bmr: baseTdeeV2 > 0 ? Math.round(baseTdeeV2 / (pal || 1.2)) : 0,
+      tdee: baseTdeeV2 || Math.round(targetsV2.kcal - adjV2),
+      kcal: targetsV2.kcal,
+      protein: targetsV2.proteinG,
+      fats: targetsV2.fatG,
+      carbs: targetsV2.carbsG,
+      adjustment: adjV2,
+    };
+  } else {
+    try {
+      const r = calcNutrition({ weightKg: weight, heightCm: height, age, sex: sex || 'male', pal, goal: engineGoal });
+      targets = { bmr: r.bmr, tdee: r.tdee, kcal: r.kcal, protein: r.protein, fats: r.fats, carbs: r.carbs, adjustment: r.kcal - r.tdee };
+    } catch {
+      targets = { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300, adjustment: 0 };
+    }
+  }
+
+  // 2. Bulk surplus
+  if (engineGoal === 'bulk' && surplusPct !== 10) {
+    targets.kcal = Math.round((targets.tdee || targets.kcal) * (1 + surplusPct / 100));
+    targets.carbs = Math.round((targets.kcal - targets.protein * 4 - targets.fats * 9) / 4);
+  }
+
+  // 3. Phase multipliers
+  const pm = PHASE_MULT[phase] || { kcalMod: 1.0, pAdd: 0 };
+  targets.kcal = Math.round(targets.kcal * pm.kcalMod);
+  targets.protein = Math.round(targets.protein + weight * pm.pAdd);
+  if (pm.kcalMod !== 1.0 || pm.pAdd !== 0) {
+    const pKcal = targets.protein * 4;
+    const remaining = Math.max(0, targets.kcal - pKcal);
+    if (targets.fats > 0 || targets.carbs > 0) {
+      const fRatio = (targets.fats * 9) / Math.max(1, targets.fats * 9 + targets.carbs * 4);
+      targets.fats = Math.round((remaining * fRatio) / 9);
+      targets.carbs = Math.round((remaining * (1 - fRatio)) / 4);
+    } else {
+      targets.fats = Math.round((remaining * 0.25) / 9);
+      targets.carbs = Math.round((remaining * 0.75) / 4);
+    }
+  }
+
+  // 4-7. Pharma adjustments
+  const hasAAS = injections.some(i => i.type === 'ААС');
+  const hasShortInsulin = injections.some(i => i.type === 'инсулин' && i.esterType !== 'long');
+  const hasInsulin = injections.some(i => i.type === 'инсулин');
+  const hasGLP = injections.some(i => i.type === 'семаглутид' || i.type === 'тирзепатид');
+
+  if (hasAAS) targets.protein = Math.round(targets.protein + weight * 0.3);
+  if (hasShortInsulin) {
+    const totalInsulinDose = injections.filter(i => i.type === 'инсулин' && i.esterType !== 'long').reduce((s, i) => s + i.dose, 0);
+    const minInsulinCarbs = totalInsulinDose * 10;
+    if (targets.carbs < minInsulinCarbs) targets.carbs = Math.round(minInsulinCarbs * 1.2);
+    const maxFat = Math.round(weight * 0.5);
+    if (targets.fats > maxFat) targets.fats = maxFat;
+    targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
+  }
+  if (hasInsulin) {
+    const maxFat = Math.round(weight * 0.5);
+    if (targets.fats > maxFat) targets.fats = maxFat;
+    targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
+  }
+  if (hasGLP) {
+    targets.fats = Math.min(targets.fats, Math.round(weight * 0.4));
+    targets.protein = Math.round(targets.protein + weight * 0.2);
+    targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
+  }
+
+  // 8. Weight adapt
+  if (weightAdj !== 1.0) {
+    targets.kcal = Math.round(targets.kcal * weightAdj);
+    targets.protein = Math.round(targets.protein * weightAdj);
+    targets.fats = Math.round(targets.fats * weightAdj);
+    targets.carbs = Math.round(targets.carbs * weightAdj);
+  }
+
+  // 9. Metabolic adaptation
+  if (metabolicAdaptEnabled && metabolicAdaptPct > 0) {
+    const adaptFactor = 1 - metabolicAdaptPct / 100;
+    targets.kcal = Math.round(targets.kcal * adaptFactor);
+    targets.protein = Math.round(targets.protein * adaptFactor);
+    targets.fats = Math.round(targets.fats * adaptFactor);
+    targets.carbs = Math.round(targets.carbs * adaptFactor);
+  }
+
+  // 10. Manual г/кг (overrides macros, recompute kcal)
+  if (manualGPerKg.protein > 0) targets.protein = Math.round(weight * manualGPerKg.protein);
+  if (manualGPerKg.fat > 0) targets.fats = Math.round(weight * manualGPerKg.fat);
+  if (manualGPerKg.carbs > 0) targets.carbs = Math.round(weight * manualGPerKg.carbs);
+  if (manualGPerKg.protein > 0 || manualGPerKg.fat > 0 || manualGPerKg.carbs > 0) {
+    targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
+  }
+
+  return targets as PlannerTargets;
+}
