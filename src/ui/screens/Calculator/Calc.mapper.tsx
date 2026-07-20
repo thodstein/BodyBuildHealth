@@ -15,6 +15,7 @@ import { DEFAULT_DOSAGES } from '../../../data/support-meta';
 import { classifyPed } from '../../../data/ped-potency-table';
 import { getSubstanceForm, type SubstanceForm } from '../../../data/substance-forms';
 import { checkInteractions, type DrugInteraction } from '../../../data/drug-interactions';
+import { SYNERGY_NETWORK } from '../../../data/support-synergy-network';
 import { getTitrationProtocol, type TitrationProtocol } from '../../../data/titration-protocols';
 import { CONTRAINDICATIONS, getContraindications, type ContraindicationRule } from '../../../data/substance-contraindications';
 import { GLASS, BADGE } from './Calc.types';
@@ -626,6 +627,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [showSymptoms, setShowSymptoms] = useState(true);
   const [showNutrition, setShowNutrition] = useState(false);
   const [showInteractions, setShowInteractions] = useState(false);
+  const [showSynergyCard, setShowSynergyCard] = useState(false);
   const [showEnhancementPopup, setShowEnhancementPopup] = useState(false);
   const [enhancementSearch, setEnhancementSearch] = useState('');
   const [showMegaPopup, setShowMegaPopup] = useState(false);
@@ -2214,6 +2216,76 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                           </div>
                         </div>
                       ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Синергии веществ (из SYNERGY_NETWORK) */}
+      {finalRec && finalRec.subs.length > 1 && (() => {
+        const idSet = new Set(finalRec.subs.map((s: any) => (s.substanceId || '').toLowerCase()));
+        const synergies: { a: string; b: string; effect: string; mechanism: string; severity: string; score: number }[] = [];
+        const seenSyn = new Set<string>();
+
+        for (const entry of SYNERGY_NETWORK) {
+          if (entry.type !== 'synergy') continue;
+          const members = [entry.a, entry.b, entry.c, entry.d, entry.e, entry.f, entry.g]
+            .filter(Boolean)
+            .concat(entry.substances || [])
+            .map(s => s!.toLowerCase());
+          const inStack = members.filter(m => idSet.has(m));
+          if (inStack.length >= 2) {
+            for (let i = 0; i < inStack.length; i++) {
+              for (let j = i + 1; j < inStack.length; j++) {
+                const k = [inStack[i], inStack[j]].sort().join('|');
+                if (seenSyn.has(k)) continue;
+                seenSyn.add(k);
+                synergies.push({
+                  a: inStack[i], b: inStack[j],
+                  effect: entry.effect, mechanism: entry.mechanism,
+                  severity: entry.severity, score: entry.score,
+                });
+              }
+            }
+          }
+        }
+        synergies.sort((a, b) => b.score - a.score);
+
+        if (synergies.length === 0) return null;
+        const totalSyn = synergies.reduce((s, x) => s + x.score, 0);
+        const highCount = synergies.filter(s => s.severity === 'HIGH').length;
+
+        return (
+          <div style={{ marginTop:6 }}>
+            <div onClick={() => setShowSynergyCard(!showSynergyCard)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showSynergyCard ? '8px 8px 0 0' : 8, background: highCount > 2 ? 'rgba(34,197,94,0.08)' : 'rgba(34,197,94,0.05)', border:'1px solid ' + (highCount > 2 ? 'rgba(34,197,94,0.2)' : 'rgba(34,197,94,0.12)') }}>
+              <span style={{ fontSize:10, fontWeight:700, color:'#22c55e', display:'flex', alignItems:'center', gap:5 }}>
+                🧬 Синергии веществ ({synergies.length})
+                <span style={{ fontSize:7, fontWeight:600, color:'rgba(34,197,94,0.5)', padding:'1px 5px', borderRadius:4, background:'rgba(34,197,94,0.1)' }}>Σ score: {totalSyn}</span>
+              </span>
+              <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showSynergyCard ? '▲ скрыть' : '▼ показать'}</span>
+            </div>
+            {showSynergyCard && (
+              <div style={{ padding:'6px 9px', background:'rgba(34,197,94,0.03)', border:'1px solid rgba(34,197,94,0.08)', borderTop:'none', borderRadius:'0 0 8px 8px' }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:5, lineHeight:1.4 }}>
+                  Найдено {synergies.length} синергических пар среди {finalRec.subs.length} веществ назначения. Синергии усиливают взаимный эффект препаратов.
+                </div>
+                {synergies.slice(0, 20).map((syn, i) => {
+                  const sevColor = syn.severity === 'HIGH' ? '#22c55e' : syn.severity === 'MEDIUM' ? '#f59e0b' : 'rgba(255,255,255,0.5)';
+                  const sevBg = syn.severity === 'HIGH' ? 'rgba(34,197,94,0.06)' : syn.severity === 'MEDIUM' ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.03)';
+                  return (
+                    <div key={i} style={{ padding:'4px 7px', borderRadius:5, background:sevBg, border:`1px solid ${sevColor}15`, marginBottom:3 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
+                        <span style={{ fontSize:9, color:'#fff', fontWeight:600 }}>{subNameRu(syn.a)}</span>
+                        <span style={{ fontSize:7, color:sevColor, fontWeight:700 }}>+{syn.score}</span>
+                        <span style={{ fontSize:9, color:'#fff', fontWeight:600 }}>{subNameRu(syn.b)}</span>
+                        <span style={{ marginLeft:'auto', fontSize:7, fontWeight:700, color:sevColor, padding:'1px 5px', borderRadius:3, background:`${sevColor}15` }}>{syn.severity}</span>
+                      </div>
+                      <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', marginBottom:1 }}>{syn.effect}</div>
+                      <div style={{ fontSize:7, color:'rgba(255,255,255,0.45)', lineHeight:1.3 }}>{syn.mechanism}</div>
                     </div>
                   );
                 })}

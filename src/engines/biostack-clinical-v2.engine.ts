@@ -13,6 +13,7 @@ import { normalizeMechanisms } from './biostack-mechanism-normalizer';
 import { getCost } from './biostack-budget.engine';
 import type { LabCompositeResult } from './lab-analysis.engine';
 import { SUBSTANCE_ANALOGS, SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX } from '../data/support-meta';
+import { SYNERGY_NETWORK, type SynergyNetworkEntry } from '../data/support-synergy-network';
 
 /* ─────────────────────────────────────────────────────────────────────────
    Clinical-grade improvements for BioStack (sports pharmacology audit)
@@ -552,6 +553,8 @@ export interface SelectStackResult {
   redundancy: PathwayRedundancy[];
   cycling: CyclingAdvice[];
   strategy: StackStrategy;
+  synergyPairs: { a: string; b: string; effect: string; mechanism: string; severity: string; score: number }[];
+  synergyBoost: number; // total synergy score for the stack (cumulative)
 }
 
 export function selectStack(
@@ -598,6 +601,47 @@ export function selectStack(
   const redundancy = checkPathwayRedundancy(ids);
   const cycling = getStackCyclingAdvice(ids, 'none');
 
+  // 7. synergy scoring — find pairs in SYNERGY_NETWORK that boost the selected stack
+  const idSet = new Set(ids.map(id => id.toLowerCase()));
+  const synergyPairs: SelectStackResult['synergyPairs'] = [];
+  let synergyBoost = 0;
+
+  for (const entry of SYNERGY_NETWORK) {
+    if (entry.type !== 'synergy') continue;
+    const members = [entry.a, entry.b, entry.c, entry.d, entry.e, entry.f, entry.g]
+      .filter(Boolean)
+      .concat(entry.substances || [])
+      .map(s => s!.toLowerCase());
+
+    // Count how many members of this synergy entry are in our stack
+    const inStack = members.filter(m => idSet.has(m));
+    if (inStack.length >= 2) {
+      // Generate pairs from the in-stack substances
+      for (let i = 0; i < inStack.length; i++) {
+        for (let j = i + 1; j < inStack.length; j++) {
+          synergyPairs.push({
+            a: inStack[i],
+            b: inStack[j],
+            effect: entry.effect,
+            mechanism: entry.mechanism,
+            severity: entry.severity,
+            score: entry.score,
+          });
+          synergyBoost += entry.score / (members.length || 1);
+        }
+      }
+    }
+  }
+
+  // Deduplicate and sort by score desc
+  const seenPairs = new Set<string>();
+  const uniqueSynergyPairs = synergyPairs.filter(p => {
+    const k = [p.a, p.b].sort().join('|');
+    if (seenPairs.has(k)) return false;
+    seenPairs.add(k);
+    return true;
+  }).sort((a, b) => b.score - a.score);
+
   return {
     ids,
     hardStops,
@@ -609,5 +653,7 @@ export function selectStack(
     redundancy,
     cycling,
     strategy,
+    synergyPairs: uniqueSynergyPairs,
+    synergyBoost: Math.round(synergyBoost),
   };
 }
