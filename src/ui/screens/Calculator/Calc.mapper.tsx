@@ -27,6 +27,7 @@ import { MECH_TRANSLATIONS_RU, MECH_LABELS } from '../SupportScreen_parts/Suppor
 import { CalcSubstanceManager } from './CalcSubstanceManager';
 import { checkStackToxicity, type ToxWarning } from '../../../engines/biostack-safety.engine';
 import { calculateReboundTrajectory, getReboundSummary, type ReboundInput } from '../../../engines/rebound-modeling.engine';
+import { printProtocol, buildExportDataFromRec, ExportButton } from '../../../ui/components/ProtocolExport';
 
 // ── Конфигурация суставного модуля ──────────────────────────────────────────
 interface JointPreset {
@@ -2667,6 +2668,29 @@ const CalcActions: React.FC<CalcActionsProps> = ({ rec, state }) => {
     setDoctorFlash(true); setTimeout(() => setDoctorFlash(false), 1800);
   }, [rec, state]);
 
+  const [pdfFlash, setPdfFlash] = useState(false);
+  const exportPdf = useCallback(() => {
+    if (!finalRec) return;
+    const data = buildExportDataFromRec(
+      finalRec,
+      {
+        name: state.profile?.name || 'Пациент',
+        age: state.profile?.age || 30,
+        weight: state.profile?.weight || 80,
+        height: state.profile?.height || 178,
+        sex: state.profile?.sex || 'male',
+      },
+      {
+        drugs: rec?.phaseAssignedDrugs?.map((d: any) => d.substanceId) || [],
+        peds: rec?.pedFlags?.pedIds || [],
+        weeks: state.goals?.cycleWeeks || 12,
+        phase: rec?.phase || 'course',
+      }
+    );
+    printProtocol(data);
+    setPdfFlash(true); setTimeout(() => setPdfFlash(false), 1800);
+  }, [finalRec, rec, state]);
+
   const btn = (label: string, onClick: () => void, flash: boolean, col: string, icon: string) => (
     <button onClick={onClick} style={{
       flex:1, padding:'6px 5px', borderRadius:8, fontSize:8, fontWeight:700, cursor:'pointer',
@@ -2682,6 +2706,7 @@ const CalcActions: React.FC<CalcActionsProps> = ({ rec, state }) => {
       {btn('Сохранить', saveToFavorites, savedFlash, 'rgba(99,102,241,0.4)', '💾')}
       {btn('Копировать', copyPlan, copiedFlash, 'rgba(96,165,250,0.4)', '📋')}
       {btn('Врачу', copyDoctor, doctorFlash, 'rgba(168,85,247,0.4)', '📄')}
+      {btn('PDF', exportPdf, pdfFlash, 'rgba(245,158,11,0.4)', '🖨')}
     </div>
   );
 };
