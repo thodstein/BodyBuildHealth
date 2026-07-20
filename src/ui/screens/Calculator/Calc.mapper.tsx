@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import type { LabSlice } from '../../../engines/support-plan';
 import type { CalculatorState } from '../../../engines/support-plan';
@@ -705,21 +705,21 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   useEffect(() => {
     if (!finalRec) return;
     try {
+      const notifLabs = labSliceToValues(state.labs?.fullPanel ?? null);
       const notifState: any = {
         labs: {
           lastLabDate: state.labs?.fullPanel?.date,
-          alt: state.labs?.fullPanel?.ALT,
-          ast: state.labs?.fullPanel?.AST,
-          e2: state.labs?.fullPanel?.ESTRADIOL,
-          prl: state.labs?.fullPanel?.PROLACTIN,
-          hct: state.labs?.fullPanel?.HEMATOCRIT,
-          ldl: state.labs?.fullPanel?.LDL,
-          egfr: state.labs?.fullPanel?.EGFR,
-          dDimer: state.labs?.fullPanel?.D_DIMER,
+          alt: notifLabs['ALT'] ?? notifLabs['АЛТ'],
+          ast: notifLabs['AST'] ?? notifLabs['АСТ'],
+          e2: notifLabs['ESTRADIOL'] ?? notifLabs['ЭСТРАДИОЛ'],
+          prl: notifLabs['PROLACTIN'] ?? notifLabs['ПРОЛАКТИН'],
+          hct: notifLabs['HEMATOCRIT'] ?? notifLabs['ГЕМАТОКРИТ'],
+          ldl: notifLabs['LDL'] ?? notifLabs['ЛПНП'],
+          egfr: notifLabs['EGFR'] ?? notifLabs['СКФ'],
+          dDimer: notifLabs['D_DIMER'] ?? notifLabs['D_ДИМЕР'],
         },
         pharma: {
           phase: rec?.phase || 'course',
-          courseStartDate: state.goals?.courseStartDate,
           hasAI: rec?.subs?.some((s: any) => s.substanceId === 'anastrozole' || s.substanceId === 'anastro'),
           hasOral17: rec?.pedFlags?.hasOral17 || false,
         },
@@ -2798,11 +2798,11 @@ const CalcActions: React.FC<CalcActionsProps> = ({ rec, state }) => {
 
   const [pdfFlash, setPdfFlash] = useState(false);
   const exportPdf = useCallback(() => {
-    if (!finalRec) return;
+    if (!rec) return;
     const data = buildExportDataFromRec(
-      finalRec,
+      rec,
       {
-        name: state.profile?.name || 'Пациент',
+        name: (state.profile as any)?.name || 'Пациент',
         age: state.profile?.age || 30,
         weight: state.profile?.weight || 80,
         height: state.profile?.height || 178,
@@ -2817,7 +2817,7 @@ const CalcActions: React.FC<CalcActionsProps> = ({ rec, state }) => {
     );
     printProtocol(data);
     setPdfFlash(true); setTimeout(() => setPdfFlash(false), 1800);
-  }, [finalRec, rec, state]);
+  }, [rec, state]);
 
   const btn = (label: string, onClick: () => void, flash: boolean, col: string, icon: string) => (
     <button onClick={onClick} style={{

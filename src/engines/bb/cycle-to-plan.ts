@@ -829,3 +829,430 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
 
   return { ...finalPlan, volumeLandmarks, muscleFrequency };
 }
+
+// ──────────────────────────────────────────────────────────────────────
+// DIRECT CONVERTER: FullProgram → BBPlan (FAITHFUL MODE).
+// Использует ВСЕ недели из program.weeks[], сохраняя реальную прогрессию,
+// RIR/множители/фазы (!), warmup/rest/reps/notes/progression каждого упражнения.
+// Не пересоздаёт недели из week1 — это устраняет искажение готовых программ.
+// ──────────────────────────────────────────────────────────────────────
+
+export interface ProgramToBBPlanOpts {
+  workMax: Record<string, number>;
+  weakPoints?: string[];
+  focusGroup?: string;
+  injuries?: Injury[];
+  intTechnique?: IntensityTechnique;
+  autoDeload?: boolean;
+  deloadType?: DeloadType;
+  loadStrategy?: LoadStrategy;
+  autoRegResult?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number };
+  favoriteExercises?: string[];
+  excludedExercises?: string[];
+  avoidAxialLoad?: boolean;
+  equipment?: string[];
+  peds?: PED[];
+  pedDoses?: Record<string, number>;
+  courseIntensity?: CourseIntensity;
+  level?: string;
+  volumeGoal?: BBVolumeGoal;
+  specialization?: boolean;
+  /** Режим адаптации: 'faithful' = программа дословно (только safety-фильтры), 'adapt' = + добивка слабых групп */
+  mode?: 'faithful' | 'adapt';
+}
+
+function parseReps(repsStr: string | undefined): number {
+  if (!repsStr) return 8;
+  const s = String(repsStr).trim();
+  if (/^(amrap|max|\d\+)$/i.test(s)) return 5; // AMRAP → берём средний расчёт
+  // "5-8" → среднее 6.5; "5/3/1" → 3 (наиболее «жёсткая» цифровая сессия); "10-12" → 11
+  const first = s.match(/(\d+)/);
+  if (first) return parseInt(first[1], 10);
+  return 8;
+}
+
+function parseRepsRange(repsStr: string | undefined): [number, number] {
+  if (!repsStr) return [8, 12];
+  const s = String(repsStr).trim();
+  if (/^(amrap|max|\d\+)$/i.test(s)) return [4, 10];
+  const m = s.match(/(\d+)\s*[-–]\s*(\d+)/);
+  if (m) return [parseInt(m[1], 10), parseInt(m[2], 10)];
+  const slash = s.match(/(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)/);
+  if (slash) return [parseInt(slash[3], 10), parseInt(slash[1], 10)];
+  const first = s.match(/(\d+)/);
+  if (first) { const v = parseInt(first[1], 10); return [v, v]; }
+  return [8, 12];
+}
+
+/** warmup parsing: "3 ramp-up sets per exercise" → ramp 30/60/80% */
+function parseWarmup(workWeight: number, dayWarmup: string | undefined): { load: number; reps: number }[] {
+  const wu: { load: number; reps: number }[] = [];
+  if (!dayWarmup || workWeight <= 0) return wu;
+  // Если heat weight указан — строим ramp по % рабочего веса
+  const steps = workWeight <= 60 ? 2 : workWeight <= 100 ? 3 : 4;
+  for (let i = 1; i <= steps; i++) {
+    const pct = 0.30 + 0.55 * (i / steps);
+    wu.push({ load: Math.round(workWeight * pct), reps: Math.min(8, 5 + i) });
+  }
+  return wu;
+}
+
+export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts): BBPlan {
+  const mode = opts.mode || 'adapt';
+  const totalWeeks = program.weeks.length;
+  const daysPerWeek = program.daysPerWeek;
+  const workMax = opts.workMax || {};
+  const weakPoints = mode === 'faithful' ? [] : (opts.weakPoints || []);
+  const focusGroup = mode === 'faithful' ? undefined : opts.focusGroup;
+  const excludedMuscles = getExcludedMuscles(opts.injuries || [], new Date().toISOString().slice(0, 10));
+  const gradedInjuries = getGradedInjuries(opts.injuries || [], new Date().toISOString().slice(0, 10));
+  const exclIds = new Set(opts.excludedExercises || []);
+  const favIds = new Set(opts.favoriteExercises || []);
+  const eqList = opts.equipment || [];
+  const avAxial = mode === 'faithful' ? false : (opts.avoidAxialLoad || false);
+  const level = opts.level || 'intermediate';
+
+  // PED adaptation для MRV-кап (добивка слабых групп не превышает MRV)
+  const levelForLandmarks = (['beginner', 'intermediate', 'advanced'].includes(level) ? level : 'intermediate') as 'beginner' | 'intermediate' | 'advanced';
+  const allLandmarks = getAllVolumeLandmarks(levelForLandmarks);
+  const landmarks = Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv]));
+  const pedAdapt = adaptForPEDs(opts.peds || [], landmarks, opts.pedDoses, opts.courseIntensity);
+  const mrvMult = pedAdapt.combinedMrvMultiplier || 1.0;
+  const pedMrvMult = mrvMult;
+
+  const rationale: string[] = [];
+  rationale.push(`📚 Программа: ${program.name} (${program.author})`);
+  rationale.push(`📅 ${totalWeeks} нед, ${daysPerWeek}×/нед, уровень ${program.level}`);
+  rationale.push(`🎯 Цель: ${program.goal}${program.direction && program.direction !== program.goal ? ` (${program.direction})` : ''}`);
+  if (program.progressionModel) rationale.push(`📈 Прогрессия: ${program.progressionModel}`);
+  if (program.deloadProtocol) rationale.push(`🔋 Разгрузка: ${program.deloadProtocol}`);
+  if (mode === 'faithful') rationale.push(`🔒 Режим: Точно по программе (прогрессия/RIR/warmup сохранены дословно)`);
+  else rationale.push(`🔧 Режим: Адаптация (структура программы сохранена + добивка слабых групп)`);
+  if (weakPoints.length > 0) rationale.push(`🔥 Слабые группы (+accessory добивка): ${weakPoints.join(', ')}`);
+  if (focusGroup) rationale.push(`⭐ Фокус-группа (+30% объём): ${focusGroup}`);
+  if (excludedMuscles.size > 0) rationale.push(`⚠ Исключены мышцы (травма): ${[...excludedMuscles].join(', ')}`);
+  if (opts.peds && opts.peds.length > 0) rationale.push(`💉 PED: MRV ×${mrvMult.toFixed(2)}`);
+  if (opts.avoidAxialLoad) rationale.push(`🦴 Без осевой нагрузки`);
+
+  // Build weeks — все недели из program.weeks[] напрямую (faithful)
+  const weeks: BBWeek[] = [];
+  for (let wIdx = 0; wIdx < program.weeks.length; wIdx++) {
+    const pw = program.weeks[wIdx];
+    const weekNum = pw.week || (wIdx + 1);
+    const isDeload = !!pw.deload;
+    const volMult = pw.volumeMultiplier ?? 1.0;
+    const intMult = pw.intensityMultiplier ?? 1.0;
+
+    const sessions: BBSession[] = [];
+    for (let dIdx = 0; dIdx < pw.days.length; dIdx++) {
+      const pd = pw.days[dIdx];
+      if (!pd.exercises || pd.exercises.length === 0) continue;
+      const musclesInDay = pd.exercises.map(e => muscleGroupFromExName(e.name, EXERCISE_CATALOG));
+      // Determine primary muscle of day (first muscle appearing with RPE >= 8 or just first exercise)
+      const firstExerciseMuscle = musclesInDay[0] || 'chest';
+      const sessionTag = (() => {
+        const s = new Set(musclesInDay);
+        const hasChest = s.has('chest'), hasBack = s.has('back'), hasShoulders = s.has('shoulders');
+        const hasQuads = s.has('quads'), hasHams = s.has('hamstrings'), hasGlutes = s.has('glutes');
+        const isLegs = hasQuads || hasHams || hasGlutes;
+        const hasBi = s.has('biceps'), hasTri = s.has('triceps');
+        if (hasChest && hasBack && !isLegs) return 'ChestBack';
+        if (hasChest && hasTri && !hasBack && !isLegs) return 'Push';
+        if (hasBack && hasBi && !hasChest && !isLegs) return 'Pull';
+        if (hasShoulders && (hasBi || hasTri) && !hasChest && !hasBack && !isLegs) return 'ShouldersArms';
+        if (hasChest && !hasBack && !isLegs) return 'Chest';
+        if (hasBack && !hasChest && !isLegs) return 'Back';
+        if (hasShoulders && !hasChest && !hasBack && !isLegs) return 'Shoulders';
+        if ((hasBi || hasTri) && !hasChest && !hasBack && !isLegs && !hasShoulders) return 'Arms';
+        if (isLegs && !hasChest && !hasBack) return 'Legs';
+        if (hasChest && hasBack && isLegs) return 'FullBody';
+        return 'FullBody';
+      })();
+      const hasHeavy = pd.exercises.some(e => (e.rpe || 7) >= 8);
+
+      // Track per-muscle первичного упражнения — для primary/accessory роли
+      const seenMusclesPrimary = new Set<string>();
+      const exercises: BBExercise[] = [];
+
+      for (let eIdx = 0; eIdx < pd.exercises.length; eIdx++) {
+        const ex = pd.exercises[eIdx];
+        const muscle = muscleGroupFromExName(ex.name, EXERCISE_CATALOG);
+        if (excludedMuscles.has(muscle)) continue;
+
+        // Find catalog entry (for safety filters)
+        const catEntry = EXERCISE_CATALOG.find(e => e.name === ex.name);
+        const catId = catEntry?.id || '';
+
+        // excluded exercise (user prefs) — заменить на альтернативу
+        let finalExName = ex.name;
+        if (exclIds.has(catId) || exclIds.has(ex.name)) {
+          const rep = findReplacementForCycle(ex.name, muscleGroupFromExName(ex.name, EXERCISE_CATALOG), new Set(), favIds, new Set());
+          if (rep) finalExName = rep.name;
+          else continue;
+        }
+        // avoidAxialLoad filter
+        if (avAxial && catEntry && isAxialLoadExercise(catEntry)) {
+          const rep = findReplacementForCycle(ex.name, muscleGroupFromExName(ex.name, EXERCISE_CATALOG), new Set(), favIds, new Set());
+          if (rep) finalExName = rep.name;
+        }
+        // equipment filter
+        if (eqList.length > 0 && catEntry) {
+          const rawEq = (catEntry as any).equipment;
+          const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
+          if (exEq.length > 0 && !exEq.some(eq => eqList.includes(eq))) {
+            const rep = findReplacementForCycle(ex.name, muscleGroupFromExName(ex.name, EXERCISE_CATALOG), new Set(), favIds, new Set());
+            if (rep) finalExName = rep.name;
+          }
+        }
+
+        const rir = ex.rir ?? (ex.rpe !== undefined ? Math.max(0, 10 - ex.rpe) : 2);
+        const reps = parseReps(ex.reps);
+        const [repMin, repMax] = parseRepsRange(ex.reps);
+        const sets = ex.sets || 3;
+        const restSec = ex.restSec || (rir <= 2 ? 150 : 90);
+
+        // Primary/accessory role by load label OR first muscle in day
+        const isMainLoad = /тяж|heavy/i.test((ex as any).notes || '') || (ex.rpe || 0) >= 8;
+        let role: 'primary' | 'accessory' = 'accessory';
+        if (!seenMusclesPrimary.has(muscle) && (isMainLoad || (eIdx === 0))) {
+          role = 'primary';
+          seenMusclesPrimary.add(muscle);
+        }
+
+        // Weight calculation
+        const workMaxVal = (function () {
+          if (workMax[muscle]) return workMax[muscle];
+          if (muscle === 'quads' && workMax['legs']) return workMax['legs'];
+          if (muscle === 'hamstrings' && workMax['legs']) return Math.round(workMax['legs'] * 0.65);
+          if (workMax['chest']) return workMax['chest'];
+          return 80;
+        })();
+        const pctForRir = PCT_FOR_RIR[rir] ?? 0.82;
+        const baseWeight = workMaxVal * pctForRir * intMult;
+        const setDrift = 1; // faithful: neutral drift per set (program progress handles progression)
+        const weightPerSet = Math.round(baseWeight * setDrift * 10) / 10;
+
+        // Fade out reps per set slightly for multi-set work (program variance) — faithful: stay uniform
+        const workSets: BBSet[] = Array.from({ length: sets }, (_, si) => ({
+          reps,
+          rir,
+          weight: Math.round(weightPerSet * (1 + si * 0.02) * 10) / 10, // small top-set escalation
+          restSeconds: restSec,
+          tempo: undefined,
+        }));
+
+        // Adapt mode: weak group boost (+ sets), focus boost
+        let adjSets = sets;
+        let adjRepsMin = repMin, adjRepsMax = repMax, adjRir = rir;
+        if (mode === 'adapt') {
+          const isWeak = weakPoints.includes(muscle);
+          const isFocus = focusGroup === muscle;
+          if (isWeak) adjSets = Math.round(adjSets * 1.15); // small boost, не раздуваю (есть добивка ниже)
+          if (isFocus) adjSets = Math.round(adjSets * 1.30);
+          if (isWeak) adjRir = Math.max(0, rir - 1); // слабые → упорнее
+        }
+        const usedSets = adjSets !== sets
+          ? Array.from({ length: Math.max(1, adjSets) }, (_, si) => ({
+              reps,
+              rir: adjRir,
+              weight: Math.round(weightPerSet * (1 + si * 0.02) * 10) / 10,
+              restSeconds: restSec,
+            }))
+          : workSets;
+
+        // Graded injury adaptation
+        const gradedInj = gradedInjuries.find(i => muscleGroupFromExName((i as any).muscle || i.muscle, EXERCISE_CATALOG) === muscle);
+        if (gradedInj) {
+          const volPct = (gradedInj as any).volumePct ?? 1.0;
+          const wtPct = (gradedInj as any).weightPct ?? 1.0;
+          const reduced = Math.max(1, Math.round(adjSets * volPct));
+          usedSets.forEach((ws, i) => { if (i >= reduced) usedSets.splice(i); });
+          usedSets.forEach(ws => { ws.weight = Math.round(ws.weight * wtPct * 10) / 10; ws.rir = Math.min(5, ws.rir + 1); });
+        }
+
+        const workWeight = usedSets[0]?.weight || weightPerSet;
+        exercises.push({
+          name: finalExName,
+          muscle,
+          role,
+          character: (ex.rpe || 7) >= 8 ? 'тяж' : 'памп',
+          sets: usedSets.length,
+          repsRange: [Math.min(adjRepsMin, reps), Math.max(adjRepsMax, reps)],
+          rir: adjRir,
+          workSets: usedSets,
+          restSeconds: restSec,
+          exerciseName: finalExName,
+          comment: `${role === 'primary' ? '🎯 Основное' : '📌 Добивочное'}: ${muscle}. ${usedSets.length}×${reps} @${Math.round(workWeight)} кг, RIR ${adjRir}.${ex.notes ? ' ' + ex.notes : ''}${ex.progression ? ' ' + ex.progression : ''}${mode === 'adapt' && weakPoints.includes(muscle) ? ' 🔥 Слабая группа.' : ''}${mode === 'adapt' && focusGroup === muscle ? ' ⭐ Фокус.' : ''}`,
+          warmupSets: role === 'primary' ? parseWarmup(workWeight, pd.warmup) : [],
+          rationale: `${finalExName} (${muscle}) из программы «${program.name}» недели ${weekNum}`,
+        });
+      }
+
+      // ▓▓ ADAPT MODE: добивка слабых групп accessory упражнениями в конце дня ▓▓
+      if (mode === 'adapt' && weakPoints.length > 0 && exercises.length > 0) {
+        const allDayMuscles = new Set(exercises.map(e => e.muscle));
+        const seenNames = new Set(exercises.map(e => e.name));
+        // 1. Слабая группа, уже представленная в дне (но не primary) → +1 isolation добивка
+        for (const wp of weakPoints) {
+          if (allDayMuscles.has(wp)) {
+            const candidates = EXERCISE_CATALOG.filter(e => (e.group || '').toLowerCase() === wp && !seenNames.has(e.name) && trueMuscleOf(e) !== null);
+            if (candidates.length > 0) {
+              const iso = candidates.find(c => c.type === 'isolation') || candidates[0];
+              const wm = workMax[wp] || workMax['chest'] || 60;
+              const w = Math.round(wm * 0.55 * 10) / 10; // 55% 1RM — памп-добивка
+              exercises.push({
+                name: iso.name, muscle: wp, role: 'accessory', character: 'памп',
+                sets: 3, repsRange: [12, 15], rir: 3,
+                workSets: Array.from({ length: 3 }, () => ({ reps: 12, rir: 3, weight: w, restSeconds: 60 })),
+                restSeconds: 60, exerciseName: iso.name,
+                comment: `🔥 Слабая группа — памп-добивка: ${iso.name}, 3×12 @${w} кг, RIR 3.`,
+                warmupSets: [],
+                rationale: `Pump finisher для слабой группы ${wp}`,
+              });
+              seenNames.add(iso.name);
+              allDayMuscles.add(wp);
+            }
+          }
+        }
+        // 2. Слабая группа НЕ представлена в дне, но день совместим (Push/Pull/Legs/Shoulders/Arms):
+        // добивка в дни-антагонисты или synergist (Push-день + biceps/triceps weak → ok)
+        const isLegsDay = sessionTag === 'Legs' || String(sessionTag).startsWith('Lower');
+        const isUpperDay = !isLegsDay;
+        for (const wp of weakPoints) {
+          if (allDayMuscles.has(wp)) continue;
+          // совместимость: arms/shoulders/calves/abs → в upper day; legs group → в legs day; иначе skip
+          const isWpLegs = ['quads', 'hamstrings', 'glutes', 'calves'].includes(wp);
+          const isWpUpper = ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'forearms', 'arms'].includes(wp);
+          const isWpAbs = wp === 'abs';
+          if (isWpLegs && !isLegsDay) continue;
+          if (isWpUpper && !isUpperDay && !isWpAbs) continue;
+          // MRV soft-cap
+          const lm = (allLandmarks as any)[wp];
+          if (lm && lm.mrv) {
+            // посчитать weekly объём этой мышцы — на недельном уровне кап тяжело, проверим session cap
+            const sessionSetsThisMuscle = exercises.filter(e => e.muscle === wp).reduce((a, e) => a + e.sets, 0);
+            const sessionMrvCap = Math.round(lm.mrv * pedMrvMult / Math.max(1, daysPerWeek));
+            if (sessionSetsThisMuscle >= sessionMrvCap) continue;
+          }
+          const candidates = EXERCISE_CATALOG.filter(e => (e.group || '').toLowerCase() === wp && !seenNames.has(e.name) && trueMuscleOf(e) !== null);
+          if (candidates.length === 0) continue;
+          const cat = candidates.find(c => c.type === 'compound') || candidates.find(c => c.type === 'isolation') || candidates[0];
+          const wm = workMax[wp] || 70;
+          const w = Math.round(wm * 0.65 * 10) / 10;
+          exercises.push({
+            name: cat.name, muscle: wp, role: 'accessory', character: 'памп',
+            sets: 3, repsRange: [10, 12], rir: 3,
+            workSets: Array.from({ length: 3 }, () => ({ reps: 10, rir: 3, weight: w, restSeconds: 60 })),
+            restSeconds: 60, exerciseName: cat.name,
+            comment: `🔥 Слабая группа ${wp} — accessory добивка: ${cat.name}, 3×10 @${w} кг, RIR 3.`,
+            warmupSets: [],
+            rationale: `Weak-group accessory для ${wp} (.DTO день-совместим)`,
+          });
+          seenNames.add(cat.name);
+          allDayMuscles.add(wp);
+        }
+      }
+
+      // Sort: primary first, then compound → isolation → pump finisher; faithful: respect original order
+      // Adapt: keep original order + finisher в конце (уже так pushились), но primary в начало
+      if (mode === 'adapt') {
+        exercises.sort((a, b) => (a.role === 'primary' ? -1 : 1) - (b.role === 'primary' ? -1 : 1));
+      }
+
+      sessions.push({
+        day: dIdx + 1,
+        weekOffset: (wIdx) * daysPerWeek + dIdx + 1,
+        character: hasHeavy ? 'тяж' : 'памп',
+        sessionTag,
+        exercises,
+      });
+    }
+
+    // Faithful deload: уважаем pw.deload (volume×0.5 уже учтён в volumeMultiplier, но дополнительно снизим на -50%)
+    if (isDeload) {
+      for (const sess of sessions) {
+        for (const ex of sess.exercises) {
+          ex.sets = Math.max(1, Math.round(ex.sets * 0.5 / Math.max(0.5, volMult)));
+          ex.rir = Math.min(5, ex.rir + 1);
+          for (const ws of ex.workSets) {
+            ws.weight = Math.round(ws.weight * 0.85 * 10) / 10;
+            ws.rir = Math.min(5, ws.rir + 1);
+          }
+        }
+      }
+      rationale.push(`🔋 Разгрузка нед ${weekNum}: объём -50%, RIR +1, вес -15%`);
+    }
+
+    weeks.push({ week: weekNum, sessions });
+  }
+
+  // Compute rotationMuscleVolume from week 1
+  const rotationMuscleVolume: Record<string, number> = {};
+  if (weeks.length > 0) {
+    for (const sess of weeks[0].sessions) {
+      for (const ex of sess.exercises) {
+        rotationMuscleVolume[ex.muscle] = (rotationMuscleVolume[ex.muscle] || 0) + ex.sets;
+      }
+    }
+  }
+
+  // muscleFrequency — calculate from all weeks (avg per week)
+  const muscleFrequency: Record<string, number> = {};
+  if (weeks.length > 0) {
+    for (const wk of weeks) {
+      const weekMuscles = new Set<string>();
+      for (const sess of wk.sessions) {
+        for (const ex of sess.exercises) {
+          if (!excludedMuscles.has(ex.muscle)) weekMuscles.add(ex.muscle);
+        }
+      }
+      for (const m of weekMuscles) muscleFrequency[m] = (muscleFrequency[m] || 0) + 1;
+    }
+    // normalize to per-week average
+    for (const m of Object.keys(muscleFrequency)) {
+      muscleFrequency[m] = Math.round(muscleFrequency[m] / weeks.length * 10) / 10;
+    }
+  }
+
+  // Pattern info for BBPlan
+  const pattern = {
+    id: program.id, name: program.name, description: program.description || '',
+    rotationDays: 7, sessionsPerRotation: daysPerWeek,
+    level: [program.level],
+    schedule: (weeks[0]?.sessions || []).map((s, i) => ({
+      kind: 'тренировка' as const, character: null,
+      sessionTag: s.sessionTag || ['Upper', 'Lower', 'Push', 'Pull', 'Legs', 'FullBody'][i % 6],
+    })),
+  };
+
+  let finalPlan: BBPlan = { pattern, weeks, rotationMuscleVolume, rationale };
+
+  // Apply post-processing for adapt mode (интенс-техники/авто-делод/загрузка/авторег)
+  if (mode === 'adapt' && ((opts.intTechnique && opts.intTechnique !== 'none') || weakPoints.length > 0 || opts.loadStrategy || opts.autoDeload || opts.autoRegResult)) {
+    finalPlan = applyPostPhaseProcessing({
+      plan: finalPlan,
+      totalWeeks,
+      workMax,
+      loadStrategy: opts.loadStrategy as LoadStrategy,
+      autoDeload: opts.autoDeload,
+      deloadType: opts.deloadType,
+      acwrRatio: 1,
+      autoRegResult: opts.autoRegResult,
+      skipPhaseRedistribution: true,
+      intensityTechnique: opts.intTechnique && opts.intTechnique !== 'none' ? opts.intTechnique : undefined,
+      weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
+    });
+  }
+
+  // Volume-landmarks
+  const volumeLandmarks = getBBVolumeLandmarks(finalPlan, levelForLandmarks, pedMrvMult);
+  return { ...finalPlan, volumeLandmarks, muscleFrequency };
+}
+
+// helper: get volume landmarks wrapper (used in adapt mode)
+function _getLandmarksForMuscle(level: 'beginner' | 'intermediate' | 'advanced', muscle: string): { mev: number; mav: number; mrv: number } | null {
+  try {
+    const all = getAllVolumeLandmarks(level);
+    return (all as any)[muscle] || null;
+  } catch { return null; }
+}

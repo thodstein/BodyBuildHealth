@@ -119,6 +119,22 @@ const SUPPLEMENT_MAX_G: Record<string, number> = {
 };
 // Глобальный лимит на одну порцию любого продукта (г)
 const MAX_GRAM_PER_ITEM = 500;
+// D-18: Realistic portion cap for cooked grains/cereals (porridge, buckwheat, rice, pasta,
+// barley, millet, quinoa ~12-28g carbs/100g). Without this, a 140g-carb lunch target pushes
+// buckwheat to ~700g portions (capped only at the global 500g) — an absurd single bowl.
+// Cap grains at 280g per meal; if the carb target needs more, a second carb source is added.
+const MAX_GRAIN_GRAM_PER_MEAL = 280;
+
+// D-18: realistic per-portion ceiling for a carb source. Low-density cooked starches
+// (grains ~12-28g/100g, potato ~17-21g, cooked pasta) need huge gram portions to hit a
+// carb target — without a cap a 140g-carb lunch pushes buckwheat to ~700g. High-density
+// carbs (bread ~50g/100g, dried fruit, honey) naturally portion small, so they keep the
+// global MAX_GRAM_PER_ITEM ceiling. Threshold: <30g carbs/100g = "cooked starch" bowl.
+function carbPortionCap(food: FoodItem): number {
+  const carbPer100 = food.carbs || 0;
+  if (carbPer100 > 0 && carbPer100 < 30) return MAX_GRAIN_GRAM_PER_MEAL;
+  return MAX_GRAM_PER_ITEM;
+}
 
 const MEAT_KEYWORDS = ['beef','pork','chicken','turkey','lamb','veal','duck','salmon','tuna','shrimp','cod','mackerel','trout','sardine','crab','lobster','squid','octopus','venison','rabbit','goose','pate','sausage','bacon','ham','pepperoni','salami','bologna','hot_dog','meatball','cutlet','steak','pollock','tilapia','herring','anchovy','clam','mussel','oyster','scallops','catfish','flounder','sole','white_fish','whelk','cockles','seafood_','fish_','_fish','mintai','mahi','trumpeter','shellfish','cockle','abalone','conch','snail','escargot','sea_urchin','sea_cucumber','caviar','roe','liver','kidney','heart_tripe','tongue','brain','sweetbread','gizzard','bison','frog','elk','boar','quail','pheasant','goat','mutton','crayfish','krill','eel','sturgeon','halibut','perch','carp','pike','bream','bass','grouper','snapper','tongue','tripe','oxtail','trotters','wings','drumstick','thigh','breast_','_breast','mince','_minced'];
 const isMeatId = (id: string): boolean => MEAT_KEYWORDS.some(k => id.toLowerCase().includes(k));
@@ -331,12 +347,16 @@ function getLeucine(food: FoodItem): number {
 }
 
 // ─── Граммовка для достижения цели по макросу ─────────────────────────
-function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carbs' | 'fat'): number {
+function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carbs' | 'fat', capG?: number): number {
   const per100 = macro === 'protein' ? (food.protein || 0) : macro === 'carbs' ? (food.carbs || 0) : (food.fat || 0);
   if (per100 <= 0) return 0;
   // Role-aware minimum: fat-dense foods (oils, nuts) need smaller min grams
   const minG = macro === 'fat' && per100 >= 80 ? 5 : macro === 'fat' && per100 >= 50 ? 10 : 20;
-  const base = Math.min(MAX_GRAM_PER_ITEM, Math.max(minG, Math.round(targetG / per100 * 100)));
+  // D-18: realistic per-item gram ceiling. Default to MAX_GRAM_PER_ITEM; caller may pass a
+  // tighter cap (e.g. MAX_GRAIN_GRAM_PER_MEAL for cooked grains so a 140g-carb target doesn't
+  // produce a 500g bowl of buckwheat).
+  const ceiling = Math.min(MAX_GRAM_PER_ITEM, capG ?? MAX_GRAM_PER_ITEM);
+  const base = Math.min(ceiling, Math.max(minG, Math.round(targetG / per100 * 100)));
   const supplementCap = SUPPLEMENT_MAX_G[food.id];
   return supplementCap ? Math.min(supplementCap, base) : base;
 }
@@ -443,6 +463,7 @@ function buildWholeMeal(
   }
 ): Meal {
   const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds, lockedIds, recentIds, vegColorIdx } = params;
+ 
   const items: MealItem[] = [];
   let remP = proteinG, remC = carbG, remF = fatG;
 
@@ -467,7 +488,29 @@ function buildWholeMeal(
     : pool.proteinSolid;
   const proteinSource = pickPriority(proteinPool, seed, { lockedIds, preferredIds: preferredRot.length > 0 ? undefined : preferredIds, recentIds });
   if (proteinSource) {
-    const grams = gramsForMacro(proteinSource, remP, 'protein');
+    let grams = gramsForMacro(proteinSource, remP, 'protein');
+   
+    // Carb-aware protein sizing (D-16): legumes (lentils/chickpeas/beans ~20-27g carbs/100g,
+    // modest protein) are carb-dense. Sizing them purely by the protein target blows the
+    // meal's carb budget — this is the root cause of "huge carbs in the last meal" on dinner
+    // / cutting / keto / low-carb days where the carb allocation is small. Cap the legume
+    // portion to the carb budget (reserving room for the dedicated carb source + veg/fruit),
+    // then let the MPS top-up (step 6) close the protein gap with zero-carb whey.
+    const proteinCarbsPer100 = proteinSource.carbs || 0;
+    const isCarbDenseProtein = proteinCarbsPer100 >= 8 && (proteinSource.protein || 0) < 25;
+    if (isCarbDenseProtein && remC > 0) {
+      const vegCarbReserve = includeVeg ? 12 : 0;
+      const fruitCarbReserve = includeFruit ? 10 : 0;
+      const maxCarbForProtein = Math.max(0, remC - vegCarbReserve - fruitCarbReserve);
+      if (proteinCarbsPer100 > 0 && maxCarbForProtein < remC) {
+        const carbCapGrams = Math.floor((maxCarbForProtein * 100) / proteinCarbsPer100);
+        if (carbCapGrams < grams) {
+          // Keep a sensible minimum portion (20g) even if it slightly overshoots —
+          // better a small legume serving + whey top-up than no protein source.
+          grams = Math.max(20, carbCapGrams);
+        }
+      }
+    }
     if (grams > 0) {
       const item = makeItem(proteinSource, grams, 'protein');
       items.push(item); remP -= item.p; remF -= item.f; remC -= item.c;
@@ -489,10 +532,27 @@ function buildWholeMeal(
      // Lines 371 & 470 now use exact Set membership check (removed substring.includes)
      // Debug: verify both lines use exact Set.has (UTF-8 safe)
      if (carbSource) {
-      const grams = gramsForMacro(carbSource, carbTarget, 'carbs');
+      // D-18: cap cooked starches at a realistic 280g portion (avoids 500g buckwheat bowls).
+      const grams = gramsForMacro(carbSource, carbTarget, 'carbs', carbPortionCap(carbSource));
       if (grams > 0) {
         const item = makeItem(carbSource, grams, 'carb_slow');
         items.push(item); remP -= item.p; remF -= item.f; remC -= item.c;
+      }
+      // D-18b: if the carb target was large and the first (grain-capped) source didn't cover it,
+      // add a second carb source (different food) to close the gap — keeps daily carb totals
+      // intact and adds intra-meal carb variety (e.g. buckwheat + rice).
+     
+      if (remC > 15 && carbTarget >= 50) {
+        const secondPool = (commonCarbs.length > 0 ? commonCarbs : carbPool).filter(f => f.id !== carbSource.id);
+        const carbSource2 = pickPriority(secondPool.length > 0 ? secondPool : carbPool.filter(f => f.id !== carbSource.id), seed + 11, { lockedIds, recentIds });
+       
+        if (carbSource2) {
+          const grams2 = gramsForMacro(carbSource2, remC, 'carbs', carbPortionCap(carbSource2));
+          if (grams2 > 0) {
+            const item2 = makeItem(carbSource2, grams2, 'carb_slow');
+            items.push(item2); remP -= item2.p; remF -= item2.f; remC -= item2.c;
+          }
+        }
       }
     }
   }
@@ -557,6 +617,42 @@ function buildWholeMeal(
           items.push(wItem); remP -= wItem.p; remF -= wItem.f; remC -= wItem.c;
         }
       }
+
+      // D-17: Post-build carb cap (safety net for buildWholeMeal only). Even after
+      // carb-aware protein sizing, carb-rich veg (sweet_potato ~20g/100g, beetroot,
+      // carrot) or large fruit portions can push the meal above its carb allocation.
+      // If total carbs exceed the target by more than 25% + 10g tolerance, scale down
+      // the carb-contributing items (carb source / veg / fruit — never protein items)
+      // proportionally. This is what keeps dinner / cutting / low-carb evenings contained.
+      if (carbG > 0) {
+        const carbCeiling = Math.round(carbG * 1.25 + 10);
+        const curC = items.reduce((s, i) => s + i.c, 0);
+        if (curC > carbCeiling) {
+          const carbItemIdxs = items
+            .map((it, i) => ({ i, c: it.c, role: it.role }))
+            .filter(x => x.c > 0 && x.role !== 'protein' && x.role !== 'fast_protein' && x.role !== 'slow_protein');
+          const carbItemCarbs = carbItemIdxs.reduce((s, x) => s + x.c, 0);
+          const proteinCarbs = curC - carbItemCarbs;
+          if (carbItemCarbs > 0) {
+            const target = Math.max(0, carbCeiling - proteinCarbs);
+            const scale = Math.min(1, target / carbItemCarbs);
+            carbItemIdxs.forEach(x => {
+              const it = items[x.i];
+              const newGrams = Math.max(0, Math.round(it.amount * scale));
+              if (newGrams < it.amount) {
+                const r = newGrams / it.amount;
+                it.amount = newGrams;
+                it.kcal = Math.round(it.kcal * r);
+                it.p = Math.round(it.p * r);
+                it.f = Math.round(it.f * r);
+                it.c = Math.round(it.c * r);
+                it.fiber = Math.round((it.fiber || 0) * r);
+                it.leucine_mg = Math.round((it.leucine_mg || 0) * r);
+              }
+            });
+          }
+        }
+      }
   const totals = items.reduce((acc, it) => ({
     kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
     fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
@@ -596,9 +692,11 @@ function buildPreWorkout(
     items.push(makeItem(proteinSource, grams, 'protein'));
   }
   if (carbSource) {
-    const grams = gramsForMacro(carbSource, carbG, 'carbs');
+    // D-18: cap cooked grains at 280g so a high-carb day doesn't yield a 500g pre-W buckwheat bowl.
+    const grams = gramsForMacro(carbSource, carbG, 'carbs', carbPortionCap(carbSource));
     items.push(makeItem(carbSource, grams, 'carb_slow'));
   }
+
 
   const totals = items.reduce((acc, it) => ({
     kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
@@ -636,9 +734,23 @@ function buildPostWorkout(
     items.push(makeItem(fastProtein, grams, 'fast_protein'));
   }
   if (fastCarb) {
-    const grams = gramsForMacro(fastCarb, carbG, 'carbs');
+    // D-18: cap cooked starches at 280g (post-W fast carbs are usually bread/pasta/rice/potato;
+    // a 100g-carb target on a high-carb day could otherwise push pasta to ~400g).
+    const grams = gramsForMacro(fastCarb, carbG, 'carbs', carbPortionCap(fastCarb));
+    const delivered = (fastCarb.carbs || 0) * grams / 100;
     items.push(makeItem(fastCarb, grams, 'carb_fast'));
+    // D-18b: if the cap left a large carb gap (high-carb day), add a second fast-carb source.
+    if (delivered < carbG - 15 && carbG >= 60) {
+      const secondPool = (prefCarb.length > 0 ? prefCarb : pool.carbFast).filter(f => f.id !== fastCarb.id);
+      const fastCarb2 = pickPriority(secondPool.length > 0 ? secondPool : pool.carbFast.filter(f => f.id !== fastCarb.id), seed + 21, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds });
+      if (fastCarb2) {
+        const rem = Math.max(0, carbG - delivered);
+        const grams2 = gramsForMacro(fastCarb2, rem, 'carbs', carbPortionCap(fastCarb2));
+        if (grams2 > 0) items.push(makeItem(fastCarb2, grams2, 'carb_fast'));
+      }
+    }
   }
+
 
   const totals = items.reduce((acc, it) => ({
     kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
@@ -665,6 +777,7 @@ function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof b
   } else {
     items.push({ id: 'cyclic_dextrin', name: 'Циклический декстрин', amount: INTRA_CARB_G_PER_H, kcal: INTRA_CARB_G_PER_H * 4, p: 0, f: 0, c: INTRA_CARB_G_PER_H, fiber: 0, role: 'liquid' });
   }
+
   const totals = items.reduce((acc, it) => ({
     kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
     fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
@@ -716,6 +829,7 @@ function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof build
   const melPool = FOOD_DB.filter(f => f.id === 'kiwi' || f.id === 'cherry' || f.id.includes('berries'));
   const melSource = pickPriority(melPool as any as FoodItem[], seed + 2, { recentIds: opts?.recentIds, lockedIds: opts?.lockedIds }) as any || melPool[0];
   if (melSource) items.push(makeItem(melSource, 50, 'fruit'));
+
 
   const totals = items.reduce((acc, it) => ({
     kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
@@ -943,6 +1057,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // 2. Обед — основной цельный приём ─────────────────────────────────────
   const lunchRot = rotationForMeal(1);
+ 
   const lunch = buildWholeMeal({
     label: 'Обед', time: tLunch, type: 'lunch',
     proteinG: mealBudget.lunch.p,
@@ -1244,7 +1359,16 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const scale = Math.max(0.88, Math.min(1.12, 1 + dev * 0.65));
       items.forEach(({ item }) => {
         const suppMin = SUPPLEMENT_MAX_G[item.id] ? 5 : floor;
-        const newAmount = Math.max(suppMin, Math.round(item.amount * scale));
+        const rawNew = Math.round(item.amount * scale);
+        // D-18: respect the realistic grain-portion ceiling when sizing carb items, so the
+        // daily-macro correction loops can't inflate a 280g buckwheat bowl back to 365g+ to
+        // close a carb deficit. A small total shortfall is preferable to an absurd portion.
+        let upCap = MAX_GRAM_PER_ITEM;
+        if (item.role === 'carb_slow' || item.role === 'carb_fast') {
+          const fd = FOOD_DB.find(f => f.id === item.id);
+          if (fd) upCap = carbPortionCap(fd);
+        }
+        const newAmount = Math.max(suppMin, Math.min(upCap, rawNew));
         const factor = newAmount / (item.amount || 1);
         item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
       });
@@ -1332,7 +1456,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // Точная граммовка: нужно изменить макрос на needDeltaG
     const deltaGrams = needDeltaG / best.per100 * 100;
     const minAmount = SUPPLEMENT_MAX_G[best.food.id] ? 5 : 10;
-    const maxAmount = SUPPLEMENT_MAX_G[best.food.id] || MAX_GRAM_PER_ITEM;
+    const suppMax = SUPPLEMENT_MAX_G[best.food.id];
+    let maxAmount = suppMax ?? MAX_GRAM_PER_ITEM;
+    // D-18: grain carb items are capped at MAX_GRAIN_GRAM_PER_MEAL even during precise
+    // adjustment — don't push a single buckwheat/rice portion above a realistic bowl.
+    if (!suppMax && (best.item.role === 'carb_slow' || best.item.role === 'carb_fast') && carbPortionCap(best.food) < maxAmount) {
+      maxAmount = carbPortionCap(best.food);
+    }
     let newAmount = best.item.amount + deltaGrams;
     newAmount = Math.max(minAmount, Math.min(maxAmount, Math.round(newAmount)));
     // Реальная дельта после округления и капов

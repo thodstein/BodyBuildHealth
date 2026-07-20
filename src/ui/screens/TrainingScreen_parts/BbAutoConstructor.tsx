@@ -36,10 +36,12 @@ import type { InjurySelectEntry } from './InjurySelectCard';
 import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, type LoadStrategy, type DeloadType, INTENSITY_TECHNIQUES, DEFAULT_TECHNIQUE_BY_PHASE, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { PCT_FOR_RIR } from '../../../engines/rir-table';
 import { getCyclesByDirection, getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
-import { convertCycleToBBPlan, programToCycleTemplate, cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
+import { convertCycleToBBPlan, programToCycleTemplate, cycleTemplateToFullProgram, programToBBPlan } from '../../../engines/bb/cycle-to-plan';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
-import { getAllPrograms } from '../../../engines/complete-program-library.engine';
+import { getAllPrograms, FULL_PROGRAM_LIBRARY } from '../../../engines/complete-program-library.engine';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
+import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
+import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { getPlanFeedback } from '../../../engines/plan-execution-feedback.engine';
 import { validatePlan, weeklySetsFromBBPlan } from '../../../engines/plan-validator';
 import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } from './PlanCharts';
@@ -200,6 +202,9 @@ export const BbAutoConstructor: React.FC = () => {
   const [bbEquipment, setBbEquipment] = useState<string[]>(() => prof.equipment || []);
   // Кастомный цикл из библиотеки программ (через planner-bridge kind='program' или прямой пикер)
   const [customCycle, setCustomCycle] = useState<SRCycleTemplate | null>(null);
+  const [customProgram, setCustomProgram] = useState<FullProgram | null>(null);
+  const [bbProgramPath, setBbProgramPath] = useState<'library' | 'cycle'>('cycle');
+  const [bbAdaptMode, setBbAdaptMode] = useState<'faithful' | 'adapt'>('adapt');
   const [bbSource, setBbSource] = useState<'cycle' | 'program'>(customCycle ? 'program' : 'cycle');
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(customCycle ? customCycle.meta.id.replace('prog_', '') : null);
   const [bridgeMsg, setBridgeMsg] = useState('');
@@ -265,19 +270,45 @@ export const BbAutoConstructor: React.FC = () => {
     return () => { unsub(); };
   }, []);
 
-  // Применение готовой программы из библиотеки (прямой пикер или bridge)
+  // Применение готовой программы из библиотеки (прямой пикер или bridge).
+  // Определяет путь: программы ББ-цикла (cycle-bb-*) идут через convertCycleToBBPlan,
+  // остальные (FULL_PROGRAM_LIBRARY + WOMENS + CUSTOM_PROGRAMS) идут через programToBBPlan (faithful).
   const applyProgramToBb = useCallback((program: FullProgram) => {
-    const cycle = programToCycleTemplate(program);
-    setCustomCycle(cycle);
-    setPlanMode('bb_cycle');
-    setBbSource('program');
-    setSelectedProgramId(program.id);
-    setSelectedCycleId(cycle.meta.id);
-    setBbDays(cycle.meta.sessionsPerWeek);
-    setBbWeeks(cycle.meta.weeks);
-    setBbLevel(cycle.meta.level === 'novice' ? 'beginner' : cycle.meta.level === 'KMS-MS' || cycle.meta.level === 'MS-MSMK' ? 'advanced' : 'intermediate');
-    setBbGoal(cycle.meta.period === 'strength' ? 'strength_mass' : 'mass');
-    setBridgeMsg(`🔗 Программа загружена: ${cycle.meta.title}`);
+    const id = program.id || '';
+    const isBbCycleProgram = id.startsWith('cycle-bb') || id.startsWith('bb_cycle_') || (program.author === 'LMS/PROF' && id.startsWith('prog_cycle-bb'));
+    if (isBbCycleProgram) {
+      // BB-cycle путь: конвертация через SRCycleTemplate (старый путь)
+      const cycle = programToCycleTemplate(program);
+      setCustomCycle(cycle);
+      setCustomProgram(null);
+      setBbProgramPath('cycle');
+      setPlanMode('bb_cycle');
+      setBbSource('program');
+      setSelectedProgramId(program.id);
+      setSelectedCycleId(cycle.meta.id);
+      setBbDays(cycle.meta.sessionsPerWeek);
+      setBbWeeks(cycle.meta.weeks);
+      setBbLevel(cycle.meta.level === 'novice' ? 'beginner' : cycle.meta.level === 'KMS-MS' || cycle.meta.level === 'MS-MSMK' ? 'advanced' : 'intermediate');
+      setBbGoal(cycle.meta.period === 'strength' ? 'strength_mass' : 'mass');
+    } else {
+      // Library путь: прямой FullProgram → programToBBPlan (faithful)
+      setCustomProgram(program);
+      setCustomCycle(null);
+      setBbProgramPath('library');
+      setPlanMode('bb_cycle');
+      setBbSource('program');
+      setSelectedProgramId(program.id);
+      setSelectedCycleId('prog_' + program.id);
+      setBbDays(program.daysPerWeek);
+      setBbWeeks(program.durationWeeks);
+      setBbLevel(program.level === 'beginner' ? 'beginner' : program.level === 'advanced' ? 'advanced' : 'intermediate');
+      const goalMap: Record<string, string> = {
+        hypertrophy: 'mass', strength: 'strength_mass', bodybuilding: 'mass',
+        peaking: 'cut', powerlifting: 'strength_mass', athletic: 'mass', rehab: 'mass',
+      };
+      setBbGoal(goalMap[program.goal] || 'mass');
+    }
+    setBridgeMsg(`🔗 Программа загружена: ${program.name} (режим: ${isBbCycleProgram ? 'PROF-цикл' : 'библиотека, faithful + адаптация'})`);
     setTimeout(() => setBridgeMsg(''), 5000);
     setStep('params');
   }, []);
@@ -371,6 +402,28 @@ export const BbAutoConstructor: React.FC = () => {
       .map(c => cycleTemplateToFullProgram(c));
   }, []);
 
+  // Все доступные программы для ББ-контекста:
+  // FULL_PROGRAM_LIBRARY + WOMENS_PROGRAMS + CUSTOM_PROGRAMS + bb-циклы (дедуп по id).
+  // Фильтр направления: только bodybuilding или both (силовые PL-only исключаем из ББ-выбора).
+  const bbLibraryPrograms = useMemo<FullProgram[]>(() => {
+    const all = [
+      ...FULL_PROGRAM_LIBRARY,
+      ...WOMENS_PROGRAMS,
+      ...CUSTOM_PROGRAMS,
+      ...bbCyclePrograms,
+    ];
+    const seen = new Set<string>();
+    const out: FullProgram[] = [];
+    for (const p of all) {
+      if (!p || !p.id || seen.has(p.id)) continue;
+      // ББ-контекст принимает bodybuilding / both; чисто силовые_PL отсекаем.
+      if (p.direction === 'strength') continue;
+      seen.add(p.id);
+      out.push(p);
+    }
+    return out;
+  }, [bbCyclePrograms]);
+
   const applyBbSubstitution = useCallback((newId: string) => {
     if (!subTarget || !builtPlan) return;
     const rep = getExerciseById(newId); if (!rep) { setSubTarget(null); return; }
@@ -403,34 +456,65 @@ export const BbAutoConstructor: React.FC = () => {
 
     try {
 
-    if (planMode === 'bb_cycle' && (selectedCycleId || customCycle)) {
-      const cycle = customCycle || (getCycleById(selectedCycleId) as SRCycleTemplate | undefined);
-      if (!cycle) { alert('Цикл не найден'); return; }
-      plan = convertCycleToBBPlan({
-        cycle,
-        workMax: bbWorkMax,
-        weakPoints,
-        peds,
-        pedDoses,
-        courseIntensity,
-        loadStrategy,
-        injuries,
-        intensityTechnique: intensityTech,
-        autoDeload,
-        deloadType,
-        autoRegResult: autoRegPayload,
-        favoriteExercises: prof.favoriteExercises || [],
-        excludedExercises: prof.excludedExercises || [],
-        avoidAxialLoad: prof.avoidAxialLoad || false,
-        volumeGoal: bbVolGoal as any,
-        specialization: specializationMode,
-        focusGroup: bbFocus,
-        level: bbLevel,
-        equipment: bbEquipment,
-      });
-      const cycleWeeks = cycle.meta.sessionsPerWeek;
-      if (bbDays !== cycleWeeks) setBbDays(cycleWeeks);
-      if (bbWeeks !== cycle.meta.weeks) setBbWeeks(cycle.meta.weeks);
+    if (planMode === 'bb_cycle') {
+      // Library путь (FullProgram напрямую → programToBBPlan, faithful режим)
+      if (bbProgramPath === 'library' && customProgram) {
+        plan = programToBBPlan(customProgram, {
+          workMax: bbWorkMax,
+          weakPoints,
+          focusGroup: bbFocus,
+          injuries,
+          intTechnique: intensityTech,
+          autoDeload,
+          deloadType,
+          loadStrategy,
+          autoRegResult: autoRegPayload,
+          favoriteExercises: prof.favoriteExercises || [],
+          excludedExercises: prof.excludedExercises || [],
+          avoidAxialLoad: prof.avoidAxialLoad || false,
+          equipment: bbEquipment,
+          peds,
+          pedDoses,
+          courseIntensity,
+          level: bbLevel,
+          volumeGoal: bbVolGoal as any,
+          specialization: specializationMode,
+          mode: bbAdaptMode,
+        });
+        if (bbDays !== customProgram.daysPerWeek) setBbDays(customProgram.daysPerWeek);
+        if (bbWeeks !== customProgram.durationWeeks) setBbWeeks(customProgram.durationWeeks);
+      } else if (selectedCycleId || customCycle) {
+        // BB-цикл путь (SRCycleTemplate → convertCycleToBBPlan)
+        const cycle = customCycle || (getCycleById(selectedCycleId) as SRCycleTemplate | undefined);
+        if (!cycle) { alert('Цикл не найден'); return; }
+        plan = convertCycleToBBPlan({
+          cycle,
+          workMax: bbWorkMax,
+          weakPoints,
+          peds,
+          pedDoses,
+          courseIntensity,
+          loadStrategy,
+          injuries,
+          intensityTechnique: intensityTech,
+          autoDeload,
+          deloadType,
+          autoRegResult: autoRegPayload,
+          favoriteExercises: prof.favoriteExercises || [],
+          excludedExercises: prof.excludedExercises || [],
+          avoidAxialLoad: prof.avoidAxialLoad || false,
+          volumeGoal: bbVolGoal as any,
+          specialization: specializationMode,
+          focusGroup: bbFocus,
+          level: bbLevel,
+          equipment: bbEquipment,
+        });
+        const cycleWeeks = cycle.meta.sessionsPerWeek;
+        if (bbDays !== cycleWeeks) setBbDays(cycleWeeks);
+        if (bbWeeks !== cycle.meta.weeks) setBbWeeks(cycle.meta.weeks);
+      } else {
+        return; // нет ни программы, ни цикла — нельзя строить (защита)
+      }
     } else {
       const pattern = SPLIT_PATTERNS.find(p => p.id === selectedSplitId);
       if (!pattern) return;
@@ -688,18 +772,12 @@ export const BbAutoConstructor: React.FC = () => {
           {bbSource === 'program' && (
             <>
               <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📚 Готовая программа из библиотеки</div>
-              <PopupSelect label="Программа" value={selectedProgramId ?? ''} onChange={v => { const p = [...getAllPrograms(), ...bbCyclePrograms].find(pr => pr.id === v); if (p) applyProgramToBb(p); }} options={[
-                ...getAllPrograms().map(p => ({
-                  id: p.id,
-                  label: `${p.name} (${p.durationWeeks} нед, ${p.daysPerWeek}×/нед, ${p.level})`,
-                  description: p.description?.slice(0, 120),
-                })),
-                ...bbCyclePrograms.map(p => ({
-                  id: p.id,
-                  label: `🏋️ ${p.name} (${p.durationWeeks} нед, ${p.daysPerWeek}×/нед, ${p.level})`,
-                  description: p.description?.slice(0, 120),
-                })),
-              ]} />
+              <BbProgramLibraryPicker
+                label='Программа'
+                value={selectedProgramId}
+                programs={bbLibraryPrograms}
+                onSelect={applyProgramToBb}
+              />
               {bbSource === 'program' && customCycle && (
                 <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
                   <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Программа:</span> {customCycle.meta.title}</div>
@@ -710,18 +788,143 @@ export const BbAutoConstructor: React.FC = () => {
                 </div>
               )}
               {bbSource === 'program' && selectedProgramId && !customCycle && (() => {
-                const p = [...getAllPrograms(), ...bbCyclePrograms].find(pr => pr.id === selectedProgramId);
+                const p = bbLibraryPrograms.find(pr => pr.id === selectedProgramId);
                 if (!p) return null;
                 return (
                   <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
                     <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Программа:</span> {p.name}</div>
+                    <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Автор:</span> {p.author}</div>
                     <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Уровень:</span> {p.level}</div>
                     <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Дней/нед:</span> {p.daysPerWeek}</div>
                     <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Недель:</span> {p.durationWeeks}</div>
-                    <div style={{ marginTop:4, padding:'4px 8px', borderRadius:8, background:'rgba(96,165,250,0.06)', fontSize:11, color:'rgba(255,255,255,0.7)' }}>{p.description?.slice(0, 200)}</div>
+                    <div><span style={{ fontWeight:700, color:'rgba(255,255,255,0.8)' }}>Цель:</span> {p.goal}{p.direction && p.direction !== p.goal ? ` (${p.direction})` : ''}</div>
+                    {p.targetAudience && <div style={{ marginTop:3, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}><b>Кому:</b> {p.targetAudience.slice(0, 160)}{p.targetAudience.length > 160 ? '…' : ''}</div>}
+                    {p.warnings && p.warnings.length > 0 && (
+                      <div style={{ marginTop:3, padding:'4px 8px', borderRadius:8, background:'rgba(245,158,11,0.08)', fontSize:10, color:'#fbbf24', lineHeight:1.4 }}>
+                        ⚠️ {p.warnings.slice(0, 2).join(' · ')}{p.warnings.length > 2 ? '…' : ''}
+                      </div>
+                    )}
+                    <div style={{ marginTop:4, padding:'4px 8px', borderRadius:8, background:'rgba(96,165,250,0.06)', fontSize:11, color:'rgba(255,255,255,0.7)' }}>{p.description?.slice(0, 240)}</div>
                   </div>
                 );
               })()}
+
+              {/* 🔧 Дополнительная настройка выбранной программы (применяется к генерации ББ-цикла) */}
+              {bbSource === 'program' && selectedProgramId && (
+                <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.18)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 8, display:'flex', alignItems:'center', gap:6 }}>
+                    🔧 Дополнительная настройка программы
+                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, marginBottom: 10 }}>
+                    Переопределяет параметры выбранной программы под ваш профиль — слабые группы, интенсивность и стратегию прогрессии.
+                    Если не менять — берутся разумные дефолты.
+                  </div>
+
+                  {/* Режим адаптации (faithful vs adapt) — только для library path */}
+                  {bbProgramPath === 'library' && (
+                    <div style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>🔒 Режим конвертации программы</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => setBbAdaptMode('faithful')} style={{
+                          flex: 1, padding: '7px 8px', borderRadius: 9, cursor: 'pointer', fontWeight: 700, fontSize: 10,
+                          border: bbAdaptMode === 'faithful' ? '2px solid #60a5fa' : '1px solid rgba(255,255,255,0.08)',
+                          background: bbAdaptMode === 'faithful' ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.02)',
+                          color: bbAdaptMode === 'faithful' ? '#60a5fa' : 'rgba(255,255,255,0.6)',
+                        }}>🎯 Точно по программе</button>
+                        <button onClick={() => setBbAdaptMode('adapt')} style={{
+                          flex: 1, padding: '7px 8px', borderRadius: 9, cursor: 'pointer', fontWeight: 700, fontSize: 10,
+                          border: bbAdaptMode === 'adapt' ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                          background: bbAdaptMode === 'adapt' ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)',
+                          color: bbAdaptMode === 'adapt' ? '#00e68a' : 'rgba(255,255,255,0.6)',
+                        }}>🔧 Адаптировать</button>
+                      </div>
+                      <div style={{ marginTop: 6, fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>
+                        {bbAdaptMode === 'faithful'
+                          ? 'Все недели, RIR/множители/фазы/warmup/rest/reps/notes берутся дословно из программы. Применяются только safety-фильтры (травмы/исключённые упражнения/оборудование).'
+                          : 'Структура программы сохраняется, но добавляется добивка слабых групп (+isolation), интенсив-техники, авто-делод и стратегия прогрессии.'}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <PopupSelect
+                      label='🎯 Фокус-группа'
+                      value={bbFocus}
+                      onChange={setBbFocus}
+                      options={[{ id: '', label: 'Баланс (без акцента)' }, ...WEAK_GROUPS.map(([id, l]) => ({ id, label: l }))]}
+                    />
+                    <PopupSelect
+                      label='🔥 Интенсив-техника'
+                      value={intensityTech}
+                      onChange={v => setIntensityTech(v as IntensityTechnique)}
+                      options={[
+                        { id: 'none', label: 'Авто по фазе' },
+                        { id: 'rest_pause', label: 'Рест-пауза' },
+                        { id: 'drop_set', label: 'Дроп-сет' },
+                        { id: 'myo_reps', label: 'Myo-reps' },
+                        { id: 'pause_rep', label: 'Пауза-репс' },
+                        { id: 'mechanical_drop', label: 'Мех. дроп-сет' },
+                      ]}
+                    />
+                    <PopupSelect
+                      label='📈 Стратегия прогрессии'
+                      value={loadStrategy}
+                      onChange={v => setLoadStrategy(v as LoadStrategy)}
+                      options={[
+                        { id: 'double_progression', label: 'Двойная прогрессия' },
+                        { id: 'linear', label: 'Линейная' },
+                        { id: 'wave', label: 'Волновая' },
+                        { id: 'rpe_based', label: 'RPE-based' },
+                      ]}
+                    />
+                    <PopupSelect
+                      label='📉 Тип делода'
+                      value={deloadType}
+                      onChange={v => setDeloadType(v as DeloadType)}
+                      hint='Какую разгрузочную неделю строить при перегрузке (ACWR>1.3)'
+                      options={[
+                        { id: 'pump', label: 'Памп-делод (50% объём)' },
+                        { id: 'neural', label: 'Нейр-делод (тяж/мало)' },
+                        { id: 'full_rest', label: 'Полный отдых' },
+                      ]}
+                    />
+                  </div>
+                  <button
+                    onClick={() => setAutoDeload(a => !a)}
+                    style={{
+                      width:'100%', marginTop: 8, padding: '8px 10px', borderRadius: 10, cursor: 'pointer',
+                      fontSize: 11, fontWeight: 700, textAlign: 'left', boxSizing: 'border-box',
+                      background: autoDeload ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.03)',
+                      border: autoDeload ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.08)',
+                      color: autoDeload ? ACCENT : 'rgba(255,255,255,0.6)',
+                    }}
+                  >
+                    {autoDeload ? '✅ Авто-делод при перегрузке' : '⬜ Авто-делод при перегрузке'} (ACWR&gt;1.3)
+                  </button>
+
+                  {/* Слабые группы (мульти-чипсы) */}
+                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>🔥 Слабые группы (акцент объёма)</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {WEAK_GROUPS.map(([id, l]) => {
+                      const on = weakPoints.includes(id);
+                      return (
+                        <button key={id} onClick={() => setWeakPoints(wp => on ? wp.filter(x => x !== id) : [...wp, id])}
+                          style={{
+                            padding: '5px 10px', borderRadius: 999, cursor: 'pointer', fontSize: 10, fontWeight: 700,
+                            background: on ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)',
+                            border: on ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.06)',
+                            color: on ? '#fbbf24' : 'rgba(255,255,255,0.75)',
+                          }}
+                        >{on ? '✓ ' : ''}{l}</button>
+                      );
+                    })}
+                  </div>
+                  {weakPoints.length > 0 && (
+                    <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+                      Количество слабых групп: {weakPoints.length}. Отстающие группы получат ~20-30% дополнительный объём топлива.
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>

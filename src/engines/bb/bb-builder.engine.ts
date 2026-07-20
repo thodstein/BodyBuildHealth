@@ -1035,6 +1035,65 @@ function buildSession(
     exercises.length = 0;
     exercises.push(...kept, ...armAcc.slice(0, Math.max(1, Math.floor(maxAcc / 2))), ...otherAcc.slice(0, Math.max(0, maxAcc - Math.max(1, Math.floor(maxAcc / 2)))));
   }
+
+  // ▓▓ A1: Pump-finisher слабых групп (структурная добивка метаболическим стрессом) ▓▓
+  // Если в текущей сессии слабая группа уже представлена (но не primary этой сессии) —
+  // добавить 1 памп-сет в конце (3×15-20 @ 50% workMax, RIR 4). Это не "множитель",
+  // а структурная тренерская техника: добивание мышцы после основного объёма.
+  // Skip если день-сессия уже близка к exCap (защита от перегрузки)
+  let SESSION_USED = exercises.length;
+  const SESSION_FINAL_CAP = Math.min(exCap, SESSION_USED + 2);
+  if (weakPoints.length > 0 && SESSION_USED < SESSION_FINAL_CAP) {
+    const sessionMusclesPush = new Set(exercises.map(e => e.muscle));
+    const tagPush = (sched.sessionTag || '').toLowerCase();
+    const isLegsDay = tagPush === 'legs' || tagPush.startsWith('lower');
+    const isUpperDay = !isLegsDay;
+    // только слабые группы совместимые с днём
+    for (const wp of weakPoints) {
+      if (SESSION_USED >= SESSION_FINAL_CAP) break;
+      const isWpLegs = ['quads','hamstrings','glutes','calves'].includes(wp);
+      const isWpUpper = ['chest','back','shoulders','biceps','triceps','forearms','arms'].includes(wp);
+      if (isWpLegs && !isLegsDay) continue;
+      if (isWpUpper && !isUpperDay) continue;
+      // Не делать finisher если эта группа уже primary сегодня (есть большой compound-объём —
+      // finisher только для accessory мышцы)
+      const isPrimaryToday = exercises.some(e => e.role === 'primary' && e.muscle === wp);
+      if (isPrimaryToday) continue;
+      // Не делать finisher, если не было accessory этой группы сегодня (метаболический
+      // стимул без предшествующего базового объёма — неэффективно)
+      if (!sessionMusclesPush.has(wp)) continue;
+      const seenNamesList = new Set(exercises.map(e => e.name));
+      const pumpPool = EXERCISE_CATALOG.filter((ex: any) => {
+        const tm = trueMuscleOf(ex);
+        if (tm === null || tm !== wp) return false;
+        if (seenNamesList.has(ex.name)) return false;
+        if (isBBJunk(ex)) return false;
+        const n = (ex.name || '').toLowerCase();
+        if (n.includes('становая') || n.includes('жим стоя') || n.includes('армей')) return false;
+        if (equipmentList.length > 0) {
+          const rawEq = ex.equipment;
+          const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
+          if (exEq.length > 0 && !exEq.some(eq => equipmentList.includes(eq))) return false;
+        }
+        return true;
+      });
+      if (pumpPool.length === 0) continue;
+      const iso = pumpPool.find((e: any) => e.type === 'isolation') || pumpPool[0];
+      const wm = workMax[wp] || PRO_WORKMAX_RATIO[wp]?.(workMax) || defaultWorkMax(wp);
+      const wu = Math.round(wm * 0.50 * 10) / 10; // 50% workMax — памп-финишер
+      exercises.push({
+        muscle: wp, name: iso.name, role: 'accessory', character: 'памп',
+        sets: 3, repsRange: [15, 20], rir: 4,
+        workSets: Array.from({length: 3}, () => ({ reps: 15, rir: 4, weight: wu, tempo: '2-1-2-0', restSeconds: 45 })),
+        exerciseName: iso.name, tempoSpec: '2-1-2-0', restSeconds: 45,
+        comment: `🔥 Weak pump-finisher: ${iso.name}, 3×15 @${wu} кг RIR 4 — метаболический стресс на отстающую группу.`,
+        warmupSets: [], rationale: 'Pump finisher для слабой группы',
+      });
+      seenNamesList.add(iso.name);
+      SESSION_USED++;
+    }
+  }
+
   return { day: dayInRotation, weekOffset: 0, character, sessionTag: sched.sessionTag, exercises };
 }
 

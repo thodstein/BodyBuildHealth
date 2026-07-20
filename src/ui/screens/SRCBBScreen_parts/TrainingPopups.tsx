@@ -47,7 +47,7 @@ export const PopupNumber: React.FC<{
   const display = value ? `${value}${suffix}` : `—${suffix ? ' ' + suffix : ''}`;
   return <>
     <button onClick={() => { setEdit(String(value)); setOpen(true); }} style={cardBtnStyle(!!value)}>
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 14, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{display}</div>
     </button>
     {open && <PortalOverlay onClose={() => setOpen(false)}>
@@ -81,7 +81,7 @@ export const PopupSelect: React.FC<{
   return (
     <>
       <button onClick={() => setOpen(true)} style={cardBtnStyle(!!value)}>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
         <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{sel ? sel.label : 'Выбрать…'}</div>
       </button>
       {open && (
@@ -141,7 +141,7 @@ export const PopupSelectSmart: React.FC<{
   return (
     <>
       <button onClick={() => setOpen(true)} style={cardBtnStyle(!!value)}>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 2 }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2 }}>
           {label}{isSuggested && value && suggestedIds!.has(value) && <span style={{ color: '#f59e0b', marginLeft: 4 }}>★</span>}
         </div>
         <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{sel ? sel.label : 'Выбрать…'}</div>
@@ -178,7 +178,7 @@ export const PopupSelectSmart: React.FC<{
                         <span>{isSug && !isSelected ? '★ ' : ''}{o.label}</span>
                         {isSelected && <span style={{ fontSize: 10 }}>✓</span>}
                       </div>
-                      {o.desc && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>}
+                    {o.desc && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>}
                     </button>
                   );
                 })}
@@ -200,7 +200,7 @@ export const PopupText: React.FC<{
   const [edit, setEdit] = useState(value);
   return <>
     <button onClick={() => { setEdit(value); setOpen(true); }} style={cardBtnStyle(!!value)}>
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{value || 'Введите...'}</div>
     </button>
     {open && <PortalOverlay onClose={() => setOpen(false)}>
@@ -277,7 +277,7 @@ export const CalcSection: React.FC<{
       <span style={{ fontSize: 16 }}>{icon}</span>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 12, fontWeight: 800, color: accent }}>{title}</div>
-        {desc && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 1, lineHeight: 1.3 }}>{desc}</div>}
+        {desc && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 1, lineHeight: 1.3 }}>{desc}</div>}
       </div>
     </div>
     <div style={{
@@ -322,9 +322,9 @@ export const CalcResult: React.FC<{
     background: `${accent}0d`, border: `1px solid ${accent}22`,
     marginBottom: 10,
   }}>
-    <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{label}</div>
+    <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{label}</div>
     <div style={{ fontSize: 22, fontWeight: 800, color: accent }}>{value}</div>
-    {hint && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginTop: 2, lineHeight: 1.3 }}>{hint}</div>}
+    {hint && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 2, lineHeight: 1.3 }}>{hint}</div>}
   </div>
 );
 

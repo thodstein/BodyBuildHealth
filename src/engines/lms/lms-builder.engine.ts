@@ -34,6 +34,12 @@ export interface LMSBuildInput {
   weakPoints?: string[];
   /** Слабые точки СРЦ-движений (профи-диагностика): какой лифт + какой участок амплитуды. */
   plWeakPoints?: { lift: Lift; weakPoint: WeakPoint }[];
+  /** Пользовательский выбор дней для слабых групп мышц: {muscleId: [1-based dayIdx,...]}.
+   *  Если не задано — авто-распределение: малые группы → 2 дня (heavy+pump), крупные → 1 день. */
+  weakGroupDayMap?: Record<string, number[]>;
+  /** Пользовательский выбор дней для слабых точек СРЦ-движений.
+   *  Ключ формата `${lift}|${weakPointId}` → [1-based dayIdx,...]. Если не задано — авто. */
+  plWeakPointDayMap?: Record<string, number[]>;
 }
 
 
@@ -252,56 +258,107 @@ function injectPLWeakPoints(
   phaseVolMod: number,
   vrLevel: 'beginner' | 'intermediate' | 'advanced',
   pedMrvMult: number,
+  plWeakPointDayMap?: Record<string, number[]>,
 ): void {
   const mainNameMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга', pulldown: 'Тяга', incline_press: 'Жим гантелей' };
-  const MAX_CORRECTIONS = 2;
+  const MAX_CORRECTIONS = 3; // берём 2-3 кандидата, для распределения в 2 дня
   for (const wp of weakPoints) {
     const mainName = mainNameMap[wp.lift] || 'Жим';
-    let hostDayIdx = -1;
-    let maxMainSets = -1;
+    // Найти дни с лифтом (rank по объёму: max-heavy + min-light)
+    const dayRankByMain: { idx: number; mainSets: number }[] = [];
     for (let i = 0; i < days.length; i++) {
       const mainSets = days[i].exercises
         .filter(e => norm(e.name) === norm(mainName))
         .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
-      if (mainSets > maxMainSets) { maxMainSets = mainSets; hostDayIdx = i; }
+      if (mainSets > 0) dayRankByMain.push({ idx: i, mainSets });
     }
-    if (hostDayIdx < 0) hostDayIdx = 0;
-    const hostDay = days[hostDayIdx];
-    const existing = new Set(hostDay.exercises.map(e => norm(e.name)));
+    // Авто-распределение: heavy = max объём лифта, light = следующий по объёму (минимум)
+    let heavyDayIdx = -1, lightDayIdx = -1;
+    if (dayRankByMain.length > 0) {
+      const sorted = [...dayRankByMain].sort((a, b) => b.mainSets - a.mainSets);
+      heavyDayIdx = sorted[0].idx;
+      if (sorted.length > 1) lightDayIdx = sorted[1].idx;
+    } else {
+      heavyDayIdx = 0;
+    }
+    // Override через пользовательский выбор
+    const mapKey = `${wp.lift}|${wp.weakPoint}`;
+    const userDays = plWeakPointDayMap?.[mapKey] || plWeakPointDayMap?.[wp.lift as string];
+    if (userDays && userDays.length > 0) {
+      heavyDayIdx = (userDays[0] - 1);
+      if (userDays.length > 1) lightDayIdx = (userDays[1] - 1);
+      else lightDayIdx = -1;
+    }
+
     const liftGroup = liftToEnGroup(wp.lift);
     const corrections = collectPLCorrections(wp.lift, wp.weakPoint).slice(0, MAX_CORRECTIONS);
-    for (const c of corrections) {
+    if (corrections.length === 0) continue;
+
+    // 1-й кандидат — в heavy-day (3×8 @ RIR 2, "Тяжёлая" добивка)
+    // 2-й кандидат — в light-day (3×12 @ RIR 3, памп-вариант)
+    const heavyDay = days[heavyDayIdx];
+    if (heavyDay) {
+      const c = corrections[0];
       const ex = findCatalogExerciseByLabel(c.name);
       const resolvedName = ex ? ex.name : c.name;
-      if (existing.has(norm(resolvedName))) continue;
-      const exGroup = ex ? (ex.group as string) : liftGroup;
-      const sets = Math.max(2, Math.round(3 * phaseVolMod));
-      const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? 80;
-      // MRV soft-cap: считаем только упражнения, реально присутствующие в каталоге
-      const ref = getVolumeLandmarks(vrLevel, exGroup);
-      if (ref) {
-        let cur = 0;
-        for (const d of days) {
-          for (const e of d.exercises) {
-            const eg = groupOfExercise(e.name, '');
-            if (eg === exGroup) {
-              cur += e.workSets.reduce((x, ws) => x + ws.sets, 0);
+      const existing = new Set(heavyDay.exercises.map(e => norm(e.name)));
+      if (!existing.has(norm(resolvedName)) && heavyDay.exercises.length < 8) {
+        const exGroup = ex ? (ex.group as string) : liftGroup;
+        const sets = Math.max(2, Math.round(3 * phaseVolMod));
+        const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? 80;
+        const ref = getVolumeLandmarks(vrLevel, exGroup);
+        if (ref) {
+          let cur = 0;
+          for (const d of days) {
+            for (const e of d.exercises) {
+              const eg = groupOfExercise(e.name, '');
+              if (eg === exGroup) cur += e.workSets.reduce((x, ws) => x + ws.sets, 0);
             }
           }
+          if (cur + sets > Math.round(ref.mrv * pedMrvMult)) continue;
         }
-        if (cur + sets > Math.round(ref.mrv * pedMrvMult)) continue;
+        heavyDay.exercises.push({
+          name: resolvedName, group: exGroup, coef: 0.7, mnosz: 1,
+          load: 'Тяжелая', pm, rir: rirBase,
+          workSets: [{ pct: c.pct, reps: 8, sets: Math.max(1, sets), weight: workWeight(pm, c.pct), rir: rirBase }],
+        });
+        existing.add(norm(resolvedName));
       }
-      hostDay.exercises.push({
-        name: resolvedName,
-        group: exGroup,
-        coef: 0.7,
-        mnosz: 1,
-        load: 'Средняя',
-        pm,
-        rir: rirBase,
-        workSets: [{ pct: c.pct, reps: 8, sets: Math.max(1, sets), weight: workWeight(pm, c.pct), rir: rirBase }],
-      });
-      existing.add(norm(resolvedName));
+    }
+
+    // 2-й кандидат — в light-day (если есть второй candidate в heavyDayIdx)
+    if (lightDayIdx >= 0 && corrections.length > 1) {
+      const lightDay = days[lightDayIdx];
+      if (lightDay) {
+        const c = corrections[1];
+        const ex = findCatalogExerciseByLabel(c.name);
+        const resolvedName = ex ? ex.name : c.name;
+        const existing = new Set(lightDay.exercises.map(e => norm(e.name)));
+        if (!existing.has(norm(resolvedName)) && lightDay.exercises.length < 8) {
+          const exGroup = ex ? (ex.group as string) : liftGroup;
+          const sets = Math.max(2, Math.round(3 * phaseVolMod));
+          const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? 80;
+          const ref = getVolumeLandmarks(vrLevel, exGroup);
+          if (ref) {
+            let cur = 0;
+            for (const d of days) {
+              for (const e of d.exercises) {
+                const eg = groupOfExercise(e.name, '');
+                if (eg === exGroup) cur += e.workSets.reduce((x, ws) => x + ws.sets, 0);
+              }
+            }
+            if (cur + sets > Math.round(ref.mrv * pedMrvMult)) continue;
+          }
+          // Памп-протокол: 3×12 @ 60% 1PM, RIR 3
+          const pumpPct = 0.60;
+          lightDay.exercises.push({
+            name: resolvedName, group: exGroup, coef: 0.65, mnosz: 1,
+            load: 'Средняя', pm, rir: Math.max(3, rirBase + 1),
+            workSets: [{ pct: pumpPct, reps: 12, sets: Math.max(1, sets), weight: workWeight(pm, pumpPct), rir: Math.max(3, rirBase + 1) }],
+          });
+          existing.add(norm(resolvedName));
+        }
+      }
     }
   }
 }
@@ -329,6 +386,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   const rationale = hasExplicitWeeks
     ? 'Программа задана дословно по источнику (явная раскладка всех недель, без авто-прогрессии PM).'
     : progressionRationale({ ...progInput, pm0: 100 });
+  const weakNotes: string[] = [];
 
   const goalKey = rirGoalKey(template.meta.period);
   const levelKey = rirLevelKey(template.meta.level);
@@ -417,40 +475,110 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
     // Инъекция ассистентов по слабым точкам СРЦ-движений (все циклы, включая faithful с полными weeks[])
     if (input.plWeakPoints && input.plWeakPoints.length) {
-      injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, pedMrvMult);
+      injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, pedMrvMult, input.plWeakPointDayMap);
     }
 
-    // Инъекция изолирующих упражнений для слабых групп мышц (+1 упражнение на группу)
+    // Инъекция accessory-упражнений для слабых групп мышц — авто-распределение по 1-2 дням.
+    // Тренерская логика:
+    //  - Малые группы (biceps, triceps, forearms, calves, abs, delt_rear/delt_mid): 2×/нед → тяжёлый день (3×8 @RIR 2) + памп-день (3×12 @RIR 3)
+    //  - Крупные группы (chest, back, quads, hamstrings, glutes, shoulders): 1×/нед → памп-добивка в synergist/антагонист-день (3×10 @RIR 3)
+    //  - Уважается MRV soft-cap мышцы, day cap (упражнения ≤ 8 в день).
+    //  - Пользовательский override: weakGroupDayMap[muscle] = [dayIdx,...] — 1-based. Если не задано — авто.
     if (input.weakPoints && input.weakPoints.length) {
+      const SMALL_GROUPS_2X = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'delt_rear', 'delt_mid']);
+      const userDayMap = (input as any).weakGroupDayMap as Record<string, number[]> | undefined;
       const allWeekNames = new Set(days.flatMap(d => d.exercises.map(e => norm(e.name))));
+
       for (const wg of input.weakPoints) {
         const candidates = getExercisesByGroup(wg)
           .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name)));
         if (candidates.length === 0) continue;
-        const pick = candidates[0];
-        // найти день с наименьшим объёмом этой группы
-        let bestDay = days[0];
-        let bestCnt = Infinity;
-        for (const d of days) {
-          const cnt = d.exercises.filter(e => {
-            const g = groupOfExercise(e.name, exEnGroup(e.group) || '');
-            return g === wg;
-          })
-            .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
-          if (cnt < bestCnt) { bestCnt = cnt; bestDay = d; }
+
+        // Определить число дней для добивки
+        const isSmall = SMALL_GROUPS_2X.has(wg);
+        let targetDayCount = isSmall ? 2 : 1;
+        // Пользовательский override выбора дней
+        let targetDays: number[] = [];
+        if (userDayMap && userDayMap[wg]) {
+          targetDays = userDayMap[wg].slice(0, days.length).filter(d => d >= 1 && d <= days.length);
+          targetDayCount = targetDays.length;
         }
-        const wPm = pmRow[pick.name] ?? 80;
-        bestDay.exercises.push({
-          name: pick.name,
-          group: wg,
-          coef: 0.5,
-          mnosz: 1,
-          load: 'Средняя',
-          pm: wPm,
-          rir: rirBase,
-          workSets: [{ pct: 0.65, reps: 12, sets: 3, weight: workWeight(wPm, 0.65), rir: rirBase }],
-        });
-        allWeekNames.add(norm(pick.name));
+        if (targetDays.length === 0) {
+          // Авто-распределение: найти дни с минимальным объёмом целевой мышцы (для spread)
+          const dayStats: { idx: number; cnt: number; isLegsDay: boolean; isUpperDay: boolean }[] = [];
+          for (let di = 0; di < days.length; di++) {
+            const cnt = days[di].exercises
+              .filter(e => groupOfExercise(e.name, exEnGroup(e.group) || '') === wg)
+              .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+            const dayMuscleGroups = new Set(days[di].exercises.map(e => exEnGroup(e.group) || ''));
+            const isLegsDay = dayMuscleGroups.has('quads') || dayMuscleGroups.has('hamstrings') || dayMuscleGroups.has('glutes');
+            const isUpperDay = dayMuscleGroups.has('chest') || dayMuscleGroups.has('back') || dayMuscleGroups.has('shoulders');
+            dayStats.push({ idx: di, cnt, isLegsDay, isUpperDay });
+          }
+          // Сортировать по возрастанию объёма мышцы (min volume = best для spread)
+          dayStats.sort((a, b) => a.cnt - b.cnt);
+          // Для тяжёлого группы ног → предпочесть не ноги день; uppper weak → предпочесть upper
+          const isWpLegs = ['quads', 'hamstrings', 'glutes', 'calves'].includes(wg);
+          const isWpUpper = ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'forearms'].includes(wg);
+          if (isWpLegs) {
+            dayStats.sort((a, b) => (a.isLegsDay === b.isLegsDay ? a.cnt - b.cnt : a.isLegsDay ? 1 : -1));
+          } else if (isWpUpper) {
+            dayStats.sort((a, b) => (a.isUpperDay === b.isUpperDay ? a.cnt - b.cnt : a.isUpperDay ? -1 : 1));
+          }
+          // Взять top targetDayCount дней (разные дни — dequeueReusableCell)
+          targetDays = dayStats.slice(0, targetDayCount).map(s => s.idx + 1);
+        }
+
+        // Для каждого выбранного дня — добавить accessory упражнения с разным протоколом
+        const listedMuscleRef = getVolumeLandmarks(vrLevel, wg as any);
+        const fakeMrvCap = listedMuscleRef ? Math.round(listedMuscleRef.mrv * pedMrvMult) : 99;
+        for (let ti = 0; ti < targetDays.length; ti++) {
+          const dayIdx = targetDays[ti] - 1;
+          if (dayIdx < 0 || dayIdx >= days.length) continue;
+          const targetDay = days[dayIdx];
+          // Протокол дня: 1-й = тяжёлый добив (3×8 RIR 2), 2-й = памп-добив (3×12 RIR 3)
+          const isHeavyDay = ti === 0 && isSmall && targetDays.length > 1;
+          // Выбрать упражнение: тяж-день → compound/isolation если есть; памп-день → изоляция
+          const poolFiltered = candidates.filter(ex => !targetDay.exercises.some(e => norm(e.name) === norm(ex.name)));
+          if (poolFiltered.length === 0) continue;
+          const pick = (isHeavyDay
+            ? (poolFiltered.find(e => (e as any).type === 'compound') || poolFiltered[0])
+            : (poolFiltered.find(e => (e as any).type === 'isolation') || poolFiltered[0])) as Exercise;
+
+          // Выбор exercises сделан; tfПротокол
+          const pct = isHeavyDay ? 0.68 : 0.55;
+          const reps = isHeavyDay ? 8 : 12;
+          const sets = 3;
+          const rir = isHeavyDay ? 2 : 3;
+          // MRV soft-cap
+          let weeklyMuscleSets = 0;
+          for (const d of days) {
+            weeklyMuscleSets += d.exercises
+              .filter(e => groupOfExercise(e.name, exEnGroup(e.group) || '') === wg)
+              .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+          }
+          if (weeklyMuscleSets + sets > fakeMrvCap) {
+            // По cap можно поставить только limited объёмm
+            const margin = Math.max(0, fakeMrvCap - weeklyMuscleSets);
+            if (margin < 2) continue; // недостаточно бюджета на этот день
+          }
+          // Day cap: упражнений ≤ 8
+          if (targetDay.exercises.length >= 8) continue;
+
+          const wPm = pmRow[pick.name] ?? 80;
+          targetDay.exercises.push({
+            name: pick.name,
+            group: wg,
+            coef: 0.5,
+            mnosz: 1,
+            load: isHeavyDay ? 'Тяжелая' : 'Средняя',
+            pm: wPm,
+            rir,
+            workSets: [{ pct, reps, sets, weight: workWeight(wPm, pct), rir }],
+          });
+          allWeekNames.add(norm(pick.name));
+          weakNotes.push(`🔥 Слабая группа ${wg} — добивка в день ${dayIdx + 1}: ${pick.name} ${sets}×${reps} @${Math.round(workWeight(wPm, pct))}кг RIR ${rir}${isHeavyDay ? ' (heavy)' : ' (pump)'}.`);
+        }
       }
     }
 
@@ -478,6 +606,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     input.focusLift ? `Приоритет: акцент на ${input.focusLift === 'squat' ? 'присед' : input.focusLift === 'bench' ? 'жим' : 'тягу'} (+20% объёма).` : '',
     input.weakPoints?.length ? `Слабые группы: ${input.weakPoints.join(', ')} (+20% объёма для упражнений на эти группы).` : '',
     `S-MRV: объём сессий автоматически ограничен бюджетом утомления (Ready: ${input.currentReadiness || 80}%).`,
+    ...weakNotes,
   ].filter(Boolean).join(' ');
 
   return { template, progressionRationale: proRationale, weeks, cycleMetrics, plVolumeLandmarks: getPLVolumeLandmarks(weeks, template.meta.level, pedMrvMult) };

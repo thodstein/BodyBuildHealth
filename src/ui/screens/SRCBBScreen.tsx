@@ -61,15 +61,15 @@ const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepT
 type Mode = 'pl' | 'bb' | 'manual';
 
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: '12px', margin: '6px 0' };
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 10, lineHeight: 1.4 };
+const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 11, lineHeight: 1.4 };
 const cardBg = CARD;
 const ACCENT = 'var(--accent)';
 const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 12, minHeight: 40, cursor: 'pointer' };
 const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: '1px solid var(--accent-dim)' };
-const PILL = (active: boolean) => ({ padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight: active ? 700 : 500, cursor:'pointer', border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)', background: active ? 'linear-gradient(135deg,var(--accent),#00c8a0)' : '#18181b', color: active ? '#000' : '#fff', flexShrink:0 } as React.CSSProperties);
+const PILL = (active: boolean) => ({ padding:'7px 12px', borderRadius:20, fontSize:11, fontWeight: active ? 700 : 500, cursor:'pointer', border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)', background: active ? 'linear-gradient(135deg,var(--accent),#00c8a0)' : '#18181b', color: active ? '#000' : '#fff', flexShrink:0 } as React.CSSProperties);
 const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 40, width: '100%', outline: 'none', boxSizing: 'border-box' };
 const IN: React.CSSProperties = { ...SEL, padding: '10px' };
-const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 10, margin: '6px 0 3px' };
+const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, margin: '6px 0 3px' };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 };
 
 export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
@@ -228,7 +228,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!pmMap['Присед']) pmMap['Присед'] = pmSquat;
     if (!pmMap['Жим лежа']) pmMap['Жим лежа'] = pmBench;
     if (!pmMap['Становая тяга']) pmMap['Становая тяга'] = pmDead;
-    const plan = buildLMSPlan({ 
+    const plan = buildLMSPlan({
       template: tpl, pmMap, fallbackPm: 80, mode: peds.length ? 'on_course' : 'natural', courseIntensity, weeksOverride: cycleWeeks,
       volumeGoal: (linked.profile?.settings?.volumeGoal as any) || 'mav',
       focusLift: (linked.profile?.settings?.focusLift as any),
@@ -236,6 +236,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       equipment: linked.profile?.settings?.equipment,
       weakPoints: weakPoints,
       plWeakPoints: plWeakPoints,
+      weakGroupDayMap,
+      plWeakPointDayMap,
     });
     setBuiltSrc(plan); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setSrcAdditions({}); setPickerDay(null);
     // TRAINING INTEGRATION: конвертировать PL план в сессии
@@ -271,6 +273,24 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (idx >= 0) return p.filter((_, i) => i !== idx);
     return [...p, { lift, weakPoint }];
   });
+  // 📅 Ручной выбор дней недели для слабых групп и слабых точек (1-based)
+  const [weakGroupDayMap, setWeakGroupDayMap] = useState<Record<string, number[]>>({});
+  const [plWeakPointDayMap, setPlWeakPointDayMap] = useState<Record<string, number[]>>({});
+  const toggleDayInMap = (mapKey: string, day: number, which: 'wg' | 'pw') => {
+    if (which === 'wg') {
+      setWeakGroupDayMap(prev => {
+        const cur = new Set(prev[mapKey] || []);
+        if (cur.has(day)) cur.delete(day); else { cur.add(day); (cur as any) = Array.from(cur).sort((a: number, b: number) => a - b); }
+        return { ...prev, [mapKey]: Array.from(cur) };
+      });
+    } else {
+      setPlWeakPointDayMap(prev => {
+        const cur = new Set(prev[mapKey] || []);
+        if (cur.has(day)) cur.delete(day); else { cur.add(day); (cur as any) = Array.from(cur).sort((a: number, b: number) => a - b); }
+        return { ...prev, [mapKey]: Array.from(cur) };
+      });
+    }
+  };
   // V7 расширение: тренд 1ПМ по выбранному упражнению
   const [selectedTrendEx, setSelectedTrendEx] = useState<string | null>(null);
   const PL_WEAKPOINT_LABELS: Record<WeakPoint, string> = {
@@ -656,14 +676,14 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             if (mainCount <= 3 && !isArmCycle) {
               return (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8 }}>
                     <PopupNumber label="Присед" value={pmSquat} min={20} max={500} suffix=" кг" onChange={v => setPmSquat(v)} />
                     <PopupNumber label="Жим лёжа" value={pmBench} min={20} max={400} suffix=" кг" onChange={v => setPmBench(v)} />
                     <PopupNumber label="Становая тяга" value={pmDead} min={20} max={500} suffix=" кг" onChange={v => setPmDead(v)} />
                   </div>
                   {exs.length > 3 && (
                     <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid var(--accent-dim)' }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🔧 Дополнительные ПМ по упражнениям цикла</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🔧 Дополнительные ПМ по упражнениям цикла</div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr ' + (cols > 3 ? '1fr' : ''), gap: 6 }}>
                         {exs.filter(e => {
                           const n = e.toLowerCase();
@@ -679,7 +699,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             }
             return (
               <>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>
                   Цикл использует {exs.length} упражнений. Укажите ПМ для каждого:
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr ' + (cols > 3 ? '1fr' : ''), gap: 6 }}>
@@ -701,6 +721,31 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           </div>
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: ACCENT }}>🎯 Слабые группы (акцент, сохраняются в профиль)</div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6 }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)" }}>{l}{on ? " ✓" : ""}</button>; })}</div>
+          {/* 📅 Выбор дней для слабых групп — авто-распределение если не выбрано */}
+          {weakPoints.length > 0 && (() => {
+            const tpl = getCycleById(selectedCycleId);
+            const dayCount = tpl?.week1?.length || 3;
+            const WEAK_GROUP_LABELS_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' };
+            return (
+              <div style={{ marginTop:6, padding:'8px 10px', borderRadius:10, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.15)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>📅 Выбор дней недели для слабых групп (если не выбрать — авто)</div>
+                {weakPoints.map(wg => {
+                  const days = weakGroupDayMap[wg] || [];
+                  return (
+                    <div key={wg} style={{ marginBottom: 6 }}>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 3 }}>{WEAK_GROUP_LABELS_RU[wg] || wg}{days.length > 0 ? ` → день ${days.join(', ')}` : ' → авто (малые: 2 дня, крупные: 1 день)'}</div>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => {
+                          const on = days.includes(d);
+                          return <button key={d} onClick={() => toggleDayInMap(wg, d, 'wg')} style={{ padding:'4px 10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', border: on ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}>{'Д' + d}{on ? ' ✓' : ''}</button>;
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: '#8b5cf6' }}>🎯 Слабые точки СРЦ-движений (диагностика weakpoint-pl)</div>
           {(() => {
             const WP_LABELS: Record<string, string> = {
@@ -727,6 +772,32 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             </div>
             ));
           })()}
+          {/* 📅 Выбор дней недели для каждой выбранной слабой точки СРЦ */}
+          {plWeakPoints.length > 0 && (() => {
+            const tpl = getCycleById(selectedCycleId);
+            const dayCount = tpl?.week1?.length || 3;
+            const liftLabelMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая', ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга верхнего блока', incline_press: 'Жим на наклонной' };
+            return (
+              <div style={{ marginTop:6, padding:'8px 10px', borderRadius:10, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.15)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6', marginBottom: 6 }}>📅 Дни недели для слабых точек СРЦ (если пусто — авто: тяжёлый+памп-день)</div>
+                {plWeakPoints.map(wp => {
+                  const mapKey = `${wp.lift}|${wp.weakPoint}`;
+                  const days = plWeakPointDayMap[mapKey] || [];
+                  return (
+                    <div key={mapKey} style={{ marginBottom: 6 }}>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 3 }}>{liftLabelMap[wp.lift] || wp.lift} · {wp.weakPoint}{days.length > 0 ? ` → день ${days.join(', ')}` : ' → авто (2 дня: тяжёлый + памп)'}</div>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => {
+                          const on = days.includes(d);
+                          return <button key={d} onClick={() => toggleDayInMap(mapKey, d, 'pw')} style={{ padding:'4px 10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', border: on ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#8b5cf6' : 'rgba(255,255,255,0.6)' }}>{'Д' + d}{on ? ' ✓' : ''}</button>;
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
           {/* 💉 PED-адаптация объёмов (как в ББ-авто) */}
           <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>💉 PED / Курс — адаптация объёмов</div>
@@ -741,12 +812,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             {peds.length > 0 && (
               <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Дозировки (мг/нед или МЕ/нед)</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 6 }}>
                   {peds.map(p => {
                     const labels: Record<string, string> = { AAS: 'ААС, мг/нед', insulin: 'Инсулин, МЕ/день', MGF: 'MGF, мкг/нед', IGF1: 'IGF-1, мкг/день', GH: 'ГР, МЕ/день' };
                     return (
                       <div key={p} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{labels[p] || p}</span>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{labels[p] || p}</span>
                         <input type="number" value={pedDoses[p] || 0} min={0} max={p === 'AAS' ? 3000 : p === 'insulin' ? 50 : 500}
                           onChange={e => setPedDoses(d => ({ ...d, [p]: parseInt(e.target.value) || 0 }))}
                           style={{ width: '100%', padding: '5px 8px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 11, fontWeight: 700, textAlign: 'center', boxSizing: 'border-box' }} />
@@ -759,7 +830,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             {peds.length > 0 && (
               <div style={{ marginTop: 8 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>Интенсивность курса</div>
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {([['mild','Лёгкая'],['moderate','Умеренная'],['heavy','Тяжёлая']] as const).map(([val,label]) => (
                     <button key={val} onClick={() => setCourseIntensity(val)}
                       style={{ padding: '5px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer',
@@ -801,12 +872,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             return <div style={CARD}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8 }}>
                 <div style={{ ...H, margin:0 }}>План: {builtSrc.template.meta.title}</div>
-                <span style={{ fontSize:10, fontWeight:700, color: PH_COLOR[phase], background: PH_COLOR[phase]+'22', padding:'3px 8px', borderRadius:10 }}>{PH_RU[phase]}</span>
+                <span style={{ fontSize:11, fontWeight:700, color: PH_COLOR[phase], background: PH_COLOR[phase]+'22', padding:'3px 8px', borderRadius:10 }}>{PH_RU[phase]}</span>
               </div>
               <div style={{ ...SMALL, marginTop:4 }}>{builtSrc.progressionRationale}</div>
-              {methodHints.label && <div style={{ marginTop:4, fontSize:10, color:'var(--accent)', background:'var(--accent-dim)', border:'1px solid rgba(0,230,138,0.2)', padding:'3px 8px', borderRadius:8, display:'inline-block' }}>🧩 {methodHints.label}{methodHints.volumeMult !== 1 ? ' · объём×' + methodHints.volumeMult : ''}{methodHints.technique ? ' · ' + methodHints.technique : ''}</div>}
+              {methodHints.label && <div style={{ marginTop:4, fontSize:11, color:'var(--accent)', background:'var(--accent-dim)', border:'1px solid rgba(0,230,138,0.2)', padding:'3px 8px', borderRadius:8, display:'inline-block' }}>🧩 {methodHints.label}{methodHints.volumeMult !== 1 ? ' · объём×' + methodHints.volumeMult : ''}{methodHints.technique ? ' · ' + methodHints.technique : ''}</div>}
               {plWeakPoints.length > 0 && (
-                <div style={{ marginTop:8, fontSize:10, color:'#c4b5fd', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.25)', padding:'6px 8px', borderRadius:8 }}>
+                <div style={{ marginTop:8, fontSize:11, color:'#c4b5fd', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.25)', padding:'6px 8px', borderRadius:8 }}>
                   <div style={{ fontWeight:700, marginBottom:4 }}>🎯 Слабые точки СРЦ (добавлены ассистенты в план):</div>
                   {plWeakPoints.map((wp, i) => {
                     const rec = getPLWeakPointRecommendations(wp.lift, wp.weakPoint);
@@ -827,17 +898,17 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 const stt = shouldTrainToday({ readiness: linked.readiness?.recovery ?? 80, acwr: autoRegResult.deload ? { ratio: 1.8, zone: 'dangerous' } : { ratio: 1.0, zone: 'optimal' }, fatigue: linked.readiness?.fatigue ?? 30, hrvRatio: linked.profile?.settings?.baselineHrvRatio ?? 1.0 });
                 return (
                   <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: autoRegResult.deload ? 'rgba(239,68,68,0.08)' : 'rgba(96,165,250,0.06)', border: '1px solid ' + (autoRegResult.deload ? 'rgba(239,68,68,0.25)' : 'rgba(96,165,250,0.2)') }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
                       <div>
                         <span style={{ fontSize:11, fontWeight:700, color: stt.train ? (autoRegResult.deload ? '#ef4444' : '#60a5fa') : '#ef4444' }}>
                           {stt.train ? '✅' : '⚠️'} {stt.reason}
                         </span>
-                        {autoRegResult.intensityNote && <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: autoRegResult.intensityNote === 'силовая' ? 'rgba(239,68,68,0.15)' : autoRegResult.intensityNote === 'восстановительная' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)', color: autoRegResult.intensityNote === 'силовая' ? '#ef4444' : autoRegResult.intensityNote === 'восстановительная' ? '#22c55e' : '#f59e0b' }}>{autoRegResult.intensityNote === 'силовая' ? 'СИЛОВАЯ' : autoRegResult.intensityNote === 'восстановительная' ? 'ВОССТАНОВИТ.' : autoRegResult.intensityNote === 'лёгкая' ? 'ЛЁГКАЯ' : ''}</span>}
+                        {autoRegResult.intensityNote && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: autoRegResult.intensityNote === 'силовая' ? 'rgba(239,68,68,0.15)' : autoRegResult.intensityNote === 'восстановительная' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)', color: autoRegResult.intensityNote === 'силовая' ? '#ef4444' : autoRegResult.intensityNote === 'восстановительная' ? '#22c55e' : '#f59e0b' }}>{autoRegResult.intensityNote === 'силовая' ? 'СИЛОВАЯ' : autoRegResult.intensityNote === 'восстановительная' ? 'ВОССТАНОВИТ.' : autoRegResult.intensityNote === 'лёгкая' ? 'ЛЁГКАЯ' : ''}</span>}
                       </div>
-                      <span style={{ marginRight: 8, fontSize: 10, fontWeight: 700, color: autoRegResult.deload ? '#ef4444' : '#60a5fa' }}>Авторегуляция {autoRegOn ? 'ВКЛ' : 'ВЫКЛ'}</span>
-                      <button onClick={() => setAutoRegOn(a => !a)} style={{ padding:'5px 10px', borderRadius:6, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegOn ? '#60a5fa' : 'rgba(255,255,255,0.1)', color: autoRegOn ? '#000' : 'var(--text-dim)' }}>{autoRegOn ? 'Отключить' : 'Применить'}</button>
+                      <span style={{ marginRight: 8, fontSize: 11, fontWeight: 700, color: autoRegResult.deload ? '#ef4444' : '#60a5fa' }}>Авторегуляция {autoRegOn ? 'ВКЛ' : 'ВЫКЛ'}</span>
+                      <button onClick={() => setAutoRegOn(a => !a)} style={{ padding:'5px 10px', borderRadius:6, fontSize:11, fontWeight:700, cursor:'pointer', border:'none', background: autoRegOn ? '#60a5fa' : 'rgba(255,255,255,0.1)', color: autoRegOn ? '#000' : 'var(--text-dim)' }}>{autoRegOn ? 'Отключить' : 'Применить'}</button>
                     </div>
-                    {autoRegOn && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.7)' }}>
+                    {autoRegOn && <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.7)' }}>
                       <div>Топ-сет ×{autoRegResult.topSetPctMultiplier} · объём ×{autoRegResult.volumeMultiplier} · RIR +{autoRegResult.rirShift}{autoRegResult.deload ? ' · 🔴 DELOAD' : ''}</div>
                       {autoRegResult.decisions.slice(0,3).map((d, i) => <div key={i} style={{ marginTop:2, color:'rgba(255,255,255,0.55)' }}>• {d}</div>)}
                     </div>}
@@ -850,22 +921,22 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#18181b', display:'flex', flexDirection:'column' }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 12px 0' }}>
                       <span style={{ fontSize:14, fontWeight:700, color:'var(--accent)' }}>＋ Упражнение в день</span>
-                      <button onClick={() => setPickerDay(null)} style={{ fontSize:10, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', padding:'4px 8px' }}>✕</button>
+                      <button onClick={() => setPickerDay(null)} style={{ fontSize:11, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', padding:'4px 8px' }}>✕</button>
                     </div>
                     <div style={{ flex:1, overflowY:'auto', padding:'8px 12px 80px' }}>
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>{CAT_GROUPS.map(g => <button key={g} onClick={() => { setPickerGroup(g); setPickerExName(''); }} style={{ padding:'5px 10px', borderRadius:16, fontSize:10, cursor:'pointer', border: pickerGroup===g?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.08)', background: pickerGroup===g?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.03)', color: pickerGroup===g?'var(--accent)':'rgba(255,255,255,0.7)' }}>{GRP_RU[g]||g}</button>)}</div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>{CAT_GROUPS.map(g => <button key={g} onClick={() => { setPickerGroup(g); setPickerExName(''); }} style={{ padding:'5px 10px', borderRadius:16, fontSize:11, cursor:'pointer', border: pickerGroup===g?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.08)', background: pickerGroup===g?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.03)', color: pickerGroup===g?'var(--accent)':'rgba(255,255,255,0.7)' }}>{GRP_RU[g]||g}</button>)}</div>
                       <select value={pickerExName} onChange={e => setPickerExName(e.target.value)} style={{ ...SEL, marginBottom:8 }}>
                         <option value=''>— выберите упражнение —</option>
                         {getExercisesByGroup(pickerGroup).map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
                       </select>
                       <div style={{ display:'flex', flexWrap:'wrap', gap:6, alignItems:'center', marginBottom:8 }}>
-                        <span style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>Подходы</span>
-                        <input type='number' value={pickerScheme.sets} onChange={e => setPickerScheme(s => ({ ...s, sets: +e.target.value }))} style={{ width:48, ...IN, padding:'4px', fontSize:10 }} />
+                        <span style={{ fontSize:11, color:'rgba(255,255,255,0.6)' }}>Подходы</span>
+                        <input type='number' value={pickerScheme.sets} onChange={e => setPickerScheme(s => ({ ...s, sets: +e.target.value }))} style={{ width:48, ...IN, padding:'4px', fontSize:11 }} />
                         <span style={{ fontSize:11 }}>×</span>
-                        <input type='number' value={pickerScheme.reps} onChange={e => setPickerScheme(s => ({ ...s, reps: +e.target.value }))} style={{ width:48, ...IN, padding:'4px', fontSize:10 }} />
+                        <input type='number' value={pickerScheme.reps} onChange={e => setPickerScheme(s => ({ ...s, reps: +e.target.value }))} style={{ width:48, ...IN, padding:'4px', fontSize:11 }} />
                         <span style={{ fontSize:11 }}>×</span>
-                        <input type='number' value={pickerScheme.weight} onChange={e => setPickerScheme(s => ({ ...s, weight: +e.target.value }))} style={{ width:56, ...IN, padding:'4px', fontSize:10 }} />
-                        <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>кг</span>
+                        <input type='number' value={pickerScheme.weight} onChange={e => setPickerScheme(s => ({ ...s, weight: +e.target.value }))} style={{ width:56, ...IN, padding:'4px', fontSize:11 }} />
+                        <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>кг</span>
                       </div>
                       <button onClick={() => addExToDay(pickerDay)} disabled={!pickerExName} style={{ width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer', fontWeight:700, fontSize:11, background: pickerExName ? 'linear-gradient(135deg,var(--accent),#00c8a0)' : 'rgba(255,255,255,0.1)', color: pickerExName ? '#000' : 'rgba(255,255,255,0.3)' }}>Добавить в день</button>
                     </div>
@@ -887,12 +958,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {W.map(w => { const ph = mesocyclePhaseForWeek(w.week, totalW); const active = w.week === wk.week; const maxT = Math.max(1, ...W.map(ww => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0))); const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0); return (
                     <div key={w.week} onClick={() => setSrcWeek(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', background: active ? 'var(--accent-dim)' : 'transparent', border: active ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent' }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: active ? 'var(--accent)' : 'rgba(255,255,255,0.7)', minWidth: 26 }}>Н{w.week}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: active ? 'var(--accent)' : 'rgba(255,255,255,0.7)', minWidth: 26 }}>Н{w.week}</span>
                       <span style={{ width: 4, height: 14, borderRadius: 2, background: PH_COLOR[ph], flexShrink: 0 }} title={PH_RU[ph]} />
                       <div style={{ flex: 1, display: 'flex', gap: 2 }}>
                         {w.days.map((d, di) => { const t = d.metrics.tonnage; return <div key={di} title={'Д' + (di+1) + ': ' + t.toFixed(0) + ' кг·пов'} style={{ flex: 1, height: 14, borderRadius: 3, background: t > 0 ? `linear-gradient(180deg, ${PH_COLOR[ph]}, ${PH_COLOR[ph]}88)` : 'rgba(255,255,255,0.04)', opacity: 0.4 + 0.6 * (t / maxT) }} />; })}
                       </div>
-                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', minWidth: 38, textAlign: 'right' }}>{wTotal.toFixed(0)}</span>
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', minWidth: 38, textAlign: 'right' }}>{wTotal.toFixed(0)}</span>
                     </div>
                   ); })}
                 </div>
@@ -912,13 +983,13 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 const px = (i: number) => 24 + (i / Math.max(1, W2 - 1)) * 280;
                 const py = (v: number) => 70 - ((v - minV) / Math.max(1, maxV - minV)) * 56;
                 return <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.15)' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>📈 Прогрессия ПМ по неделям</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>📈 Прогрессия ПМ по неделям</div>
                   <svg width="100%" viewBox="0 0 320 80" style={{ maxWidth: 360, margin: '0 auto', display: 'block' }}>
                     {[0,1,2,3].map(g => <line key={g} x1={24} x2={304} y1={14 + g * 18} y2={14 + g * 18} stroke="rgba(255,255,255,0.06)" strokeWidth={0.5} />)}
                     {exNames.map((n, ei) => { const pts = builtSrc.weeks.map((w, i) => `${px(i)},${py(w.pmRow[n] || 0)}`).join(' '); return <polyline key={n} points={pts} fill="none" stroke={colors[ei]} strokeWidth={1.6} />; })}
                     {exNames.map((n, ei) => builtSrc.weeks.map((w, i) => <circle key={n + i} cx={px(i)} cy={py(w.pmRow[n] || 0)} r={2} fill={colors[ei]} />))}
                   </svg>
-                  <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>{exNames.map((n, ei) => <span key={n} style={{ fontSize: 9, color: colors[ei] }}>● {n}</span>)}</div>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>{exNames.map((n, ei) => <span key={n} style={{ fontSize: 10, color: colors[ei] }}>● {n}</span>)}</div>
                 </div>;
               })()}
               {e1rmSeries.length > 0 && (() => {
@@ -941,7 +1012,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     {exerciseE1rm.length > 0 && (
                       <div style={{ marginTop: 10, borderTop: '1px solid var(--accent-dim)', paddingTop: 8 }}>
                         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4 }}>Личные 1ПМ по упражнениям (из дневника):</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '3px 8px', fontSize: 10, alignItems: 'center' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '3px 8px', fontSize: 11, alignItems: 'center' }}>
                           <div style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Упражнение</div>
                           <div style={{ color: 'var(--text-dim)', fontWeight: 600, textAlign: 'right' }}>1ПМ</div>
                           <div style={{ color: 'var(--text-dim)', fontWeight: 600, textAlign: 'right' }}>подход</div>
@@ -953,7 +1024,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                             </React.Fragment>
                           ))}
                         </div>
-                        {exerciseE1rm.length > 15 && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>показано 15 из {exerciseE1rm.length}</div>}
+                        {exerciseE1rm.length > 15 && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>показано 15 из {exerciseE1rm.length}</div>}
                       </div>
                     )}
                     {exerciseE1rm.length > 0 && (
@@ -962,7 +1033,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                         <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
                           {exerciseE1rm.slice(0, 10).map((e) => (
                             <button key={e.name} onClick={() => setSelectedTrendEx(s => s === e.name ? null : e.name)}
-                              style={{ padding: '2px 7px', borderRadius: 10, fontSize: 9, fontWeight: 600, cursor: 'pointer',
+                              style={{ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 600, cursor: 'pointer',
                                 border: selectedTrendEx === e.name ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
                                 background: selectedTrendEx === e.name ? 'var(--accent-dim)' : 'rgba(255,255,255,0.03)',
                                 color: selectedTrendEx === e.name ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}>
@@ -980,22 +1051,22 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                           const py = (v: number) => H - PADY - ((v - minV) / ((maxV - minV) || 1)) * (H - PADY - 12);
                           return (
                             <div>
-                              <div style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 700, marginBottom: 2 }}>{selectedTrendEx}</div>
+                              <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, marginBottom: 2 }}>{selectedTrendEx}</div>
                               <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
                                 {[0, 1, 2].map(g => <line key={g} x1={PADX} x2={W - 8} y1={12 + g * ((H - PADY - 12) / 2)} y2={12 + g * ((H - PADY - 12) / 2)} stroke="rgba(255,255,255,0.05)" strokeWidth={0.5} />)}
                                 <polyline points={exTrendSeries.map((p, i) => `${px(i)},${py(p.e1)}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={1.8} />
                                 {exTrendSeries.map((p, i) => <circle key={i} cx={px(i)} cy={py(p.e1)} r={2.5} fill="var(--accent)" />)}
                               </svg>
                               <div style={{ display: 'flex', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: 9, color: 'var(--accent)' }}>посл: {exTrendSeries[exTrendSeries.length - 1].e1}кг</span>
-                                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>макс: {maxV.toFixed(0)}кг</span>
-                                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>тренировок: {n}</span>
+                                <span style={{ fontSize: 10, color: 'var(--accent)' }}>посл: {exTrendSeries[exTrendSeries.length - 1].e1}кг</span>
+                                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>макс: {maxV.toFixed(0)}кг</span>
+                                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>тренировок: {n}</span>
                               </div>
                             </div>
                           );
                         })()}
                         {selectedTrendEx && exTrendSeries.length < 2 && (
-                          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>нужно ≥2 тренировок для графика (найдено {exTrendSeries.length})</div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>нужно ≥2 тренировок для графика (найдено {exTrendSeries.length})</div>
                         )}
                       </div>
                     )}
@@ -1024,7 +1095,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                              <div key={ei} style={{ background:'rgba(255,255,255,0.02)', borderRadius:8, padding:'6px 8px', marginBottom:4, border:'1px solid rgba(255,255,255,0.04)', overflow:'hidden' }}>
                                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:2 }}>
                                  <span style={{ fontSize:11, fontWeight:600, color:'#fff', flex:1, minWidth:0, overflowWrap:'break-word' }}>{e.name}</span>
-                                 <span style={{ fontSize:10, color:e.load === 'main' ? 'var(--accent)' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.4)', fontWeight:600, padding:'1px 6px', borderRadius:4, flexShrink:0, background: e.load === 'main' ? 'var(--accent-dim)' : e.load === 'additional' ? 'rgba(245,158,11,0.1)' : 'transparent' }}>
+                                  <span style={{ fontSize:11, color:e.load === 'main' ? 'var(--accent)' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.4)', fontWeight:600, padding:'1px 6px', borderRadius:4, flexShrink:0, background: e.load === 'main' ? 'var(--accent-dim)' : e.load === 'additional' ? 'rgba(245,158,11,0.1)' : 'transparent' }}>
                                    {e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}
                                  </span>
                                </div>
@@ -1047,7 +1118,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                              <div key={a.uid} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:4, padding:'5px 0', borderBottom:'1px solid var(--accent-dim)', alignItems:'center' }}>
                                <div style={{ fontSize:11, color:'var(--accent)', fontWeight:600, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.name}</div>
                                <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
-                                 <span style={{ fontSize:10, color:'rgba(255,255,255,0.4)' }}>＋ добавлено</span>
+                                  <span style={{ fontSize:11, color:'rgba(255,255,255,0.4)' }}>＋ добавлено</span>
                                  <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:11, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', marginLeft:4 }}>✕</button>
                                </div>
                               <div style={{ fontSize:11, color:'rgba(255,255,255,0.75)', textAlign:'right' }}>
@@ -1081,7 +1152,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     detail: a.sets + 'x' + a.reps + 'x' + a.weight + 'кг',
                     note: '＋ добавлено',
                     highlighted: true,
-                    actions: <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:10, color:'#ef4444', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', borderRadius:5, padding:'4px 8px', cursor:'pointer' }}>✕ Удалить</button>,
+                    actions: <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:11, color:'#ef4444', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', borderRadius:5, padding:'4px 8px', cursor:'pointer' }}>✕ Удалить</button>,
                   });
                 });
                 return (
@@ -1201,7 +1272,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   return true;
                 };
                 return <MetricCard title='🎯 Рекомендации тренера: ПЛ-ассистенты по слабым группам' icon='🎯' accent='#ff9100'>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginBottom:6 }}>
+                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', marginBottom:6 }}>
                     Фаза: <b style={{color:'#ff9100'}}>{PH_RU[phase]}</b> · схема: <b style={{color:'#ff9100'}}>{scheme.label}</b> (вес ≈ {Math.round(scheme.pct*100)}% workMax)
                   </div>
                   {weakPoints.map(g => {
@@ -1211,16 +1282,16 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     const dayLabel = `День ${di+1}`;
                     const dayName = `День ${di+1}`;
                     return <div key={g} style={{ marginBottom: 8, padding:8, borderRadius:8, background:'rgba(255,145,0,0.04)', border:'1px solid rgba(255,145,0,0.1)' }}>
-                      <div style={{ fontSize:10, fontWeight:700, color:'#ff9100', marginBottom:3, display:'flex', justifyContent:'space-between' }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#ff9100', marginBottom:3, display:'flex', justifyContent:'space-between' }}>
                         <span>{GRP_RU[g] || g}</span>
-                        <span style={{ fontSize:8, fontWeight:400, color:'rgba(255,255,255,0.45)' }}>→ {dayLabel} ({dayName})</span>
+                        <span style={{ fontSize:10, fontWeight:400, color:'rgba(255,255,255,0.45)' }}>→ {dayLabel} ({dayName})</span>
                       </div>
                       {pool.map(ex => (
                         <button key={ex.name} onClick={() => addAccessory(dk, ex.name, g)}
-                          style={{ display:'block', width:'100%', marginBottom:3, padding:'5px 8px', borderRadius:6, fontSize:10, cursor:'pointer', textAlign:'left',
+                          style={{ display:'block', width:'100%', marginBottom:3, padding:'5px 8px', borderRadius:6, fontSize:11, cursor:'pointer', textAlign:'left',
                             border:'1px solid rgba(255,145,0,0.25)', background:'rgba(255,145,0,0.06)', color:'#ff9100', transition:'all 0.15s' }}>
                           <span style={{fontWeight:700}}>＋ {ex.name}</span>
-                          <span style={{fontSize:8, color:'rgba(255,255,255,0.45)', marginLeft:6}}>— {ex.note}</span>
+                          <span style={{fontSize:10, color:'rgba(255,255,255,0.45)', marginLeft:6}}>— {ex.note}</span>
                         </button>
                       ))}
                     </div>;
@@ -1228,7 +1299,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   <div style={{ ...SMALL, color: 'rgba(255,255,255,0.5)' }}>
                     Добавляется в {phase === 'base' ? 'базовый' : phase === 'build' ? 'накопительный' : phase === 'peak' ? 'пиковый' : 'восстановительный'} день цикла: {scheme.reps}П × 3 подхода, вес {Math.round(scheme.pct*100)}% workMax (фазовая схема). Можно отредактировать в режиме правки.
                   </div>
-                  <div style={{ fontSize:8, color:'rgba(255,145,0,0.5)', marginTop:4 }}>
+                  <div style={{ fontSize:10, color:'rgba(255,145,0,0.5)', marginTop:4 }}>
                     💡 Совет тренера: не ставьте изоляцию — для ПЛ слабая точка лечится вариациями соревновательного движения, а не махами гантелей. Каждое упражнение — это устранение конкретной фазы.
                   </div>
                 </MetricCard>;
