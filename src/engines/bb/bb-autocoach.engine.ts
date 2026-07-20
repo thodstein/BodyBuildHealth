@@ -7,7 +7,7 @@
 import type { BBWeek, BBSession, BBExercise, BBSet, BBPlan } from './bb-builder.engine';
 import { defaultWorkMax } from './bb-builder.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
-import { PHASE_CONFIGS, distributePhases } from '../../ui/screens/TrainingScreen_parts/TrainingConstructor/phase-periodization';
+import { PHASE_CONFIGS, distributePhases } from '../../ui/screens/TrainingScreen_parts/phase-periodization';
 import { PCT_FOR_RIR } from '../rir-table';
 
 /* ──────────── BB phase ──────────── */

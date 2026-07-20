@@ -26,6 +26,7 @@ import { getStrengthLevel, getNextLevelTarget } from '../../engines/performance-
 import { computeStructuredAnalytics } from '../../engines/structured-analytics.engine';
 import { PlannerPlAuto } from './TrainingScreen_parts/PlannerPlAuto';
 import { PlannerBbAuto } from './TrainingScreen_parts/PlannerBbAuto';
+import { ProgramManagerPanel } from './TrainingScreen_parts/ProgramManagerPanel';
 import { DiaryAnalyticsZone } from './TrainingScreen_parts/DiaryAnalyticsZone';
 import { LibraryZone } from './TrainingScreen_parts/LibraryZone';
 import { LoadSafetyCard } from './TrainingScreen_parts/LoadSafetyCard';
@@ -437,7 +438,6 @@ export const TrainingScreen: React.FC = () => {
 
   const bmiCategory = (v: number) => v < 18.5 ? 'Недостаток веса' : v < 25 ? 'Норма' : v < 30 ? 'Избыток' : 'Ожирение';
 
-  const showNonBuilder = tab !== 'constructor';
 
   return (
     <div className="screen training-screen" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: 0 }}>
@@ -587,6 +587,7 @@ export const TrainingScreen: React.FC = () => {
             </div>
             {planningTrack === 'pl' && <PlannerPlAuto />}
             {planningTrack === 'bb' && <PlannerBbAuto />}
+            {planningTrack === 'my' && <ProgramManagerPanel />}
           </div>
         </InfoErrorBoundary>
       )}
@@ -733,4 +734,3 @@ import MesoCorrectionCard from './TrainingScreen_parts/MesoCorrectionCard';
 import MMCTrackingCard from './TrainingScreen_parts/MMCTrackingCard';
 import { loadRirCalibrationStats } from '../../engines/meso-correction.engine';
 
-import { TrainingConstructor } from './TrainingScreen_parts/TrainingConstructor';

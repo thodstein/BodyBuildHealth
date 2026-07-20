@@ -81,8 +81,9 @@ export function zoneForTab(tab: TrainingTab): TrainingZone {
 /** Режимы зоны 'planner' — сегментированный переключатель.
  *  Ручной сбор убран: давал убогие программы (смешивал ПЛ+ББ, дубликаты, мусор).
  *  ПЛ-авто (LMS-циклы) и ББ-авто (generic split + BB-циклы) покрывают все сценарии. */
-export type PlannerMode = 'pl' | 'bb';
+export type PlannerMode = 'pl' | 'bb' | 'my';
 export const PLANNER_MODES: { id: PlannerMode; label: string; icon: string; hint: string }[] = [
   { id: 'pl', label: 'ПЛ-авто', icon: '🏆', hint: 'Пауэрлифтинг: силовые циклы, ПМ-прогрессия, пик' },
   { id: 'bb', label: 'ББ-авто', icon: '💪', hint: 'Бодибилдинг: сплиты, объём по группам, PED-адаптация, прогрессия' },
+  { id: 'my', label: 'Мои программы', icon: '📂', hint: 'Свои программы: создать с нуля, загрузить, редактировать, клон из библиотеки' },
 ];

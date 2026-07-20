@@ -6,9 +6,9 @@
  * Ротация упражнений: каждые N недель заменяет часть упражнений на альтернативы
  * из той же substitutionGroup (предотвращает адаптацию).
  */
-import { RIR_WAVE_PATTERNS, PCT_FOR_RIR, type ManualExercise, type ManualDay } from './types';
-import { VOLUME_LANDMARKS_DB, type TrainingLevel, normLevel } from '../../../../engines/volume-landmarks.engine';
-import { EXERCISE_CATALOG } from '../../../../core/exercise-catalog';
+import { RIR_WAVE_PATTERNS, PCT_FOR_RIR, type ManualExercise, type ManualDay } from './program-types';
+import { VOLUME_LANDMARKS_DB, type TrainingLevel, normLevel } from '../../../engines/volume-landmarks.engine';
+import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 
 /* ──────────── Типы фаз ──────────── */
 export type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';

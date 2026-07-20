@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { calcQualityScore } from './TrainingConstructor/PlanDisplay';
-import { GROUP_RU } from './TrainingConstructor/types';
+import { calcQualityScore } from './plan-quality-score';
+import { GROUP_RU } from './program-types';
 
 const ACCENT = '#00e68a';
 const ru = (g: string) => GROUP_RU[g] || g;

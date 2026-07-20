@@ -13,8 +13,8 @@ import {
   type PlanQualityResult,
   type PlanQualityInput,
 } from '../../../engines/plan-quality.engine';
-import type { ManualResult, ManualDay } from './TrainingConstructor/types';
-import { GROUP_RU, LEVELS, GOALS } from './TrainingConstructor/types';
+import type { ManualResult, ManualDay } from './program-types';
+import { GROUP_RU, LEVELS, GOALS } from './program-types';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';

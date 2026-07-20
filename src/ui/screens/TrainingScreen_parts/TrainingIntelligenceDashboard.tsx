@@ -2,7 +2,7 @@
  *  Категории с цветными заголовками, каждая карточка — иконка + название + описание.
  *  Без коллапсов и мелких текстов: всё видно сразу, читаемо на 320px+ */
 import React from 'react';
-import type { ManualResult } from './TrainingConstructor/types';
+import type { ManualResult } from './program-types';
 import type { WorkoutLog } from '../../../core/types';
 import type { TrainingTab } from './shared';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';

@@ -284,6 +284,8 @@ export interface CycleToPlanInput {
   level?: string;
   /** Доступное оборудование — фильтр отбора упражнений. */
   equipment?: string[];
+  /** Режим адаптации: 'faithful' = цикл дословно (только safety-фильтры), 'adapt' = + слабые группы/фокус/пост-фаза. */
+  mode?: 'faithful' | 'adapt';
 }
 
 function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG): string {
@@ -448,17 +450,23 @@ function findReplacementForCycle(exName: string, muscle: string, favNames: Set<s
   // Пул упражнений той же группы, не в дне
   const pool = EXERCISE_CATALOG.filter(e => e.group === group && e.name !== exName && !alreadyInDay.has(e.name));
   if (pool.length === 0) return null;
-  // Приоритет 1: любимое
+  // Приоритет 1: любимое (из той же группы)
   const favMatch = pool.find(e => favNames.has(e.name) || favIdSet.has(e.id));
   if (favMatch) return { name: favMatch.name, group };
-  // Приоритет 2: compound с ДРУГИМ углом/паттерном
+  // Приоритет 2: тот же тип (compound→compound, isolation→isolation) — сохраняет характер упражнения
+  const exType = cat?.type;
+  if (exType) {
+    const sameType = pool.find(e => e.type === exType);
+    if (sameType) return { name: sameType.name, group };
+  }
+  // Приоритет 3: compound с ДРУГИМ углом/паттерном (разнообразие для базовых)
   const exAngle = classifyAngle(exName);
   const diffAngle = pool.find(e => e.type === 'compound' && classifyAngle(e.name) !== exAngle);
   if (diffAngle) return { name: diffAngle.name, group };
-  // Приоритет 3: compound
+  // Приоритет 4: compound
   const compound = pool.find(e => e.type === 'compound');
   if (compound) return { name: compound.name, group };
-  // Приоритет 4: любое
+  // Приоритет 5: любое
   return { name: pool[0].name, group };
 }
 
@@ -495,13 +503,16 @@ function classifyAngle(exName: string): string {
  */
 export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const {
-    cycle, workMax, weakPoints = [], peds = [], pedDoses, courseIntensity,
+    cycle, workMax, peds = [], pedDoses, courseIntensity,
     loadStrategy = 'double_progression', injuries = [],
     intensityTechnique, autoDeload, deloadType, autoRegResult,
     favoriteExercises = [], excludedExercises = [], avoidAxialLoad = false,
-    volumeGoal = 'mav', specialization = false, focusGroup = '',
-    level = 'advanced', equipment = [],
+    volumeGoal = 'mav', level = 'advanced', equipment = [],
   } = input;
+  const mode = input.mode || 'adapt';
+  const weakPoints = mode === 'faithful' ? [] : (input.weakPoints || []);
+  const focusGroup = mode === 'faithful' ? '' : (input.focusGroup || '');
+  const specialization = mode === 'faithful' ? false : (input.specialization || false);
   const meta = cycle.meta;
   const totalWeeks = meta.weeks;
   const daysPerWeek = meta.sessionsPerWeek;
@@ -792,7 +803,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   // Условие покрывает ВСЕ признаки, а не только technique/weakPoints — иначе loadStrategy
   // и autoDeload теряются (баг: dfa8842fb убрал дубль-вызов, но не расширил guard).
   const acwrRatio = 1; // cycle mode не вычисляет ACWR (нет sRPE-интеграции); autoDeload работает по meta.deloadWeeks
-  if ((intensityTechnique && intensityTechnique !== 'none') || weakPoints.length > 0 || loadStrategy || autoDeload || autoRegResult) {
+  if (mode === 'adapt' && ((intensityTechnique && intensityTechnique !== 'none') || weakPoints.length > 0 || loadStrategy || autoDeload || autoRegResult)) {
     finalPlan = applyPostPhaseProcessing({
       plan: finalPlan,
       totalWeeks,
@@ -1033,6 +1044,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const gradedInjuries = getGradedInjuries(opts.injuries || [], new Date().toISOString().slice(0, 10));
   const exclIds = new Set(opts.excludedExercises || []);
   const favIds = new Set(opts.favoriteExercises || []);
+  // favoriteExercises могут быть id или именами — строим множество имён для приоритета при замене.
+  const favNames = new Set<string>((opts.favoriteExercises || []).flatMap(id => { const cat = EXERCISE_CATALOG.find(e => e.id === id); return cat ? [cat.name] : [id]; }));
   const eqList = opts.equipment || [];
   const avAxial = mode === 'faithful' ? false : (opts.avoidAxialLoad || false);
   const level = opts.level || 'intermediate';
@@ -1111,13 +1124,13 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
         // excluded exercise (user prefs) — заменить на альтернативу
         let finalExName = ex.name;
         if (exclIds.has(catId) || exclIds.has(ex.name)) {
-          const rep = findReplacementForCycle(ex.name, muscleGroupFromExName(ex.name, EXERCISE_CATALOG), new Set(), favIds, new Set());
+          const rep = findReplacementForCycle(ex.name, muscleGroupFromExName(ex.name, EXERCISE_CATALOG), favNames, favIds, new Set(exercises.map(e => e.name)));
           if (rep) finalExName = rep.name;
           else continue;
         }
         // avoidAxialLoad filter
         if (avAxial && catEntry && isAxialLoadExercise(catEntry)) {
-          const rep = findReplacementForCycle(ex.name, muscleGroupFromExName(ex.name, EXERCISE_CATALOG), new Set(), favIds, new Set());
+          const rep = findReplacementForCycle(ex.name, muscleGroupFromExName(ex.name, EXERCISE_CATALOG), favNames, favIds, new Set(exercises.map(e => e.name)));
           if (rep) finalExName = rep.name;
         }
         // equipment filter
@@ -1125,7 +1138,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           const rawEq = (catEntry as any).equipment;
           const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
           if (exEq.length > 0 && !exEq.some(eq => eqList.includes(eq))) {
-            const rep = findReplacementForCycle(ex.name, muscleGroupFromExName(ex.name, EXERCISE_CATALOG), new Set(), favIds, new Set());
+            const rep = findReplacementForCycle(ex.name, muscleGroupFromExName(ex.name, EXERCISE_CATALOG), favNames, favIds, new Set(exercises.map(e => e.name)));
             if (rep) finalExName = rep.name;
           }
         }

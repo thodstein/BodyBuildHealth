@@ -6,6 +6,7 @@
  * баланса тяни/толкай, отсутствия дублирования паттернов, доступного оборудования.
  */
 import type { Exercise } from '../core/types';
+import { bbExerciseTier, isInappropriateBB } from './bb/bb-exercise-tier.engine';
 import { getExerciseById } from '../core/exercise-catalog';
 import { EXERCISE_BIOMECHANICS_DB } from '../data/exercise-biomechanics-db';
 import { getMappedBioId } from '../data/exercise-id-mapping';
@@ -403,6 +404,13 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
 
     // Бонус для compound (базовые)
     if (ex.type === 'compound') score += 5;
+
+    // ▓▓ Тиры «обычности» для ББ-гипертрофии: канонические — предпочитать, экзотику — штраф ▓▓
+    const _tier = bbExerciseTier(ex);
+    if (_tier === 1) { score += 8; rationales.push('Каноническое упражнение +8'); }
+    else if (_tier === 3) { score -= 15; rationales.push('Экзотика/специфика −15'); }
+    else if (_tier === 4) { score -= 40; rationales.push('Не для дефолтной ББ-гипертрофии −40'); }
+    if (isInappropriateBB(ex) && level && (level === 'beginner' || level === 'intermediate')) { score -= 30; rationales.push('Недоступно на уровне −30'); }
 
     // 5b. Контекст бодибилдинга: штраф пауэрлифт-подъёмов
     // Умеренный штраф (-5): compound (+5) всё ещё перевешивает изоляцию,

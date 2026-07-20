@@ -28,7 +28,9 @@ import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landma
 // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
-import { distributePhases, PHASE_CONFIGS, getPhaseVolumeMult, type BBPhase } from '../../ui/screens/TrainingScreen_parts/TrainingConstructor/phase-periodization';
+import { distributePhases, PHASE_CONFIGS, getPhaseVolumeMult, type BBPhase } from '../../ui/screens/TrainingScreen_parts/phase-periodization';
+import { orderSessionExercises } from './bb-session-order.engine';
+import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 
@@ -500,6 +502,8 @@ function buildSession(
   // Формула: dailyCap × S_MRV_FACTOR × pedMult × levelMult
   const levelMultMap: Record<string, number> = { beginner: 0.9, intermediate: 1.0, advanced: 1.15, enhanced: 1.3 };
   const levelMult = levelMultMap[level] ?? 1.0;
+  // Экзотика (гиря/олимп/стронгмен/мобилити) — только для advanced/enhanced; каноника по умолчанию.
+  const allowExotic = level === 'advanced' || level === 'enhanced';
   const dayFatigueBudget = Math.round(dailyCap * S_MRV_FACTOR * (pedAdapt?.combinedRecoveryMultiplier ?? 1) * levelMult);
   
   // Pre-calculate each muscle's expected volume to allocate budget proportionally
@@ -599,7 +603,7 @@ function buildSession(
     const pedBoost = pedAdapt ? Math.max(0, Math.round((pedAdapt.combinedMrvMultiplier - 1.0) / 0.2)) : 0;
     const levelBase = level === 'beginner' ? 1 : level === 'intermediate' ? 0 : 1;
     const primaryBase = ['back', 'quads', 'chest', 'shoulders'].includes(muscle) ? (isMultiDay ? 3 : 4) : 2;
-    const exerciseCount = role === 'primary'
+    let exerciseCount = role === 'primary'
       ? Math.min(isMultiDay ? 3 : 4, primaryBase + levelBase + pedBoost)
       : Math.min(3, accessoryCount + Math.floor(pedBoost / 2) + (['triceps', 'biceps', 'shoulders'].includes(muscle) ? 1 : 0));
     // A2: focusGroup — структурная специализация. Если мышца = focusGroup и primary
@@ -630,6 +634,7 @@ function buildSession(
       if (tm === null || !roleMuscles.includes(tm)) return false;
       // BB-junk фильтр: реабилитация/кор-стабильность/изометрика не для гипертрофии
       if (isBBJunk(ex)) return false;
+      { const _t = bbExerciseTier(ex); if (_t === 4 || (!allowExotic && _t === 3)) return false; }
       // Rear delt НЕ в Push/Chest/Shoulders-днях (только в Pull/Back)
       if (pushDay && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
       // Equipment hard filter: если указано оборудование — исключить упражнения без него
@@ -661,6 +666,7 @@ function buildSession(
       const tm = trueMuscleOf(ex);
       if (tm === null || !roleMuscles.includes(tm)) return false;
       if (isBBJunk(ex)) return false;
+      { const _t = bbExerciseTier(ex); if (_t === 4 || (!allowExotic && _t === 3)) return false; }
       // Equipment fallback: не фильтруем по оборудованию (лучше хоть что-то, чем пусто)
       return true;
     });
@@ -694,9 +700,9 @@ function buildSession(
       // Rear delt только в Pull/Back-днях
       const tag = (sched.sessionTag || '').toLowerCase();
       const allowRear = tag.includes('pull') || tag.includes('back') || tag === 'back';
-      const presses = pool.filter(e => isPress(e) && !isLateral(e) && !isRear(e) && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name));
-      const laterals = pool.filter(e => isLateral(e) && !isPress(e) && !isRear(e) && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name));
-      const rears = allowRear ? pool.filter(e => isRear(e) && !isPress(e) && !isLateral(e) && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name)) : [];
+      const presses = pool.filter(e => isPress(e) && !isLateral(e) && !isRear(e) && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name)).sort((a,b) => bbExerciseTier(a) - bbExerciseTier(b));
+      const laterals = pool.filter(e => isLateral(e) && !isPress(e) && !isRear(e) && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name)).sort((a,b) => bbExerciseTier(a) - bbExerciseTier(b));
+      const rears = allowRear ? pool.filter(e => isRear(e) && !isPress(e) && !isLateral(e) && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name)).sort((a,b) => bbExerciseTier(a) - bbExerciseTier(b)) : [];
       const diverse: any[] = [];
       // Press (front delt) — 1-2 упражнения если primary
       if (presses.length > 0) {
@@ -1029,6 +1035,12 @@ function buildSession(
   // Кап упражнений в сессии: максимум 8 (реалистичная ББ-тренировка 60-75 мин)
   // Кап упражнений в сессии: зависит от PED (натурал 8, enhanced 12).
   // Финальный кап (с учётом feeders) — в buildBBPlan после добавления feeders.
+  // ▓▓ Технически грамотный порядок упражнений (до обрезки по exCap) ▓▓
+  // Базовые основной мышцы → базовые вторичных → изоляция (растяжка первой) → финиши.
+  // Устраняет «жим стоя перед жимом лёжа» и подобные нарушения логики.
+  const _ordered = orderSessionExercises(exercises, { sessionTag: sched.sessionTag });
+  exercises.length = 0; exercises.push(..._ordered);
+
   const exCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 12 : 8;
   if (exercises.length > exCap) {
     const kept = exercises.filter(e => e.role === 'primary').slice(0, 7);
@@ -1073,6 +1085,7 @@ function buildSession(
         if (tm === null || tm !== wp) return false;
         if (seenNamesList.has(ex.name)) return false;
         if (isBBJunk(ex)) return false;
+      { const _t = bbExerciseTier(ex); if (_t === 4 || (!allowExotic && _t === 3)) return false; }
         const n = (ex.name || '').toLowerCase();
         if (n.includes('становая') || n.includes('жим стоя') || n.includes('армей')) return false;
         if (equipmentList.length > 0) {

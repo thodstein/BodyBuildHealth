@@ -1,5 +1,5 @@
 import type React from 'react';
-import { getVolumeLandmarks } from '../../../../engines/volume-landmarks.engine';
+import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 
 export const ACCENT = '#00e68a';
 export const DIM = 'rgba(255,255,255,0.5)';
@@ -24,7 +24,7 @@ export const LEVELS = [
   { value: 'enhanced', label: '⚡ Enhanced' },
 ];
 
-export { PCT_FOR_RIR } from '../../../../engines/rir-table';
+export { PCT_FOR_RIR } from '../../../engines/rir-table';
 
 /* ─── Расширенные группы мышц (15 групп) ─── */
 export const ALL_GROUPS = [
@@ -179,5 +179,5 @@ export const RIR_WAVE_PATTERNS: Record<string, { label: string; desc: string; ri
 
 export type ConstructorMode = 'macro' | 'manual';
 
-import { detectMuscleGroup as detectGroup } from '../../../../engines/muscle-group';
+import { detectMuscleGroup as detectGroup } from '../../../engines/muscle-group';
 export { detectGroup };

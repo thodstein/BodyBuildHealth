@@ -45,7 +45,7 @@ import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { getPlanFeedback } from '../../../engines/plan-execution-feedback.engine';
 import { validatePlan, weeklySetsFromBBPlan } from '../../../engines/plan-validator';
 import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } from './PlanCharts';
-import { distributePhases as distributePhasesUnified, PHASE_CONFIGS, type PhaseDistribution } from './TrainingConstructor/phase-periodization';
+import { distributePhases as distributePhasesUnified, PHASE_CONFIGS, type PhaseDistribution } from './phase-periodization';
 import { validatePlanQuality, bbPlanToQualityInput, type PlanQualityResult } from '../../../engines/plan-quality.engine';
 import { PlanExportCard } from './PlanExportCard';
 import { DayCard, ExerciseRow, PhaseBanner, WeekStrip, PHASE_COLORS, PHASE_LABELS, type PlanDayView, type PlanExerciseView, type PhaseKey } from './PlanOutput';
@@ -204,7 +204,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [customCycle, setCustomCycle] = useState<SRCycleTemplate | null>(null);
   const [customProgram, setCustomProgram] = useState<FullProgram | null>(null);
   const [bbProgramPath, setBbProgramPath] = useState<'library' | 'cycle'>('cycle');
-  const [bbAdaptMode, setBbAdaptMode] = useState<'faithful' | 'adapt'>('adapt');
+  const [bbAdaptMode, setBbAdaptMode] = useState<'faithful' | 'adapt'>('faithful');
   const [bbSource, setBbSource] = useState<'cycle' | 'program'>(customCycle ? 'program' : 'cycle');
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(customCycle ? customCycle.meta.id.replace('prog_', '') : null);
   const [bridgeMsg, setBridgeMsg] = useState('');
@@ -291,7 +291,8 @@ export const BbAutoConstructor: React.FC = () => {
       setBbLevel(cycle.meta.level === 'novice' ? 'beginner' : cycle.meta.level === 'KMS-MS' || cycle.meta.level === 'MS-MSMK' ? 'advanced' : 'intermediate');
       setBbGoal(cycle.meta.period === 'strength' ? 'strength_mass' : 'mass');
     } else {
-      // Library путь: прямой FullProgram → programToBBPlan (faithful)
+      // Library путь: прямой FullProgram → programToBBPlan. По умолчанию faithful — программа без изменений.
+      setBbAdaptMode('faithful');
       setCustomProgram(program);
       setCustomCycle(null);
       setBbProgramPath('library');
@@ -508,6 +509,7 @@ export const BbAutoConstructor: React.FC = () => {
           focusGroup: bbFocus,
           level: bbLevel,
           equipment: bbEquipment,
+          mode: bbAdaptMode,
         });
         const cycleWeeks = cycle.meta.sessionsPerWeek;
         if (bbDays !== cycleWeeks) setBbDays(cycleWeeks);
@@ -821,7 +823,7 @@ export const BbAutoConstructor: React.FC = () => {
                   </div>
 
                   {/* Режим адаптации (faithful vs adapt) — только для library path */}
-                  {bbProgramPath === 'library' && (
+                  {(planMode === 'bb_cycle') && (
                     <div style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>🔒 Режим конвертации программы</div>
                       <div style={{ display: 'flex', gap: 6 }}>
