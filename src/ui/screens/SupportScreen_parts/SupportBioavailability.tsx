@@ -212,6 +212,7 @@ const DetailView: React.FC<{ entry: EnrichedEntry; onBack: () => void; catalog: 
         <div><div style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)' }}>{entry.nameRu}</div><div style={{ fontSize: 8, color: 'var(--text-dim)' }}>{entry.nameEn} · {entry.source === 'catalog' ? 'БАД' : entry.source === 'pharma' ? 'Фарма' : 'Пептид'} · {entry.category.join(', ')}</div></div>
       </div>
       {entry.description && <div style={{ ...S.card }}><div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.3 }}>{entry.description}</div></div>}
+      {entry.source === 'pharma' && <div style={{ ...S.card, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}><div style={{ fontSize: 8, color: '#f59e0b', lineHeight: 1.3 }}>⚠ Биодоступность фармпрепаратов зависит от рецептуры, генетики CYP450, состояния ЖКТ и взаимодействий. Значения ориентировочные — для выбора формы, а не расчёта точной дозы.</div></div>}
 
       {/* Forms table */}
       <div style={{ ...S.card }}>
