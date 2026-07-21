@@ -1534,6 +1534,16 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
   }
 
+  // D-23: активное закрытие дефицита микронутриентов (dietology: план должен быть
+  // микронутриентно-адекватным, а не только диагностированным). Добавляем целевой
+  // продукт для самого критичного дефицита (<60% RDA) в самый лёгкий приём, затем
+  // пересчитываем макро-totals — kcal пересчитается блоком Atwater ниже.
+  const microBoost = activelyCloseTopDeficiency(meals, !!input.isVegetarian, input.sex || 'male', input.excludedIds || new Set());
+  if (microBoost.note) {
+    notes.push('🧬 ' + microBoost.note);
+    totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + (m.totals.fiber||0), 0); totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg||0), 0);
+  }
+
   // ─── Atwater kcal: totals.kcal = P*4 + C*4 + F*9 (соответствует макросам) ───
   totals.kcal = Math.round(totals.p * 4 + totals.c * 4 + totals.f * 9);
   meals.forEach(m => { m.totals.kcal = Math.round(m.totals.p * 4 + m.totals.c * 4 + m.totals.f * 9); });
@@ -1642,4 +1652,39 @@ function closeFoodDeficiencies(meals: Meal[], isVegetarian = false, sex: 'male'|
     }
   });
   return notes;
+}
+
+// D-23: активное закрытие дефицита — добавляет целевой продукт для самого критичного
+// микронутриента (<60% RDA) в самый лёгкий приём. Возвращает note (или null).
+function activelyCloseTopDeficiency(meals: Meal[], isVegetarian: boolean, sex: 'male'|'female'|'other', excludedIds: Set<string>): { note: string | null } {
+  const microTotals: Record<string, number> = {};
+  meals.flatMap(m => m.items).forEach(it => {
+    const food = FOOD_DB.find(f => f.id === it.id); if (!food) return;
+    const factor = (it.amount || 0) / 100;
+    Object.keys(RDA_TARGETS).forEach(k => { microTotals[k] = (microTotals[k] || 0) + getMicroFromFood(food, k) * factor; });
+  });
+  let worstKey: string | null = null; let worstPct = 60;
+  for (const [key, cfg] of Object.entries(RDA_TARGETS)) {
+    const effRda = key === 'Fe' ? (sex === 'male' ? 8 : 18) : cfg.rda;
+    const pct = (microTotals[key] || 0) / effRda * 100;
+    if (pct < worstPct) { worstPct = pct; worstKey = key; }
+  }
+  if (!worstKey) return { note: null };
+  const cfg = RDA_TARGETS[worstKey];
+  const sourceId = isVegetarian ? (cfg.vegFoodId || cfg.foodId) : cfg.foodId;
+  const food = FOOD_DB.find(f => f.id === sourceId) || FOOD_DB.find(f => f.id === cfg.foodId);
+  if (!food || excludedIds.has(food.id)) return { note: null };
+  // если продукт уже в плане — не дублируем (добавим note-флаг через closeFoodDeficiencies)
+  if (meals.flatMap(m => m.items).some(it => it.id === food.id)) return { note: null };
+  // в самый лёгкий приём (обычно snack/pre-sleep)
+  let target = meals[0];
+  for (const m of meals) if ((m.totals.kcal || 0) < (target.totals.kcal || 0)) target = m;
+  const grams = cfg.foodG;
+  const item = makeItem(food, grams, 'veg');
+  target.items.push(item);
+  target.totals = target.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber||0), leucine_mg: acc.leucine_mg + (it.leucine_mg||0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+  const effRda = worstKey === 'Fe' ? (sex === 'male' ? 8 : 18) : cfg.rda;
+  const added = Math.round(getMicroFromFood(food, worstKey) * grams / 100);
+  const before = Math.round(microTotals[worstKey] || 0);
+  return { note: `${food.name} ${grams}г → закрытие дефицита ${worstKey}: +${added} ${cfg.unit} (${before}→${before + added}/${effRda} ${cfg.unit})` };
 }

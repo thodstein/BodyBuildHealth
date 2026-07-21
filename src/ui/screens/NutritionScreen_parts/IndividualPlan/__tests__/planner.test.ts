@@ -218,3 +218,31 @@ describe('buildDayPlan — Glycemic Load per meal', () => {
     expect(highCarbLowGI / highCarbCount).toBeGreaterThan(0.5);
   });
 });
+
+describe('buildDayPlan — active micro-gap closing (D-23)', () => {
+  it('микро-буст не ломает план: kcal/белок остаются у цели', () => {
+    const plan = buildDayPlan(baseInput({ goalProteinG: 180, goalKcal: 3000 }));
+    // план валиден
+    expect(plan.meals.length).toBeGreaterThan(0);
+    expect(Math.abs(plan.totals.kcal - 3000) / 3000).toBeLessThan(0.1);
+    // если есть микро-буст note — формат корректный
+    const boostNote = plan.notes.find((n: string) => n.includes('🧬'));
+    if (boostNote) {
+      expect(boostNote).toContain('закрытие дефицита');
+    }
+  });
+
+  it('движок не падает и собирает валидный план при обеднённом пуле (овощи/фрукты исключены)', () => {
+    // D-23 + robustness: даже при обеднённом пуле план должен собираться без краха,
+    // а микро-буст (если дефицит есть) — не ломать макро-цели.
+    const vegFruitIds = ['broccoli','spinach','cucumber','tomato','veg_bell_pepper_red','zucchini','cabbage','green_beans','papaya','blueberry','orange','apple','banana','avocado'];
+    const excluded = new Set(vegFruitIds);
+    const plan = buildDayPlan(baseInput({ excludedIds: excluded, goalProteinG: 180, goalKcal: 3000, isTrainingDay: false, trainStartMin: undefined, allowIntraWorkout: false }));
+    expect(plan.meals.length).toBeGreaterThan(0);
+    expect(plan.totals.kcal).toBeGreaterThan(1500);
+    expect(plan.totals.p).toBeGreaterThan(120);
+    // если микро-буст сработал — note содержит «закрытие дефицита»
+    const boostNote = plan.notes.find((n: string) => n.includes('🧬'));
+    if (boostNote) expect(boostNote).toContain('закрытие дефицита');
+  });
+});
