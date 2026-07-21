@@ -156,7 +156,7 @@ export function checkAbsoluteContraindications(
    returns + potential hormesis harm.
    ════════════════════════════════════════════════════════════════ */
 
-const ANTIOXIDANT_PATHWAY: Record<string, string> = {
+export const ANTIOXIDANT_PATHWAY: Record<string, string> = {
   nac: 'glutathione', glutathione: 'glutathione',
   vitamin_c: 'vitc_ascorbate',
   vitamin_e: 'lipid_peroxidation',

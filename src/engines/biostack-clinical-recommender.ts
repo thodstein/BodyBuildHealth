@@ -27,7 +27,7 @@ import {
   type PlanSubstance,
 } from './support-plan';
 
-import { selectStack, getEvidenceGrade, type StackStrategy, type EvidenceGrade } from './biostack-clinical-v2.engine';
+import { selectStack, getEvidenceGrade, type StackStrategy, type EvidenceGrade, ANTIOXIDANT_PATHWAY } from './biostack-clinical-v2.engine';
 import type { BioStackProfile } from './biostack-ai.engine';
 import type { LabCompositeResult } from './lab-analysis.engine';
 
@@ -37,6 +37,7 @@ import { DEFAULT_DOSAGES } from '../data/support-meta';
 import { getPrioritySubstances, type SeverityLevel } from '../data/lab-priority-map';
 import { SUPPLEMENTS_DB } from '../data/support-db/supplements';
 import { PHARMACY_DB } from '../data/support-db/pharmacy-db';
+import { normalizeDoseByWeight } from '../engines/support-plan/engine-helpers';
 import { SYNERGY_NETWORK } from '../data/support-synergy-network';
 import { TZ_AUTO_BLACKLIST, PHASE_BLOCKLIST } from './support-plan/shared-constants';
 
@@ -240,6 +241,8 @@ export interface ClinicalSubstance {
   comment: string;
   tzMechanisms: { mechId: string; label: string }[];
   brandName?: string;
+  /** источник вещества в стеке */
+  source?: 'mandatory' | 'lab' | 'tz' | 'greedy';
 }
 
 export interface ClinicalStackResult {
@@ -570,6 +573,13 @@ export function buildClinicalStack(
     const drugExclSet = new Set(gate.drugExclusions.map(e => e.substanceId));
     const allCatalogIds = Object.keys(SUPPORT_CATALOG_DATA);
 
+    // Pre-compute mechanisms of already selected substances for redundancy check
+    const selectedMechs = new Set<string>();
+    for (const gid of gate.ids) {
+      const tz = getDrugTzMechanisms(gid) || [];
+      for (const m of tz) selectedMechs.add(m.mechId);
+    }
+
     const synCandidates: Array<{ id: string; synScore: number }> = [];
     for (const candId of allCatalogIds) {
       const candLower = candId.toLowerCase();
@@ -579,15 +589,39 @@ export function buildClinicalStack(
       if (TZ_AUTO_BLACKLIST.has(candId)) continue;
 
       let synScore = 0;
+      let hasConflict = false;
       for (const entry of SYNERGY_NETWORK) {
-        if (entry.type !== 'synergy') continue;
-        const partners = [entry.a, entry.b, entry.c, entry.d, entry.e, entry.f, entry.g, ...(entry.substances || [])]
-          .filter(Boolean).map(s => (s as string).toLowerCase());
-        if (!partners.includes(candLower)) continue;
-        for (const gid of gate.ids) {
-          if (partners.includes(gid.toLowerCase())) synScore += entry.score;
+        if (entry.type === 'synergy') {
+          const partners = [entry.a, entry.b, entry.c, entry.d, entry.e, entry.f, entry.g, ...(entry.substances || [])]
+            .filter(Boolean).map(s => (s as string).toLowerCase());
+          if (!partners.includes(candLower)) continue;
+          for (const gid of gate.ids) {
+            if (partners.includes(gid.toLowerCase())) synScore += entry.score;
+          }
+        } else if (entry.type === 'conflict' || entry.type === 'caution') {
+          // Проверка конфликтов с уже выбранными
+          const partners = [entry.a, entry.b, entry.c, entry.d, entry.e, entry.f, entry.g, ...(entry.substances || [])]
+            .filter(Boolean).map(s => (s as string).toLowerCase());
+          if (partners.includes(candLower)) {
+            for (const gid of gate.ids) {
+              if (partners.includes(gid.toLowerCase())) { hasConflict = true; break; }
+            }
+          }
+          if (hasConflict) break;
         }
       }
+      if (hasConflict) continue;
+
+      // Redundancy check: не >2 веществ на одном антиоксидантном пути
+      const candPathway = ANTIOXIDANT_PATHWAY[candLower];
+      if (candPathway) {
+        let samePathCount = 0;
+        for (const gid of gate.ids) {
+          if (ANTIOXIDANT_PATHWAY[gid.toLowerCase()] === candPathway) samePathCount++;
+        }
+        if (samePathCount >= 2) continue; // путь уже перегружен
+      }
+
       if (synScore >= 15) synCandidates.push({ id: candId, synScore });
     }
 
@@ -602,6 +636,12 @@ export function buildClinicalStack(
   const gateIdSet = new Set(gate.ids);
   const byId = new Map<string, PlanSubstance>(plan.substances.map((s) => [s.id, s]));
 
+  // Определяем источники веществ
+  const mandatoryIds = new Set((plan.phaseAssignedDrugs || []).map(d => d.id));
+  // Greedy-вещества: были в greedy pass, но не в candidateIds (не из plan.substances)
+  const planSubIds = new Set(plan.substances.map(s => s.id));
+  const greedyIds = new Set(gate.ids.filter(id => !planSubIds.has(id) && !mandatoryIds.has(id)));
+
   const substances: ClinicalSubstance[] = [];
   for (const id of gate.ids) {
     const s = byId.get(id);
@@ -610,6 +650,12 @@ export function buildClinicalStack(
       mechId: m.mechId,
       label: (TZ_MECH_LABELS as any)[m.mechId] || m.mechId,
     }));
+
+    // Определяем источник
+    let source: ClinicalSubstance['source'] = 'tz';
+    if (mandatoryIds.has(id)) source = 'mandatory';
+    else if (greedyIds.has(id)) source = 'greedy';
+    else if (s) source = 'tz'; // из plan.substances (mandatory + lab + TZ)
 
     if (s) {
       // вещество из движка калькулятора (канонические дозы)
@@ -626,15 +672,18 @@ export function buildClinicalStack(
         comment: s.comment || '',
         tzMechanisms: tz,
         brandName: s.brandName,
+        source,
       });
     } else if (catalog) {
-      // fallback: вещество из каталога (дозы из DEFAULT_DOSAGES)
+      // fallback: вещество из каталога (дозы из DEFAULT_DOSAGES, нормализованные по весу)
       const dosage = (DEFAULT_DOSAGES as any)[id] || (catalog as any).dosage || { mg: 500, timing: 'с едой' };
+      const bw = state.profile?.weight || 80;
+      const normalizedMg = normalizeDoseByWeight(dosage.mg || 500, bw);
       substances.push({
         id,
         name: (catalog as any).nameRu || (catalog as any).name || id,
-        doseMg: dosage.mg || 500,
-        doseDisplay: `${dosage.mg || 500} мг`,
+        doseMg: normalizedMg,
+        doseDisplay: `${normalizedMg} мг`,
         timing: dosage.timing || 'с едой',
         tier: (catalog as any).tier || 'standard',
         categories: (catalog as any).category || [],
@@ -643,6 +692,7 @@ export function buildClinicalStack(
         comment: '',
         tzMechanisms: tz,
         brandName: undefined,
+        source: 'greedy',
       });
     }
   }
@@ -773,6 +823,18 @@ export function buildClinicalStack(
     riskBefore: plan.overallRiskBefore,
     riskAfter: plan.overallRiskAfter,
     coveragePercent,
+  });
+
+  // Сортировка веществ: mandatory → core → standard → advanced → greedy
+  const sourceOrder: Record<string, number> = { mandatory: 0, lab: 1, tz: 2, greedy: 3 };
+  const tierOrder: Record<string, number> = { core: 0, standard: 1, advanced: 2, specialty: 3 };
+  substances.sort((a, b) => {
+    const sa = sourceOrder[a.source || 'tz'] ?? 2;
+    const sb = sourceOrder[b.source || 'tz'] ?? 2;
+    if (sa !== sb) return sa - sb;
+    const ta = tierOrder[a.tier] ?? 1;
+    const tb = tierOrder[b.tier] ?? 1;
+    return ta - tb;
   });
 
   const conflictsAsText = (plan.conflicts || []).map(

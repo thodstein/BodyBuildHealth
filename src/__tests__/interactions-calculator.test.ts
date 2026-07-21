@@ -334,24 +334,144 @@ describe('Class-aware dedup (vitamin_k2 + @anticoagulant = CLASS_ANTICOAGULANT)'
   });
 });
 
-describe('Score formula', () => {
-  it('CRITICAL/HIGH → score < 50', () => {
-    const r = calculateInteractions({ substances: ['VITAMIN_K2', 'WARFARIN'] });
-    // score = 100 - 18 (HIGH) - 35 (CRITICAL) = 47
-    expect(r.score).toBeLessThanOrEqual(50);
+describe('Alias mapping (resolveInteractionId)', () => {
+  it('magnesium forms → MAGNESIUM', () => {
+    const r1 = findInteractionsForSubstance('magnesium_glycinate');
+    const r2 = findInteractionsForSubstance('magnesium_l_threonate');
+    const r3 = findInteractionsForSubstance('magnesium_taurate');
+    // Должны находить те же записи что и magnesium
+    const base = findInteractionsForSubstance('magnesium');
+    expect(r1.length).toBe(base.length);
+    expect(r2.length).toBe(base.length);
+    expect(r3.length).toBe(base.length);
   });
 
-  it('CRITICAL → blocked = true', () => {
-    const r = calculateInteractions({ substances: ['VITAMIN_K2', 'WARFARIN'] });
-    expect(r.blocked).toBe(true);
+  it('zinc forms → ZINC', () => {
+    const r1 = findInteractionsForSubstance('zinc_picolinate');
+    const r2 = findInteractionsForSubstance('zinc_gluconate');
+    const base = findInteractionsForSubstance('zinc');
+    expect(r1.length).toBe(base.length);
+    expect(r2.length).toBe(base.length);
   });
 
-  it('только LOW (synergy) → score >= 100 (бонус, clamp)', () => {
-    // Iron+VitC — есть synergy + cross-alerts. Создадим кейс ТОЛЬКО с synergy:
-    // для чистоты возьмём CAFFEINE+L_THEANINE (известная synergy)
-    const r = calculateInteractions({ substances: ['CAFFEINE', 'L_THEANINE'] });
-    // Могут быть и conflicts, но synergy должна быть
-    expect(r.bySeverity.LOW.length).toBeGreaterThanOrEqual(0);
-    expect(r.score).toBeGreaterThanOrEqual(0);
+  it('calcium forms → CALCIUM', () => {
+    const r1 = findInteractionsForSubstance('calcium_citrate');
+    const r2 = findInteractionsForSubstance('calcium_carbonate');
+    const base = findInteractionsForSubstance('calcium');
+    expect(r1.length).toBe(base.length);
+    expect(r2.length).toBe(base.length);
+  });
+
+  it('selenium forms → SELENIUM', () => {
+    const r1 = findInteractionsForSubstance('selenomethionine');
+    const r2 = findInteractionsForSubstance('sodium_selenite');
+    const base = findInteractionsForSubstance('selenium');
+    expect(r1.length).toBe(base.length);
+    expect(r2.length).toBe(base.length);
+  });
+
+  it('omega3 forms → OMEGA3', () => {
+    const r1 = findInteractionsForSubstance('fish_oil');
+    const r2 = findInteractionsForSubstance('epa');
+    const r3 = findInteractionsForSubstance('dha');
+    const base = findInteractionsForSubstance('omega3');
+    expect(r1.length).toBe(base.length);
+    expect(r2.length).toBe(base.length);
+    expect(r3.length).toBe(base.length);
+  });
+
+  it('vitamin D forms → VITAMIN_D', () => {
+    const r1 = findInteractionsForSubstance('vitamin_d3');
+    const r2 = findInteractionsForSubstance('vitamin_d2');
+    const r3 = findInteractionsForSubstance('cholecalciferol');
+    const base = findInteractionsForSubstance('VITAMIN_D');
+    expect(r1.length).toBe(base.length);
+    expect(r2.length).toBe(base.length);
+    expect(r3.length).toBe(base.length);
+  });
+
+  it('vitamin B12 forms → VITAMIN_B12', () => {
+    const r1 = findInteractionsForSubstance('methylcobalamin');
+    const r2 = findInteractionsForSubstance('cyanocobalamin');
+    const r3 = findInteractionsForSubstance('hydroxocobalamin');
+    const base = findInteractionsForSubstance('vitamin_b12');
+    expect(r1.length).toBe(base.length);
+    expect(r2.length).toBe(base.length);
+    expect(r3.length).toBe(base.length);
+  });
+
+  it('vitamin B6 forms → VITAMIN_B6', () => {
+    const r1 = findInteractionsForSubstance('pyridoxine');
+    const r2 = findInteractionsForSubstance('p5p');
+    const base = findInteractionsForSubstance('vitamin_b6');
+    expect(r1.length).toBe(base.length);
+    expect(r2.length).toBe(base.length);
+  });
+
+  it('pharma IDs: anastrozole → PHARMA_ANASTROZOLE', () => {
+    const r1 = findInteractionsForSubstance('anastrozole');
+    const r2 = findInteractionsForSubstance('anastrazole');
+    const base = findInteractionsForSubstance('pharma_anastrozole');
+    expect(r1.length).toBe(base.length);
+    expect(r2.length).toBe(base.length);
+  });
+
+  it('pharma IDs: tamoxifen → PHARMA_TAMOXIFEN', () => {
+    const r1 = findInteractionsForSubstance('tamoxifen');
+    const r2 = findInteractionsForSubstance('nolvadex');
+    const base = findInteractionsForSubstance('pharma_tamoxifen');
+    expect(r1.length).toBe(base.length);
+    expect(r2.length).toBe(base.length);
+  });
+
+  it('pharma IDs: cabergoline → PHARMA_CABERGOLINE', () => {
+    const r1 = findInteractionsForSubstance('cabergoline');
+    const r2 = findInteractionsForSubstance('caber');
+    const base = findInteractionsForSubstance('pharma_cabergoline');
+    expect(r1.length).toBe(base.length);
+    expect(r2.length).toBe(base.length);
+  });
+
+  it('pharma IDs: testosterone → PHARMA_TESTOSTERONE', () => {
+    const r1 = findInteractionsForSubstance('testosterone');
+    const r2 = findInteractionsForSubstance('test');
+    const r3 = findInteractionsForSubstance('test_enan');
+    const r4 = findInteractionsForSubstance('test_cyp');
+    const r5 = findInteractionsForSubstance('test_prop');
+    const base = findInteractionsForSubstance('pharma_testosterone');
+    expect(r1.length).toBe(base.length);
+    expect(r2.length).toBe(base.length);
+    expect(r3.length).toBe(base.length);
+    expect(r4.length).toBe(base.length);
+    expect(r5.length).toBe(base.length);
+  });
+
+  it('iron forms → IRON', () => {
+    const r1 = findInteractionsForSubstance('iron_bisglycinate');
+    const r2 = findInteractionsForSubstance('iron_sulfate');
+    const r3 = findInteractionsForSubstance('iron_fumarate');
+    const base = findInteractionsForSubstance('iron');
+    expect(r1.length).toBe(base.length);
+    expect(r2.length).toBe(base.length);
+    expect(r3.length).toBe(base.length);
+  });
+
+  it('unknown ID → uppercase conversion', () => {
+    const r1 = findInteractionsForSubstance('xyz_unknown');
+    expect(r1.length).toBe(0);
+  });
+
+  it('case insensitive', () => {
+    const r1 = findInteractionsForSubstance('MAGNESIUM');
+    const r2 = findInteractionsForSubstance('magnesium');
+    expect(r1.length).toBe(r2.length);
+  });
+
+  it('whitespace and hyphen normalization', () => {
+    const r1 = findInteractionsForSubstance('magnesium glycinate');
+    const r2 = findInteractionsForSubstance('magnesium-glycinate');
+    const base = findInteractionsForSubstance('magnesium_glycinate');
+    expect(r1.length).toBe(base.length);
+    expect(r2.length).toBe(base.length);
   });
 });

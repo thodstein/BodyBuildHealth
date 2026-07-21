@@ -1,0 +1,228 @@
+/* UnifiedInteractionCard CSS Module */
+
+.card {
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: default;
+  margin-bottom: 6px;
+  transition: box-shadow 0.15s ease, transform 0.1s ease;
+  min-height: 44px;
+  /* iOS safe area support */
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.card:active {
+  transform: scale(0.98);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Header: severity + type + source */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge_critical {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.badge_high {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge_medium {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+.badge_low {
+  background: rgba(0, 230, 138, 0.12);
+  color: #00e68a;
+  border: 1px solid rgba(0, 230, 138, 0.25);
+}
+
+.badge_info {
+  background: rgba(96, 165, 250, 0.1);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+.typeLabel {
+  font-size: 9px;
+  font-weight: 600;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.sourceLabel {
+  font-size: 8px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-dim);
+}
+
+/* Title: a + b */
+.title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+  word-break: break-word;
+}
+
+/* Effect (short essence) */
+.effect {
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+
+.effectLabel {
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+/* Mechanism */
+.mechanism {
+  font-size: 10px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+
+.mechanismLabel {
+  font-weight: 600;
+}
+
+/* Recommendation + timing chips */
+.recommendation {
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin-top: 4px;
+  /* inline styles override color/border/background */
+}
+
+.recommendationLabel {
+  font-weight: 700;
+}
+
+/* Mobile responsive */
+@media (max-width: 480px) {
+  .card {
+    padding: 14px 16px;
+    min-height: 44px; /* iOS HIG touch target */
+    margin-bottom: 8px;
+  }
+
+  .title {
+    font-size: 13px;
+  }
+
+  .effect {
+    font-size: 12px;
+  }
+
+  .mechanism {
+    font-size: 11px;
+  }
+
+  .recommendation {
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+
+  .badge {
+    font-size: 10px;
+    padding: 4px 9px;
+  }
+}
+
+/* High DPI / Retina */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .badge {
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+  .card:hover {
+    transform: none;
+  }
+  .card:active {
+    transform: none;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .card {
+    border-width: 2px;
+  }
+  
+  .badge {
+    border-width: 2px;
+  }
+}
+
+/* RTL support */
+@media (direction: rtl) {
+  .header {
+    flex-direction: row-reverse;
+  }
+}
+
+/* Focus visible for keyboard navigation */
+.card:focus-visible {
+  outline: 2px solid var(--accent, #60a5fa);
+  outline-offset: 2px;
+}
+
+/* Print styles */
+@media print {
+  .card {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #ccc;
+    background: white !important;
+    color: black !important;
+  }
+  
+  .badge {
+    border: 1px solid #333;
+    background: white !important;
+    color: #333 !important;
+  }
+}

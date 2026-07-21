@@ -524,6 +524,16 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
               🚀 Начать сборку стека
             </button>
             <button
+              onClick={onBuild}
+              disabled={building}
+              style={{
+                width: '100%', padding: '14px 0', borderRadius: 12, border: '1px solid rgba(168,85,247,0.3)',
+                background: 'rgba(168,85,247,0.08)', color: '#c084fc', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+              }}
+            >
+              ⚡ Быстрая сборка (без фильтров)
+            </button>
+            <button
               onClick={() => setStep(4)}
               style={{
                 width: '100%', padding: '14px 0', borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)',
@@ -719,6 +729,15 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
                       background: s.tier === 'core' ? 'rgba(34,197,94,0.15)' : s.tier === 'standard' ? 'rgba(96,165,250,0.15)' : 'rgba(167,139,250,0.1)',
                       color: s.tier === 'core' ? '#22c55e' : s.tier === 'standard' ? '#60a5fa' : '#a78bfa',
                     }}>{s.tier}</span>
+                    {s.source && (
+                      <span style={{
+                        marginLeft: 4, fontSize: 8, padding: '2px 6px', borderRadius: 4,
+                        background: s.source === 'mandatory' ? 'rgba(239,68,68,0.12)' : s.source === 'greedy' ? 'rgba(168,85,247,0.12)' : 'rgba(96,165,250,0.12)',
+                        color: s.source === 'mandatory' ? '#f87171' : s.source === 'greedy' ? '#c084fc' : '#93c5fd',
+                      }}>
+                        {s.source === 'mandatory' ? 'обязательно' : s.source === 'greedy' ? 'синергия' : 'ТЗ'}
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#00e68a' }}>
                     {s.doseDisplay || `${s.doseMg} мг`}

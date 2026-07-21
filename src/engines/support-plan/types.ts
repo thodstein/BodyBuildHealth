@@ -382,6 +382,8 @@ export interface PlanResult {
   depletionWarnings?: Array<{ depleter: string; depleterName: string; depleted: string; depletedName: string; mechanism: string; severity: string; recommendation: string }>;
   cumulativeLoad?: Array<{ nutrientId: string; nutrientName: string; totalMg: number; ulMg?: number; percentUL?: number; isOverUL: boolean; contributors: string[] }>;
   pillBurden?: { totalSubstances: number; estimatedPillsPerDay: number; morningPills: number; afternoonPills: number; eveningPills: number; feasibility: string; message: string };
+  /** Mandatory-назначения (hCG, AI, caber, TUDCA, NAC и т.д.) */
+  phaseAssignedDrugs?: Array<{ id: string; reason: string; trigger: string; category: string }>;
 }
 
 export interface LabFindingSub {

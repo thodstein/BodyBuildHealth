@@ -28,7 +28,7 @@ import { SYNERGY_NETWORK } from '../../data/support-synergy-network';
 /** Нормализация дозы по весу тела (мг → мг с учётом кг).
  *  weightNormalized = baseDose × (bodyWeight / referenceWeight)^0.75
  *  Показатель 0.75 — аллометрическое масштабирование Клейбера. */
-function normalizeDoseByWeight(baseDoseMg: number, bodyWeightKg: number, refWeightKg = 80): number {
+export function normalizeDoseByWeight(baseDoseMg: number, bodyWeightKg: number, refWeightKg = 80): number {
   const bmiFactor = Math.pow(bodyWeightKg / refWeightKg, 0.75);
   return Math.round(baseDoseMg * bmiFactor);
 }

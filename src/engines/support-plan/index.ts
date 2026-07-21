@@ -144,6 +144,7 @@ export function runSupportUnified(state: CalculatorState): PlanResult {
     depletionWarnings: depletionWarnings.length > 0 ? depletionWarnings : undefined,
     cumulativeLoad: cumulativeLoad.length > 0 ? cumulativeLoad : undefined,
     pillBurden,
+    phaseAssignedDrugs: tzRes.phaseAssignedDrugs,
   };
 }
 
