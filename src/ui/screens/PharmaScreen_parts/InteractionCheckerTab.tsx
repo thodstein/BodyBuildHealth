@@ -286,6 +286,8 @@ export const InteractionCheckerTab: React.FC = () => {
                   border: `1px solid ${unifiedOnlyCritical ? 'var(--accent)' : 'var(--border)'}`,
                 }}>{unifiedOnlyCritical ? '🔓 Показать все' : '🔒 Только CRITICAL'}</button>
               </div>
+              {/* Dev-mode telemetry (появляется при ≥10 extracts) */}
+              <TimingTelemetryPanel autoRefreshMs={3000} />
               {/* Unified items */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {items.length === 0 ? (
