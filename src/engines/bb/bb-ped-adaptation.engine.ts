@@ -220,7 +220,9 @@ export function adaptForPEDs(
   }
 
   // Суммарный множитель: натурал = 1.0, соло-ААС 500мг = ~1.28, полный стек heavy = до 1.85
+  // B8: recMult cap 1.85 — синхрон с mrvMult, чтобы не было рассинхрона
   mrvMult = Math.min(mrvMult, 1.85);
+  recMult = Math.min(recMult, 1.85);
   const adjustedMrv: Record<string, number> = {};
   for (const m of Object.keys(baseMrv)) adjustedMrv[m] = Math.round(baseMrv[m] * mrvMult);
 

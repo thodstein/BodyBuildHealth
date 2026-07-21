@@ -1,11 +1,16 @@
 /**
  * HybridPlanPanel.tsx — powerbuilder (сила + масса): ПЛ-цикл (faithful) +
  * ББ-аксессуары. ПЛ-цикл immutable; аксессуары генерируются движком.
+ *
+ * U1: подключён к data flow — принимает program/hybrid как prop и при изменении
+ * обновляет обратно через onChange. Раньше компонент использовал свой локальный state
+ * и данные терялись при сохранении.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { buildHybridPlan, type HybridPlan, type HybridDay } from '../../../engines/bb/hybrid-plan.engine';
 import type { LMSPlanExercise, LMSWorkSet } from '../../../engines/lms/lms-builder.engine';
+import type { UserProgram, HybridProgramBody } from '../../../engines/user-program/user-program.types';
 import { GROUP_RU } from './program-types';
 import { CARD, ACCENT, IN, SMALL, DIM, DIM_STRONG, BTN } from './training-ui';
 
@@ -18,18 +23,78 @@ function fmtHeavy(ex: LMSPlanExercise): string {
   return `${sets}×${top?.reps ?? '?'} @${Math.round(top?.weight ?? 0)}кг (${Math.round((top?.pct ?? 0) * 100)}%) RIR${ex.rir}`;
 }
 
-export const HybridPlanPanel: React.FC = () => {
+export const HybridPlanPanel: React.FC<{
+  program: UserProgram;
+  onChange: (hybrid: HybridProgramBody) => void;
+  onSave: (note?: string) => void;
+}> = ({ program, onChange, onSave }) => {
   // PL cycles = powerlifting direction OR strength period.
   const plCycles = useMemo(() => LMS_CYCLES.filter(c => c.meta.direction === 'powerlifting' || c.meta.period === 'strength'), []);
-  const [cycleId, setCycleId] = useState<string>(plCycles[0]?.meta.id || '');
-  const [squat, setSquat] = useState(120);
-  const [bench, setBench] = useState(100);
-  const [dead, setDead] = useState(140);
-  const [weeks, setWeeks] = useState<number>(() => plCycles[0]?.meta.weeks || 8);
-  const [level, setLevel] = useState('intermediate');
+  const initial = program.hybrid;
+  const [cycleId, setCycleId] = useState<string>(initial?.plRef?.sourceCycleId || plCycles[0]?.meta.id || '');
+  const [squat, setSquat] = useState(initial?.workMax?.squat || 120);
+  const [bench, setBench] = useState(initial?.workMax?.bench || 100);
+  const [dead, setDead] = useState(initial?.workMax?.deadlift || 140);
+  const [weeks, setWeeks] = useState<number>(initial?.weeksOverride || plCycles[0]?.meta.weeks || 8);
+  const [level, setLevel] = useState(initial?.level || program.meta.level || 'intermediate');
   const [built, setBuilt] = useState<HybridPlan | null>(null);
+  const [notes, setNotes] = useState(initial?.notes || '');
+
+  // При изменении props (program) — синхронизируем с локальным state (только если external changed)
+  useEffect(() => {
+    if (initial) {
+      setCycleId(initial.plRef?.sourceCycleId || plCycles[0]?.meta.id || '');
+      setSquat(initial.workMax?.squat || 120);
+      setBench(initial.workMax?.bench || 100);
+      setDead(initial.workMax?.deadlift || 140);
+      setWeeks(initial.weeksOverride || plCycles[0]?.meta.weeks || 8);
+      setLevel(initial.level || program.meta.level || 'intermediate');
+      setNotes(initial.notes || '');
+    }
+  }, [program.meta.id]);
 
   const build = () => setBuilt(buildHybridPlan({ cycleId, pmMap: { squat, bench, dead }, weeks, level, equipment: ['barbell', 'dumbbell', 'cable', 'machine'] }));
+
+  // Применить собранный план к program.hybrid
+  const apply = () => {
+    if (!built) return;
+    const newHybrid: HybridProgramBody = {
+      direction: 'hybrid',
+      plRef: { sourceCycleId: built.cycle.meta.id, sessionIndices: [] },
+      bbWeeks: built.daysByWeek.map((days, wi) => ({
+        week: wi + 1,
+        phase: 'accumulation' as const,
+        deload: false,
+        sessions: days.map((d, di) => ({
+          id: 'ses_h_' + wi + '_' + di,
+          name: `${LIFT_LABEL[d.mainLift] || 'День'} ${di + 1}`,
+          focus: d.mainLift,
+          blocks: [
+            ...d.heavy.exercises.map((e, ei) => ({
+              id: 'blk_h_' + wi + '_' + di + '_h' + ei,
+              type: 'compound' as const,
+              exerciseName: e.name,
+              muscle: (d.mainLift === 'squat' ? 'quads' : d.mainLift === 'bench' ? 'chest' : 'back') as any,
+              role: 'primary' as const,
+              sets: [{ reps: e.workSets[e.workSets.length - 1]?.reps || 5, rir: e.rir, weight: e.workSets[e.workSets.length - 1]?.weight || 0, restSec: 180 }],
+            })),
+            ...d.accessories.map((a, ai) => ({
+              id: 'blk_h_' + wi + '_' + di + '_a' + ai,
+              type: 'accessory' as const,
+              exerciseName: a.name,
+              muscle: a.muscle as any,
+              role: 'accessory' as const,
+              sets: [{ reps: a.workSets[0]?.reps || 10, rir: a.rir, weight: a.workSets[0]?.weight || 0, restSec: 90 }],
+            })),
+          ],
+        })),
+      })),
+      workMax: { squat, bench, deadlift: dead },
+      notes,
+    };
+    onChange(newHybrid);
+    onSave('Hybrid powerbuilder-план');
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -52,7 +117,14 @@ export const HybridPlanPanel: React.FC = () => {
           <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>Недель<input type="number" style={IN} value={weeks} min={1} max={16} onChange={e => setWeeks(parseInt(e.target.value) || 1)} /></label>
           <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>Уровень<select style={IN} value={level} onChange={e => setLevel(e.target.value)}><option value="beginner">Новичок</option><option value="intermediate">Средний</option><option value="advanced">Опытный</option><option value="enhanced">Enhanced</option></select></label>
         </div>
-        <button style={{ ...BTN, width: '100%' }} onClick={build}>⚡ Собрать powerbuilder-план</button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button style={{ ...BTN, flex: 1 }} onClick={build}>🔧 Собрать powerbuilder-план</button>
+          {built && <button style={{ ...BTN, flex: 1, background: '#3b82f6' }} onClick={apply}>💾 Применить к программе</button>}
+        </div>
+        <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          Заметки
+          <textarea style={{ ...IN, minHeight: 50, resize: 'vertical' }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Акценты, адаптации под восстановление" />
+        </label>
       </div>
 
       {built && (

@@ -30,16 +30,24 @@ const PortalOverlay: React.FC<{ onClose: () => void; children: React.ReactNode }
   );
 };
 
-type FilterKey = 'all' | 'women' | 'bb' | 'cut' | 'pump' | 'strength_mass' | 'rehab';
+// P2.14: унификация — канонические значения goal + daysPerWeek + level
+type FilterKey = 'all' | 'women' | 'mass' | 'cut' | 'pump' | 'strength_mass' | 'rehab' | 'beginner' | 'intermediate' | 'advanced' | '3d' | '4d' | '5d' | '6d';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'Все' },
   { key: 'women', label: '🚺 Женские' },
-  { key: 'bb', label: '💪 Масса' },
+  { key: 'mass', label: '💪 Масса' },
   { key: 'cut', label: '✂️ Сушка' },
   { key: 'pump', label: '🔥 Пампинг' },
   { key: 'strength_mass', label: '🎯 Сила+Масса' },
   { key: 'rehab', label: '⚕️ Реабилитация' },
+  { key: 'beginner', label: '🌱 Новичок' },
+  { key: 'intermediate', label: '📈 Средний' },
+  { key: 'advanced', label: '🏆 Продвинутый' },
+  { key: '3d', label: '📅 3 дн' },
+  { key: '4d', label: '📅 4 дн' },
+  { key: '5d', label: '📅 5 дн' },
+  { key: '6d', label: '📅 6 дн' },
 ];
 
 /** Источник программы — для визуальной пометки в списке. */
@@ -55,11 +63,22 @@ function sourceTag(p: FullProgram): { text: string; color: string } | null {
 function matchFilter(p: FullProgram, key: FilterKey): boolean {
   if (key === 'all') return true;
   if (key === 'women') return p.id.startsWith('women_') || /женск|жен/i.test(p.name);
-  if (key === 'bb') return (p.direction === 'bodybuilding' || p.direction === 'both') && /гиперт|масс|bodybuild/i.test(p.goal + p.type + p.name);
-  if (key === 'cut') return /peaking|сушк|cut|рельеф/i.test(p.goal + p.type + p.name);
-  if (key === 'pump') return /памп|pump|vol|объём|hypertrophy/i.test(p.goal + p.type + p.name);
-  if (key === 'strength_mass') return /strength_mass|сила \+ масса|powerbuild/i.test(p.goal + p.type + p.name) || (p.direction === 'both');
-  if (key === 'rehab') return p.goal === 'rehab' || /реабил/i.test(p.type + p.name);
+  // P2.14: унифицированный goal — теперь ищем по goal в любом регистре
+  if (key === 'mass') return /mass|hypertrophy|bodybuilding|масс|гиперт/i.test((p.goal || '') + (p.type || '') + p.name);
+  if (key === 'cut') return /peaking|cut|рельеф|сушк/i.test((p.goal || '') + (p.type || '') + p.name);
+  if (key === 'pump') return /pump|памп|hypertrophy/i.test((p.goal || '') + (p.type || '') + p.name);
+  if (key === 'strength_mass') return /strength_mass|сила \+ масса|powerbuild/i.test((p.goal || '') + (p.type || '') + p.name) || (p.direction === 'both');
+  if (key === 'rehab') return p.goal === 'rehab' || /реабил/i.test((p.type || '') + p.name);
+  // P2.14: фильтры по уровню
+  if (key === 'beginner') return p.level === 'beginner';
+  if (key === 'intermediate') return p.level === 'intermediate';
+  if (key === 'advanced') return (p.level as string) === 'advanced' || (p.level as string) === 'enhanced';
+  // P2.14: фильтры по дням в неделю
+  if (key === '3d') return p.daysPerWeek === 3;
+  if (key === '4d') return p.daysPerWeek === 4;
+  if (key === '5d') return p.daysPerWeek === 5;
+  if (key === '6d') return p.daysPerWeek === 6;
+  return true;
   return true;
 }
 

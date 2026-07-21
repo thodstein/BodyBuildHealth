@@ -38,12 +38,23 @@ export function derivePattern(ex: any): string {
   if (isCarryExercise(ex)) return 'carry';
   if (/паллоф|анти-?рот|антирот/.test(nm)) return 'anti_rotation';
 
+  // HINGE: специфичные движения (deadlift, RDL, good_morning, hyperextension) — до общей "тяга",
+  // иначе row_*/pulldown_* ошибочно классифицируются как hinge
+  if (/станов|deadlift|румын|мёртв|гудморнинг|good.?morning|гиперэкстенз|back.?extension|разгибани.*спин/.test(hay)) return 'hinge';
+  // GLUTE_BRIDGE / HIP_THRUST: до isolation-ветки (g=legs → должен быть glute_squat, не isolation_legs_ham)
+  if (/ягодич|мост|thrust|hip.?thrust|glute.?bridge|ягодичн/.test(hay)) return 'glute_squat';
+
   if (type === 'isolation') {
     if (g === 'chest') return 'isolation_chest';
     if (g === 'shoulders' || g === 'delts' || g === 'delts_rear') return 'isolation_shoulders';
     if (g === 'back' || g === 'traps') return 'isolation_back';
     if (g === 'arms' || g === 'forearms') return 'isolation_arms';
-    if (g === 'legs') return /квад|бедр|разгиб|присед|выпрям|quad/i.test(hay) ? 'isolation_legs_quad' : 'isolation_legs_ham';
+    if (g === 'legs') {
+      if (/икронож|икры|calf|камбалов/.test(hay)) return 'isolation_calves';
+      if (/квад|quad|разгиб|присед|выпрям/.test(hay)) return 'isolation_legs_quad';
+      if (/бедр|сгибани|ham/.test(hay)) return 'isolation_legs_ham';
+      return /квад|quad/.test(tgt) ? 'isolation_legs_quad' : 'isolation_legs_ham';
+    }
     if (g === 'calves') return 'isolation_calves';
     if (g === 'core') return 'core';
     return 'core';
@@ -51,18 +62,22 @@ export function derivePattern(ex: any): string {
 
   if (/присед|квад|разгибани|выпрям.*ног| squat/i.test(hay)) return 'squat';
   if (/шраг/.test(nm)) return 'isolation_back';
-  if (/тяга|deadlift|наклон.*тяг|гиперэкстенз/.test(hay)) return 'hinge';
+  // Горизонтальные тяги (штанга в наклоне, т-гриф, гантель в наклоне, горизонтальный блок) — ДО общего regex "тяга"
+  if (/ тяга .*наклон|тяга .*т-?гриф|тяга .*гантел|тяга .*штанги| тяга .*блок .*горизонт| тяга горизонтальн|seated.?row| тяга блока/.test(hay) || /^row[ _]/.test(nm)) return 'horizontal_pull';
+  // Вертикальные тяги (верхний блок, подтягивания, пулдаун)
+  if (/тяга .*верхн|пулдаун|pulldown|подтяг|chin.?up|chinup|pullup/.test(hay)) return 'vertical_pull';
+  // Пуловер (не тяга, не вертикальная, не горизонтальная)
+  if (/пуловер|pullover|пулов/.test(hay)) return 'isolation_back';
   if (/выпад|лунг|болгар/.test(nm)) return 'lunge';
   if (/жим.*наклон|incline|наклонн/.test(nm)) return 'incline_push';
   if (/отрицат|decline|опускан/.test(nm)) return 'decline_push';
-  if (/жим|отжим|дип|dip|пресс.*груд/i.test(nm)) return 'horizontal_push';
-  if (/армейск|над голов|вертик|олимп|выталк|push.*up/i.test(nm)) return 'vertical_push';
-  if (/подтяг|row|блок.*тяг|тяга/i.test(hay)) return 'vertical_pull';
+  if (/жим|пресс.*груд| bench/i.test(nm)) return 'horizontal_push';
+  if (/армейск|над голов|вертик|выталк|push.?up/.test(nm)) return 'vertical_push';
   if (/мах|разводк|fly|пек-дек|сведен/.test(nm)) return 'isolation_chest';
   if (/поворот|рубк|rotation/i.test(nm)) return 'rotation';
 
   const gMap: Record<string, string> = {
-    chest: 'horizontal_push', back: 'vertical_pull', legs: 'squat', shoulders: 'vertical_push',
+    chest: 'horizontal_push', back: 'horizontal_pull', legs: 'squat', shoulders: 'vertical_push',
     arms: 'isolation_arms', core: 'core', traps: 'isolation_back', calves: 'isolation_calves',
     delts: 'vertical_push', delts_rear: 'isolation_shoulders', forearms: 'isolation_arms',
     glutes: 'glute_squat', quads: 'isolation_legs_quad', hamstrings: 'isolation_legs_ham',

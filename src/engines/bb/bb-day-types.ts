@@ -52,6 +52,9 @@ export const TAG_MUSCLES: Record<string, string[]> = {
   UpperHyp: ['chest', 'back', 'delt_front', 'delt_mid', 'delt_rear', 'biceps', 'triceps'],
   LowerHyp: ['quads', 'hamstrings', 'glutes', 'calves', 'abs'],
   LegsBiceps: ['quads', 'hamstrings', 'calves', 'biceps'],
+  /** Женский glute-фокус: только ягодицы + бицепс бедра (задняя цепь) — без quads. */
+  Glutes: ['glutes', 'hamstrings'],
+  GlutesHams: ['glutes', 'hamstrings', 'calves'],
 };
 
 /** Пары ротации первичная/добивочная: (A тяж + B добивка) / (B тяж + A добивка). */

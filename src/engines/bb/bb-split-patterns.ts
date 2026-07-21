@@ -284,6 +284,23 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
     description: '8-дн ротация: квадрицепс тяж+бицепс / грудь памп+плечи+трицепс / спина тяж+задняя дельта+трапеции / отдых / ноги тяж (бицепс бедра+ягодицы) / грудь тяж+трицепс / спина памп+бицепс+задняя дельта / отдых. Специализация слабых групп. Только для продвинутых (KMS-MS).',
     direction: 'bodybuilding',
   },
+  {
+    id: 'glute_focus_4',
+    name: 'Glute Focus 4×/нед (женский)',
+    rotationDays: 7, sessionsPerRotation: 4,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Glutes' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Upper' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'GlutesHams' },
+      { kind: 'отдых', character: null },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'Upper' },
+      { kind: 'отдых', character: null },
+      { kind: 'отдых', character: null },
+    ],
+    level: ['intermediate', 'advanced', 'enhanced'],
+    description: 'Женский сплит с приоритетом ягодичных: 2 тяж-дня Glutes (hip-thrust, back squat, B-stance hip-thrust) + 1 GlutesHams (RDL, hip-thrust, glute kickback) + 2 Upper (горизонтальная тяга, жим, плечи). Минимум 2×/нед ягодичные для гипертрофии.',
+    direction: 'bodybuilding',
+  },
 ];
 
 export function getPattern(id: string): SplitPattern | undefined {

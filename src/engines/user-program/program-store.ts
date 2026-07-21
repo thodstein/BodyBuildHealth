@@ -19,7 +19,7 @@ import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from '../bb/bb-buil
 import {
   type UserProgram, type ProgramMeta, type ProgramDirection, type ProgramSource,
   type BBProgramBody, type PLProgramBody, type UserWeek, type UserSession, type UserBlock,
-  type UserSet, type VolumeBudget, type MicrocycleTemplate, type Phase,
+  type UserSet, type VolumeBudget, type MicrocycleTemplate, type Phase, type ValidationIssue,
   newId,
 } from './user-program.types';
 
@@ -77,8 +77,96 @@ export function deleteRevision(id: string, revIdx: number): UserProgram | null {
   revs.splice(revIdx, 1);
   const updated: UserProgram = { ...prog, meta: { ...prog.meta, revisions: revs } };
   all[idx] = updated;
-  try { localStorage.setItem(KEY, JSON.stringify(all)); } catch(_e) { /* ignore */ }
+  try { localStorage.setItem(KEY, JSON.stringify(all)); } catch { /* ignore */ }
   return updated;
+}
+
+/* ───────────────────────── P2.8: Валидация программы ───────────────────────── */
+import { getVolumeLandmarks, normLevel } from '../volume-landmarks.engine';
+
+const ADULT_MEVS: Record<string, number> = {
+  chest: 8, back: 8, quads: 6, hamstrings: 6, glutes: 4, shoulders: 6, biceps: 6, triceps: 6, calves: 4, abs: 0, forearms: 0, traps: 0,
+};
+
+/** Валидировать UserProgram: errors (блокирующие), warnings (предупреждения), info (информация). */
+export function validateProgram(program: UserProgram): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const dir = program.meta.direction;
+  const meta = program.meta;
+
+  // 1. Проверка meta
+  if (!meta.title || meta.title.trim().length === 0) {
+    issues.push({ level: 'error', code: 'NO_TITLE', message: 'Название программы пустое' });
+  }
+  if (meta.daysPerWeek < 1 || meta.daysPerWeek > 7) {
+    issues.push({ level: 'error', code: 'BAD_DAYS', message: `Дней/нед должно быть от 1 до 7 (сейчас ${meta.daysPerWeek})` });
+  }
+  if (meta.weeks < 1 || meta.weeks > 52) {
+    issues.push({ level: 'error', code: 'BAD_WEEKS', message: `Недель должно быть от 1 до 52 (сейчас ${meta.weeks})` });
+  }
+
+  // 2. Проверка ББ
+  if (dir === 'bb' && program.bb) {
+    const bb = program.bb;
+    if (bb.weeks.length === 0) {
+      issues.push({ level: 'warning', code: 'NO_WEEKS', message: 'Программа без недель — добавьте хотя бы одну' });
+    }
+    let totalExercises = 0;
+    const allMuscleVolume: Record<string, number> = {};
+    for (const w of bb.weeks) {
+      for (const s of w.sessions) {
+        for (const b of s.blocks) {
+          totalExercises++;
+          for (const st of b.sets) {
+            const m = b.muscle || 'other';
+            allMuscleVolume[m] = (allMuscleVolume[m] || 0) + (st.reps && typeof st.reps === 'number' ? 1 : 0);
+          }
+        }
+      }
+    }
+    if (totalExercises === 0) {
+      issues.push({ level: 'warning', code: 'NO_EXERCISES', message: 'Программа пуста — добавьте упражнения' });
+    }
+    // Проверка MRV-превышения (только для известных мышц)
+    const lvl = normLevel(meta.level);
+    for (const [muscle, sets] of Object.entries(allMuscleVolume)) {
+      if (sets < 1) continue;
+      const lm = getVolumeLandmarks(lvl, muscle);
+      if (lm && sets > lm.mrv * 1.2) {
+        issues.push({ level: 'warning', code: 'MRV_EXCEED', message: `${muscle}: ${sets} сетов/нед превышает MRV (${lm.mrv}) на 20%+`, muscle });
+      }
+      // Проверка наличия делода в длинных циклах
+      if (meta.weeks >= 6 && !wHasDeload(bb)) {
+        issues.push({ level: 'info', code: 'NO_DELOAD', message: 'Длинный цикл без явной делод-недели' });
+      }
+      // Проверка consistency: daysPerWeek vs реальное число сессий
+      if (bb.weeks.length > 0 && bb.weeks[0].sessions.length !== meta.daysPerWeek) {
+        issues.push({ level: 'info', code: 'DAYS_MISMATCH', message: `meta.daysPerWeek=${meta.daysPerWeek}, но в неделе ${bb.weeks[0].sessions.length} сессий. Нажмите «Дней/нед» чтобы синхронизировать.` });
+      }
+    }
+  }
+
+  // 3. Проверка ПЛ
+  if (dir === 'pl' && program.pl) {
+    if (!program.pl.sourceCycleId) {
+      issues.push({ level: 'error', code: 'NO_CYCLE', message: 'Не выбран ПЛ-цикл (процентки и раскладка пустые)' });
+    }
+  }
+
+  // 4. Проверка Hybrid
+  if (dir === 'hybrid' && program.hybrid) {
+    if (!program.hybrid.plRef?.sourceCycleId) {
+      issues.push({ level: 'warning', code: 'HYBRID_NO_CYCLE', message: 'Hybrid-программа без ПЛ-цикла — только ББ' });
+    }
+    if ((program.hybrid.bbWeeks ?? []).length === 0) {
+      issues.push({ level: 'info', code: 'HYBRID_NO_BB', message: 'Hybrid без ББ-недель — добавьте ББ-аксессуары' });
+    }
+  }
+  return issues;
+}
+
+function wHasDeload(bb: BBProgramBody): boolean {
+  return bb.weeks.some(w => w.deload || w.phase === 'deload');
 }
 
 /* ───────────────────────── Миграторы ───────────────────────── */
@@ -206,14 +294,28 @@ export function cloneFromCycle(cycleId: string): UserProgram | null {
 }
 
 /** Создать UserProgram из собранного ББ-плана (BBPlan). */
-export function createFromBuild(plan: BBPlan, params: { title?: string; goal?: string; level?: string; weakPoints?: string[]; equipment?: string[] }): UserProgram {
-  const weeks = (plan.weeks ?? []).map((w) => weekFromBuild(w));
+export function createFromBuild(
+  plan: BBPlan,
+  params: {
+    title?: string; goal?: string; level?: string;
+    weakPoints?: string[]; equipment?: string[];
+    /** Исходная FullProgram (если план получен из клонирования библиотечной программы) — используется
+     *  для восстановления phase/deload/weeks-структуры, иначе вычисляется из week.week/totalWeeks. */
+    originalProgram?: FullProgram;
+  }
+): UserProgram {
+  const totalWeeks = plan.weeks?.length ?? 0;
+  const weeks = (plan.weeks ?? []).map((w) => weekFromBuild(w, totalWeeks, params.originalProgram));
   const microcycle: MicrocycleTemplate = {
-    daySlots: (plan.pattern?.schedule ?? []).filter(d => d.kind === 'тренировка').map((d, i) => ({
-      day: i + 1,
-      label: d.sessionTag ?? ('День ' + (i + 1)),
-      muscles: [],
-    })),
+    daySlots: (plan.weeks?.[0]?.sessions ?? []).map((s, i) => {
+      // Собираем фокус дня (мышцы) из реальных упражнений недели 1 (дедуп по muscle).
+      const muscles = Array.from(new Set((s.exercises ?? []).map((e) => e.muscle).filter(Boolean)));
+      return {
+        day: i + 1,
+        label: s.sessionTag ?? ('День ' + (i + 1)),
+        muscles: muscles.map((m) => ({ muscle: m, role: 'primary' as const })),
+      };
+    }),
   };
   const body: BBProgramBody = {
     direction: 'bb',
@@ -229,8 +331,8 @@ export function createFromBuild(plan: BBPlan, params: { title?: string; goal?: s
   };
   const meta = baseMeta({
     title: params.title ?? (plan.pattern?.name ?? 'ББ-программа') + ' (из сборки)',
-    goal: params.goal ?? 'hypertrophy',
-    level: params.level ?? 'intermediate',
+    goal: mapGoal(params.goal),
+    level: mapLevel(params.level),
     daysPerWeek: weeks[0]?.sessions.length ?? 4,
     weeks: weeks.length,
     direction: 'bb',
@@ -240,11 +342,40 @@ export function createFromBuild(plan: BBPlan, params: { title?: string; goal?: s
   return { meta, bb: body };
 }
 
-function weekFromBuild(w: BBWeek): UserWeek {
+/** Маппинг ББ-целей визарда → канонические цели UserProgram. */
+function mapGoal(g?: string): string {
+  if (!g) return 'hypertrophy';
+  if (g === 'strength_mass') return 'strength';
+  if (g === 'cut') return 'bodybuilding';
+  return g;
+}
+
+/** Маппинг ББ-уровней визарда → канонические уровни UserProgram. */
+function mapLevel(l?: string): string {
+  if (!l) return 'intermediate';
+  if (l === 'enhanced') return 'advanced';
+  return l;
+}
+
+/** Эвристика для фазы недели: accumulation → intensification → peaking (без исходной FullProgram). */
+function phaseFromWeek(week: number, totalWeeks: number): Phase {
+  if (totalWeeks <= 1) return 'accumulation';
+  const ratio = week / totalWeeks;
+  if (ratio <= 0.35) return 'accumulation';
+  if (ratio <= 0.75) return 'intensification';
+  if (week === totalWeeks || ratio >= 0.9) return 'peaking';
+  return 'intensification';
+}
+
+function weekFromBuild(w: BBWeek, totalWeeks: number, original?: FullProgram): UserWeek {
+  // Приоритет: originalProgram.weeks[w.week - 1] (если есть) — точные phase/deload.
+  const origWeek = original?.weeks?.[w.week - 1];
+  const phase: Phase = (origWeek?.phase as Phase) ?? phaseFromWeek(w.week, totalWeeks);
+  const deload = origWeek ? !!origWeek.deload : false;
   return {
     week: w.week,
-    phase: 'accumulation',
-    deload: false,
+    phase,
+    deload,
     sessions: (w.sessions ?? []).map((s, si) => sessionFromBuild(s, si)),
   };
 }
@@ -263,6 +394,8 @@ function blockFromBuild(e: BBExercise, ei: number): UserBlock {
     reps: ws.reps, rir: ws.rir, weight: ws.weight,
     technique: ws.technique as UserSet['technique'], tempo: ws.tempo, restSec: ws.restSeconds,
   }));
+  // Если у блока есть tempoSpec, кладём в sets[0].tempo (уже могло быть через ws.tempo).
+  if (e.tempoSpec && sets.length > 0 && !sets[0].tempo) sets[0].tempo = e.tempoSpec;
   return {
     id: newId('blk'),
     type: e.role === 'primary' ? 'compound' : 'accessory',
@@ -271,6 +404,11 @@ function blockFromBuild(e: BBExercise, ei: number): UserBlock {
     role: e.role === 'primary' ? 'primary' : 'accessory',
     sets,
     rationale: e.rationale,
+    character: e.character,
+    repsRange: e.repsRange,
+    tempoSpec: e.tempoSpec,
+    warmupSets: e.warmupSets,
+    comment: e.comment,
   };
 }
 
@@ -278,12 +416,14 @@ function blockFromBuild(e: BBExercise, ei: number): UserBlock {
 export function createBlank(direction: ProgramDirection): UserProgram {
   const now = new Date().toISOString();
   if (direction === 'pl') {
+    // U2: дефолтный цикл — первый из LMS_CYCLES (без ленивого импорта, чтобы избежать цикла)
+    // Используем жёстко закодированный id 'cycle-01' как безопасный дефолт.
     return {
       meta: baseMeta({
         title: 'Новая ПЛ-программа', goal: 'powerlifting', level: 'intermediate',
         daysPerWeek: 3, weeks: 12, direction: 'pl', source: 'custom', tags: ['custom'],
       }),
-      pl: { direction: 'pl', sourceCycleId: '', schedule: [], weakPoints: [], notes: '', workMax: {} },
+      pl: { direction: 'pl', sourceCycleId: 'cycle-01', schedule: [], weakPoints: [], notes: '', workMax: {} },
     };
   }
   if (direction === 'hybrid') {
@@ -292,7 +432,7 @@ export function createBlank(direction: ProgramDirection): UserProgram {
         title: 'Новый powerbuilder-план', goal: 'powerbuilding', level: 'intermediate',
         daysPerWeek: 4, weeks: 8, direction: 'hybrid', source: 'custom', tags: ['custom', 'powerbuilder'],
       }),
-      hybrid: { direction: 'hybrid', plRef: { sourceCycleId: '', sessionIndices: [] }, bbWeeks: [], notes: '' },
+      hybrid: { direction: 'hybrid', plRef: { sourceCycleId: 'cycle-01', sessionIndices: [] }, bbWeeks: [], notes: '', workMax: { squat: 120, bench: 100, deadlift: 140 }, level: 'intermediate', weeksOverride: 8 },
     };
   }
   return {

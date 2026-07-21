@@ -69,9 +69,10 @@ export function isAxialLoadExercise(ex: Exercise): boolean {
   // Присед (barbell/фронт на плечах) — осевой
   if (n.includes('присед') || n.includes('squat')) return true;
 
-  // Становая / мёртвая / румын / гудморнинг — осевой (наклон со штангой)
-  if (n.includes('станов') || n.includes('мёртв') || n.includes('мертв') || n.includes('deadlift')
-    || n.includes('рум') || n.includes('гудморнинг') || n.includes('good morning')) return true;
+  // Становая / мёртвая тяга / румынская / гудморнинг — осевой (наклон со штангой).
+  // FIX: убрано `мёртв`/`мертв` без уточнения — ловило "мёртвый жук" (dead_bug, кор, НЕ осевая).
+  if (n.includes('станов') || n.includes('мёртв.*тяг') || n.includes('мертв.*тяг') || n.includes('deadlift')
+    || n.includes('румын') || n.includes('румынск') || n.includes('гудморнинг') || n.includes('good morning') || n.includes('good_morning')) return true;
 
   // Жим стоя / армейский / overhead (штанга над головой) — осевой
   if (n.includes('жим') && (n.includes('стоя') || n.includes('армей') || n.includes('overhead') || n.includes('над голов'))) return true;

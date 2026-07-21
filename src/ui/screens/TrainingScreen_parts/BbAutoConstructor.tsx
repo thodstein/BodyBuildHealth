@@ -53,6 +53,7 @@ import { validatePlanQuality, bbPlanToQualityInput, type PlanQualityResult } fro
 import { PlanExportCard } from './PlanExportCard';
 import { DayCard, ExerciseRow, PhaseBanner, WeekStrip, PHASE_COLORS, PHASE_LABELS, type PlanDayView, type PlanExerciseView, type PhaseKey } from './PlanOutput';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
+import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { WhatIfCard } from './WhatIfCard';
@@ -637,6 +638,28 @@ export const BbAutoConstructor: React.FC = () => {
   const handleDeleteVariant = (id: string) => {
     const updated = deleteBBPlanVariant(id);
     setSavedPlans(updated);
+  };
+
+  /** Сохранить собранный ББ-план в «Мои программы» (UserProgram) — канонический путь редактирования. */
+  const handleSaveAsUserProgram = () => {
+    if (!builtPlan) return;
+    const fallbackName = `${builtPlan.pattern.name} ${bbWeeks}нед`;
+    const name = window.prompt('📂 Название программы (Мои программы):', fallbackName);
+    if (!name) return;
+    try {
+      const userProg = createUserProgramFromBuild(builtPlan, {
+        title: name,
+        goal: bbGoal,
+        level: bbLevel,
+        weakPoints: weakPoints.slice(),
+        equipment: bbEquipment.slice(),
+      });
+      saveUserProgramStore(userProg, 'Импорт из ББ-визарда');
+      alert(`✅ Сохранено в «Мои программы»: ${name}`);
+    } catch (e: any) {
+      console.error('[BB-auto] Ошибка сохранения в Мои программы:', e);
+      alert('⚠ Не удалось сохранить: ' + (e?.message || String(e)));
+    }
   };
 
   const handleLoadVariant = (v: SavedBBPlan) => {
@@ -2123,6 +2146,7 @@ export const BbAutoConstructor: React.FC = () => {
             <button style={BTN_GHOST} onClick={() => { setExerciseEdits({}); setStep('split'); }}>🔄 Перестроить план</button>
             <button style={BTN_GHOST} onClick={handleSavePlan}>💾 Сохранить план</button>
             <button style={{ ...BTN_GHOST, borderColor:'#60a5fa', color:'#60a5fa' }} onClick={handleSaveToMyPlans}>💾 В Мои тренировки</button>
+            <button style={{ ...BTN_GHOST, borderColor:'#a78bfa', color:'#a78bfa' }} onClick={handleSaveAsUserProgram}>📂 В Мои программы</button>
             <button style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e' }} onClick={handleSaveVariant}>💾 Вариант ({savedPlans.length})</button>
             <button style={{ ...BTN_GHOST, borderColor:'#f59e0b', color:'#f59e0b' }} onClick={() => setShowCompare(s => !s)}>⚖ Сравнить</button>
             <button style={{ ...BTN_GHOST, borderColor:'#a855f7', color:'#a855f7' }} onClick={handleSendToExecution}>▶ К выполнению</button>

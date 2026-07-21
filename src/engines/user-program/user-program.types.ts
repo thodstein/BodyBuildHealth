@@ -68,6 +68,16 @@ export interface UserBlock {
   /** Обоснование выбора (почему это упражнение) — прозрачность для пользователя. */
   rationale?: string;
   note?: string;
+  /** Характер упражнения (из BBPlan.character): 'тяж' | 'памп' | 'лёг' — дневник использует для раздела тяжёлых/лёгких подходов. */
+  character?: 'тяж' | 'памп' | 'лёг';
+  /** Диапазон повторений [min, max] (из BBPlan.repsRange) — для прогрессий 5/3/1 и пр. */
+  repsRange?: [number, number];
+  /** PRO-темп (из BBPlan.tempoSpec) — нотация "2-1-1-0". Также может жить в sets[].tempo. */
+  tempoSpec?: string;
+  /** Схема разминки compounds (из BBPlan.warmupSets). */
+  warmupSets?: { load: number; reps: number }[];
+  /** Тренерский комментарий из BBPlan.comment (роль/слабые/фаза/нагрузка/⚠ Замена/⭐ Фокус). */
+  comment?: string;
 }
 
 export interface UserSession {
@@ -129,6 +139,16 @@ export interface MicrocycleTemplate {
   }[];
 }
 
+/* ───────────────────────── Валидация программы (P2.8) ───────────────────────── */
+export interface ValidationIssue {
+  level: 'error' | 'warning' | 'info';
+  code: string;
+  message: string;
+  /** Недельный объём по мышце, если проблема связана с объёмом. */
+  muscle?: string;
+  week?: number;
+}
+
 /** ББ-тело: полностью редактируемая структура. */
 export interface BBProgramBody {
   direction: 'bb';
@@ -162,6 +182,12 @@ export interface HybridProgramBody {
   plRef: { sourceCycleId: string; sessionIndices: number[] };
   bbWeeks: UserWeek[];
   notes: string;
+  /** Рабочие максимумы для расчёта весов (из hybridPlanPanel). */
+  workMax?: { squat?: number; bench?: number; deadlift?: number };
+  /** Уровень спортсмена (отдельный от meta.level, чтобы не пересоздавать meta при правке). */
+  level?: string;
+  /** Длина цикла в неделях (override на meta.weeks). */
+  weeksOverride?: number;
 }
 
 /* ───────────────────────── Мета и канонический тип ───────────────────────── */

@@ -405,7 +405,9 @@ function replacePLForBB(exName: string, group: string): { name: string; group: s
   if (n.includes('рывок') || n.includes('толчок') || n.includes('взятие на грудь')
       || n.includes('подъём на грудь') || n.includes('подъем на грудь')
       || n.includes('power clean') || n.includes('hang clean') || n.includes('power snatch')
-      || n.includes('clean pull') || n.includes('muscle snatch')) {
+      || n.includes('clean pull') || n.includes('muscle snatch')
+      || n.includes('power jerk') || n.includes('split jerk') || n.includes('push jerk')
+      || n.includes('clean and jerk') || n.includes('clean & jerk') || n.includes('jerk')) {
     return null;
   }
   // Пендл → Тяга штанги в наклоне
@@ -516,6 +518,9 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const meta = cycle.meta;
   const totalWeeks = meta.weeks;
   const daysPerWeek = meta.sessionsPerWeek;
+  // L7: src2-* циклы имеют явную много-недельную разкладку (cycle.weeks[][]).
+  // Если она есть и совпадает по длине с totalWeeks — используем каждую неделю дословно (multi-week faithful).
+  const hasExplicitWeeks = !!(cycle as any).weeks && Array.isArray((cycle as any).weeks) && (cycle as any).weeks.length > 0;
   const week1Days = cycle.week1;
   const rirProg = meta.rirProgression;
   const phases = meta.phases && meta.phases.length > 0 ? meta.phases : undefined;
@@ -584,9 +589,11 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   // Build weeks
   const weeks: BBWeek[] = [];
   for (let w = 1; w <= totalWeeks; w++) {
-    const sessions: BBSession[] = week1Days.map((daySpec, dayIdx) => {
+    // L7: для каждой недели берём дословный набор дней из tpl.weeks[w-1], если есть.
+    const currentWeekDays = (hasExplicitWeeks && (cycle as any).weeks[w - 1]) ? (cycle as any).weeks[w - 1] : week1Days;
+    const sessions: BBSession[] = currentWeekDays.map((daySpec: any, dayIdx: number) => {
       const seenNames = new Set<string>(); // дедупликация по имени внутри дня
-      const exercises: BBExercise[] = daySpec.exercises.map((exSpec) => {
+      const exercises: BBExercise[] = (daySpec.exercises || []).map((exSpec: any) => {
         // BB-ФИЛЬТР: заменить ПЛ/олимпийские упражнения на ББ-альтернативы
         const exGroup = exSpec.group || muscleGroupFromExName(exSpec.name, EXERCISE_CATALOG);
         const bbReplaced = replacePLForBB(exSpec.name, exGroup);
@@ -604,7 +611,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         const _tag = (daySpec as any)._sessionTag || '';
         const sessionTagLower = _tag.toLowerCase() || muscleGroupFromExName(bbExName, EXERCISE_CATALOG).toLowerCase();
         // Определить тип дня по упражнениям в дне
-        const dayMuscles = daySpec.exercises.map(ex => muscleGroupFromExName(ex.name, EXERCISE_CATALOG));
+        const dayMuscles = (daySpec.exercises as any[]).map((ex: any) => muscleGroupFromExName(ex.name, EXERCISE_CATALOG));
         const isPushDay = dayMuscles.includes('chest') && !dayMuscles.includes('back');
         if (isPushDay && isRearDeltExercise(bbExName)) return null as any;
         const bbExGroup = bbReplaced.group;
@@ -880,6 +887,10 @@ function parseReps(repsStr: string | undefined): number {
   if (slash) return parseInt(slash[1], 10); // For 5/3/1 — primary rep = first (5)
   const m = s.match(/(\d+)\s*[-–]\s*(\d+)/);
   if (m) return Math.round((parseInt(m[1], 10) + parseInt(m[2], 10)) / 2);
+  // L10: суперсет reps '12+12' → берём максимум (12), иначе теряем 2-ю часть
+  // L11: '15+AMRAP' / '5+AMRAP' / '5+BP' → AMRAP (5 reps, маркер /i)
+  if (/^\d+\+\s*amrap$/i.test(s)) return parseInt(s, 10);
+  if (/^\d+\+\d+$/.test(s)) return parseInt(s.split('+')[1], 10); // '12+12' → 12
   const first = s.match(/(\d+)/);
   if (first) return parseInt(first[1], 10);
   return 8;
@@ -1111,11 +1122,32 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       // Track per-muscle первичного упражнения — для primary/accessory роли
       const seenMusclesPrimary = new Set<string>();
       const exercises: BBExercise[] = [];
+      // L12: очередь суперсет-пар для добавления в конец дня (чтобы не сломать порядок)
+      const pendingSupersets: { rightName: string; leftName: string; exIdx: number }[] = [];
 
       for (let eIdx = 0; eIdx < pd.exercises.length; eIdx++) {
-        const ex = pd.exercises[eIdx];
-        const muscle = muscleGroupFromExName(ex.name, EXERCISE_CATALOG);
+        let ex = pd.exercises[eIdx];
+        let muscle = muscleGroupFromExName(ex.name, EXERCISE_CATALOG);
         if (excludedMuscles.has(muscle)) continue;
+
+        // L12: парсить `+` notation в суперсетах. Исходная запись `Суперсет: Жим + Тяга` —
+        // ищется в EXERCISE_CATALOG целиком, не находится, выкидывается. Здесь:
+        // если name содержит `+` или `Суперсет:` — разбиваем на 2 упражнения.
+        const isSupersetName = /суперсет|superset/i.test(ex.name) || (ex.name.includes(' + ') && ex.name.length > 12);
+        if (isSupersetName) {
+          const sepIdx = ex.name.indexOf(' + ');
+          if (sepIdx > 0) {
+            const leftName = ex.name.replace(/^.*?суперсет\s*[:—\-]?\s*/i, '').slice(0, sepIdx).trim();
+            const rightName = ex.name.slice(sepIdx + 3).trim();
+            if (leftName && rightName) {
+              // Заменяем ex на первое упражнение, потом добавим второе в конец дня.
+              ex = { ...ex, name: leftName, notes: (ex.notes || '') + ' [Суперсет с: ' + rightName + ']' };
+              muscle = muscleGroupFromExName(leftName, EXERCISE_CATALOG);
+              // Запоминаем в sessionTags для добавления после
+              pendingSupersets.push({ rightName, leftName, exIdx: exercises.length });
+            }
+          }
+        }
 
         // Find catalog entry (for safety filters)
         const catEntry = EXERCISE_CATALOG.find(e => e.name === ex.name);
@@ -1298,6 +1330,28 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       // Adapt: keep original order + finisher в конце (уже так pushились), но primary в начало
       if (mode === 'adapt') {
         exercises.sort((a, b) => (a.role === 'primary' ? -1 : 1) - (b.role === 'primary' ? -1 : 1));
+      }
+
+      // L12: добавить суперсет-пары в конец дня (как отдельные упражнения)
+      for (const ss of pendingSupersets) {
+        const rMuscle = muscleGroupFromExName(ss.rightName, EXERCISE_CATALOG);
+        if (excludedMuscles.has(rMuscle)) continue;
+        const rCat = EXERCISE_CATALOG.find(e => e.name === ss.rightName);
+        if (!rCat) continue;
+        exercises.push({
+          muscle: rMuscle,
+          name: rCat.name,
+          role: 'accessory',
+          character: 'памп' as any,
+          sets: 3,
+          repsRange: [10, 15],
+          rir: 2,
+          workSets: Array.from({ length: 3 }, () => ({ reps: 12, rir: 2, weight: 30, restSeconds: 30 })),
+          exerciseName: rCat.name,
+          comment: `[Суперсет с: ${ss.leftName}] Без отдыха между упражнениями.`,
+          warmupSets: [],
+          rationale: 'Суперсет: повышение плотности тренировки.',
+        });
       }
 
       sessions.push({
