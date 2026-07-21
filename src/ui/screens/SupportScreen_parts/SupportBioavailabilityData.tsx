@@ -54,32 +54,32 @@ export interface StatsInfo {
 
 // ─── Bioavailability coefficients ───
 export const FORM_BIOAVAIL: Record<string, number> = {
-  ubiquinol: 0.90, ubiquinone: 0.20, mitoq: 0.95,
+  ubiquinol: 0.85, ubiquinone: 0.20, mitoq: 0.95,
   d3_regular: 0.60, d3_liposomal: 0.95, d3_oil: 0.85,
-  curcumin_std: 0.05, curcumin_piperine: 0.30, curcumin_meriva: 0.60,
-  curcumin_theracurmin: 0.70, curcumin_liposomal: 0.80,
+  curcumin_std: 0.01, curcumin_piperine: 0.06, curcumin_meriva: 0.65,
+  curcumin_theracurmin: 0.65, curcumin_liposomal: 0.65,
   silymarin_std: 0.15, silymarin_phospho: 0.60, silymarin_liposomal: 0.80,
   vitc_std: 0.45, vitc_liposomal: 0.90, vitc_buffered: 0.55, vitc_ascorbyl_palmitate: 0.75,
-  ala_racemic: 0.30, ala_r_form: 0.90, ala_na: 0.60,
-  mg_oxide: 0.04, mg_citrate: 0.30, mg_glycinate: 0.45, mg_bisglycinate: 0.50,
-  mg_threonate: 0.55, mg_malate: 0.35, mg_taurate: 0.40, mg_chloride: 0.25, mg_orotate: 0.35,
-  zn_oxide: 0.20, zn_picolinate: 0.60, zn_bisglycinate: 0.55, zn_acetate: 0.45,
-  zn_citrate: 0.45, zn_sulfate: 0.35, zn_monomethionine: 0.55, zn_carnosine: 0.50,
+  ala_racemic: 0.40, ala_r_form: 0.85, ala_na: 0.60,
+  mg_oxide: 0.04, mg_citrate: 0.60, mg_glycinate: 0.80, mg_bisglycinate: 0.80,
+  mg_threonate: 0.65, mg_malate: 0.35, mg_taurate: 0.40, mg_chloride: 0.25, mg_orotate: 0.35,
+  zn_oxide: 0.20, zn_picolinate: 0.85, zn_bisglycinate: 0.55, zn_acetate: 0.45,
+  zn_citrate: 0.45, zn_sulfate: 0.35, zn_monomethionine: 0.55, zn_carnosine: 0.70,
   se_selenite: 0.50, se_selenomethionine: 0.90, se_methylselenocysteine: 0.70, se_yeast: 0.85,
-  fe_sulfate: 0.15, fe_bisglycinate: 0.40, fe_fumarate: 0.20, fe_glycinate: 0.35,
+  fe_sulfate: 0.20, fe_bisglycinate: 0.50, fe_fumarate: 0.20, fe_glycinate: 0.35,
   ca_carbonate: 0.25, ca_citrate: 0.40, ca_malate: 0.35, ca_lactate: 0.30, ca_mcha: 0.35,
-  omega3_ee: 0.60, omega3_tg: 0.85, omega3_pl: 0.95, omega3_rTG: 0.90,
+  omega3_ee: 0.50, omega3_tg: 0.70, omega3_pl: 0.75, omega3_rTG: 0.70,
   b12_cyano: 0.02, b12_methyl: 0.55, b12_hydroxo: 0.40, b12_adeno: 0.50,
   folate_fa: 0.50, folate_mthf: 0.95, folate_folinic: 0.70,
   b6_pyridoxine: 0.60, b6_p5p: 0.95,
   b2_riboflavin: 0.55, b2_r5p: 0.90,
   b1_thiamine: 0.45, b1_benfotiamine: 0.85, b1_ttfd: 0.90,
   k2_mk4: 0.40, k2_mk7: 0.70, k2_mk7_trans: 0.85,
-  creatine_monohydrate: 0.90, creatine_hcl: 0.80, creatine_ethyl: 0.25,
-  nac_std: 0.60, nac_effervescent: 0.75,
+  creatine_monohydrate: 0.99, creatine_hcl: 0.80, creatine_ethyl: 0.25,
+  nac_std: 0.06, nac_effervescent: 0.75,
   glutathione_lipo: 0.85, glutathione_reduced: 0.10, glutathione_acetyl: 0.50, glutathione_liposomal: 0.90,
-  resveratrol_std: 0.05, resveratrol_piperine: 0.25, resveratrol_trans: 0.35,
-  quercetin_std: 0.05, quercetin_phytosome: 0.60, quercetin_dihydro: 0.40,
+  resveratrol_std: 0.01, resveratrol_piperine: 0.06, resveratrol_trans: 0.02,
+  quercetin_std: 0.02, quercetin_phytosome: 0.50, quercetin_dihydro: 0.25,
   nmn_std: 0.10, nmn_liposomal: 0.60, nmn_sublingual: 0.80,
   iodine_ki: 0.90, iodine_kelp: 0.40, iodine_molecular: 0.70,
   cr_picolinate: 0.40, cr_chloride: 0.20, cr_polynicotinate: 0.50,
@@ -94,11 +94,11 @@ export const FORM_BIOAVAIL: Record<string, number> = {
 
 export const MODIFIERS: Record<string, EnhancerInfo> = {
   with_fat: { label: 'С жирной пищей', mult: 1.4, desc: 'Жиры образуют мицеллы для жирорастворимых веществ (D3, A, E, K, CoQ10, куркумин)' },
-  with_piperine: { label: 'С пиперином (Bioperine)', mult: 4.0, desc: 'Ингибирует глюкуронидацию и CYP3A4, ↑ биодоступность куркумина до 2000%' },
+  with_piperine: { label: 'С пиперином (Bioperine)', mult: 1.5, desc: 'Ингибирует глюкуронидацию и CYP3A4. Для куркумина: ×2000% уже заложено в коэффициент формы. Общий множитель ×1.5 для ресвератрола, кверцетина и др.' },
   liposomal_form: { label: 'Липосомальная форма', mult: 2.5, desc: 'Липосомы защищают от разрушения в ЖКТ, прямой транспорт через мембраны' },
   empty_stomach: { label: 'Натощак (за 30 мин до еды)', mult: 1.2, desc: 'Без конкуренции с пищей для аминокислот, NAC, пробиотиков' },
   with_vitamin_c: { label: 'С витамином C', mult: 1.5, desc: 'Восстанавливает Fe³⁺→Fe²⁺, ↑ абсорбцию Fe в 3-6×, Zn, Cr, Se' },
-  sublingual: { label: 'Сублингвально / буккально', mult: 3.0, desc: 'Минует ЖКТ и first-pass метаболизм печени через слизистую рта' },
+  sublingual: { label: 'Сублингвально / буккально', mult: 1.5, desc: 'Минует first-pass метаболизм печени через слизистую рта. Максимальный эффект для B12 и мелатонина (для них коэффициенты форм уже учитывают путь).' },
   phytosome: { label: 'Фитосомальная технология', mult: 2.2, desc: 'Связывание с фосфатидилхолином для трансмембранного транспорта' },
   nanoparticle: { label: 'Наночастицы / SoluMatrix', mult: 2.5, desc: 'Наноразмер (<200нм) увеличивает растворимость в 2-5×' },
   with_black_pepper: { label: 'С чёрным перцем', mult: 2.0, desc: 'Пиперин ингибирует CYP3A4 и P-гликопротеин' },
@@ -123,10 +123,13 @@ export const COMPETITION_PAIRS: CompetitorInfo[] = [
   { withLabel: 'Колестирамин / секвестранты', effect: 'Связывают жирорастворимые A,D,E,K + CoQ10. Интервал ≥4ч.', severity: 'HIGH' },
   { withLabel: 'Тетрациклины / фторхинолоны', effect: 'Нерастворимые хелаты с Ca, Mg, Fe, Zn. Интервал ≥2ч до / 4-6ч после.', severity: 'HIGH' },
   { withLabel: 'Левотироксин (L-T4)', effect: 'Ca, Fe, Mg, соя ↓ абсорбцию L-T4 на 20–40%. L-T4 за 4ч до минералов.', severity: 'HIGH' },
+  { withLabel: 'Нитроглицерин / нитраты', effect: 'NAC усиливает вазодилатирующий эффект нитратов → риск гипотензии. Контроль АД.', severity: 'HIGH' },
+  { withLabel: 'Фторхинолоны / тетрациклины (Mg)', effect: 'Mg²⁺ образует нерастворимые хелаты с фторхинолонами и тетрациклинами. Интервал ≥2ч до / 4-6ч после.', severity: 'HIGH' },
+  { withLabel: 'Антикоагулянты (куркумин/омега-3)', effect: 'Куркумин и высокодозная омега-3 ↑ риск кровотечения при сочетании с варфарином/АСК/DOAC. Контроль МНО.', severity: 'MEDIUM' },
 ];
 
 export const COMPETITION_KEYWORDS: Record<string, string[]> = {
-  zn: ['calcium', 'iron', 'copper', 'iron'],
+  zn: ['calcium', 'iron', 'copper'],
   fe: ['calcium', 'zinc', 'tannins'],
   ca: ['magnesium', 'zinc', 'iron', 'ppis'],
   mg: ['calcium'],
@@ -322,7 +325,7 @@ export function detectFormBioKey(formName: string, formRu: string, notes?: strin
   if (t.includes('gluconate') || t.includes('глюконат')) return 'mn_gluconate';
   if (t.includes('orthosilicic') || t.includes('ортокремниев')) return 'silicon_orthosilicic';
   if (t.includes('bamboo') || t.includes('бамбук')) return 'silicon_bamboo';
-  if (t.includes('choline') || t.includes('холин') && !t.includes('choline_bitartrate')) return 'silicon_choline';
+  if ((t.includes('silicon_choline') || t.includes('холин-стабилизированная кремниевая')) && !t.includes('phosphatidyl') && !t.includes('lecithin') && !t.includes('фосфатидил')) return 'silicon_choline';
   if (t.includes('sublingual') || t.includes('сублингвально')) return 'sublingual';
   if (t.includes('chelate') || t.includes('хелат')) return 'chelated';
   return 'standard';
@@ -391,8 +394,10 @@ export function detectCompetition(entry: SupportCatalogEntry, nameRu: string, ca
   if (n.includes('мед') || n.includes('copper')) COMPETITION_PAIRS.filter(p => p.withLabel.includes('Медь')).forEach(p => res.push(p));
   if (isB12) COMPETITION_PAIRS.filter(p => p.withLabel.includes('Метформин') || p.withLabel.includes('Антациды/ИПП')).forEach(p => { if (!res.find(r => r.withLabel === p.withLabel)) res.push(p); });
   if (isT4) COMPETITION_PAIRS.filter(p => p.withLabel.includes('Левотироксин')).forEach(p => { if (!res.find(r => r.withLabel === p.withLabel)) res.push(p); });
+  if (n.includes('nac') || n.includes('n-ацетил') || n.includes('глутатион')) COMPETITION_PAIRS.filter(p => p.withLabel.includes('Нитроглицерин')).forEach(p => { if (!res.find(r => r.withLabel === p.withLabel)) res.push(p); });
+  if (n.includes('куркум') || n.includes('curcumin') || n.includes('омега') || n.includes('omega')) COMPETITION_PAIRS.filter(p => p.withLabel.includes('Антикоагулянты')).forEach(p => { if (!res.find(r => r.withLabel === p.withLabel)) res.push(p); });
   if (isMineral && res.length === 0) COMPETITION_PAIRS.forEach(p => { if (!res.find(r => r.withLabel === p.withLabel)) res.push(p); });
-  return res.slice(0, 5);
+  return res.slice(0, 7);
 }
 
 export function classifySubstance(nru: string, cats: string[]): { abs: string; hl: string; food: string; win: string; cost: number | null } {
@@ -428,7 +433,8 @@ export function bioLabel(bio: number): string {
   if (bio >= 0.60) return 'Высокая';
   if (bio >= 0.40) return 'Средняя';
   if (bio >= 0.20) return 'Низкая';
-  return 'Очень низкая';
+  if (bio >= 0.05) return 'Очень низкая';
+  return 'Минимальная (passive diffusion)';
 }
 
 // ─── Timing slot types for daily planner ───
@@ -642,11 +648,11 @@ export const FORM_RECOMMENDER: Record<string, FormRecommendation[]> = {
   mg: [
     { formKey: 'mg_oxide', label: 'Mg оксид', tier: 'budget', goal: 'Бюджетно: слабительный эффект', budget: '~150 ₽/мес' },
     { formKey: 'mg_citrate', label: 'Mg цитрат', tier: 'standard', goal: 'Оптимально: био 30%, мягкое усвоение', budget: '~500 ₽/мес' },
-    { formKey: 'mg_glycinate', label: 'Mg бисглицинат', tier: 'premium', goal: 'Премиум: био 50%, лучшая переносимость', budget: '~1200 ₽/мес' },
+    { formKey: 'mg_glycinate', label: 'Mg бисглицинат', tier: 'premium', goal: 'Премиум: био 80%, лучшая переносимость', budget: '~1200 ₽/мес' },
   ],
   zn: [
     { formKey: 'zn_sulfate', label: 'Zn сульфат', tier: 'budget', goal: 'Бюджетно: био 35%, может раздражать ЖКТ', budget: '~100 ₽/мес' },
-    { formKey: 'zn_picolinate', label: 'Zn пиколинат', tier: 'standard', goal: 'Оптимально: био 60%, хорошая абсорбция', budget: '~400 ₽/мес' },
+    { formKey: 'zn_picolinate', label: 'Zn пиколинат', tier: 'standard', goal: 'Оптимально: био 85%, хорошая абсорбция', budget: '~400 ₽/мес' },
     { formKey: 'zn_bisglycinate', label: 'Zn бисглицинат', tier: 'premium', goal: 'Премиум: био 55%, без раздражения ЖКТ', budget: '~600 ₽/мес' },
   ],
   d3: [

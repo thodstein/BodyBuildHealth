@@ -42,7 +42,7 @@ interface DosingCardProps {
   formOpts: { id: string; label: string; desc?: string }[];
   forms: FormWithBio[];
   form?: FormWithBio;
-  eff: { absorbed: number; rawAbsorbed: number; status: string };
+  eff: { absorbed: number; rawAbsorbed: number; status: string; ulWarning: string };
   adjMult: number;
   costEff: number | null;
 }
@@ -98,6 +98,11 @@ const DosingCard: React.FC<DosingCardProps> = ({
             {eff.status}
           </div>
         )}
+        {eff.ulWarning && (
+          <div style={{ marginTop: 3, padding: '3px 6px', borderRadius: 5, fontSize: 7, textAlign: 'center', background: 'rgba(239,68,68,0.15)', color: '#ef4444', fontWeight: 700 }}>
+            {eff.ulWarning}
+          </div>
+        )}
         {costEff !== null && (
           <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
             эфф-ть: {costEff.toFixed(2)} ₽/мг
@@ -134,7 +139,9 @@ export const SupportEffectiveDose: React.FC = () => {
   const sub2 = sub2Id ? catalog.find(e => e.id === sub2Id) : null;
   const f1 = sub1?.forms[form1Idx];
   const f2 = sub2?.forms[form2Idx];
-  const adjMult = activeAdjusters.reduce((p, k) => p * (PERSONAL_ADJUSTERS[k]?.mult || 1), 1.0);
+  const adjMultRaw = activeAdjusters.reduce((p, k) => p * (PERSONAL_ADJUSTERS[k]?.mult || 1), 1.0);
+  const adjMult = Math.max(0.15, adjMultRaw);
+  const adjClamped = adjMultRaw < 0.15;
 
   const catalogOpts = useMemo(() => catalog.map(e => ({
     id: e.id, label: e.nameRu + ' (' + e.source + ')',
@@ -152,18 +159,24 @@ export const SupportEffectiveDose: React.FC = () => {
   })), [sub2]);
 
   const calcEffDose = (form: FormWithBio | undefined, doseMg: number, id: string) => {
-    if (!form || !doseMg) return { absorbed: 0, rawAbsorbed: 0, range: null as { therMin: number; therMax: number; label: string } | null, status: '' };
+    if (!form || !doseMg) return { absorbed: 0, rawAbsorbed: 0, range: null as { therMin: number; therMax: number; label: string } | null, status: '', ulWarning: '' };
     const rawAbsorbed = Math.round(doseMg * form.bioavailability);
     const absorbed = Math.round(rawAbsorbed * adjMult);
     const rangeKey = Object.keys(DOSE_RANGES).find(k => id.toLowerCase().includes(k));
     const range = rangeKey ? DOSE_RANGES[rangeKey] : null;
+    const winKey = Object.keys(THERAPEUTIC_WINDOWS).find(k => id.toLowerCase().includes(k));
+    const win = winKey ? THERAPEUTIC_WINDOWS[winKey] : null;
     let status = '';
+    let ulWarning = '';
     if (range) {
       if (doseMg < range.therMin) status = 'Ниже терапевтического (мин ' + range.therMin + ' мг)';
       else if (doseMg > range.therMax) status = 'Выше терапевтического (макс ' + range.therMax + ' мг)';
       else status = 'В терапевтическом диапазоне ' + range.therMin + '-' + range.therMax + ' мг';
     }
-    return { absorbed, rawAbsorbed, range, status };
+    if (win && win.ul < 9999 && doseMg > win.ul) {
+      ulWarning = 'Превышен верхний безопасный уровень (UL ' + win.ul + ' мг). Риск побочных эффектов.';
+    }
+    return { absorbed, rawAbsorbed, range, status, ulWarning };
   };
 
   const eff1 = calcEffDose(f1, dose1, sub1Id);
@@ -362,7 +375,12 @@ export const SupportEffectiveDose: React.FC = () => {
           }}>
             <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Суммарный множитель: </span>
             <span style={{ fontSize: 15, fontWeight: 800, color: '#f44336' }}>×{adjMult.toFixed(2)}</span>
-            {adjMult < 0.7 && (
+            {adjClamped && (
+              <div style={{ fontSize: 7, color: '#ff9800', marginTop: 2 }}>
+                Ограничено минимумом ×0.15 (реальный: ×{adjMultRaw.toFixed(2)}). При множителе &lt;0.15 пероральный приём неэффективен — рассмотрите парентеральный путь.
+              </div>
+            )}
+            {!adjClamped && adjMult < 0.7 && (
               <div style={{ fontSize: 7, color: '#ff9800', marginTop: 2 }}>
                 Сильная коррекция — рассмотрите смену формы или дополнительную поддержку
               </div>
