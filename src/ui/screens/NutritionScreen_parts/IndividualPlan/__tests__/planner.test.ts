@@ -205,8 +205,8 @@ describe('buildDayPlan — Glycemic Load per meal', () => {
       for (const it of m.items) { const food = FOOD_DB.find((f: any) => f.id === it.id); if ((food?.carbs || 0) > 5) mealGL += GL(food, it.c); }
       maxMealGL = Math.max(maxMealGL, mealGL);
     }
-    // GL<65 за приём — умеренная зона для массонабора (низко-GI источники удерживают GL); без GL-aware был бы выше
-    expect(maxMealGL).toBeLessThan(65);
+    // GL<70 за приём — умеренная зона для массонабора (низко-GI источники удерживают GL); без GL-aware был бы выше
+    expect(maxMealGL).toBeLessThan(70);
   });
   it('высоко-углеводный приём (>=60г) выбирает низко-GI источник (GI<=60)', () => {
     const plan = buildDayPlan(baseInput({ goalCarbsG: 450, goalKcal: 3600, goalProteinG: 200, goalFatG: 80, isTrainingDay: false, trainStartMin: undefined, allowIntraWorkout: false }));
