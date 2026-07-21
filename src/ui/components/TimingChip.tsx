@@ -1,20 +1,6 @@
 import React from 'react';
 import type { TimingInfo } from '../../engines/interactions-calculator';
-
-const FOOD_LABELS: Record<NonNullable<TimingInfo['withFood']>, string> = {
-  fasting: '⏰ Натощак',
-  before_meal: '⏰ До еды',
-  with_meal: '🍽 С едой',
-  after_meal: '⏰ После еды',
-  any: '⏰ Любое время',
-};
-
-const TIME_OF_DAY_LABELS: Record<NonNullable<TimingInfo['timeOfDay']>, string> = {
-  morning: '🌅 Утром',
-  noon: '☀️ Днём',
-  evening: '🌆 Вечером',
-  bedtime: '🛌 Перед сном',
-};
+import { FOOD_LABELS, TIME_OF_DAY_LABELS } from '../../data/interactions-labels';
 
 interface ChipDef {
   label: string;

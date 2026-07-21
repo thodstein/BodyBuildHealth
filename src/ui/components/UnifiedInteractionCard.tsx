@@ -1,31 +1,7 @@
 import React from 'react';
-import type { UnifiedInteraction, UnifiedSeverity } from '../../engines/interactions-calculator';
+import type { UnifiedInteraction } from '../../engines/interactions-calculator';
+import { SEVERITY_META, TYPE_LABELS, SOURCE_LABELS, SECTION_LABELS } from '../../data/interactions-labels';
 import { TimingChip } from './TimingChip';
-
-const SEVERITY_META: Record<UnifiedSeverity, { label: string; color: string; bg: string; border: string; icon: string }> = {
-  CRITICAL: { label: 'КРИТИЧНО', color: '#ef4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.30)', icon: '🛑' },
-  HIGH:     { label: 'ПРЕДУПРЕЖДЕНИЕ', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.30)', icon: '⚠️' },
-  MEDIUM:   { label: 'ВНИМАНИЕ', color: '#fbbf24', bg: 'rgba(251,191,36,0.06)', border: 'rgba(251,191,36,0.25)', icon: '⚡' },
-  LOW:      { label: 'СИНЕРГИЯ', color: '#00e68a', bg: 'rgba(0,230,138,0.06)', border: 'rgba(0,230,138,0.25)', icon: '✨' },
-  INFO:     { label: 'ИНФО', color: '#60a5fa', bg: 'rgba(96,165,250,0.06)', border: 'rgba(96,165,250,0.20)', icon: 'ℹ️' },
-};
-
-const TYPE_LABELS: Record<UnifiedInteraction['type'], string> = {
-  synergy: '⊕ Синергия',
-  conflict: '⚡ Конфликт',
-  caution: '⚠ Осторожно',
-  danger: '🛑 Опасно',
-  block: '🛑 Блок',
-  warn: '⚠ Предупреждение',
-  monitor: '👁 Мониторинг',
-  info: 'ℹ Инфо',
-};
-
-const SOURCE_LABELS: Record<UnifiedInteraction['source'], string> = {
-  support_db: 'БАД-каталог',
-  drug_interactions: 'Drug-каталог',
-  pharma_rules: 'AAS/PED правила',
-};
 
 export interface UnifiedInteractionCardProps {
   /** Unified interaction item from calculateInteractions() */
@@ -89,7 +65,7 @@ export const UnifiedInteractionCard: React.FC<UnifiedInteractionCardProps> = ({
       {/* Effect (короткая суть) */}
       {item.effect && (
         <div style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.5, marginBottom: 6 }}>
-          <span style={{ fontWeight: 700, color: 'var(--text-dim)' }}>Суть: </span>
+          <span style={{ fontWeight: 700, color: 'var(--text-dim)' }}>{SECTION_LABELS.fieldEffect}: </span>
           {item.effect}
         </div>
       )}
@@ -97,7 +73,7 @@ export const UnifiedInteractionCard: React.FC<UnifiedInteractionCardProps> = ({
       {/* Mechanism (если есть) */}
       {item.mechanism && item.mechanism !== item.effect && (
         <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 6 }}>
-          <span style={{ fontWeight: 600 }}>⚙️ Механизм: </span>
+          <span style={{ fontWeight: 600 }}>⚙️ {SECTION_LABELS.fieldMechanismShort}: </span>
           {item.mechanism}
         </div>
       )}
@@ -105,7 +81,7 @@ export const UnifiedInteractionCard: React.FC<UnifiedInteractionCardProps> = ({
       {/* Recommendation + timing chips */}
       {item.recommendation && (
         <div style={{ fontSize: 11, color: meta.color, lineHeight: 1.5, padding: '8px 10px', borderRadius: 6, background: `${meta.color}0a`, border: `1px solid ${meta.border}` }}>
-          <span style={{ fontWeight: 700 }}>💊 Действие: </span>
+          <span style={{ fontWeight: 700 }}>💊 {SECTION_LABELS.fieldRecommendationShort}: </span>
           {item.recommendation}
           {item.timing && <TimingChip timing={item.timing} />}
         </div>
