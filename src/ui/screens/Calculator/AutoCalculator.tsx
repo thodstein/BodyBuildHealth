@@ -12,7 +12,7 @@ import { deriveStateFromLabs, labPointsToSlice } from './Calc.labs-derived';
 import { db } from '../../../core/db';
 import { CalcMapperCard } from './Calc.mapper';
 
-export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked, labsLinked, onOpenManualPicker, planResult }) => {
+export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked, labsLinked, onOpenManualPicker, onOpenLabs, planResult }) => {
   const [state, setState] = useState<CalculatorState>(() => {
     const h = hydrateState();
     return { ...DEFAULT_STATE, ...h, profile: { ...DEFAULT_STATE.profile, ...(h.profile || {}) }, pharma: { ...DEFAULT_STATE.pharma, ...(h.pharma || {}) }, labs: { ...DEFAULT_STATE.labs, ...(h.labs || {}), fullPanel: h.labs?.fullPanel || DEFAULT_STATE.labs.fullPanel } };
@@ -526,7 +526,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       <CalcMapperCard state={state} onStateChange={(n) => setState(n)} onApply={(rec) => {
         const subIds = rec.subs.map(s => s.substanceId);
         onApply({ level: rec.level, subs: subIds, tzRec: rec });
-      }} onOpenManualPicker={onOpenManualPicker} planResult={planResult} />
+      }} onOpenManualPicker={onOpenManualPicker} onOpenLabs={onOpenLabs} planResult={planResult} />
 
       {result.contraindicationAlerts.length > 0 && (
         <div style={{ ...GLASS, padding: 8, marginTop: 6 }}>

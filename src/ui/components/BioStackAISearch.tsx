@@ -705,6 +705,26 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
                     const cat = SUPPORT_CATALOG_DATA[mr.replacementId];
                     if (!cat) return null;
                     const inStack = stackIds.includes(mr.replacementId);
+
+                    // Терапевтический класс
+                    const classMatch = mr.reason?.match(/Терапевтический класс: ([^—]+)/);
+                    const classLabel = classMatch ? classMatch[1].trim() : '';
+
+                    // Форма, доза, timing
+                    const formInfo: string[] = [];
+                    if (mr.form) formInfo.push(mr.form);
+                    if (mr.doseMg) formInfo.push(`${mr.doseMg} мг`);
+                    if (mr.timing) formInfo.push(mr.timing);
+
+                    const equivColor = mr.clinicalEquivalence === 'high' ? '#22c55e'
+                                     : mr.clinicalEquivalence === 'moderate' ? '#f59e0b'
+                                     : mr.clinicalEquivalence === 'low' ? '#ef4444'
+                                     : '#94a3b8';
+                    const equivLabel = mr.clinicalEquivalence === 'high' ? '✅ Высокая'
+                                     : mr.clinicalEquivalence === 'moderate' ? '⚠ Умеренная'
+                                     : mr.clinicalEquivalence === 'low' ? '⛔ Низкая'
+                                     : '';
+
                     return (
                       <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.14)' }}>
                         <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 4 }}>💊 Осмысленная замена (по анализам/профилю)</div>
@@ -712,6 +732,36 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
                         const ns = stackIds.some(s => s.toLowerCase() === oldLow) ? stackIds.map(s => s.toLowerCase() === oldLow ? mr.replacementId : s) : [...stackIds.filter(s => s.toLowerCase() !== oldLow), mr.replacementId]; setStackIds(ns); setReplacePopup(null); }} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{mr.replacementName}{mr.gradeUpgrade ? <span style={{ marginLeft: 5, padding: '1px 5px', borderRadius: 4, fontSize: 6, fontWeight: 700, background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>↑ грейд</span> : null}</div>
+
+                            {classLabel && (
+                              <div style={{ fontSize: 7, color: '#00e68a', marginTop: 2, padding: '1px 5px', borderRadius: 3, background: 'rgba(0,230,138,0.1)', display: 'inline-block', fontWeight: 600 }}>
+                                💊 {classLabel}
+                              </div>
+                            )}
+                            {formInfo.length > 0 && (
+                              <div style={{ fontSize: 7, color: '#60a5fa', marginTop: 2, padding: '1px 5px', borderRadius: 3, background: 'rgba(96,165,250,0.1)', display: 'inline-block', marginLeft: 3, fontWeight: 500 }}>
+                                📋 {formInfo.join(' · ')}
+                              </div>
+                            )}
+                            {equivLabel && (
+                              <div style={{ fontSize: 7, color: equivColor, marginTop: 2, padding: '1px 5px', borderRadius: 3, background: `${equivColor}15`, display: 'inline-block', marginLeft: 3, fontWeight: 600 }}>
+                                {equivLabel} эквив.
+                              </div>
+                            )}
+
+                            {mr.doseWarning && (
+                              <div style={{ fontSize: 7, color: '#f87171', marginTop: 2, lineHeight: 1.3, padding: '3px 5px', background: 'rgba(239,68,68,0.1)', borderRadius: 3, border: '1px solid rgba(239,68,68,0.25)' }}>
+                                {mr.doseWarning}
+                                {mr.recommendedDoseMg && ` → ${mr.recommendedDoseMg} мг`}
+                              </div>
+                            )}
+
+                            {mr.clinicalNote && (
+                              <div style={{ fontSize: 7, color: '#fbbf24', marginTop: 2, lineHeight: 1.3, padding: '3px 5px', background: 'rgba(251,191,36,0.08)', borderRadius: 3, border: '1px solid rgba(251,191,36,0.18)' }}>
+                                ⚠️ {mr.clinicalNote}
+                              </div>
+                            )}
+
                             <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, marginTop: 2 }}>{mr.reason}</div>
                             {mr.safetyNote ? <div style={{ fontSize: 7, color: '#f59e0b', lineHeight: 1.3, marginTop: 2 }}>⚠ {mr.safetyNote}</div> : null}
                           </div>

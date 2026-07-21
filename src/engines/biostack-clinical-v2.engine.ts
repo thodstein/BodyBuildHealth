@@ -14,6 +14,8 @@ import { getCost } from './biostack-budget.engine';
 import type { LabCompositeResult } from './lab-analysis.engine';
 import { SUBSTANCE_ANALOGS, SUPPLEMENT_COMPOSITION, COMPONENT_TO_COMPLEX } from '../data/support-meta';
 import { SYNERGY_NETWORK, type SynergyNetworkEntry } from '../data/support-synergy-network';
+import { THERAPEUTIC_CLASS_MAP, getTherapeuticClassLabel, type TherapeuticClass } from './therapeutic-classes';
+import { getCriticalNote, validateReplacementDose, type DoseValidation } from './bioequivalence-base';
 
 /* ─────────────────────────────────────────────────────────────────────────
    Clinical-grade improvements for BioStack (sports pharmacology audit)
@@ -391,6 +393,15 @@ export interface MeaningfulReplacement {
   reason: string;
   safetyNote: string;
   gradeUpgrade: boolean;
+  // Дополнительные поля
+  form?: string;
+  doseMg?: number;
+  timing?: string;
+  clinicalEquivalence?: 'high' | 'moderate' | 'low' | 'unknown';
+  clinicalNote?: string;
+  therapeuticClass?: string;
+  doseWarning?: string;
+  recommendedDoseMg?: number;
 }
 
 // Whole-catalog analog fallback: when a substance has no curated
@@ -442,7 +453,6 @@ export function findMeaningfulReplacement(
   }
   if (!analogs.length) return null;
 
-  const condKw = new Set<string>();
   const medTokens = buildUserMedTokens(profile);
   const avoidSet = new Set([...(profile.avoidIds || []), ...excludedIds].map(a => a.toLowerCase()));
 
@@ -451,6 +461,8 @@ export function findMeaningfulReplacement(
 
   const origMechSet = new Set(normalizeMechanisms((cat(originalId)?.mechanisms) || []));
   const origCatsSet = new Set((cat(originalId) as any)?.category || []);
+  const origTherapeuticClass = THERAPEUTIC_CLASS_MAP[originalId.toLowerCase()];
+
   for (const cand of analogs) {
     const cid = cand?.id || cand;
     if (!cid || cid.toLowerCase() === originalId.toLowerCase() || avoidSet.has(cid.toLowerCase())) continue;
@@ -464,7 +476,6 @@ export function findMeaningfulReplacement(
     let forbidden = false;
     for (const line of ci) {
       const low = line.toLowerCase();
-      if (condKw.size && [...condKw].some(kw => low.includes(kw))) { forbidden = true; break; }
       if (medTokens.some(tok => low.includes(tok))) { forbidden = true; break; }
     }
     if (forbidden) continue;
@@ -474,8 +485,7 @@ export function findMeaningfulReplacement(
     for (const m of cMech) if (origMechSet.has(m)) shared++;
     let sharedCat = false;
     for (const catName of candCats) if (origCatsSet.has(catName)) { sharedCat = true; break; }
-    // ── same-family guard: skip candidates that are essentially the same active
-    //     ingredient (e.g. Legalon→milk_thistle, both silymarin) ──
+    // same-family guard
     const mechOverlap = origMechSet.size > 0 ? shared / origMechSet.size : 0;
     let catOverlap = 0;
     if (origCatsSet.size > 0) {
@@ -484,19 +494,56 @@ export function findMeaningfulReplacement(
       catOverlap = sharedCats / origCatsSet.size;
     }
     if (mechOverlap > 0.7 && catOverlap > 0.5) continue;
+
+    // Терапевтический класс кандидата
+    const candTherapeuticClass = THERAPEUTIC_CLASS_MAP[cid.toLowerCase()];
+    const sameTherapeuticClass = origTherapeuticClass && candTherapeuticClass && candTherapeuticClass === origTherapeuticClass;
+
     const gOrig = evidenceWeight(getEvidenceGrade(originalId));
     const gCand = evidenceWeight(getEvidenceGrade(cid));
-    // приоритет — совпадение механизмов/класса с оригиналом, а не общая «накачанность» кандидата
-    const score = shared * 100 + (sharedCat ? 20 : 0) + gCand;
+
+    // Scoring: therapeutic class match = highest priority (200), затем механизмы
+    const equivalenceBonus = cand?.clinicalEquivalence === 'high' ? 30
+                            : cand?.clinicalEquivalence === 'moderate' ? 15
+                            : cand?.clinicalEquivalence === 'low' ? -20
+                            : 0;
+    const score = (sameTherapeuticClass ? 200 : 0) + shared * 50 + (sharedCat ? 20 : 0) + gCand + equivalenceBonus;
+
     if (score > bestScore) {
       bestScore = score;
+      // Формируем клиническое примечание
+      let clinicalNote = cand?.criticalNote || getCriticalNote(cid) || '';
+
+      // Проверка корректности дозы через bioequivalence-base
+      let doseWarning: string | undefined;
+      let recommendedDoseMg: number | undefined;
+      if (cand?.mg && cand.mg > 0) {
+        const validation: DoseValidation = validateReplacementDose(originalId, cid, cand.mg, cand.mg);
+        if (!validation.isCorrect && validation.warning) {
+          doseWarning = validation.warning;
+          recommendedDoseMg = validation.recommendedDoseMg;
+        }
+      }
+
+      const classLabel = candTherapeuticClass
+        ? `Терапевтический класс: ${getTherapeuticClassLabel(candTherapeuticClass)}`
+        : `Группа: ${cand?.group || 'совместимый'}`;
+
       best = {
         originalId,
         replacementId: cid,
         replacementName: nameOf(cid),
-        reason: `Аналог по группе «${cand?.group || 'совместимый'}»: ${cand?.note || 'сходный механизм действия'}`,
+        reason: `${classLabel}${sameTherapeuticClass ? ' — замена в том же классе' : ''}: ${cand?.note || 'сходный механизм действия'}.`,
         safetyNote: gCand >= gOrig ? 'Грейд доказательности не ниже оригинала.' : 'Грейд доказательности ниже — приоритет за клинически подтверждённым.',
         gradeUpgrade: gCand > gOrig,
+        form: cand?.form,
+        doseMg: cand?.mg,
+        timing: cand?.timing,
+        clinicalEquivalence: cand?.clinicalEquivalence,
+        clinicalNote: clinicalNote || undefined,
+        therapeuticClass: candTherapeuticClass,
+        doseWarning,
+        recommendedDoseMg,
       };
     }
   }

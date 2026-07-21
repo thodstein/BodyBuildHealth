@@ -221,5 +221,6 @@ export interface AutoCalculatorProps {
   courseLinked?: AutoCalculatorCourseEntry[];
   labsLinked?: LabSlice | null;
   onOpenManualPicker?: () => void;
+  onOpenLabs?: () => void;
   planResult?: import('../../../engines/support-plan').PlanResult;
 }

@@ -32,6 +32,16 @@ interface AnalogCardData {
   note: string;
   sharedMechs: string[];
   recommended: boolean;
+  // Фармакокинетика
+  form?: string;
+  doseMg?: number;
+  doseUnit?: string;
+  timing?: string;
+  clinicalEquivalence?: 'high' | 'moderate' | 'low' | 'unknown';
+  clinicalNote?: string;
+  therapeuticClass?: string;
+  doseWarning?: string;
+  recommendedDoseMg?: number;
 }
 
 interface BioStackAIAnalogProps {
@@ -84,6 +94,16 @@ export default function BioStackAIAnalog({ profile, stackIds, setStackIds, onToa
         note: best.reason,
         sharedMechs: sharedMechs(originId, best.replacementId),
         recommended: true,
+        // Прокидываем фармакокинетику
+        form: (best as any).form,
+        doseMg: (best as any).doseMg,
+        doseUnit: (best as any).doseUnit,
+        timing: (best as any).timing,
+        clinicalEquivalence: (best as any).clinicalEquivalence,
+        clinicalNote: (best as any).clinicalNote,
+        therapeuticClass: (best as any).therapeuticClass,
+        doseWarning: (best as any).doseWarning,
+        recommendedDoseMg: (best as any).recommendedDoseMg,
       });
     }
     for (const m of mech) {
@@ -139,6 +159,22 @@ export default function BioStackAIAnalog({ profile, stackIds, setStackIds, onToa
   const renderCard = (card: AnalogCardData, originId: string) => {
     const g = getEvidenceGrade(card.replacementId);
     const accent = card.recommended ? '#a78bfa' : gradeColor(g);
+
+    // Форма, доза, timing
+    const formInfo: string[] = [];
+    if (card.form) formInfo.push(card.form);
+    if (card.doseMg) formInfo.push(`${card.doseMg} мг`);
+    if (card.timing) formInfo.push(card.timing);
+
+    const equivColor = card.clinicalEquivalence === 'high' ? '#22c55e'
+                     : card.clinicalEquivalence === 'moderate' ? '#f59e0b'
+                     : card.clinicalEquivalence === 'low' ? '#ef4444'
+                     : '#94a3b8';
+    const equivLabel = card.clinicalEquivalence === 'high' ? '✅ Высокая'
+                     : card.clinicalEquivalence === 'moderate' ? '⚠ Умеренная'
+                     : card.clinicalEquivalence === 'low' ? '⛔ Низкая'
+                     : '';
+
     return (
       <div
         key={card.replacementId}
@@ -166,6 +202,17 @@ export default function BioStackAIAnalog({ profile, stackIds, setStackIds, onToa
           {card.group === 'категория' ? '🔁 По терапевтической группе' : '🧬 По механизму действия'} · {card.note}
         </div>
 
+        {formInfo.length > 0 && (
+          <div style={{ marginTop: 6, fontSize: 10, color: '#60a5fa', padding: '4px 8px', borderRadius: 6, background: 'rgba(96,165,250,0.1)', display: 'inline-block', fontWeight: 500 }}>
+            📋 {formInfo.join(' · ')}
+          </div>
+        )}
+        {equivLabel && (
+          <div style={{ marginTop: 4, fontSize: 10, color: equivColor, padding: '3px 7px', borderRadius: 6, background: `${equivColor}15`, display: 'inline-block', marginLeft: 4, fontWeight: 600 }}>
+            {equivLabel} эквив.
+          </div>
+        )}
+
         {card.sharedMechs.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
             {card.sharedMechs.map((m) => (
@@ -187,6 +234,12 @@ export default function BioStackAIAnalog({ profile, stackIds, setStackIds, onToa
         )}
 
         <div style={{ fontSize: 11.5, color: '#e2e8f0', marginTop: 7, lineHeight: 1.4 }}>{card.reason}</div>
+
+        {card.clinicalNote && (
+          <div style={{ fontSize: 10.5, color: '#fbbf24', marginTop: 6, lineHeight: 1.4, padding: '6px 8px', background: 'rgba(251,191,36,0.06)', borderRadius: 6, border: '1px solid rgba(251,191,36,0.15)' }}>
+            ⚠️ {card.clinicalNote}
+          </div>
+        )}
         {card.safetyNote && <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.6)', marginTop: 4 }}>{card.safetyNote}</div>}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 9 }}>

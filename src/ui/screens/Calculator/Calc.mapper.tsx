@@ -30,6 +30,8 @@ import { checkStackToxicity, type ToxWarning } from '../../../engines/biostack-s
 import { calculateReboundTrajectory, getReboundSummary, type ReboundInput } from '../../../engines/rebound-modeling.engine';
 import { printProtocol, buildExportDataFromRec } from '../../../ui/components/ProtocolExport';
 import { checkNotifications, type NotificationRule } from '../../../engines/notification-engine';
+import { computeOverdueSystems, type SystemOverdue } from '../../../engines/labs-overdue';
+import { LabsDueBanner } from './LabsDueBanner';
 
 // ── Конфигурация суставного модуля ──────────────────────────────────────────
 interface JointPreset {
@@ -700,8 +702,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
     return Array.from(map.values());
   }, [level, selectedStacks]);
 
-  // Проверка уведомлений по лабам/рискам при изменении rec
-  const [notifToast, setNotifToast] = useState<string | null>(null);
+  // Реактивная проверка уведомлений (логирует в he_notification_log; UI не здесь).
+  // (Используется для реактивных алертов E2/HCT/ЛПНП/D-димер и т.п.,
+  // отображается в других местах; баннер лаборатории — отдельный useMemo ниже)
   useEffect(() => {
     if (!finalRec) return;
     try {
@@ -718,6 +721,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           egfr: notifLabs['EGFR'] ?? notifLabs['СКФ'],
           dDimer: notifLabs['D_DIMER'] ?? notifLabs['D_ДИМЕР'],
         },
+        fullPanel: state.labs?.fullPanel ?? null,
         pharma: {
           phase: rec?.phase || 'course',
           hasAI: rec?.subs?.some((s: any) => s.substanceId === 'anastrozole' || s.substanceId === 'anastro'),
@@ -725,35 +729,38 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         },
         goals: { cycleWeeks: state.goals?.cycleWeeks || 12 },
       };
-      const notifications = checkNotifications(notifState);
-      if (notifications.length > 0) {
-        const critCount = notifications.filter(n => n.priority === 'critical').length;
-        const first = notifications[0];
-        setNotifToast(critCount > 0 
-          ? `⛔ ${critCount} критических предупреждений. ${first.message}`
-          : `⚠ ${first.message}`
-        );
-        setTimeout(() => setNotifToast(null), 8000);
-      }
+      checkNotifications(notifState);
     } catch {}
   }, [finalRec, state.labs, rec?.phase]);
 
+  // Sticky-баннер «Сдайте анализы»: группировка по системам, не перекрывает нижние кнопки.
+  const overdueSystems: SystemOverdue[] = useMemo(() => {
+    try {
+      return computeOverdueSystems({
+        fullPanel: state.labs?.fullPanel ?? null,
+        phase: rec?.phase || 'course',
+        lastLabDate: state.labs?.fullPanel?.date,
+      });
+    } catch { return []; }
+  }, [state.labs?.fullPanel, rec?.phase]);
+
+  const [bannerDismissed, setBannerDismissed] = useState<boolean>(() => {
+    try { return localStorage.getItem('he_calc_labs_banner_dismissed') === '1'; }
+    catch { return false; }
+  });
+
   return (
     <React.Fragment>
-      {/* Toast-уведомления */}
-      {notifToast && (
-        <div style={{
-          position:'fixed', bottom: 20, left: 16, right: 16, zIndex: 9999,
-          padding: '10px 14px', borderRadius: 10,
-          background: notifToast.startsWith('⛔') ? 'rgba(239,68,68,0.95)' : 'rgba(245,158,11,0.95)',
-          color: '#fff', fontSize: 11, fontWeight: 600, lineHeight: 1.4,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-          cursor: 'pointer',
-        }} onClick={() => setNotifToast(null)}>
-          {notifToast}
-          <div style={{ fontSize: 8, opacity: 0.7, marginTop: 2 }}>(нажмите чтобы закрыть)</div>
-        </div>
-      )}
+      {/* Sticky-баннер «Сдайте анализы» — вверху карточки, не перекрывает нижние кнопки */}
+      <LabsDueBanner
+        systems={overdueSystems}
+        onOpenLabs={onOpenLabs}
+        onDismiss={() => {
+          setBannerDismissed(true);
+          try { localStorage.setItem('he_calc_labs_banner_dismissed', '1'); } catch {}
+        }}
+        dismissed={bannerDismissed}
+      />
 
       <div style={{ ...GLASS, padding: 10, marginBottom: 8, border: '2px solid rgba(0,230,138,0.2)' }}>
       <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)', marginBottom: 6 }}>

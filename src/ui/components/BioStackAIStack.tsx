@@ -1601,6 +1601,26 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
                 if (!mr) return null;
                 const cat = SUPPORT_CATALOG_DATA[mr.replacementId];
                 if (!cat) return null;
+
+                // Терапевтический класс
+                const classMatch = mr.reason?.match(/Терапевтический класс: ([^—]+)/);
+                const classLabel = classMatch ? classMatch[1].trim() : '';
+
+                // Форма, доза, timing
+                const formInfo: string[] = [];
+                if (mr.form) formInfo.push(mr.form);
+                if (mr.doseMg) formInfo.push(`${mr.doseMg} мг`);
+                if (mr.timing) formInfo.push(mr.timing);
+
+                const equivColor = mr.clinicalEquivalence === 'high' ? '#22c55e'
+                                 : mr.clinicalEquivalence === 'moderate' ? '#f59e0b'
+                                 : mr.clinicalEquivalence === 'low' ? '#ef4444'
+                                 : '#94a3b8';
+                const equivLabel = mr.clinicalEquivalence === 'high' ? '✅ Высокая'
+                                 : mr.clinicalEquivalence === 'moderate' ? '⚠ Умеренная'
+                                 : mr.clinicalEquivalence === 'low' ? '⛔ Низкая'
+                                 : '';
+
                 return (
                   <div style={{ marginBottom: 12, padding: '12px 14px', borderRadius: 14, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.16)' }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: '#00e68a', marginBottom: 6 }}>💊 Осмысленная замена (по профилю и анализам)</div>
@@ -1609,7 +1629,37 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
                         {mr.replacementName}
                         {mr.gradeUpgrade ? <span style={{ marginLeft: 6, padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(34,197,94,0.14)', color: '#22c55e' }}>↑ грейд</span> : null}
                       </div>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>{mr.reason}</div>
+
+                      {classLabel && (
+                        <div style={{ fontSize: 9, color: '#00e68a', marginTop: 2, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.1)', display: 'inline-block', fontWeight: 600 }}>
+                          💊 {classLabel}
+                        </div>
+                      )}
+                      {formInfo.length > 0 && (
+                        <div style={{ fontSize: 9, color: '#60a5fa', marginTop: 2, padding: '2px 6px', borderRadius: 4, background: 'rgba(96,165,250,0.1)', display: 'inline-block', marginLeft: 4, fontWeight: 500 }}>
+                          📋 {formInfo.join(' · ')}
+                        </div>
+                      )}
+                      {equivLabel && (
+                        <div style={{ fontSize: 9, color: equivColor, marginTop: 2, padding: '2px 6px', borderRadius: 4, background: `${equivColor}15`, display: 'inline-block', marginLeft: 4, fontWeight: 600 }}>
+                          {equivLabel} эквив.
+                        </div>
+                      )}
+
+                      {mr.doseWarning && (
+                        <div style={{ fontSize: 10, color: '#f87171', marginTop: 4, lineHeight: 1.3, padding: '4px 6px', background: 'rgba(239,68,68,0.08)', borderRadius: 4, border: '1px solid rgba(239,68,68,0.2)' }}>
+                          {mr.doseWarning}
+                          {mr.recommendedDoseMg && ` Рекомендуется: ${mr.recommendedDoseMg} мг.`}
+                        </div>
+                      )}
+
+                      {mr.clinicalNote && (
+                        <div style={{ fontSize: 10, color: '#fbbf24', marginTop: 4, lineHeight: 1.3, padding: '4px 6px', background: 'rgba(251,191,36,0.06)', borderRadius: 4, border: '1px solid rgba(251,191,36,0.15)' }}>
+                          ⚠️ {mr.clinicalNote}
+                        </div>
+                      )}
+
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, marginTop: 3 }}>{mr.reason}</div>
                       {mr.safetyNote && <div style={{ fontSize: 10, color: '#f59e0b', lineHeight: 1.3, marginTop: 3 }}>⚠ {mr.safetyNote}</div>}
                     </div>
                   </div>

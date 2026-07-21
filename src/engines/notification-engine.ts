@@ -3,6 +3,8 @@
 //  Использование: import { checkNotifications, type NotificationRule } from './notification-engine';
 //  ════════════════════════════════════════════════════════════════════════════
 
+import { computeOverdueSystems, type SystemOverdue, type LabSliceLike } from './labs-overdue';
+
 export type NotificationPriority = 'info' | 'warning' | 'critical';
 export type NotificationChannel = 'telegram' | 'browser' | 'toast';
 
@@ -14,6 +16,8 @@ export interface NotificationRule {
   priority: NotificationPriority;
   channels: NotificationChannel[];
   cooldownHours: number;
+  /** Детальные данные для рендера (для labs_overdue — массив систем). */
+  details?: SystemOverdue[];
 }
 
 export interface NotificationState {
@@ -31,6 +35,9 @@ export interface NotificationState {
     cortisol?: number;
     potassium?: number; sodium?: number;
   };
+  /** Полная панель лаб-анализов (LabSlice-формат). Используется для расчёта
+   *  просроченных систем (rule labs_overdue). */
+  fullPanel?: LabSliceLike | null;
   pharma: {
     phase?: string;
     courseStartDate?: string;
@@ -45,14 +52,21 @@ export interface NotificationState {
 
 const NOTIFICATION_RULES: NotificationRule[] = [
   {
-    id: 'alt_ast_due',
+    id: 'labs_overdue',
     trigger: 'lab_due',
     condition: (s) => {
-      if (!s.labs.lastLabDate) return true;
-      const weeksSince = (Date.now() - new Date(s.labs.lastLabDate).getTime()) / (7 * 24 * 3600 * 1000);
-      return weeksSince >= 4 && s.pharma.phase === 'course';
+      // Не срабатывает, если нет активной фазы (без курса/ПКТ анализы опциональны)
+      const phase = (s.pharma.phase || '').toLowerCase();
+      if (phase === 'none' || phase === '') return false;
+      // Запускаем computeOverdueSystems — он сам решит, есть ли просроченные системы
+      const systems = computeOverdueSystems({
+        fullPanel: s.fullPanel ?? null,
+        phase: s.pharma.phase,
+        lastLabDate: s.labs.lastLabDate,
+      });
+      return systems.length > 0;
     },
-    message: '⏰ Контроль АЛТ/АСТ/ГГТ: прошло 4+ нед с последних анализов. Сдайте печёночную панель.',
+    message: '⏰ Сдайте анализы: есть просроченные маркеры по текущей фазе.',
     priority: 'warning',
     channels: ['browser', 'toast'],
     cooldownHours: 48,
@@ -223,6 +237,17 @@ export function checkNotifications(state: NotificationState): NotificationRule[]
       if (wasRecentlyTriggered(rule.id, rule.cooldownHours)) return false;
       return true;
     } catch { return false; }
+  }).map(rule => {
+    // Для labs_overdue: прикрепляем детали (список систем) для UI-баннера.
+    if (rule.id === 'labs_overdue' && !rule.details) {
+      const systems = computeOverdueSystems({
+        fullPanel: state.fullPanel ?? null,
+        phase: state.pharma.phase,
+        lastLabDate: state.labs.lastLabDate,
+      });
+      return { ...rule, details: systems };
+    }
+    return rule;
   });
 }
 

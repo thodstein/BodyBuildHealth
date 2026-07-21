@@ -91,12 +91,62 @@ export const ClinicalResultCard: React.FC<{
   const replaceBtn = (origId: string) => {
     const rep = replacements[origId];
     if (!rep || !onReplace) return null;
+
+    // Extract therapeutic class from reason
+    const classMatch = rep.reason?.match(/Терапевтический класс: ([^—]+)/);
+    const classLabel = classMatch ? classMatch[1].trim() : '';
+
+    // Фармакокинетические данные
+    const formInfo: string[] = [];
+    if (rep.form) formInfo.push(rep.form);
+    if (rep.doseMg) formInfo.push(`${rep.doseMg} мг`);
+    if (rep.timing) formInfo.push(rep.timing);
+
+    const equivColor = rep.clinicalEquivalence === 'high' ? '#22c55e'
+                     : rep.clinicalEquivalence === 'moderate' ? '#f59e0b'
+                     : rep.clinicalEquivalence === 'low' ? '#ef4444'
+                     : '#94a3b8';
+    const equivLabel = rep.clinicalEquivalence === 'high' ? '✅ Высокая'
+                     : rep.clinicalEquivalence === 'moderate' ? '⚠ Умеренная'
+                     : rep.clinicalEquivalence === 'low' ? '⛔ Низкая'
+                     : '';
+
     return (
       <div style={{ marginTop:6 }}>
         <button onClick={() => onReplace(origId, rep.replacementId)} style={{
           padding:'7px 14px',borderRadius:8,cursor:'pointer',fontSize:11,fontWeight:700,
           background:'rgba(0,230,138,0.12)',border:'1px solid rgba(0,230,138,0.3)',color:'#00e68a',
         }}>🔄 Заменить на {rep.replacementName}{rep.gradeUpgrade ? ' ⬆' : ''}</button>
+
+        {classLabel && (
+          <div style={{ fontSize:9,color:'#00e68a',marginTop:3,padding:'2px 6px',borderRadius:4,background:'rgba(0,230,138,0.1)',display:'inline-block',fontWeight:600 }}>
+            💊 {classLabel}
+          </div>
+        )}
+        {formInfo.length > 0 && (
+          <div style={{ fontSize:9,color:'#60a5fa',marginTop:3,padding:'2px 6px',borderRadius:4,background:'rgba(96,165,250,0.1)',display:'inline-block',marginLeft:4,fontWeight:500 }}>
+            📋 {formInfo.join(' · ')}
+          </div>
+        )}
+        {equivLabel && (
+          <div style={{ fontSize:9,color:equivColor,marginTop:3,padding:'2px 6px',borderRadius:4,background:`${equivColor}15`,display:'inline-block',marginLeft:4,fontWeight:600 }}>
+            {equivLabel} эквивалентность
+          </div>
+        )}
+
+        {rep.doseWarning && (
+          <div style={{ fontSize:10,color:'#f87171',marginTop:4,lineHeight:1.3,padding:'4px 6px',background:'rgba(239,68,68,0.08)',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)' }}>
+            {rep.doseWarning}
+            {rep.recommendedDoseMg && ` Рекомендуется: ${rep.recommendedDoseMg} мг.`}
+          </div>
+        )}
+
+        {rep.clinicalNote && (
+          <div style={{ fontSize:10,color:'#fbbf24',marginTop:4,lineHeight:1.3,padding:'4px 6px',background:'rgba(251,191,36,0.06)',borderRadius:4,border:'1px solid rgba(251,191,36,0.15)' }}>
+            ⚠️ {rep.clinicalNote}
+          </div>
+        )}
+
         <div style={{ fontSize:10,color:'rgba(255,255,255,0.35)',marginTop:3,lineHeight:1.3 }}>{rep.reason} · {rep.safetyNote}</div>
       </div>
     );
