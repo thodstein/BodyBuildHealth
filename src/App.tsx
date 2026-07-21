@@ -142,7 +142,7 @@ export default function App() {
     switch (tab) {
       case 'home': return <DashboardScreen key={key} onNavigate={handleNavigate} />;
       case 'pharma': return <PharmaScreen key={key} />;
-      case 'support': return <SupportScreen key={key} />;
+      case 'support': return <SupportScreen key={key} onNavigate={handleNavigate} />;
       case 'training': return <TrainingScreen key={key} />;
       case 'labs': return <LabsScreen key={key} />;
       case 'risks': return <RiskScreen key={key} />;

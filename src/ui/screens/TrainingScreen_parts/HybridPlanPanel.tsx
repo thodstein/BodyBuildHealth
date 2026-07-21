@@ -19,7 +19,8 @@ function fmtHeavy(ex: LMSPlanExercise): string {
 }
 
 export const HybridPlanPanel: React.FC = () => {
-  const plCycles = useMemo(() => LMS_CYCLES.filter(c => c.meta.direction === 'strength' || c.meta.period === 'strength'), []);
+  // PL cycles = powerlifting direction OR strength period.
+  const plCycles = useMemo(() => LMS_CYCLES.filter(c => c.meta.direction === 'powerlifting' || c.meta.period === 'strength'), []);
   const [cycleId, setCycleId] = useState<string>(plCycles[0]?.meta.id || '');
   const [squat, setSquat] = useState(120);
   const [bench, setBench] = useState(100);

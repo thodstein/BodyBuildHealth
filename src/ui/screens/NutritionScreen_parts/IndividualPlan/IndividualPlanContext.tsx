@@ -2073,7 +2073,23 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // GLP-1 + high fat
     if (t.includes('семаглутид') || t.includes('тирзепатид')) { const totalFat = dayPlan.totals.f || 0; if (totalFat > weight * 0.6) warnings.push(`💊 ${inj.name}: жиры ${totalFat}г/день — риск тошноты/панкреатита при GLP-1. Ограничьте до ${Math.round(weight*0.5)}г.`); }
   });
-  // 🔴3 — Drug-nutrient interaction checker (8 pairs)
+  // D-26: AAS / PCT food-drug interactions (clinical dietology for BB on course).
+  // Oral AAS detection: by name (since DrugInjection.esterType has no 'oral' value).
+  const _hasOralAAS = v2Pharma?.AAS_ORAL || injections.some(i => i.type === 'ААС' && /метан|станазол|оксан|туринаб|анадрол|анабол/i.test(i.name||''));
+  const _hasInjectAAS = v2Pharma?.AAS_INJECTABLE || injections.some(i => i.type === 'ААС');
+  const _hasPCT = phase === 'pct';
+  if (_hasOralAAS) {
+    if (/грейпфрут|grapefruit/i.test(allFoodNames)) warnings.push('🔴 Оральные ААС + грейпфрут: ингибирование CYP3A4 → рост гепатотоксичности. Полностью исключите грейпфрут!');
+    if (/алкогол|пив|вин|водк|beer|wine|alcohol/i.test(allFoodNames)) warnings.push('🔴 Оральные ААС + алкоголь: аддитивное гепатотоксическое действие. Исключите алкоголь на курсе!');
+    if (/творог|молоко|сыр|кефир|йогурт|dairy|cottage|milk|cheese|yogurt/i.test(allFoodNames)) warnings.push('🟡 Оральные ААС + молочные: кальций снижает эмульгацию/абсорбцию 17α-алкил-ААС. Интервал 2-3 ч.');
+    if (/отруби|bran|чечевиц|lentils|фасол|beans|овсян|oats/i.test(allFoodNames)) warnings.push('🟡 Оральные ААС + высоко-клетчаточные: фитаты связывают липофильные ААС (−15-25% абсорбции). Интервал 1-2 ч.');
+  }
+  if (_hasInjectAAS && /алкогол|пив|вин|водк|alcohol/i.test(allFoodNames)) warnings.push('🟡 Инъекционные ААС + алкоголь: нагрузка на печень/липиды. Ограничьте алкоголь.');
+  if (_hasPCT) {
+    if (/грейпфрут|grapefruit/i.test(allFoodNames)) warnings.push('🟠 ПКТ (SERM/AI) + грейпфрут: CYP3A4 → рост концентрации тамоксифена/кломифена. Избегайте грейпфрут.');
+    if (!/творог|молоко|сыр|kefir|dairy|cheese|tofu|сардин|sardines|кальц/i.test(allFoodNames)) warnings.push('🟠 ПКТ + ингибиторы ароматазы → деминерализация костей. Увеличьте Ca (1200 мг): творог, сыр, сардины.');
+  }
+    // 🔴3 — Drug-nutrient interaction checker (8 pairs)
   if (takenSupplements.some(s => s.includes('statin') || s.includes('atorva') || s.includes('rosuva') || s.includes('simva'))) {
     if (/грейпфрут|grapefruit/i.test(allFoodNames)) warnings.push('💊 Статины + грейпфрут: ингибирование CYP3A4 → риск рабдомиолиза. Исключите грейпфрут!');
   }
@@ -2106,6 +2122,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       }
     } catch(e) { try { console.error('Report failed:', e); } catch {} }
   };
+  // D-26: auto-run drug-compat check when the plan changes (live food-drug warnings).
+  useEffect(() => { generateDrugCompatReport(); }, [dayPlan, injections, v2Pharma, phase, takenSupplements]);
   // D-25: auto-generate the report (without archiving) whenever the day plan changes,
   // so the dietology scorecard in the day card is live without opening the Отчёт tab.
   useEffect(() => { if (dayPlan) generateFullNutritionReport(dayPlan, false); }, [dayPlan]);
@@ -2153,6 +2171,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             </div>
           </div>
           {nutritionReport && (() => { const r = nutritionReport; const chip = (ok: boolean, label: string, val: string) => (<div style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 6px',borderRadius:6,fontSize:7,fontWeight:600,background:ok?'rgba(0,230,138,0.08)':'rgba(245,158,11,0.08)',border:`1px solid ${ok?'rgba(0,230,138,0.2)':'rgba(245,158,11,0.25)'}`,color:ok?'#22c55e':'#f59e0b'}}><span style={{width:5,height:5,borderRadius:'50%',background:ok?'#22c55e':'#f59e0b'}} />{label} {val}</div>); const mpsOk = (r.proteinTiming?.evennessScore||0) >= 70; const fibOk = (r.fiberAnalysis?.pct||0) >= 80; const glOk = r.glycemicLoad?.status !== 'high'; const satOk = (r.fatQuality?.satPct||0) <= 15; const nakOk = r.sodiumPotassium?.status === 'ok'; const pralOk = r.pral?.status === 'ok' || r.pral?.status === 'mild'; const o3 = r.fatQuality?.omega3G||0; const o3Ok = o3 >= 1.6; return (<div style={{marginTop:6,padding:'6px 8px',borderRadius:8,background:'rgba(139,92,246,0.04)',border:'1px solid rgba(139,92,246,0.12)'}}><div style={{fontSize:8,fontWeight:700,color:'#a78bfa',marginBottom:4}}>🩺 Диетология</div><div style={{display:'flex',flexWrap:'wrap',gap:4}}>{chip(mpsOk,'MPS',(r.proteinTiming?.evennessScore||0).toFixed(0)+'%')}{chip(fibOk,'Клетч.',(r.fiberAnalysis?.totalG||0).toFixed(0)+'г')}{chip(glOk,'ГН',r.glycemicLoad?.status==='high'?'выс.':r.glycemicLoad?.status==='low'?'низк.':'норма')}{chip(satOk,'Нас.жир',(r.fatQuality?.satPct||0).toFixed(0)+'%')}{chip(nakOk,'Na:K',(r.sodiumPotassium?.ratio||0).toFixed(1)+':1')}{chip(pralOk,'PRAL',(r.pral?.mEq||0)+'мэкв')}{chip(o3Ok,'Ω3',o3.toFixed(1)+'г')}</div></div>); })()}
+          {drugCompatReport?.warnings && drugCompatReport.warnings.length > 0 && drugCompatReport.warnings[0] && !drugCompatReport.warnings[0].includes('совместимы') && (<div style={{marginTop:6,padding:'6px 8px',borderRadius:8,background:'rgba(239,68,68,0.04)',border:'1px solid rgba(239,68,68,0.12)'}}><div style={{fontSize:8,fontWeight:700,color:'#ef4444',marginBottom:4}}>⚠ Лекарства × питание</div>{drugCompatReport.warnings.slice(0,4).map((w: string, i: number) => <div key={i} style={{fontSize:7,color:'rgba(255,255,255,0.75)',marginBottom:2}}>{w}</div>)}</div>)}
+
           <div style={{height:4,display:'flex'}}>
             <div style={{height:'100%',width:`${Math.max(2,pKcalPct)}%`,background:'#3b82f6',minWidth:2}}/>
             <div style={{height:'100%',width:`${Math.max(2,fKcalPct)}%`,background:'#f59e0b',minWidth:2}}/>

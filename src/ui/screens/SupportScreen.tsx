@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TARGETS, SUPPORT_RESEARCH, calculateSupport, checkSupportInteractions, findSupportForGoal, findSupportByGoal, getSupportDatabaseStats, type SupportInput, type SupplementTarget } from '../../engines/support.engine';
 import type { SupportRecommendation } from '../../engines/tz-mapper-engine';
 import { decodeGarbled, cleanDesc } from '../../utils/text-sanitizer';
@@ -82,7 +82,7 @@ import { SupportEffectiveDose } from './SupportScreen_parts/SupportEffectiveDose
 import { UnifiedSynergyCalculator } from './SupportScreen_parts/UnifiedSynergyCalculator';
 import { SupportTimingPlanner } from './SupportScreen_parts/SupportTimingPlanner';
 import { AutoCalculator } from './Calculator';
-export const SupportScreen: React.FC<{ initialTab?: SupportTab }> = ({ initialTab }) => {
+export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (screen: string) => void }> = ({ initialTab, onNavigate }) => {
   const linked = useDataLink();
   const [tab, setTab] = useState<SupportTab>(initialTab || 'main');
   const [supportView, setSupportView] = useState<SupportView>('main');
@@ -3454,6 +3454,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             }
           }}
           onOpenManualPicker={() => setShowManualPicker(true)}
+          onOpenLabs={() => onNavigate?.('labs')}
           planResult={planResult ?? undefined}
         />
       )}
