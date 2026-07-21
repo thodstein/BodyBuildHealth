@@ -10,8 +10,10 @@ import { RiskScreen } from './ui/screens/RiskScreen';
 import { NutritionScreen } from './ui/screens/NutritionScreen';
 import { ProfileScreen } from './ui/screens/ProfileScreen';
 import { ArticlesScreen } from './ui/screens/ArticlesScreen';
+import { MarketplaceScreen } from './ui/screens/MarketplaceScreen';
 
 import { ToastContainer } from './ui/ToastContainer';
+import { setLocale, getLocale } from './data/interactions-labels';
 
 type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'articles' | 'marketplace';
 
@@ -43,7 +45,6 @@ export default function App() {
 
   useEffect(() => { registry.init().then(() => setInitialized(true)); }, []);
 
-  // Telegram Mini App viewport and theme
   useEffect(() => {
     try {
       const tg = (window as any).Telegram?.WebApp;
@@ -159,8 +160,29 @@ export default function App() {
       <DarkBg />
       <main ref={mainRef} style={{ position: 'relative', zIndex: 1, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <img src="/bg-profile.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill', zIndex:0, pointerEvents:'none', opacity:0.3 }} />
-        <div style={{ position:'relative', zIndex:1, flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-        {renderContent()}
+<div style={{ position:'relative', zIndex:1, flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+          {/* Locale toggle button (top-right) */}
+          <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 1000 }}>
+            <button
+              onClick={() => setLocale(getLocale() === 'ru' ? 'en' : 'ru')}
+              style={{
+                padding: '6px 10px',
+                borderRadius: 20,
+                fontSize: 11,
+                fontWeight: 600,
+                background: 'rgba(96,165,250,0.12)',
+                border: '1px solid rgba(96,165,250,0.25)',
+                color: '#60a5fa',
+                cursor: 'pointer',
+                backdropFilter: 'blur(8px)',
+                whiteSpace: 'nowrap',
+              }}
+              title={getLocale() === 'ru' ? 'Switch to English' : 'Переключить на русский'}
+            >
+              {getLocale() === 'ru' ? 'EN' : 'RU'}
+            </button>
+          </div>
+          {renderContent()}
         </div>
       </main>
       <ToastContainer />
