@@ -18,9 +18,10 @@ import { DRUG_INTERACTIONS, checkInteractions as checkDrugList } from '../data/d
 import { checkDrugInteractions, getDrugDrugConflicts, getClassInstructions, getCourseRecommendations, type InteractionAlert, type DrugDrugConflict, type ClassInstruction, type CourseRecommendation } from './pharma-interactions.engine';
 import type { InteractionEntry } from '../core/types';
 import type { CourseEntry } from '../core/types';
-import type { Interaction as SupportInteraction, SeverityLevel, InteractionType } from '../data/support-interactions-db';
+import type { Interaction as SupportInteraction, SeverityLevel } from '../data/support-interactions-db';
 import type { DrugInteraction } from '../data/drug-interactions';
-import type { UnifiedSeverity, UnifiedInteraction, TimingInfo, InteractionSource, InteractionType, Locale } from '../data/interactions-types';
+import type { UnifiedSeverity, UnifiedInteraction, TimingInfo, InteractionSource, Locale } from '../data/interactions-types';
+import type { InteractionType } from '../data/interactions-types';
 
 export type { UnifiedSeverity, UnifiedInteraction, TimingInfo, InteractionSource, InteractionType, Locale };
 

@@ -280,11 +280,12 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
   // freqMap — частота группы в микроцикле (сколько дней в неделю тренируется)
   const freqMap: Record<string, number> = {};
   cycle.forEach(d => d.forEach(g => { freqMap[g] = (freqMap[g] || 0) + 1; }));
-  // dailyMrv — дневной аллоуэшн: равномерное распределение недельного MRV по частоте,
-  // без искусственного пола 13 (для 3×/нед группы MRV/3 ≈ 6-7 — корректно).
+  // dailyMrv — дневной аллоуэшн: равномерное распределение недельного MRV по частоте.
+  // Минимум 10 для реалистичной тренировки, но НЕ ниже weeklyMrvOf (для тестов MRV<10).
   const dailyMrv = (g: string) => {
     const f = freqMap[g] || 1;
-    return Math.max(10, Math.min(16, Math.round(weeklyMrvOf(g) / f)));
+    const w = weeklyMrvOf(g);
+    return Math.max(Math.min(10, w), Math.min(16, Math.round(w / f)));
   };
   const groupCorrections: string[] = [];
   const isWeak = (g: string) => weakPoints.includes(g);
@@ -346,7 +347,12 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
 
     groups.forEach(g => {
       const isExcluded = excludedMuscles.has(g);
-      if (isExcluded) return;
+      if (isExcluded) {
+        const inj = injuries.find(i => i.muscle === g);
+        groupCorrections.push(`Группа «${g}» пропущена по травме (с ${inj?.from || 'неизвестно'}${inj?.to ? ` по ${inj.to}` : ''}).`);
+        weeklySets[g] = 0;
+        return;
+      }
       const isGraded = gradedInjuries.some(inj => inj.muscle === g);
       const injuryFactor = gradedInjuries.find(inj => inj.muscle === g);
 
@@ -390,7 +396,10 @@ export function buildPlanDays(input: BuildPlanInput): { days: PlanDay[]; weeklyS
           if (remainingDaily < 3) break;
           // P1.3: недельный кап — сумма сетов группы за неделю ≤ MRV группы
           const remainingWeekly = Math.max(0, weeklyMrvOf(g) - (weeklySets[g] || 0));
-          if (remainingWeekly < 3) break;
+          if (remainingWeekly < 3) {
+            groupCorrections.push(`Группа «${g}»: объём достиг MRV (${weeklyMrvOf(g)} сетов/нед) — лишние упражнения убраны (анти-перетрен).`);
+            break;
+          }
           if (groupFatigue < (ex.fatigueCost || 5)) break;
 
          // Подстановка для градированной травмы

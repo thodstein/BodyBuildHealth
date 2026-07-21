@@ -25,7 +25,7 @@
  */
 
 import { calculateSupportTZ, hydrateState } from './engine';
-import type { CalculatorState, PlanResult } from './types';
+import type { CalculatorState, CalculatorResult, PlanResult } from './types';
 import { clamp } from './types';
 import { buildSubstances, buildSchedule, computeWeekScale } from './substances';
 import {
@@ -156,7 +156,7 @@ export function runSupportForLevel(
   state: CalculatorState,
   level: 'basic' | 'mid' | 'max' | 'boost'
 ): CalculatorResult {
-  return runSupportUnified({ ...state, powerLevel: level });
+  return calculateSupportTZ({ ...state, powerLevel: level });
 }
 
 // Re-export для обратной совместимости

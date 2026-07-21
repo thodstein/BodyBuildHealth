@@ -1,3 +1,84 @@
+## Session Summary (Jul 21) — BioStack: 6 more quality improvements (conflicts, weight, sources, quick-build)
+
+### Goal
+Устранить 6 оставшихся слабых мест сборщика: конфликты в greedy pass, нормализация доз, источники веществ, redundancy, сортировка, quick-build.
+
+### ✅ Done и проверено (vite build OK, 51s)
+- **Fix 1 — Greedy pass проверяет конфликты:** `type='conflict'/'caution'` из SYNERGY_NETWORK — кандидат с конфликтом пропускается.
+- **Fix 2 — Нормализация доз по весу:** фоллбэк-вещества получают `normalizeDoseByWeight(baseDose, userWeight)` (аллометрическое масштабирование Клейбера, ref=80кг). Экспортировано из engine-helpers.ts.
+- **Fix 3 — Источники веществ в UI:** поле `source` в ClinicalSubstance (mandatory/lab/tz/greedy). UI показывает цветные бейджи: обязательно (красный), ТЗ (синий), синергия (фиолетовый). `phaseAssignedDrugs` проброшен через PlanResult.
+- **Fix 4 — Redundancy в greedy pass:** ANTIOXIDANT_PATHWAY экспортирован из v2.engine. Greedy pass пропускает кандидата если на том же пути уже ≥2 веществ (гормезис-риск).
+- **Fix 5 — Сортировка результата:** mandatory → lab → tz → greedy; внутри core → standard → advanced.
+- **Fix 6 — Quick-build кнопка:** «⚡ Быстрая сборка (без фильтров)» на стартовом экране — один клик, дефолтные параметры.
+- **Bonus:** fix double comma в cycle-01.ts (build blocker от Jul 21 src2 session).
+
+### Commits
+- `70d8e95f` — BioStack: 6 more quality improvements
+
+### Relevant Files
+- `src/engines/biostack-clinical-recommender.ts` — Fix 1-5 (greedy conflicts, weight norm, source, redundancy, sort)
+- `src/engines/biostack-clinical-v2.engine.ts` — Fix 4 (export ANTIOXIDANT_PATHWAY)
+- `src/engines/support-plan/engine-helpers.ts` — Fix 2 (export normalizeDoseByWeight)
+- `src/engines/support-plan/index.ts` — Fix 3 (phaseAssignedDrugs in PlanResult)
+- `src/engines/support-plan/types.ts` — Fix 3 (PlanResult interface)
+- `src/ui/components/BioStackAIClinicalBuild.tsx` — Fix 3+6 (source badges + quick-build)
+- `src/data/lms-cycles/cycle-01.ts` — bonus (double comma fix)
+
+---
+
+## Session Summary (Jul 21) — BioStack: 7 quality improvements for stack builder
+
+### Goal
+Улучшить качество сборки стеков BioStack: фильтры не должны убивать кандидатов, синергии должны влиять на отбор, фоллбэк должен знать контекст.
+
+### ✅ Done и проверено (vite build OK, 39s)
+- **P1 — Фильтры → взвешенный scoring:** маркеры (+5), механизмы (+3), органы (+3) начисляют баллы вместо последовательного AND. Вещества с score > 0 проходят. Если ни один фильтр не совпал — оставляем всех (не убиваем стек). Evidence filter откатывается если убил всех кандидатов.
+- **P2 — Synergy-aware maxStackSize:** сортировка при усечении учитывает синергии с уже отобранными (greedy pass — пересчёт после каждого выбора).
+- **P3 — Каталог-фоллбэк с контекстом:** фаза курса (PHASE_BLOCKLIST), TZ_AUTO_BLACKLIST, синергии с существующими, дедупликация.
+- **P4 — Порог fallback ≥3:** фоллбэк срабатывает при <3 кандидатах (было ==0). MERGE с существующими (не замена).
+- **P5 — Greedy synergy pass:** после selectStack сканирует весь каталог на вещества с score ≥15 к уже выбранным, добавляет топ.
+- **P7 — Источники в описании:** показывает ориентировочность, курс, лабы, greedy-добавки.
+- **P6 пропущён** (budget удалён из профиля). **P8 верифицирован** (mandatory корректно блокирует TZ-scoring через markUsed).
+
+### Commits
+- `e99f30bc` — BioStack: 7 quality improvements (scoring, synergy, fallback)
+
+### Relevant Files
+- `src/engines/biostack-clinical-recommender.ts` — P1-P5, P7 (все фиксы)
+
+---
+
+## Session Summary (Jul 21) — BioStack: fix course/labs/profile toggle logic
+
+### Goal
+Исправить логику переключателей «Курс ААС», «Анализы», «Профиль» в BioStack: при выключении курса/анализов стек должен собираться из TZ-scoring + PHASE 4 (stateRecipes) на реальных данных пользователя, а не из дефолтных данных.
+
+### ✅ Done и проверено (vite build OK, 792 modules, 1m 10s)
+- **biostack-clinical-recommender.ts (Fix 1):** Блок формирования `state` (строки 389-423) переписан. Раньше `...(useLabs ? (h as Partial<CalculatorState>) : { labs: DEFAULT_STATE.labs })` ПЕРЕЗАПИСЫВАЛ ВСЕ предыдущие поля (neuro, cardio, hepatobiliary и т.д.) через spread. Теперь каждое поле явно берётся из `hydrateState()` или `DEFAULT_STATE`. Только `pharma` и `labs` управляются переключателями. Остальные поля (profile, neuro, cardio, hepatobiliary, contraindications, goals, nutrition, oda, dental, gi, toxicLoad, epicrisis, injection, journal, genetics, psych) — ВСЕГДА из localStorage.
+- **biostack-clinical-recommender.ts (Fix 2):** Добавлено поле `isOrientational?: boolean` в `ClinicalStackResult`. = true когда `!useLabs && !useCourse` (стек без курса и анализов).
+- **biostack-clinical-recommender.ts (Fix 3):** Логирование сценария (`console.log`): useCourse/useLabs/useProfile + aasCount/hasLabs/isOrientational.
+- **BioStackAIClinicalBuild.tsx (Fix 4):** Баннер «⚠️ Стек ориентировочный» при `result.isOrientational === true`.
+- **InteractionCheckerTab.tsx (bonus):** Исправлен путь импорта `../../../components/` → `../../components/` (баг от Jul 21 interactions unification).
+
+### Сценарии после фикса
+| Курс | Лабы | Профиль | Результат |
+|------|------|---------|-----------|
+| ✅ | ✅ | ✅ | hCG+AI+TUDCA+NAC + лаб-рекомендации + TZ-scoring + профиль |
+| ❌ | ✅ | ✅ | Лаб-рекомендации + TZ-scoring + профиль (без mandatory AAS), стек того же размера |
+| ✅ | ❌ | ✅ | hCG+AI+TUDCA+NAC + TZ-scoring + профиль + баннер «ориентировочный» |
+| ❌ | ❌ | ✅ | TZ-scoring + PHASE 4 (stateRecipes) + профиль + баннер «ориентировочный» |
+| ❌ | ❌ | ❌ | TZ-scoring на дефолтных данных + base_antioxidant (NAC+D3+K2+Zn) + баннер |
+
+### Commits
+- `034700e5` — BioStack: fix course/labs/profile toggle logic (pharma+labs isolation, orientational banner)
+
+### Relevant Files
+- `src/engines/biostack-clinical-recommender.ts` — Fix 1, 2, 3 (state formation, isOrientational, logging)
+- `src/ui/components/BioStackAIClinicalBuild.tsx` — Fix 4 (orientational banner)
+- `src/ui/screens/PharmaScreen_parts/InteractionCheckerTab.tsx` — import path fix
+
+---
+
 ## Session Summary (Jul 18) — BioStack clinical build: TZ alignment + мульти-фильтры (органы/механизмы/маркеры/доказательность)
 
 ### Goal

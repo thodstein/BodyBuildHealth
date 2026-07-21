@@ -10,6 +10,7 @@ import {
   type InteractionAlert,
 } from '../../../engines/interactions-calculator';
 import { UnifiedInteractionCard } from '../../components/UnifiedInteractionCard';
+import { TimingTelemetryPanel } from '../../components/TimingTelemetryPanel';
 import { SECTION_LABELS } from '../../../data/interactions-labels';
 import type { CourseEntry } from '../../../core/types';
 import { resolveInteractionId, type Interaction as SupportInteraction } from '../../../data/support-interactions-db';
@@ -174,19 +175,96 @@ export const InteractionCheckerTab: React.FC = () => {
     info: { bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.25)', text: '#3b82f6', label: 'ИНФОРМАЦИЯ' },
   };
 
+  const subTabs: Array<{ id: 'interactions' | 'synergies' | 'unified'; label: string }> = [
+    { id: 'interactions', label: '⚡ Взаимодействия' },
+    { id: 'synergies', label: '💥 Синергии и комбинации' },
+    { id: 'unified', label: '🔬 Unified' },
+  ];
+
+  const renderUnified = (): React.ReactElement => {
+    const validIdsForUnified = validIds.length > 0 ? validIds : [''];
+    const courseForUnified: CourseEntry[] = validIdsForUnified.filter(Boolean).map((id, i) => ({
+      id: `${id}-${i}`,
+      substanceId: id,
+      doseValue: doseMgWk,
+      doseUnit: 'mg/wk',
+      frequency: '2x/week',
+      startWeek: 0,
+      endWeek: 12,
+    }));
+    try {
+      const result = calculateInteractions({
+        substances: validIdsForUnified.filter(Boolean),
+        course: courseForUnified.filter(c => c.substanceId),
+      });
+      const items = filterAndSortInteractions(result.all, unifiedOnlyCritical ? { onlyCritical: true } : {});
+      return (
+        <div style={{
+          background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+          borderRadius: 12, padding: '14px 16px', marginBottom: 10,
+        }}>
+          <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>🔬 Unified View</h3>
+          <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 8px 0' }}>
+            Объединённый список из drug-каталога, БАД-каталога и AAS/PED правил
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Safety score:</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: result.score < 50 ? '#ef4444' : result.score < 80 ? '#f59e0b' : '#00e68a' }}>
+              {result.score}/100
+            </span>
+            {result.blocked && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>⛔ BLOCKED</span>
+            )}
+            <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>·</span>
+            <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{result.all.length} пар</span>
+            <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>·</span>
+            <span style={{ fontSize: 10, color: '#ef4444' }}>{result.bySeverity.CRITICAL.length} CRIT</span>
+            <span style={{ fontSize: 10, color: '#f59e0b' }}>· {result.bySeverity.HIGH.length} HIGH</span>
+            <button onClick={() => setUnifiedOnlyCritical(!unifiedOnlyCritical)} style={{
+              marginLeft: 'auto',
+              padding: '4px 10px', borderRadius: 12, fontSize: 9, fontWeight: 600,
+              cursor: 'pointer',
+              background: unifiedOnlyCritical ? 'var(--accent)' : 'var(--bg-secondary)',
+              color: unifiedOnlyCritical ? '#000' : 'var(--text-dim)',
+              border: `1px solid ${unifiedOnlyCritical ? 'var(--accent)' : 'var(--border)'}`,
+            }}>{unifiedOnlyCritical ? '🔓 Показать все' : '🔒 Только CRITICAL'}</button>
+          </div>
+          <TimingTelemetryPanel autoRefreshMs={3000} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {items.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)', fontSize: 12 }}>
+                {unifiedOnlyCritical ? '✅ Нет CRITICAL взаимодействий' : 'Нет взаимодействий'}
+              </div>
+            ) : items.map((item, i) => (
+              <UnifiedInteractionCard key={i} item={item} />
+            ))}
+          </div>
+        </div>
+      );
+    } catch (e) {
+      return (
+        <div style={{ textAlign: 'center', padding: 20, color: '#ef4444', fontSize: 12 }}>
+          Ошибка: {String(e)}
+        </div>
+      );
+    }
+  };
+
   return (
     <div>
       {/* Sub-tab pills */}
       <div style={{ display:'flex', gap:4, marginBottom:8 }}>
-        {(['interactions','synergies','unified'] as const).map(t => (
-          <button key={t} onClick={() => setInteractSub(t)} style={{
-            padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
-            cursor:'pointer', flexShrink:0,
-            background: interactSub === t ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: interactSub === t ? '#000' : 'var(--text-dim)',
-            border: `1px solid ${interactSub === t ? 'var(--accent)' : 'var(--border)'}`,
-          }}>{t === 'interactions' ? '⚡ Взаимодействия' : t === 'synergies' ? '💥 Синергии и комбинации' : '🔬 Unified'}</button>
-        ))}
+        {subTabs.map((t) => {
+          return (
+            <button key={t.id} onClick={() => setInteractSub(t.id)} style={{
+              padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
+              cursor:'pointer', flexShrink:0,
+              background: interactSub === t.id ? 'var(--accent)' : 'var(--bg-secondary)',
+              color: interactSub === t.id ? '#000' : 'var(--text-dim)',
+              border: `1px solid ${interactSub === t.id ? 'var(--accent)' : 'var(--border)'}`,
+            }}>{t.label}</button>
+          );
+        })}
       </div>
 
       {interactSub === 'synergies' ? (
@@ -235,79 +313,7 @@ export const InteractionCheckerTab: React.FC = () => {
             )}
           </div>
         </div>
-      ) : interactSub === 'unified' ? (() => {
-        // Unified view: объединяет drug_interactions + support_db + pharma_rules
-        // в один список с разделением effect/mechanism/recommendation.
-        const validIdsForUnified = validIds.length > 0 ? validIds : [''];
-        const courseForUnified: CourseEntry[] = validIdsForUnified.filter(Boolean).map((id, i) => ({
-          id: `${id}-${i}`,
-          substanceId: id,
-          doseValue: doseMgWk,
-          doseUnit: 'mg/wk',
-          frequency: '2x/week',
-          startWeek: 0,
-          endWeek: 12,
-        }));
-        try {
-          const result = calculateInteractions({
-            substances: validIdsForUnified.filter(Boolean),
-            course: courseForUnified.filter(c => c.substanceId),
-          });
-          const items = filterAndSortInteractions(result.all, unifiedOnlyCritical ? { onlyCritical: true } : {});
-          return (
-            <div style={{
-              background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
-              borderRadius: 12, padding: '14px 16px', marginBottom: 10,
-            }}>
-              <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>🔬 Unified View</h3>
-              <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 8px 0' }}>
-                Объединённый список из drug-каталога, БАД-каталога и AAS/PED правил
-              </p>
-              {/* Score gauge + filter toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Safety score:</span>
-                <span style={{ fontSize: 16, fontWeight: 800, color: result.score < 50 ? '#ef4444' : result.score < 80 ? '#f59e0b' : '#00e68a' }}>
-                  {result.score}/100
-                </span>
-                {result.blocked && (
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>⛔ BLOCKED</span>
-                )}
-                <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>·</span>
-                <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{result.all.length} пар</span>
-                <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>·</span>
-                <span style={{ fontSize: 10, color: '#ef4444' }}>{result.bySeverity.CRITICAL.length} CRIT</span>
-                <span style={{ fontSize: 10, color: '#f59e0b' }}>· {result.bySeverity.HIGH.length} HIGH</span>
-                <button onClick={() => setUnifiedOnlyCritical(!unifiedOnlyCritical)} style={{
-                  marginLeft: 'auto',
-                  padding: '4px 10px', borderRadius: 12, fontSize: 9, fontWeight: 600,
-                  cursor: 'pointer',
-                  background: unifiedOnlyCritical ? 'var(--accent)' : 'var(--bg-secondary)',
-                  color: unifiedOnlyCritical ? '#000' : 'var(--text-dim)',
-                  border: `1px solid ${unifiedOnlyCritical ? 'var(--accent)' : 'var(--border)'}`,
-                }}>{unifiedOnlyCritical ? '🔓 Показать все' : '🔒 Только CRITICAL'}</button>
-              </div>
-              {/* Dev-mode telemetry (появляется при ≥10 extracts) */}
-              <TimingTelemetryPanel autoRefreshMs={3000} />
-              {/* Unified items */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {items.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)', fontSize: 12 }}>
-                    {unifiedOnlyCritical ? '✅ Нет CRITICAL взаимодействий' : 'Нет взаимодействий'}
-                  </div>
-                ) : items.map((item, i) => (
-                  <UnifiedInteractionCard key={i} item={item} />
-                ))}
-              </div>
-            </div>
-          );
-        } catch (e) {
-          return (
-            <div style={{ textAlign: 'center', padding: 20, color: '#ef4444', fontSize: 12 }}>
-              Ошибка: {String(e)}
-            </div>
-          );
-        }
-      }) : (<>
+      ) : interactSub === 'unified' ? renderUnified() : (<>
         {/* ── AUTO DETECTED ALERTS ── */}
         {hasAlerts && (
           <div style={{

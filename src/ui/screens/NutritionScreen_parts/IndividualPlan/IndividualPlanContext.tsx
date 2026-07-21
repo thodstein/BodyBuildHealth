@@ -749,8 +749,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (phaseSupps.length > 0) {
       timeline.push({ time: '▸ Фаза', items: [{name:`Фаза «${phase}»`,dose:'—',note:phaseSupps.map(s=>`${s.name} ${s.dose}: ${s.note}`).join(' | ')}] });
       timeline.push(...phaseSupps.map(s => ({ time: '', items: [s] })));
-      if (isPreW && isTrainingDay && userSupps.some(s => (s?.id||'').includes('citrulline'))) slotItems.push({name:'Цитруллин',dose:'6-8г',note:'За 30-45 мин до трена (NO-буст, pumps)'});
-      if (isPreW && isTrainingDay && userSupps.some(s => (s?.id||'').includes('beta_alanine'))) slotItems.push({name:'Бета-аланин',dose:'3-4г',note:'Пре-трен, буфер молочной кислоты'});
     }
     return timeline;
   };
@@ -839,8 +837,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // #13 Настоящий refeed: высоко-углеводный день (carb x2.5, fat x0.5, protein hold) для восстановления лептина/гликогена на сушке.
         // Назначается на определённый день недели (используем isTrain=false — refeed обычно в день отдыха от тяжёлой тренировки).
         let isRefeedDay = false;
-        if (cyclingMode === 'cheatmeal' || cyclingMode === 'refeed') {
-          // refeed на 1 день недели: offset % 7 === 6 (воскресенье) либо первый отдых-день
+        if (cyclingMode === 'cheatmeal') {
           isRefeedDay = (offset % 7 === 6) || (!isTrain && (offset % 7 === 0 || !trainingDays.slice(0, 7).some(Boolean)));
           if (isRefeedDay) { dayKcalMod = 1.15; dayCarbMod = 2.5; }
           else { dayKcalMod = 0.85; dayCarbMod = 0.5; }

@@ -10,7 +10,6 @@ import { RiskScreen } from './ui/screens/RiskScreen';
 import { NutritionScreen } from './ui/screens/NutritionScreen';
 import { ProfileScreen } from './ui/screens/ProfileScreen';
 import { ArticlesScreen } from './ui/screens/ArticlesScreen';
-import { MarketplaceScreen } from './ui/screens/MarketplaceScreen';
 
 import { ToastContainer } from './ui/ToastContainer';
 import { setLocale, getLocale } from './data/interactions-labels';

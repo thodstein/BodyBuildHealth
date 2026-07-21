@@ -5,9 +5,6 @@
 //  и хелпер pickLabels(locale).
 // ════════════════════════════════════════════════════════════════════════════
 
-import type { UnifiedSeverity, TimingInfo } from '../engines/interactions-calculator';
-
-// ─── Severity meta ───
 import type { UnifiedSeverity, TimingInfo, Locale } from './interactions-types';
 
 export interface SeverityMeta {
@@ -146,14 +143,32 @@ const FILTER_LABELS_EN = {
 } as const;
 
 // ─── i18n helper: pickLabels(locale) ───
+export interface SectionsLabels {
+  autoAlerts: string;
+  autoAlertsDesc: string;
+  crossAlerts: string;
+  crossAlertsDesc: string;
+  noAlerts: string;
+  noAlertsDesc: string;
+  fieldMechanism: string;
+  fieldMechanismShort: string;
+  fieldRecommendation: string;
+  fieldRecommendationShort: string;
+  fieldEffect: string;
+}
+export interface FilterLabels {
+  onlyCritical: string;
+  sortBySeverity: string;
+  showAll: string;
+}
 export interface LabelsBundle {
   SEVERITY_META: Record<UnifiedSeverity, SeverityMeta>;
   TYPE_LABELS: Record<string, string>;
   FOOD_LABELS: Record<NonNullable<TimingInfo['withFood']>, string>;
   TIME_OF_DAY_LABELS: Record<NonNullable<TimingInfo['timeOfDay']>, string>;
   SOURCE_LABELS: Record<'support_db' | 'drug_interactions' | 'pharma_rules', string>;
-  SECTION_LABELS: typeof SECTION_LABELS;
-  FILTER_LABELS: typeof FILTER_LABELS;
+  SECTION_LABELS: SectionsLabels;
+  FILTER_LABELS: FilterLabels;
 }
 
 export function pickLabels(locale: Locale = 'ru'): LabelsBundle {
