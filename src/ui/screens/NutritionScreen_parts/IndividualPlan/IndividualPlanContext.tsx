@@ -15,7 +15,7 @@ import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrit
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { computePlannerTargets } from "./planner-targets";
 import { safeWriteJSON } from "./planner-storage";
-import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplaceHistory, type Specificity, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
+import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplaceHistory, expandRecipePreferred, type Specificity, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
 import { buildDayPlan as buildDayPlanV2, type DayPlanV2, type MealPlanInput } from "./meal-plan-engine";
@@ -822,7 +822,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           trainStartMin: linkToTraining && trainingDays[offset % 7] ? toMin(trainStart) : undefined,
           allowIntraWorkout: trainIntensity === 'high',
           trainDurationMin: (s?.avgWorkoutMinutes || 60),
-          excludedIds, preferredIds: new Set(preferredFoods),
+          excludedIds, preferredIds: new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)),
           preferredByMeal: Object.fromEntries(Object.entries(preferredByMeal).map(([k, v]) => [k, new Set(v)])),
           specificity, intolerances, tasteProfile,
           categoryPref: { preferred: [], excluded: excludedCategories },
