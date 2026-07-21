@@ -114,7 +114,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       const hasHCG = !!courseLinked.find(c => c.substanceId === 'hcg');
       const hasAI = !!courseLinked.find(c => ['anastrozole','letrozole','exemestane'].includes(c.substanceId));
       const hasSERM = !!courseLinked.find(c => ['tamoxifen','clomiphene','enclomiphene'].includes(c.substanceId));
-      uPharm({ aas: linkedAas, hasHCG: hasHCG || state.pharma.hasHCG, hasAI: hasAI || state.pharma.hasAI, hasSERM: hasSERM || state.pharma.hasSERM, phase: 'course' as any });
+      uPharm({ aas: linkedAas, hasHCG: hasHCG || state.pharma.hasHCG, hasAI: hasAI || state.pharma.hasAI, hasSERM: hasSERM || state.pharma.hasSERM, phase: 'course' });
       setFillStatus(`✅ Курс: ${linkedAas.length} ААС`); setTimeout(() => setFillStatus(''), 2000);
     } catch { setFillStatus('❌ Ошибка курса'); setTimeout(() => setFillStatus(''), 2000); }
   };
@@ -251,11 +251,11 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           <span style={{ fontSize:8, fontWeight:600, color:'rgba(255,255,255,0.3)', letterSpacing:0 }}>(GH · Insulin · IGF · Clen · T3)</span>
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(100px, 1fr))', gap:5 }}>
-          <PopupPEDInput id="ghIU" value={(state.pharma as any).ghIU ?? 0} onChange={v => uPharm({ ...state.pharma, ghIU: v, hasGH: v > 0 } as any)} />
-          <PopupPEDInput id="insulinIU" value={(state.pharma as any).insulinIU ?? 0} onChange={v => uPharm({ ...state.pharma, insulinIU: v, hasInsulin: v > 0 } as any)} />
-          <PopupPEDInput id="igfMcg" value={(state.pharma as any).igfMcg ?? 0} onChange={v => uPharm({ ...(state.pharma as any), igfMcg: v } as any)} />
-          <PopupPEDInput id="clenMcg" value={(state.pharma as any).clenMcg ?? 0} onChange={v => uPharm({ ...(state.pharma as any), clenMcg: v } as any)} />
-          <PopupPEDInput id="t3Mcg" value={(state.pharma as any).t3Mcg ?? 0} onChange={v => uPharm({ ...(state.pharma as any), t3Mcg: v } as any)} />
+          <PopupPEDInput id="ghIU" value={state.pharma.ghIU ?? 0} onChange={v => uPharm({ ...state.pharma, ghIU: v, hasGH: v > 0 })} />
+          <PopupPEDInput id="insulinIU" value={state.pharma.insulinIU ?? 0} onChange={v => uPharm({ ...state.pharma, insulinIU: v, hasInsulin: v > 0 })} />
+          <PopupPEDInput id="igfMcg" value={state.pharma.igfMcg ?? 0} onChange={v => uPharm({ ...state.pharma, igfMcg: v })} />
+          <PopupPEDInput id="clenMcg" value={state.pharma.clenMcg ?? 0} onChange={v => uPharm({ ...state.pharma, clenMcg: v })} />
+          <PopupPEDInput id="t3Mcg" value={state.pharma.t3Mcg ?? 0} onChange={v => uPharm({ ...state.pharma, t3Mcg: v })} />
         </div>
       </div>
 
@@ -268,7 +268,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           { key:'fertility', icon:'⚧', label:'Фертильность', desc:'Восстановление сперматогенеза. hCG + rFSH.', gradient:'linear-gradient(135deg,rgba(168,85,247,0.1),rgba(147,51,234,0.05))', color:'#a78bfa' },
           { key:'trt', icon:'♾', label:'ЗГТ (TRT)', desc:'Терапевтический T. HPTA подавлена хронически.', gradient:'linear-gradient(135deg,rgba(34,197,94,0.1),rgba(22,163,74,0.05))', color:'#22c55e' },
         ];
-        const current = (state.pharma as any).phase || 'course';
+        const current = state.pharma.phase;
         const protoDesc = (() => {
           const map: Record<string, string> = {
             course:'💉 Курс: гепатопротектор (NAC/TUDCA) · кардиопротектор (телмисартан/бергамот, ЭПК при ↑ТГ) · антиоксидант (АЛЬК/CoQ10) · hCG 500 МЕ 2р/нед · AI по E2',
@@ -281,12 +281,12 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         })();
 
         const handleAutoPhase = () => {
-          const aas = (state.pharma as any).aas || [];
-          const gh = (state.pharma as any).ghIU || 0;
-          const insulin = (state.pharma as any).insulinIU || 0;
+          const aas = state.pharma.aas;
+          const gh = state.pharma.ghIU || 0;
+          const insulin = state.pharma.insulinIU || 0;
           const onCycle = aas.length > 0 || gh > 0 || insulin > 0;
           const phase = onCycle ? 'course' : 'bridge';
-          uPharm({ ...(state.pharma as any), phase } as any);
+          uPharm({ ...state.pharma, phase });
           setFillStatus('🔍 Фаза: ' + (onCycle ? 'Курс ААС' : 'Мост') + ' (авто)'); setTimeout(() => setFillStatus(''), 2000);
         };
 
@@ -318,7 +318,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
               {phases.map(p => {
                 const active = current === p.key;
                 return (
-                  <div key={p.key} onClick={() => uPharm({ ...(state.pharma as any), phase: p.key } as any)}
+                  <div key={p.key} onClick={() => uPharm({ ...state.pharma, phase: p.key as typeof state.pharma.phase })}
                     style={{
                       padding:'6px 4px', borderRadius:10, cursor:'pointer', textAlign:'center',
                       background: active ? p.gradient : 'rgba(255,255,255,0.02)',
@@ -433,7 +433,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
                     suffix="нед"
                     onChange={(v: number) => {
                       const sw = Math.max(1, Math.min(v, (a.endWeek || 12) - 1));
-                      uPharm({ aas: state.pharma.aas.map((x, xi) => xi === i ? { ...x, startWeek: sw } : x) as any });
+                      uPharm({ aas: state.pharma.aas.map((x, xi) => xi === i ? { ...x, startWeek: sw } : x) });
                     }}
                   />
                   <PopupNumber
@@ -443,7 +443,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
                     suffix="нед"
                     onChange={(v: number) => {
                       const ew = Math.max((a.startWeek || 1) + 1, Math.min(v, 52));
-                      uPharm({ aas: state.pharma.aas.map((x, xi) => xi === i ? { ...x, endWeek: ew } : x) as any });
+                      uPharm({ aas: state.pharma.aas.map((x, xi) => xi === i ? { ...x, endWeek: ew } : x) });
                     }}
                   />
                 </div>

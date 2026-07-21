@@ -5,6 +5,8 @@
  */
 
 import { SUPPORT_CATALOG_DATA, DEFAULT_DOSAGES } from '../../data/support-database';
+import type { SupportCatalogEntry } from '../../data/support-catalog-data';
+import type { SupportStack } from '../../data/support-stacks-types';
 import type { TzSpecResult } from '../risk-engine-tz-spec';
 
 // ═══════════════════════════════════════════════════════════════
@@ -47,6 +49,12 @@ export interface PharmaStackData {
   hasGH: boolean; hasIGF: boolean; hasInsulin: boolean;
   hasHCG: boolean; hasAI: boolean; hasCaber: boolean; hasSERM: boolean;
   hasSARMs: boolean; hasMGF: boolean; hasGLP1: boolean;
+  // Дозировки PED (вводятся в AutoCalculator)
+  ghIU?: number;       // ГР в МЕ/день
+  insulinIU?: number;  // Инсулин в МЕ/день
+  igfMcg?: number;      // IGF-1 LR3 в мкг/день
+  clenMcg?: number;     // Кленбутерол в мкг/день
+  t3Mcg?: number;       // Т3 (лиотиронин) в мкг/день
 }
 
 // ─── Block 4: Goals & Cycle ───
@@ -397,7 +405,7 @@ export interface LabFinding {
 }
 
 export interface StackRecommendation {
-  stack: any;
+  stack: SupportStack;
   score: number;
   coveragePercent: number;
   coveredSystems: string[];
@@ -447,7 +455,7 @@ export function sysEmoji(sys: string): string {
     || '📌';
 }
 
-export function catalogEntry(id: string): any {
+export function catalogEntry(id: string): SupportCatalogEntry | null {
   return SUPPORT_CATALOG_DATA[id]
     || SUPPORT_CATALOG_DATA[id.toUpperCase()]
     || SUPPORT_CATALOG_DATA[id.toLowerCase()]
