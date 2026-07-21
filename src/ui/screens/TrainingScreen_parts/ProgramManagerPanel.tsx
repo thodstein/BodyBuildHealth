@@ -28,6 +28,7 @@ import type {
 } from '../../../engines/user-program/user-program.types';
 import { newId } from '../../../engines/user-program/user-program.types';
 import { HybridPlanPanel } from './HybridPlanPanel';
+import { ExercisePicker } from './ExercisePicker';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { ACCENT, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle } from './training-ui';
 import { GROUP_RU } from './program-types';
@@ -289,6 +290,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => v
   const addBlock = () => onChange([...blocks, { id: newId('blk'), type: 'accessory', exerciseName: '', muscle: '', role: 'accessory', sets: [{ reps: 10, rir: 2 }] }]);
   const updateBlock = (bi: number, patch: Partial<UserBlock>) => onChange(blocks.map((b, i) => i === bi ? { ...b, ...patch } : b));
   const removeBlock = (bi: number) => onChange(blocks.filter((_, i) => i !== bi));
+  const moveBlock = (bi: number, dir: -1 | 1) => { const j = bi + dir; if (j < 0 || j >= blocks.length) return; const arr = [...blocks]; const tmp = arr[bi]; arr[bi] = arr[j]; arr[j] = tmp; onChange(arr); };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -300,9 +302,13 @@ const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => v
             <option value="isolation">Изоляция</option>
             <option value="finisher">Финишь</option>
           </select>
-          <input style={{ ...IN, padding: '4px 6px', fontSize: 11, flex: 1 }} value={b.exerciseName} onChange={e => updateBlock(bi, { exerciseName: e.target.value })} placeholder="Упражнение" />
+          <ExercisePicker value={b.exerciseName} muscle={b.muscle} onSelect={ex => updateBlock(bi, { exerciseName: ex.name, muscle: ex.group || b.muscle, type: (ex.type === 'compound' ? 'compound' : ex.type === 'isolation' ? 'isolation' : 'accessory') as UserBlock['type'], role: ex.type === 'compound' ? 'primary' : 'accessory' })} />
           <input style={{ ...IN, padding: '4px 6px', fontSize: 11, flex: '0 0 90px' }} value={b.muscle} onChange={e => updateBlock(bi, { muscle: e.target.value })} placeholder="Мышца" list="muscle-list" />
           <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <button style={{ ...BTN_GHOST, padding: '0 4px', fontSize: 9, minHeight: 0, lineHeight: 1 }} onClick={() => moveBlock(bi, -1)} title="Вверх">▲</button>
+            <button style={{ ...BTN_GHOST, padding: '0 4px', fontSize: 9, minHeight: 0, lineHeight: 1 }} onClick={() => moveBlock(bi, 1)} title="Вниз">▼</button>
+          </div>
           <button style={{ ...BTN_GHOST, padding: '3px 6px', fontSize: 10, minHeight: 0, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeBlock(bi)}>✕</button>
         </div>
       ))}
