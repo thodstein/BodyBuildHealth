@@ -1,4 +1,5 @@
 import { SUPPORT_CATALOG_DATA, ALL_INTERACTIONS } from '../data/support-database';
+import { resolveInteractionId } from '../data/support-interactions-db';
 import type { SupportCatalogEntry } from '../data/support-catalog-data';
 import { SUPPLEMENTS_DB } from '../data/support-db/supplements';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../data/support-db';
@@ -95,8 +96,8 @@ export function getStackInteractions(stackIds: string[]): {
     for (let j = i + 1; j < stackIds.length; j++) {
       const idA = stackIds[i], idB = stackIds[j];
       const direct = ALL_INTERACTIONS.filter(inx =>
-        (inx.substanceA === idA && inx.substanceB === idB) ||
-        (inx.substanceA === idB && inx.substanceB === idA));
+        (resolveInteractionId(inx.substanceA) === resolveInteractionId(idA) && resolveInteractionId(inx.substanceB) === resolveInteractionId(idB)) ||
+        (resolveInteractionId(inx.substanceA) === resolveInteractionId(idB) && resolveInteractionId(inx.substanceB) === resolveInteractionId(idA)));
       if (direct.length > 0) {
         direct.forEach(inx => {
           pairs.push({

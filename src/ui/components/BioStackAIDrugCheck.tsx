@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { type BioStackProfile, saveBioStackProfile } from '../../engines/biostack-ai.engine';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { GlassCard, PillBtn, showToast } from './BioStackAIConstants';
-import { KNOWN_DRUG_SUP_INTERACTIONS, type DrugSupInteraction } from '../../engines/biostack-clinical';
+import { findInteractionsForId, resolveInteractionId } from '../../data/support-interactions-db';
 import { expandDrug } from '../../engines/biostack-safety.engine';
 
 const CYP_LABELS: Record<string, string> = {
@@ -61,13 +61,17 @@ export function DrugCheckTab({ profile, stackIds }: { profile: BioStackProfile; 
     if (drugs.length === 0) return null;
     const found: CheckResult[] = [];
     for (const drug of drugs) {
-      const expandedDrugs = expandDrug(drug);
+      const drugId = resolveInteractionId(drug);
+      const interactions = findInteractionsForId(drugId);
       for (const [id, cat] of Object.entries(SUPPORT_CATALOG_DATA)) {
-        const subName = (cat.nameRu || cat.name || id).toLowerCase();
-        const direct = KNOWN_DRUG_SUP_INTERACTIONS.filter(k =>
-          expandDrug(k.drug).some(dt => expandedDrugs.includes(dt)) &&
-          (subName.includes(k.substance) || id.includes(k.substance)));
-        direct.forEach(d => found.push({ ...d, substance: cat.nameRu || cat.name || id }));
+        for (const inter of interactions) {
+          const otherSide = resolveInteractionId(inter.substanceA) === drugId ? inter.substanceB : inter.substanceA;
+          if (otherSide.toUpperCase() === id.toUpperCase() || id.toUpperCase().includes(otherSide.toUpperCase()) || otherSide.toUpperCase().includes(id.toUpperCase())) {
+            if (inter.type === 'conflict' || inter.type === 'caution') {
+              found.push({ drug, substance: cat.nameRu || cat.name || id, effect: inter.effect, severity: inter.severity, mechanism: inter.notes || (inter.mechanisms || []).join('; ') });
+            }
+          }
+        }
       }
     }
     return found;
@@ -82,15 +86,19 @@ export function DrugCheckTab({ profile, stackIds }: { profile: BioStackProfile; 
     const res: CheckResult[] = [];
     const targetIds = checkMode === 'stack' ? stackIds : Object.keys(SUPPORT_CATALOG_DATA).slice(0, 50);
     for (const drug of drugs) {
-      const expandedDrugs = expandDrug(drug);
+      const drugId = resolveInteractionId(drug);
+      const interactions = findInteractionsForId(drugId);
       for (const id of targetIds) {
         const cat = SUPPORT_CATALOG_DATA[id];
         if (!cat) continue;
-        const subName = (cat.nameRu || cat.name || id).toLowerCase();
-        const direct = KNOWN_DRUG_SUP_INTERACTIONS.filter(k =>
-          expandDrug(k.drug).some(dt => expandedDrugs.includes(dt)) &&
-          (subName.includes(k.substance) || id.includes(k.substance)));
-        direct.forEach(d => res.push({ ...d, substance: cat.nameRu || cat.name || id }));
+        for (const inter of interactions) {
+          const otherSide = resolveInteractionId(inter.substanceA) === drugId ? inter.substanceA : inter.substanceB;
+          if (otherSide.toUpperCase() === id.toUpperCase() || id.toUpperCase().includes(otherSide.toUpperCase()) || otherSide.toUpperCase().includes(id.toUpperCase())) {
+            if (inter.type === 'conflict' || inter.type === 'caution') {
+              res.push({ drug, substance: cat.nameRu || cat.name || id, effect: inter.effect, severity: inter.severity, mechanism: inter.notes || (inter.mechanisms || []).join('; ') });
+            }
+          }
+        }
       }
     }
     for (const allergy of allergies) {

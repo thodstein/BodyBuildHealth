@@ -1,5 +1,5 @@
 import { resolveCanonicalId } from './support-meta';
-import { INTERACTIONS_DB } from './support-interactions-db';
+import { INTERACTIONS_DB, resolveInteractionId } from './support-interactions-db';
 import { SYNERGY_NETWORK } from './support-synergy-network';
 import { SUPPORT_CATALOG_DATA } from './support-catalog-data';
 
@@ -535,14 +535,14 @@ for (const _cid of Object.keys(_catData)) {
 
   for (const _inter of ALL_INTERACTIONS) {
     if (!_inter || !_inter.substanceA || !_inter.substanceB) continue;
-    const _aNorm = _norm(_inter.substanceA);
-    const _bNorm = _norm(_inter.substanceB);
+    const _aResolved = resolveInteractionId(_inter.substanceA);
+    const _bResolved = resolveInteractionId(_inter.substanceB);
     let _partnerId = '';
     let _partnerName = '';
-    if (_aNorm === _normId || _aNorm.includes(_normId) || _normId.includes(_aNorm)) {
+    if (_aResolved === _cid || _aResolved.toUpperCase() === _cid.toUpperCase()) {
       _partnerId = _inter.substanceB;
       _partnerName = _catData[_inter.substanceB]?.nameRu || _catData[_inter.substanceB]?.name || _inter.substanceB;
-    } else if (_bNorm === _normId || _bNorm.includes(_normId) || _normId.includes(_bNorm)) {
+    } else if (_bResolved === _cid || _bResolved.toUpperCase() === _cid.toUpperCase()) {
       _partnerId = _inter.substanceA;
       _partnerName = _catData[_inter.substanceA]?.nameRu || _catData[_inter.substanceA]?.name || _inter.substanceA;
     } else {

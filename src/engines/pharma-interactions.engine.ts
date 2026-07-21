@@ -75,7 +75,7 @@ export function checkDrugInteractions(course: CourseEntry[]): InteractionAlert[]
   }
 
   // ── 4. Инсулин + SARMs/Оралы (гипогликемический риск) ──
-  const insulin = validCourse.some(c => c.substanceId.startsWith('ins_'));
+  const insulin = hasId('ins_') || hasId('insulin');
   if (insulin && (orals.length || sarms.length)) {
     alerts.push({
       type: 'critical',
@@ -209,7 +209,106 @@ export function checkDrugInteractions(course: CourseEntry[]): InteractionAlert[]
     });
   }
 
+  // ── 16. AAS/19-nor + Оральные антикоагулянты (варфарин/апиксабан/дабигатран) ──
+  const has19Nor = hasTren || hasNand || hasBold;
+  const hasAnticoagulant = hasId('warfar') || hasId('apixa') || hasId('dabi');
+  if (has19Nor && hasAnticoagulant) {
+    alerts.push({
+      type: 'critical',
+      drugs: ['19-nor-aas', 'oral_anticoagulant'],
+      mechanism: '19-нор стероиды (нандролон, болденон, тренболон) значительно повышают HCT и вязкость крови. Оральные антикоагулянты (варфарин, апиксабан, дабигатран) снижают свёртывание. Комбинация создаёт парадоксальный про-тромботический риск (полицитемия) на фоне антикоагуляции → высокий риск кровотечений при микротравмах.',
+      recommendation: 'Контроль HCT каждые 2 нед. При HCT > 52% — флеботомия. Контроль МНО (варфарин) или анти-Xa (апиксабан). Избегать травм и инвазивных процедур.'
+    });
+  }
+
+  // ── 17. Тренболон + Серотонинергические (СИОЗС, 5-HTP, триптофан) ──
+  const hasSerotonergic = hasId('fluox') || hasId('sertral') || hasId('escital') || hasId('parox') || hasId('venlafax') || hasId('5htp') || hasId('tryptophan');
+  if (hasTren && hasSerotonergic) {
+    alerts.push({
+      type: 'warning',
+      drugs: ['trenbolone', 'serotonergic'],
+      mechanism: 'Тренболон обладает нейротоксичностью (↑ глутамат, ↓ ГАМК) и нарушает серотонинергическую передачу. СИОЗС/5-HTP повышают уровень серотонина. Комбинация может привести к серотониновому синдрому (тремор, гипертермия, миоклонус) или тяжёлой депрессии/тревожности.',
+      recommendation: 'Избегать тренболона при приёме СИОЗС. При необходимости — контроль настроения ежедневно. При симптомах серотонинового синдрома — немедленная отмена.'
+    });
+  }
+
+  // ── 18. AAS + CYP3A4 ингибиторы (кетоконазол, кларитромицин, верапамил) ──
+  const hasCYP3A4Inhibitor = hasId('ketoco') || hasId('itra') || hasId('clarith') || hasId('erythro') || hasId('verapamil') || hasId('diltiazem');
+  if ((orals.length > 0 || hasTren || hasNand || hasBold || hasGH || sarms.length > 0) && hasCYP3A4Inhibitor) {
+    alerts.push({
+      type: 'warning',
+      drugs: ['aas', 'cyp3a4_inhibitor'],
+      mechanism: 'Ингибиторы CYP3A4 (кетоконазол, кларитромицин, верапамил) замедляют метаболизм ААС → повышение концентрации стероидов в крови на 30-80%. Риск усиления побочных эффектов (гепатотоксичность, задержка воды, гинекомастия).',
+      recommendation: 'Снизить дозу ААС на 25-30% при одновременном приёме CYP3A4 ингибиторов. Контроль АЛТ/АСТ, E2, АД каждые 2 нед.'
+    });
+  }
+
+  // ── 19. AAS + Стимуляторы (кленбутерол, эфедрин) ──
+  const hasStimulant = hasId('clen') || hasId('ephedr') || hasId('amphet');
+  if ((orals.length > 0 || hasTren || hasNand || hasBold || hasGH || sarms.length > 0) && hasStimulant) {
+    alerts.push({
+      type: 'warning',
+      drugs: ['aas', 'stimulant'],
+      mechanism: 'ААС повышают АД и ЧСС (задержка Na+, активация РААС). Стимуляторы (кленбутерол, эфедрин) усиливают симпатическую активность. Комбинация создаёт значительную кардиоваскулярную нагрузку: тахикардия, гипертензия, аритмии.',
+      recommendation: 'Контроль АД и ЧСС 2×/день. При ЧСС покоя > 90 уд/мин — снизить дозу стимулятора. Добавить магний 400 мг + таурин 2000 мг. Кардио-мониторинг при тренировках.'
+    });
+  }
+
+  // ── 20. Инсулин + Неселективные β-блокаторы (пропранолол) ──
+  const hasNonSelectiveBB = hasId('propra') || hasId('nadolol') || hasId('timolol');
+  if (insulin && hasNonSelectiveBB) {
+    alerts.push({
+      type: 'critical',
+      drugs: ['insulin', 'non_selective_beta_blocker'],
+      mechanism: 'Неселективные β-блокаторы (пропранолол) маскируют симптомы гипогликемии (тремор, тахикардия, тревожность) через блокаду β₂-адренорецепторов. Также β-блокаторы подавляют глюконеогенез → усиление гипогликемии. Пациент может не почувствовать критическое падение глюкозы.',
+      recommendation: 'Избегать неселективных β-блокаторов при приёме инсулина. Использовать кардиоселективные (бисопролол, метопролол). При необходимости пропранолола — контроль глюкозы каждые 2 ч, глюкометр всегда при себе.'
+    });
+  }
+
+  // ── 21. SARMs + Оральные 17-AA (двойная гепатотоксичность) ──
+  if (sarms.length > 0 && oral17aa.length > 0) {
+    alerts.push({
+      type: 'critical',
+      drugs: [...sarms.map(s => s.substanceId), ...oral17aa.map(o => o.substanceId)],
+      mechanism: 'SARMs и 17-AA оральные стероиды оба проходят через печень (первый проход). SARMs снижают SHBG на 40-70%, что повышает свободный тестостерон и нагрузку на печень. 17-AA оральные непосредственно гепатотоксичны. Двойная нагрузка → риск острого гепатита.',
+      recommendation: 'Категорически не рекомендуется. Если необходимо — курс ≤ 4 нед, TUDCA 1000 мг + NAC 1800 мг. Контроль АЛТ/АСТ каждые 10 дней. При АЛТ > 3×ULN — немедленная отмена.'
+    });
+  }
+
+  // ── 22. SERM (тамоксифен/кломифен) + Ароматизирующиеся ААС ──
+  const hasSERM = hasId('tamox') || hasId('clom') || hasId('ralox');
+  const hasAromatizing = validCourse.some(c => {
+    const sub = PHARMA_DB[c.substanceId];
+    return sub?.pd?.aromatization && sub.pd.aromatization >= 0.5;
+  });
+  if (hasSERM && hasAromatizing) {
+    alerts.push({
+      type: 'warning',
+      drugs: ['serm', 'aromatizing_aas'],
+      mechanism: 'SERM (тамоксифен, кломифен) блокируют эстрогенные рецепторы, но не снижают продукцию эстрадиола. Ароматизирующиеся ААС (тестостерон, болденон, нандролон) повышают E2. Высокий E2 + SERM → риск «эстрогенного всплеска» (начальная стимуляция рецепторов до блокады) → гинекомастия в первые дни.',
+      recommendation: 'При использовании SERM на курсе: контроль E2 каждые 2 нед. При E2 > 50 пг/мл — добавить ИА (анастрозол 0.25 мг 2р/нед) вместо увеличения дозы SERM. Тамоксифен 20 мг/сут (не более).'
+    });
+  }
+
   return alerts;
+}
+
+// ── Unified drug-drug conflict wrapper ──
+export interface DrugDrugConflict {
+  a: string;
+  b: string;
+  severity: 'high' | 'medium' | 'low';
+  message: string;
+}
+
+export function getDrugDrugConflicts(course: CourseEntry[]): DrugDrugConflict[] {
+  const alerts = checkDrugInteractions(course);
+  return alerts.map(alert => ({
+    a: alert.drugs[0] || '',
+    b: alert.drugs[1] || '',
+    severity: alert.type === 'critical' ? 'high' as const : alert.type === 'warning' ? 'medium' as const : 'low' as const,
+    message: `${alert.mechanism} → ${alert.recommendation}`,
+  }));
 }
 
 // ── Class-level special instructions ──

@@ -3926,3 +3926,42 @@ Make PL-auto plan/cycle UI in SRCBBScreen.tsx phone-friendly, matching the earli
 - `src/ui/screens/SRCBBScreen.tsx` — PL/BB plan UI; tsc fix 1073; all mobile edits above.
 - `src/engines/exercise-selector.engine.ts` — Fix A (408–418) from prior session (verified).
 - `src/engines/bb/bb-builder.engine.ts` — Fix B (562–568), Fix C (612–614) (verified).
+
+---
+
+## Session Summary (Jul 21) — Interactions calculator unification (COMPLETE — 7 of 7 steps)
+
+### Goal
+Unify fragmented drug↔drug / drug↔supplement interaction data across 4 surfaces into a single canonical INTERACTIONS_DB.
+
+### ✅ All 7 steps completed and verified (esbuild OK, runtime tests pass)
+1. **support-interactions-db.ts**: Added ALIAS_MAP (170+ entries: Russian drug names + supplement aliases → canonical UPPERCASE IDs), resolveInteractionId(raw), findInteractionsForId(id). Merged 167 new Interaction records from KNOWN_DRUG_SUP_INTERACTIONS with correct Cyrillic. File: 472→740 lines.
+2. **biostack-clinical.ts**: Deleted 250-line KNOWN_DRUG_SUP_INTERACTIONS array → empty deprecated stub. File: 250→6 lines.
+3. **pharma-interactions.engine.ts**: Added 7 new drug-drug rules (16-22: AAS+anticoagulant, tren+serotonergic, AAS+CYP3A4 inhibitor, AAS+stimulant, insulin+non-selective β-blocker, SARM+oral17aa, SERM+aromatizing AAS) + getDrugDrugConflicts() unified wrapper.
+4. **InteractionCheckerTab.tsx**: Fixed dead supportCrossAlerts — now uses resolveInteractionId for canonical matching between pharma course entries and INTERACTIONS_DB.
+5. **BioStackAIDrugCheck.tsx**: Replaced KNOWN_DRUG_SUP_INTERACTIONS import with findInteractionsForId + resolveInteractionId — now matches through canonical resolution.
+6. **biostack-bridge.ts**: Updated getStackInteractions() to use resolveInteractionId for case-insensitive matching.
+7. **support-substances.ts**: Updated auto-population loop to use resolveInteractionId instead of fragile substring matching.
+
+### Runtime verification
+- resolveInteractionId('варфарин') → 'WARFARIN' ✅
+- findInteractionsForId('варфарин') → 12 interactions (7 original + 5 merged) ✅
+- Rule 16 (nandrolone+warfarin): CRITICAL ✅
+- Rule 20 (insulin+propranolol): CRITICAL ✅
+- Rule 22 (tamoxifen+testosterone): WARNING ✅
+- getDrugDrugConflicts() wrapper returns correct severity mapping ✅
+- esbuild transform: 7/7 files OK (0 syntax errors)
+
+### INTERACTIONS_DB stats
+- Total: 319 entries (152 original + 167 merged from KNOWN_DRUG_SUP_INTERACTIONS)
+- ALIAS_MAP: 170+ entries (Russian drug names, supplement aliases, pharma prefixes)
+- Canonical resolution: all substance names normalize to UPPERCASE IDs
+
+### Files modified (7)
+- src/data/support-interactions-db.ts — ALIAS_MAP, resolveInteractionId, findInteractionsForId, 167 merged entries
+- src/engines/pharma-interactions.engine.ts — rules 16-22, getDrugDrugConflicts, insulin detection fix
+- src/engines/biostack-clinical.ts — deprecated KNOWN_DRUG_SUP_INTERACTIONS
+- src/engines/biostack-bridge.ts — case-insensitive getStackInteractions
+- src/data/support-substances.ts — resolveInteractionId in auto-population
+- src/ui/components/BioStackAIDrugCheck.tsx — canonical resolution
+- src/ui/screens/PharmaScreen_parts/InteractionCheckerTab.tsx — canonical supportCrossAlerts

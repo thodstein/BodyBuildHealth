@@ -4,6 +4,7 @@ import { checkDrugInteractions, getClassInstructions, getCourseRecommendations, 
 import type { CourseEntry } from '../../../core/types';
 import { SYNERGY_PAIRS } from '../../../engines/support.engine';
 import { findInteractionsForSubstance, type SupportInteraction } from '../../../data/support-substances';
+import { resolveInteractionId } from '../../../data/support-interactions-db';
 import { decodeGarbled } from '../../../utils/text-sanitizer';
 import { useDataLink } from '../../../core/data-link';
 
@@ -141,11 +142,13 @@ export const InteractionCheckerTab: React.FC = () => {
   const supportCrossAlerts = useMemo(() => {
     if (validIds.length < 2) return [];
     const results: SupportInteraction[] = [];
-    for (const id of validIds) {
-      const interactions = findInteractionsForSubstance(id);
+    const resolvedIds = validIds.map(id => ({ original: id, resolved: resolveInteractionId(id) }));
+    for (const { original: id, resolved: resolvedId } of resolvedIds) {
+      const interactions = findInteractionsForSubstance(resolvedId);
       for (const inter of interactions) {
-        const other = inter.substanceA === id ? inter.substanceB : inter.substanceA;
-        if (validIds.includes(other) && !results.some(r => r.interactionId === inter.interactionId)) {
+        const otherResolved = resolveInteractionId(inter.substanceA) === resolvedId ? resolveInteractionId(inter.substanceB) : resolveInteractionId(inter.substanceA);
+        const otherOriginal = resolvedIds.find(r => r.resolved === otherResolved);
+        if (otherOriginal && !results.some(r => r.interactionId === inter.interactionId)) {
           results.push(inter);
         }
       }
