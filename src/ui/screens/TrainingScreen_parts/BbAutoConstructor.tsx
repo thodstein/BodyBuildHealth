@@ -988,6 +988,7 @@ export const BbAutoConstructor: React.FC = () => {
             { id:'pump', label:'🩸 Pump-разгрузка: лёгкие веса, высокие повторы (рекоменд.)' },
             { id:'neural', label:'🧠 Нейральная: низкий объём, умеренный вес, долгий отдых' },
             { id:'full_rest', label:'😴 Полный отдых: минимальная активность, только при перетрене' },
+            { id:'mini', label:'🪶 Мини-делоад: −1-2 сета, вес почти тот же, без смены схемы' },
           ]} />
           <div style={{ marginTop:4, padding:'4px 8px', borderRadius:8, background:'rgba(34,197,94,0.06)', fontSize:11, color:'rgba(255,255,255,0.6)' }}>
             {DELOAD_PROTOCOLS[deloadType].description}

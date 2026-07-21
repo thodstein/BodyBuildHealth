@@ -143,7 +143,7 @@ export function prescribeLoad(
 }
 
 /* ──────────── Deload protocols ──────────── */
-export type DeloadType = 'pump' | 'neural' | 'full_rest';
+export type DeloadType = 'pump' | 'neural' | 'full_rest' | 'mini';
 
 export interface DeloadProtocol {
   type: DeloadType;
@@ -152,6 +152,8 @@ export interface DeloadProtocol {
   rirTarget: number;
   repRange: [number, number];
   restSeconds: number;
+  /** Mini-делоад: сохранить исходные повторы (не переопределять repRange) — лёгкая разгрузка без смены схемы. */
+  keepOriginalReps?: boolean;
   description: string;
   instructions: string;
 }
@@ -187,6 +189,17 @@ export const DELOAD_PROTOCOLS: Record<DeloadType, DeloadProtocol> = {
     description: 'Полный отдых: минимальная активность, сохранение движения. Только для перетренированности.',
     instructions: '20% объёма, 40% веса. Минимум упражнений (2-3 на сессию). Приоритет — сон и питание.',
   },
+  mini: {
+    type: 'mini',
+    volumeMultiplier: 0.70,
+    intensityMultiplier: 0.92,
+    rirTarget: 3,
+    repRange: [6, 12],
+    restSeconds: 120,
+    keepOriginalReps: true,
+    description: 'Мини-делоад: −1-2 сета на compounds, вес почти тот же (×0.92), RIR +1-2. Без смены схемы. Лёгкая разгрузка без потери прогресса.',
+    instructions: '70% объёма (−1-2 сета с базовых), 92% веса, RIR 3. Повторы и упражнения — те же. Микро-восстановление.',
+  },
 };
 
 export function applyDeloadToWeek(week: BBWeek, protocol: DeloadProtocol): BBWeek {
@@ -195,9 +208,9 @@ export function applyDeloadToWeek(week: BBWeek, protocol: DeloadProtocol): BBWee
     for (const e of s.exercises) {
       e.sets = Math.max(1, Math.round(e.sets * protocol.volumeMultiplier));
       e.rir = protocol.rirTarget;
-      e.repsRange = [protocol.repRange[0], protocol.repRange[1]];
+      if (!protocol.keepOriginalReps) e.repsRange = [protocol.repRange[0], protocol.repRange[1]];
       for (const ws of e.workSets) {
-        ws.reps = Math.round((protocol.repRange[0] + protocol.repRange[1]) / 2);
+        if (!protocol.keepOriginalReps) ws.reps = Math.round((protocol.repRange[0] + protocol.repRange[1]) / 2);
         ws.rir = protocol.rirTarget;
         ws.weight = Math.round(ws.weight * protocol.intensityMultiplier * 10) / 10;
         ws.restSeconds = protocol.restSeconds;
