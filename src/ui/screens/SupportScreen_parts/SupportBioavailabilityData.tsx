@@ -1,6 +1,9 @@
 import type { SupportCatalogEntry, CatalogSubstanceForm } from '../../../data/support-database';
+import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
 import { ALL_SUBSTANCES } from '../../../data/support-substances';
-import { ROUTE_LABELS } from '../../../engines/peptide-calculator.engine';
+import { ROUTE_LABELS, PEPTIDE_DB } from '../../../engines/peptide-calculator.engine';
+import { PHARMA_DB } from '../../../core/pharma-database';
+import { FORM_PROFILES } from '../../../engines/bioequivalence-base';
 
 // ─── Types ───
 export interface FormWithBio extends CatalogSubstanceForm {
@@ -144,21 +147,21 @@ export const ABSORPTION_SITES: Record<string, { site: string; ph: string; note: 
   large_intestine: { site: 'Толстая кишка', ph: 'pH 5.5–7.0', note: 'Медленное всасывание, SCFA-продукция.' },
 };
 
-export const THERAPEUTIC_WINDOWS: Record<string, { minMg: number; optMg: number; maxMg: number; ul: number; note: string }> = {
+export const THERAPEUTIC_WINDOWS: Record<string, { minMg: number; optMg: number; maxMg: number; ul: number; note: string; unit?: string }> = {
   zn: { minMg: 15, optMg: 30, maxMg: 50, ul: 40, note: 'UL 40 мг. >50 мг → дефицит Cu через 4-8 нед.' },
   mg: { minMg: 200, optMg: 400, maxMg: 600, ul: 350, note: 'UL 350 мг из добавок. Диарея при >600 мг цитрата.' },
   fe: { minMg: 18, optMg: 30, maxMg: 60, ul: 45, note: 'UL 45 мг. Гемохроматоз — абс. противопоказание.' },
   ca: { minMg: 500, optMg: 800, maxMg: 1200, ul: 2500, note: 'Разовая доза ≤500 мг элемент. Ca.' },
-  se: { minMg: 55, optMg: 100, maxMg: 200, ul: 300, note: 'UL 300 мкг. >400 мкг → селеноз (волосы, ногти).' },
-  d3: { minMg: 400, optMg: 2000, maxMg: 4000, ul: 4000, note: 'Дозы в МЕ. UL 4000 МЕ/сут.' },
-  b12: { minMg: 2.4, optMg: 100, maxMg: 1000, ul: 9999, note: 'Нет UL. Депо в печени 2-5 мг.' },
+  se: { minMg: 55, optMg: 100, maxMg: 200, ul: 300, unit: 'мкг', note: 'UL 300 мкг. >400 мкг → селеноз (волосы, ногти).' },
+  d3: { minMg: 400, optMg: 2000, maxMg: 4000, ul: 4000, unit: 'МЕ', note: 'Дозы в МЕ. UL 4000 МЕ/сут.' },
+  b12: { minMg: 2.4, optMg: 100, maxMg: 1000, ul: 9999, unit: 'мкг', note: 'Нет UL. Депо в печени 2-5 мг.' },
   vitc: { minMg: 90, optMg: 500, maxMg: 2000, ul: 2000, note: 'UL 2000 мг. >1000 мг → осмотическая диарея.' },
   ala: { minMg: 300, optMg: 600, maxMg: 1200, ul: 1800, note: 'R-форма эффективнее. >1200 мг → тошнота.' },
   nac: { minMg: 600, optMg: 1200, maxMg: 2400, ul: 3000, note: '>2400 мг/сут → головная боль. 2-3 приёма.' },
   coq10: { minMg: 100, optMg: 200, maxMg: 400, ul: 1200, note: 'Убихинол в 3× эффективнее убихинона.' },
   omega3: { minMg: 500, optMg: 1000, maxMg: 3000, ul: 5000, note: 'EPA+DHA. >3000 мг → риск кровотечения.' },
-  cr: { minMg: 25, optMg: 200, maxMg: 1000, ul: 1000, note: 'Cr пиколинат 200-1000 мкг. UL 1000 мкг.' },
-  iodine: { minMg: 150, optMg: 225, maxMg: 500, ul: 1100, note: 'Дозы в мкг. UL 1100 мкг/сут.' },
+  cr: { minMg: 25, optMg: 200, maxMg: 1000, ul: 1000, unit: 'мкг', note: 'Cr пиколинат 200-1000 мкг. UL 1000 мкг.' },
+  iodine: { minMg: 150, optMg: 225, maxMg: 500, ul: 1100, unit: 'мкг', note: 'Дозы в мкг. UL 1100 мкг/сут.' },
   // ── Расширенные терапевтические окна ──
   berberine: { minMg: 500, optMg: 1000, maxMg: 2000, ul: 3000, note: '500 мг 2-3 р/д с едой. >1500 мг → ЖКТ.' },
   curcumin: { minMg: 500, optMg: 1000, maxMg: 3000, ul: 8000, note: 'С пиперином. Мерива/теракурмин предпочтительнее.' },
@@ -183,8 +186,8 @@ export const THERAPEUTIC_WINDOWS: Record<string, { minMg: number; optMg: number;
   glucosamine: { minMg: 500, optMg: 1500, maxMg: 3000, ul: 9999, note: 'С едой. 3 р/д по 500 мг.' },
   chondroitin: { minMg: 400, optMg: 1200, maxMg: 2400, ul: 9999, note: 'С едой. Часто с глюкозамином.' },
   msm: { minMg: 1000, optMg: 3000, maxMg: 6000, ul: 9999, note: 'Титровать. >3000 мг → ЖКТ.' },
-  melatonin: { minMg: 0.3, optMg: 1, maxMg: 5, ul: 10, note: '0.5-3 мг перед сном. >5 мг → головная боль.' },
-  probiotics: { minMg: 1, optMg: 10, maxMg: 50, ul: 9999, note: 'Млрд КОЕ. Натощак или с едой.' },
+  melatonin: { minMg: 0.3, optMg: 1, maxMg: 5, ul: 10, unit: 'мг', note: '0.5-3 мг перед сном. >5 мг → головная боль.' },
+  probiotics: { minMg: 1, optMg: 10, maxMg: 50, ul: 9999, unit: 'млрд КОЕ', note: 'Млрд КОЕ. Натощак или с едой.' },
   egcg: { minMg: 100, optMg: 400, maxMg: 800, ul: 1200, note: 'Натощак. >800 мг → гепатотоксичность.' },
   agmatine: { minMg: 500, optMg: 1000, maxMg: 2600, ul: 9999, note: '2 р/д натощак.' },
   citrulline: { minMg: 3000, optMg: 6000, maxMg: 10000, ul: 9999, note: 'Pre-workout. 6-8 г.' },
@@ -677,3 +680,42 @@ export const FORM_RECOMMENDER: Record<string, FormRecommendation[]> = {
     { formKey: 'collagen_peptides', label: 'Коллагеновые пептиды (II тип)', tier: 'premium', goal: 'Премиум: био 85%, для суставов', budget: '~1500 ₽/мес' },
   ],
 };
+
+// ─── Build enriched catalog (shared by SupportBioavailability + SupportEffectiveDose) ───
+export function buildBioavailabilityCatalog(): EnrichedEntry[] {
+  const entries: EnrichedEntry[] = [];
+  for (const [id, entry] of Object.entries(SUPPORT_CATALOG_DATA)) {
+    if (!entry?.nameRu) continue;
+    const forms: FormWithBio[] = (entry.forms || []).map(f => {
+      const bio = getCatalogFormBio(f);
+      return { ...f, bioavailability: bio, bioLabel: `${(bio * 100).toFixed(0)}%`, effectiveDose: (doseMg: number) => Math.round(doseMg * bio) };
+    });
+    const bios = forms.map(f => f.bioavailability);
+    const clinical = classifySubstance(entry.nameRu, entry.category || []);
+    entries.push({
+      id, source: 'catalog', nameRu: entry.nameRu, nameEn: entry.name || id,
+      tier: entry.tier, category: entry.category || [], description: entry.description || '',
+      forms, maxBio: bios.length ? Math.max(...bios) : 0, minBio: bios.length ? Math.min(...bios) : 0,
+      avgBio: bios.length ? bios.reduce((a, b) => a + b, 0) / bios.length : 0,
+      bestForm: forms.find(f => f.best) || null,
+      enhancers: detectEnhancers(entry), competitors: detectCompetition(entry, entry.nameRu, entry.category),
+      absorptionKey: clinical.abs, halfLifeKey: clinical.hl, foodKey: clinical.food, windowKey: clinical.win, costPerGram: clinical.cost,
+    });
+  }
+  for (const [pid, ph] of Object.entries(PHARMA_DB)) {
+    if (!ph || !ph.name) continue;
+    const bio = ph.pk?.bioavailability ?? (ph.bioavailability ? (typeof ph.bioavailability === 'number' ? ph.bioavailability : (typeof ph.bioavailability === 'object' && 'avg' in (ph.bioavailability as any) ? (ph.bioavailability as any).avg : 0.85)) : 0.85);
+    const forms: FormWithBio[] = [{ id: pid, name: ph.name, nameRu: ph.name, dose: ph.dosageRange ? `${ph.dosageRange.min}-${ph.dosageRange.max} ${ph.dosageRange.unit}` : '—', best: true, bioavailability: bio, bioLabel: `${(bio * 100).toFixed(0)}%`, effectiveDose: (d: number) => Math.round(d * bio) }];
+    entries.push({ id: pid, source: 'pharma', nameRu: ph.name, nameEn: ph.name || pid, tier: 'standard', category: ['pharma', (ph as any).class || 'aas'].filter(Boolean), description: ph.description || '', forms, maxBio: bio, minBio: bio, avgBio: bio, bestForm: forms[0], enhancers: [], competitors: [], absorptionKey: 'stomach', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
+  }
+  for (const [pepId, pp] of Object.entries(PEPTIDE_DB)) {
+    if (!pp || !pp.name) continue;
+    const forms: FormWithBio[] = (pp.routes || []).map(rt => {
+      const b = pp.bioavailability?.[rt]; const bio = b ? (b.min + b.max) / 2 / 100 : 0.80;
+      return { id: `${pepId}_${rt}`, name: `${pp.name} (${ROUTE_LABELS_MAP[rt] || rt})`, nameRu: `${pp.name} (${ROUTE_LABELS_MAP[rt] || rt})`, dose: `${pp.amountMg} мг`, best: rt === 'sc', bioavailability: bio, bioLabel: `${(bio * 100).toFixed(0)}%`, notes: b ? `диапазон ${b.min}-${b.max}%` : '', effectiveDose: (d: number) => Math.round(d * bio) };
+    });
+    const bios = forms.map(f => f.bioavailability);
+    entries.push({ id: pepId, source: 'peptide', nameRu: pp.name, nameEn: pp.name || pepId, tier: 'advanced', category: ['peptide', pp.className || 'gh_peptide'].filter(Boolean), description: `${pp.effects?.join(', ') || ''}`, forms, maxBio: bios.length ? Math.max(...bios) : 0, minBio: bios.length ? Math.min(...bios) : 0, avgBio: bios.length ? bios.reduce((a, b) => a + b, 0) / bios.length : 0, bestForm: forms[0] || null, enhancers: [], competitors: [], absorptionKey: 'sublingual_area', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
+  }
+  return entries;
+}

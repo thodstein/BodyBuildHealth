@@ -1,7 +1,4 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { SUPPORT_CATALOG_DATA, type SupportCatalogEntry } from '../../../data/support-database';
-import { PHARMA_DB } from '../../../core/pharma-database';
-import { PEPTIDE_DB } from '../../../engines/peptide-calculator.engine';
 import { InfoErrorBoundary } from './SupportScreenData';
 import { S } from './SupportShared';
 import { PopupSelect } from '../../components/PopupXxx';
@@ -13,49 +10,9 @@ import {
   TIMING_SLOTS, CATEGORY_TIMING, type TimeSlot, type TimingSlot, type SubstanceTiming,
   LAB_MARKERS, type LabMarker,
   FORM_RECOMMENDER, type FormRecommendation,
+  buildBioavailabilityCatalog,
 } from './SupportBioavailabilityData';
 
-// ─── Build enriched catalog ───
-function buildCatalog(): EnrichedEntry[] {
-  const entries: EnrichedEntry[] = [];
-  for (const [id, entry] of Object.entries(SUPPORT_CATALOG_DATA)) {
-    if (!entry?.nameRu) continue;
-    const forms: FormWithBio[] = (entry.forms || []).map(f => {
-      const bio = getCatalogFormBio(f);
-      return { ...f, bioavailability: bio, bioLabel: `${(bio * 100).toFixed(0)}%`, effectiveDose: (doseMg: number) => Math.round(doseMg * bio) };
-    });
-    const bios = forms.map(f => f.bioavailability);
-    const clinical = classifySubstance(entry.nameRu, entry.category || []);
-    entries.push({
-      id, source: 'catalog', nameRu: entry.nameRu, nameEn: entry.name || id,
-      tier: entry.tier, category: entry.category || [], description: entry.description || '',
-      forms, maxBio: bios.length ? Math.max(...bios) : 0, minBio: bios.length ? Math.min(...bios) : 0,
-      avgBio: bios.length ? bios.reduce((a, b) => a + b, 0) / bios.length : 0,
-      bestForm: forms.find(f => f.best) || null,
-      enhancers: detectEnhancers(entry), competitors: detectCompetition(entry, entry.nameRu, entry.category),
-      absorptionKey: clinical.abs, halfLifeKey: clinical.hl, foodKey: clinical.food, windowKey: clinical.win, costPerGram: clinical.cost,
-    });
-  }
-  for (const [pid, ph] of Object.entries(PHARMA_DB)) {
-    if (!ph || !ph.name) continue;
-    const bio = ph.pk?.bioavailability ?? (ph.bioavailability ? (typeof ph.bioavailability === 'number' ? ph.bioavailability : (typeof ph.bioavailability === 'object' && 'avg' in (ph.bioavailability as any) ? (ph.bioavailability as any).avg : 0.85)) : 0.85);
-    const forms: FormWithBio[] = [{ id: pid, name: ph.name, nameRu: ph.name, dose: ph.dosageRange ? `${ph.dosageRange.min}-${ph.dosageRange.max} ${ph.dosageRange.unit}` : '—', best: true, bioavailability: bio, bioLabel: `${(bio * 100).toFixed(0)}%`, effectiveDose: (d: number) => Math.round(d * bio) }];
-    entries.push({ id: pid, source: 'pharma', nameRu: ph.name, nameEn: ph.name || pid, tier: 'standard', category: ['pharma', (ph as any).class || 'aas'].filter(Boolean), description: ph.description || '', forms, maxBio: bio, minBio: bio, avgBio: bio, bestForm: forms[0], enhancers: [], competitors: [], absorptionKey: 'stomach', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
-  }
-  for (const [pepId, pp] of Object.entries(PEPTIDE_DB)) {
-    if (!pp || !pp.name) continue;
-    const forms: FormWithBio[] = (pp.routes || []).map(rt => {
-      const b = pp.bioavailability?.[rt]; const bio = b ? (b.min + b.max) / 2 / 100 : 0.80;
-      return { id: `${pepId}_${rt}`, name: `${pp.name} (${ROUTE_LABELS_MAP[rt] || rt})`, nameRu: `${pp.name} (${ROUTE_LABELS_MAP[rt] || rt})`, dose: `${pp.amountMg} мг`, best: rt === 'sc', bioavailability: bio, bioLabel: `${(bio * 100).toFixed(0)}%`, notes: b ? `диапазон ${b.min}-${b.max}%` : '', effectiveDose: (d: number) => Math.round(d * bio) };
-    });
-    const bios = forms.map(f => f.bioavailability);
-    entries.push({ id: pepId, source: 'peptide', nameRu: pp.name, nameEn: pp.name || pepId, tier: 'advanced', category: ['peptide', pp.className || 'gh_peptide'].filter(Boolean), description: `${pp.effects?.join(', ') || ''}`, forms, maxBio: bios.length ? Math.max(...bios) : 0, minBio: bios.length ? Math.min(...bios) : 0, avgBio: bios.length ? bios.reduce((a, b) => a + b, 0) / bios.length : 0, bestForm: forms[0] || null, enhancers: [], competitors: [], absorptionKey: 'sublingual_area', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
-  }
-  return entries;
-}
-
-// Missing import from data module
-import { ROUTE_LABELS_MAP } from './SupportBioavailabilityData';
 
 // ─── Category labels (RU) ───
 const CATEGORY_LABELS_RU: Record<string, string> = {
@@ -99,7 +56,7 @@ export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s
   const [compareIds, setCompareIds] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_bio_compare') || '[]'); } catch { return []; } });
   const [showCompare, setShowCompare] = useState(compareIds.length > 0);
 
-  const catalog = useMemo(() => buildCatalog(), []);
+  const catalog = useMemo(() => buildBioavailabilityCatalog(), []);
   const allCategories = useMemo(() => { const c = new Set<string>(); catalog.forEach(e => e.category.forEach(cat => c.add(cat))); return Array.from(c).sort(); }, [catalog]);
   const filtered = useMemo(() => {
     let list = catalog; const q = searchQuery.toLowerCase();
@@ -415,8 +372,8 @@ const ClinicalCards: React.FC<{ entry: EnrichedEntry; expandedSections: Record<s
     {entry.absorptionKey && ABSORPTION_SITES[entry.absorptionKey] && (
       <div style={{ ...S.cardBlue }}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: expandedSections['clinical_absorption'] ? 3 : 0 }}><div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa' }}>🔬 Место всасывания</div><button onClick={() => toggleSection('clinical_absorption')} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 7, cursor: 'pointer', border: '1px solid var(--border)', background: expandedSections['clinical_absorption'] ? 'rgba(167,139,250,0.1)' : 'transparent', color: expandedSections['clinical_absorption'] ? '#a78bfa' : 'var(--text-dim)' }}>{expandedSections['clinical_absorption'] ? '▲' : '▼'}</button></div>{expandedSections['clinical_absorption'] && <div style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.3 }}><b>{ABSORPTION_SITES[entry.absorptionKey].site}</b> · {ABSORPTION_SITES[entry.absorptionKey].ph} · {ABSORPTION_SITES[entry.absorptionKey].note}</div>}</div>
     )}
-    {entry.windowKey && THERAPEUTIC_WINDOWS[entry.windowKey] && (() => { const tw = THERAPEUTIC_WINDOWS[entry.windowKey]; return (
-      <div style={{ ...S.cardAccent }}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: expandedSections['clinical_window'] ? 3 : 0 }}><div style={{ fontSize: 10, fontWeight: 700, color: '#00e68a' }}>🎯 Терапевтическое окно</div><button onClick={() => toggleSection('clinical_window')} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 7, cursor: 'pointer', border: '1px solid var(--border)', background: expandedSections['clinical_window'] ? 'rgba(167,139,250,0.1)' : 'transparent', color: expandedSections['clinical_window'] ? '#a78bfa' : 'var(--text-dim)' }}>{expandedSections['clinical_window'] ? '▲' : '▼'}</button></div>{expandedSections['clinical_window'] && <><div style={{ display: 'flex', gap: 3, marginBottom: 3 }}>{[{ label: 'Мин', value: tw.minMg, color: '#ff9800' }, { label: 'Оптим', value: tw.optMg, color: '#00e68a' }, { label: 'Макс', value: tw.maxMg, color: '#f44336' }].map(s => (<div key={s.label} style={{ textAlign: 'center', flex: 1, padding: '3px', borderRadius: 4, background: 'rgba(255,255,255,0.02)' }}><div style={{ fontSize: 13, fontWeight: 800, color: s.color }}>{s.value}</div><div style={{ fontSize: 7, color: 'var(--text-dim)' }}>мг {s.label}</div></div>))}</div><div style={{ fontSize: 7, color: 'var(--text-dim)' }}>{tw.note}</div></>}</div>
+    {entry.windowKey && THERAPEUTIC_WINDOWS[entry.windowKey] && (() => { const tw = THERAPEUTIC_WINDOWS[entry.windowKey]; const u = tw.unit || 'мг'; return (
+      <div style={{ ...S.cardAccent }}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: expandedSections['clinical_window'] ? 3 : 0 }}><div style={{ fontSize: 10, fontWeight: 700, color: '#00e68a' }}>🎯 Терапевтическое окно</div><button onClick={() => toggleSection('clinical_window')} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 7, cursor: 'pointer', border: '1px solid var(--border)', background: expandedSections['clinical_window'] ? 'rgba(167,139,250,0.1)' : 'transparent', color: expandedSections['clinical_window'] ? '#a78bfa' : 'var(--text-dim)' }}>{expandedSections['clinical_window'] ? '▲' : '▼'}</button></div>{expandedSections['clinical_window'] && <><div style={{ display: 'flex', gap: 3, marginBottom: 3 }}>{[{ label: 'Мин', value: tw.minMg, color: '#ff9800' }, { label: 'Оптим', value: tw.optMg, color: '#00e68a' }, { label: 'Макс', value: tw.maxMg, color: '#f44336' }].map(s => (<div key={s.label} style={{ textAlign: 'center', flex: 1, padding: '3px', borderRadius: 4, background: 'rgba(255,255,255,0.02)' }}><div style={{ fontSize: 13, fontWeight: 800, color: s.color }}>{s.value}</div><div style={{ fontSize: 7, color: 'var(--text-dim)' }}>{u} {s.label}</div></div>))}</div><div style={{ fontSize: 7, color: 'var(--text-dim)' }}>{tw.note}</div></>}</div>
     ); })()}
     {entry.halfLifeKey && HALF_LIFE_INFO[entry.halfLifeKey] && (() => { const hl = HALF_LIFE_INFO[entry.halfLifeKey]; return (
       <div style={{ ...S.card }}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: expandedSections['clinical_halflife'] ? 3 : 0 }}><div style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa' }}>⏱ Период полувыведения</div><button onClick={() => toggleSection('clinical_halflife')} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 7, cursor: 'pointer', border: '1px solid var(--border)', background: expandedSections['clinical_halflife'] ? 'rgba(167,139,250,0.1)' : 'transparent', color: expandedSections['clinical_halflife'] ? '#a78bfa' : 'var(--text-dim)' }}>{expandedSections['clinical_halflife'] ? '▲' : '▼'}</button></div>{expandedSections['clinical_halflife'] && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 8 }}><div style={{ textAlign: 'center', padding: '3px', borderRadius: 4, background: 'rgba(255,255,255,0.02)' }}><div style={{ fontSize: 13, fontWeight: 800, color: '#60a5fa' }}>{hl.t12h < 24 ? hl.t12h + 'ч' : (hl.t12h / 24).toFixed(0) + 'д'}</div><div style={{ color: 'var(--text-dim)' }}>T½</div></div><div style={{ textAlign: 'center', padding: '3px', borderRadius: 4, background: 'rgba(255,255,255,0.02)' }}><div style={{ fontSize: 8, fontWeight: 700, color: '#00e68a' }}>{hl.freq}</div><div style={{ color: 'var(--text-dim)' }}>Кратность</div></div><div style={{ textAlign: 'center', padding: '3px', borderRadius: 4, background: 'rgba(255,255,255,0.02)' }}><div style={{ fontSize: 8, fontWeight: 700, color: '#ff9800' }}>{hl.steadyState}</div><div style={{ color: 'var(--text-dim)' }}>Равн.</div></div></div>}</div>

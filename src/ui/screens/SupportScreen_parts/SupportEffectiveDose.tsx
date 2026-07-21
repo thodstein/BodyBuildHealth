@@ -1,43 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
-import { PHARMA_DB } from '../../../core/pharma-database';
 import {
   type EnrichedEntry, type FormWithBio,
-  getCatalogFormBio, detectEnhancers, detectCompetition, classifySubstance,
   PERSONAL_ADJUSTERS, bioColor, THERAPEUTIC_WINDOWS, MODIFIERS, COST_PER_GRAM,
+  buildBioavailabilityCatalog,
 } from './SupportBioavailabilityData';
 import { PopupSelect, PopupNumber, PopupBool } from '../../components/PopupXxx';
 import { S } from './SupportShared';
-
-// ─── Build enriched catalog ───
-function buildCatalog(): EnrichedEntry[] {
-  const entries: EnrichedEntry[] = [];
-  for (const [id, entry] of Object.entries(SUPPORT_CATALOG_DATA)) {
-    if (!entry?.nameRu) continue;
-    const forms: FormWithBio[] = (entry.forms || []).map(f => {
-      const bio = getCatalogFormBio(f);
-      return { ...f, bioavailability: bio, bioLabel: `${(bio * 100).toFixed(0)}%`, effectiveDose: (doseMg: number) => Math.round(doseMg * bio) };
-    });
-    const clinical = classifySubstance(entry.nameRu, entry.category || []);
-    entries.push({
-      id, source: 'catalog', nameRu: entry.nameRu, nameEn: entry.name || id,
-      tier: entry.tier, category: entry.category || [], description: entry.description || '',
-      forms, maxBio: forms.length ? Math.max(...forms.map(f=>f.bioavailability)) : 0,
-      minBio: forms.length ? Math.min(...forms.map(f=>f.bioavailability)) : 0,
-      avgBio: forms.length ? forms.reduce((a, f) => a + f.bioavailability, 0) / forms.length : 0,
-      bestForm: forms.find(f => f.best) || null,
-      enhancers: detectEnhancers(entry), competitors: detectCompetition(entry, entry.nameRu, entry.category || []),
-      absorptionKey: clinical.abs, halfLifeKey: clinical.hl, foodKey: clinical.food, windowKey: clinical.win, costPerGram: clinical.cost,
-    });
-  }
-  for (const [pid, ph] of Object.entries(PHARMA_DB)) {
-    if (!ph || !ph.name) continue;
-    const bio = ph.pk?.bioavailability ?? (ph.bioavailability ? (typeof ph.bioavailability === 'number' ? ph.bioavailability : (typeof ph.bioavailability === 'object' && 'avg' in (ph.bioavailability as any) ? (ph.bioavailability as any).avg : 0.85)) : 0.85);
-    const forms: FormWithBio[] = [{ id: pid, name: ph.name, nameRu: ph.name, dose: ph.dosageRange ? `${ph.dosageRange.min}-${ph.dosageRange.max} ${ph.dosageRange.unit}` : '—', best: true, bioavailability: bio, bioLabel: `${(bio * 100).toFixed(0)}%`, effectiveDose: (d: number) => Math.round(d * bio) }];
-    entries.push({ id: pid, source: 'pharma', nameRu: ph.name, nameEn: ph.name || pid, tier: 'standard', category: ['pharma', (ph as any).class || 'aas'].filter(Boolean), description: ph.description || '', forms, maxBio: bio, minBio: bio, avgBio: bio, bestForm: forms[0], enhancers: [], competitors: [], absorptionKey: 'stomach', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
-  }
-  return entries;
-}
 
 // ─── Therapeutic ranges for key supplements ───
 const DOSE_RANGES: Record<string, { therMin: number; therMax: number; label: string }> = {
@@ -160,7 +128,7 @@ export const SupportEffectiveDose: React.FC = () => {
     try { return JSON.parse(localStorage.getItem('he_bio_adjusters') || '[]'); } catch { return []; }
   });
 
-  const catalog = useMemo(() => buildCatalog(), []);
+  const catalog = useMemo(() => buildBioavailabilityCatalog(), []);
 
   const sub1 = sub1Id ? catalog.find(e => e.id === sub1Id) : null;
   const sub2 = sub2Id ? catalog.find(e => e.id === sub2Id) : null;
