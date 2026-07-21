@@ -37,6 +37,8 @@ import { DEFAULT_DOSAGES } from '../data/support-meta';
 import { getPrioritySubstances, type SeverityLevel } from '../data/lab-priority-map';
 import { SUPPLEMENTS_DB } from '../data/support-db/supplements';
 import { PHARMACY_DB } from '../data/support-db/pharmacy-db';
+import { SYNERGY_NETWORK } from '../data/support-synergy-network';
+import { TZ_AUTO_BLACKLIST, PHASE_BLOCKLIST } from './support-plan/shared-constants';
 
 /* ------------------------------------------------------------------ *
  *  Дефолтное состояние калькулятора (локальная копия, без импорта из UI).
@@ -287,16 +289,27 @@ function buildCatalogFallback(
   filterMechanisms?: string[],
   filterMarkers?: string[],
   profile?: BioStackProfile,
+  phase?: string,
+  existingIds?: string[],
 ): string[] {
   const allIds = Object.keys(SUPPORT_CATALOG_DATA);
   const scored: Array<{ id: string; score: number }> = [];
+  const existingSet = new Set((existingIds || []).map(id => id.toLowerCase()));
+
+  // Phase-блоклист
+  const phaseKey = phase || 'course';
+  const phaseBlocked = PHASE_BLOCKLIST[phaseKey] || new Set<string>();
 
   for (const id of allIds) {
-    // пропускаем pharma-only (лекарства) — они только из курса
+    const idLower = id.toLowerCase();
     const cat = SUPPORT_CATALOG_DATA[id];
     if (!cat) continue;
 
-    // сопоставление TZ-органов
+    // Чёрные списки
+    if (TZ_AUTO_BLACKLIST.has(id)) continue;
+    if (phaseBlocked.has(id)) continue;
+    if (existingSet.has(idLower)) continue; // не дублируем уже выбранные
+
     const tzOrgans = (getDrugTzMechanisms(id) || []).map(m => m.organId);
     const tzMechs = (getDrugTzMechanisms(id) || []).map(m => m.mechId);
 
@@ -333,6 +346,19 @@ function buildCatalogFallback(
     // broad-spectrum (вещества с >4 TZ-механизмами)
     if (tzMechs.length > 4) score += 2;
 
+    // синергии с уже выбранными веществами
+    if (existingIds && existingIds.length > 0) {
+      for (const entry of SYNERGY_NETWORK) {
+        if (entry.type !== 'synergy') continue;
+        const partners = [entry.a, entry.b, entry.c, entry.d, entry.e, entry.f, entry.g, ...(entry.substances || [])]
+          .filter(Boolean).map(s => (s as string).toLowerCase());
+        if (!partners.includes(idLower)) continue;
+        for (const eid of existingIds) {
+          if (partners.includes(eid.toLowerCase())) { score += Math.min(entry.score, 10); break; }
+        }
+      }
+    }
+
     // если нет фильтров — всем дать базовый score, потом отберём топ
     if (!filterOrgans?.length && !filterMechanisms?.length && !filterMarkers?.length) {
       score += isCore ? 5 : 1;
@@ -341,9 +367,9 @@ function buildCatalogFallback(
     if (score > 0) scored.push({ id, score });
   }
 
-  // сортировка по score, топ-20
+  // сортировка по score, топ-25
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, 20).map(s => s.id);
+  return scored.slice(0, 25).map(s => s.id);
 }
 
 /* ------------------------------------------------------------------ *
@@ -448,46 +474,80 @@ export function buildClinicalStack(
   let candidateIds = plan.substances.map((s) => s.id);
   console.log('[BioStack] initial candidateIds:', candidateIds);
 
-  // ── Каталоговый fallback: если движок вернул 0 веществ ──
-  if (!candidateIds.length) {
-    const fallbackSet = buildCatalogFallback(opts.filterOrgans, opts.filterMechanisms, opts.filterMarkers, profile);
+  // ── Каталоговый fallback: если движок вернул мало веществ ──
+  if (candidateIds.length < 3) {
+    const fallbackSet = buildCatalogFallback(
+      opts.filterOrgans, opts.filterMechanisms, opts.filterMarkers, profile,
+      state.pharma?.phase, candidateIds,
+    );
     if (fallbackSet.length) {
-      console.log('[BioStack] catalog fallback:', fallbackSet.length, 'candidates');
-      candidateIds = fallbackSet;
+      console.log('[BioStack] catalog fallback:', fallbackSet.length, 'candidates (had', candidateIds.length, ')');
+      // MERGE с существующими, не замена
+      candidateIds = [...new Set([...candidateIds, ...fallbackSet])];
     }
   }
 
-  if (filterMarkers && filterMarkers.length) {
+  // ── Взвешенный scoring фильтров (UNION вместо AND) ──
+  // Каждый фильтр добавляет баллы. Вещества с score > 0 проходят.
+  // Это предотвращает «воронку смерти» когда последовательные AND убивают всех кандидатов.
+  const hasAnyFilter = (filterMarkers && filterMarkers.length) || (filterMechanisms && filterMechanisms.length) || (filterOrgans && filterOrgans.length);
+
+  if (hasAnyFilter) {
+    // Pre-compute marker substances
     const markerSubs = new Set<string>();
-    const SEVERITIES: SeverityLevel[] = ['mild', 'moderate', 'severe'];
-    for (const mk of filterMarkers) {
-      for (const sev of SEVERITIES) {
-        for (const e of getPrioritySubstances(mk, sev)) markerSubs.add(e.substanceId);
+    if (filterMarkers && filterMarkers.length) {
+      const SEVERITIES: SeverityLevel[] = ['mild', 'moderate', 'severe'];
+      for (const mk of filterMarkers) {
+        for (const sev of SEVERITIES) {
+          for (const e of getPrioritySubstances(mk, sev)) markerSubs.add(e.substanceId);
+        }
       }
     }
-    if (markerSubs.size) candidateIds = candidateIds.filter((id) => markerSubs.has(id));
-  }
 
-  if (filterMechanisms && filterMechanisms.length) {
-    candidateIds = candidateIds.filter((id) =>
-      (getDrugTzMechanisms(id) || []).some((m) => filterMechanisms!.includes(m.mechId)),
-    );
-  }
+    const filterScore = new Map<string, number>();
+    for (const id of candidateIds) {
+      let score = 0;
+      // маркеры: +5 за совпадение
+      if (markerSubs.size && markerSubs.has(id)) score += 5;
+      // механизмы: +3 за каждый совпавший
+      if (filterMechanisms && filterMechanisms.length) {
+        const tz = getDrugTzMechanisms(id) || [];
+        const mechHits = tz.filter(m => filterMechanisms!.includes(m.mechId)).length;
+        if (mechHits > 0) score += mechHits * 3;
+      }
+      // органы: +3 за каждый совпавший
+      if (filterOrgans && filterOrgans.length) {
+        const tz = getDrugTzMechanisms(id) || [];
+        const organHits = tz.filter(m => filterOrgans!.includes(m.organId)).length;
+        if (organHits > 0) score += organHits * 3;
+      }
+      if (score > 0) filterScore.set(id, score);
+    }
 
-  if (filterOrgans && filterOrgans.length) {
-    candidateIds = candidateIds.filter((id) =>
-      (getDrugTzMechanisms(id) || []).some((m) => filterOrgans!.includes(m.organId)),
-    );
+    if (filterScore.size > 0) {
+      candidateIds = candidateIds
+        .filter(id => filterScore.has(id))
+        .sort((a, b) => (filterScore.get(b) || 0) - (filterScore.get(a) || 0));
+    } else {
+      // Ни один фильтр не совпал — оставляем всех (не убиваем стек)
+      console.log('[BioStack] WARN: no filter matches, keeping all candidates');
+    }
   }
 
   if (evidenceLevel && evidenceLevel !== 'all') {
     const allowed: EvidenceGrade[] = opts.evidenceLevel === 'C' ? ['A','B','C'] : opts.evidenceLevel === 'B' ? ['A','B'] : ['A'];
     const allowedSet = new Set(allowed);
+    const before = candidateIds.length;
     candidateIds = candidateIds.filter((id) => {
       const entries = [...(SUPPLEMENTS_DB[id] || []), ...(PHARMACY_DB[id] || [])];
       if (!entries.length) return true; // нет данных доказательности → не отсеиваем
       return entries.some((e) => allowedSet.has(e.q));
     });
+    // Если evidence убил всех — откатываем
+    if (candidateIds.length === 0 && before > 0) {
+      console.log('[BioStack] WARN: evidence filter killed all candidates, reverting');
+      candidateIds = plan.substances.map((s) => s.id);
+    }
   }
   console.log('[BioStack] candidateIds after filters:', candidateIds);
 
@@ -501,6 +561,43 @@ export function buildClinicalStack(
   );
   console.log('[BioStack] gate.ids:', gate.ids);
   console.log('[BioStack] gate.excluded:', gate.hardStops.length + gate.drugExclusions.length + gate.ulWarnings.length);
+
+  // 3a) Greedy synergy pass: добавить вещества с высокой синергией к уже выбранным
+  const maxStack = opts.maxStackSize || 20;
+  if (gate.ids.length < maxStack) {
+    const gateSet = new Set(gate.ids.map(id => id.toLowerCase()));
+    const hardStopSet = new Set(gate.hardStops.map(h => h.substanceId));
+    const drugExclSet = new Set(gate.drugExclusions.map(e => e.substanceId));
+    const allCatalogIds = Object.keys(SUPPORT_CATALOG_DATA);
+
+    const synCandidates: Array<{ id: string; synScore: number }> = [];
+    for (const candId of allCatalogIds) {
+      const candLower = candId.toLowerCase();
+      if (gateSet.has(candLower)) continue;
+      if (hardStopSet.has(candId)) continue;
+      if (drugExclSet.has(candId)) continue;
+      if (TZ_AUTO_BLACKLIST.has(candId)) continue;
+
+      let synScore = 0;
+      for (const entry of SYNERGY_NETWORK) {
+        if (entry.type !== 'synergy') continue;
+        const partners = [entry.a, entry.b, entry.c, entry.d, entry.e, entry.f, entry.g, ...(entry.substances || [])]
+          .filter(Boolean).map(s => (s as string).toLowerCase());
+        if (!partners.includes(candLower)) continue;
+        for (const gid of gate.ids) {
+          if (partners.includes(gid.toLowerCase())) synScore += entry.score;
+        }
+      }
+      if (synScore >= 15) synCandidates.push({ id: candId, synScore });
+    }
+
+    synCandidates.sort((a, b) => b.synScore - a.synScore);
+    const toAdd = synCandidates.slice(0, maxStack - gate.ids.length);
+    if (toAdd.length > 0) {
+      console.log('[BioStack] greedy synergy pass: adding', toAdd.length, 'substances (score ≥ 15)');
+      gate.ids.push(...toAdd.map(c => c.id));
+    }
+  }
 
   const gateIdSet = new Set(gate.ids);
   const byId = new Map<string, PlanSubstance>(plan.substances.map((s) => [s.id, s]));
@@ -550,19 +647,52 @@ export function buildClinicalStack(
     }
   }
 
-  // 3a) Кап количества: если задан maxStackSize, усекаем по грейду + широте покрытия
+  // 3a) Кап количества: если задан maxStackSize, усекаем по грейду + широте + синергиям
   if (opts.maxStackSize && opts.maxStackSize > 0 && substances.length > opts.maxStackSize) {
+    // Pre-compute synergy scores with already-selected substances (greedy)
+    const selected = new Set<string>();
+    const synergyCache = new Map<string, number>();
+
+    const getSynBonus = (id: string): number => {
+      if (synergyCache.has(id)) return synergyCache.get(id)!;
+      let bonus = 0;
+      const idLower = id.toLowerCase();
+      for (const entry of SYNERGY_NETWORK) {
+        if (entry.type !== 'synergy') continue;
+        const partners = [entry.a, entry.b, entry.c, entry.d, entry.e, entry.f, entry.g, ...(entry.substances || [])]
+          .filter(Boolean).map(s => (s as string).toLowerCase());
+        if (!partners.includes(idLower)) continue;
+        for (const sel of selected) {
+          if (partners.includes(sel.toLowerCase())) bonus += entry.score;
+        }
+      }
+      synergyCache.set(id, bonus);
+      return bonus;
+    };
+
     substances.sort((a, b) => {
       const ga = getEvidenceGrade(a.id);
       const gb = getEvidenceGrade(b.id);
       const wa = ga === 'A' ? 3 : ga === 'B' ? 2 : 1;
       const wb = gb === 'A' ? 3 : gb === 'B' ? 2 : 1;
-      if (wa !== wb) return wb - wa; // A > B > C
+      if (wa !== wb) return wb - wa;
+      // synergy bonus с уже отобранными
+      const synA = getSynBonus(a.id);
+      const synB = getSynBonus(b.id);
+      if (synA !== synB) return synB - synA;
       const breadthDiff = (b.tzMechanisms?.length || 0) - (a.tzMechanisms?.length || 0);
       if (breadthDiff !== 0) return breadthDiff;
       return (b.tier === 'core' ? 1 : 0) - (a.tier === 'core' ? 1 : 0);
     });
-    const trimmed = substances.slice(0, opts.maxStackSize);
+
+    // Greedy pass: пересчитываем synergy bonus после каждого выбора
+    const trimmed: typeof substances = [];
+    for (const s of substances) {
+      if (trimmed.length >= opts.maxStackSize) break;
+      trimmed.push(s);
+      selected.add(s.id.toLowerCase());
+      synergyCache.clear(); // invalidate cache после каждого выбора
+    }
     substances.length = 0;
     substances.push(...trimmed);
   }
@@ -603,7 +733,12 @@ export function buildClinicalStack(
   if (gradeCounts.A) gradeParts.push(`A:${gradeCounts.A}`);
   if (gradeCounts.B) gradeParts.push(`B:${gradeCounts.B}`);
   if (gradeCounts.C) gradeParts.push(`C:${gradeCounts.C}`);
-  const stackDescription = `Стек из ${substances.length} веществ (${gradeParts.join(', ')}). Грейд: ${opts.evidenceLevel || 'all'}. Покрытие систем: ${systemNames || 'не определено'}. Построено движком калькулятора поддержки (runSupportUnified).`;
+  const orientTag = isOrientational ? ' ⚠️ Ориентировочный (без курса и анализов)' : '';
+  const courseTag = useCourse && state.pharma.aas.length > 0 ? ` · Курс: ${state.pharma.aas.length} ААС` : '';
+  const labTag = useLabs && (state.labs?.fullPanel || state.labs?.midCourse) ? ' · Лаб: ✓' : '';
+  const greedyCount = gate.ids.length - candidateIds.filter(id => gate.ids.includes(id)).length;
+  const greedyTag = greedyCount > 0 ? ` · +${greedyCount} синергия` : '';
+  const stackDescription = `Стек из ${substances.length} веществ (${gradeParts.join(', ')}).${orientTag}${courseTag}${labTag}${greedyTag} Покрытие систем: ${systemNames || 'не определено'}.`;
 
   // 4) Отсеянные вещества (прозрачность)
   const excluded: ClinicalStackResult['excluded'] = [];
