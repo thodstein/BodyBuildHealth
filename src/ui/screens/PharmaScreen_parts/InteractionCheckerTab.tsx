@@ -9,7 +9,7 @@ import {
   filterAndSortInteractions,
   type InteractionAlert,
 } from '../../../engines/interactions-calculator';
-import { UnifiedInteractionCard } from '../../../components/UnifiedInteractionCard';
+import { UnifiedInteractionCard } from '../../components/UnifiedInteractionCard';
 import { SECTION_LABELS } from '../../../data/interactions-labels';
 import type { CourseEntry } from '../../../core/types';
 import { resolveInteractionId, type Interaction as SupportInteraction } from '../../../data/support-interactions-db';

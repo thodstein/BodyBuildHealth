@@ -659,6 +659,21 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
           ════════════════════════════════════════════════════════════════ */}
       {result && (
         <>
+          {/* Предупреждение: стек ориентировочный */}
+          {result.isOrientational && (
+            <div style={{
+              padding: '10px 14px', borderRadius: 12, marginBottom: 10,
+              background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b' }}>
+                ⚠️ Стек ориентировочный
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 4, lineHeight: 1.4 }}>
+                Собран без учёта курса и анализов. Для точного подбора включите «💉 Курс ААС» и/или «🧪 Анализы».
+              </div>
+            </div>
+          )}
+
           {/* Описание стека */}
           <GlassCard title="📋 Описание стека" icon="📝" color="#a78bfa" style={{ marginTop: 12 }}>
             <div style={{ fontSize: 12, color: 'rgba(235,235,245,0.8)', lineHeight: 1.5 }}>

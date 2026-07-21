@@ -273,6 +273,8 @@ export interface ClinicalStackResult {
   sourceOfTruth: 'support-plan/runSupportUnified';
   /** неделя курса, на которой считался план */
   courseWeek: number;
+  /** true если стек собран без анализов и без курса — ориентировочный */
+  isOrientational?: boolean;
 }
 
 /* ------------------------------------------------------------------ *
@@ -388,17 +390,49 @@ export function buildClinicalStack(
 
   const state: CalculatorState = {
     ...DEFAULT_STATE,
-    ...(useCourse ? (h as Partial<CalculatorState>) : { pharma: DEFAULT_STATE.pharma }),
-    ...(useLabs ? (h as Partial<CalculatorState>) : { labs: DEFAULT_STATE.labs }),
+    // ВСЕГДА из hydrateState (не зависят от переключателей)
+    profile: h.profile || DEFAULT_STATE.profile,
+    neuro: h.neuro || DEFAULT_STATE.neuro,
+    psych: h.psych || DEFAULT_STATE.psych,
+    genetics: h.genetics || DEFAULT_STATE.genetics,
+    hepatobiliary: h.hepatobiliary || DEFAULT_STATE.hepatobiliary,
+    cardio: h.cardio || DEFAULT_STATE.cardio,
+    urinary: h.urinary || DEFAULT_STATE.urinary,
+    goals: h.goals || DEFAULT_STATE.goals,
+    nutrition: h.nutrition || DEFAULT_STATE.nutrition,
+    oda: h.oda || DEFAULT_STATE.oda,
+    dental: h.dental || DEFAULT_STATE.dental,
+    gi: h.gi || DEFAULT_STATE.gi,
+    toxicLoad: h.toxicLoad || DEFAULT_STATE.toxicLoad,
+    epicrisis: h.epicrisis || DEFAULT_STATE.epicrisis,
+    injection: h.injection || DEFAULT_STATE.injection,
+    journal: h.journal || DEFAULT_STATE.journal,
+    // pharma: ТОЛЬКО если useCourse=true
+    pharma: useCourse ? (h.pharma || DEFAULT_STATE.pharma) : DEFAULT_STATE.pharma,
+    // labs: ТОЛЬКО если useLabs=true
+    labs: useLabs ? (h.labs || DEFAULT_STATE.labs) : DEFAULT_STATE.labs,
+    // contraindications: ВСЕГДА из hydrateState, дополнительно из profile если useProfile
     contraindications: useProfile
-      ? mapProfileToContraindications(profile, DEFAULT_STATE.contraindications)
-      : DEFAULT_STATE.contraindications,
+      ? mapProfileToContraindications(profile, h.contraindications || DEFAULT_STATE.contraindications)
+      : (h.contraindications || DEFAULT_STATE.contraindications),
     jointMode: useProfile ? modes.jointMode : false,
     neuroMode: useProfile ? modes.neuroMode : false,
     boostEnabled: false,
     powerLevel: opts.powerLevel ?? 'mid',
-    courseWeek,
+    courseWeek: useCourse ? courseWeek : 1,
   } as CalculatorState;
+
+  // Стек ориентировочный если нет ни курса, ни анализов
+  const isOrientational = !useLabs && !useCourse;
+
+  console.log('[BioStack] scenario:', {
+    useCourse, useLabs, useProfile,
+    aasCount: state.pharma.aas.length,
+    hasLabs: !!state.labs?.fullPanel || !!state.labs?.midCourse,
+    profileWeight: state.profile?.weight,
+    powerLevel: state.powerLevel,
+    isOrientational,
+  });
 
   // 2) Источник истины: движок калькулятора поддержки (канонические дозы + механизмы)
   const plan: PlanResult = runSupportUnified(state);
@@ -631,6 +665,7 @@ export function buildClinicalStack(
     },
     sourceOfTruth: 'support-plan/runSupportUnified',
     courseWeek,
+    isOrientational,
   };
 }
 
