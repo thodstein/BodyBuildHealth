@@ -212,7 +212,7 @@ export const IndividualPlanSettings: React.FC = () => {
               const goalMap: Record<string, any> = { bulk: 'mass', cut: 'fat_loss', maintenance: 'maintenance', strength: 'strength', recomposition: 'recomposition', rehab: 'rehab' };
               setGoal(goalMap[s.primaryGoal] || 'maintenance');
             }
-            if (s?.workoutsPerWeek) setMealsCount(Math.max(3, Math.min(7, s.workoutsPerWeek + 1)));
+            if (s?.workoutsPerWeek) setMealsCount(Math.max(3, Math.min(8, s.workoutsPerWeek + 1)));
             if (s?.bedtime) setBedTime(s.bedtime);
             if (s?.wakeTime) setWakeTime(s.wakeTime);
           }} style={{
@@ -1067,7 +1067,7 @@ export const IndividualPlanSettings: React.FC = () => {
         <div>
           <label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:4,display:'block'}}>Количество приёмов пищи</label>
           <div style={{ display: 'flex', gap: 4 }}>
-            {[3,4,5,6].map(n => (
+            {[3,4,5,6,7,8].map(n => (
               <PillBtn key={n} active={mealsCount === n} onClick={() => setMealsCount(n)} color={mealsCount === n ? '#06b6d4' : undefined}>{n}</PillBtn>
             ))}
           </div>

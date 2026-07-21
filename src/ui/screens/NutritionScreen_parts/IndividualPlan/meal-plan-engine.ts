@@ -992,63 +992,62 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const carbFloorG = impossibleGoal ? 50 : _floorCarbG;                                // ketogenic-ish floor on hard cut
   const carbsTotal = Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG);
   // Д-2: Peri-workout carbs must SCALE with the daily carb budget (not hardcoded 40/60g),
-  // otherwise high-carb (insulin/mass) days overload dinner instead of the pre/post window.
-  // Pre = 20% of carbs, Post = 25% of carbs (with floors); breakfast/lunch/dinner share the rest.
-  // Carb distribution must sum to ~100% per scenario — no residual to dump.
-  // Training day: break(20%) + lunch(21%) + dinner(14%) + pre(20%) + post(25%) = 100%
-  // Rest day:     break(25%) + lunch(47%) + dinner(18%) + snack(10%)          = 100%
-  // Carbs are front-loaded: lunch > dinner. Evening is low-carb for sleep quality & insulin sensitivity.
-  const breakC = Math.round(carbsTotal * (trainWindow ? 0.20 : 0.25));
-  const trainCarbLunch = Math.round(carbsTotal * 0.21);
-  const restCarbLunch = Math.round(carbsTotal * 0.47);
-  const trainCarbDinner = Math.round(carbsTotal * 0.14);
-  const restCarbDinner = Math.round(carbsTotal * 0.18);
-  // Pre/post carb targets scale with carbsTotal; floors keep them meaningful on low-carb days.
-  const lowCarbDay = (ptm.cMult ?? 1) < 0.4;
-  const prewCarbG = trainWindow ? (lowCarbDay ? Math.round(carbsTotal * 0.10) : Math.max(PREW_CARB_SLOW_G, Math.round(carbsTotal * 0.20))) : PREW_CARB_SLOW_G;
-  const postwCarbG = trainWindow ? (lowCarbDay ? Math.round(carbsTotal * 0.10) : Math.max(POSTW_FAST_CARB_G, Math.round(carbsTotal * 0.25))) : POSTW_FAST_CARB_G;
+  // D-24: mealsCount-aware carb distribution (weight-based, lunch = main meal).
+  // Веса нормируются к 100% по приёмам, которые РЕАЛЬНО будут построены → нет
+  // дефицита/перебора ни при каком mealsCount (3-8); обед — главный приём.
+  // Жёсткие %-фиксации (раньше 20/21/14/20/25) ломались, когда mealsCount исключал
+  // часть приёмов — углеводы «терялись» → недобор ~20%, а обед получался ~10%.
+  const CARB_W: Record<string, number> = { breakfast: 1.0, lunch: 1.7, dinner: 0.7, prew: 1.0, postw: 1.2, snack: 0.5, snack2: 0.5, preSleep: 0.3, intra: 0.4 };
+  const intraEligible = trainWindow && input.allowIntraWorkout && (!input.trainDurationMin || input.trainDurationMin >= 75);
+  // set of roles that WILL be built (must match the build conditions below)
+  const _builtRoles: string[] = ['breakfast','lunch','dinner'];
+  if (trainWindow) _builtRoles.push('prew','postw');
+  if (wantPreSleep) _builtRoles.push('preSleep');
+  if (!trainWindow && input.mealsCount >= 3) _builtRoles.push('snack');
+  if (intraEligible) _builtRoles.push('intra');
+  if (input.mealsCount >= 6) _builtRoles.push('snack2');  // второй перекус для 6-8 приёмов
+  // mealsCount cap: core (breakfast/lunch/dinner) + postw на тренинге — неприкосновенны;
+  // лишнее выбрасываем в порядке приоритета: intra → snack → preSleep → prew.
+  let _roles = [..._builtRoles];
+  for (const r of ['intra','snack','preSleep','prew']) { if (_roles.length <= input.mealsCount) break; _roles = _roles.filter(x => x !== r); }
+  if (_roles.length > input.mealsCount) _roles = _roles.slice(0, Math.max(3, input.mealsCount));
+  const _keep = new Set(_roles);
+  const _wOf = (r: string): number => { let v = CARB_W[r] ?? 0.5; if (r === 'dinner' && input.eveningLowCarb) v *= 0.5; return v; };
+  const _wSum = _roles.reduce((s, r) => s + _wOf(r), 0) || 1;
+  const _carbFor = (r: string): number => _keep.has(r) ? Math.round(carbsTotal * _wOf(r) / _wSum) : 0;
+  const breakC = _carbFor('breakfast');
+  const lunchC = _carbFor('lunch');
+  const dinnerC = _carbFor('dinner');
+  const prewCarbG = _carbFor('prew');
+  const postwCarbG = _carbFor('postw');
+  const snackC = _carbFor('snack');
+  const snack2C = _carbFor('snack2');
   const fatTotal = Math.max(fatFloorG, adjustedFatG || input.goalFatG);
 
-  // P1.4: Snack on non-training days to fill MPS gap (lunch 12:30 → dinner 19:00 = 6.5h)
+  // Snack on non-training days to fill MPS gap (lunch 12:30 → dinner 19:00 = 6.5h)
   const snackP = Math.max(15, Math.round(mpsPerMeal * 0.6));
-  const snackC = Math.round(carbsTotal * 0.10);
   const snackF = Math.round(fatTotal * 0.10);
-  const hasSnack = !trainWindow && input.mealsCount >= 3;
+  const hasSnack = _keep.has('snack');
 
-  // P1.3: fat distribution учитывает pre-sleep (~6-8г жира из семечек/Мg-источника) —
-  // снижаем долю ужина, чтобы вечер не был перегружен жирами (тяжело для сна/ЖКТ).
-  const preSleepFatG = wantPreSleep ? 8 : 0;
+  // fat distribution учитывает pre-sleep (~8г жира) — снижаем долю ужина.
+  const preSleepFatG = (_keep.has('preSleep') && wantPreSleep) ? 8 : 0;
   const mealBudget = {
     breakfast: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: breakC, f: Math.round(fatTotal * 0.20) },
-    lunch: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: (input.eveningLowCarb ? Math.round((trainWindow ? trainCarbLunch : restCarbLunch) * 1.3) : (trainWindow ? trainCarbLunch : restCarbLunch)), f: Math.round(fatTotal * 0.15) },
-    dinner: { p: Math.max(20, Math.round(mpsPerMeal * 1.2) - preSleepP), c: input.eveningLowCarb ? Math.round((trainWindow ? trainCarbDinner : restCarbDinner) * 0.5) : (trainWindow ? trainCarbDinner : restCarbDinner), f: Math.max(8, Math.round(fatTotal * 0.22) - preSleepFatG) },
-    prew: trainWindow ? { p: PREW_PROTEIN_G, c: prewCarbG, f: PREW_FAT_MAX_G } : null,
-    postw: trainWindow ? { p: POSTW_FAST_PROTEIN_G, c: postwCarbG, f: 0 } : null,
-    snack: hasSnack ? { p: snackP, c: snackC, f: snackF } : null,
+    lunch: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: lunchC, f: Math.round(fatTotal * 0.15) },
+    dinner: { p: Math.max(20, Math.round(mpsPerMeal * 1.2) - preSleepP), c: dinnerC, f: Math.max(8, Math.round(fatTotal * 0.22) - preSleepFatG) },
+    prew: (_keep.has('prew') && trainWindow) ? { p: PREW_PROTEIN_G, c: prewCarbG, f: PREW_FAT_MAX_G } : null,
+    postw: (_keep.has('postw') && trainWindow) ? { p: POSTW_FAST_PROTEIN_G, c: postwCarbG, f: 0 } : null,
+    snack: _keep.has('snack') ? { p: snackP, c: snackC, f: snackF } : null,
+    snack2: _keep.has('snack2') ? { p: snackP, c: snack2C, f: snackF } : null,
   };
 
   const usedP = mealBudget.breakfast.p + mealBudget.lunch.p + mealBudget.dinner.p + (mealBudget.prew?.p || 0) + (mealBudget.postw?.p || 0) + (mealBudget.snack?.p || 0);
-  const usedC = mealBudget.breakfast.c + mealBudget.lunch.c + mealBudget.dinner.c + (mealBudget.prew?.c || 0) + (mealBudget.postw?.c || 0) + (mealBudget.snack?.c || 0);
   const goalProteinTarget = adjustedProteinG || input.goalProteinG;
-  const residualP = usedP >= goalProteinTarget ? 0 : Math.max(20, goalProteinTarget - usedP);
-  const residualC = Math.max(0, carbsTotal - usedC);
-  // Distribute any residual carbs proportionally across breakfast/lunch (NOT dinner — preserve eveningLowCarb ×0.5).
-  if (residualC > 0) {
-    const carbMeals = [mealBudget.breakfast, mealBudget.lunch];
-    const carbSum = carbMeals.reduce((s, m) => s + m.c, 0);
-    if (carbSum > 0) {
-      let remaining = residualC;
-      for (let i = 0; i < carbMeals.length; i++) {
-        const share = i === carbMeals.length - 1
-          ? remaining
-          : Math.round(residualC * carbMeals[i].c / carbSum);
-        carbMeals[i].c += share;
-        remaining -= share;
-      }
-    }
-  }
+  let residualP = usedP >= goalProteinTarget ? 0 : Math.max(20, goalProteinTarget - usedP);
+  // Если pre-sleep исключён (мало приёмов) — остаток белка уходит в обед, а не теряется.
+  if (!_keep.has('preSleep') && residualP > 0) { mealBudget.lunch.p += residualP; residualP = 0; }
 
-  const allFoodsUsed: string[] = [];
+    const allFoodsUsed: string[] = [];
   // Д-4: intra-day diversity — foods already used today are deprioritized for subsequent meals
   // (recentFoodIds only covers PREVIOUS days; without this a food can repeat across today's meals).
   const usedTodayIds = new Set<string>();
@@ -1122,6 +1121,21 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     markUsed(snack);
     notes.push('Полдник 15:30: MPS gap fill (нетренировочный день) — белок + фрукт');
   }
+  // D-24b: второй перекус (для 6-8 приёмов) — между обедом и ужином (или после ужина).
+  if (_keep.has('snack2') && mealBudget.snack2) {
+    const snack2Rot = rotationForMeal(5);
+    const tSnack2 = (() => { const [lh, lm] = tLunch.split(':').map(Number); const [dh, dm] = tDinner.split(':').map(Number); const mid = Math.round(((lh*60+lm) + (dh*60+dm)) / 2); const [bh, bm] = tBed.split(':').map(Number); const bedMin2 = bh*60+bm; const afterDinner = Math.round(((dh*60+dm) + bedMin2) / 2); return mid > (dh*60+dm - 90) ? String(Math.floor(afterDinner/60)).padStart(2,'0') + ':' + String(afterDinner%60).padStart(2,'0') : String(Math.floor(mid/60)).padStart(2,'0') + ':' + String(mid%60).padStart(2,'0'); })();
+    const snack2 = buildWholeMeal({
+      label: 'Перекус', time: tSnack2, type: 'snack',
+      proteinG: mealBudget.snack2.p, carbG: mealBudget.snack2.c, fatG: mealBudget.snack2.f,
+      pool, proteinRotationIds: snack2Rot.ids, seed: seedBase + 13,
+      includeVeg: false, includeFruit: true,
+      preferredIds: effectivePreferred, lockedIds: input.lockedIds, recentIds: effRecentIds(),
+      rationales: ['Второй перекус: поддержка MPS + углеводное окно при большом числе приёмов'],
+    });
+    meals.push(snack2); markUsed(snack2);
+  }
+
 
   // 3. Pre-workout (если тренировка) — за 90 мин до старта ─────────────
   if (trainWindow && mealBudget.prew && input.trainStartMin) {
@@ -1135,8 +1149,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // 4. Intra-workout (тяжёлый training, allowIntraWorkout=true) ─────────
   // Д-8: intra-workout (EAA + cyclic dextrin) only for long sessions (>75 min). Short HIIT sessions
   // don't deplete glycogen enough to justify intra carbs; the rationale text already says ">60 мин".
-  const intraEligible = trainWindow && input.allowIntraWorkout && (!input.trainDurationMin || input.trainDurationMin >= 75);
-  if (intraEligible && input.trainStartMin) {
+  // intraEligible объявлен выше (блок carb-distribution); gate по mealsCount через _keep.
+  if (intraEligible && _keep.has('intra') && input.trainStartMin) {
     const intraTime = fmtTime(input.trainStartMin + 30);
     const intra = buildIntraWorkout(intraTime, seedBase + 4, pool);
     meals.push(intra);
@@ -1175,7 +1189,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // 7. Pre-sleep — казеин + Mg + мелатонин ───────────────────────────────
   const preSleepSeed = seedBase + 7 + randomSalt * 13;
-  const preSleep = wantPreSleep ? buildPreSleep(tPreSleep, preSleepSeed, pool, Math.max(residualP, preSleepP), { lockedIds: input.lockedIds, recentIds: effRecentIds() }) : null;
+  const preSleep = (_keep.has('preSleep') && wantPreSleep) ? buildPreSleep(tPreSleep, preSleepSeed, pool, Math.max(residualP, preSleepP), { lockedIds: input.lockedIds, recentIds: effRecentIds() }) : null;
   if (preSleep) { meals.push(preSleep); markUsed(preSleep); notes.push('Pre-sleep: казеин + Mg + мелатонин-источник для ночного восстановления'); }
 
   // Sort meals by time (chronological order)
