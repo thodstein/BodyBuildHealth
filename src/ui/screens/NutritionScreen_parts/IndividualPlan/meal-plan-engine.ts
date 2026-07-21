@@ -25,6 +25,8 @@
 
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
 import { filterBySpecificity, filterByIntolerance, matchesCategoryPref, isPreferredCategory, tasteMatchScore, type Specificity, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences";
+import { analyzeMicroCoverage, type MicroCoverageEntry } from "./planner-micro-coverage";
+import { detectMealInteractions } from "./planner-food-interactions";
 import type { FoodItem } from "../../../../core/nutrition-database";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
 
@@ -53,6 +55,7 @@ export interface DayPlanV2 {
   totals: { kcal: number; p: number; f: number; c: number; fiber: number; leucine_mg: number };
   mpsSummary: { feedings: number; avg_leucine_g: number; avg_protein_per_meal_g: number; intra_workout: boolean; prePostWindow: boolean };
   diversity: { uniqueFoods: number; categories: Record<string, number> };
+  microSummary?: { coverage: MicroCoverageEntry[]; topDeficitNutrient: string | null };
   notes: string[];
 }
 
@@ -92,6 +95,13 @@ export interface MealPlanInput {
   lockedIds?: Set<string>;
   // P1.3: Foods used in recent days — deprioritized to avoid repetition
   recentFoodIds?: Set<string>;
+  // Smart 7-day variety: foods used in the last 1-2 days — HARD-excluded (stricter than
+  // recentFoodIds which only deprioritizes). Empty by default = no hard exclusion.
+  hardRecentIds?: Set<string>;
+  // 'soft' = only deprioritize recent (legacy). 'strict' = hard-exclude hardRecentIds.
+  varietyStrictness?: 'soft' | 'strict';
+  // Адаптация по дневнику: дельта к сегодняшней цели (note пробрасывается в plan notes).
+  diaryCompensation?: { kcalDelta: number; pDelta: number; fDelta: number; cDelta: number; note: string; severity?: 'low' | 'medium' | 'high' };
   // FIX 1: User-set meal times (overrides hardcoded defaults)
   wakeTime?: string;
   lunchTime?: string;
@@ -345,21 +355,31 @@ function pickWeighted(arr: FoodItem[], seed: number): FoodItem | undefined {
 }
 
 // P1.2: Pick from pool, but prefer locked foods, then preferred, then deprioritize recent
-function pickPriority<T extends { id: string }>(arr: T[], seed: number, opts?: { lockedIds?: Set<string>; preferredIds?: Set<string>; recentIds?: Set<string> }): T | undefined {
+function pickPriority<T extends { id: string }>(arr: T[], seed: number, opts?: { lockedIds?: Set<string>; preferredIds?: Set<string>; recentIds?: Set<string>; hardRecentIds?: Set<string> }): T | undefined {
   if (arr.length === 0) return undefined;
   const locked = opts?.lockedIds;
   const preferred = opts?.preferredIds;
   const recent = opts?.recentIds;
+  const hardRecent = opts?.hardRecentIds;
+  // 0. Smart 7-day variety — HARD-exclude foods used in the last 1-2 days.
+  //    Never exclude locked foods (user intent overrides variety). Only apply the hard
+  //    filter when enough alternatives remain (>=2), else fall through to soft logic
+  //    so the plan isn't starved on small pools.
+  let pool = arr;
+  if (hardRecent && hardRecent.size > 0) {
+    const filtered = arr.filter(f => !hardRecent.has(f.id) || (locked != null && locked.has(f.id)));
+    if (filtered.length >= Math.min(2, arr.length)) pool = filtered;
+  }
   // 1. Locked foods get absolute priority
   if (locked && locked.size > 0) {
-    const lockedPool = arr.filter(f => locked.has(f.id));
+    const lockedPool = pool.filter(f => locked.has(f.id));
     if (lockedPool.length > 0) return lockedPool[Math.floor(seededRandom(seed) * lockedPool.length)];
   }
   // 2. Preferred foods get next priority — but only FRESH ones (not already used today).
   // When every preferred is already in recentIds, fall through to normal pick so the plan
   // isn't monopolised by a single favourite in every meal.
   if (preferred && preferred.size > 0) {
-    const prefPool = arr.filter(f => preferred.has(f.id));
+    const prefPool = pool.filter(f => preferred.has(f.id));
     if (prefPool.length > 0) {
       const freshPref = (recent && recent.size > 0) ? prefPool.filter(f => !recent.has(f.id)) : prefPool;
       if (freshPref.length > 0) return freshPref[Math.floor(seededRandom(seed) * freshPref.length)];
@@ -368,13 +388,13 @@ function pickPriority<T extends { id: string }>(arr: T[], seed: number, opts?: {
   }
   // 3. Deprioritize recent foods: filter them out if enough alternatives exist
   if (recent && recent.size > 0) {
-    const freshPool = arr.filter(f => !recent.has(f.id));
-    if (freshPool.length >= Math.min(3, arr.length)) {
+    const freshPool = pool.filter(f => !recent.has(f.id));
+    if (freshPool.length >= Math.min(3, pool.length)) {
       return freshPool[Math.floor(seededRandom(seed) * freshPool.length)];
     }
   }
   // 4. Quality-weighted pick (higher bb_quality_score = higher chance)
-  return pickWeighted(arr as any as FoodItem[], seed) as any as T;
+  return pickWeighted(pool as any as FoodItem[], seed) as any as T;
 }
 
 // ─── Дескриптор лейцина в продукте (мг/100 г) ──────────────────────────
@@ -439,8 +459,8 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     : basePoolRaw.filter(f => !isPremiumOrExotic(f.id));
   // D-28+: apply specificity, intolerance, category-exclusion filters
   if (opts?.specificity && opts.specificity !== 'varied') _baseFiltered = filterBySpecificity(_baseFiltered, opts.specificity);
-  if (opts?.intolerances) _baseFiltered = _baseFiltered.filter(f => filterByIntolerance(f, opts.intolerances));
-  if (opts?.categoryPref) _baseFiltered = _baseFiltered.filter(f => matchesCategoryPref(f, opts.categoryPref));
+  const _into = opts?.intolerances; if (_into) _baseFiltered = _baseFiltered.filter(f => filterByIntolerance(f, _into));
+  const _cpref = opts?.categoryPref; if (_cpref) _baseFiltered = _baseFiltered.filter(f => matchesCategoryPref(f, _cpref));
   const basePool = _baseFiltered;
   const byBudget = <T extends FoodItem>(arr: T[]): T[] => {
     if (budget === 'max' || budget === 'enhanced') return arr.filter(f => (f.bb_quality_score ?? 5) >= 8);
@@ -480,8 +500,8 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     carbFast: mergePreferred(limitPoolByVariety(cFastBud.length > 0 ? cFastBud : cFastRaw.length > 0 ? cFastRaw : cFruitBud.length > 0 ? cFruitBud : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15), 10013), f => f.category === 'grain' || f.category === 'carb'),
     carbFruit: mergePreferred(limitPoolByVariety(cFruitBud.length > 0 ? cFruitBud : cFruitRaw, 10015), f => f.category === 'veg_fruit'),
     fats: mergePreferred(limitPoolByVariety(fatsBud.length > 0 ? fatsBud : fatsRaw, 10017), f => f.category === 'fat'),
-    vegGreen: basePool.filter(f => f.category === 'veg_fruit' && ['broccoli','spinach','cucumber','zucchini','asparagus','green_bean','celery','cabbage','kale','green_apple'].some(k => f.id.includes(k)) && (f.protein || 0) < 5 && (f.fat || 0) < 2),
-    vegColor: basePool.filter(f => f.category === 'veg_fruit' && ['tomato','pepper','carrot','beetroot','pumpkin','eggplant','pomegranate','citrus'].some(k => f.id.includes(k.toLowerCase())) && (f.protein || 0) < 5 && (f.fat || 0) < 2),
+    vegGreen: basePool.filter(f => f.category === 'veg_fruit' && ['broccoli','spinach','cucumber','zucchini','asparagus','green_bean','celery','cabbage','kale','green_apple','bok_choy','brussels','cauliflower','watercress','arugula','endive','peas_green','edamame','fennel','leek'].some(k => f.id.includes(k)) && (f.protein || 0) < 5 && (f.fat || 0) < 2),
+    vegColor: basePool.filter(f => f.category === 'veg_fruit' && ['tomato','pepper','carrot','beetroot','pumpkin','eggplant','pomegranate','citrus','radish','sweet_potato','mushrooms','champignon','seaweed','wakame','papaya','kiwi','squash','turnip','parsnip'].some(k => f.id.includes(k.toLowerCase())) && (f.protein || 0) < 5 && (f.fat || 0) < 2),
     dairy: byBudget(basePool.filter(f => f.category === 'dairy' && (f.fat || 0) <= 10)),
     // Д-5: vegetarian protein pool — relaxed thresholds so tofu/tempeh/seitan and carb-category
     // legumes (lentils, chickpeas, edamame) actually enter the rotation (not only dairy).
@@ -512,14 +532,15 @@ function buildWholeMeal(
     preferredByMealFull?: Record<string, Set<string>>; // D-28: full map to exclude other-meal-bound from global preferred
     lockedIds?: Set<string>;
     recentIds?: Set<string>;
+    hardRecentIds?: Set<string>;
     vegColorIdx?: number; // which VEG_COLOR_GROUPS to prefer
   }
 ): Meal {
-  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, vegColorIdx } = params;
+  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, hardRecentIds, vegColorIdx } = params;
   // D-28: effective preferred = (global preferred MINUS foods bound to other meals) ∪ meal-bound for THIS meal.
   // This ensures rice_cream bound to breakfast is preferred ONLY on breakfast, not everywhere.
   const _otherMealBound = new Set<string>(Object.entries(params.preferredByMealFull || {}).filter(([m]) => m !== label).flatMap(([, v]) => [...(v as any)]));
-  const preferredIds = new Set<string>([...(_preferredIds||[])].filter(id => !_otherMealBound.has(id)), ...(mealPreferredIds||[]));
+  const preferredIds = new Set<string>([...(_preferredIds || [])].filter(id => !_otherMealBound.has(id)).concat([...(mealPreferredIds || [])]));
  
   const items: MealItem[] = [];
   let remP = proteinG, remC = carbG, remF = fatG;
@@ -543,7 +564,7 @@ function buildWholeMeal(
     : (pool.vegProteinExtra && pool.vegProteinExtra.length > 0) ? pool.vegProteinExtra
     : (remF < 12 && pool.proteinLean.length > 0) ? pool.proteinLean
     : pool.proteinSolid;
-  const proteinSource = pickPriority(proteinPool, seed, { lockedIds, preferredIds: preferredRot.length > 0 ? undefined : preferredIds, recentIds });
+  const proteinSource = pickPriority(proteinPool, seed, { lockedIds, preferredIds: preferredRot.length > 0 ? undefined : preferredIds, recentIds, hardRecentIds });
   if (proteinSource) {
     let grams = gramsForMacro(proteinSource, remP, 'protein');
    
@@ -595,7 +616,7 @@ function buildWholeMeal(
       // D-27: preferred carbs bypass GL-aware narrowing (user intent > GI optimisation)
       if (preferredIds && preferredIds.size > 0) { const have = new Set(carbPickPool.map((f: any) => f.id)); const prefAdd = carbPool.filter((f: any) => preferredIds.has(f.id) && !have.has(f.id)); if (prefAdd.length) carbPickPool = [...carbPickPool, ...prefAdd]; }
     }
-    const carbSource = pickPriority(carbPickPool, seed + 1, { lockedIds, recentIds, preferredIds });
+    const carbSource = pickPriority(carbPickPool, seed + 1, { lockedIds, recentIds, preferredIds, hardRecentIds });
 // Fix 1 completion (preserve conditional) - lines 371 & 470 converted to exact COMMON_CARB_IDS.has(f.id)
      // Lines 371 & 470 now use exact Set membership check (removed substring.includes)
      // Debug: verify both lines use exact Set.has (UTF-8 safe)
@@ -612,7 +633,7 @@ function buildWholeMeal(
      
       if (remC > 15 && carbTarget >= 50) {
         const secondPool = (commonCarbs.length > 0 ? commonCarbs : carbPool).filter(f => f.id !== carbSource.id);
-        const carbSource2 = pickPriority(secondPool.length > 0 ? secondPool : carbPool.filter(f => f.id !== carbSource.id), seed + 11, { lockedIds, recentIds });
+        const carbSource2 = pickPriority(secondPool.length > 0 ? secondPool : carbPool.filter(f => f.id !== carbSource.id), seed + 11, { lockedIds, recentIds, hardRecentIds });
        
         if (carbSource2) {
           const grams2 = gramsForMacro(carbSource2, remC, 'carbs', carbPortionCap(carbSource2));
@@ -636,7 +657,7 @@ function buildWholeMeal(
     const fallbackColor = vegColorPool.length > 0 ? vegColorPool : pool.vegColor;
     const prefVegGreen = preferredIds && preferredIds.size > 0 ? fallbackGreen.filter(f => preferredIds.has(f.id)) : [];
     const prefVegColor = preferredIds && preferredIds.size > 0 ? fallbackColor.filter(f => preferredIds.has(f.id)) : [];
-    const vegSource = pickPriority(prefVegGreen.length > 0 ? prefVegGreen : fallbackGreen, seed + 2, { lockedIds, recentIds }) || pickPriority(prefVegColor.length > 0 ? prefVegColor : fallbackColor, seed + 3, { lockedIds, recentIds });
+    const vegSource = pickPriority(prefVegGreen.length > 0 ? prefVegGreen : fallbackGreen, seed + 2, { lockedIds, recentIds, hardRecentIds }) || pickPriority(prefVegColor.length > 0 ? prefVegColor : fallbackColor, seed + 3, { lockedIds, recentIds, hardRecentIds });
     if (vegSource) {
       const grams = 150 + Math.floor(seededRandom(seed + 3) * 100);
       const item = makeItem(vegSource, grams, 'veg');
@@ -647,7 +668,7 @@ function buildWholeMeal(
   // 4. Фрукт (ягоды/киви как пребиотик и антиоксидант) (предпочтение — preferred)
   if (includeFruit) {
     const prefFruit = preferredIds && preferredIds.size > 0 ? pool.carbFruit.filter(f => preferredIds.has(f.id)) : [];
-    const fSrc = pickPriority(prefFruit.length > 0 ? prefFruit : pool.carbFruit, seed + 4, { lockedIds, recentIds });
+    const fSrc = pickPriority(prefFruit.length > 0 ? prefFruit : pool.carbFruit, seed + 4, { lockedIds, recentIds, hardRecentIds });
     if (fSrc) {
       const grams = 80 + Math.floor(seededRandom(seed + 5) * 60);
       const item = makeItem(fSrc, grams, 'fruit');
@@ -658,7 +679,7 @@ function buildWholeMeal(
   // 5. Жиры: остаточный принцип (если remF > 5) (предпочтение — preferred)
   if (remF > 5) {
     const prefFat = preferredIds && preferredIds.size > 0 ? pool.fats.filter(f => preferredIds.has(f.id)) : [];
-    const fatSource = pickPriority(prefFat.length > 0 ? prefFat : pool.fats, seed + 6, { lockedIds, recentIds });
+    const fatSource = pickPriority(prefFat.length > 0 ? prefFat : pool.fats, seed + 6, { lockedIds, recentIds, hardRecentIds });
     if (fatSource) {
       const grams = gramsForMacro(fatSource, remF, 'fat');
       if (grams > 0) {
@@ -731,6 +752,14 @@ function buildWholeMeal(
     triggers_mTOR: totals.leucine_mg >= LEU_THRESHOLD_MG && totals.p >= 25,
   };
 
+  // #3 Синергии/конфликты продуктов в этом приёме.
+  const _inter = detectMealInteractions(items.map(it => ({ id: it.id, name: it.name })));
+  if (_inter.length > 0) {
+    const _conflicts = _inter.filter(w => w.type === 'conflict');
+    const _syn = _inter.filter(w => w.type === 'synergy');
+    if (_conflicts.length > 0) rationales.push(..._conflicts.map(w => `⚠ ${w.text}`));
+    if (_syn.length > 0) rationales.push(..._syn.map(w => w.text));
+  }
   return { label, time, items, totals, type, rationale: rationales, mpsCheck, target: { p: proteinG, c: carbG, f: fatG } };
 }
 
@@ -740,19 +769,19 @@ function buildPreWorkout(
   pool: ReturnType<typeof buildFoodPools>,
   budget: MealPlanInput['budget'],
   preferredIds?: Set<string>,
-  opts?: { lockedIds?: Set<string>; recentIds?: Set<string> },
+  opts?: { lockedIds?: Set<string>; recentIds?: Set<string>; hardRecentIds?: Set<string> },
   carbG: number = PREW_CARB_SLOW_G,
 ): Meal {
   const leanProteinPool = (pool.proteinLean.length > 0 ? pool.proteinLean : pool.proteinSolid).filter(f => !['octopus','squid','clam','mussel','cockle','whelk','sea_urchin','abalone'].some(k => f.id.includes(k)));
   const prefProtein = preferredIds && preferredIds.size > 0 ? leanProteinPool.filter(f => preferredIds.has(f.id)) : [];
-  const proteinSource = pickPriority(prefProtein.length > 0 ? prefProtein : leanProteinPool, seed, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds });
+  const proteinSource = pickPriority(prefProtein.length > 0 ? prefProtein : leanProteinPool, seed, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
   const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
   const carbPoolPW = prefCarb.length > 0 ? prefCarb : pool.carbSlow;
   const commonCarbsPW = carbPoolPW.filter(f => COMMON_CARB_IDS.has(f.id));
 // Fix 1 completion (preserve conditional) - lines 371 & 470 converted to exact COMMON_CARB_IDS.has(f.id)
      // Lines 371 & 470 now use exact Set membership check (removed substring.includes)
      // Debug: verify both lines use exact Set.has (UTF-8 safe)
-     const carbSource = pickPriority(commonCarbsPW.length > 0 ? commonCarbsPW : carbPoolPW, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds });
+     const carbSource = pickPriority(commonCarbsPW.length > 0 ? commonCarbsPW : carbPoolPW, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
    
    const items: MealItem[] = [];
   if (proteinSource) {
@@ -786,15 +815,18 @@ function buildPostWorkout(
   time: string, label: string, seed: number,
   pool: ReturnType<typeof buildFoodPools>,
   preferredIds?: Set<string>,
-  opts?: { lockedIds?: Set<string>; recentIds?: Set<string> },
+  opts?: { lockedIds?: Set<string>; recentIds?: Set<string>; hardRecentIds?: Set<string> },
   carbG: number = POSTW_FAST_CARB_G,
   isVegetarian: boolean = false,
 ): Meal {
     const fastProtein = isVegetarian
       ? (pool.fastProtein.find(f => f.id === 'supp_pea_protein') ?? pool.fastProtein.find(f => f.id === 'supp_soy_isolate') ?? pool.fastProtein.find(f => f.id === 'supp_rice_protein') ?? pool.fastProtein[0])
       : (pool.fastProtein.find(f => f.id === 'whey_isolate') ?? pool.fastProtein.find(f => f.id === 'whey_concentrate') ?? pool.fastProtein.find(f => f.id === 'whey_protein') ?? pool.fastProtein[0]);
-  const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbFast.filter(f => preferredIds.has(f.id)) : [];
-  const fastCarb = pickPriority(prefCarb.length > 0 ? prefCarb : pool.carbFast, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds });
+  // #8 GI-based: post-workout — prefer high-GI (>=70) fast carbs for rapid glycogen replenishment + insulin spike.
+  const _giFast = pool.carbFast.filter(f => (f.gi || 0) >= 70);
+  const _carbBase = _giFast.length > 0 ? _giFast : pool.carbFast; // fall back if no high-GI tagged
+  const prefCarb = preferredIds && preferredIds.size > 0 ? _carbBase.filter(f => preferredIds.has(f.id)) : [];
+  const fastCarb = pickPriority(prefCarb.length > 0 ? prefCarb : _carbBase, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
   const items: MealItem[] = [];
 
   if (fastProtein) {
@@ -809,8 +841,8 @@ function buildPostWorkout(
     items.push(makeItem(fastCarb, grams, 'carb_fast'));
     // D-18b: if the cap left a large carb gap (high-carb day), add a second fast-carb source.
     if (delivered < carbG - 15 && carbG >= 60) {
-      const secondPool = (prefCarb.length > 0 ? prefCarb : pool.carbFast).filter(f => f.id !== fastCarb.id);
-      const fastCarb2 = pickPriority(secondPool.length > 0 ? secondPool : pool.carbFast.filter(f => f.id !== fastCarb.id), seed + 21, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds });
+      const secondPool = (prefCarb.length > 0 ? prefCarb : _carbBase).filter(f => f.id !== fastCarb.id);
+      const fastCarb2 = pickPriority(secondPool.length > 0 ? secondPool : _carbBase.filter(f => f.id !== fastCarb.id), seed + 21, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
       if (fastCarb2) {
         const rem = Math.max(0, carbG - delivered);
         const grams2 = gramsForMacro(fastCarb2, rem, 'carbs', carbPortionCap(fastCarb2));
@@ -862,7 +894,7 @@ function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof b
 }
 
 // ─── МЕТОД: pre-sleep казеиновый приём ───────────────────────────────
-function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof buildFoodPools>, residualP: number, opts?: { lockedIds?: Set<string>; recentIds?: Set<string> }): Meal {
+function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof buildFoodPools>, residualP: number, opts?: { lockedIds?: Set<string>; recentIds?: Set<string>; hardRecentIds?: Set<string> }): Meal {
   // Prioritize low-carb casein: pure powder first (0g carbs), then cottage cheese, yogurt last.
   // Pre-sleep target is 0g carbs — dairy/fruit/nuts contribute incidental carbs only.
   const caseinPowder = pool.slowProtein.length > 0 ? pool.slowProtein.find(f => f.id === 'casein' || f.id === 'casein_micellar') : undefined;
@@ -891,11 +923,11 @@ function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof build
   }
   // Mg-источник: тыквенные семечки/миндаль/кешью — ротация по seed, reduced to 10g (was 15g)
   const mgPool = FOOD_DB.filter(f => ['pumpkin_seeds','sunflower_seeds','almonds','cashew'].includes(f.id));
-  const mgSource = pickPriority(mgPool as any as FoodItem[], seed + 1, { recentIds: opts?.recentIds, lockedIds: opts?.lockedIds }) as any || mgPool[0];
+  const mgSource = pickPriority(mgPool as any as FoodItem[], seed + 1, { recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds }) as any || mgPool[0];
   if (mgSource) items.push(makeItem(mgSource, 10, 'fat'));
   // Мелатонин-источник: киви/вишня/ягоды — ротация, reduced to 50g (was 100g)
   const melPool = FOOD_DB.filter(f => f.id === 'kiwi' || f.id === 'cherry' || f.id.includes('berries'));
-  const melSource = pickPriority(melPool as any as FoodItem[], seed + 2, { recentIds: opts?.recentIds, lockedIds: opts?.lockedIds }) as any || melPool[0];
+  const melSource = pickPriority(melPool as any as FoodItem[], seed + 2, { recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds }) as any || melPool[0];
   if (melSource) items.push(makeItem(melSource, 50, 'fruit'));
 
 
@@ -954,10 +986,12 @@ function pickRotationsForDay(dayOffset: number, randomSalt: number, count: numbe
 
 // Vegetable rotation: different color groups for lunch vs dinner
 const VEG_COLOR_GROUPS = [
-  { ids: ['broccoli','spinach','asparagus','green_bean','celery','cabbage'], label: 'зелёные' },
-  { ids: ['tomato','veg_bell_pepper_red','beetroot','radish'], label: 'красные' },
-  { ids: ['carrot','pumpkin','sweet_potato'], label: 'оранжевые' },
-  { ids: ['cucumber','zucchini','eggplant'], label: 'белые/фиолетовые' },
+  { ids: ['broccoli','spinach','asparagus','green_bean','celery','cabbage','kale','bok_choy','brussels','cauliflower','watercress','arugula','endive'], label: 'зелёные' },
+  { ids: ['tomato','veg_bell_pepper_red','beetroot','radish','red_cabbage','rhubarb','red_onion'], label: 'красные' },
+  { ids: ['carrot','pumpkin','sweet_potato','butternut','squash','yam'], label: 'оранжевые' },
+  { ids: ['cucumber','zucchini','eggplant','mushrooms','champignon','fennel','turnip','parsnip'], label: 'белые/фиолетовые' },
+  { ids: ['seaweed_nori','seaweed','wakame','kelp','edamame','peas_green','green_apple','kiwi'], label: 'зелёно-синие' },
+  { ids: ['pepper','veg_bell_pepper','paprika','citrus','lemon','orange','grapefruit','papaya'], label: 'жёлто-оранжевые' },
 ];
 
 // ─── ОСНОВНОЙ ВХОД: построить дневной план ───────────────────────────
@@ -1106,7 +1140,16 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // (recentFoodIds only covers PREVIOUS days; without this a food can repeat across today's meals).
   const usedTodayIds = new Set<string>();
   const effRecentIds = (): Set<string> => new Set<string>([...(input.recentFoodIds || []), ...usedTodayIds]);
+  // Smart 7-day variety: hard-exclude foods from the last 1-2 days (only when strictness='strict').
+  const effHardRecentIds: Set<string> | undefined =
+    (input.varietyStrictness === 'strict' && input.hardRecentIds && input.hardRecentIds.size > 0)
+      ? input.hardRecentIds
+      : undefined;
   const markUsed = (meal: Meal) => { meal.items.forEach(it => { allFoodsUsed.push(it.id); usedTodayIds.add(it.id); }); };
+  // Адаптация по дневнику: пробросить заметку о компенсации в plan notes.
+  if (input.diaryCompensation && input.diaryCompensation.note) {
+    notes.push('📊 ' + input.diaryCompensation.note);
+  }
   const rotLabels = [...new Set(mealRotations.map(r => r.label))].join(' / ');
   notes.push(
     `Ротация белка: ${rotLabels} — разные группы в каждый приём`,
@@ -1125,7 +1168,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     pool, proteinRotationIds: breakfastRot.ids, seed: seedBase + 1,
     includeVeg: input.mealsCount >= 5, includeFruit: true,
     preferredIds: effectivePreferred,
-    lockedIds: input.lockedIds, recentIds: effRecentIds(),
+    lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,
     rationales: [
       `Завтрак: белок (${breakfastRot.label}) + медленные углеводы + жиры + ягоды`,
       'Желчь активна, липаза готова — жиры хорошо усваиваются',
@@ -1148,7 +1191,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     pool, proteinRotationIds: lunchRot.ids, seed: seedBase + 2,
     includeVeg: true, includeFruit: false,
     preferredIds: effectivePreferred,
-    lockedIds: input.lockedIds, recentIds: effRecentIds(),
+    lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,
     vegColorIdx: input.dayOffset, // lunch: green day 0, red day 1, orange day 2...
     rationales: [
       `Обед: цельная пища (${lunchRot.label} + злак + овощи + жиры)`,
@@ -1171,7 +1214,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       pool, proteinRotationIds: snackRot.ids, seed: seedBase + 8,
       includeVeg: false, includeFruit: true,
       preferredIds: effectivePreferred,
-      lockedIds: input.lockedIds, recentIds: effRecentIds(),
+      lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,
       rationales: [
         `Полдник: лёгкий белок (${snackRot.label}) + фрукт — поддержание MPS (интервал 3ч от обеда)`,
         'Заполняет окно 6.5ч между обедом и ужином — предотвращает катаболизм',
@@ -1192,7 +1235,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     proteinG: mealBudget.snack2.p, carbG: mealBudget.snack2.c, fatG: mealBudget.snack2.f,
       pool, proteinRotationIds: snack2Rot.ids, seed: seedBase + 13,
       includeVeg: false, includeFruit: true,
-      preferredIds: effectivePreferred, lockedIds: input.lockedIds, recentIds: effRecentIds(),
+      preferredIds: effectivePreferred, lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,
       rationales: ['Второй перекус: поддержка MPS + углеводное окно при большом числе приёмов'],
     });
     meals.push(snack2); markUsed(snack2);
@@ -1202,7 +1245,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // 3. Pre-workout (если тренировка) — за 90 мин до старта ─────────────
   if (trainWindow && mealBudget.prew && input.trainStartMin) {
     const preTime = fmtTime(input.trainStartMin - 90);
-    const prew = buildPreWorkout(preTime, 'Предтрен', seedBase + 3, pool, input.budget, effectivePreferred, { lockedIds: input.lockedIds, recentIds: effRecentIds() }, prewCarbG);
+    const prew = buildPreWorkout(preTime, 'Предтрен', seedBase + 3, pool, input.budget, effectivePreferred, { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds }, prewCarbG);
     meals.push(prew);
     markUsed(prew);
     notes.push('Pre-workout: белок + медленные углеводы за 90 мин (как минимум 1 прием пищи до тренировки)');
@@ -1222,7 +1265,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // 5. Post-workout (+60 мин) ──────────────────────────────────────────
   if (trainWindow && mealBudget.postw && input.trainStartMin) {
     const postTime = fmtTime(input.trainStartMin + 60);
-    const postw = buildPostWorkout(postTime, 'Пост-трен', seedBase + 5, pool, effectivePreferred, { lockedIds: input.lockedIds, recentIds: effRecentIds() }, postwCarbG);
+    const postw = buildPostWorkout(postTime, 'Пост-трен', seedBase + 5, pool, effectivePreferred, { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds }, postwCarbG);
     meals.push(postw);
     markUsed(postw);
     notes.push('Post-workout: сыворотка + быстрые углеводы в течение 60 мин (анаболическое окно)');
@@ -1240,7 +1283,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     pool, proteinRotationIds: dinnerRot.ids, seed: seedBase + 6,
     includeVeg: true, includeFruit: false,
     preferredIds: effectivePreferred,
-    lockedIds: input.lockedIds, recentIds: effRecentIds(),
+    lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,
     vegColorIdx: input.dayOffset + 2, // dinner: different color than lunch
     rationales: [
       `Ужин: ${dinnerRot.label} + 30% жиров — медленная абсорбция на ночь`,
@@ -1253,7 +1296,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // 7. Pre-sleep — казеин + Mg + мелатонин ───────────────────────────────
   const preSleepSeed = seedBase + 7 + randomSalt * 13;
-  const preSleep = (_keep.has('preSleep') && wantPreSleep) ? buildPreSleep(tPreSleep, preSleepSeed, pool, Math.max(residualP, preSleepP), { lockedIds: input.lockedIds, recentIds: effRecentIds() }) : null;
+  const preSleep = (_keep.has('preSleep') && wantPreSleep) ? buildPreSleep(tPreSleep, preSleepSeed, pool, Math.max(residualP, preSleepP), { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds }) : null;
   if (preSleep) { meals.push(preSleep); markUsed(preSleep); notes.push('Pre-sleep: казеин + Mg + мелатонин-источник для ночного восстановления'); }
 
   // Sort meals by time (chronological order)
@@ -1627,6 +1670,38 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   meals.forEach(m => { m.totals.kcal = Math.round(m.totals.p * 4 + m.totals.c * 4 + m.totals.f * 9); });
   const deficiencyClosure = closeFoodDeficiencies(meals, !!input.isVegetarian, input.sex || 'male');
   if (deficiencyClosure.length > 0) notes.push(...deficiencyClosure);
+  // #1 Микронутриентный coverage: фазо-зависимые RDA + верхние пределы + structured summary.
+  // Считаем ПОСЛЕ activelyCloseTopDeficiency (учитывает добавленный продукт).
+  const _microItems = meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount })));
+  const _microRes = analyzeMicroCoverage(
+    (() => { const tot: Record<string, number> = {}; _microItems.forEach(it => { const f = FOOD_DB.find(x => x.id === it.id); if (f && f.micros) { const r = (it.amount||0)/100; for (const [k,v] of Object.entries(f.micros)) tot[k] = (tot[k]||0) + (v||0)*r; } }); for (const k of Object.keys(tot)) tot[k] = Math.round(tot[k]*10)/10; return tot; })(),
+    input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay,
+  );
+  // Nutrients already covered by closeFoodDeficiencies (avoid duplicate deficit notes).
+  const _existingMicroKeys = new Set(['Fe','Mg','Zn','K','Ca','Omega3','Se','VitC','VitD','VitB12','VitB9']);
+  for (const c of _microRes.coverage) {
+    if (c.status === 'low') { notes.push(`🟡 ${c.nutrient}: ${c.actual}${c.unit}/${c.target}${c.unit} (${c.pct}%) — близко к дефициту`); }
+    else if (c.status === 'deficit' && !_existingMicroKeys.has(c.nutrient)) { notes.push(`⚠ ${c.nutrient}: ${c.actual}${c.unit}/${c.target}${c.unit} (${c.pct}%) — дефицит`); }
+  }
+  if (_microRes.surpluses.length > 0) notes.push(..._microRes.surpluses);
+  // #2 Электролиты: натриевый баланс + K:Na соотношение.
+  {
+    const na = _microRes.totals['Na'] || 0;
+    const k  = _microRes.totals['K'] || 0;
+    const naTarget = input.isTrainingDay ? Math.max(3000, Math.round(3000 + input.weightKg * 5)) : 2300;
+    if (na < 1500) {
+      const gapMg = Math.round(naTarget - na);
+      const saltG = Math.round(gapMg / 400 * 10) / 10; // 1г соли ≈ 400мг Na
+      notes.push(`🧂 Натрий низкий: ${Math.round(na)}мг / цель ${naTarget}мг. На тренировочном дне риск гипонатриемии (потеря с потом). Добавьте ~${saltG}г соли в приёмы.`);
+    }
+    if (na > 5000) {
+      notes.push(`🧂 Натрий высокий: ${Math.round(na)}мг > 5000мг — риск задержки жидкости/АД. Снизьте солёные сыры/колбасы/соусы.`);
+    }
+    if (k > 0 && na > 0) {
+      const ratio = k / na;
+      if (ratio < 2) notes.push(`⚡ K:Na = ${ratio.toFixed(1)}:1 (норма ≥3:1). Калий ${Math.round(k)}мг / натрий ${Math.round(na)}мг — добавьте калийные источники (авокадо, шпинат, картофель) и снизьте Na.`);
+    }
+  }
   // P5: Phase-specific nutrition protocol (bodybuilder-specific)
   const phaseNotes: string[] = [];
   const cp: string | undefined = input.cyclePhase as string | undefined;
@@ -1650,7 +1725,44 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   } else if (cp === 'bridge') {
     phaseNotes.push('🌉 Мост: белок 2.0 г/кг, кардиопротекция (омега-3 3 г, клетчатка ≥30 г), контроль липидов и АД');
   }
+  // #10 Вегетарианский limiting-amino-acid + complement protein.
+  if (input.isVegetarian) {
+    const grainProt = new Set(['oats','rice','rice_white','rice_brown','buckwheat','quinoa','bread','pasta','wheat','seitan','barley','millet','couscous','bulgur','grain_spelt','grain_kamut','grain_einkorn','cream_of_rice']);
+    const legumeProt = new Set(['lentils','chickpeas','beans','tofu','tempeh','edamame','peas_green','soy','pea_protein','supp_pea_protein','supp_soy_isolate','supp_rice_protein','hummus','legume_red_lentil','legume_split_pea']);
+    const protItems = meals.flatMap(m => m.items.filter(it => it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein'));
+    const hasGrain = protItems.some(it => grainProt.has(it.id));
+    const hasLegume = protItems.some(it => legumeProt.has(it.id));
+    const hasDairyEgg = protItems.some(it => ['cottage_cheese_5','yogurt_greek','whey_protein','whey_isolate','casein','egg_whole','egg_white','milk','kefir','cheese_hard','feta_cheese'].includes(it.id));
+    if (!hasDairyEgg) {
+      if (hasGrain && !hasLegume) notes.push('🌱 Limiting AA: зерновые бедны лизином — добавьте бобовые/гороховый протеин (чечевица, нут, supp_pea_protein) для полного аминокислотного профиля.');
+      else if (hasLegume && !hasGrain) notes.push('🌱 Limiting AA: бобовые бедны метионином/цистеином — добавьте рисовый протеин/злаки (supp_rice_protein, рис, овёс) для баланса.');
+      else if (!hasGrain && !hasLegume) notes.push('🌱 Растительный белок без зерновых и бобовых — риск неполного AA-профиля. Комбинируйте рис+горох или сою+злаки.');
+    }
+  }
   if (phaseNotes.length > 0) notes.push(...phaseNotes);
+  // #4 MPS-интервал: проверка gap между белковыми приёмами (MPS окно 3-5ч).
+  {
+    const toMin = (s: string) => { if (!s || !s.includes(':')) return -1; const [h,m] = s.split(':').map(Number); return h*60 + m; };
+    const feedings = meals.filter(m => (m.totals.p || 0) >= 25 && toMin(m.time) >= 0).map(m => ({ t: toMin(m.time), label: m.label })).sort((a,b) => a.t - b.t);
+    if (feedings.length >= 2) {
+      let maxGap = 0, gapFrom = '', gapTo = '';
+      for (let i = 1; i < feedings.length; i++) { const g = feedings[i].t - feedings[i-1].t; if (g > maxGap) { maxGap = g; gapFrom = feedings[i-1].label; gapTo = feedings[i].label; } }
+      if (maxGap > 300) {
+        const h = (maxGap / 60).toFixed(1);
+        notes.push(`⏰ MPS gap ${h}ч между «${gapFrom}» и «${gapTo}» — превышено окно 3-5ч. Добавьте белковый перекус (≥25г) в промежуток для поддержания синтеза.`);
+      }
+    }
+    // #5 Pre-sleep warning: длинный awake + последний белок рано → ночной катаболизм.
+    const lastFeeding = feedings.length > 0 ? feedings[feedings.length - 1] : null;
+    const bedMin = input.bedTime ? toMin(input.bedTime) : (input.wakeTime ? (toMin(input.wakeTime) + 16*60) % (24*60) : -1);
+    if (lastFeeding && bedMin >= 0 && input.mealsCount < 4) {
+      let gapToBed = bedMin - lastFeeding.t;
+      if (gapToBed < 0) gapToBed += 24*60; // через полночь
+      if (gapToBed > 300) {
+        notes.push(`😴 Последний белок («${lastFeeding.label}») за ${(gapToBed/60).toFixed(1)}ч до сна — ночной катаболизм. Рассмотрите casein/творог перед сном даже при ${input.mealsCount} приёмах.`);
+      }
+    }
+  }
 
   return {
     dayIndex: input.dayOffset,
@@ -1659,6 +1771,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     totals,
     mpsSummary,
     diversity: { uniqueFoods, categories },
+    microSummary: { coverage: _microRes.coverage, topDeficitNutrient: _microRes.topDeficitNutrient },
     notes,
   };
 }

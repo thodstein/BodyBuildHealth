@@ -462,6 +462,42 @@ export const IndividualPlanResults: React.FC = () => {
           )}
         </div>
       )}
+      {/* ????????? ?? ????????: ?????? ??????????? ?????????? ?????????? */}
+      {/* #1 Микронутриентный coverage — структура по 16 нутриентам */}
+      {generated && dayPlan && (dayPlan as any).microSummary && (dayPlan as any).microSummary.coverage && (() => {
+        const cov = (dayPlan as any).microSummary.coverage as any[];
+        const ordered = [...cov].sort((a,b) => a.pct - b.pct);
+        const colorFor = (s: string) => s === 'deficit' ? '#ef4444' : s === 'high' ? '#f97316' : s === 'low' ? '#f59e0b' : '#22c55e';
+        const labelMap: Record<string,string> = { Ca:'Кальций', Fe:'Железо', Mg:'Магний', Zn:'Цинк', Se:'Селен', K:'Калий', Na:'Натрий', VitC:'C', VitD:'D', VitB12:'B12', VitB6:'B6', VitB9:'Фолат', VitA:'A', VitE:'E', VitK:'K', Omega3:'Омега-3' };
+        return (
+          <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.2)', marginBottom:8 }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>🧪 Микронутриенты (RDA coverage)</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4 }}>
+              {ordered.slice(0, 16).map(c => (
+                <div key={c.nutrient} style={{ textAlign:'center', padding:'3px 2px', borderRadius:6, background:'rgba(255,255,255,0.03)' }}>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)' }}>{labelMap[c.nutrient] || c.nutrient}</div>
+                  <div style={{ fontSize:11, fontWeight:800, color: colorFor(c.status) }}>{c.pct}%</div>
+                  <div style={{ height:3, borderRadius:2, background:'rgba(255,255,255,0.08)', marginTop:2, overflow:'hidden' }}>
+                    <div style={{ height:'100%', width:`${Math.min(100, c.pct)}%`, background: colorFor(c.status) }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+      {generated && dayPlan && (dayPlan as any).diaryCompensation && (() => {
+        const dc = (dayPlan as any).diaryCompensation;
+        const sev = dc.severity || 'low';
+        const color = sev === 'high' ? '#ef4444' : sev === 'medium' ? '#f59e0b' : '#10b981';
+        return (
+          <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:`rgba(${sev==='high'?'239,68,68':sev==='medium'?'245,158,11':'16,185,129'},0.08)`, border:`1px solid rgba(${sev==='high'?'239,68,68':sev==='medium'?'245,158,11':'16,185,129'},0.25)` }}>
+            <div style={{ fontSize:8, fontWeight:700, color, marginBottom:2 }}>?? ????????? ?? ????????</div>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{dc.note}</div>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:3 }}>???? ?? ??????? ??????????????? ?? ????? ?????????? ???.</div>
+          </div>
+        );
+      })()}
       {generated && dayPlan && <DailyDietDashboard />}
       {generated && dayPlan && (
         <NutritionQualityCard
@@ -976,6 +1012,7 @@ export const IndividualPlanResults: React.FC = () => {
                         </span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           {packEstimate && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{packEstimate}</span>}
+                          {data.batchCook && <span title={data.batchCook} style={{ fontSize: 6, color: '#22c55e', fontWeight: 700, padding: '1px 4px', borderRadius: 4, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>🍳{data.dayCount}д</span>}
                           <span style={{ color: isChecked ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                             {data.amount >= 1000 ? `${(data.amount / 1000).toFixed(1)} кг` : `${Math.round(data.amount)} г`}
                           </span>

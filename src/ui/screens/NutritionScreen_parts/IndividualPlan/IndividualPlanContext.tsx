@@ -5,7 +5,7 @@ import { PHARMA_DB } from "../../../../core/pharma-database";
 import { calcNutrition } from "../../../../engines/nutrition.engine";
 import { calcNutritionV2 } from "../../../../engines/nutrition-v2.engine";
 import { updateProfile } from "../../../../core/profile-manager";
-import { getRecipesByMeal, type Recipe } from "../../../../engines/nutrition-periodization.engine";
+import { getRecipes, getRecipesByMeal, type Recipe } from "../../../../engines/nutrition-periodization.engine";
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type DailyDietReport, type MealScoreV2 } from "../../../../engines/product-usefulness-v2.engine";
 import { scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU, parseServingSizeGrams } from "../../../../engines/kbju-food-match.engine";
 import { generateNutritionReport, type NutritionReport } from "../../../../engines/nutrition-report.engine";
@@ -19,6 +19,7 @@ import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplac
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
 import { buildDayPlan as buildDayPlanV2, type DayPlanV2, type MealPlanInput } from "./meal-plan-engine";
+import { getYesterdaySummary, computeCompensation, computeRollingCompensation, type CompensationResult } from "./planner-diary-adaptation";
 import {
   GOALS, PHASES, BUDGET_LEVELS, NUTRITION_LEVELS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES,
@@ -95,6 +96,8 @@ export interface PlanCtx {
   budget: BudgetLevel; setBudget: (v: BudgetLevel) => void;
   nutrLevel: NutritionLevel; setNutrLevel: (v: NutritionLevel) => void;
   variety: string; setVariety: (v: any) => void;
+  diaryAdaptation: boolean; setDiaryAdaptation: (v: boolean) => void;
+  varietyStrictness: 'soft' | 'strict'; setVarietyStrictness: (v: 'soft' | 'strict') => void;
   wakeTime: string; setWakeTime: (v: string) => void;
   bedTime: string; setBedTime: (v: string) => void;
   lunchTime: string; setLunchTime: (v: string) => void;
@@ -107,6 +110,11 @@ export interface PlanCtx {
   planType: PlanType; setPlanType: (v: PlanType) => void;
   preferredFoods: string[]; setPreferredFoods: (v: any) => void;
   excludedFoods: string[]; setExcludedFoods: (v: any) => void;
+  preferredByMeal: Record<string, string[]>; setPreferredByMeal: (v: any) => void;
+  specificity: Specificity; setSpecificity: (v: Specificity) => void;
+  intolerances: Intolerances; setIntolerances: (v: any) => void;
+  tasteProfile: TasteProfile; setTasteProfile: (v: any) => void;
+  excludedCategories: string[]; setExcludedCategories: (v: any) => void;
   allergenExcludedCount: number; setAllergenExcludedCount: (v: number) => void;
   planTargets: any; setPlanTargets: (v: any) => void;
   cyclingMode: CycleType; setCyclingMode: (v: CycleType) => void;
@@ -382,10 +390,16 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { try { localStorage.setItem('he_specificity', specificity); } catch {} }, [specificity]);
   const [intolerances, setIntolerances] = useState<Intolerances>(() => { try { return JSON.parse(localStorage.getItem('he_intolerances') || '{}'); } catch { return {}; } });
   useEffect(() => { try { localStorage.setItem('he_intolerances', JSON.stringify(intolerances)); } catch {} }, [intolerances]);
-  const [tasteProfile, setTasteProfile] = useState<TasteProfile>(() => { try { return JSON.parse(localStorage.getItem('he_taste_profile') || '{"spicy":0,"sweet":0,"salty":0,"sour":0}'); } catch { return { spicy: 0, sweet: 0, salty: 0, sour: 0 }; } });
+  const [tasteProfile, setTasteProfile] = useState<TasteProfile>(() => { try { const p = JSON.parse(localStorage.getItem('he_taste_profile') || '{"spicy":0,"sweet":0,"salty":0,"sour":0,"umami":0}'); return { spicy: 0, sweet: 0, salty: 0, sour: 0, umami: 0, ...p }; } catch { return { spicy: 0, sweet: 0, salty: 0, sour: 0, umami: 0 }; } });
   useEffect(() => { try { localStorage.setItem('he_taste_profile', JSON.stringify(tasteProfile)); } catch {} }, [tasteProfile]);
   const [excludedCategories, setExcludedCategories] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_excluded_categories') || '[]'); } catch { return []; } });
   useEffect(() => { try { localStorage.setItem('he_excluded_categories', JSON.stringify(excludedCategories)); } catch {} }, [excludedCategories]);
+  // Адаптация по фактическому дневнику (вчера → сегодня компенсация).
+  const [diaryAdaptation, setDiaryAdaptation] = useState<boolean>(() => { try { return localStorage.getItem('he_diary_adaptation') !== 'false'; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem('he_diary_adaptation', diaryAdaptation ? 'true' : 'false'); } catch {} }, [diaryAdaptation]);
+  // Smart 7-day variety: 'soft' = только deprioritize recent, 'strict' = hard-exclude последние 1-2 дня.
+  const [varietyStrictness, setVarietyStrictness] = useState<'soft' | 'strict'>(() => { try { return (localStorage.getItem('he_variety_strictness') as 'soft' | 'strict') || 'strict'; } catch { return 'strict'; } });
+  useEffect(() => { try { localStorage.setItem('he_variety_strictness', varietyStrictness); } catch {} }, [varietyStrictness]);
   const [excludedFoods, setExcludedFoods] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_excluded_foods') || '[]'); } catch { return []; } });
   const [dietPrefs, setDietPrefs] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_diet_preferences') || '[]'); } catch { return []; } });
   const [allergenExcludedCount, setAllergenExcludedCount] = useState(0);
@@ -700,7 +714,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (isPreW && isTrainingDay && userSupps.some(s => (s?.id||'').includes('bcaa')||(s?.id||'').includes('eaa'))) slotItems.push({name:'BCAA/EAA',dose:'10-15г',note:'За 30 мин до тренировки'});
       if (isPostW && isTrainingDay) {
         if (userSupps.some(s => (s?.id||'').includes('whey')||(s?.id||'').includes('protein'))) slotItems.push({name:'Протеин',dose:'30-50г',note:'После тренировки'});
-        if (userSupps.some(s => (s?.id||'').includes('creatine'))) slotItems.push({name:'Креатин',dose:'5г',note:'С пост-тренировочным приёмом'});
+        if (userSupps.some(s => (s?.id||'').includes('creatine'))) slotItems.push({name:'Креатин',dose:'5г',note:'С углеводами postW (инсулин усиливает транспорт в мышцы)'});
       }
       if (isEvening) {
         if (userSupps.some(s => (s?.id||'').includes('omega')||(s?.id||'').includes('fish_oil'))) slotItems.push({name:'Омега-3',dose:'2-3г',note:'Второй приём за день'});
@@ -735,6 +749,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (phaseSupps.length > 0) {
       timeline.push({ time: '▸ Фаза', items: [{name:`Фаза «${phase}»`,dose:'—',note:phaseSupps.map(s=>`${s.name} ${s.dose}: ${s.note}`).join(' | ')}] });
       timeline.push(...phaseSupps.map(s => ({ time: '', items: [s] })));
+      if (isPreW && isTrainingDay && userSupps.some(s => (s?.id||'').includes('citrulline'))) slotItems.push({name:'Цитруллин',dose:'6-8г',note:'За 30-45 мин до трена (NO-буст, pumps)'});
+      if (isPreW && isTrainingDay && userSupps.some(s => (s?.id||'').includes('beta_alanine'))) slotItems.push({name:'Бета-аланин',dose:'3-4г',note:'Пре-трен, буфер молочной кислоты'});
     }
     return timeline;
   };
@@ -797,11 +813,38 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         if (!isNaN(num) && num > 0) labValuesForPlan[key.toUpperCase()] = num;
       });
 
+      // Адаптация по дневнику: компенсация вчерашнего отклонения для сегодняшнего дня.
+      const baseGoalKcal = Math.max(1200, effectiveKcal || weight * 30 || 2500);
+      const baseGoalP = Math.max(80, effectiveP || weight * 2 || 160);
+      const baseGoalF = Math.max(30, effectiveF || weight * 0.8 || 70);
+      const baseGoalC = Math.max(50, effectiveC || weight * 3.5 || 300);
+      // #6 rolling 7-day компенсация (вчера 50% + старшие дни 25% от среднего; алкоголь-осведомлённая #15)
+      const diaryComp: CompensationResult | null = diaryAdaptation
+        ? computeRollingCompensation({ kcal: baseGoalKcal, p: baseGoalP, f: baseGoalF, c: baseGoalC }, 7)
+        : null;
+      // Smart 7-day variety: rolling window of food IDs from the last 2 built days.
+      // recentFoodIds (existing) accumulates ALL prior days; hardWindow holds the last 2
+      // for the stricter hard-exclusion (adjacent days don't repeat products).
+      const hardWindow: string[][] = [];
+      const collectDayFoods = (day: any): string[] => {
+        const ids: string[] = [];
+        if (day?.meals) day.meals.forEach((m: any) => m.items?.forEach((it: any) => { if (it.id) ids.push(it.id); }));
+        return ids;
+      };
+
       const buildOneDay = (offset: number): any => {
         // Apply cycling mode adjustments per-day
         const isTrain = !!trainingDays[offset % 7];
         let dayKcalMod = 1.0, dayCarbMod = 1.0;
-        if (cyclingMode === 'macro') {
+        // #13 Настоящий refeed: высоко-углеводный день (carb x2.5, fat x0.5, protein hold) для восстановления лептина/гликогена на сушке.
+        // Назначается на определённый день недели (используем isTrain=false — refeed обычно в день отдыха от тяжёлой тренировки).
+        let isRefeedDay = false;
+        if (cyclingMode === 'cheatmeal' || cyclingMode === 'refeed') {
+          // refeed на 1 день недели: offset % 7 === 6 (воскресенье) либо первый отдых-день
+          isRefeedDay = (offset % 7 === 6) || (!isTrain && (offset % 7 === 0 || !trainingDays.slice(0, 7).some(Boolean)));
+          if (isRefeedDay) { dayKcalMod = 1.15; dayCarbMod = 2.5; }
+          else { dayKcalMod = 0.85; dayCarbMod = 0.5; }
+        } else if (cyclingMode === 'macro') {
           if (isTrain) { dayKcalMod = 1.15; dayCarbMod = 1.3; }
           else { dayKcalMod = 0.85; dayCarbMod = 0.7; }
         } else if (cyclingMode === 'butch') {
@@ -811,13 +854,21 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           if (isTrain) { dayKcalMod = 1.1; dayCarbMod = 1.4; }
           else { dayKcalMod = 0.85; dayCarbMod = 0.4; }
         }
+        // #7 Anti-oscillation: если компенсация и cycling толкают в одну сторону —
+        // демпфируем компенсацию (не стекаем +15% training-day с +200 недобора).
+        const _diaryActive = (offset === dayIdx && diaryComp && diaryComp.applied);
+        const _cycDir = dayKcalMod - 1; // >0 = up-day, <0 = down-day
+        const _dampK = (_diaryActive && Math.sign(_cycDir) === Math.sign(diaryComp.delta.kcal)) ? (1 - Math.abs(_cycDir)) : 1;
+        const _dampC = (_diaryActive && Math.sign(dayCarbMod - 1) === Math.sign(diaryComp.delta.c)) ? (1 - Math.abs(dayCarbMod - 1)) : 1;
         const input: MealPlanInput = {
           weightKg: weight, lbmKg, bodyFatPct: bfPct, sex,
           // D-22: nutrMult already folded into effective* above — do NOT multiply again.
-          goalKcal: Math.round(Math.max(1200, effectiveKcal || weight * 30 || 2500) * dayKcalMod),
-          goalProteinG: Math.round(Math.max(80, effectiveP || weight * 2 || 160)),
-          goalFatG: Math.round(Math.max(30, effectiveF || weight * 0.8 || 70)),
-          goalCarbsG: Math.round(Math.max(50, effectiveC || weight * 3.5 || 300) * dayCarbMod),
+          // D-22: nutrMult folded into effective* above. Адаптация по дневнику: компенсация
+          // вчерашнего отклонения применяется только к «сегодня» (offset === dayIdx).
+          goalKcal: Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
+          goalProteinG: Math.round(Math.max(80, baseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
+          goalFatG: Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
+          goalCarbsG: Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
           mealsCount, isTrainingDay: !!trainingDays[offset % 7],
           trainStartMin: linkToTraining && trainingDays[offset % 7] ? toMin(trainStart) : undefined,
           allowIntraWorkout: trainIntensity === 'high',
@@ -828,6 +879,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           categoryPref: { preferred: [], excluded: excludedCategories },
           deprioritizedIds: getDeprioritizedIds(),
           lockedIds, recentFoodIds,
+          hardRecentIds: new Set(hardWindow.flat()),
+          varietyStrictness,
+          diaryCompensation: (offset === dayIdx && diaryComp && diaryComp.applied) ? { kcalDelta: diaryComp.delta.kcal, pDelta: diaryComp.delta.p, fDelta: diaryComp.delta.f, cDelta: diaryComp.delta.c, note: diaryComp.note, severity: diaryComp.severity } : undefined,
           budget, isVegetarian: dietPrefs.includes('vegetarian'),
           isCutting: goal === 'cutting' || goal === 'fat_loss',
           dayOffset: offset, cyclePhase: phase as any,
@@ -849,6 +903,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         }));
         const dayKcalForPct = Math.max(1, v2.totals.kcal);
         const mealTimesPro = meals.map(m => ({ time: m.time, label: m.label, pct: Math.round((m.totals.kcal / dayKcalForPct) * 100) }));
+        // Smart 7-day variety: collect this day's foods so subsequent days see them (soft + hard window).
+        const _dayFoodIds = collectDayFoods({ meals });
+        _dayFoodIds.forEach((id: string) => recentFoodIds.add(id));
+        hardWindow.push(_dayFoodIds);
+        if (hardWindow.length > 2) hardWindow.shift();
         return {
           meals, totals: { kcal: v2.totals.kcal, p: v2.totals.p, f: v2.totals.f, c: v2.totals.c, fiber: v2.totals.fiber },
           isTrainingDay: v2.isTrainingDay,
@@ -857,6 +916,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           nutritionLogic: [],
           dietDiversity: { uniqueFoods: v2.diversity.uniqueFoods, totalPortions: 0, categories: v2.diversity.categories, score: Math.min(10, v2.diversity.uniqueFoods), note: `${v2.diversity.uniqueFoods} уникальных продуктов` },
           timingScores: [], intraWorkout: null, mpsSummary: v2.mpsSummary, proNotes: v2.notes,
+          microSummary: v2.microSummary,
+          diaryCompensation: (offset === dayIdx && diaryComp && diaryComp.applied) ? diaryComp : undefined,
+          isRefeedDay,
+          refeedNote: isRefeedDay ? '🔄 Refeed-день: углеводы ×2.5 (восстановление гликогена/лептина), жиры снижены, белок удержан. Психологическая разгрузка на сушке.' : undefined,
         };
       };
 
@@ -879,12 +942,20 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (days >= 7 && weekDays.length > 0) { allDayPlans = weekDays; }
       else if (days >= 3 && d2 && d3) { allDayPlans = [d1, d2, d3]; }
       else { allDayPlans = [d1]; }
-      allDayPlans.forEach((dp: any) => { (dp.meals || []).forEach((m: any) => { (m.items || []).forEach((it: any) => {
+      // #12 Batch-cook: считаем в скольких днях встречается продукт + готовка партиями.
+      const BATCH_COOKABLE = new Set(['chicken_breast','chicken_thigh','turkey_breast','beef_lean','beef_minced','rice_white','rice_brown','buckwheat','quinoa','oats','lentils','chickpeas','beans','pasta_durum','bulgur','barley','millet','sweet_potato','potato_boiled','tofu','tempeh','whey_protein','whey_isolate','casein']);
+      allDayPlans.forEach((dp: any, dayIdx: number) => { (dp.meals || []).forEach((m: any) => { (m.items || []).forEach((it: any) => {
         const ex = shoppingMap.get(it.id);
-        if (ex) { ex.amount += it.amount || 0; ex.kcal += it.kcal || 0; ex.p += it.p || 0; ex.f += it.f || 0; ex.c += it.c || 0; }
-        else { const food = FOOD_DB.find(f => f.id === it.id); shoppingMap.set(it.id, { name: it.name, id: it.id, amount: it.amount || 100, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0, category: food?.category || 'other' }); }
+        if (ex) { ex.amount += it.amount || 0; ex.kcal += it.kcal || 0; ex.p += it.p || 0; ex.f += it.f || 0; ex.c += it.c || 0; ex.daySet.add(dayIdx); }
+        else { const food = FOOD_DB.find(f => f.id === it.id); shoppingMap.set(it.id, { name: it.name, id: it.id, amount: it.amount || 100, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0, category: food?.category || 'other', daySet: new Set([dayIdx]) }); }
       }); }); });
-      setShoppingList(Array.from(shoppingMap.values()).sort((a, b) => b.amount - a.amount));
+      const shoppingArr = Array.from(shoppingMap.values()).map((e: any) => {
+        const dayCount = e.daySet ? e.daySet.size : 1;
+        const batchCookable = BATCH_COOKABLE.has(e.id);
+        const batchCook = batchCookable && dayCount >= 2 ? `Готовить сразу ${dayCount}-дневную партию (${Math.round(e.amount)}г)` : undefined;
+        return { name: e.name, id: e.id, amount: e.amount, kcal: e.kcal, p: e.p, f: e.f, c: e.c, category: e.category, dayCount, batchCook };
+      }).sort((a: any, b: any) => b.amount - a.amount);
+      setShoppingList(shoppingArr);
       // Water
       const hasPharma = injections.length > 0 || (courseEntries?.length || 0) > 0;
       const aasCount = injections.filter(i => i.type === 'ААС').length;
@@ -2444,7 +2515,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
     resultsRef, budget, setBudget, nutrLevel, setNutrLevel,
-    variety, setVariety, wakeTime, setWakeTime, bedTime, setBedTime,
+    variety, setVariety, diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, wakeTime, setWakeTime, bedTime, setBedTime,
     lunchTime, setLunchTime, dinnerTime, setDinnerTime, mealsCount, setMealsCount,
     workFood, setWorkFood, allergens, setAllergens, healthIssues, setHealthIssues,
     eveningLowCarb, setEveningLowCarb, planType, setPlanType,

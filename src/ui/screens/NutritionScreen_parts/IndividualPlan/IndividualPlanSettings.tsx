@@ -74,7 +74,7 @@ export const IndividualPlanSettings: React.FC = () => {
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
     budget, setBudget, nutrLevel, setNutrLevel,
-    variety, setVariety,
+    variety, setVariety, diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness,
     wakeTime, setWakeTime, bedTime, setBedTime,
     lunchTime, setLunchTime, dinnerTime, setDinnerTime,
     workFood, setWorkFood, mealsCount, setMealsCount,
@@ -1265,6 +1265,25 @@ export const IndividualPlanSettings: React.FC = () => {
       )}
 
             <GlassCard title="🏭 Подбор продуктов" icon="🏭" color="#06b6d4">
+        {/* ????????? ?? ???????? + ??????? ????????????? */}
+        <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(16,185,129,0.06)', border:'1px solid rgba(16,185,129,0.18)' }}>
+          <div style={{ fontSize:8, fontWeight:700, color:'#10b981', marginBottom:6 }}>?? ????????? ? 7-??????? ?????????????</div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+            <div>
+              <div style={{ fontSize:10, fontWeight:600, color: diaryAdaptation ? '#10b981' : '#fff' }}>??????????? ?? ????????</div>
+              <div style={{ fontSize:8, color: diaryAdaptation ? 'rgba(16,185,129,0.8)' : 'rgba(255,255,255,0.6)' }}>???????/??????? ????? ? ???????</div>
+            </div>
+            <button onClick={() => setDiaryAdaptation(!diaryAdaptation)} style={{ width:36, height:20, borderRadius:10, border:'none', cursor:'pointer', position:'relative', background: diaryAdaptation ? '#10b981' : 'rgba(255,255,255,0.15)' }}>
+              <span style={{ position:'absolute', top:2, left: diaryAdaptation ? 19 : 3, width:16, height:16, borderRadius:'50%', background:'#fff', boxShadow:'0 1px 4px rgba(0,0,0,0.3)', transition:'left 0.15s' }} />
+            </button>
+          </div>
+          <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+            {([['soft','??????'],['strict','???????']] as [string,string][]).map(([id,label]) => (
+              <button key={id} onClick={() => setVarietyStrictness(id as any)} style={{ flex:1, padding:'5px 4px', borderRadius:8, cursor:'pointer', fontSize:8, fontWeight: varietyStrictness===id?800:600, background: varietyStrictness===id?'rgba(16,185,129,0.15)':'rgba(255,255,255,0.03)', border: varietyStrictness===id?'1px solid #10b981':'1px solid rgba(255,255,255,0.06)', color: varietyStrictness===id?'#10b981':'rgba(255,255,255,0.7)' }}>{label} ?????????????</button>
+            ))}
+          </div>
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.55)' }}>{varietyStrictness==='strict' ? '??????: ???????? ????????? 1-2 ???? ??????????? ?? ????????? ????.' : '?????: ?????? ??????????????? ????????.'}</div>
+        </div>
         {/* D: Specificity */}
         <div style={{ fontSize:8, fontWeight:700, color:'#06b6d4', marginBottom:4 }}>📊 Специфичность продуктов</div>
         <div style={{ display:'flex', gap:4, marginBottom:8 }}>
@@ -1282,7 +1301,7 @@ export const IndividualPlanSettings: React.FC = () => {
         {/* A: Taste profile */}
         <div style={{ fontSize:8, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>👫 Вкусовые предпочтения</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:8 }}>
-          {([['spicy','🌶️ Острое'],['sweet','🍬 Сладкое'],['salty','🥢 Солёное'],['sour','🍋 Кислое']] as [string,string][]).map(([key,label]) => (
+          {([['spicy','🌶️ Острое'],['sweet','🍬 Сладкое'],['salty','🥢 Солёное'],['sour','🍋 Кислое',['umami','🍄 Умами']]] as [string,string][]).map(([key,label]) => (
             <div key={key} style={{ display:'flex', alignItems:'center', gap:4 }}>
               <span style={{ fontSize:7, color:'rgba(255,255,255,0.7)', minWidth:50 }}>{label}</span>
               <input type='range' min={0} max={3} value={(tasteProfile as any)[key]||0} onChange={e => setTasteProfile((prev:any) => ({ ...prev, [key]: +e.target.value }))} style={{ flex:1, height:4 }} />
