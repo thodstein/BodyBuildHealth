@@ -34,7 +34,7 @@ export function loadUserPrograms(): UserProgram[] {
     if (!raw) return [];
     const arr = JSON.parse(raw);
     return Array.isArray(arr) ? (arr as UserProgram[]) : [];
-  } catch { return []; }
+  } catch(_e) { return []; }
 }
 
 export function getUserProgram(id: string): UserProgram | null {
@@ -56,14 +56,29 @@ export function saveUserProgram(program: UserProgram, note?: string): UserProgra
   const idx = all.findIndex(p => p.meta.id === updated.meta.id);
   if (idx >= 0) all[idx] = updated; else all.unshift(updated);
   const capped = all.slice(0, MAX_PROGRAMS);
-  try { localStorage.setItem(KEY, JSON.stringify(capped)); } catch { /* ignore */ }
+  try { localStorage.setItem(KEY, JSON.stringify(capped)); } catch(_e) { /* ignore */ }
   return capped;
 }
 
 export function deleteUserProgram(id: string): UserProgram[] {
   const all = loadUserPrograms().filter(p => p.meta.id !== id);
-  try { localStorage.setItem(KEY, JSON.stringify(all)); } catch { /* ignore */ }
+  try { localStorage.setItem(KEY, JSON.stringify(all)); } catch(_e) { /* ignore */ }
   return all;
+}
+
+/** Удалить одну запись из meta.revisions (по индексу). Пересохраняет программу без неё. */
+export function deleteRevision(id: string, revIdx: number): UserProgram | null {
+  const all = loadUserPrograms();
+  const idx = all.findIndex(p => p.meta.id === id);
+  if (idx < 0) return null;
+  const prog = all[idx];
+  const revs = (prog.meta.revisions ?? []).slice();
+  if (revIdx < 0 || revIdx >= revs.length) return prog;
+  revs.splice(revIdx, 1);
+  const updated: UserProgram = { ...prog, meta: { ...prog.meta, revisions: revs } };
+  all[idx] = updated;
+  try { localStorage.setItem(KEY, JSON.stringify(all)); } catch(_e) { /* ignore */ }
+  return updated;
 }
 
 /* ───────────────────────── Миграторы ───────────────────────── */
@@ -300,4 +315,87 @@ export function createBlank(direction: ProgramDirection): UserProgram {
 export function getReferencedCycle(program: UserProgram): SRCycleTemplate | undefined {
   if (program.pl?.sourceCycleId) return getCycleById(program.pl.sourceCycleId);
   return undefined;
+}
+
+/* ───────────────────────── Конвертер в BBPlan (для VolumeBudgetCard) ───────────────────────── */
+
+/** Свести любой ключ мышцы к каноническому (delt_*→shoulders, fore/back→...); fallback — 'other'. */
+function collapseMuscleKey(muscle: string): string {
+  if (!muscle) return 'other';
+  const m = muscle.toLowerCase();
+  if (m.startsWith('delt_') || m === 'shoulders') return 'shoulders';
+  if (m === 'forearms') return 'arms';
+  if (m === 'core' || m === 'abs') return 'core';
+  return m;
+}
+
+/** Характер упражнения по RIR-схеме (RIR<2 — тяж, ≤2 — лёг, иначе памп). */
+function characterFromRir(rir: number, isCompound: boolean): 'тяж' | 'памп' | 'лёг' {
+  if (isCompound) return rir <= 1 ? 'тяж' : 'лёг';
+  if (rir <= 1) return 'тяж';
+  if (rir <= 3) return 'памп';
+  return 'лёг';
+}
+
+/** Конвертировать одну неделю UserProgram → минимальный BBPlan, пригодный для calcBBPlanMetrics. */
+export function userWeekToBBPlan(week: UserWeek, level: string): BBPlan {
+  const bbPlan: BBPlan = {
+    pattern: {} as BBPlan['pattern'],
+    weeks: [],
+    rotationMuscleVolume: {},
+    rationale: ['user-program editor'],
+  };
+  // level не входит в BBPlan, но calcBBPlanMetrics читает (plan as any).level
+  (bbPlan as any).level = level;
+  const bbWeek: BBWeek = {
+    week: week.week,
+    sessions: (week.sessions ?? []).map((s, si) => {
+      const exercises: BBExercise[] = (s.blocks ?? []).map((b) => {
+        const isCompound = b.type === 'compound' || b.type === 'power_main';
+        const rir0 = b.sets?.[0]?.rir ?? 2;
+        const reps0Raw = b.sets?.[0]?.reps;
+        const reps0 = typeof reps0Raw === 'number' ? reps0Raw : 10;
+        const workSets: BBSet[] = (b.sets ?? []).map((us) => ({
+          reps: typeof us.reps === 'number' ? us.reps : 10,
+          rir: us.rir ?? 2,
+          weight: us.weight ?? 0,
+          restSeconds: us.restSec,
+          tempo: us.tempo,
+          technique: us.technique && us.technique !== 'none' ? us.technique : undefined,
+        }));
+        return {
+          muscle: collapseMuscleKey(b.muscle || 'other'),
+          name: b.exerciseName || '—',
+          exerciseName: b.exerciseName,
+          role: b.role === 'primary' ? 'primary' : 'accessory',
+          character: characterFromRir(rir0, isCompound),
+          sets: b.sets?.length ?? 0,
+          repsRange: [reps0, reps0] as [number, number],
+          rir: rir0,
+          workSets,
+          restSeconds: b.sets?.[0]?.restSec,
+          rationale: b.rationale,
+        } as BBExercise;
+      });
+      return {
+        day: si + 1,
+        weekOffset: si,
+        character: exercises.some((e) => e.character === 'тяж') ? 'тяж' : (exercises[0]?.character ?? 'лёг'),
+        sessionTag: s.focus || s.name,
+        exercises,
+      } as BBSession;
+    }),
+  };
+  const pattern: BBPlan['pattern'] = {
+    id: 'user-program',
+    name: 'User Program',
+    rotationDays: 7,
+    sessionsPerRotation: bbWeek.sessions.length,
+    schedule: [],
+    level: [level],
+    description: 'User-edited program (для VolumeBudgetCard)',
+  };
+  bbPlan.pattern = pattern;
+  bbPlan.weeks = [bbWeek];
+  return bbPlan;
 }
