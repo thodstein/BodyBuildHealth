@@ -154,7 +154,7 @@ export function runSupportUnified(state: CalculatorState): PlanResult {
 export function runSupportForLevel(
   state: CalculatorState,
   level: 'basic' | 'mid' | 'max' | 'boost'
-): PlanResult {
+): CalculatorResult {
   return runSupportUnified({ ...state, powerLevel: level });
 }
 

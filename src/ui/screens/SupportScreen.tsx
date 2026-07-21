@@ -35,7 +35,7 @@ import {
 } from '../../engines/weekly-plan.engine';
 
 import { getSubstanceName, type StackResult as OptimizerStackResult } from '../../engines/stack-optimizer.engine';
-import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
+import { checkDrugInteractions } from '../../engines/interactions-calculator';
 import type { CourseEntry } from '../../core/types';
 import { searchPubMed, type PubMedArticle } from '../../engines/pubmed-search.engine';
 import { calculateSupportTZ, hydrateState } from '../../engines/support-plan';
@@ -585,36 +585,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
     } as CalculatorState;
     stateRef.current = state;
 
-    // ── Переиспользуем planResult если уровень совпадает (устраняем дубль вызова движка) ──
+    // ── Всегда вызываем calculateSupportTZ для полного CalculatorResult ──
+    // (раньше здесь была lossy-реконструкция из planResult, которая теряла8+ полей)
     let tzResult: CalculatorResult;
-    if (planResult && level === supportLevel && !overrideSubs) {
-      //planResult уже вычислен effectiveLevel useMemo — пересобираем CalculatorResult из него
-      const selSubs = planResult.substances.map(p => p.id);
-      const sysBreakdown: Record<string, { raw: number; net: number }> = {};
-      for (const [sysId, sysData] of Object.entries(planResult.systems)) {
-        sysBreakdown[sysId] = { raw: sysData.raw, net: sysData.net };
-      }
-      tzResult = {
-        risk: { systems: [], overallRaw: planResult.overallRiskBefore, overallAfterSupport: planResult.overallRiskAfter, timestamp: new Date().toISOString() },
-        schedule: planResult.schedule,
-        selectedSubstances: selSubs,
-        jointSubs: planResult.substances.filter(p => p.fromJoint).map(p => p.id) as any,
-        neuroSubs: planResult.substances.filter(p => p.fromNeuro).map(p => p.id) as any,
-        boostAdded: planResult.substances.filter(p => p.fromBoost).map(p => p.id) as any,
-        synergyIdsUsed: [],
-        titrationApplied: {},
-        labDeltas: [],
-        overallRiskBefore: planResult.overallRiskBefore,
-        overallRiskAfter: planResult.overallRiskAfter,
-        contraindicationAlerts: [],
-        negativeBlocks: [],
-        comparisonBeforeAfter: Object.entries(sysBreakdown).map(([system, v]) => ({ system, before: v.raw, after: v.net })),
-        synergyRecommendations: planResult.stackRecommendations as any,
-        timestamp: new Date().toISOString(),
-      } as unknown as CalculatorResult;
-    } else {
-      tzResult = calculateSupportTZ(state);
-    }
+    tzResult = calculateSupportTZ(state);
     // ── ЕДИНЫЙ ДВИЖОК РИСКА: calculateTzSpecRisk (механизм-ориентированная модель) ──
     const systemBreakdown: Record<string, { raw: number; net: number }> = {};
     for (const cmp of (tzResult.comparisonBeforeAfter || [])) {
