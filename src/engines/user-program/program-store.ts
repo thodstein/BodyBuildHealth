@@ -271,6 +271,15 @@ export function createBlank(direction: ProgramDirection): UserProgram {
       pl: { direction: 'pl', sourceCycleId: '', schedule: [], weakPoints: [], notes: '', workMax: {} },
     };
   }
+  if (direction === 'hybrid') {
+    return {
+      meta: baseMeta({
+        title: 'Новый powerbuilder-план', goal: 'powerbuilding', level: 'intermediate',
+        daysPerWeek: 4, weeks: 8, direction: 'hybrid', source: 'custom', tags: ['custom', 'powerbuilder'],
+      }),
+      hybrid: { direction: 'hybrid', plRef: { sourceCycleId: '', sessionIndices: [] }, bbWeeks: [], notes: '' },
+    };
+  }
   return {
     meta: baseMeta({
       title: 'Новая ББ-программа', goal: 'hypertrophy', level: 'intermediate',

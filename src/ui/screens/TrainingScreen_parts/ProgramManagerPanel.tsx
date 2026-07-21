@@ -27,6 +27,7 @@ import type {
   UserProgram, BBProgramBody, PLProgramBody, UserWeek, UserSession, UserBlock, UserSet,
 } from '../../../engines/user-program/user-program.types';
 import { newId } from '../../../engines/user-program/user-program.types';
+import { HybridPlanPanel } from './HybridPlanPanel';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { ACCENT, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle } from './training-ui';
 import { GROUP_RU } from './program-types';
@@ -58,7 +59,7 @@ export const ProgramManagerPanel: React.FC = () => {
   const refresh = useCallback(() => setPrograms(loadUserPrograms()), []);
   const flash = useCallback((m: string) => { setToast(m); setTimeout(() => setToast(''), 2200); }, []);
 
-  const startCreate = (dir: 'bb' | 'pl') => {
+  const startCreate = (dir: 'bb' | 'pl' | 'hybrid') => {
     const p = createBlank(dir);
     setEditing(p);
   };
@@ -120,6 +121,7 @@ export const ProgramManagerPanel: React.FC = () => {
       <div style={{ display: 'flex', gap: 6 }}>
         <button style={btn} onClick={() => startCreate('bb')}>🆕 ББ</button>
         <button style={btn} onClick={() => startCreate('pl')}>🆕 ПЛ</button>
+        <button style={{...btn, color:'#3b82f6', borderColor:'rgba(59,130,246,0.3)'}} onClick={() => startCreate('hybrid')}>⚡ Powerbuilder</button>
         <button style={ghostBtn} onClick={() => setPickerOpen('bb')}>🔍 Библиотека</button>
         <button style={ghostBtn} onClick={() => setPickerOpen('pl')}>🔍 ПЛ-циклы</button>
       </div>
@@ -216,7 +218,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
 
       {dir === 'bb' && program.bb && <BBEditor body={program.bb} onChange={(bb) => update({ bb })} />}
       {dir === 'pl' && program.pl && <PLEditor body={program.pl} onChange={(pl) => update({ pl })} />}
-      {dir === 'hybrid' && <div style={{ ...CARD, padding: 10, fontSize: 11, color: DIM }}>Hybrid-редактор — в следующей итерации.</div>}
+      {dir === 'hybrid' && <HybridPlanPanel />}
     </div>
   );
 };
