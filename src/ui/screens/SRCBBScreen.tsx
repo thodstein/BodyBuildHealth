@@ -279,13 +279,13 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const toggleDayInMap = (mapKey: string, day: number, which: 'wg' | 'pw') => {
     if (which === 'wg') {
       setWeakGroupDayMap(prev => {
-        const cur = new Set(prev[mapKey] || []);
+        let cur = new Set(prev[mapKey] || []);
         if (cur.has(day)) cur.delete(day); else { cur.add(day); (cur as any) = Array.from(cur).sort((a: number, b: number) => a - b); }
         return { ...prev, [mapKey]: Array.from(cur) };
       });
     } else {
       setPlWeakPointDayMap(prev => {
-        const cur = new Set(prev[mapKey] || []);
+        let cur = new Set(prev[mapKey] || []);
         if (cur.has(day)) cur.delete(day); else { cur.add(day); (cur as any) = Array.from(cur).sort((a: number, b: number) => a - b); }
         return { ...prev, [mapKey]: Array.from(cur) };
       });
