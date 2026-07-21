@@ -8,6 +8,8 @@ import {
   type InteractionAlert,
   type SupportInteraction,
 } from '../../../engines/interactions-calculator';
+import { TimingChip } from '../../../components/TimingChip';
+import { extractTiming } from '../../../engines/interactions-calculator';
 import type { CourseEntry } from '../../../core/types';
 import { resolveInteractionId } from '../../../data/support-interactions-db';
 import { decodeGarbled } from '../../../utils/text-sanitizer';
@@ -265,6 +267,7 @@ export const InteractionCheckerTab: React.FC = () => {
                     <div style={{ fontSize: 11, color: colors.text, lineHeight: 1.5, padding: '8px 10px', borderRadius: 6, background: `${colors.text}0a`, border: `1px solid ${colors.border}` }}>
                       <span style={{ fontWeight: 700 }}>Рекомендация: </span>
                       {alert.recommendation}
+                      <TimingChip timing={extractTiming(alert.recommendation)} />
                     </div>
                   </div>
                 );
@@ -518,6 +521,7 @@ export const InteractionCheckerTab: React.FC = () => {
                   {inter.substanceA} ↔ {inter.substanceB}
                 </div>
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>{inter.effect}</div>
+                <TimingChip timing={extractTiming(inter.notes || '')} />
               </div>
             ))}
           </div>

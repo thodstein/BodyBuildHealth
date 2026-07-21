@@ -45,6 +45,79 @@ export const DRUG_INTERACTIONS: DrugInteraction[] = [
   { a: 'metformin', b: '@alcohol', severity: 'warn', reason: '↑ лактоацидоз риск', action: '⚠ ZERO или сильное ↓ алкоголя' },
   { a: 'spironolactone', b: '@nsaid', severity: 'warn', reason: 'Снижение антигипертензивного эффекта + K⁺ риск', action: '⚠ Избегать длительных НПВС' },
   { a: 'spironolactone', b: 'potassium', severity: 'block', reason: 'Гиперкалиемия', action: '⛔ Не добавлять K⁺-добавки на спиро' },
+
+  // ─── Анастрозол/летрозол: ароматизация и AAS/RAAS ───
+  { a: 'anastrozole', b: 'tamoxifen', severity: 'block', reason: 'AI + SERM: AI ↓ E2 (мишень SERM → неэффективен)', action: '⛔ Не комбинировать. Выбрать один механизм контроля E2' },
+  { a: 'anastrozole', b: '@statin', severity: 'warn', reason: 'Оба метаболизируются CYP3A4 → ↑ концентрация обоих', action: '⚠ Мониторинг липидограммы и E2 каждые 4 нед' },
+  { a: 'anastrozole', b: '@raas', severity: 'warn', reason: 'AI ↓ E2 → возможна ортостатическая гипотензия, RAAS ↓ АД — аддитивно', action: '⚠ Контроль АД, титровать дозу AI медленно' },
+  { a: 'anastrozole', b: 'cabergoline', severity: 'warn', reason: 'Оба ↓ пролактина → риск гипопролактинемии', action: '⚠ Контроль PRL каждые 4 нед' },
+
+  // ─── Телмисартан / Небиволол (комбинация антигипертензивных) ───
+  { a: 'telmisartan', b: '@nsaid', severity: 'warn', reason: 'НПВС ↓ антигипертензивный эффект ARB + ↑ риск почечной недостаточности', action: '⚠ Избегать длительных НПВС. Краткие курсы + мониторинг креатинина' },
+  { a: 'telmisartan', b: 'potassium', severity: 'warn', reason: 'ARB сберегает K⁺ → аддитивная гиперкалиемия', action: '⚠ Мониторинг K⁺ каждые 4 нед. Калийсодержащие добавки осторожно' },
+  { a: 'telmisartan', b: 'spironolactone', severity: 'block', reason: 'Двойная K⁺-сберегающая → ↑↑ риск гиперкалиемии', action: '⛔ Не комбинировать. Выбрать один K⁺-сберегающий препарат' },
+  { a: 'nebivolol', b: '@nsaid', severity: 'warn', reason: 'НПВС ↓ антигипертензивный эффект β-блокатора', action: '⚠ Мониторинг АД. Краткие курсы НПВС' },
+
+  // ─── Тамоксифен / кломифен ───
+  { a: 'tamoxifen', b: '@anticoagulant', severity: 'warn', reason: 'Тамоксифен ингибирует CYP2C9 → ↑ концентрация варфарина', action: '⚠ Мониторинг МНО каждые 2 нед' },
+  { a: 'tamoxifen', b: '@ssri', severity: 'warn', reason: 'Флуоксетин/пароксетин ингибируют CYP2D6 → ↓ конвертация тамоксифена в активный эндоксифен', action: '⚠ Избегать пароксетина/флуоксетина. Альтернатива: сертралин, циталопрам' },
+  { a: 'clomiphene', b: '@ssri', severity: 'warn', reason: 'SSRI может ↓ эффективность кломифена', action: '⚠ Мониторинг овуляции/тестостерона' },
+
+  // ─── Каберголин ───
+  { a: 'cabergoline', b: 'tadalafil', severity: 'warn', reason: 'Оба ↓ АД → аддитивная гипотензия', action: '⚠ Контроль АД. Старт каберголина вечером перед сном' },
+
+  // ─── Берберин + стандартная антидиабетическая терапия ───
+  { a: 'berberine', b: '@raas', severity: 'monitor', reason: 'Оба ↓ АД → аддитивная гипотензия, особенно при старте', action: 'Мониторинг АД первые 2 нед' },
+  { a: 'berberine', b: '@cyp3a4_substrate', severity: 'warn', reason: 'Берберин ингибирует CYP3A4 → ↑ концентрация tadalafil/anastrozole', action: '⚠ Мониторинг побочек. Разнести на 2+ ч' },
+
+  // ─── Статины + CoQ10 (известная клиническая рекомендация) ───
+  { a: '@statin', b: 'coq10', severity: 'warn', reason: 'Статины ↓ эндогенный CoQ10 → миопатия, усталость', action: '⚠ Дополнительный CoQ10 100-200 мг/сут' },
+  { a: 'simvastatin', b: '@cyp3a4_inhibitor', severity: 'block', reason: 'CYP3A4-ингибиторы ↑ AUC симвастатина в 5-10× → рабдомиолиз', action: '⛔ Избегать комбинации. Перейти на аторвастатин или розувастатин' },
+  { a: 'atorvastatin', b: '@cyp3a4_inhibitor', severity: 'warn', reason: 'CYP3A4-ингибиторы ↑ AUC аторвастатина в 2-4×', action: '⚠ Снизить дозу аторвастатина. Мониторинг КФК' },
+
+  // ─── Аспирин + ибупрофен (НПВС) ───
+  { a: 'aspirin', b: '@nsaid', severity: 'warn', reason: 'Ибупрофен конкурентно блокирует COX-1 → ↓ антиагрегантный эффект аспирина', action: '⚠ Ибупрофен принимать через 2+ ч после аспирина' },
+
+  // ─── Витамин D + тиазидные диуретики ───
+  { a: 'vitamin_d', b: 'hydrochlorothiazide', severity: 'warn', reason: 'Тиазиды ↑ Ca реабсорбцию → с D3 → ↑ риск гиперкальциемии', action: '⚠ Мониторинг Ca²⁺ каждые 8 нед. Снизить дозу D3 при необходимости' },
+
+  // ─── CoQ10 + статины (см. выше) + другие ───
+  { a: 'coq10', b: '@statin', severity: 'warn', reason: 'См. правило выше', action: '⚠ Дополнительный CoQ10 рекомендован' },
+
+  // ─── Астаксантин + статины (хорошо) ───
+  // (не conflict, нет записи)
+
+  // ─── Омега-3 + антикоагулянт (см. выше) ───
+  { a: 'omega3', b: 'aspirin', severity: 'warn', reason: 'Омега-3 ↓ агрегацию + аспирин → аддитивный антиагрегантный эффект', action: '⚠ Мониторинг. До 2 г/сут омега-3 безопасно с аспирином' },
+  { a: 'omega3', b: '@anticoagulant', severity: 'warn', reason: 'См. правило fish_oil выше', action: '⚠ До 2 г/сут' },
+
+  // ─── Креатин + нефротоксины ───
+  { a: 'creatine', b: '@nsaid', severity: 'monitor', reason: 'НПВС ↓ почечный кровоток + креатин ↑ креатинин в крови → ложная картина нефропатии', action: 'Мониторинг: контролировать клиренс креатинина, не только абс. значение' },
+
+  // ─── Магний + остеопорозные препараты ───
+  { a: 'magnesium', b: 'alendronate', severity: 'warn', reason: 'Mg²⁺ ↓ всасывание бисфосфонатов', action: '⚠ Разнести на 2+ ч' },
+
+  // ─── Железо + ингибиторы протонной помпы ───
+  { a: 'iron', b: 'omeprazole', severity: 'warn', reason: 'ИПП ↓ кислотность → ↓ всасывание Fe²⁺ на 30-50%', action: '⚠ Fe принимать с вит.С за 1 ч до ИПП или через 4 ч после' },
+  { a: 'iron', b: '@antacid', severity: 'warn', reason: 'Антациды (Ca, Mg, Al) ↓ всасывание Fe', action: '⚠ Интервал 2-4 ч' },
+
+  // ─── Кальций + левотироксин (см. выше) + другие интервалы ───
+  { a: 'calcium', b: 'alendronate', severity: 'warn', reason: 'Ca ↓ всасывание бисфосфонатов на 40-60%', action: '⚠ Разнести на 2+ ч. Бисфосфонат натощак' },
+  { a: 'calcium', b: 'ciprofloxacin', severity: 'warn', reason: 'Ca²⁺ хелатирует фторхинолоны → ↓ AUC на 50%', action: '⚠ Разнести на 2+ ч' },
+
+  // ─── Цинк + хинолоны ───
+  { a: 'zinc', b: 'ciprofloxacin', severity: 'warn', reason: 'Zn²⁺ хелатирует фторхинолоны → ↓ AUC на 30%', action: '⚠ Разнести на 2+ ч' },
+
+  // ─── Пробиотики + антибиотики ───
+  { a: '@macrolide', b: 'probiotics', severity: 'monitor', reason: 'Антибиотики ↓ жизнеспособность пробиотиков', action: 'Мониторинг: разнести на 2+ ч для сохранения эффективности' },
+
+  // ─── Грейпфрут + статины (классика) ───
+  { a: 'grapefruit', b: 'simvastatin', severity: 'block', reason: 'Грейпфрут ингибирует CYP3A4 в кишечнике → ↑ AUC симвастатина в 10-15× → рабдомиолиз', action: '⛔ Избегать грейпфрута при приёме симвастатина' },
+  { a: 'grapefruit', b: 'atorvastatin', severity: 'warn', reason: 'Грейпфрут ↑ AUC аторвастатина в 2×', action: '⚠ Ограничить грейпфрут. Или перейти на розувастатин (не CYP3A4)' },
+  { a: 'grapefruit', b: 'tadalafil', severity: 'warn', reason: 'CYP3A4-ингибирование → ↑ tadalafil', action: '⚠ Снизить дозу tadalafil до 2.5 мг при частом употреблении' },
+
+  // ─── Нитраты + ингибиторы ФДЭ-5 (см. tadalafil выше) ───
+  { a: 'nitroglycerin', b: 'tadalafil', severity: 'block', reason: 'См. правило tadalafil+nitrates', action: '⛔ Не комбинировать. STOP tadalafil за 48 ч до нитратов' },
   // ─── Тиазидные диуретики ───
   { a: 'hydrochlorothiazide', b: '@raas', severity: 'warn', reason: 'Аддитивная гипотензия (↓↓АД), но K⁺ компенсируется (тиазид вымывает + ARB сберегает)', action: '⚠ Мониторинг АД и K⁺ каждые 2 нед. Снижение дозы может потребоваться' },
   { a: 'hydrochlorothiazide', b: '@nsaid', severity: 'warn', reason: '↓ антигипертензивный эффект + ↑ K⁺ риск (НПВС ↓ диуретик efficacy)', action: '⚠ Избегать длительных НПВС. Краткие курсы + мониторинг АД' },

@@ -3,7 +3,8 @@ import React, { useState, useMemo } from 'react';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
 import { INTERACTION_ENRICHMENT } from '../../../data/support-interaction-enrichment';
-import { checkDrugInteractions, getClassInstructions, getCourseRecommendations } from '../../../engines/interactions-calculator';
+import { checkDrugInteractions, getClassInstructions, getCourseRecommendations, extractTiming } from '../../../engines/interactions-calculator';
+import { TimingChip } from '../../../components/TimingChip';
 import type { CourseEntry, MasterDB, SubstanceEntry, InteractionEntry } from '../../../core/types';
 import { PopupSelect } from '../../components/PopupXxx';
 import { MECH_TRANSLATIONS_RU, MECH_LABELS, EFFECT_LABELS } from './SupportScreenData';
@@ -598,6 +599,7 @@ export const SupportInteractionsView: React.FC<{ s: Record<string, any> }> = ({ 
                             {alert.recommendation && (
                               <div style={{ fontSize:8, color:'#f59e0b', lineHeight:1.3, background:'rgba(245,158,11,0.06)', padding:'4px 6px', borderRadius:4 }}>
                                 💊 Рекомендация: {alert.recommendation}
+                                <TimingChip timing={extractTiming(alert.recommendation)} />
                               </div>
                             )}
                           </div>

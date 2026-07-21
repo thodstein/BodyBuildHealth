@@ -38,6 +38,8 @@ export type { InteractionAlert, DrugDrugConflict, ClassInstruction, CourseRecomm
 // ─── Unified result shape ───
 export type UnifiedSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 
+// TimingInfo + рендер в отдельном .tsx файле (src/ui/components/TimingChip.tsx)
+
 export interface TimingInfo {
   /** Извлечённый интервал между приёмами: "2ч", "4ч", "48ч" */
   intervalHours?: number;
