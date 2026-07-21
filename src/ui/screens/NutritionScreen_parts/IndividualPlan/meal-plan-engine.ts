@@ -24,6 +24,7 @@
  */
 
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
+import { filterBySpecificity, filterByIntolerance, matchesCategoryPref, isPreferredCategory, tasteMatchScore, type Specificity, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences";
 import type { FoodItem } from "../../../../core/nutrition-database";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
 
@@ -74,6 +75,12 @@ export interface MealPlanInput {
   preferredIds?: Set<string>;
   // D-28: meal-bound preferred — food bound to a specific meal (e.g. rice_cream only on breakfast).
   preferredByMeal?: Record<string, Set<string>>;
+  // D-28+: advanced user-preference filters
+  specificity?: Specificity;              // 'everyday' | 'varied' | 'gourmet'
+  categoryPref?: CategoryPref;           // preferred/excluded categories
+  intolerances?: Intolerances;            // lowFODMAP, lowHistamine, lowOxalate
+  tasteProfile?: TasteProfile;            // spicy/sweet/salty/sour (0-3)
+  deprioritizedIds?: Set<string>;         // B: adaptive history — frequently-replaced foods
   budget: 'low' | 'medium' | 'max' | 'enhanced';
   isVegetarian?: boolean;
   isCutting?: boolean;
@@ -309,13 +316,24 @@ function pick<T>(arr: T[], seed: number): T | undefined {
 }
 
 // FIX 2: Quality-weighted pick — foods with higher bb_quality_score get proportionally higher selection probability
+// D-28+: module-scoped preference vars (set by buildDayPlan, read by pickWeighted)
+var _tasteProfile: any = undefined;
+var _deprioritizedIds: Set<string> | undefined = undefined;
+var _categoryPref: any = undefined;
+
 function pickWeighted(arr: FoodItem[], seed: number): FoodItem | undefined {
   if (arr.length === 0) return undefined;
   if (arr.length === 1) return arr[0];
-  const weights = arr.map(f => {
+  const weights = arr.map((f, i) => {
     const score = (f as any).bb_quality_score ?? 5;
-    // Weight = score^1.5 so score 9 is ~3x more likely than score 5
-    return Math.max(0.5, Math.pow(score, 1.5));
+    let w = Math.max(0.5, Math.pow(score, 1.5));
+    // A: taste profile boost — foods matching user's taste preferences get higher weight
+    if (_tasteProfile) { const ts = tasteMatchScore(f, _tasteProfile); if (ts > 0) w *= (1 + ts * 0.3); }
+    // B: deprioritize frequently-replaced foods
+    if (_deprioritizedIds && _deprioritizedIds.has((f as any).id)) w *= 0.3;
+    // C: category-preferred boost
+    if (_categoryPref && isPreferredCategory(f, _categoryPref)) w *= 1.5;
+    return w;
   });
   const total = weights.reduce((s, w) => s + w, 0);
   let r = seededRandom(seed) * total;
@@ -393,7 +411,7 @@ function makeItem(food: FoodItem, grams: number, role: MealItem['role']): MealIt
 }
 
 // ─── Пулы продуктов по ролям (с фильтром аллергенов и диеты) ───────────
-function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPlanInput['budget'], varietyPoolSize?: number, preferredIds?: Set<string>) {
+function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPlanInput['budget'], varietyPoolSize?: number, preferredIds?: Set<string>, opts?: { specificity?: Specificity; categoryPref?: CategoryPref; intolerances?: Intolerances; tasteProfile?: TasteProfile; deprioritizedIds?: Set<string> }) {
   const isMealFood = (f: FoodItem) =>
     f.category !== 'supplement' || ['whey_protein', 'whey_isolate', 'whey_concentrate', 'casein', 'casein_micellar', 'supp_pea_protein', 'supp_soy_isolate', 'supp_rice_protein', 'supp_eaa', 'bcaa'].includes(f.id);
   // Д-3: build basePoolRaw first, then exclude premium/exotic at the source for low/medium budgets so
@@ -416,9 +434,14 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     if (isVeg) { const diet = FOOD_ALLERGEN_DIET[f.id]; if ((diet && diet.isVegetarian === false) || (diet === undefined && f.isVegetarian === false) || (isMeatId(f.id) && f.isVegetarian !== true && f.isVegan !== true)) return false; }
     return true;
   });
-  const basePool = (budget === 'max' || budget === 'enhanced')
+  let _baseFiltered = (budget === 'max' || budget === 'enhanced')
     ? basePoolRaw
     : basePoolRaw.filter(f => !isPremiumOrExotic(f.id));
+  // D-28+: apply specificity, intolerance, category-exclusion filters
+  if (opts?.specificity && opts.specificity !== 'varied') _baseFiltered = filterBySpecificity(_baseFiltered, opts.specificity);
+  if (opts?.intolerances) _baseFiltered = _baseFiltered.filter(f => filterByIntolerance(f, opts.intolerances));
+  if (opts?.categoryPref) _baseFiltered = _baseFiltered.filter(f => matchesCategoryPref(f, opts.categoryPref));
+  const basePool = _baseFiltered;
   const byBudget = <T extends FoodItem>(arr: T[]): T[] => {
     if (budget === 'max' || budget === 'enhanced') return arr.filter(f => (f.bb_quality_score ?? 5) >= 8);
     // Д-3: 'low' budget = affordable quality AND not premium/exotic (abalone, game, macadamia, etc.)
@@ -973,7 +996,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const combinedExcluded = new Set([...(input.excludedIds || []), ...labAdj.restrictFoodIds]);
   const combinedPreferred = new Set([...(input.preferredIds || []), ...labAdj.preferFoodIds]);
 
-  const pool = buildFoodPools(combinedExcluded, !!input.isVegetarian, input.budget, varietyPoolSize, input.preferredIds);
+  const pool = buildFoodPools(combinedExcluded, !!input.isVegetarian, input.budget, varietyPoolSize, input.preferredIds, { specificity: input.specificity, categoryPref: input.categoryPref, intolerances: input.intolerances, tasteProfile: input.tasteProfile, deprioritizedIds: input.deprioritizedIds });
 
   // P5: PCT food preference boost — крестоцветные (DIM/I3C) + zinc-rich + flax
   let effectivePreferred = combinedPreferred;
@@ -982,6 +1005,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     effectivePreferred = new Set([...combinedPreferred, ...pctFoodIds.filter(id => FOOD_DB.some(fd => fd.id === id))]);
   }
   const seedBase = (input.dayOffset + randomSalt) * 10007 + (input.isTrainingDay ? 3000 : 7000);
+  // D-28+: set module-scoped preference vars (declared at module level for pickWeighted access)
+  _tasteProfile = input.tasteProfile;
+  _deprioritizedIds = input.deprioritizedIds;
+  _categoryPref = input.categoryPref;
   // Ротация: разные группы белка в разные приёмы (раньше — одна на весь день)
   const mealRotations = pickRotationsForDay(input.dayOffset, randomSalt, 4, !!input.isVegetarian);
   function rotationForMeal(mealIdx: number): { label: string; ids: string[]; note: string } {

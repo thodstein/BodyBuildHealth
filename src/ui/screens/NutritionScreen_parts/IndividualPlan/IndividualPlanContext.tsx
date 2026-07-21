@@ -14,7 +14,8 @@ import { getContraindications, saveContraindications } from "../../../../core/co
 import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrition-v2-data";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { computePlannerTargets } from "./planner-targets";
-import { safeWriteJSON } from "./planner-storage"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
+import { safeWriteJSON } from "./planner-storage";
+import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplaceHistory, type Specificity, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
 import { buildDayPlan as buildDayPlanV2, type DayPlanV2, type MealPlanInput } from "./meal-plan-engine";
@@ -376,6 +377,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // D-28: meal-bound preferred foods (e.g. rice_cream → breakfast only)
   const [preferredByMeal, setPreferredByMeal] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('he_preferred_by_meal') || '{}'); } catch { return {}; } });
   useEffect(() => { try { localStorage.setItem('he_preferred_by_meal', JSON.stringify(preferredByMeal)); } catch {} }, [preferredByMeal]);
+  // D-28+: advanced preference states
+  const [specificity, setSpecificity] = useState<Specificity>(() => { try { return (localStorage.getItem('he_specificity') as Specificity) || 'varied'; } catch { return 'varied'; } });
+  useEffect(() => { try { localStorage.setItem('he_specificity', specificity); } catch {} }, [specificity]);
+  const [intolerances, setIntolerances] = useState<Intolerances>(() => { try { return JSON.parse(localStorage.getItem('he_intolerances') || '{}'); } catch { return {}; } });
+  useEffect(() => { try { localStorage.setItem('he_intolerances', JSON.stringify(intolerances)); } catch {} }, [intolerances]);
+  const [tasteProfile, setTasteProfile] = useState<TasteProfile>(() => { try { return JSON.parse(localStorage.getItem('he_taste_profile') || '{"spicy":0,"sweet":0,"salty":0,"sour":0}'); } catch { return { spicy: 0, sweet: 0, salty: 0, sour: 0 }; } });
+  useEffect(() => { try { localStorage.setItem('he_taste_profile', JSON.stringify(tasteProfile)); } catch {} }, [tasteProfile]);
+  const [excludedCategories, setExcludedCategories] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_excluded_categories') || '[]'); } catch { return []; } });
+  useEffect(() => { try { localStorage.setItem('he_excluded_categories', JSON.stringify(excludedCategories)); } catch {} }, [excludedCategories]);
   const [excludedFoods, setExcludedFoods] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_excluded_foods') || '[]'); } catch { return []; } });
   const [dietPrefs, setDietPrefs] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_diet_preferences') || '[]'); } catch { return []; } });
   const [allergenExcludedCount, setAllergenExcludedCount] = useState(0);
@@ -814,6 +824,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           trainDurationMin: (s?.avgWorkoutMinutes || 60),
           excludedIds, preferredIds: new Set(preferredFoods),
           preferredByMeal: Object.fromEntries(Object.entries(preferredByMeal).map(([k, v]) => [k, new Set(v)])),
+          specificity, intolerances, tasteProfile,
+          categoryPref: { preferred: [], excluded: excludedCategories },
+          deprioritizedIds: getDeprioritizedIds(),
           lockedIds, recentFoodIds,
           budget, isVegetarian: dietPrefs.includes('vegetarian'),
           isCutting: goal === 'cutting' || goal === 'fat_loss',
@@ -2435,7 +2448,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     lunchTime, setLunchTime, dinnerTime, setDinnerTime, mealsCount, setMealsCount,
     workFood, setWorkFood, allergens, setAllergens, healthIssues, setHealthIssues,
     eveningLowCarb, setEveningLowCarb, planType, setPlanType,
-    preferredFoods, setPreferredFoods, preferredByMeal, setPreferredByMeal, excludedFoods, setExcludedFoods,
+    preferredFoods, setPreferredFoods, preferredByMeal, setPreferredByMeal, specificity, setSpecificity, intolerances, setIntolerances, tasteProfile, setTasteProfile, excludedCategories, setExcludedCategories, excludedFoods, setExcludedFoods,
     allergenExcludedCount, setAllergenExcludedCount, planTargets, setPlanTargets,
     cyclingMode, setCyclingMode, heavyTrainDay, setHeavyTrainDay,
     workScheduleEnabled, setWorkScheduleEnabled,

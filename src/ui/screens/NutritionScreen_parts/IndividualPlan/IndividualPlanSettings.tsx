@@ -83,6 +83,7 @@ export const IndividualPlanSettings: React.FC = () => {
     eveningLowCarb, setEveningLowCarb,
     planType, setPlanType,
     preferredFoods, setPreferredFoods, preferredByMeal, setPreferredByMeal, excludedFoods, setExcludedFoods,
+    specificity, setSpecificity, intolerances, setIntolerances, tasteProfile, setTasteProfile, excludedCategories, setExcludedCategories,
     customNotes, setCustomNotes,
     cyclingMode, setCyclingMode, trainingDays, setTrainingDays, DAY_LABELS,
     heavyTrainDay, setHeavyTrainDay,
@@ -1263,6 +1264,41 @@ export const IndividualPlanSettings: React.FC = () => {
       </GlassCard>
       )}
 
+            <GlassCard title="🏭 Подбор продуктов" icon="🏭" color="#06b6d4">
+        {/* D: Specificity */}
+        <div style={{ fontSize:8, fontWeight:700, color:'#06b6d4', marginBottom:4 }}>📊 Специфичность продуктов</div>
+        <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+          {([['everyday','🍱 Повседневные'],['varied','💡 Разнообразные'],['gourmet','🍩 Гурман']] as [string,string][]).map(([id,label]) => (
+            <button key={id} onClick={() => setSpecificity(id as any)} style={{ flex:1, padding:'5px 4px', borderRadius:8, cursor:'pointer', fontSize:7, fontWeight: specificity===id?800:600, background: specificity===id?'rgba(6,182,212,0.15)':'rgba(255,255,255,0.03)', border: specificity===id?'1px solid #06b6d4':'1px solid rgba(255,255,255,0.06)', color: specificity===id?'#06b6d4':'rgba(255,255,255,0.7)' }}>{label}</button>
+          ))}
+        </div>
+        {/* E: Intolerances */}
+        <div style={{ fontSize:8, fontWeight:700, color:'#ef4444', marginBottom:4 }}>🧪 Непереносимость</div>
+        <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
+          {([['lowFODMAP','FODMAP'],['lowHistamine','Гистамин'],['lowOxalate','Оксалаты']] as [string,string][]).map(([key,label]) => (
+            <button key={key} onClick={() => setIntolerances((prev:any) => ({ ...prev, [key]: !prev[key] }))} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:7, fontWeight:600, background: (intolerances as any)[key]?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.03)', border: (intolerances as any)[key]?'1px solid rgba(239,68,68,0.25)':'1px solid rgba(255,255,255,0.06)', color: (intolerances as any)[key]?'#ef4444':'rgba(255,255,255,0.7)' }}>{(intolerances as any)[key]?'✅ ':''}{label}</button>
+          ))}
+        </div>
+        {/* A: Taste profile */}
+        <div style={{ fontSize:8, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>👫 Вкусовые предпочтения</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:8 }}>
+          {([['spicy','🌶️ Острое'],['sweet','🍬 Сладкое'],['salty','🥢 Солёное'],['sour','🍋 Кислое']] as [string,string][]).map(([key,label]) => (
+            <div key={key} style={{ display:'flex', alignItems:'center', gap:4 }}>
+              <span style={{ fontSize:7, color:'rgba(255,255,255,0.7)', minWidth:50 }}>{label}</span>
+              <input type='range' min={0} max={3} value={(tasteProfile as any)[key]||0} onChange={e => setTasteProfile((prev:any) => ({ ...prev, [key]: +e.target.value }))} style={{ flex:1, height:4 }} />
+              <span style={{ fontSize:7, color:'#f59e0b', minWidth:8 }}>{(tasteProfile as any)[key]||0}</span>
+            </div>
+          ))}
+        </div>
+        {/* C: Excluded categories */}
+        <div style={{ fontSize:8, fontWeight:700, color:'#a78bfa', marginBottom:4 }}>🚫 Не люблю категорию</div>
+        <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
+          {['fish','dairy','legumes','cabbage','nuts','pork','shellfish','mushroom'].map(cat => {
+            const sel = excludedCategories.includes(cat);
+            return (<button key={cat} onClick={() => { const upd = sel ? excludedCategories.filter(c => c !== cat) : [...excludedCategories, cat]; setExcludedCategories(upd); }} style={{ padding:'3px 6px', borderRadius:6, cursor:'pointer', fontSize:7, fontWeight:600, background: sel?'rgba(167,139,250,0.15)':'rgba(255,255,255,0.03)', border: sel?'1px solid rgba(167,139,250,0.3)':'1px solid rgba(255,255,255,0.06)', color: sel?'#a78bfa':'rgba(255,255,255,0.7)' }}>{sel?'✅ ':''}{cat}</button>);
+          })}
+        </div>
+      </GlassCard>
       {true && (
       <GlassCard title="⚡ Быстрые пресеты" icon="⚡" color="#f97316">
         {/* P2.1: 3 categories, 12 presets */}
