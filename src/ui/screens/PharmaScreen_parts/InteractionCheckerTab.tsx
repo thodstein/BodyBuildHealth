@@ -1,9 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { PHARMA_DB } from '../../../core/pharma-database';
-import { checkDrugInteractions, getClassInstructions, getCourseRecommendations, type InteractionAlert } from '../../../engines/pharma-interactions.engine';
+import {
+  checkDrugInteractions,
+  getClassInstructions,
+  getCourseRecommendations,
+  findInteractionsForSubstance,
+  type InteractionAlert,
+  type SupportInteraction,
+} from '../../../engines/interactions-calculator';
 import type { CourseEntry } from '../../../core/types';
-import { SYNERGY_PAIRS } from '../../../engines/support.engine';
-import { findInteractionsForSubstance, type SupportInteraction } from '../../../data/support-substances';
 import { resolveInteractionId } from '../../../data/support-interactions-db';
 import { decodeGarbled } from '../../../utils/text-sanitizer';
 import { useDataLink } from '../../../core/data-link';

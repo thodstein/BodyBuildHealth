@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
 import { validateCourse } from '../../engines/pharmacology.engine';
-import { checkDrugInteractions } from '../../engines/pharma-interactions.engine';
+import { checkDrugInteractions } from '../../engines/interactions-calculator';
 import { db } from '../../core/db';
 import { notifyDataChange } from '../../core/data-link';
 import type { CourseEntry } from '../../core/types';

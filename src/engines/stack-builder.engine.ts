@@ -1,5 +1,5 @@
 import { MASTER_DB } from '../core/master-db';
-import { analyzeInteractions } from './interaction-checker.engine';
+import { analyzeInteractions } from './interactions-calculator';
 import type { SubstanceEntry } from '../core/types';
 
 export interface StackResult {

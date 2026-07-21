@@ -2,7 +2,7 @@ import {
   EffectEntry, InteractionEntry, GoalProfile, StackTemplate, 
   SubstanceEntry 
 } from '../core/types';
-import { analyzeInteractions } from './interactions.engine';
+import { analyzeInteractions } from './interactions-calculator';
 
 export interface GeneratedStack {
   substances: string[];

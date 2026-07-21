@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
 import { INTERACTION_ENRICHMENT } from '../../../data/support-interaction-enrichment';
-import { checkDrugInteractions, getClassInstructions, getCourseRecommendations } from '../../../engines/pharma-interactions.engine';
+import { checkDrugInteractions, getClassInstructions, getCourseRecommendations } from '../../../engines/interactions-calculator';
 import type { CourseEntry, MasterDB, SubstanceEntry, InteractionEntry } from '../../../core/types';
 import { PopupSelect } from '../../components/PopupXxx';
 import { MECH_TRANSLATIONS_RU, MECH_LABELS, EFFECT_LABELS } from './SupportScreenData';
