@@ -225,6 +225,8 @@ export interface CalculatorState {
   jointMode?: boolean;
   reproMode?: boolean;
   neuroMode?: boolean;
+  symptoms?: string[];
+  healthConditions?: string[];
 }
 
 // ═══════════════════════════════════════════════════════════════

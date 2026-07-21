@@ -448,28 +448,28 @@ export function buildMapperCtx(
       mgPerWeek: a.mgPerWeek ?? a.dosePerWeek ?? (a.dose ? Number(String(a.dose).replace(/\D/g,''))*7 : 500),
       form: (a.form === 'oral' ? 'oral' : 'inject') as 'oral' | 'inject',
     }));
-  const ghIU = (state.pharma as any).ghIU || 0;
+  const ghIU = state.pharma.ghIU || 0;
   if (ghIU > 0) pedDoses.push({ id: 'somatropin', pClass: 'gh', iuPerDay: ghIU, form: 'subq' } as any);
-  const insulinIU = (state.pharma as any).insulinIU || 0;
+  const insulinIU = state.pharma.insulinIU || 0;
   if (insulinIU > 0) pedDoses.push({ id: 'insulin_rapid', pClass: 'insulin', iuPerDay: insulinIU, form: 'subq' } as any);
-  const igfMcg = (state.pharma as any).igfMcg || 0;
+  const igfMcg = state.pharma.igfMcg || 0;
   if (igfMcg > 0) pedDoses.push({ id: 'igf1_lr3', pClass: 'igf', mcgPerDay: igfMcg, form: 'subq' } as any);
-  const clenMcg = (state.pharma as any).clenMcg || 0;
+  const clenMcg = state.pharma.clenMcg || 0;
   if (clenMcg > 0) pedDoses.push({ id: 'clenbuterol', pClass: 'clenbut', mcgPerDay: clenMcg, form: 'oral' } as any);
-  const t3Mcg = (state.pharma as any).t3Mcg || 0;
+  const t3Mcg = state.pharma.t3Mcg || 0;
   if (t3Mcg > 0) pedDoses.push({ id: 't3', pClass: 't3', mcgPerDay: t3Mcg, form: 'oral' } as any);
   return {
     labs, phaseCtx, boosterCtx, level, manualChoices,
     onCourse: state.pharma.aas.length > 0 || pedDoses.length > 0,
     e2Level: labs['ESTRADIOL'], hemoglobin: labs['HEMOGLOBIN'], hematocrit: labs['HEMATOCRIT'],
     hasHCG: state.pharma.hasHCG, hasAI: state.pharma.hasAI,
-    hasCabergoline: (state.pharma as any).hasCaber || false,
+    hasCabergoline: state.pharma.hasCaber || false,
     aasIds: (state.pharma.aas || []).map((a: any) => a.id || '').filter(Boolean),
-    pedDoses, libidoLow: ((state as any).symptoms || []).includes('low_libido'),
+    pedDoses, libidoLow: (state.symptoms || []).includes('low_libido'),
     bpSystolic: state.cardio.bpStage === 'high' ? 150 : state.cardio.bpStage === 'normal' ? 120 : 135,
     lipidLdl: labs['LDL'],
-    symptoms: (state as any).symptoms || [],
-    healthConditions: (state as any).healthConditions || [],
+    symptoms: state.symptoms || [],
+    healthConditions: state.healthConditions || [],
   };
 }
 
@@ -493,7 +493,7 @@ function analyzeStackModule(
   if (!stack) return { analysis: [], contextSummary: '' };
 
   const planIds = new Set((rec?.subs || []).map(s => canonIdLocal(s.substanceId)));
-  const symptoms = (state as any).symptoms || [];
+  const symptoms = state.symptoms || [];
   const labs = labSliceToValues(state.labs.fullPanel);
   const jointPain = state.oda.jointPain;
   const hasJointSymptom = symptoms.includes('joint_pain');
@@ -503,7 +503,7 @@ function analyzeStackModule(
   const stressLevel = state.profile.stressLevel || 5;
   const aggressionScore = state.neuro.aggressionScore || 0;
   const aasCount = state.pharma.aas.length;
-  const pedCount = (state.pharma as any).ghIU ? 1 : 0 + (state.pharma as any).insulinIU ? 1 : 0 + aasCount;
+  const pedCount = (state.pharma.ghIU ? 1 : 0) + (state.pharma.insulinIU ? 1 : 0) + aasCount;
   const hasOral17 = (state.pharma.aas || []).some((a: any) => a.form === 'oral');
   const altVal = labs['ALT'] || labs['AST'];
   const hctVal = labs['HEMATOCRIT'] || labs['HCT'];
@@ -532,8 +532,8 @@ function analyzeStackModule(
     const triggers: string[] = [];
     if (aasCount > 0) triggers.push(`${aasCount} ААС`);
     if (hasOral17) triggers.push('оральный 17α');
-    if ((state.pharma as any).ghIU) triggers.push('GH');
-    if ((state.pharma as any).insulinIU) triggers.push('инсулин');
+    if (state.pharma.ghIU) triggers.push('GH');
+    if (state.pharma.insulinIU) triggers.push('инсулин');
     if (pedCount > 2) triggers.push('мульти-курс');
     const alt = altVal;
     if (alt && alt > 40) triggers.push(`АЛТ/АСТ ↑ (${alt})`);
@@ -1317,7 +1317,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         // Для articular_stack — новый попап с протоколами и выбором
         if (stackModulePopup === 'articular_stack') {
           const planIds = new Set((rec?.subs || []).map(s => canonIdLocal(s.substanceId)));
-          const symptoms = (state as any).symptoms || [];
+          const symptoms = state.symptoms || [];
           const labs = labSliceToValues(state.labs.fullPanel);
           const jointPain = state.oda.jointPain;
           const hasJointSymptom = symptoms.includes('joint_pain');
@@ -1464,7 +1464,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         // ── Нейропротекция: пресеты + выбор ──
         if (stackModulePopup === 'neuroprotection_stack') {
           const planIds = new Set((rec?.subs || []).map(s => canonIdLocal(s.substanceId)));
-          const symptoms = (state as any).symptoms || [];
+          const symptoms = state.symptoms || [];
           const hasInsomnia = symptoms.includes('insomnia');
           const hasAnxiety = symptoms.includes('anxiety');
           const sleepHours = state.profile.sleepHours || 7;
