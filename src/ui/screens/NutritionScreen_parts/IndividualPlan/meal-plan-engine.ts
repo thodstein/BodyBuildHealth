@@ -72,6 +72,8 @@ export interface MealPlanInput {
   allowIntraWorkout?: boolean;
   excludedIds?: Set<string>;
   preferredIds?: Set<string>;
+  // D-28: meal-bound preferred — food bound to a specific meal (e.g. rice_cream only on breakfast).
+  preferredByMeal?: Record<string, Set<string>>;
   budget: 'low' | 'medium' | 'max' | 'enhanced';
   isVegetarian?: boolean;
   isCutting?: boolean;
@@ -154,7 +156,7 @@ const isMeatId = (id: string): boolean => MEAT_KEYWORDS.some(k => id.toLowerCase
 // (abalone, macadamia, loquat, game meats, exotic oils/eggs) into rations. This set excludes them.
 // Д-3: premium/exotic foods excluded from low/medium budgets. Tokens match REAL FOOD_DB ids
 // (e.g. oil_mustard, oil_black_cumin, oil_perilla, oil_camelina, oil_truffle, oil_macadamia).
-const PREMIUM_OR_EXOTIC = ['abalone','sea_urchin','caviar','roe','truffle','macadamia','medlar',
+const PREMIUM_OR_EXOTIC = ['abalone','sea_urchin','caviar','roe','truffle','macadamia','medlar','lobster','crab','mussels','clams','squid','oysters','octopus','scallop','langoust','crayfish','sea_cucumber',
   'oil_mustard','oil_black_cumin','oil_perilla','oil_camelina','oil_truffle','oil_macadamia','oil_hazelnut',
   'oil_almond','oil_walnut','oil_cedar','oil_pistachio','saffron','vanilla','quail_egg','duck_egg','goose_egg','ostrich',
   'venison','rabbit','duck_breast','duck_leg','goose_roasted','veal','mahi','trumpeter','conch','quail_whole',
@@ -483,12 +485,18 @@ function buildWholeMeal(
     isVegetarian?: boolean;
     rationales: string[];
     preferredIds?: Set<string>;
+    mealPreferredIds?: Set<string>; // D-28: meal-bound preferred (e.g. rice_cream → breakfast only)
+    preferredByMealFull?: Record<string, Set<string>>; // D-28: full map to exclude other-meal-bound from global preferred
     lockedIds?: Set<string>;
     recentIds?: Set<string>;
     vegColorIdx?: number; // which VEG_COLOR_GROUPS to prefer
   }
 ): Meal {
-  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds, lockedIds, recentIds, vegColorIdx } = params;
+  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, vegColorIdx } = params;
+  // D-28: effective preferred = (global preferred MINUS foods bound to other meals) ∪ meal-bound for THIS meal.
+  // This ensures rice_cream bound to breakfast is preferred ONLY on breakfast, not everywhere.
+  const _otherMealBound = new Set<string>(Object.entries(params.preferredByMealFull || {}).filter(([m]) => m !== label).flatMap(([, v]) => [...(v as any)]));
+  const preferredIds = new Set<string>([...(_preferredIds||[])].filter(id => !_otherMealBound.has(id)), ...(mealPreferredIds||[]));
  
   const items: MealItem[] = [];
   let remP = proteinG, remC = carbG, remF = fatG;
@@ -1082,6 +1090,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const breakfastRot = rotationForMeal(0);
   const breakfast = buildWholeMeal({
     label: 'Завтрак', time: tBreakfast, type: 'breakfast',
+    mealPreferredIds: input.preferredByMeal?.['Завтрак'],
+    preferredByMealFull: input.preferredByMeal,
     proteinG: mealBudget.breakfast.p,
     carbG: mealBudget.breakfast.c,
     fatG: mealBudget.breakfast.f,
@@ -1103,6 +1113,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
  
   const lunch = buildWholeMeal({
     label: 'Обед', time: tLunch, type: 'lunch',
+    mealPreferredIds: input.preferredByMeal?.['Обед'],
+    preferredByMealFull: input.preferredByMeal,
     proteinG: mealBudget.lunch.p,
     carbG: mealBudget.lunch.c,
     fatG: mealBudget.lunch.f,
@@ -1124,7 +1136,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const snackRot = rotationForMeal(3);
     const snack = buildWholeMeal({
       label: 'Полдник', time: tSnack, type: 'snack',
-      proteinG: mealBudget.snack.p,
+      mealPreferredIds: input.preferredByMeal?.['Полдник'],
+    preferredByMealFull: input.preferredByMeal,
+    proteinG: mealBudget.snack.p,
       carbG: mealBudget.snack.c,
       fatG: mealBudget.snack.f,
       pool, proteinRotationIds: snackRot.ids, seed: seedBase + 8,
@@ -1146,7 +1160,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const tSnack2 = (() => { const [lh, lm] = tLunch.split(':').map(Number); const [dh, dm] = tDinner.split(':').map(Number); const mid = Math.round(((lh*60+lm) + (dh*60+dm)) / 2); const [bh, bm] = tBed.split(':').map(Number); const bedMin2 = bh*60+bm; const afterDinner = Math.round(((dh*60+dm) + bedMin2) / 2); return mid > (dh*60+dm - 90) ? String(Math.floor(afterDinner/60)).padStart(2,'0') + ':' + String(afterDinner%60).padStart(2,'0') : String(Math.floor(mid/60)).padStart(2,'0') + ':' + String(mid%60).padStart(2,'0'); })();
     const snack2 = buildWholeMeal({
       label: 'Перекус', time: tSnack2, type: 'snack',
-      proteinG: mealBudget.snack2.p, carbG: mealBudget.snack2.c, fatG: mealBudget.snack2.f,
+      mealPreferredIds: input.preferredByMeal?.['Перекус'],
+    preferredByMealFull: input.preferredByMeal,
+    proteinG: mealBudget.snack2.p, carbG: mealBudget.snack2.c, fatG: mealBudget.snack2.f,
       pool, proteinRotationIds: snack2Rot.ids, seed: seedBase + 13,
       includeVeg: false, includeFruit: true,
       preferredIds: effectivePreferred, lockedIds: input.lockedIds, recentIds: effRecentIds(),
@@ -1189,6 +1205,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const dinnerRot = rotationForMeal(2);
   const dinner = buildWholeMeal({
     label: 'Ужин', time: tDinner, type: 'dinner',
+    mealPreferredIds: input.preferredByMeal?.['Ужин'],
+    preferredByMealFull: input.preferredByMeal,
     proteinG: mealBudget.dinner.p,
     carbG: mealBudget.dinner.c,
     fatG: mealBudget.dinner.f,

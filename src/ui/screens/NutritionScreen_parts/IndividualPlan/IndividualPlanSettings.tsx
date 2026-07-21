@@ -82,7 +82,7 @@ export const IndividualPlanSettings: React.FC = () => {
     healthIssues, setHealthIssues, toggleHealthIssue,
     eveningLowCarb, setEveningLowCarb,
     planType, setPlanType,
-    preferredFoods, setPreferredFoods, excludedFoods, setExcludedFoods,
+    preferredFoods, setPreferredFoods, preferredByMeal, setPreferredByMeal, excludedFoods, setExcludedFoods,
     customNotes, setCustomNotes,
     cyclingMode, setCyclingMode, trainingDays, setTrainingDays, DAY_LABELS,
     heavyTrainDay, setHeavyTrainDay,
@@ -1454,19 +1454,12 @@ export const IndividualPlanSettings: React.FC = () => {
             <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'50vh', overflowY:'auto' }}>
               {FOOD_DB.filter(f => !prefSearch || (f.name||'').toLowerCase().includes(prefSearch.toLowerCase()) || (f.id||'').toLowerCase().includes(prefSearch.toLowerCase())).slice(0,60).map(f => {
                 const sel = preferredFoods.includes(f.id);
+                const mealBound = (['Завтрак','Обед','Ужин','Полдник']).find(m => (preferredByMeal[m]||[]).includes(f.id));
                 return (
-                  <div key={f.id} onClick={() => {
-                    const upd = sel ? preferredFoods.filter(x => x !== f.id) : [...preferredFoods, f.id];
-                    setPreferredFoods(upd); localStorage.setItem('he_preferred_foods', JSON.stringify(upd));
-                  }} style={{
-                    padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9,
-                    background: sel ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)',
-                    border: sel ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent',
-                    color: sel ? '#00e68a' : 'rgba(255,255,255,0.7)',
-                    display:'flex', alignItems:'center', gap:6,
-                  }}>
-                    <span style={{ fontSize:8, minWidth:12 }}>{sel ? '✓' : '○'}</span>
-                    <span>{f.name}</span>
+                  <div key={f.id} style={{ padding:'6px 8px', borderRadius:8, fontSize:9, background: sel ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent', color: sel ? '#00e68a' : 'rgba(255,255,255,0.7)', display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                    <span onClick={() => { const upd = sel ? preferredFoods.filter(x => x !== f.id) : [...preferredFoods, f.id]; setPreferredFoods(upd); localStorage.setItem('he_preferred_foods', JSON.stringify(upd)); if (sel) { const bm = {...preferredByMeal}; Object.keys(bm).forEach(k => bm[k] = (bm[k]||[]).filter(x => x !== f.id)); setPreferredByMeal(bm); } }} style={{ cursor:'pointer', fontSize:8, minWidth:12 }}>{sel ? '✅' : '○'}</span>
+                    <span style={{ cursor:'pointer' }} onClick={() => { const upd = sel ? preferredFoods.filter(x => x !== f.id) : [...preferredFoods, f.id]; setPreferredFoods(upd); localStorage.setItem('he_preferred_foods', JSON.stringify(upd)); }}>{f.name}</span>
+                    {sel && (<div style={{ display:'flex', gap:2, marginLeft:'auto' }}>{[['Завтрак','🌅'],['Обед','☀️'],['Ужин','🌙'],['Полдник','🍏']].map(([m,icon]) => { const isB = (preferredByMeal[m]||[]).includes(f.id); return (<span key={m} onClick={() => { const bm = {...preferredByMeal}; Object.keys(bm).forEach(k => bm[k] = (bm[k]||[]).filter(x => x !== f.id)); bm[m] = [...(bm[m]||[]), f.id]; setPreferredByMeal(bm); }} style={{ cursor:'pointer', fontSize:9, padding:'1px 4px', borderRadius:4, background: isB ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.03)', border: isB ? '1px solid rgba(0,230,138,0.4)' : '1px solid transparent' }}>{icon}</span>); })}{mealBound && <span onClick={() => { const bm = {...preferredByMeal}; Object.keys(bm).forEach(k => bm[k] = (bm[k]||[]).filter(x => x !== f.id)); setPreferredByMeal(bm); }} style={{ cursor:'pointer', fontSize:7, color:'rgba(255,255,255,0.4)' }} title='Любой приём'>★</span>}</div>)}
                   </div>
                 );
               })}

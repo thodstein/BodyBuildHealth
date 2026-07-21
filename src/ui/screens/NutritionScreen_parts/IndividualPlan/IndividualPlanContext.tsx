@@ -373,6 +373,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [quickAddMealIdx, setQuickAddMealIdx] = useState<number | null>(null);
   const [quickAddSearch, setQuickAddSearch] = useState('');
   const [customNotes, setCustomNotes] = useState(() => { try { return localStorage.getItem('he_nutrition_notes') || ''; } catch { return ''; } });
+  // D-28: meal-bound preferred foods (e.g. rice_cream → breakfast only)
+  const [preferredByMeal, setPreferredByMeal] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('he_preferred_by_meal') || '{}'); } catch { return {}; } });
+  useEffect(() => { try { localStorage.setItem('he_preferred_by_meal', JSON.stringify(preferredByMeal)); } catch {} }, [preferredByMeal]);
   const [excludedFoods, setExcludedFoods] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_excluded_foods') || '[]'); } catch { return []; } });
   const [dietPrefs, setDietPrefs] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_diet_preferences') || '[]'); } catch { return []; } });
   const [allergenExcludedCount, setAllergenExcludedCount] = useState(0);
@@ -810,6 +813,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           allowIntraWorkout: trainIntensity === 'high',
           trainDurationMin: (s?.avgWorkoutMinutes || 60),
           excludedIds, preferredIds: new Set(preferredFoods),
+          preferredByMeal: Object.fromEntries(Object.entries(preferredByMeal).map(([k, v]) => [k, new Set(v)])),
           lockedIds, recentFoodIds,
           budget, isVegetarian: dietPrefs.includes('vegetarian'),
           isCutting: goal === 'cutting' || goal === 'fat_loss',
@@ -2431,7 +2435,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     lunchTime, setLunchTime, dinnerTime, setDinnerTime, mealsCount, setMealsCount,
     workFood, setWorkFood, allergens, setAllergens, healthIssues, setHealthIssues,
     eveningLowCarb, setEveningLowCarb, planType, setPlanType,
-    preferredFoods, setPreferredFoods, excludedFoods, setExcludedFoods,
+    preferredFoods, setPreferredFoods, preferredByMeal, setPreferredByMeal, excludedFoods, setExcludedFoods,
     allergenExcludedCount, setAllergenExcludedCount, planTargets, setPlanTargets,
     cyclingMode, setCyclingMode, heavyTrainDay, setHeavyTrainDay,
     workScheduleEnabled, setWorkScheduleEnabled,
