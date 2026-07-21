@@ -39,13 +39,26 @@ export function filterBySpecificity(foods: FoodItem[], level: Specificity): Food
 // ── C: Category preferences ──
 export type CategoryPref = { preferred: string[]; excluded: string[] };
 
+const CATEGORY_PATTERNS: Record<string, string[]> = {
+  fish: ['salmon','tuna','cod','mackerel','sardine','trout','pollock','herring','haddock','sea_bass','dorado','red_fish','red_caviar','caviar','roe','anchovy'],
+  dairy: ['milk','cheese','yogurt','kefir','cottage','cream_33','creme','whey','casein','ricotta','mascarpone','feta','parmesan','mozzarella'],
+  legumes: ['lentils','chickpeas','beans','tofu','tempeh','edamame','hummus','peas','pea_protein','soy'],
+  cabbage: ['cabbage','broccoli','cauliflower','brussels','kale','bok_choy','sauerkraut'],
+  nuts: ['almond','cashew','walnut','hazelnut','pistachio','pecan','peanut','macadamia','brazil_nut','pine_nut','seed','nut'],
+  pork: ['pork','bacon','ham','sausage','lard'],
+  shellfish: ['shrimp','lobster','crab','mussels','clams','squid','oysters','octopus','scallop','crayfish'],
+  mushroom: ['mushroom','champignon','shiitake','porcini','truffle'],
+};
+
 export function matchesCategoryPref(food: FoodItem, pref: CategoryPref): boolean {
-  const cat = food.category || '';
   const id = food.id.toLowerCase();
-  // excluded categories
   for (const ex of pref.excluded) {
-    if (cat === ex) return false;
-    if (id.includes(ex.toLowerCase())) return false;
+    const patterns = CATEGORY_PATTERNS[ex.toLowerCase()];
+    if (patterns) {
+      if (patterns.some(p => id.includes(p))) return false;
+    } else if (id.includes(ex.toLowerCase())) {
+      return false;
+    }
   }
   return true;
 }
