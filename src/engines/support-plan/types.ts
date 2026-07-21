@@ -545,6 +545,20 @@ export const SUBSTANCE_HALF_LIFE: Record<string, HalfLifeCategory> = {
   betaine: 'short',      // t½ ≈ 0.5h → 2-3×/день
 };
 
+/** Кратность приёма по периоду полувыведения.
+ *  ultra_short → 3×/день, short → 2×/день, medium/long/ultra_long → 1×/день */
+export function halfLifeMultiplicity(id: string): number {
+  const cat = SUBSTANCE_HALF_LIFE[id];
+  if (!cat) return 1;
+  switch (cat) {
+    case 'ultra_short': return 3;
+    case 'short': return 2;
+    case 'medium': return 1;
+    case 'long': return 1;
+    case 'ultra_long': return 1;
+  }
+}
+
 /** Множители биодоступности по форме (из SupportBioavailability). */
 export const FORM_BIOAVAIL_MULT: Record<string, number> = {
   mg_oxide: 0.04, mg_citrate: 0.25, mg_glycinate: 0.45, mg_malate: 0.30,

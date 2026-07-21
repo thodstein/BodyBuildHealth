@@ -7,7 +7,7 @@
 import { ALL_INTERACTIONS, SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { evaluateRecommendations } from '../recommendation-engine';
 import type { CalculatorState, CalculatorResult, LabFinding } from './types';
-import { catalogEntry, NUTRIENT_UL, MINERAL_SEPARATION_HOURS, SUBSTANCE_HALF_LIFE } from './types';
+import { catalogEntry, NUTRIENT_UL, MINERAL_SEPARATION_HOURS, halfLifeMultiplicity } from './types';
 
 /** Клинические механизмы для распространённых конфликтов (используется
  *  когда ALL_INTERACTIONS не содержит mechanism). */
@@ -382,11 +382,11 @@ export function buildPillBurden(
     else if (s.timeBlock === 'afternoon') afternoonCount++;
     else eveningCount++;
   }
-  // Учитываем half-life multiplicity: добавляем +1 таблетку для веществ с 2+/day
+  // Учитываем half-life multiplicity: +1 таблетка для 2×/day, +2 для 3×/day
   let estimatedTotal = 0;
   for (const subId of substances) {
-    const mult = SUBSTANCE_HALF_LIFE ? 1 : 1; // default
-    estimatedTotal += 1;
+    const mult = halfLifeMultiplicity(subId);
+    estimatedTotal += mult;
   }
   const total = substances.length;
   let feasibility: 'optimal' | 'acceptable' | 'high' | 'excessive' = 'optimal';

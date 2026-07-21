@@ -536,7 +536,7 @@ export function toSystemRisks(scores: Record<RiskSystemId, number>, result: Calc
   return (Object.keys(SYS_META) as RiskSystemId[]).map(id => {
     const raw = scores[id];
     const mechs: MechanismDetail[] = MECH_NAMES[id].slice(0, 7).map((name, i) => {
-      const contribution = raw > 0 ? clamp(Math.round(raw / 7 * (i + 1) * (0.85 + Math.random() * 0.3))) : 0;
+      const contribution = raw > 0 ? clamp(Math.round(raw / 7 * (i + 1))) : 0;
       return { id: i + 1, name, contribution, active: contribution > 10, triggers: [] };
     });
     const protection = 0.3 + (result.synergyIdsUsed.length * 0.02);
