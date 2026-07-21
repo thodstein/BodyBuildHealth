@@ -37,7 +37,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
     const aasClasses = ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm'];
     const linkedAas = courseLinked
       .filter(c => {
-        const ph = (PHARMA_DB as any)[c.substanceId];
+        const ph = PHARMA_DB[c.substanceId];
         return ph?.class && aasClasses.includes(ph.class);
       })
       .map(c => ({
@@ -110,7 +110,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
     try {
       if (!courseLinked || courseLinked.length === 0) { setFillStatus('❌ Нет активного курса'); setTimeout(() => setFillStatus(''), 2000); return; }
       const aasClasses = ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm'];
-      const linkedAas = courseLinked.filter(c => { const ph = (PHARMA_DB as any)[c.substanceId]; return ph?.class && aasClasses.includes(ph.class); }).map(c => ({ id: c.substanceId, doseMgWeek: (c.doseValue || 0) * (c.frequency || 1), weeks: (c.endWeek || 12) - (c.startWeek || 0), startWeek: c.startWeek || 1, endWeek: c.endWeek || 12 }));
+      const linkedAas = courseLinked.filter(c => { const ph = PHARMA_DB[c.substanceId]; return ph?.class && aasClasses.includes(ph.class); }).map(c => ({ id: c.substanceId, doseMgWeek: (c.doseValue || 0) * (c.frequency || 1), weeks: (c.endWeek || 12) - (c.startWeek || 0), startWeek: c.startWeek || 1, endWeek: c.endWeek || 12 }));
       const hasHCG = !!courseLinked.find(c => c.substanceId === 'hcg');
       const hasAI = !!courseLinked.find(c => ['anastrozole','letrozole','exemestane'].includes(c.substanceId));
       const hasSERM = !!courseLinked.find(c => ['tamoxifen','clomiphene','enclomiphene'].includes(c.substanceId));
@@ -383,8 +383,8 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           {/* Список ААС */}
           <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:8 }}>
             {state.pharma.aas.map((a, i) => {
-              const phName = (PHARMA_DB as any)[a.id]?.name || a.id;
-              const phClass = (PHARMA_DB as any)[a.id]?.class || '';
+              const phName = PHARMA_DB[a.id]?.name || a.id;
+              const phClass = PHARMA_DB[a.id]?.class || '';
               const classColor = phClass === 'testosterone' ? 'rgba(99,102,241,0.15)'
                 : phClass === 'nandrolone' ? 'rgba(34,197,94,0.15)'
                 : phClass === 'trenbolone' ? 'rgba(239,68,68,0.15)'

@@ -2809,7 +2809,7 @@ const CalcActions: React.FC<CalcActionsProps> = ({ rec, state }) => {
     const data = buildExportDataFromRec(
       rec,
       {
-        name: (state.profile as any)?.name || 'Пациент',
+        name: state.profile?.name || 'Пациент',
         age: state.profile?.age || 30,
         weight: state.profile?.weight || 80,
         height: state.profile?.height || 178,

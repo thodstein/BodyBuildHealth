@@ -19,6 +19,7 @@ export type PowerLevel = 'basic' | 'mid' | 'max' | 'boost';
 
 // ─── Block 1: User Profile ───
 export interface UserProfileData {
+  name?: string;
   weight: number; age: number; sex: Sex;
   height?: number; bodyfat?: number;
   workoutsPerWeek: number; avgWorkoutMinutes: number;
