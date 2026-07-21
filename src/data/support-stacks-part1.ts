@@ -549,7 +549,7 @@ export const STACKS_PART_1: SupportStack[] = [
         'Креатин — ↑ PCr, регенерация АТФ через CK-MM, буфер H+ в мышцах',
         'АЛЬК — активация Nrf2/ARE, ↑ PGC-1α, ↑ биогенез митохондрий',
       ],
-      mechanismCodes: ['MITOCHONDRIAL_BIOGENESIS', 'ATP_PRODUCTION', 'FATTY_ACID_OXIDATION', 'ANTIOXIDANT', 'CREATINE_KINASE'],
+      mechanismCodes: ['MITOCHONDRIAL_BIOGENESIS', 'ATP_PRODUCTION', 'FATTY_ACID_OXIDATION', 'LIPID_PEROXIDATION_INHIBITION', 'CREATINE_KINASE'],
       finalEffect: '↑ АТФ-продукции на 30-50%, ↑ физической выносливости, ↓ утомляемости, ↑ когнитивной энергии',
     },
     structuredInteractions: {
@@ -1202,7 +1202,7 @@ export const STACKS_PART_1: SupportStack[] = [
         'Гиалуроновая кислота — субстрат для HA-синтаз, повышает объём дермы, снижает TEWL',
         'Карнозин — ловушка AGEs, снижает гликацию коллагена, повышает эластичность и упругость',
       ],
-      mechanismCodes: ['COLLAGEN_SYNTHESIS', 'ANTIGLYCATION', 'MMP_REGULATION', 'HYALURONAN_SYNTHESIS', 'ANTIOXIDANT'],
+      mechanismCodes: ['COLLAGEN_SYNTHESIS', 'ANTIGLYCATION', 'MMP_REGULATION', 'HYALURONAN_SYNTHESIS', 'LIPID_PEROXIDATION_INHIBITION'],
       finalEffect: 'Повышение P1NP/P3NP на 40-70%, снижение дезоксипиридинолина, повышение упругости кожи на 25%, снижение глубины морщин',
     },
     structuredInteractions: {

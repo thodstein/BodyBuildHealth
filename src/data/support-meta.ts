@@ -2955,13 +2955,25 @@ export interface SupportLevel {
 }
 
 // Substance analogs: what can replace what
-export const SUBSTANCE_ANALOGS: Record<string, { id: string; name: string; reason: string; form?: string; mg?: number; timing?: string }[]> = {
-  nac: [{ id: 'nac', name: 'NAC', reason: 'Оригинал', form: 'капсулы', mg: 600, timing: 'натощак' }, { id: 'milk_thistle', name: 'Силимарин', reason: 'Гепатопротекция', form: 'капсулы', mg: 600, timing: 'с едой, 2x/д' }, { id: 'alpha_lipoic', name: 'АЛЬК', reason: 'Глутатион + антиоксидант', form: 'R-форма', mg: 300, timing: 'натощак' }],
+export const SUBSTANCE_ANALOGS: Record<string, { id: string; name: string; reason: string; form?: string; mg?: number; timing?: string; therapeuticClass?: string; clinicalEquivalence?: 'high' | 'moderate' | 'low' | 'unknown'; criticalNote?: string }[]> = {
+  nac: [
+    { id: 'nac', name: 'NAC', reason: 'Оригинал (предшественник глутатиона)', form: 'капсулы', mg: 600, timing: 'натощак', therapeuticClass: 'hepatoprotector', clinicalEquivalence: 'high', criticalNote: '⚠ Биодоступность NAC всего 6-10%. 1200 мг NAC = ~80 мг в крови. Стандарт 600-1200 мг/день натощак.' },
+    { id: 'tudca', name: 'TUDCA', reason: 'Гепатопротекция (ER-стресс, BSEP)', form: 'капсулы', mg: 500, timing: '2x/д с едой', therapeuticClass: 'hepatoprotector', clinicalEquivalence: 'high' },
+    { id: 'milk_thistle', name: 'Силимарин', reason: 'Мембраны гепатоцитов + антиоксидант', form: 'капсулы', mg: 600, timing: '2x/д с едой', therapeuticClass: 'hepatoprotector', clinicalEquivalence: 'high' },
+    { id: 'alpha_lipoic', name: 'АЛЬК R-форма', reason: 'Глутатион-регенерация + Nrf2', form: 'R-липоевая', mg: 300, timing: 'натощак', therapeuticClass: 'hepatoprotector', clinicalEquivalence: 'moderate' },
+    { id: 'phosphatidylcholine', name: 'Фосфатидилхолин', reason: 'Мембраны гепатоцитов', form: 'капсулы', mg: 1200, timing: 'с едой', therapeuticClass: 'hepatoprotector', clinicalEquivalence: 'moderate' },
+  ],
   omega3: [{ id: 'omega3', name: 'Омега-3', reason: 'Оригинал', form: 'EPA+DHA 60%', mg: 2000, timing: 'с едой, 2x/д' }, { id: 'egcg', name: 'EGCG', reason: 'Антиоксидант + липиды', form: 'капсулы', mg: 400, timing: 'натощак' }],
   tudca: [{ id: 'tudca', name: 'TUDCA', reason: 'Оригинал', form: 'капсулы', mg: 500, timing: 'перед едой, 2x/д' }, { id: 'milk_thistle', name: 'Силимарин', reason: 'Гепатопротекция (слабее)', form: 'капсулы', mg: 600, timing: 'с едой, 2x/д' }, { id: 'phosphatidylcholine', name: 'Фосфатидилхолин', reason: 'Мембраны гепатоцитов', form: 'капсулы', mg: 1200, timing: 'с едой' }],
   magnesium: [{ id: 'magnesium', name: 'Магний бисглицинат', reason: 'Оригинал', form: 'бисглицинат', mg: 400, timing: 'на ночь' }, { id: 'taurine', name: 'Таурин', reason: 'Расслабление + антиоксидант', form: 'порошок', mg: 2000, timing: 'натощак' }],
   vitamin_d3: [{ id: 'vitamin_d3', name: 'Витамин D3', reason: 'Оригинал', form: 'капсулы', mg: 5000, timing: 'с едой (МЕ)' }, { id: 'vitamin_k2', name: 'Витамин K2', reason: 'Направление Ca в кости', form: 'МК-7', mg: 200, timing: 'с едой (мкг)' }],
-  coq10: [{ id: 'coq10', name: 'CoQ10 убихинол', reason: 'Оригинал', form: 'убихинол', mg: 200, timing: 'с едой' }],
+  coq10: [
+    { id: 'coq10', name: 'CoQ10 убихинол', reason: 'Оригинал (активная форма)', form: 'убихинол', mg: 200, timing: 'с едой (жирной)', therapeuticClass: 'cardioprotector', clinicalEquivalence: 'high', criticalNote: '⚠ Убихинол в 4.25x биодоступнее убихинона. 200 мг убихинола = 47 мг убихинола теоретически. После 40 лет — преимущественно убихинол.' },
+    { id: 'pqq', name: 'PQQ', reason: 'Митохондриальный биогенез', form: 'BioPQQ® 20 мг', mg: 20, timing: 'с едой', therapeuticClass: 'mitochondrial', clinicalEquivalence: 'moderate' },
+    { id: 'alpha_lipoic', name: 'АЛЬК R-форма', reason: 'Регенерация CoQ10 в ETC + антиоксидант', form: 'R-липоевая', mg: 300, timing: 'натощак', therapeuticClass: 'antioxidant', clinicalEquivalence: 'moderate' },
+    { id: 'taurine', name: 'Таурин', reason: 'Кардиопротекция + АД ↓', form: 'порошок', mg: 2000, timing: 'натощак', therapeuticClass: 'cardioprotector', clinicalEquivalence: 'moderate' },
+    { id: 'magnesium', name: 'Магний', reason: 'Кардио + вазодилатация + кофактор АТФ', form: 'бисглицинат', mg: 400, timing: 'на ночь', therapeuticClass: 'cardioprotector', clinicalEquivalence: 'moderate' },
+  ],
   zinc: [{ id: 'zinc', name: 'Цинк пиколинат', reason: 'Оригинал', form: 'пиколинат', mg: 30, timing: 'на ночь' }],
   berberine: [{ id: 'berberine', name: 'Берберин', reason: 'Оригинал', form: 'капсулы', mg: 500, timing: 'с едой, 2x/д' }],
   ashwagandha: [{ id: 'ashwagandha', name: 'Ашваганда KSM-66', reason: 'Оригинал', form: 'KSM-66', mg: 600, timing: 'вечер' }],
@@ -2979,7 +2991,29 @@ export const SUBSTANCE_ANALOGS: Record<string, { id: string; name: string; reaso
   nebivolol: [{ id: 'nebivolol', name: 'Небиволол', reason: 'Оригинал', form: 'таблетки', mg: 5, timing: 'утро' }, { id: 'telmisartan', name: 'Телмисартан', reason: 'Альтернатива по АД (АРБ)', form: 'таблетки', mg: 40, timing: 'утро' }, { id: 'carvedilol', name: 'Карведилол', reason: 'Альтернатива по АД (α+β)', form: 'таблетки', mg: 12.5, timing: 'утро' }],
   carvedilol: [{ id: 'carvedilol', name: 'Карведилол', reason: 'Оригинал', form: 'таблетки', mg: 12.5, timing: 'утро' }, { id: 'nebivolol', name: 'Небиволол', reason: 'Альтернатива по АД (β1+NO)', form: 'таблетки', mg: 5, timing: 'утро' }, { id: 'telmisartan', name: 'Телмисартан', reason: 'Альтернатива по АД (АРБ)', form: 'таблетки', mg: 40, timing: 'утро' }],
   saw_palmetto: [{ id: 'saw_palmetto', name: 'Сабаль пальметто', reason: 'Оригинал', form: 'капсулы', mg: 640, timing: 'с едой, 2x/д' }],
-  hcg: [{ id: 'hcg', name: 'ХГЧ', reason: '500 МЕ 2р/нед, схема 3/1 (3 нед приема, 1 нед отдых)', form: 'инъекции', mg: 500, timing: '2x/нед (МЕ)' }],
+  hcg: [
+    { id: 'hcg', name: 'ХГЧ', reason: 'Оригинал (аналог ЛГ, ↑ интратестикулярного T)', form: 'инъекции', mg: 500, timing: '2x/нед (МЕ), схема 3/1', therapeuticClass: 'aas_protection', clinicalEquivalence: 'high', criticalNote: '⚠ Схема 3/1 (3 нед приёма, 1 нед отдых) — обязательна. Замена на SERM требует ↑ дозы и ↑ времени до восстановления.' },
+    { id: 'enclomiphene', name: 'Энкломифен', reason: 'SERM (стимулирует LH/FSH, оральный)', form: 'таблетки', mg: 12.5, timing: 'с едой', therapeuticClass: 'aas_protection', clinicalEquivalence: 'moderate', criticalNote: '⚠ SERM vs ХГЧ: разные механизмы. SERM оральный, не требует инъекций. Для PCT обычно добавляют оба.' },
+  ],
+  anastrozole: [
+    { id: 'anastrozole', name: 'Анастрозол', reason: 'Оригинал (АИ 3 поколения)', form: 'таблетки', mg: 0.5, timing: '2x/нед (титровать по E2)', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'high' },
+    { id: 'letrozole', name: 'Летрозол', reason: 'АИ 3 поколения (более мощный)', form: 'таблетки', mg: 2.5, timing: '2x/нед', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'moderate' },
+    { id: 'exemestane', name: 'Экземестан', reason: 'Стероидный АИ (другой механизм)', form: 'таблетки', mg: 25, timing: 'с едой', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'moderate' },
+  ],
+  letrozole: [
+    { id: 'letrozole', name: 'Летрозол', reason: 'Оригинал (АИ 3 поколения, мощный)', form: 'таблетки', mg: 2.5, timing: '2x/нед', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'high' },
+    { id: 'anastrozole', name: 'Анастрозол', reason: 'АИ 3 поколения (мягче)', form: 'таблетки', mg: 0.5, timing: '2x/нед', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'moderate' },
+    { id: 'exemestane', name: 'Экземестан', reason: 'Стероидный АИ', form: 'таблетки', mg: 25, timing: 'с едой', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'moderate' },
+  ],
+  exemestane: [
+    { id: 'exemestane', name: 'Экземестан', reason: 'Оригинал (стероидный АИ)', form: 'таблетки', mg: 25, timing: 'с едой', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'high' },
+    { id: 'anastrozole', name: 'Анастрозол', reason: 'Нестероидный АИ', form: 'таблетки', mg: 0.5, timing: '2x/нед', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'moderate' },
+    { id: 'letrozole', name: 'Летрозол', reason: 'Нестероидный АИ (мощный)', form: 'таблетки', mg: 2.5, timing: '2x/нед', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'moderate' },
+  ],
+  magnesium_l_threonate: [
+    { id: 'magnesium_l_threonate', name: 'Магний L-треонат', reason: 'Оригинал (для мозга через ГЭБ)', form: 'L-треонат (Magtein®)', mg: 2000, timing: 'с едой', therapeuticClass: 'nootropic', clinicalEquivalence: 'high', criticalNote: '⚠ 2000 мг Magtein = только 144 мг элементарного Mg (7.2%). Уникально для мозга через ГЭБ. Не заменять 1:1 с другими формами Mg.' },
+    { id: 'magnesium_glycinate', name: 'Магний глицинат', reason: 'Другая форма Mg (НЕ для мозга)', form: 'глицинат', mg: 800, timing: 'на ночь', therapeuticClass: 'cardioprotector', clinicalEquivalence: 'low', criticalNote: '⚠ L-треонат 2000 мг = 144 мг Mg; глицинат 800 мг = 114 мг Mg. Дозы не эквивалентны (7.2% vs 14.3% elementalFactor).' },
+  ],
 };
 
 // Substance enhancers: what boosts each substance

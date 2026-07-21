@@ -34,7 +34,7 @@ export const STACKS_PART_2: SupportStack[] = [
         'Se — GPX и тиоредоксинредуктаза, снижение АФК в фолликуле',
         'Vit C — гидроксилирование Pro, повышение абсорбции Zn, антиоксидант',
       ],
-      mechanismCodes: ['KERATIN_SYNTHESIS', '5AR_INHIBITION', 'ANTIOXIDANT', 'COLLAGEN_SYNTHESIS', 'SEBUM_REGULATION'],
+      mechanismCodes: ['KERATIN_SYNTHESIS', '5AR_INHIBITION', 'LIPID_PEROXIDATION_INHIBITION', 'COLLAGEN_SYNTHESIS', 'SEBUM_REGULATION'],
       finalEffect: 'Повышение толщины волоса на 15%, снижение DHT на 10-15%, снижение ломкости ногтей, повышение плотности волос',
     },
     structuredInteractions: {
@@ -447,7 +447,7 @@ export const STACKS_PART_2: SupportStack[] = [
         'Таурин — вазодилататор, антиоксидант, стабилизация мембран эндотелия',
         'Пикногенол — активатор eNOS через PI3K/Akt, ингибитор АПФ',
       ],
-      mechanismCodes: ['NO_PATHWAY', 'EOS_ACTIVATION', 'VASODILATION', 'ACE_INHIBITION', 'ANTIOXIDANT'],
+      mechanismCodes: ['NO_PATHWAY', 'EOS_ACTIVATION', 'VASODILATION', 'ACE_INHIBITION', 'LIPID_PEROXIDATION_INHIBITION'],
       finalEffect: 'Повышение NO метаболитов на 40-60%, снижение АД на 5-10 мм рт.ст., снижение вязкости крови',
     },
     structuredInteractions: {
@@ -699,7 +699,7 @@ export const STACKS_PART_2: SupportStack[] = [
         'B2 (FAD) — кофактор глутатионредуктазы (GSH рециклинг)',
         'Se — кофактор GPX (H2O2 → H2O в эритроцитах)',
       ],
-      mechanismCodes: ['ERYTHROPOIESIS', 'HEME_SYNTHESIS', 'DNA_SYNTHESIS', 'ANTIOXIDANT', 'FOLATE_CYCLE', 'GLUTATHIONE_RECYCLING'],
+      mechanismCodes: ['ERYTHROPOIESIS', 'HEME_SYNTHESIS', 'DNA_SYNTHESIS', 'LIPID_PEROXIDATION_INHIBITION', 'FOLATE_CYCLE', 'GLUTATHIONE_RECYCLING'],
       finalEffect: '↑ Hb на 15-30 г/л, ↑ ферритина, нормализация MCV/MCH, ↓ гомоцистеина, ↓ окислительного стресса эритроцитов',
     },
     structuredInteractions: {
@@ -1288,7 +1288,7 @@ export const STACKS_PART_2: SupportStack[] = [
         'PQQ — ↑ CREB/PGC1α, ↑ митохондриальный биогенез, ↑ NGF',
         'B12 — ↑ метионин-синтаза, ↑ миелинизация, ↓ гомоцистеин',
       ],
-      mechanismCodes: ['MITOCHONDRIAL_ENERGY', 'ELECTRON_TRANSPORT_CHAIN', 'NRF2_ACTIVATION', 'MITOCHONDRIAL_BIOGENESIS', 'NEUROPROTECTION', 'ANTIOXIDANT'],
+      mechanismCodes: ['MITOCHONDRIAL_ENERGY', 'ELECTRON_TRANSPORT_CHAIN', 'NRF2_ACTIVATION', 'MITOCHONDRIAL_BIOGENESIS', 'NEUROPROTECTION', 'LIPID_PEROXIDATION_INHIBITION'],
       finalEffect: '↑ АТФ, ↓ лактата, ↑ когнитивных функций, ↓ нейропатической боли, ↑ выносливости',
     },
     structuredInteractions: {
@@ -1510,7 +1510,7 @@ export const STACKS_PART_2: SupportStack[] = [
         'АЛЬК — ↑ Nrf2/ARE, ↑ GLUT4, ↓ AGE, ↓ Nf-κB, ↑ GSH',
         'Хром — ↓ апоБ-хромодулин → ↑ активация IR, ↑ GLUT4-экспрессия',
       ],
-      mechanismCodes: ['INSULIN_SENSITIVITY', 'NRF2_ACTIVATION', 'GLUCOSE_UPTAKE', 'NEUROPROTECTION', 'ANTI_GLYCATION', 'VITAMIN_B1', 'CHROMIUM_COFACTOR'],
+      mechanismCodes: ['INSULIN_SENSITIVITY', 'NRF2_ACTIVATION', 'GLUCOSE_UPTAKE', 'NEUROPROTECTION', 'ANTI_GLYCATION', 'CARDIOPROTECTION', 'CHROMIUM_COFACTOR'],
       finalEffect: '↓ HOMA-IR на 20-40%, ↓ HbA1c на 0.3-0.5%, ↓ AGE на 30%, ↓ нейропатической боли, ↑ чувствительности к инсулину',
     },
     structuredInteractions: {
@@ -1613,11 +1613,11 @@ export const STACKS_PART_2: SupportStack[] = [
       ],
       mechanismCodes: [
         'ACETYLCHOLINE_SYNTHESIS', 'MEMORY_ENHANCEMENT', 'FIBRINOLYSIS', 'PLATELET_AGGREGATION_INHIBITION',
-        'VENOTONIC', 'ANTIOXIDANT', 'IMMUNE_MODULATION', 'AMPK_ACTIVATION',
+        'VENOTONIC', 'LIPID_PEROXIDATION_INHIBITION', 'IMMUNE_MODULATION', 'AMPK_ACTIVATION',
         'GLUTATHIONE_SYNTHESIS', 'ER_STRESS_REDUCTION', 'MEMBRANE_STABILIZATION',
         'NO_UPREGULATION', 'PPAR_ACTIVATION', 'MITOCHONDRIAL_ENERGY',
         'METHYLATION_CYCLE', 'CYP3A4_INHIBITION', 'NMDA_BLOCK',
-        'GABA_MODULATION', 'CORTISOL_REGULATION', 'BLIDE_ACID_MOD',
+        'GABA_MODULATION', 'CORTISOL_REGULATION', 'BILE_ACID_MODULATION',
       ],
       finalEffect: 'Комплексная оптимизация всех систем организма: снижение общего риска ССЗ на 30-50%, улучшение когнитивных функций (память+10-20%, внимание+25%, скорость реакции+15%), нормализация АД, улучшение липидного профиля (ЛПНП ↓ 15-30%, ЛПВП ↑ 10-20%), снижение гомоцистеина до нормы, нормализация функции печени (АЛТ/АСТ ↓ 40-60%), улучшение гемореологии, повышение иммунитета и адаптации к стрессу, улучшение качества сна, поддержка половой функции.',
     },

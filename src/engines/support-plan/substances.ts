@@ -122,7 +122,7 @@ export function buildSubstances(
       timing: def?.timing || e?.dosage?.timing || e?.forms?.[0]?.dose || 'с едой',
       category: e?.category || [],
       tier: e?.tier || 'standard',
-      targetSystems: e?.targetSystems || e?.systems || [],
+      targetSystems: e?.systems || [],
       comment: e?.description || '',
       mechanismReason: SUBSTANCE_REASONS[cid] || e?.mechanismOfAction || e?.mechanisms?.[0] || '',
       fromJoint: jointSet.has(id),

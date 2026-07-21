@@ -38,7 +38,7 @@ export const STACKS_PART_3: SupportStack[] = [
         'Артишок (цинарин) — ↑ продукция желчи, холеретик, ↓ окисление ЛПНП, антиоксидант',
         'Таурин — осморегуляция, конъюгация ЖК (таурохолевая кислота), ↓ АФК, нейтрализация HOCl',
       ],
-      mechanismCodes: ['GLUTATHIONE_SYNTHESIS', 'ER_STRESS_REDUCTION', 'MEMBRANE_STABILIZATION', 'BILE_FLOW_STIMULATION', 'NRF2_ACTIVATION', 'ANTIOXIDANT', 'METHYLATION_CYCLE', 'OSMOREGULATION'],
+      mechanismCodes: ['GLUTATHIONE_SYNTHESIS', 'ER_STRESS_REDUCTION', 'MEMBRANE_STABILIZATION', 'BILE_FLOW_STIMULATION', 'NRF2_ACTIVATION', 'LIPID_PEROXIDATION_INHIBITION', 'METHYLATION_CYCLE', 'OSMOREGULATION'],
       finalEffect: 'Снижение АЛТ/АСТ на 50-70% за 2 недели, нормализация ГГТ за 3-4 нед, билирубин ↓ до нормы. Восстановление синтетической функции печени (альбумин ↑, ПТИ ↑).',
     },
     structuredInteractions: {
