@@ -118,6 +118,45 @@ export const DRUG_INTERACTIONS: DrugInteraction[] = [
 
   // ─── Нитраты + ингибиторы ФДЭ-5 (см. tadalafil выше) ───
   { a: 'nitroglycerin', b: 'tadalafil', severity: 'block', reason: 'См. правило tadalafil+nitrates', action: '⛔ Не комбинировать. STOP tadalafil за 48 ч до нитратов' },
+
+  // ─── Серотонинергические добавки + СИОЗС/СИОЗСН (серотониновый синдром) ───
+  { a: '5htp', b: '@ssri', severity: 'block', reason: '5-HTP → серотонин + СИОЗС блокирует обратный захват → серотониновый синдром (тремор, гипертермия, миоклонус)', action: '⛔ Не комбинировать. При отмене СИОЗС → 2-4 нед washout перед 5-HTP' },
+  { a: 'tryptophan', b: '@ssri', severity: 'block', reason: 'L-триптофан → серотонин + СИОЗС → серотониновый синдром', action: '⛔ Не комбинировать' },
+  { a: 'st_johns_wort', b: '@ssri', severity: 'block', reason: 'Зверобой + СИОЗС → серотониновый синдром (летальные случаи описаны)', action: '⛔ Абсолютное противопоказание. 5-нед washout после СИОЗС' },
+  { a: 'tyrosine', b: 'phenelzine', severity: 'block', reason: 'L-тирозин → дофамин/норадреналин + ИМАО → гипертонический криз', action: '⛔ Не комбинировать с ИМАО. 2 нед washout' },
+  { a: 'tyrosine', b: 'tranylcypromine', severity: 'block', reason: 'L-тирозин → дофамин/норадреналин + ИМАО → гипертонический криз', action: '⛔ Не комбинировать с ИМАО' },
+  { a: 'tyrosine', b: 'selegiline', severity: 'warn', reason: 'L-тирозин + селегилин (ИМАО-B) → ↑ тираминовый эффект', action: '⚠ Осторожно. Избегать доз тирозина >500 мг' },
+  { a: 'sam_e', b: '@ssri', severity: 'block', reason: 'SAM-e ↑ серотонин/норадреналин + СИОЗС → серотониновый синдром', action: '⛔ Не комбинировать' },
+  { a: 'rhodiola', b: '@ssri', severity: 'warn', reason: 'Родиола ингибирует MAO-A → ↑ серотонин + СИОЗС → ↑ риск синдрома', action: '⚠ Мониторинг. Начинать с низких доз родиолы' },
+
+  // ─── L-теанин + антигипертензивные ───
+  { a: 'l_theanine', b: 'telmisartan', severity: 'monitor', reason: 'Теанин ↓ АД → аддитивная гипотензия с антигипертензивными', action: 'Мониторинг АД' },
+
+  // ─── Кофеин + бронходилататоры (теофиллин) ───
+  { a: 'caffeine', b: 'theophylline', severity: 'warn', reason: 'Оба метаболизируются CYP1A2 → ↑ концентрация обоих', action: '⚠ Мониторинг ЧСС, тремор. Снизить кофеин' },
+
+  // ─── Железо + тетрациклины (chelation) ───
+  { a: 'iron', b: '@tetracycline', severity: 'warn', reason: 'Fe²⁺ хелатирует тетрациклины → ↓ AUC на 50-80%', action: '⚠ Интервал 2-3 ч' },
+  { a: 'iron', b: 'doxycycline', severity: 'warn', reason: 'См. tetracycline', action: '⚠ Интервал 2-3 ч' },
+
+  // ─── Кальций + левотироксин (см. выше) + другие интервалы ───
+  { a: 'magnesium', b: 'ciprofloxacin', severity: 'warn', reason: 'Mg²⁺ хелатирует фторхинолоны → ↓ AUC', action: '⚠ Интервал 2+ ч' },
+  { a: 'aluminum', b: 'ciprofloxacin', severity: 'warn', reason: 'Al³⁺ хелатирует фторхинолоны', action: '⚠ Интервал 2+ ч (антациды принимать отдельно)' },
+
+  // ─── Мелатонин + варфарин ───
+  { a: 'melatonin', b: '@anticoagulant', severity: 'monitor', reason: 'Мелатонин может усиливать антикоагулянтный эффект варфарина (единичные сообщения)', action: 'Мониторинг МНО при длительном приёме' },
+
+  // ─── Зверобой + оральные контрацептивы ───
+  { a: 'st_johns_wort', b: 'ethinyl_estradiol', severity: 'warn', reason: 'Зверобой индуцирует CYP3A4 → ↓ концентрация оральных контрацептивов → потеря эффективности', action: '⚠ Не рекомендуется комбинировать. Использовать доп. контрацепцию' },
+
+  // ─── Кверцетин + циклоспорин (см. выше в support_db) — но также в drug_interactions ───
+  { a: 'quercetin', b: 'cyclosporine', severity: 'warn', reason: 'Кверцетин ингибирует CYP3A4 → ↑ AUC циклоспорина', action: '⚠ Мониторинг уровня циклоспорина в крови' },
+
+  // ─── NAC + нитроглицерин (нитратная толерантность) ───
+  { a: 'nac', b: 'nitroglycerin', severity: 'warn', reason: 'NAC ↓ развитие нитратной толерантности (полезно)', action: '⚠ Мониторинг. Можно использовать как адъювант' },
+
+  // ─── Литий + ибупрофен (НПВС ↑ уровень лития) ───
+  { a: 'lithium', b: '@nsaid', severity: 'block', reason: 'НПВС ↓ почечный клиренс лития → ↑ уровень в 2-3× → токсичность', action: '⛔ Избегать НПВС при литии. Парацетамол — альтернатива' },
   // ─── Тиазидные диуретики ───
   { a: 'hydrochlorothiazide', b: '@raas', severity: 'warn', reason: 'Аддитивная гипотензия (↓↓АД), но K⁺ компенсируется (тиазид вымывает + ARB сберегает)', action: '⚠ Мониторинг АД и K⁺ каждые 2 нед. Снижение дозы может потребоваться' },
   { a: 'hydrochlorothiazide', b: '@nsaid', severity: 'warn', reason: '↓ антигипертензивный эффект + ↑ K⁺ риск (НПВС ↓ диуретик efficacy)', action: '⚠ Избегать длительных НПВС. Краткие курсы + мониторинг АД' },
@@ -149,6 +188,9 @@ const CLASS_MAP: Record<string, string[]> = {
   '@ssri':           ['fluoxetine', 'sertraline', 'citalopram', 'escitalopram', 'paroxetine'],
   '@tetracycline':   ['doxycycline', 'tetracycline', 'minocin'],
   '@levothyroxine':  ['levothyroxine', 'liothyronine', 't4', 't3'],
+  '@maoi':           ['phenelzine', 'tranylcypromine', 'isocarboxazid', 'selegiline', 'rasagiline'],
+  '@snri':           ['venlafaxine', 'duloxetine', 'desvenlafaxine', 'milnacipran'],
+  '@tricyclic':       ['amitriptyline', 'nortriptyline', 'imipramine', 'clomipramine', 'doxepin'],
 };
 
 // ════════════════════════════════════════════════════════════════════════════

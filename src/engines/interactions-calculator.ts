@@ -38,15 +38,17 @@ export type { InteractionAlert, DrugDrugConflict, ClassInstruction, CourseRecomm
 // ─── Unified result shape ───
 export type UnifiedSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 
-// TimingInfo + рендер в отдельном .tsx файле (src/ui/components/TimingChip.tsx)
-
 export interface TimingInfo {
   /** Извлечённый интервал между приёмами: "2ч", "4ч", "48ч" */
   intervalHours?: number;
   /** Режим приёма: до еды / после еды / натощак / с едой / любое время */
   withFood?: 'fasting' | 'before_meal' | 'with_meal' | 'after_meal' | 'any';
+  /** Время суток: утро / день / вечер / перед сном */
+  timeOfDay?: 'morning' | 'noon' | 'evening' | 'bedtime';
   /** Периодичность контроля: "каждые 2 нед", "каждые 4 нед" */
   monitoringPeriod?: string;
+  /** Длительность приёма: "8 нед", "4-6 мес" */
+  durationDays?: string;
 }
 
 export interface UnifiedInteraction {
@@ -176,8 +178,25 @@ function extractPharmaRules(course?: CourseEntry[]): InteractionAlert[] {
 }
 
 // ─── Timing extraction из текста recommendation/notes ───
+// Извлекает: intervalHours, withFood, timeOfDay, monitoringPeriod, durationDays
+//
+// Телеметрия: глобальные счётчики для отслеживания эффективности regex
+let _timingTotal = 0;
+let _timingMatched = 0;
+let _timingLastReport = 0;
+
+export function getTimingTelemetry(): { total: number; matched: number; missRate: number; reset: () => void } {
+  return {
+    total: _timingTotal,
+    matched: _timingMatched,
+    missRate: _timingTotal > 0 ? 1 - _timingMatched / _timingTotal : 0,
+    reset: () => { _timingTotal = 0; _timingMatched = 0; },
+  };
+}
+
 export function extractTiming(text: string): TimingInfo | undefined {
   if (!text) return undefined;
+  _timingTotal++;
   const t: TimingInfo = {};
 
   // Интервал между приёмами: "Интервал ≥ 2ч", "разнести на 4+ ч", "STOP за 48 ч"
@@ -187,19 +206,41 @@ export function extractTiming(text: string): TimingInfo | undefined {
     t.intervalHours = parseInt(intervalMatch[1], 10);
   }
 
-  // Режим приёма: "натощак", "с едой", "до еды", "после еды"
   const lower = text.toLowerCase();
-  if (/(натощак|fasting|empty stomach)/iu.test(lower)) t.withFood = 'fasting';
-  else if (/(до\s*еды|за\s*\d+\s*мин\s*до\s*еды|before\s*meal)/iu.test(lower)) t.withFood = 'before_meal';
-  else if (/(с\s*жирн\w*\s*едой|с\s*едой|with\s*meal|with\s*food)/iu.test(lower)) t.withFood = 'with_meal';
+
+  // ── Режим приёма пищи ──
+  if (/(натощак|fasting|empty stomach|на\s*пустой\s*желудок)/iu.test(lower)) t.withFood = 'fasting';
+  else if (/(до\s*еды|за\s*\d+\s*мин\s*до\s*еды|before\s*meal|за\s*\d+\s*мин\s*до\s*приема)/iu.test(lower)) t.withFood = 'before_meal';
+  else if (/(с\s*жирн\w*\s*едой|с\s*едой|with\s*meal|with\s*food|во\s*время\s*еды|вместе\s*с\s*едой)/iu.test(lower)) t.withFood = 'with_meal';
   else if (/(после\s*еды|after\s*meal)/iu.test(lower)) t.withFood = 'after_meal';
 
-  // Мониторинг: "каждые 2 нед", "каждые 1-2 мес", "каждые 4 недели"
+  // ── Время суток (перед сном, утром, днём, вечером) ──
+  if (/(перед\s*сном|at\s*bedtime|before\s*bed|вечером\s*перед\s*сном)/iu.test(lower)) t.timeOfDay = 'bedtime';
+  else if (/(утром|утра|at\s*morning|in\s*the\s*morning)/iu.test(lower)) t.timeOfDay = 'morning';
+  else if (/(днём|днем|afternoon|в\s*обед)/iu.test(lower)) t.timeOfDay = 'noon';
+  else if (/(вечером|in\s*the\s*evening)/iu.test(lower)) t.timeOfDay = 'evening';
+
+  // ── Мониторинг: "каждые 2 нед", "каждые 1-2 мес", "каждые 4 недели" ──
   const monMatch = text.match(/кажд(?:ые|ую|ые)?\s+(\d+(?:-\d+)?)\s+(нед|недел|мес|месяц|дн|день|дня|недели|месяца|месяцев)/iu);
   if (monMatch) {
     t.monitoringPeriod = `каждые ${monMatch[1]} ${monMatch[2]}`;
   }
 
+  // ── Длительность приёма: "курс 8 нед", "принимать 4-6 нед" ──
+  const durMatch = text.match(/(?:курс|принимать|приём|прием|длительность)\s+(\d+(?:-\d+)?)\s*(нед|недел|мес|месяц|дн|день|дня|недели|месяца|месяцев)/iu);
+  if (durMatch) {
+    t.durationDays = durMatch[1] + ' ' + durMatch[2];
+  }
+
+  if (Object.keys(t).length > 0) {
+    _timingMatched++;
+    // Каждые 1000 вызовов — логировать в console (для dev-mode мониторинга)
+    if (_timingTotal - _timingLastReport >= 1000) {
+      const rate = (1 - _timingMatched / _timingTotal) * 100;
+      console.log(`[timing telemetry] ${_timingTotal} extracts, ${rate.toFixed(1)}% miss rate`);
+      _timingLastReport = _timingTotal;
+    }
+  }
   return Object.keys(t).length > 0 ? t : undefined;
 }
 
@@ -263,6 +304,35 @@ function dedupKey(a: string, b: string): string {
 }
 
 // ─── MAIN: единый вход ───
+/**
+ * Единый калькулятор взаимодействий для БАД, фармы и AAS/PED-курсов.
+ *
+ * @param input - { substances?: string[], course?: CourseEntry[] }
+ *   - substances: ID БАДов/витаминов/минералов (например "CAFFEINE", "VITAMIN_K2")
+ *   - course: Курс фармы (AAS, GH, инсулин, SARMs) с дозами и неделями
+ *   Оба параметра опциональны. Если оба пустые → score=100, all=[]
+ *
+ * @returns UnifiedResult:
+ *   - score: 0-100 (100 = безопасно, 0 = заблокировано)
+ *   - blocked: true если есть CRITICAL block/danger
+ *   - bySource: { supportDb, drugInteractions, pharmaRules } — секционированные данные
+ *   - all: UnifiedInteraction[] — нормализованные взаимодействия (dedup по паре)
+ *   - bySeverity: Record<CRITICAL|HIGH|MEDIUM|LOW|INFO, UnifiedInteraction[]>
+ *   - counts: { synergies, conflicts, blocks, warnings, monitor, info }
+ *
+ * Severity шкала:
+ *   CRITICAL (35 штрафа) → HIGH (18) → MEDIUM (8) → LOW (-3 бонус) → INFO (0)
+ *
+ * @example
+ *   calculateInteractions({ substances: ['VITAMIN_K2', 'WARFARIN'] })
+ *   // → score: 47, blocked: true, bySeverity.CRITICAL: [...]
+ *
+ *   calculateInteractions({ course: [
+ *     { substanceId: 'test_enan', doseValue: 750, doseUnit: 'mg/wk', ... },
+ *     { substanceId: 'tren_ace', doseValue: 350, doseUnit: 'mg/wk', ... },
+ *   ]})
+ *   // → score: 82, bySource.pharmaRules: [tren+test warning]
+ */
 export function calculateInteractions(input: CalculateInput): UnifiedResult {
   const subs = input.substances || [];
   const course = input.course;
@@ -375,6 +445,46 @@ export function calculateInteractions(input: CalculateInput): UnifiedResult {
 }
 
 // ─── Адаптеры для обратной совместимости со старыми API ───
+
+// Сортировка: CRITICAL первыми → HIGH → MEDIUM → LOW → INFO
+const SEVERITY_ORDER: Record<UnifiedSeverity, number> = {
+  CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4,
+};
+
+/**
+ * Сортирует массив unified items по severity (CRITICAL сверху) с опциональным фильтром.
+ * @param items - результат calculateInteractions().all
+ * @param options.onlyCritical - если true, оставить только CRITICAL
+ * @param options.onlySeverity - фильтр по конкретному severity
+ * @param options.maxSeverity - порог (показать <= maxSeverity, т.е. CRITICAL+HIGH при 'HIGH')
+ * @param options.types - whitelist типов (например ['block', 'danger'] для показа только критичных)
+ */
+export interface FilterOptions {
+  onlyCritical?: boolean;
+  onlySeverity?: UnifiedSeverity;
+  maxSeverity?: UnifiedSeverity;
+  types?: UnifiedInteraction['type'][];
+}
+
+export function filterAndSortInteractions(
+  items: UnifiedInteraction[],
+  options: FilterOptions = {}
+): UnifiedInteraction[] {
+  let result = items;
+  if (options.onlyCritical) result = result.filter(i => i.severity === 'CRITICAL');
+  if (options.onlySeverity) result = result.filter(i => i.severity === options.onlySeverity);
+  if (options.maxSeverity) {
+    const max = SEVERITY_ORDER[options.maxSeverity];
+    result = result.filter(i => SEVERITY_ORDER[i.severity] <= max);
+  }
+  if (options.types && options.types.length > 0) {
+    const set = new Set(options.types);
+    result = result.filter(i => set.has(i.type));
+  }
+  return [...result].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+}
+
+// Старый формат analyzeInteractions (interaction-checker.engine)
 
 // Старый формат analyzeInteractions (interaction-checker.engine)
 // Совместим со ВСЕМИ источниками: support_db + drug_interactions + pharma_rules.

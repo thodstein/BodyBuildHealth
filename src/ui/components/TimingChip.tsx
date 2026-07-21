@@ -9,6 +9,13 @@ const FOOD_LABELS: Record<NonNullable<TimingInfo['withFood']>, string> = {
   any: '⏰ Любое время',
 };
 
+const TIME_OF_DAY_LABELS: Record<NonNullable<TimingInfo['timeOfDay']>, string> = {
+  morning: '🌅 Утром',
+  noon: '☀️ Днём',
+  evening: '🌆 Вечером',
+  bedtime: '🛌 Перед сном',
+};
+
 interface ChipDef {
   label: string;
   color: string;
@@ -36,12 +43,28 @@ export const TimingChip: React.FC<{ timing?: TimingInfo }> = ({ timing }) => {
       border: 'rgba(245,158,11,0.25)',
     });
   }
+  if (timing.timeOfDay) {
+    chips.push({
+      label: TIME_OF_DAY_LABELS[timing.timeOfDay],
+      color: '#06b6d4',
+      bg: 'rgba(6,182,212,0.10)',
+      border: 'rgba(6,182,212,0.25)',
+    });
+  }
   if (timing.monitoringPeriod) {
     chips.push({
       label: `📅 ${timing.monitoringPeriod}`,
       color: '#a78bfa',
       bg: 'rgba(167,139,250,0.10)',
       border: 'rgba(167,139,250,0.25)',
+    });
+  }
+  if (timing.durationDays) {
+    chips.push({
+      label: `⏳ Курс ${timing.durationDays}`,
+      color: '#10b981',
+      bg: 'rgba(16,185,129,0.10)',
+      border: 'rgba(16,185,129,0.25)',
     });
   }
   if (chips.length === 0) return null;
