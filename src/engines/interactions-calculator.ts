@@ -20,6 +20,9 @@ import type { InteractionEntry } from '../core/types';
 import type { CourseEntry } from '../core/types';
 import type { Interaction as SupportInteraction, SeverityLevel, InteractionType } from '../data/support-interactions-db';
 import type { DrugInteraction } from '../data/drug-interactions';
+import type { UnifiedSeverity, UnifiedInteraction, TimingInfo, InteractionSource, InteractionType, Locale } from '../data/interactions-types';
+
+export type { UnifiedSeverity, UnifiedInteraction, TimingInfo, InteractionSource, InteractionType, Locale };
 
 // ─── Re-exports для обратной совместимости ───
 export {
@@ -36,34 +39,8 @@ export {
 export type { InteractionAlert, DrugDrugConflict, ClassInstruction, CourseRecommendation, DrugInteraction };
 
 // ─── Unified result shape ───
-export type UnifiedSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
-
-export interface TimingInfo {
-  /** Извлечённый интервал между приёмами: "2ч", "4ч", "48ч" */
-  intervalHours?: number;
-  /** Режим приёма: до еды / после еды / натощак / с едой / любое время */
-  withFood?: 'fasting' | 'before_meal' | 'with_meal' | 'after_meal' | 'any';
-  /** Время суток: утро / день / вечер / перед сном */
-  timeOfDay?: 'morning' | 'noon' | 'evening' | 'bedtime';
-  /** Периодичность контроля: "каждые 2 нед", "каждые 4 нед" */
-  monitoringPeriod?: string;
-  /** Длительность приёма: "8 нед", "4-6 мес" */
-  durationDays?: string;
-}
-
-export interface UnifiedInteraction {
-  source: 'support_db' | 'drug_interactions' | 'pharma_rules';
-  a: string;
-  b: string;
-  type: 'synergy' | 'conflict' | 'caution' | 'danger' | 'block' | 'warn' | 'monitor' | 'info';
-  severity: UnifiedSeverity;
-  effect: string;
-  mechanism: string;
-  recommendation: string;
-  /** Извлечённые тайминги из recommendation (для UI: "Принять с интервалом 2ч") */
-  timing?: TimingInfo;
-  raw: any;
-}
+// Типы UnifiedSeverity, UnifiedInteraction, TimingInfo вынесены в ../data/interactions-types
+// (re-export выше для обратной совместимости)
 
 export interface UnifiedResult {
   // 0-100, где 100 = безопасно, 0 = заблокировано
@@ -234,14 +211,33 @@ export function extractTiming(text: string): TimingInfo | undefined {
 
   if (Object.keys(t).length > 0) {
     _timingMatched++;
-    // Каждые 1000 вызовов — логировать в console (для dev-mode мониторинга)
-    if (_timingTotal - _timingLastReport >= 1000) {
-      const rate = (1 - _timingMatched / _timingTotal) * 100;
+  }
+  // Каждые 1000 вызовов — логировать в console (для dev-mode мониторинга)
+  if (_timingTotal - _timingLastReport >= 1000) {
+    const rate = _timingTotal > 0 ? (1 - _timingMatched / _timingTotal) * 100 : 0;
+    if (typeof console !== 'undefined') {
       console.log(`[timing telemetry] ${_timingTotal} extracts, ${rate.toFixed(1)}% miss rate`);
-      _timingLastReport = _timingTotal;
     }
+    _timingLastReport = _timingTotal;
   }
   return Object.keys(t).length > 0 ? t : undefined;
+}
+
+/**
+ * Рендерит мини-бейдж телеметрии (для dev-mode panel).
+ * Если missRate > 30% → рекомендует расширить regex.
+ */
+export function TimingTelemetryBadge(): { text: string; color: string; shouldImprove: boolean } {
+  const t = getTimingTelemetry();
+  const missRate = t.missRate * 100;
+  const text = t.total === 0
+    ? '⏰ Telemetry: нет данных'
+    : `⏰ Timing: ${t.matched}/${t.total} (${missRate.toFixed(0)}% miss)`;
+  return {
+    text,
+    color: missRate > 40 ? '#ef4444' : missRate > 25 ? '#f59e0b' : '#00e68a',
+    shouldImprove: missRate > 30 && t.total >= 10,
+  };
 }
 
 // ─── Severity weight table (для unified score) ───

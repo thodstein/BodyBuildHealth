@@ -3,8 +3,10 @@ import React, { useState, useMemo } from 'react';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
 import { INTERACTION_ENRICHMENT } from '../../../data/support-interaction-enrichment';
-import { checkDrugInteractions, getClassInstructions, getCourseRecommendations, extractTiming } from '../../../engines/interactions-calculator';
+import { checkDrugInteractions, getClassInstructions, getCourseRecommendations, extractTiming, calculateInteractions, filterAndSortInteractions } from '../../../engines/interactions-calculator';
 import { TimingChip } from '../../components/TimingChip';
+import { UnifiedInteractionCard } from '../../components/UnifiedInteractionCard';
+import { SECTION_LABELS } from '../../../data/interactions-labels';
 import type { CourseEntry, MasterDB, SubstanceEntry, InteractionEntry } from '../../../core/types';
 import { PopupSelect } from '../../components/PopupXxx';
 import { MECH_TRANSLATIONS_RU, MECH_LABELS, EFFECT_LABELS } from './SupportScreenData';
@@ -573,38 +575,44 @@ export const SupportInteractionsView: React.FC<{ s: Record<string, any> }> = ({ 
                   const color = (t: string) => t === 'critical' ? '#ef4444' : t === 'warning' ? '#f59e0b' : '#60a5fa';
                   return (
                     <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      {alerts.map((alert:any, ai:number) => {
-                        const c = color(alert.type);
-                        const alertSevLabel = alert.type === 'critical' ? 'Критично' : alert.type === 'warning' ? 'Предупреждение' : 'Инфо';
-                        return (
-                          <div key={`alert_${ai}`} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'10px 12px', border:'1px solid '+c+'33' }}>
-                            {/* Header */}
-                            <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:3 }}>
-                              <span style={{ fontSize:10, fontWeight:700, color:c }}>{alert.type === 'critical' ? '🔴' : alert.type === 'warning' ? '🟡' : '🔵'}</span>
-                              <span style={{ fontSize:9, padding:'1px 6px', borderRadius:3, background:c+'22', color:c, fontWeight:600 }}>{alertSevLabel}</span>
-                              <span style={{ fontSize:8, color:'var(--text-dim)' }}>{(alert.drugs||[]).map((d:string) => resolveSubName(d)).join(', ')}</span>
-                            </div>
-                            {/* Severity bar */}
-                            <div style={{ height:3, borderRadius:2, background:'rgba(255,255,255,0.06)', marginBottom:5, overflow:'hidden' }}>
-                              <div style={{ width: alert.type === 'critical' ? '100%' : alert.type === 'warning' ? '60%' : '30%', height:'100%', background:c, borderRadius:2 }} />
-                            </div>
-                            {/* Эффект / Почему */}
-                            {alert.mechanism && (
-                              <div style={{ fontSize:9, color:'rgba(255,255,255,0.9)', lineHeight:1.3, marginBottom:5 }}>
-                                <span style={{ color:'#a78bfa', fontWeight:600, fontSize:8 }}>⚙️ Механизм: </span>
-                                {alert.mechanism}
+                      {(() => {
+                        // ── Unified рендер: используем calculateInteractions для полного
+                        // unified item (effect/mechanism/recommendation раздельно)
+                        try {
+                          const result = calculateInteractions({ course });
+                          const items = filterAndSortInteractions(result.all, { types: ['danger', 'conflict', 'block', 'warn', 'caution', 'monitor'] });
+                          if (items.length === 0) {
+                            return (
+                              <div style={{ textAlign:'center', padding:'10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)' }}>
+                                <span style={{ fontSize:10, color:'#4caf50', fontWeight:600 }}>✓ Конфликтов не обнаружено</span>
                               </div>
-                            )}
-                            {/* Рекомендация */}
-                            {alert.recommendation && (
-                              <div style={{ fontSize:8, color:'#f59e0b', lineHeight:1.3, background:'rgba(245,158,11,0.06)', padding:'4px 6px', borderRadius:4 }}>
-                                💊 Рекомендация: {alert.recommendation}
-                                <TimingChip timing={extractTiming(alert.recommendation)} />
+                            );
+                          }
+                          return items.map((item, idx) => (
+                            <UnifiedInteractionCard
+                              key={`unified_${idx}`}
+                              item={item}
+                              title={(item.raw?.drugs || []).map((d: string) => resolveSubName(d)).join(' + ')}
+                            />
+                          ));
+                        } catch (e) {
+                          // Fallback на inline alerts при ошибке
+                          return alerts.map((alert:any, ai:number) => {
+                            const c = color(alert.type);
+                            const alertSevLabel = alert.type === 'critical' ? 'Критично' : alert.type === 'warning' ? 'Предупреждение' : 'Инфо';
+                            return (
+                              <div key={`alert_${ai}`} style={{ background:'var(--bg-secondary)', borderRadius:10, padding:'10px 12px', border:'1px solid '+c+'33' }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:3 }}>
+                                  <span style={{ fontSize:10, fontWeight:700, color:c }}>{alert.type === 'critical' ? '🔴' : alert.type === 'warning' ? '🟡' : '🔵'}</span>
+                                  <span style={{ fontSize:9, padding:'1px 6px', borderRadius:3, background:c+'22', color:c, fontWeight:600 }}>{alertSevLabel}</span>
+                                </div>
+                                {alert.mechanism && <div style={{ fontSize:9 }}>{alert.mechanism}</div>}
+                                {alert.recommendation && <div style={{ fontSize:8, color:'#f59e0b' }}>💊 {alert.recommendation}</div>}
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                            );
+                          });
+                        }
+                      })()}
                     </div>
                   );
                 } catch (e) {

@@ -654,7 +654,7 @@ export const ALIAS_MAP: Record<string, string> = {
   'folate': 'FOLATE', 'gaba': 'GABA', 'garlic': 'GARLIC',
   'garlic_extract': 'GARLIC', 'ginkgo': 'GINKGO', 'glutamine': 'GLUTAMINE',
   'green_tea_extract': 'GREEN_TEA_EXTRACT', 'huperzine_a': 'HUPERZINE_A',
-  'iodine': 'IODINE', 'iron': 'IRON', 'l_carnitine': 'L_CARNITINE',
+  'iodine': 'IODINE', 'iron': 'IRON', 'iron_bisglycinate': 'IRON', 'iron_sulfate': 'IRON', 'iron_fumarate': 'IRON', 'l_carnitine': 'L_CARNITINE',
   'l_dopa': 'L_DOPA', 'l_theanine': 'L_THEANINE', 'l_tryptophan': 'TRYPTOPHAN',
   'lions_mane': 'LIONS_MANE', 'lithium': 'LITHIUM', 'magnesium': 'MAGNESIUM',
   'melatonin': 'MELATONIN', 'methotrexate': 'METHOTREXATE', 'mg': 'MAGNESIUM',
