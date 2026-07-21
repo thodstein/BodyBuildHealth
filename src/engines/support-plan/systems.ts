@@ -109,6 +109,7 @@ export function buildRiskDynamics(
 ): Array<{ system: string; before: number; after: number; mechanisms: PlanMechanism[] }> {
   const out: Array<{ system: string; before: number; after: number; mechanisms: PlanMechanism[] }> = [];
   const systems = buildSystems(tzRes);
+  const allMechs = buildMechanisms(tzRes);
   for (const sys of SYS_ORDER) {
     const s = systems[sys];
     if (!s) continue;
@@ -116,7 +117,7 @@ export function buildRiskDynamics(
       system: sys,
       before: s.raw,
       after: s.net,
-      mechanisms: [],
+      mechanisms: allMechs.filter(m => m.systemLabel === sysName(sys)),
     });
   }
   return out;
