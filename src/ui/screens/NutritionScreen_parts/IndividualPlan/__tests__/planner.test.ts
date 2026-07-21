@@ -272,3 +272,22 @@ describe('buildDayPlan — mealsCount-aware distribution (D-24)', () => {
     expect(main[1]).toBeGreaterThanOrEqual(Math.min(...main));
   });
 });
+
+describe('buildDayPlan — preferred foods (D-27)', () => {
+  it('любимое блюдо (rice_cream, GI 82) появляется в большинстве дней недели', () => {
+    let hits = 0;
+    for (let d = 0; d < 7; d++) {
+      const plan = buildDayPlan(baseInput({ dayOffset: d, isTrainingDay: d % 2 === 0, preferredIds: new Set(['rice_cream']) } as any));
+      if (plan.meals.flatMap(m => m.items).some(i => i.id === 'rice_cream')) hits++;
+    }
+    // ранее 0/7; после D-27 — большинство дней (>=5)
+    expect(hits).toBeGreaterThanOrEqual(5);
+  });
+
+  it('preferred не монополизирует каждый приём (разнообразие сохраняется)', () => {
+    const plan = buildDayPlan(baseInput({ preferredIds: new Set(['rice_cream']) } as any));
+    const mealsWithRice = plan.meals.filter(m => m.items.some(i => i.id === 'rice_cream')).length;
+    // не во всех приёмах (fresh-preferred deprioritization после первого использования)
+    expect(mealsWithRice).toBeLessThan(plan.meals.length);
+  });
+});

@@ -335,10 +335,16 @@ function pickPriority<T extends { id: string }>(arr: T[], seed: number, opts?: {
     const lockedPool = arr.filter(f => locked.has(f.id));
     if (lockedPool.length > 0) return lockedPool[Math.floor(seededRandom(seed) * lockedPool.length)];
   }
-  // 2. Preferred foods get next priority (already handled by caller for most cases, but as fallback)
+  // 2. Preferred foods get next priority — but only FRESH ones (not already used today).
+  // When every preferred is already in recentIds, fall through to normal pick so the plan
+  // isn't monopolised by a single favourite in every meal.
   if (preferred && preferred.size > 0) {
     const prefPool = arr.filter(f => preferred.has(f.id));
-    if (prefPool.length > 0) return prefPool[Math.floor(seededRandom(seed) * prefPool.length)];
+    if (prefPool.length > 0) {
+      const freshPref = (recent && recent.size > 0) ? prefPool.filter(f => !recent.has(f.id)) : prefPool;
+      if (freshPref.length > 0) return freshPref[Math.floor(seededRandom(seed) * freshPref.length)];
+      // all preferred already used today → variety pick (fall through)
+    }
   }
   // 3. Deprioritize recent foods: filter them out if enough alternatives exist
   if (recent && recent.size > 0) {
@@ -385,12 +391,22 @@ function makeItem(food: FoodItem, grams: number, role: MealItem['role']): MealIt
 }
 
 // ─── Пулы продуктов по ролям (с фильтром аллергенов и диеты) ───────────
-function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPlanInput['budget'], varietyPoolSize?: number) {
+function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPlanInput['budget'], varietyPoolSize?: number, preferredIds?: Set<string>) {
   const isMealFood = (f: FoodItem) =>
     f.category !== 'supplement' || ['whey_protein', 'whey_isolate', 'whey_concentrate', 'casein', 'casein_micellar', 'supp_pea_protein', 'supp_soy_isolate', 'supp_rice_protein', 'supp_eaa', 'bcaa'].includes(f.id);
   // Д-3: build basePoolRaw first, then exclude premium/exotic at the source for low/medium budgets so
   // they cannot enter ANY pool via raw fallbacks (fatsRaw, cFruitRaw) which bypass byBudget.
-  const basePoolRaw = FOOD_DB.filter(f => {
+  // D-27: force-include preferred foods into the relevant pools (after variety-limit + budget filter)
+  // so a user's favourite (e.g. rice_cream, GI 82) is actually selectable in regular meals.
+  // Without this, preferred foods that don't match the GI/category gate (rice_cream is high-GI → carbFast,
+  // but regular meals pick from carbSlow) are never chosen despite being marked preferred.
+  const mergePreferred = <T extends FoodItem>(arr: T[], pred: (f: FoodItem) => boolean): T[] => {
+    if (!preferredIds || preferredIds.size === 0) return arr;
+    const have = new Set(arr.map(f => f.id));
+    const extra = basePoolRaw.filter(f => preferredIds.has(f.id) && !have.has(f.id) && !excludedIds.has(f.id) && pred(f));
+    return extra.length ? ([...arr, ...extra] as T[]) : arr;
+  };
+    const basePoolRaw = FOOD_DB.filter(f => {
     if (excludedIds.has(f.id)) return false;
     if (!isMealFood(f)) return false;
     // Д-10: prefer explicit isVegetarian tag; isMeatId is only a last-resort heuristic for unlabeled foods.
@@ -430,15 +446,15 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     return shuffled.slice(0, varietyPoolSize);
   };
   return {
-    proteinSolid: limitPoolByVariety(pSolid.length > 0 ? pSolid : anyProtein, 10001),
+    proteinSolid: mergePreferred(limitPoolByVariety(pSolid.length > 0 ? pSolid : anyProtein, 10001), f => f.category === 'protein' || f.category === 'dairy'),
     proteinFatty: limitPoolByVariety(pFatty.length > 0 ? pFatty : anyProtein, 10003),
     proteinLean: limitPoolByVariety(pLean.length > 0 ? pLean : anyProtein, 10005),
     fastProtein: FOOD_DB.filter(f => !excludedIds.has(f.id) && (f.id === 'whey_isolate' || f.id === 'whey_protein' || f.id === 'egg_white')),
     slowProtein: FOOD_DB.filter(f => !excludedIds.has(f.id) && (f.id === 'casein' || f.id === 'cottage_cheese_5' || f.id === 'yogurt_greek')),
-    carbSlow: limitPoolByVariety(cSlowBud.length > 0 ? cSlowBud : cSlowRaw.length > 0 ? cSlowRaw : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15), 10011),
-    carbFast: limitPoolByVariety(cFastBud.length > 0 ? cFastBud : cFastRaw.length > 0 ? cFastRaw : cFruitBud.length > 0 ? cFruitBud : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15), 10013),
-    carbFruit: limitPoolByVariety(cFruitBud.length > 0 ? cFruitBud : cFruitRaw, 10015),
-    fats: limitPoolByVariety(fatsBud.length > 0 ? fatsBud : fatsRaw, 10017),
+    carbSlow: mergePreferred(limitPoolByVariety(cSlowBud.length > 0 ? cSlowBud : cSlowRaw.length > 0 ? cSlowRaw : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15), 10011), f => f.category === 'grain' || f.category === 'carb'),
+    carbFast: mergePreferred(limitPoolByVariety(cFastBud.length > 0 ? cFastBud : cFastRaw.length > 0 ? cFastRaw : cFruitBud.length > 0 ? cFruitBud : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15), 10013), f => f.category === 'grain' || f.category === 'carb'),
+    carbFruit: mergePreferred(limitPoolByVariety(cFruitBud.length > 0 ? cFruitBud : cFruitRaw, 10015), f => f.category === 'veg_fruit'),
+    fats: mergePreferred(limitPoolByVariety(fatsBud.length > 0 ? fatsBud : fatsRaw, 10017), f => f.category === 'fat'),
     vegGreen: basePool.filter(f => f.category === 'veg_fruit' && ['broccoli','spinach','cucumber','zucchini','asparagus','green_bean','celery','cabbage','kale','green_apple'].some(k => f.id.includes(k)) && (f.protein || 0) < 5 && (f.fat || 0) < 2),
     vegColor: basePool.filter(f => f.category === 'veg_fruit' && ['tomato','pepper','carrot','beetroot','pumpkin','eggplant','pomegranate','citrus'].some(k => f.id.includes(k.toLowerCase())) && (f.protein || 0) < 5 && (f.fat || 0) < 2),
     dairy: byBudget(basePool.filter(f => f.category === 'dairy' && (f.fat || 0) <= 10)),
@@ -533,8 +549,9 @@ function buildWholeMeal(
     const vegCarbReserve = includeVeg ? 12 : 0;
     const fruitCarbReserve = includeFruit ? 10 : 0;
     const carbTarget = Math.max(5, remC - vegCarbReserve - fruitCarbReserve);
-    const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
-    const carbPool = prefCarb.length > 0 ? prefCarb : pool.carbSlow;
+    // D-27: don't narrow to only-preferred (that monopolised one favourite in every meal).
+    // Use the full carbSlow pool; pickPriority will honour preferred (fresh-first) for variety.
+    const carbPool = pool.carbSlow;
     // Prefer common carbs (rice, oats, buckwheat, potato, pasta) over exotic ones
     const commonCarbs = carbPool.filter(f => COMMON_CARB_IDS.has(f.id));
     // GL-aware: при высокой углеводной цели (>=60g) выбираем источники с наименьшим GI,
@@ -544,8 +561,10 @@ function buildWholeMeal(
       const byGI = [...carbPickPool].sort((a,b) => (a.gi||55) - (b.gi||55));
       // берём 3 самых низко-GI (fallback на полный пул, если их мало)
       carbPickPool = byGI.slice(0, 3).length >= 2 ? byGI.slice(0, 3) : carbPickPool;
+      // D-27: preferred carbs bypass GL-aware narrowing (user intent > GI optimisation)
+      if (preferredIds && preferredIds.size > 0) { const have = new Set(carbPickPool.map((f: any) => f.id)); const prefAdd = carbPool.filter((f: any) => preferredIds.has(f.id) && !have.has(f.id)); if (prefAdd.length) carbPickPool = [...carbPickPool, ...prefAdd]; }
     }
-    const carbSource = pickPriority(carbPickPool, seed + 1, { lockedIds, recentIds });
+    const carbSource = pickPriority(carbPickPool, seed + 1, { lockedIds, recentIds, preferredIds });
 // Fix 1 completion (preserve conditional) - lines 371 & 470 converted to exact COMMON_CARB_IDS.has(f.id)
      // Lines 371 & 470 now use exact Set membership check (removed substring.includes)
      // Debug: verify both lines use exact Set.has (UTF-8 safe)
@@ -946,7 +965,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const combinedExcluded = new Set([...(input.excludedIds || []), ...labAdj.restrictFoodIds]);
   const combinedPreferred = new Set([...(input.preferredIds || []), ...labAdj.preferFoodIds]);
 
-  const pool = buildFoodPools(combinedExcluded, !!input.isVegetarian, input.budget, varietyPoolSize);
+  const pool = buildFoodPools(combinedExcluded, !!input.isVegetarian, input.budget, varietyPoolSize, input.preferredIds);
 
   // P5: PCT food preference boost — крестоцветные (DIM/I3C) + zinc-rich + flax
   let effectivePreferred = combinedPreferred;
