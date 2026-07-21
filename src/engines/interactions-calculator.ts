@@ -38,6 +38,15 @@ export type { InteractionAlert, DrugDrugConflict, ClassInstruction, CourseRecomm
 // ─── Unified result shape ───
 export type UnifiedSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 
+export interface TimingInfo {
+  /** Извлечённый интервал между приёмами: "2ч", "4ч", "48ч" */
+  intervalHours?: number;
+  /** Режим приёма: до еды / после еды / натощак / с едой / любое время */
+  withFood?: 'fasting' | 'before_meal' | 'with_meal' | 'after_meal' | 'any';
+  /** Периодичность контроля: "каждые 2 нед", "каждые 4 нед" */
+  monitoringPeriod?: string;
+}
+
 export interface UnifiedInteraction {
   source: 'support_db' | 'drug_interactions' | 'pharma_rules';
   a: string;
@@ -47,7 +56,9 @@ export interface UnifiedInteraction {
   effect: string;
   mechanism: string;
   recommendation: string;
-  raw: any; // оригинальный объект из источника
+  /** Извлечённые тайминги из recommendation (для UI: "Принять с интервалом 2ч") */
+  timing?: TimingInfo;
+  raw: any;
 }
 
 export interface UnifiedResult {
@@ -112,15 +123,40 @@ function toUnifiedSeverity(
   return 'LOW';
 }
 
-// ─── Source 1: support_db (БАД-БАД / БАД-drug) ───
-function extractSupportDb(substanceIds: string[]): SupportInteraction[] {
-  if (!substanceIds?.length) return [];
-  const norm = new Set(substanceIds.map(s => resolveInteractionId(s)));
-  const out: SupportInteraction[] = [];
+// ─── Precomputed индекс INTERACTIONS_DB: resolvedId → Interaction[] ───
+// O(1) lookup вместо O(N) перебора. Строится лениво при первом обращении.
+let _interactionsIndex: Map<string, SupportInteraction[]> | null = null;
+
+function buildInteractionsIndex(): Map<string, SupportInteraction[]> {
+  if (_interactionsIndex) return _interactionsIndex;
+  const idx = new Map<string, SupportInteraction[]>();
   for (const i of INTERACTIONS_DB) {
     const a = resolveInteractionId(i.substanceA);
     const b = resolveInteractionId(i.substanceB);
-    if (norm.has(a) && norm.has(b)) out.push(i);
+    if (!idx.has(a)) idx.set(a, []);
+    if (!idx.has(b)) idx.set(b, []);
+    idx.get(a)!.push(i);
+    idx.get(b)!.push(i);
+  }
+  _interactionsIndex = idx;
+  return idx;
+}
+
+// ─── Source 1: support_db (БАД-БАД / БАД-drug) ───
+function extractSupportDb(substanceIds: string[]): SupportInteraction[] {
+  if (!substanceIds?.length) return [];
+  const idx = buildInteractionsIndex();
+  const seen = new Set<string>();
+  const out: SupportInteraction[] = [];
+  for (const raw of substanceIds) {
+    const resolved = resolveInteractionId(raw);
+    const candidates = idx.get(resolved);
+    if (!candidates) continue;
+    for (const i of candidates) {
+      if (seen.has(i.id)) continue;
+      seen.add(i.id);
+      out.push(i);
+    }
   }
   return out;
 }
@@ -135,6 +171,34 @@ function extractDrugInteractions(substanceIds: string[]): DrugInteraction[] {
 function extractPharmaRules(course?: CourseEntry[]): InteractionAlert[] {
   if (!course?.length) return [];
   return checkDrugInteractions(course);
+}
+
+// ─── Timing extraction из текста recommendation/notes ───
+function extractTiming(text: string): TimingInfo | undefined {
+  if (!text) return undefined;
+  const t: TimingInfo = {};
+
+  // Интервал между приёмами: "Интервал ≥ 2ч", "разнести на 4+ ч", "STOP за 48 ч"
+  // Unicode флаг 'u' обязателен для кириллицы; 'i' для регистра
+  const intervalMatch = text.match(/(?:интервал\w*\s*[≥>=]*\s*|разнест\w*\s*на\s*|за\s*|stop\s*за\s*|пауза\s*)(\d+)\s*ч/iu);
+  if (intervalMatch) {
+    t.intervalHours = parseInt(intervalMatch[1], 10);
+  }
+
+  // Режим приёма: "натощак", "с едой", "до еды", "после еды"
+  const lower = text.toLowerCase();
+  if (/(натощак|fasting|empty stomach)/iu.test(lower)) t.withFood = 'fasting';
+  else if (/(до\s*еды|за\s*\d+\s*мин\s*до\s*еды|before\s*meal)/iu.test(lower)) t.withFood = 'before_meal';
+  else if (/(с\s*жирн\w*\s*едой|с\s*едой|with\s*meal|with\s*food)/iu.test(lower)) t.withFood = 'with_meal';
+  else if (/(после\s*еды|after\s*meal)/iu.test(lower)) t.withFood = 'after_meal';
+
+  // Мониторинг: "каждые 2 нед", "каждые 1-2 мес", "каждые 4 недели"
+  const monMatch = text.match(/кажд(?:ые|ую|ые)?\s+(\d+(?:-\d+)?)\s+(нед|недел|мес|месяц|дн|день|дня|недели|месяца|месяцев)/iu);
+  if (monMatch) {
+    t.monitoringPeriod = `каждые ${monMatch[1]} ${monMatch[2]}`;
+  }
+
+  return Object.keys(t).length > 0 ? t : undefined;
 }
 
 // ─── Severity weight table (для unified score) ───
@@ -241,6 +305,7 @@ export function calculateInteractions(input: CalculateInput): UnifiedResult {
       effect: s.effect,
       mechanism: (s.mechanisms || []).join('; '),
       recommendation: s.notes,
+      timing: extractTiming(s.notes),
       raw: s,
     });
   }
@@ -255,14 +320,12 @@ export function calculateInteractions(input: CalculateInput): UnifiedResult {
       effect: d.reason,
       mechanism: '',
       recommendation: d.action,
+      timing: extractTiming(d.action),
       raw: d,
     });
   }
 
   for (const p of pharma) {
-    // Для pharma_rules: effect = краткая суть (например, "Тяжёлая гипогликемия"),
-    // recommendation = действие ("Контроль глюкозы каждые 2ч").
-    // Извлекаем первое предложение mechanism как краткую суть.
     const effectShort = (p.mechanism || '').split(/[.!?]/)[0]?.trim() || p.recommendation;
     addOrUpgrade({
       source: 'pharma_rules',
@@ -273,6 +336,7 @@ export function calculateInteractions(input: CalculateInput): UnifiedResult {
       effect: effectShort,
       mechanism: p.mechanism,
       recommendation: p.recommendation,
+      timing: extractTiming(p.recommendation),
       raw: p,
     });
   }
@@ -337,9 +401,19 @@ export function analyzeInteractions(substanceIds: string[]): LegacyInteractionRe
   };
 }
 
-// Старый формат findInteractionsForSubstance (support-substances)
+// Старый формат findInteractionsForSubstance (support-substances) — O(1) через индекс
 export function findInteractionsForSubstance(id: string): SupportInteraction[] {
-  return INTERACTIONS_DB.filter(e => resolveInteractionId(e.substanceA) === resolveInteractionId(id) || resolveInteractionId(e.substanceB) === resolveInteractionId(id));
+  const idx = buildInteractionsIndex();
+  const seen = new Set<string>();
+  const out: SupportInteraction[] = [];
+  const candidates = idx.get(resolveInteractionId(id));
+  if (!candidates) return [];
+  for (const i of candidates) {
+    if (seen.has(i.id)) continue;
+    seen.add(i.id);
+    out.push(i);
+  }
+  return out;
 }
 
 export function findSynergies(id: string): SupportInteraction[] {

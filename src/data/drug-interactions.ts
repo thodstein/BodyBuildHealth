@@ -29,6 +29,12 @@ export const DRUG_INTERACTIONS: DrugInteraction[] = [
   { a: 'garlic', b: '@anticoagulant', severity: 'warn', reason: '↑ INR', action: '⚠ Мониторинг. Nattokinase тоже — additive' },
   { a: 'nattokinase', b: '@anticoagulant', severity: 'warn', reason: 'Аддитивный фибринолиз → риск кровотечения', action: '⚠ Мониторинг. Снижение anticoagulant dose может потребоваться' },
   { a: 'serrapeptase', b: '@anticoagulant', severity: 'warn', reason: 'Аддитивный фибринолиз', action: '⚠ Осторожно с варфарином/DOAC' },
+  { a: 'vitamin_k2', b: '@anticoagulant', severity: 'block', reason: 'K2 активирует факторы свёртывания → ↓ эффективность варфарина/DOAC', action: '⛔ Не комбинировать. K2 — антагонист варфарина. Контроль МНО каждые 2 нед' },
+  { a: 'aspirin', b: '@anticoagulant', severity: 'block', reason: 'Аспирин (необратимая блокада COX-1) + антикоагулянт = высокий риск ЖК-кровотечений', action: '⛔ Избегать комбинации. Если необходимо — ИПП (омепразол 20 мг) + мониторинг гемоглобина' },
+  { a: 'coq10', b: '@anticoagulant', severity: 'warn', reason: 'CoQ10 структурно похож на вит.K → может ↓ антикоагулянтный эффект', action: '⚠ Мониторинг МНО каждые 2 нед' },
+  { a: 'ginkgo', b: '@anticoagulant', severity: 'warn', reason: 'Гинкго билоба ингибирует PAF → ↑ кровотечение при приёме антикоагулянтов', action: '⚠ Мониторинг. Гинкго + warfarin = ↑ риск геморрагического инсульта' },
+  { a: 'fish_oil', b: '@anticoagulant', severity: 'warn', reason: 'Омега-3 (>3 г/сут) ↓ агрегацию тромбоцитов → аддитивный эффект', action: '⚠ Мониторинг. До 2 г/сут безопасно с варфарином' },
+  { a: 'vitamin_e', b: '@anticoagulant', severity: 'warn', reason: 'Высокие дозы вит.E (>600 МЕ) ↓ агрегацию тромбоцитов', action: '⚠ Мониторинг. Избегать доз >400 МЕ одновременно с варфарином' },
   { a: 'tadalafil', b: '@cyp3a4_inhibitor', severity: 'warn', reason: 'CYP3A4-ингибиторы (кетоконазол, ритонавир) ↑ tadalafil', action: '⚠ Снизить tadalafil дозу до 2.5 мг. Проконсультироваться с врачом' },
   { a: 'cabergoline', b: '@macrolide', severity: 'warn', reason: 'CYP3A4 ингибирование → ↑ caber levels', action: '⚠ Мониторинг побочек (гипотония, им-пульсивность)' },
   { a: 'milk_thistle', b: '@cyp3a4_substrate', severity: 'warn', reason: 'Силимарин ингибирует CYP3A4 → ↑ tadalafil/anastrozole levels', action: '⚠ Не принимать одновременно. Разнести на 2+ ч' },
@@ -74,24 +80,36 @@ const CLASS_MAP: Record<string, string[]> = {
 
 // ════════════════════════════════════════════════════════════════════════════
 //  checkInteractions — проверка списка препаратов на взаимодействия
+//  Поддерживает: точные имена, class-based матчинг, substring fallback,
+//  Unicode whitespace, нормализацию регистра.
 // ════════════════════════════════════════════════════════════════════════════
+function normalize(s: string): string {
+  return s.toLowerCase().trim().replace(/\s+/g, ' ').replace(/[_-]+/g, '-');
+}
+
 export function checkInteractions(substanceIds: string[]): DrugInteraction[] {
-  const idSet = new Set(substanceIds.map(s => s.toLowerCase()));
+  if (!substanceIds?.length) return [];
+  const idSet = new Set(substanceIds.map(normalize));
   const results: DrugInteraction[] = [];
   const seen = new Set<string>();
 
   for (const interaction of DRUG_INTERACTIONS) {
-    const a = interaction.a.toLowerCase();
-    const isBClass = interaction.b.startsWith('@');
-    const bMembers = isBClass ? (CLASS_MAP[interaction.b] || []) : [];
+    const a = normalize(interaction.a);
+    const b = normalize(interaction.b);
+    const isBClass = b.startsWith('@');
+    const bMembers = isBClass ? (CLASS_MAP[interaction.b] || []).map(normalize) : [];
 
-    const matchA = idSet.has(a) || (CLASS_MAP['@' + a] ? CLASS_MAP['@' + a].some(m => idSet.has(m.toLowerCase())) : false);
+    // matchA: точное совпадение ИЛИ substring (для 'warfarin' vs 'warfarin sodium')
+    // ИЛИ class-match (если a — имя класса)
+    const matchA = idSet.has(a)
+      || (CLASS_MAP[interaction.a] ? CLASS_MAP[interaction.a].map(normalize).some(m => idSet.has(m)) : false)
+      || Array.from(idSet).some(id => a.length >= 4 && id.includes(a));
     const matchB = isBClass
-      ? bMembers.some(m => idSet.has(m.toLowerCase()))
-      : idSet.has(interaction.b.toLowerCase());
+      ? bMembers.some(m => idSet.has(m) || Array.from(idSet).some(id => m.length >= 4 && id.includes(m)))
+      : (idSet.has(b) || Array.from(idSet).some(id => b.length >= 4 && id.includes(b)));
 
     if (matchA && matchB) {
-      const key = [a, interaction.b].sort().join('+');
+      const key = [a, b].sort().join('+');
       if (seen.has(key)) continue;
       seen.add(key);
       results.push(interaction);
