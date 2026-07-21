@@ -749,11 +749,21 @@ export const IndividualPlanResults: React.FC = () => {
                     {m.mpsCheck && (m.mpsCheck.triggers_mTOR
                       ? <span style={{ fontSize: 6, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', marginLeft:4 }}>⚡ mTOR</span>
                       : <span style={{ fontSize: 6, padding:'1px 4px', borderRadius:3, background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.2)', color:'#f59e0b', marginLeft:4 }}>⚠ {Math.round(m.mpsCheck.leucineG * 10) / 10}г лейц</span>)}
-                    {m.rationale && m.rationale.length > 0 && (
-                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', marginTop: 3, lineHeight: 1.4, fontStyle: 'italic' }}>
-                        {m.rationale.slice(0, 2).map((r: string, i: number) => <div key={i}>• {r}</div>)}
-                      </div>
-                    )}
+                    {m.rationale && m.rationale.length > 0 && (() => {
+                      const _inter = (m.rationale as string[]).filter(r => r.startsWith('⚠') || r.includes('Синергия'));
+                      const _regular = (m.rationale as string[]).filter(r => !r.startsWith('⚠') && !r.includes('Синергия')).slice(0, 2);
+                      return (
+                        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', marginTop: 3, lineHeight: 1.4, fontStyle: 'italic' }}>
+                          {_regular.map((r: string, i: number) => <div key={i}>• {r}</div>)}
+                          {_inter.map((r: string, i: number) => (
+                            <div key={'i'+i} style={{ marginTop: 2, padding: '1px 4px', borderRadius: 3, fontStyle: 'normal', fontWeight: 600,
+                              background: r.startsWith('⚠') ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
+                              border: `1px solid ${r.startsWith('⚠') ? 'rgba(239,68,68,0.25)' : 'rgba(34,197,94,0.25)'}`,
+                              color: r.startsWith('⚠') ? '#ef4444' : '#22c55e' }}>{r}</div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                     <span style={{ fontSize: 8, color: '#00e68a', fontWeight: 700 }}>{k} ккал</span>
                     <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Б {Math.round(m.totals?.p || 0)} Ж {Math.round(m.totals?.f || 0)} У {Math.round(m.totals?.c || 0)}</span>
                   </div>
