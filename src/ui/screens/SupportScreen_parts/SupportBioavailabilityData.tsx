@@ -52,6 +52,33 @@ export interface StatsInfo {
   highBio: number; midBio: number; lowBio: number; multiForm: number;
 }
 
+// ─── Mapping: FORM_BIOAVAIL keys → FORM_PROFILES IDs ───
+const BIOKEY_TO_PROFILE: Record<string, string> = {
+  mg_glycinate: 'magnesium_glycinate_form', mg_bisglycinate: 'magnesium_glycinate_form',
+  mg_citrate: 'magnesium_citrate_form', mg_threonate: 'magnesium_l_threonate_form',
+  mg_oxide: 'magnesium_oxide_form', zn_picolinate: 'zinc_picolinate_form',
+  zn_carnosine: 'zinc_carnosine_form', fe_bisglycinate: 'iron_bisglycinate_form',
+  fe_sulfate: 'iron_sulfate_form', ca_citrate: 'calcium_citrate_form',
+  ca_carbonate: 'calcium_carbonate_form', k2_mk7: 'vitamin_k2_mk7_form',
+  k2_mk7_trans: 'vitamin_k2_mk7_form', k2_mk4: 'vitamin_k2_mk4_form',
+  ubiquinol: 'coq10_ubiquinol_form', ubiquinone: 'coq10_ubiquinone_form',
+  creatine_monohydrate: 'creatine_monohydrate_form', curcumin_liposomal: 'curcumin_liposomal_form',
+  curcumin_meriva: 'curcumin_liposomal_form', curcumin_theracurmin: 'curcumin_liposomal_form',
+  curcumin_std: 'curcumin_plain_form', omega3_tg: 'omega3_triglyceride_form',
+  omega3_rTG: 'omega3_triglyceride_form', omega3_ee: 'omega3_ethyl_ester_form',
+  omega3_pl: 'krill_oil_form', d3_regular: 'vitamin_d3_cholecalciferol_form',
+  d3_oil: 'vitamin_d3_cholecalciferol_form', d3_liposomal: 'vitamin_d3_cholecalciferol_form',
+  ala_r_form: 'alpha_lipoic_r_form', ala_racemic: 'alpha_lipoic_racemate_form',
+  nac_std: 'nac_n_form', nac_effervescent: 'nac_n_form',
+  b12_methyl: 'b12_methyl_form', b12_cyano: 'b12_cyano_form', b12_hydroxo: 'b12_hydroxo_form',
+  folate_mthf: 'folate_mthf_form', folate_fa: 'folate_fa_form',
+  b6_p5p: 'b6_p5p_form', se_selenomethionine: 'se_selenomethionine_form',
+  cr_picolinate: 'cr_picolinate_form', iodine_ki: 'iodine_ki_form',
+  glutathione_lipo: 'glutathione_lipo_form', glutathione_reduced: 'glutathione_reduced_form',
+  nmn_sublingual: 'nmn_sublingual_form', quercetin_phytosome: 'quercetin_phytosome_form',
+  collagen_peptides: 'collagen_peptides_form', hyaluronic_oral: 'hyaluronic_oral_form',
+};
+
 // ─── Bioavailability coefficients ───
 export const FORM_BIOAVAIL: Record<string, number> = {
   ubiquinol: 0.85, ubiquinone: 0.20, mitoq: 0.95,
@@ -342,6 +369,10 @@ export function getCatalogFormBio(form: CatalogSubstanceForm): number {
     if (mf && mf.bioavailability > 0) return mf.bioavailability;
   }
   const key = detectFormBioKey(form.name, form.nameRu, form.notes);
+  // Primary: FORM_PROFILES (bioequivalence-base.ts — единый источник truth)
+  const profileId = BIOKEY_TO_PROFILE[key];
+  if (profileId && FORM_PROFILES[profileId]) return FORM_PROFILES[profileId].bioavailability;
+  // Fallback: FORM_BIOAVAIL (legacy)
   if (FORM_BIOAVAIL[key] !== undefined) return FORM_BIOAVAIL[key];
   if (form.notes?.includes('Лучшая') || form.notes?.includes('Максимальная')) return 0.80;
   if (form.notes?.includes('Менее биодоступен')) return 0.25;

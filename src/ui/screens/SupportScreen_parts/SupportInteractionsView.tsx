@@ -4,7 +4,7 @@ import { PHARMA_DB } from '../../../core/pharma-database';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
 import { INTERACTION_ENRICHMENT } from '../../../data/support-interaction-enrichment';
 import { checkDrugInteractions, getClassInstructions, getCourseRecommendations, extractTiming } from '../../../engines/interactions-calculator';
-import { TimingChip } from '../../../components/TimingChip';
+import { TimingChip } from '../../components/TimingChip';
 import type { CourseEntry, MasterDB, SubstanceEntry, InteractionEntry } from '../../../core/types';
 import { PopupSelect } from '../../components/PopupXxx';
 import { MECH_TRANSLATIONS_RU, MECH_LABELS, EFFECT_LABELS } from './SupportScreenData';

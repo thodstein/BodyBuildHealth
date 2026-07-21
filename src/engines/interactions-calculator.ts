@@ -176,7 +176,7 @@ function extractPharmaRules(course?: CourseEntry[]): InteractionAlert[] {
 }
 
 // ─── Timing extraction из текста recommendation/notes ───
-function extractTiming(text: string): TimingInfo | undefined {
+export function extractTiming(text: string): TimingInfo | undefined {
   if (!text) return undefined;
   const t: TimingInfo = {};
 
