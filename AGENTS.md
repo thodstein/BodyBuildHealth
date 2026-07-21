@@ -3965,3 +3965,79 @@ Unify fragmented drug↔drug / drug↔supplement interaction data across 4 surfa
 - src/data/support-substances.ts — resolveInteractionId in auto-population
 - src/ui/components/BioStackAIDrugCheck.tsx — canonical resolution
 - src/ui/screens/PharmaScreen_parts/InteractionCheckerTab.tsx — canonical supportCrossAlerts
+
+---
+
+## Session Summary (Jul 21) — Calculator audit + P0/P1/P2 fixes
+
+### Goal
+Full audit of the Support Calculator subsystem (engine + UI + data), prioritized bug fixes and type safety improvements.
+
+### ✅ Done (P0 — critical bugs)
+1. **BUG-3**: Removed `Math.random()` from `toSystemRisks` (engine-helpers.ts:539) → mechanism contributions now deterministic
+2. **BUG-1**: Added `halfLifeMultiplicity()` export to types.ts, imported in display.ts → `buildPillBurden` now correctly counts 2-3×/day dosing (NAC, berberine, alpha-lipoic, etc.) instead of always1
+3. **BUG-4**: False positive — `PhaseAssignedDrug.substanceId` is correct field name (not `.id`)
+4. **BUG-7**: Fixed `buildRiskDynamics` — mechanisms[] was always empty, now filled with actual mechanism data
+
+### ✅ Done (P1 — type safety)
+1. Added `ghIU?`, `insulinIU?`, `igfMcg?`, `clenMcg?`, `t3Mcg?` to `PharmaStackData` interface
+2. Removed 8 `as any` casts in AutoCalculator.tsx for `state.pharma` field access
+3. Typed `catalogEntry()` return: `any` → `SupportCatalogEntry | null`
+4. Typed `StackRecommendation.stack`: `any` → `SupportStack`
+
+### ✅ Done (P2 — architecture)
+1. `buildMechanisms` — coverage-based reduction (0→1.0, 1→0.65, 2+→0.45) instead of hardcoded×0.7
+2. `buildRiskDynamics` — mechanisms[] populated per system (was empty array)
+3. Dead code audit: all5 "dead" exports were actually live — no changes needed
+
+### ❌ Skipped
+- **P2-2 (dual pipeline unification)**: Too risky for this session. `runSupportUnified` + `calculateSupportTZ` serve different purposes. Full unification would require extensive testing of all downstream consumers.
+
+### Commits
+- `43f181a1` — P0: deterministic risk + half-life multiplicity
+- `8b7b31c9` — P1: PharmaStackData + catalogEntry + StackRecommendation typing
+- `880be63a` + `ff701523` — P2: buildMechanisms coverage-based reduction + BUG-7 fix
+
+### Files modified
+- `src/engines/support-plan/types.ts` — PharmaStackData fields, catalogEntry type, StackRecommendation type, halfLifeMultiplicity export
+- `src/engines/support-plan/engine-helpers.ts` — remove Math.random()
+- `src/engines/support-plan/display.ts` — import halfLifeMultiplicity, fix buildPillBurden
+- `src/engines/support-plan/systems.ts` — buildMechanisms coverage factor, buildRiskDynamics mechanisms fill
+- `src/ui/screens/Calculator/AutoCalculator.tsx` — remove8 `as any` for state.pharma
+
+---
+
+## Session Summary (Jul 21) — Calculator: P2-2 pipeline unification + DATA audit + as any cleanup
+
+### Goal
+Unify dual pipeline (runSupportUnified + calculateSupportTZ), verify data integrity (mechanisms[]/mechanismCodes[]), reduce `as any` casts.
+
+### ✅ Done
+1. **P2-2**: Removed lossy `CalculatorResult` reconstruction in `SupportScreen.tsx` (lines 590-614, 25 lines deleted). Was losing 8+ fields (titrationApplied, labDeltas, contraindicationAlerts, negativeBlocks, synergyIdsUsed, risk.systems, timeline, peakWeek, phaseAssignedDrugs, tzSpecResult). Now always calls `calculateSupportTZ(state)` directly.
+2. **DATA audit**: Verified 370 substances (0 empty mechanisms[], 0 non-canonical codes) and 55 stacks (0 empty mechanismCodes[], 0 non-canonical). Fixed 10 non-canonical codes: ANTIOXIDANT→LIPID_PEROXIDATION_INHIBITION (8 stacks), BLIDE_ACID_MOD→BILE_ACID_MODULATION (typo, 1 stack), VITAMIN_B1→CARDIOPROTECTION (1 stack).
+3. **as any cleanup**: Removed 16 casts from Calc.mapper.tsx:
+   - state.pharma.ghIU/insulinIU/igfMcg/clenMcg/t3Mcg (5 casts)
+   - state.pharma.hasCaber (1 cast)
+   - state.symptoms/healthConditions (4 casts, added to CalculatorState type)
+   - state.pharma.ghIU/insulinIU in pedCount (1 cast + fixed operator precedence bug)
+   - state.pharma.ghIU/insulinIU in triggers (2 casts)
+   - ghIU/insulinIU/igfMcg/clenMcg/t3Mcg read (3 casts)
+4. **types.ts**: Added `symptoms?: string[]` and `healthConditions?: string[]` to `CalculatorState`.
+
+### Remaining
+- 18 structural `as any` casts in Calc.mapper.tsx (ALL_STACKS typing, pedDoses mixed shapes, gaps type, profile.name)
+- 7 `as any` in AutoCalculator.tsx (PHARMA_DB lookup, Profile type fields)
+
+### Commits
+- `022db3c6` — DATA audit: fix 10 non-canonical mechanismCodes in stacks
+- `4b4ac8ce` — P2-2: Fix lossy CalculatorResult reconstruction in SupportScreen.tsx
+- `13c64f29` — P2-2 + as any cleanup: lossy reconstruction fix + pharma fields + symptoms
+
+### Files modified
+- `src/data/support-stacks-late.ts` — ANTIOXIDANT→LIPID_PEROXIDATION_INHIBITION
+- `src/data/support-stacks-part1.ts` — ANTIOXIDANT→LIPID_PEROXIDATION_INHIBITION (2 stacks)
+- `src/data/support-stacks-part2.ts` — ANTIOXIDANT→LIPID_PEROXIDATION_INHIBITION (5 stacks) + BLIDE_ACID_MOD→BILE_ACID_MODULATION + VITAMIN_B1→CARDIOPROTECTION
+- `src/ui/screens/SupportScreen.tsx` — removed lossy reconstruction block
+- `src/engines/support-plan/types.ts` — added symptoms/healthConditions to CalculatorState
+- `src/engines/support-plan/index.ts` — minor (re-export cleanup)
+- `src/ui/screens/Calculator/Calc.mapper.tsx` — removed 16 `as any` casts + fixed pedCount precedence bug
