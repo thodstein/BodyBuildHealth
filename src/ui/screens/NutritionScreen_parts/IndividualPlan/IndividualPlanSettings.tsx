@@ -1265,26 +1265,26 @@ export const IndividualPlanSettings: React.FC = () => {
       )}
 
             <GlassCard title="🏭 Подбор продуктов" icon="🏭" color="#06b6d4">
-        {/* ????????? ?? ???????? + ??????? ????????????? */}
+        {/* Адаптация по дневнику + строгая вариативность */}
         <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(16,185,129,0.06)', border:'1px solid rgba(16,185,129,0.18)' }}>
-          <div style={{ fontSize:8, fontWeight:700, color:'#10b981', marginBottom:6 }}>?? ????????? ? 7-??????? ?????????????</div>
+          <div style={{ fontSize:8, fontWeight:700, color:'#10b981', marginBottom:6 }}>📊 Адаптация и 7-дневная вариативность</div>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
             <div>
-              <div style={{ fontSize:10, fontWeight:600, color: diaryAdaptation ? '#10b981' : '#fff' }}>??????????? ?? ????????</div>
-              <div style={{ fontSize:8, color: diaryAdaptation ? 'rgba(16,185,129,0.8)' : 'rgba(255,255,255,0.6)' }}>???????/??????? ????? ? ???????</div>
+              <div style={{ fontSize:10, fontWeight:600, color: diaryAdaptation ? '#10b981' : '#fff' }}>Компенсация по дневнику</div>
+              <div style={{ fontSize:8, color: diaryAdaptation ? 'rgba(16,185,129,0.8)' : 'rgba(255,255,255,0.6)' }}>Недобор/перебор вчера → сегодня</div>
             </div>
             <button onClick={() => setDiaryAdaptation(!diaryAdaptation)} style={{ width:36, height:20, borderRadius:10, border:'none', cursor:'pointer', position:'relative', background: diaryAdaptation ? '#10b981' : 'rgba(255,255,255,0.15)' }}>
               <span style={{ position:'absolute', top:2, left: diaryAdaptation ? 19 : 3, width:16, height:16, borderRadius:'50%', background:'#fff', boxShadow:'0 1px 4px rgba(0,0,0,0.3)', transition:'left 0.15s' }} />
             </button>
           </div>
           <div style={{ display:'flex', gap:4, marginBottom:6 }}>
-            {([['soft','??????'],['strict','???????']] as [string,string][]).map(([id,label]) => (
-              <button key={id} onClick={() => setVarietyStrictness(id as any)} style={{ flex:1, padding:'5px 4px', borderRadius:8, cursor:'pointer', fontSize:8, fontWeight: varietyStrictness===id?800:600, background: varietyStrictness===id?'rgba(16,185,129,0.15)':'rgba(255,255,255,0.03)', border: varietyStrictness===id?'1px solid #10b981':'1px solid rgba(255,255,255,0.06)', color: varietyStrictness===id?'#10b981':'rgba(255,255,255,0.7)' }}>{label} ?????????????</button>
+            {([['soft','Мягкая'],['strict','Строгая']] as [string,string][]).map(([id,label]) => (
+              <button key={id} onClick={() => setVarietyStrictness(id as any)} style={{ flex:1, padding:'5px 4px', borderRadius:8, cursor:'pointer', fontSize:8, fontWeight: varietyStrictness===id?800:600, background: varietyStrictness===id?'rgba(16,185,129,0.15)':'rgba(255,255,255,0.03)', border: varietyStrictness===id?'1px solid #10b981':'1px solid rgba(255,255,255,0.06)', color: varietyStrictness===id?'#10b981':'rgba(255,255,255,0.7)' }}>{label} вариативность</button>
             ))}
           </div>
-          <div style={{ fontSize:7, color:'rgba(255,255,255,0.55)' }}>{varietyStrictness==='strict' ? '??????: ???????? ????????? 1-2 ???? ??????????? ?? ????????? ????.' : '?????: ?????? ??????????????? ????????.'}</div>
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.55)' }}>{varietyStrictness==='strict' ? 'Строго: продукты последних 1-2 дней исключаются из следующих дней.' : 'Мягко: только деприоритизация повторов.'}</div>
         </div>
-        {/* D: Specificity */}
+                {/* D: Specificity */}
         <div style={{ fontSize:8, fontWeight:700, color:'#06b6d4', marginBottom:4 }}>📊 Специфичность продуктов</div>
         <div style={{ display:'flex', gap:4, marginBottom:8 }}>
           {([['everyday','🍱 Повседневные'],['varied','💡 Разнообразные'],['gourmet','🍩 Гурман']] as [string,string][]).map(([id,label]) => (
@@ -1294,14 +1294,14 @@ export const IndividualPlanSettings: React.FC = () => {
         {/* E: Intolerances */}
         <div style={{ fontSize:8, fontWeight:700, color:'#ef4444', marginBottom:4 }}>🧪 Непереносимость</div>
         <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
-          {([['lowFODMAP','FODMAP'],['lowHistamine','Гистамин'],['lowOxalate','Оксалаты']] as [string,string][]).map(([key,label]) => (
+          {([['lowFODMAP','Фодмап'],['lowHistamine','Гистамин'],['lowOxalate','Оксалаты']] as [string,string][]).map(([key,label]) => (
             <button key={key} onClick={() => setIntolerances((prev:any) => ({ ...prev, [key]: !prev[key] }))} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:7, fontWeight:600, background: (intolerances as any)[key]?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.03)', border: (intolerances as any)[key]?'1px solid rgba(239,68,68,0.25)':'1px solid rgba(255,255,255,0.06)', color: (intolerances as any)[key]?'#ef4444':'rgba(255,255,255,0.7)' }}>{(intolerances as any)[key]?'✅ ':''}{label}</button>
           ))}
         </div>
         {/* A: Taste profile */}
         <div style={{ fontSize:8, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>👫 Вкусовые предпочтения</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:8 }}>
-          {([['spicy','🌶️ Острое'],['sweet','🍬 Сладкое'],['salty','🥢 Солёное'],['sour','🍋 Кислое',['umami','🍄 Умами']]] as [string,string][]).map(([key,label]) => (
+          {([['spicy','🌶️ Острое'],['sweet','🍬 Сладкое'],['salty','🥢 Солёное'],['sour','🍋 Кислое'],['umami','🍄 Умами']] as [string,string][]).map(([key,label]) => (
             <div key={key} style={{ display:'flex', alignItems:'center', gap:4 }}>
               <span style={{ fontSize:7, color:'rgba(255,255,255,0.7)', minWidth:50 }}>{label}</span>
               <input type='range' min={0} max={3} value={(tasteProfile as any)[key]||0} onChange={e => setTasteProfile((prev:any) => ({ ...prev, [key]: +e.target.value }))} style={{ flex:1, height:4 }} />
@@ -1312,9 +1312,9 @@ export const IndividualPlanSettings: React.FC = () => {
         {/* C: Excluded categories */}
         <div style={{ fontSize:8, fontWeight:700, color:'#a78bfa', marginBottom:4 }}>🚫 Не люблю категорию</div>
         <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
-          {['fish','dairy','legumes','cabbage','nuts','pork','shellfish','mushroom'].map(cat => {
+          {([['fish','🐟 Рыба'],['dairy','🥛 Молочное'],['legumes','🫘 Бобовые'],['cabbage','🥬 Капуста'],['nuts','🥜 Орехи'],['pork','🥓 Свинина'],['shellfish','🦐 Морепродукты'],['mushroom','🍄 Грибы']] as [string,string][]).map(([cat,ruLabel]) => {
             const sel = excludedCategories.includes(cat);
-            return (<button key={cat} onClick={() => { const upd = sel ? excludedCategories.filter(c => c !== cat) : [...excludedCategories, cat]; setExcludedCategories(upd); }} style={{ padding:'3px 6px', borderRadius:6, cursor:'pointer', fontSize:7, fontWeight:600, background: sel?'rgba(167,139,250,0.15)':'rgba(255,255,255,0.03)', border: sel?'1px solid rgba(167,139,250,0.3)':'1px solid rgba(255,255,255,0.06)', color: sel?'#a78bfa':'rgba(255,255,255,0.7)' }}>{sel?'✅ ':''}{cat}</button>);
+            return (<button key={cat} onClick={() => { const upd = sel ? excludedCategories.filter(c => c !== cat) : [...excludedCategories, cat]; setExcludedCategories(upd); }} style={{ padding:'3px 6px', borderRadius:6, cursor:'pointer', fontSize:7, fontWeight:600, background: sel?'rgba(167,139,250,0.15)':'rgba(255,255,255,0.03)', border: sel?'1px solid rgba(167,139,250,0.3)':'1px solid rgba(255,255,255,0.06)', color: sel?'#a78bfa':'rgba(255,255,255,0.7)' }}>{sel?'✅ ':''}{ruLabel}</button>);
           })}
         </div>
       </GlassCard>

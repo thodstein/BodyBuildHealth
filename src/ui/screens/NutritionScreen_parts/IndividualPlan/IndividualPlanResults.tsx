@@ -462,7 +462,7 @@ export const IndividualPlanResults: React.FC = () => {
           )}
         </div>
       )}
-      {/* ????????? ?? ????????: ?????? ??????????? ?????????? ?????????? */}
+      {/* Адаптация по дневнику: баннер компенсации вчерашнего отклонения */}
       {/* #1 Микронутриентный coverage — структура по 16 нутриентам */}
       {generated && dayPlan && (dayPlan as any).microSummary && (dayPlan as any).microSummary.coverage && (() => {
         const cov = (dayPlan as any).microSummary.coverage as any[];
@@ -492,9 +492,9 @@ export const IndividualPlanResults: React.FC = () => {
         const color = sev === 'high' ? '#ef4444' : sev === 'medium' ? '#f59e0b' : '#10b981';
         return (
           <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:`rgba(${sev==='high'?'239,68,68':sev==='medium'?'245,158,11':'16,185,129'},0.08)`, border:`1px solid rgba(${sev==='high'?'239,68,68':sev==='medium'?'245,158,11':'16,185,129'},0.25)` }}>
-            <div style={{ fontSize:8, fontWeight:700, color, marginBottom:2 }}>?? ????????? ?? ????????</div>
+            <div style={{ fontSize:8, fontWeight:700, color, marginBottom:2 }}>📊 Адаптация по дневнику</div>
             <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{dc.note}</div>
-            <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:3 }}>???? ?? ??????? ??????????????? ?? ????? ?????????? ???.</div>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:3 }}>Цели на сегодня скорректированы по факту вчерашнего дня.</div>
           </div>
         );
       })()}
