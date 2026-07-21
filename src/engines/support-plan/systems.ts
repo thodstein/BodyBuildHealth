@@ -44,13 +44,17 @@ export function buildMechanisms(tzRes: CalculatorResult): PlanMechanism[] {
           covering.push(subId);
         }
       }
+      // Reduction based on coverage: 0 → 1.0 (no reduction), 1 → 0.65, 2+ → 0.45
+      const reductionFactor = covering.length === 0 ? 1.0
+        : covering.length === 1 ? 0.65
+        : 0.45;
       out.push({
         mechKey: `${sysId}.${m.id || m.name}`,
         mechLabel: m.name,
         systemLabel: sysLabel,
         substances: covering,
         riskBefore: Math.round(m.contribution || 0),
-        riskAfter: Math.max(0, Math.round((m.contribution || 0) * 0.7)),
+        riskAfter: Math.max(0, Math.round((m.contribution || 0) * reductionFactor)),
       });
     }
   }
