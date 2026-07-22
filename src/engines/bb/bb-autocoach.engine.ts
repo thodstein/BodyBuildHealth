@@ -17,26 +17,12 @@ export type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
 export type LoadStrategy = 'double_progression' | 'linear' | 'wave' | 'rpe_based';
 
 export interface LoadStrategyPrescription {
-  nextWeight: number;      // кг, цель на следующую сессию
-  nextReps: number;        // цель по повторениям
-  nextRIR: number;         // цель RIR
-  label: string;           // что делать спортсмену
+  nextWeight: number;
+  nextReps: number;
+  nextRIR: number;
+  label: string;
 }
 
-/**
- * Применить стратегию прогрессии к упражнению.
- * @param strategy — выбранная стратегия
- * @param currentWeight — текущий рабочий вес (кг)
- * @param currentReps — текущие повторения
- * @param currentRIR — текущий RIR
- * @param maxWeight — рабочий максимум для мышцы (кг)
- * @param week — неделя мезоцикла (1-based)
- * @param totalWeeks — всего недель
- * @param phase — текущая фаза
- * @param exType — тип упражнения ('compound' | 'isolation' | 'accessory' | 'machine' | 'cable')
- *                  для P4: linear-прогрессия масштабируется по типу.
- * @param role — роль в сессии ('primary' | 'accessory') — для P4-корректировки.
- */
 export function prescribeLoad(
   strategy: LoadStrategy,
   currentWeight: number,
@@ -51,94 +37,34 @@ export function prescribeLoad(
 ): LoadStrategyPrescription {
   switch (strategy) {
     case 'double_progression': {
-      // Спортсмен сначала добивает повторы до верхней границы, потом повышает вес на ~5%
       const repCap = phase === 'intensification' ? 8 : 12;
       if (currentReps < repCap) {
-        return {
-          nextWeight: currentWeight,
-          nextReps: currentReps + 1,
-          nextRIR: Math.max(0, currentRIR - 1),
-          label: `Добейте ${currentReps + 1} повторов (цель ${repCap}) с тем же весом`,
-        };
+        return { nextWeight: currentWeight, nextReps: currentReps + 1, nextRIR: Math.max(0, currentRIR - 1), label: `Добейте ${currentReps + 1} повторов (цель ${repCap})` };
       }
-      return {
-        nextWeight: Math.round(currentWeight * 1.05),
-        nextReps: Math.max(6, repCap - 4),
-        nextRIR: Math.min(3, currentRIR + 1),
-        label: `Повысьте вес до ${Math.round(currentWeight * 1.05)} кг, снизьте повторы до ${Math.max(6, repCap - 4)}`,
-      };
+      return { nextWeight: Math.round(currentWeight * 1.05), nextReps: Math.max(6, repCap - 4), nextRIR: Math.min(3, currentRIR + 1), label: `Повысьте вес до ${Math.round(currentWeight * 1.05)} кг` };
     }
     case 'linear': {
-      // P4: разделение increment по типу упражнения. Изоляция +1кг/нед = перетрен трицепса.
-      // Compound +2.5кг, machine_compound +1.5кг, isolation +1кг, accessory +0.5кг.
-      const phaseMult = week < totalWeeks * 0.75 ? 1.0 : 0.5; // ramp down в последней четверти
-      const typeBase: Record<string, number> = {
-        compound: 2.5,
-        machine_compound: 1.5,
-        cable: 1.25,
-        machine: 1.0,
-        isolation: 1.0,
-        accessory: 0.5,
-      };
+      const phaseMult = week < totalWeeks * 0.75 ? 1.0 : 0.5;
+      const typeBase: Record<string, number> = { compound: 2.5, machine_compound: 1.5, cable: 1.25, machine: 1.0, isolation: 1.0, accessory: 0.5 };
       const baseIncr = typeBase[exType || 'compound'] ?? (role === 'accessory' ? 0.5 : 1.5);
       const increment = baseIncr * phaseMult;
-      return {
-        nextWeight: Math.round((currentWeight + increment) * 10) / 10,
-        nextReps: currentReps,
-        nextRIR: Math.max(0, currentRIR - 1),
-        label: `Линейная ${exType || 'compound'}: +${increment.toFixed(1)} кг/нед (нед ${week}${phaseMult < 1 ? ' — ramp down' : ''})`,
-      };
+      return { nextWeight: Math.round((currentWeight + increment) * 10) / 10, nextReps: currentReps, nextRIR: Math.max(0, currentRIR - 1), label: `Линейная +${increment.toFixed(1)} кг/нед` };
     }
     case 'wave': {
-      // 3-нед микроцикл: тяж/сред/лёг
       const pos = (week - 1) % 3;
-      const waveLabel = pos === 0 ? 'тяжёлая' : pos === 1 ? 'средняя' : 'лёгкая';
       const waveMult = pos === 0 ? 1.05 : pos === 1 ? 1.0 : 0.92;
-      return {
-        nextWeight: Math.round(currentWeight * waveMult * 10) / 10,
-        nextReps: pos === 0 ? Math.max(4, currentReps - 2) : pos === 2 ? Math.min(15, currentReps + 3) : currentReps,
-        nextRIR: pos === 0 ? 0 : pos === 2 ? 3 : currentRIR,
-        label: `Волновая: ${waveLabel} неделя (×${waveMult})`,
-      };
+      return { nextWeight: Math.round(currentWeight * waveMult * 10) / 10, nextReps: currentReps, nextRIR: currentRIR, label: `Волновая: нед ${week}` };
     }
     case 'rpe_based': {
-      // P3: реальный RPE-алгоритм.
-      // Target RPE нарастает от accumulation (7) к peaking (9.5): linear по фазе + неделя внутри фазы.
-      // Если currentRIR (фактический RPE) отклоняется от targetRIR — корректируем вес.
-      // RPE 10 = отказ (RIR 0), RPE 9 = RIR 1, ..., RPE 5 = RIR 5.
-      // Целевой RIR по неделе: accumulation week 1 → RIR 3 (RPE 7), peaking last week → RIR 0 (RPE 10).
-      const phaseStartRir: Record<string, [number, number]> = {
-        accumulation: [3, 1],   // нед 1: RIR 3, нед N: RIR 1
-        intensification: [2, 0], // нед 1: RIR 2, нед N: RIR 0
-        peaking: [1, 0],
-        deload: [4, 4],
-      };
+      const phaseStartRir: Record<string, [number, number]> = { accumulation: [3, 1], intensification: [2, 0], peaking: [1, 0], deload: [4, 4] };
       const rirRange = phaseStartRir[phase] || [2, 0];
       const phaseProgress = totalWeeks > 1 ? (week - 1) / (totalWeeks - 1) : 0;
       const targetRir = Math.max(0, Math.round(rirRange[0] - phaseProgress * (rirRange[0] - rirRange[1])));
-      // Корректировка: если фактический RIR > targetRIR (легче, чем нужно) → вес ↑,
-      // если < targetRIR (тяжелее) → вес ↓.
       const rirDelta = currentRIR - targetRir;
-      let weightMult = 1.0;
-      let direction = '';
-      if (rirDelta >= 1) {
-        weightMult = 1.025;  // +2.5% — наращиваем нагрузку
-        direction = `RIR ${currentRIR} > target ${targetRir}: +2.5% веса (наращивание)`;
-      } else if (rirDelta <= -1) {
-        weightMult = 0.97;   // -3% — снижаем, был перебор
-        direction = `RIR ${currentRIR} < target ${targetRir}: -3% веса (восстановление)`;
-      } else {
-        direction = `RIR ${currentRIR} ≈ target ${targetRir}: удержание веса`;
-      }
-      return {
-        nextWeight: Math.round(currentWeight * weightMult * 10) / 10,
-        nextReps: currentReps,
-        nextRIR: targetRir,
-        label: `RPE-стратегия: ${direction}`,
-      };
+      const weightMult = rirDelta >= 1 ? 1.025 : rirDelta <= -1 ? 0.97 : 1.0;
+      return { nextWeight: Math.round(currentWeight * weightMult * 10) / 10, nextReps: currentReps, nextRIR: targetRir, label: `RPE: RIR ${currentRIR} → target ${targetRir}` };
     }
-    default:
-      return { nextWeight: currentWeight, nextReps: currentReps, nextRIR: currentRIR, label: 'Продолжайте по плану' };
+    default: return { nextWeight: currentWeight, nextReps: currentReps, nextRIR: currentRIR, label: 'Продолжайте по плану' };
   }
 }
 
@@ -147,65 +73,65 @@ export type DeloadType = 'pump' | 'neural' | 'full_rest' | 'mini';
 
 export interface DeloadProtocol {
   type: DeloadType;
-  volumeMultiplier: number;    // × объём
-  intensityMultiplier: number; // × вес
+  volumeMultiplier: number;
+  intensityMultiplier: number;
   rirTarget: number;
   repRange: [number, number];
   restSeconds: number;
-  /** Mini-делоад: сохранить исходные повторы (не переопределять repRange) — лёгкая разгрузка без смены схемы. */
   keepOriginalReps?: boolean;
   description: string;
   instructions: string;
 }
 
 export const DELOAD_PROTOCOLS: Record<DeloadType, DeloadProtocol> = {
-  pump: {
-    type: 'pump',
-    volumeMultiplier: 0.5,
-    intensityMultiplier: 0.55,
-    rirTarget: 4,
-    repRange: [15, 20],
-    restSeconds: 45,
-    description: 'Pump-разгрузка: лёгкие веса, высокие повторы, минимальный отдых. Кровоток + восстановление.',
-    instructions: '50% объёма, 55% веса, короткий отдых (45с). Цель: пампинг без утомления ЦНС.',
-  },
-  neural: {
-    type: 'neural',
-    volumeMultiplier: 0.4,
-    intensityMultiplier: 0.7,
-    rirTarget: 3,
-    repRange: [3, 5],
-    restSeconds: 180,
-    description: 'Нейральная разгрузка: низкий объём, умеренные веса, долгий отдых. Восстановление ЦНС.',
-    instructions: '40% объёма, 70% веса, долгий отдых (3мин). Цель: движение без утомления.',
-  },
-  full_rest: {
-    type: 'full_rest',
-    volumeMultiplier: 0.2,
-    intensityMultiplier: 0.4,
-    rirTarget: 5,
-    repRange: [10, 12],
-    restSeconds: 60,
-    description: 'Полный отдых: минимальная активность, сохранение движения. Только для перетренированности.',
-    instructions: '20% объёма, 40% веса. Минимум упражнений (2-3 на сессию). Приоритет — сон и питание.',
-  },
-  mini: {
-    type: 'mini',
-    volumeMultiplier: 0.70,
-    intensityMultiplier: 0.92,
-    rirTarget: 3,
-    repRange: [6, 12],
-    restSeconds: 120,
-    keepOriginalReps: true,
-    description: 'Мини-делоад: −1-2 сета на compounds, вес почти тот же (×0.92), RIR +1-2. Без смены схемы. Лёгкая разгрузка без потери прогресса.',
-    instructions: '70% объёма (−1-2 сета с базовых), 92% веса, RIR 3. Повторы и упражнения — те же. Микро-восстановление.',
-  },
+  pump: { type: 'pump', volumeMultiplier: 0.5, intensityMultiplier: 0.55, rirTarget: 4, repRange: [15, 20], restSeconds: 45, description: 'Pump-разгрузка', instructions: '50% объёма, 55% веса, отдых 45с.' },
+  neural: { type: 'neural', volumeMultiplier: 0.4, intensityMultiplier: 0.7, rirTarget: 3, repRange: [3, 5], restSeconds: 180, description: 'Нейральная разгрузка', instructions: '40% объёма, 70% веса, отдых 3мин.' },
+  full_rest: { type: 'full_rest', volumeMultiplier: 0.2, intensityMultiplier: 0.4, rirTarget: 5, repRange: [10, 12], restSeconds: 60, description: 'Полный отдых', instructions: '20% объёма, 40% веса.' },
+  mini: { type: 'mini', volumeMultiplier: 0.70, intensityMultiplier: 0.92, rirTarget: 3, repRange: [6, 12], restSeconds: 120, keepOriginalReps: true, description: 'Мини-делоад', instructions: '70% объёма, 92% веса, RIR 3.' },
 };
+
+const DELOAD_SWAP_MAP: Record<string, string> = {
+  'жим штанги лёжа': 'жим гантелей лёжа',
+  'жим гантелей лёжа': 'жим в тренажёре',
+  'жим стоя': 'жим гантелей сидя',
+  'присед со штангой': 'жим ногами',
+  'становой тяга': 'румынская тяга с гантелями',
+  'тяга в наклоне': 'тяга верхнего блока',
+  'подтягивания': 'тяга верхнего блока',
+  'армейский жим': 'жим гантелей сидя',
+};
+
+function findDeloadSwap(exName: string): string | null {
+  const n = (exName || '').toLowerCase();
+  for (const [heavy, light] of Object.entries(DELOAD_SWAP_MAP)) {
+    if (n.includes(heavy.toLowerCase()) || heavy.toLowerCase().includes(n)) return light;
+  }
+  return null;
+}
 
 export function applyDeloadToWeek(week: BBWeek, protocol: DeloadProtocol): BBWeek {
   const w2 = JSON.parse(JSON.stringify(week)) as BBWeek;
   for (const s of w2.sessions) {
     for (const e of s.exercises) {
+      const swapName = findDeloadSwap(e.exerciseName || e.name || '');
+      if (swapName) {
+        const swapEx = (EXERCISE_CATALOG as any).find((ex: any) =>
+          (ex.name || '').toLowerCase().includes(swapName.toLowerCase()) ||
+          swapName.toLowerCase().includes((ex.name || '').toLowerCase())
+        );
+        if (swapEx) {
+          e.name = swapEx.name;
+          e.exerciseName = swapEx.name;
+          e.muscle = swapEx.targetMuscle || e.muscle;
+          if (!protocol.keepOriginalReps) e.repsRange = [protocol.repRange[0], protocol.repRange[1]];
+          for (const ws of e.workSets) {
+            if (!protocol.keepOriginalReps) ws.reps = Math.round((protocol.repRange[0] + protocol.repRange[1]) / 2);
+            ws.weight = Math.round((e.workSets?.[0]?.weight || ws.weight) * protocol.intensityMultiplier * 10) / 10;
+            ws.restSeconds = protocol.restSeconds;
+          }
+          continue;
+        }
+      }
       e.sets = Math.max(1, Math.round(e.sets * protocol.volumeMultiplier));
       e.rir = protocol.rirTarget;
       if (!protocol.keepOriginalReps) e.repsRange = [protocol.repRange[0], protocol.repRange[1]];

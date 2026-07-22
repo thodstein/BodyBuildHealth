@@ -502,6 +502,16 @@ function buildSession(
   equipmentList: string[] = [],
   methodology: SessionMethodology = 'compound_first',
   isFemale: boolean = false,
+  intensityTechnique?: IntensityTechnique,
+  autoDeload?: boolean,
+  loadStrategy?: LoadStrategy,
+  autoRegResult?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number },
+  specialization?: boolean,
+  pedDoses?: Record<string, number>,
+  courseIntensity?: CourseIntensity,
+  onCourse: boolean = false,
+  sex: 'male' | 'female' = 'male',
+  weekLocalUsed: Map<string, Set<string>> = new Map(),
 ): BBSession {
   const character = sched.character as DayCharacter;
   const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles);
@@ -618,15 +628,20 @@ function buildSession(
     // B13: levelBase монотонно растёт с уровнем (beginner=1, intermediate=2, advanced=3, enhanced=4).
     // Раньше было beginner=1, intermediate=0, advanced=1 — intermediate получал МЕНЬШЕ, чем beginner (нелогично).
     const levelBase = level === 'beginner' ? 1 : level === 'intermediate' ? 2 : level === 'enhanced' ? 4 : 3;
-    // Realistic exerciseCount: для 1×/нед мышц (bro-split) exerciseCount ≤ 3, иначе 4.
-    // isMultiDay — глобальный (3+ мышц в дне). isSingleFreq — эта мышца появляется только 1×/нед.
     const isSingleFreq = (muscleSessionCount[muscle] || 1) === 1;
-    const primaryBase = ['back', 'quads', 'chest', 'shoulders'].includes(muscle) ? (isMultiDay ? 3 : (isSingleFreq ? 3 : 4)) : 2;
-    // Для 1×/нед accessory тоже снижаем (без +1 бонуса для arms/shoulders), иначе bro-day = 8 упр.
-    const accessoryBoost = isSingleFreq ? 0 : (['triceps', 'biceps', 'shoulders'].includes(muscle) ? 1 : 0);
+    const isArm = ['triceps','biceps','shoulders','forearms','arms'].includes(muscle);
+    const isLeg = ['quads','hamstrings','glutes','calves'].includes(muscle);
+    const onPED = pedAdapt ? pedAdapt.combinedMrvMultiplier >= 1.3 : false;
+    const primaryBase = ['back','quads','chest','shoulders'].includes(muscle)
+      ? (isMultiDay ? (onPED ? 4 : 3) : (isSingleFreq ? 3 : (onPED ? 5 : 4)))
+      : (isArm && onPED ? 3 : 2);
+    const accessoryBase = isArm && onPED ? 3 : (isArm ? 2 : 1);
+    const accessoryBoost = isSingleFreq ? 0 : (isArm ? 1 : 0);
     let exerciseCount = role === 'primary'
-      ? Math.min(isMultiDay ? 3 : (isSingleFreq ? 3 : 4), primaryBase + Math.max(0, levelBase - 2) + pedBoost)
-      : Math.min(3, accessoryCount + Math.floor(pedBoost / 2) + accessoryBoost);
+      ? Math.min(isMultiDay ? (onPED ? 5 : 3) : (isSingleFreq ? 4 : (onPED ? 6 : 4)),
+                 primaryBase + Math.max(0, levelBase - 2) + pedBoost)
+      : Math.min(isArm && onPED ? 4 : 3,
+                 accessoryBase + Math.floor(pedBoost / 2) + accessoryBoost);
     // A2: focusGroup — структурная специализация. Если мышца = focusGroup и primary
     // → упражнений +1 (compound + 2 multi-angle isolation для полноценного покрытия).
     if (focusGroup && muscle === focusGroup && role === 'primary') {
@@ -648,17 +663,15 @@ function buildSession(
     // неверную атрибуцию (leg curl → «calves», farmer walk → «biceps»,
     // good morning → «quads») и исключает ПЛ-движения (carry/hinge/становая).
     const roleMuscles = musclesForRole(repKey);
-    // Определить тип дня — для фильтрации rear delt (не нужна в Push/Chest-днях)
     const pushDay = isPushDayTag(sched.sessionTag || '');
+    const tag = (sched.sessionTag || '').toLowerCase();
+    const isPurePull = /pull|back/.test(tag) && !/push|chest/.test(tag);
     let pool = EXERCISE_CATALOG.filter((ex: any) => {
       const tm = trueMuscleOf(ex);
       if (tm === null || !roleMuscles.includes(tm)) return false;
-      // BB-junk фильтр: реабилитация/кор-стабильность/изометрика не для гипертрофии
       if (isBBJunk(ex)) return false;
       { const _t = bbExerciseTier(ex); if (_t === 4 || (!allowExotic && _t === 3)) return false; }
-      // Rear delt НЕ в Push/Chest/Shoulders-днях (только в Pull/Back)
-      if (pushDay && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
-      // Equipment hard filter: если указано оборудование — исключить упражнения без него
+      if (!isPurePull && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
       if (equipmentList.length > 0) {
         const rawEq = ex.equipment;
         const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
@@ -668,7 +681,6 @@ function buildSession(
     });
     // Фильтр по контексту сессии (доп. страховка, в основном инертен после
     // фильтрации по истинной мышце)
-    const tag = (sched.sessionTag || '').toLowerCase();
     pool = pool.filter(ex => {
       const n = (ex.name || '').toLowerCase();
       if (tag.includes('push') || tag === 'chest' || tag === 'shoulders') {
@@ -711,6 +723,39 @@ function buildSession(
     });
     for (const s of selected) { if (s && s.id) sessionSelectedIds.push(s.id); if (s && s.name) sessionSelectedNames.push(s.name); }
     let exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5 }];
+    // Freshness guard: не повторять упражнение в той же неделе на той же мышце.
+    {
+      const weekUsedForMuscle = weekLocalUsed.get(muscle) || new Set<string>();
+      const fresh = exDatas.filter(d => !weekUsedForMuscle.has((d as any).name || ''));
+      if (fresh.length > 0) exDatas = fresh;
+      for (const d of exDatas) weekUsedForMuscle.add((d as any).name || '');
+      weekLocalUsed.set(muscle, weekUsedForMuscle);
+    }
+    // Phase-aware equipment hard bias: если первое упражнение НЕ из preferred-списка фазы —
+    // поднимаем ближайшее подходящее на первое место (не удаляя остальные).
+    {
+      const phaseEquip = PHASE_EQUIPMENT_PREF[phase] || ['barbell','dumbbell','machine','cable'];
+      if (phaseEquip.length > 0 && exDatas.length > 1) {
+        const firstEq = String((exDatas[0] as any)?.equipment || '').toLowerCase();
+        const firstOk = phaseEquip.some(eq => firstEq.includes(eq));
+        if (!firstOk) {
+          const betterIdx = exDatas.findIndex((d: any) => {
+            const eq = String(d.equipment || '').toLowerCase();
+            return phaseEquip.some(p => eq.includes(p));
+          });
+          if (betterIdx > 0) { const [moved] = exDatas.splice(betterIdx, 1); exDatas.unshift(moved); }
+        }
+      }
+    }
+    // Movement-pattern diversity: минимум 2 уникальных паттерна в сессии.
+    {
+      const patts = new Set(exDatas.map(d => derivePattern(d as any)));
+      if (patts.size < 2 && pool.length > 1) {
+        const usedNames = new Set(exDatas.map(d => (d as any).name || ''));
+        const alt = pool.find(d => !usedNames.has((d as any).name || '') && !patts.has(derivePattern(d)));
+        if (alt && exDatas.length > 0) { exDatas[exDatas.length - 1] = alt; patts.add(derivePattern(alt)); }
+      }
+    }
     // Сохраняем rationale выбора для каждого упражнения
     const rationaleMap = new Map<string, string>();
     for (const s of selected) {
@@ -1090,7 +1135,7 @@ function buildSession(
   const _ordered = orderSessionExercises(exercises, { sessionTag: sched.sessionTag, methodology });
   exercises.length = 0; exercises.push(..._ordered);
 
-  const exCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 12 : 8;
+  const exCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 15 : 9;
   if (exercises.length > exCap) {
     const kept = exercises.filter(e => e.role === 'primary').slice(0, 7);
     const acc = exercises.filter(e => e.role === 'accessory');
@@ -1370,6 +1415,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // Fallback: если пул исчерпан (все исключены) — selectExercisesSmart вернёт 0,
   // тогда buildSession очистит rotationIds для этой мышцы и пересоберёт.
   const rotationUsedByMuscle = new Map<string, string[]>(); // muscle → [exerciseName, ...]
+  const weekRotationByMuscle = new Map<string, Set<string>>(); // muscle →Set<name> внутри недели
+  const prevWeekUsedByMuscle = new Map<string, Set<string>>(); // muscle →Set<name> за предыдущую неделю
   // fix L: паттерны движений, уже задействованные для отстающих групп внутри текущей недели.
   // Сбрасывается каждую неделю; позволяет не повторять один и тот же паттерн на разных днях.
   const weekWeakPatterns = new Map<string, Set<string>>(); // weakMuscle → Set<pattern>
@@ -1380,10 +1427,17 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // fix L: паттерны отстающих групп сбрасываются раз в неделю (свежий выбор движений)
     weekWeakPatterns.clear();
     const musclePrimaryAssigned = new Set<string>(); // ← сбрасывается КАЖДУЮ неделю
+    const weekUsedByMuscle = new Map<string, Set<string>>(); // muscle →Set<name> внутри недели
     const weekSessions: BBSession[] = [];
     const phase = phaseByWeek.get(w) || 'accumulation';
     phaseWeekCounter[phase] = (phaseWeekCounter[phase] || 0) + 1;
     const phaseWeek = phaseWeekCounter[phase];
+    // Soft freshness: упражнения предыдущей недели — в штрафном списке (не хард-блок).
+    const prevWeekNames = (() => {
+      const out: string[] = [];
+      for (const set of prevWeekUsedByMuscle.values()) out.push(...set);
+      return out;
+    })();
     // FB-ротация: запрещаем повтор упражнений между днями
     const fbUsedIds: string[] = [];
     const fbUsedNames: string[] = [];
@@ -1410,7 +1464,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // Ротация: собираем ID упражнений, использованных ранее для этих мышц.
       // rotationUsedByMuscle хранит exerciseName (имена) → конвертируем в IDs для selectExercisesSmart.
       const rotationIds: string[] = [];
-      const rotationNames: string[] = [];
+      const rotationNames: string[] = [...prevWeekNames];
       for (const m of sessMuscles) {
         const prevNames = rotationUsedByMuscle.get(m) || [];
         rotationNames.push(...prevNames);
@@ -1587,6 +1641,15 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // fix D: капаем недельный объём каждой мышцы по её истинному MRV
     normalizeWeekMrv(weekSessions, mrvByMuscle);
     weeks.push({ week: w, sessions: weekSessions });
+    // Запоминаем упражнения этой недели для мягкого freshness блокировки следующей.
+    prevWeekUsedByMuscle.clear();
+    for (const sess of weekSessions) {
+      for (const ex of sess.exercises) {
+        const m = collapseKey(ex.muscle);
+        if (!prevWeekUsedByMuscle.has(m)) prevWeekUsedByMuscle.set(m, new Set());
+        prevWeekUsedByMuscle.get(m)!.add(ex.exerciseName || ex.name || '');
+      }
+    }
   }
 
   // FIX-2: Прогрессия весов (double_progression) — реальный прогресс от недели к неделе.
@@ -1596,6 +1659,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const prevWeek = weeks[wi - 1];
     const curWeek = weeks[wi];
     const curPhase = phaseByWeek.get(curWeek.week) || 'accumulation';
+    if (curPhase === 'deload') continue; // Делод — нет прогрессии веса
     for (const curSess of curWeek.sessions) {
       for (const curEx of curSess.exercises) {
         const prevEx = prevWeek.sessions

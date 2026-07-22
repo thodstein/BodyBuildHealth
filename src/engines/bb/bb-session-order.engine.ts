@@ -117,38 +117,39 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
  *  [0] tier:            0 = основное тяжёлое (primary+тяж), 1 = compound, 2 = изоляция, 3 = финишь
  *  [1] primaryMuscleFlag: 0 = мышца дня (primaryMuscle), 1 = прочие
  *  [2] musclePriority:   большие мышцы раньше (chest/back/legs > shoulders > arms)
- *  [3] subOrder:         для compound — pressPosition (гориз. жим раньше верт. в грудной день);
+ *  [3] tagPriority:      позиция мышцы в TAG_MUSCLES[tag] — первая мышца тега = главная дня
+ *  [4] subOrder:         для compound — pressPosition (гориз. жим раньше верт. в грудной день);
  *                        для изоляции — stretchRank (растянутая позиция первой);
  *                        для ПЛ-специфики — +50 (в конец своего тира)
- *  [4] load:             тяжелее / меньше RIR — раньше (тонкая подстройка)
+ *  [5] load:             тяжелее / меньше RIR — раньше (тонкая подстройка)
  */
 function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string>, methodology: SessionMethodology = 'compound_first'): number[] {
   const exMuscle = collapseMuscle(ex.muscle || '');
   const isPrimaryMuscle = exMuscle === collapseMuscle(primaryMuscle);
+  const tagArray = Array.from(tagMuscleSet).map(m => collapseMuscle(m));
+  const tagPriority = tagArray.indexOf(exMuscle);
   const isPrimaryHeavy = ex.role === 'primary' && ex.character === 'тяж';
   const compound = isCompoundEx(ex);
   const plSpec = isPLSpec(ex.name || '');
   const isFinisher = ex.role === 'accessory' && (ex.character === 'памп' || (ex.workSets?.[0]?.reps ?? 0) >= 12);
 
-  // pre_exhaust: изоляция основной мышцы — ПЕРВОЙ (предварительное утомление), затем compound.
   const isPrimaryIsolation = isPrimaryMuscle && !compound && !isFinisher;
   let tier: number;
   if (isFinisher) tier = 3;
-  else if (methodology === 'pre_exhaust' && isPrimaryIsolation) tier = -1; // изоляция основной мышцы первой
+  else if (methodology === 'pre_exhaust' && isPrimaryIsolation) tier = -1;
   else if (isPrimaryHeavy) tier = 0;
   else if (compound) tier = 1;
   else tier = 2;
 
   const primaryMuscleFlag = isPrimaryMuscle ? 0 : 1;
   const muscP = musclePriority(exMuscle);
-  // subOrder: для изоляций — растяжка; для compounds — позиция жима; ПЛ-специфика → +50.
   let subOrder: number;
   if (tier === 2) subOrder = stretchRank(ex.name || '');
   else if (compound) subOrder = isPress(ex.name || '') ? pressPositionRank(ex.name || '', primaryMuscle) : 0;
   else subOrder = 0;
   if (plSpec) subOrder += 50;
   const load = loadRank(ex);
-  return [tier, primaryMuscleFlag, muscP, subOrder, load];
+  return [tier, primaryMuscleFlag, muscP, tagPriority >= 0 ? tagPriority : 99, subOrder, load];
 }
 
 function collapseMuscle(m: string): string {
