@@ -498,6 +498,17 @@ export const IndividualPlanResults: React.FC = () => {
           </div>
         );
       })()}
+      {/* #1 Женская фаза цикла */}
+      {generated && dayPlan && (dayPlan as any).menstrualPhaseNote && (
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(236,72,153,0.08)', border:'1px solid rgba(236,72,153,0.25)' }}>
+          <div style={{ fontSize:8, fontWeight:700, color:'#ec4899', marginBottom:2 }}>🌈 Фаза цикла</div>
+          <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).menstrualPhaseNote}</div>
+        </div>
+      )}
+      {/* #2 Кости/кальций (женское) */}
+      {generated && dayPlan && (dayPlan as any).boneNotes && ((dayPlan as any).boneNotes as string[]).map((n: string, i: number) => (
+        <div key={'bone'+i} style={{ marginBottom:4, padding:'6px 10px', borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.2)', fontSize:8, color:'rgba(255,255,255,0.8)', lineHeight:1.4 }}>{n}</div>
+      ))}
       {generated && dayPlan && <DailyDietDashboard />}
       {generated && dayPlan && (
         <NutritionQualityCard

@@ -20,6 +20,7 @@ import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
 import { buildDayPlan as buildDayPlanV2, type DayPlanV2, type MealPlanInput } from "./meal-plan-engine";
 import { getYesterdaySummary, computeCompensation, computeRollingCompensation, type CompensationResult } from "./planner-diary-adaptation";
+import { getMenstrualPhaseNutrition, getCalciumTarget, calciumDoseSplitNote, getFemaleSupplementRules, type MenstrualPhase } from "./planner-female-cycle";
 import {
   GOALS, PHASES, BUDGET_LEVELS, NUTRITION_LEVELS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES,
@@ -746,6 +747,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (phase === 'cutting') {
       phaseSupps.push({name:'L-Карнитин',dose:'2-3г',note:'Липолиз + транспорт ЖК в митохондрии'}); phaseSupps.push({name:'Зелёный чай',dose:'500мг EGCG',note:'Термогенез + антиоксидант'}); phaseSupps.push({name:'Йохимбин',dose:'5-10мг',note:'α2-антагонист — stubborn fat'}); phaseSupps.push({name:'Клетчатка',dose:'10-15г',note:'Сытость + ЖКТ на дефиците'});
     }
+    // #3 Женские правила добавок (тайминг по фазе цикла).
+    if (sex === 'female') {
+      const fRules = getFemaleSupplementRules((cyclePhase as MenstrualPhase) || 'none');
+      if (fRules.length > 0) {
+        timeline.push({ time: '▸ Женское', items: [{name: 'Тайминг добавок', dose: '—', note: fRules.map(r => `${r.supplement}: ${r.rule}`).join(' | ')}] });
+        timeline.push(...fRules.map(r => ({ time: '', items: [{name: r.supplement, dose: 'см. правило', note: r.rule}] })));
+      }
+    }
     if (phaseSupps.length > 0) {
       timeline.push({ time: '▸ Фаза', items: [{name:`Фаза «${phase}»`,dose:'—',note:phaseSupps.map(s=>`${s.name} ${s.dose}: ${s.note}`).join(' | ')}] });
       timeline.push(...phaseSupps.map(s => ({ time: '', items: [s] })));
@@ -789,6 +798,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const trainStartMin = linkToTraining && trainStart?.includes(':') ? toMin(trainStart) : undefined;
       const excludedIds = new Set<string>(excludedFoods);
       healthIssues.forEach(hid => { const issue = HEALTH_ISSUES.find(h => h.id === hid); if (issue?.foodIds) issue.foodIds.forEach(fid => excludedIds.add(fid)); });
+      // #1 женская фаза: avoid-продукты (модуль ㅅветает в buildOneDay, но excludedIds строится здесь один раз).
       // P1.2: Pass locked foods to engine
       const lockedIds = new Set<string>([...lockedFoodIds]);
       // P1.3: Build recent foods set from existing plans to avoid repetition
@@ -851,6 +861,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           if (isTrain) { dayKcalMod = 1.1; dayCarbMod = 1.4; }
           else { dayKcalMod = 0.85; dayCarbMod = 0.4; }
         }
+        // #1 Женская фаза цикла: калорийно-углеводные моды + преферты (apply поверх cycling).
+        const _mp = (sex === 'female') ? getMenstrualPhaseNutrition((cyclePhase as MenstrualPhase) || 'none') : null;
+        if (_mp) { dayKcalMod *= _mp.kcalMod; dayCarbMod *= _mp.carbMod; }
+        // #2 Кости/кальций для женщин: повышенный Ca при низком %жира/аменорее/менопаузе.
+        const _caInfo = (sex === 'female') ? getCalciumTarget('female', bfPct, (cyclePhase as MenstrualPhase) || 'none', age) : null;
+        const _boneNotes: string[] = [];
+        if (_caInfo && _caInfo.boneRisk) _boneNotes.push(_caInfo.note, calciumDoseSplitNote());
         // #7 Anti-oscillation: если компенсация и cycling толкают в одну сторону —
         // демпфируем компенсацию (не стекаем +15% training-day с +200 недобора).
         const _diaryActive = (offset === dayIdx && diaryComp && diaryComp.applied);
@@ -888,6 +905,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           planTypeMod: (() => { const pt = PLAN_TYPES.find(p => p.id === (dietPrefs.includes('vegetarian') ? 'vegetarian' : planType)); return { pMult: pt?.pMult || 1.0, fMult: pt?.fMult || 1.0, cMult: pt?.cMult || 1.0 }; })(),
           eveningLowCarb,
           labValues: Object.keys(labValuesForPlan).length > 0 ? labValuesForPlan : undefined,
+          calciumTargetOverride: _caInfo ? _caInfo.target : undefined,
+          menstrualPhaseNote: _mp ? _mp.note : undefined,
         };
         const v2 = buildDayPlanV2(input);
         // Преобразуем DayPlanV2 → совместимый формат старого dayPlan
@@ -917,6 +936,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           diaryCompensation: (offset === dayIdx && diaryComp && diaryComp.applied) ? diaryComp : undefined,
           isRefeedDay,
           refeedNote: isRefeedDay ? '🔄 Refeed-день: углеводы ×2.5 (восстановление гликогена/лептина), жиры снижены, белок удержан. Психологическая разгрузка на сушке.' : undefined,
+          menstrualPhaseNote: _mp ? _mp.note : undefined,
+          boneNotes: _boneNotes.length > 0 ? _boneNotes : undefined,
         };
       };
 

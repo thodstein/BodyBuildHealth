@@ -113,6 +113,10 @@ export interface MealPlanInput {
   eveningLowCarb?: boolean;
   // Lab values for dietary adjustments (key = lab code from REFERENCE_RANGES)
   labValues?: Record<string, number>;
+  // #2 Female bone health: override Ca target (1200-1500mg for low-bf/amenorrhea/menopause).
+  calciumTargetOverride?: number;
+  // #1 Female menstrual phase note (surfaced in plan notes).
+  menstrualPhaseNote?: string;
 }
 
 // ─── Константы (клинические ориентиры) ─────────────────────────────────
@@ -1675,7 +1679,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const _microItems = meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount })));
   const _microRes = analyzeMicroCoverage(
     (() => { const tot: Record<string, number> = {}; _microItems.forEach(it => { const f = FOOD_DB.find(x => x.id === it.id); if (f && f.micros) { const r = (it.amount||0)/100; for (const [k,v] of Object.entries(f.micros)) tot[k] = (tot[k]||0) + (v||0)*r; } }); for (const k of Object.keys(tot)) tot[k] = Math.round(tot[k]*10)/10; return tot; })(),
-    input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay,
+    input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay, input.calciumTargetOverride,
   );
   // Nutrients already covered by closeFoodDeficiencies (avoid duplicate deficit notes).
   const _existingMicroKeys = new Set(['Fe','Mg','Zn','K','Ca','Omega3','Se','VitC','VitD','VitB12','VitB9']);
@@ -1684,6 +1688,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     else if (c.status === 'deficit' && !_existingMicroKeys.has(c.nutrient)) { notes.push(`⚠ ${c.nutrient}: ${c.actual}${c.unit}/${c.target}${c.unit} (${c.pct}%) — дефицит`); }
   }
   if (_microRes.surpluses.length > 0) notes.push(..._microRes.surpluses);
+  // #1 женская фаза цикла: проброс заметки в plan notes.
+  if (input.menstrualPhaseNote) notes.push(input.menstrualPhaseNote);
   // #2 Электролиты: натриевый баланс + K:Na соотношение.
   {
     const na = _microRes.totals['Na'] || 0;

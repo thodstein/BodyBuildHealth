@@ -124,6 +124,7 @@ export function analyzeMicroCoverage(
   weightKg: number,
   phase: CyclePhase,
   isTrainingDay: boolean,
+  calciumTargetOverride?: number,
 ): MicroCoverageResult {
   const targets = getMicroTargets(sex, weightKg, phase, isTrainingDay);
   const coverage: MicroCoverageEntry[] = [];
@@ -131,6 +132,7 @@ export function analyzeMicroCoverage(
   const surpluses: string[] = [];
 
   for (const t of targets) {
+    if (t.nutrient === 'Ca' && calciumTargetOverride !== undefined) t.target = calciumTargetOverride;
     const actual = microTotals[t.nutrient] || 0;
     const pct = Math.round((actual / Math.max(1, t.target)) * 100);
     const upper = UPPER_LIMIT[t.nutrient];
