@@ -269,7 +269,7 @@ export const IndividualPlanSettings: React.FC = () => {
         </div>
         {sex === 'female' && (
           <div style={{ marginBottom: 6 }}>
-            <PopupSelect label="🌸 Фаза цикла" value={cyclePhase} options={[{id:'none',label:'Не указана'},{id:'follicular',label:'Фолликулярная'},{id:'ovulation',label:'Овуляция'},{id:'luteal',label:'Лютеиновая'},{id:'menstrual',label:'Менструация'}]} onChange={v => setCyclePhase(v as CycleType)} />
+            {sex === 'female' && <PopupSelect label="🌸 Фаза цикла" value={cyclePhase} options={[{id:'none',label:'Не указана'},{id:'follicular',label:'Фолликулярная'},{id:'ovulation',label:'Овуляция'},{id:'luteal',label:'Лютеиновая'},{id:'menstrual',label:'Менструация'}]} onChange={v => setCyclePhase(v as CycleType)} />}
             <PopupSelect label="🏋 Категория" value={bbCategory} options={[{id:'none',label:'Не указана'}, ...categoriesForSex(sex).map(c => ({id:c.id,label:c.label}))]} onChange={v => setBBCategory(v as any)} />
             <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:4 }}>
               <button onClick={() => setPeakWeekEnabled(!peakWeekEnabled)} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:7, fontWeight:700, border:'none', background: peakWeekEnabled ? '#f59e0b' : 'rgba(255,255,255,0.08)', color: peakWeekEnabled ? '#000' : 'rgba(255,255,255,0.7)' }}>🏋 Peak-week {peakWeekEnabled ? 'ON' : 'OFF'}</button>

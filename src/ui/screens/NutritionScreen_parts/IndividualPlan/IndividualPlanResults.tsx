@@ -721,11 +721,11 @@ export const IndividualPlanResults: React.FC = () => {
               const wC = Math.round(d.totals.c);
               const wIsTraining = d.isTrainingDay;
               return (
-                <div key={di} style={{
-                  padding: 10, borderRadius: 12,
+                <div key={di} onClick={() => { if (weekPlan?.days?.[di]) { setDayPlan(weekPlan.days[di]); setPlanDays(1); setSelectedDayIndex(di); } }} style={{
+                  padding: 10, borderRadius: 12, cursor: 'pointer',
                   background: wIsTraining ? 'rgba(0,230,138,0.03)' : '#202023',
                   border: wIsTraining ? '1px solid rgba(0,230,138,0.15)' : '1px solid rgba(255,255,255,0.06)',
-                }}>
+                }} title='Нажмите, чтобы открыть день подробно'>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 14 }}>{wIsTraining ? '🏋️' : '😴'}</span>
@@ -803,6 +803,9 @@ export const IndividualPlanResults: React.FC = () => {
         </GlassCard>
       )}
 
+      {generated && planDays === 1 && dayPlan && weekPlan && (
+        <button onClick={() => setPlanDays(7)} style={{ marginBottom:6, padding:'6px 12px', borderRadius:8, border:'1px solid rgba(139,92,246,0.25)', background:'rgba(139,92,246,0.06)', color:'#a78bfa', cursor:'pointer', fontSize:9, fontWeight:600 }}>← Назад к неделе</button>
+      )}
       {generated && planDays === 1 && dayPlan && (
         <GlassCard title="⏳ Таймлайн дня" icon="⏳" color="#06b6d4">
           <div style={{ position: 'relative', paddingLeft: 20 }}>
