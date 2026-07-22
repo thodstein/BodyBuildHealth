@@ -20,8 +20,8 @@ import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
 import { buildDayPlan as buildDayPlanV2, type DayPlanV2, type MealPlanInput } from "./meal-plan-engine";
 import { getYesterdaySummary, computeCompensation, computeRollingCompensation, type CompensationResult } from "./planner-diary-adaptation";
-import { getMenstrualPhaseNutrition, getCalciumTarget, calciumDoseSplitNote, getFemaleSupplementRules, type MenstrualPhase } from "./planner-female-cycle";
-import { getBBCategory, type BBCategory } from "./planner-categories";
+import { getMenstrualPhaseNutrition, getCalciumTarget, calciumDoseSplitNote, getFemaleSupplementRules, type MenstrualPhase, getLifeStageNote, type LifeStage } from "./planner-female-cycle";
+import { getBBCategory, type BBCategory, getPeakWeekDay } from "./planner-categories";
 import {
   GOALS, PHASES, BUDGET_LEVELS, NUTRITION_LEVELS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES,
@@ -213,6 +213,9 @@ export interface PlanCtx {
   renderMealList: (dayData: any, editable?: boolean) => React.ReactNode;
   cyclePhase: string; setCyclePhase: (v: any) => void;
   bbCategory: BBCategory; setBBCategory: (v: any) => void;
+  peakWeekEnabled: boolean; setPeakWeekEnabled: (v: boolean) => void;
+  peakWeekShowDay: number; setPeakWeekShowDay: (v: number) => void;
+  lifeStage: LifeStage; setLifeStage: (v: any) => void;
   hungerLevel: number; setHungerLevel: (v: number) => void;
   householdActivity: string; setHouseholdActivity: (v: any) => void;
   customNotes: string; setCustomNotes: (v: string) => void;
@@ -258,6 +261,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [cyclePhase, setCyclePhase] = useState<'none' | 'follicular' | 'ovulation' | 'luteal' | 'menstrual'>('none');
   const [bbCategory, setBBCategory] = useState<BBCategory>(() => { try { return (localStorage.getItem('he_bb_category') as BBCategory) || 'none'; } catch { return 'none'; } });
   useEffect(() => { try { localStorage.setItem('he_bb_category', bbCategory); } catch {} }, [bbCategory]);
+  const [peakWeekEnabled, setPeakWeekEnabled] = useState<boolean>(() => { try { return localStorage.getItem('he_peak_week') === 'true'; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem('he_peak_week', peakWeekEnabled ? 'true' : 'false'); } catch {} }, [peakWeekEnabled]);
+  const [peakWeekShowDay, setPeakWeekShowDay] = useState<number>(() => { try { const n = parseInt(localStorage.getItem('he_peak_show_day') || '6'); return isNaN(n) ? 6 : Math.max(0, Math.min(6, n)); } catch { return 6; } });
+  useEffect(() => { try { localStorage.setItem('he_peak_show_day', String(peakWeekShowDay)); } catch {} }, [peakWeekShowDay]);
+  const [lifeStage, setLifeStage] = useState<LifeStage>(() => { try { return (localStorage.getItem('he_life_stage') as LifeStage) || 'none'; } catch { return 'none'; } });
+  useEffect(() => { try { localStorage.setItem('he_life_stage', lifeStage); } catch {} }, [lifeStage]);
   const [hungerLevel, setHungerLevel] = useState(5);
   const [weightAdaptMode, setWeightAdaptMode] = useState(false);
   const [weightLogWeek, setWeightLogWeek] = useState<number[]>([80, 80, 80]);
@@ -882,6 +891,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // #5 Категория бодибилдинга → целевой %жира + акцент.
         const _bbCat = getBBCategory(bbCategory, sex);
         const _categoryNote: string | undefined = _bbCat ? `${_bbCat.label}: целевой %жира ~${_bbCat.targetBodyFatPct}% — ${_bbCat.note}` : undefined;
+        // #4 Peak-week: корректировка углеводов/воды/натрия по дням до выступления.
+        const _daysBefore = peakWeekEnabled ? (peakWeekShowDay - (offset % 7)) : -1;
+        const _peakDay = (_daysBefore >= 0 && _daysBefore <= 6) ? getPeakWeekDay(_daysBefore) : null;
+        if (_peakDay) { dayCarbMod *= _peakDay.carbMod; }
+        const _peakNote: string | undefined = _peakDay ? _peakDay.note : undefined;
+        // #10 Жизненные этапы / контрацепция.
+        const _lifeStageNote: string | undefined = (sex === 'female') ? (getLifeStageNote(lifeStage) || undefined) : undefined;
         const _dietBreakNote: string | undefined = ((goal === 'cutting' || goal === 'fat_loss') && metabolicAdaptEnabled && metabolicAdaptPct > 0)
           ? '📉 Diet break рекомендован: метаболическая адаптация обнаружена. Перейдите на 2 недели maintenance (калорий поддержания) для восстановления лептина/гормонов и щитовидной. Белок 2.2 г/кг, углеводы восстановления, тренировки сохранить.'
           : undefined;
@@ -961,6 +977,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           sleepNote: _sleepNote,
           dietBreakNote: _dietBreakNote,
           categoryNote: _categoryNote,
+          peakWeekNote: _peakNote,
+          lifeStageNote: _lifeStageNote,
         };
       };
 
@@ -2556,7 +2574,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
     resultsRef, budget, setBudget, nutrLevel, setNutrLevel,
-    variety, setVariety, diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, bbCategory, setBBCategory, wakeTime, setWakeTime, bedTime, setBedTime,
+    variety, setVariety, diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, bbCategory, setBBCategory, peakWeekEnabled, setPeakWeekEnabled, peakWeekShowDay, setPeakWeekShowDay, lifeStage, setLifeStage, wakeTime, setWakeTime, bedTime, setBedTime,
     lunchTime, setLunchTime, dinnerTime, setDinnerTime, mealsCount, setMealsCount,
     workFood, setWorkFood, allergens, setAllergens, healthIssues, setHealthIssues,
     eveningLowCarb, setEveningLowCarb, planType, setPlanType,

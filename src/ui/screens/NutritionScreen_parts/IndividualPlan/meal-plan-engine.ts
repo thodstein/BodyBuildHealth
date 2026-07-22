@@ -26,7 +26,7 @@
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
 import { filterBySpecificity, filterByIntolerance, matchesCategoryPref, isPreferredCategory, tasteMatchScore, type Specificity, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences";
 import { analyzeMicroCoverage, type MicroCoverageEntry } from "./planner-micro-coverage";
-import { detectMealInteractions } from "./planner-food-interactions";
+import { detectMealInteractions, cookMethodGuidance } from "./planner-food-interactions";
 import type { FoodItem } from "../../../../core/nutrition-database";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
 
@@ -764,6 +764,9 @@ function buildWholeMeal(
     if (_conflicts.length > 0) rationales.push(..._conflicts.map(w => `⚠ ${w.text}`));
     if (_syn.length > 0) rationales.push(..._syn.map(w => w.text));
   }
+  // #9 Способ приготовления — советы по обработке ключевых продуктов.
+  const _cook = cookMethodGuidance(items.map(it => ({ id: it.id, name: it.name })));
+  if (_cook.length > 0) rationales.push(..._cook);
   return { label, time, items, totals, type, rationale: rationales, mpsCheck, target: { p: proteinG, c: carbG, f: fatG } };
 }
 

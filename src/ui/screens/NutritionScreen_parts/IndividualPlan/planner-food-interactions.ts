@@ -100,3 +100,39 @@ export function detectMealInteractions(items: FoodItemLike[]): InteractionWarnin
 
   return out;
 }
+
+
+// ── #9 Способ приготовления — влияние на биодоступность ──────────────
+// Совет по способу обработки ключевых продуктов в приёме (raw vs cooked vs fried).
+export function cookMethodGuidance(items: FoodItemLike[]): string[] {
+  const out: string[] = [];
+  if (!items || items.length === 0) return out;
+  const has = (list: string[]) => items.some(it => matchesAny(it.id, list));
+
+  if (has(['spinach','chard','sorrel','beetroot','beet'])) {
+    out.push('🍗 Оксалаты: шпинат/свёкла бланшируйте 1-2 мин (оксалаты ↓, блокируют Ca/Fe) — но не варите долго (вит C ↓). С вит C (лимон) для Fe.');
+  }
+  if (has(['carrot','pumpkin','sweet_potato','tomato'])) {
+    out.push('🍅 Жирорастворимые: морковь/томат лучше треть/варить + капля жира (вит A/ликопен +биодоступность).');
+  }
+  if (has(['garlic','onion'])) {
+    out.push('🧄 Чеснок/лук: дайте порезанным отстоять 10 мин (аллицин формируется) — добавляйте в конце готовки.');
+  }
+  if (has(['broccoli','cauliflower','brussels','kale','cabbage'])) {
+    out.push('🥦 Крестоцветные: пар/бланш 3-5 мин (сульфорафан сохраняется). Не варить долго — гойтрогены ↓, вит C ↓.');
+  }
+  if (has(['potato_boiled','potato','rice_white','pasta'])) {
+    out.push('❄️ Резистентный крахмал: картофель/рис/паста отстаять отваренными 12-24ч (охлаждение → resistant starch, ниже GI, кормит микробиом).');
+  }
+  if (has(['shawarma','pizza','burger','kfc','mcd','bk_','vt_','fast_food','fried','fries'])) {
+    out.push('⚠️ Фастфуд/жареное: +калории (впитывает масло), канцерогены (акриламид при жарке), транс-жиры. Минимизируйте или запекайте/гриль.');
+  }
+  if (has(['egg_whole','egg'])) {
+    out.push('🥚 Яйца: желток варить (биотин усваивается, сальмонелла ↓); белок обязательно термообработка (авидин).');
+  }
+  if (has(['beef_lean','beef_minced','chicken_breast','turkey','salmon'])) {
+    out.push('🥩 Мясо/рыба: запекание/гриль/пар предпочтительнее жарки (меньше канцерогенов, сохранение аминокислот). Рыбу не пережаривать (омега-3 страдает).');
+  }
+  // limit to 2 notes per meal to avoid clutter
+  return out.slice(0, 2);
+}

@@ -157,3 +157,22 @@ export const FEMALE_SUPPLEMENT_RULES: FemaleSupplementRule[] = [
 export function getFemaleSupplementRules(cyclePhase: MenstrualPhase): FemaleSupplementRule[] {
   return FEMALE_SUPPLEMENT_RULES.filter(r => r.applies(cyclePhase));
 }
+
+
+// ── #10 Жизненные этапы / контрацепция ───────────────────────────────
+export type LifeStage = 'none' | 'pregnancy' | 'lactation' | 'menopause' | 'contraception';
+
+export function getLifeStageNote(stage: LifeStage): string | null {
+  switch (stage) {
+    case 'pregnancy':
+      return '👶 Беременность: НЕТ сушке и ААС! +340 ккал (II трим)/+452 (III), белок 1.1г/кг, фолат 600мкг, Fe 27мг, Ca 1000мг, DHA 200мг, избегать вит A/кафеин/сырые мяса/рыбу с ртутью.';
+    case 'lactation':
+      return '🤺 Лактация: +500 ккал, белок 1.3г/кг, вода +700мл, Ca 1000мг, Fe 9мг, DHA 300мг. Без дефицита — безопасная потеря веса ~0.5кг/нед.';
+    case 'menopause':
+      return '🌳 Менопауза: BMR −шее ~10-15%, Ca 1500мг + VitD 2000-4000МЕ + K2, силовые тренировки (кости/мышцы), фитоэстрогены в умеренном (соя осторожно), омега-3, Mg для приливов.';
+    case 'contraception':
+      return '💬 Контрацепция: деплеция B6/фолата/цинка/магния — добавьте B-комплекс, Zn 15мг, Mg 400мг, фолат 400мкг. Возможна задержка жидкости — калий/магний, меньше соли. Толеранс углеводов может снижаться.';
+    default:
+      return null;
+  }
+}

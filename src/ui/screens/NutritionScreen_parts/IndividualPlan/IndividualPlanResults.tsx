@@ -521,6 +521,14 @@ export const IndividualPlanResults: React.FC = () => {
       {generated && dayPlan && (dayPlan as any).categoryNote && (
         <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.25)', fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).categoryNote}</div>
       )}
+      {/* #4 Peak-week protocol */}
+      {generated && dayPlan && (dayPlan as any).peakWeekNote && (
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.3)', fontSize:8, color:'#fbbf24', fontWeight:600, lineHeight:1.4 }}>{(dayPlan as any).peakWeekNote}</div>
+      )}
+      {/* #10 Жизненный этап */}
+      {generated && dayPlan && (dayPlan as any).lifeStageNote && (
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.25)', fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).lifeStageNote}</div>
+      )}
       {generated && dayPlan && <DailyDietDashboard />}
       {generated && dayPlan && (
         <NutritionQualityCard
