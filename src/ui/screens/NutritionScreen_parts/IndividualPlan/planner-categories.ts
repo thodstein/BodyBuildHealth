@@ -81,3 +81,33 @@ export function getCategoryDeficitMod(targetBodyFatPct: number, isCutting: boole
   if (targetBodyFatPct <= 9) return 0.97;   // Figure
   return 0.98;                              // Bikini / Wellness — мягче
 }
+
+
+// ── #7 Target-BF-driven deficit ─────────────────────────────────────
+// Дефицит зависит от того, СКОЛЬКО %жира осталось скинуть до цели категории.
+// Уже у цели -> maintenance (без пересушки). Близко -> мягкий. Далеко -> агрессивнее
+// (но не хуже category mod, чтобы не уйти в RED-S).
+export function getTargetBFDeficitMod(
+  currentBodyFatPct: number | undefined,
+  targetBodyFatPct: number,
+  isCutting: boolean,
+): number {
+  if (!isCutting || currentBodyFatPct === undefined) return 1.0;
+  const gap = currentBodyFatPct - targetBodyFatPct;
+  if (gap <= 0) return 1.0;            // уже у цели -> maintenance, не пересушивать
+  if (gap <= 2) return 0.98;           // близко -> мягкий дефицит
+  if (gap <= 5) return 0.95;
+  return 0.93;                          // далеко -> агрессивнее
+}
+
+/** Комбинированный дефицит-мод: берём более консервативный (больше ккал) из
+ *  category-mod и target-BF-mod, чтобы не стекаться в RED-S. */
+export function getCombinedDeficitMod(
+  currentBodyFatPct: number | undefined,
+  targetBodyFatPct: number,
+  isCutting: boolean,
+): number {
+  const cat = getCategoryDeficitMod(targetBodyFatPct, isCutting);
+  const tbf = getTargetBFDeficitMod(currentBodyFatPct, targetBodyFatPct, isCutting);
+  return Math.max(cat, tbf); // более консервативный = выше ккал
+}

@@ -419,7 +419,7 @@ export const IndividualPlanResults: React.FC = () => {
           )}
           <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
             <button onClick={() => {
-              const txt = dayPlan ? `🍽 План питания\n${dayPlan.meals.map((m: any) => `${m.time} ${m.label}: ${m.items.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}  [${Math.round(m.totals?.kcal || 0)}ккал]`).join('\n')}\n\n📊 Итого: ${Math.round(dayPlan.totals.kcal)} ккал, Б${Math.round(dayPlan.totals.p)}/Ж${Math.round(dayPlan.totals.f)}/У${Math.round(dayPlan.totals.c)}` : '';
+              const txt = dayPlan ? `🍽 План питания\n${dayPlan.meals.map((m: any) => `${m.time} ${m.label}: ${m.items.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}  [${Math.round(m.totals?.kcal || 0)}ккал]`).join('\n')}\n\n📊 Итого: ${Math.round(dayPlan.totals.kcal)} ккал, Б${Math.round(dayPlan.totals.p)}/Ж${Math.round(dayPlan.totals.f)}/У${Math.round(dayPlan.totals.c)}, клетчатка ${Math.round(dayPlan.totals.fiber||0)}г${(dayPlan as any).healthScore ? `\n\n🩺 Health-score: ${(dayPlan as any).healthScore.score}/100 (${(dayPlan as any).healthScore.status}) — микро ${(dayPlan as any).healthScore.micro}/клетч ${(dayPlan as any).healthScore.fiber}/MPS ${(dayPlan as any).healthScore.mps}/EA ${(dayPlan as any).healthScore.ea}/диверс ${(dayPlan as any).healthScore.diversity}` : ''}${(dayPlan as any).energyAvailability ? `\n⚡ EA: ${(dayPlan as any).energyAvailability.ea} ккал/кг FFM (${(dayPlan as any).energyAvailability.status})` : ''}${(dayPlan as any).menstrualPhaseNote ? `\n🌸 ${(dayPlan as any).menstrualPhaseNote}` : ''}${(dayPlan as any).categoryNote ? `\n🏋 ${(dayPlan as any).categoryNote}` : ''}${(dayPlan as any).redSNote ? `\n⚠️ ${(dayPlan as any).redSNote}` : ''}${(dayPlan as any).peakWeekNote ? `\n🏆 ${(dayPlan as any).peakWeekNote}` : ''}` : '';
               navigator.clipboard?.writeText(txt);
             }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:7, fontWeight:600 }}>📤 Копировать</button>
             <button onClick={() => {
@@ -433,6 +433,32 @@ export const IndividualPlanResults: React.FC = () => {
           </div>
         </GlassCard>
       </>)}
+      {/* #8 Health-score дня */}
+      {generated && dayPlan && (dayPlan as any).healthScore && (() => {
+        const hs = (dayPlan as any).healthScore;
+        const col = hs.status === 'green' ? '#22c55e' : hs.status === 'yellow' ? '#f59e0b' : '#ef4444';
+        const bg = hs.status === 'green' ? 'rgba(34,197,94,0.08)' : hs.status === 'yellow' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)';
+        const bor = hs.status === 'green' ? '1px solid rgba(34,197,94,0.25)' : hs.status === 'yellow' ? '1px solid rgba(245,158,11,0.25)' : '1px solid rgba(239,68,68,0.3)';
+        const bars = [['Микро', hs.micro], ['Клетч', hs.fiber], ['MPS', hs.mps], ['EA', hs.ea], ['Диверс', hs.diversity]] as [string,number][];
+        return (
+          <div style={{ padding:'8px 12px', borderRadius:12, background:bg, border:bor, marginBottom:8, display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ textAlign:'center', minWidth:54 }}>
+              <div style={{ fontSize:20, fontWeight:800, color:col, lineHeight:1 }}>{hs.score}</div>
+              <div style={{ fontSize:7, color:col, fontWeight:600, textTransform:'uppercase' }}>{hs.status === 'green' ? 'отлично' : hs.status === 'yellow' ? 'норма' : 'внимание'}</div>
+            </div>
+            <div style={{ flex:1, display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:4 }}>
+              {bars.map(([lab,val]) => (
+                <div key={lab} style={{ textAlign:'center' }}>
+                  <div style={{ fontSize:6, color:'rgba(255,255,255,0.6)' }}>{lab}</div>
+                  <div style={{ fontSize:9, fontWeight:700, color: val >= 75 ? '#22c55e' : val >= 50 ? '#f59e0b' : '#ef4444' }}>{val}</div>
+                  <div style={{ height:3, borderRadius:2, background:'rgba(255,255,255,0.08)', marginTop:1, overflow:'hidden' }}><div style={{ height:'100%', width:`${Math.min(100,val)}%`, background: val >= 75 ? '#22c55e' : val >= 50 ? '#f59e0b' : '#ef4444' }} /></div>
+                </div>
+              ))}
+            </div>
+            {hs.conflicts > 0 && <span style={{ fontSize:7, color:'#ef4444', fontWeight:600 }}>⚠ {hs.conflicts} конфликт</span>}
+          </div>
+        );
+      })()}
       {/* Pro Engine MPS-сводка */}
       {generated && dayPlan && (dayPlan as any).mpsSummary && (
         <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)', marginBottom:8 }}>
