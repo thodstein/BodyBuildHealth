@@ -69,3 +69,15 @@ export function getPeakWeekDay(daysBeforeShow: number): PeakWeekDay {
   // show day
   return { carbMod: 0.8, waterMod: 0.3, sodiumMod: 0.3, note: `🏆 SHOW DAY: минимум воды (×0.3), минимум натрия (×0.3), углеводы умеренно для пампинга. Тренировка пампинга перед выходом.` };
 }
+
+
+// ── #3 Категория -> агрессивность дефицита при сушке ────────────────
+// Чем суше категория (ниже целевой %жира), тем агрессивнее дефицит,
+// но с капом, чтобы не уйти в RED-S (EA<30).
+export function getCategoryDeficitMod(targetBodyFatPct: number, isCutting: boolean): number {
+  if (!isCutting) return 1.0;
+  if (targetBodyFatPct <= 5) return 0.94;   // BB / 212 / Classic — суше
+  if (targetBodyFatPct <= 7) return 0.95;   // wBB / Women's Physique
+  if (targetBodyFatPct <= 9) return 0.97;   // Figure
+  return 0.98;                              // Bikini / Wellness — мягче
+}

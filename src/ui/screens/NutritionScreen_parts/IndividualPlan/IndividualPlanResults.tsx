@@ -529,6 +529,19 @@ export const IndividualPlanResults: React.FC = () => {
       {generated && dayPlan && (dayPlan as any).lifeStageNote && (
         <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.25)', fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).lifeStageNote}</div>
       )}
+      {/* #1 RED-S / Energy Availability */}
+      {generated && dayPlan && (dayPlan as any).redSNote && (
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.35)', fontSize:8, color:'#fca5a5', fontWeight:600, lineHeight:1.4 }}>{(dayPlan as any).redSNote}</div>
+      )}
+      {generated && dayPlan && (dayPlan as any).energyAvailability && (dayPlan as any).energyAvailability.status !== 'risk' && (
+        <div style={{ marginBottom:6, padding:'6px 10px', borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.2)', fontSize:7, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>
+          ⚡ Energy Availability: {(dayPlan as any).energyAvailability.ea} ккал/кг FFM ({(dayPlan as any).energyAvailability.status}) — трен. расход {(dayPlan as any).energyAvailability.exerciseKcal} ккал
+        </div>
+      )}
+      {/* #2 Голод */}
+      {generated && dayPlan && (dayPlan as any).hungerNote && (
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.25)', fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).hungerNote}</div>
+      )}
       {generated && dayPlan && <DailyDietDashboard />}
       {generated && dayPlan && (
         <NutritionQualityCard

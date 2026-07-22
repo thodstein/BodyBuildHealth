@@ -176,3 +176,43 @@ export function getLifeStageNote(stage: LifeStage): string | null {
       return null;
   }
 }
+
+
+// ── #1 RED-S / Energy Availability ──────────────────────────────────
+// EA = (энергия на еду − энергия тренировки) / FFM (кг).
+// EA < 30 ккал/кг FFM/день → зона риска RED-S (аменорея, кости, метаболизм).
+// Особенно критично для женщин-спортсменок.
+export interface EnergyAvailabilityResult {
+  ea: number;                    // ккал/кг FFM/день
+  exerciseKcal: number;
+  status: 'optimal' | 'reduced' | 'risk';
+  note: string | null;
+}
+
+export function computeEnergyAvailability(
+  intakeKcal: number,
+  weightKg: number,
+  lbmKg: number,
+  isTrainingDay: boolean,
+  trainDurationMin: number,
+  trainIntensity: 'low' | 'medium' | 'high',
+  sex: 'male' | 'female',
+): EnergyAvailabilityResult {
+  const ffm = Math.max(1, lbmKg > 0 ? lbmKg : weightKg * 0.85);
+  // METs для силовой тренировки: ~5 (умер) / 6 (средне) / 7 (тяжело).
+  const mets = trainIntensity === 'high' ? 7 : trainIntensity === 'medium' ? 6 : 5;
+  const hours = isTrainingDay ? (trainDurationMin || 60) / 60 : 0;
+  const exerciseKcal = Math.round(mets * weightKg * hours);
+  const ea = Math.round((intakeKcal - exerciseKcal) / ffm);
+  let status: EnergyAvailabilityResult['status'] = 'optimal';
+  let note: string | null = null;
+  if (ea < 30) {
+    status = 'risk';
+    const lowEf = sex === 'female' ? 'аменорея/потеря костей/метаболическое замедление (RED-S)' : 'снижение тестостерона/восстановления/иммунитета';
+    note = '⚠️ RED-S риск: Energy Availability = ' + ea + ' ккал/кг FFM/день (<30). Дефицит слишком глубокий относительно тренировочной нагрузки — ' + lowEf + '. Увеличьте ккал или снизьте объём тренировок. Целевой EA: 40-45 (женщины), ≥40 (мужчины).';
+  } else if (ea < 40) {
+    status = 'reduced';
+    note = '🟡 EA = ' + ea + ' ккал/кг FFM/день (30-40, сниженная зона). Контролируйте восстановление/цикл/либидо; не задерживайтесь долго.';
+  }
+  return { ea, exerciseKcal, status, note };
+}

@@ -115,8 +115,12 @@ export interface MealPlanInput {
   labValues?: Record<string, number>;
   // #2 Female bone health: override Ca target (1200-1500mg for low-bf/amenorrhea/menopause).
   calciumTargetOverride?: number;
+  // #4 Peak-week sodium manipulation.
+  sodiumTargetOverride?: number;
   // #1 Female menstrual phase note (surfaced in plan notes).
   menstrualPhaseNote?: string;
+  // #5 Menstrual carb GI preference ('low' = strict low-GI in luteal/menstrual).
+  carbGiPref?: 'low' | 'normal' | 'high';
 }
 
 // ─── Константы (клинические ориентиры) ─────────────────────────────────
@@ -1126,6 +1130,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // fat distribution учитывает pre-sleep (~8г жира) — снижаем долю ужина.
   const preSleepFatG = (_keep.has('preSleep') && wantPreSleep) ? 8 : 0;
+  // #5 Менструальный low-GI: в лютеиновую/менструацию строго низкий GI (≤50).
+  if (input.carbGiPref === 'low' && pool.carbSlow.length > 0) {
+    const _strictLowGi = pool.carbSlow.filter((f: FoodItem) => (f.gi || 0) <= 50);
+    if (_strictLowGi.length >= 3) pool.carbSlow = _strictLowGi;
+  }
   const mealBudget = {
     breakfast: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: breakC, f: Math.round(fatTotal * 0.20) },
     lunch: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: lunchC, f: Math.round(fatTotal * 0.15) },
@@ -1682,7 +1691,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const _microItems = meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount })));
   const _microRes = analyzeMicroCoverage(
     (() => { const tot: Record<string, number> = {}; _microItems.forEach(it => { const f = FOOD_DB.find(x => x.id === it.id); if (f && f.micros) { const r = (it.amount||0)/100; for (const [k,v] of Object.entries(f.micros)) tot[k] = (tot[k]||0) + (v||0)*r; } }); for (const k of Object.keys(tot)) tot[k] = Math.round(tot[k]*10)/10; return tot; })(),
-    input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay, input.calciumTargetOverride,
+    input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay, input.calciumTargetOverride, input.sodiumTargetOverride,
   );
   // Nutrients already covered by closeFoodDeficiencies (avoid duplicate deficit notes).
   const _existingMicroKeys = new Set(['Fe','Mg','Zn','K','Ca','Omega3','Se','VitC','VitD','VitB12','VitB9']);

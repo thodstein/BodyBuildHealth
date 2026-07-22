@@ -20,8 +20,8 @@ import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
 import { buildDayPlan as buildDayPlanV2, type DayPlanV2, type MealPlanInput } from "./meal-plan-engine";
 import { getYesterdaySummary, computeCompensation, computeRollingCompensation, type CompensationResult } from "./planner-diary-adaptation";
-import { getMenstrualPhaseNutrition, getCalciumTarget, calciumDoseSplitNote, getFemaleSupplementRules, type MenstrualPhase, getLifeStageNote, type LifeStage } from "./planner-female-cycle";
-import { getBBCategory, type BBCategory, getPeakWeekDay } from "./planner-categories";
+import { getMenstrualPhaseNutrition, getCalciumTarget, calciumDoseSplitNote, getFemaleSupplementRules, type MenstrualPhase, getLifeStageNote, type LifeStage, computeEnergyAvailability } from "./planner-female-cycle";
+import { getBBCategory, type BBCategory, getPeakWeekDay, getCategoryDeficitMod } from "./planner-categories";
 import {
   GOALS, PHASES, BUDGET_LEVELS, NUTRITION_LEVELS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES,
@@ -878,6 +878,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           // time-based cyclePos%4 could put a low-carb day on a training day, underfueling the session.
           if (isTrain) { dayKcalMod = 1.1; dayCarbMod = 1.4; }
           else { dayKcalMod = 0.85; dayCarbMod = 0.4; }
+        } else if (dietPauseMode === 'flex_80_20') {
+          // #6 80/20: лёгкий профицит (+5%) для adherence, без жёсткого cycling.
+          dayKcalMod = 1.05; dayCarbMod = 1.0;
+        } else if (dietPauseMode === 'periodization_2_1') {
+          // #6 2 дня ВУ / 1 день НУ: 2 дня выше ккал+carb, 3-й день ниже.
+          const _cycPos = offset % 3;
+          if (_cycPos < 2) { dayKcalMod = 1.12; dayCarbMod = 1.25; } else { dayKcalMod = 0.85; dayCarbMod = 0.6; }
+        } else if (dietPauseMode === 'diet_5_2') {
+          // #6 5:2 — 5 дней дефицит, 2 дня maintenance (восстановление лептина).
+          const _isMaint = (offset % 7 >= 5); // последние 2 дня недели — maintenance
+          if (_isMaint) { dayKcalMod = 1.0; dayCarbMod = 1.0; } else { dayKcalMod = 0.8; dayCarbMod = 0.7; }
         }
         // #1 Женская фаза цикла: калорийно-углеводные моды + преферты (apply поверх cycling).
         const _mp = (sex === 'female') ? getMenstrualPhaseNutrition((cyclePhase as MenstrualPhase) || 'none') : null;
@@ -891,6 +902,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // #5 Категория бодибилдинга → целевой %жира + акцент.
         const _bbCat = getBBCategory(bbCategory, sex);
         const _categoryNote: string | undefined = _bbCat ? `${_bbCat.label}: целевой %жира ~${_bbCat.targetBodyFatPct}% — ${_bbCat.note}` : undefined;
+        // #3 Категория -> агрессивность дефицита при сушке (суше категории -> больше дефицит, с капом RED-S).
+        if (_bbCat) { const _defMod = getCategoryDeficitMod(_bbCat.targetBodyFatPct, goal === 'cutting' || goal === 'fat_loss'); dayKcalMod *= _defMod; }
         // #4 Peak-week: корректировка углеводов/воды/натрия по дням до выступления.
         const _daysBefore = peakWeekEnabled ? (peakWeekShowDay - (offset % 7)) : -1;
         const _peakDay = (_daysBefore >= 0 && _daysBefore <= 6) ? getPeakWeekDay(_daysBefore) : null;
@@ -923,7 +936,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           trainStartMin: linkToTraining && trainingDays[offset % 7] ? toMin(trainStart) : undefined,
           allowIntraWorkout: trainIntensity === 'high',
           trainDurationMin: (s?.avgWorkoutMinutes || 60),
-          excludedIds, preferredIds: new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)),
+          excludedIds: (() => { const s = new Set(excludedIds); if (_mp) _mp.avoidIds.forEach((id: string) => s.add(id)); return s; })(),
+          preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); if (hungerLevel >= 6) ['broccoli','cucumber','cabbage','zucchini','spinach','kale','green_bean','oats','lentils','cottage_cheese_5'].forEach((id: string) => s.add(id)); return s; })(),
           preferredByMeal: Object.fromEntries(Object.entries(preferredByMeal).map(([k, v]) => [k, new Set(v)])),
           specificity, intolerances, tasteProfile,
           categoryPref: { preferred: [], excluded: excludedCategories },
@@ -942,8 +956,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           eveningLowCarb,
           labValues: Object.keys(labValuesForPlan).length > 0 ? labValuesForPlan : undefined,
           calciumTargetOverride: _caInfo ? _caInfo.target : undefined,
+          sodiumTargetOverride: _peakDay ? Math.round((isTrain ? Math.max(3000, 3000 + weight * 5) : 2300) * _peakDay.sodiumMod) : undefined,
           menstrualPhaseNote: _mp ? _mp.note : undefined,
+          carbGiPref: _mp ? _mp.carbGiPref : undefined,
         };
+        // #1 RED-S / Energy Availability: критично для женщин-спортсменок (EA < 30 ккал/кг FFM).
+        const _ea = computeEnergyAvailability(input.goalKcal, weight, lbmKg, !!input.isTrainingDay, input.trainDurationMin || 60, (trainIntensity as any) || 'medium', sex);
+        const _redSNote: string | undefined = _ea.note || undefined;
         const v2 = buildDayPlanV2(input);
         // Преобразуем DayPlanV2 → совместимый формат старого dayPlan
         const meals = v2.meals.map(m => ({
@@ -964,7 +983,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           meals, totals: { kcal: v2.totals.kcal, p: v2.totals.p, f: v2.totals.f, c: v2.totals.c, fiber: v2.totals.fiber },
           isTrainingDay: v2.isTrainingDay,
           supplementTimeline: buildSupplementTimeline(mealTimesPro, v2.isTrainingDay),
-          waterTimeline: buildWaterTimeline(weight, mealTimesPro, v2.isTrainingDay, trainStart),
+          waterTimeline: (() => { const wl = buildWaterTimeline(weight, mealTimesPro, v2.isTrainingDay, trainStart); if (_peakDay) return wl.map((w: any) => ({ ...w, ml: Math.round(w.ml * _peakDay.waterMod) })); return wl; })(),
           nutritionLogic: [],
           dietDiversity: { uniqueFoods: v2.diversity.uniqueFoods, totalPortions: 0, categories: v2.diversity.categories, score: Math.min(10, v2.diversity.uniqueFoods), note: `${v2.diversity.uniqueFoods} уникальных продуктов` },
           timingScores: [], intraWorkout: null, mpsSummary: v2.mpsSummary, proNotes: v2.notes,
@@ -979,6 +998,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           categoryNote: _categoryNote,
           peakWeekNote: _peakNote,
           lifeStageNote: _lifeStageNote,
+          redSNote: _redSNote,
+          energyAvailability: _ea,
         };
       };
 

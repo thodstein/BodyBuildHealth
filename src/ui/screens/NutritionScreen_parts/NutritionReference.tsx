@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FOOD_DB } from '../../../core/nutrition-database';
-import { getBioStackStackIds, getStackNutritional } from '../../../engines/biostack-bridge';
+
 
 const NUTRITION_RULES = [
   { title: 'Качество продуктов — основа', body: 'Свежая, минимально обработанная пища — приоритет. Джанк-фуд не более 15-20% от рациона. Чем короче состав продукта, тем лучше.', color: '#22c55e' },
@@ -333,28 +333,6 @@ export const NutritionReference: React.FC = () => {
         ))}
       </SectionCard>
 
-      {/* BioStack AI — nutritional stack */}
-      {(() => {
-        const stackIds = getBioStackStackIds();
-        if (stackIds.length === 0) return null;
-        const nutris = getStackNutritional();
-        if (nutris.length === 0) return null;
-        return (
-          <SectionCard title="🧬 BioStack AI • питательные вещества" isOpen={openSections.has('biostack')} onToggle={() => toggle('biostack')} color="#00e68a">
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {nutris.map(s => (
-                <span key={s.id} style={{ padding: '4px 8px', borderRadius: 8, fontSize: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.1)', color: '#00e68a', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>{s.nameRu || s.name}</span>
-                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)' }}>{(s as any).category?.[0] || (s as any).categories?.[0] || ''}</span>
-                </span>
-              ))}
-            </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginTop: 6, lineHeight: 1.5 }}>
-              Ваш стек BioStack AI содержит {nutris.length} питательных веществ{nutris.length > 3 ? ', учитывайте их при составлении рациона' : ''}
-            </div>
-          </SectionCard>
-        );
-      })()}
         </>
       )}
     </div>
