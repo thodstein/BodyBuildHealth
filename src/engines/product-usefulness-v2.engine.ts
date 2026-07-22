@@ -154,12 +154,12 @@ function applyPhaseModifiers(score: number, f: FoodItem, p: UserDietProfile): { 
   const fodmap = f.gastro_tags?.fodmap_group ?? 'LOW';
   const fiber = f.fiber;
   const sugar = f.macro_100g?.carbs_sugar ?? 0;
-  const satFat = f.macro_100g?.fats_saturated ?? 0;
+  const satFat = getMicro(f, 'SatFat');
   const animalP = f.macro_100g?.proteins_animal ?? 0;
   const plantP = f.macro_100g?.proteins_plant ?? 0;
-  const sodium = f.electrolytes_100g?.sodium_mg ?? 100;
-  const potassium = f.electrolytes_100g?.potassium_mg ?? 200;
-  const cholesterol = f.macro_100g?.cholesterol_mg ?? 0;
+  const sodium = getMicro(f, 'Na');
+  const potassium = getMicro(f, 'K');
+  const cholesterol = getMicro(f, 'Cholesterol');
 
   const totalProtein = animalP + plantP;
 
@@ -177,7 +177,7 @@ function applyPhaseModifiers(score: number, f: FoodItem, p: UserDietProfile): { 
       else if (f.category === 'grain' && fodmap === 'LOW') { score += 2.0; ff.push({ text: 'Крупы LOW FODMAP — идеал загрузки', impact: 2.0, icon: '✅' }); }
       if (sodium > 120 && p.pharma.DIURETICS) { score -= 5.0; ff.push({ text: 'Na >120мг + диуретики', impact: -5.0, icon: '🚨' }); }
       if (potassium < 100) { score -= 2.0; ff.push({ text: 'K <100мг на пике', impact: -2.0, icon: '⚠️' }); }
-      if ((f.trace_elements_100g?.iodine_mcg ?? 0) > 50 || f.metabolic_flags?.thyroid_support_level === 'HIGH') { score += 0.5; ff.push({ text: 'Поддержка щитовидки', impact: 0.5, icon: '✅' }); }
+      if (getMicro(f, 'Iodine') > 50 || f.metabolic_flags?.thyroid_support_level === 'HIGH') { score += 0.5; ff.push({ text: 'Поддержка щитовидки', impact: 0.5, icon: '✅' }); }
       break;
     case 'LEAN_MASS':
       score += cals / 60 - enzyme / 2;
@@ -192,7 +192,7 @@ function applyPhaseModifiers(score: number, f: FoodItem, p: UserDietProfile): { 
       if (cholesterol >= 50 && cholesterol <= 150) { score += 2.0; ff.push({ text: 'Холестерин 50-150 — субстрат тестостерона', impact: 2.0, icon: '✅' }); }
       if (f.metabolic_flags?.detox_support_level === 'HIGH') { score += 1.0; ff.push({ text: 'Детокс-поддержка', impact: 1.0, icon: '✅' }); }
       if (f.metabolic_flags?.cns_impact === 'STIMULANT') { score -= 1.0; ff.push({ text: 'Стимуляция ЦНС на ПКТ', impact: -1.0, icon: '⚠️' }); }
-      if ((f.vitamins_100g?.vitamin_d_mcg ?? 0) > 5) { score += 1.0; ff.push({ text: 'Витамин D для гормонов', impact: 1.0, icon: '✅' }); }
+      if (getMicro(f, 'VitD') > 5) { score += 1.0; ff.push({ text: 'Витамин D для гормонов', impact: 1.0, icon: '✅' }); }
       break;
   }
   return { score, factors: ff };
@@ -210,8 +210,8 @@ function applyPharmaModifiers(score: number, f: FoodItem, p: UserDietProfile): {
   const detox = f.metabolic_flags?.detox_support_level ?? 'LOW';
   const gutIrr = f.gastro_tags?.gut_irritant_potential ?? 'LOW';
   const enzyme = f.gastro_tags?.enzyme_demand_score ?? 3;
-  const sodium = f.electrolytes_100g?.sodium_mg ?? 100;
-  const o3 = f.macro_100g?.omega_3_mg ?? 0;
+  const sodium = getMicro(f, 'Na');
+  const o3 = getMicro(f, 'Omega3');
   const o6 = f.macro_100g?.omega_6_mg ?? 0;
   const fiber = f.fiber;
   const protein = f.protein;
@@ -229,7 +229,7 @@ function applyPharmaModifiers(score: number, f: FoodItem, p: UserDietProfile): {
   if (p.pharma.DETOX_SUPPORT && (f.metabolic_flags?.ammonia_source_level ?? 'LOW') === 'HIGH') { score += 1.5; }
   if (!p.pharma.FIBER_SUPPLEMENT && fiber < 2) { score -= 1.0; ff.push({ text: 'Мало клетчатки без добавки', impact: -1.0, icon: '⚠️' }); }
   if (!p.pharma.DIGESTIVE_ENZYMES && enzyme > 7) { score -= 2.0; ff.push({ text: 'Высокая ферментная нагрузка', impact: -2.0, icon: '⚠️' }); }
-  if (!p.pharma.VIT_MIN_SUPPLEMENT && ((f.vitamins_100g?.vitamin_d_mcg ?? 0) < 5 || (f.electrolytes_100g?.magnesium_mg ?? 0) < 100)) { score -= 0.5; }
+  if (!p.pharma.VIT_MIN_SUPPLEMENT && (getMicro(f, 'VitD') < 5 || getMicro(f, 'Mg') < 100)) { score -= 0.5; }
   if (!p.pharma.OMEGA3_SUPPLEMENT && o6 > 0 && o3 / Math.max(o6, 1) < 0.2) { score -= 1.0; }
 
   return { score, factors: ff };
@@ -245,23 +245,23 @@ function applyLabModifiers(score: number, f: FoodItem, p: UserDietProfile): { sc
   if (!L) return { score, factors: ff };
 
   const gi = f.gi;
-  const o3 = f.macro_100g?.omega_3_mg ?? 0;
+  const o3 = getMicro(f, 'Omega3');
   const o6 = f.macro_100g?.omega_6_mg ?? 0;
   const atherogenic = f.metabolic_flags?.atherogenic_potential ?? 'LOW';
   const category = f.category;
   const pral = f.electrolytes_100g?.pral_index ?? 0;
   const protein = f.protein;
   const animalP = f.macro_100g?.proteins_animal ?? 0;
-  const potassium = f.electrolytes_100g?.potassium_mg ?? 200;
-  const sodium = f.electrolytes_100g?.sodium_mg ?? 100;
+  const potassium = getMicro(f, 'K');
+  const sodium = getMicro(f, 'Na');
   const fiber = f.fiber;
   const sugar = f.macro_100g?.carbs_sugar ?? 0;
-  const zinc = f.trace_elements_100g?.zinc_mg ?? 0;
+  const zinc = getMicro(f, 'Zn');
   const ironHeme = f.trace_elements_100g?.iron_heme_mg ?? 0;
   const detox = f.metabolic_flags?.detox_support_level ?? 'LOW';
-  const chole = f.macro_100g?.cholesterol_mg ?? 0;
-  const iodine = f.trace_elements_100g?.iodine_mcg ?? 0;
-  const selenium = f.trace_elements_100g?.selenium_mcg ?? 0;
+  const chole = getMicro(f, 'Cholesterol');
+  const iodine = getMicro(f, 'Iodine');
+  const selenium = getMicro(f, 'Se');
   const chromium = f.trace_elements_100g?.chromium_mcg ?? 0;
   const ala = f.specific_compounds_100g?.alpha_lipoic_acid_mg ?? 0;
   const berberine = f.specific_compounds_100g?.berberine_mg ?? 0;
@@ -309,9 +309,9 @@ function applyLabModifiers(score: number, f: FoodItem, p: UserDietProfile): { sc
   }
   // Homocysteine
   if ((L.homocysteine ?? 0) > 15) {
-    const b6 = f.vitamins_100g?.vitamin_b6_mg ?? 0;
-    const b9 = f.vitamins_100g?.vitamin_b9_mcg ?? 0;
-    const b12 = f.vitamins_100g?.vitamin_b12_mcg ?? 0;
+    const b6 = getMicro(f, 'VitB6');
+    const b9 = getMicro(f, 'VitB9');
+    const b12 = getMicro(f, 'VitB12');
     if (b9 < 50 || b6 < 0.5 || b12 < 1) score -= 3.0;
     if (b9 > 100) { score += 2.0; ff.push({ text: 'Фолат при гомоцистеине', impact: 2.0, icon: '✅' }); }
   }
@@ -319,7 +319,7 @@ function applyLabModifiers(score: number, f: FoodItem, p: UserDietProfile): { sc
   if ((L.alt ?? 0) > 45 || (L.ast ?? 0) > 35 || (L.bilirubin_total ?? 0) > 20) {
     if (detox === 'HIGH') score += 2.0;
     if ((f.gastro_tags?.enzyme_demand_score ?? 3) > 7) score -= 3.0;
-    if ((f.macro_100g?.fats_saturated ?? 0) > 10) score -= 2.5;
+    if (getMicro(f, 'SatFat') > 10) score -= 2.5;
   }
   // Uric acid
   if ((L.uric_acid ?? 0) > 450) {
@@ -754,10 +754,10 @@ export function analyzeDailyDiet(
 
   // ── Phase 2: Glutathione status ──
   const totalCysteine = sumF(f => f.amino_acid_profile_100g?.cysteine_mg ?? 0);
-  const totalSelenium = sumF(f => f.trace_elements_100g?.selenium_mcg ?? 0);
-  const totalVitC = sumF(f => f.vitamins_100g?.vitamin_c_mg ?? 0);
-  const totalB2 = sumF(f => f.vitamins_100g?.vitamin_b2_mg ?? 0);
-  const totalB3 = sumF(f => f.vitamins_100g?.vitamin_b3_mg ?? 0);
+  const totalSelenium = sumF(f => getMicro(f, 'Se'));
+  const totalVitC = sumF(f => getMicro(f, 'VitC'));
+  const totalB2 = sumF(f => getMicro(f, 'VitB2'));
+  const totalB3 = sumF(f => getMicro(f, 'VitB3'));
   let glutathioneWarning: string | null = null;
   if (!profile.pharma.DETOX_SUPPORT && (totalCysteine < 500 || totalSelenium < 50 || totalVitC < 50 || totalB2 < 1 || totalB3 < 10)) {
     const deficits: string[] = [];

@@ -5,6 +5,7 @@
  * Продвинутый режим: + параметры полезности (DIAAS, GI, PRAL, обработка, амино)
  */
 import { FOOD_DB, calcBBQualityScore, type FoodItem } from '../core/nutrition-database';
+import { getMicro } from '../core/nutrition-micros';
 
 export interface KbjuTarget {
   kcal: number;
@@ -210,8 +211,8 @@ export function calcKbjuMatchScore(food: FoodItem, target: KbjuTarget, currentKb
     bbQuality: food.bb_quality_score || calcBBQualityScore(food),
     aminoScore: calcAminoScore(food),
     insulinIndex: food.macro_100g?.insulin_index,
-    omega3mg: food.macro_100g?.omega_3_mg ?? food.micros?.Omega3 ?? 0,
-    saturatedFat: food.macro_100g?.fats_saturated ?? 0,
+    omega3mg: getMicro(food, 'Omega3'),
+    saturatedFat: getMicro(food, 'SatFat'),
     processingLevel: getProcessingLevel(food),
     atherogenicPotential: food.metabolic_flags?.atherogenic_potential,
     glycationPotential: food.metabolic_flags?.glycation_potential,
