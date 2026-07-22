@@ -575,9 +575,9 @@ const DIGEST: Record<string, number> = {
   fruit: 0.85, other: 0.85,
 };
 
-export function calcDIAAS(f: FoodItem): { diaas: number; limitingAA: string; score: number } {
+export function calcDIAAS(f: FoodItem): { diaas: number; limitingAA: string; score: number; reliable: boolean } {
   const a = f.amino_acid_profile_100g;
-  if (!a || f.protein === 0) return { diaas: 0, limitingAA: '—', score: 0 };
+  if (!a || f.protein === 0) return { diaas: 0, limitingAA: '—', score: 0, reliable: false };
 
   const protG = f.protein;
   const ratios: Record<string, number> = {
@@ -586,7 +586,8 @@ export function calcDIAAS(f: FoodItem): { diaas: number; limitingAA: string; sco
     leucine: ((a.leucine_mg ?? 0) / protG) / FAO_WHO_REF.leucine,
     lysine: ((a.lysine_mg ?? 0) / protG) / FAO_WHO_REF.lysine,
     methionine_cystine: (((a.methionine_mg ?? 0) + (a.cysteine_mg ?? 0)) / protG) / FAO_WHO_REF.methionine_cystine,
-    phenylalanine_tyrosine: (((a.phenylalanine_mg ?? 0) + (a.phenylalanine_mg ?? 0) * 0.5) / protG) / FAO_WHO_REF.phenylalanine_tyrosine,
+    // tyrosine not tracked in DB — estimate Tyr ~ 0.6*Phe (FAO AAA = Phe+Tyr)
+    phenylalanine_tyrosine: (((a.phenylalanine_mg ?? 0) * 1.6) / protG) / FAO_WHO_REF.phenylalanine_tyrosine,
     threonine: ((a.threonine_mg ?? 0) / protG) / FAO_WHO_REF.threonine,
     tryptophan: ((a.tryptophan_mg ?? 0) / protG) / FAO_WHO_REF.tryptophan,
     valine: ((a.valine_mg ?? 0) / protG) / FAO_WHO_REF.valine,
@@ -595,18 +596,22 @@ export function calcDIAAS(f: FoodItem): { diaas: number; limitingAA: string; sco
   const limiting = Object.entries(ratios).reduce((min, curr) => curr[1] < min[1] ? curr : min);
   const coefficient = DIGEST[f.category] ?? 0.85;
   const diaas = Math.min(limiting[1] * coefficient, 1.5);
+  // #9 reliability: count amino acids with no data (missing -> 0 ratio artificially limits).
+  const missingAA = Object.values(ratios).filter(r => r === 0).length;
+  const reliable = missingAA <= 2;
 
   return {
     diaas: Math.round(diaas * 100) / 100,
-    limitingAA: limiting[0],
+    limitingAA: reliable ? limiting[0] : (limiting[0] + ' (неполный профиль)'),
     score: diaas >= 1.0 ? 1.5 : diaas < 0.75 ? -2.0 : 0,
+    reliable,
   };
 }
 
-export function calcMealDIAAS(products: { foodId: string; weightGrams: number }[]): { diaas: number; limitingAA: string } {
+export function calcMealDIAAS(products: { foodId: string; weightGrams: number }[]): { diaas: number; limitingAA: string; reliable: boolean } {
   const entries = products.map(p => ({ f: FOOD_DB.find(x => x.id === p.foodId), w: p.weightGrams })).filter(e => e.f);
   const totalW = entries.reduce((s, e) => s + e.w, 0);
-  if (totalW === 0) return { diaas: 0, limitingAA: '—' };
+  if (totalW === 0) return { diaas: 0, limitingAA: '—', reliable: false };
 
   // Sum amino acids weighted by weight
   const sum = { histidine: 0, isoleucine: 0, leucine: 0, lysine: 0, methionine: 0, cysteine: 0,
@@ -618,14 +623,14 @@ export function calcMealDIAAS(products: { foodId: string; weightGrams: number }[
       sum.histidine += (a.histidine_mg ?? 0) * w; sum.isoleucine += (a.isoleucine_mg ?? 0) * w;
       sum.leucine += (a.leucine_mg ?? 0) * w; sum.lysine += (a.lysine_mg ?? 0) * w;
       sum.methionine += (a.methionine_mg ?? 0) * w; sum.cysteine += (a.cysteine_mg ?? 0) * w;
-      sum.phenylalanine += (a.phenylalanine_mg ?? 0) * w; sum.tyrosine += (a.phenylalanine_mg ?? 0) * 0.5 * w;
+      sum.phenylalanine += (a.phenylalanine_mg ?? 0) * w; sum.tyrosine += (a.phenylalanine_mg ?? 0) * 0.6 * w; // Tyr estimated from Phe
       sum.threonine += (a.threonine_mg ?? 0) * w; sum.tryptophan += (a.tryptophan_mg ?? 0) * w;
       sum.valine += (a.valine_mg ?? 0) * w;
     }
     sum.protein += e.f!.protein * w;
   }
 
-  if (sum.protein === 0) return { diaas: 0, limitingAA: '—' };
+  if (sum.protein === 0) return { diaas: 0, limitingAA: '—', reliable: false };
 
   const ref = FAO_WHO_REF;
   const ratios: Record<string, number> = {
@@ -634,6 +639,7 @@ export function calcMealDIAAS(products: { foodId: string; weightGrams: number }[
     leucine: (sum.leucine / sum.protein) / ref.leucine,
     lysine: (sum.lysine / sum.protein) / ref.lysine,
     methionine_cystine: ((sum.methionine + sum.cysteine) / sum.protein) / ref.methionine_cystine,
+    phenylalanine_tyrosine: ((sum.phenylalanine + sum.tyrosine) / sum.protein) / ref.phenylalanine_tyrosine,
     threonine: (sum.threonine / sum.protein) / ref.threonine,
     tryptophan: (sum.tryptophan / sum.protein) / ref.tryptophan,
     valine: (sum.valine / sum.protein) / ref.valine,
@@ -642,7 +648,9 @@ export function calcMealDIAAS(products: { foodId: string; weightGrams: number }[
   const limiting = Object.entries(ratios).reduce((min, curr) => curr[1] < min[1] ? curr : min);
   const avgCoef = entries.reduce((s, e) => s + (DIGEST[e.f!.category] ?? 0.85) * e.w, 0) / totalW;
   const diaas = Math.min(limiting[1] * avgCoef, 1.5);
-  return { diaas: Math.round(diaas * 100) / 100, limitingAA: limiting[0] };
+  const mealReliable = entries.every(e => e.f!.amino_acid_profile_100g);
+  const missingMeal = Object.values(ratios).filter(r => r === 0).length;
+  return { diaas: Math.round(diaas * 100) / 100, limitingAA: (mealReliable && missingMeal <= 2) ? limiting[0] : (limiting[0] + ' (неполный)'), reliable: mealReliable && missingMeal <= 2 };
 }
 // ═══════════════════════════════════════════════════════════════════
 
