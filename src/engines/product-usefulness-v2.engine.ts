@@ -6,6 +6,7 @@
  */
 
 import { FOOD_DB, calcBBQualityScore, type FoodItem } from '../core/nutrition-database';
+import { getMicro } from "../core/nutrition-micros";
 
 // ═══════════════════════════════════════════════════════════════════
 // 1. TYPES
@@ -508,7 +509,7 @@ export function calcMealScoreV2(
   if (leucineTotal >= 3000) modifiers.push({ name: 'Лейциновый триггер (mTOR)', value: 1.5 });
   const avgEnzyme = entries.reduce((s, e) => s + (e.food.gastro_tags?.enzyme_demand_score ?? 3) * e.weightG, 0) / totalW;
   if (avgEnzyme > 7) modifiers.push({ name: 'Высокая ферментная нагрузка', value: -2.0 });
-  const kna = entries.reduce((s, e) => s + ((e.food.electrolytes_100g?.potassium_mg ?? 200) / Math.max(e.food.electrolytes_100g?.sodium_mg ?? 100, 1)) * e.weightG, 0) / totalW;
+  const kna = entries.reduce((s, e) => { const _k = getMicro(e.food, 'K') || 200; const _na = getMicro(e.food, 'Na') || 100; return s + (_k / Math.max(_na, 1)) * e.weightG; }, 0) / totalW;
   if ((profile.labs.estradiol ?? 0) > 180 && kna < 2) modifiers.push({ name: 'Эстрадиоловый отёк', value: -2.5 });
   const hasHighAthero = entries.some(e => e.food.metabolic_flags?.atherogenic_potential === 'HIGH');
   if ((profile.pharma.AAS_ORAL || (profile.labs.ldl ?? 0) > 4.2) && hasHighAthero) modifiers.push({ name: 'Липидный/ААС конфликт', value: -3.5 });
@@ -690,8 +691,8 @@ export function analyzeDailyDiet(
   const ammoniaRisk = ammoniaScore > ammoniaThreshold && fiber < fiberThreshold;
 
   // Electrolytes
-  const potassiumMg = sumF(f => f.electrolytes_100g?.potassium_mg ?? 0);
-  const magnesiumMg = sumF(f => f.electrolytes_100g?.magnesium_mg ?? 0);
+  const potassiumMg = sumF(f => getMicro(f, 'K'));
+  const magnesiumMg = sumF(f => getMicro(f, 'Mg'));
   const electrolyteRisk = profile.pharma.DIURETICS && (potassiumMg < 3500 || magnesiumMg < 400);
 
   // Insulin ricochet
@@ -705,7 +706,7 @@ export function analyzeDailyDiet(
   const pralWarning = pralTotal > 10 ? 'Закисление' : pralTotal < -10 ? 'Защелачивание' : null;
 
   // Omega
-  const o3 = sumF(f => f.macro_100g?.omega_3_mg ?? 0);
+  const o3 = sumF(f => getMicro(f, 'Omega3'));
   const o6 = sumF(f => f.macro_100g?.omega_6_mg ?? 0);
   const omegaRatio = o3 > 0 ? o6 / o3 : 30;
   const omegaThreshold = profile.pharma.OMEGA3_SUPPLEMENT ? 8 : 5;
@@ -713,9 +714,9 @@ export function analyzeDailyDiet(
 
   // Micro deficits (simplified)
   const microDeficits: string[] = [];
-  const zincTotal = sumF(f => f.trace_elements_100g?.zinc_mg ?? 0);
+  const zincTotal = sumF(f => getMicro(f, 'Zn'));
   if (zincTotal < 8 && !profile.pharma.VIT_MIN_SUPPLEMENT) microDeficits.push('Цинк');
-  const magTotal = sumF(f => f.electrolytes_100g?.magnesium_mg ?? 0);
+  const magTotal = sumF(f => getMicro(f, 'Mg'));
   if (magTotal < 300 && !profile.pharma.VIT_MIN_SUPPLEMENT) microDeficits.push('Магний');
 
   // HOMA-IR

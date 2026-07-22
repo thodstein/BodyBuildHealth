@@ -1,7 +1,8 @@
 import { FOOD_DB } from '../core/nutrition-database';
+import { getMicro } from '../core/nutrition-micros';
 import { saveNutritionV2Data } from '../core/nutrition-v2-data';
 
-interface MealItem { name: string; kcal: number; p: number; f: number; c: number; category?: string }
+interface MealItem { name: string; kcal: number; p: number; f: number; c: number; category?: string; id?: string; amount?: number; qty?: number }
 
 export interface QualityScore {
   total: number;
@@ -22,7 +23,7 @@ const MICRO_TARGETS: Record<string, { target: number; unit: string; label: strin
   Zn: { target: 15, unit: 'мг', label: 'Цинк' },
   Ca: { target: 1000, unit: 'мг', label: 'Кальций' },
   VitC: { target: 90, unit: 'мг', label: 'Витамин C' },
-  VitD: { target: 600, unit: 'МЕ', label: 'Витамин D' },
+  VitD: { target: 15, unit: 'мкг', label: 'Витамин D' },
   VitB12: { target: 2.4, unit: 'мкг', label: 'B12' },
   K: { target: 3500, unit: 'мг', label: 'Калий' },
 };
@@ -40,23 +41,29 @@ export function calcMealQuality(items: MealItem[]): QualityScore {
     totalF += item.f;
     totalC += item.c;
 
-    // Look up food in DB for detailed data
-    const food = FOOD_DB.find(f => (f.name||'').toLowerCase() === (item.name||'').toLowerCase());
+    // Bug 1: match by id first (accurate), fallback to name (diary items may lack id).
+    const food = (item.id ? FOOD_DB.find(f => f.id === item.id) : undefined)
+      || FOOD_DB.find(f => (f.name||'').toLowerCase() === (item.name||'').toLowerCase());
     if (food) {
-      totalFiber += food.fiber || 0;
+      // Bug 3: scale by portion (amount ?? qty ?? 100).
+      const _rawAmt = item.amount ?? item.qty ?? 100;
+      const _amtNum = typeof _rawAmt === 'string' ? (parseFloat(_rawAmt) || 100) : (_rawAmt as number);
+      const factor = _amtNum / 100;
+      totalFiber += (food.fiber || 0) * factor;
       if (food.micros) {
         for (const [key, val] of Object.entries(food.micros)) {
-          if (typeof val === 'number') microTotals[key] = (microTotals[key] || 0) + val;
+          if (typeof val === 'number') microTotals[key] = (microTotals[key] || 0) + val * factor;
         }
       }
-      // Whole food vs processed
-      if (food.category === 'fast_food' || food.category === 'supplement') {
+      // Bug 6: only fast_food is 'processed'; sports supplements (whey/casein/creatine) are NOT junk.
+      if (food.category === 'fast_food') {
         processedKcal += item.kcal;
       } else {
         wholeFoodKcal += item.kcal;
       }
-      totalSatFat += (food.micros as any)?.Cholesterol || 0;
-      totalOmega3 += (food.micros as any)?.Omega3 || 0;
+      // Bug 2: real saturated fat (not Cholesterol); omega-3 from getMicro.
+      totalSatFat += getMicro(food, 'SatFat');
+      totalOmega3 += getMicro(food, 'Omega3');
     }
   }
 

@@ -1707,12 +1707,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const na = _microRes.totals['Na'] || 0;
     const k  = _microRes.totals['K'] || 0;
     const naTarget = input.isTrainingDay ? Math.max(3000, Math.round(3000 + input.weightKg * 5)) : 2300;
-    if (na < 1500) {
+    if (na < 1500 && input.sodiumTargetOverride === undefined) { // peak-week управляет Na намеренно
       const gapMg = Math.round(naTarget - na);
       const saltG = Math.round(gapMg / 400 * 10) / 10; // 1г соли ≈ 400мг Na
       notes.push(`🧂 Натрий низкий: ${Math.round(na)}мг / цель ${naTarget}мг. На тренировочном дне риск гипонатриемии (потеря с потом). Добавьте ~${saltG}г соли в приёмы.`);
     }
-    if (na > 5000) {
+    if (na > 5000 && input.sodiumTargetOverride === undefined) {
       notes.push(`🧂 Натрий высокий: ${Math.round(na)}мг > 5000мг — риск задержки жидкости/АД. Снизьте солёные сыры/колбасы/соусы.`);
     }
     if (k > 0 && na > 0) {
