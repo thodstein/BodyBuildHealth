@@ -509,6 +509,18 @@ export const IndividualPlanResults: React.FC = () => {
       {generated && dayPlan && (dayPlan as any).boneNotes && ((dayPlan as any).boneNotes as string[]).map((n: string, i: number) => (
         <div key={'bone'+i} style={{ marginBottom:4, padding:'6px 10px', borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.2)', fontSize:8, color:'rgba(255,255,255,0.8)', lineHeight:1.4 }}>{n}</div>
       ))}
+      {/* #7 Сон-питание */}
+      {generated && dayPlan && (dayPlan as any).sleepNote && (
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.25)', fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).sleepNote}</div>
+      )}
+      {/* #6 Diet-break диагностика */}
+      {generated && dayPlan && (dayPlan as any).dietBreakNote && (
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)', fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).dietBreakNote}</div>
+      )}
+      {/* #5 Категория бодибилдинга */}
+      {generated && dayPlan && (dayPlan as any).categoryNote && (
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.25)', fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).categoryNote}</div>
+      )}
       {generated && dayPlan && <DailyDietDashboard />}
       {generated && dayPlan && (
         <NutritionQualityCard

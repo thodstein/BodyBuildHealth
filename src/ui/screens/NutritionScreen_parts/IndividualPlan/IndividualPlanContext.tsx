@@ -21,6 +21,7 @@ import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine
 import { buildDayPlan as buildDayPlanV2, type DayPlanV2, type MealPlanInput } from "./meal-plan-engine";
 import { getYesterdaySummary, computeCompensation, computeRollingCompensation, type CompensationResult } from "./planner-diary-adaptation";
 import { getMenstrualPhaseNutrition, getCalciumTarget, calciumDoseSplitNote, getFemaleSupplementRules, type MenstrualPhase } from "./planner-female-cycle";
+import { getBBCategory, type BBCategory } from "./planner-categories";
 import {
   GOALS, PHASES, BUDGET_LEVELS, NUTRITION_LEVELS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES,
@@ -211,6 +212,7 @@ export interface PlanCtx {
   generateFullNutritionReport: () => void;
   renderMealList: (dayData: any, editable?: boolean) => React.ReactNode;
   cyclePhase: string; setCyclePhase: (v: any) => void;
+  bbCategory: BBCategory; setBBCategory: (v: any) => void;
   hungerLevel: number; setHungerLevel: (v: number) => void;
   householdActivity: string; setHouseholdActivity: (v: any) => void;
   customNotes: string; setCustomNotes: (v: string) => void;
@@ -254,6 +256,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [sleepQuality, setSleepQuality] = useState(7);
   const [stressLevel, setStressLevel] = useState(5);
   const [cyclePhase, setCyclePhase] = useState<'none' | 'follicular' | 'ovulation' | 'luteal' | 'menstrual'>('none');
+  const [bbCategory, setBBCategory] = useState<BBCategory>(() => { try { return (localStorage.getItem('he_bb_category') as BBCategory) || 'none'; } catch { return 'none'; } });
+  useEffect(() => { try { localStorage.setItem('he_bb_category', bbCategory); } catch {} }, [bbCategory]);
   const [hungerLevel, setHungerLevel] = useState(5);
   const [weightAdaptMode, setWeightAdaptMode] = useState(false);
   const [weightLogWeek, setWeightLogWeek] = useState<number[]>([80, 80, 80]);
@@ -762,7 +766,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     return timeline;
   };
   const buildWaterTimeline = (w: number, mealTimes: { time: string; label: string }[], isTrainingDay: boolean, trainStart: string) => {
-    const totalMl = Math.round(w * 40);
+    // #8 Гидратация по поту: base 35 мл/кг + sweat по интенсивности/длительности.
+    const _sweatMlPerH = trainIntensity === 'high' ? 1500 : trainIntensity === 'medium' ? 1000 : 600; // пот мл/ч
+    const _trainDurH = (s?.avgWorkoutMinutes || 60) / 60;
+    const _sweatMl = isTrainingDay ? Math.round(_sweatMlPerH * _trainDurH) : 0;
+    const totalMl = Math.round(w * 35) + _sweatMl;
     const slots = mealTimes.length;
     const perSlot = Math.round(totalMl / (slots + 2));
     const timeline: { time: string; ml: number; note: string }[] = [];
@@ -775,8 +783,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const tH = parseInt(trainStart.split(':')[0]);
       const preH = Math.max(0, tH - 1);
       const postH = Math.min(23, tH + 1);
-      timeline.push({ time: `${String(preH).padStart(2,'0')}:30`, ml: 400, note: 'За 60 мин до тренировки' });
-      timeline.push({ time: `${String(postH).padStart(2,'0')}:00`, ml: 500, note: 'После тренировки: восстановление' });
+      const _postMl = Math.min(800, 400 + Math.round(_sweatMl * 0.5));
+      timeline.push({ time: `${String(preH).padStart(2,'0')}:30`, ml: 500, note: 'За 60 мин до тренировки' });
+      timeline.push({ time: `${String(postH).padStart(2,'0')}:00`, ml: _postMl, note: 'После тренировки: восстановление' + (_sweatMl > 800 ? ' (пот ~' + _sweatMl + ' мл — добавьте электролиты: Na/K/Mg)' : '') });
     }
     timeline.push({ time: '21:00', ml: 300, note: 'Вечер: не позже чем за 1-2ч до сна' });
     return timeline;
@@ -868,6 +877,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _caInfo = (sex === 'female') ? getCalciumTarget('female', bfPct, (cyclePhase as MenstrualPhase) || 'none', age) : null;
         const _boneNotes: string[] = [];
         if (_caInfo && _caInfo.boneRisk) _boneNotes.push(_caInfo.note, calciumDoseSplitNote());
+        // #7 Сон-питание: при плохом сне/дефиците — триптофан/Mg/вишня.
+        // #6 Diet-break диагностика: долгая сушка + метаболическая адаптация → рекомендация 2-недельного maintenance.
+        // #5 Категория бодибилдинга → целевой %жира + акцент.
+        const _bbCat = getBBCategory(bbCategory, sex);
+        const _categoryNote: string | undefined = _bbCat ? `${_bbCat.label}: целевой %жира ~${_bbCat.targetBodyFatPct}% — ${_bbCat.note}` : undefined;
+        const _dietBreakNote: string | undefined = ((goal === 'cutting' || goal === 'fat_loss') && metabolicAdaptEnabled && metabolicAdaptPct > 0)
+          ? '📉 Diet break рекомендован: метаболическая адаптация обнаружена. Перейдите на 2 недели maintenance (калорий поддержания) для восстановления лептина/гормонов и щитовидной. Белок 2.2 г/кг, углеводы восстановления, тренировки сохранить.'
+          : undefined;
+        const _sleepNote: string | undefined = (sleepHours < 7 || sleepQuality < 6)
+          ? '😴 Сон слабый: добавьте tryptophan-источники (индейка, яйцо, творог, овсянка) + Mg glycinate на ночь. Тарт-вишня (мелатонин) перед сном. Избегать кофеин/алкоголя после 15:00.'
+          : undefined;
         // #7 Anti-oscillation: если компенсация и cycling толкают в одну сторону —
         // демпфируем компенсацию (не стекаем +15% training-day с +200 недобора).
         const _diaryActive = (offset === dayIdx && diaryComp && diaryComp.applied);
@@ -938,6 +958,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           refeedNote: isRefeedDay ? '🔄 Refeed-день: углеводы ×2.5 (восстановление гликогена/лептина), жиры снижены, белок удержан. Психологическая разгрузка на сушке.' : undefined,
           menstrualPhaseNote: _mp ? _mp.note : undefined,
           boneNotes: _boneNotes.length > 0 ? _boneNotes : undefined,
+          sleepNote: _sleepNote,
+          dietBreakNote: _dietBreakNote,
+          categoryNote: _categoryNote,
         };
       };
 
@@ -2533,7 +2556,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
     resultsRef, budget, setBudget, nutrLevel, setNutrLevel,
-    variety, setVariety, diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, wakeTime, setWakeTime, bedTime, setBedTime,
+    variety, setVariety, diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, bbCategory, setBBCategory, wakeTime, setWakeTime, bedTime, setBedTime,
     lunchTime, setLunchTime, dinnerTime, setDinnerTime, mealsCount, setMealsCount,
     workFood, setWorkFood, allergens, setAllergens, healthIssues, setHealthIssues,
     eveningLowCarb, setEveningLowCarb, planType, setPlanType,

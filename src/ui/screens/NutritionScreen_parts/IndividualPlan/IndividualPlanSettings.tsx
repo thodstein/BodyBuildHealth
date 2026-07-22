@@ -10,6 +10,7 @@ import {
 } from "./types";
 import { GlassCard, PillBtn, inputStyle, selectStyle, greenBtn } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
+import { categoriesForSex } from "./planner-categories";
 import { PopupNumber, PopupSelect, PopupText } from '../../../components/PopupXxx';
 import { getRecipes, type Recipe } from '../../../../engines/nutrition-periodization.engine';
 import { getMergedExternalSubIds } from '../../../screens/TrainingScreen_parts/support-plan-bridge';
@@ -55,7 +56,7 @@ export const IndividualPlanSettings: React.FC = () => {
     trainType, setTrainType, trainIntensity, setTrainIntensity,
     householdActivity, setHouseholdActivity, bodyFatPct, setBodyFatPct,
     sleepHours, setSleepHours, sleepQuality, setSleepQuality,
-    stressLevel, setStressLevel, cyclePhase, setCyclePhase,
+    stressLevel, setStressLevel, cyclePhase, setCyclePhase, bbCategory, setBBCategory,
     hungerLevel, setHungerLevel,
     weightAdaptMode, setWeightAdaptMode, weightLogWeek, setWeightLogWeek,
     expectedLossKgWeek, setExpectedLossKgWeek,
@@ -269,6 +270,7 @@ export const IndividualPlanSettings: React.FC = () => {
         {sex === 'female' && (
           <div style={{ marginBottom: 6 }}>
             <PopupSelect label="🌸 Фаза цикла" value={cyclePhase} options={[{id:'none',label:'Не указана'},{id:'follicular',label:'Фолликулярная'},{id:'ovulation',label:'Овуляция'},{id:'luteal',label:'Лютеиновая'},{id:'menstrual',label:'Менструация'}]} onChange={v => setCyclePhase(v as CycleType)} />
+            <PopupSelect label="🏋 Категория" value={bbCategory} options={[{id:'none',label:'Не указана'}, ...categoriesForSex(sex).map(c => ({id:c.id,label:c.label}))]} onChange={v => setBBCategory(v as any)} />
           </div>
         )}
         <PopupNumber label="🍽 Голод/сытость (1–сыт, 10–голоден)" value={hungerLevel} min={1} max={10} suffix="/10" onChange={setHungerLevel} />
