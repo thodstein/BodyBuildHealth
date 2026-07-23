@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { generateTrainingRecommendations } from '../training-recommendations.engine';
 import { calcAllPoints, calcIPFGL, calcDOTS, calcWilks } from '../pl-points.engine';
 import { computePeriWorkoutNutrition } from '../nutrition-periworkout.engine';
-import { buildPlanDays } from '../manual-plan-builder';
 import type { WorkoutLog } from '../../core/types';
 
 const mkWorkout = (date: string, exerciseId: string, nSets: number): WorkoutLog => ({
@@ -94,24 +93,5 @@ describe('интеграционный тест: пери-воркаут (кра
     const p = computePeriWorkoutNutrition({ sessionVolume: 500, durationMin: 20, bodyWeight: 60 });
     expect(p.intra.carbsGPerH).toBe(0);
     expect(p.pre.carbsG).toBeLessThan(100);
-  });
-});
-
-describe('интеграционный тест: buildPlanDays с реалистичным сплитом', () => {
-  it('4-дневный сплит (верх/низ) — 4 дня, разные группы', () => {
-    const cycle = [['chest', 'shoulders', 'arms'], ['legs', 'back', 'core']];
-    const r = buildPlanDays({
-      cycle, mrv: 20, goal: 'hypertrophy', level: 'intermediate', mesoLength: 12,
-      weakPoints: ['legs'], equipment: ['barbell', 'dumbbell'],
-      workMax: { chest: 100, back: 110, legs: 140, shoulders: 60, arms: 50, core: 60 },
-      manualWorkMax: {}, injuries: [], pctForRir: { 0: 1.0, 1: 0.96, 2: 0.92, 3: 0.87, 4: 0.82, 5: 0.77 },
-    });
-    expect(r.days.length).toBe(2);
-    expect(r.days[0].exercises.length).toBeGreaterThan(0);
-    expect(r.days[1].exercises.length).toBeGreaterThan(0);
-    expect(r.weeklySets.chest).toBeGreaterThan(0);
-    expect(r.weeklySets.legs).toBeGreaterThan(0);
-    // legs is weak point → should have exercises
-    expect(r.weeklySets.legs).toBeGreaterThanOrEqual(r.weeklySets.chest || 0);
   });
 });

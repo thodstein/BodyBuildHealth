@@ -67,6 +67,18 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
   },
 };
 
+/** Режимы зоны 'planner' — сегментированный переключатель.
+ *  PL-авто и BB-авто — авто-планировщики.
+ *  Manual ("Ручной конструктор") — пустая UserProgram, которую пользователь сам
+ *  редактирует (program-store.ts). Не дублирует BB-auto — пустой blackboard,
+ *  который программируется пользователем по факту. */
+export type PlannerMode = 'pl' | 'bb' | 'manual';
+export const PLANNER_MODES: { id: PlannerMode; label: string; icon: string; hint: string }[] = [
+  { id: 'pl', label: 'ПЛ-авто', icon: '🏆', hint: 'Пауэрлифтинг: LMS-циклы, ПМ-прогрессия, пик-протоколы' },
+  { id: 'bb', label: 'ББ-авто', icon: '💪', hint: 'Бодибилдинг: сплиты, объём по группам, PED-адаптация, прогрессия' },
+  { id: 'manual', label: 'Ручной конструктор', icon: '✋', hint: 'Своя программа: создать с нуля, загрузить для правки, авто-черновик для ручной правки' },
+];
+
 /** Порядок вывода зон на hero-экране. */
 export const ZONE_ORDER: TrainingZone[] = ['planner', 'training', 'diary', 'calculators', 'library'];
 
@@ -77,13 +89,3 @@ for (const z of ZONE_ORDER) for (const t of ZONES[z].tabs) TAB_TO_ZONE[t] = z;
 export function zoneForTab(tab: TrainingTab): TrainingZone {
   return TAB_TO_ZONE[tab] ?? 'planner';
 }
-
-/** Режимы зоны 'planner' — сегментированный переключатель.
- *  Ручной сбор убран: давал убогие программы (смешивал ПЛ+ББ, дубликаты, мусор).
- *  ПЛ-авто (LMS-циклы) и ББ-авто (generic split + BB-циклы) покрывают все сценарии. */
-export type PlannerMode = 'pl' | 'bb' | 'my';
-export const PLANNER_MODES: { id: PlannerMode; label: string; icon: string; hint: string }[] = [
-  { id: 'pl', label: 'ПЛ-авто', icon: '🏆', hint: 'Пауэрлифтинг: силовые циклы, ПМ-прогрессия, пик' },
-  { id: 'bb', label: 'ББ-авто', icon: '💪', hint: 'Бодибилдинг: сплиты, объём по группам, PED-адаптация, прогрессия' },
-  { id: 'my', label: 'Мои программы', icon: '📂', hint: 'Свои программы: создать с нуля, загрузить, редактировать, клон из библиотеки' },
-];

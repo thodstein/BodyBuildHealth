@@ -587,7 +587,7 @@ export const TrainingScreen: React.FC = () => {
             </div>
             {planningTrack === 'pl' && <PlannerPlAuto />}
             {planningTrack === 'bb' && <PlannerBbAuto />}
-            {planningTrack === 'my' && <ProgramManagerPanel />}
+            {planningTrack === 'manual' && <ProgramManagerPanel />}
           </div>
         </InfoErrorBoundary>
       )}
@@ -703,7 +703,6 @@ import StickingPointAnalysisCard from './TrainingScreen_parts/StickingPointAnaly
 import { LoadRadarCard } from './TrainingScreen_parts/LoadRadarCard';
 import { WeekCompareCard } from './TrainingScreen_parts/WeekCompareCard';
 import { CsvImportTab } from './TrainingScreen_parts/CsvImportTab';
-import { usePlanGeneration } from '../hooks/usePlanGeneration';
 import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { ProgramsTab } from './TrainingScreen_parts/ProgramsTab';
 import { VolumeOptimizerTab } from './TrainingScreen_parts/VolumeOptimizerTab';

@@ -32,6 +32,8 @@ import { HybridPlanPanel } from './HybridPlanPanel';
 import { ExercisePicker } from './ExercisePicker';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
+import { BbContextPanel, PLContextPanel } from './program-editor-context-panels';
+import { SET_TEMPLATES } from './program-types';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle } from './training-ui';
 import { GROUP_RU } from './program-types';
@@ -209,11 +211,64 @@ export const ProgramManagerPanel: React.FC = () => {
     />;
   }
 
+  // P3 — Empty-state: если ни одной программы, показать яркий CTA (5 крупных кнопок)
+  if (programs.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ padding: '14px 12px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(96,165,250,0.10))', border: '1px solid rgba(0,230,138,0.25)' }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>✋ Ручной конструктор программ</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginTop: 4, lineHeight: 1.45 }}>
+            Здесь вы сами собираете программу: выбираете упражнения, ставите сеты,
+            RIR, вес, отдых. Можно создать с нуля, загрузить готовую для правки или
+            подключить LMS-цикл и поверх него сделать свой оверлей.
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700 }}>🆕 Создать новую</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button style={{ ...BTN, flex: 1, minHeight: 56, flexDirection: 'column', gap: 2 }} onClick={() => startCreate('bb')}>
+              <span style={{ fontSize: 16 }}>💪</span>
+              <span>ББ программа</span>
+              <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.8 }}>бодибилдинг: weeks→sessions→blocks</span>
+            </button>
+            <button style={{ ...BTN, flex: 1, minHeight: 56, flexDirection: 'column', gap: 2, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => startCreate('pl')}>
+              <span style={{ fontSize: 16 }}>🏆</span>
+              <span>ПЛ программа</span>
+              <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.8 }}>LMS-цикл + оверлей</span>
+            </button>
+            <button style={{ ...BTN, flex: 1, minHeight: 56, flexDirection: 'column', gap: 2, color: '#3b82f6', borderColor: 'rgba(59,130,246,0.3)' }} onClick={() => startCreate('hybrid')}>
+              <span style={{ fontSize: 16 }}>⚡</span>
+              <span>Powerbuilder</span>
+              <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.8 }}>гибрид ПЛ+ББ</span>
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700 }}>📥 Загрузить для правки</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button style={{ ...BTN_GHOST, flex: 1, minHeight: 48, display: 'flex', flexDirection: 'column', gap: 2 }} onClick={() => setPickerOpen('bb')}>
+              <span style={{ fontSize: 13 }}>🔍 Библиотека полных программ</span>
+              <span style={{ fontSize: 9, color: DIM }}>FullProgram → редактируемая копия</span>
+            </button>
+            <button style={{ ...BTN_GHOST, flex: 1, minHeight: 48, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.2)', display: 'flex', flexDirection: 'column', gap: 2 }} onClick={() => setPickerOpen('pl')}>
+              <span style={{ fontSize: 13 }}>📥 Подключить LMS-цикл</span>
+              <span style={{ fontSize: 9, color: DIM }}>процентки неизменны, оверлей ваш</span>
+            </button>
+          </div>
+        </div>
+
+        {toast && <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, padding: '4px 0' }}>{toast}</div>}
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>📂 Мои программы</div>
+      <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>✋ Ручной конструктор — Мои программы ({programs.length})</div>
       <div style={{ fontSize: 11, color: DIM }}>
-        Создавайте свои программы с нуля, клонируйте из библиотеки или подключайте проф. ПЛ-циклы (без изменения их проценток).
+        Создавайте программы с нуля, клонируйте готовые из библиотеки или подключайте LMS-циклы (без изменения их процентовок).
       </div>
 
       {/* Actions — P2.9: иерархия кнопок (Создать / Загрузить) */}
@@ -378,6 +433,10 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
   const update = (patch: Partial<UserProgram>) => onChange({ ...program, ...patch });
   const updateMeta = (patch: Partial<UserProgram['meta']>) => onChange({ ...program, meta: { ...program.meta, ...patch } });
 
+  // Локальный toast — сам ProgramEditor не имеет доступа к flash() родителя.
+  const [editorToast, setEditorToast] = useState('');
+  const showToast = (m: string) => { setEditorToast(m); setTimeout(() => setEditorToast(''), 2200); };
+
   const revisions = program.meta.revisions ?? [];
   const removeRev = (revIdx: number) => {
     const updated = deleteRevision(program.meta.id, revIdx);
@@ -418,14 +477,111 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
     setIsDirty(false);
   };
 
+  // P5: «⚡ Заполнить автоматически» — на основе meta (дни / уровень / цель)
+  // создаёт минимальный blackboard с пустыми слотами для редактирования.
+  // НЕ дублирует bb-builder — это просто предзаполнение шаблона, чтобы
+  // пользователь сразу видел структуру и заполнял её упражнениями.
+  const autoFillDraft = () => {
+    const days = Math.max(2, Math.min(7, program.meta.daysPerWeek || 4));
+    const title = '[Черновик] ' + (program.meta.title || 'Моя программа');
+    updateMeta({ title });
+    if (dir === 'bb' && program.bb) {
+      const weeks: UserWeek[] = Array.from({ length: Math.max(1, program.meta.weeks || 4) }, (_, wi) => ({
+        week: wi + 1,
+        phase: 'accumulation' as const,
+        deload: false,
+        sessions: Array.from({ length: days }, (_, si) => ({
+          id: newId('ses'),
+          name: 'День ' + (si + 1),
+          focus: '',
+          blocks: [
+            {
+              id: newId('blk'),
+              type: 'compound' as const,
+              exerciseName: '',
+              muscle: '',
+              role: 'primary' as const,
+              sets: [{ reps: 8, rir: 2, weight: 0, restSec: 120 }],
+            },
+            {
+              id: newId('blk'),
+              type: 'accessory' as const,
+              exerciseName: '',
+              muscle: '',
+              role: 'accessory' as const,
+              sets: [{ reps: 12, rir: 2, weight: 0, restSec: 90 }],
+            },
+          ],
+        })),
+      }));
+      update({ bb: { ...program.bb, weeks } });
+    } else if (dir === 'pl' && program.pl) {
+      // Для ПЛ автозаполнение минимально: добавляем расписание цикла по дням.
+      const sessCount = Math.max(2, Math.min(6, days));
+      update({
+        pl: {
+          ...program.pl,
+          schedule: Array.from({ length: sessCount }, (_, i) => ({ sessionIdx: i, dayOfWeek: i })),
+        },
+      });
+    }
+    showToast('⚡ Черновик создан — заполните упражнения и ПМ');
+  };
+
+  // P6.1: «🚚 К выполнению» — конвертирует текущую program → PlayerDay[] и
+  // пишет в he_pl_runtime, переключает на зону training/tab=runtime.
+  const sendToExecution = () => {
+    if (dir !== 'bb' || !program.bb) {
+      alert('К выполнению можно отправить только ББ-программу.');
+      return;
+    }
+    const days: { label: string; exercises: { name: string; muscleGroup: string; targetSets: { weight: number; reps: number; rir: number }[] }[] }[] = [];
+    const week1 = program.bb.weeks[0];
+    if (!week1) { alert('Сначала добавьте хотя бы одну сессию.'); return; }
+    for (const s of week1.sessions) {
+      days.push({
+        label: s.name || 'День',
+        exercises: s.blocks
+          .filter((b) => b.exerciseName)
+          .map((b) => ({
+            name: b.exerciseName,
+            muscleGroup: b.muscle,
+            targetSets: b.sets.map((set) => ({
+              weight: set.weight ?? 0,
+              reps: typeof set.reps === 'number' ? set.reps : parseInt(String(set.reps).replace(/[^0-9]/g, '')) || 8,
+              rir: set.rir ?? 2,
+            })),
+          })),
+      });
+    }
+    if (days.length === 0 || days.every((d) => d.exercises.length === 0)) {
+      alert('Добавьте хотя бы одно упражнение, прежде чем отправлять к выполнению.');
+      return;
+    }
+    try {
+      localStorage.setItem('he_pl_runtime', JSON.stringify({ days, focus: program.meta.title || 'Моя программа', week: 1, track: 'manual' }));
+    } catch {}
+    showToast('🚚 Отправлено к выполнению — откройте зону «▶ Тренировка»');
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 0 }} onClick={safeBack}>← К списку</button>
         <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
         {isDirty && <span style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b' }} title="Несохранённые изменения">●</span>}
-        <button style={{ ...BTN, padding: '6px 14px', fontSize: 11, minHeight: 0, marginLeft: 'auto' }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a' }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней">⚡ Авто-черновик</button>
+          {dir === 'bb' && (
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToExecution} title="Отправить к выполнению (he_pl_runtime)">🚚 К выполнению</button>
+          )}
+          <button style={{ ...BTN, padding: '6px 14px', fontSize: 11, minHeight: 0 }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
+        </div>
       </div>
+
+      {/* P4 — контекстные панели (НЕ калькуляторы): отображают статус текущей программы */}
+      {dir === 'bb' && program.bb && <BbContextPanel program={program} level={program.meta.level} />}
+      {dir === 'pl' && program.pl && <PLContextPanel program={program} />}
 
       {/* Meta */}
       <div style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -482,6 +638,13 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           </label>
         </div>
       </div>
+
+      {/* Локальный toast для сообщений внутри редактора (авто-черновик, к выполнению и т.п.) */}
+      {editorToast && (
+        <div style={{ padding: '6px 10px', background: 'rgba(0,230,138,0.10)', borderLeft: '2px solid rgba(0,230,138,0.4)', borderRadius: 6, fontSize: 11, fontWeight: 700, color: '#fff' }}>
+          {editorToast}
+        </div>
+      )}
 
       {/* P2.11: редактирование constraints (оборудование, травмы, avoidAxialLoad, любимые/исключённые) + progression */}
       {dir === 'bb' && program.bb && (
@@ -826,8 +989,8 @@ const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => v
             <option value="isolation">Изоляция</option>
             <option value="finisher">Финишь</option>
           </select>
-          <ExercisePicker value={b.exerciseName} muscle={b.muscle} onSelect={ex => updateBlock(bi, { exerciseName: ex.name, muscle: ex.group || b.muscle, type: (ex.type === 'compound' ? 'compound' : ex.type === 'isolation' ? 'isolation' : 'accessory') as UserBlock['type'], role: ex.type === 'compound' ? 'primary' : 'accessory' })} />
-          <input style={{ ...IN, padding: '4px 6px', fontSize: 11, flex: '0 0 90px' }} value={b.muscle} onChange={e => updateBlock(bi, { muscle: e.target.value })} placeholder="Мышца" list="muscle-list" />
+<ExercisePicker value={b.exerciseName} muscle={b.muscle} onSelect={ex => updateBlock(bi, { exerciseName: ex.name, muscle: ex.group || b.muscle, type: (ex.type === 'compound' ? 'compound' : ex.type === 'isolation' ? 'isolation' : 'accessory') as UserBlock['type'], role: ex.type === 'compound' ? 'primary' : 'accessory' })} />
+          <input style={{ ...IN, padding: '4px 6px', fontSize: 11, flex: '0 0 90px' }} value={b.muscle} onChange={e => updateBlock(bi, { muscle: e.target.value })} placeholder="Мышечная группа" list="muscle-list" />
           <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <button style={{ ...BTN_GHOST, padding: '0 4px', fontSize: 9, minHeight: 0, lineHeight: 1 }} onClick={() => moveBlock(bi, -1)} title="Вверх">▲</button>
@@ -894,6 +1057,20 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void }>
         </div>
       ))}
       <button style={{ ...BTN_GHOST, padding: '2px 6px', fontSize: 10, minHeight: 0 }} onClick={add}>+ сет</button>
+      {/* Phase 6: быстрые шаблоны сетов — клик заменяет все сеты на pattern из SET_TEMPLATES */}
+      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 4, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <span style={{ fontSize: 8, color: DIM, marginRight: 4 }}>📋 Шаблоны:</span>
+        {Object.entries(SET_TEMPLATES).slice(0, 6).map(([key, tmpl]) => (
+          <button
+            key={key}
+            title={`Применить: ${key} (${tmpl.sets}×${tmpl.reps} RIR${tmpl.rir}, ${Math.floor(tmpl.rest / 60)}м)`}
+            style={{ padding: '2px 6px', borderRadius: 6, fontSize: 9, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700 }}
+            onClick={() => onChange(Array.from({ length: tmpl.sets }, () => ({ reps: tmpl.reps, rir: tmpl.rir, restSec: tmpl.rest, weight: sets[0]?.weight ?? 0 })))}
+          >
+            {key}
+          </button>
+        ))}
+      </div>
     </div>
   );
 };

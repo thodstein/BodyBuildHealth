@@ -107,12 +107,18 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
 
 };
 
-// ══ Режим зоны «Планировщик»: ПЛ-авто / ББ-авто (сегментированный переключатель в nav.ts).
-// Ручной сбор убран — давал убогие программы. ПЛ-авто и ББ-авто покрывают все сценарии.
-export type PlanningTrack = 'pl' | 'bb' | 'my';
+// ══ Режим зоны «Планировщик»: ПЛ-авто / ББ-авто / Ручной конструктор
+// (сегментированный переключатель в nav.ts).
+export type PlanningTrack = 'pl' | 'bb' | 'manual';
 const PT_KEY = 'he_training_planning_track';
 export function getPlanningTrack(): PlanningTrack {
-  try { const v = localStorage.getItem(PT_KEY); return (v === 'bb' || v === 'my') ? v : 'pl'; } catch { return 'pl'; }
+  try {
+    const v = localStorage.getItem(PT_KEY);
+    if (v === 'bb' || v === 'manual') return v;
+    // Backward-compat: старое значение 'my' → 'manual'.
+    if (v === 'my') return 'manual';
+    return 'pl';
+  } catch { return 'pl'; }
 }
 export function setPlanningTrack(t: PlanningTrack): void {
   try { localStorage.setItem(PT_KEY, t); } catch { /* ignore */ }
