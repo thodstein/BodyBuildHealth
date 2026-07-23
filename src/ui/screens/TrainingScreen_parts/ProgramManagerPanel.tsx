@@ -78,9 +78,12 @@ export const ProgramManagerPanel: React.FC = () => {
   const [wizardDays, setWizardDays] = useState(4);
   const [wizardWeeks, setWizardWeeks] = useState(8);
   const startCreate = (dir: 'bb' | 'pl' | 'hybrid') => {
-    setWizardDir(dir);
-    setWizardStep(1);
-    setWizardOpen(true);
+    // Прямое создание — без визарда. Пользователь видит результат сразу и редактирует.
+    const p = createBlank(dir);
+    p.meta.daysPerWeek = 4;
+    p.meta.weeks = 8;
+    setEditing(p);
+    flash('🆕 Создана пустая программа — заполните упражнениями или нажмите ⚡ авто-черновик');
   };
   const finishWizard = () => {
     const p = createBlank(wizardDir);
