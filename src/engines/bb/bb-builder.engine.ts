@@ -585,7 +585,8 @@ function buildSession(
     // Glute priority для женщин: glutes всегда primary в любом ножном дне (Legs/Lower/Limbs/LegsBiceps/Glutes/GlutesHams).
     const isGlutePriority = isFemale && muscle === 'glutes' && /leg|lower|glute|limbs/i.test(sched.sessionTag || '');
     const isMainMuscle = !tagPrimaries || tagPrimaries.has(muscle) || isGlutePriority;
-    if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж') && isMainMuscle) {
+    const SMALL_NEVER_PRIMARY = new Set(['traps', 'forearms', 'calves']);
+    if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж') && isMainMuscle && !SMALL_NEVER_PRIMARY.has(muscle)) {
       role = 'primary'; musclePrimaryAssigned.add(muscle);
     }
     // Слабые группы (weakPoints): структурное повышение до primary —
@@ -595,6 +596,25 @@ function buildSession(
     if (isMainMuscle && isWeak(muscle, weakPoints)) {
       role = 'primary'; musclePrimaryAssigned.add(muscle);
     }
+    // Small FORCE_HEAVY muscles (traps/forearms/calves) never lead a day — always accessory
+    // unless they're the day's explicit lead. Stops shrugs / wrist-curls stealing the primary
+    // lead on pump days.
+    if (role === 'primary' && SMALL_NEVER_PRIMARY.has(muscle)) role = 'accessory';
+    // Force the day's lead compound muscle to primary so the session opens with a big compound
+    // (bench / squat / row / OHP / close-grip bench) instead of a small isolation on pump days.
+    const LEAD_MUSCLE: Record<string, string> = {
+      Chest: 'chest', Back: 'back', Shoulders: 'shoulders', Arms: 'triceps',
+      Push: 'chest', Pull: 'back', ChestBack: 'chest', ShouldersArms: 'shoulders',
+      Upper: 'chest', UpperPower: 'chest', UpperHyp: 'chest',
+      Torso: 'chest', Limbs: 'quads', LegsBiceps: 'quads', Glutes: 'glutes', GlutesHams: 'glutes',
+      Legs: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
+      Lower: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
+      LowerPower: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
+      LowerHyp: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
+      FullBody: '',
+    };
+    const leadMuscle = LEAD_MUSCLE[sched.sessionTag || ''] || ((musclePlans[0] as any)?.group || '');
+    if (muscle === leadMuscle && !excludedMuscles.has(repKey)) { role = 'primary'; musclePrimaryAssigned.add(muscle); }
     const mavRot = muscleVolumeRotation[muscle] || 0;
     const sessionsForMuscle = muscleSessionCount[muscle] || 1;
     let sets = sessionShareFor(mavRot, sessionsForMuscle, role, muscle, pedAdapt, isFemale);

@@ -94,7 +94,7 @@ export function derivePattern(ex: any): string {
  * farmer's walk — «biceps», good morning — «quads».
  */
 const MP_TO_MUSCLE: Record<string, string | null> = {
-  horizontal_push: 'chest', incline_push: 'chest', dip_push: 'chest', decline_push: 'chest', vertical_push: 'chest',
+  horizontal_push: 'chest', incline_push: 'chest', dip_push: 'chest', decline_push: 'chest', vertical_push: 'shoulders',
   isolation_chest: 'chest',
   vertical_pull: 'back', horizontal_pull: 'back',
   // isolation_back — НЕ здесь; обрабатывается ниже (traps vs back по targetMuscle)
@@ -119,6 +119,11 @@ export function trueMuscleOf(ex: any): string | null {
   if (/станов|рывок|толчок|пендл|подъём на грудь|взятие на грудь|армлифт|конвой|удержание штанг|олимп|швунг|push.?press|push.?jerk|clean.?pull|muscle.?snatch|power.?clean|power.?snatch|hang.?clean/.test(nm)) return null;
   // Hinge (good morning / deadlift / RDL) — ПЛ-движение, не ББ
   if (mp === 'hinge') return null;
+  // Catalog mis-tags overhead presses as movementPattern 'horizontal_push'; force shoulders-group presses to shoulders.
+  const _g = (ex?.group || '').toLowerCase();
+  if (_g === 'shoulders' && /жим|press|армей|overhead|ohp|жимовой швунг/i.test(nm) && !/мах|raise|fly|развод|отведен/i.test(nm)) return 'shoulders';
+  // Close-grip bench is a triceps compound, not chest.
+  if (/жим.*узк|close.?grip/i.test(nm) || (/узким хватом/.test(nm) && /жим|press|bench/i.test(nm))) return 'triceps';
   const base = MP_TO_MUSCLE[mp];
   if (base) return base;
   // isolation_back: шраги → traps, остальное → back
@@ -128,7 +133,7 @@ export function trueMuscleOf(ex: any): string | null {
   }
   if (mp === 'isolation_arms') {
     if (/трицепс/.test(tgt)) return 'triceps';
-    if (/предплеч|хват/.test(tgt)) return 'forearms';
+    if (/предплеч|хват|запяст|wrist/.test(tgt)) return 'forearms';
     return 'biceps'; // сгибания на бицепс по умолчанию
   }
   if (mp === 'isolation_back') {
