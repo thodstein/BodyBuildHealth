@@ -43,6 +43,9 @@ import {
   plLmsScheduleDays,
   suggestExercisesForGroup,
 } from '../../../engines/manual-constructor.engine';
+import { tempoFor } from '../../../engines/bb/bb-tempo-rest';
+import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
+import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
 import { loadTrainingProfile } from './training-profile';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle } from './training-ui';
@@ -625,6 +628,135 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
             )}
             <div style={{ fontSize: 9, color: DIM, marginTop: 4, fontStyle: 'italic' }}>
               Оценка в реальном времени: weeklySets vs MRV. Зелёный ≥75, жёлтый ≥50, красный &lt;50.
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* MiniBox: маленькая карточка-индикатор для грид-сетки статистики */}
+      {(() => null)()}
+
+      {/* P3.1 — Статистика реального плана (calcBBPlanMetrics на weeks[0]). */}
+      {dir === 'bb' && program.bb && program.bb.weeks?.[0]?.sessions?.[0] && (() => {
+        try {
+          const m = calcBBPlanMetrics(userWeekToBBPlan(program.bb.weeks[0], program.meta.level), 1.0);
+          const onCourse = (loadTrainingProfile().onCourse ?? false) ? ' 🅿 курс' : '';
+          return (
+            <div style={{ ...CARD, padding: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>📊 Статистика плана{onCourse}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                <div style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Недель</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: DIM_STRONG }}>{program.bb.weeks.length}</div>
+                </div>
+                <div style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Сессий/нед</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: DIM_STRONG }}>{program.bb.weeks[0]?.sessions.length ?? 0}</div>
+                </div>
+                <div style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Упражнений</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: DIM_STRONG }}>{(program.bb.weeks[0]?.sessions ?? []).reduce((s, ss) => s + (ss.blocks?.length ?? 0), 0)}</div>
+                </div>
+                <div style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Сетов/нед</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: DIM_STRONG }}>{(program.bb.weeks[0]?.sessions ?? []).reduce((s, ss) => s + (ss.blocks ?? []).reduce((s2, b) => s2 + (b.sets?.length ?? 0), 0), 0)}</div>
+                </div>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 9, color: DIM, lineHeight: 1.4 }}>
+                Тяж {m.тяжPct?.toFixed?.(0) ?? 0}% / Памп {m.пампPct?.toFixed?.(0) ?? 0}% · Средний RIR {m.avgRir?.toFixed?.(1) ?? '—'}
+              </div>
+            </div>
+          );
+        } catch { return null; }
+      })()}
+
+      {/* P3.2 — Bulk-apply методик ко всем блокам */}
+      {dir === 'bb' && program.bb && program.bb.weeks.length > 0 && (() => {
+        const curIntensity = (program.bb.progression?.intensityTechniques ?? ['none'])[0];
+        const applyTechnique = (key: IntensityTechnique | 'none') => {
+          const next: UserProgram = {
+            ...program,
+            bb: {
+              ...program.bb!,
+              weeks: program.bb!.weeks.map((w) => ({
+                ...w,
+                sessions: w.sessions.map((s) => ({
+                  ...s,
+                  blocks: s.blocks.map((b) => ({
+                    ...b,
+                    sets: (b.sets ?? []).map((st) => ({ ...st, technique: key === 'none' ? undefined : key })),
+                  })),
+                })),
+              })),
+              progression: {
+                ...(program.bb!.progression ?? { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] }),
+                intensityTechniques: key === 'none' ? ['none'] : [key],
+              },
+            },
+          };
+          onChange(next);
+          showToast('🔧 Применено ко всем блокам: ' + (key === 'none' ? 'без техники' : INTENSITY_TECHNIQUES[key as IntensityTechnique].label));
+        };
+        const applyCharacter = (char: 'тяж' | 'памп' | 'лёг') => {
+          const tempo = tempoFor(char);
+          const restByChar = { тяж: 180, памп: 60, лёг: 90 } as const;
+          const next: UserProgram = {
+            ...program,
+            bb: {
+              ...program.bb!,
+              weeks: program.bb!.weeks.map((w) => ({
+                ...w,
+                sessions: w.sessions.map((s) => ({
+                  ...s,
+                  blocks: s.blocks.map((b) => ({
+                    ...b,
+                    sets: (b.sets ?? []).map((st, i) => i === 0 ? { ...st, restSec: restByChar[char] } : st),
+                  })),
+                })),
+              })),
+            },
+          };
+          onChange(next);
+          showToast('🏋 Характер дня: ' + char + ' → отдых ' + restByChar[char] + 'с, темп ' + tempo.notation);
+        };
+        return (
+          <div style={{ ...CARD, padding: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>
+              🔧 Применить ко всем блокам
+              <span style={{ fontSize: 9, color: DIM, marginLeft: 6, fontWeight: 500 }}>(сейчас: {INTENSITY_TECHNIQUES[curIntensity as IntensityTechnique]?.label ?? curIntensity})</span>
+            </div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(167,139,250,0.7)', marginBottom: 4 }}>
+              Интенсив-техника:
+            </div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+              {(Object.entries(INTENSITY_TECHNIQUES) as [IntensityTechnique, { label: string; description: string }][]).map(([key, meta]) => (
+                <button
+                  key={key}
+                  title={meta.description}
+                  onClick={() => applyTechnique(key)}
+                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700 }}
+                >
+                  {meta.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(34,197,94,0.7)', marginBottom: 4 }}>
+              Характер дня (отдых + темп):
+            </div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {(['тяж', 'памп', 'лёг'] as const).map((char) => (
+                <button
+                  key={char}
+                  title={`${char}-характер дня: темп ${tempoFor(char).notation}, отдых ${{тяж:180,памп:60,лёг:90}[char]}с`}
+                  onClick={() => applyCharacter(char)}
+                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.25)', color: '#22c55e', fontWeight: 700 }}
+                >
+                  {char === 'тяж' ? 'Тяж. день → 180с/отдых' : char === 'памп' ? 'Памп день → 60с/отдых' : 'Лёгкий день → 90с/отдых'}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 9, color: DIM, marginTop: 4, fontStyle: 'italic' }}>
+              Применяет выбор ко всем Weeks→Sessions→Blocks. Темп/RIR правила — из RIR_MATRIX[goal][level].
             </div>
           </div>
         );
