@@ -537,6 +537,7 @@ function buildSession(
   let totalExpectedFatigue = 0;
   const sessionSelectedIds: string[] = [...preSelectedIds, ...rotationBlockIds];
   const sessionSelectedNames: string[] = [...preSelectedNames];
+  const rotationNamesSet = new Set(preSelectedNames); // cross-session rotation only (excludes prior days/weeks, not this session's own picks)
   
   for (const mp of musclePlans) {
     const muscle = mp.group;      // каталог-группа (shoulders/arms/back/legs/core…)
@@ -752,7 +753,7 @@ function buildSession(
       const patts = new Set(exDatas.map(d => derivePattern(d as any)));
       if (patts.size < 2 && pool.length > 1) {
         const usedNames = new Set(exDatas.map(d => (d as any).name || ''));
-        const alt = pool.find(d => !usedNames.has((d as any).name || '') && !patts.has(derivePattern(d)));
+        const alt = pool.find(d => !usedNames.has((d as any).name || '') && !patts.has(derivePattern(d as any)) && !rotationNamesSet.has((d as any).name || '') && !sessionSelectedNames.includes((d as any).name || ''));
         if (alt && exDatas.length > 0) { exDatas[exDatas.length - 1] = alt; patts.add(derivePattern(alt)); }
       }
     }
@@ -905,7 +906,7 @@ function buildSession(
         for (let ci = 0; ci < classes.length; ci++) {
           const ac = classes[ci];
           if (diverse.length >= exerciseCount) break;
-          let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id));
+          let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id) && !rotationNamesSet.has(e.name));
           // Сортировать по strengthRank (тяж compounds первыми) + weakExerciseBonus (слабые группы приоритет)
           candidates = candidates.sort((a, b) => {
             const rankDiff = strengthRank(a) - strengthRank(b);
@@ -1452,6 +1453,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // День 1: грудь+спина primary, день 2: ноги primary, день 3: плечи+руки primary
       const isFB = s.sessionTag === 'FullBody';
       if (isFB) {
+        musclePrimaryAssigned.clear(); // per-day distribution: re-block non-primary muscles for THIS day only
         const fbSchedule = [
           ['chest', 'back'],
           ['quads', 'hamstrings'],
