@@ -23,7 +23,10 @@ export const CYCLE_08: SRCycleTemplate = {
  },
  week1: [
  { exercises: [
+ { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.4,reps:10,sets:1},{pct:0.5,reps:8,sets:1},{pct:0.58,reps:8,sets:3}] },
  { name: 'Подъем гантели перед собой', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.35,reps:12,sets:1},{pct:0.48,reps:10,sets:2},{pct:0.55,reps:8,sets:2}] },
+ { name: 'Махи гантелями в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.25,reps:15,sets:4}] },
+ { name: 'Махи в наклоне на заднюю дельту', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.22,reps:15,sets:4}] },
  ] },
  { exercises: [
  { name: 'Подъем гантелей в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Тяжелая', sets: [{pct:0.4,reps:12,sets:3}] },
