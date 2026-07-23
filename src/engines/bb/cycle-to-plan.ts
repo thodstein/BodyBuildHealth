@@ -14,7 +14,7 @@ import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
 import { adaptForPEDs, type PED, type CourseIntensity } from './bb-ped-adaptation.engine';
 import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-plan-builder';
 import { applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
-import { tidySessionExercises, SESSION_TIDY_RATIONALE } from './bb-session-order.engine';
+import { tidySessionExercises, SESSION_TIDY_RATIONALE, isIsolationByName } from './bb-session-order.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { trueMuscleOf } from '../movement-pattern';
 import type { FullProgram, ProgramWeek, ProgramDay } from '../../engines/complete-program-library.engine';
@@ -651,8 +651,10 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
           }
         }
         const exRir = computeRirForEx(w, totalWeeks, rirProg, phases);
-        const isPrimary = isPrimaryByLoad(exSpec.load);
-        const character = exSpec.load === 'Тяжелая' ? 'тяж' : 'памп';
+        let isPrimary = isPrimaryByLoad(exSpec.load);
+        if (isPrimary && isIsolationByName(finalExName)) { isPrimary = false; }
+        let character: 'тяж' | 'памп' = exSpec.load === 'Тяжелая' ? 'тяж' : 'памп';
+        if (!isPrimary && character === 'тяж') { character = 'памп'; }
         const workMaxVal = calcWorkMaxForEx(finalExName, workMax);
         const muscle = muscleGroupFromExName(finalExName, EXERCISE_CATALOG);
         // Пропускаем упражнения на исключённые мышцы (травмы)
@@ -1195,7 +1197,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
         // Primary/accessory role by load label OR first muscle in day
         const isMainLoad = /тяж|heavy/i.test((ex as any).notes || '') || (ex.rpe || 0) >= 8;
         let role: 'primary' | 'accessory' = 'accessory';
-        if (!seenMusclesPrimary.has(muscle) && (isMainLoad || (eIdx === 0))) {
+        if (!seenMusclesPrimary.has(muscle) && (isMainLoad || (eIdx === 0)) && !isIsolationByName(finalExName)) {
           role = 'primary';
           seenMusclesPrimary.add(muscle);
         }
@@ -1259,7 +1261,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           name: finalExName,
           muscle,
           role,
-          character: (ex.rpe || 7) >= 8 ? 'тяж' : 'памп',
+          character: (role === 'primary' && (ex.rpe || 7) >= 8) ? 'тяж' : 'памп',
           sets: usedSets.length,
           repsRange: [Math.min(repMin, reps), Math.max(repMax, reps)],
           rir: adjRir,

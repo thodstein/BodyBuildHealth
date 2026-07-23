@@ -34,9 +34,16 @@ function musclePriority(muscle: string): number {
 /* ───────────────────────── Классификаторы по имени ───────────────────────── */
 
 /** Базовое (compound) упражнение по имени или роли. */
+const ISOLATION_RE = /мах|raise|fly|развод|сгибан|разгибан|curl|extension|kickback|crunch|пресс|скручив|француз|шраг|кроссовер|из-за головы|в стороны|перед собой|на носки|подъём гантелей|подъем гантелей|бицепс|трицепс|молотк|сведен/i;
+/** True for isolation movements by name (french press, curl, lateral/front raise, shrug, pushdown,
+ *  fly, calf raise, crunch, etc.) — used to keep heavy/primary isolations out of the compound tier. */
+export function isIsolationByName(name: string): boolean {
+  return ISOLATION_RE.test((name || '').toLowerCase());
+}
+
 export function isCompoundEx(ex: BBExercise): boolean {
   const n = (ex.name || '').toLowerCase();
-  if (/мах|raise|fly|развод|сгибан|разгибан|curl|extension|kickback|crunch|пресс|скручив|француз|шраг|кроссовер|из-за головы|в стороны|перед собой|на носки|подъём гантелей|подъем гантелей|бицепс|трицепс|молотк|сведен/i.test(n)) return false; // isolation never treated as compound, even if role=primary
+  if (ISOLATION_RE.test(n)) return false; // isolation never treated as compound, even if role=primary
   if (ex.role === 'primary') return true;
   return (
     /жим|присед|становая|тяга|выпад|пулловер|pull-?up|подтяг|отжимание|dip|bench|press|squat|deadlift|row|lunge|hip.?thrust|rdl|good.?morning/i.test(n)
