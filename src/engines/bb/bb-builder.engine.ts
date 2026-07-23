@@ -711,7 +711,13 @@ function buildSession(
         if (n.includes('жим')&&!n.includes('ногами')||n.includes('press')||n.includes('разгиб')||n.includes('extension')) return false;
       }
       if (tag === 'legs' || tag === 'lower') {
-        if (n.includes('жим')&&!n.includes('ногами')||n.includes('тяга')||n.includes('подтяг')||n.includes('бицепс')||n.includes('трицепс')) return false;
+        // Раньше: `n.includes('тяга')` блокировало ВСЕ тяги для ножного дня (включая RDL).
+        // Теперь релей-блокировка 'тяга' для всего что НЕ относится к ББ-поза-цепи (RDL/мёртвая
+        // на прямых ногах/гудморнинг/гиперэкстензия/обратная гипер). Эти лифты разрешены в
+        // хамстринг/поясничных днях — иначе хамстринги остаются только с leg_curl (изоляция).
+        // Паттерн `Тяга штанги в наклоне` (row) → всё ещё блокируется (BB-posterior не совпадает).
+        const isBbPosteriorChain = /румын|мёртв|stiff.?leg|мёртв.*в смите|мёртв.*на прям|мёртв.*на одной|гудморнинг|good.?morning|rdl|гиперэкстенз|обратн.*гипер|reverse.?hyper/.test(n);
+        if ((n.includes('жим') && !n.includes('ногами')) || (!isBbPosteriorChain && n.includes('тяга')) || n.includes('подтяг') || n.includes('бицепс') || n.includes('трицепс')) return false;
       }
       return true;
     });
