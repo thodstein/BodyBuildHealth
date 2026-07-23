@@ -981,6 +981,18 @@ function buildSession(
         if (diverse.length >= Math.min(2, exerciseCount)) {
           exDatas = diverse.slice(0, exerciseCount);
         }
+        // Lead-muscle compound does not rotate: the day's main lift (RDL / close-grip bench /
+        // OHP / squat) opens the session even if it was used in a prior session this week —
+        // main lifts repeat; variety is for accessories. Stops an isolation (leg curl / french
+        // press) leading an alternate hamstrings / arms day after rotation exhausts the compound.
+        if (muscle === leadMuscle && exDatas.length > 0 && (exDatas[0] as any).type !== 'compound') {
+          const ciComp = exDatas.findIndex((d: any) => (d as any).type === 'compound');
+          if (ciComp > 0) { const [c] = exDatas.splice(ciComp, 1); exDatas.unshift(c); }
+          else {
+            const comp = pool.find((d: any) => (d as any).type === 'compound' && !usedIds.has((d as any).id) && !sessionSelectedIds.includes((d as any).id));
+            if (comp) { exDatas[0] = comp; usedIds.add(comp.id); sessionSelectedIds.push(comp.id); sessionSelectedNames.push(comp.name); }
+          }
+        }
       }
     }
 
