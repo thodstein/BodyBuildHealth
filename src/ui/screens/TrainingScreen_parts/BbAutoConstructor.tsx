@@ -1569,6 +1569,8 @@ export const BbAutoConstructor: React.FC = () => {
                     const comment = e.comment || exerciseComment(e, weakPoints, bbFocus, currentPhase);
                     const roleColor = e.role === 'primary' ? '#00e68a' : '#a855f7';
                     const isCompound = isCompoundEx(e);
+                    const _cat = EXERCISE_CATALOG.find(c => c.name === (e.exerciseName || e.name));
+                    const technique = _cat?.technique || ((_cat as any)?.targetMuscle ? 'Акцент: ' + (_cat as any).targetMuscle : '');
                     const charColor = e.character === 'тяж' ? '#ef4444' : '#60a5fa';
                     
                     return (
@@ -1643,6 +1645,12 @@ export const BbAutoConstructor: React.FC = () => {
                         <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.5)', lineHeight:1.4, padding:'4px 8px', borderRadius:8, background:'rgba(255,255,255,0.02)' }}>
                           {comment}
                         </div>
+                        {technique && (
+                          <details style={{ marginTop:4 }}>
+                            <summary style={{ fontSize:11, fontWeight:600, color:'rgba(0,230,138,0.75)', cursor:'pointer' }}>💡 Техника выполнения</summary>
+                            <div style={{ fontSize:10, color:'rgba(255,255,255,0.62)', padding:'4px 8px', lineHeight:1.45, marginTop:2, borderRadius:8, background:'rgba(0,230,138,0.05)' }}>{technique}</div>
+                          </details>
+                        )}
 
                         {/* Разминка */}
                         {(e.warmupSets && e.warmupSets.length > 0 ? e.warmupSets : (e.role === 'primary' && e.character === 'тяж' ? buildWarmup(edit.weight, true) : [])).length > 0 && (
