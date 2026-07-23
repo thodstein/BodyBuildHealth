@@ -34,6 +34,16 @@ import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { BbContextPanel, PLContextPanel } from './program-editor-context-panels';
 import { SET_TEMPLATES } from './program-types';
+import {
+  autodraftBBPlan,
+  buildUserProgramFromBB,
+  computePlanQualityFor,
+  muscleAwareSets,
+  makeSetsFromTemplate,
+  plLmsScheduleDays,
+  suggestExercisesForGroup,
+} from '../../../engines/manual-constructor.engine';
+import { loadTrainingProfile } from './training-profile';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle } from './training-ui';
 import { GROUP_RU } from './program-types';
@@ -480,46 +490,56 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
     setIsDirty(false);
   };
 
-  // P5: «⚡ Заполнить автоматически» — на основе meta (дни / уровень / цель)
-  // создаёт минимальный blackboard с пустыми слотами для редактирования.
-  // НЕ дублирует bb-builder — это просто предзаполнение шаблона, чтобы
-  // пользователь сразу видел структуру и заполнял её упражнениями.
+  // P5: «⚡ Заполнить автоматически» — реальная интеллектуальная сборка через
+  // buildBBPlan (BB) + LMS-cycles (PL). Пользователь получает рабочую программу
+  // с реальными упражнениями и весами, а не пустую заготовку.
   const autoFillDraft = () => {
     const days = Math.max(2, Math.min(7, program.meta.daysPerWeek || 4));
     const title = '[Черновик] ' + (program.meta.title || 'Моя программа');
     updateMeta({ title });
-    if (dir === 'bb' && program.bb) {
-      const weeks: UserWeek[] = Array.from({ length: Math.max(1, program.meta.weeks || 4) }, (_, wi) => ({
-        week: wi + 1,
-        phase: 'accumulation' as const,
-        deload: false,
-        sessions: Array.from({ length: days }, (_, si) => ({
-          id: newId('ses'),
-          name: 'День ' + (si + 1),
-          focus: '',
-          blocks: [
-            {
-              id: newId('blk'),
-              type: 'compound' as const,
-              exerciseName: '',
-              muscle: '',
-              role: 'primary' as const,
-              sets: [{ reps: 8, rir: 2, weight: 0, restSec: 120 }],
-            },
-            {
-              id: newId('blk'),
-              type: 'accessory' as const,
-              exerciseName: '',
-              muscle: '',
-              role: 'accessory' as const,
-              sets: [{ reps: 12, rir: 2, weight: 0, restSec: 90 }],
-            },
-          ],
-        })),
-      }));
-      update({ bb: { ...program.bb, weeks } });
+    if ((dir === 'bb' || dir === 'hybrid') && program.bb) {
+      try {
+        // Полная BB-cycle-сборка (тот же движок что в BbAutoConstructor);
+        // конвертация через createFromBuild даёт weeks→sessions→blocks→sets
+        // с реальными именами, весами, RIR, темпом.
+        const bbPlan = autodraftBBPlan({
+          level: program.meta.level,
+          goal: program.meta.goal,
+          daysPerWeek: days,
+          weeks: Math.max(1, program.meta.weeks || 4),
+          equipment: program.bb.constraints?.equipment ?? [],
+          weakPoints: (program.bb.constraints?.injuries ?? []).map((inj) => inj.muscle),
+        });
+        const userProg = createFromBuild(bbPlan, {
+          title: program.meta.title || `${days}д/нед · ${program.meta.weeks}нед`,
+          goal: program.meta.goal,
+          level: program.meta.level,
+          weakPoints: (program.bb.constraints?.injuries ?? []).map((inj) => inj.muscle),
+          equipment: program.bb.constraints?.equipment ?? [],
+        });
+        userProg.meta.title = title;
+        userProg.meta.weeks = program.meta.weeks;
+        userProg.meta.daysPerWeek = days;
+        update({ bb: userProg.bb });
+      } catch (err) {
+        // безопасный fallback: только block-skeleton (если buildBBPlan упал)
+        const weeks: UserWeek[] = Array.from({ length: Math.max(1, program.meta.weeks || 4) }, (_, wi) => ({
+          week: wi + 1, phase: 'accumulation' as const, deload: false,
+          sessions: Array.from({ length: days }, (_, si) => ({
+            id: newId('ses'), name: 'День ' + (si + 1), focus: '',
+            blocks: [
+              { id: newId('blk'), type: 'compound' as const, exerciseName: '', muscle: '', role: 'primary' as const,
+                sets: [{ reps: 8, rir: 2, weight: 0, restSec: 120 }] },
+              { id: newId('blk'), type: 'accessory' as const, exerciseName: '',
+                muscle: '', role: 'accessory' as const,
+                sets: [{ reps: 12, rir: 2, weight: 0, restSec: 90 }] },
+            ],
+          })),
+        }));
+        update({ bb: { ...program.bb, weeks } });
+      }
     } else if (dir === 'pl' && program.pl) {
-      // Для ПЛ автозаполнение минимально: добавляем расписание цикла по дням.
+      // Минимальное автозаполнение для ПЛ: расписание цикла по дням
       const sessCount = Math.max(2, Math.min(6, days));
       update({
         pl: {
@@ -531,8 +551,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
     showToast('⚡ Черновик создан — заполните упражнения и ПМ');
   };
 
-  // P6.1: «🚚 К выполнению» — конвертирует текущую program → PlayerDay[] и
-  // пишет в he_pl_runtime, переключает на зону training/tab=runtime.
+  // «🚚 К выполнению» — поддерживает BB и PL.
   const sendToExecution = () => {
     if (dir !== 'bb' || !program.bb) {
       alert('К выполнению можно отправить только ББ-программу.');
@@ -585,6 +604,31 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       {/* P4 — контекстные панели (НЕ калькуляторы): отображают статус текущей программы */}
       {dir === 'bb' && program.bb && <BbContextPanel program={program} level={program.meta.level} />}
       {dir === 'pl' && program.pl && <PLContextPanel program={program} />}
+
+      {/* P2 — LIVE Quality Panel: оценка 0-100 и конкретные правки. */}
+      {dir === 'bb' && program.bb && (() => {
+        const q = computePlanQualityFor(program, program.meta.level);
+        const bar = q.score >= 75 ? '#22c55e' : q.score >= 50 ? '#f59e0b' : '#ef4444';
+        return (
+          <div style={{ ...CARD, padding: 10, borderLeft: '2px solid ' + bar }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>🏆 Качество (live)</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: bar, marginLeft: 'auto' }}>{q.score}/100 {q.grade}</span>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 6, height: 6, overflow: 'hidden', marginBottom: 6 }}>
+              <div style={{ width: q.score + '%', height: '100%', background: bar, transition: 'width 0.3s' }} />
+            </div>
+            {q.issues.length > 0 && (
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                {q.issues.slice(0, 5).map((iss, i) => <div key={i} style={{ marginBottom: 2 }}>{iss}</div>)}
+              </div>
+            )}
+            <div style={{ fontSize: 9, color: DIM, marginTop: 4, fontStyle: 'italic' }}>
+              Оценка в реальном времени: weeklySets vs MRV. Зелёный ≥75, жёлтый ≥50, красный &lt;50.
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Meta */}
       <div style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -994,7 +1038,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => v
           </select>
 <ExercisePicker value={b.exerciseName} muscle={b.muscle} onSelect={ex => updateBlock(bi, { exerciseName: ex.name, muscle: ex.group || b.muscle, type: (ex.type === 'compound' ? 'compound' : ex.type === 'isolation' ? 'isolation' : 'accessory') as UserBlock['type'], role: ex.type === 'compound' ? 'primary' : 'accessory' })} />
           <input style={{ ...IN, padding: '4px 6px', fontSize: 11, flex: '0 0 90px' }} value={b.muscle} onChange={e => updateBlock(bi, { muscle: e.target.value })} placeholder="Мышечная группа" list="muscle-list" />
-          <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} />
+          <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} muscle={b.muscle} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <button style={{ ...BTN_GHOST, padding: '0 4px', fontSize: 9, minHeight: 0, lineHeight: 1 }} onClick={() => moveBlock(bi, -1)} title="Вверх">▲</button>
             <button style={{ ...BTN_GHOST, padding: '0 4px', fontSize: 9, minHeight: 0, lineHeight: 1 }} onClick={() => moveBlock(bi, 1)} title="Вниз">▼</button>
@@ -1014,7 +1058,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => v
   );
 };
 
-const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void }> = ({ sets, onChange }) => {
+const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; muscle?: string }> = ({ sets, onChange, muscle }) => {
   const add = () => onChange([...sets, { reps: 10, rir: 2, weight: 0, restSec: 90 }]);
   const upd = (i: number, patch: Partial<UserSet>) => onChange(sets.map((s, j) => j === i ? { ...s, ...patch } : s));
   const del = (i: number) => onChange(sets.filter((_, j) => j !== i));
@@ -1060,13 +1104,13 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void }>
         </div>
       ))}
       <button style={{ ...BTN_GHOST, padding: '2px 6px', fontSize: 10, minHeight: 0 }} onClick={add}>+ сет</button>
-      {/* Phase 6: быстрые шаблоны сетов — клик заменяет все сеты на pattern из SET_TEMPLATES */}
+      {/* Phase 6: быстрые шаблоны сетов — клик заменяет все сеты на pattern */}
       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 4, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         <span style={{ fontSize: 8, color: DIM, marginRight: 4 }}>📋 Шаблоны:</span>
-        {Object.entries(SET_TEMPLATES).slice(0, 6).map(([key, tmpl]) => (
+        {Object.entries(SET_TEMPLATES).slice(0, 5).map(([key, tmpl]) => (
           <button
             key={key}
-            title={`Применить: ${key} (${tmpl.sets}×${tmpl.reps} RIR${tmpl.rir}, ${Math.floor(tmpl.rest / 60)}м)`}
+            title={'Применить: ' + key + ' (' + tmpl.sets + '×' + tmpl.reps + ' RIR' + tmpl.rir + ', ' + Math.floor(tmpl.rest / 60) + 'м)'}
             style={{ padding: '2px 6px', borderRadius: 6, fontSize: 9, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700 }}
             onClick={() => onChange(Array.from({ length: tmpl.sets }, () => ({ reps: tmpl.reps, rir: tmpl.rir, restSec: tmpl.rest, weight: sets[0]?.weight ?? 0 })))}
           >
