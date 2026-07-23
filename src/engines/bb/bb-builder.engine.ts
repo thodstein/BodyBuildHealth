@@ -905,12 +905,15 @@ function buildSession(
         for (let ci = 0; ci < classes.length; ci++) {
           const ac = classes[ci];
           if (diverse.length >= exerciseCount) break;
-          let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id)
-            && !sessionSelectedIds.includes(e.id) && !sessionSelectedNames.includes(e.name));
+          let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id));
           // Сортировать по strengthRank (тяж compounds первыми) + weakExerciseBonus (слабые группы приоритет)
           candidates = candidates.sort((a, b) => {
             const rankDiff = strengthRank(a) - strengthRank(b);
             if (rankDiff !== 0) return rankDiff;
+            // tie-break by coaching tier: canonical (barbell bench) before acceptable (reverse-grip bench)
+            // so a niche/advanced lift doesn't lead a day over the canonical compound at the same load.
+            const tierDiff = bbExerciseTier(a) - bbExerciseTier(b);
+            if (tierDiff !== 0) return tierDiff;
             const weakDiff = weakExerciseBonus(b.name || '', weakPoints) - weakExerciseBonus(a.name || '', weakPoints);
             return weakDiff;
           });
@@ -933,6 +936,8 @@ function buildSession(
           candidates = candidates.sort((a, b) => {
             const rankDiff = strengthRank(a) - strengthRank(b);
             if (rankDiff !== 0) return rankDiff;
+            const tierDiff = bbExerciseTier(a) - bbExerciseTier(b);
+            if (tierDiff !== 0) return tierDiff;
             return weakExerciseBonus(b.name || '', weakPoints) - weakExerciseBonus(a.name || '', weakPoints);
           });
           if (candidates.length > 0) {
