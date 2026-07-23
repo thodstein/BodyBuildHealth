@@ -35,8 +35,9 @@ function musclePriority(muscle: string): number {
 
 /** Базовое (compound) упражнение по имени или роли. */
 export function isCompoundEx(ex: BBExercise): boolean {
-  if (ex.role === 'primary') return true;
   const n = (ex.name || '').toLowerCase();
+  if (/мах|raise|fly|развод|сгибан|разгибан|curl|extension|kickback|crunch|пресс|скручив|француз|шраг|кроссовер|из-за головы|в стороны|перед собой|на носки|подъём гантелей|подъем гантелей|бицепс|трицепс|молотк|сведен/i.test(n)) return false; // isolation never treated as compound, even if role=primary
+  if (ex.role === 'primary') return true;
   return (
     /жим|присед|становая|тяга|выпад|пулловер|pull-?up|подтяг|отжимание|dip|bench|press|squat|deadlift|row|lunge|hip.?thrust|rdl|good.?morning/i.test(n)
   ) && !/мах|raise|fly|развод|сгибан|разгибан|curl|extension|kickback|crunch|пресс|скручив/i.test(n);
@@ -128,10 +129,10 @@ function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string
   const isPrimaryMuscle = exMuscle === collapseMuscle(primaryMuscle);
   const tagArray = Array.from(tagMuscleSet).map(m => collapseMuscle(m));
   const tagPriority = tagArray.indexOf(exMuscle);
-  const isPrimaryHeavy = ex.role === 'primary' && ex.character === 'тяж';
   const compound = isCompoundEx(ex);
+  const isPrimaryHeavy = ex.role === 'primary' && ex.character === 'тяж' && compound;
   const plSpec = isPLSpec(ex.name || '');
-  const isFinisher = ex.role === 'accessory' && (ex.character === 'памп' || (ex.workSets?.[0]?.reps ?? 0) >= 12);
+  const isFinisher = ex.role === 'accessory' && !compound && (ex.character === 'памп' || (ex.workSets?.[0]?.reps ?? 0) >= 12);
 
   const isPrimaryIsolation = isPrimaryMuscle && !compound && !isFinisher;
   let tier: number;
@@ -174,4 +175,48 @@ function pressPositionRank(name: string, primaryMuscle: string): number {
     if (isHorizontal) return 10;
   }
   return isHorizontal ? 0 : (isVertical ? 5 : 2);
+}
+
+// === BB-cycle tidy pass (used by programToBBPlan / convertCycleToBBPlan) ===
+// Library/cycle plans previously kept a crude order (role-only sort or none), which produced
+// illogical sequences (triceps before chest, 4 shrugs in one day). This gives them the same
+// coaching-grade sequencing as generic_split buildBBPlan: compound -> isolation, day's
+// primary muscle first, horizontal press before vertical, isolation from lengthened position.
+export const SESSION_TIDY_RATIONALE = "Exercise order rebuilt (compound -> isolation, day primary muscle first, redundant per-muscle exercises capped).";
+
+const MUSCLE_EX_CAP: Record<string, number> = {
+  traps: 2, calves: 2, forearms: 2, abs: 3, core: 3,
+  biceps: 3, triceps: 3, arms: 3,
+  delt_rear: 2, delt_front: 2, delt_mid: 2,
+  shoulders: 4, chest: 4, back: 4, quads: 4, hamstrings: 4, glutes: 4, legs: 4,
+};
+
+// Keep at most N exercises per muscle in a session (anti-spam: 4 shrugs -> 2).
+// Ranks by primary role then heavier load; preserves original input order in output.
+export function capExercisesPerMuscle(exercises: BBExercise[]): BBExercise[] {
+  const ranked = exercises.map((ex, i) => ({ ex, i }));
+  ranked.sort((a, b) => {
+    const ra = (a.ex.role === "primary" ? 0 : 1) - (b.ex.role === "primary" ? 0 : 1);
+    if (ra !== 0) return ra;
+    const wa = a.ex.workSets?.[0]?.weight ?? 0;
+    const wb = b.ex.workSets?.[0]?.weight ?? 0;
+    if (wb !== wa) return wb - wa;
+    return a.i - b.i;
+  });
+  const counts: Record<string, number> = {};
+  const keep = new Set<BBExercise>();
+  for (const { ex } of ranked) {
+    const m = ex.muscle || "";
+    const cap = MUSCLE_EX_CAP[m] ?? 4;
+    if ((counts[m] || 0) >= cap) continue;
+    counts[m] = (counts[m] || 0) + 1;
+    keep.add(ex);
+  }
+  return exercises.filter((e) => keep.has(e));
+}
+
+// Cap redundancy then apply coaching-grade ordering for a session.
+export function tidySessionExercises(exercises: BBExercise[], primaryMuscle?: string): BBExercise[] {
+  const capped = capExercisesPerMuscle(exercises);
+  return orderSessionExercises(capped, { primaryMuscle, methodology: "compound_first" });
 }

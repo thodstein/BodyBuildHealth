@@ -14,6 +14,7 @@ import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
 import { adaptForPEDs, type PED, type CourseIntensity } from './bb-ped-adaptation.engine';
 import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-plan-builder';
 import { applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
+import { tidySessionExercises, SESSION_TIDY_RATIONALE } from './bb-session-order.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { trueMuscleOf } from '../movement-pattern';
 import type { FullProgram, ProgramWeek, ProgramDay } from '../../engines/complete-program-library.engine';
@@ -289,6 +290,13 @@ export interface CycleToPlanInput {
 }
 
 function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG): string {
+  const _l = (exName || '').toLowerCase();
+  // Name-based overrides for cycle/SRC2 naming not matched exactly by the catalog.
+  if (_l.includes("\u0448\u0440\u0430\u0433")) return 'traps';            // shrugs -> traps (catalog lists them as 'back')
+  if (_l.includes("\u0444\u0440\u0430\u043d\u0446\u0443\u0437") || _l.includes("\u0443\u0437\u043a\u0438\u043c \u0445\u0432\u0430\u0442\u043e\u043c")) return 'triceps';  // french press / close-grip bench
+  if (_l.includes("\u0440\u0430\u0437\u0433\u0438\u0431") && _l.includes("\u0433\u043e\u043b\u043e\u0432\u044b")) return 'triceps';  // overhead triceps extension
+  if (_l.includes("\u0440\u0430\u0437\u0433\u0438\u0431") && _l.includes("\u0431\u043b\u043e\u043a") && !_l.includes("\u043d\u043e\u0433")) return 'triceps';  // triceps pushdown (not leg extension)
+  if (_l.includes("\u043d\u0430 \u043f\u0440\u044f\u043c\u044b\u0445 \u043d\u043e\u0433\u0430\u0445")) return 'hamstrings'; // straight-leg / RDL deadlift
   const found = catalog.find(e => e.name === exName);
   if (found?.group) {
     const mg = found.group.toLowerCase();
@@ -594,9 +602,12 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     const sessions: BBSession[] = currentWeekDays.map((daySpec: any, dayIdx: number) => {
       const seenNames = new Set<string>(); // дедупликация по имени внутри дня
       const exercises: BBExercise[] = (daySpec.exercises || []).map((exSpec: any) => {
-        // BB-ФИЛЬТР: заменить ПЛ/олимпийские упражнения на ББ-альтернативы
         const exGroup = exSpec.group || muscleGroupFromExName(exSpec.name, EXERCISE_CATALOG);
-        const bbReplaced = replacePLForBB(exSpec.name, exGroup);
+        // В faithful-режиме не трогаем упражнения программы (пропускаем PL→BB фильтр),
+        // остаются только safety-фильтры (травмы/исключения/оборудование).
+        const bbReplaced = mode === 'faithful'
+          ? { name: exSpec.name, group: exGroup }
+          : replacePLForBB(exSpec.name, exGroup);
         if (bbReplaced === null) {
           // Пропустить упражнение (ПЛ/мусор без ББ-аналога)
           return null as any;
@@ -723,11 +734,10 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         if (eq.includes('bodyweight') || eq.includes('suspension')) return 5;
         return 5;
       };
-      exercises.sort((a, b) => {
-        const roleDiff = (a.role === 'primary' ? -1 : 1) - (b.role === 'primary' ? -1 : 1);
-        if (roleDiff !== 0) return roleDiff;
-        return cycleStrengthRank(a) - cycleStrengthRank(b);
-      });
+      {
+        const _tidy = tidySessionExercises(exercises, exercises.find(e => e.role === 'primary')?.muscle);
+        exercises.length = 0; exercises.push(..._tidy);
+      }
 
       // Determine session character from exercises
       const hasHeavy = exercises.some(e => e.character === 'тяж');
@@ -804,6 +814,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     schedule: week1Days.map((_, i) => ({ kind: 'тренировка' as const, character: null, sessionTag: ['Upper', 'Lower', 'Push', 'Pull', 'Legs', 'FullBody', 'Arms', 'Shoulders', 'ChestBack', 'ShouldersArms'][i % 10] })),
   };
 
+  rationale.push(SESSION_TIDY_RATIONALE);
   let finalPlan: BBPlan = { pattern, weeks, rotationMuscleVolume, rationale };
 
   // Применяем пост-обработку (техники/авто-делод/загрузка/авторег) — как в buildBBPlan.
@@ -1328,8 +1339,9 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
 
       // Sort: primary first, then compound → isolation → pump finisher; faithful: respect original order
       // Adapt: keep original order + finisher в конце (уже так pushились), но primary в начало
-      if (mode === 'adapt') {
-        exercises.sort((a, b) => (a.role === 'primary' ? -1 : 1) - (b.role === 'primary' ? -1 : 1));
+      {
+        const _tidy = tidySessionExercises(exercises, exercises.find(e => e.role === 'primary')?.muscle);
+        exercises.length = 0; exercises.push(..._tidy);
       }
 
       // L12: добавить суперсет-пары в конец дня (как отдельные упражнения)
@@ -1420,6 +1432,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     })),
   };
 
+  rationale.push(SESSION_TIDY_RATIONALE);
   let finalPlan: BBPlan = { pattern, weeks, rotationMuscleVolume, rationale };
 
   // Apply post-processing for adapt mode (интенс-техники/авто-делод/загрузка/авторег)
