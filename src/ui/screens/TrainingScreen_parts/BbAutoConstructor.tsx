@@ -37,6 +37,7 @@ import { InjurySelectCard } from './InjurySelectCard';
 import type { InjurySelectEntry } from './InjurySelectCard';
 import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, type LoadStrategy, type DeloadType, INTENSITY_TECHNIQUES, DEFAULT_TECHNIQUE_BY_PHASE, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import type { SessionMethodology } from '../../../engines/bb/bb-session-order.engine';
+import { isCompoundEx } from '../../../engines/bb/bb-session-order.engine';
 import { PCT_FOR_RIR } from '../../../engines/rir-table';
 import { getCyclesByDirection, getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 import { convertCycleToBBPlan, programToCycleTemplate, cycleTemplateToFullProgram, programToBBPlan } from '../../../engines/bb/cycle-to-plan';
@@ -1567,6 +1568,7 @@ export const BbAutoConstructor: React.FC = () => {
                     const isEditing = editMode?.dayIdx === si && editMode?.exIdx === ei;
                     const comment = e.comment || exerciseComment(e, weakPoints, bbFocus, currentPhase);
                     const roleColor = e.role === 'primary' ? '#00e68a' : '#a855f7';
+                    const isCompound = isCompoundEx(e);
                     const charColor = e.character === 'тяж' ? '#ef4444' : '#60a5fa';
                     
                     return (
@@ -1578,10 +1580,12 @@ export const BbAutoConstructor: React.FC = () => {
                         {/* Имя упражнения + кнопки */}
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
                           <div style={{ flex:1 }}>
-                            <div style={{ fontSize:14, fontWeight:800, color:'#fff', lineHeight:1.25, marginBottom:5, letterSpacing:'-0.2px' }}>
-                              {e.name}
+                            <div style={{ display:'flex', alignItems:'baseline', gap:8, marginBottom:5 }}>
+                              <span style={{ minWidth:22, height:22, borderRadius:'50%', background:'rgba(0,230,138,0.15)', color:'#00e68a', fontSize:12, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{ei+1}</span>
+                              <span style={{ fontSize:14, fontWeight:800, color:'#fff', lineHeight:1.25, letterSpacing:'-0.2px' }}>{e.name}</span>
                             </div>
                             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                              <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background: (isCompound?'#00e68a':'#f59e0b')+'20', color: isCompound?'#00e68a':'#f59e0b', border: '0.5px solid '+(isCompound?'#00e68a':'#f59e0b')+'30' }}>{isCompound?'База':'Изо'}</span>
                               <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background: roleColor + '20', color: roleColor, border: '0.5px solid ' + roleColor + '30' }}>
                                 {e.role === 'primary' ? '🎯 Основное' : '📌 Добивка'}
                               </span>
