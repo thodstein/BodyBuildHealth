@@ -370,7 +370,7 @@ function buildCatalogFallback(
     // broad-spectrum: даём бонус ТОЛЬКО если есть фильтр-совпадение
     // (чтобы generic omega3/CoQ10 не прыгали вверх в organ-фильтрованном стеке)
     // strict-mode: мин. 2 фильтровых совпадения, иначе broad-spectrum не получает бонус
-    if (hasFilterMatch && tzMechs.length > 4) {
+    if (hasFilterMatch && tzMechs.length > 2) {
       const organHits = filterOrgans?.filter(o => tzOrgans.includes(o)).length || 0;
       const mechHits = filterMechanisms?.filter(m => tzMechs.includes(m)).length || 0;
       const markerHit = (filterMarkers?.length && hasFilterMatch) ? 1 : 0;
@@ -500,9 +500,9 @@ export function buildClinicalStack(
   console.log('[BioStack] plan.substances:', plan.substances.map(s => s.id));
   console.log('[BioStack] plan.overallRiskBefore/After:', plan.overallRiskBefore, plan.overallRiskAfter);
 
-  const filterOrgans = useProfile && opts.filterOrgans?.length ? opts.filterOrgans : undefined;
-  const filterMechanisms = useProfile && opts.filterMechanisms?.length ? opts.filterMechanisms : undefined;
-  const filterMarkers = useProfile && opts.filterMarkers?.length ? opts.filterMarkers : undefined;
+  const filterOrgans = opts.filterOrgans?.length ? opts.filterOrgans : undefined;
+  const filterMechanisms = opts.filterMechanisms?.length ? opts.filterMechanisms : undefined;
+  const filterMarkers = opts.filterMarkers?.length ? opts.filterMarkers : undefined;
   const evidenceLevel = opts.evidenceLevel;
   const hasActiveFilters = (filterOrgans?.length || filterMechanisms?.length || filterMarkers?.length);
   const organFilterActive = !!(filterOrgans && filterOrgans.length);
@@ -622,7 +622,7 @@ export function buildClinicalStack(
 
     const filterMode = opts.filterMode || 'balanced';
     const synThreshold = filterMode === 'strict' ? 25 : 15;
-    const synCap = filterMode === 'strict' ? 6 : 10;
+    const synCap = filterMode === 'strict' ? 3 : 10;
     const strictFilter = filterMode === 'strict' && hasActiveFilters;
     const synCandidates: Array<{ id: string; synScore: number }> = [];
     for (const candId of allCatalogIds) {
@@ -687,9 +687,9 @@ export function buildClinicalStack(
     }
 
     synCandidates.sort((a, b) => b.synScore - a.synScore);
-    const toAdd = synCandidates.slice(0, maxStack - gate.ids.length);
+    const toAdd = synCandidates.slice(0, Math.min(synCap, maxStack - gate.ids.length));
     if (toAdd.length > 0) {
-      console.log('[BioStack] greedy synergy pass: adding', toAdd.length, 'substances (score ≥ 15)');
+      console.log('[BioStack] greedy synergy pass: adding', toAdd.length, 'substances (score ≥ ' + synThreshold + ', cap=' + synCap + ')');
       gate.ids.push(...toAdd.map(c => c.id));
     }
   }

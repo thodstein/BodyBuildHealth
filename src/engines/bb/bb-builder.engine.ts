@@ -791,14 +791,14 @@ function buildSession(
     const accessoryBase = isArm && onPED ? 3 : (isArm ? 2 : 1);
     const accessoryBoost = isSingleFreq ? 0 : (isArm ? 1 : 0);
     let exerciseCount = role === 'primary'
-      ? Math.min(isMultiDay ? (onPED ? 4 : 3) : (isSingleFreq ? 4 : (onPED ? 5 : 4)),
+      ? Math.min(isMultiDay ? (onPED ? 5 : 3) : (isSingleFreq ? 4 : (onPED ? 6 : 4)),
                  primaryBase + Math.max(0, levelBase - 2) + pedExerciseBoost)
-      : Math.min(isArm && onPED ? 3 : 2,
+      : Math.min(isArm && onPED ? 4 : 3,
                  accessoryBase + Math.floor(pedExerciseBoost / 2) + accessoryBoost);
     // A2: focusGroup — структурная специализация. Если мышца = focusGroup и primary
     // → упражнений +1 (compound + 2 multi-angle isolation для полноценного покрытия).
     if (focusGroup && muscle === focusGroup && role === 'primary') {
-      exerciseCount = Math.min(isMultiDay ? 3 : (isSingleFreq ? 3 : 4), exerciseCount + 1);
+      exerciseCount = Math.min(isMultiDay ? 4 : (isSingleFreq ? 4 : 5), exerciseCount + 1);
     }
     // selType: primary → compound; accessory → isolation (но на enhanced/курсе —
     // accessory может быть compound для большего механического натяжения).
@@ -1118,15 +1118,11 @@ function buildSession(
           const ac = classes[ci];
           if (diverse.length >= exerciseCount) break;
           let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id) && !rotationNamesSet.has(e.name));
-          // Сортировать по _score (BB-приоритет из generic-пула) + strengthRank + weakExerciseBonus
+          // _score BB-приоритет ВСЕГДА (hack +15 > barbell -10, incline +15 > flat -10)
           candidates = candidates.sort((a, b) => {
-            // Generic pool has _score with BB preference (hack +15, barbell -10 etc).
-            // Respect it first — hack squat wins over barbell squat.
-            if (isGeneric) {
-              const sa = (a as any)._score ?? 0;
-              const sb = (b as any)._score ?? 0;
-              if (sa !== sb) return sb - sa;
-            }
+            const sa = (a as any)._score ?? 0;
+            const sb = (b as any)._score ?? 0;
+            if (sa !== sb) return sb - sa;
             const rankDiff = strengthRank(a) - strengthRank(b);
             if (rankDiff !== 0) return rankDiff;
             // tie-break by coaching tier: canonical (barbell bench) before acceptable (reverse-grip bench)
@@ -1153,11 +1149,9 @@ function buildSession(
           if (diverse.length >= exerciseCount) break;
           let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id));
           candidates = candidates.sort((a, b) => {
-            if (isGeneric) {
-              const sa = (a as any)._score ?? 0;
-              const sb = (b as any)._score ?? 0;
-              if (sa !== sb) return sb - sa;
-            }
+            const sa = (a as any)._score ?? 0;
+            const sb = (b as any)._score ?? 0;
+            if (sa !== sb) return sb - sa;
             const rankDiff = strengthRank(a) - strengthRank(b);
             if (rankDiff !== 0) return rankDiff;
             const tierDiff = bbExerciseTier(a) - bbExerciseTier(b);
@@ -1372,8 +1366,8 @@ function buildSession(
   const _ordered = orderSessionExercises(exercises, { sessionTag: sched.sessionTag, methodology });
   exercises.length = 0; exercises.push(..._ordered);
 
-  // Кап упражнений в сессии: максимум 7 натурал, 10 на PED.
-  const exCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 10 : 7;
+  // Кап упражнений в сессии: 8 натурал, 12 на PED (без второго капа — feeders/финишеры сверху).
+  const exCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 12 : 8;
   if (exercises.length > exCap) {
     const kept = exercises.filter(e => e.role === 'primary').slice(0, 5);
     const acc = exercises.filter(e => e.role === 'accessory');
@@ -1869,19 +1863,6 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         addedFeeders.add(pName);
       }
       weekSessions.push(sess);
-    }
-    // Финальный кап упражнений в каждой сессии (с учётом feeder/pump-финишеров)
-    const finalExCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 10 : 7;
-    for (const sess of weekSessions) {
-      if (sess.exercises.length > finalExCap) {
-        const kept = sess.exercises.filter(e => e.role === 'primary').slice(0, 5);
-        const acc = sess.exercises.filter(e => e.role === 'accessory');
-        const maxAcc = Math.max(0, finalExCap - kept.length);
-        const armAcc = acc.filter(e => ['triceps', 'biceps', 'forearms'].includes(e.muscle));
-        const otherAcc = acc.filter(e => !['triceps', 'biceps', 'forearms'].includes(e.muscle));
-        sess.exercises.length = 0;
-        sess.exercises.push(...kept, ...armAcc.slice(0, Math.max(1, Math.floor(maxAcc / 2))), ...otherAcc.slice(0, maxAcc - Math.max(1, Math.floor(maxAcc / 2))));
-      }
     }
     // fix D: капаем недельный объём каждой мышцы по её истинному MRV
     normalizeWeekMrv(weekSessions, mrvByMuscle);

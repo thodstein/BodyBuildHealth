@@ -4,6 +4,7 @@
  * При выборе упражнения вызывает onSelect с каноническим упражнением.
  */
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import ExerciseLabMerged from './ExerciseLabMerged';
 import type { Exercise } from '../../../core/types';
 
@@ -32,7 +33,7 @@ export const ExerciseLabPicker: React.FC<{
         style={{ 
           flex: 1, 
           minWidth: 0,
-          padding: '4px 6px', 
+          padding: '6px 8px', 
           fontSize: 11, 
           textAlign: 'left', 
           cursor: 'pointer', 
@@ -40,13 +41,14 @@ export const ExerciseLabPicker: React.FC<{
           background: 'rgba(118,118,128,0.12)',
           border: '0.5px solid rgba(255,255,255,0.1)',
           borderRadius: 12,
+          minHeight: 38,
           transition: 'all 0.2s'
         }}
       >
         {value || '🧬 Выбрать из лаборатории…'}
       </button>
       
-      {open && (
+      {open && ReactDOM.createPortal(
         <div 
           style={{ 
             position: 'fixed', 
@@ -76,7 +78,8 @@ export const ExerciseLabPicker: React.FC<{
               onClose={handleClose}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

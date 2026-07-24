@@ -122,20 +122,24 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
 
 /**
  * Кортеж приоритета (лексикографический):
- *  [0] tier:            0 = основное тяжёлое (primary+тяж), 1 = compound, 2 = изоляция, 3 = финишь
- *  [1] primaryMuscleFlag: 0 = мышца дня (primaryMuscle), 1 = прочие
- *  [2] musclePriority:   большие мышцы раньше (chest/back/legs > shoulders > arms)
- *  [3] tagPriority:      позиция мышцы в TAG_MUSCLES[tag] — первая мышца тега = главная дня
- *  [4] subOrder:         для compound — pressPosition (гориз. жим раньше верт. в грудной день);
- *                        для изоляции — stretchRank (растянутая позиция первой);
- *                        для ПЛ-специфики — +50 (в конец своего тира)
- *  [5] load:             тяжелее / меньше RIR — раньше (тонкая подстройка)
+ *  [0] muscleGroup:     упражнения ОДНОЙ мышцы строго вместе (collapseMuscle → MUSCLE_ORDER)
+ *  [1] tier:            0 = основное тяжёлое, 1 = compound, 2 = изоляция, 3 = финишь
+ *  [2] primaryMuscleFlag: 0 = мышца дня, 1 = прочие
+ *  [3] subOrder:         для compound — pressPosition; для изоляции — stretchRank; ПЛ-специфика +50
+ *  [4] load:             тяжелее / меньше RIR — раньше
  */
+
+/** Порядок мышц в сессии: большие compound-мышцы → малые изолирующие → финишные.
+ *  Гарантирует: все упражнения одной мышцы идут ПОДРЯД, без вкраплений других мышц. */
+const MUSCLE_ORDER: Record<string, number> = {
+  quads: 0, back: 1, chest: 2, hamstrings: 3, glutes: 4,
+  legs: 4, shoulders: 5, delt_front: 5, delt_mid: 5, delt_rear: 5,
+  traps: 6, trapezius: 6, biceps: 7, triceps: 8, arms: 9,
+  calves: 10, forearms: 11, abs: 12, core: 12, lower_back: 12,
+};
 function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string>, methodology: SessionMethodology = 'compound_first'): number[] {
   const exMuscle = collapseMuscle(ex.muscle || '');
   const isPrimaryMuscle = exMuscle === collapseMuscle(primaryMuscle);
-  const tagArray = Array.from(tagMuscleSet).map(m => collapseMuscle(m));
-  const tagPriority = tagArray.indexOf(exMuscle);
   const compound = isCompoundEx(ex);
   const isPrimaryHeavy = ex.role === 'primary' && ex.character === 'тяж' && compound;
   const plSpec = isPLSpec(ex.name || '');
@@ -149,15 +153,18 @@ function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string
   else if (compound) tier = 1;
   else tier = 2;
 
+  // muscleGroup: все упражнения ОДНОЙ мышцы строго вместе
+  const muscleGroup = MUSCLE_ORDER[exMuscle] ?? 12;
   const primaryMuscleFlag = isPrimaryMuscle ? 0 : 1;
-  const muscP = musclePriority(exMuscle);
+
   let subOrder: number;
   if (tier === 2) subOrder = stretchRank(ex.name || '');
   else if (compound) subOrder = isPress(ex.name || '') ? pressPositionRank(ex.name || '', primaryMuscle) : 0;
   else subOrder = 0;
   if (plSpec) subOrder += 50;
+
   const load = loadRank(ex);
-  return [tier, primaryMuscleFlag, muscP, tagPriority >= 0 ? tagPriority : 99, subOrder, load];
+  return [muscleGroup, tier, primaryMuscleFlag, subOrder, load];
 }
 
 function collapseMuscle(m: string): string {

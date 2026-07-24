@@ -27,6 +27,7 @@ import { findSubstitutions } from '../../../engines/exercise-substitution.engine
 import { ExerciseLabPicker } from './ExerciseLabPicker';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
+import { diagnoseWeakPoint, WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 
 /* ─── ББ-редактор: недели → сессии → блоки ─── */
 
@@ -343,39 +344,42 @@ const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => v
           onTouchStart={onTouchStart(bi)}
           onTouchMove={onTouchMove}
           style={{
-            display: 'flex', gap: 4, alignItems: 'center', padding: '4px 0',
+            display: 'flex', flexDirection: 'column', gap: 4, padding: '6px 0',
             borderTop: overIdx === bi ? '2px solid #00e68a' : '2px solid transparent',
             transition: 'border-color 0.1s',
             background: touchArmedRef.current === bi ? 'rgba(0,230,138,0.06)' : 'transparent',
-            borderRadius: 6,
+            borderRadius: 8,
           }}
         >
+          {/* Ряд 1: drag + тип + упражнение + мышца + сеты */}
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
           <span
-            title="Перетащите для изменения порядка (или удерживайте на тач-устройстве)"
+            title="Перетащите для изменения порядка"
             style={{ cursor: 'grab', fontSize: 13, color: '#64748b', userSelect: 'none', padding: '4px 6px', touchAction: 'none', minWidth: 32, minHeight: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
             aria-label="drag handle"
           >☰</span>
-          <select style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: '0 0 86px', minHeight: 38 }} value={b.type} onChange={e => updateBlock(bi, { type: e.target.value as UserBlock['type'], role: e.target.value === 'compound' ? 'primary' : 'accessory' })}>
+          <select style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: '0 0 auto', minHeight: 38 }} value={b.type} onChange={e => updateBlock(bi, { type: e.target.value as UserBlock['type'], role: e.target.value === 'compound' ? 'primary' : 'accessory' })}>
             <option value="compound">Базовое</option>
             <option value="accessory">Доп.</option>
             <option value="isolation">Изоляция</option>
             <option value="finisher">Финишь</option>
           </select>
           <ExerciseLabPicker value={b.exerciseName} muscle={b.muscle} onSelect={ex => updateBlock(bi, { exerciseName: ex.name, muscle: ex.group || b.muscle, type: (ex.type === 'compound' ? 'compound' : ex.type === 'isolation' ? 'isolation' : 'accessory') as UserBlock['type'], role: ex.type === 'compound' ? 'primary' : 'accessory' })} />
-          <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: '0 0 90px', minHeight: 38 }} value={b.muscle} onChange={e => updateBlock(bi, { muscle: e.target.value })} placeholder="Мышечная группа" list="muscle-list" />
+          <input style={{ ...IN, padding: '6px 10px', fontSize: 11, width: 80, minHeight: 38 }} value={b.muscle} onChange={e => updateBlock(bi, { muscle: e.target.value })} placeholder="Мышца" list="muscle-list" />
           <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} muscle={b.muscle} workMax={(loadTrainingProfile().workMax ?? {}) as Record<string, number>} />
+          </div>
           
-          {/* Комментарий к упражнению */}
+          {/* Ряд 2: комментарий + кнопки управления */}
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
           <input 
-            style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: '1 1 100%', minWidth: 120, minHeight: 38 }} 
+            style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: '1 1 120px', minWidth: 90, minHeight: 38 }} 
             value={b.note || ''} 
             onChange={e => updateBlock(bi, { note: e.target.value })} 
-            placeholder="💬 Комментарий (роль, акцент, замена...)" 
+            placeholder="💬 Комментарий" 
           />
           {b.rationale && (
-            <span style={{ fontSize: 10, color: DIM, flex: '0 0 auto', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={b.rationale}>📝 {b.rationale}</span>
+            <span style={{ fontSize: 10, color: DIM, flex: '0 0 auto', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={b.rationale}>📝</span>
           )}
-          
           {/* Выбор второго упражнения для суперсета */}
           {b.supersetWith && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', background: 'rgba(167,139,250,0.08)', borderRadius: 6, border: '1px solid rgba(167,139,250,0.2)' }}>
@@ -426,6 +430,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => v
               ))}
             </div>
           )}
+        </div>
         </div>
       ))}
       <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38, alignSelf: 'flex-start' }} onClick={addBlock}>+ Упражнение</button>
@@ -736,6 +741,44 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
             </label>
           ))}
         </div>
+      </div>
+
+      {/* Слабые точки ПЛ — диагностика по движениям */}
+      <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #ef4444' }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#ef4444', marginBottom: 6 }}>🎯 Слабые точки ПЛ-движений</div>
+        {(['squat', 'bench', 'dead'] as const).map(lift => {
+          const liftLabel: Record<string, string> = { squat: 'Присед', bench: 'Жим', dead: 'Тяга' };
+          const weakPoints = (WEAK_POINTS_BY_LIFT as Record<string, WeakPoint[]>)[lift] ?? [];
+          return (
+            <div key={lift} style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: DIM_STRONG, marginBottom: 3 }}>{liftLabel[lift] ?? lift}:</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                {weakPoints.map((wp: WeakPoint) => {
+                  const diag = diagnoseWeakPoint(lift as Lift, wp);
+                  return (
+                    <button
+                      key={wp}
+                      onClick={() => {
+                        if (!weeks[0]?.days[0]) return;
+                        const d0 = weeks[0].days[0];
+                        const newExercises = diag.assistance.slice(0, 2).map(name => ({
+                          name, lift: 'accessory' as const, muscle: lift === 'bench' ? 'chest' : lift === 'squat' ? 'legs' : 'back',
+                          sets: [{ pct: diag.intensityPct, reps: 6, sets: 3, rir: 2 }],
+                        }));
+                        updateDay(0, 0, { exercises: [...d0.exercises, ...newExercises] });
+                      }}
+                      title={diag.description + '\n' + diag.rationale + '\nУпр: ' + diag.assistance.join(', ')}
+                      style={{ padding: '5px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)', color: '#ef4444', fontWeight: 700, minHeight: 38, textAlign: 'left', lineHeight: 1.3 }}
+                    >
+                      <div>{diag.label}</div>
+                      <div style={{ fontSize: 8, fontWeight: 400, opacity: 0.7 }}>{diag.assistance.slice(0, 2).join(' · ')}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Weeks */}

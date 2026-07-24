@@ -45,7 +45,6 @@ import {
 import { tempoFor } from '../../../engines/bb/bb-tempo-rest';
 import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
-import { applyToPlanner } from './planner-bridge';
 import { loadTrainingProfile, useTrainingProfile, type TrainingProfile } from './training-profile';
 import { TrainingProfileCard } from './TrainingProfileCard';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
@@ -405,6 +404,59 @@ export const ProgramManagerPanel: React.FC = () => {
         ))}
       </div>
 
+      {/* P2-5: панель сравнения двух программ */}
+      {compareIds.length === 2 && (() => {
+        const [a, b] = [programs.find(p => p.meta.id === compareIds[0]), programs.find(p => p.meta.id === compareIds[1])];
+        if (!a || !b) return null;
+        const stats = (p: UserProgram) => {
+          const s: Record<string, number> = {};
+          if (p.bb?.weeks) {
+            for (const w of p.bb.weeks) {
+              for (const ses of w.sessions ?? []) {
+                for (const blk of ses.blocks ?? []) {
+                  const m = (blk.muscle || '').toLowerCase();
+                  if (m) s[m] = (s[m] || 0) + (blk.sets?.length ?? 0);
+                }
+              }
+            }
+          }
+          return s;
+        };
+        const sa = stats(a);
+        const sb = stats(b);
+        const allMuscles = Array.from(new Set([...Object.keys(sa), ...Object.keys(sb)])).slice(0, 10);
+        return (
+          <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b' }}>⚖ Сравнение</span>
+              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38 }} onClick={() => setCompareIds([])}>✕ Закрыть</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 4, fontSize: 11, marginBottom: 4 }}>
+              <div style={{ fontWeight: 700, color: DIR_COLOR[a.meta.direction] }}>{a.meta.title}</div>
+              <div style={{ color: DIM }}></div>
+              <div style={{ fontWeight: 700, color: DIR_COLOR[b.meta.direction] }}>{b.meta.title}</div>
+              <div style={{ color: DIM }}>{a.meta.daysPerWeek}д/нед · {a.meta.weeks}нед</div>
+              <div style={{ color: DIM }}>vs</div>
+              <div style={{ color: DIM }}>{b.meta.daysPerWeek}д/нед · {b.meta.weeks}нед</div>
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: DIM_STRONG, marginBottom: 4, marginTop: 6 }}>Объём по мышцам (сетов/программу):</div>
+            {allMuscles.map(m => {
+              const va = sa[m] || 0;
+              const vb = sb[m] || 0;
+              const delta = vb - va;
+              return (
+                <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: 11 }}>
+                  <span style={{ color: DIM_STRONG, minWidth: 50 }}>{GROUP_RU[m] ?? m}</span>
+                  <span style={{ color: '#00e68a', fontWeight: 700, minWidth: 28, textAlign: 'right' }}>{va}</span>
+                  <span style={{ color: delta > 0 ? '#22c55e' : delta < 0 ? '#ef4444' : DIM, fontWeight: 700, minWidth: 36, textAlign: 'center' }}>{delta > 0 ? '+' + delta : delta === 0 ? '0' : delta}</span>
+                  <span style={{ color: '#a78bfa', fontWeight: 700, minWidth: 28, textAlign: 'right' }}>{vb}</span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* P2.1: Визард создания программы (5 шагов) */}
       {wizardOpen && (
         <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa' }}>
@@ -515,6 +567,23 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
   // Локальный toast — сам ProgramEditor не имеет доступа к flash() родителя.
   const [editorToast, setEditorToast] = useState('');
   const showToast = (m: string) => { setEditorToast(m); setTimeout(() => setEditorToast(''), 2200); };
+
+  // Библиотека внутри редактора
+  const [editorLibOpen, setEditorLibOpen] = useState<'bb' | 'pl' | null>(null);
+  const libraryPrograms = useMemo(() => getAllPrograms(), []);
+  const plCycleList = useMemo(() => LMS_CYCLES, []);
+  const loadIntoEditor = (p: UserProgram) => {
+    onChange(p);
+    setEditorLibOpen(null);
+    showToast('📥 Загружено: ' + p.meta.title);
+  };
+  const loadCycleIntoEditor = (cycleId: string) => {
+    const p = cloneFromCycle(cycleId);
+    if (!p) { showToast('⚠ Цикл не найден'); return; }
+    onChange(p);
+    setEditorLibOpen(null);
+    showToast('📥 Загружен ПЛ-цикл: ' + p.meta.title);
+  };
 
   const revisions = program.meta.revisions ?? [];
   const removeRev = (revIdx: number) => {
@@ -634,14 +703,29 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       }
     } else if (dir === 'pl' && program.pl) {
       const sessCount = Math.max(2, Math.min(6, days));
+      // Авто-подбор LMS-цикла по уровню и дням
+      let foundCycle = LMS_CYCLES.find(c =>
+        c.meta.level === program.meta.level &&
+        Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1
+      );
+      if (!foundCycle) {
+        foundCycle = LMS_CYCLES.find(c =>
+          Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1
+        );
+      }
       update({
         pl: {
           ...program.pl,
+          sourceCycleId: foundCycle ? foundCycle.meta.id : program.pl.sourceCycleId,
           schedule: Array.from({ length: sessCount }, (_, i) => ({ sessionIdx: i, dayOfWeek: i })),
           workMax: { squat: prof.pmSquat, bench: prof.pmBench, dead: prof.pmDead },
           weakPoints: (prof.weakPoints ?? []) as string[],
+          notes: foundCycle
+            ? `Цикл: ${foundCycle.meta.title} (${foundCycle.meta.weeks} нед, ${foundCycle.meta.sessionsPerWeek}д/нед). Процентки неизменны — ваш оверлей.`
+            : 'Цикл не выбран. Нажмите «🔍 ПЛ-циклы» чтобы подключить.',
         },
       });
+      if (foundCycle) showToast('🏆 ПЛ-цикл подобран: ' + foundCycle.meta.title);
     }
     showToast('⚡ Черновик создан из профиля — заполните упражнения и ПМ');
   };
@@ -743,52 +827,6 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
     showToast('🚚 Отправлено к выполнению — откройте зону «▶ Тренировка»');
   };
 
-  /** «🔗 В BB-auto» — отправить текущую программу в BB-autoconstructor для доработки. */
-  const exportToAuto = () => {
-    if (!program.bb) {
-      alert('Перенос в BB-auto только для ББ-программ');
-      return;
-    }
-    try {
-      applyToPlanner({
-        kind: 'program',
-        label: program.meta.title || 'ББ-программа',
-        data: {
-          source: 'manual_constructor',
-          bbPlan: program.bb as any,
-          meta: program.meta,
-        },
-      });
-      showToast('🔗 Отправлено → откройте «💪 ББ-авто» (planner-apply зарегистрирован)');
-    } catch (e) {
-      console.error(e);
-      showToast('⚠ Ошибка отправки в BB-auto');
-    }
-  };
-
-  /** «🔗 В ПЛ-auto» — отправить в ПЛ-autoconstructor для доработки. */
-  const exportToPl = () => {
-    if (!program.pl) {
-      alert('Перенос в ПЛ-auto только для ПЛ-программ');
-      return;
-    }
-    try {
-      applyToPlanner({
-        kind: 'program',
-        label: program.meta.title || 'ПЛ-программа',
-        data: {
-          source: 'manual_constructor',
-          plProgram: program.pl as any,
-          meta: program.meta,
-        },
-      });
-      showToast('🔗 Отправлено → откройте «🏆 ПЛ-авто» (planner-apply зарегистрирован)');
-    } catch (e) {
-      console.error(e);
-      showToast('⚠ Ошибка отправки в ПЛ-auto');
-    }
-  };
-
   /** 🖨 PDF-печать программы — print-friendly окно с таблицами */
   const printProgram = () => {
     const w = window.open('', '_blank', 'width=800,height=900');
@@ -874,6 +912,14 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a' }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней">⚡ Авто-черновик</button>
+          {/* Загрузить цикл/программу из библиотеки */}
+          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(245,158,11,0.4)', color: '#f59e0b' }}
+            onClick={() => {
+              if (dir === 'bb') setEditorLibOpen('bb');
+              else if (dir === 'pl') setEditorLibOpen('pl');
+            }}
+            title="Загрузить программу или цикл из библиотеки для редактирования"
+          >📥 Загрузить</button>
           {dir === 'bb' && program.bb && (program.bb.weeks?.length ?? 0) >= 4 && (
             <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
               onClick={() => {
@@ -895,24 +941,6 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           )}
           {dir === 'pl' && program.pl && (
             <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-цикл к выполнению (he_pl_runtime)">🚚 К выполнению</button>
-          )}
-          {(dir === 'bb' || dir === 'pl' || dir === 'hybrid') && (
-            <button
-              style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
-              title="Отправить текущую программу как стартовый контекст в BB-авто (через planner-bridge)"
-              onClick={() => exportToAuto()}
-            >
-              🔗 В BB-auto
-            </button>
-          )}
-          {(dir === 'pl' || dir === 'hybrid') && program.pl && (
-            <button
-              style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}
-              title="Отправить программу как стартовый контекст в PL-авто (через planner-bridge)"
-              onClick={() => exportToPl()}
-            >
-              🔗 В ПЛ-auto
-            </button>
           )}
           <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 38 }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
           <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / сохранить в PDF">🖨 PDF</button>
@@ -1230,7 +1258,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
               );
             })}
             <div style={{ fontSize: 9, color: DIM, fontStyle: 'italic', marginTop: 4 }}>
-              Используйте «⚡ Авто-сборка» в Параметрах или «+ Block» в нужной сессии.
+              Используйте кнопку «+ Упражнение» в нужной сессии или «⚡ Авто-черновик» для быстрой сборки.
             </div>
           </div>
         );
@@ -1535,6 +1563,40 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         </div>
       )}
 
+      {/* Библиотека — модальное окно внутри редактора */}
+      {editorLibOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
+          <div style={{ background: '#18181b', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', maxWidth: 700, width: '100%', maxHeight: '85vh', overflow: 'auto', padding: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>📚 {editorLibOpen === 'bb' ? 'Библиотека программ' : 'Проф. ПЛ-циклы'}</span>
+              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38 }} onClick={() => setEditorLibOpen(null)}>✕ Закрыть</button>
+            </div>
+            {editorLibOpen === 'bb' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '60vh', overflow: 'auto' }}>
+                {libraryPrograms.map(pr => (
+                  <button key={pr.id ?? pr.name} onClick={() => loadIntoEditor(cloneFromLibrary(pr))}
+                    style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)', color: DIM_STRONG, cursor: 'pointer', fontSize: 11 }}>
+                    <div style={{ fontWeight: 700 }}>{pr.name}</div>
+                    <div style={{ fontSize: 10, color: DIM }}>{pr.author} · {pr.goal} · {pr.daysPerWeek}д/нед · {pr.durationWeeks}нед</div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {editorLibOpen === 'pl' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '60vh', overflow: 'auto' }}>
+                {plCycleList.map(c => (
+                  <button key={c.meta.id} onClick={() => loadCycleIntoEditor(c.meta.id)}
+                    style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.18)', color: DIM_STRONG, cursor: 'pointer', fontSize: 11 }}>
+                    <div style={{ fontWeight: 700 }}>{c.meta.title}</div>
+                    <div style={{ fontSize: 10, color: DIM }}>{c.meta.sessionsPerWeek}д/нед · {c.meta.weeks} нед · {c.meta.level} · {c.meta.period}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* P2.11: редактирование constraints (оборудование, травмы, avoidAxialLoad, любимые/исключённые) + progression */}
       {dir === 'bb' && program.bb && (
         <BBConstraintsPanel
@@ -1551,7 +1613,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         <>
           <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #3b82f6', background: 'rgba(59,130,246,0.06)' }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#3b82f6' }}>⚡ Powerbuilder (Hybrid)</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>Гибрид ПЛ+ББ в активной разработке. Используйте кнопки «🔗 В ББ-auto» или «🔗 В ПЛ-auto» чтобы перенести программу в соответствующий конструктор.</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>Гибрид ПЛ+ББ в активной разработке. Редактируйте ПЛ и ББ части независимо.</div>
           </div>
           <HybridPlanPanel program={program} onChange={(hybrid) => update({ hybrid })} onSave={onSave} />
         </>

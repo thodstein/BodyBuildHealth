@@ -53,18 +53,83 @@ const ORGAN_OPTIONS: { id: string; label: string; icon: string; pseudo?: boolean
 const MECH_OPTIONS = Object.entries(TZ_MECH_LABELS).map(([id, label]) => ({ id, label }));
 
 const MARKER_OPTIONS: { id: string; label: string; organ?: string }[] = [
-  { id: 'ALT', label: 'АЛТ (печень)', organ: 'hepatic' },
-  { id: 'AST', label: 'АСТ (печень)', organ: 'hepatic' },
-  { id: 'GGT', label: 'ГГТ (печень)', organ: 'hepatic' },
-  { id: 'BILIRUBIN', label: 'Билирубин', organ: 'hepatic' },
-  { id: 'GLU', label: 'Глюкоза', organ: 'metabolic' },
-  { id: 'HOMOCYSTEINE', label: 'Гомоцистеин', organ: 'cardio' },
-  { id: 'CRP', label: 'СРБ (воспаление)', organ: 'immune' },
-  { id: 'CREATININE', label: 'Креатинин (почки)', organ: 'renal' },
-  { id: 'LDL', label: 'ЛПНП (липиды)', organ: 'cardio' },
-  { id: 'TRIGLYCERIDES', label: 'Триглицериды', organ: 'cardio' },
+  // ── Печень ──
+  { id: 'ALT', label: 'АЛТ', organ: 'hepatic' },
+  { id: 'AST', label: 'АСТ', organ: 'hepatic' },
+  { id: 'GGT', label: 'ГГТ', organ: 'hepatic' },
+  { id: 'Bilirubin', label: 'Билирубин общий', organ: 'hepatic' },
+  { id: 'DIRECT_BIL', label: 'Билирубин прямой', organ: 'hepatic' },
+  { id: 'ALP', label: 'Щелочная фосфатаза', organ: 'hepatic' },
+  { id: 'AMMONIA', label: 'Аммиак', organ: 'hepatic' },
+  { id: 'TOTAL_PROTEIN', label: 'Общий белок', organ: 'hepatic' },
+  { id: 'ALB', label: 'Альбумин', organ: 'hepatic' },
+  // ── Почки ──
+  { id: 'Creatinine', label: 'Креатинин', organ: 'renal' },
+  { id: 'Urea', label: 'Мочевина', organ: 'renal' },
+  { id: 'URIC_ACID', label: 'Мочевая кислота', organ: 'renal' },
+  { id: 'EGFR', label: 'рСКФ (eGFR)', organ: 'renal' },
+  { id: 'CYSTATIN_C', label: 'Цистатин C', organ: 'renal' },
+  { id: 'PROTEIN_URINE', label: 'Белок в моче', organ: 'renal' },
+  { id: 'MICROALB', label: 'Микроальбуминурия', organ: 'renal' },
+  // ── ССС / Липиды ──
+  { id: 'LDL', label: 'ЛПНП', organ: 'cardio' },
+  { id: 'HDL', label: 'ЛПВП', organ: 'cardio' },
+  { id: 'Triglycerides', label: 'Триглицериды', organ: 'cardio' },
+  { id: 'BP_SYSTOLIC', label: 'АД систолическое', organ: 'cardio' },
+  { id: 'BP_DIASTOLIC', label: 'АД диастолическое', organ: 'cardio' },
+  { id: 'HR', label: 'ЧСС', organ: 'cardio' },
+  { id: 'CK', label: 'КФК (креатинкиназа)', organ: 'cardio' },
+  // ── Кровь / Коагуляция ──
   { id: 'HCT', label: 'Гематокрит', organ: 'hematologic' },
-  { id: 'D_DIMER', label: 'D-димер', organ: 'hematologic' },
+  { id: 'HGB', label: 'Гемоглобин', organ: 'hematologic' },
+  { id: 'RBC', label: 'Эритроциты', organ: 'hematologic' },
+  { id: 'PLT', label: 'Тромбоциты', organ: 'hematologic' },
+  { id: 'WBC', label: 'Лейкоциты', organ: 'hematologic' },
+  { id: 'D-dimer', label: 'D-димер', organ: 'hematologic' },
+  { id: 'Fibrinogen', label: 'Фибриноген', organ: 'hematologic' },
+  { id: 'ESR', label: 'СОЭ', organ: 'hematologic' },
+  { id: 'INR', label: 'МНО (INR)', organ: 'hematologic' },
+  // ── Гормоны ──
+  { id: 'TT', label: 'Тестостерон общий', organ: 'reproductive' },
+  { id: 'FT', label: 'Тестостерон свободный', organ: 'reproductive' },
+  { id: 'E2', label: 'Эстрадиол', organ: 'reproductive' },
+  { id: 'PRL', label: 'Пролактин', organ: 'reproductive' },
+  { id: 'LH', label: 'ЛГ', organ: 'reproductive' },
+  { id: 'FSH', label: 'ФСГ', organ: 'reproductive' },
+  { id: 'SHBG', label: 'ГСПГ (SHBG)', organ: 'reproductive' },
+  { id: 'DHT', label: 'Дигидротестостерон', organ: 'reproductive' },
+  { id: 'PROG', label: 'Прогестерон', organ: 'reproductive' },
+  { id: 'DHEA_S', label: 'ДГЭА-сульфат', organ: 'reproductive' },
+  // ── Щитовидная ──
+  { id: 'TSH', label: 'ТТГ', organ: 'endocrine' },
+  { id: 'FT3', label: 'Т3 свободный', organ: 'endocrine' },
+  { id: 'FT4', label: 'Т4 свободный', organ: 'endocrine' },
+  { id: 'TPO_AB', label: 'Антитела к ТПО', organ: 'endocrine' },
+  // ── Метаболизм ──
+  { id: 'GLU', label: 'Глюкоза', organ: 'metabolic' },
+  { id: 'HbA1c', label: 'HbA1c (гликированный)', organ: 'metabolic' },
+  { id: 'INS', label: 'Инсулин', organ: 'metabolic' },
+  { id: 'HOMAIR', label: 'HOMA-IR', organ: 'metabolic' },
+  { id: 'HOMOCYSTEINE', label: 'Гомоцистеин', organ: 'cardio' },
+  // ── Воспаление ──
+  { id: 'CRP', label: 'СРБ', organ: 'immune' },
+  { id: 'TNF_ALPHA', label: 'ФНО-α', organ: 'immune' },
+  { id: 'IL6', label: 'Интерлейкин-6', organ: 'immune' },
+  // ── Витамины / Минералы ──
+  { id: 'VITD', label: 'Витамин D (25-OH)', organ: 'metabolic' },
+  { id: 'B12', label: 'Витамин B12', organ: 'metabolic' },
+  { id: 'FOL', label: 'Фолат', organ: 'metabolic' },
+  { id: 'FERRITIN', label: 'Ферритин', organ: 'hematologic' },
+  { id: 'IRON', label: 'Железо сыв.', organ: 'hematologic' },
+  { id: 'MAGNESIUM', label: 'Магний', organ: 'metabolic' },
+  { id: 'ZINC', label: 'Цинк', organ: 'metabolic' },
+  { id: 'SELENIUM', label: 'Селен', organ: 'metabolic' },
+  { id: 'POTASSIUM', label: 'Калий', organ: 'renal' },
+  { id: 'CALCIUM', label: 'Кальций', organ: 'metabolic' },
+  // ── Прочее ──
+  { id: 'CORTISOL', label: 'Кортизол', organ: 'cns' },
+  { id: 'PSA', label: 'ПСА (простата)', organ: 'reproductive' },
+  { id: 'CHOLINESTERASE', label: 'Холинэстераза', organ: 'hepatic' },
 ];
 
 // Орган → механизмы (по префиксам)
@@ -510,9 +575,9 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
           strategy,
           lab: useLabs ? (labAnalysis ?? null) : null,
           courseWeek: typeof courseWeek === 'number' ? courseWeek : 1,
-          filterOrgans: useProfile && filterOrgans.length ? filterOrgans : undefined,
-          filterMechanisms: useProfile && filterMechanisms.length ? filterMechanisms : undefined,
-          filterMarkers: useProfile && filterMarkers.length ? filterMarkers : undefined,
+          filterOrgans: filterOrgans.length ? filterOrgans : undefined,
+          filterMechanisms: filterMechanisms.length ? filterMechanisms : undefined,
+          filterMarkers: filterMarkers.length ? filterMarkers : undefined,
           evidenceLevel: grade !== 'C' ? grade : undefined,
           maxStackSize: maxStackSize > 0 ? maxStackSize : undefined,
           useCourse,
@@ -571,163 +636,159 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
         </div>
       </div>
 
-      {/* ── Пошаговый UI ── */}
-      <GlassCard title="" icon="" color="#00e68a" style={{ padding: 0, background: 'transparent', border: 'none', boxShadow: 'none' }}>
+      {/* ── Карточки фильтров (вместо wizard'а) ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-        {/* Стартовая кнопка (шаг 0) */}
-        {step === 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button
-              onClick={() => setStep(1)}
-              style={{
-                width: '100%', padding: '18px 0', borderRadius: 14, border: 'none',
-                background: 'linear-gradient(135deg,#00e68a,#00b4d8)',
-                color: '#00120c', fontWeight: 800, fontSize: 16, cursor: 'pointer',
-                boxShadow: '0 6px 20px rgba(0,230,138,0.2)',
-              }}
-            >
-              🚀 Начать сборку стека
-            </button>
-            <button
-              onClick={onBuild}
-              disabled={building}
-              style={{
-                width: '100%', padding: '14px 0', borderRadius: 12, border: '1px solid rgba(168,85,247,0.3)',
-                background: 'rgba(168,85,247,0.08)', color: '#c084fc', fontWeight: 700, fontSize: 13, cursor: 'pointer',
-              }}
-            >
-              ⚡ Быстрая сборка (без фильтров)
-            </button>
-            <button
-              onClick={() => setStep(4)}
-              style={{
-                width: '100%', padding: '14px 0', borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)',
-                background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
-              }}
-            >
-              ⏭ Пропустить к параметрам
-            </button>
+        {/* 🫀 Органы */}
+        <div onClick={() => setStep(1)} style={{
+          padding: '14px 16px', borderRadius: 14, cursor: 'pointer',
+          background: filterOrgans.length ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)',
+          border: `1px solid ${filterOrgans.length ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.08)'}`,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 20 }}>🫀</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>По органам и системам</span>
           </div>
-        )}
+          <span style={{
+            fontSize: 12, padding: '4px 10px', borderRadius: 10,
+            background: filterOrgans.length ? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.06)',
+            color: filterOrgans.length ? '#00e68a' : 'rgba(255,255,255,0.4)',
+            fontWeight: 600,
+          }}>
+            {filterOrgans.length ? `Выбрано: ${filterOrgans.length}` : 'Выбрать'}
+          </span>
+        </div>
 
-        {/* Шаги 1-3: попапы органов/механизмов/маркеров */}
-        {step >= 1 && step <= 3 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <StepPopup
-              title="Шаг 1 из 4: Органы и системы"
-              icon="🫀"
-              color="#00e68a"
-              show={step === 1}
-              onClose={() => setStep(4)}
-            >
-              {organChildren}
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button onClick={() => setStep(2)} style={{
-                  flex: 1, padding: '12px', borderRadius: 10, border: 'none',
-                  background: filterOrgans.length ? '#00e68a' : 'rgba(255,255,255,0.08)',
-                  color: filterOrgans.length ? '#00120c' : 'rgba(255,255,255,0.5)',
-                  fontWeight: 700, fontSize: 13, cursor: filterOrgans.length ? 'pointer' : 'not-allowed',
-                }} disabled={!filterOrgans.length}>
-                  Далее: Механизмы {filterOrgans.length && `(${filterOrgans.length})`}
-                </button>
-                <button onClick={() => setStep(2)} style={{
-                  flex: 1, padding: '12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
-                  background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
-                }}>
-                  ⏭ Пропустить
-                </button>
-              </div>
-            </StepPopup>
-
-            <StepPopup
-              title="Шаг 2 из 4: Механизмы ТЗ"
-              icon="⚙️"
-              color="#a78bfa"
-              show={step === 2}
-              onClose={() => setStep(3)}
-            >
-              {mechChildren}
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button onClick={() => setStep(3)} style={{
-                  flex: 1, padding: '12px', borderRadius: 10, border: 'none',
-                  background: filterMechanisms.length ? '#a78bfa' : 'rgba(255,255,255,0.08)',
-                  color: filterMechanisms.length ? '#00120c' : 'rgba(255,255,255,0.5)',
-                  fontWeight: 700, fontSize: 13, cursor: filterMechanisms.length ? 'pointer' : 'not-allowed',
-                }} disabled={!filterMechanisms.length}>
-                  Далее: Лаб-маркеры {filterMechanisms.length && `(${filterMechanisms.length})`}
-                </button>
-                <button onClick={() => setStep(3)} style={{
-                  flex: 1, padding: '12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
-                  background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
-                }}>
-                  ⏭ Пропустить
-                </button>
-              </div>
-            </StepPopup>
-
-            <StepPopup
-              title="Шаг 3 из 4: Лаб-маркеры"
-              icon="🧪"
-              color="#f59e0b"
-              show={step === 3}
-              onClose={() => setStep(2)}
-            >
-              {markerChildren}
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button onClick={() => setStep(4)} style={{
-                  flex: 1, padding: '12px', borderRadius: 10, border: 'none',
-                  background: '#f59e0b', color: '#00120c',
-                  fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                }}>
-                  Далее: Параметры сборки {filterMarkers.length && `(${filterMarkers.length} маркеров)`}
-                </button>
-                <button onClick={() => setStep(4)} style={{
-                  flex: 1, padding: '12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
-                  background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
-                }}>
-                  ⏭ Пропустить
-                </button>
-              </div>
-            </StepPopup>
+        {/* ⚙️ Механизмы */}
+        <div onClick={() => setStep(2)} style={{
+          padding: '14px 16px', borderRadius: 14, cursor: 'pointer',
+          background: filterMechanisms.length ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.03)',
+          border: `1px solid ${filterMechanisms.length ? 'rgba(167,139,250,0.25)' : 'rgba(255,255,255,0.08)'}`,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 20 }}>⚙️</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>По механизмам ТЗ</span>
           </div>
-        )}
+          <span style={{
+            fontSize: 12, padding: '4px 10px', borderRadius: 10,
+            background: filterMechanisms.length ? 'rgba(167,139,250,0.18)' : 'rgba(255,255,255,0.06)',
+            color: filterMechanisms.length ? '#a78bfa' : 'rgba(255,255,255,0.4)',
+            fontWeight: 600,
+          }}>
+            {filterMechanisms.length ? `Выбрано: ${filterMechanisms.length}` : 'Выбрать'}
+          </span>
+        </div>
 
-        {/* Шаг 4: Параметры (грейд + стратегия + макс. кол-во) */}
-        {step === 4 && (
-          <div style={{ padding: '4px 0 0' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.82)', marginBottom: 10 }}>
-              Шаг 4 из 4: Параметры сборки
-            </div>
-            {paramChildren}
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button onClick={() => setStep(3)} style={{
-                flex: 1, padding: '12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)',
-                background: 'transparent', color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
-              }}>Назад</button>
-              <button onClick={onBuild} disabled={building} style={{
-                flex: 1, padding: '12px', borderRadius: 10, border: 'none',
-                background: building ? 'rgba(0,230,138,0.4)' : 'linear-gradient(135deg,#00e68a,#00b4d8)',
-                color: '#00120c', fontWeight: 800, fontSize: 14, cursor: 'pointer',
-                boxShadow: building ? 'none' : '0 4px 16px rgba(0,230,138,0.2)',
-              }}>
-                {building ? '⚙️ Собираю…' : '⚕️ Собрать клинический стек'}
-              </button>
-            </div>
+        {/* 🧪 Анализы */}
+        <div onClick={() => setStep(3)} style={{
+          padding: '14px 16px', borderRadius: 14, cursor: 'pointer',
+          background: filterMarkers.length ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.03)',
+          border: `1px solid ${filterMarkers.length ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.08)'}`,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 20 }}>🧪</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>По лабораторным анализам</span>
           </div>
-        )}
+          <span style={{
+            fontSize: 12, padding: '4px 10px', borderRadius: 10,
+            background: filterMarkers.length ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.06)',
+            color: filterMarkers.length ? '#f59e0b' : 'rgba(255,255,255,0.4)',
+            fontWeight: 600,
+          }}>
+            {filterMarkers.length ? `Выбрано: ${filterMarkers.length}` : 'Выбрать'}
+          </span>
+        </div>
 
-        {/* Сброс фильтров (показывает выбранные значения) */}
-        {step > 0 && hasAnyFilter && (
+        {/* ── Попапы (открываются при клике на карточку) ── */}
+        <StepPopup title="Органы и системы ТЗ" icon="🫀" color="#00e68a" show={step === 1} onClose={() => setStep(0)}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 10 }}>
+            Выберите органы — движок подберёт вещества, влияющие на эти системы
+          </div>
+          {organChildren}
+          <button onClick={() => setStep(0)} style={{
+            marginTop: 12, width: '100%', padding: '12px', borderRadius: 10, border: 'none',
+            background: '#00e68a', color: '#00120c', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+          }}>Готово</button>
+        </StepPopup>
+
+        <StepPopup title="Механизмы ТЗ (28 кодов)" icon="⚙️" color="#a78bfa" show={step === 2} onClose={() => setStep(0)}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 10 }}>
+            Выберите механизмы — фильтр по механизмам ТЗ (cv1-cv5, liv1-liv3, ren1-ren4, cns1-cns6, rep1-rep5, hem1-hem5)
+          </div>
+          {mechChildren}
+          <button onClick={() => setStep(0)} style={{
+            marginTop: 12, width: '100%', padding: '12px', borderRadius: 10, border: 'none',
+            background: '#a78bfa', color: '#00120c', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+          }}>Готово</button>
+        </StepPopup>
+
+        <StepPopup title="Лабораторные анализы" icon="🧪" color="#f59e0b" show={step === 3} onClose={() => setStep(0)}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 10 }}>
+            Исчерпывающий перечень — {MARKER_OPTIONS.length} маркеров. Выберите те, по которым нужна коррекция
+          </div>
+          {markerChildren}
+          <button onClick={() => setStep(0)} style={{
+            marginTop: 12, width: '100%', padding: '12px', borderRadius: 10, border: 'none',
+            background: '#f59e0b', color: '#00120c', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+          }}>Готово</button>
+        </StepPopup>
+
+        {/* ── Параметры сборки ── */}
+        <div style={{
+          marginTop: 4, padding: '12px 14px', borderRadius: 14,
+          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>📊 Параметры сборки</div>
+          {paramChildren}
+        </div>
+
+        {/* ── Тогглы источника данных ── */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, background: useCourse ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${useCourse ? '#00e68a' : 'rgba(255,255,255,0.1)'}`, fontSize: 11 }}>
+            <input type="checkbox" checked={useCourse} onChange={e => setUseCourse(e.target.checked)} style={{ accentColor: '#00e68a', width: 14, height: 14 }} />
+            <span style={{ color: useCourse ? '#00e68a' : 'rgba(255,255,255,0.5)', fontWeight: 500 }}>💉 Курс</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, background: useLabs ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${useLabs ? '#f59e0b' : 'rgba(255,255,255,0.1)'}`, fontSize: 11 }}>
+            <input type="checkbox" checked={useLabs} onChange={e => setUseLabs(e.target.checked)} style={{ accentColor: '#f59e0b', width: 14, height: 14 }} />
+            <span style={{ color: useLabs ? '#f59e0b' : 'rgba(255,255,255,0.5)', fontWeight: 500 }}>🧪 Анализы</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, background: useProfile ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${useProfile ? '#a78bfa' : 'rgba(255,255,255,0.1)'}`, fontSize: 11 }}>
+            <input type="checkbox" checked={useProfile} onChange={e => setUseProfile(e.target.checked)} style={{ accentColor: '#a78bfa', width: 14, height: 14 }} />
+            <span style={{ color: useProfile ? '#a78bfa' : 'rgba(255,255,255,0.5)', fontWeight: 500 }}>👤 Профиль</span>
+          </label>
+        </div>
+
+        {/* ── Кнопки сборки ── */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onBuild} disabled={building} style={{
+            flex: 1, padding: '14px 0', borderRadius: 14, border: 'none',
+            background: building ? 'rgba(0,230,138,0.4)' : 'linear-gradient(135deg,#00e68a,#00b4d8)',
+            color: '#00120c', fontWeight: 800, fontSize: 14, cursor: 'pointer',
+            boxShadow: building ? 'none' : '0 4px 16px rgba(0,230,138,0.2)',
+          }}>
+            {building ? '⚙️ Собираю…' : '🔧 Собрать стек'}
+          </button>
+          <button onClick={onBuild} disabled={building} style={{
+            padding: '14px 16px', borderRadius: 14, border: '1px solid rgba(168,85,247,0.3)',
+            background: 'rgba(168,85,247,0.08)', color: '#c084fc', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}>
+            ⚡ Быстро
+          </button>
+        </div>
+
+        {hasAnyFilter && (
           <button onClick={resetAll} style={{
-            marginTop: 12, alignSelf: 'flex-start', fontSize: 11, padding: '6px 12px',
-            borderRadius: 8, cursor: 'pointer', background: 'transparent',
-            border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)',
+            padding: '8px 12px', borderRadius: 8, cursor: 'pointer', background: 'transparent',
+            border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)', fontSize: 11, alignSelf: 'flex-start',
           }}>
             ✕ Сбросить всё
           </button>
         )}
-
-      </GlassCard>
+      </div>
 
       {/* ════════════════════════════════════════════════════════════════
           РЕЗУЛЬТАТ: СНАЧАЛА состав + механизмы + синергии + описание
