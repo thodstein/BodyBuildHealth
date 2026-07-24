@@ -642,6 +642,21 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 0 }} onClick={safeBack}>← К списку</button>
         <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
+        {program.meta.updatedAt && (
+          <span style={{ fontSize: 9, color: DIM, fontWeight: 500 }} title={`Создано: ${new Date(program.meta.createdAt).toLocaleString('ru-RU')}\nОбновлено: ${new Date(program.meta.updatedAt).toLocaleString('ru-RU')}`}>
+            · {(() => {
+              const diff = Date.now() - new Date(program.meta.updatedAt).getTime();
+              if (diff < 0 || diff < 60000) return 'только что';
+              const min = Math.floor(diff / 60000);
+              if (min < 60) return `${min} мин назад`;
+              const hr = Math.floor(min / 60);
+              if (hr < 24) return `${hr} ч назад`;
+              const day = Math.floor(hr / 24);
+              if (day < 30) return `${day} дн назад`;
+              return `${Math.floor(day / 30)} мес назад`;
+            })()}
+          </span>
+        )}
         {isDirty && <span style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b' }} title="Несохранённые изменения">●</span>}
 
       {/* P5.2 — Inline-валидация: критические ошибки сразу бросаются в глаза. */}
