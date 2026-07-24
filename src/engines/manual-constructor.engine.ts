@@ -201,36 +201,46 @@ export function buildUserProgramFromBB(
 /**
  * Конвертация PL-программы (LMS cycle) → PlayerDay[] для подачи в he_pl_runtime.
  * Использует расписание pl.schedule, чтобы каждой сессии цикла дать день недели.
- * Упражнения берутся напрямую из week 1 иммутабельного цикла.
+ * Упражнения берутся из week1 (anchor) цикла — SRDaySpec[] уже player-ready.
  */
 export function plLmsScheduleDays(program: UserProgram): { label: string; exercises: any[] }[] {
   if (!program.pl) return [];
   const cycle = getReferencedCycle(program);
   if (!cycle) return [];
-  const week1 = cycle.weeks?.[0] as any;
-  if (!week1 || !Array.isArray(week1.sessions)) return [];
+  // LMS cycles: week1 (anchor) — SRDaySpec[]. weeks? (explicit per-week) — SRDaySpec[][].
+  // plLmsScheduleDays использует week1 (anchor — основная неделя цикла).
+  const week1Days = (cycle.week1 ?? []) as Array<{ exercises?: Array<{ name: string; group?: string; coef?: number; mnosz?: number; load?: string; sets?: Array<{ pct: number; reps: number; sets: number; rir?: number }> }> }>;
+  if (!Array.isArray(week1Days) || week1Days.length === 0) return [];
   const schedMap = new Map<number, number>();
   for (const s of program.pl.schedule ?? []) schedMap.set(s.sessionIdx, s.dayOfWeek);
-  return week1.sessions.map((sess: any, idx: number) => ({
-    label: sess.sessionTag ?? `День ${(schedMap.get(idx) ?? idx) + 1}`,
-    exercises: (sess.exercises ?? []).map((e: any) => {
-      const ws = e.workSets?.[0] ?? {};
-      const pct = program.pl?.workMax && program.meta.goal ? 0.85 : 0.85;
-      const rollMuscle = e.muscle || 'chest';
-      const baseMax = (program.pl?.workMax?.squat && rollMuscle === 'legs') ? program.pl.workMax.squat : 100;
-      return {
-        name: e.name,
-        muscleGroup: rollMuscle,
-        pct,
-        targetWeight: ws.weight ?? Math.round(baseMax * (1 - (idx * 0.05))),
-        targetSets: Array.from({ length: e.sets ?? 3 }, () => ({
-          weight: ws.weight ?? Math.round(baseMax * (1 - (idx * 0.05))),
-          reps: typeof ws.reps === 'number' ? ws.reps : 8,
-          rir: ws.rir ?? 2,
-        })),
-      };
-    }),
-  })).filter((d: any) => d.exercises.length > 0);
+  return week1Days.map((day, idx) => {
+    const wm = program.pl?.workMax ?? {};
+    const dayOfWeek = schedMap.get(idx) ?? idx;
+    const dowLabel = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][dayOfWeek] ?? '';
+    return {
+      label: `День ${idx + 1}${dowLabel ? ' (' + dowLabel + ')' : ''}`,
+      exercises: (day.exercises ?? []).map((e) => {
+        // Determine lift type by name (simple heuristic)
+        const haystack = (e.name || '') + ' ' + (e.group || '');
+        let lift: 'squat' | 'bench' | 'dead' | null = null;
+        if (/жим/i.test(haystack)) lift = 'bench';
+        else if (/тяг|стан/i.test(haystack)) lift = 'dead';
+        else if (/прис|скв/i.test(haystack)) lift = 'squat';
+        const pmVal = lift ? (wm[lift] ?? 0) : 0;
+        return {
+          name: e.name,
+          muscleGroup: e.group ?? '',
+          sets: (e.sets ?? []).map((st) => ({
+            pct: st.pct,
+            reps: st.reps,
+            sets: st.sets,
+            rir: st.rir ?? 2,
+            weight: pmVal > 0 ? Math.round((pmVal * st.pct) / 2.5) * 2.5 : 0,
+          })),
+        };
+      }),
+    };
+  });
 }
 
 /**
