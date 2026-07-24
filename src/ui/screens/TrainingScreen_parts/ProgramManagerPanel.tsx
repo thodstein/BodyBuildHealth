@@ -46,6 +46,7 @@ import {
 import { tempoFor } from '../../../engines/bb/bb-tempo-rest';
 import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
+import { applyToPlanner } from './planner-bridge';
 import { loadTrainingProfile } from './training-profile';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle } from './training-ui';
@@ -554,7 +555,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
     showToast('⚡ Черновик создан — заполните упражнения и ПМ');
   };
 
-  // «🚚 К выполнению» — поддерживает BB и PL.
+// «🚚 К выполнению» — поддерживает BB и PL.
   const sendToExecution = () => {
     if (dir !== 'bb' || !program.bb) {
       alert('К выполнению можно отправить только ББ-программу.');
@@ -589,6 +590,52 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
     showToast('🚚 Отправлено к выполнению — откройте зону «▶ Тренировка»');
   };
 
+  /** «🔗 В BB-auto» — отправить текущую программу в BB-autoconstructor для доработки. */
+  const exportToAuto = () => {
+    if (!program.bb) {
+      alert('Перенос в BB-auto только для ББ-программ');
+      return;
+    }
+    try {
+      applyToPlanner({
+        kind: 'program',
+        label: program.meta.title || 'ББ-программа',
+        data: {
+          source: 'manual_constructor',
+          bbPlan: program.bb as any,
+          meta: program.meta,
+        },
+      });
+      showToast('🔗 Отправлено → откройте «💪 ББ-авто» (planner-apply зарегистрирован)');
+    } catch (e) {
+      console.error(e);
+      showToast('⚠ Ошибка отправки в BB-auto');
+    }
+  };
+
+  /** «🔗 В ПЛ-auto» — отправить в ПЛ-autoconstructor для доработки. */
+  const exportToPl = () => {
+    if (!program.pl) {
+      alert('Перенос в ПЛ-auto только для ПЛ-программ');
+      return;
+    }
+    try {
+      applyToPlanner({
+        kind: 'program',
+        label: program.meta.title || 'ПЛ-программа',
+        data: {
+          source: 'manual_constructor',
+          plProgram: program.pl as any,
+          meta: program.meta,
+        },
+      });
+      showToast('🔗 Отправлено → откройте «🏆 ПЛ-авто» (planner-apply зарегистрирован)');
+    } catch (e) {
+      console.error(e);
+      showToast('⚠ Ошибка отправки в ПЛ-auto');
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -599,6 +646,24 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a' }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней">⚡ Авто-черновик</button>
           {dir === 'bb' && (
             <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToExecution} title="Отправить к выполнению (he_pl_runtime)">🚚 К выполнению</button>
+          )}
+          {(dir === 'bb' || dir === 'pl' || dir === 'hybrid') && (
+            <button
+              style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
+              title="Отправить текущую программу как стартовый контекст в BB-авто (через planner-bridge)"
+              onClick={() => exportToAuto()}
+            >
+              🔗 В BB-auto
+            </button>
+          )}
+          {(dir === 'pl' || dir === 'hybrid') && program.pl && (
+            <button
+              style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}
+              title="Отправить программу как стартовый контекст в PL-авто (через planner-bridge)"
+              onClick={() => exportToPl()}
+            >
+              🔗 В ПЛ-auto
+            </button>
           )}
           <button style={{ ...BTN, padding: '6px 14px', fontSize: 11, minHeight: 0 }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
         </div>
