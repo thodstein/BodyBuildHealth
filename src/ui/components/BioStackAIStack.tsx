@@ -942,53 +942,53 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
       {/* 🧬 Почему этот стек работает */}
       {synergyExplanation && (
         <GlassCard title="🧬 Почему этот стек работает" icon="🧬" color="#a855f7">
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, marginBottom: 8, padding: '6px 8px', borderRadius: 6, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.1)' }}>
+          <div style={{ fontSize: 12, color: 'rgba(235,235,245,0.8)', lineHeight: 1.5, marginBottom: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.1)' }}>
             {synergyExplanation.cascadeDesc}
           </div>
 
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#22c55e', marginBottom: 4 }}>🔬 Области покрытия ({synergyExplanation.domains.length})</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#22c55e', marginBottom: 6 }}>🔬 Области покрытия ({synergyExplanation.domains.length})</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {synergyExplanation.domains.map(d => (
-                <span key={d} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.08)', color: '#22c55e' }}>
+                <span key={d} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.1)', color: '#22c55e', fontWeight: 600 }}>
                   {DOMAIN_LABELS_RU[d] || d}
                 </span>
               ))}
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>🎯 Роли в стеке</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>🎯 Роли в стеке</div>
               {(['core','synergy','coverage','support'] as const).map(role => {
                 const subs = stackIds.filter(id => synergyExplanation.roles[id] === role);
                 if (subs.length === 0) return null;
                 const rl: Record<string, string> = { core: 'Основные', synergy: 'Синергисты', coverage: 'Покрытие', support: 'Вспомог.' };
                 const rc: Record<string, string> = { core: '#00e68a', synergy: '#8b5cf6', coverage: '#60a5fa', support: 'rgba(255,255,255,0.4)' };
-                return <div key={role} style={{ fontSize: 7, color: rc[role], marginBottom: 1 }}><strong>{rl[role]}</strong> ({subs.length})</div>;
+                return <div key={role} style={{ fontSize: 11, color: rc[role], marginBottom: 2 }}><strong>{rl[role]}</strong> ({subs.length})</div>;
               })}
             </div>
             <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>🔄 Пары ({synergyExplanation.pairs.length})</div>
-              {synergyExplanation.pairs.slice(0, 4).map((p, i) => (
-                <div key={i} style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', lineHeight: 1.3, padding: '1px 0' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>🔄 Пары ({synergyExplanation.pairs.length})</div>
+              {synergyExplanation.pairs.slice(0, 6).map((p, i) => (
+                <div key={i} style={{ fontSize: 11, color: 'rgba(235,235,245,0.75)', lineHeight: 1.4, padding: '2px 0' }}>
                   {p.a.split(' ').slice(0, 2).join(' ')} + {p.b.split(' ').slice(0, 2).join(' ')}
                   <span style={{
-                    fontSize: 5, padding: '1px 3px', borderRadius: 2, marginLeft: 3,
+                    fontSize: 10, padding: '2px 6px', borderRadius: 4, marginLeft: 6,
                     background: p.strength === 'HIGH' ? 'rgba(34,197,94,0.1)' : p.strength === 'MEDIUM' ? 'rgba(251,191,36,0.1)' : 'rgba(255,255,255,0.04)',
                     color: p.strength === 'HIGH' ? '#22c55e' : p.strength === 'MEDIUM' ? '#f59e0b' : 'rgba(255,255,255,0.3)',
                   }}>{p.strength === 'HIGH' ? '🟢' : p.strength === 'MEDIUM' ? '🟡' : '⚪'}</span>
                 </div>
               ))}
-              {synergyExplanation.pairs.length > 4 && <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.25)', marginTop: 1 }}>+{synergyExplanation.pairs.length - 4} ещё</div>}
+              {synergyExplanation.pairs.length > 6 && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>+{synergyExplanation.pairs.length - 6} ещё</div>}
             </div>
           </div>
 
           {synergyExplanation.contributions.length > 0 && (
-            <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.06)' }}>
-              <div style={{ fontSize: 7, color: '#22c55e', fontWeight: 600, marginBottom: 2 }}>💡 Уникальный вклад:</div>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.06)' }}>
+              <div style={{ fontSize: 11, color: '#22c55e', fontWeight: 700, marginBottom: 4 }}>💡 Уникальный вклад:</div>
               {synergyExplanation.contributions.map((c, i) => (
-                <div key={i} style={{ fontSize: 8, color: '#4ade80', lineHeight: 1.3 }}>
+                <div key={i} style={{ fontSize: 11, color: '#4ade80', lineHeight: 1.4, marginBottom: 2 }}>
                   • <strong>{SUPPORT_CATALOG_DATA[c.id]?.nameRu || SUPPORT_CATALOG_DATA[c.id]?.name || c.id}</strong> — {c.text}
                 </div>
               ))}
@@ -996,17 +996,17 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
           )}
 
           {explanation?.warnings && explanation.warnings.length > 0 && (
-            <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)' }}>
-              <div style={{ fontSize: 8, fontWeight: 700, color: '#ef4444', marginBottom: 3 }}>⚠️ Предупреждения</div>
-              {explanation.warnings.slice(0, 5).map((w: string, i: number) => <div key={i} style={{ fontSize: 7, color: '#f87171', lineHeight: 1.3 }}>• {w}</div>)}
+            <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>⚠️ Предупреждения</div>
+              {explanation.warnings.slice(0, 5).map((w: string, i: number) => <div key={i} style={{ fontSize: 10, color: '#f87171', lineHeight: 1.4 }}>• {w}</div>)}
             </div>
           )}
 
           {explanation?.timingNotes && explanation.timingNotes.length > 0 && (
-            <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.12)' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>⏰ Разнесено по времени (для безопасности)</div>
+            <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.12)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>⏰ Разнесено по времени (для безопасности)</div>
               {explanation.timingNotes.map((tn: any, i: number) => (
-                <div key={i} style={{ fontSize: 8, color: '#93c5fd', lineHeight: 1.4 }}>
+                <div key={i} style={{ fontSize: 10, color: '#93c5fd', lineHeight: 1.4 }}>
                   💡 {tn.note}
                 </div>
               ))}

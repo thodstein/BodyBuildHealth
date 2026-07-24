@@ -54,6 +54,12 @@ export interface UserSet {
   tempo?: string;         // нотация темпа "3-1-1-0"
   restSec?: number;
   note?: string;
+  // Динамические поля для техник
+  dropWeight?: number;    // вес дропа (кг) для drop_set
+  dropReps?: number;      // повторения дропа для drop_set
+  miniReps?: number;      // мини-повторения для myo_reps
+  miniRestSec?: number;   // мини-отдых (сек) для myo_reps
+  pauseSec?: number;      // пауза (сек) для pause_rep
 }
 
 export interface UserBlock {

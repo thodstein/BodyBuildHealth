@@ -193,6 +193,7 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
   const [filterOrgans, setFilterOrgans] = useState<string[]>([]);
   const [filterMechanisms, setFilterMechanisms] = useState<string[]>([]);
   const [filterMarkers, setFilterMarkers] = useState<string[]>([]);
+  const [filterMode, setFilterMode] = useState<'balanced' | 'strict'>('balanced');
   const [grade, setGrade] = useState<'A' | 'B' | 'C'>('C');
   const [strategy, setStrategy] = useState<StackStrategy>('comprehensive');
   const [maxStackSize, setMaxStackSize] = useState(0);
@@ -423,10 +424,51 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
             <input type="checkbox" checked={useProfile} onChange={e => setUseProfile(e.target.checked)} style={{ accentColor: '#a78bfa', width: 16, height: 16 }} />
             <span style={{ fontSize: 13, fontWeight: 500, color: useProfile ? '#a78bfa' : 'rgba(255,255,255,0.7)' }}>👤 Профиль (органы/цели/состояние)</span>
           </label>
-        </div>
-      </div>
-    </div>
-  );
+         </div>
+       </div>
+
+       {/* Режим фильтрации */}
+       <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+         <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.82)', marginBottom: 8 }}>
+           🎯 Режим фильтрации
+         </div>
+         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+           <button
+             onClick={() => setFilterMode('balanced')}
+             style={{
+               flex: 1, padding: '10px 0', borderRadius: 10, cursor: 'pointer', border: 'none',
+               background: filterMode === 'balanced' ? '#60a5fa22' : 'rgba(255,255,255,0.04)',
+               borderLeft: filterMode === 'balanced' ? '3px solid #60a5fa' : '3px solid transparent',
+               transition: 'all 0.2s',
+             }}
+           >
+             <div style={{ fontSize: 13, fontWeight: 700, color: filterMode === 'balanced' ? '#60a5fa' : 'rgba(255,255,255,0.5)' }}>
+               Сбалансированный
+             </div>
+             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+               Фильтры + синергии
+             </div>
+           </button>
+           <button
+             onClick={() => setFilterMode('strict')}
+             style={{
+               flex: 1, padding: '10px 0', borderRadius: 10, cursor: 'pointer', border: 'none',
+               background: filterMode === 'strict' ? '#f59e0b22' : 'rgba(255,255,255,0.04)',
+               borderLeft: filterMode === 'strict' ? '3px solid #f59e0b' : '3px solid transparent',
+               transition: 'all 0.2s',
+             }}
+           >
+             <div style={{ fontSize: 13, fontWeight: 700, color: filterMode === 'strict' ? '#f59e0b' : 'rgba(255,255,255,0.5)' }}>
+               Строгий
+             </div>
+             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+               Только по выбранным органам/механизмам
+             </div>
+           </button>
+         </div>
+       </div>
+     </div>
+   );
 
 const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
    
@@ -435,6 +477,7 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
     setFilterOrgans([]);
     setFilterMechanisms([]);
     setFilterMarkers([]);
+    setFilterMode('balanced');
     setGrade('C');
     setStrategy('comprehensive');
     setMaxStackSize(0);
@@ -457,6 +500,7 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
           useCourse,
           useLabs,
           useProfile,
+          filterMode,
         });
         setResult(r);
       } catch (e: any) {
@@ -686,8 +730,18 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
 
           {/* Описание стека */}
           <GlassCard title="📋 Описание стека" icon="📝" color="#a78bfa" style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 12, color: 'rgba(235,235,245,0.8)', lineHeight: 1.5 }}>
-              {result.stackDescription}
+            <div style={{ fontSize: 12, color: 'rgba(235,235,245,0.8)', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+              {result.stackDescription.split('\n').map((line, i) => {
+                const trimmed = line.trim();
+                if (!trimmed) return null;
+                if (trimmed === 'Принцип:' || trimmed === 'Покрытие систем:') {
+                  return <div key={i} style={{ fontSize: 11, fontWeight: 700, color: '#c084fc', marginTop: 6, marginBottom: 2 }}>{trimmed}</div>;
+                }
+                if (trimmed.startsWith('• ')) {
+                  return <div key={i} style={{ fontSize: 11, color: 'rgba(235,235,245,0.75)', paddingLeft: 8, marginTop: 1 }}>{trimmed}</div>;
+                }
+                return <div key={i} style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 2 }}>{trimmed}</div>;
+              })}
             </div>
           </GlassCard>
 
@@ -695,20 +749,36 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
           {result.stackSynergies.length > 0 && (
             <GlassCard title={`🔗 Синергии в стеке (${result.stackSynergies.length})`} icon="⚡" color="#c084fc" style={{ marginTop: 8 }}>
               {result.stackSynergies.map((syn, i) => (
-                <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontWeight: 600, fontSize: 12, color: '#c084fc' }}>
-                    {syn.ids.join(' + ')}
+                <div key={i} style={{
+                  padding: '10px 12px', marginBottom: 8, borderRadius: 12,
+                  background: 'rgba(192,132,252,0.04)', border: '1px solid rgba(192,132,252,0.1)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: '#fff' }}>
+                      {syn.ids.join(' + ')}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      {syn.domain && syn.domain !== 'general' && (
+                        <span style={{
+                          fontSize: 10, padding: '3px 8px', borderRadius: 6,
+                          background: 'rgba(148,163,184,0.12)', color: '#cbd5e1', fontWeight: 600,
+                        }}>{syn.domain}</span>
+                      )}
+                      <span style={{
+                        fontSize: 10, padding: '3px 8px', borderRadius: 6, fontWeight: 700,
+                        background: syn.strength === 'HIGH' ? 'rgba(239,68,68,0.15)' : syn.strength === 'MEDIUM' ? 'rgba(245,158,11,0.15)' : 'rgba(100,116,139,0.15)',
+                        color: syn.strength === 'HIGH' ? '#f87171' : syn.strength === 'MEDIUM' ? '#fbbf24' : '#94a3b8',
+                      }}>
+                        {syn.strength}
+                      </span>
+                    </div>
                   </div>
-                  <div style={{ fontSize: 10, color: 'rgba(235,235,245,0.6)', marginTop: 2 }}>
-                    {syn.effect}
+                  {syn.mechanism && (
+                    <div style={{ fontSize: 10, color: 'rgba(235,235,245,0.45)', marginTop: 3 }}>{syn.mechanism}</div>
+                  )}
+                  <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.7)', marginTop: 4, lineHeight: 1.4 }}>
+                    {syn.description || syn.effect}
                   </div>
-                  <span style={{
-                    fontSize: 9, marginTop: 3, display: 'inline-block', padding: '2px 6px', borderRadius: 4,
-                    background: syn.strength === 'HIGH' ? 'rgba(239,68,68,0.15)' : syn.strength === 'MEDIUM' ? 'rgba(245,158,11,0.15)' : 'rgba(100,116,139,0.15)',
-                    color: syn.strength === 'HIGH' ? '#f87171' : syn.strength === 'MEDIUM' ? '#fbbf24' : '#94a3b8',
-                  }}>
-                    {syn.strength}
-                  </span>
                 </div>
               ))}
             </GlassCard>

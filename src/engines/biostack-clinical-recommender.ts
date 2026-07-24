@@ -251,7 +251,14 @@ export interface ClinicalStackResult {
   /** описание стека (авто-сгенерированное) */
   stackDescription: string;
   /** синергии внутри стека (пары веществ, которые работают вместе) */
-  stackSynergies: { ids: string[]; effect: string; strength: string }[];
+  stackSynergies: Array<{
+    ids: string[];
+    effect: string;
+    mechanism?: string;
+    strength: string;
+    domain?: string;
+    description?: string;
+  }>;
   /** вещества, отсеянные шлюзом (для прозрачности) */
   excluded: {
     id: string;
@@ -294,6 +301,7 @@ function buildCatalogFallback(
   profile?: BioStackProfile,
   phase?: string,
   existingIds?: string[],
+  filterMode?: 'strict' | 'balanced',
 ): string[] {
   const allIds = Object.keys(SUPPORT_CATALOG_DATA);
   const scored: Array<{ id: string; score: number }> = [];
@@ -303,8 +311,13 @@ function buildCatalogFallback(
   const phaseKey = phase || 'course';
   const phaseBlocked = PHASE_BLOCKLIST[phaseKey] || new Set<string>();
 
+  const hasActiveFilters = (filterOrgans?.length || filterMechanisms?.length || filterMarkers?.length);
+  const seen = new Set<string>();
+
   for (const id of allIds) {
     const idLower = id.toLowerCase();
+    if (seen.has(idLower)) continue; // не дублируем один и тот же препарат в разном регистре
+    seen.add(idLower);
     const cat = SUPPORT_CATALOG_DATA[id];
     if (!cat) continue;
 
@@ -317,17 +330,20 @@ function buildCatalogFallback(
     const tzMechs = (getDrugTzMechanisms(id) || []).map(m => m.mechId);
 
     let score = 0;
+    let hasFilterMatch = false;
 
     // organs match
     if (filterOrgans?.length) {
       const organHits = filterOrgans.filter(o => tzOrgans.includes(o)).length;
-      score += organHits * 3;
+      if (organHits > 0) hasFilterMatch = true;
+      score += organHits * 5;
     }
 
     // mechanisms match
     if (filterMechanisms?.length) {
       const mechHits = filterMechanisms.filter(m => tzMechs.includes(m)).length;
-      score += mechHits * 3;
+      if (mechHits > 0) hasFilterMatch = true;
+      score += mechHits * 4;
     }
 
     // markers match
@@ -336,7 +352,10 @@ function buildCatalogFallback(
       for (const mk of filterMarkers) {
         for (const sev of SEVERITIES) {
           for (const e of getPrioritySubstances(mk, sev)) {
-            if (e.substanceId === id) score += 5;
+            if (e.substanceId === id) {
+              score += 5;
+              hasFilterMatch = true;
+            }
           }
         }
       }
@@ -346,8 +365,16 @@ function buildCatalogFallback(
     const isCore = (cat as any).tier === 'core';
     if (isCore) score += 2;
 
-    // broad-spectrum (вещества с >4 TZ-механизмами)
-    if (tzMechs.length > 4) score += 2;
+    // broad-spectrum: даём бонус ТОЛЬКО если есть фильтр-совпадение
+    // (чтобы generic omega3/CoQ10 не прыгали вверх в organ-фильтрованном стеке)
+    // strict-mode: мин. 2 фильтровых совпадения, иначе broad-spectrum не получает бонус
+    if (hasFilterMatch && tzMechs.length > 4) {
+      const organHits = filterOrgans?.filter(o => tzOrgans.includes(o)).length || 0;
+      const mechHits = filterMechanisms?.filter(m => tzMechs.includes(m)).length || 0;
+      const markerHit = (filterMarkers?.length && hasFilterMatch) ? 1 : 0;
+      const totalFilterHits = organHits + mechHits + markerHit;
+      if (filterMode !== 'strict' || totalFilterHits >= 2) score += 2;
+    }
 
     // синергии с уже выбранными веществами
     if (existingIds && existingIds.length > 0) {
@@ -363,16 +390,17 @@ function buildCatalogFallback(
     }
 
     // если нет фильтров — всем дать базовый score, потом отберём топ
-    if (!filterOrgans?.length && !filterMechanisms?.length && !filterMarkers?.length) {
+    if (!hasActiveFilters) {
       score += isCore ? 5 : 1;
     }
 
     if (score > 0) scored.push({ id, score });
   }
 
-  // сортировка по score, топ-25
+  // сортировка по score, топ-N (меньше при фильтрации — уже отобрали релевантное)
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, 25).map(s => s.id);
+  const cap = filterMode === 'strict' ? 8 : (hasActiveFilters ? 12 : 25);
+  return scored.slice(0, cap).map(s => s.id);
 }
 
 /* ------------------------------------------------------------------ *
@@ -400,6 +428,8 @@ export interface BuildClinicalStackOpts {
   useLabs?: boolean;
   /** учитывать профиль (healthConditions, targetSystems, targetOrgans) */
   useProfile?: boolean;
+  /** режим фильтрации: 'strict' = только вещества по активным фильтрам, 'balanced' = фильтры + синергии */
+  filterMode?: 'strict' | 'balanced';
 }
 
 export function buildClinicalStack(
@@ -472,6 +502,7 @@ export function buildClinicalStack(
   const filterMechanisms = useProfile && opts.filterMechanisms?.length ? opts.filterMechanisms : undefined;
   const filterMarkers = useProfile && opts.filterMarkers?.length ? opts.filterMarkers : undefined;
   const evidenceLevel = opts.evidenceLevel;
+  const hasActiveFilters = (filterOrgans?.length || filterMechanisms?.length || filterMarkers?.length);
 
   // 2a) Фильтры по органам / механизмам / маркерам / доказательности (до клинического шлюза)
   let candidateIds = plan.substances.map((s) => s.id);
@@ -481,12 +512,12 @@ export function buildClinicalStack(
   if (candidateIds.length < 3) {
     const fallbackSet = buildCatalogFallback(
       opts.filterOrgans, opts.filterMechanisms, opts.filterMarkers, profile,
-      state.pharma?.phase, candidateIds,
+      state.pharma?.phase, candidateIds, opts.filterMode,
     );
     if (fallbackSet.length) {
       console.log('[BioStack] catalog fallback:', fallbackSet.length, 'candidates (had', candidateIds.length, ')');
       // MERGE с существующими, не замена
-      candidateIds = [...new Set([...candidateIds, ...fallbackSet])];
+      candidateIds = [...new Map([...candidateIds, ...fallbackSet].map(id => [id.toLowerCase(), id])).values()];
     }
   }
 
@@ -508,6 +539,8 @@ export function buildClinicalStack(
     }
 
     const filterScore = new Map<string, number>();
+    const filterMode = opts.filterMode || 'balanced';
+    const minScore = filterMode === 'strict' ? 6 : 1;
     for (const id of candidateIds) {
       let score = 0;
       // маркеры: +5 за совпадение
@@ -524,7 +557,7 @@ export function buildClinicalStack(
         const organHits = tz.filter(m => filterOrgans!.includes(m.organId)).length;
         if (organHits > 0) score += organHits * 3;
       }
-      if (score > 0) filterScore.set(id, score);
+      if (score >= minScore) filterScore.set(id, score);
     }
 
     if (filterScore.size > 0) {
@@ -580,6 +613,10 @@ export function buildClinicalStack(
       for (const m of tz) selectedMechs.add(m.mechId);
     }
 
+    const filterMode = opts.filterMode || 'balanced';
+    const synThreshold = filterMode === 'strict' ? 25 : 15;
+    const synCap = filterMode === 'strict' ? 6 : 10;
+    const strictFilter = filterMode === 'strict' && hasActiveFilters;
     const synCandidates: Array<{ id: string; synScore: number }> = [];
     for (const candId of allCatalogIds) {
       const candLower = candId.toLowerCase();
@@ -622,7 +659,18 @@ export function buildClinicalStack(
         if (samePathCount >= 2) continue; // путь уже перегружен
       }
 
-      if (synScore >= 15) synCandidates.push({ id: candId, synScore });
+      // Орган/механизм-фильтр в synergy pass:
+      // в strict-режиме добавляем только вещества, совпадающие с активным фильтром
+      if (strictFilter) {
+        const candTz = getDrugTzMechanisms(candId) || [];
+        const candOrgans = new Set(candTz.map(m => m.organId));
+        const candMechs = new Set(candTz.map(m => m.mechId));
+        const organHit = filterOrgans?.some(o => candOrgans.has(o));
+        const mechHit = filterMechanisms?.some(m => candMechs.has(m));
+        if (!organHit && !mechHit) continue;
+      }
+
+      if (synScore >= synThreshold) synCandidates.push({ id: candId, synScore });
     }
 
     synCandidates.sort((a, b) => b.synScore - a.synScore);
@@ -747,10 +795,32 @@ export function buildClinicalStack(
     substances.push(...trimmed);
   }
 
-  // 3b) Синергии внутри стека
+  // 3b) Синергии внутри стека — расширенные
   const stackSynergies: ClinicalStackResult['stackSynergies'] = [];
   const subIdSet = new Set(substances.map((s) => s.id.toLowerCase()));
   const seenSynKeys = new Set<string>();
+
+  const DOMAIN_KEYWORDS: Record<string, string[]> = {
+    antioxidant: ['ANTIOXIDANT', 'GLUTATHIONE', 'NRF2', 'ROS', 'OXIDATIVE'],
+    hepatic: ['LIVER', 'HEPAT', 'BILE', 'CHOLESTASIS', 'GLUTATHIONE'],
+    cardio: ['HEART', 'CARDIO', 'VESSEL', 'COENZYME', 'COQ'],
+    neuro: ['NEURO', 'GABA', 'DOPAMINE', 'NMDA', 'MYELIN', 'COGNITIVE'],
+    metabolic: ['AMPK', 'INSULIN', 'MITOCHONDRIAL', 'GLUCOSE', 'LIPID'],
+    detox: ['DETOX', 'CYP450', 'PHASE_II', 'AMMONIA'],
+    immune: ['IMMUNE', 'ANTIINFLAMMATORY', 'NFKB', 'CYTOKINE'],
+    hormonal: ['TESTOSTERONE', 'AROMATASE', 'PROLACTIN', 'THYROID', 'ESTROGEN'],
+    membrane: ['MEMBRANE', 'PHOSPHOLIPID', 'BILE_ACID'],
+    adaptogen: ['ADAPTOGEN', 'CORTISOL', 'STRESS', 'ADRENAL'],
+  };
+
+  const detectDomain = (mechIds: string[]): string => {
+    const joined = mechIds.join(' ').toUpperCase();
+    for (const [domain, keywords] of Object.entries(DOMAIN_KEYWORDS)) {
+      if (keywords.some(kw => joined.includes(kw))) return domain;
+    }
+    return 'general';
+  };
+
   for (const s of substances) {
     const cat_ = SUPPORT_CATALOG_DATA[s.id] || SUPPORT_CATALOG_DATA[s.id.toUpperCase()];
     if (!(cat_ as any)?.synergies) continue;
@@ -760,35 +830,66 @@ export function buildClinicalStack(
       const key = [s.id.toLowerCase(), partnerId].sort().join('|');
       if (seenSynKeys.has(key)) continue;
       seenSynKeys.add(key);
+
+      const partnerMechs = (SUPPORT_CATALOG_DATA[partnerId] || SUPPORT_CATALOG_DATA[partnerId.toUpperCase()] || {}).mechanisms || [];
+      const allMechs = [...(s.tzMechanisms || []).map(t => t.mechId), ...partnerMechs];
+      const domain = detectDomain(allMechs);
+
       stackSynergies.push({
         ids: [s.id, partnerId],
         effect: syn.effect || syn.mechanism || '',
+        mechanism: syn.mechanism || '',
         strength: (syn.severity || syn.strength || 'MEDIUM').toUpperCase(),
+        domain,
+        description: syn.effect || syn.mechanism || `${s.name} + ${(SUPPORT_CATALOG_DATA[partnerId] as any)?.nameRu || partnerId}: синергическое взаимодействие`,
       });
     }
   }
 
-  // 3c) Описание стека
+  // 3c) Развёрнутое описание стека
   const coveredSystems = new Set<string>();
+  const systemMechs: Record<string, string[]> = {};
   for (const s of substances) {
     for (const tz of s.tzMechanisms || []) {
       const prefixMap: Record<string, string> = { cv: 'cardio', liv: 'hepatic', ren: 'renal', cns: 'cns', rep: 'reproductive', hem: 'hematologic' };
       const prefix = tz.mechId.match(/^[a-z]+/)?.[0];
-      if (prefix && prefixMap[prefix]) coveredSystems.add(prefixMap[prefix]);
+      if (prefix && prefixMap[prefix]) {
+        coveredSystems.add(prefixMap[prefix]);
+        if (!systemMechs[prefixMap[prefix]]) systemMechs[prefixMap[prefix]] = [];
+        if (!systemMechs[prefixMap[prefix]].includes(tz.label)) systemMechs[prefixMap[prefix]].push(tz.label);
+      }
     }
   }
-  const systemNames = [...coveredSystems].map((sys) => (TZ_SYSTEM_LABELS as any)[sys] || sys).join(', ');
+  const systemNames = [...coveredSystems].map((sys) => (TZ_SYSTEM_LABELS as any)[sys] || sys);
   const gradeCounts = substances.reduce((acc, s) => { const g = getEvidenceGrade(s.id); acc[g] = (acc[g] || 0) + 1; return acc; }, {} as Record<string, number>);
   const gradeParts: string[] = [];
   if (gradeCounts.A) gradeParts.push(`A:${gradeCounts.A}`);
   if (gradeCounts.B) gradeParts.push(`B:${gradeCounts.B}`);
   if (gradeCounts.C) gradeParts.push(`C:${gradeCounts.C}`);
-  const orientTag = isOrientational ? ' ⚠️ Ориентировочный (без курса и анализов)' : '';
-  const courseTag = useCourse && state.pharma.aas.length > 0 ? ` · Курс: ${state.pharma.aas.length} ААС` : '';
-  const labTag = useLabs && (state.labs?.fullPanel || state.labs?.midCourse) ? ' · Лаб: ✓' : '';
-  const greedyCount = gate.ids.length - candidateIds.filter(id => gate.ids.includes(id)).length;
-  const greedyTag = greedyCount > 0 ? ` · +${greedyCount} синергия` : '';
-  const stackDescription = `Стек из ${substances.length} веществ (${gradeParts.join(', ')}).${orientTag}${courseTag}${labTag}${greedyTag} Покрытие систем: ${systemNames || 'не определено'}.`;
+
+  const parts: string[] = [];
+  parts.push(`Клинический стек из ${substances.length} веществ (${gradeParts.join(', ')}).`);
+  const contextParts: string[] = [];
+  if (isOrientational) contextParts.push('⚠️ Ориентировочный (без курса и анализов)');
+  if (useCourse && state.pharma.aas.length > 0) contextParts.push(`Курс: ${state.pharma.aas.length} ААС`);
+  if (useLabs && (state.labs?.fullPanel || state.labs?.midCourse)) contextParts.push('Лаб: ✓');
+  if (contextParts.length > 0) parts.push(contextParts.join(' · '));
+
+  parts.push('Принцип:');
+  for (const s of substances) {
+    const mechs = (s.tzMechanisms || []).map(t => t.label).join(', ');
+    const role = s.mechanismReason || mechs || 'поддержка';
+    parts.push(`• ${s.name} (${s.doseDisplay || s.doseMg + ' мг'}, ${s.timing}) — ${role}`);
+  }
+
+  if (systemNames.length > 0) {
+    parts.push('Покрытие систем:');
+    for (const sys of systemNames) {
+      const mechs = systemMechs[sys] || [];
+      parts.push(`• ${sys}: ${mechs.join(', ')}`);
+    }
+  }
+  const stackDescription = parts.join('\n');
 
   // 4) Отсеянные вещества (прозрачность)
   const excluded: ClinicalStackResult['excluded'] = [];

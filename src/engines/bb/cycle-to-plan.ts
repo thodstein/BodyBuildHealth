@@ -631,8 +631,9 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const pedAdapt = adaptForPEDs(peds, landmarks, pedDoses, courseIntensity);
   const mrvMult = pedAdapt.combinedMrvMultiplier || 1.0;
 
-  // volumeGoal scaling: MEV=0.7, MAV=1.0, MRV=1.15 (поверх шаблона)
-  const volGoalMult = volumeGoal === 'mev' ? 0.70 : volumeGoal === 'mrv' ? 1.15 : 1.0;
+  // volumeGoal scaling: MEV=0.7, MAV=1.0, MRV=1.15 (поверх шаблона).
+  // Faithful: всегда 1.0 — не меняем объём программы.
+  const volGoalMult = mode === 'faithful' ? 1.0 : (volumeGoal === 'mev' ? 0.70 : volumeGoal === 'mrv' ? 1.15 : 1.0);
   // specialization: weak groups +10%, others на MEV (×0.7)
   const specWeak = specialization ? weakPoints.slice(0, 2) : [];
 
@@ -690,11 +691,9 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
       const seenNames = new Set<string>(); // дедупликация по имени внутри дня
       const exercises: BBExercise[] = (daySpec.exercises || []).map((exSpec: any) => {
         const exGroup = exSpec.group || muscleGroupFromExName(exSpec.name, EXERCISE_CATALOG);
-        // В faithful-режиме не трогаем упражнения программы (пропускаем PL→BB фильтр),
-        // остаются только safety-фильтры (травмы/исключения/оборудование).
-        const bbReplaced = mode === 'faithful'
-          ? { name: exSpec.name, group: exGroup }
-          : replacePLForBB(exSpec.name, exGroup);
+        // PL→BB замена — safety-фильтр, применяется в ОБИХ режимах (faithful/adapt).
+        // ПЛ-упражнения (становая, жим стоя, рывок и др.) несовместимы с ББ-гипертрофией.
+        const bbReplaced = replacePLForBB(exSpec.name, exGroup);
         if (bbReplaced === null) {
           // Пропустить упражнение (ПЛ/мусор без ББ-аналога)
           return null as any;
@@ -755,8 +754,9 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         const isSubstituted = finalExName !== exSpec.name;
 
         // Volume boost: weak groups + PED adaptation + volumeGoal + specialization + focusGroup.
-        // При активных PED: primary получает полный множитель, accessory — 80% множителя, минимум 2 сета.
-        const pedFactor = peds.length > 0 ? (isPrimary ? mrvMult : Math.max(1.0, mrvMult * 0.8)) : 1.0;
+        // PED: primary × mrvMult, accessory × max(1, mrvMult×0.8) — как в buildBBPlan.
+        // Faithful: pedFactor=1.0 — не меняем объём программы.
+        const pedFactor = (mode === 'adapt' && peds.length > 0) ? (isPrimary ? mrvMult : Math.max(1.0, mrvMult * 0.8)) : 1.0;
         // specialization: слабые (топ-2) на +10%, остальные на MEV (×0.7)
         const specFactor = specialization ? (specWeak.includes(muscle) ? 1.10 : 0.70) : 1.0;
         // focusGroup: +30%
@@ -767,6 +767,18 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         let targetSets = Math.max(1, Math.round(baseSets * setMult));
         // Минимум 2 сета для любого упражнения (ББ-практика)
         if (targetSets < 2) targetSets = 2;
+        // PED arm boost (как в buildBBPlan): arms/shoulders ×1.4 при mrvMult≥1.3
+        if (mode === 'adapt' && mrvMult >= 1.3 && ['triceps', 'biceps', 'shoulders', 'forearms'].includes(muscle)) {
+          targetSets = Math.round(targetSets * 1.4);
+        }
+        // MRV cap (как в buildBBPlan normalizeWeekMrv): не превышать MRV×mrvMult
+        if (mode === 'adapt') {
+          const lm = (allLandmarks as any)[muscle];
+          if (lm && lm.mrv) {
+            const mrvCap = Math.round(lm.mrv * mrvMult);
+            targetSets = Math.min(targetSets, mrvCap);
+          }
+        }
 
         // RIR: weak groups get 0.5 harder
         const effectiveRir = isWeak ? Math.max(0, exRir - 1) : exRir;
@@ -825,7 +837,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         if (eq.includes('bodyweight') || eq.includes('suspension')) return 5;
         return 5;
       };
-      {
+      // Faithful: сохраняем оригинальный порядок программы (не переупорядочиваем).
+      if (mode !== 'faithful') {
         const _tidy = tidySessionExercises(exercises, exercises.find(e => e.role === 'primary')?.muscle);
         exercises.length = 0; exercises.push(..._tidy);
       }
@@ -914,13 +927,13 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   // (хардкод) → авто-делод никогда не срабатывал. Теперь — единый расчёт.
   const acwrInfo = computeAcwrCyclePlan();
   const acwrRatio = acwrInfo.ratio;
-  if (mode === 'adapt' && autoDeload && acwrRatio > 1.3) {
+  if (acwrRatio > 1.3) {
     rationale.push(`⚠ ACWR=${acwrRatio.toFixed(2)} (${acwrInfo.zone}) → план может потребовать разгрузочной недели`);
   }
 
   // Применяем пост-обработку (техники/авто-делод/загрузка/авторег) — как в buildBBPlan.
-  // Условие покрывает ВСЕ признаки, а не только technique/weakPoints — иначе loadStrategy
-  // и autoDeload теряются.
+  // Только в adapt: faithful сохраняет программу как есть (без изменения объёма/RIR/делода).
+  // ACWR-warning показывается в обоих режимах (см. выше).
   if (mode === 'adapt' && ((intensityTechnique && intensityTechnique !== 'none') || weakPoints.length > 0 || loadStrategy || autoDeload || autoRegResult)) {
     finalPlan = applyPostPhaseProcessing({
       plan: finalPlan,
@@ -1169,7 +1182,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   // favoriteExercises могут быть id или именами — строим множество имён для приоритета при замене.
   const favNames = new Set<string>((opts.favoriteExercises || []).flatMap(id => { const cat = EXERCISE_CATALOG.find(e => e.id === id); return cat ? [cat.name] : [id]; }));
   const eqList = opts.equipment || [];
-  const avAxial = mode === 'faithful' ? false : (opts.avoidAxialLoad || false);
+  const avAxial = opts.avoidAxialLoad || false;
   const level = opts.level || 'intermediate';
 
   // PED adaptation для MRV-кап (добивка слабых групп не превышает MRV)
@@ -1269,10 +1282,10 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           const bbRep = replacePLForBB(ex.name, exGroup);
           if (!bbRep) continue; // ПЛ/олимпийский/мусор без ББ-аналога — пропускаем
           if (bbRep.name !== ex.name) {
+            const originalName = ex.name;
             ex = { ...ex, name: bbRep.name };
             muscle = muscleGroupFromExName(bbRep.name, EXERCISE_CATALOG);
-            // Train комментарий с указанием замены (для прозрачности для пользователя).
-            ex = { ...ex, notes: (ex.notes ? ex.notes + '. ' : '') + '⚠ Замена ПЛ→ББ: ' + ex.name + ' → ' + bbRep.name };
+            ex = { ...ex, notes: (ex.notes ? ex.notes + '. ' : '') + '⚠ Замена ПЛ→ББ: ' + originalName + ' → ' + bbRep.name };
           }
         }
 
@@ -1343,7 +1356,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           tempo: undefined,
         }));
 
-        // Adapt mode: weak/focus boost — добираем добавочные сеты (НЕ меняем faithfull %
+        // Adapt mode: weak/focus/PED boost — добираем добавочные сеты (НЕ меняем faithfull %
         // основной прогрессии). Apply к RIR слабой группы (стимул упорнее), увеличиваем sets.
         let adjSets = sets;
         let adjRir = rir;
@@ -1354,6 +1367,21 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           if (isWeak) adjSets = Math.round(adjSets * 1.15);
           if (isFocus) adjSets = Math.round(adjSets * 1.30);
           if (isWeak) adjRir = Math.max(0, rir - 1);
+          // PED volume boost (как в buildBBPlan): primary × mrvMult, accessory × max(1, mrvMult×0.8)
+          if (opts.peds && opts.peds.length > 0) {
+            const pedFactor = role === 'primary' ? mrvMult : Math.max(1.0, mrvMult * 0.8);
+            adjSets = Math.round(adjSets * pedFactor);
+          }
+          // PED arm boost (как в buildBBPlan): arms/shoulders ×1.4 при mrvMult≥1.3
+          if (opts.peds && opts.peds.length > 0 && mrvMult >= 1.3 && ['triceps', 'biceps', 'shoulders', 'forearms'].includes(muscle)) {
+            adjSets = Math.round(adjSets * 1.4);
+          }
+          // MRV cap (как в buildBBPlan normalizeWeekMrv): не превышать MRV×mrvMult
+          const lm = (allLandmarks as any)[muscle];
+          if (lm && lm.mrv) {
+            const mrvCap = Math.round(lm.mrv * mrvMult);
+            adjSets = Math.min(adjSets, mrvCap);
+          }
           if (adjSets !== sets) {
             // Доп-сеты берут pct и rir последнего сета
             usedSets = Array.from({ length: Math.max(1, adjSets) }, (_, si) => {
@@ -1463,7 +1491,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
 
       // Sort: primary first, then compound → isolation → pump finisher; faithful: respect original order
       // Adapt: keep original order + finisher в конце (уже так pushились), но primary в начало
-      {
+      if (mode !== 'faithful') {
         const _tidy = tidySessionExercises(exercises, exercises.find(e => e.role === 'primary')?.muscle);
         exercises.length = 0; exercises.push(..._tidy);
       }
@@ -1499,8 +1527,9 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       });
     }
 
-    // Faithful deload: уважаем pw.deload (volume×0.5 уже учтён в volumeMultiplier, но дополнительно снизим на -50%)
-    if (isDeload) {
+    // Deload: в adapt — дополнительное снижение (поверх volumeMultiplier программы).
+    // Faithful: НЕ применяется — программа уже учитывает deload через volumeMultiplier/intensityMultiplier.
+    if (isDeload && mode !== 'faithful') {
       for (const sess of sessions) {
         for (const ex of sess.exercises) {
           ex.sets = Math.max(1, Math.round(ex.sets * 0.5 / Math.max(0.5, volMult)));
@@ -1564,11 +1593,13 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   // и ACWR-warning никогда не срабатывали.
   const acwrInfo = computeAcwrCyclePlan();
   const acwrRatio = acwrInfo.ratio;
-  if (opts.autoDeload && acwrRatio > 1.3) {
+  if (acwrRatio > 1.3) {
     rationale.push(`⚠ ACWR=${acwrRatio.toFixed(2)} (${acwrInfo.zone}) → план может потребовать разгрузочной недели`);
   }
 
-  // Apply post-processing for adapt mode (интенс-техники/авто-делод/загрузка/авторег)
+  // Apply post-processing (интенс-техники/авто-делод/загрузка/авторег) — только adapt.
+  // Faithful: программа сохраняется как есть (без изменения объёма/RIR/делода).
+  // ACWR-warning показывается в обоих режимах (см. выше).
   if (mode === 'adapt' && ((opts.intTechnique && opts.intTechnique !== 'none') || weakPoints.length > 0 || opts.loadStrategy || opts.autoDeload || opts.autoRegResult)) {
     finalPlan = applyPostPhaseProcessing({
       plan: finalPlan,

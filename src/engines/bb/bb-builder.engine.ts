@@ -45,6 +45,14 @@ export const PHASE_EQUIPMENT_PREF: Record<string, string[]> = {
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
 export type BBVolumeGoal = 'mev' | 'mav' | 'mrv';
 
+export interface MusclePlan {
+  muscle: string; resolved: string; role: 'primary' | 'accessory';
+  sets: number; exerciseCount: number; rir: number;
+  reps: number; weight: number; pool: any[]; exDatas: any[]; selType: string;
+  rationaleMap: Map<string, string>;
+  phaseEquip?: string[];
+}
+
 export interface BBBuilderInput {
   patternId: string;
   level: string;                 // beginner/intermediate/advanced/enhanced
@@ -213,6 +221,60 @@ const WEAK_TO_MUSCLE: Record<string, string> = {
 
 /** Для каких мышц в BB-контексте ВСЕГДА брать только изоляцию (нет compound аналогов). */
 const ALWAYS_ISOLATION: Set<string> = new Set(['calves', 'forearms', 'abs']);
+
+// "Золотой стандарт" ББ-упражнений (максимально эффективные для гипертрофии).
+// Приоритизируются в generic-планах (без специализации/слабых точек).
+const PREFERRED_BB_EXERCISES = new Set([
+  // Грудь
+  'bench_press', 'incline_barbell_press', 'dumbbell_bench_press', 'incline_dumbbell_press',
+  // Спина
+  'barbell_row', 't_bar_row', 'dumbbell_row', 'lat_pulldown', 'pull_up', 'chin_up',
+  // Ноги
+  'squat', 'leg_press', 'dumbbell_lunge', 'romanian_deadlift', 'leg_curl', 'leg_extension',
+  // Плечи
+  'overhead_press', 'arnold_press', 'dumbbell_lateral_raise',
+  // Руки
+  'tricep_pushdown', 'barbell_curl', 'dumbbell_curl',
+  // Икры/Пресс
+  'calf_raise', 'crunch',
+]);
+
+// Слишком специфические упражнения (исключать для generic плана, если нет weak point).
+// "Жим обратным хватом" — пример из запроса: мало эффективен для общего развития груди.
+const BLACKLIST_GENERIC = new Set([
+  'bench_press_reverse_grip', 'reverse_grip_bench_press',
+  'underhand_grip_lat_pulldown',
+  'wide_grip_bench_press',
+  'smith_machine_squat',
+  'leg_press_machine_close_stance',
+  'machine preacher_curl',
+]);
+
+// Детальные инструкции по выполнению (углы, хват, техника).
+// Заменяют абстрактные "постоянный темп" на конкретные команды.
+const EXECUTION_NOTES: Record<string, string> = {
+  bench_press: "Ловка: на ширине плеч. Хват: прямой. Локти: чуть под грифом (не в стороны). Опускайте до касания груди.",
+  incline_barbell_press: "Скамья: 30-45 градусов. Ловка: чуть шире плеч. Спина: плотно прижата.",
+  dumbbell_bench_press: "Хват: нейтральный (ладони друг к другу). Опускайте до растяжения груди.",
+  squat: "Стопы: на ширине плеч. Спина: прямая, натяжение. Глубина: параллельно полу. Взгляд: вперёд.",
+  leg_press: "Стопы: на платформе, плечи защищены. Глубина: до 90 градусов в коленях.",
+  romanian_deadlift: "Спина: прямая. Гриф: близко к голеням. Взгляд: вперёд. Не круглить спину!",
+  deadlift: "Хват: по ширине плеч или разносторонний. Спина: прямая, грудь вперёд.",
+  barbell_row: "Наклон: 45-60 градусов. Тяга к низу живота. Локти: вдоль туловища.",
+  dumbbell_row: "Наклон: опора на скамью. Тяга к поясу. Руки параллельно.",
+  lat_pulldown: "Хват: широкий. Тяните к верху груди. Не раскачивайтесь корпусом.",
+  pull_up: "Хват: широкий. Подбородок над перекладиной. Опускайте до почти полного выпрямления рук.",
+  overhead_press: "Хват: чуть шире плеч. Выжимайте над головой. Не прогибайтесь в пояснице.",
+  arnold_press: "Хват: нейтральный. Выжимайте вверх, разворачивая ладонями от себя при подъеме.",
+  tricep_pushdown: "Хват: узкий V-образный. Локти прижаты к корпусу. Опускайте медленно, вверх взрывно.",
+  lying_tricep_extension: "Хват: EZ-гриф. Локти направлены в потолок (не разводите в стороны!).",
+  barbell_curl: "Хват: на ширине плеч. Локти прижаты. Не раскачивайтесь корпусом.",
+  dumbbell_curl: "Чередуйте супинацию (ладони друг к другу, нейтральный).",
+  leg_curl: "Опускайте медленно (эксцентрика), поднимайте быстро (концентрика).",
+  leg_extension: "Выпрямляйте полностью (вверху задержка 0.5 сек).",
+  calf_raise: "Максимум растяжения внизу, стойте на носках 1 сек вверху.",
+  crunch: "Поднимайте лопатки с пола. Руки за головой. Движение короткое, концентрированное.",
+};
 
 /** Ранг упражнения по "тяжести" — определяет порядок внутри угла.
  *  compound barbell (1) > compound dumbbell (2) > compound machine (3) >
@@ -431,12 +493,25 @@ function exerciseRiskWarning(name: string): string {
 }
 
 /** Построить тренерский комментарий к упражнению. */
+/** Форматирование темпа в понятные инструкции (2-0-X-0 -> "Опуск 2 сек..."). */
+function formatTempoUser(tempo: string): string {
+  if (!tempo || tempo === 'auto') return 'Контролируемый темп';
+  const parts = tempo.split('-').map(p => p.trim());
+  const desc = [];
+  if (parts[0]) desc.push(`Опуск ${parts[0]} сек`);
+  if (parts[1]) desc.push(`Низ ${parts[1]} сек`);
+  if (parts[2]) desc.push(`Вверх ${parts[2]}`);
+  if (parts[3]) desc.push(`Верх ${parts[3]}`);
+  return desc.join(', ');
+}
+
 function buildExComment(
   muscle: string, name: string, role: 'primary' | 'accessory',
   character: DayCharacter, sets: number, reps: number, weight: number, rir: number,
   weakPoints: string[], focusGroup: string | undefined,
   phase: BBPhase, tempo: string, restSec: number,
   isSubstituted: boolean,
+  exerciseId?: string,
 ): string {
   const parts: string[] = [];
   const label = role === 'primary' ? '🎯 Основное' : '📌 Добивочное';
@@ -448,7 +523,14 @@ function buildExComment(
   const charLabel = character === 'тяж' ? 'тяж' : character === 'памп' ? 'памп' : 'лёг';
   parts.push(`${phaseNames[phase] || phase}, RIR ${rir} (${charLabel})`);
   parts.push(`${sets}×${reps} @ ${weight} кг`);
-  parts.push(`Темп ${tempo}, отдых ${restSec}с`);
+  
+  // Конкретные инструкции по выполнению (углы, хват, техника)
+  const execNote = exerciseId ? EXECUTION_NOTES[exerciseId] || EXECUTION_NOTES[name] : EXECUTION_NOTES[name];
+  if (execNote) parts.push(execNote);
+  
+  // Понятный темп
+  parts.push(`Темп: ${formatTempoUser(tempo)}. Отдых: ${restSec}с`);
+  
   const warn = exerciseRiskWarning(name);
   if (warn) parts.push(warn);
   return parts.join('. ');
@@ -464,6 +546,50 @@ export function buildWarmup(workWeight: number, isCompound: boolean): { load: nu
     warmups.push({ load: Math.round(workWeight * pct), reps: Math.min(8, 5 + i) });
   }
   return warmups;
+}
+
+/** База динамических растяжек для основных мышц ББ. */
+const STRETCH_DB: Record<string, { name: string; muscle: string; instruction: string }> = {
+  chest: { name: 'Разведение рук в тренажере (пек-дек)', muscle: 'chest', instruction: '12-15 reps. Легкое растяжение груди и передней дельты. Плечи отведены назад.' },
+  back: { name: 'Подтягивание на верхнем блоке (широкий хват)', muscle: 'back', instruction: '12-15 reps. Растяжка широчайших мышц спины. Грудь прижата к блоку.' },
+  shoulders: { name: 'Разведение гантелей в стороны (сидя)', muscle: 'shoulders', instruction: '12-15 reps. Растяжка средней дельты. Без веса, концентрация на пике.' },
+  quads: { name: 'Выпад на одну ногу (подтягивание другой коленом)', muscle: 'quads', instruction: '10-12 reps на ногу. Растяжка квадрицепса. Колено выпрямляющей ноги не касается пола.' },
+  hamstrings: { name: 'Румынская тяга с гантелями (стоя)', muscle: 'hamstrings', instruction: '12-15 reps. Спина прямая. Гриф близко к голеням. Растяжка задней поверхности бедра.' },
+  glutes: { name: 'Ягодичный мостик (bodyweight)', muscle: 'glutes', instruction: '12-15 reps. Плечи на скамье. Колени под 90°. Пик вверху на 1 сек.' },
+  calves: { name: 'Растяжка икр на носках (о стены)', muscle: 'calves', instruction: '30 сек. Пятка опущена, колено прямое. Растяжка икроножечной мышцы.' },
+  abs: { name: 'Кobra stretch (растяжка пресса)', muscle: 'abs', instruction: '30 сек. Опора на пальцы ног и предплечья. Выгнуть спину дугой, голову вверх.' },
+};
+
+/**
+ * Добавить динамическую растяжку в конец сессии.
+ * Выбирает 1-2 упражнения на основе musclePlans дня.
+ */
+function addStretching(musclePlans: MusclePlan[]): BBExercise[] {
+  if (!musclePlans || musclePlans.length === 0) return [];
+  const stretchExs: BBExercise[] = [];
+  const usedMuscles = new Set<string>();
+  
+  // Добавляем растяжку для 1-2 основных мышц (не дублируем)
+  for (const plan of musclePlans.slice(0, 2)) {
+    const canonKey = collapseKey(plan.muscle);
+    if (usedMuscles.has(canonKey)) continue;
+    const stretch = STRETCH_DB[canonKey];
+    if (stretch) {
+      stretchExs.push({
+        muscle: canonKey,
+        name: stretch.name,
+        role: 'accessory',
+        character: 'лёг',
+        sets: 1,
+        repsRange: [15, 20], // Динамическая растяжка — reps как индикатор
+        rir: 3,
+        workSets: [],
+        comment: `Растяжка: ${stretch.instruction}`,
+      });
+      usedMuscles.add(canonKey);
+    }
+  }
+  return stretchExs;
 }
 
 // fix E: реалистичные значения workMax по умолчанию (кг) — используются,
@@ -526,13 +652,6 @@ function buildSession(
   const dayFatigueBudget = Math.round(dailyCap * S_MRV_FACTOR * (pedAdapt?.combinedRecoveryMultiplier ?? 1) * levelMult);
   
   // Pre-calculate each muscle's expected volume to allocate budget proportionally
-  interface MusclePlan {
-    muscle: string; resolved: string; role: 'primary' | 'accessory';
-    sets: number; exerciseCount: number; rir: number;
-    reps: number; weight: number; pool: any[]; exDatas: any[]; selType: string;
-    rationaleMap: Map<string, string>;
-    phaseEquip?: string[];
-  }
   const plans: MusclePlan[] = [];
   let totalExpectedFatigue = 0;
   const sessionSelectedIds: string[] = [...preSelectedIds, ...rotationBlockIds];
@@ -737,6 +856,37 @@ function buildSession(
       if (avoidAxialLoad && ex.name && isAxialLoadExercise(ex)) return false;
       return true;
     });
+
+    // Generic-план (без специализации/слабых точек): убираем слишком специфичные вариации
+    // (обратный хват, узкая стойка, изолирующие машины) и приоритизируем "золотой стандарт".
+    const isGeneric = !focusGroup && !weakPoints.some(wp => {
+      const parent = WEAK_TO_MUSCLE[wp];
+      return wp === muscle || (parent && parent === muscle);
+    });
+    if (isGeneric) {
+      pool = pool.filter((ex: any) => {
+        const id = (ex.id || '').toLowerCase();
+        const n = (ex.name || '').toLowerCase();
+        // Проверка ID (строгий мэтчинг) и паттернов имени (для надежности)
+        const isBlacklisted = Array.from(BLACKLIST_GENERIC).some(bid =>
+          id.includes(bid) || n.includes(bid.replace(/_/g, ' ')));
+        return !isBlacklisted;
+      });
+      // Сортируем пул: preferred упражнения (золотой стандарт) приоритетнее.
+      // Добавляем невидимый `_score` для сортировки.
+      pool = pool.map((ex: any) => {
+        let score = 0;
+        const n = (ex.name || '').toLowerCase();
+        if (PREFERRED_BB_EXERCISES.has(ex.id)) score += 50; // Большой буст стандарту
+        else if (favoriteIds.includes(ex.id)) score += 20; // Любимые пользователя
+        // Штраф за редкие вариации (узкий/обратный/глубокий хват, изолирующие машины)
+        if (n.includes('обратн') || n.includes('обрат') || n.includes('reverse')) score -= 10;
+        if (n.includes('узкий') || n.includes('узк') || n.includes('narrow')) score -= 5;
+        if (n.includes('машин') || n.includes('machine') || n.includes('блок')) score -= 5;
+        return { ...ex, _score: score };
+      }).sort((a: any, b: any) => (b._score || 0) - (a._score || 0));
+    }
+
     let selected = selectExercisesSmart({
       candidates: pool, muscleGroup: muscle, count: exerciseCount,
       selectedIds: sessionSelectedIds, selectedNames: sessionSelectedNames,
@@ -1134,7 +1284,7 @@ function buildSession(
           rir: finalRir,
           workSets, exerciseName: (exData as any).name || (exData as any).id,
           tempoSpec: tempoStr, restSeconds: exRest,
-          comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted),
+          comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id),
           warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary'),
           rationale: pl.rationaleMap.get((exData as any).name) || '',
         });

@@ -564,15 +564,25 @@ export function getTzSystemLabel(sysId: string): string {
 }
 
 export function getDrugTzMechanisms(drugId: string): { organId: string; mechId: string; weight: number }[] {
-  const entry = DRUG_DB[drugId];
-  if (!entry) return [];
-  const result: { organId: string; mechId: string; weight: number }[] = [];
-  for (const [organId, mechs] of Object.entries(entry.organMechanisms)) {
-    for (const mechId of mechs) {
-      result.push({ organId, mechId, weight: entry.mechanismWeights[mechId] || 1 });
+  const drugEntry = DRUG_DB[drugId];
+  if (drugEntry) {
+    const result: { organId: string; mechId: string; weight: number }[] = [];
+    for (const [organId, mechs] of Object.entries(drugEntry.organMechanisms)) {
+      for (const mechId of mechs) {
+        result.push({ organId, mechId, weight: drugEntry.mechanismWeights[mechId] || 1 });
+      }
     }
+    return result;
   }
-  return result;
+
+  const key = drugId.toLowerCase();
+  const suppEntries = SUPPLEMENTS_DB[key] || SUPPLEMENTS_DB[drugId] || PHARMACY_DB[key] || PHARMACY_DB[drugId];
+  if (!suppEntries?.length) return [];
+  return suppEntries.map(e => ({
+    organId: e.organId,
+    mechId: e.mechId,
+    weight: 1,
+  }));
 }
 
 export function formatTzDrugMapping(drugId: string): string {
@@ -582,13 +592,25 @@ export function formatTzDrugMapping(drugId: string): string {
 }
 
 export function getSystemMechsForDrug(drugId: string, organId: string): { mechId: string; label: string; weight: number }[] {
-  const entry = DRUG_DB[drugId];
-  if (!entry?.organMechanisms[organId]) return [];
-  return entry.organMechanisms[organId].map(m => ({
-    mechId: m,
-    label: TZ_MECH_LABELS[m] || m,
-    weight: entry.mechanismWeights[m] || 1,
-  }));
+  const drugEntry = DRUG_DB[drugId];
+  if (drugEntry?.organMechanisms[organId]) {
+    return drugEntry.organMechanisms[organId].map(m => ({
+      mechId: m,
+      label: TZ_MECH_LABELS[m] || m,
+      weight: drugEntry.mechanismWeights[m] || 1,
+    }));
+  }
+
+  const key = drugId.toLowerCase();
+  const suppEntries = SUPPLEMENTS_DB[key] || SUPPLEMENTS_DB[drugId] || PHARMACY_DB[key] || PHARMACY_DB[drugId];
+  if (!suppEntries?.length) return [];
+  return suppEntries
+    .filter(e => e.organId === organId)
+    .map(e => ({
+      mechId: e.mechId,
+      label: TZ_MECH_LABELS[e.mechId] || e.mechId,
+      weight: 1,
+    }));
 }
 
 // ── Для карточек поддержки: читает SUPPORT_DB ──

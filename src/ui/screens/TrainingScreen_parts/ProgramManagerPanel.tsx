@@ -29,7 +29,7 @@ import type {
 } from '../../../engines/user-program/user-program.types';
 import { newId } from '../../../engines/user-program/user-program.types';
 import { HybridPlanPanel } from './HybridPlanPanel';
-import { ExercisePicker } from './ExercisePicker';
+import { ExerciseLabPicker } from './ExerciseLabPicker';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { BbContextPanel, PLContextPanel } from './program-editor-context-panels';
@@ -1660,9 +1660,35 @@ const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => v
             <option value="isolation">Изоляция</option>
             <option value="finisher">Финишь</option>
           </select>
-<ExercisePicker value={b.exerciseName} muscle={b.muscle} onSelect={ex => updateBlock(bi, { exerciseName: ex.name, muscle: ex.group || b.muscle, type: (ex.type === 'compound' ? 'compound' : ex.type === 'isolation' ? 'isolation' : 'accessory') as UserBlock['type'], role: ex.type === 'compound' ? 'primary' : 'accessory' })} />
+          <ExerciseLabPicker value={b.exerciseName} muscle={b.muscle} onSelect={ex => updateBlock(bi, { exerciseName: ex.name, muscle: ex.group || b.muscle, type: (ex.type === 'compound' ? 'compound' : ex.type === 'isolation' ? 'isolation' : 'accessory') as UserBlock['type'], role: ex.type === 'compound' ? 'primary' : 'accessory' })} />
           <input style={{ ...IN, padding: '4px 6px', fontSize: 11, flex: '0 0 90px' }} value={b.muscle} onChange={e => updateBlock(bi, { muscle: e.target.value })} placeholder="Мышечная группа" list="muscle-list" />
           <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} muscle={b.muscle} />
+          
+          {/* Комментарий к упражнению */}
+          <input 
+            style={{ ...IN, padding: '3px 6px', fontSize: 10, flex: '1 1 100%', minWidth: 120 }} 
+            value={b.note || ''} 
+            onChange={e => updateBlock(bi, { note: e.target.value })} 
+            placeholder="💬 Комментарий (роль, акцент, замена...)" 
+          />
+          
+          {/* Выбор второго упражнения для суперсета */}
+          {b.supersetWith && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', background: 'rgba(167,139,250,0.08)', borderRadius: 6, border: '1px solid rgba(167,139,250,0.2)' }}>
+              <span style={{ fontSize: 9, color: '#a78bfa', fontWeight: 700 }}>⊕ Суперсет с:</span>
+              <ExerciseLabPicker 
+                value={blocks.find(bl => bl.id === b.supersetWith)?.exerciseName || ''} 
+                muscle={b.muscle}
+                onSelect={ex => {
+                  // Найти индекс партнёра и обновить его название
+                  const partnerIdx = blocks.findIndex(bl => bl.id === b.supersetWith);
+                  if (partnerIdx >= 0) {
+                    updateBlock(partnerIdx, { exerciseName: ex.name, muscle: ex.group || b.muscle });
+                  }
+                }} 
+              />
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <button style={{ ...BTN_GHOST, padding: '0 4px', fontSize: 9, minHeight: 0, lineHeight: 1 }} onClick={() => moveBlock(bi, -1)} title="Вверх">▲</button>
             <button style={{ ...BTN_GHOST, padding: '0 4px', fontSize: 9, minHeight: 0, lineHeight: 1 }} onClick={() => moveBlock(bi, 1)} title="Вниз">▼</button>
@@ -1716,40 +1742,80 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
     del(i);
   };
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 3, flex: '0 0 auto', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 auto' }}>
       {sets.map((s, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,230,138,0.06)', borderRadius: 6, padding: '2px 4px' }}>
-          {/* U7: расширенный SetEditor: reps × rir @ вес + RPE-тайп + техника */}
-          <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 10, width: 30 }} value={typeof s.reps === 'number' ? s.reps : 0} onChange={e => upd(i, { reps: parseInt(e.target.value) || 0 })} title="повторения" />
-          <span style={{ fontSize: 9, color: DIM }}>×</span>
-          <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 10, width: 26 }} value={s.rir} min={0} max={5} onChange={e => upd(i, { rir: parseInt(e.target.value) || 0 })} title="RIR" />
-          <span style={{ fontSize: 9, color: DIM }}>@</span>
-          <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 10, width: 36 }} value={s.weight ?? 0} onChange={e => upd(i, { weight: parseFloat(e.target.value) || 0 })} title="вес (кг)" placeholder="кг" />
-          <select
-            style={{ ...IN, padding: '1px 2px', fontSize: 9, width: 50 }}
-            value={s.technique || 'none'}
-            onChange={e => upd(i, { technique: e.target.value as any })}
-            title="Техника"
-          >
-            <option value="none">—</option>
-            <option value="rest_pause">RP</option>
-            <option value="drop_set">DRP</option>
-            <option value="myo_reps">MYO</option>
-            <option value="pause_rep">PRS</option>
-            <option value="mechanical_drop">MD</option>
-          </select>
-          <input
-            type="number" style={{ ...IN, padding: '2px 3px', fontSize: 10, width: 32 }} value={Math.floor((s.restSec ?? 90) / 60)}
-            min={0} max={20}
-            onChange={e => upd(i, { restSec: (parseInt(e.target.value) || 0) * 60 })}
-            title="отдых (мин)"
-            placeholder="отд"
-          />
-          <span style={{ fontSize: 8, color: DIM }}>м</span>
-          <button style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 10, padding: 0 }} onClick={() => confirmDelete(i)}>✕</button>
+        <div key={i} style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 6, padding: '4px 6px' }}>
+          {/* Основная строка: reps × rir @ вес + техника + отдых */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
+            <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 10, width: 30 }} value={typeof s.reps === 'number' ? s.reps : 0} onChange={e => upd(i, { reps: parseInt(e.target.value) || 0 })} title="повторения" />
+            <span style={{ fontSize: 9, color: DIM }}>×</span>
+            <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 10, width: 26 }} value={s.rir} min={0} max={5} onChange={e => upd(i, { rir: parseInt(e.target.value) || 0 })} title="RIR" />
+            <span style={{ fontSize: 9, color: DIM }}>@</span>
+            <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 10, width: 36 }} value={s.weight ?? 0} onChange={e => upd(i, { weight: parseFloat(e.target.value) || 0 })} title="вес (кг)" placeholder="кг" />
+            <select
+              style={{ ...IN, padding: '1px 2px', fontSize: 9, width: 50 }}
+              value={s.technique || 'none'}
+              onChange={e => upd(i, { technique: e.target.value as any })}
+              title="Техника"
+            >
+              <option value="none">—</option>
+              <option value="rest_pause">RP</option>
+              <option value="drop_set">DRP</option>
+              <option value="myo_reps">MYO</option>
+              <option value="pause_rep">PRS</option>
+              <option value="mechanical_drop">MD</option>
+            </select>
+            <input
+              type="number" style={{ ...IN, padding: '2px 3px', fontSize: 10, width: 32 }} value={Math.floor((s.restSec ?? 90) / 60)}
+              min={0} max={20}
+              onChange={e => upd(i, { restSec: (parseInt(e.target.value) || 0) * 60 })}
+              title="отдых (мин)"
+              placeholder="отд"
+            />
+            <span style={{ fontSize: 8, color: DIM }}>м</span>
+            <button style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 10, padding: 0 }} onClick={() => confirmDelete(i)}>✕</button>
+          </div>
+          
+          {/* Динамические поля для техник */}
+          {s.technique === 'drop_set' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4, paddingTop: 4, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+              <span style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700 }}>↓ Дроп:</span>
+              <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 9, width: 36 }} value={s.dropWeight ?? 0} onChange={e => upd(i, { dropWeight: parseFloat(e.target.value) || 0 })} title="вес дропа (кг)" placeholder="вес" />
+              <span style={{ fontSize: 9, color: DIM }}>×</span>
+              <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 9, width: 30 }} value={s.dropReps ?? 0} onChange={e => upd(i, { dropReps: parseInt(e.target.value) || 0 })} title="повторения дропа" placeholder="повт" />
+            </div>
+          )}
+          {s.technique === 'myo_reps' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4, paddingTop: 4, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+              <span style={{ fontSize: 9, color: '#a78bfa', fontWeight: 700 }}>Мини:</span>
+              <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 9, width: 30 }} value={s.miniReps ?? 0} onChange={e => upd(i, { miniReps: parseInt(e.target.value) || 0 })} title="мини-повторения" placeholder="повт" />
+              <span style={{ fontSize: 9, color: DIM }}>отд</span>
+              <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 9, width: 32 }} value={Math.floor((s.miniRestSec ?? 15) / 60)} onChange={e => upd(i, { miniRestSec: (parseInt(e.target.value) || 0) * 60 })} title="мини-отдых (мин)" placeholder="отд" />
+              <span style={{ fontSize: 8, color: DIM }}>м</span>
+            </div>
+          )}
+          {s.technique === 'pause_rep' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4, paddingTop: 4, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+              <span style={{ fontSize: 9, color: '#22c55e', fontWeight: 700 }}>Пауза:</span>
+              <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 9, width: 32 }} value={s.pauseSec ?? 2} onChange={e => upd(i, { pauseSec: parseInt(e.target.value) || 0 })} title="пауза (сек)" placeholder="сек" />
+              <span style={{ fontSize: 8, color: DIM }}>сек</span>
+            </div>
+          )}
+          {s.technique === 'rest_pause' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4, paddingTop: 4, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+              <span style={{ fontSize: 9, color: '#3b82f6', fontWeight: 700 }}>RP:</span>
+              <span style={{ fontSize: 9, color: DIM }}>Отдых между мини-сетами: {Math.floor((s.restSec ?? 15) / 60)}м {((s.restSec ?? 15) % 60)}с</span>
+            </div>
+          )}
+          {s.technique === 'mechanical_drop' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4, paddingTop: 4, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+              <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 700 }}>Мех.дроп:</span>
+              <span style={{ fontSize: 9, color: DIM }}>Переход на более лёгкое упражнение после отказа</span>
+            </div>
+          )}
         </div>
       ))}
-      <button style={{ ...BTN_GHOST, padding: '2px 6px', fontSize: 10, minHeight: 0 }} onClick={add}>+ сет</button>
+      <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 0, alignSelf: 'flex-start' }} onClick={add}>+ сет</button>
       {/* Phase 6: быстрые шаблоны сетов — клик заменяет все сеты на pattern */}
       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 4, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         <span style={{ fontSize: 8, color: DIM, marginRight: 4 }}>📋 Шаблоны:</span>
