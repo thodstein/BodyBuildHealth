@@ -20,7 +20,9 @@ import { getExercisesByGroup } from '../core/exercise-catalog';
 import { getVolumeLandmarks } from './volume-landmarks.engine';
 import type { UserProgram, BBProgramBody, UserWeek, UserSession, UserBlock, UserSet } from './user-program/user-program.types';
 import { buildBBPlan, type BBBuilderInput, type BBPlan, type BBGoal } from './bb/bb-builder.engine';
+import { adaptForPEDs, type PED, type PEDAdaptation, type CourseIntensity } from './bb/bb-ped-adaptation.engine';
 import { getReferencedCycle, createFromBuild } from './user-program/program-store';
+import type { Injury } from './manual-plan-builder';
 
 // Exercise type не экспортирован из exercise-catalog, берём из core/types.
 
@@ -39,6 +41,12 @@ export interface AutoDraftOptions {
   daysPerWeek: number;
   weeks: number;
   splitPattern?: string;
+  favoriteExercises?: string[];
+  excludedExercises?: string[];
+  workMax?: Record<string, number>;
+  onCourse?: boolean;
+  courseIntensity?: string;
+  injuries?: { muscle: string; from?: string; to?: string; exclude?: boolean; volumePct?: number; weightPct?: number; repsCap?: number }[];
 }
 
 /**
@@ -119,23 +127,30 @@ export function autodraftBBPlan(opts: AutoDraftOptions): BBPlan {
     ? opts.goal as BBGoal
     : 'hypertrophy') as BBGoal;
   const patternId = opts.splitPattern ?? (opts.daysPerWeek <= 3 ? 'fullbody_3' : opts.daysPerWeek <= 4 ? 'upper_lower_4' : 'ppl_6');
+  const injuries: Injury[] = (opts.injuries ?? []).map((inj) => ({ muscle: inj.muscle, from: inj.from ?? new Date().toISOString().split('T')[0], to: inj.to, weightPct: inj.weightPct, volumePct: inj.volumePct, repsCap: inj.repsCap, exclude: inj.exclude }));
   const input: BBBuilderInput = {
     patternId,
     level: opts.level,
     goal,
     weeks: Math.max(1, Math.min(opts.weeks, 16)),
-    workMax: defaultWorkMax(),
+    workMax: opts.workMax ?? defaultWorkMax(),
     weakPoints: opts.weakPoints ?? [],
     equipment: opts.equipment ?? [],
     volumeGoal: 'mav',
     avoidAxialLoad: opts.avoidAxialLoad ?? false,
-    favoriteExercises: [],
-    excludedExercises: [],
+    favoriteExercises: opts.favoriteExercises ?? [],
+    excludedExercises: opts.excludedExercises ?? [],
+    injuries,
+    courseIntensity: (opts.courseIntensity ?? 'moderate') as CourseIntensity,
   };
+  let pedAdapt: PEDAdaptation | undefined;
+  if (opts.onCourse) {
+    const peds: PED[] = (['AAS', 'GH', 'INSULIN', 'IGF1', 'MGF'] as PED[]).filter((p) => (opts.workMax && true));
+    pedAdapt = adaptForPEDs(peds.length > 0 ? peds : ['AAS' as PED], defaultWorkMax(), undefined, (opts.courseIntensity ?? 'moderate') as CourseIntensity);
+  }
   try {
-    return buildBBPlan(input);
+    return buildBBPlan(input, pedAdapt);
   } catch (e) {
-    // В крайнем случае возвращаем конструктор ниже, чтобы UI не падал
     return emptyBBPlan(opts);
   }
 }

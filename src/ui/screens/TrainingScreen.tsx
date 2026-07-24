@@ -73,7 +73,7 @@ export const TrainingScreen: React.FC = () => {
     setPage('tabs');
   };
   // Переход в зону «Планировщик» → режим «Ручной сбор» (внешние ссылки setTab('constructor'))
-  const goPlannerManual = useCallback(() => { setZone('planner'); switchPlanningTrack('bb'); }, []);
+  const goPlannerManual = useCallback(() => { setZone('planner'); switchPlanningTrack('manual'); }, []);
   // Универсальный переход на вкладку с автоматическим выбором её зоны
   const goTab = useCallback((t: TrainingTab) => { setZone(zoneForTab(t)); setTab(t); }, []);
 

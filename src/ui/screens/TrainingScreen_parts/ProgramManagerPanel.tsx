@@ -47,10 +47,16 @@ import { tempoFor } from '../../../engines/bb/bb-tempo-rest';
 import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
 import { applyToPlanner } from './planner-bridge';
-import { loadTrainingProfile } from './training-profile';
+import { loadTrainingProfile, useTrainingProfile, type TrainingProfile } from './training-profile';
+import { TrainingProfileCard } from './TrainingProfileCard';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle } from './training-ui';
 import { GROUP_RU } from './program-types';
+import { labTrainingAdjust } from './lab-training-adjust';
+import { distributePhases, PHASE_CONFIGS, getRirForWeek } from './phase-periodization';
+import { suggestFeeders } from '../../../engines/bb/bb-autocoach.engine';
+import { useDataLink } from '../../../core/data-link';
+import { findSubstitutions } from '../../../engines/exercise-substitution.engine';
 
 const GOAL_OPTS = [
   { id: 'hypertrophy', label: 'Масса' }, { id: 'powerlifting', label: 'Сила (ПЛ)' },
@@ -450,6 +456,9 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
   const dir = program.meta.direction;
   const update = (patch: Partial<UserProgram>) => onChange({ ...program, ...patch });
   const updateMeta = (patch: Partial<UserProgram['meta']>) => onChange({ ...program, meta: { ...program.meta, ...patch } });
+  const linked = useDataLink();
+  const labAdjust = useMemo(() => labTrainingAdjust(linked.labAnalysis ?? null), [linked.labAnalysis]);
+  const [tprofile, updateTProfile] = useTrainingProfile();
 
   // Локальный toast — сам ProgramEditor не имеет доступа к flash() родителя.
   const [editorToast, setEditorToast] = useState('');
@@ -498,36 +507,56 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
   // P5: «⚡ Заполнить автоматически» — реальная интеллектуальная сборка через
   // buildBBPlan (BB) + LMS-cycles (PL). Пользователь получает рабочую программу
   // с реальными упражнениями и весами, а не пустую заготовку.
+  // Читает единый профиль тренированности (equipment, weakPoints, avoidAxialLoad,
+  // workMax, onCourse, favoriteExercises, excludedExercises) + лаб. коррекцию.
   const autoFillDraft = () => {
+    const prof = loadTrainingProfile();
     const days = Math.max(2, Math.min(7, program.meta.daysPerWeek || 4));
     const title = '[Черновик] ' + (program.meta.title || 'Моя программа');
     updateMeta({ title });
     if ((dir === 'bb' || dir === 'hybrid') && program.bb) {
       try {
-        // Полная BB-cycle-сборка (тот же движок что в BbAutoConstructor);
-        // конвертация через createFromBuild даёт weeks→sessions→blocks→sets
-        // с реальными именами, весами, RIR, темпом.
         const bbPlan = autodraftBBPlan({
           level: program.meta.level,
           goal: program.meta.goal,
           daysPerWeek: days,
           weeks: Math.max(1, program.meta.weeks || 4),
-          equipment: program.bb.constraints?.equipment ?? [],
-          weakPoints: (program.bb.constraints?.injuries ?? []).map((inj) => inj.muscle),
+          equipment: (prof.equipment ?? []) as string[],
+          weakPoints: (prof.weakPoints ?? []) as string[],
+          avoidAxialLoad: prof.avoidAxialLoad ?? false,
+          favoriteExercises: (prof.favoriteExercises ?? []) as string[],
+          excludedExercises: (prof.excludedExercises ?? []) as string[],
+          workMax: prof.workMax ?? {},
+          onCourse: prof.onCourse ?? false,
+          courseIntensity: prof.courseIntensity ?? 'moderate',
+          injuries: prof.injuries ?? [],
         });
         const userProg = createFromBuild(bbPlan, {
           title: program.meta.title || `${days}д/нед · ${program.meta.weeks}нед`,
           goal: program.meta.goal,
           level: program.meta.level,
-          weakPoints: (program.bb.constraints?.injuries ?? []).map((inj) => inj.muscle),
-          equipment: program.bb.constraints?.equipment ?? [],
+          weakPoints: (prof.weakPoints ?? []) as string[],
+          equipment: (prof.equipment ?? []) as string[],
         });
         userProg.meta.title = title;
         userProg.meta.weeks = program.meta.weeks;
         userProg.meta.daysPerWeek = days;
+        if (userProg.bb) {
+          userProg.bb.constraints = {
+            equipment: (prof.equipment ?? []) as string[],
+            avoidAxialLoad: prof.avoidAxialLoad ?? false,
+            injuries: (prof.injuries ?? []).map((inj) => ({ muscle: inj.muscle, grade: inj.exclude ? 'excluded' : 'graded' })),
+            favoriteExercises: (prof.favoriteExercises ?? []) as string[],
+            excludedExercises: (prof.excludedExercises ?? []) as string[],
+          };
+          userProg.bb.progression = {
+            loadStrategy: (prof.loadStrategy ?? 'double_progression') as ProgramProgression['loadStrategy'],
+            deloadProtocol: 'pump',
+            intensityTechniques: ['none'],
+          };
+        }
         update({ bb: userProg.bb });
       } catch (err) {
-        // безопасный fallback: только block-skeleton (если buildBBPlan упал)
         const weeks: UserWeek[] = Array.from({ length: Math.max(1, program.meta.weeks || 4) }, (_, wi) => ({
           week: wi + 1, phase: 'accumulation' as const, deload: false,
           sessions: Array.from({ length: days }, (_, si) => ({
@@ -544,16 +573,17 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         update({ bb: { ...program.bb, weeks } });
       }
     } else if (dir === 'pl' && program.pl) {
-      // Минимальное автозаполнение для ПЛ: расписание цикла по дням
       const sessCount = Math.max(2, Math.min(6, days));
       update({
         pl: {
           ...program.pl,
           schedule: Array.from({ length: sessCount }, (_, i) => ({ sessionIdx: i, dayOfWeek: i })),
+          workMax: { squat: prof.pmSquat, bench: prof.pmBench, dead: prof.pmDead },
+          weakPoints: (prof.weakPoints ?? []) as string[],
         },
       });
     }
-    showToast('⚡ Черновик создан — заполните упражнения и ПМ');
+    showToast('⚡ Черновик создан из профиля — заполните упражнения и ПМ');
   };
 
 // «🚚 К выполнению» — поддерживает BB и PL.
@@ -675,6 +705,47 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
     }
   };
 
+  /** 🖨 PDF-печать программы — print-friendly окно с таблицами */
+  const printProgram = () => {
+    const w = window.open('', '_blank', 'width=800,height=900');
+    if (!w) { showToast('⚠ Разрешите всплывающие окна'); return; }
+    const html: string[] = [];
+    html.push(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${program.meta.title}</title><style>`);
+    html.push('body{font-family:Arial,sans-serif;margin:20px;color:#1a1a1a;background:#fff}');
+    html.push('h1{font-size:20px;margin:0 0 6px}h2{font-size:14px;margin:16px 0 6px;color:#333}');
+    html.push('table{border-collapse:collapse;width:100%;margin:6px 0;font-size:12px}');
+    html.push('th,td{border:1px solid #ccc;padding:4px 8px;text-align:left}th{background:#f0f0f0}');
+    html.push('.meta{color:#666;font-size:11px;margin-bottom:12px}');
+    html.push('.phase{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;margin-left:6px}');
+    html.push('</style></head><body>');
+    html.push(`<h1>${program.meta.title}</h1>`);
+    html.push(`<div class="meta">Цель: ${GOAL_OPTS.find(g=>g.id===program.meta.goal)?.label ?? program.meta.goal} · Уровень: ${LEVEL_OPTS.find(l=>l.id===program.meta.level)?.label ?? program.meta.level} · ${program.meta.daysPerWeek} дн/нед × ${program.meta.weeks} нед</div>`);
+    if (program.bb?.weeks) {
+      for (const w of program.bb.weeks) {
+        html.push(`<h2>Неделя ${w.week} <span class="phase" style="background:${w.deload?'#f59e0b20':'#00e68a20'};color:${w.deload?'#f59e0b':'#00e68a'}">${w.phase}${w.deload?' · делод':''}</span></h2>`);
+        for (const s of w.sessions) {
+          html.push(`<table><thead><tr><th colspan="5">${s.name || 'День'} ${s.focus ? '· ' + s.focus : ''}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>Сеты</th><th>RIR</th><th>Вес</th></tr></thead><tbody>`);
+          for (const b of s.blocks) {
+            if (!b.exerciseName) continue;
+            const setsStr = b.sets.map(st => `${st.reps}×`).join(', ');
+            const rir = b.sets[0]?.rir ?? '-';
+            const wt = b.sets[0]?.weight ?? 0;
+            html.push(`<tr><td>${b.exerciseName}</td><td>${GROUP_RU[b.muscle] ?? b.muscle}</td><td>${setsStr}</td><td>${rir}</td><td>${wt} кг</td></tr>`);
+          }
+          html.push('</tbody></table>');
+        }
+      }
+    } else if (program.pl) {
+      html.push(`<h2>ПЛ-цикл: ${program.pl.sourceCycleId}</h2>`);
+      html.push(`<div class="meta">ПМ: присед ${program.pl.workMax.squat ?? '-'} · жим ${program.pl.workMax.bench ?? '-'} · тяга ${program.pl.workMax.dead ?? '-'} кг</div>`);
+      if (program.pl.notes) html.push(`<p>${program.pl.notes}</p>`);
+    }
+    html.push('</body></html>');
+    w.document.write(html.join(''));
+    w.document.close();
+    setTimeout(() => { w.print(); }, 300);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -722,6 +793,9 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           {dir === 'bb' && (
             <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToExecution} title="Отправить к выполнению (he_pl_runtime)">🚚 К выполнению</button>
           )}
+          {dir === 'pl' && program.pl && (
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-цикл к выполнению (he_pl_runtime)">🚚 К выполнению</button>
+          )}
           {(dir === 'bb' || dir === 'pl' || dir === 'hybrid') && (
             <button
               style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
@@ -741,12 +815,44 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
             </button>
           )}
           <button style={{ ...BTN, padding: '6px 14px', fontSize: 11, minHeight: 0 }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
+          <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / сохранить в PDF">🖨 PDF</button>
         </div>
       </div>
 
       {/* P4 — контекстные панели (НЕ калькуляторы): отображают статус текущей программы */}
       {dir === 'bb' && program.bb && <BbContextPanel program={program} level={program.meta.level} />}
       {dir === 'pl' && program.pl && <PLContextPanel program={program} />}
+
+      {/* Единый профиль тренированности: ПМ, workMax, weakPoints, оборудование, курс —
+          авто-черновик и SMART-рекомендации читают эти данные. */}
+      <TrainingProfileCard profile={tprofile} update={updateTProfile} compact />
+
+      {/* Лабораторная коррекция плана: MRV× + предупреждения по анализам */}
+      {labAdjust.mrvMultiplier < 1 && (() => {
+        const prof = loadTrainingProfile();
+        const feeders = suggestFeeders((prof.weakPoints ?? []) as string[], (prof.equipment ?? []) as string[]);
+        return (
+          <div style={{ ...panelStyle('#f59e0b'), padding: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 4 }}>
+              🧪 Лабораторная коррекция плана (MRV ×{labAdjust.mrvMultiplier.toFixed(2)})
+            </div>
+            {labAdjust.intensityNote && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>{labAdjust.intensityNote}</div>}
+            {labAdjust.warnings.length > 0 && (
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>
+                {labAdjust.warnings.map((w, i) => <div key={i}>• {w}</div>)}
+              </div>
+            )}
+            {labAdjust.deloadRecommended && (
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', marginTop: 4 }}>⚠ Рекомендуется разгрузочная неделя</div>
+            )}
+            {feeders.length > 0 && (
+              <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 6 }}>
+                🔥 Фидер-сеты для слабых групп: {feeders.map((f) => `${f.exercise} ${f.sets}×${f.reps}`).join(' · ')}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* P5.1 — Week schedule grid Пн..Вс с фокусом мышц по дням. */}
       {((dir === 'bb' && program.bb?.weeks?.[0]?.sessions) || (dir === 'pl' && program.pl?.schedule)) && (() => {
@@ -836,7 +942,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
               <span style={{ fontSize: 9, color: DIM, fontWeight: 500 }}>weakPoints: {wp.map((m) => GROUP_RU[m] ?? m).join(', ')}</span>
             </div>
             {gaps.slice(0, 4).map((g, gi) => {
-              const recs = suggestExercisesForGroup(g.muscle, program.meta.level, 2, (prof.equipment ?? []) as string[], (prof.favoriteExercises ?? []) as string[], (prof.excludedExercises ?? []) as string[]);
+              const recs = suggestExercisesForGroup(g.muscle, program.meta.level, 2, (prof.equipment ?? []) as string[], (prof.weakPoints ?? []) as string[], [], prof.avoidAxialLoad ?? false, (prof.favoriteExercises ?? []) as string[], (prof.excludedExercises ?? []) as string[]);
               const has = recs.length > 0;
               const statusColor = g.status === 'over' ? '#ef4444' : g.status === 'high' ? '#f59e0b' : '#60a5fa';
               return (
@@ -1275,6 +1381,48 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>Структура ({body.weeks.length} нед)</div>
+      {/* 🎯 Быстрое добавление упражнений для слабых групп из профиля */}
+      {(() => {
+        const prof = loadTrainingProfile();
+        const wp = (prof.weakPoints ?? []) as string[];
+        if (wp.length === 0) return null;
+        const addWeakToWeek = (muscle: string) => {
+          if (!body.weeks[0]?.sessions[0]) return;
+          const recs = suggestExercisesForGroup(muscle, level, 2, (prof.equipment ?? []) as string[], wp, [], prof.avoidAxialLoad ?? false, (prof.favoriteExercises ?? []) as string[], (prof.excludedExercises ?? []) as string[]);
+          if (recs.length === 0) return;
+          const w0 = body.weeks[0];
+          const s0 = w0.sessions[0];
+          const newBlocks: UserBlock[] = recs.slice(0, 2).map((r) => ({
+            id: newId('blk'),
+            type: 'accessory' as const,
+            exerciseName: r.name,
+            muscle,
+            role: 'accessory' as const,
+            sets: makeSetsFromTemplate(muscleAwareSets(muscle, level), (prof.workMax ?? {})[muscle] ?? 40),
+          }));
+          const updatedWeeks = body.weeks.map((w, i) => i === 0 ? {
+            ...w,
+            sessions: w.sessions.map((s, si) => si === 0 ? { ...s, blocks: [...s.blocks, ...newBlocks] } : s),
+          } : w);
+          setWeeks(updatedWeeks);
+        };
+        return (
+          <div style={{ ...CARD, padding: 8, borderLeft: '3px solid #a78bfa' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', marginBottom: 4 }}>🎯 Слабые группы — быстрое добавление</div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {wp.map((m) => (
+                <button
+                  key={m}
+                  onClick={() => addWeakToWeek(m)}
+                  style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700 }}
+                >
+                  + {GROUP_RU[m] ?? m}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
       {body.weeks.map((w, wi) => (
         <div key={wi} style={{ ...CARD, padding: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -1400,6 +1548,20 @@ const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => v
       return b;
     }));
   };
+  // 🔄 Замена упражнения: findSubstitutions подбирает альтернативы
+  const [substFor, setSubstFor] = useState<number | null>(null);
+  const substResults = useMemo(() => {
+    if (substFor == null) return [];
+    const b = blocks[substFor];
+    if (!b || !b.exerciseName) return [];
+    const prof = loadTrainingProfile();
+    const injured = new Set((prof.injuries ?? []).filter((i) => i.exclude).map((i) => i.muscle));
+    return findSubstitutions(b.exerciseName, b.muscle, injured).slice(0, 4);
+  }, [substFor, blocks]);
+  const applySubst = (bi: number, name: string, muscle: string) => {
+    updateBlock(bi, { exerciseName: name, muscle: muscle || blocks[bi].muscle });
+    setSubstFor(null);
+  };
   const moveBlock = (bi: number, dir: -1 | 1) => { const j = bi + dir; if (j < 0 || j >= blocks.length) return; const arr = [...blocks]; const tmp = arr[bi]; arr[bi] = arr[j]; arr[j] = tmp; onChange(arr); };
   const moveTo = (from: number, to: number) => {
     if (from === to || from < 0 || from >= blocks.length || to < 0 || to >= blocks.length) return;
@@ -1511,7 +1673,29 @@ const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => v
             title={b.supersetWith ? 'Снять superset-привязку' : 'Связать суперсетом с соседним блоком'}
           >⊕</button>
           <button style={{ ...BTN_GHOST, padding: '2px 4px', fontSize: 9, minHeight: 0 }} onClick={() => cloneBlock(bi)} title="Клонировать блок">⧉</button>
+          {b.exerciseName && (
+            <button
+              style={{ ...BTN_GHOST, padding: '2px 4px', fontSize: 9, minHeight: 0, color: substFor === bi ? '#f59e0b' : DIM, borderColor: substFor === bi ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)' }}
+              onClick={() => setSubstFor(substFor === bi ? null : bi)}
+              title="Подобрать замену"
+            >🔄</button>
+          )}
           <button style={{ ...BTN_GHOST, padding: '3px 6px', fontSize: 10, minHeight: 0, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeBlock(bi)}>✕</button>
+          {substFor === bi && substResults.length > 0 && (
+            <div style={{ padding: '4px 8px', marginTop: 4, background: 'rgba(245,158,11,0.06)', borderRadius: 6, border: '1px solid rgba(245,158,11,0.18)' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>🔄 Замены для «{b.exerciseName}»:</div>
+              {substResults.map((r, ri) => (
+                <button
+                  key={ri}
+                  onClick={() => applySubst(bi, r.exercise.name, r.exercise.group || b.muscle)}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 6px', marginBottom: 2, borderRadius: 4, fontSize: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM_STRONG }}
+                >
+                  <b>{r.exercise.name}</b> <span style={{ color: DIM, fontSize: 9 }}>({r.confidence})</span>
+                  <div style={{ fontSize: 9, color: DIM }}>{r.reason}</div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       ))}
       <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 0, alignSelf: 'flex-start' }} onClick={addBlock}>+ Упражнение</button>
