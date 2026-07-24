@@ -642,6 +642,27 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 0 }} onClick={safeBack}>← К списку</button>
         <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
         {isDirty && <span style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b' }} title="Несохранённые изменения">●</span>}
+
+      {/* P5.2 — Inline-валидация: критические ошибки сразу бросаются в глаза. */}
+      {(() => {
+        const issues = validateProgram(program);
+        const errs = issues.filter((i) => i.level === 'error');
+        const warns = issues.filter((i) => i.level === 'warning');
+        if (errs.length === 0 && warns.length === 0) return null;
+        return (
+          <div style={{ background: errs.length > 0 ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.10)', borderRadius: 8, padding: '8px 10px', borderLeft: '3px solid ' + (errs.length > 0 ? '#ef4444' : '#f59e0b') }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: errs.length > 0 ? '#ef4444' : '#f59e0b', marginBottom: 4 }}>
+              {errs.length > 0 ? `🚫 ${errs.length} ошибк${errs.length === 1 ? 'а' : 'и'} валидации` : `⚠ ${warns.length} предупреждений`}
+            </div>
+            <div style={{ fontSize: 10, lineHeight: 1.45, color: 'rgba(255,255,255,0.85)' }}>
+              {errs.slice(0, 4).map((i, ix) => <div key={'e' + ix}>• <b>{i.code}</b>: {i.message}</div>)}
+              {warns.slice(0, 3).map((i, ix) => <div key={'w' + ix}>• <b>{i.code}</b>: {i.message}</div>)}
+              {(errs.length + warns.length) > 7 && <div style={{ color: DIM, marginTop: 4 }}>…и ещё {(errs.length + warns.length) - 7}</div>}
+            </div>
+          </div>
+        );
+      })()}
+
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a' }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней">⚡ Авто-черновик</button>
           {dir === 'bb' && (
