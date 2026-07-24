@@ -17,7 +17,29 @@ import { applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, t
 import { tidySessionExercises, SESSION_TIDY_RATIONALE, isIsolationByName } from './bb-session-order.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { trueMuscleOf } from '../movement-pattern';
+import { loadSRPESessions } from '../pro/srpe-store';
+import { acuteChronicRatio, toDailyLoads } from '../pro/training-load.engine';
 import type { FullProgram, ProgramWeek, ProgramDay } from '../../engines/complete-program-library.engine';
+
+/**
+ * Вычислить ACWR из реальных sRPE-сессий пользователя (отдельная функция для cycle/program mode).
+ * В cycle/program mode нет своего ACWR-расчёта в bb-builder.engine (computeAcwr приватный);
+ * дублируем логику здесь, чтобы MODE 2 (cycle/program) тоже учитывал PED-логику первого режима
+ * (autoDeload по ACWR).
+ */
+function computeAcwrCyclePlan(): { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'danger' } {
+  try {
+    const sessions = loadSRPESessions();
+    if (!sessions || sessions.length < 2) return { ratio: 1, zone: 'optimal' };
+    const daily = toDailyLoads(sessions as any);
+    const r = acuteChronicRatio(daily);
+    if (!r || !isFinite(r.ratio)) return { ratio: 1, zone: 'optimal' };
+    const zone = r.ratio < 0.8 ? 'undertrained' : r.ratio <= 1.3 ? 'optimal' : r.ratio <= 1.5 ? 'caution' : 'danger';
+    return { ratio: r.ratio, zone };
+  } catch {
+    return { ratio: 1, zone: 'optimal' };
+  }
+}
 
 export type CycleSourceCycle = SRCycleTemplate;
 export type BBVolumeGoal = 'mev' | 'mav' | 'mrv';
@@ -51,7 +73,7 @@ export function programToCycleTemplate(program: FullProgram): SRCycleTemplate {
     for (const ex of day.exercises) {
       // BB-фильтр: заменить ПЛ/олимпийские на ББ-альтернативы
       const muscle = muscleGroupFromExName(ex.name, EXERCISE_CATALOG);
-      const bbRep = replacePLForBB(ex.name, muscle === 'chest' ? 'Грудь' : muscle === 'back' ? 'Спина' : muscle === 'shoulders' ? 'Плечи' : muscle === 'quads' || muscle === 'hamstrings' || muscle === 'glutes' || muscle === 'calves' ? 'Ноги' : muscle === 'biceps' || muscle === 'triceps' || muscle === 'forearms' ? 'Руки' : 'Кор');
+      const bbRep = replacePLForBB(ex.name, exGroupForPLMap(muscle));
       if (!bbRep) continue; // пропустить ПЛ/мусор без ББ-аналога
       // Дедупликация: если упражнение уже есть в дне — пропустить
       if (seenNames.has(bbRep.name)) continue;
@@ -396,20 +418,44 @@ function isPrimaryByLoad(load: string | undefined): boolean {
 function replacePLForBB(exName: string, group: string): { name: string; group: string } | null {
   const n = (exName || '').toLowerCase().trim();
 
-  // Становая тяга → Тяга штанги в наклоне (если спина) или Румынская (если бицепс бедра)
-  if (n === 'становая тяга' || n === 'становая тяга (классика)' || n === 'становая тяга сумо' || n === 'становая тяга классическая') {
+  // L8 (Jul 21 update): нормализация имени — снимаем программные суффиксы ("5/3/1", "BBB",
+  // "AMRAP", "(warm-up)", "(тяжелая)" и т.д.) для попадания в базовый regex-маппинг.
+  // Без нормализации: "Жим стоя 5/3/1" / "Становая тяга BBB" остаются как ПЛ в ББ-плане.
+  const stripped = n
+    .replace(/\s+(5\s*\/\s*3\s*\/\s*1|bbb|amrap|размин|warm[- ]?up|тяжел|тяжёл|тяжёлая|тяжелая|средняя|лёгкая|лёг|легк|легкая)(?=\s|$)/g, '')
+    .replace(/\s*\(.*?\)\s*/g, '')    // удаляем parens "(...)"
+    .replace(/\s+/g, ' ')
+    .trim();
+  const s = stripped || n; // fallback на оригинальное имя, если нормализация съела всё
+
+  // Хингеры (RDL / Гудморнинг / наклон со штангой / обратная гипер) →
+  // Румынская тяга (или Смита / одной ноге). ПЛ-классику (становую классику/сумо/дефицит/трап)
+  // отдельно обрабатываем ниже.
+  // Становая тяга → Тяга штанги в наклоне (если спина) или Румынская (если бицепс бедра).
+  // Также покрывает варианты с суффиксами: "Становая тяга 5/3/1" → "станов" срабатывает,
+  // а нормализация очищает имя до "Становая тяга" — основной regex ловит.
+  if (/^станов|классич|сумо|дефицит|рывков|толчков|трап|pendlay/i.test(s)) {
     const g = (group || '').toLowerCase();
-    if (g.includes('спин') || g === 'back') {
+    if (g.includes('спин') || g === 'back' || g === 'спина') {
       return { name: 'Тяга штанги в наклоне', group: 'Спина' };
     }
+    if (g.includes('бедр') || g.includes('ног') || g === 'legs' || g === 'хамст') {
+      // Сумо/дефицит для ног → Румынская (более безопасная альтернатива).
+      return { name: 'Румынская тяга', group: 'Ноги' };
+    }
+    if (g.includes('верх спины') || g.includes('трапец')) {
+      // Snatch-grip DL → Тяга штанги в наклоне (больше широчайших).
+      return { name: 'Тяга штанги в наклоне', group: 'Спина' };
+    }
+    // Дефолт: Румынская (hamstrings — задняя цепь).
     return { name: 'Румынская тяга', group: 'Ноги' };
   }
-  // Жим стоя / армейский / OHP → Жим гантелей сидя (не осевая)
-  if (n === 'жим стоя' || n === 'армейский жим' || n === 'жим над головой' || n === 'ohp'
-      || n.includes('швунг') || n.includes('push press') || n.includes('жимовой швунг')) {
+  // Жим стоя / армейский / OHP / швунг / push press → Жим гантелей сидя (не осевая, для ББ).
+  // Покрывает варианты: "Жим стоя 5/3/1", "Жим стоя BBB", "Жим стоя (армейский)" и др.
+  if (/жим стоя|армейск|ohp|жим над голов|швунг|push.?press|жимовой.?швунг/i.test(s)) {
     return { name: 'Жим гантелей сидя', group: 'Плечи' };
   }
-  // Олимпийские: рывок/толчок/взятие — пропустить (нет ББ-аналога в шаблоне)
+  // Олимпийские: рывок/толчок/взятие — пропустить (нет ББ-аналога в шаблоне).
   if (n.includes('рывок') || n.includes('толчок') || n.includes('взятие на грудь')
       || n.includes('подъём на грудь') || n.includes('подъем на грудь')
       || n.includes('power clean') || n.includes('hang clean') || n.includes('power snatch')
@@ -418,28 +464,56 @@ function replacePLForBB(exName: string, group: string): { name: string; group: s
       || n.includes('clean and jerk') || n.includes('clean & jerk') || n.includes('jerk')) {
     return null;
   }
-  // Пендл → Тяга штанги в наклоне
-  if (n.includes('пендл') || n.includes('pendlay')) {
+  // Пендл → Тяга штанги в наклоне.
+  if (/пендл|pendlay/i.test(s)) {
     return { name: 'Тяга штанги в наклоне', group: 'Спина' };
   }
-  // Good morning → Румынская тяга
-  if (n.includes('гудмор') || n.includes('good morning') || n.includes('наклоны со штангой')) {
+  // Good morning / Наклоны со штангой / Гудморнинг → Румынская тяга.
+  // L8.1: "Наклоны" (без "со штангой") и "Нагруженные наклоны" → тоже GM → Румынская.
+  if (/гудмор|good.?morning|наклон|нaклон/i.test(s)) {
     return { name: 'Румынская тяга', group: 'Ноги' };
   }
-  // Rack pull / тяга с плинт → Тяга штанги в наклоне
-  if (n.includes('rack pull') || n.includes('тяга с плинт') || n.includes('тяга с плинта')) {
+  // Rack pull / тяга с плинт → Тяга штанги в наклоне.
+  if (/rack.?pull|тяга с плинт/i.test(s)) {
     return { name: 'Тяга штанги в наклоне', group: 'Спина' };
   }
-  // Фермерская прогулка / переноска → пропустить (не ББ)
+  // L8.2: Close-grip bench / жим средним хватом → Жим штанги лёжа узким хватом (трицепс-focus).
+  // (Программы иногда пишут "Жим средним хватом" без "лёжа").
+  if (/средним хватом|узк|close.?grip|narrow.?grip/i.test(s)) {
+    return { name: 'Жим штанги лёжа узким хватом', group: 'Грудь' };
+  }
+  // L8.3: "Жим гантелей" без уточнения → каталог не содержит точное имя → DB bench press (грудь).
+  // "Жим гантелей лёжа" / "Жим гантелей на наклонной" / "Жим гантелей сидя" — прямые имена,
+  // найдутся в каталоге и пройдут как ББ (не требуют замены). Эвристика только для "голого" имени.
+  if (s === 'жим гантелей' || s === 'жим с гантелями') {
+    return { name: 'Жим гантелей лёжа', group: 'Грудь' };
+  }
+  // Фермерская прогулка / переноска → пропустить (не ББ).
   if (n.includes('фермерск') || n.includes('прогулка фермер') || n.includes('farmer walk')
       || n.includes('прогулка официант') || n.includes('waiter walk')
       || n.includes('yoke walk') || n.includes('прогулка с коромысл')) {
     return null;
   }
-  // Паллоф / bird dog / планка (изометрика) → пропустить
+  // Паллоф / bird dog / планка (изометрика) → пропустить.
   if (n.includes('паллоф') || n.includes('pallof') || n.includes('bird dog') || n.includes('птица-собака')
       || n.includes('планк') && !n.includes('боков') || n.includes('plank') && !n.includes('side')) {
     return null;
+  }
+  // L8.4: Deficit DL / Pendlay / Snatch-grip / Paused / Trap-bar ещё раз по
+  // ОРИГИНАЛЬНОМУ имени (на случай если нормализатор исказил).
+  const rawN = (exName || '').toLowerCase().trim();
+  if (/станов|классич|сумо|дефицит|рывков|толчков|трап|pendlay/i.test(rawN)) {
+    const g = (group || '').toLowerCase();
+    if (g.includes('спин') || g === 'back' || g === 'спина') {
+      return { name: 'Тяга штанги в наклоне', group: 'Спина' };
+    }
+    return { name: 'Румынская тяга', group: 'Ноги' };
+  }
+  if (/жим стоя|армейск|ohp/i.test(rawN)) {
+    return { name: 'Жим гантелей сидя', group: 'Плечи' };
+  }
+  if (/гудмор|good.?morning|наклон/i.test(rawN)) {
+    return { name: 'Румынская тяга', group: 'Ноги' };
   }
   return { name: exName, group };
 }
@@ -450,6 +524,19 @@ function validateReplacement(rep: { name: string; group: string }): { name: stri
   if (found) return rep;
   // Fallback: Тяга штанги в наклоне (всегда есть в каталоге)
   return { name: 'Тяга штанги в наклоне', group: 'Спина' };
+}
+
+/** Маппинг из канонического EN-ключа мышцы (chest/back/...) в человеко-читаемую группу,
+ *  которую ожидает `replacePLForBB` (Грудь/Спина/Плечи/Ноги/Руки/Кор). */
+function exGroupForPLMap(muscle: string): string {
+  const m = (muscle || '').toLowerCase();
+  if (m === 'chest') return 'Грудь';
+  if (m === 'back') return 'Спина';
+  if (m === 'shoulders') return 'Плечи';
+  if (['quads', 'hamstrings', 'glutes', 'calves'].includes(m)) return 'Ноги';
+  if (['biceps', 'triceps', 'forearms', 'arms'].includes(m)) return 'Руки';
+  if (['abs', 'core'].includes(m)) return 'Кор';
+  return 'Кор';
 }
 
 /** Найти замену для исключённого/осевого упражнения из той же группы, с учётом угла.
@@ -615,7 +702,9 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         const bbExName = bbReplaced.name;
         // Дедупликация: если упражнение уже есть в этом дне — пропустить
         if (seenNames.has(bbExName)) return null as any;
-        // JUNK-фильтр: проверить trueMuscleOf — пропустить если null (hinge/carry/junk)
+        // JUNK-фильтр: проверить trueMuscleOf — пропустить если null (hinge/carry/junk).
+        // L8: после replacePLForBB дополнительно фильтруем выжившие ПЛ-импонанты по trueMuscleOf
+        // (def DL/sumo/deficit/Oly lift → null после фикса в movement-pattern.ts).
         const catCheck = EXERCISE_CATALOG.find(e => e.name === bbExName);
         if (catCheck && trueMuscleOf(catCheck) === null) return null as any;
         // Rear delt фильтр: не ставить rear delt в Push/Chest/Shoulders-дни
@@ -819,10 +908,19 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   rationale.push(SESSION_TIDY_RATIONALE);
   let finalPlan: BBPlan = { pattern, weeks, rotationMuscleVolume, rationale };
 
+  // L8: ACWR из реальных sRPE-сессий пользователя (PED-логика первого режима):
+  // mode 1 (buildBBPlan) рассчитывает acwrRatio = computeAcwr() и подаёт в
+  // applyPostPhaseProcessing → авто-делод при >1.5. Mode 2 раньше передавал acwrRatio=1
+  // (хардкод) → авто-делод никогда не срабатывал. Теперь — единый расчёт.
+  const acwrInfo = computeAcwrCyclePlan();
+  const acwrRatio = acwrInfo.ratio;
+  if (mode === 'adapt' && autoDeload && acwrRatio > 1.3) {
+    rationale.push(`⚠ ACWR=${acwrRatio.toFixed(2)} (${acwrInfo.zone}) → план может потребовать разгрузочной недели`);
+  }
+
   // Применяем пост-обработку (техники/авто-делод/загрузка/авторег) — как в buildBBPlan.
   // Условие покрывает ВСЕ признаки, а не только technique/weakPoints — иначе loadStrategy
-  // и autoDeload теряются (баг: dfa8842fb убрал дубль-вызов, но не расширил guard).
-  const acwrRatio = 1; // cycle mode не вычисляет ACWR (нет sRPE-интеграции); autoDeload работает по meta.deloadWeeks
+  // и autoDeload теряются.
   if (mode === 'adapt' && ((intensityTechnique && intensityTechnique !== 'none') || weakPoints.length > 0 || loadStrategy || autoDeload || autoRegResult)) {
     finalPlan = applyPostPhaseProcessing({
       plan: finalPlan,
@@ -831,7 +929,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
       loadStrategy: loadStrategy as LoadStrategy,
       autoDeload,
       deloadType,
-      acwrRatio,
+      acwrRatio, // ← теперь единый расчёт ACWR с mode 1
       autoRegResult,
       skipPhaseRedistribution: true,
       intensityTechnique: intensityTechnique && intensityTechnique !== 'none' ? intensityTechnique : undefined,
@@ -1162,6 +1260,22 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           }
         }
 
+        // L8: PL→BB-замена (стандартизация для BB-auto). Покрывает "Жим стоя 5/3/1",
+        // "Становая тяга BBB", "Наклоны", "Жим гантелей" (без уточнения) и др.
+        // Раньше программы сохраняли ПЛ-имена дословно → в BB-плане появлялись жимы стоя,
+        // становые тяги без альтернативы. Теперь — единая замена через replacePLForBB.
+        {
+          const exGroup = exGroupForPLMap(muscle);
+          const bbRep = replacePLForBB(ex.name, exGroup);
+          if (!bbRep) continue; // ПЛ/олимпийский/мусор без ББ-аналога — пропускаем
+          if (bbRep.name !== ex.name) {
+            ex = { ...ex, name: bbRep.name };
+            muscle = muscleGroupFromExName(bbRep.name, EXERCISE_CATALOG);
+            // Train комментарий с указанием замены (для прозрачности для пользователя).
+            ex = { ...ex, notes: (ex.notes ? ex.notes + '. ' : '') + '⚠ Замена ПЛ→ББ: ' + ex.name + ' → ' + bbRep.name };
+          }
+        }
+
         // Find catalog entry (for safety filters)
         const catEntry = EXERCISE_CATALOG.find(e => e.name === ex.name);
         const catId = catEntry?.id || '';
@@ -1186,6 +1300,14 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
             const rep = findReplacementForCycle(ex.name, muscleGroupFromExName(ex.name, EXERCISE_CATALOG), favNames, favIds, new Set(exercises.map(e => e.name)));
             if (rep) finalExName = rep.name;
           }
+        }
+
+        // JUNK-фильтр: проверить trueMuscleOf → skip ПЛ-движения (ПЛ-становая, overs/deficit
+        // трап-гриф, ол. snatch — все они дают trueMuscleOf === null после моего предыдущего фикса).
+        if (catEntry && trueMuscleOf(catEntry) === null) {
+          // Через replacePLForBB должно быть уже обработано, но для страховки если name
+          // прошёл (например, unclassified день), дублируем фильтр.
+          continue;
         }
 
         const rir = ex.rir ?? (ex.rpe !== undefined ? Math.max(0, 10 - ex.rpe) : 2);
@@ -1437,6 +1559,15 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   rationale.push(SESSION_TIDY_RATIONALE);
   let finalPlan: BBPlan = { pattern, weeks, rotationMuscleVolume, rationale };
 
+  // L8: ACWR из реальных sRPE-сессий (PED-логика первого режима) — единый расчёт
+  // с mode 1 (buildBBPlan). Раньше mode 2 передавал acwrRatio: 1 (хардкод) → авто-делод
+  // и ACWR-warning никогда не срабатывали.
+  const acwrInfo = computeAcwrCyclePlan();
+  const acwrRatio = acwrInfo.ratio;
+  if (opts.autoDeload && acwrRatio > 1.3) {
+    rationale.push(`⚠ ACWR=${acwrRatio.toFixed(2)} (${acwrInfo.zone}) → план может потребовать разгрузочной недели`);
+  }
+
   // Apply post-processing for adapt mode (интенс-техники/авто-делод/загрузка/авторег)
   if (mode === 'adapt' && ((opts.intTechnique && opts.intTechnique !== 'none') || weakPoints.length > 0 || opts.loadStrategy || opts.autoDeload || opts.autoRegResult)) {
     finalPlan = applyPostPhaseProcessing({
@@ -1446,7 +1577,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       loadStrategy: opts.loadStrategy as LoadStrategy,
       autoDeload: opts.autoDeload,
       deloadType: opts.deloadType,
-      acwrRatio: 1,
+      acwrRatio,
       autoRegResult: opts.autoRegResult,
       skipPhaseRedistribution: true,
       intensityTechnique: opts.intTechnique && opts.intTechnique !== 'none' ? opts.intTechnique : undefined,
