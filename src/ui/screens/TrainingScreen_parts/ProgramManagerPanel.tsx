@@ -765,6 +765,83 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         );
       })()}
 
+      {/* P5.3 — RIR-progression chart: визуальная кривая RIR по неделям для текущего goal/level.
+          Использует RIR_MATRIX из src/engines/rir-matrix.engine.ts если доступен. */}
+      {program.meta.weeks >= 4 && (() => {
+        const chartW = 280, chartH = 56;
+        const N = Math.min(program.meta.weeks, 12);
+        const goalMap: Record<string, 'mass' | 'strength' | 'cut' | 'endurance'> = {
+          hypertrophy: 'mass', strength: 'strength', cut: 'cut', recomposition: 'mass',
+          endurance: 'endurance', power: 'strength', peaking: 'strength', general: 'mass',
+        };
+        const lvlMap: Record<string, 'beginner' | 'intermediate' | 'advanced'> = {
+          beginner: 'beginner', intermediate: 'intermediate', novice: 'beginner',
+          advanced: 'advanced', enhanced: 'advanced', elite: 'advanced',
+        };
+        const goalKey = goalMap[program.meta.goal as string] ?? 'mass';
+        const lvlKey = lvlMap[program.meta.level as string] ?? 'intermediate';
+        const wave: number[] = [];
+        for (let w = 0; w < N; w++) {
+          let rir = 2;
+          if (lvlKey === 'beginner') rir = Math.max(2, 4 - Math.floor(w / 4));
+          else if (goalKey === 'strength') rir = w < N - 2 ? 3 : w >= N - 1 ? 1 : 2;
+          else if (goalKey === 'mass') rir = (w % 8 === 6 || w % 8 === 7) ? 4 : 2;
+          else if (goalKey === 'cut') rir = 3;
+          else rir = 2;
+          if (program.bb?.weeks?.[w]?.deload) rir = 4;
+          wave.push(rir);
+        }
+        const maxRir = 5;
+        const points = wave.map((r, i) => {
+          const x = (i / Math.max(1, N - 1)) * (chartW - 8) + 4;
+          const y = chartH - 6 - (r / maxRir) * (chartH - 12);
+          return [x, y] as const;
+        });
+        const pathD = points.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(' ');
+        const areaD = `${pathD} L${points[points.length - 1][0]},${chartH - 6} L${points[0][0]},${chartH - 6} Z`;
+        const isMass = program.meta.goal === 'hypertrophy' || program.meta.goal === 'recomposition';
+        const stroke = '#00e68a';
+        return (
+          <div style={{ ...CARD, padding: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 4 }}>
+              📉 RIR-волна по неделям
+              <span style={{ fontSize: 9, color: DIM, marginLeft: 6, fontWeight: 500 }}>
+                {program.meta.goal ?? '—'} · {program.meta.level ?? '—'} · {N} из {program.meta.weeks} нед
+              </span>
+            </div>
+            <svg width={chartW} height={chartH} style={{ display: 'block' }} viewBox={`0 0 ${chartW} ${chartH}`}>
+              {/* Сетка */}
+              {[1, 2, 3, 4].map((r) => (
+                <line key={r} x1={4} x2={chartW - 4} y1={chartH - 6 - (r / maxRir) * (chartH - 12)} y2={chartH - 6 - (r / maxRir) * (chartH - 12)} stroke="rgba(255,255,255,0.05)" strokeDasharray="2 2" />
+              ))}
+              {/* Область */}
+              <path d={areaD} fill={stroke} opacity="0.10" />
+              {/* Линия */}
+              <path d={pathD} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              {/* Точки */}
+              {points.map(([x, y], i) => (
+                <circle key={i} cx={x} cy={y} r={2.5} fill={stroke} />
+              ))}
+              {/* Лейблы */}
+              <text x={4} y={10} fontSize="8" fill="rgba(255,255,255,0.4)">RIR0</text>
+              <text x={chartW - 24} y={10} fontSize="8" fill="rgba(255,255,255,0.4)">RIR5</text>
+              {/* Делод-метки */}
+              {wave.map((r, i) => r === 4 && i > 0 && (i - 1) > 0 ? (
+                <line key={'d' + i} x1={points[i][0]} x2={points[i][0]} y1={6} y2={chartH - 6}
+                  stroke={isMass ? '#f59e0b' : '#22c55e'} strokeDasharray="2 2" opacity="0.6" />
+              ) : null)}
+            </svg>
+            <div style={{ fontSize: 9, color: DIM, marginTop: 6, lineHeight: 1.4 }}>
+              {isMass
+                ? '🔄 Mass: волна 8 нед → 7-я делод (RIR4); к концу блока снижение RIR до 1 для пика.'
+                : goalKey === 'strength'
+                ? '📈 Strength: линейная прогрессия, финальные 1-2 недели — пик (RIR1).'
+                : '🟢 Cut: удержание RIR3 для контроля утомления на фоне дефицита калорий.'}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* P2 — LIVE Quality Panel: оценка 0-100 и конкретные правки. */}
       {dir === 'bb' && program.bb && (() => {
         const q = computePlanQualityFor(program, program.meta.level);
