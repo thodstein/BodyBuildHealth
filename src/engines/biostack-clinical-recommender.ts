@@ -525,10 +525,10 @@ export function buildClinicalStack(
   // Каждый фильтр добавляет баллы. Вещества с score > 0 проходят.
   // Это предотвращает «воронку смерти» когда последовательные AND убивают всех кандидатов.
   const hasAnyFilter = (filterMarkers && filterMarkers.length) || (filterMechanisms && filterMechanisms.length) || (filterOrgans && filterOrgans.length);
+  const markerSubs = new Set<string>();
 
   if (hasAnyFilter) {
     // Pre-compute marker substances
-    const markerSubs = new Set<string>();
     if (filterMarkers && filterMarkers.length) {
       const SEVERITIES: SeverityLevel[] = ['mild', 'moderate', 'severe'];
       for (const mk of filterMarkers) {

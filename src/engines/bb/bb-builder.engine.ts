@@ -224,13 +224,16 @@ const ALWAYS_ISOLATION: Set<string> = new Set(['calves', 'forearms', 'abs']);
 
 // "Золотой стандарт" ББ-упражнений (максимально эффективные для гипертрофии).
 // Приоритизируются в generic-планах (без специализации/слабых точек).
+// ББ-логика: наклонный жим > плоский (верх груди — отстающая у большинства),
+// гакк/Смит-присед > свободный присед (безопасность поясницы, изоляция квадрицепса).
 const PREFERRED_BB_EXERCISES = new Set([
-  // Грудь
-  'bench_press', 'incline_barbell_press', 'dumbbell_bench_press', 'incline_dumbbell_press',
+  // Грудь — наклонные приоритет (верх груди растёт хуже, чем средняя/нижняя)
+  'incline_barbell_press', 'incline_dumbbell_press', 'dumbbell_bench_press', 'bench_press',
   // Спина
   'barbell_row', 't_bar_row', 'dumbbell_row', 'lat_pulldown', 'pull_up', 'chin_up',
-  // Ноги
-  'squat', 'leg_press', 'dumbbell_lunge', 'romanian_deadlift', 'leg_curl', 'leg_extension',
+  // Ноги — гакк/Смит/лег-пресс приоритет (безопасность поясницы, изоляция)
+  'hack_squat', 'smith_squat', 'leg_press', 'bulgarian_split_squat', 'dumbbell_lunge',
+  'romanian_deadlift', 'leg_curl', 'leg_extension',
   // Плечи
   'overhead_press', 'arnold_press', 'dumbbell_lateral_raise',
   // Руки
@@ -274,6 +277,14 @@ const EXECUTION_NOTES: Record<string, string> = {
   leg_extension: "Выпрямляйте полностью (вверху задержка 0.5 сек).",
   calf_raise: "Максимум растяжения внизу, стойте на носках 1 сек вверху.",
   crunch: "Поднимайте лопатки с пола. Руки за головой. Движение короткое, концентрированное.",
+  incline_dumbbell_press: "Скамья: 30-45 градусов. Гантели: нейтральный хват. Опускайте до растяжения верхней груди.",
+  t_bar_row: "Хват: широкий. Грудь опирается на подушку. Тяните локтями, сводите лопатки.",
+  chin_up: "Хват: обратный (ладони к себе). Подбородок над перекладиной. Бицепс+спина.",
+  dumbbell_lunge: "Шаг: длинный. Колено передней ноги не выходит за носок. Корпус вертикально.",
+  dumbbell_lateral_raise: "Без раскачки. Локти чуть согнуты. Поднимайте до уровня плеч. Большой палец вниз.",
+  hack_squat: "Спина плотно прижата к подушке. Стопы: на ширине плеч, ближе к верху платформы. Глубина: до 90° в коленях. Не отрывать таз.",
+  smith_squat: "Спина прямая, гриф по траектории Смита. Стопы чуть вперёд от корпуса (снижает нагрузку на колени). Глубина: параллельно.",
+  bulgarian_split_squat: "Задняя нога на скамье. Шаг передней: средний. Колено не выходит за носок. Корпус вертикально. Гантель в одной руке или по бокам.",
 };
 
 /** Ранг упражнения по "тяжести" — определяет порядок внутри угла.
@@ -564,14 +575,14 @@ const STRETCH_DB: Record<string, { name: string; muscle: string; instruction: st
  * Добавить динамическую растяжку в конец сессии.
  * Выбирает 1-2 упражнения на основе musclePlans дня.
  */
-function addStretching(musclePlans: MusclePlan[]): BBExercise[] {
+function addStretching(musclePlans: MuscleGroupPlan[]): BBExercise[] {
   if (!musclePlans || musclePlans.length === 0) return [];
   const stretchExs: BBExercise[] = [];
   const usedMuscles = new Set<string>();
   
   // Добавляем растяжку для 1-2 основных мышц (не дублируем)
   for (const plan of musclePlans.slice(0, 2)) {
-    const canonKey = collapseKey(plan.muscle);
+    const canonKey = collapseKey(plan.group);
     if (usedMuscles.has(canonKey)) continue;
     const stretch = STRETCH_DB[canonKey];
     if (stretch) {
@@ -581,7 +592,7 @@ function addStretching(musclePlans: MusclePlan[]): BBExercise[] {
         role: 'accessory',
         character: 'лёг',
         sets: 1,
-        repsRange: [15, 20], // Динамическая растяжка — reps как индикатор
+        repsRange: [15, 20],
         rir: 3,
         workSets: [],
         comment: `Растяжка: ${stretch.instruction}`,
@@ -766,22 +777,24 @@ function buildSession(
     const isMultiDay = musclePlans.length > 2;
     const pedBoost = pedAdapt ? Math.max(0, Math.round((pedAdapt.combinedMrvMultiplier - 1.0) / 0.2)) : 0;
     // B13: levelBase монотонно растёт с уровнем (beginner=1, intermediate=2, advanced=3, enhanced=4).
-    // Раньше было beginner=1, intermediate=0, advanced=1 — intermediate получал МЕНЬШЕ, чем beginner (нелогично).
     const levelBase = level === 'beginner' ? 1 : level === 'intermediate' ? 2 : level === 'enhanced' ? 4 : 3;
     const isSingleFreq = (muscleSessionCount[muscle] || 1) === 1;
     const isArm = ['triceps','biceps','shoulders','forearms','arms'].includes(muscle);
     const isLeg = ['quads','hamstrings','glutes','calves'].includes(muscle);
     const onPED = pedAdapt ? pedAdapt.combinedMrvMultiplier >= 1.3 : false;
+    // PED dose-aware: чем выше MRV-множитель, тем больше упражнений (как у профи на курсе).
+    // AAS 500мг = ~1.3 → +1 упражнение; AAS 1000+insulin+GH = ~1.6 → +3 упражнения.
+    const pedExerciseBoost = pedAdapt ? Math.round((pedAdapt.combinedMrvMultiplier - 1.0) * 5) : 0;
     const primaryBase = ['back','quads','chest','shoulders'].includes(muscle)
-      ? (isMultiDay ? (onPED ? 4 : 3) : (isSingleFreq ? 3 : (onPED ? 5 : 4)))
-      : (isArm && onPED ? 3 : 2);
+      ? (isMultiDay ? (onPED ? 5 : 3) : (isSingleFreq ? 4 : (onPED ? 7 : 5)))
+      : (isArm && onPED ? 4 : 2);
     const accessoryBase = isArm && onPED ? 3 : (isArm ? 2 : 1);
     const accessoryBoost = isSingleFreq ? 0 : (isArm ? 1 : 0);
     let exerciseCount = role === 'primary'
-      ? Math.min(isMultiDay ? (onPED ? 5 : 3) : (isSingleFreq ? 4 : (onPED ? 6 : 4)),
-                 primaryBase + Math.max(0, levelBase - 2) + pedBoost)
-      : Math.min(isArm && onPED ? 4 : 3,
-                 accessoryBase + Math.floor(pedBoost / 2) + accessoryBoost);
+      ? Math.min(isMultiDay ? (onPED ? 8 : 4) : (isSingleFreq ? 6 : (onPED ? 10 : 6)),
+                 primaryBase + Math.max(0, levelBase - 2) + pedExerciseBoost)
+      : Math.min(isArm && onPED ? 5 : 3,
+                 accessoryBase + Math.floor(pedExerciseBoost / 2) + accessoryBoost);
     // A2: focusGroup — структурная специализация. Если мышца = focusGroup и primary
     // → упражнений +1 (compound + 2 multi-angle isolation для полноценного покрытия).
     if (focusGroup && muscle === focusGroup && role === 'primary') {
@@ -824,7 +837,7 @@ function buildSession(
     pool = pool.filter(ex => {
       const n = (ex.name || '').toLowerCase();
       if (tag.includes('push') || tag === 'chest' || tag === 'shoulders') {
-        if (n.includes('тяга')||n.includes('становая')||n.includes('мёртвая')||n.includes('гиперэкстенз')||n.includes('фермер')||n.includes('carry')) return false;
+        if (n.includes('тяга')||n.includes('становая')||n.includes('мёртвая')||n.includes('мертвая')||n.includes('гиперэкстенз')||n.includes('фермер')||n.includes('carry')||n.includes('rdl')||n.includes('romanian')||n.includes('deadlift')||n.includes('good morning')||n.includes('гудморнинг')) return false;
       }
       if (tag.includes('pull') || tag === 'back') {
         if (n.includes('жим')&&!n.includes('ногами')||n.includes('press')||n.includes('разгиб')||n.includes('extension')) return false;
@@ -877,8 +890,18 @@ function buildSession(
       pool = pool.map((ex: any) => {
         let score = 0;
         const n = (ex.name || '').toLowerCase();
+        const id = (ex.id || '').toLowerCase();
         if (PREFERRED_BB_EXERCISES.has(ex.id)) score += 50; // Большой буст стандарту
         else if (favoriteIds.includes(ex.id)) score += 20; // Любимые пользователя
+        // ББ-приоритет: наклонный жим > плоский (верх груди — отстающая у большинства)
+        if (id.includes('incline') || n.includes('наклон')) score += 15;
+        // ББ-приоритет: гакк/Смит-присед > свободный присед (безопасность поясницы)
+        if (id.includes('hack') || n.includes('гакк')) score += 15;
+        if (id.includes('smith') && id.includes('squat')) score += 10;
+        // Штраф: плоский жим в ББ (наклонный важнее для гипертрофии груди)
+        if ((id === 'bench_press' || id === 'barbell_bench_press') && !id.includes('incline')) score -= 10;
+        // Штраф: классический присед со штангой в ББ (гакк/Смит безопаснее)
+        if ((id === 'squat' || id === 'barbell_squat' || id === 'back_squat') && !id.includes('hack') && !id.includes('smith')) score -= 10;
         // Штраф за редкие вариации (узкий/обратный/глубокий хват, изолирующие машины)
         if (n.includes('обратн') || n.includes('обрат') || n.includes('reverse')) score -= 10;
         if (n.includes('узкий') || n.includes('узк') || n.includes('narrow')) score -= 5;
@@ -1314,7 +1337,7 @@ function buildSession(
         rir: finalRir,
         workSets, exerciseName: (exData as any).name || (exData as any).id,
         tempoSpec: tempoStr, restSeconds: exRest,
-        comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, exSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted),
+        comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, exSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id),
         warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary'),
         rationale: pl.rationaleMap.get((exData as any).name) || '',
       });
@@ -1329,9 +1352,9 @@ function buildSession(
   const _ordered = orderSessionExercises(exercises, { sessionTag: sched.sessionTag, methodology });
   exercises.length = 0; exercises.push(..._ordered);
 
-  const exCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 15 : 9;
+  const exCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 18 : 9;
   if (exercises.length > exCap) {
-    const kept = exercises.filter(e => e.role === 'primary').slice(0, 7);
+        const kept = exercises.filter(e => e.role === 'primary').slice(0, 10);
     const acc = exercises.filter(e => e.role === 'accessory');
     const maxAcc = Math.max(0, exCap - kept.length);
     // Гарантировать arms accessory (triceps/biceps) — не обрезать их первыми
@@ -1464,6 +1487,12 @@ function buildSession(
       const wb = isWeak(b.muscle, weakPoints) ? -1 : 0;
       return wa - wb;
     });
+  }
+
+  // Добавляем растяжку в конец сессии (динамическая растяжка для основных групп мышц)
+  const stretchExs = addStretching(musclePlans);
+  if (stretchExs.length > 0) {
+    exercises.push(...stretchExs);
   }
 
   return { day: dayInRotation, weekOffset: 0, character, sessionTag: sched.sessionTag, exercises };
@@ -1821,7 +1850,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       weekSessions.push(sess);
     }
     // Финальный кап упражнений в каждой сессии (с учётом feeder/pump-финишеров)
-    const finalExCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 12 : 8;
+    const finalExCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 16 : 8;
     for (const sess of weekSessions) {
       if (sess.exercises.length > finalExCap) {
         const kept = sess.exercises.filter(e => e.role === 'primary').slice(0, 7);
