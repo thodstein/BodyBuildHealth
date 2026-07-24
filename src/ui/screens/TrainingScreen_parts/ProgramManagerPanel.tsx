@@ -241,6 +241,7 @@ export const ProgramManagerPanel: React.FC = () => {
           </div>
         </div>
 
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700 }}>🆕 Создать новую</div>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -760,6 +761,48 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
             </div>
             <div style={{ fontSize: 9, color: DIM, marginTop: 6, fontStyle: 'italic' }}>
               Шаблон недели повторяется для всех мезоциклов. Делод-недели должны быть явно отмечены флагом «deload» в структуре.
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* P5.4 — SMART-рекомендации (распознаёт gap в weakPoints из профиля, показывает какие мышцы нуждаются в дозаполнении и какие упражнения рекомендованы для этого). */}
+      {(() => {
+        const prof = loadTrainingProfile();
+        const wp = (prof.weakPoints ?? []) as string[];
+        if (wp.length === 0) return null;
+        const liveQ = dir === 'bb' && program.bb ? computePlanQualityFor(program, program.meta.level) : null;
+        if (!liveQ) return null;
+        const gaps = liveQ.perMuscle.filter((m) => wp.includes(m.muscle) && (m.status === 'low' || m.status === 'high' || (m.mev > 0 && m.sets < m.mev)));
+        if (gaps.length === 0) return null;
+        return (
+          <div style={{ padding: '10px 12px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(167,139,250,0.08), rgba(245,158,11,0.08))', borderLeft: '3px solid #a78bfa' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 13 }}>💡</span>
+              <span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>SMART-рекомендации</span>
+              <span style={{ fontSize: 9, color: DIM, fontWeight: 500 }}>weakPoints: {wp.map((m) => GROUP_RU[m] ?? m).join(', ')}</span>
+            </div>
+            {gaps.slice(0, 4).map((g, gi) => {
+              const recs = suggestExercisesForGroup(g.muscle, program.meta.level, 2, (prof.equipment ?? []) as string[], (prof.favoriteExercises ?? []) as string[], (prof.excludedExercises ?? []) as string[]);
+              const has = recs.length > 0;
+              const statusColor = g.status === 'over' ? '#ef4444' : g.status === 'high' ? '#f59e0b' : '#60a5fa';
+              return (
+                <div key={gi} style={{ padding: 6, marginBottom: 4, background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 10, color: statusColor, fontWeight: 700 }}>
+                    {GROUP_RU[g.muscle] ?? g.muscle}: {g.sets} сетов/мезо (MEV {g.mev} / MAV {g.mav} / MRV {g.mrv})
+                  </div>
+                  {has ? (
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 4 }}>
+                      ➕ Добавьте: <b>{recs.map((r) => r.name).join(' · ')}</b>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Нет рекомендаций при доступном оборудовании.</div>
+                  )}
+                </div>
+              );
+            })}
+            <div style={{ fontSize: 9, color: DIM, fontStyle: 'italic', marginTop: 4 }}>
+              Используйте «⚡ Авто-сборка» в Параметрах или «+ Block» в нужной сессии.
             </div>
           </div>
         );
