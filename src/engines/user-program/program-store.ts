@@ -423,7 +423,18 @@ export function createBlank(direction: ProgramDirection): UserProgram {
         title: 'Новая ПЛ-программа', goal: 'powerlifting', level: 'intermediate',
         daysPerWeek: 3, weeks: 12, direction: 'pl', source: 'custom', tags: ['custom'],
       }),
-      pl: { direction: 'pl', sourceCycleId: 'cycle-01', schedule: [], weakPoints: [], notes: '', workMax: {} },
+      pl: {
+        direction: 'pl',
+        sourceCycleId: 'cycle-01',
+        schedule: [
+          { sessionIdx: 0, dayOfWeek: 0 }, // Пн
+          { sessionIdx: 1, dayOfWeek: 2 }, // Ср
+          { sessionIdx: 2, dayOfWeek: 4 }, // Пт
+        ],
+        weakPoints: [],
+        notes: '',
+        workMax: {},
+      },
     };
   }
   if (direction === 'hybrid') {
@@ -435,15 +446,30 @@ export function createBlank(direction: ProgramDirection): UserProgram {
       hybrid: { direction: 'hybrid', plRef: { sourceCycleId: 'cycle-01', sessionIndices: [] }, bbWeeks: [], notes: '', workMax: { squat: 120, bench: 100, deadlift: 140 }, level: 'intermediate', weeksOverride: 8 },
     };
   }
+  // ББ default: meta.daysPerWeek=4 → 4 сессии с по 1 пустому блоку, чтобы юзер сразу видел
+  // редактируемую структуру вместо «программа пустая».
+  const bbDays = 4;
+  const bbWeeks: UserWeek[] = [{
+    week: 1,
+    phase: 'accumulation',
+    deload: false,
+    sessions: Array.from({ length: bbDays }, (_, si) => ({
+      id: newId('ses'),
+      name: `День ${si + 1}`,
+      focus: '',
+      dayOfWeek: [0, 1, 3, 4][si] ?? si, // Пн/Вт/Чт/Пт — типичный 4д
+      blocks: [],
+    })),
+  }];
   return {
     meta: baseMeta({
       title: 'Новая ББ-программа', goal: 'hypertrophy', level: 'intermediate',
-      daysPerWeek: 4, weeks: 6, direction: 'bb', source: 'custom', tags: ['custom'],
+      daysPerWeek: bbDays, weeks: 6, direction: 'bb', source: 'custom', tags: ['custom'],
     }),
     bb: {
       direction: 'bb',
-      microcycleTemplate: { daySlots: [{ day: 1, label: 'День 1', muscles: [] }] },
-      weeks: [],
+      microcycleTemplate: { daySlots: bbWeeks[0].sessions.map((s, i) => ({ day: i + 1, label: s.name, muscles: [] })) },
+      weeks: bbWeeks,
       volumeBudget: {},
       progression: { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] },
       constraints: { equipment: [] },
