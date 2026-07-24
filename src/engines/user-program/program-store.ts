@@ -117,10 +117,9 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
       for (const s of w.sessions) {
         for (const b of s.blocks) {
           totalExercises++;
-          for (const st of b.sets) {
-            const m = b.muscle || 'other';
-            allMuscleVolume[m] = (allMuscleVolume[m] || 0) + (st.reps && typeof st.reps === 'number' ? 1 : 0);
-          }
+          const m = b.muscle || 'other';
+          // P2: считаем сеты по количеству, не по rep-флагу (AMRAP ≠ 0)
+          allMuscleVolume[m] = (allMuscleVolume[m] || 0) + (b.sets?.length || 0);
         }
       }
     }
@@ -135,21 +134,29 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
       if (lm && sets > lm.mrv * 1.2) {
         issues.push({ level: 'warning', code: 'MRV_EXCEED', message: `${muscle}: ${sets} сетов/нед превышает MRV (${lm.mrv}) на 20%+`, muscle });
       }
-      // Проверка наличия делода в длинных циклах
-      if (meta.weeks >= 6 && !wHasDeload(bb)) {
-        issues.push({ level: 'info', code: 'NO_DELOAD', message: 'Длинный цикл без явной делод-недели' });
-      }
-      // Проверка consistency: daysPerWeek vs реальное число сессий
-      if (bb.weeks.length > 0 && bb.weeks[0].sessions.length !== meta.daysPerWeek) {
-        issues.push({ level: 'info', code: 'DAYS_MISMATCH', message: `meta.daysPerWeek=${meta.daysPerWeek}, но в неделе ${bb.weeks[0].sessions.length} сессий. Нажмите «Дней/нед» чтобы синхронизировать.` });
-      }
+    }
+    // P2: проверка делода и дней — ВНЕ цикла мышц (раньше дублировались N раз)
+    if (meta.weeks >= 6 && !wHasDeload(bb)) {
+      issues.push({ level: 'info', code: 'NO_DELOAD', message: 'Длинный цикл без явной делод-недели' });
+    }
+    if (bb.weeks.length > 0 && bb.weeks[0].sessions.length !== meta.daysPerWeek) {
+      issues.push({ level: 'info', code: 'DAYS_MISMATCH', message: `meta.daysPerWeek=${meta.daysPerWeek}, но в неделе ${bb.weeks[0].sessions.length} сессий. Нажмите «Дней/нед» чтобы синхронизировать.` });
     }
   }
 
   // 3. Проверка ПЛ
   if (dir === 'pl' && program.pl) {
-    if (!program.pl.sourceCycleId) {
-      issues.push({ level: 'error', code: 'NO_CYCLE', message: 'Не выбран ПЛ-цикл (процентки и раскладка пустые)' });
+    if (!program.pl.sourceCycleId && (!program.pl.customWeeks || program.pl.customWeeks.length === 0)) {
+      issues.push({ level: 'error', code: 'NO_CYCLE', message: 'Не выбран ПЛ-цикл и нет своего custom-цикла' });
+    }
+    if (program.pl.customWeeks && program.pl.customWeeks.length > 0) {
+      let totalPLEx = 0;
+      for (const w of program.pl.customWeeks) {
+        for (const d of w.days) totalPLEx += (d.exercises?.length || 0);
+      }
+      if (totalPLEx === 0) {
+        issues.push({ level: 'warning', code: 'PL_NO_EXERCISES', message: 'Свой ПЛ-цикл без упражнений — добавьте упражнения' });
+      }
     }
   }
 
@@ -416,8 +423,7 @@ function blockFromBuild(e: BBExercise, ei: number): UserBlock {
 export function createBlank(direction: ProgramDirection): UserProgram {
   const now = new Date().toISOString();
   if (direction === 'pl') {
-    // U2: дефолтный цикл — первый из LMS_CYCLES (без ленивого импорта, чтобы избежать цикла)
-    // Используем жёстко закодированный id 'cycle-01' как безопасный дефолт.
+    // P1-9: пустой PL с customWeeks — пользователь сам строит цикл
     return {
       meta: baseMeta({
         title: 'Новая ПЛ-программа', goal: 'powerlifting', level: 'intermediate',
@@ -425,15 +431,22 @@ export function createBlank(direction: ProgramDirection): UserProgram {
       }),
       pl: {
         direction: 'pl',
-        sourceCycleId: 'cycle-01',
+        sourceCycleId: null,
         schedule: [
-          { sessionIdx: 0, dayOfWeek: 0 }, // Пн
-          { sessionIdx: 1, dayOfWeek: 2 }, // Ср
-          { sessionIdx: 2, dayOfWeek: 4 }, // Пт
+          { sessionIdx: 0, dayOfWeek: 0 },
+          { sessionIdx: 1, dayOfWeek: 2 },
+          { sessionIdx: 2, dayOfWeek: 4 },
         ],
         weakPoints: [],
         notes: '',
         workMax: {},
+        customWeeks: [
+          { week: 1, phase: 'accumulation', deload: false, days: [
+            { name: 'Присед', exercises: [{ name: '', lift: 'squat', sets: [{ pct: 0.75, reps: 5, sets: 3, rir: 2 }] }] },
+            { name: 'Жим', exercises: [{ name: '', lift: 'bench', sets: [{ pct: 0.75, reps: 5, sets: 3, rir: 2 }] }] },
+            { name: 'Тяга', exercises: [{ name: '', lift: 'dead', sets: [{ pct: 0.75, reps: 5, sets: 3, rir: 2 }] }] },
+          ]},
+        ],
       },
     };
   }

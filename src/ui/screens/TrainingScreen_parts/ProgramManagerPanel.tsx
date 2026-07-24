@@ -31,15 +31,14 @@ import { newId } from '../../../engines/user-program/user-program.types';
 import { HybridPlanPanel } from './HybridPlanPanel';
 import { ExerciseLabPicker } from './ExerciseLabPicker';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
-import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { BbContextPanel, PLContextPanel } from './program-editor-context-panels';
+import { BBEditor, PLEditor, BBConstraintsPanel } from './ProgramEditorComponents';
 import { SET_TEMPLATES } from './program-types';
 import {
   autodraftBBPlan,
   buildUserProgramFromBB,
   computePlanQualityFor,
-  muscleAwareSets,
-  makeSetsFromTemplate,
+  applyPhaseModulation,
   plLmsScheduleDays,
   suggestExercisesForGroup,
 } from '../../../engines/manual-constructor.engine';
@@ -53,10 +52,13 @@ import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle } from './training-ui';
 import { GROUP_RU } from './program-types';
 import { labTrainingAdjust } from './lab-training-adjust';
-import { distributePhases, PHASE_CONFIGS, getRirForWeek } from './phase-periodization';
+import { distributePhases, PHASE_CONFIGS } from './phase-periodization';
 import { suggestFeeders } from '../../../engines/bb/bb-autocoach.engine';
 import { useDataLink } from '../../../core/data-link';
 import { findSubstitutions } from '../../../engines/exercise-substitution.engine';
+import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
+import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
+import type { Exercise } from '../../../core/types';
 
 const GOAL_OPTS = [
   { id: 'hypertrophy', label: 'Масса' }, { id: 'powerlifting', label: 'Сила (ПЛ)' },
@@ -85,6 +87,8 @@ export const ProgramManagerPanel: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filterDir, setFilterDir] = useState<'all' | 'bb' | 'pl' | 'hybrid'>('all');
   const [sortBy, setSortBy] = useState<'updated' | 'title' | 'days'>('updated');
+  // P2-5: сравнение двух программ
+  const [compareIds, setCompareIds] = useState<string[]>([]);
 
   const refresh = useCallback(() => setPrograms(loadUserPrograms()), []);
   const flash = useCallback((m: string) => { setToast(m); setTimeout(() => setToast(''), 2200); }, []);
@@ -314,6 +318,41 @@ export const ProgramManagerPanel: React.FC = () => {
           <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.3, color: DIM_STRONG, textTransform: 'uppercase', flex: 1 }}>
             Сохранённые ({filteredPrograms().length}{filteredPrograms().length !== programs.length ? ` из ${programs.length}` : ''})
           </span>
+          {/* P1-6: JSON экспорт/импорт */}
+          <button style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 0 }} onClick={() => {
+            const json = JSON.stringify(programs, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'bodybuildhealth-programs-' + new Date().toISOString().slice(0,10) + '.json';
+            a.click(); URL.revokeObjectURL(url);
+            flash('📥 Экспортировано ' + programs.length + ' программ');
+          }} title="Экспорт всех программ в JSON">📥 JSON</button>
+          <label style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 0, cursor: 'pointer', position: 'relative' }}>
+            📤 JSON
+            <input type="file" accept=".json" style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} onChange={e => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                try {
+                  const imported = JSON.parse(reader.result as string);
+                  if (!Array.isArray(imported)) throw new Error('Not an array');
+                  let added = 0;
+                  for (const p of imported) {
+                    if (!p.meta?.id || !p.meta?.direction) continue;
+                    const exists = programs.find(x => x.meta.id === p.meta.id);
+                    if (exists) continue;
+                    saveUserProgram(p as UserProgram, 'Импорт JSON');
+                    added++;
+                  }
+                  refresh();
+                  flash('📤 Импортировано: ' + added + ' новых программ');
+                } catch { flash('⚠ Ошибка: неверный формат JSON'); }
+              };
+              reader.readAsText(file);
+              e.target.value = '';
+            }} />
+          </label>
         </div>
         {/* P2.6: поиск + фильтр по direction + сортировка */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -347,6 +386,19 @@ export const ProgramManagerPanel: React.FC = () => {
               </div>
             </div>
             <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 0 }} onClick={() => openExisting(p.meta.id)}>Открыть</button>
+            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 0 }} onClick={() => {
+              const clone = JSON.parse(JSON.stringify(p));
+              clone.meta.id = newId('prog');
+              clone.meta.title = p.meta.title + ' (копия)';
+              clone.meta.source = 'custom';
+              clone.meta.createdAt = new Date().toISOString();
+              clone.meta.updatedAt = new Date().toISOString();
+              clone.meta.revisions = [{ ts: new Date().toISOString(), note: 'Клон «' + p.meta.title + '»' }];
+              saveUserProgram(clone, 'Клонирование');
+              refresh();
+              flash('📋 Клонировано: ' + clone.meta.title);
+            }} title="Клонировать">⧉</button>
+            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 0 }} onClick={() => { setCompareIds(prev => prev.includes(p.meta.id) ? prev.filter(x => x !== p.meta.id) : prev.length < 2 ? [...prev, p.meta.id] : [prev[1], p.meta.id]); }} title="Сравнить">⚖</button>
             <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 0 }} onClick={() => copyProgramToClipboard(p)} title="Скопировать в буфер">📋</button>
             <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 0, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeProgram(p.meta.id)}>✕</button>
           </div>
@@ -554,6 +606,14 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
             deloadProtocol: 'pump',
             intensityTechniques: ['none'],
           };
+          // P0-3: фазовая периодизация — RIR/объём/повторения по неделям
+          if ((userProg.bb.weeks?.length ?? 0) >= 4) {
+            userProg.bb.weeks = applyPhaseModulation(userProg.bb.weeks!, {
+              goal: program.meta.goal,
+              level: program.meta.level,
+              weeksTotal: program.meta.weeks || 4,
+            });
+          }
         }
         update({ bb: userProg.bb });
       } catch (err) {
@@ -586,14 +646,16 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
     showToast('⚡ Черновик создан из профиля — заполните упражнения и ПМ');
   };
 
-// «🚚 К выполнению» — поддерживает BB и PL.
+ // «🚚 К выполнению» — поддерживает BB и PL.
+  const [execWeek, setExecWeek] = useState(1);
   const sendToExecution = () => {
     let days: { label: string; exercises: { name: string; muscleGroup: string; targetSets: { weight: number; reps: number; rir: number }[] }[] }[] = [];
 
     if (dir === 'bb' && program.bb) {
-      const week1 = program.bb.weeks[0];
-      if (!week1) { alert('Сначала добавьте хотя бы одну сессию.'); return; }
-      for (const s of week1.sessions) {
+      const wi = Math.max(0, Math.min(execWeek - 1, program.bb.weeks.length - 1));
+      const week = program.bb.weeks[wi];
+      if (!week) { alert('Сначала добавьте хотя бы одну сессию.'); return; }
+      for (const s of week.sessions) {
         days.push({
           label: s.name || 'День',
           exercises: s.blocks
@@ -614,47 +676,69 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         return;
       }
     } else if (dir === 'pl' && program.pl) {
-      // PL: использовать plLmsScheduleDays из manual-constructor.engine — превращает LMS-cycle в PlayerDay[].
-      const plDays = plLmsScheduleDays(program);
-      if (!plDays || plDays.length === 0) {
-        alert('ПЛ-цикл пустой. Укажите ПМ (приседа/жима/тяги) и проверьте подключение LMS-цикла.');
-        return;
-      }
-      const wm = program.pl.workMax || {};
-      const wmVal = (liftStr: string): number => {
-        if (/жим/i.test(liftStr)) return wm.bench ?? 0;
-        if (/тяг/i.test(liftStr)) return wm.dead ?? 0;
-        return wm.squat ?? 0;
-      };
-      days = plDays.map((pd) => ({
-        label: pd.label,
-        exercises: (pd.exercises as Array<{ name: string; group: string; sets: Array<{ pct: number; reps: number; weight: number }> }>).map((ex) => {
-          const pmBase = wmVal(ex.name);
-          return {
+      // P0-2: custom PL — конвертируем customWeeks в PlayerDay[]
+      if (program.pl.sourceCycleId === null && program.pl.customWeeks && program.pl.customWeeks.length > 0) {
+        const wm = program.pl.workMax || {};
+        const wmFor = (lift: string): number => {
+          if (lift === 'bench') return wm.bench ?? 0;
+          if (lift === 'dead') return wm.dead ?? 0;
+          return wm.squat ?? 0;
+        };
+        const wiPL = Math.max(0, Math.min(execWeek - 1, program.pl.customWeeks!.length - 1));
+        const wk0 = program.pl.customWeeks[wiPL];
+        if (!wk0 || wk0.days.length === 0) {
+          alert('Свой ПЛ-цикл пуст — добавьте дни и упражнения.');
+          return;
+        }
+        days = wk0.days.map((d, di) => ({
+          label: d.name || `День ${di + 1}`,
+          exercises: d.exercises.map((ex) => ({
             name: ex.name,
-            muscleGroup: ex.group || '',
-            targetSets: ex.sets.map((st) => {
-              // Если в ex.sets уже есть готовый weight (PM-прогрессия) — используем его.
-              // Иначе считаем из pct×PM, округляем до 2.5 кг.
-              const w = (st as { weight?: number }).weight;
-              const computed = (typeof w === 'number' && w > 0)
-                ? w
-                : (pmBase > 0 ? Math.round((pmBase * (ex.sets[0]?.pct ?? 0.7)) / 2.5) * 2.5 : 0);
-              return {
-                weight: computed,
-                reps: st.reps ?? 5,
-                rir: 2,
-              };
-            }),
-          };
-        }),
-      }));
+            muscleGroup: ex.muscle || ex.lift,
+            targetSets: ex.sets.map((st) => ({
+              weight: Math.round((wmFor(ex.lift) * st.pct) / 2.5) * 2.5,
+              reps: st.reps,
+              rir: st.rir ?? 2,
+            })),
+          })),
+        }));
+      } else {
+        // PL: использовать plLmsScheduleDays из manual-constructor.engine — превращает LMS-cycle в PlayerDay[].
+        const plDays = plLmsScheduleDays(program);
+        if (!plDays || plDays.length === 0) {
+          alert('ПЛ-цикл пустой. Укажите ПМ (приседа/жима/тяги) и проверьте подключение LMS-цикла.');
+          return;
+        }
+        const wm = program.pl.workMax || {};
+        const wmVal = (liftStr: string): number => {
+          if (/жим/i.test(liftStr)) return wm.bench ?? 0;
+          if (/тяг/i.test(liftStr)) return wm.dead ?? 0;
+          return wm.squat ?? 0;
+        };
+        days = plDays.map((pd) => ({
+          label: pd.label,
+          exercises: (pd.exercises as Array<{ name: string; group: string; sets: Array<{ pct: number; reps: number; weight: number }> }>).map((ex) => {
+            const pmBase = wmVal(ex.name);
+            return {
+              name: ex.name,
+              muscleGroup: ex.group || '',
+              targetSets: ex.sets.map((st) => {
+                const w = (st as { weight?: number }).weight;
+                const computed = (typeof w === 'number' && w > 0)
+                  ? w
+                  : (pmBase > 0 ? Math.round((pmBase * (ex.sets[0]?.pct ?? 0.7)) / 2.5) * 2.5 : 0);
+                return { weight: computed, reps: st.reps ?? 5, rir: 2 };
+              }),
+            };
+          }),
+        }));
+      }
     } else {
       alert('Сначала выберите ББ или ПЛ программу.');
       return;
     }
     try {
-      localStorage.setItem('he_pl_runtime', JSON.stringify({ days, focus: program.meta.title || 'Моя программа', week: 1, track: dir }));
+      localStorage.setItem('he_pl_runtime', JSON.stringify({ days, focus: program.meta.title || 'Моя программа', week: execWeek, track: dir }));
     } catch {}
     showToast('🚚 Отправлено к выполнению — откройте зону «▶ Тренировка»');
   };
@@ -789,16 +873,32 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       })()}
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a' }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней">⚡ Авто-черновик</button>
+          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a' }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней">⚡ Авто-черновик</button>
+          {dir === 'bb' && program.bb && (program.bb.weeks?.length ?? 0) >= 4 && (
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
+              onClick={() => {
+                const updated = { ...program.bb!, weeks: applyPhaseModulation(program.bb!.weeks!, { goal: program.meta.goal, level: program.meta.level, weeksTotal: program.meta.weeks || 4 }) };
+                update({ bb: updated });
+                showToast('📈 Фазовая периодизация применена: RIR/фазы/повторения по неделям');
+              }}
+              title="Применить фазовую периодизацию (RIR/объём/повторения по неделям)"
+            >📈 Применить фазы</button>
+          )}
+          {(dir === 'bb' || dir === 'pl') && (
+            <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4, marginRight: 4 }}>
+              Нед
+              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 38, minHeight: 34, textAlign: 'center' }} value={execWeek} min={1} max={program.meta.weeks} onChange={e => setExecWeek(Math.max(1, Math.min(parseInt(e.target.value) || 1, program.meta.weeks)))} />
+            </label>
+          )}
           {dir === 'bb' && (
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToExecution} title="Отправить к выполнению (he_pl_runtime)">🚚 К выполнению</button>
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToExecution} title="Отправить к выполнению (he_pl_runtime)">🚚 К выполнению</button>
           )}
           {dir === 'pl' && program.pl && (
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-цикл к выполнению (he_pl_runtime)">🚚 К выполнению</button>
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-цикл к выполнению (he_pl_runtime)">🚚 К выполнению</button>
           )}
           {(dir === 'bb' || dir === 'pl' || dir === 'hybrid') && (
             <button
-              style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
+              style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
               title="Отправить текущую программу как стартовый контекст в BB-авто (через planner-bridge)"
               onClick={() => exportToAuto()}
             >
@@ -807,15 +907,15 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           )}
           {(dir === 'pl' || dir === 'hybrid') && program.pl && (
             <button
-              style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}
+              style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}
               title="Отправить программу как стартовый контекст в PL-авто (через planner-bridge)"
               onClick={() => exportToPl()}
             >
               🔗 В ПЛ-auto
             </button>
           )}
-          <button style={{ ...BTN, padding: '6px 14px', fontSize: 11, minHeight: 0 }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
-          <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 0, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / сохранить в PDF">🖨 PDF</button>
+          <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 38 }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
+          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / сохранить в PDF">🖨 PDF</button>
         </div>
       </div>
 
@@ -854,6 +954,175 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         );
       })()}
 
+      {/* ──────────────────────── ИНТЕГРИРОВАННЫЕ ПАНЕЛИ ИНСТРУМЕНТОВ ──────────────────────── */}
+      {/* P8.1 — Volume Landmarks Panel: MEV/MAV/MRV для текущего уровня */}
+      {(() => {
+        const prof = loadTrainingProfile();
+        const MUSCLES = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;
+        // P0-1: пиковая неделя (макс сетов/нед на мышцу), не сумма всех недель
+        const peakByMuscle: Record<string, number> = {};
+        if (dir === 'bb' && program.bb) {
+          for (const w of program.bb.weeks) {
+            const weekSets: Record<string, number> = {};
+            for (const s of w.sessions) {
+              for (const b of s.blocks) {
+                if (b.muscle) weekSets[b.muscle] = (weekSets[b.muscle] || 0) + (b.sets?.length || 0);
+              }
+            }
+            for (const [m, sets] of Object.entries(weekSets)) {
+              peakByMuscle[m] = Math.max(peakByMuscle[m] || 0, sets);
+            }
+          }
+        } else if (dir === 'pl' && program.pl?.customWeeks) {
+          for (const w of program.pl.customWeeks) {
+            const weekSets: Record<string, number> = {};
+            for (const d of w.days) {
+              for (const ex of d.exercises) {
+                if (ex.muscle) weekSets[ex.muscle] = (weekSets[ex.muscle] || 0) + ex.sets.reduce((sum, s) => sum + s.sets, 0);
+              }
+            }
+            for (const [m, sets] of Object.entries(weekSets)) {
+              peakByMuscle[m] = Math.max(peakByMuscle[m] || 0, sets);
+            }
+          }
+        }
+        if (Object.keys(peakByMuscle).length === 0) return null;
+        return (
+          <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #22c55e' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#22c55e', marginBottom: 6 }}>📊 Объём и MRV по мышцам (пиковая неделя)</div>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 6, fontStyle: 'italic' }}>
+              Сравнение пиковой недели с MEV/MAV/MRV для уровня <b>{program.meta.level}</b>
+              {labAdjust.mrvMultiplier < 1 && <span> (лабораторный MRV ×{labAdjust.mrvMultiplier.toFixed(2)})</span>}
+              {(prof.onCourse ?? false) && <span style={{ color: '#f59e0b' }}> · курс: MRV +15-30%</span>}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {MUSCLES.filter(m => peakByMuscle[m] > 0).map(m => {
+                const cur = peakByMuscle[m] || 0;
+                const lm = getVolumeLandmarks(program.meta.level, m);
+                if (!lm) return null;
+                const labMrv = labAdjust.mrvMultiplier < 1 ? Math.round(lm.mrv * labAdjust.mrvMultiplier) : lm.mrv;
+                const pctMrv = labMrv > 0 ? Math.round((cur / labMrv) * 100) : 0;
+                const barColor = pctMrv > 100 ? '#ef4444' : pctMrv >= 80 ? '#f59e0b' : '#22c55e';
+                return (
+                  <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
+                    <span style={{ fontSize: 11, color: DIM_STRONG, flex: '0 0 80px' }}>{GROUP_RU[m] ?? m}</span>
+                    <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.min(100, pctMrv)}%`, height: '100%', background: barColor, borderRadius: 4, transition: 'width 0.3s' }} />
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: barColor, minWidth: 60, textAlign: 'right' }}>{cur} / {labMrv}с</span>
+                    <span style={{ fontSize: 11, color: DIM, minWidth: 36, textAlign: 'right' }}>{pctMrv}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* P8.2 — Weak Point Panel: рекомендованные упражнения с кнопкой «+ Добавить» */}
+      {(() => {
+        const prof = loadTrainingProfile();
+        const wp = (prof.weakPoints ?? []) as string[];
+        if (wp.length === 0 || !program.bb) return null;
+        const wpWithRecs = wp.map(m => {
+          const recs = suggestExercisesForGroup(m, program.meta.level, 3, (prof.equipment ?? []) as string[], wp, [], prof.avoidAxialLoad ?? false, (prof.favoriteExercises ?? []) as string[], (prof.excludedExercises ?? []) as string[]);
+          return { muscle: m, recs };
+        }).filter(x => x.recs.length > 0);
+        if (wpWithRecs.length === 0) return null;
+        const addToWeek = (muscle: string, exName: string) => {
+          if (!program.bb?.weeks[0]?.sessions[0]) return;
+          const newBlock: UserBlock = {
+            id: newId('blk'), type: 'accessory' as const, exerciseName: exName, muscle,
+            role: 'accessory' as const,
+            sets: [{ reps: 12, rir: 2, weight: 0, restSec: 90 }],
+          };
+          const updated = { ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((w, wi) => wi === 0 ? { ...w, sessions: w.sessions.map((s, si) => si === 0 ? { ...s, blocks: [...s.blocks, newBlock] } : s) } : w) } };
+          onChange(updated);
+          showToast(`✅ Добавлено: ${exName} (${(GROUP_RU[muscle] ?? muscle)})`);
+        };
+        return (
+          <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #a78bfa' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', marginBottom: 6 }}>🎯 Слабые группы — рекомендованные упражнения</div>
+            {wpWithRecs.map(({ muscle, recs }) => (
+              <div key={muscle} style={{ padding: 4, marginBottom: 4 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', marginBottom: 4 }}>{GROUP_RU[muscle] ?? muscle}:</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {recs.map((r, ri) => (
+                    <button
+                      key={ri}
+                      onClick={() => addToWeek(muscle, r.name)}
+                      title={`Добавить ${r.name} в сессию 1 недели 1`}
+                      style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700, minHeight: 38 }}
+                    >
+                      + {r.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* P8.3 — Phase Legend Panel: фазовая таблица */}
+      {program.meta.weeks >= 4 && (() => {
+        const phases = distributePhases(program.meta.weeks, 0, program.meta.goal === 'powerlifting' ? 'strength' : program.meta.goal === 'cut' ? 'endurance' : 'bulk');
+        if (!phases || phases.length === 0) return null;
+        return (
+          <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #60a5fa' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>📈 Фазовая легенда ({program.meta.weeks} нед)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {phases.map((p, i) => {
+                const pColor = { accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' }[p.phase] ?? '#fff';
+                const label = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' }[p.phase] ?? p.phase;
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 10, background: pColor, flexShrink: 0 }} />
+                    <span style={{ fontSize: 10, color: DIM_STRONG, flex: '0 0 100px' }}>{label}</span>
+                    <span style={{ fontSize: 10, color: DIM }}>нед {p.startWeek}–{p.endWeek}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: pColor, marginLeft: 'auto' }}>{p.endWeek - p.startWeek + 1} нед</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* P8.4 — Exercise Info Panel: показывает био-данные упражнения из EXERCISE_CATALOG */}
+      {(() => {
+        let selectedEx: Exercise | undefined;
+        if (dir === 'bb' && program.bb) {
+          for (const w of program.bb.weeks) {
+            for (const s of w.sessions) {
+              for (const b of s.blocks) {
+                if (b.exerciseName) {
+                  const found = EXERCISE_CATALOG.find((ex: Exercise) => ex.name === b.exerciseName);
+                  if (found) { selectedEx = found; break; }
+                }
+              }
+              if (selectedEx) break;
+            }
+            if (selectedEx) break;
+          }
+        }
+        if (!selectedEx) return null;
+        const ex = selectedEx;
+        const exAny = ex as any;
+        return (
+          <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #06b6d4' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#06b6d4', marginBottom: 4 }}>🔬 Инфо упражнения: {ex.name}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 4 }}>
+              {ex.group && <div style={{ fontSize: 10, color: DIM }}>Группа: <b style={{ color: DIM_STRONG }}>{GROUP_RU[ex.group] ?? ex.group}</b></div>}
+              {ex.type && <div style={{ fontSize: 10, color: DIM }}>Тип: <b style={{ color: DIM_STRONG }}>{ex.type}</b></div>}
+              {ex.equipment && <div style={{ fontSize: 10, color: DIM }}>Инвентарь: <b style={{ color: DIM_STRONG }}>{typeof ex.equipment === 'string' ? ex.equipment : (ex.equipment as string[]).join(', ')}</b></div>}
+              {exAny.forceVector && <div style={{ fontSize: 10, color: DIM }}>Вектор: <b style={{ color: DIM_STRONG }}>{exAny.forceVector}</b></div>}
+              {exAny.primaryMuscles && <div style={{ fontSize: 10, color: DIM }}>Основные мышцы: <b style={{ color: DIM_STRONG }}>{Array.isArray(exAny.primaryMuscles) ? (exAny.primaryMuscles as string[]).join(', ') : exAny.primaryMuscles}</b></div>}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* P5.1 — Week schedule grid Пн..Вс с фокусом мышц по дням. */}
       {((dir === 'bb' && program.bb?.weeks?.[0]?.sessions) || (dir === 'pl' && program.pl?.schedule)) && (() => {
         const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -881,11 +1150,11 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           <div style={{ ...CARD, padding: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>
               🗓 Неделя — расписание
-              <span style={{ fontSize: 9, color: DIM, marginLeft: 6, fontWeight: 500 }}>
+              <span style={{ fontSize: 11, color: DIM, marginLeft: 6, fontWeight: 500 }}>
                 (по плану текущей редактируемой программы)
               </span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(52px, 1fr))', gap: 4 }}>
               {WEEKDAYS.map((day, wi) => {
                 const d = dayByDow[wi];
                 const fill = d ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)';
@@ -896,15 +1165,15 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                     border: d ? '1px solid rgba(0,230,138,0.25)' : '1px solid rgba(255,255,255,0.05)',
                     textAlign: 'center',
                   }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: d ? '#00e68a' : DIM }}>{day}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: d ? '#00e68a' : DIM }}>{day}</div>
                     {d ? (
                       <>
-                        <div style={{ fontSize: 9, color: DIM_STRONG, marginTop: 4, fontWeight: 600 }}>{d.label}</div>
-                        <div style={{ fontSize: 9, color: DIM, marginTop: 2, lineHeight: 1.2 }}>
+                        <div style={{ fontSize: 10, color: DIM_STRONG, marginTop: 4, fontWeight: 600 }}>{d.label}</div>
+                        <div style={{ fontSize: 10, color: DIM, marginTop: 2, lineHeight: 1.2 }}>
                           {d.muscles.filter((m) => m !== '—').slice(0, 2).map((m, mi) => (
                             <span key={mi} style={{
-                              display: 'inline-block', padding: '1px 4px', marginRight: 2,
-                              borderRadius: 3, fontSize: 8,
+                              display: 'inline-block', padding: '2px 5px', marginRight: 2,
+                              borderRadius: 3, fontSize: 10,
                               background: (groupColors[m] ?? '#888') + '20',
                               color: groupColors[m] ?? '#fff',
                             }}>{GROUP_RU[m] ?? m}</span>
@@ -912,13 +1181,13 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                         </div>
                       </>
                     ) : (
-                      <div style={{ fontSize: 9, color: DIM, marginTop: 12, fontStyle: 'italic' }}>отдых</div>
+                      <div style={{ fontSize: 10, color: DIM, marginTop: 12, fontStyle: 'italic' }}>отдых</div>
                     )}
                   </div>
                 );
               })}
             </div>
-            <div style={{ fontSize: 9, color: DIM, marginTop: 6, fontStyle: 'italic' }}>
+            <div style={{ fontSize: 10, color: DIM, marginTop: 6, fontStyle: 'italic' }}>
               Шаблон недели повторяется для всех мезоциклов. Делод-недели должны быть явно отмечены флагом «deload» в структуре.
             </div>
           </div>
@@ -1044,9 +1313,14 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         );
       })()}
 
-      {/* P2 — LIVE Quality Panel: оценка 0-100 и конкретные правки. */}
-      {dir === 'bb' && program.bb && (() => {
-        const q = computePlanQualityFor(program, program.meta.level);
+      {/* P2 — LIVE Quality Panel: оценка 0-100 и конкретные правки (BB + PL). */}
+      {(dir === 'bb' && program.bb || dir === 'pl' && program.pl?.customWeeks) && (() => {
+        const prof = loadTrainingProfile();
+        const q = computePlanQualityFor(program, program.meta.level, {
+          onCourse: prof.onCourse ?? false,
+          courseIntensity: prof.courseIntensity ?? 'moderate',
+          labMult: labAdjust.mrvMultiplier,
+        });
         const bar = q.score >= 75 ? '#22c55e' : q.score >= 50 ? '#f59e0b' : '#ef4444';
         return (
           <div style={{ ...CARD, padding: 10, borderLeft: '2px solid ' + bar }}>
@@ -1080,7 +1354,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           return (
             <div style={{ ...CARD, padding: 10 }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>📊 Статистика плана{onCourse}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 6 }}>
                 <div style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
                   <div style={{ fontSize: 9, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Недель</div>
                   <div style={{ fontSize: 14, fontWeight: 800, color: DIM_STRONG }}>{program.bb.weeks.length}</div>
@@ -1164,13 +1438,13 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
             <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(167,139,250,0.7)', marginBottom: 4 }}>
               Интенсив-техника:
             </div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
               {(Object.entries(INTENSITY_TECHNIQUES) as [IntensityTechnique, { label: string; description: string }][]).map(([key, meta]) => (
                 <button
                   key={key}
                   title={meta.description}
                   onClick={() => applyTechnique(key)}
-                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700 }}
+                  style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700, minHeight: 38 }}
                 >
                   {meta.label}
                 </button>
@@ -1185,7 +1459,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                   key={char}
                   title={`${char}-характер дня: темп ${tempoFor(char).notation}, отдых ${{тяж:180,памп:60,лёг:90}[char]}с`}
                   onClick={() => applyCharacter(char)}
-                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.25)', color: '#22c55e', fontWeight: 700 }}
+                  style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.25)', color: '#22c55e', fontWeight: 700, minHeight: 38 }}
                 >
                   {char === 'тяж' ? 'Тяж. день → 180с/отдых' : char === 'памп' ? 'Памп день → 60с/отдых' : 'Лёгкий день → 90с/отдых'}
                 </button>
@@ -1242,9 +1516,9 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                   const weeks = [...program.bb.weeks];
                   while (weeks.length < v) {
                     const n = weeks.length + 1;
-                    // Копируем sessions из недели 1 для согласованности
                     const template = weeks[0]?.sessions ?? [];
-                    weeks.push({ week: n, phase: 'accumulation', deload: false, sessions: template.map(s => ({ ...s, id: newId('ses'), blocks: s.blocks.map(b => ({ ...b, id: newId('blk'), sets: b.sets.map(st => ({ ...st })) })) })) });
+                    const progression = 1 + (n - 1) * 0.025; // +2.5% за каждую неделю
+                    weeks.push({ week: n, phase: 'accumulation', deload: n % 4 === 0, sessions: template.map(s => ({ ...s, id: newId('ses'), blocks: s.blocks.map(b => ({ ...b, id: newId('blk'), sets: b.sets.map(st => ({ ...st, weight: st.weight ? Math.round(st.weight * progression / 2.5) * 2.5 : st.weight })) })) })) });
                   }
                   while (weeks.length > v) weeks.pop();
                   onChange({ ...program, meta: { ...program.meta, weeks: v }, bb: { ...program.bb, weeks } });
@@ -1273,7 +1547,15 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
 
       {dir === 'bb' && program.bb && <BBEditor body={program.bb} level={program.meta.level} onChange={(bb) => update({ bb })} />}
       {dir === 'pl' && program.pl && <PLEditor body={program.pl} onChange={(pl) => update({ pl })} />}
-      {dir === 'hybrid' && program.hybrid && <HybridPlanPanel program={program} onChange={(hybrid) => update({ hybrid })} onSave={onSave} />}
+      {dir === 'hybrid' && program.hybrid && (
+        <>
+          <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #3b82f6', background: 'rgba(59,130,246,0.06)' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#3b82f6' }}>⚡ Powerbuilder (Hybrid)</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>Гибрид ПЛ+ББ в активной разработке. Используйте кнопки «🔗 В ББ-auto» или «🔗 В ПЛ-auto» чтобы перенести программу в соответствующий конструктор.</div>
+          </div>
+          <HybridPlanPanel program={program} onChange={(hybrid) => update({ hybrid })} onSave={onSave} />
+        </>
+      )}
 
       {/* P2.8: Валидация программы */}
       {(() => {
@@ -1324,663 +1606,6 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-/* ─── ББ-редактор: недели → сессии → блоки ─── */
-
-const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => void; level: string }> = ({ body, onChange, level }) => {
-  const [volWeekIdx, setVolWeekIdx] = useState<number | null>(null);
-  const setWeeks = (weeks: UserWeek[]) => onChange({ ...body, weeks });
-  const addWeek = () => {
-    const n = body.weeks.length + 1;
-    setWeeks([...body.weeks, { week: n, phase: 'accumulation', deload: false, sessions: [] }]);
-  };
-  const updateWeek = (wi: number, patch: Partial<UserWeek>) => {
-    const w2 = body.weeks.map((w, i) => i === wi ? { ...w, ...patch } : w);
-    setWeeks(w2);
-  };
-  // U4: confirm-диалог при удалении недели
-  const removeWeek = (wi: number) => {
-    const wk = body.weeks[wi];
-    const sessCount = wk?.sessions?.length ?? 0;
-    if (!window.confirm(`Удалить неделю ${wk?.week}? Будет потеряно ${sessCount} сессий. Это нельзя отменить.`)) return;
-    setWeeks(body.weeks.filter((_, i) => i !== wi).map((w, i) => ({ ...w, week: i + 1 })));
-  };
-  // U12: клонировать неделю
-  const cloneWeek = (wi: number) => {
-    const src = body.weeks[wi];
-    if (!src) return;
-    const cloned: UserWeek = {
-      week: body.weeks.length + 1,
-      phase: src.phase,
-      deload: src.deload,
-      sessions: src.sessions.map(s => ({
-        id: newId('ses'),
-        name: s.name,
-        dayOfWeek: s.dayOfWeek,
-        focus: s.focus,
-        blocks: s.blocks.map(b => ({ ...b, id: newId('blk'), sets: b.sets.map(st => ({ ...st })) })),
-        warmup: s.warmup,
-        cooldown: s.cooldown,
-      })),
-    };
-    setWeeks([...body.weeks, cloned]);
-  };
-
-  /** Метрики для выбранной недели — пересчитываем при каждом изменении блоков/сетов. */
-  const volMetrics = useMemo(() => {
-    if (volWeekIdx == null) return null;
-    const w = body.weeks[volWeekIdx];
-    if (!w) return null;
-    if ((w.sessions ?? []).length === 0) return null;
-    try { return calcBBPlanMetrics(userWeekToBBPlan(w, level)); } catch { return null; }
-  }, [volWeekIdx, body.weeks, level]);
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>Структура ({body.weeks.length} нед)</div>
-      {/* 🎯 Быстрое добавление упражнений для слабых групп из профиля */}
-      {(() => {
-        const prof = loadTrainingProfile();
-        const wp = (prof.weakPoints ?? []) as string[];
-        if (wp.length === 0) return null;
-        const addWeakToWeek = (muscle: string) => {
-          if (!body.weeks[0]?.sessions[0]) return;
-          const recs = suggestExercisesForGroup(muscle, level, 2, (prof.equipment ?? []) as string[], wp, [], prof.avoidAxialLoad ?? false, (prof.favoriteExercises ?? []) as string[], (prof.excludedExercises ?? []) as string[]);
-          if (recs.length === 0) return;
-          const w0 = body.weeks[0];
-          const s0 = w0.sessions[0];
-          const newBlocks: UserBlock[] = recs.slice(0, 2).map((r) => ({
-            id: newId('blk'),
-            type: 'accessory' as const,
-            exerciseName: r.name,
-            muscle,
-            role: 'accessory' as const,
-            sets: makeSetsFromTemplate(muscleAwareSets(muscle, level), (prof.workMax ?? {})[muscle] ?? 40),
-          }));
-          const updatedWeeks = body.weeks.map((w, i) => i === 0 ? {
-            ...w,
-            sessions: w.sessions.map((s, si) => si === 0 ? { ...s, blocks: [...s.blocks, ...newBlocks] } : s),
-          } : w);
-          setWeeks(updatedWeeks);
-        };
-        return (
-          <div style={{ ...CARD, padding: 8, borderLeft: '3px solid #a78bfa' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', marginBottom: 4 }}>🎯 Слабые группы — быстрое добавление</div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {wp.map((m) => (
-                <button
-                  key={m}
-                  onClick={() => addWeakToWeek(m)}
-                  style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700 }}
-                >
-                  + {GROUP_RU[m] ?? m}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-      {body.weeks.map((w, wi) => (
-        <div key={wi} style={{ ...CARD, padding: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: DIM_STRONG }}>Неделя {w.week}</span>
-            <select style={{ ...IN, padding: '4px 6px', fontSize: 10, flex: '0 0 auto' }} value={w.phase} onChange={e => updateWeek(wi, { phase: e.target.value as UserWeek['phase'] })}>
-              <option value="accumulation">Накопление</option>
-              <option value="intensification">Интенсификация</option>
-              <option value="deload">Разгрузка</option>
-              <option value="peaking">Пик</option>
-            </select>
-            <label style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <input type="checkbox" checked={w.deload} onChange={e => updateWeek(wi, { deload: e.target.checked })} /> deload
-            </label>
-            <button
-              style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 0,
-                       color: volWeekIdx === wi ? ACCENT : DIM_STRONG,
-                       borderColor: volWeekIdx === wi ? ACCENT_LINE : 'rgba(255,255,255,0.08)' }}
-              onClick={() => setVolWeekIdx(volWeekIdx === wi ? null : wi)}
-              title="Показать бюджет объёма по мышцам для этой недели"
-            >📊 Объём</button>
-            <button style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 0 }} onClick={() => cloneWeek(wi)} title="Клонировать неделю">⧉</button>
-            <button style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 0, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeWeek(wi)}>✕ нед</button>
-          </div>
-          {volWeekIdx === wi && (
-            <div style={{ marginBottom: 8 }}>
-              {volMetrics
-                ? <VolumeBudgetCard metrics={volMetrics} />
-                : <div style={{ fontSize: 11, color: DIM, padding: 8, background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
-                    Недостаточно данных — добавьте хотя бы одну сессию с упражнениями, чтобы увидеть бюджет объёма.
-                  </div>
-              }
-            </div>
-          )}
-          <SessionList sessions={w.sessions} onChange={(sessions) => updateWeek(wi, { sessions })} />
-        </div>
-      ))}
-      <button style={{ ...BTN_GHOST, padding: '8px' }} onClick={addWeek}>+ Добавить неделю</button>
-    </div>
-  );
-};
-
-const SessionList: React.FC<{ sessions: UserSession[]; onChange: (s: UserSession[]) => void }> = ({ sessions, onChange }) => {
-  const addSession = () => onChange([...sessions, { id: newId('ses'), name: 'День ' + (sessions.length + 1), focus: '', blocks: [] }]);
-  const updateSession = (si: number, patch: Partial<UserSession>) => onChange(sessions.map((s, i) => i === si ? { ...s, ...patch } : s));
-  // U4: confirm-диалог при удалении сессии
-  const removeSession = (si: number) => {
-    const s = sessions[si];
-    if (!window.confirm(`Удалить "${s.name}"? Будет потеряно ${s.blocks.length} упражнений. Это нельзя отменить.`)) return;
-    onChange(sessions.filter((_, i) => i !== si));
-  };
-  // U12: клонировать сессию
-  const cloneSession = (si: number) => {
-    const src = sessions[si];
-    if (!src) return;
-    onChange([
-      ...sessions,
-      {
-        id: newId('ses'),
-        name: src.name + ' (копия)',
-        dayOfWeek: src.dayOfWeek,
-        focus: src.focus,
-        blocks: src.blocks.map(b => ({ ...b, id: newId('blk'), sets: b.sets.map(st => ({ ...st })) })),
-        warmup: src.warmup,
-        cooldown: src.cooldown,
-      },
-    ]);
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {sessions.map((s, si) => (
-        <div key={s.id} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-            <input style={{ ...IN, padding: '4px 6px', fontSize: 11, flex: 1 }} value={s.name} onChange={e => updateSession(si, { name: e.target.value })} placeholder="День" />
-            <input style={{ ...IN, padding: '4px 6px', fontSize: 11, flex: 1 }} value={s.focus} onChange={e => updateSession(si, { focus: e.target.value })} placeholder="Фокус (грудь/трицепс)" />
-            <button style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 0 }} onClick={() => cloneSession(si)} title="Клонировать сессию">⧉</button>
-            <button style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 0, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeSession(si)}>✕</button>
-          </div>
-          <BlockList blocks={s.blocks} onChange={(blocks) => updateSession(si, { blocks })} />
-        </div>
-      ))}
-      <button style={{ ...BTN_GHOST, padding: '6px', fontSize: 10 }} onClick={addSession}>+ Сессия</button>
-    </div>
-  );
-};
-
-const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => void }> = ({ blocks, onChange }) => {
-  const addBlock = () => onChange([...blocks, { id: newId('blk'), type: 'accessory', exerciseName: '', muscle: '', role: 'accessory', sets: [{ reps: 10, rir: 2 }] }]);
-  const updateBlock = (bi: number, patch: Partial<UserBlock>) => onChange(blocks.map((b, i) => i === bi ? { ...b, ...patch } : b));
-  // U4: confirm-диалог при удалении блока
-  const removeBlock = (bi: number) => {
-    const b = blocks[bi];
-    if (!window.confirm(`Удалить "${b.exerciseName || 'упражнение'}"? Будет потеряно ${b.sets.length} сетов. Это нельзя отменить.`)) return;
-    onChange(blocks.filter((_, i) => i !== bi));
-  };
-  // U12: клонировать блок
-  const cloneBlock = (bi: number) => {
-    const src = blocks[bi];
-    if (!src) return;
-    onChange([
-      ...blocks,
-      { ...src, id: newId('blk'), sets: src.sets.map(s => ({ ...s })) },
-    ]);
-  };
-  // U11: назначить/снять superset-партнёра (следующий/предыдущий блок)
-  const linkSuperset = (bi: number) => {
-    const current = blocks[bi];
-    if (!current) return;
-    // Ищем ближайший блок вверх/вниз, у которого ещё нет supersetWith или текущий — не его партнёр
-    const partnerIdx = bi > 0 ? bi - 1 : bi + 1;
-    if (partnerIdx < 0 || partnerIdx >= blocks.length) return;
-    const partner = blocks[partnerIdx];
-    onChange(blocks.map((b, i) => {
-      if (i === bi) return { ...b, supersetWith: partner.id };
-      if (i === partnerIdx) return { ...b, supersetWith: current.id };
-      return b;
-    }));
-  };
-  const unlinkSuperset = (bi: number) => {
-    onChange(blocks.map((b, i) => {
-      if (i === bi) return { ...b, supersetWith: undefined };
-      if (b.supersetWith === blocks[bi]?.id) return { ...b, supersetWith: undefined };
-      return b;
-    }));
-  };
-  // 🔄 Замена упражнения: findSubstitutions подбирает альтернативы
-  const [substFor, setSubstFor] = useState<number | null>(null);
-  const substResults = useMemo(() => {
-    if (substFor == null) return [];
-    const b = blocks[substFor];
-    if (!b || !b.exerciseName) return [];
-    const prof = loadTrainingProfile();
-    const injured = new Set((prof.injuries ?? []).filter((i) => i.exclude).map((i) => i.muscle));
-    return findSubstitutions(b.exerciseName, b.muscle, injured).slice(0, 4);
-  }, [substFor, blocks]);
-  const applySubst = (bi: number, name: string, muscle: string) => {
-    updateBlock(bi, { exerciseName: name, muscle: muscle || blocks[bi].muscle });
-    setSubstFor(null);
-  };
-  const moveBlock = (bi: number, dir: -1 | 1) => { const j = bi + dir; if (j < 0 || j >= blocks.length) return; const arr = [...blocks]; const tmp = arr[bi]; arr[bi] = arr[j]; arr[j] = tmp; onChange(arr); };
-  const moveTo = (from: number, to: number) => {
-    if (from === to || from < 0 || from >= blocks.length || to < 0 || to >= blocks.length) return;
-    const arr = [...blocks];
-    const [moved] = arr.splice(from, 1);
-    arr.splice(to, 0, moved);
-    onChange(arr);
-  };
-
-  // HTML5 drag-and-drop: desktop работает «из коробки», мобильный (iOS 13+/Chrome) — через draggable.
-  // Touch fallback (long-press → перетаскивание через touch events) для старых мобильных WebView.
-  const dragSrcRef = React.useRef<number | null>(null);
-  const touchSrcRef = React.useRef<number | null>(null);
-  const touchArmedRef = React.useRef<number | null>(null);
-  const longPressTimer = React.useRef<number | null>(null);
-  const rowRefs = React.useRef<(HTMLDivElement | null)[]>([]);
-  const [overIdx, setOverIdx] = useState<number | null>(null);
-
-  const onTouchStart = (bi: number) => (e: React.TouchEvent) => {
-    touchSrcRef.current = bi;
-    if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
-    longPressTimer.current = window.setTimeout(() => {
-      touchArmedRef.current = bi;
-      setOverIdx(bi);
-      try { (navigator as any).vibrate?.(15); } catch { /* ignore */ }
-    }, 350);
-  };
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (touchArmedRef.current == null) return;
-    e.preventDefault();
-    const t = e.touches[0];
-    const y = t.clientY;
-    let nearest = touchArmedRef.current;
-    let nearestDist = Infinity;
-    rowRefs.current.forEach((el, i) => {
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const mid = r.top + r.height / 2;
-      const d = Math.abs(mid - y);
-      if (d < nearestDist) { nearestDist = d; nearest = i; }
-    });
-    setOverIdx(nearest);
-  };
-  const onTouchEnd = () => {
-    if (longPressTimer.current) { window.clearTimeout(longPressTimer.current); longPressTimer.current = null; }
-    if (touchArmedRef.current != null && overIdx != null) {
-      moveTo(touchArmedRef.current, overIdx);
-    }
-    touchSrcRef.current = null;
-    touchArmedRef.current = null;
-    setOverIdx(null);
-  };
-  const onTouchCancel = () => {
-    if (longPressTimer.current) { window.clearTimeout(longPressTimer.current); longPressTimer.current = null; }
-    touchSrcRef.current = null;
-    touchArmedRef.current = null;
-    setOverIdx(null);
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }} onTouchEnd={onTouchEnd} onTouchCancel={onTouchCancel}>
-      {blocks.map((b, bi) => (
-        <div
-          key={b.id}
-          ref={el => { rowRefs.current[bi] = el; }}
-          draggable
-          onDragStart={e => { dragSrcRef.current = bi; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(bi)); setOverIdx(bi); }}
-          onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (overIdx !== bi) setOverIdx(bi); }}
-          onDragLeave={() => { if (overIdx === bi) setOverIdx(null); }}
-          onDrop={e => {
-            e.preventDefault();
-            const src = dragSrcRef.current;
-            dragSrcRef.current = null;
-            setOverIdx(null);
-            if (src != null) moveTo(src, bi);
-          }}
-          onDragEnd={() => { dragSrcRef.current = null; setOverIdx(null); }}
-          onTouchStart={onTouchStart(bi)}
-          onTouchMove={onTouchMove}
-          style={{
-            display: 'flex', gap: 4, alignItems: 'center', padding: '4px 0',
-            borderTop: overIdx === bi ? '2px solid #00e68a' : '2px solid transparent',
-            transition: 'border-color 0.1s',
-            background: touchArmedRef.current === bi ? 'rgba(0,230,138,0.06)' : 'transparent',
-            borderRadius: 6,
-          }}
-        >
-          <span
-            title="Перетащите для изменения порядка (или удерживайте на тач-устройстве)"
-            style={{ cursor: 'grab', fontSize: 12, color: '#64748b', userSelect: 'none', padding: '0 2px', touchAction: 'none' }}
-            aria-label="drag handle"
-          >☰</span>
-          <select style={{ ...IN, padding: '3px 4px', fontSize: 10, flex: '0 0 86px' }} value={b.type} onChange={e => updateBlock(bi, { type: e.target.value as UserBlock['type'], role: e.target.value === 'compound' ? 'primary' : 'accessory' })}>
-            <option value="compound">Базовое</option>
-            <option value="accessory">Доп.</option>
-            <option value="isolation">Изоляция</option>
-            <option value="finisher">Финишь</option>
-          </select>
-          <ExerciseLabPicker value={b.exerciseName} muscle={b.muscle} onSelect={ex => updateBlock(bi, { exerciseName: ex.name, muscle: ex.group || b.muscle, type: (ex.type === 'compound' ? 'compound' : ex.type === 'isolation' ? 'isolation' : 'accessory') as UserBlock['type'], role: ex.type === 'compound' ? 'primary' : 'accessory' })} />
-          <input style={{ ...IN, padding: '4px 6px', fontSize: 11, flex: '0 0 90px' }} value={b.muscle} onChange={e => updateBlock(bi, { muscle: e.target.value })} placeholder="Мышечная группа" list="muscle-list" />
-          <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} muscle={b.muscle} />
-          
-          {/* Комментарий к упражнению */}
-          <input 
-            style={{ ...IN, padding: '3px 6px', fontSize: 10, flex: '1 1 100%', minWidth: 120 }} 
-            value={b.note || ''} 
-            onChange={e => updateBlock(bi, { note: e.target.value })} 
-            placeholder="💬 Комментарий (роль, акцент, замена...)" 
-          />
-          
-          {/* Выбор второго упражнения для суперсета */}
-          {b.supersetWith && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', background: 'rgba(167,139,250,0.08)', borderRadius: 6, border: '1px solid rgba(167,139,250,0.2)' }}>
-              <span style={{ fontSize: 9, color: '#a78bfa', fontWeight: 700 }}>⊕ Суперсет с:</span>
-              <ExerciseLabPicker 
-                value={blocks.find(bl => bl.id === b.supersetWith)?.exerciseName || ''} 
-                muscle={b.muscle}
-                onSelect={ex => {
-                  // Найти индекс партнёра и обновить его название
-                  const partnerIdx = blocks.findIndex(bl => bl.id === b.supersetWith);
-                  if (partnerIdx >= 0) {
-                    updateBlock(partnerIdx, { exerciseName: ex.name, muscle: ex.group || b.muscle });
-                  }
-                }} 
-              />
-            </div>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <button style={{ ...BTN_GHOST, padding: '0 4px', fontSize: 9, minHeight: 0, lineHeight: 1 }} onClick={() => moveBlock(bi, -1)} title="Вверх">▲</button>
-            <button style={{ ...BTN_GHOST, padding: '0 4px', fontSize: 9, minHeight: 0, lineHeight: 1 }} onClick={() => moveBlock(bi, 1)} title="Вниз">▼</button>
-          </div>
-          <button
-            style={{ ...BTN_GHOST, padding: '2px 4px', fontSize: 9, minHeight: 0, color: b.supersetWith ? '#a78bfa' : DIM, borderColor: b.supersetWith ? 'rgba(167,139,250,0.3)' : 'rgba(255,255,255,0.08)' }}
-            onClick={() => b.supersetWith ? unlinkSuperset(bi) : linkSuperset(bi)}
-            title={b.supersetWith ? 'Снять superset-привязку' : 'Связать суперсетом с соседним блоком'}
-          >⊕</button>
-          <button style={{ ...BTN_GHOST, padding: '2px 4px', fontSize: 9, minHeight: 0 }} onClick={() => cloneBlock(bi)} title="Клонировать блок">⧉</button>
-          {b.exerciseName && (
-            <button
-              style={{ ...BTN_GHOST, padding: '2px 4px', fontSize: 9, minHeight: 0, color: substFor === bi ? '#f59e0b' : DIM, borderColor: substFor === bi ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)' }}
-              onClick={() => setSubstFor(substFor === bi ? null : bi)}
-              title="Подобрать замену"
-            >🔄</button>
-          )}
-          <button style={{ ...BTN_GHOST, padding: '3px 6px', fontSize: 10, minHeight: 0, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeBlock(bi)}>✕</button>
-          {substFor === bi && substResults.length > 0 && (
-            <div style={{ padding: '4px 8px', marginTop: 4, background: 'rgba(245,158,11,0.06)', borderRadius: 6, border: '1px solid rgba(245,158,11,0.18)' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>🔄 Замены для «{b.exerciseName}»:</div>
-              {substResults.map((r, ri) => (
-                <button
-                  key={ri}
-                  onClick={() => applySubst(bi, r.exercise.name, r.exercise.group || b.muscle)}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 6px', marginBottom: 2, borderRadius: 4, fontSize: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM_STRONG }}
-                >
-                  <b>{r.exercise.name}</b> <span style={{ color: DIM, fontSize: 9 }}>({r.confidence})</span>
-                  <div style={{ fontSize: 9, color: DIM }}>{r.reason}</div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-      <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 0, alignSelf: 'flex-start' }} onClick={addBlock}>+ Упражнение</button>
-      <datalist id="muscle-list">{Object.entries(GROUP_RU).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</datalist>
-    </div>
-  );
-};
-
-const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; muscle?: string }> = ({ sets, onChange, muscle }) => {
-  const add = () => onChange([...sets, { reps: 10, rir: 2, weight: 0, restSec: 90 }]);
-  const upd = (i: number, patch: Partial<UserSet>) => onChange(sets.map((s, j) => j === i ? { ...s, ...patch } : s));
-  const del = (i: number) => onChange(sets.filter((_, j) => j !== i));
-  // U4: confirm при удалении последнего сета (если блок станет пустым)
-  const confirmDelete = (i: number) => {
-    if (sets.length === 1) {
-      if (!window.confirm('Удалить последний сет? Блок останется без сетов (можно добавить заново).')) return;
-    }
-    del(i);
-  };
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 auto' }}>
-      {sets.map((s, i) => (
-        <div key={i} style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 6, padding: '4px 6px' }}>
-          {/* Основная строка: reps × rir @ вес + техника + отдых */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
-            <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 10, width: 30 }} value={typeof s.reps === 'number' ? s.reps : 0} onChange={e => upd(i, { reps: parseInt(e.target.value) || 0 })} title="повторения" />
-            <span style={{ fontSize: 9, color: DIM }}>×</span>
-            <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 10, width: 26 }} value={s.rir} min={0} max={5} onChange={e => upd(i, { rir: parseInt(e.target.value) || 0 })} title="RIR" />
-            <span style={{ fontSize: 9, color: DIM }}>@</span>
-            <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 10, width: 36 }} value={s.weight ?? 0} onChange={e => upd(i, { weight: parseFloat(e.target.value) || 0 })} title="вес (кг)" placeholder="кг" />
-            <select
-              style={{ ...IN, padding: '1px 2px', fontSize: 9, width: 50 }}
-              value={s.technique || 'none'}
-              onChange={e => upd(i, { technique: e.target.value as any })}
-              title="Техника"
-            >
-              <option value="none">—</option>
-              <option value="rest_pause">RP</option>
-              <option value="drop_set">DRP</option>
-              <option value="myo_reps">MYO</option>
-              <option value="pause_rep">PRS</option>
-              <option value="mechanical_drop">MD</option>
-            </select>
-            <input
-              type="number" style={{ ...IN, padding: '2px 3px', fontSize: 10, width: 32 }} value={Math.floor((s.restSec ?? 90) / 60)}
-              min={0} max={20}
-              onChange={e => upd(i, { restSec: (parseInt(e.target.value) || 0) * 60 })}
-              title="отдых (мин)"
-              placeholder="отд"
-            />
-            <span style={{ fontSize: 8, color: DIM }}>м</span>
-            <button style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 10, padding: 0 }} onClick={() => confirmDelete(i)}>✕</button>
-          </div>
-          
-          {/* Динамические поля для техник */}
-          {s.technique === 'drop_set' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4, paddingTop: 4, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
-              <span style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700 }}>↓ Дроп:</span>
-              <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 9, width: 36 }} value={s.dropWeight ?? 0} onChange={e => upd(i, { dropWeight: parseFloat(e.target.value) || 0 })} title="вес дропа (кг)" placeholder="вес" />
-              <span style={{ fontSize: 9, color: DIM }}>×</span>
-              <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 9, width: 30 }} value={s.dropReps ?? 0} onChange={e => upd(i, { dropReps: parseInt(e.target.value) || 0 })} title="повторения дропа" placeholder="повт" />
-            </div>
-          )}
-          {s.technique === 'myo_reps' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4, paddingTop: 4, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
-              <span style={{ fontSize: 9, color: '#a78bfa', fontWeight: 700 }}>Мини:</span>
-              <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 9, width: 30 }} value={s.miniReps ?? 0} onChange={e => upd(i, { miniReps: parseInt(e.target.value) || 0 })} title="мини-повторения" placeholder="повт" />
-              <span style={{ fontSize: 9, color: DIM }}>отд</span>
-              <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 9, width: 32 }} value={Math.floor((s.miniRestSec ?? 15) / 60)} onChange={e => upd(i, { miniRestSec: (parseInt(e.target.value) || 0) * 60 })} title="мини-отдых (мин)" placeholder="отд" />
-              <span style={{ fontSize: 8, color: DIM }}>м</span>
-            </div>
-          )}
-          {s.technique === 'pause_rep' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4, paddingTop: 4, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
-              <span style={{ fontSize: 9, color: '#22c55e', fontWeight: 700 }}>Пауза:</span>
-              <input type="number" style={{ ...IN, padding: '2px 3px', fontSize: 9, width: 32 }} value={s.pauseSec ?? 2} onChange={e => upd(i, { pauseSec: parseInt(e.target.value) || 0 })} title="пауза (сек)" placeholder="сек" />
-              <span style={{ fontSize: 8, color: DIM }}>сек</span>
-            </div>
-          )}
-          {s.technique === 'rest_pause' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4, paddingTop: 4, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
-              <span style={{ fontSize: 9, color: '#3b82f6', fontWeight: 700 }}>RP:</span>
-              <span style={{ fontSize: 9, color: DIM }}>Отдых между мини-сетами: {Math.floor((s.restSec ?? 15) / 60)}м {((s.restSec ?? 15) % 60)}с</span>
-            </div>
-          )}
-          {s.technique === 'mechanical_drop' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4, paddingTop: 4, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
-              <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 700 }}>Мех.дроп:</span>
-              <span style={{ fontSize: 9, color: DIM }}>Переход на более лёгкое упражнение после отказа</span>
-            </div>
-          )}
-        </div>
-      ))}
-      <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 0, alignSelf: 'flex-start' }} onClick={add}>+ сет</button>
-      {/* Phase 6: быстрые шаблоны сетов — клик заменяет все сеты на pattern */}
-      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 4, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <span style={{ fontSize: 8, color: DIM, marginRight: 4 }}>📋 Шаблоны:</span>
-        {Object.entries(SET_TEMPLATES).slice(0, 5).map(([key, tmpl]) => (
-          <button
-            key={key}
-            title={'Применить: ' + key + ' (' + tmpl.sets + '×' + tmpl.reps + ' RIR' + tmpl.rir + ', ' + Math.floor(tmpl.rest / 60) + 'м)'}
-            style={{ padding: '2px 6px', borderRadius: 6, fontSize: 9, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700 }}
-            onClick={() => onChange(Array.from({ length: tmpl.sets }, () => ({ reps: tmpl.reps, rir: tmpl.rir, restSec: tmpl.rest, weight: sets[0]?.weight ?? 0 })))}
-          >
-            {key}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-/* ─── ПЛ-редактор: immutable-цикл + оверлей ─── */
-
-const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => void }> = ({ body, onChange }) => {
-  const cycle = useMemo(() => getReferencedCycle({ meta: {} as any, pl: body } as UserProgram), [body.sourceCycleId]);
-  const set = (patch: Partial<PLProgramBody>) => onChange({ ...body, ...patch });
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ ...panelStyle('#a78bfa'), padding: 10 }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', marginBottom: 4 }}>📋 Проф. ПЛ-цикл (immutable)</div>
-        {cycle ? (
-          <div style={{ fontSize: 11, color: DIM_STRONG }}>
-            <div style={{ fontWeight: 700 }}>{cycle.meta.title}</div>
-            <div style={{ fontSize: 10, color: DIM }}>{cycle.meta.sessionsPerWeek}д/нед · {cycle.meta.weeks} нед · {cycle.meta.level} · {cycle.meta.period} · корректировка {((cycle.meta.correctionPct || 0) * 100).toFixed(1)}%/нед</div>
-            <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Процентки/сеты/повторения цикла не редактируются — это профессиональная методика. Ниже — ваш оверлей.</div>
-          </div>
-        ) : (
-          <div style={{ fontSize: 11, color: '#ef4444' }}>⚠ Цикл не выбран. Вернитесь и подключите цикл через «🔍 ПЛ-циклы».</div>
-        )}
-      </div>
-
-      <div style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>Оверлей пользователя</div>
-
-        <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          Рабочие максимумы (кг) — для расчёта весов из % цикла
-          <div style={{ display: 'flex', gap: 6 }}>
-            {(['squat', 'bench', 'dead'] as const).map(k => (
-              <label key={k} style={{ flex: 1, fontSize: 10, color: DIM }}>
-                {k === 'squat' ? 'Присед' : k === 'bench' ? 'Жим' : 'Тяга'}
-                <input type="number" style={IN} value={body.workMax[k] ?? ''} onChange={e => set({ workMax: { ...body.workMax, [k]: parseFloat(e.target.value) || undefined } })} />
-              </label>
-            ))}
-          </div>
-        </label>
-
-        <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          Заметки к циклу
-          <textarea style={{ ...IN, minHeight: 60, resize: 'vertical' }} value={body.notes} onChange={e => set({ notes: e.target.value })} placeholder="Например: акцент на слабые группы, адаптации под восстановление" />
-        </label>
-
-        <div>
-          <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Слабые группы (приоритет акцента)</div>
-          <WeakPointChips value={body.weakPoints} onChange={(weakPoints) => set({ weakPoints })} />
-        </div>
-
-        <div>
-          <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Расписание: сессия → день недели</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {body.schedule.map((s, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-                <span style={{ color: DIM, minWidth: 70 }}>Сессия {s.sessionIdx + 1}</span>
-                <select style={{ ...IN, padding: '4px 6px', fontSize: 10 }} value={s.dayOfWeek} onChange={e => { const sc = [...body.schedule]; sc[i] = { ...sc[i], dayOfWeek: parseInt(e.target.value) }; set({ schedule: sc }); }}>
-                  {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d, di) => <option key={di} value={di}>{d}</option>)}
-                </select>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const WEAK_OPTS = ['chest', 'back', 'quads', 'hamstrings', 'glutes', 'shoulders', 'biceps', 'triceps', 'core', 'deadlift', 'squat', 'bench'];
-const WeakPointChips: React.FC<{ value: string[]; onChange: (v: string[]) => void }> = ({ value, onChange }) => {
-  const toggle = (m: string) => onChange(value.includes(m) ? value.filter(x => x !== m) : [...value, m]);
-  return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-      {WEAK_OPTS.map(m => {
-        const on = value.includes(m);
-        return <button key={m} onClick={() => toggle(m)} style={{ padding: '3px 8px', borderRadius: 8, fontSize: 10, cursor: 'pointer', border: on ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.02)', color: on ? '#fff' : DIM }}>{GROUP_RU[m] ?? m}</button>;
-      })}
-    </div>
-  );
-};
-
-/* ─── P2.11: BBConstraintsPanel — редактирование constraints (оборудование, травмы, avoidAxial, любимые/исключённые) + progression ─── */
-
-const EQUIPMENT_OPTS = [
-  { id: 'barbell', label: 'Штанга' }, { id: 'dumbbell', label: 'Гантели' }, { id: 'cable', label: 'Блок' },
-  { id: 'machine', label: 'Тренажёр' }, { id: 'bodyweight', label: 'Свой вес' }, { id: 'suspension', label: 'TRX/петли' },
-  { id: 'kettlebell', label: 'Гиря' }, { id: 'band', label: 'Резина' }, { id: 'smith', label: 'Смит' }, { id: 'plate', label: 'Блин' },
-];
-const LOAD_STRATEGY_OPTS = [
-  { id: 'double_progression', label: 'Двойная прогрессия' }, { id: 'linear', label: 'Линейная' },
-  { id: 'wave', label: 'Волновая' }, { id: 'rpe_based', label: 'По RPE' },
-];
-const DELOAD_PROTOCOL_OPTS = [
-  { id: 'pump', label: 'Памп' }, { id: 'neural', label: 'Нейральная' },
-  { id: 'full_rest', label: 'Полный отдых' }, { id: 'mini', label: 'Микро-делод' },
-];
-const INTENSITY_TECHNIQUE_OPTS = [
-  { id: 'none', label: 'Нет' }, { id: 'rest_pause', label: 'Рест-пауза' }, { id: 'drop_set', label: 'Дроп-сет' },
-  { id: 'myo_reps', label: 'Мио-репс' }, { id: 'pause_rep', label: 'Пауза' }, { id: 'mechanical_drop', label: 'Мех. дроп' },
-];
-
-const Chip: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode; color?: string }> = ({ active, onClick, children, color }) => (
-  <button onClick={onClick} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', border: active ? '1px solid ' + (color || '#00e68a') : '1px solid rgba(255,255,255,0.08)', background: active ? (color || '#00e68a') + '20' : 'rgba(255,255,255,0.02)', color: active ? '#fff' : DIM }}>{children}</button>
-);
-
-const BBConstraintsPanel: React.FC<{
-  constraints: ProgramConstraints;
-  progression: ProgramProgression;
-  onChangeConstraints: (c: ProgramConstraints) => void;
-  onChangeProgression: (p: ProgramProgression) => void;
-}> = ({ constraints, progression, onChangeConstraints, onChangeProgression }) => {
-  const toggleEq = (eq: string) => {
-    const arr = constraints.equipment ?? [];
-    onChangeConstraints({ ...constraints, equipment: arr.includes(eq) ? arr.filter(x => x !== eq) : [...arr, eq] });
-  };
-  const toggleIntensity = (it: any) => {
-    const arr: any[] = (progression.intensityTechniques as any[]) ?? ['none'];
-    if (it === 'none') onChangeProgression({ ...progression, intensityTechniques: ['none'] as any });
-    else onChangeProgression({ ...progression, intensityTechniques: (arr.includes(it) ? arr.filter(x => x !== it && x !== 'none') : [...arr.filter(x => x !== 'none'), it]) as any });
-  };
-  return (
-    <div style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>⚙️ Параметры ББ-программы</div>
-      <div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Оборудование (доступное)</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {EQUIPMENT_OPTS.map(o => <Chip key={o.id} active={(constraints.equipment ?? []).includes(o.id)} onClick={() => toggleEq(o.id)}>{o.label}</Chip>)}
-        </div>
-      </div>
-      <div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Прогрессия весов</div>
-        <select style={IN} value={progression.loadStrategy || 'double_progression'} onChange={e => onChangeProgression({ ...progression, loadStrategy: e.target.value as any })}>
-          {LOAD_STRATEGY_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-        </select>
-      </div>
-      <div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Протокол делода</div>
-        <select style={IN} value={progression.deloadProtocol || 'pump'} onChange={e => onChangeProgression({ ...progression, deloadProtocol: e.target.value as any })}>
-          {DELOAD_PROTOCOL_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-        </select>
-      </div>
-      <div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Интенсив-техники</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {INTENSITY_TECHNIQUE_OPTS.map(o => <Chip key={o.id} active={((progression.intensityTechniques as any[]) ?? ['none']).includes(o.id as any)} onClick={() => toggleIntensity(o.id)}>{o.label}</Chip>)}
-        </div>
-      </div>
-      <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <input type="checkbox" checked={constraints.avoidAxialLoad ?? false} onChange={e => onChangeConstraints({ ...constraints, avoidAxialLoad: e.target.checked })} />
-        🦴 Убрать осевую нагрузку (присед/становая/жим стоя)
-      </label>
     </div>
   );
 };

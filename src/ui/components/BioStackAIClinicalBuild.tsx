@@ -22,6 +22,7 @@ import { GlassCard, PillBtn, showToast, initBioToast, SubstanceMechanismCard, Su
 import type { BioStackProfile } from '../../engines/biostack-ai.engine';
 import type { LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { buildClinicalStack, type ClinicalStackResult } from '../../engines/biostack-clinical-recommender';
+import { selectStack, findMeaningfulReplacement } from '../../engines/biostack-clinical-v2.engine';
 import type { StackStrategy } from '../../engines/biostack-clinical-v2.engine';
 import { TZ_SYSTEM_LABELS, TZ_MECH_LABELS } from '../../data/support-db';
 
@@ -199,6 +200,23 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
   const [maxStackSize, setMaxStackSize] = useState(0);
   const [result, setResult] = useState<ClinicalStackResult | null>(null);
   const [building, setBuilding] = useState(false);
+  const [replacements, setReplacements] = useState<Record<string, string | null | undefined>>({}); // excludedId → replacementId|null|undefined
+
+  const handleReplace = (excludedId: string) => {
+    if (replacements[excludedId] !== undefined) return; // already processing
+    setReplacements(prev => ({ ...prev, [excludedId]: undefined }));
+    try {
+      const rep = findMeaningfulReplacement(excludedId, profile, result?.substances.map(s => s.id) || []);
+      const repId = rep?.replacementId || null;
+      setReplacements(prev => ({ ...prev, [excludedId]: repId }));
+      if (repId) {
+        setStackIds([...new Set([...result!.substances.map(s => s.id), repId])]);
+        showToast(`Заменено: ${excludedId} → ${rep?.replacementName || repId}`, 'success');
+      }
+    } catch {
+      setReplacements(prev => ({ ...prev, [excludedId]: null }));
+    }
+  };
 
   // Toggles for data sources
   const [useCourse, setUseCourse] = useState(true);
@@ -518,6 +536,9 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
       'he_biostack_to_plan',
       JSON.stringify({ stackIds: ids, name: 'Клинический подбор (BioStack)' }),
     );
+    if (result.gate) {
+      localStorage.setItem('he_biostack_gate_cache', JSON.stringify(result.gate));
+    }
     setStackIds(ids);
     showToast(`Клинический стек (${ids.length}) отправлен в план поддержки`, 'success');
   };
@@ -890,12 +911,40 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
             return groups.map((g) => (
               <GlassCard key={g.sev} title={`${g.meta.title} (${g.items.length})`} icon={g.meta.icon} color={g.meta.color} style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 10, color: g.meta.color, marginBottom: 6, fontWeight: 600 }}>{g.meta.note}</div>
-                {g.items.map((x, i) => (
-                  <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div style={{ fontWeight: 600, fontSize: 12 }}>{x.name}</div>
-                    <div style={{ fontSize: 10, color: 'rgba(235,235,245,0.6)' }}>{x.reason}</div>
-                  </div>
-                ))}
+                {g.items.map((x, i) => {
+                  const repState = replacements[x.id as string];
+                  const canReplace = (g.sev === 'hard' || g.sev === 'drug');
+                  return (
+                    <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ fontWeight: 600, fontSize: 12 }}>{x.name}</div>
+                      <div style={{ fontSize: 10, color: 'rgba(235,235,245,0.6)' }}>{x.reason}</div>
+                      {canReplace && (
+                        <div style={{ marginTop: 4 }}>
+                          {repState === undefined ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleReplace(x.id as string); }}
+                              style={{
+                                fontSize: 10, padding: '4px 10px', borderRadius: 8, cursor: 'pointer',
+                                background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)',
+                                color: '#c084fc', fontWeight: 600,
+                              }}
+                            >
+                              ↻ Найти замену
+                            </button>
+                          ) : repState === null ? (
+                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
+                              Нет подходящей замены
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>
+                              ✓ Заменён на {repState}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </GlassCard>
             ));
           })()}

@@ -1,7 +1,10 @@
 /** ExerciseLabMerged.tsx — ПРОФЕССИОНАЛЬНАЯ лаборатория упражнений.
  *  Объединяет: Лабораторию упражнений (6 режимов) + ББ-инструменты (темп/техники/слабые/демография).
- *  Единый инструмент тренера: подбор → техника → сравнение → ПРО-анализ → замена → каталог → ББ-параметры. */
-import React, { useState, useCallback } from 'react';
+ *  Единый инструмент тренера: подбор → техника → сравнение → ПРО-анализ → замена → каталог → ББ-параметры.
+ *  
+ *  Поддерживает опциональный режим выбора: при передаче onSelectExercise добавляет кнопки выбора
+ *  в каталог и автоматически переключается в режим 'catalog'. */
+import React, { useState, useCallback, useEffect } from 'react';
 import { ACCENT, DIM, LabMode } from './ExerciseLabShared';
 import PrescriptionTab from './ExerciseLabPrescription';
 import TechniqueTab from './ExerciseLabTechnique';
@@ -10,6 +13,7 @@ import ProAnalysisTab from './ExerciseLabPro';
 import ExerciseLabSubstitute from './ExerciseLabSubstitute';
 import ExerciseLabCatalog from './ExerciseLabCatalog';
 import { BbToolsCard } from './BbToolsCard';
+import type { Exercise } from '../../../core/types';
 
 export type LabProMode = LabMode | 'bb_tools';
 
@@ -23,9 +27,19 @@ const MODE_DEFS: Array<{ m: LabProMode; label: string; icon: string; desc: strin
   { m: 'bb_tools', label: 'ББ-инструменты', icon: '💪', desc: 'Темп/отдых по характеру дня, техники интенсификации, слабые группы, демография.', color: '#00e68a' },
 ];
 
-const ExerciseLabMerged: React.FC = () => {
+const ExerciseLabMerged: React.FC<{
+  onSelectExercise?: (ex: Exercise) => void;
+  onClose?: () => void;
+}> = ({ onSelectExercise, onClose }) => {
   const [mode, setMode] = useState<LabProMode>('prescription');
   const [compareIds, setCompareIds] = useState<string[]>([]);
+
+  // При наличии onSelectExercise автоматически переключаемся в режим каталога
+  useEffect(() => {
+    if (onSelectExercise) {
+      setMode('catalog');
+    }
+  }, [onSelectExercise]);
 
   const handleSelectForCompare = useCallback((id: string) => {
     setCompareIds(prev => {
@@ -40,9 +54,20 @@ const ExerciseLabMerged: React.FC = () => {
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
         <span style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>🧬 Лаборатория упражнений</span>
         <span style={{ fontSize: 10, color: DIM, background: 'rgba(0,230,138,0.1)', padding: '1px 8px', borderRadius: 10, fontWeight: 700 }}>PRO</span>
+        {onSelectExercise && (
+          <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', padding: '1px 8px', borderRadius: 10, fontWeight: 700, marginLeft: 'auto' }}>
+            Режим выбора
+          </span>
+        )}
+        {onClose && (
+          <button onClick={onClose} style={{ marginLeft: 'auto', padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: DIM, cursor: 'pointer' }}>
+            ✕ Закрыть
+          </button>
+        )}
       </div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>
         Профессиональный инструмент тренера: подбор нагрузки, анализ техники, сравнение, ПРО-анализ, замена упражнений, полный каталог и ББ-инструменты — всё в одном месте.
+        {onSelectExercise && ' Выберите упражнение из каталога.'}
       </div>
 
       {/* Row 1: основные режимы */}
@@ -93,7 +118,7 @@ const ExerciseLabMerged: React.FC = () => {
       {mode === 'compare' && <CompareTab initialId1={compareIds[0] || ''} initialId2={compareIds[1] || ''} />}
       {mode === 'pro' && <ProAnalysisTab />}
       {mode === 'substitute' && <ExerciseLabSubstitute />}
-      {mode === 'catalog' && <ExerciseLabCatalog />}
+      {mode === 'catalog' && <ExerciseLabCatalog onSelectExercise={onSelectExercise} />}
       {mode === 'bb_tools' && <BbToolsCard />}
     </div>
   );

@@ -155,17 +155,7 @@ export const TrainingScreen: React.FC = () => {
   const [exCalcType, setExCalcType] = useState('');
   const [exCalcEquip, setExCalcEquip] = useState('');
 
-  // Unified program builder state
-        const PCT_FOR_RIR_MAN: Record<number, number> = { 0: 1.0, 1: 0.96, 2: 0.92, 3: 0.88, 4: 0.84, 5: 0.80 };
-  const [manualResult, setManualResult] = useState<{ splitName: string; corrections: string[]; days: { day: number; groups: string[]; exercises: { name: string; sets: number; reps: string; rir: number; rest: number; group: string; weight: number }[] }[] } | null>(() => { try { return JSON.parse(localStorage.getItem('he_manual_session') || 'null'); } catch { return null; } });
-  useEffect(() => { try { localStorage.setItem('he_manual_session', JSON.stringify(manualResult)); } catch { /* ignore */ } }, [manualResult]);
-  const GRP_RU_M: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор', full: 'Общее' };
-  const SET_TEMPLATES: Record<string, { sets: number; reps: string; rir: number; rest: number }> = {
-    '5×5': { sets: 5, reps: '5', rir: 1, rest: 180 }, '3×8': { sets: 3, reps: '8', rir: 2, rest: 90 },
-    '4×10': { sets: 4, reps: '10', rir: 2, rest: 90 }, '3×12': { sets: 3, reps: '12', rir: 2, rest: 75 },
-    'AMRAP': { sets: 1, reps: 'AMRAP', rir: 0, rest: 180 }, 'Myo-rep': { sets: 1, reps: '15 + 5×3', rir: 0, rest: 120 },
-    '10×10 GVT': { sets: 10, reps: '10', rir: 3, rest: 60 }, '5/3/1': { sets: 3, reps: '5/3/1+', rir: 1, rest: 180 },
-  };
+  // (manualResult state removed — now uses ProgramManagerPanel + CalcQualityTab reads UserProgram from localStorage)
 
   // Diary state
   const [diaryStats, setDiaryStats] = useState<StrengthStats[]>([]);
@@ -655,7 +645,7 @@ export const TrainingScreen: React.FC = () => {
             <button style={backBtnStyle} onClick={() => { setTab('runtime'); }}>← К дашборду</button>
             {tab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub /></InfoErrorBoundary>}
             {tab === 'load_management' && <InfoErrorBoundary label="Управление нагрузкой"><LoadManagementHub sessions={historyWorkouts} baseRisk={linked.risk?.overallRaw ?? 20} baseReadiness={readiness?.recovery ?? 75} /></InfoErrorBoundary>}
-            {tab === 'diagnostics' && <InfoErrorBoundary label="Диагностика"><DiagnosticsHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={0} currentVolume={manualResult?.days?.reduce((s: number, d: any) => s + d.exercises.length, 0) ?? 18} currentRir={2} /></InfoErrorBoundary>}
+            {tab === 'diagnostics' && <InfoErrorBoundary label="Диагностика"><DiagnosticsHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={0} currentVolume={18} currentRir={2} /></InfoErrorBoundary>}
             {tab === 'periodization_hub' && <InfoErrorBoundary label="Периодизация"><PeriodizationHub /></InfoErrorBoundary>}
             {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLabMerged /></InfoErrorBoundary>}
             {tab === 'calc_plates' && <InfoErrorBoundary label="Калькулятор блинов"><PlateCalcTab /></InfoErrorBoundary>}
@@ -664,13 +654,13 @@ export const TrainingScreen: React.FC = () => {
             {tab === 'split_gen' && <InfoErrorBoundary label="Генератор сплитов"><SplitGenCard /></InfoErrorBoundary>}
             {tab === 'pri_reppat' && <InfoErrorBoundary label="PRI/схема повт"><PriRepPatternCard /></InfoErrorBoundary>}
             {tab === 'tonnage' && <InfoErrorBoundary label="Тоннаж"><TonnageCalcTab /></InfoErrorBoundary>}
-             {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab plan={manualResult} level={level} goal={goal} readiness={((readiness?.recovery ?? 7) * 10)} onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
+              {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
             {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixTab /></InfoErrorBoundary>}
             {tab === 'mix_presets' && <InfoErrorBoundary label="Пресеты здоровья"><MixPresetsCard /></InfoErrorBoundary>}
           </>);
         }
         return <TrainingIntelligenceDashboard
-          manualResult={manualResult} level={level}
+          manualResult={null} level={level}
           historyWorkouts={historyWorkouts} tprofile={tprofile}
           readinessRecovery={readiness?.recovery ?? 70}
           readinessFatigue={readiness?.fatigue ?? 30}

@@ -90,6 +90,20 @@ export const BioStackAIScreen: React.FC = () => {
   const stopIds = useMemo(() => {
     if (stackIds.length === 0) return new Set<string>();
     try {
+      // Пробуем кэшированный gate из результата сборки (быстрее, не вызывает selectStack повторно)
+      const rawGate = localStorage.getItem('he_biostack_gate_cache');
+      if (rawGate) {
+        const cached = JSON.parse(rawGate);
+        const cachedIds = new Set(cached.ids?.map((s: string) => s.toLowerCase()) || []);
+        const currentIds = new Set(stackIds.map(s => s.toLowerCase()));
+        if (cachedIds.size > 0 && [...currentIds].every(id => cachedIds.has(id))) {
+          return new Set<string>([
+            ...(cached.hardStops || []).map((h: any) => h.substanceId),
+            ...(cached.drugExclusions || []).map((e: any) => e.substanceId),
+          ]);
+        }
+      }
+      // Fallback: полный вызов selectStack
       const r = selectStack(stackIds, loadBioStackProfile(), 'comprehensive', null);
       return new Set<string>([
         ...r.hardStops.map((h: any) => h.substanceId),

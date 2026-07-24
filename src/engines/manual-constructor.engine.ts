@@ -23,6 +23,8 @@ import { buildBBPlan, type BBBuilderInput, type BBPlan, type BBGoal } from './bb
 import { adaptForPEDs, type PED, type PEDAdaptation, type CourseIntensity } from './bb/bb-ped-adaptation.engine';
 import { getReferencedCycle, createFromBuild } from './user-program/program-store';
 import type { Injury } from './manual-plan-builder';
+import { distributePhases, PHASE_CONFIGS, getRirForWeek, PHASE_LABELS, getVolumeWaveFactor, getDupReps, type BBPhase, type PhaseDistribution } from '../ui/screens/TrainingScreen_parts/phase-periodization';
+import { tempoFor } from './bb/bb-tempo-rest';
 
 // Exercise type не экспортирован из exercise-catalog, берём из core/types.
 
@@ -145,8 +147,9 @@ export function autodraftBBPlan(opts: AutoDraftOptions): BBPlan {
   };
   let pedAdapt: PEDAdaptation | undefined;
   if (opts.onCourse) {
-    const peds: PED[] = (['AAS', 'GH', 'INSULIN', 'IGF1', 'MGF'] as PED[]).filter((p) => (opts.workMax && true));
-    pedAdapt = adaptForPEDs(peds.length > 0 ? peds : ['AAS' as PED], defaultWorkMax(), undefined, (opts.courseIntensity ?? 'moderate') as CourseIntensity);
+    // P2: реалистичный PED-набор — AAS базово, остальные только если есть в профиле
+    const peds: PED[] = ['AAS' as PED];
+    pedAdapt = adaptForPEDs(peds, defaultWorkMax(), undefined, (opts.courseIntensity ?? 'moderate') as CourseIntensity);
   }
   try {
     return buildBBPlan(input, pedAdapt);
@@ -265,36 +268,85 @@ export function plLmsScheduleDays(program: UserProgram): { label: string; exerci
 export function computePlanQualityFor(
   program: UserProgram,
   level: string,
+  opts?: { onCourse?: boolean; courseIntensity?: string; labMult?: number },
 ): { score: number; grade: string; perMuscle: Array<{ muscle: string; sets: number; status: 'over' | 'high' | 'ok' | 'low'; mrv: number; mav: number; mev: number }>; issues: string[] } {
-  const setsByMuscle: Record<string, number> = {};
+  // P0-1: считаем ПИКОВУЮ неделю (макс сетов на мышцу за неделю), не сумму всех недель
+  const weeklySetsByMuscle: Record<string, number[]> = {};
   if (program.bb) {
     for (const w of program.bb.weeks ?? []) {
+      const weekSets: Record<string, number> = {};
       for (const s of w.sessions ?? []) {
         for (const b of s.blocks ?? []) {
           const mu = (b.muscle || '').toLowerCase();
           if (!mu) continue;
-          setsByMuscle[mu] = (setsByMuscle[mu] || 0) + (b.sets?.length || 0);
+          weekSets[mu] = (weekSets[mu] || 0) + (b.sets?.length || 0);
         }
       }
+      for (const [mu, sets] of Object.entries(weekSets)) {
+        if (!weeklySetsByMuscle[mu]) weeklySetsByMuscle[mu] = [];
+        weeklySetsByMuscle[mu].push(sets);
+      }
+    }
+  }
+  // Берём пиковую неделю для каждой мышцы
+  const setsByMuscle: Record<string, number> = {};
+  for (const [mu, weeks] of Object.entries(weeklySetsByMuscle)) {
+    setsByMuscle[mu] = Math.max(...weeks, 0);
+  }
+  // PL custom: считаем из customWeeks если BB-тела нет
+  if (Object.keys(setsByMuscle).length === 0 && program.pl?.customWeeks) {
+    for (const w of program.pl.customWeeks) {
+      const weekSets: Record<string, number> = {};
+      for (const d of w.days ?? []) {
+        for (const ex of d.exercises ?? []) {
+          const mu = (ex.muscle || ex.lift || '').toLowerCase();
+          if (!mu) continue;
+          weekSets[mu] = (weekSets[mu] || 0) + (ex.sets?.reduce((s, st) => s + (st.sets || 1), 0) || 0);
+        }
+      }
+      for (const [mu, sets] of Object.entries(weekSets)) {
+        if (!weeklySetsByMuscle[mu]) weeklySetsByMuscle[mu] = [];
+        weeklySetsByMuscle[mu].push(sets);
+      }
+    }
+    for (const [mu, weeks] of Object.entries(weeklySetsByMuscle)) {
+      setsByMuscle[mu] = Math.max(...weeks, 0);
     }
   }
   const perMuscle: Array<{ muscle: string; sets: number; status: 'over' | 'high' | 'ok' | 'low'; mrv: number; mav: number; mev: number }> = [];
   const issues: string[] = [];
   let totalScore = 100;
+  const onCourse = opts?.onCourse ?? false;
+  const courseIntensity = opts?.courseIntensity ?? 'moderate';
+  const labMult = opts?.labMult ?? 1;
   for (const [muscle, sets] of Object.entries(setsByMuscle)) {
     const lm = getVolumeLandmarks(level, muscle);
     if (!lm) continue;
+    let mrv = lm.mrv;
+    let mav = lm.mav;
+    let mev = lm.mev;
+    if (onCourse) {
+      const courseMult = courseIntensity === 'heavy' ? 1.3 : courseIntensity === 'mild' ? 1.15 : 1.2;
+      mrv = Math.round(mrv * courseMult);
+      mav = Math.round(mav * courseMult);
+      mev = Math.round(mev * courseMult);
+    }
+    if (labMult < 1) {
+      mrv = Math.round(mrv * labMult);
+      mav = Math.round(mav * labMult);
+      mev = Math.round(mev * labMult);
+    }
     let status: 'over' | 'high' | 'ok' | 'low';
-    if (sets > lm.mrv) {
-      status = 'over'; totalScore -= 8; issues.push(`⚠ ${muscle}: ${sets} сетов > MRV (${lm.mrv}) — перетрен`);
-    } else if (sets >= lm.mav) {
+    if (sets > mrv) {
+      status = 'over'; totalScore -= 8; issues.push(`⚠ ${muscle}: ${sets} сетов > MRV (${mrv}) — перетрен`);
+    } else if (sets >= mav) {
       status = 'high'; totalScore -= 2;
-    } else if (sets >= lm.mev) {
+    } else if (sets >= mev) {
       status = 'ok';
     } else {
-      status = 'low'; totalScore -= 3; issues.push(`⬇ ${muscle}: ${sets} сетов < MEV (${lm.mev}) — минимум не добирается`);
+      status = 'low'; totalScore -= 3; issues.push(`⬇ ${muscle}: ${sets} сетов < MEV (${mev}) — минимум не добирается`);
     }
-    perMuscle.push({ muscle, sets, status, mrv: lm.mrv, mav: lm.mav, mev: lm.mev });
+    perMuscle.push({ muscle, sets, status, mrv, mav, mev });
   }
   if (perMuscle.length === 0) {
     issues.push('⚠ Программа пуста — добавьте упражнения');
@@ -333,4 +385,66 @@ export function muscleAwareSets(muscle: string, level: string): Array<{ reps: nu
 /** Сборка `UserSet`-массива по template (мульти-сеты). */
 export function makeSetsFromTemplate(templates: Array<{ reps: number | string; rir: number; restSec: number }>, weight: number): UserSet[] {
   return templates.map((t) => ({ reps: t.reps, rir: t.rir, weight, restSec: t.restSec }));
+}
+
+/**
+ * Применяет фазовую периодизацию к неделям UserProgram после авто-черновика.
+ * Вызывается для ББ-программ. На входе — плоские недели (все accumulation/RIR2),
+ * на выходе — каждая неделя получает корректную фазу, RIR, объёмный множитель,
+ * диапазон повторений и темп в соответствии с distributePhases().
+ */
+export function applyPhaseModulation(
+  weeks: UserWeek[],
+  opts: { goal: string; level: string; deloadFreq?: number; weeksTotal: number },
+): UserWeek[] {
+  const { goal, deloadFreq, weeksTotal, level } = opts;
+  const actualWeeks = Math.max(1, weeksTotal);
+  const deloadEvery = deloadFreq ?? (actualWeeks >= 8 ? 4 : actualWeeks >= 6 ? 3 : 0);
+  const dist = distributePhases(actualWeeks, deloadEvery, goal);
+  const phaseWeekMap: Record<string, number> = {};
+  const phaseTotals: Record<string, number> = { accumulation: 0, intensification: 0, deload: 0, peaking: 0 };
+  for (const pd of dist) { phaseTotals[pd.phase] = (phaseTotals[pd.phase] || 0) + (pd.weeks?.length || 0); }
+
+  return weeks.map((w) => {
+    const weekNum = w.week;
+    const pd = dist.find((d) => d.weeks && d.weeks.includes(weekNum));
+    if (!pd) return w;
+    phaseWeekMap[pd.phase] = (phaseWeekMap[pd.phase] || 0) + 1;
+    const phaseWeek = phaseWeekMap[pd.phase];
+    const cfg = PHASE_CONFIGS[pd.phase];
+    if (!cfg) return w;
+    const rir = getRirForWeek(weekNum, actualWeeks, 'default', pd.phase, phaseWeek);
+    const volMult = cfg.volumeMultiplier;
+    const reps = getDupReps(cfg, phaseWeek, phaseTotals[pd.phase] || 1);
+    const tempo = cfg.tempo;
+    const deloadFlag = pd.phase === 'deload';
+
+    const sessions = (w.sessions ?? []).map((s) => {
+      const blocks = (s.blocks ?? []).map((b) => {
+        const isCompound = b.type === 'compound';
+        const rirAdj = Math.max(0, Math.min(5, rir));
+        const sets = (b.sets ?? []).map((st) => ({
+          ...st,
+          rir: rirAdj,
+          tempo: tempo || st.tempo,
+          reps: reps,
+          restSec: isCompound ? Math.max(90, st.restSec ?? 120) : st.restSec,
+        }));
+        return {
+          ...b,
+          repsRange: [parseInt(reps.split('-')[0]) || 8, parseInt(reps.split('-')[1] || reps.split('-')[0]) || 12] as [number, number],
+          tempoSpec: tempo,
+          sets,
+        };
+      });
+      return { ...s, blocks };
+    });
+
+    return {
+      ...w,
+      phase: pd.phase as 'accumulation' | 'intensification' | 'deload' | 'peaking',
+      deload: deloadFlag,
+      sessions,
+    };
+  });
 }

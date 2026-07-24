@@ -91,7 +91,7 @@ export const BbContextPanel: React.FC<{ program: UserProgram; level: string }> =
     <div style={{ ...CARD, padding: 10, borderLeft: '2px solid rgba(0,230,138,0.2)' }}>
       <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>📋 Состояние ББ-программы</div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 6, marginBottom: 8 }}>
         <Mini label="Недели" value={totalWeeks} />
         <Mini label="Сессии" value={totalSessions} />
         <Mini label="Базовых" value={compoundBlocks} />
@@ -141,7 +141,7 @@ export const PLContextPanel: React.FC<{ program: UserProgram }> = ({ program }) 
   if (!pl) return null;
 
   const cycle = useMemo(() => {
-    try { return getCycleById(pl.sourceCycleId); } catch { return null; }
+    try { if (!pl.sourceCycleId) return null; return getCycleById(pl.sourceCycleId); } catch { return null; }
   }, [pl.sourceCycleId]);
 
   /** Вычислить рабочий вес по % от ПМ (если известны). */

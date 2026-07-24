@@ -27,7 +27,7 @@ import {
   type PlanSubstance,
 } from './support-plan';
 
-import { selectStack, getEvidenceGrade, type StackStrategy, type EvidenceGrade, ANTIOXIDANT_PATHWAY } from './biostack-clinical-v2.engine';
+import { selectStack, getEvidenceGrade, type StackStrategy, type EvidenceGrade, type SelectStackResult, ANTIOXIDANT_PATHWAY } from './biostack-clinical-v2.engine';
 import type { BioStackProfile } from './biostack-ai.engine';
 import type { LabCompositeResult } from './lab-analysis.engine';
 
@@ -287,6 +287,8 @@ export interface ClinicalStackResult {
   courseWeek: number;
   /** true если стек собран без анализов и без курса — ориентировочный */
   isOrientational?: boolean;
+  /** сырой результат клинического шлюза (кэш для переиспользования в UI) */
+  gate?: SelectStackResult;
 }
 
 /* ------------------------------------------------------------------ *
@@ -503,6 +505,7 @@ export function buildClinicalStack(
   const filterMarkers = useProfile && opts.filterMarkers?.length ? opts.filterMarkers : undefined;
   const evidenceLevel = opts.evidenceLevel;
   const hasActiveFilters = (filterOrgans?.length || filterMechanisms?.length || filterMarkers?.length);
+  const organFilterActive = !!(filterOrgans && filterOrgans.length);
 
   // 2a) Фильтры по органам / механизмам / маркерам / доказательности (до клинического шлюза)
   let candidateIds = plan.substances.map((s) => s.id);
@@ -545,6 +548,7 @@ export function buildClinicalStack(
       let score = 0;
       // маркеры: +5 за совпадение
       if (markerSubs.size && markerSubs.has(id)) score += 5;
+      let organMatch = false;
       // механизмы: +3 за каждый совпавший
       if (filterMechanisms && filterMechanisms.length) {
         const tz = getDrugTzMechanisms(id) || [];
@@ -552,11 +556,14 @@ export function buildClinicalStack(
         if (mechHits > 0) score += mechHits * 3;
       }
       // органы: +3 за каждый совпавший
-      if (filterOrgans && filterOrgans.length) {
+      if (organFilterActive) {
         const tz = getDrugTzMechanisms(id) || [];
         const organHits = tz.filter(m => filterOrgans!.includes(m.organId)).length;
-        if (organHits > 0) score += organHits * 3;
+        if (organHits > 0) { score += organHits * 3; organMatch = true; }
       }
+      // Если орган-фильтр активен, требовать хотя бы одно орган-совпадение
+      // (нельзя пройти только по маркерам или механизмам)
+      if (organFilterActive && !organMatch) continue;
       if (score >= minScore) filterScore.set(id, score);
     }
 
@@ -660,14 +667,20 @@ export function buildClinicalStack(
       }
 
       // Орган/механизм-фильтр в synergy pass:
-      // в strict-режиме добавляем только вещества, совпадающие с активным фильтром
-      if (strictFilter) {
+      // strict-режим: все активные фильтры обязательны
+      // balanced-режим: орган-фильтр уважается, механизм-фильтр — опционально
+      if (hasActiveFilters) {
         const candTz = getDrugTzMechanisms(candId) || [];
         const candOrgans = new Set(candTz.map(m => m.organId));
         const candMechs = new Set(candTz.map(m => m.mechId));
         const organHit = filterOrgans?.some(o => candOrgans.has(o));
         const mechHit = filterMechanisms?.some(m => candMechs.has(m));
-        if (!organHit && !mechHit) continue;
+        // balanced: орган обязателен если выбран; strict: и орган, и механизм обязательны
+        if (strictFilter) {
+          if (!organHit && !mechHit) continue;
+        } else {
+          if (organFilterActive && !organHit) continue;
+        }
       }
 
       if (synScore >= synThreshold) synCandidates.push({ id: candId, synScore });
@@ -964,6 +977,7 @@ export function buildClinicalStack(
     sourceOfTruth: 'support-plan/runSupportUnified',
     courseWeek,
     isOrientational,
+    gate,
   };
 }
 

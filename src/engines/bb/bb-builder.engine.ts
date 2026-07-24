@@ -791,14 +791,14 @@ function buildSession(
     const accessoryBase = isArm && onPED ? 3 : (isArm ? 2 : 1);
     const accessoryBoost = isSingleFreq ? 0 : (isArm ? 1 : 0);
     let exerciseCount = role === 'primary'
-      ? Math.min(isMultiDay ? (onPED ? 8 : 4) : (isSingleFreq ? 6 : (onPED ? 10 : 6)),
+      ? Math.min(isMultiDay ? (onPED ? 4 : 3) : (isSingleFreq ? 4 : (onPED ? 5 : 4)),
                  primaryBase + Math.max(0, levelBase - 2) + pedExerciseBoost)
-      : Math.min(isArm && onPED ? 5 : 3,
+      : Math.min(isArm && onPED ? 3 : 2,
                  accessoryBase + Math.floor(pedExerciseBoost / 2) + accessoryBoost);
     // A2: focusGroup — структурная специализация. Если мышца = focusGroup и primary
     // → упражнений +1 (compound + 2 multi-angle isolation для полноценного покрытия).
     if (focusGroup && muscle === focusGroup && role === 'primary') {
-      exerciseCount = Math.min(isMultiDay ? 4 : (isSingleFreq ? 4 : 5), exerciseCount + 1);
+      exerciseCount = Math.min(isMultiDay ? 3 : (isSingleFreq ? 3 : 4), exerciseCount + 1);
     }
     // selType: primary → compound; accessory → isolation (но на enhanced/курсе —
     // accessory может быть compound для большего механического натяжения).
@@ -870,8 +870,42 @@ function buildSession(
       return true;
     });
 
+    // ━━━ BB: минимальный фильтр non-BB упражнений (всегда, не только generic) ━━━
+    // trueMuscleOf уже отсекает deadlift/snatch/clean/jerk/carry (~80 упражнений).
+    // bbExerciseTier отсекает tier 3-4: доски/пины/спото/цепи/кольца/TRX/strongman (~60).
+    // Здесь — только 2 известных просачивающихся упражнения, проходящих tier=1:
+    // overhead squat и pistol squat (имеют "присед"/"squat" в имени → tier canonical).
+    pool = pool.filter((ex: any) => {
+      const n = (ex.name || '').toLowerCase();
+      const id = (ex.id || '').toLowerCase();
+      if (/над голов|overhead.*squat|пистол.*присед|pistol.*squat/i.test(n)) return false;
+      return true;
+    });
+
+    // ━━━ _score: BB-приоритет ВСЕГДА (не только generic) ━━━
+    // Гакк/Смит > свободный присед, наклонный жим > плоский, стандартные
+    // compound'ы приоритетны. Этот скор используется multi-angle diversity
+    // для выбора лучшего упражнения из каждого угла.
+    pool = pool.map((ex: any) => {
+      let score = 0;
+      const n = (ex.name || '').toLowerCase();
+      const id = (ex.id || '').toLowerCase();
+      if (PREFERRED_BB_EXERCISES.has(ex.id)) score += 50;
+      else if (favoriteIds.includes(ex.id)) score += 20;
+      if (id.includes('incline') || n.includes('наклон')) score += 15;
+      if (id.includes('hack') || n.includes('гакк')) score += 15;
+      if (id.includes('smith') && id.includes('squat')) score += 10;
+      if ((id === 'bench_press' || id === 'barbell_bench_press') && !id.includes('incline')) score -= 10;
+      if ((id === 'squat' || id === 'barbell_squat' || id === 'back_squat') && !id.includes('hack') && !id.includes('smith')) score -= 10;
+      // Редкие/специфичные вариации (не для массонабора)
+      if (n.includes('обратн') || n.includes('обрат') || n.includes('reverse')) score -= 10;
+      if (n.includes('узкий') || n.includes('узк') || n.includes('narrow')) score -= 5;
+      return { ...ex, _score: score };
+    }).sort((a: any, b: any) => (b._score || 0) - (a._score || 0));
+
     // Generic-план (без специализации/слабых точек): убираем слишком специфичные вариации
-    // (обратный хват, узкая стойка, изолирующие машины) и приоритизируем "золотой стандарт".
+    // (обратный хват, узкая стойка) — они уже оштрафованы в _score, но при generic
+    // без weak-point лучше их полностью исключить.
     const isGeneric = !focusGroup && !weakPoints.some(wp => {
       const parent = WEAK_TO_MUSCLE[wp];
       return wp === muscle || (parent && parent === muscle);
@@ -880,34 +914,10 @@ function buildSession(
       pool = pool.filter((ex: any) => {
         const id = (ex.id || '').toLowerCase();
         const n = (ex.name || '').toLowerCase();
-        // Проверка ID (строгий мэтчинг) и паттернов имени (для надежности)
         const isBlacklisted = Array.from(BLACKLIST_GENERIC).some(bid =>
           id.includes(bid) || n.includes(bid.replace(/_/g, ' ')));
         return !isBlacklisted;
       });
-      // Сортируем пул: preferred упражнения (золотой стандарт) приоритетнее.
-      // Добавляем невидимый `_score` для сортировки.
-      pool = pool.map((ex: any) => {
-        let score = 0;
-        const n = (ex.name || '').toLowerCase();
-        const id = (ex.id || '').toLowerCase();
-        if (PREFERRED_BB_EXERCISES.has(ex.id)) score += 50; // Большой буст стандарту
-        else if (favoriteIds.includes(ex.id)) score += 20; // Любимые пользователя
-        // ББ-приоритет: наклонный жим > плоский (верх груди — отстающая у большинства)
-        if (id.includes('incline') || n.includes('наклон')) score += 15;
-        // ББ-приоритет: гакк/Смит-присед > свободный присед (безопасность поясницы)
-        if (id.includes('hack') || n.includes('гакк')) score += 15;
-        if (id.includes('smith') && id.includes('squat')) score += 10;
-        // Штраф: плоский жим в ББ (наклонный важнее для гипертрофии груди)
-        if ((id === 'bench_press' || id === 'barbell_bench_press') && !id.includes('incline')) score -= 10;
-        // Штраф: классический присед со штангой в ББ (гакк/Смит безопаснее)
-        if ((id === 'squat' || id === 'barbell_squat' || id === 'back_squat') && !id.includes('hack') && !id.includes('smith')) score -= 10;
-        // Штраф за редкие вариации (узкий/обратный/глубокий хват, изолирующие машины)
-        if (n.includes('обратн') || n.includes('обрат') || n.includes('reverse')) score -= 10;
-        if (n.includes('узкий') || n.includes('узк') || n.includes('narrow')) score -= 5;
-        if (n.includes('машин') || n.includes('machine') || n.includes('блок')) score -= 5;
-        return { ...ex, _score: score };
-      }).sort((a: any, b: any) => (b._score || 0) - (a._score || 0));
     }
 
     let selected = selectExercisesSmart({
@@ -1057,10 +1067,12 @@ function buildSession(
           { name: 'shrugs', match: (e) => /шраг/i.test(e.name) },
         ],
         quads: [
-          { name: 'barbell_squat', match: (e) => /присед.*(штанг|спин|на спин)|squat/i.test(e.name) && !/гантел|фронт|гоблет|болгар|выпад|машина|хак/i.test(e.name) },
-          { name: 'leg_press_hack', match: (e) => /жим.*ног|leg.?press|хак|hack.*squat|машина.*присед/i.test(e.name) },
+          // BB-приоритет: все compound-приседания и жимы ногами в ОДНОМ классе.
+          // _score из generic-пула решает: hack_squat +15, barbell_squat -10 → гакк побеждает.
+          // overhead/pistol/split/front — НЕ бодибилдинг, исключены.
+          { name: 'compound_squat', match: (e) => /присед|squat|жим.*ног|leg.?press|хак|hack/i.test(e.name) && !/над голов|overhead|пистол|pistol|split|выпад|lunge|болгар|bulgarian|гоблет|goblet|гантел/i.test(e.name) },
           { name: 'extension', match: (e) => /разгибан.*ног|leg.?extension/i.test(e.name) },
-          { name: 'lunge_bulgarian', match: (e) => /выпад|lunge|болгар|bulgarian|гоблет|goblet/i.test(e.name) },
+          { name: 'lunge_bulgarian', match: (e) => /выпад|lunge|болгар|bulgarian|гоблет|goblet|фронт.*присед|front.*squat|split.*squat|присед.*ножниц/i.test(e.name) },
         ],
         hamstrings: [
           { name: 'curl', match: (e) => /сгибан.*ног|leg.?curl|сгибания ног/i.test(e.name) },
@@ -1106,8 +1118,15 @@ function buildSession(
           const ac = classes[ci];
           if (diverse.length >= exerciseCount) break;
           let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id) && !rotationNamesSet.has(e.name));
-          // Сортировать по strengthRank (тяж compounds первыми) + weakExerciseBonus (слабые группы приоритет)
+          // Сортировать по _score (BB-приоритет из generic-пула) + strengthRank + weakExerciseBonus
           candidates = candidates.sort((a, b) => {
+            // Generic pool has _score with BB preference (hack +15, barbell -10 etc).
+            // Respect it first — hack squat wins over barbell squat.
+            if (isGeneric) {
+              const sa = (a as any)._score ?? 0;
+              const sb = (b as any)._score ?? 0;
+              if (sa !== sb) return sb - sa;
+            }
             const rankDiff = strengthRank(a) - strengthRank(b);
             if (rankDiff !== 0) return rankDiff;
             // tie-break by coaching tier: canonical (barbell bench) before acceptable (reverse-grip bench)
@@ -1134,6 +1153,11 @@ function buildSession(
           if (diverse.length >= exerciseCount) break;
           let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id));
           candidates = candidates.sort((a, b) => {
+            if (isGeneric) {
+              const sa = (a as any)._score ?? 0;
+              const sb = (b as any)._score ?? 0;
+              if (sa !== sb) return sb - sa;
+            }
             const rankDiff = strengthRank(a) - strengthRank(b);
             if (rankDiff !== 0) return rankDiff;
             const tierDiff = bbExerciseTier(a) - bbExerciseTier(b);
@@ -1343,18 +1367,15 @@ function buildSession(
       });
     }
   }
-  // Кап упражнений в сессии: максимум 8 (реалистичная ББ-тренировка 60-75 мин)
-  // Кап упражнений в сессии: зависит от PED (натурал 8, enhanced 12).
-  // Финальный кап (с учётом feeders) — в buildBBPlan после добавления feeders.
   // ▓▓ Технически грамотный порядок упражнений (до обрезки по exCap) ▓▓
   // Базовые основной мышцы → базовые вторичных → изоляция (растяжка первой) → финиши.
-  // Устраняет «жим стоя перед жимом лёжа» и подобные нарушения логики.
   const _ordered = orderSessionExercises(exercises, { sessionTag: sched.sessionTag, methodology });
   exercises.length = 0; exercises.push(..._ordered);
 
-  const exCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 18 : 9;
+  // Кап упражнений в сессии: максимум 7 натурал, 10 на PED.
+  const exCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 10 : 7;
   if (exercises.length > exCap) {
-        const kept = exercises.filter(e => e.role === 'primary').slice(0, 10);
+    const kept = exercises.filter(e => e.role === 'primary').slice(0, 5);
     const acc = exercises.filter(e => e.role === 'accessory');
     const maxAcc = Math.max(0, exCap - kept.length);
     // Гарантировать arms accessory (triceps/biceps) — не обрезать их первыми
@@ -1850,10 +1871,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       weekSessions.push(sess);
     }
     // Финальный кап упражнений в каждой сессии (с учётом feeder/pump-финишеров)
-    const finalExCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 16 : 8;
+    const finalExCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 10 : 7;
     for (const sess of weekSessions) {
       if (sess.exercises.length > finalExCap) {
-        const kept = sess.exercises.filter(e => e.role === 'primary').slice(0, 7);
+        const kept = sess.exercises.filter(e => e.role === 'primary').slice(0, 5);
         const acc = sess.exercises.filter(e => e.role === 'accessory');
         const maxAcc = Math.max(0, finalExCap - kept.length);
         const armAcc = acc.filter(e => ['triceps', 'biceps', 'forearms'].includes(e.muscle));

@@ -51,6 +51,8 @@ export interface UserSet {
   weight?: number;        // кг (рабочий вес); для ПЛ может быть не задан → считается из %1RM
   pctOf1RM?: number;      // ПЛ-стиль: доля от предельного максимума (0.68 = 68%)
   technique?: IntensityTechnique;
+  /** Мульти-выбор техник - можно комбинировать несколько */
+  techniques?: IntensityTechnique[];
   tempo?: string;         // нотация темпа "3-1-1-0"
   restSec?: number;
   note?: string;
@@ -165,11 +167,12 @@ export interface BBProgramBody {
   constraints: ProgramConstraints;
 }
 
-/** ПЛ-тело: ссылка на иммутабельный LMS-цикл + пользовательский оверлей. */
+/** ПЛ-тело: ссылка на иммутабельный LMS-цикл + пользовательский оверлей.
+ *  При sourceCycleId=null — полностью свой (custom) ПЛ-цикл с editable customWeeks. */
 export interface PLProgramBody {
   direction: 'pl';
-  /** id иммутабельного цикла из src/data/lms-cycles. Процентки НЕ мутируются. */
-  sourceCycleId: string;
+  /** id иммутабельного цикла из src/data/lms-cycles. null = custom/empty PL cycle. */
+  sourceCycleId: string | null;
   /** ISO-дата начала (необязательно). */
   startDate?: string;
   /** Расписание: сессия цикла (по индексу) → день недели (0-6). */
@@ -180,6 +183,32 @@ export interface PLProgramBody {
   notes: string;
   /** Рабочие максимумы для расчёта весов из % цикла. */
   workMax: { squat?: number; bench?: number; dead?: number };
+  /** Custom PL: когда sourceCycleId===null, weeks содержит редактируемую структуру. */
+  customWeeks?: PLWeek[];
+}
+
+export interface PLDay {
+  name: string;
+  exercises: PLExercise[];
+}
+export interface PLExercise {
+  name: string;
+  lift: 'squat' | 'bench' | 'dead' | 'accessory';
+  muscle?: string;
+  sets: PLSet[];
+  note?: string;
+}
+export interface PLSet {
+  pct: number;
+  reps: number;
+  sets: number;
+  rir?: number;
+}
+export interface PLWeek {
+  week: number;
+  phase: 'accumulation' | 'intensification' | 'deload' | 'peaking';
+  deload: boolean;
+  days: PLDay[];
 }
 
 /** Hybrid-тело (powerbuilder) — зарезервировано для следующих итераций. */
@@ -227,8 +256,11 @@ export interface UserProgram {
 /* ───────────────────────── Утилиты id ───────────────────────── */
 
 export function newId(prefix: string): string {
-  return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+  const now = Date.now();
+  newId._counter = (newId._counter ?? 0) + 1;
+  return prefix + '_' + now.toString(36) + '_' + newId._counter.toString(36) + '_' + Math.random().toString(36).slice(2, 6);
 }
+newId._counter = 0 as number;
 
 /* Конвертация источников → UserProgram реализована в program-store.ts. */
 export type { FullProgram, SRCycleTemplate, BBPlan };
