@@ -673,6 +673,77 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       {dir === 'bb' && program.bb && <BbContextPanel program={program} level={program.meta.level} />}
       {dir === 'pl' && program.pl && <PLContextPanel program={program} />}
 
+      {/* P5.1 — Week schedule grid Пн..Вс с фокусом мышц по дням. */}
+      {((dir === 'bb' && program.bb?.weeks?.[0]?.sessions) || (dir === 'pl' && program.pl?.schedule)) && (() => {
+        const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+        const groupColors: Record<string, string> = {
+          chest: '#22c55e', back: '#3b82f6', legs: '#f59e0b', shoulders: '#a78bfa',
+          arms: '#ef4444', core: '#06b6d4',
+        };
+        let dayLabels: Array<{ idx: number; label: string; muscles: string[] }> = [];
+        if (dir === 'bb' && program.bb) {
+          dayLabels = (program.bb.weeks[0]?.sessions ?? []).map((s, i) => ({
+            idx: i,
+            label: s.name || `День ${i + 1}`,
+            muscles: Array.from(new Set((s.blocks ?? []).map((b) => b.muscle).filter(Boolean))),
+          }));
+        } else if (dir === 'pl' && program.pl) {
+          dayLabels = (program.pl.schedule ?? []).map((s, i) => ({
+            idx: i,
+            label: (s.sessionIdx != null ? `Сессия ${s.sessionIdx + 1}` : `День ${i + 1}`),
+            muscles: ['—'],
+          }));
+        }
+        const dayByDow: Record<number, { idx: number; label: string; muscles: string[] }> = {};
+        dayLabels.forEach((d) => { dayByDow[d.idx % 7] = d; });
+        return (
+          <div style={{ ...CARD, padding: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>
+              🗓 Неделя — расписание
+              <span style={{ fontSize: 9, color: DIM, marginLeft: 6, fontWeight: 500 }}>
+                (по плану текущей редактируемой программы)
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+              {WEEKDAYS.map((day, wi) => {
+                const d = dayByDow[wi];
+                const fill = d ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)';
+                return (
+                  <div key={wi} style={{
+                    minHeight: 64, borderRadius: 6, padding: '6px 4px',
+                    background: fill,
+                    border: d ? '1px solid rgba(0,230,138,0.25)' : '1px solid rgba(255,255,255,0.05)',
+                    textAlign: 'center',
+                  }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: d ? '#00e68a' : DIM }}>{day}</div>
+                    {d ? (
+                      <>
+                        <div style={{ fontSize: 9, color: DIM_STRONG, marginTop: 4, fontWeight: 600 }}>{d.label}</div>
+                        <div style={{ fontSize: 9, color: DIM, marginTop: 2, lineHeight: 1.2 }}>
+                          {d.muscles.filter((m) => m !== '—').slice(0, 2).map((m, mi) => (
+                            <span key={mi} style={{
+                              display: 'inline-block', padding: '1px 4px', marginRight: 2,
+                              borderRadius: 3, fontSize: 8,
+                              background: (groupColors[m] ?? '#888') + '20',
+                              color: groupColors[m] ?? '#fff',
+                            }}>{GROUP_RU[m] ?? m}</span>
+                          )) ?? null}
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 9, color: DIM, marginTop: 12, fontStyle: 'italic' }}>отдых</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: 9, color: DIM, marginTop: 6, fontStyle: 'italic' }}>
+              Шаблон недели повторяется для всех мезоциклов. Делод-недели должны быть явно отмечены флагом «deload» в структуре.
+            </div>
+          </div>
+        );
+      })()}
+
       {/* P2 — LIVE Quality Panel: оценка 0-100 и конкретные правки. */}
       {dir === 'bb' && program.bb && (() => {
         const q = computePlanQualityFor(program, program.meta.level);
