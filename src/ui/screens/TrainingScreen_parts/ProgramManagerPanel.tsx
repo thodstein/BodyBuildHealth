@@ -558,35 +558,73 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
 
 // «🚚 К выполнению» — поддерживает BB и PL.
   const sendToExecution = () => {
-    if (dir !== 'bb' || !program.bb) {
-      alert('К выполнению можно отправить только ББ-программу.');
-      return;
-    }
-    const days: { label: string; exercises: { name: string; muscleGroup: string; targetSets: { weight: number; reps: number; rir: number }[] }[] }[] = [];
-    const week1 = program.bb.weeks[0];
-    if (!week1) { alert('Сначала добавьте хотя бы одну сессию.'); return; }
-    for (const s of week1.sessions) {
-      days.push({
-        label: s.name || 'День',
-        exercises: s.blocks
-          .filter((b) => b.exerciseName)
-          .map((b) => ({
-            name: b.exerciseName,
-            muscleGroup: b.muscle,
-            targetSets: b.sets.map((set) => ({
-              weight: set.weight ?? 0,
-              reps: typeof set.reps === 'number' ? set.reps : parseInt(String(set.reps).replace(/[^0-9]/g, '')) || 8,
-              rir: set.rir ?? 2,
+    let days: { label: string; exercises: { name: string; muscleGroup: string; targetSets: { weight: number; reps: number; rir: number }[] }[] }[] = [];
+
+    if (dir === 'bb' && program.bb) {
+      const week1 = program.bb.weeks[0];
+      if (!week1) { alert('Сначала добавьте хотя бы одну сессию.'); return; }
+      for (const s of week1.sessions) {
+        days.push({
+          label: s.name || 'День',
+          exercises: s.blocks
+            .filter((b) => b.exerciseName)
+            .map((b) => ({
+              name: b.exerciseName,
+              muscleGroup: b.muscle,
+              targetSets: b.sets.map((set) => ({
+                weight: set.weight ?? 0,
+                reps: typeof set.reps === 'number' ? set.reps : parseInt(String(set.reps).replace(/[^0-9]/g, '')) || 8,
+                rir: set.rir ?? 2,
+              })),
             })),
-          })),
-      });
-    }
-    if (days.length === 0 || days.every((d) => d.exercises.length === 0)) {
-      alert('Добавьте хотя бы одно упражнение, прежде чем отправлять к выполнению.');
+        });
+      }
+      if (days.length === 0 || days.every((d) => d.exercises.length === 0)) {
+        alert('Добавьте хотя бы одно упражнение, прежде чем отправлять к выполнению.');
+        return;
+      }
+    } else if (dir === 'pl' && program.pl) {
+      // PL: использовать plLmsScheduleDays из manual-constructor.engine — превращает LMS-cycle в PlayerDay[].
+      const plDays = plLmsScheduleDays(program);
+      if (!plDays || plDays.length === 0) {
+        alert('ПЛ-цикл пустой. Укажите ПМ (приседа/жима/тяги) и проверьте подключение LMS-цикла.');
+        return;
+      }
+      const wm = program.pl.workMax || {};
+      const wmVal = (liftStr: string): number => {
+        if (/жим/i.test(liftStr)) return wm.bench ?? 0;
+        if (/тяг/i.test(liftStr)) return wm.dead ?? 0;
+        return wm.squat ?? 0;
+      };
+      days = plDays.map((pd) => ({
+        label: pd.label,
+        exercises: (pd.exercises as Array<{ name: string; group: string; sets: Array<{ pct: number; reps: number; weight: number }> }>).map((ex) => {
+          const pmBase = wmVal(ex.name);
+          return {
+            name: ex.name,
+            muscleGroup: ex.group || '',
+            targetSets: ex.sets.map((st) => {
+              // Если в ex.sets уже есть готовый weight (PM-прогрессия) — используем его.
+              // Иначе считаем из pct×PM, округляем до 2.5 кг.
+              const w = (st as { weight?: number }).weight;
+              const computed = (typeof w === 'number' && w > 0)
+                ? w
+                : (pmBase > 0 ? Math.round((pmBase * (ex.sets[0]?.pct ?? 0.7)) / 2.5) * 2.5 : 0);
+              return {
+                weight: computed,
+                reps: st.reps ?? 5,
+                rir: 2,
+              };
+            }),
+          };
+        }),
+      }));
+    } else {
+      alert('Сначала выберите ББ или ПЛ программу.');
       return;
     }
     try {
-      localStorage.setItem('he_pl_runtime', JSON.stringify({ days, focus: program.meta.title || 'Моя программа', week: 1, track: 'manual' }));
+      localStorage.setItem('he_pl_runtime', JSON.stringify({ days, focus: program.meta.title || 'Моя программа', week: 1, track: dir }));
     } catch {}
     showToast('🚚 Отправлено к выполнению — откройте зону «▶ Тренировка»');
   };
