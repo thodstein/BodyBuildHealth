@@ -417,142 +417,6 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
     </div>
   ), [filterMarkers, markerGroups]);
 
-  // Параметры сборки (грейд, стратегия, макс. кол-во)
-  const paramChildren = useMemo(() => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* Грейд */}
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.82)', marginBottom: 6 }}>
-          📚 Грейд доказательности
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {GRADE_OPTIONS.map((g) => (
-            <button
-              key={g.id}
-              onClick={() => setGrade(g.id)}
-              style={{
-                flex: 1, padding: '10px 0', borderRadius: 12, cursor: 'pointer', border: 'none',
-                background: grade === g.id ? `${g.color}22` : 'rgba(255,255,255,0.04)',
-                borderLeft: grade === g.id ? `3px solid ${g.color}` : '3px solid transparent',
-                transition: 'all 0.2s',
-              }}
-            >
-              <div style={{ fontSize: 18, fontWeight: 800, color: grade === g.id ? g.color : 'rgba(255,255,255,0.5)' }}>
-                {g.label}
-              </div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
-                {g.desc}
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Стратегия под грейдом */}
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.82)', marginBottom: 6 }}>
-          ⚙️ Стратегия подбора
-        </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {STRATEGIES.map((s) => (
-            <PillBtn key={s.id} active={strategy === s.id} onClick={() => setStrategy(s.id)} color="#00e68a" small>
-              {s.label}
-            </PillBtn>
-          ))}
-        </div>
-      </div>
-
-      {/* Макс. количество */}
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.82)', marginBottom: 6 }}>
-          📦 Макс. количество препаратов
-        </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {COUNT_PRESETS.map((n) => (
-            <button
-              key={n}
-              onClick={() => setMaxStackSize(n)}
-              style={{
-                padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
-                background: maxStackSize === n ? '#e879f922' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${maxStackSize === n ? '#e879f9' : 'rgba(255,255,255,0.1)'}`,
-                color: maxStackSize === n ? '#e879f9' : 'rgba(255,255,255,0.7)',
-                fontWeight: maxStackSize === n ? 700 : 500, fontSize: 13,
-              }}
-            >
-              {n === 0 ? '∞' : n}
-            </button>
-          ))}
-        </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
-          0 = без ограничений
-        </div>
-      </div>
-
-      {/* Источники данных */}
-      <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.82)', marginBottom: 8 }}>
-          📊 Источники данных для подбора
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, background: useCourse ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${useCourse ? '#00e68a' : 'rgba(255,255,255,0.1)'}` }}>
-            <input type="checkbox" checked={useCourse} onChange={e => setUseCourse(e.target.checked)} style={{ accentColor: '#00e68a', width: 16, height: 16 }} />
-            <span style={{ fontSize: 13, fontWeight: 500, color: useCourse ? '#00e68a' : 'rgba(255,255,255,0.7)' }}>💉 Курс ААС</span>
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, background: useLabs ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${useLabs ? '#f59e0b' : 'rgba(255,255,255,0.1)'}` }}>
-            <input type="checkbox" checked={useLabs} onChange={e => setUseLabs(e.target.checked)} style={{ accentColor: '#f59e0b', width: 16, height: 16 }} />
-            <span style={{ fontSize: 13, fontWeight: 500, color: useLabs ? '#f59e0b' : 'rgba(255,255,255,0.7)' }}>🧪 Анализы (лаборатория)</span>
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, background: useProfile ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${useProfile ? '#a78bfa' : 'rgba(255,255,255,0.1)'}` }}>
-            <input type="checkbox" checked={useProfile} onChange={e => setUseProfile(e.target.checked)} style={{ accentColor: '#a78bfa', width: 16, height: 16 }} />
-            <span style={{ fontSize: 13, fontWeight: 500, color: useProfile ? '#a78bfa' : 'rgba(255,255,255,0.7)' }}>👤 Профиль (органы/цели/состояние)</span>
-          </label>
-         </div>
-       </div>
-
-       {/* Режим фильтрации */}
-       <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-         <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.82)', marginBottom: 8 }}>
-           🎯 Режим фильтрации
-         </div>
-         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-           <button
-             onClick={() => setFilterMode('balanced')}
-             style={{
-               flex: 1, padding: '10px 0', borderRadius: 10, cursor: 'pointer', border: 'none',
-               background: filterMode === 'balanced' ? '#60a5fa22' : 'rgba(255,255,255,0.04)',
-               borderLeft: filterMode === 'balanced' ? '3px solid #60a5fa' : '3px solid transparent',
-               transition: 'all 0.2s',
-             }}
-           >
-             <div style={{ fontSize: 13, fontWeight: 700, color: filterMode === 'balanced' ? '#60a5fa' : 'rgba(255,255,255,0.5)' }}>
-               Сбалансированный
-             </div>
-             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
-               Фильтры + синергии
-             </div>
-           </button>
-           <button
-             onClick={() => setFilterMode('strict')}
-             style={{
-               flex: 1, padding: '10px 0', borderRadius: 10, cursor: 'pointer', border: 'none',
-               background: filterMode === 'strict' ? '#f59e0b22' : 'rgba(255,255,255,0.04)',
-               borderLeft: filterMode === 'strict' ? '3px solid #f59e0b' : '3px solid transparent',
-               transition: 'all 0.2s',
-             }}
-           >
-             <div style={{ fontSize: 13, fontWeight: 700, color: filterMode === 'strict' ? '#f59e0b' : 'rgba(255,255,255,0.5)' }}>
-               Строгий
-             </div>
-             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
-               Только по выбранным органам/механизмам
-             </div>
-           </button>
-         </div>
-       </div>
-    </div>
-  ), [grade, strategy, maxStackSize, useCourse, useLabs, useProfile, filterMode]);
-
 const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
    
   const resetAll = () => {
@@ -760,28 +624,59 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
           }}>Готово</button>
         </StepPopup>
 
-        {/* ── Параметры сборки ── */}
-        <div style={{
-          marginTop: 4, padding: '12px 14px', borderRadius: 14,
-          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-        }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>📊 Параметры сборки</div>
-          {paramChildren}
+        {/* ── Параметры: грейд + стратегия + макс ── */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {GRADE_OPTIONS.map(g => (
+            <button key={g.id} onClick={() => setGrade(g.id)} style={{
+              padding: '6px 12px', borderRadius: 10, cursor: 'pointer', border: 'none',
+              fontSize: 12, fontWeight: 700,
+              background: grade === g.id ? `${g.color}22` : 'rgba(255,255,255,0.04)',
+              color: grade === g.id ? g.color : 'rgba(255,255,255,0.5)',
+            }}>{g.label}</button>
+          ))}
+          <span style={{ color: 'rgba(255,255,255,0.15)' }}>|</span>
+          {STRATEGIES.map(s => (
+            <button key={s.id} onClick={() => setStrategy(s.id)} style={{
+              padding: '6px 12px', borderRadius: 10, cursor: 'pointer', border: 'none',
+              fontSize: 12, fontWeight: 600,
+              background: strategy === s.id ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
+              color: strategy === s.id ? '#00e68a' : 'rgba(255,255,255,0.5)',
+            }}>{s.label}</button>
+          ))}
+          <span style={{ color: 'rgba(255,255,255,0.15)' }}>|</span>
+          {COUNT_PRESETS.map(n => (
+            <button key={n} onClick={() => setMaxStackSize(n)} style={{
+              padding: '5px 10px', borderRadius: 10, cursor: 'pointer', border: 'none',
+              fontSize: 12, fontWeight: 600,
+              background: maxStackSize === n ? 'rgba(232,121,249,0.15)' : 'rgba(255,255,255,0.04)',
+              color: maxStackSize === n ? '#e879f9' : 'rgba(255,255,255,0.5)',
+            }}>{n === 0 ? '∞' : n}</button>
+          ))}
         </div>
 
-        {/* ── Тогглы источника данных ── */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, background: useCourse ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${useCourse ? '#00e68a' : 'rgba(255,255,255,0.1)'}`, fontSize: 11 }}>
-            <input type="checkbox" checked={useCourse} onChange={e => setUseCourse(e.target.checked)} style={{ accentColor: '#00e68a', width: 14, height: 14 }} />
-            <span style={{ color: useCourse ? '#00e68a' : 'rgba(255,255,255,0.5)', fontWeight: 500 }}>💉 Курс</span>
+        {/* ── Режим + источник данных ── */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button onClick={() => setFilterMode('balanced')} style={{
+            padding: '5px 10px', borderRadius: 10, cursor: 'pointer', border: 'none',
+            fontSize: 11, fontWeight: 600,
+            background: filterMode === 'balanced' ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.04)',
+            color: filterMode === 'balanced' ? '#60a5fa' : 'rgba(255,255,255,0.5)',
+          }}>balanced</button>
+          <button onClick={() => setFilterMode('strict')} style={{
+            padding: '5px 10px', borderRadius: 10, cursor: 'pointer', border: 'none',
+            fontSize: 11, fontWeight: 600,
+            background: filterMode === 'strict' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)',
+            color: filterMode === 'strict' ? '#f59e0b' : 'rgba(255,255,255,0.5)',
+          }}>strict</button>
+          <span style={{ color: 'rgba(255,255,255,0.15)' }}>|</span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer', fontSize: 11, color: useCourse ? '#00e68a' : 'rgba(255,255,255,0.4)', fontWeight: 500 }}>
+            <input type="checkbox" checked={useCourse} onChange={e => setUseCourse(e.target.checked)} style={{ accentColor: '#00e68a', width: 13, height: 13 }} />Курс
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, background: useLabs ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${useLabs ? '#f59e0b' : 'rgba(255,255,255,0.1)'}`, fontSize: 11 }}>
-            <input type="checkbox" checked={useLabs} onChange={e => setUseLabs(e.target.checked)} style={{ accentColor: '#f59e0b', width: 14, height: 14 }} />
-            <span style={{ color: useLabs ? '#f59e0b' : 'rgba(255,255,255,0.5)', fontWeight: 500 }}>🧪 Анализы</span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer', fontSize: 11, color: useLabs ? '#f59e0b' : 'rgba(255,255,255,0.4)', fontWeight: 500 }}>
+            <input type="checkbox" checked={useLabs} onChange={e => setUseLabs(e.target.checked)} style={{ accentColor: '#f59e0b', width: 13, height: 13 }} />Анализы
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, background: useProfile ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${useProfile ? '#a78bfa' : 'rgba(255,255,255,0.1)'}`, fontSize: 11 }}>
-            <input type="checkbox" checked={useProfile} onChange={e => setUseProfile(e.target.checked)} style={{ accentColor: '#a78bfa', width: 14, height: 14 }} />
-            <span style={{ color: useProfile ? '#a78bfa' : 'rgba(255,255,255,0.5)', fontWeight: 500 }}>👤 Профиль</span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer', fontSize: 11, color: useProfile ? '#a78bfa' : 'rgba(255,255,255,0.4)', fontWeight: 500 }}>
+            <input type="checkbox" checked={useProfile} onChange={e => setUseProfile(e.target.checked)} style={{ accentColor: '#a78bfa', width: 13, height: 13 }} />Профиль
           </label>
         </div>
 
@@ -806,11 +701,9 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
 
         {hasAnyFilter && (
           <button onClick={resetAll} style={{
-            padding: '8px 12px', borderRadius: 8, cursor: 'pointer', background: 'transparent',
-            border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)', fontSize: 11, alignSelf: 'flex-start',
-          }}>
-            ✕ Сбросить всё
-          </button>
+            padding: '6px 12px', borderRadius: 8, cursor: 'pointer', background: 'transparent',
+            border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)', fontSize: 11, alignSelf: 'flex-start',
+          }}>✕ Сбросить всё</button>
         )}
       </div>
 

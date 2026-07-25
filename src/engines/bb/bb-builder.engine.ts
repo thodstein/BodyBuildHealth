@@ -314,7 +314,7 @@ function strengthRank(ex: any): number {
  * Эти упражнения не дают механического натяжения/метаболического стресса для роста мышц.
  * Разрешены: скручивания (crunch), подъём ног, гиперэкстензия (ягодицы/разгибатели спины).
  */
-const BB_JUNK_PATTERNS: RegExp = /паллоф|pallof|bird.?dog|птиц.*собак|monster.?walk|резин|banded|band.?walk|планк|plank|copenhagen|копенгаген|spiderman|человек.?паук|plank.?jack|планк.*прыжк|walkout|шагающ.*планк|супермен|superman|gator.?walk|аллигатор|inchworm|гусениц|dead.?bug|мёртв.*жук|мертв.*жук|медбол|med.?ball|medicine.?ball|бросок.*мяч|рубк.*дров|рубк.*дерев|wood.?chop|ротацион|rotational|bradford|брэдфорд|наклон.*сидя.*штанг|seated.*good.?morning|отжиман|push.?up|русск.*твист|russian.*twist|тяга.*за голов|pulldown.*behind|pike.*отжим|pike.*push|индийск|hindu.*push/;
+const BB_JUNK_PATTERNS: RegExp = /паллоф|pallof|bird.?dog|птиц.*собак|monster.?walk|резин|banded|band.?walk|планк|plank|copenhagen|копенгаген|spiderman|человек.?паук|plank.?jack|планк.*прыжк|walkout|шагающ.*планк|супермен|superman|gator.?walk|аллигатор|inchworm|гусениц|dead.?bug|мёртв.*жук|мертв.*жук|медбол|med.?ball|medicine.?ball|бросок.*мяч|рубк.*дров|рубк.*дерев|wood.?chop|ротацион|rotational|bradford|брэдфорд|наклон.*сидя.*штанг|seated.*good.?morning|отжиман|push.?up|русск.*твист|russian.*twist|тяга.*за голов|pulldown.*behind|pike.*отжим|pike.*push|индийск|hindu.*push|скольжен.*стен|wall.?slide|кубан|cuban|мельниц.*гир|windmill|пугало|scarecrow|жим.*гир|kb.?press|bent.?press|наклонн.*жим.*гир|лэндмайн|landmine/;
 
 /** Проверить, является ли упражнение BB-мусором (не для гипертрофии). */
 function isBBJunk(ex: any): boolean {
@@ -1965,8 +1965,75 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // Final re-sort: compensateCrossDayWeakPoints may have added feeders that break grouping
   for (const w of finalPlan.weeks) {
     for (const s of w.sessions) {
+      // ━━━ ДЕДУПЛИКАЦИЯ ━━━
+      // 1. Точные дубликаты по имени
+      const seenNames = new Set<string>();
+      s.exercises = s.exercises.filter(e => {
+        const n = (e.exerciseName || e.name || '').toLowerCase();
+        if (seenNames.has(n)) return false;
+        seenNames.add(n);
+        return true;
+      });
+      // 2. Дубликаты по паттерну (5 ягодичных мостов → оставить 2)
+      const PER_MUSCLE_MAX: Record<string, number> = {
+        glutes: 3, hamstrings: 3, quads: 4, chest: 4, back: 4,
+        shoulders: 3, biceps: 3, triceps: 3, calves: 2, abs: 3,
+        traps: 2, forearms: 2, core: 2, lower_back: 2,
+      };
+      const perMuscleCount: Record<string, number> = {};
+      // 3. Подсчёт similarity: "ягодичный мост на скамье" ~ "ягодичный мост на полу" → один паттерн
+      const patternOf = (name: string): string => {
+        const n = name.toLowerCase();
+        if (/ягодичн.*мост|hip.?thrust|glute.?bridge/i.test(n)) return 'hip_thrust';
+        if (/сгибан.*ног|leg.?curl/i.test(n)) return 'leg_curl';
+        if (/разгибан.*ног|leg.?ext/i.test(n)) return 'leg_ext';
+        if (/выпад|lunge|болгар|реверанс/i.test(n)) return 'lunge';
+        if (/присед|squat/i.test(n) && !/над голов|overhead|пистол/i.test(n)) return 'squat';
+        if (/жим.*ног|leg.?press/i.test(n)) return 'leg_press';
+        if (/жим.*лёж|bench.*press/i.test(n) && !/наклон|incline/i.test(n)) return 'bench_press';
+        if (/жим.*наклон|incline.*press/i.test(n)) return 'incline_press';
+        if (/развод|fly|сведен|пек.?дек|butterfly|кроссовер.*сведен/i.test(n)) return 'fly';
+        if (/подтяг|pull.?up|chin/i.test(n)) return 'pullup';
+        if (/тяга.*верхн.*блок|lat.?pull/i.test(n)) return 'pulldown';
+        if (/тяга.*лиц|face.?pull/i.test(n)) return 'face_pull';
+        if (/тяга|row|йейтс|seal|пендл/i.test(n) && !/подтяг|лиц|резин/i.test(n)) return 'row';
+        if (/шраг/i.test(n)) return 'shrug';
+        if (/молот|hammer/i.test(n)) return 'hammer_curl';
+        if (/подъём.*бицепс|сгибан.*бицепс|сгибан.*рук|curl/i.test(n)) return 'biceps_curl';
+        if (/разгибан.*трицепс|pushdown|француз|tricep/i.test(n)) return 'tricep_ext';
+        if (/жим.*армейск|жим.*standing|жим.*сидя|arnold|арнольд|жим.*гантел.*стоя|жим.*гантел.*сидя|ohp|жим.*смите.*сидя/i.test(n)) return 'shoulder_press';
+        if (/лэндмайн|landmine/i.test(n)) return 'landmine_press';
+        if (/мах|raise|отведен|разведен/i.test(n) && /наклон|задн|rear/i.test(n)) return 'rear_delt';
+        if (/мах|raise|в сторон|lateral/i.test(n)) return 'lateral_raise';
+        if (/подъём.*носк|calf/i.test(n)) return 'calf_raise';
+        if (/скручив|crunch/i.test(n)) return 'crunch';
+        if (/отжиман.*брус|dip/i.test(n)) return 'dips';
+        return n; // уникальное имя = уникальный паттерн
+      };
+      const perPatternCount: Record<string, number> = {};
+      const PER_PATTERN_MAX = 2; // максимум 2 упражнения одного паттерна на мышцу
+      s.exercises = s.exercises.filter(e => {
+        const m = collapseKey(e.muscle || '');
+        const name = (e.exerciseName || e.name || '');
+        const pat = patternOf(name);
+        const muscleCap = PER_MUSCLE_MAX[m] ?? 4;
+        // Кап по мышце
+        perMuscleCount[m] = (perMuscleCount[m] || 0) + 1;
+        if (perMuscleCount[m] > muscleCap) return false;
+        // Кап по паттерну (не больше 2 "ягодичных мостов")
+        const patKey = m + ':' + pat;
+        perPatternCount[patKey] = (perPatternCount[patKey] || 0) + 1;
+        if (perPatternCount[patKey] > PER_PATTERN_MAX) return false;
+        return true;
+      });
+      // Re-sort после дедупликации
       const reordered = orderSessionExercises(s.exercises, { sessionTag: s.sessionTag || '' });
       s.exercises.length = 0; s.exercises.push(...reordered);
+      // ━━━ ИТОГОВЫЙ КАП ━━━
+      const finalCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 12 : 9;
+      if (s.exercises.length > finalCap) {
+        s.exercises.length = finalCap;
+      }
     }
   }
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, pedMrvMult);
