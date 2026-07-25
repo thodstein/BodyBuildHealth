@@ -44,9 +44,9 @@ function compareWithLandmarks(level: string, current: number, muscle: string): {
  *  ──────────────────────────────────────────────────────────────────────── */
 export const BbContextPanel: React.FC<{ program: UserProgram; level: string }> = ({ program, level }) => {
   const bb = program.bb;
-  if (!bb) return null;
 
   const weeklySetsByMuscle = useMemo(() => {
+    if (!bb) return {};
     const out: Record<string, number> = {};
     for (const w of bb.weeks) {
       for (const s of w.sessions) {
@@ -56,7 +56,7 @@ export const BbContextPanel: React.FC<{ program: UserProgram; level: string }> =
       }
     }
     return out;
-  }, [bb.weeks]);
+  }, [bb]);
 
   const statusByMuscle = useMemo(() => {
     return MUSCLE_ORDER.map((g) => {
@@ -65,6 +65,8 @@ export const BbContextPanel: React.FC<{ program: UserProgram; level: string }> =
       return { muscle: g, current: cur, ...cmp, missing: 'weak' };
     }).filter((row) => row.current > 0 || ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'].includes(row.muscle));
   }, [weeklySetsByMuscle, level]);
+
+  if (!bb) return null;
 
   const totalSets = Object.values(weeklySetsByMuscle).reduce((a, b) => a + b, 0);
   const ungrouped = Object.keys(weeklySetsByMuscle).filter((k) => !MUSCLE_ORDER.includes(k as any));
@@ -138,11 +140,12 @@ const Mini: React.FC<{ label: string; value: number | string }> = ({ label, valu
  *  ──────────────────────────────────────────────────────────────────────── */
 export const PLContextPanel: React.FC<{ program: UserProgram }> = ({ program }) => {
   const pl = program.pl;
-  if (!pl) return null;
 
   const cycle = useMemo(() => {
-    try { if (!pl.sourceCycleId) return null; return getCycleById(pl.sourceCycleId); } catch { return null; }
-  }, [pl.sourceCycleId]);
+    try { if (!pl?.sourceCycleId) return null; return getCycleById(pl.sourceCycleId); } catch { return null; }
+  }, [pl?.sourceCycleId]);
+
+  if (!pl) return null;
 
   /** Вычислить рабочий вес по % от ПМ (если известны). */
   const calcWeight = (pct: number, lift: 'squat' | 'bench' | 'dead'): number | null => {

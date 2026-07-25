@@ -863,7 +863,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       }
     } else if (program.pl) {
       html.push(`<h2>ПЛ-цикл: ${program.pl.sourceCycleId}</h2>`);
-      html.push(`<div class="meta">ПМ: присед ${program.pl.workMax.squat ?? '-'} · жим ${program.pl.workMax.bench ?? '-'} · тяга ${program.pl.workMax.dead ?? '-'} кг</div>`);
+      html.push(`<div class="meta">ПМ: присед ${program.pl.workMax?.squat ?? '-'} · жим ${program.pl.workMax?.bench ?? '-'} · тяга ${program.pl.workMax?.dead ?? '-'} кг</div>`);
       if (program.pl.notes) html.push(`<p>${program.pl.notes}</p>`);
     }
     html.push('</body></html>');
