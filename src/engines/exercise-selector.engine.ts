@@ -71,7 +71,7 @@ export function isAxialLoadExercise(ex: Exercise): boolean {
 
   // Становая / мёртвая тяга / румынская / гудморнинг — осевой (наклон со штангой).
   // FIX: убрано `мёртв`/`мертв` без уточнения — ловило "мёртвый жук" (dead_bug, кор, НЕ осевая).
-  if (n.includes('станов') || n.includes('мёртв.*тяг') || n.includes('мертв.*тяг') || n.includes('deadlift')
+  if (n.includes('станов') || /м(?:ёртв|ертв).*тяг/i.test(n) || n.includes('deadlift')
     || n.includes('румын') || n.includes('румынск') || n.includes('гудморнинг') || n.includes('good morning') || n.includes('good_morning')) return true;
 
   // Жим стоя / армейский / overhead (штанга над головой) — осевой
@@ -529,7 +529,7 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     if (isTooSimilar(ex, result) && result.length < count - 1) continue;
 
     // Проверяем конфликт с уже выбранными
-    const conflict = result.some(r => patternConflictScore(ex, [r]) < -20);
+    const conflict = result.some(r => patternConflictScore(ex, [r]) < -10);
     if (conflict && result.length >= count - 1) continue;
 
     result.push(ex);

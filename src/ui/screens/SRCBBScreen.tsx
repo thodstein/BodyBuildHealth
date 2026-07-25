@@ -230,10 +230,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!pmMap['Становая тяга']) pmMap['Становая тяга'] = pmDead;
     const plan = buildLMSPlan({
       template: tpl, pmMap, fallbackPm: 80, mode: peds.length ? 'on_course' : 'natural', courseIntensity, weeksOverride: cycleWeeks,
-      volumeGoal: (linked.profile?.settings?.volumeGoal as any) || 'mav',
-      focusLift: (linked.profile?.settings?.focusLift as any),
+      volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
+      focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
       currentReadiness: linked.readiness?.recovery,
-      equipment: linked.profile?.settings?.equipment,
+      equipment: (linked.profile?.settings as Record<string, any> | undefined)?.equipment,
       weakPoints: weakPoints,
       plWeakPoints: plWeakPoints,
       weakGroupDayMap,

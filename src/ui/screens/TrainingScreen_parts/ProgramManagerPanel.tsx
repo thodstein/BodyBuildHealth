@@ -33,6 +33,8 @@ import { ExerciseLabPicker } from './ExerciseLabPicker';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { BbContextPanel, PLContextPanel } from './program-editor-context-panels';
 import { BBEditor, PLEditor, BBConstraintsPanel } from './ProgramEditorComponents';
+import { DiagnosticPanel, VolumeLandmarksPanel, PhaseLegend, ExerciseInfo, RecommendationsPanel, ProgressionCoach, SplitConsultant } from './ProgramEditorPanels';
+import { getTrainingMethods } from '../../../engines/training-methodology.engine';
 import { SET_TEMPLATES } from './program-types';
 import {
   autodraftBBPlan,
@@ -569,7 +571,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
   const showToast = (m: string) => { setEditorToast(m); setTimeout(() => setEditorToast(''), 2200); };
 
   // Библиотека внутри редактора
-  const [editorLibOpen, setEditorLibOpen] = useState<'bb' | 'pl' | null>(null);
+  const [editorLibOpen, setEditorLibOpen] = useState<'bb' | 'pl' | 'methods' | null>(null);
   const libraryPrograms = useMemo(() => getAllPrograms(), []);
   const plCycleList = useMemo(() => LMS_CYCLES, []);
   const loadIntoEditor = (p: UserProgram) => {
@@ -930,6 +932,10 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
               title="Применить фазовую периодизацию (RIR/объём/повторения по неделям)"
             >📈 Применить фазы</button>
           )}
+          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}
+            onClick={() => setEditorLibOpen('methods')}
+            title="Справочник тренировочных методик"
+          >📚 Методики</button>
           {(dir === 'bb' || dir === 'pl') && (
             <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4, marginRight: 4 }}>
               Нед
@@ -982,176 +988,14 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         );
       })()}
 
-      {/* ──────────────────────── ИНТЕГРИРОВАННЫЕ ПАНЕЛИ ИНСТРУМЕНТОВ ──────────────────────── */}
-      {/* P8.1 — Volume Landmarks Panel: MEV/MAV/MRV для текущего уровня */}
-      {(() => {
-        const prof = loadTrainingProfile();
-        const MUSCLES = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;
-        // P0-1: пиковая неделя (макс сетов/нед на мышцу), не сумма всех недель
-        const peakByMuscle: Record<string, number> = {};
-        if (dir === 'bb' && program.bb) {
-          for (const w of program.bb.weeks) {
-            const weekSets: Record<string, number> = {};
-            for (const s of w.sessions) {
-              for (const b of s.blocks) {
-                if (b.muscle) weekSets[b.muscle] = (weekSets[b.muscle] || 0) + (b.sets?.length || 0);
-              }
-            }
-            for (const [m, sets] of Object.entries(weekSets)) {
-              peakByMuscle[m] = Math.max(peakByMuscle[m] || 0, sets);
-            }
-          }
-        } else if (dir === 'pl' && program.pl?.customWeeks) {
-          for (const w of program.pl.customWeeks) {
-            const weekSets: Record<string, number> = {};
-            for (const d of w.days) {
-              for (const ex of d.exercises) {
-                if (ex.muscle) weekSets[ex.muscle] = (weekSets[ex.muscle] || 0) + ex.sets.reduce((sum, s) => sum + s.sets, 0);
-              }
-            }
-            for (const [m, sets] of Object.entries(weekSets)) {
-              peakByMuscle[m] = Math.max(peakByMuscle[m] || 0, sets);
-            }
-          }
-        }
-        if (Object.keys(peakByMuscle).length === 0) return null;
-        return (
-          <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #22c55e' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#22c55e', marginBottom: 6 }}>📊 Объём и MRV по мышцам (пиковая неделя)</div>
-            <div style={{ fontSize: 10, color: DIM, marginBottom: 6, fontStyle: 'italic' }}>
-              Сравнение пиковой недели с MEV/MAV/MRV для уровня <b>{program.meta.level}</b>
-              {labAdjust.mrvMultiplier < 1 && <span> (лабораторный MRV ×{labAdjust.mrvMultiplier.toFixed(2)})</span>}
-              {(prof.onCourse ?? false) && <span style={{ color: '#f59e0b' }}> · курс: MRV +15-30%</span>}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {MUSCLES.filter(m => peakByMuscle[m] > 0).map(m => {
-                const cur = peakByMuscle[m] || 0;
-                const lm = getVolumeLandmarks(program.meta.level, m);
-                if (!lm) return null;
-                const labMrv = labAdjust.mrvMultiplier < 1 ? Math.round(lm.mrv * labAdjust.mrvMultiplier) : lm.mrv;
-                const pctMrv = labMrv > 0 ? Math.round((cur / labMrv) * 100) : 0;
-                const barColor = pctMrv > 100 ? '#ef4444' : pctMrv >= 80 ? '#f59e0b' : '#22c55e';
-                return (
-                  <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
-                    <span style={{ fontSize: 11, color: DIM_STRONG, flex: '0 0 80px' }}>{GROUP_RU[m] ?? m}</span>
-                    <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                      <div style={{ width: `${Math.min(100, pctMrv)}%`, height: '100%', background: barColor, borderRadius: 4, transition: 'width 0.3s' }} />
-                    </div>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: barColor, minWidth: 60, textAlign: 'right' }}>{cur} / {labMrv}с</span>
-                    <span style={{ fontSize: 11, color: DIM, minWidth: 36, textAlign: 'right' }}>{pctMrv}%</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
+      <DiagnosticPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
+      <VolumeLandmarksPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
+      <PhaseLegend weeks={program.meta.weeks} goal={program.meta.goal} level={program.meta.level} />
+      <ExerciseInfo program={program} dir={dir} />
+      <RecommendationsPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
+      <ProgressionCoach program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} onCourse={tprofile.onCourse ?? false} courseIntensity={tprofile.courseIntensity ?? 'moderate'} />
+      <SplitConsultant program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
 
-      {/* P8.2 — Weak Point Panel: рекомендованные упражнения с кнопкой «+ Добавить» */}
-      {(() => {
-        const prof = loadTrainingProfile();
-        const wp = (prof.weakPoints ?? []) as string[];
-        if (wp.length === 0 || !program.bb) return null;
-        const wpWithRecs = wp.map(m => {
-          const recs = suggestExercisesForGroup(m, program.meta.level, 3, (prof.equipment ?? []) as string[], wp, [], prof.avoidAxialLoad ?? false, (prof.favoriteExercises ?? []) as string[], (prof.excludedExercises ?? []) as string[]);
-          return { muscle: m, recs };
-        }).filter(x => x.recs.length > 0);
-        if (wpWithRecs.length === 0) return null;
-        const addToWeek = (muscle: string, exName: string) => {
-          if (!program.bb?.weeks[0]?.sessions[0]) return;
-          const newBlock: UserBlock = {
-            id: newId('blk'), type: 'accessory' as const, exerciseName: exName, muscle,
-            role: 'accessory' as const,
-            sets: [{ reps: 12, rir: 2, weight: 0, restSec: 90 }],
-          };
-          const updated = { ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((w, wi) => wi === 0 ? { ...w, sessions: w.sessions.map((s, si) => si === 0 ? { ...s, blocks: [...s.blocks, newBlock] } : s) } : w) } };
-          onChange(updated);
-          showToast(`✅ Добавлено: ${exName} (${(GROUP_RU[muscle] ?? muscle)})`);
-        };
-        return (
-          <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #a78bfa' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', marginBottom: 6 }}>🎯 Слабые группы — рекомендованные упражнения</div>
-            {wpWithRecs.map(({ muscle, recs }) => (
-              <div key={muscle} style={{ padding: 4, marginBottom: 4 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', marginBottom: 4 }}>{GROUP_RU[muscle] ?? muscle}:</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                  {recs.map((r, ri) => (
-                    <button
-                      key={ri}
-                      onClick={() => addToWeek(muscle, r.name)}
-                      title={`Добавить ${r.name} в сессию 1 недели 1`}
-                      style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700, minHeight: 38 }}
-                    >
-                      + {r.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-      })()}
-
-      {/* P8.3 — Phase Legend Panel: фазовая таблица */}
-      {program.meta.weeks >= 4 && (() => {
-        const phases = distributePhases(program.meta.weeks, 0, program.meta.goal === 'powerlifting' ? 'strength' : program.meta.goal === 'cut' ? 'endurance' : 'bulk');
-        if (!phases || phases.length === 0) return null;
-        return (
-          <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #60a5fa' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>📈 Фазовая легенда ({program.meta.weeks} нед)</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {phases.map((p, i) => {
-                const pColor = { accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' }[p.phase] ?? '#fff';
-                const label = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' }[p.phase] ?? p.phase;
-                return (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: 10, background: pColor, flexShrink: 0 }} />
-                    <span style={{ fontSize: 10, color: DIM_STRONG, flex: '0 0 100px' }}>{label}</span>
-                    <span style={{ fontSize: 10, color: DIM }}>нед {p.startWeek}–{p.endWeek}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: pColor, marginLeft: 'auto' }}>{p.endWeek - p.startWeek + 1} нед</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* P8.4 — Exercise Info Panel: показывает био-данные упражнения из EXERCISE_CATALOG */}
-      {(() => {
-        let selectedEx: Exercise | undefined;
-        if (dir === 'bb' && program.bb) {
-          for (const w of program.bb.weeks) {
-            for (const s of w.sessions) {
-              for (const b of s.blocks) {
-                if (b.exerciseName) {
-                  const found = EXERCISE_CATALOG.find((ex: Exercise) => ex.name === b.exerciseName);
-                  if (found) { selectedEx = found; break; }
-                }
-              }
-              if (selectedEx) break;
-            }
-            if (selectedEx) break;
-          }
-        }
-        if (!selectedEx) return null;
-        const ex = selectedEx;
-        const exAny = ex as any;
-        return (
-          <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #06b6d4' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#06b6d4', marginBottom: 4 }}>🔬 Инфо упражнения: {ex.name}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 4 }}>
-              {ex.group && <div style={{ fontSize: 10, color: DIM }}>Группа: <b style={{ color: DIM_STRONG }}>{GROUP_RU[ex.group] ?? ex.group}</b></div>}
-              {ex.type && <div style={{ fontSize: 10, color: DIM }}>Тип: <b style={{ color: DIM_STRONG }}>{ex.type}</b></div>}
-              {ex.equipment && <div style={{ fontSize: 10, color: DIM }}>Инвентарь: <b style={{ color: DIM_STRONG }}>{typeof ex.equipment === 'string' ? ex.equipment : (ex.equipment as string[]).join(', ')}</b></div>}
-              {exAny.forceVector && <div style={{ fontSize: 10, color: DIM }}>Вектор: <b style={{ color: DIM_STRONG }}>{exAny.forceVector}</b></div>}
-              {exAny.primaryMuscles && <div style={{ fontSize: 10, color: DIM }}>Основные мышцы: <b style={{ color: DIM_STRONG }}>{Array.isArray(exAny.primaryMuscles) ? (exAny.primaryMuscles as string[]).join(', ') : exAny.primaryMuscles}</b></div>}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* P5.1 — Week schedule grid Пн..Вс с фокусом мышц по дням. */}
       {((dir === 'bb' && program.bb?.weeks?.[0]?.sessions) || (dir === 'pl' && program.pl?.schedule)) && (() => {
         const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
         const groupColors: Record<string, string> = {
@@ -1210,55 +1054,42 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                       </>
                     ) : (
                       <div style={{ fontSize: 10, color: DIM, marginTop: 12, fontStyle: 'italic' }}>отдых</div>
-                    )}
+            )}
+            {editorLibOpen === 'methods' && (() => {
+              const allM = getTrainingMethods();
+              const cats = [...new Set(allM.map(m => m.category))];
+              const [mc, setMc] = React.useState('all');
+              const [ms, setMs] = React.useState('');
+              const f2 = allM.filter(m => (mc === 'all' || m.category === mc) && (!ms || m.name.toLowerCase().includes(ms.toLowerCase()))).slice(0, 30);
+              return (
+                <div>
+                  <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+                    <input style={{ ...IN, flex: 1, padding: '6px 10px', fontSize: 11, minHeight: 38 }} value={ms} onChange={e => setMs(e.target.value)} placeholder="🔍 Поиск методик..." />
+                    <select style={{ ...IN, fontSize: 11, minHeight: 38 }} value={mc} onChange={e => setMc(e.target.value)}>{cats.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '55vh', overflow: 'auto' }}>
+                    {f2.map((m, i) => (
+                      <div key={i} style={{ padding: 10, borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.12)', fontSize: 11 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <span style={{ fontWeight: 800, color: DIM_STRONG }}>{m.name}</span>
+                          <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: m.evidenceLevel === 'A' ? 'rgba(34,197,94,0.15)' : m.evidenceLevel === 'B' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)', color: m.evidenceLevel === 'A' ? '#22c55e' : m.evidenceLevel === 'B' ? '#f59e0b' : '#ef4444' }}>{m.evidenceLevel}</span>
+                          <span style={{ fontSize: 9, color: DIM }}>{m.category}</span>
+                        </div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>{m.description}</div>
+                        <div style={{ fontSize: 10, color: DIM }}>{m.howItWorks}</div>
+                        {m.example && <div style={{ fontSize: 9, color: DIM, marginTop: 2 }}>📋 {m.example}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
                   </div>
                 );
               })}
             </div>
             <div style={{ fontSize: 10, color: DIM, marginTop: 6, fontStyle: 'italic' }}>
               Шаблон недели повторяется для всех мезоциклов. Делод-недели должны быть явно отмечены флагом «deload» в структуре.
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* P5.4 — SMART-рекомендации (распознаёт gap в weakPoints из профиля, показывает какие мышцы нуждаются в дозаполнении и какие упражнения рекомендованы для этого). */}
-      {(() => {
-        const prof = loadTrainingProfile();
-        const wp = (prof.weakPoints ?? []) as string[];
-        if (wp.length === 0) return null;
-        const liveQ = dir === 'bb' && program.bb ? computePlanQualityFor(program, program.meta.level) : null;
-        if (!liveQ) return null;
-        const gaps = liveQ.perMuscle.filter((m) => wp.includes(m.muscle) && (m.status === 'low' || m.status === 'high' || (m.mev > 0 && m.sets < m.mev)));
-        if (gaps.length === 0) return null;
-        return (
-          <div style={{ padding: '10px 12px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(167,139,250,0.08), rgba(245,158,11,0.08))', borderLeft: '3px solid #a78bfa' }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 13 }}>💡</span>
-              <span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>SMART-рекомендации</span>
-              <span style={{ fontSize: 9, color: DIM, fontWeight: 500 }}>weakPoints: {wp.map((m) => GROUP_RU[m] ?? m).join(', ')}</span>
-            </div>
-            {gaps.slice(0, 4).map((g, gi) => {
-              const recs = suggestExercisesForGroup(g.muscle, program.meta.level, 2, (prof.equipment ?? []) as string[], (prof.weakPoints ?? []) as string[], [], prof.avoidAxialLoad ?? false, (prof.favoriteExercises ?? []) as string[], (prof.excludedExercises ?? []) as string[]);
-              const has = recs.length > 0;
-              const statusColor = g.status === 'over' ? '#ef4444' : g.status === 'high' ? '#f59e0b' : '#60a5fa';
-              return (
-                <div key={gi} style={{ padding: 6, marginBottom: 4, background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
-                  <div style={{ fontSize: 10, color: statusColor, fontWeight: 700 }}>
-                    {GROUP_RU[g.muscle] ?? g.muscle}: {g.sets} сетов/мезо (MEV {g.mev} / MAV {g.mav} / MRV {g.mrv})
-                  </div>
-                  {has ? (
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 4 }}>
-                      ➕ Добавьте: <b>{recs.map((r) => r.name).join(' · ')}</b>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Нет рекомендаций при доступном оборудовании.</div>
-                  )}
-                </div>
-              );
-            })}
-            <div style={{ fontSize: 9, color: DIM, fontStyle: 'italic', marginTop: 4 }}>
-              Используйте кнопку «+ Упражнение» в нужной сессии или «⚡ Авто-черновик» для быстрой сборки.
             </div>
           </div>
         );
@@ -1568,7 +1399,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
           <div style={{ background: '#18181b', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', maxWidth: 700, width: '100%', maxHeight: '85vh', overflow: 'auto', padding: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>📚 {editorLibOpen === 'bb' ? 'Библиотека программ' : 'Проф. ПЛ-циклы'}</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>📚 {editorLibOpen === 'bb' ? 'Библиотека программ' : editorLibOpen === 'pl' ? 'Проф. ПЛ-циклы' : 'Справочник методик'}</span>
               <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38 }} onClick={() => setEditorLibOpen(null)}>✕ Закрыть</button>
             </div>
             {editorLibOpen === 'bb' && (

@@ -6,7 +6,7 @@
  * генерируются прогрессией PM (lms-progression.engine). Поле week1 — шаблон-раскладка.
  */
 
-export type SRDirection = 'powerlifting' | 'bench' | 'deadlift_bench' | 'armwrestling' | 'bodybuilding' | 'weightlifting';
+export type SRDirection = 'powerlifting' | 'bench' | 'deadlift_bench' | 'squat_bench' | 'deadlift_squat' | 'armwrestling' | 'bodybuilding' | 'weightlifting' | 'peaking_pl' | 'peaking_bench' | 'peaking_deadlift' | 'competition' | 'hypertrophy' | 'peaking_bb' | 'cutting' | 'contest_prep';
 export type SRLevel = 'novice' | 'II-KMS' | 'KMS-MS' | 'MS-MSMK' | 'II-MS' | 'KMS-MSMK' | 'intermediate';
 export type SRPeriod = 'strength' | 'endurance' | 'peak' | 'mass' | 'mixed';
 

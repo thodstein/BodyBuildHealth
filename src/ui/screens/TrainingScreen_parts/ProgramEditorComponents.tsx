@@ -28,6 +28,8 @@ import { ExerciseLabPicker } from './ExerciseLabPicker';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { diagnoseWeakPoint, WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
+import { tempoFor, TEMPO_BY_CHARACTER, REST_BY_CHARACTER, tutForSet } from '../../../engines/bb/bb-tempo-rest';
+import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
 
 /* ─── ББ-редактор: недели → сессии → блоки ─── */
 
@@ -128,13 +130,40 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
       {body.weeks.map((w, wi) => (
         <div key={wi} style={{ ...CARD, padding: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: DIM_STRONG }}>Неделя {w.week}</span>
+            {(() => {
+              const pc = { accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' }[w.phase];
+              const prog = wi > 0 ? Math.round(((1.025 ** wi) - 1) * 100) : 0;
+              const totalSets = w.sessions.reduce((s, ses) => s + ses.blocks.reduce((b, blk) => b + blk.sets.length, 0), 0);
+              return (
+                <>
+                  <div style={{ width: 4, height: 24, borderRadius: 2, background: pc, flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, fontWeight: 800, color: DIM_STRONG }}>Неделя {w.week}</span>
+                  {prog > 0 && <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 700 }}>+{prog}%</span>}
+                  <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>{totalSets} сетов</span>
+                </>
+              );
+            })()}
             <select style={{ ...IN, padding: '4px 6px', fontSize: 11, flex: '0 0 auto', minHeight: 38 }} value={w.phase} onChange={e => updateWeek(wi, { phase: e.target.value as UserWeek['phase'] })}>
               <option value="accumulation">Накопление</option>
               <option value="intensification">Интенсификация</option>
               <option value="deload">Разгрузка</option>
               <option value="peaking">Пик</option>
             </select>
+            {/* P0-2: RIR-навигатор — целевой RIR фазы vs фактический в плане */}
+            {(() => {
+              const phaseRir: Record<string, string> = { accumulation: '3→1', intensification: '2→0', deload: '4', peaking: '1→0' };
+              const avgRir = w.sessions.reduce((s, ses) => s + ses.blocks.reduce((b, blk) => b + blk.sets.reduce((st, set) => st + (set.rir ?? 2), 0), 0), 0);
+              const totalSets = w.sessions.reduce((s, ses) => s + ses.blocks.reduce((b, blk) => b + blk.sets.length, 0), 0);
+              const actual = totalSets > 0 ? Math.round((avgRir / totalSets) * 10) / 10 : null;
+              const targetLo = { accumulation: 3, intensification: 2, deload: 4, peaking: 1 }[w.phase] ?? 2;
+              const ok = actual !== null && actual >= targetLo - 1 && actual <= targetLo + 1;
+              return (
+                <span style={{ fontSize: 10, color: ok ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>
+                  🎯 RIR {phaseRir[w.phase] ?? '—'}
+                  {actual !== null && <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 400 }}> · факт {actual}</span>}
+                </span>
+              );
+            })()}
             <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}>
               <input type="checkbox" checked={w.deload} onChange={e => updateWeek(wi, { deload: e.target.checked })} /> deload
             </label>
@@ -161,6 +190,50 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           <SessionList sessions={w.sessions} onChange={(sessions) => updateWeek(wi, { sessions })} />
         </div>
       ))}
+      {/* P0-1: Ротация — упражнения старше 4 недель */}
+      {body.weeks.length >= 4 && (() => {
+        const exAge: Record<string, { weeks: number; muscle: string }> = {};
+        for (const w of body.weeks) {
+          for (const s of w.sessions) {
+            for (const b of s.blocks) {
+              if (!b.exerciseName) continue;
+              const key = b.exerciseName;
+              if (!exAge[key]) exAge[key] = { weeks: 0, muscle: b.muscle };
+              exAge[key].weeks++;
+            }
+          }
+        }
+        const stale = Object.entries(exAge).filter(([, v]) => v.weeks >= 4).slice(0, 5);
+        if (stale.length === 0) return null;
+        return (
+          <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #f59e0b' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 6 }}>🔄 Ротация — упражнения старше 4 недель</div>
+            {stale.map(([name, { weeks: age, muscle }]) => {
+              const subs = findSubstitutions(name, muscle, new Set()).slice(0, 2);
+              return (
+                <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', fontSize: 10, flexWrap: 'wrap' }}>
+                  <span style={{ color: DIM_STRONG, fontWeight: 700 }}>{name}</span>
+                  <span style={{ color: '#f59e0b', fontSize: 9 }}>{age} нед</span>
+                  {subs.length > 0 ? subs.map((sub, si) => (
+                    <button key={si}
+                      onClick={() => {
+                        const newWeeks = body.weeks.map(w => ({
+                          ...w, sessions: w.sessions.map(s => ({
+                            ...s, blocks: s.blocks.map(b => b.exerciseName === name ? { ...b, exerciseName: sub.exercise.name, muscle: sub.exercise.group || b.muscle } : b)
+                          }))
+                        }));
+                        setWeeks(newWeeks);
+                      }}
+                      title={sub.reason + ' · confidence: ' + sub.confidence}
+                      style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontWeight: 700, minHeight: 30 }}
+                    >→ {sub.exercise.name}</button>
+                  )) : <span style={{ color: DIM, fontSize: 9 }}>нет замен</span>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
       <button style={{ ...BTN_GHOST, padding: '8px 14px', minHeight: 38 }} onClick={addWeek}>+ Добавить неделю</button>
     </div>
   );
@@ -369,6 +442,55 @@ const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => v
           <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} muscle={b.muscle} workMax={(loadTrainingProfile().workMax ?? {}) as Record<string, number>} />
           </div>
           
+          {/* Авто-разминка для compound с заданным весом */}
+          {b.type === 'compound' && b.sets[0]?.weight && b.sets[0].weight > 0 && (() => {
+            const w = b.sets[0].weight;
+            const warmup = [
+              { pct: 0.5, reps: 8, label: 'разминка' },
+              { pct: 0.7, reps: 5, label: 'подход' },
+              { pct: 0.85, reps: 3, label: 'подход' },
+            ];
+            return (
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '4px 0', borderTop: '1px dashed rgba(255,255,255,0.06)' }}>
+                <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700 }}>🔥 Разминка:</span>
+                {warmup.map((wu, i) => (
+                  <span key={i} style={{ fontSize: 10, color: DIM }}>
+                    {Math.round(w * wu.pct / 2.5) * 2.5}кг×{wu.reps}
+                    {i < warmup.length - 1 ? ' → ' : ''}
+                  </span>
+                ))}
+                <button
+                  style={{ marginLeft: 4, fontSize: 9, color: DIM, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                  onClick={() => {
+                    const warmupSets = warmup.map(wu => ({ load: Math.round(w * wu.pct / 2.5) * 2.5, reps: wu.reps }));
+                    updateBlock(bi, { warmupSets });
+                  }}
+                >сохранить</button>
+              </div>
+            );
+          })()}
+          
+          {/* P0-3: Гид по темпу и отдыху */}
+          {b.type === 'compound' || b.type === 'accessory' ? (() => {
+            const ch = b.character || (b.type === 'compound' ? 'тяж' : 'памп');
+            const spec = tempoFor(ch as 'тяж' | 'памп' | 'лёг');
+            const rest = REST_BY_CHARACTER[ch as 'тяж' | 'памп' | 'лёг'] ?? 90;
+            const reps = typeof b.sets[0]?.reps === 'number' ? b.sets[0].reps as number : 10;
+            const tut = spec.tutPerRep * reps;
+            return (
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0', borderTop: '1px dashed rgba(255,255,255,0.05)' }}>
+                <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 700 }}>⏱ Рекомендация:</span>
+                <span style={{ fontSize: 10, color: DIM }}>темп <b style={{ color: DIM_STRONG }}>{spec.notation}</b></span>
+                <span style={{ fontSize: 10, color: DIM }}>· отдых <b style={{ color: DIM_STRONG }}>{rest}s</b></span>
+                <span style={{ fontSize: 10, color: DIM }}>· TUT <b style={{ color: DIM_STRONG }}>~{tut}s</b></span>
+                <button
+                  style={{ fontSize: 9, color: DIM, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                  onClick={() => updateBlock(bi, { sets: b.sets.map(st => ({ ...st, tempo: spec.notation, restSec: rest })), tempoSpec: spec.notation })}
+                >применить</button>
+              </div>
+            );
+          })() : null}
+          
           {/* Ряд 2: комментарий + кнопки управления */}
           <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
           <input 
@@ -434,7 +556,6 @@ const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => v
         </div>
       ))}
       <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38, alignSelf: 'flex-start' }} onClick={addBlock}>+ Упражнение</button>
-      <datalist id="muscle-list">{Object.entries(GROUP_RU).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</datalist>
     </div>
   );
 };
@@ -842,6 +963,34 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
       <div style={{ display: 'flex', gap: 6 }}>
         <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38 }} onClick={addWeek}>+ Добавить неделю</button>
       </div>
+
+      {/* PL ротация — упражнения старше 4 недель */}
+      {(body.customWeeks?.length ?? 0) >= 4 && (() => {
+        const exAge: Record<string, { weeks: number }> = {};
+        for (const w of body.customWeeks ?? []) {
+          for (const d of w.days) {
+            for (const e of d.exercises) {
+              if (!e.name) continue;
+              if (!exAge[e.name]) exAge[e.name] = { weeks: 0 };
+              exAge[e.name].weeks++;
+            }
+          }
+        }
+        const stale = Object.entries(exAge).filter(([, v]) => v.weeks >= 4).slice(0, 5);
+        if (stale.length === 0) return null;
+        return (
+          <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #f59e0b' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 6 }}>🔄 Ротация ПЛ — устаревшие упражнения</div>
+            {stale.map(([name, { weeks: age }]) => (
+              <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', fontSize: 10, flexWrap: 'wrap' }}>
+                <span style={{ color: DIM_STRONG, fontWeight: 700 }}>{name}</span>
+                <span style={{ color: '#f59e0b', fontSize: 9 }}>{age} нед</span>
+                <span style={{ color: DIM, fontSize: 9 }}>— замените вручную через 🔬 лабораторию упражнений</span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Оверлей для custom: заметки + слабые группы + расписание */}
       <div style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>

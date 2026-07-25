@@ -737,6 +737,22 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
       }
     } catch {}
   }, []);
+  // Live-приём стеков из BioStack через CustomEvent (работает даже когда SupportScreen уже смонтирован)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      try {
+        const detail = (e as CustomEvent).detail;
+        if (detail?.stackIds && Array.isArray(detail.stackIds) && detail.stackIds.length > 0) {
+          setExternalSubs(prev => [...new Set([...prev, ...detail.stackIds])]);
+          // Переключаем на вкладку калькулятора чтобы пользователь видел результат
+          setGenTab('calculator');
+          showToast(`BioStack: +${detail.stackIds.length} веществ добавлено в план`, 'success');
+        }
+      } catch {}
+    };
+    window.addEventListener('he_biostack_to_plan', handler);
+    return () => window.removeEventListener('he_biostack_to_plan', handler);
+  }, []);
   useEffect(() => {
     const SOURCE_RU: Record<string, string> = { mix: 'Миксы', nutrition: 'Питание', biostack: 'BioStack' };
     const consume = () => {

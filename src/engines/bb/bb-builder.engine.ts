@@ -314,13 +314,19 @@ function strengthRank(ex: any): number {
  * Эти упражнения не дают механического натяжения/метаболического стресса для роста мышц.
  * Разрешены: скручивания (crunch), подъём ног, гиперэкстензия (ягодицы/разгибатели спины).
  */
-const BB_JUNK_PATTERNS: RegExp = /паллоф|pallof|bird.?dog|птиц.*собак|monster.?walk|резин.*ходьб|band.?walk|планк|plank|copenhagen|копенгаген|spiderman|человек.?паук|plank.?jack|планк.*прыжк|walkout|шагающ.*планк|супермен|superman|gator.?walk|аллигатор|inchworm|гусениц|dead.?bug|мёртв.*жук|мертв.*жук/;
+const BB_JUNK_PATTERNS: RegExp = /паллоф|pallof|bird.?dog|птиц.*собак|monster.?walk|резин|banded|band.?walk|планк|plank|copenhagen|копенгаген|spiderman|человек.?паук|plank.?jack|планк.*прыжк|walkout|шагающ.*планк|супермен|superman|gator.?walk|аллигатор|inchworm|гусениц|dead.?bug|мёртв.*жук|мертв.*жук|медбол|med.?ball|medicine.?ball|бросок.*мяч|рубк.*дров|рубк.*дерев|wood.?chop|ротацион|rotational|bradford|брэдфорд|наклон.*сидя.*штанг|seated.*good.?morning|отжиман|push.?up|русск.*твист|russian.*twist|тяга.*за голов|pulldown.*behind|pike.*отжим|pike.*push|индийск|hindu.*push/;
 
 /** Проверить, является ли упражнение BB-мусором (не для гипертрофии). */
 function isBBJunk(ex: any): boolean {
   const n = (ex.name || '').toLowerCase();
   const id = (ex.id || '').toLowerCase();
-  if (BB_JUNK_PATTERNS.test(n) || BB_JUNK_PATTERNS.test(id)) return true;
+  if (BB_JUNK_PATTERNS.test(n) || BB_JUNK_PATTERNS.test(id)) {
+    // Исключения: брусья/dips — это ББ-упражнения, не отжимания
+    if (/брус|dip/.test(n) && !/отжим.*от пол|narrow|алмаз/i.test(n)) return false;
+    // Обратные отжимания от скамьи = bench dips (трицепс) — ок для ББ
+    if (/обратн.*отжим|bench.*dip/i.test(n)) return false;
+    return true;
+  }
   // Изометрические планки/уголки — не для гипертрофии (но подъём ног в висе — OK для abs)
   if (/планк|plank|уголок|l[\s_-]?sit|hollow.?hold|лодочк|boat/.test(n) && !/подъём ног|leg.?raise|скручиван|crunch|пресс.*маши|паук/.test(n)) return true;
   return false;
@@ -1366,17 +1372,11 @@ function buildSession(
   const _ordered = orderSessionExercises(exercises, { sessionTag: sched.sessionTag, methodology });
   exercises.length = 0; exercises.push(..._ordered);
 
-  // Кап упражнений в сессии: 8 натурал, 12 на PED (без второго капа — feeders/финишеры сверху).
+  // Кап упражнений в сессии: просто берём первые exCap из уже отсортированного массива.
+  // Сортировка выше уже гарантирует: primary → accessory, мышца дня → остальные.
   const exCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 12 : 8;
   if (exercises.length > exCap) {
-    const kept = exercises.filter(e => e.role === 'primary').slice(0, 5);
-    const acc = exercises.filter(e => e.role === 'accessory');
-    const maxAcc = Math.max(0, exCap - kept.length);
-    // Гарантировать arms accessory (triceps/biceps) — не обрезать их первыми
-    const armAcc = acc.filter(e => ['triceps', 'biceps', 'forearms'].includes(e.muscle));
-    const otherAcc = acc.filter(e => !['triceps', 'biceps', 'forearms'].includes(e.muscle));
-    exercises.length = 0;
-    exercises.push(...kept, ...armAcc.slice(0, Math.max(1, Math.floor(maxAcc / 2))), ...otherAcc.slice(0, Math.max(0, maxAcc - Math.max(1, Math.floor(maxAcc / 2)))));
+    exercises.length = exCap;
   }
 
   // ▓▓ A1: Pump-finisher слабых групп (структурная добивка метаболическим стрессом) ▓▓
@@ -1505,10 +1505,9 @@ function buildSession(
   }
 
   // Добавляем растяжку в конец сессии (динамическая растяжка для основных групп мышц)
-  const stretchExs = addStretching(musclePlans);
-  if (stretchExs.length > 0) {
-    exercises.push(...stretchExs);
-  }
+  // Stretching removed: не ББ-гипертрофия, занимает слоты в плане
+  // const stretchExs = addStretching(musclePlans);
+  // if (stretchExs.length > 0) { exercises.push(...stretchExs); }
 
   return { day: dayInRotation, weekOffset: 0, character, sessionTag: sched.sessionTag, exercises };
 }
@@ -1765,6 +1764,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           if (raw !== wm && mg !== wm) return false;
           if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
           if (isBBJunk(e)) return false;
+          // Equipment filter (same as main pool)
+          if (eqList.length > 0) {
+            const rawEq = e.equipment;
+            const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
+            if (exEq.length > 0 && !exEq.some(eq => eqList.includes(eq))) return false;
+          }
           // Rear delt НЕ в Push/Chest-днях (только в Pull/Back)
           if (isPushDayTag(s.sessionTag || '') && isRearDeltExercise(e.name)) return false;
           return true;
@@ -1820,6 +1825,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           if (raw !== pm && mg !== pm) return false;
           if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
           if (isBBJunk(e)) return false;
+          if (eqList.length > 0) {
+            const rawEq = e.equipment;
+            const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
+            if (exEq.length > 0 && !exEq.some(eq => eqList.includes(eq))) return false;
+          }
           // Rear delt НЕ в Push/Chest-днях (только в Pull/Back)
           if (isPushDayTag(s.sessionTag || '') && isRearDeltExercise(e.name)) return false;
           return true;
@@ -1862,6 +1872,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         addedFeeders.add(pm);
         addedFeeders.add(pName);
       }
+      // Re-sort after feeders/pump-finishers to restore muscle grouping
+      const reordered = orderSessionExercises(sess.exercises, { sessionTag: s.sessionTag, methodology: input.methodology as any });
+      sess.exercises.length = 0; sess.exercises.push(...reordered);
       weekSessions.push(sess);
     }
     // fix D: капаем недельный объём каждой мышцы по её истинному MRV
@@ -1949,6 +1962,13 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   finalPlan = weakPoints.length > 0
     ? compensateCrossDayWeakPoints(finalPlan, weakPoints, level, workMax, eqList, pedMrvMult)
     : finalPlan;
+  // Final re-sort: compensateCrossDayWeakPoints may have added feeders that break grouping
+  for (const w of finalPlan.weeks) {
+    for (const s of w.sessions) {
+      const reordered = orderSessionExercises(s.exercises, { sessionTag: s.sessionTag || '' });
+      s.exercises.length = 0; s.exercises.push(...reordered);
+    }
+  }
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, pedMrvMult);
   // muscleFrequency: muscleSessionCount содержит число сессий на мышцу за ротацию (= неделя для 7-дн паттернов)
   const muscleFrequency: Record<string, number> = {};
@@ -2053,6 +2073,7 @@ function compensateCrossDayWeakPoints(
       const mg = collapseKey(trueMuscleOf(e) || raw);
       if (raw !== wp && mg !== wp) return false;
       if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
+      if (isBBJunk(e)) return false;
       if (isInappropriateBB(e)) return false;
       if (equipment?.length && e.equipment && !equipment.includes(e.equipment)) return false;
       if (isRearDeltExercise(e.name) && (bestSlot.session.sessionTag || '').toLowerCase().includes('push')) return false;

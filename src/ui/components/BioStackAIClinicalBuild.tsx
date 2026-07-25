@@ -295,7 +295,7 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
     arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id];
 
   // Шаг 1: Органы (группировка: ТЗ-системы + Дополнительно)
-  const organChildren = (
+  const organChildren = useMemo(() => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div>
         <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 6, textTransform: 'uppercase' }}>Системы ТЗ (6)</div>
@@ -316,7 +316,7 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
         />
       </div>
     </div>
-  );
+  ), [filterOrgans]);
 
   // Шаг 2: Механизмы (группировка по органам, фильтрация по выбранным органам)
   const mechGroups = useMemo(() => {
@@ -350,7 +350,7 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
     return groups;
   }, [mechGroups]);
 
-  const mechChildren = (
+  const mechChildren = useMemo(() => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {Object.entries(mechGroupsByOrgan).map(([organ, mechs]) => (
         <div key={organ} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -364,7 +364,7 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
         </div>
       ))}
     </div>
-  );
+  ), [filterMechanisms, mechGroupsByOrgan]);
 
   // Шаг 3: Маркеры (фильтрация по выбранным органам)
   const availableMarkers = useMemo(() => {
@@ -401,7 +401,7 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
     return groups;
   }, [availableMarkers]);
 
-  const markerChildren = (
+  const markerChildren = useMemo(() => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {Object.entries(markerGroups).map(([organ, markers]) => (
         <div key={organ} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -415,10 +415,10 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
         </div>
       ))}
     </div>
-  );
+  ), [filterMarkers, markerGroups]);
 
   // Параметры сборки (грейд, стратегия, макс. кол-во)
-  const paramChildren = (
+  const paramChildren = useMemo(() => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Грейд */}
       <div>
@@ -550,8 +550,8 @@ export const BioStackAIClinicalBuild: React.FC<Props> = ({
            </button>
          </div>
        </div>
-     </div>
-   );
+    </div>
+  ), [grade, strategy, maxStackSize, useCourse, useLabs, useProfile, filterMode]);
 
 const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
    
@@ -605,6 +605,8 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
       localStorage.setItem('he_biostack_gate_cache', JSON.stringify(result.gate));
     }
     setStackIds(ids);
+    // Оповещаем SupportScreen о новом стеке — он сам прочитает localStorage и переключится
+    window.dispatchEvent(new CustomEvent('he_biostack_to_plan', { detail: { stackIds: ids } }));
     showToast(`Клинический стек (${ids.length}) отправлен в план поддержки`, 'success');
   };
 
@@ -638,6 +640,28 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
 
       {/* ── Карточки фильтров (вместо wizard'а) ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+        {/* ── Пресеты: быстрые фильтры ── */}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {([
+            { label: '🛡️ Курс ААС', organs: ['cardio','hepatic','renal','cns','reproductive','hematologic'], mechs: ['cv1','cv2','cv4','cv5','liv1','liv2','ren1','ren2','rep1','rep2','rep4','hem1','hem2'], markers: ['ALT','AST','GGT','LDL','HDL','Triglycerides','HCT','Creatinine','E2','PRL','TT','LH','FSH'] },
+            { label: '🔄 ПКТ', organs: ['reproductive','cardio','cns'], mechs: ['rep1','rep2','rep3','rep5','cv2','cns1','cns4'], markers: ['TT','FT','LH','FSH','E2','PRL','CORTISOL'] },
+            { label: '🌉 Мост', organs: ['cardio','hepatic','cns'], mechs: ['cv1','cv2','cv5','liv1','cns1','cns4'], markers: ['ALT','AST','LDL','HDL','CORTISOL','HCT'] },
+            { label: '🩸 База', organs: ['cardio','hematologic'], mechs: ['cv2','cv4','hem1','hem2'], markers: ['LDL','HDL','Triglycerides','HCT','GLU','CRP','VITD'] },
+            { label: '✕ Сброс', organs: [], mechs: [], markers: [] },
+          ] as Array<{ label: string; organs: string[]; mechs: string[]; markers: string[] }>).map(p => (
+            <button key={p.label} onClick={() => {
+              setFilterOrgans(p.organs);
+              setFilterMechanisms(p.mechs);
+              setFilterMarkers(p.markers);
+            }} style={{
+              padding: '6px 10px', borderRadius: 10, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+              background: p.label === '✕ Сброс' ? 'transparent' : 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: p.label === '✕ Сброс' ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.8)',
+            }}>{p.label}</button>
+          ))}
+        </div>
 
         {/* 🫀 Органы */}
         <div onClick={() => setStep(1)} style={{
@@ -794,6 +818,7 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
           РЕЗУЛЬТАТ: СНАЧАЛА состав + механизмы + синергии + описание
           ════════════════════════════════════════════════════════════════ */}
       {result && (
+        useMemo(() => (
         <>
           {/* Предупреждение: стек ориентировочный */}
           {result.isOrientational && (
@@ -830,39 +855,39 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
           {/* Синергии в стеке */}
           {result.stackSynergies.length > 0 && (
             <GlassCard title={`🔗 Синергии в стеке (${result.stackSynergies.length})`} icon="⚡" color="#c084fc" style={{ marginTop: 8 }}>
-              {result.stackSynergies.map((syn, i) => (
+              {result.stackSynergies.map((syn, i) => {
+                const nameA = syn.ids[0] || '';
+                const nameB = syn.ids[1] || '';
+                return (
                 <div key={i} style={{
-                  padding: '10px 12px', marginBottom: 8, borderRadius: 12,
+                  padding: '12px 14px', marginBottom: 8, borderRadius: 12,
                   background: 'rgba(192,132,252,0.04)', border: '1px solid rgba(192,132,252,0.1)',
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: '#fff' }}>
-                      {syn.ids.join(' + ')}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: '#fff', lineHeight: 1.3 }}>
+                        {syn.effect}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 2, fontWeight: 500 }}>
+                        {nameA} + {nameB}
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      {syn.domain && syn.domain !== 'general' && (
-                        <span style={{
-                          fontSize: 10, padding: '3px 8px', borderRadius: 6,
-                          background: 'rgba(148,163,184,0.12)', color: '#cbd5e1', fontWeight: 600,
-                        }}>{syn.domain}</span>
-                      )}
-                      <span style={{
-                        fontSize: 10, padding: '3px 8px', borderRadius: 6, fontWeight: 700,
-                        background: syn.strength === 'HIGH' ? 'rgba(239,68,68,0.15)' : syn.strength === 'MEDIUM' ? 'rgba(245,158,11,0.15)' : 'rgba(100,116,139,0.15)',
-                        color: syn.strength === 'HIGH' ? '#f87171' : syn.strength === 'MEDIUM' ? '#fbbf24' : '#94a3b8',
-                      }}>
-                        {syn.strength}
-                      </span>
-                    </div>
+                    <span style={{
+                      fontSize: 10, padding: '3px 8px', borderRadius: 6, fontWeight: 700, whiteSpace: 'nowrap',
+                      background: syn.strength === 'HIGH' ? 'rgba(34,197,94,0.15)' : syn.strength === 'MEDIUM' ? 'rgba(245,158,11,0.15)' : 'rgba(100,116,139,0.15)',
+                      color: syn.strength === 'HIGH' ? '#22c55e' : syn.strength === 'MEDIUM' ? '#fbbf24' : '#94a3b8',
+                    }}>
+                      {syn.strength === 'HIGH' ? 'Сильная' : syn.strength === 'MEDIUM' ? 'Средняя' : 'Слабая'}
+                    </span>
                   </div>
                   {syn.mechanism && (
-                    <div style={{ fontSize: 10, color: 'rgba(235,235,245,0.45)', marginTop: 3 }}>{syn.mechanism}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.7)', marginTop: 6, lineHeight: 1.4 }}>
+                      {syn.mechanism}
+                    </div>
                   )}
-                  <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.7)', marginTop: 4, lineHeight: 1.4 }}>
-                    {syn.description || syn.effect}
-                  </div>
                 </div>
-              ))}
+                );
+              })}
             </GlassCard>
           )}
 
@@ -1003,9 +1028,9 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
                           )}
                         </div>
                       )}
-                    </div>
-                  );
-                })}
+    </div>
+                )
+              })}
               </GlassCard>
             ));
           })()}
@@ -1077,6 +1102,7 @@ const courseWeek = linked?.pharma?.week ?? linked?.courseWeek ?? 1;
             ➕ Отправить в план поддержки ({result.substances.length})
           </button>
         </>
+      ), [result, replacements])
       )}
     </div>
   );

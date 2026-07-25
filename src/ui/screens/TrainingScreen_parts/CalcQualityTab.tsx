@@ -23,15 +23,16 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
   }, [propsProgram]);
 
   const analysis = useMemo(() => {
-    if (!program?.bb) return null;
+    if (!program?.bb && !program?.pl?.customWeeks) return null;
     const prof = loadTrainingProfile();
-    return computePlanQualityFor(program, program.meta.level || level, {
+    return computePlanQualityFor(program!, program!.meta.level || level, {
       onCourse: prof.onCourse ?? false,
       courseIntensity: prof.courseIntensity ?? 'moderate',
     });
   }, [program, level]);
 
-  if (!program?.bb) {
+  const hasData = !!(program?.bb || program?.pl?.customWeeks);
+  if (!hasData) {
     return (
       <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>🎯 Калькулятор качества программы</div>
@@ -65,7 +66,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
 
       <div style={{ padding: 12, borderRadius: 12, background: analysis.score >= 80 ? '#22c55e08' : analysis.score >= 50 ? '#f59e0b08' : '#ef444408', border: '1px solid ' + sc + '40', marginBottom: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 800, color: analysis.score >= 80 ? analysis.score >= 90 ? '#22c55e' : '#f59e0b' : '#ef4444' }}>Оценка качества {analysis.grade}</span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: sc }}>Оценка качества {analysis.grade}</span>
           <span style={{ fontSize: 22, fontWeight: 800, color: analysis.score >= 80 ? '#22c55e' : analysis.score >= 50 ? '#f59e0b' : '#ef4444' }}>{analysis.score}<span style={{ fontSize: 11, fontWeight: 600, opacity: 0.6 }}>/100</span></span>
         </div>
         <div style={{ height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 8 }}>

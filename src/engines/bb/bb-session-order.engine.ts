@@ -122,9 +122,9 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
 
 /**
  * Кортеж приоритета (лексикографический):
- *  [0] muscleGroup:     упражнения ОДНОЙ мышцы строго вместе (collapseMuscle → MUSCLE_ORDER)
- *  [1] tier:            0 = основное тяжёлое, 1 = compound, 2 = изоляция, 3 = финишь
- *  [2] primaryMuscleFlag: 0 = мышца дня, 1 = прочие
+ *  [0] isPrimaryFlag:  0 = мышца дня (primaryMuscle) — ВСЕГДА первая
+ *  [1] muscleGroup:     упражнения ОДНОЙ мышцы строго вместе (MUSCLE_ORDER)
+ *  [2] tier:            0 = основное тяжёлое, 1 = compound, 2 = изоляция, 3 = финишь
  *  [3] subOrder:         для compound — pressPosition; для изоляции — stretchRank; ПЛ-специфика +50
  *  [4] load:             тяжелее / меньше RIR — раньше
  */
@@ -153,9 +153,10 @@ function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string
   else if (compound) tier = 1;
   else tier = 2;
 
-  // muscleGroup: все упражнения ОДНОЙ мышцы строго вместе
+  // isPrimaryFlag: мышца дня ВСЕГДА первая (0), остальные после (1)
+  const isPrimaryFlag = isPrimaryMuscle ? 0 : 1;
+  // muscleGroup: внутри primary/не-primary — группировка по мышце
   const muscleGroup = MUSCLE_ORDER[exMuscle] ?? 12;
-  const primaryMuscleFlag = isPrimaryMuscle ? 0 : 1;
 
   let subOrder: number;
   if (tier === 2) subOrder = stretchRank(ex.name || '');
@@ -164,7 +165,7 @@ function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string
   if (plSpec) subOrder += 50;
 
   const load = loadRank(ex);
-  return [muscleGroup, tier, primaryMuscleFlag, subOrder, load];
+  return [isPrimaryFlag, muscleGroup, tier, subOrder, load];
 }
 
 function collapseMuscle(m: string): string {

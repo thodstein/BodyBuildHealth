@@ -40,7 +40,7 @@ export const VOLUME_LANDMARKS_DB: Record<TrainingLevel, Record<string, MuscleVol
     quads:      { mev: 6,  mav: 10, mrv: 15 },
     hamstrings: { mev: 4,  mav: 8,  mrv: 12 },
     shoulders:  { mev: 4,  mav: 8,  mrv: 12 },
-    delt_front: { mev: 0,  mav: 4,  mrv: 8  },
+    delt_front: { mev: 0,  mav: 4,  mrv: 8  }, // MEV=0: передняя дельта получает достаточно объёма от жимовых (bench/OHP)
     delt_mid:   { mev: 2,  mav: 6,  mrv: 10 },
     delt_rear:  { mev: 2,  mav: 6,  mrv: 10 },
     biceps:     { mev: 2,  mav: 6,  mrv: 10 },

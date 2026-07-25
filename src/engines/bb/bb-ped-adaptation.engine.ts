@@ -203,14 +203,28 @@ export function adaptForPEDs(
       doseMrv = base.mrvMultiplier;
       doseRec = base.recoveryMultiplier;
     }
-    // Комбинирование с убывающей отдачей (ББ-специфичный diminishing 0.80).
-    // Каждый следующий препарат даёт 80% от своего соло-эффекта.
-    mrvMult += (doseMrv - 1) * 0.80;
-    recMult += (doseRec - 1) * 0.80;
+    // Комбинирование с убывающей отдачей — diminishing 0.85.
+    mrvMult += (doseMrv - 1) * 0.85;
+    recMult += (doseRec - 1) * 0.85;
     if (base.periWorkoutCarbs === 'high') carbs = 'high';
     perPED.push({ ped, dose, mrvMult: doseMrv, recMult: doseRec });
     const doseStr = dose > 0 ? ` (${dose} ${ped === 'AAS' ? 'мг/нед' : ped === 'insulin' || ped === 'GH' ? 'МЕ/день' : 'мкг'})` : '';
     rationale.push(`${ped}${doseStr}: MRV ×${doseMrv.toFixed(2)}, восст ×${doseRec.toFixed(2)} — ${base.notes}`);
+  }
+
+  // GH + инсулин синергия: IGF-1 × инсулин = +15% к комбинированному эффекту
+  const hasGH = activePEDs.includes('GH');
+  const hasInsulin = activePEDs.includes('insulin');
+  if (hasGH && hasInsulin) {
+    const ghMrv = perPED.find(p => p.ped === 'GH')?.mrvMult ?? 1;
+    const insMrv = perPED.find(p => p.ped === 'insulin')?.mrvMult ?? 1;
+    const ghRec = perPED.find(p => p.ped === 'GH')?.recMult ?? 1;
+    const insRec = perPED.find(p => p.ped === 'insulin')?.recMult ?? 1;
+    const synergyMrv = (ghMrv - 1) * (insMrv - 1) * 0.15;
+    const synergyRec = (ghRec - 1) * (insRec - 1) * 0.15;
+    mrvMult += synergyMrv;
+    recMult += synergyRec;
+    rationale.push(`GH+инсулин синергия: +MRV ×${(1+synergyMrv).toFixed(3)}, +восст ×${(1+synergyRec).toFixed(3)} (IGF-1 × инсулин).`);
   }
 
   // Course intensity boost (поверх PED-множителя)

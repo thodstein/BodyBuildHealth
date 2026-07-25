@@ -261,7 +261,7 @@ function injectPLWeakPoints(
   plWeakPointDayMap?: Record<string, number[]>,
 ): void {
   const mainNameMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга', pulldown: 'Тяга', incline_press: 'Жим гантелей' };
-  const MAX_CORRECTIONS = 3; // берём 2-3 кандидата, для распределения в 2 дня
+  const MAX_CORRECTIONS = 2;
   for (const wp of weakPoints) {
     const mainName = mainNameMap[wp.lift] || 'Жим';
     // Найти дни с лифтом (rank по объёму: max-heavy + min-light)
@@ -364,7 +364,31 @@ function injectPLWeakPoints(
 }
 
 export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
-  const { template, pmMap, fallbackPm = 100 } = input;
+  const { template, pmMap, fallbackPm = 80 } = input;
+  if (fallbackPm <= 0) throw new Error('buildLMSPlan: fallbackPm must be > 0');
+
+  // Валидация шаблона
+  if (!template.meta.weeks || template.meta.weeks <= 0) throw new Error('buildLMSPlan: template.meta.weeks must be > 0');
+  if (!template.week1 || !Array.isArray(template.week1) || template.week1.length === 0) throw new Error('buildLMSPlan: template.week1 must be a non-empty array of days');
+  if (typeof template.meta.correctionPct !== 'number' || isNaN(template.meta.correctionPct)) throw new Error('buildLMSPlan: template.meta.correctionPct must be a number');
+  for (const day of template.week1) {
+    for (const ex of day.exercises) {
+      if (!ex.sets || !Array.isArray(ex.sets)) throw new Error(`buildLMSPlan: exercise "${ex.name}" has missing or invalid sets`);
+      for (const s of ex.sets) {
+        if (typeof s.pct !== 'number' || s.pct <= 0 || s.pct > 1) throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid pct (${s.pct}), expected 0..1`);
+        if (typeof s.sets !== 'number' || s.sets <= 0) throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid sets count (${s.sets})`);
+        if (typeof s.reps !== 'number' || s.reps <= 0) throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid reps (${s.reps})`);
+      }
+    }
+  }
+  if (template.weeks && !Array.isArray(template.weeks)) throw new Error('buildLMSPlan: template.weeks must be an array if provided');
+  if (template.weeks) {
+    for (let wi = 0; wi < template.weeks.length; wi++) {
+      const w = template.weeks[wi];
+      if (!Array.isArray(w) || w.length === 0) throw new Error(`buildLMSPlan: template.weeks[${wi}] must be a non-empty array of days`);
+    }
+  }
+
   const mode = input.mode ?? 'natural';
   const exercises = extractExercises(template);
 
@@ -431,18 +455,13 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           // Коррекция объёма по VolumeGoal + фазе мезоцикла (только для аксессуаров)
           if (!isMain) {
             const vMult = input.volumeGoal === 'mev' ? 0.8 : input.volumeGoal === 'mrv' ? 1.2 : 1.0;
-            sets = Math.round(sets * vMult * phaseVolMod);
+            const focusRu = input.focusLift ? FOCUS_RU[input.focusLift] : undefined;
+            const focusMult = (focusRu && norm(spec.name).includes(focusRu)) ? 1.2 : 1.0;
+            const weakEn = exEnGroup(spec.group);
+            const weakMult = (input.weakPoints && weakEn && input.weakPoints.includes(weakEn)) ? 1.2 : 1.0;
+            const totalMult = vMult * phaseVolMod * focusMult * weakMult;
+            sets = Math.round(sets * totalMult);
           }
-          // Акцент по focusLift: +20% объёма для ВСЕХ упражнений целевого лифта (включая основной).
-          // focusLift задан по-английски (UI) → маппим в RU-подстроку имени.
-          const focusRu = input.focusLift ? FOCUS_RU[input.focusLift] : undefined;
-          const focusMult = (focusRu && norm(spec.name).includes(focusRu)) ? 1.2 : 1.0;
-          sets = Math.round(sets * focusMult);
-
-          // Акцент по слабым группам мышц: +20% объёма для упражнений на отстающие группы.
-          const weakEn = exEnGroup(spec.group);
-          const weakMult = (input.weakPoints && weakEn && input.weakPoints.includes(weakEn)) ? 1.2 : 1.0;
-          sets = Math.round(sets * weakMult);
 
           // S-MRV floor: аксессуары не ниже 2 подходов (иначе < MEV — бесполезный объём)
           sets = Math.max(isMain ? 1 : 2, sets);
@@ -455,13 +474,14 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         });
 
         // Проверка S-MRV: срезаем аксессуары, чтобы влезть в бюджет утомления
+        const totalWorkSets = workSets.reduce((sum, ws) => sum + ws.sets, 0);
         const fatigueCost = EXERCISE_CATALOG.find(e => e.name === spec.name)?.fatigueCost || 5;
-        const exCost = fatigueCost * (workSets[0]?.sets || 1);
+        const exCost = fatigueCost * totalWorkSets;
         if (dayFatigueBudget < exCost && !isMain) {
           const fit = Math.max(2, Math.floor(dayFatigueBudget / fatigueCost));
           workSets.forEach(ws => { ws.sets = Math.min(ws.sets, fit); });
         }
-        dayFatigueBudget -= fatigueCost * (workSets[0]?.sets || 1);
+        dayFatigueBudget -= fatigueCost * totalWorkSets;
 
         return { name: spec.name, group: spec.group, coef: spec.coef, mnosz: spec.mnosz, load: cleanLoad(spec.load, dayTag), pm, rir: rirBase, workSets };
       });
@@ -486,7 +506,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     //  - Пользовательский override: weakGroupDayMap[muscle] = [dayIdx,...] — 1-based. Если не задано — авто.
     if (input.weakPoints && input.weakPoints.length) {
       const SMALL_GROUPS_2X = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'delt_rear', 'delt_mid']);
-      const userDayMap = (input as any).weakGroupDayMap as Record<string, number[]> | undefined;
+      const userDayMap = input.weakGroupDayMap;
       const allWeekNames = new Set(days.flatMap(d => d.exercises.map(e => norm(e.name))));
 
       for (const wg of input.weakPoints) {
@@ -530,7 +550,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         }
 
         // Для каждого выбранного дня — добавить accessory упражнения с разным протоколом
-        const listedMuscleRef = getVolumeLandmarks(vrLevel, wg as any);
+        const listedMuscleRef = getVolumeLandmarks(vrLevel, wg);
         const fakeMrvCap = listedMuscleRef ? Math.round(listedMuscleRef.mrv * pedMrvMult) : 99;
         for (let ti = 0; ti < targetDays.length; ti++) {
           const dayIdx = targetDays[ti] - 1;

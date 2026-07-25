@@ -24,7 +24,8 @@ export function lmsPlanToSessions(plan: LMSBuildOutput): BridgeSession[] {
   const out: BridgeSession[] = [];
   let i = 0;
   for (const wk of plan.weeks) {
-    for (const day of wk.days) {
+    for (let dayIdx = 0; dayIdx < wk.days.length; dayIdx++) {
+      const day = wk.days[dayIdx];
       const exercises: BridgeExercise[] = day.exercises.map((ex: LMSPlanExercise, idx: number) => {
         const sets: BridgeSet[] = [];
         let sn = 1;
@@ -38,7 +39,8 @@ export function lmsPlanToSessions(plan: LMSBuildOutput): BridgeSession[] {
       });
       const totalVolume = exercises.reduce((s, e) => s + e.totalVolume, 0);
       const totalSets = exercises.reduce((s, e) => s + e.sets.length, 0);
-      out.push({ sessionId: uid('src', i), date: '', focus: `Нед${wk.week} День${day.exercises.length ? '' : ''}`, exercises, totalVolume, totalSets, totalReps: 0, weekNumber: wk.week, planned: true, source: 'SRC' });
+      const totalReps = exercises.reduce((sum, e) => sum + e.sets.reduce((ss, s) => ss + s.reps, 0), 0);
+      out.push({ sessionId: uid('src', i), date: '', focus: `Нед${wk.week} День${dayIdx + 1}`, exercises, totalVolume, totalSets, totalReps, weekNumber: wk.week, planned: true, source: 'SRC' });
       i++;
     }
   }

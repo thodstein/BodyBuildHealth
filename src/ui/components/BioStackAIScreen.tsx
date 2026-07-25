@@ -42,6 +42,7 @@ export const BioStackAIScreen: React.FC = () => {
     return saved;
   });
   const [loading, setLoading] = useState(true);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const linked = useDataLink();
   const labAnalysis: LabCompositeResult | null = linked?.labAnalysis || null;
   const activeAAS = useMemo(() => {
@@ -86,32 +87,29 @@ export const BioStackAIScreen: React.FC = () => {
   };
   const setStackIdsAndSync = (ids: string[]) => setStackIds(ids);
 
+  // Проактивно кэшируем gate при каждом изменении стека
+  useEffect(() => {
+    if (stackIds.length === 0) return;
+    try {
+      const r = selectStack(stackIds, loadBioStackProfile(), 'comprehensive', null);
+      localStorage.setItem('he_biostack_gate_cache', JSON.stringify(r));
+    } catch {}
+  }, [stackIds]);
+
   /* ── Clinic: hard-stop detection for clinical panel ── */
   const stopIds = useMemo(() => {
     if (stackIds.length === 0) return new Set<string>();
     try {
-      // Пробуем кэшированный gate из результата сборки (быстрее, не вызывает selectStack повторно)
       const rawGate = localStorage.getItem('he_biostack_gate_cache');
       if (rawGate) {
         const cached = JSON.parse(rawGate);
-        const cachedIds = new Set(cached.ids?.map((s: string) => s.toLowerCase()) || []);
-        const currentIds = new Set(stackIds.map(s => s.toLowerCase()));
-        if (cachedIds.size > 0 && [...currentIds].every(id => cachedIds.has(id))) {
-          return new Set<string>([
-            ...(cached.hardStops || []).map((h: any) => h.substanceId),
-            ...(cached.drugExclusions || []).map((e: any) => e.substanceId),
-          ]);
-        }
+        return new Set<string>([
+          ...(cached.hardStops || []).map((h: any) => h.substanceId),
+          ...(cached.drugExclusions || []).map((e: any) => e.substanceId),
+        ]);
       }
-      // Fallback: полный вызов selectStack
-      const r = selectStack(stackIds, loadBioStackProfile(), 'comprehensive', null);
-      return new Set<string>([
-        ...r.hardStops.map((h: any) => h.substanceId),
-        ...r.drugExclusions.map((e: any) => e.substanceId),
-      ]);
-    } catch {
-      return new Set<string>();
-    }
+    } catch {}
+    return new Set<string>();
   }, [stackIds]);
   const clearStops = () => setStackIds(stackIds.filter((id) => !stopIds.has(id)));
   const replaceStop = (originalId: string, replacementId: string) => {
@@ -196,23 +194,28 @@ export const BioStackAIScreen: React.FC = () => {
       </div>
 
       {/* ── Profile completeness banner ── */}
-      {(() => {
+      {!bannerDismissed && (() => {
         const comp = getProfileCompleteness(profile);
         if (comp.percent >= 70) return null;
         const missingGroups = Object.entries(comp.groupStatus)
           .filter(([, st]) => !st.filled)
           .map(([k]) => ({ personal: 'личные данные', health: 'здоровье', goals: 'цели', organs: 'органы', systems: 'системы', lifestyle: 'образ жизни', clinical: 'клинические данные' }[k] || k));
         return (
-          <div onClick={() => setTab('profile')} style={{
-            marginBottom: 6, padding: '6px 10px', borderRadius: 10, cursor: 'pointer',
+          <div style={{
+            marginBottom: 6, padding: '6px 10px', borderRadius: 10,
             background: comp.percent < 30 ? 'rgba(239,68,68,0.1)' : 'rgba(251,191,36,0.08)',
             border: `1px solid ${comp.percent < 30 ? 'rgba(239,68,68,0.2)' : 'rgba(251,191,36,0.15)'}`,
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
-            <span style={{ fontSize: 11 }}>⚠️</span>
-            <span style={{ fontSize: 9, color: comp.percent < 30 ? '#f87171' : '#fbbf24', fontWeight: 600 }}>
+            <span style={{ fontSize: 11 }} onClick={() => setTab('profile')}>⚠️</span>
+            <span onClick={() => setTab('profile')} style={{ fontSize: 9, color: comp.percent < 30 ? '#f87171' : '#fbbf24', fontWeight: 600, cursor: 'pointer', flex: 1 }}>
               Профиль заполнен на {comp.percent}%. {missingGroups.slice(0, 2).join(', ')} — нажмите чтобы заполнить
             </span>
+            <button onClick={(e) => { e.stopPropagation(); setBannerDismissed(true); }} style={{
+              fontSize: 12, padding: '2px 6px', borderRadius: 4, cursor: 'pointer',
+              background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)',
+              lineHeight: 1,
+            }}>✕</button>
           </div>
         );
       })()}
