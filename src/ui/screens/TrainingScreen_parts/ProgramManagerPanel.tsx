@@ -572,6 +572,8 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
 
   // Библиотека внутри редактора
   const [editorLibOpen, setEditorLibOpen] = useState<'bb' | 'pl' | 'methods' | null>(null);
+  const [methCat, setMethCat] = useState('all');
+  const [methSearch, setMethSearch] = useState('');
   const libraryPrograms = useMemo(() => getAllPrograms(), []);
   const plCycleList = useMemo(() => LMS_CYCLES, []);
   const loadIntoEditor = (p: UserProgram) => {
@@ -1058,14 +1060,12 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
             {editorLibOpen === 'methods' && (() => {
               const allM = getTrainingMethods();
               const cats = [...new Set(allM.map(m => m.category))];
-              const [mc, setMc] = React.useState('all');
-              const [ms, setMs] = React.useState('');
-              const f2 = allM.filter(m => (mc === 'all' || m.category === mc) && (!ms || m.name.toLowerCase().includes(ms.toLowerCase()))).slice(0, 30);
+              const f2 = allM.filter(m => (methCat === 'all' || m.category === methCat) && (!methSearch || m.name.toLowerCase().includes(methSearch.toLowerCase()))).slice(0, 30);
               return (
                 <div>
                   <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
-                    <input style={{ ...IN, flex: 1, padding: '6px 10px', fontSize: 11, minHeight: 38 }} value={ms} onChange={e => setMs(e.target.value)} placeholder="🔍 Поиск методик..." />
-                    <select style={{ ...IN, fontSize: 11, minHeight: 38 }} value={mc} onChange={e => setMc(e.target.value)}>{cats.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                    <input style={{ ...IN, flex: 1, padding: '6px 10px', fontSize: 11, minHeight: 38 }} value={methSearch} onChange={e => setMethSearch(e.target.value)} placeholder="🔍 Поиск методик..." />
+                    <select style={{ ...IN, fontSize: 11, minHeight: 38 }} value={methCat} onChange={e => setMethCat(e.target.value)}><option value="all">Все ({allM.length})</option>{cats.map(c => <option key={c} value={c}>{c}</option>)}</select>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '55vh', overflow: 'auto' }}>
                     {f2.map((m, i) => (

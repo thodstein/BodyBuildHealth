@@ -30,11 +30,10 @@ const PHASE_LABELS: Record<string, string> = { accumulation: 'Накоплени
 export const DiagnosticPanel: React.FC<PanelProps> = ({ program, dir, onChange, showToast, labMrvMult }) => {
   if (!(dir === 'bb' && program.bb || dir === 'pl' && program.pl?.customWeeks)) return null;
   const prof = loadTrainingProfile();
-  const q = computePlanQualityFor(program, program.meta.level, {
-    onCourse: prof.onCourse ?? false,
-    courseIntensity: prof.courseIntensity ?? 'moderate',
-    labMult: labMrvMult,
-  });
+  let q: ReturnType<typeof computePlanQualityFor> | null = null;
+  try {
+    q = computePlanQualityFor(program, program.meta.level, { onCourse: prof.onCourse ?? false, courseIntensity: prof.courseIntensity ?? 'moderate', labMult: labMrvMult });
+  } catch { return null; }
   if (!q || q.perMuscle.length === 0) return null;
   const weak = q.perMuscle.filter(m => m.status === 'low');
   const overloaded = q.perMuscle.filter(m => m.status === 'over');
@@ -107,19 +106,22 @@ export const ProgressionCoach: React.FC<PanelProps & { onCourse: boolean; course
   const prof = loadTrainingProfile();
   const strat = (program.bb.progression?.loadStrategy ?? 'double_progression') as 'double_progression' | 'linear' | 'wave' | 'rpe_based';
   const lastW = program.bb.weeks[program.bb.weeks.length - 1];
+  if (!lastW) return null;
   const preds: Array<{ name: string; muscle: string; curW: number; curR: number; curRIR: number; nextW: number; nextR: number; nextRIR: number; label: string }> = [];
-  for (const s of lastW.sessions) {
-    for (const b of s.blocks) {
-      if (!b.exerciseName || !b.sets[0]?.weight) continue;
-      const c = b.sets[0];
-      const cw = c.weight!;
-      const cr = typeof c.reps === 'number' ? c.reps : 10;
-      const crir = c.rir ?? 2;
-      const wm = (prof.workMax ?? {})[b.muscle] ?? cw * 1.5;
-      const pred = prescribeLoad(strat, cw, cr, crir, wm, lastW.week, program.bb.weeks.length, lastW.phase, b.type, b.role as 'primary' | 'accessory' | undefined);
-      if (pred.nextWeight !== cw || pred.nextReps !== cr) preds.push({ name: b.exerciseName, muscle: b.muscle, curW: cw, curR: cr, curRIR: crir, nextW: pred.nextWeight, nextR: pred.nextReps, nextRIR: pred.nextRIR, label: pred.label });
+  try {
+    for (const s of lastW.sessions) {
+      for (const b of s.blocks) {
+        if (!b.exerciseName || !b.sets[0]?.weight) continue;
+        const c = b.sets[0];
+        const cw = c.weight!;
+        const cr = typeof c.reps === 'number' ? c.reps : 10;
+        const crir = c.rir ?? 2;
+        const wm = (prof.workMax ?? {})[b.muscle] ?? cw * 1.5;
+        const pred = prescribeLoad(strat, cw, cr, crir, wm, lastW.week, program.bb.weeks.length, lastW.phase, b.type, b.role as 'primary' | 'accessory' | undefined);
+        if (pred.nextWeight !== cw || pred.nextReps !== cr) preds.push({ name: b.exerciseName, muscle: b.muscle, curW: cw, curR: cr, curRIR: crir, nextW: pred.nextWeight, nextR: pred.nextReps, nextRIR: pred.nextRIR, label: pred.label });
+      }
     }
-  }
+  } catch { return null; }
   if (preds.length === 0) return null;
   return (
     <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #22c55e' }}>
@@ -144,7 +146,10 @@ export const SplitConsultant: React.FC<PanelProps> = ({ program, dir, onChange, 
   const totalSessions = program.bb.weeks.reduce((s, w) => s + (w.sessions?.length || 0), 0);
   if (totalSessions > 2) return null;
   const prof = loadTrainingProfile();
-  const candidates = (selectSplit({ goal: program.meta.goal, level: program.meta.level, daysPerWeek: program.meta.daysPerWeek, recovery: prof.recovery ?? 70, fatigue: prof.fatigue ?? 30, sleep: prof.sleepHours ?? 7, stress: prof.stressLevel ?? 30, weakPoints: (prof.weakPoints ?? []) as string[], injuries: [], onCourse: prof.onCourse ?? false, equipment: (prof.equipment ?? []) as string[] } as any) as any[]).slice(0, 4);
+  let candidates: any[] = [];
+  try {
+    candidates = (selectSplit({ goal: program.meta.goal, level: program.meta.level, daysPerWeek: program.meta.daysPerWeek, recovery: prof.recovery ?? 70, fatigue: prof.fatigue ?? 30, sleep: prof.sleepHours ?? 7, stress: prof.stressLevel ?? 30, weakPoints: (prof.weakPoints ?? []) as string[], injuries: [], onCourse: prof.onCourse ?? false, equipment: (prof.equipment ?? []) as string[] } as any) as any[]).slice(0, 4);
+  } catch { return null; }
   if (!candidates || candidates.length === 0) return null;
   return (
     <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #3b82f6' }}>
@@ -278,7 +283,10 @@ export const ExerciseInfo: React.FC<{ program: UserProgram; dir: string }> = ({ 
 export const RecommendationsPanel: React.FC<PanelProps> = ({ program, dir, onChange, showToast, labMrvMult }) => {
   if (!(dir === 'bb' && program.bb || dir === 'pl' && program.pl?.customWeeks)) return null;
   const prof = loadTrainingProfile();
-  const q = computePlanQualityFor(program, program.meta.level, { onCourse: prof.onCourse ?? false, courseIntensity: prof.courseIntensity ?? 'moderate', labMult: labMrvMult });
+  let q: ReturnType<typeof computePlanQualityFor> | null = null;
+  try {
+    q = computePlanQualityFor(program, program.meta.level, { onCourse: prof.onCourse ?? false, courseIntensity: prof.courseIntensity ?? 'moderate', labMult: labMrvMult });
+  } catch { return null; }
   if (!q || q.perMuscle.length === 0) return null;
   const gaps = q.perMuscle.filter(m => m.status === 'low' || m.status === 'over');
   if (gaps.length === 0) return null;
