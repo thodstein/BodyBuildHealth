@@ -475,3 +475,50 @@ export const RecommendationsPanel: React.FC<PanelProps> = ({ program, dir, onCha
     </div>
   );
 };
+
+/* ───── Панель замен упражнений ───── */
+export const SubstitutionPanel: React.FC<PanelProps> = ({ program, dir, onChange, showToast }) => {
+  if (dir !== 'bb' || !program.bb) return null;
+  const allBlocks: { weekIdx: number; sessionIdx: number; blockIdx: number; block: UserBlock; weekLabel: string; sessionLabel: string }[] = [];
+  program.bb.weeks.forEach((w, wi) =>
+    w.sessions.forEach((s, si) =>
+      s.blocks.forEach((b, bi) => {
+        if (b.exerciseName) allBlocks.push({ weekIdx: wi, sessionIdx: si, blockIdx: bi, block: b, weekLabel: `Нед ${w.week}`, sessionLabel: s.name || `День ${si + 1}` });
+      })
+    )
+  );
+  if (allBlocks.length === 0) return null;
+
+  return (
+    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b' }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: '#f59e0b', marginBottom: 8 }}>🔄 Замены упражнений ({allBlocks.length} упр)</div>
+      <div style={{ fontSize: 11, color: DIM, marginBottom: 8 }}>Клик — заменить упражнение на рекомендуемый аналог.</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '50vh', overflow: 'auto' }}>
+        {allBlocks.slice(0, 20).map(({ weekIdx, sessionIdx, blockIdx, block, weekLabel, sessionLabel }) => {
+          let subs: any[] = [];
+          try { subs = (findSubstitutions(block.exerciseName, block.muscle, new Set<string>()) || []).filter((s: any) => s?.name && s.name !== block.exerciseName); } catch { subs = []; }
+          if (subs.length === 0) return null;
+          return (
+            <div key={`${weekIdx}-${sessionIdx}-${blockIdx}`} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+              <div style={{ fontSize: 11, color: DIM, marginBottom: 4 }}>
+                {weekLabel} · {sessionLabel} · <b style={{ color: DIM_STRONG }}>{block.exerciseName}</b>
+                {block.muscle && <span style={{ color: DIM, marginLeft: 4 }}>({GROUP_RU[block.muscle] || block.muscle})</span>}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                {subs.slice(0, 4).map((s: any, si2: number) => (
+                  <button key={si2} onClick={() => {
+                    const upd = { ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((w, wi) => wi === weekIdx ? { ...w, sessions: w.sessions.map((se, si) => si === sessionIdx ? { ...se, blocks: se.blocks.map((bl, bi) => bi === blockIdx ? { ...bl, exerciseName: s.name, note: `Замена: ${block.exerciseName} → ${s.name}` } : bl) } : se) } : w) } };
+                    onChange(upd);
+                    showToast('✅ ' + s.name);
+                  }} style={{ padding: '6px 12px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontWeight: 600, minHeight: 38 }}>
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};

@@ -35,7 +35,7 @@ import { ExerciseLabPicker } from './ExerciseLabPicker';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { BbContextPanel, PLContextPanel } from './program-editor-context-panels';
 import { BBEditor, PLEditor, BBConstraintsPanel } from './ProgramEditorComponents';
-import { DiagnosticPanel, VolumeLandmarksPanel, PhaseLegend, ExerciseInfo, RecommendationsPanel, ProgressionCoach, SplitConsultant, PlanSummaryTable, AutoPeriodizationPanel } from './ProgramEditorPanels';
+import { DiagnosticPanel, VolumeLandmarksPanel, PhaseLegend, ExerciseInfo, RecommendationsPanel, ProgressionCoach, SplitConsultant, PlanSummaryTable, AutoPeriodizationPanel, SubstitutionPanel } from './ProgramEditorPanels';
 import { getTrainingMethods } from '../../../engines/training-methodology.engine';
 import { SET_TEMPLATES } from './program-types';
 import {
@@ -1013,6 +1013,57 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       <RecommendationsPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
       <ProgressionCoach program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} onCourse={tprofile.onCourse ?? false} courseIntensity={tprofile.courseIntensity ?? 'moderate'} />
       <SplitConsultant program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
+      <SubstitutionPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
+
+      {/* 📚 Методики — всегда доступен (не внутри календаря) */}
+      {editorLibOpen === 'methods' && (
+        <div style={{ ...CARD, padding: 12, borderLeft: '3px solid #a78bfa' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>📚 Справочник методик</span>
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38 }} onClick={() => setEditorLibOpen(null)}>✕ Закрыть</button>
+          </div>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+            <input style={{ ...IN, flex: 1, padding: '6px 10px', fontSize: 11, minHeight: 38 }} value={methSearch} onChange={e => setMethSearch(e.target.value)} placeholder="🔍 Поиск методик..." />
+            <select style={{ ...IN, fontSize: 11, minHeight: 38 }} value={methCat} onChange={e => setMethCat(e.target.value)}>
+              <option value="all">Все</option>
+              {(() => { const cats = [...new Set(getTrainingMethods().map(m => m.category))]; return cats.map(c => <option key={c} value={c}>{c}</option>); })()}
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '55vh', overflow: 'auto' }}>
+            {(() => {
+              const allM = getTrainingMethods();
+              const f2 = allM.filter(m => (methCat === 'all' || m.category === methCat) && (!methSearch || m.name.toLowerCase().includes(methSearch.toLowerCase()))).slice(0, 50);
+              return f2.map((m, i) => (
+                <div key={i} style={{ padding: 12, borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.12)', fontSize: 11, cursor: 'pointer' }}
+                  onClick={() => {
+                    const text = `📚 ${m.name} (${m.category}, док-ть ${m.evidenceLevel})\n\n${m.description}\n\nКак работает: ${m.howItWorks}${m.example ? '\n\n📋 Пример: ' + m.example : ''}`;
+                    navigator.clipboard.writeText(text);
+                    showToast('📋 Методика скопирована: ' + m.name);
+                  }}
+                  onDoubleClick={() => {
+                    if (dir !== 'bb' || !program.bb) return;
+                    const updated = { ...program, bb: { ...program.bb!, progression: { ...program.bb!.progression, loadStrategy: m.name as any, deloadProtocol: program.bb!.progression?.deloadProtocol || 'pump' as any, intensityTechniques: program.bb!.progression?.intensityTechniques || ['none'] } } };
+                    onChange(updated);
+                    showToast('✅ Методика применена: ' + m.name);
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 800, color: DIM_STRONG }}>{m.name}</span>
+                    <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: m.evidenceLevel === 'A' ? 'rgba(34,197,94,0.15)' : m.evidenceLevel === 'B' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)', color: m.evidenceLevel === 'A' ? '#22c55e' : m.evidenceLevel === 'B' ? '#f59e0b' : '#ef4444' }}>{m.evidenceLevel}</span>
+                    <span style={{ fontSize: 11, color: DIM }}>{m.category}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4, lineHeight: 1.4 }}>{m.description}</div>
+                  <div style={{ fontSize: 11, color: DIM, lineHeight: 1.4 }}>{m.howItWorks}</div>
+                  {m.example && <div style={{ fontSize: 11, color: DIM, marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)' }}>📋 {m.example}</div>}
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4, fontStyle: 'italic' }}>
+                    Клик — копировать · Двойной клик — применить к программе
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+      )}
 
       {showTableView && dir === 'bb' && program.bb && (
         <PlanSummaryTable program={program} showWeek={execWeek} onShowWeekChange={setExecWeek} />
@@ -1080,33 +1131,6 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                     ) : (
                       <div style={{ fontSize: 10, color: DIM, marginTop: 12, fontStyle: 'italic' }}>отдых</div>
             )}
-            {editorLibOpen === 'methods' && (() => {
-              const allM = getTrainingMethods();
-              const cats = [...new Set(allM.map(m => m.category))];
-              const f2 = allM.filter(m => (methCat === 'all' || m.category === methCat) && (!methSearch || m.name.toLowerCase().includes(methSearch.toLowerCase()))).slice(0, 30);
-              return (
-                <div>
-                  <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
-                    <input style={{ ...IN, flex: 1, padding: '6px 10px', fontSize: 11, minHeight: 38 }} value={methSearch} onChange={e => setMethSearch(e.target.value)} placeholder="🔍 Поиск методик..." />
-                    <select style={{ ...IN, fontSize: 11, minHeight: 38 }} value={methCat} onChange={e => setMethCat(e.target.value)}><option value="all">Все ({allM.length})</option>{cats.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '55vh', overflow: 'auto' }}>
-                    {f2.map((m, i) => (
-                      <div key={i} style={{ padding: 10, borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.12)', fontSize: 11 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                          <span style={{ fontWeight: 800, color: DIM_STRONG }}>{m.name}</span>
-                          <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: m.evidenceLevel === 'A' ? 'rgba(34,197,94,0.15)' : m.evidenceLevel === 'B' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)', color: m.evidenceLevel === 'A' ? '#22c55e' : m.evidenceLevel === 'B' ? '#f59e0b' : '#ef4444' }}>{m.evidenceLevel}</span>
-                          <span style={{ fontSize: 11, color: DIM }}>{m.category}</span>
-                        </div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>{m.description}</div>
-                        <div style={{ fontSize: 10, color: DIM }}>{m.howItWorks}</div>
-                        {m.example && <div style={{ fontSize: 11, color: DIM, marginTop: 2 }}>📋 {m.example}</div>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
                   </div>
                 );
               })}
