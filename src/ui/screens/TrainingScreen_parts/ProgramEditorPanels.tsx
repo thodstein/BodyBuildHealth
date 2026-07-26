@@ -15,6 +15,7 @@ import { loadTrainingProfile } from './training-profile';
 import { distributePhases } from './phase-periodization';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import type { Exercise } from '../../../core/types';
+import { findSubstitutions } from '../../../engines/exercise-substitution.engine';
 
 interface PanelProps {
   program: UserProgram;
@@ -38,6 +39,10 @@ export const DiagnosticPanel: React.FC<PanelProps> = ({ program, dir, onChange, 
   const weak = q.perMuscle.filter(m => m.status === 'low');
   const overloaded = q.perMuscle.filter(m => m.status === 'over');
   const ok = q.perMuscle.filter(m => m.status === 'ok');
+  const pctCalc = q.perMuscle.length >= 2 ? (() => {
+    const pcts = q.perMuscle.map(p => ({ m: p.muscle, p: p.mrv > 0 ? (p.sets / p.mrv) * 100 : 0 }));
+    return Math.max(...pcts.map(p => p.p)) - Math.min(...pcts.map(p => p.p));
+  })() : 0;
   return (
     <div style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + (q.score >= 75 ? '#22c55e' : q.score >= 50 ? '#f59e0b' : '#ef4444') }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -86,16 +91,165 @@ export const DiagnosticPanel: React.FC<PanelProps> = ({ program, dir, onChange, 
           ))}
         </div>
       )}
-      {q.perMuscle.length >= 2 && (() => {
-        const pcts = q.perMuscle.map(p => ({ m: p.muscle, p: p.mrv > 0 ? (p.sets / p.mrv) * 100 : 0 }));
-        const gap = Math.max(...pcts.map(p => p.p)) - Math.min(...pcts.map(p => p.p));
-        if (gap < 30) return null;
+      {pctCalc >= 30 && (
+        <div style={{ padding: 8, borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>⚖ Дисбаланс нагрузки ({Math.round(pctCalc)}%)</div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ───── Сводная таблица плана (мобильная) ───── */
+const PHASE_LABELS_SP: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
+const CHAR_MAP: Record<string, string> = { 'тяж': '#ef4444', 'памп': '#3b82f6', 'лёг': '#6b7280' };
+
+export const PlanSummaryTable: React.FC<{
+  program: UserProgram;
+  showWeek?: number;
+  onShowWeekChange?: (w: number) => void;
+}> = ({ program, showWeek = 1, onShowWeekChange }) => {
+  const [expandedEx, setExpandedEx] = useState<string | null>(null);
+  const body = program.bb;
+  if (!body || !body.weeks || body.weeks.length === 0) return null;
+
+  const week = body.weeks.find(w => w.week === showWeek) || body.weeks[0];
+  const totalWeeks = body.weeks.length;
+  const DAY_NAMES = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+  const phaseColors: Record<string, string> = { accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' };
+
+  return (
+    <div style={{ ...CARD, padding: 12, borderLeft: '3px solid #00e68a' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+        <div>
+          <span style={{ fontSize: 14, fontWeight: 800, color: ACCENT }}>📋 План: {program.meta.title}</span>
+          <span style={{ fontSize: 11, color: DIM, marginLeft: 8 }}>{totalWeeks} нед · {program.meta.daysPerWeek} дн/нед</span>
+        </div>
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+          {body.weeks.map((w, i) => {
+            const pc = phaseColors[w.phase] || '#666';
+            return (
+              <button key={i} onClick={() => onShowWeekChange?.(w.week)}
+                style={{
+                  padding: '5px 9px', borderRadius: 10, fontSize: 11, cursor: 'pointer', minHeight: 34, minWidth: 36,
+                  background: showWeek === w.week ? pc + '20' : 'rgba(255,255,255,0.04)',
+                  border: showWeek === w.week ? '1px solid ' + pc : '1px solid rgba(255,255,255,0.06)',
+                  color: showWeek === w.week ? pc : DIM,
+                  fontWeight: showWeek === w.week ? 700 : 400,
+                }}>
+                Н{w.week}{w.deload ? '🟢' : ''}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ fontSize: 11, color: DIM, marginBottom: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
+        Фаза: <b style={{ color: phaseColors[week.phase] || '#fff' }}>{PHASE_LABELS_SP[week.phase] || week.phase}</b>
+        {week.deload && <span style={{ color: '#22c55e', marginLeft: 6 }}>🟢 Разгрузка</span>}
+      </div>
+      {week.sessions.map((session, si) => {
+        const totalSets = session.blocks.reduce((s, b) => s + b.sets.length, 0);
         return (
-          <div style={{ padding: 8, borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>⚖ Дисбаланс нагрузки ({Math.round(gap)}%)</div>
+          <div key={si} style={{ marginBottom: 8, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(24,24,27,0.3)' }}>
+            <div style={{ padding: '8px 12px', background: 'rgba(0,230,138,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>{DAY_NAMES[(session.dayOfWeek ?? si) % 7]} — {session.name || `День ${si + 1}`}</span>
+              <span style={{ fontSize: 11, color: DIM }}>{session.focus || ''} · {totalSets} подх.{session.estimatedMin ? ` · ~${session.estimatedMin}м` : ''}</span>
+            </div>
+            {session.warmup && <div style={{ padding: '3px 12px', fontSize: 11, color: DIM, fontStyle: 'italic', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>🔥 {session.warmup}</div>}
+            {session.cooldown && <div style={{ padding: '3px 12px', fontSize: 11, color: DIM, fontStyle: 'italic', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>🧊 {session.cooldown}</div>}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 11, color: DIM, fontWeight: 700 }}>
+                <span style={{ flex: 1, minWidth: 100 }}>Упражнение</span>
+                <span style={{ width: 52, textAlign: 'center' }}>Схема</span>
+                <span style={{ width: 44, textAlign: 'center' }}>RIR</span>
+                <span style={{ width: 52, textAlign: 'center' }}>Вес</span>
+                <span style={{ width: 48, textAlign: 'center' }}>Темп</span>
+                <span style={{ width: 44, textAlign: 'center' }}>Отдых</span>
+                <span style={{ width: 44, textAlign: 'center' }}>Режим</span>
+              </div>
+              {session.blocks.map((block, bi) => {
+                const exId = `${si}-${bi}`;
+                const isExpanded = expandedEx === exId;
+                const chars = (block.character || (block.role === 'primary' ? 'тяж' : 'памп'));
+                const bs = block.sets;
+                const reps = bs[0]?.reps ?? '—';
+                const rir = bs[0]?.rir ?? '—';
+                const wgt = bs[0]?.weight ? `${bs[0].weight}кг` : bs[0]?.pctOf1RM ? `${bs[0].pctOf1RM}%` : '—';
+                const tmp = bs[0]?.tempo || block.tempoSpec || '—';
+                const rst = bs[0]?.restSec ? `${bs[0].restSec}с` : '—';
+                return (
+                  <div key={exId}>
+                    <div onClick={() => setExpandedEx(isExpanded ? null : exId)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.03)', background: isExpanded ? 'rgba(0,230,138,0.06)' : 'transparent', fontSize: 12, transition: 'background 0.15s' }}>
+                      <span style={{ flex: 1, minWidth: 100, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {block.exerciseName || <span style={{ color: DIM, fontStyle: 'italic' }}>Пусто</span>}
+                        {block.role && block.role !== 'primary' && <span style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: DIM }}>{block.role === 'accessory' ? 'АКС' : block.role}</span>}
+                      </span>
+                      <span style={{ width: 52, textAlign: 'center', color: ACCENT }}>{bs.length}×{reps}</span>
+                      <span style={{ width: 44, textAlign: 'center', color: (typeof rir === 'number' && rir <= 1) ? '#ef4444' : DIM_STRONG }}>R{rir}</span>
+                      <span style={{ width: 52, textAlign: 'center', color: DIM_STRONG }}>{wgt}</span>
+                      <span style={{ width: 48, textAlign: 'center', color: DIM }}>{tmp}</span>
+                      <span style={{ width: 44, textAlign: 'center', color: DIM }}>{rst}</span>
+                      <span style={{ width: 44, textAlign: 'center', fontSize: 11, fontWeight: 700, color: CHAR_MAP[chars] || DIM }}>{chars || block.type}</span>
+                    </div>
+                    {isExpanded && (
+                      <div style={{ padding: '6px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,230,138,0.03)' }}>
+                        {block.muscle && <div style={{ fontSize: 11, color: DIM }}>Мышца: <b style={{ color: DIM_STRONG }}>{GROUP_RU[block.muscle] || block.muscle}</b></div>}
+                        {block.rationale && <div style={{ fontSize: 11, color: '#60a5fa' }}>📝 {block.rationale}</div>}
+                        {block.note && <div style={{ fontSize: 11, color: '#f59e0b' }}>💬 {block.note}</div>}
+                        {block.comment && <div style={{ fontSize: 11, color: DIM, fontStyle: 'italic' }}>{block.comment}</div>}
+                        {block.repsRange && <div style={{ fontSize: 11, color: DIM }}>Диапазон: {block.repsRange}</div>}
+                        {block.warmupSets && block.warmupSets.length > 0 && <div style={{ fontSize: 11, color: DIM }}>Разминка: {block.warmupSets.length} подх.</div>}
+                        {bs.length > 1 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>{bs.map((set, si2) => <span key={si2} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM_STRONG }}>{set.reps}×R{set.rir}{set.weight ? `@${set.weight}кг` : ''}{set.note ? ` — ${set.note}` : ''}</span>)}</div>}
+                        {(block as any).techniques && (block as any).techniques.length > 0 && (block as any).techniques[0] !== 'none' && <div style={{ fontSize: 11, color: '#a78bfa', marginTop: 4 }}>🔧 {(block as any).techniques.map((t: string) => t.replace(/_/g, ' ')).join(', ')}</div>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         );
-      })()}
+      })}
+    </div>
+  );
+};
+
+/* ───── Панель автопериодизации ───── */
+export const AutoPeriodizationPanel: React.FC<{
+  weeks: number; goal: string; level: string;
+  onApply?: (phases: Array<{ startWeek: number; endWeek: number; phase: string }>) => void;
+}> = ({ weeks, goal, level, onApply }) => {
+  if (weeks < 2) return null;
+  let phases: Array<{ startWeek: number; endWeek: number; phase: string }> = [];
+  try { phases = distributePhases(weeks, 0, goal === 'powerlifting' ? 'strength' : 'bulk') || []; } catch { return null; }
+  if (!phases.length) return null;
+  const pc: Record<string, string> = { accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' };
+  return (
+    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #60a5fa' }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: '#60a5fa', marginBottom: 8 }}>📈 Авто-периодизация</div>
+      <div style={{ display: 'flex', height: 20, borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
+        {phases.map((p, i) => {
+          const c = pc[p.phase] || '#666';
+          const w = p.endWeek - p.startWeek + 1;
+          return <div key={i} style={{ width: `${(w / weeks) * 100}%`, height: '100%', background: c, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#000' }}>{w}н</div>;
+        })}
+      </div>
+      {phases.map((p, i) => {
+        const c = pc[p.phase] || '#666';
+        return (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 6px', fontSize: 11 }}>
+            <div style={{ width: 8, height: 8, borderRadius: 10, background: c, flexShrink: 0 }} />
+            <span style={{ color: c, fontWeight: 700, minWidth: 100 }}>{PHASE_LABELS_SP[p.phase] || p.phase}</span>
+            <span style={{ color: DIM }}>нед {p.startWeek}–{p.endWeek} ({p.endWeek - p.startWeek + 1} нед)</span>
+          </div>
+        );
+      })}
+      {onApply && (
+        <button onClick={() => onApply(phases)} style={{ marginTop: 8, padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa', fontWeight: 700, minHeight: 38, width: '100%' }}>
+          🔧 Применить периодизацию
+        </button>
+      )}
     </div>
   );
 };
@@ -133,7 +287,7 @@ export const ProgressionCoach: React.FC<PanelProps & { onCourse: boolean; course
           <span style={{ color: DIM }}>{p.curW}кг×{p.curR} RIR{p.curRIR}</span>
           <span style={{ color: '#22c55e', fontWeight: 700 }}>→</span>
           <span style={{ color: '#22c55e', fontWeight: 700 }}>{p.nextW}кг×{p.nextR} RIR{p.nextRIR}</span>
-          <span style={{ fontSize: 9, color: DIM }}>{p.label}</span>
+          <span style={{ fontSize: 11, color: DIM }}>{p.label}</span>
         </div>
       ))}
     </div>
@@ -158,10 +312,10 @@ export const SplitConsultant: React.FC<PanelProps> = ({ program, dir, onChange, 
         {candidates.map((c: any, ci: number) => (
           <div key={ci} style={{ padding: 8, borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)' }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#3b82f6' }}>{c.name}</div>
-            <div style={{ fontSize: 9, color: DIM }}>{c.desc}</div>
+            <div style={{ fontSize: 11, color: DIM }}>{c.desc}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
               {(c.groupsPerDay || []).map((day: string[], di: number) => (
-                <span key={di} style={{ fontSize: 8, padding: '2px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.06)', color: DIM_STRONG }}>Д{di+1}: {day.map((g: string) => (GROUP_RU[g as keyof typeof GROUP_RU] ?? g)).join('/')}</span>
+                <span key={di} style={{ fontSize: 11, padding: '3px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: DIM_STRONG }}>Д{di+1}: {day.map((g: string) => (GROUP_RU[g as keyof typeof GROUP_RU] ?? g)).join('/')}</span>
               ))}
             </div>
             <button style={{ marginTop: 6, padding: '6px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#3b82f6', fontWeight: 700, minHeight: 34 }}

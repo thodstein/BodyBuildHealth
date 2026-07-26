@@ -186,7 +186,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
       {/* ── Подфильтры ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>{focusLabel}</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>{focusLabel}</div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             <Chip label="Все" active={focus === 'all'} onClick={() => setFocus('all')} />
             {availableFocus.map(k => (
@@ -196,7 +196,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
         </div>
 
         <div>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Уровень</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Уровень</div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             <Chip label="Все" active={levelF === 'all'} onClick={() => setLevelF('all')} />
             {LEVELS.map(l => (
@@ -207,7 +207,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 160px' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Период</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Период</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <Chip label="Все" active={period === 'all'} onClick={() => setPeriod('all')} />
               {PERIODS.map(p2 => (
@@ -216,7 +216,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
             </div>
           </div>
           <div style={{ flex: '1 1 160px' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Длительность</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Длительность</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <Chip label="Все" active={weeks === 'all'} onClick={() => setWeeks('all')} />
               {Object.keys(WEEKS_LABELS).map(w => (
@@ -228,7 +228,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 160px' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Частота</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Частота</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <Chip label="Все" active={freq === 'all'} onClick={() => setFreq('all')} />
               {['2', '3', '4', '6'].map(f => (
@@ -238,7 +238,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
           </div>
           {availableAuthors.length > 0 && (
             <div style={{ flex: '1 1 160px' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Автор / источник</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Автор / источник</div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 <Chip label="Все" active={author === 'all'} onClick={() => setAuthor('all')} />
                 {availableAuthors.map(a => (
@@ -266,7 +266,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
             {recommendations.map(r => (
               <div key={r.cycle.meta.id} style={{ background: 'rgba(24,24,27,0.4)', borderRadius: 10, padding: 8, border: '1px solid rgba(0,230,138,0.18)' }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>{r.cycle.meta.title}</div>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)', margin: '2px 0 4px' }}>Скоринг подбора: {r.score}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', margin: '2px 0 4px' }}>Скоринг подбора: {r.score}</div>
                 {r.rationale.slice(0, 2).map((x, i) => (
                   <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>✓ {x}</div>
                 ))}
@@ -284,7 +284,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
         <div key={fk}>
           <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, margin: '6px 0 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span>{FOCUS_LABELS[fk] || fk}</span>
-            <span style={{ fontSize: 9, background: 'rgba(255,255,255,0.08)', borderRadius: 10, padding: '1px 7px', color: 'var(--text-dim)' }}>{cycles.length}</span>
+            <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.08)', borderRadius: 10, padding: '1px 7px', color: 'var(--text-dim)' }}>{cycles.length}</span>
           </div>
           {cycles.map(c => {
             const m = c.meta;
@@ -299,7 +299,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
                   <div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 5 }}>
                       {chips.map((ch, i) => (
-                        <span key={i} style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-dim)', background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '2px 7px' }}>{ch}</span>
+                        <span key={i} style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '2px 7px' }}>{ch}</span>
                       ))}
                     </div>
                     <div>{m.description}</div>

@@ -201,19 +201,19 @@ const ExerciseLabCatalog: React.FC<{
                       <div style={{ marginBottom: 4, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
                         {bio.spineLoad && (
                           <div style={{ background: LOAD_COLOR[bio.spineLoad] + '10', borderRadius: 6, padding: '4px 6px', textAlign: 'center', border: `1px solid ${LOAD_COLOR[bio.spineLoad]}30` }}>
-                            <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>🦴 Позвоночник</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>🦴 Позвоночник</div>
                             <div style={{ fontSize: 11, fontWeight: 700, color: LOAD_COLOR[bio.spineLoad] }}>{bio.spineLoad === 'high' ? 'Высокая' : bio.spineLoad === 'medium' ? 'Средняя' : 'Низкая'}</div>
                           </div>
                         )}
                         {bio.kneeLoad && (
                           <div style={{ background: LOAD_COLOR[bio.kneeLoad] + '10', borderRadius: 6, padding: '4px 6px', textAlign: 'center', border: `1px solid ${LOAD_COLOR[bio.kneeLoad]}30` }}>
-                            <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>🦵 Колено</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>🦵 Колено</div>
                             <div style={{ fontSize: 11, fontWeight: 700, color: LOAD_COLOR[bio.kneeLoad] }}>{bio.kneeLoad === 'high' ? 'Высокая' : bio.kneeLoad === 'medium' ? 'Средняя' : 'Низкая'}</div>
                           </div>
                         )}
                         {bio.shoulderLoad && (
                           <div style={{ background: LOAD_COLOR[bio.shoulderLoad] + '10', borderRadius: 6, padding: '4px 6px', textAlign: 'center', border: `1px solid ${LOAD_COLOR[bio.shoulderLoad]}30` }}>
-                            <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>💪 Плечо</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>💪 Плечо</div>
                             <div style={{ fontSize: 11, fontWeight: 700, color: LOAD_COLOR[bio.shoulderLoad] }}>{bio.shoulderLoad === 'high' ? 'Высокая' : bio.shoulderLoad === 'medium' ? 'Средняя' : 'Низкая'}</div>
                           </div>
                         )}
@@ -229,15 +229,15 @@ const ExerciseLabCatalog: React.FC<{
                       {/* ЦНС и сложность */}
                       <div style={{ marginBottom: 4, display: 'flex', gap: 4 }}>
                         <div style={{ flex: 1, background: 'rgba(245,158,11,0.04)', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>🧠 ЦНС</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>🧠 ЦНС</div>
                           <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>{bio.cnsDemand || 5}/5</div>
                         </div>
                         <div style={{ flex: 1, background: 'rgba(34,197,94,0.04)', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>📊 Сложность</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>📊 Сложность</div>
                           <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e' }}>{bio.difficulty}/10</div>
                         </div>
                         <div style={{ flex: 1, background: RISK_COLOR[bio.riskProfile] + '08', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>⚠ Риск</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>⚠ Риск</div>
                           <div style={{ fontSize: 11, fontWeight: 700, color: RISK_COLOR[bio.riskProfile] }}>{bio.riskProfile === 'low' ? 'Низкий' : bio.riskProfile === 'medium' ? 'Средний' : 'Высокий'}</div>
                         </div>
                       </div>

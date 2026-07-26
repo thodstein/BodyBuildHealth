@@ -16,6 +16,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getAllPrograms } from '../../../engines/complete-program-library.engine';
+import { expandProgramWeeks } from '../../../engines/program-progression.engine';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { getReferencedCycle } from '../../../engines/user-program/program-store';
@@ -33,7 +34,7 @@ import { ExerciseLabPicker } from './ExerciseLabPicker';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { BbContextPanel, PLContextPanel } from './program-editor-context-panels';
 import { BBEditor, PLEditor, BBConstraintsPanel } from './ProgramEditorComponents';
-import { DiagnosticPanel, VolumeLandmarksPanel, PhaseLegend, ExerciseInfo, RecommendationsPanel, ProgressionCoach, SplitConsultant } from './ProgramEditorPanels';
+import { DiagnosticPanel, VolumeLandmarksPanel, PhaseLegend, ExerciseInfo, RecommendationsPanel, ProgressionCoach, SplitConsultant, PlanSummaryTable, AutoPeriodizationPanel } from './ProgramEditorPanels';
 import { getTrainingMethods } from '../../../engines/training-methodology.engine';
 import { SET_TEMPLATES } from './program-types';
 import {
@@ -172,10 +173,11 @@ export const ProgramManagerPanel: React.FC = () => {
   };
 
   const startCloneLibrary = (program: FullProgram) => {
-    const p = cloneFromLibrary(program);
+    const expanded = expandProgramWeeks(program);
+    const p = cloneFromLibrary(expanded);
     setEditing(p);
     setPickerOpen(null);
-    flash('🔗 Программа клонирована в редактируемую копию');
+    flash('🔗 Программа клонирована (' + expanded.weeks.length + ' нед)');
   };
 
   const startCloneCycle = (cycleId: string) => {
@@ -259,17 +261,17 @@ export const ProgramManagerPanel: React.FC = () => {
             <button style={{ ...BTN, flex: 1, minHeight: 56, flexDirection: 'column', gap: 2 }} onClick={() => startCreate('bb')}>
               <span style={{ fontSize: 16 }}>💪</span>
               <span>ББ программа</span>
-              <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.8 }}>бодибилдинг: weeks→sessions→blocks</span>
+              <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8 }}>бодибилдинг: weeks→sessions→blocks</span>
             </button>
             <button style={{ ...BTN, flex: 1, minHeight: 56, flexDirection: 'column', gap: 2, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => startCreate('pl')}>
               <span style={{ fontSize: 16 }}>🏆</span>
               <span>ПЛ программа</span>
-              <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.8 }}>LMS-цикл + оверлей</span>
+              <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8 }}>LMS-цикл + оверлей</span>
             </button>
             <button style={{ ...BTN, flex: 1, minHeight: 56, flexDirection: 'column', gap: 2, color: '#3b82f6', borderColor: 'rgba(59,130,246,0.3)' }} onClick={() => startCreate('hybrid')}>
               <span style={{ fontSize: 16 }}>⚡</span>
               <span>Powerbuilder</span>
-              <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.8 }}>гибрид ПЛ+ББ</span>
+              <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8 }}>гибрид ПЛ+ББ</span>
             </button>
           </div>
         </div>
@@ -279,11 +281,11 @@ export const ProgramManagerPanel: React.FC = () => {
           <div style={{ display: 'flex', gap: 6 }}>
             <button style={{ ...BTN_GHOST, flex: 1, minHeight: 48, display: 'flex', flexDirection: 'column', gap: 2 }} onClick={() => setPickerOpen('bb')}>
               <span style={{ fontSize: 13 }}>🔍 Библиотека полных программ</span>
-              <span style={{ fontSize: 9, color: DIM }}>FullProgram → редактируемая копия</span>
+              <span style={{ fontSize: 11, color: DIM }}>FullProgram → редактируемая копия</span>
             </button>
             <button style={{ ...BTN_GHOST, flex: 1, minHeight: 48, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.2)', display: 'flex', flexDirection: 'column', gap: 2 }} onClick={() => setPickerOpen('pl')}>
               <span style={{ fontSize: 13 }}>📥 Подключить LMS-цикл</span>
-              <span style={{ fontSize: 9, color: DIM }}>процентки неизменны, оверлей ваш</span>
+              <span style={{ fontSize: 11, color: DIM }}>процентки неизменны, оверлей ваш</span>
             </button>
           </div>
         </div>
@@ -320,7 +322,7 @@ export const ProgramManagerPanel: React.FC = () => {
             Сохранённые ({filteredPrograms().length}{filteredPrograms().length !== programs.length ? ` из ${programs.length}` : ''})
           </span>
           {/* P1-6: JSON экспорт/импорт */}
-          <button style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 0 }} onClick={() => {
+          <button style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 38 }} onClick={() => {
             const json = JSON.stringify(programs, null, 2);
             const blob = new Blob([json], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -328,7 +330,7 @@ export const ProgramManagerPanel: React.FC = () => {
             a.click(); URL.revokeObjectURL(url);
             flash('📥 Экспортировано ' + programs.length + ' программ');
           }} title="Экспорт всех программ в JSON">📥 JSON</button>
-          <label style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 0, cursor: 'pointer', position: 'relative' }}>
+          <label style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 38, cursor: 'pointer', position: 'relative' }}>
             📤 JSON
             <input type="file" accept=".json" style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} onChange={e => {
               const file = e.target.files?.[0];
@@ -386,8 +388,8 @@ export const ProgramManagerPanel: React.FC = () => {
                 {p.meta.updatedAt && ' · ' + new Date(p.meta.updatedAt).toLocaleDateString()}
               </div>
             </div>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 0 }} onClick={() => openExisting(p.meta.id)}>Открыть</button>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 0 }} onClick={() => {
+            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38 }} onClick={() => openExisting(p.meta.id)}>Открыть</button>
+            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38 }} onClick={() => {
               const clone = JSON.parse(JSON.stringify(p));
               clone.meta.id = newId('prog');
               clone.meta.title = p.meta.title + ' (копия)';
@@ -399,9 +401,9 @@ export const ProgramManagerPanel: React.FC = () => {
               refresh();
               flash('📋 Клонировано: ' + clone.meta.title);
             }} title="Клонировать">⧉</button>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 0 }} onClick={() => { setCompareIds(prev => prev.includes(p.meta.id) ? prev.filter(x => x !== p.meta.id) : prev.length < 2 ? [...prev, p.meta.id] : [prev[1], p.meta.id]); }} title="Сравнить">⚖</button>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 0 }} onClick={() => copyProgramToClipboard(p)} title="Скопировать в буфер">📋</button>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 0, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeProgram(p.meta.id)}>✕</button>
+            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38 }} onClick={() => { setCompareIds(prev => prev.includes(p.meta.id) ? prev.filter(x => x !== p.meta.id) : prev.length < 2 ? [...prev, p.meta.id] : [prev[1], p.meta.id]); }} title="Сравнить">⚖</button>
+            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38 }} onClick={() => copyProgramToClipboard(p)} title="Скопировать в буфер">📋</button>
+            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeProgram(p.meta.id)}>✕</button>
           </div>
         ))}
       </div>
@@ -464,7 +466,7 @@ export const ProgramManagerPanel: React.FC = () => {
         <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>🪄 Визард создания программы — шаг {wizardStep} из 4</span>
-            <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 0 }} onClick={() => setWizardOpen(false)}>Отмена</button>
+            <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 38 }} onClick={() => setWizardOpen(false)}>Отмена</button>
           </div>
           {wizardStep === 1 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -528,7 +530,7 @@ export const ProgramManagerPanel: React.FC = () => {
         <div style={{ ...CARD, padding: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 800, color: ACCENT }}>Библиотека программ</span>
-            <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 0 }} onClick={() => setPickerOpen(null)}>Закрыть</button>
+            <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 38 }} onClick={() => setPickerOpen(null)}>Закрыть</button>
           </div>
           <BbProgramLibraryPicker value={null} label="Выбрать программу" programs={allLibraryPrograms} onSelect={startCloneLibrary} />
         </div>
@@ -538,7 +540,7 @@ export const ProgramManagerPanel: React.FC = () => {
         <div style={{ ...CARD, padding: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>Проф. ПЛ-циклы (immutable)</span>
-            <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 0 }} onClick={() => setPickerOpen(null)}>Закрыть</button>
+            <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 38 }} onClick={() => setPickerOpen(null)}>Закрыть</button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
             {plCycles.map(c => (
@@ -572,6 +574,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
 
   // Библиотека внутри редактора
   const [editorLibOpen, setEditorLibOpen] = useState<'bb' | 'pl' | 'methods' | null>(null);
+  const [showTableView, setShowTableView] = useState(false);
   const [methCat, setMethCat] = useState('all');
   const [methSearch, setMethSearch] = useState('');
   const libraryPrograms = useMemo(() => getAllPrograms(), []);
@@ -875,10 +878,10 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 0 }} onClick={safeBack}>← К списку</button>
+        <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38 }} onClick={safeBack}>← К списку</button>
         <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
         {program.meta.updatedAt && (
-          <span style={{ fontSize: 9, color: DIM, fontWeight: 500 }} title={`Создано: ${new Date(program.meta.createdAt).toLocaleString('ru-RU')}\nОбновлено: ${new Date(program.meta.updatedAt).toLocaleString('ru-RU')}`}>
+          <span style={{ fontSize: 11, color: DIM, fontWeight: 500 }} title={`Создано: ${new Date(program.meta.createdAt).toLocaleString('ru-RU')}\nОбновлено: ${new Date(program.meta.updatedAt).toLocaleString('ru-RU')}`}>
             · {(() => {
               const diff = Date.now() - new Date(program.meta.updatedAt).getTime();
               if (diff < 0 || diff < 60000) return 'только что';
@@ -915,6 +918,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       })()}
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: showTableView ? 'rgba(0,230,138,0.6)' : 'rgba(255,255,255,0.15)', color: showTableView ? '#00e68a' : DIM }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Редактор' : 'Таблица плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
           <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a' }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней">⚡ Авто-черновик</button>
           {/* Загрузить цикл/программу из библиотеки */}
           <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(245,158,11,0.4)', color: '#f59e0b' }}
@@ -993,10 +997,28 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       <DiagnosticPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
       <VolumeLandmarksPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
       <PhaseLegend weeks={program.meta.weeks} goal={program.meta.goal} level={program.meta.level} />
+      <AutoPeriodizationPanel weeks={program.meta.weeks} goal={program.meta.goal} level={program.meta.level}
+        onApply={(phases) => {
+          if (dir !== 'bb' || !program.bb) return;
+          const weeks = program.bb.weeks.map((w, i) => {
+            const phase = phases.find(p => i + 1 >= p.startWeek && i + 1 <= p.endWeek);
+            return { ...w, phase: (phase?.phase || w.phase) as any, deload: phase?.phase === 'deload' ? true : w.deload };
+          });
+          update({ bb: { ...program.bb!, weeks } });
+          showToast('📈 Периодизация применена: ' + phases.map(p => p.phase).join(' → '));
+        }}
+      />
       <ExerciseInfo program={program} dir={dir} />
       <RecommendationsPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
       <ProgressionCoach program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} onCourse={tprofile.onCourse ?? false} courseIntensity={tprofile.courseIntensity ?? 'moderate'} />
       <SplitConsultant program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
+
+      {showTableView && dir === 'bb' && program.bb && (
+        <PlanSummaryTable program={program} showWeek={execWeek} onShowWeekChange={setExecWeek} />
+      )}
+
+      {!showTableView && (
+      <>
 
       {((dir === 'bb' && program.bb?.weeks?.[0]?.sessions) || (dir === 'pl' && program.pl?.schedule)) && (() => {
         const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -1072,12 +1094,12 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                       <div key={i} style={{ padding: 10, borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.12)', fontSize: 11 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                           <span style={{ fontWeight: 800, color: DIM_STRONG }}>{m.name}</span>
-                          <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: m.evidenceLevel === 'A' ? 'rgba(34,197,94,0.15)' : m.evidenceLevel === 'B' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)', color: m.evidenceLevel === 'A' ? '#22c55e' : m.evidenceLevel === 'B' ? '#f59e0b' : '#ef4444' }}>{m.evidenceLevel}</span>
-                          <span style={{ fontSize: 9, color: DIM }}>{m.category}</span>
+                          <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: m.evidenceLevel === 'A' ? 'rgba(34,197,94,0.15)' : m.evidenceLevel === 'B' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)', color: m.evidenceLevel === 'A' ? '#22c55e' : m.evidenceLevel === 'B' ? '#f59e0b' : '#ef4444' }}>{m.evidenceLevel}</span>
+                          <span style={{ fontSize: 11, color: DIM }}>{m.category}</span>
                         </div>
                         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>{m.description}</div>
                         <div style={{ fontSize: 10, color: DIM }}>{m.howItWorks}</div>
-                        {m.example && <div style={{ fontSize: 9, color: DIM, marginTop: 2 }}>📋 {m.example}</div>}
+                        {m.example && <div style={{ fontSize: 11, color: DIM, marginTop: 2 }}>📋 {m.example}</div>}
                       </div>
                     ))}
                   </div>
@@ -1094,6 +1116,8 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           </div>
         );
       })()}
+
+      </> )}
 
       {/* P5.3 — RIR-progression chart: визуальная кривая RIR по неделям для текущего goal/level.
           Использует RIR_MATRIX из src/engines/rir-matrix.engine.ts если доступен. */}
@@ -1135,7 +1159,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           <div style={{ ...CARD, padding: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 4 }}>
               📉 RIR-волна по неделям
-              <span style={{ fontSize: 9, color: DIM, marginLeft: 6, fontWeight: 500 }}>
+              <span style={{ fontSize: 11, color: DIM, marginLeft: 6, fontWeight: 500 }}>
                 {program.meta.goal ?? '—'} · {program.meta.level ?? '—'} · {N} из {program.meta.weeks} нед
               </span>
             </div>
@@ -1161,7 +1185,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                   stroke={isMass ? '#f59e0b' : '#22c55e'} strokeDasharray="2 2" opacity="0.6" />
               ) : null)}
             </svg>
-            <div style={{ fontSize: 9, color: DIM, marginTop: 6, lineHeight: 1.4 }}>
+            <div style={{ fontSize: 11, color: DIM, marginTop: 6, lineHeight: 1.4 }}>
               {isMass
                 ? '🔄 Mass: волна 8 нед → 7-я делод (RIR4); к концу блока снижение RIR до 1 для пика.'
                 : goalKey === 'strength'
@@ -1195,7 +1219,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                 {q.issues.slice(0, 5).map((iss, i) => <div key={i} style={{ marginBottom: 2 }}>{iss}</div>)}
               </div>
             )}
-            <div style={{ fontSize: 9, color: DIM, marginTop: 4, fontStyle: 'italic' }}>
+            <div style={{ fontSize: 11, color: DIM, marginTop: 4, fontStyle: 'italic' }}>
               Оценка в реальном времени: weeklySets vs MRV. Зелёный ≥75, жёлтый ≥50, красный &lt;50.
             </div>
           </div>
@@ -1215,23 +1239,23 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
               <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>📊 Статистика плана{onCourse}</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 6 }}>
                 <div style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Недель</div>
+                  <div style={{ fontSize: 11, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Недель</div>
                   <div style={{ fontSize: 14, fontWeight: 800, color: DIM_STRONG }}>{program.bb.weeks.length}</div>
                 </div>
                 <div style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Сессий/нед</div>
+                  <div style={{ fontSize: 11, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Сессий/нед</div>
                   <div style={{ fontSize: 14, fontWeight: 800, color: DIM_STRONG }}>{program.bb.weeks[0]?.sessions.length ?? 0}</div>
                 </div>
                 <div style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Упражнений</div>
+                  <div style={{ fontSize: 11, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Упражнений</div>
                   <div style={{ fontSize: 14, fontWeight: 800, color: DIM_STRONG }}>{(program.bb.weeks[0]?.sessions ?? []).reduce((s, ss) => s + (ss.blocks?.length ?? 0), 0)}</div>
                 </div>
                 <div style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Сетов/нед</div>
+                  <div style={{ fontSize: 11, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Сетов/нед</div>
                   <div style={{ fontSize: 14, fontWeight: 800, color: DIM_STRONG }}>{(program.bb.weeks[0]?.sessions ?? []).reduce((s, ss) => s + (ss.blocks ?? []).reduce((s2, b) => s2 + (b.sets?.length ?? 0), 0), 0)}</div>
                 </div>
               </div>
-              <div style={{ marginTop: 6, fontSize: 9, color: DIM, lineHeight: 1.4 }}>
+              <div style={{ marginTop: 6, fontSize: 11, color: DIM, lineHeight: 1.4 }}>
                 Тяж {m.тяжPct?.toFixed?.(0) ?? 0}% / Памп {m.пампPct?.toFixed?.(0) ?? 0}% · Средний RIR {m.avgRir?.toFixed?.(1) ?? '—'}
               </div>
             </div>
@@ -1292,9 +1316,9 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           <div style={{ ...CARD, padding: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>
               🔧 Применить ко всем блокам
-              <span style={{ fontSize: 9, color: DIM, marginLeft: 6, fontWeight: 500 }}>(сейчас: {INTENSITY_TECHNIQUES[curIntensity as IntensityTechnique]?.label ?? curIntensity})</span>
+              <span style={{ fontSize: 11, color: DIM, marginLeft: 6, fontWeight: 500 }}>(сейчас: {INTENSITY_TECHNIQUES[curIntensity as IntensityTechnique]?.label ?? curIntensity})</span>
             </div>
-            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(167,139,250,0.7)', marginBottom: 4 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(167,139,250,0.7)', marginBottom: 4 }}>
               Интенсив-техника:
             </div>
              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
@@ -1309,7 +1333,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                 </button>
               ))}
             </div>
-            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(34,197,94,0.7)', marginBottom: 4 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(34,197,94,0.7)', marginBottom: 4 }}>
               Характер дня (отдых + темп):
             </div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -1324,7 +1348,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                 </button>
               ))}
             </div>
-            <div style={{ fontSize: 9, color: DIM, marginTop: 4, fontStyle: 'italic' }}>
+            <div style={{ fontSize: 11, color: DIM, marginTop: 4, fontStyle: 'italic' }}>
               Применяет выбор ко всем Weeks→Sessions→Blocks. Темп/RIR правила — из RIR_MATRIX[goal][level].
             </div>
           </div>
@@ -1405,10 +1429,10 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
             {editorLibOpen === 'bb' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '60vh', overflow: 'auto' }}>
                 {libraryPrograms.map(pr => (
-                  <button key={pr.id ?? pr.name} onClick={() => loadIntoEditor(cloneFromLibrary(pr))}
+                  <button key={pr.id ?? pr.name} onClick={() => loadIntoEditor(cloneFromLibrary(expandProgramWeeks(pr)))}
                     style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)', color: DIM_STRONG, cursor: 'pointer', fontSize: 11 }}>
                     <div style={{ fontWeight: 700 }}>{pr.name}</div>
-                    <div style={{ fontSize: 10, color: DIM }}>{pr.author} · {pr.goal} · {pr.daysPerWeek}д/нед · {pr.durationWeeks}нед</div>
+                    <div style={{ fontSize: 11, color: DIM }}>{pr.author} · {pr.goal} · {pr.daysPerWeek}д/нед · {pr.durationWeeks}нед</div>
                   </button>
                 ))}
               </div>
@@ -1429,7 +1453,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       )}
 
       {/* P2.11: редактирование constraints (оборудование, травмы, avoidAxialLoad, любимые/исключённые) + progression */}
-      {dir === 'bb' && program.bb && (
+      {!showTableView && dir === 'bb' && program.bb && (
         <BBConstraintsPanel
           constraints={program.bb.constraints ?? { equipment: [] }}
           progression={program.bb.progression ?? { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] }}
@@ -1438,9 +1462,9 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         />
       )}
 
-      {dir === 'bb' && program.bb && <BBEditor body={program.bb} level={program.meta.level} onChange={(bb) => update({ bb })} />}
-      {dir === 'pl' && program.pl && <PLEditor body={program.pl} onChange={(pl) => update({ pl })} />}
-      {dir === 'hybrid' && program.hybrid && (
+      {!showTableView && dir === 'bb' && program.bb && <BBEditor body={program.bb} level={program.meta.level} onChange={(bb) => update({ bb })} />}
+      {!showTableView && dir === 'pl' && program.pl && <PLEditor body={program.pl} onChange={(pl) => update({ pl })} />}
+      {!showTableView && dir === 'hybrid' && program.hybrid && (
         <>
           <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #3b82f6', background: 'rgba(59,130,246,0.06)' }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#3b82f6' }}>⚡ Powerbuilder (Hybrid)</div>
@@ -1470,7 +1494,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 6px', borderRadius: 4, background: iss.level === 'error' ? 'rgba(239,68,68,0.08)' : iss.level === 'warning' ? 'rgba(245,158,11,0.08)' : 'rgba(59,130,246,0.08)' }}>
                   <span style={{ fontSize: 10, color: iss.level === 'error' ? '#ef4444' : iss.level === 'warning' ? '#f59e0b' : '#3b82f6', fontWeight: 800, minWidth: 16 }}>{iss.level === 'error' ? '✕' : iss.level === 'warning' ? '!' : 'i'}</span>
                   <span style={{ fontSize: 10, color: '#fff' }}>{iss.message}</span>
-                  <span style={{ fontSize: 9, color: DIM, marginLeft: 'auto' }}>{iss.code}</span>
+                  <span style={{ fontSize: 11, color: DIM, marginLeft: 'auto' }}>{iss.code}</span>
                 </div>
               ))}
             </div>
@@ -1492,7 +1516,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                 <div key={r.ts} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
                   <span style={{ fontSize: 10, color: DIM_STRONG, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.note}</span>
                   <span style={{ fontSize: 10, color: DIM }}>{new Date(r.ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-                  <button style={{ ...BTN_GHOST, padding: '2px 6px', fontSize: 9, minHeight: 0, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeRev(realIdx)} title="Удалить запись">✕</button>
+                  <button style={{ ...BTN_GHOST, padding: '2px 6px', fontSize: 11, minHeight: 38, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeRev(realIdx)} title="Удалить запись">✕</button>
                 </div>
               );
             })}

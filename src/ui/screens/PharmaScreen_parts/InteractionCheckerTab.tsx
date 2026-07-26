@@ -22,6 +22,7 @@ export const InteractionCheckerTab: React.FC = () => {
   const linked = useDataLink();
   const [interactSub, setInteractSub] = useState<'interactions' | 'synergies' | 'unified'>('interactions');
   const [unifiedOnlyCritical, setUnifiedOnlyCritical] = useState(false);
+  const [unifiedSeverity, setUnifiedSeverity] = useState<'CRITICAL'|'HIGH'|'ALL'>('HIGH'); // по умолчанию только крит+высокие
   const [interactDetail, setInteractDetail] = useState<'conflicts' | 'instructions'>('conflicts');
   const PHARMA_INTERACT_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other']);
   const allSubstances = useMemo(() => {
@@ -83,6 +84,13 @@ export const InteractionCheckerTab: React.FC = () => {
   };
 
   const validIds = selectedIds.filter(Boolean);
+
+  // Только выбранные пользователем препараты (не все подряд)
+  const selectedPharma = useMemo(() => {
+    if (validIds.length === 0) return allSubstances;
+    const idSet = new Set(validIds);
+    return allSubstances.filter(s => idSet.has(s.id));
+  }, [allSubstances, validIds]);
 
   const interactFiltered = interactSearch
     ? allSubstances.filter(p => (p.name||'').toLowerCase().includes(interactSearch.toLowerCase()) || (p.class||'').toLowerCase().includes(interactSearch.toLowerCase()))
@@ -197,7 +205,11 @@ export const InteractionCheckerTab: React.FC = () => {
         substances: validIdsForUnified.filter(Boolean),
         course: courseForUnified.filter(c => c.substanceId),
       });
-      const items = filterAndSortInteractions(result.all, unifiedOnlyCritical ? { onlyCritical: true } : {});
+      const items = filterAndSortInteractions(result.all,
+        unifiedOnlyCritical ? { onlyCritical: true } :
+        unifiedSeverity === 'HIGH' ? { maxSeverity: 'HIGH' } :
+        {}
+      );
       return (
         <div style={{
           background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
@@ -220,14 +232,17 @@ export const InteractionCheckerTab: React.FC = () => {
             <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>·</span>
             <span style={{ fontSize: 10, color: '#ef4444' }}>{result.bySeverity.CRITICAL.length} CRIT</span>
             <span style={{ fontSize: 10, color: '#f59e0b' }}>· {result.bySeverity.HIGH.length} HIGH</span>
-            <button onClick={() => setUnifiedOnlyCritical(!unifiedOnlyCritical)} style={{
-              marginLeft: 'auto',
-              padding: '4px 10px', borderRadius: 12, fontSize: 9, fontWeight: 600,
-              cursor: 'pointer',
-              background: unifiedOnlyCritical ? 'var(--accent)' : 'var(--bg-secondary)',
-              color: unifiedOnlyCritical ? '#000' : 'var(--text-dim)',
-              border: `1px solid ${unifiedOnlyCritical ? 'var(--accent)' : 'var(--border)'}`,
-            }}>{unifiedOnlyCritical ? '🔓 Показать все' : '🔒 Только CRITICAL'}</button>
+            <div style={{ marginLeft:'auto', display:'flex', gap:2 }}>
+              {(['CRITICAL','HIGH','ALL'] as const).map(s => (
+                <button key={s} onClick={() => { if (s==='CRITICAL') { setUnifiedOnlyCritical(true); } else { setUnifiedOnlyCritical(false); setUnifiedSeverity(s); } }} style={{
+                  padding:'4px 8px', borderRadius:s==='CRITICAL'?'12px 0 0 12px':s==='ALL'?'0 12px 12px 0':'0', fontSize:10, fontWeight:600,
+                  cursor:'pointer',
+                  background: (s==='CRITICAL'&&unifiedOnlyCritical)||(s==='HIGH'&&!unifiedOnlyCritical&&unifiedSeverity==='HIGH')||(s==='ALL'&&!unifiedOnlyCritical&&unifiedSeverity==='ALL') ? 'var(--accent)' : 'var(--bg-secondary)',
+                  color: (s==='CRITICAL'&&unifiedOnlyCritical)||(s==='HIGH'&&!unifiedOnlyCritical&&unifiedSeverity==='HIGH')||(s==='ALL'&&!unifiedOnlyCritical&&unifiedSeverity==='ALL') ? '#000' : 'var(--text-dim)',
+                  border: '1px solid var(--border)',
+                }}>{s==='CRITICAL'?'🔴Крит':s==='HIGH'?'⚠ Высокие':'Все'}</button>
+              ))}
+            </div>
           </div>
           <TimingTelemetryPanel autoRefreshMs={3000} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -464,10 +479,11 @@ export const InteractionCheckerTab: React.FC = () => {
           <>
             <h3 style={{ margin: '0 0 4px 0', fontSize: 14, color: 'var(--accent)' }}>⚡ Взаимодействия по препаратам</h3>
             <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 12px 0' }}>
-              Информация о взаимодействиях для каждого препарата каталога фармакологии и пептидов
+              Взаимодействия для выбранных препаратов курса
+              {validIds.length === 0 ? ' (выберите препараты в селекторе выше)' : ` (${selectedPharma.length} из ${allSubstances.length})`}
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {allSubstances.map(sub => {
+              {(validIds.length === 0 ? allSubstances : selectedPharma).map(sub => {
                 const conflicts = sub.conflicts || [];
                 const linkedSubs = (sub.linkedSubstances || []).filter(ls => PHARMA_DB[ls.id]);
                 if (conflicts.length === 0 && linkedSubs.length === 0) return null;

@@ -74,6 +74,8 @@ export const LibraryZone: React.FC<Props> = (p) => {
             selectedProgram={p.selectedProgram}
             setSelectedProgram={p.setSelectedProgram}
             onAddToMyTraining={(exs) => p.setCustomExercises(prev => [...prev, ...exs])}
+            onLoadToConstructor={(prog) => { p.setCustomExercises(prev => [...prev, ...(prog.exercises || [])]); }}
+            goPlannerManual={p.goPlannerManual}
           />
         </InfoErrorBoundary>
       )}

@@ -498,7 +498,7 @@ export const TrainingScreen: React.FC = () => {
             <div style={{ marginBottom: 8 }}>
               {cats.map(cat => (
                 <div key={cat.label} style={{ marginBottom: 6 }}>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', margin: '2px 0 2px', textTransform: 'uppercase', letterSpacing: 0.3 }}>{cat.icon} {cat.label}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', margin: '2px 0 2px', textTransform: 'uppercase', letterSpacing: 0.3 }}>{cat.icon} {cat.label}</div>
                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                     {cat.tabs.map(k => (
                       <button key={k} onClick={() => { hapticImpact('light'); goTab(k); }} style={{
@@ -546,15 +546,15 @@ export const TrainingScreen: React.FC = () => {
               { label: 'Усталость', value: 100 - (readiness.fatigue ?? 50), color: (readiness.fatigue ?? 50) < 40 ? '#22c55e' : '#ef4444' },
             ].map(item => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: 9, color: 'var(--text-dim)', minWidth: 38, whiteSpace:'normal' }}>{item.label}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 38, whiteSpace:'normal' }}>{item.label}</span>
                 <div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 3, height: 4, overflow: 'hidden' }}>
                   <div style={{ width: `${Math.min(100, Math.max(0, item.value))}%`, height: '100%', background: item.color, borderRadius: 3 }} />
                 </div>
-                <span style={{ fontSize: 9, fontWeight: 600, color: item.color, minWidth: 22, textAlign: 'right' }}>{Math.round(item.value)}%</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: item.color, minWidth: 22, textAlign: 'right' }}>{Math.round(item.value)}%</span>
               </div>
             ))}
           </div>
-          {(() => { const srpe = loadSRPESessions(); if (srpe.length < 2) return null; const acwr = acuteChronicRatio(toDailyLoads(srpe)); const zoneColor = acwr.ratio > 1.5 ? '#ef4444' : acwr.ratio > 1.3 ? '#eab308' : acwr.ratio < 0.8 ? '#3b82f6' : '#22c55e'; const zoneLabel = acwr.ratio > 1.5 ? 'опасно' : acwr.ratio > 1.3 ? 'осторожно' : acwr.ratio < 0.8 ? 'недотрен' : 'оптимум'; return <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, fontSize: 9 }}><span style={{ color: 'var(--text-dim)', minWidth: 38 }}>Нагрузка</span><div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 3, height: 4, overflow: 'hidden' }}><div style={{ width: Math.min(100, acwr.ratio * 50) + '%', height: '100%', background: zoneColor, borderRadius: 3 }} /></div><span style={{ fontWeight: 700, color: zoneColor, minWidth: 50, textAlign: 'right', fontSize:9 }}>ACWR {acwr.ratio.toFixed(2)} · {zoneLabel}</span></div>; })()}
+          {(() => { const srpe = loadSRPESessions(); if (srpe.length < 2) return null; const acwr = acuteChronicRatio(toDailyLoads(srpe)); const zoneColor = acwr.ratio > 1.5 ? '#ef4444' : acwr.ratio > 1.3 ? '#eab308' : acwr.ratio < 0.8 ? '#3b82f6' : '#22c55e'; const zoneLabel = acwr.ratio > 1.5 ? 'опасно' : acwr.ratio > 1.3 ? 'осторожно' : acwr.ratio < 0.8 ? 'недотрен' : 'оптимум'; return <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}><span style={{ color: 'var(--text-dim)', minWidth: 38 }}>Нагрузка</span><div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 3, height: 4, overflow: 'hidden' }}><div style={{ width: Math.min(100, acwr.ratio * 50) + '%', height: '100%', background: zoneColor, borderRadius: 3 }} /></div><span style={{ fontWeight: 700, color: zoneColor, minWidth: 50, textAlign: 'right', fontSize:11 }}>ACWR {acwr.ratio.toFixed(2)} · {zoneLabel}</span></div>; })()}
         </div>
       )}
 
@@ -571,7 +571,7 @@ export const TrainingScreen: React.FC = () => {
                 <button key={m.id} onClick={() => { hapticImpact('medium'); switchPlanningTrack(m.id); }} style={{ flex:'0 0 auto', minWidth:104, padding:'8px 10px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', border: planningTrack === m.id ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)', background: planningTrack === m.id ? 'rgba(0,230,138,0.20)' : 'rgba(255,255,255,0.02)', color: planningTrack === m.id ? '#ffffff' : 'var(--text-dim)', display:'flex', flexDirection:'column', alignItems:'center', gap:2, whiteSpace:'nowrap', boxShadow: planningTrack === m.id ? '0 0 0 1px rgba(0,230,138,0.4), 0 2px 10px rgba(0,0,0,0.25)' : 'none' }}>
                   <span style={{ fontSize:16 }}>{m.icon}</span>
                   <span>{m.label}</span>
-                  <span style={{ fontSize:9, fontWeight:400, opacity:0.75, lineHeight:1.2, maxWidth:'100%', overflow:'hidden', textOverflow:'ellipsis' }}>{m.hint}</span>
+                  <span style={{ fontSize:11, fontWeight:400, opacity:0.75, lineHeight:1.2, maxWidth:'100%', overflow:'hidden', textOverflow:'ellipsis' }}>{m.hint}</span>
                 </button>
               ))}
             </div>

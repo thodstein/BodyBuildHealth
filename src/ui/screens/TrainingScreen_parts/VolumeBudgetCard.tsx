@@ -47,7 +47,7 @@ export const VolumeBudgetCard: React.FC<{ metrics: BBPlanMetrics | null; mrvMult
       </div>
 
       {/* Легенда */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 8, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8, fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
         <span><span style={{ color: '#22c55e' }}>●</span> MEV (минимум)</span>
         <span><span style={{ color: '#f59e0b' }}>●</span> MAV (оптимум)</span>
         <span><span style={{ color: '#ef4444' }}>●</span> MRV (максимум)</span>
@@ -74,11 +74,11 @@ export const VolumeBudgetCard: React.FC<{ metrics: BBPlanMetrics | null; mrvMult
               {/* MRV marker */}
               <div title={`MRV ${m.mrv}`} style={{ position: 'absolute', left: pct(m.mrv) + '%', top: -2, bottom: -2, width: 2, background: '#ef4444' }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 3 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 3 }}>
               <span>MEV {m.mev} · MAV {m.mav} · MRV {m.mrv}</span>
               <span>частота {m.frequencyPerRotation}×/рот · тяж {тяжPct}% · RIR {m.avgRir.toFixed(1)}</span>
             </div>
-            <div style={{ fontSize: 9, color: st.color, fontWeight: 600 }}>{recommendation(m)}</div>
+            <div style={{ fontSize: 11, color: st.color, fontWeight: 600 }}>{recommendation(m)}</div>
           </div>
         );
       })}

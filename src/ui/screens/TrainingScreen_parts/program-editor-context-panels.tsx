@@ -128,7 +128,7 @@ export const BbContextPanel: React.FC<{ program: UserProgram; level: string }> =
 
 const Mini: React.FC<{ label: string; value: number | string }> = ({ label, value }) => (
   <div style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.02)', borderRadius: 6, textAlign: 'center' }}>
-    <div style={{ fontSize: 9, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>{label}</div>
+    <div style={{ fontSize: 11, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>{label}</div>
     <div style={{ fontSize: 13, fontWeight: 800, color: DIM_STRONG }}>{value}</div>
   </div>
 );
@@ -235,10 +235,10 @@ export const PLContextPanel: React.FC<{ program: UserProgram }> = ({ program }) 
             <div style={{ fontSize: 10, fontWeight: 700, color: DIM_STRONG, marginBottom: 4 }}>
               Неделя {wi + 1}{wi === 0 ? ' (anchor)' : ''}{wi > 0 && cycle.meta.correctionPct ? ` · PM × ${(1 + (wi * cycle.meta.correctionPct * 100)).toFixed(1)}%` : ''}
             </div>
-            {week.length === 0 && <div style={{ fontSize: 9, color: DIM }}>Дней нет.</div>}
+            {week.length === 0 && <div style={{ fontSize: 11, color: DIM }}>Дней нет.</div>}
             {week.map((day, di) => (
               <div key={di} style={{ marginBottom: 4, padding: '4px 6px', background: 'rgba(0,0,0,0.25)', borderRadius: 6 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#a78bfa' }}>День {di + 1}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa' }}>День {di + 1}</div>
                 {day.exercises.map((ex: { name: string; group: string; sets: Array<{ pct: number; reps: number; sets: number }> }, ei: number) => {
                   const liftMatch = /скам|скват|жим|тяг|прис/i.test((ex.name || '') + ' ' + (ex.group || ''));
                   let lift: 'squat' | 'bench' | 'dead' | null = null;
@@ -249,12 +249,12 @@ export const PLContextPanel: React.FC<{ program: UserProgram }> = ({ program }) 
                   }
                   const wmVal = lift ? (wm[lift] ?? null) : null;
                   return (
-                    <div key={ei} style={{ fontSize: 9, color: DIM_STRONG, padding: '2px 0', display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    <div key={ei} style={{ fontSize: 11, color: DIM_STRONG, padding: '2px 0', display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                       <span style={{ color: DIM, minWidth: 14 }}>{ei + 1}.</span>
                       <span style={{ flex: 1, fontWeight: 600 }}>{ex.name}</span>
-                      <span style={{ fontSize: 8, color: DIM }}>{ex.group}</span>
+                      <span style={{ fontSize: 11, color: DIM }}>{ex.group}</span>
                       {ex.sets.map((s, si) => (
-                        <span key={si} style={{ padding: '1px 4px', borderRadius: 4, background: 'rgba(167,139,250,0.15)', color: '#a78bfa', fontSize: 8, fontWeight: 600 }}>
+                        <span key={si} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(167,139,250,0.15)', color: '#a78bfa', fontSize: 11, fontWeight: 600, minHeight: 24 }}>
                           {s.sets}×{s.reps}@{Math.round(s.pct * 100)}%
                           {wmVal ? `=${Math.round((wmVal * s.pct) / 2.5) * 2.5}кг` : ''}
                         </span>
@@ -281,9 +281,9 @@ export const PLContextPanel: React.FC<{ program: UserProgram }> = ({ program }) 
 
 const WmField: React.FC<{ label: string; value: number | undefined; subHint?: string }> = ({ label, value, subHint }) => (
   <div style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.02)', borderRadius: 6, textAlign: 'center' }}>
-    <div style={{ fontSize: 9, color: DIM }}>{label}</div>
+    <div style={{ fontSize: 11, color: DIM }}>{label}</div>
     <div style={{ fontSize: 14, fontWeight: 800, color: value ? ACCENT : DIM }}>{value ?? '—'}</div>
-    {subHint && <div style={{ fontSize: 8, color: DIM, marginTop: 2 }}>{subHint}</div>}
+    {subHint && <div style={{ fontSize: 11, color: DIM, marginTop: 2 }}>{subHint}</div>}
   </div>
 );
 

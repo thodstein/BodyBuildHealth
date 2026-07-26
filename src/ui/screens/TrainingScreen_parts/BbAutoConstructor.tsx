@@ -869,7 +869,7 @@ export const BbAutoConstructor: React.FC = () => {
                           color: bbAdaptMode === 'adapt' ? '#00e68a' : 'rgba(255,255,255,0.6)',
                         }}>🔧 Адаптировать</button>
                       </div>
-                      <div style={{ marginTop: 6, fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>
+                      <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>
                         {bbAdaptMode === 'faithful'
                           ? 'Все недели, RIR/множители/фазы/warmup/rest/reps/notes берутся дословно из программы. Применяются только safety-фильтры (травмы/исключённые упражнения/оборудование).'
                           : 'Структура программы сохраняется, но добавляется добивка слабых групп (+isolation), интенсив-техники, авто-делод и стратегия прогрессии.'}
@@ -1439,7 +1439,7 @@ export const BbAutoConstructor: React.FC = () => {
                 </div>
                 <div style={{ textAlign:'center', padding:6, borderRadius:8, background: zoneColor + '10' }}>
                   <div style={{ color:'rgba(255,255,255,0.5)', fontSize:10 }}>ACWR</div>
-                  <div style={{ fontWeight:700, color: zoneColor }}>{acwrData.ratio.toFixed(2)} <span style={{ fontSize:9 }}>{zoneLabel}</span></div>
+                  <div style={{ fontWeight:700, color: zoneColor }}>{acwrData.ratio.toFixed(2)} <span style={{ fontSize:11 }}>{zoneLabel}</span></div>
                 </div>
               </div>
               {acwrData.ratio > 1.3 && <div style={{ marginTop:6, fontSize:10, color:'#f59e0b' }}>⚠ Восстановление недостаточно — план учитывает авторегуляцию.</div>}
@@ -2195,8 +2195,8 @@ export const BbAutoConstructor: React.FC = () => {
                           <span style={{ color: v.metrics.qualityScore >= 75 ? '#22c55e' : v.metrics.qualityScore >= 50 ? '#f59e0b' : '#ef4444', fontWeight:700 }}>{v.metrics.qualityScore}</span>
                         </td>
                         <td style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)', display:'flex', gap:4 }}>
-                          <button onClick={() => handleLoadVariant(v)} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:9, fontWeight:700 }}>↩</button>
-                          <button onClick={() => handleDeleteVariant(v.id)} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontSize:9, fontWeight:700 }}>✕</button>
+                          <button onClick={() => handleLoadVariant(v)} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:11, fontWeight:700 }}>↩</button>
+                          <button onClick={() => handleDeleteVariant(v.id)} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontSize:11, fontWeight:700 }}>✕</button>
                         </td>
                       </tr>
                     ))}

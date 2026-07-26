@@ -130,22 +130,22 @@ export const HybridPlanPanel: React.FC<{
       {built && (
         <div style={{ ...CARD, padding: 10, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.2)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', marginBottom: 4 }}>📋 {built.cycle.meta.title}</div>
-          <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.4 }}>{built.rationale}</div>
-          {built.daysByWeek.slice(0, 2).map((days, wi) => (
+          <div style={{ fontSize: 11, color: DIM, marginBottom: 8, lineHeight: 1.4 }}>{built.rationale}</div>
+          {built.daysByWeek.map((days, wi) => (
             <div key={wi} style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: DIM_STRONG, marginBottom: 4 }}>Неделя {built.heavyWeeks[wi].week}</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: DIM_STRONG, marginBottom: 4 }}>Неделя {built.heavyWeeks[wi].week}</div>
               {days.map((d: HybridDay, di) => (
                 <div key={di} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', marginBottom: 6, borderLeft: `3px solid ${LIFT_COLOR[d.mainLift]}` }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: LIFT_COLOR[d.mainLift], marginBottom: 4 }}>{LIFT_LABEL[d.mainLift]} — день {d.dayIdx + 1}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>🏋 Сила (цикл):</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: LIFT_COLOR[d.mainLift], marginBottom: 4 }}>{LIFT_LABEL[d.mainLift]} — день {d.dayIdx + 1}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>🏋 Сила (цикл):</div>
                   {d.heavy.exercises.map((ex, ei) => (
                     <div key={ei} style={{ fontSize: 11, color: DIM_STRONG, padding: '2px 0 2px 8px' }}><b>{ex.name}</b> — {fmtHeavy(ex)}</div>
                   ))}
                   {d.accessories.length > 0 && (
                     <>
-                      <div style={{ fontSize: 10, color: ACCENT, marginTop: 4, marginBottom: 2 }}>💪 Масса (аксессуары):</div>
+                      <div style={{ fontSize: 11, color: ACCENT, marginTop: 4, marginBottom: 2 }}>💪 Масса (аксессуары):</div>
                       {d.accessories.map((a, ai) => (
-                        <div key={ai} style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', padding: '2px 0 2px 8px' }}><b>{a.name}</b> — {a.sets}×{a.workSets[0]?.reps} @{a.workSets[0]?.weight}кг RIR{a.rir} <span style={{ opacity: 0.5 }}>({GROUP_RU[a.muscle] || a.muscle})</span></div>
+                        <div key={ai} style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', padding: '2px 0 2px 8px' }}><b>{a.name}</b> — {a.sets}×{a.workSets[0]?.reps} @{a.workSets[0]?.weight}кг RIR{a.rir} <span style={{ opacity: 0.6 }}>({GROUP_RU[a.muscle] || a.muscle})</span></div>
                       ))}
                     </>
                   )}

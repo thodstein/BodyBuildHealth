@@ -78,47 +78,17 @@ export function SubstanceTzCard({ id }: { id: string }) {
   );
 }
 
-export type BSTab = 'profile' | 'select' | 'stack' | 'reports';
+export type BSTab = 'profile' | 'build' | 'analysis';
 
 export const SUB_TABS: { id: BSTab; label: string }[] = [
   { id: 'profile', label: '👤 Профиль' },
-  { id: 'select', label: '🔍 Подбор' },
-  { id: 'stack', label: '📋 Мой стек' },
-  { id: 'reports', label: '📊 Итоги' },
+  { id: 'build', label: '🔧 Сборка' },
+  { id: 'analysis', label: '📊 Анализ' },
 ];
 
-export const SUB_TAB_GROUPS: Record<string, { id: string; label: string }[]> = {
-  profile: [
-    { id: 'settings', label: '⚙️ Профиль' },
-  ],
-  select: [
-    { id: 'search', label: '🔍 Поиск' },
-    { id: 'analog', label: '🔁 Аналог' },
-    { id: 'build', label: '🧩 Сборка' },
-    { id: 'complexes', label: '🧪 Комплексы' },
-  ],
-  stack: [
-    { id: 'mystack', label: '📋 Стек' },
-    { id: 'interactions', label: '⚗️ Взаимод.' },
-    { id: 'dose', label: '💊 Доза' },
-    { id: 'timing', label: '⏰ Время' },
-    { id: 'clinical', label: '🩺 Клин.' },
-    { id: 'drugcheck', label: '💊 ЛС' },
-  ],
-  reports: [
-    { id: 'reports', label: '📊 Отчёты' },
-    { id: 'risks', label: '⚠ Риски' },
-    { id: 'compare', label: '⚖ Сравн.' },
-    { id: 'export', label: '📤 Экспорт' },
-  ],
-};
+export const SUB_TAB_GROUPS: Record<string, { id: string; label: string }[]> = {};
 
-export const DEFAULT_SUB: Record<string, string> = {
-  profile: 'settings',
-  select: 'search',
-  stack: 'mystack',
-  reports: 'reports',
-};
+export const DEFAULT_SUB: Record<string, string> = {};
 
 export const GOALS: { key: GoalType; label: string }[] = [
   { key:'sleep', label:'😴 Сон' }, { key:'energy', label:'⚡ Энергия' },

@@ -125,7 +125,7 @@ export const BbProgramLibraryPicker: React.FC<{
       <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>
         {sel ? `${sel.name} · ${sel.durationWeeks} нед · ${sel.daysPerWeek}×/нед · ${sel.level}` : 'Выбрать программу...'}
       </div>
-      {value && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>Всего в библиотеке: {deduped.length}</div>}
+      {value && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>Всего в библиотеке: {deduped.length}</div>}
     </button>
     {open && (
       <PortalOverlay onClose={() => setOpen(false)}>
@@ -187,21 +187,21 @@ export const BbProgramLibraryPicker: React.FC<{
                       {p.name}
                       {isSel && <span style={{ fontSize: 10, marginLeft: 4 }}>✓</span>}
                     </span>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
                       {p.durationWeeks} нед · {p.daysPerWeek}× · {p.level}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 3, fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 3, fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
                     {p.type && <span>📋 {p.type}</span>}
                     {p.goal && <span>🎯 {p.goal}</span>}
                     {p.direction && <span>🗺️ {p.direction}</span>}
                   </div>
                   {p.description && (
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 3, lineHeight: 1.4 }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 3, lineHeight: 1.4 }}>
                       {p.description.slice(0, 140)}{p.description.length > 140 ? '…' : ''}
                     </div>
                   )}
-                  {isDisabled && <div style={{ fontSize: 9, color: 'rgba(255,107,107,0.7)', marginTop: 3 }}>Недоступно для текущей конфигурации</div>}
+                  {isDisabled && <div style={{ fontSize: 11, color: 'rgba(255,107,107,0.7)', marginTop: 3 }}>Недоступно для текущей конфигурации</div>}
                 </button>;
               })}
             </div>

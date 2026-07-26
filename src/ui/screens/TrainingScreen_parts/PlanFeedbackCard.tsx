@@ -73,7 +73,7 @@ export const PlanFeedbackCard: React.FC<{
           })}
         </div>
       )}
-      <div style={{ marginTop: 6, fontSize: 9, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
+      <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
         RIR-дельта = факт − цель. Отрицательная (тяжелее цели) → вес растём осторожнее; положительная (легче) → +вес. Стратегия: {strategy}.
       </div>
     </div>

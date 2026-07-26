@@ -68,7 +68,7 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
       </div>
 
       <div style={LABEL}>🎯 Слабые группы мышц (ББ-акцент)</div>
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>
         💪 Бодибилдинг: отстающие мышцы → +accessory добивка, pump-finisher,Compound-первым. Используется в ББ-авто и ручном конструкторе.
       </div>
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -77,7 +77,7 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
           return <button key={o.id} onClick={() => toggleArr('weakPoints', o.id)} style={{ padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: on ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>{o.label}{on ? ' ✓' : ''}</button>;
         })}
       </div>
-      <div style={{ fontSize: 9, color: '#a78bfa', marginTop: 4, padding: '4px 8px', borderRadius: 8, background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.15)' }}>
+      <div style={{ fontSize: 11, color: '#a78bfa', marginTop: 4, padding: '4px 8px', borderRadius: 8, background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.15)' }}>
         🏋️ Слабые точки СРЦ-движений (ПЛ-диагностика) выбираются в ПЛ-авто: «Силовой цикл» → «Слабые точки СРЦ-движений».
       </div>
 

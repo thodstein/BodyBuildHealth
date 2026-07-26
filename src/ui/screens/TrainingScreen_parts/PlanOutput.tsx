@@ -41,6 +41,16 @@ export interface PlanExerciseView {
   highlighted?: boolean;
   /** Кастомные действия справа/под упражнением (кнопки редактирования) */
   actions?: React.ReactNode;
+  /** BB-характер: тяж/памп/лёг */
+  character?: string;
+  /** Целевая мышца */
+  muscleTarget?: string;
+  /** Инвентарь */
+  equipment?: string;
+  /** Обоснование выбора */
+  rationale?: string;
+  /** Подходов разминки */
+  warmupSets?: number;
 }
 
 export interface PlanDayView {
@@ -88,28 +98,41 @@ function roleLabel(role?: string): string {
 
 const Badge: React.FC<{ label: string; color: string }> = ({ label, color }) => (
   <span style={{
-    fontSize: 9, fontWeight: 700, color, background: color + '22',
-    padding: '2px 6px', borderRadius: 6, flexShrink: 0, whiteSpace: 'nowrap',
+    fontSize: 11, fontWeight: 700, color, background: color + '22',
+    padding: '3px 8px', borderRadius: 6, flexShrink: 0, whiteSpace: 'nowrap',
+    minHeight: 28,
   }}>{label}</span>
 );
+
+const charColor = (c?: string): string => c === 'тяж' ? '#ef4444' : c === 'памп' ? '#3b82f6' : c === 'лёг' ? '#6b7280' : 'rgba(255,255,255,0.5)';
 
 export const ExerciseRow: React.FC<{ ex: PlanExerciseView }> = ({ ex }) => {
   const rc = roleStyle(ex.role);
   const rl = roleLabel(ex.role);
   const hasMeta = ex.detail || ex.rir !== undefined && ex.rir !== '' || ex.tempo || ex.rest;
+  const hasExtra = ex.character || ex.muscleTarget || ex.equipment;
   return (
     <div style={{
       background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '8px 10px',
       border: '1px solid rgba(255,255,255,0.05)', marginBottom: 6,
       borderLeft: ex.highlighted ? `3px solid ${ACCENT}` : '3px solid transparent',
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{ex.name}</span>
-        {rl && <span style={{ fontSize: 9, fontWeight: 700, flexShrink: 0, color: rc.fg, background: rc.bg, padding: '2px 7px', borderRadius: 6 }}>{rl}</span>}
+        <span style={{ display: 'flex', gap: 4, flexShrink: 0, flexWrap: 'wrap' }}>
+          {ex.character && <Badge label={ex.character} color={charColor(ex.character)} />}
+          {rl && <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, color: rc.fg, background: rc.bg, padding: '3px 8px', borderRadius: 6, minHeight: 28 }}>{rl}</span>}
+        </span>
       </div>
+      {hasExtra && (
+        <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
+          {ex.muscleTarget && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>🎯 {ex.muscleTarget}</span>}
+          {ex.equipment && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>🏋️ {ex.equipment}</span>}
+        </div>
+      )}
       {hasMeta && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' }}>{ex.detail}</span>
+          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' }}>{ex.detail}</span>
           <span style={{ display: 'flex', gap: 4, flexShrink: 0, flexWrap: 'wrap' }}>
             {ex.rir !== undefined && ex.rir !== '' && <Badge label={'RIR ' + ex.rir} color="#a855f7" />}
             {ex.tempo && <Badge label={ex.tempo} color="#a855f7" />}
@@ -117,7 +140,9 @@ export const ExerciseRow: React.FC<{ ex: PlanExerciseView }> = ({ ex }) => {
           </span>
         </div>
       )}
-      {ex.note && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginTop: 4, lineHeight: 1.4 }}>{ex.note}</div>}
+      {ex.rationale && <div style={{ fontSize: 11, color: '#60a5fa', marginTop: 3, lineHeight: 1.4 }}>📝 {ex.rationale}</div>}
+      {ex.warmupSets && ex.warmupSets > 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>🔥 Разминка: {ex.warmupSets} подх.</div>}
+      {ex.note && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 4, lineHeight: 1.4 }}>{ex.note}</div>}
       {ex.actions && <div style={{ marginTop: 6 }}>{ex.actions}</div>}
     </div>
   );
@@ -139,7 +164,7 @@ export const DayCard: React.FC<{ day: PlanDayView }> = ({ day }) => {
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
         <span style={{ fontSize: 14, fontWeight: 800, color: '#fff', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{day.title}</span>
-        {day.volumeTag && <span style={{ fontSize: 10, fontWeight: 700, color: phaseColor, background: phaseColor + '22', padding: '3px 9px', borderRadius: 10, flexShrink: 0 }}>{day.volumeTag}</span>}
+        {day.volumeTag && <span style={{ fontSize: 11, fontWeight: 700, color: phaseColor, background: phaseColor + '22', padding: '4px 10px', borderRadius: 10, flexShrink: 0, minHeight: 28 }}>{day.volumeTag}</span>}
       </div>
       {day.metaLine && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginBottom: 8, lineHeight: 1.4 }}>{day.metaLine}</div>}
       {day.headerActions && <div style={{ marginBottom: 8 }}>{day.headerActions}</div>}

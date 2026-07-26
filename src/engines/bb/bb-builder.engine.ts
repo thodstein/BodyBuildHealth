@@ -796,16 +796,15 @@ function buildSession(
       : (isArm && onPED ? 4 : 2);
     const accessoryBase = isArm && onPED ? 3 : (isArm ? 2 : 1);
     const accessoryBoost = isSingleFreq ? 0 : (isArm ? 1 : 0);
+    // ★ E: Снижен exerciseCount — качество > количество.
+    // Primary: 2-4 упр на мышцу (3 для multi-day, 4 single-freq natural, 5 PED single-freq)
+    // Accessory: 1-2 упр (2 для arms на PED)
     let exerciseCount = role === 'primary'
-      ? Math.min(isMultiDay ? (onPED ? 5 : 3) : (isSingleFreq ? 4 : (onPED ? 6 : 4)),
-                 primaryBase + Math.max(0, levelBase - 2) + pedExerciseBoost)
-      : Math.min(isArm && onPED ? 4 : 3,
-                 accessoryBase + Math.floor(pedExerciseBoost / 2) + accessoryBoost);
-    // A2: focusGroup — структурная специализация. Если мышца = focusGroup и primary
-    // → упражнений +1 (compound + 2 multi-angle isolation для полноценного покрытия).
-    if (focusGroup && muscle === focusGroup && role === 'primary') {
-      exerciseCount = Math.min(isMultiDay ? 4 : (isSingleFreq ? 4 : 5), exerciseCount + 1);
-    }
+      ? (isMultiDay ? 3 : (isSingleFreq ? (onPED ? 4 : 3) : (onPED ? 5 : 4)))
+      : (isArm && onPED ? 2 : (isArm ? 2 : 1));
+    // ★ B: focusGroup/weakPoint — больше СЕТОВ (не упражнений).
+    // Объём уже усилен через sessionShareFor (×1.2 weak, ×1.3 focus).
+    // exerciseCount НЕ повышаем — качество > количество.
     // selType: primary → compound; accessory → isolation (но на enhanced/курсе —
     // accessory может быть compound для большего механического натяжения).
     // triceps/biceps в Push/Pull-днях могут получить compound (жим узким хватом,
@@ -831,6 +830,7 @@ function buildSession(
       if (isBBJunk(ex)) return false;
       { const _t = bbExerciseTier(ex); if (_t === 4 || (!allowExotic && _t === 3)) return false; }
       if (!isPurePull && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
+      if (avoidAxialLoad && ex.name && isAxialLoadExercise(ex as any)) return false;
       if (equipmentList.length > 0) {
         const rawEq = ex.equipment;
         const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
@@ -1211,6 +1211,14 @@ function buildSession(
     }
     for (const d of exDatas) (d as any)._weightMod = weightModFor((d as any).name || '');
 
+    // ★ A: Тяж+памп баланс — если все упражнения мышцы тяж и их >=3,
+    // последнее переводим в памп (метаболический стресс вместо чистого натяжения).
+    const PUMPABLE_MUSCLES = new Set(['glutes', 'calves', 'traps', 'forearms', 'abs', 'biceps', 'triceps', 'shoulders', 'delt_front', 'delt_mid', 'delt_rear']);
+    if (PUMPABLE_MUSCLES.has(muscle) && exDatas.length >= 3 && exDatas.every((d: any) => (d as any)._origChar !== 'памп')) {
+      const last = exDatas[exDatas.length - 1] as any;
+      if (last) (last as any)._pumpOverride = true;
+    }
+
     // P1: DUP-волна повторений внутри фазы (недельная вариация).
     // Ранние недели фазы → больше повторений (метаболический стресс),
     // поздние → меньше (механическое натяжение). Аналог getDupReps в phase-periodization.
@@ -1325,10 +1333,20 @@ function buildSession(
           weight: Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10,
           tempo: tempoStr, restSeconds: exRest,
         }));
+        // ★ A: pump override — character + reps для последнего тяжёлого
+        const effChar: DayCharacter = (exData as any)._pumpOverride ? 'памп' : pl.resolved as DayCharacter;
+        const effReps: [number, number] = (exData as any)._pumpOverride
+          ? [15, 20] as [number, number]
+          : [Math.min(Math.max(repMin, adjReps - 2), repsCap), Math.min(repMax, repsCap)];
+        const effRir = (exData as any)._pumpOverride ? 3 : finalRir;
+        const effRest = (exData as any)._pumpOverride ? 45 : exRest;
+        if ((exData as any)._pumpOverride) {
+          for (const ws of workSets) { ws.reps = 18; ws.rir = 3; ws.restSeconds = 45; ws.weight = Math.round(ws.weight * 0.50 * 10) / 10; }
+        }
         exercises.push({
-          muscle: trueMuscleOf(exData) || pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: pl.resolved as DayCharacter,
-          sets: adjustedSets, repsRange: [Math.min(Math.max(repMin, adjReps - 2), repsCap), Math.min(repMax, repsCap)],
-          rir: finalRir,
+          muscle: trueMuscleOf(exData) || pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: effChar,
+          sets: adjustedSets, repsRange: effReps,
+          rir: effRir,
           workSets, exerciseName: (exData as any).name || (exData as any).id,
           tempoSpec: tempoStr, restSeconds: exRest,
           comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id),
@@ -1356,9 +1374,9 @@ function buildSession(
         tempo: tempoStr, restSeconds: exRest,
       }));
       exercises.push({
-        muscle: pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: pl.resolved as DayCharacter,
-        sets: exSets, repsRange: [Math.min(Math.max(repMin, adjReps - 2), repsCap), Math.min(repMax, repsCap)],
-        rir: finalRir,
+        muscle: pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: (exData as any)._pumpOverride ? 'памп' : pl.resolved as DayCharacter,
+        sets: exSets, repsRange: (exData as any)._pumpOverride ? [15,20] as [number,number] : [Math.min(Math.max(repMin, adjReps - 2), repsCap), Math.min(repMax, repsCap)] as [number,number],
+        rir: (exData as any)._pumpOverride ? 3 : finalRir,
         workSets, exerciseName: (exData as any).name || (exData as any).id,
         tempoSpec: tempoStr, restSeconds: exRest,
         comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, exSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id),
@@ -1770,6 +1788,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
             const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
             if (exEq.length > 0 && !exEq.some(eq => eqList.includes(eq))) return false;
           }
+          if (avAxial && isAxialLoadExercise(e as any)) return false; // осевая исключена
           // Rear delt НЕ в Push/Chest-днях (только в Pull/Back)
           if (isPushDayTag(s.sessionTag || '') && isRearDeltExercise(e.name)) return false;
           return true;
@@ -1830,6 +1849,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
             const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
             if (exEq.length > 0 && !exEq.some(eq => eqList.includes(eq))) return false;
           }
+          if (avAxial && isAxialLoadExercise(e as any)) return false;
           // Rear delt НЕ в Push/Chest-днях (только в Pull/Back)
           if (isPushDayTag(s.sessionTag || '') && isRearDeltExercise(e.name)) return false;
           return true;
@@ -1960,7 +1980,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // Cross-day weakPoints compensation: если слабая группа получает < MEV за неделю (потому что
   // не входит ни в один дневной тег), добавить feeder-сет в ближайший релевантный день.
   finalPlan = weakPoints.length > 0
-    ? compensateCrossDayWeakPoints(finalPlan, weakPoints, level, workMax, eqList, pedMrvMult)
+    ? compensateCrossDayWeakPoints(finalPlan, weakPoints, level, workMax, eqList, pedMrvMult, avAxial)
     : finalPlan;
   // Final re-sort: compensateCrossDayWeakPoints may have added feeders that break grouping
   for (const w of finalPlan.weeks) {
@@ -2006,12 +2026,15 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         if (/мах|raise|отведен|разведен/i.test(n) && /наклон|задн|rear/i.test(n)) return 'rear_delt';
         if (/мах|raise|в сторон|lateral/i.test(n)) return 'lateral_raise';
         if (/подъём.*носк|calf/i.test(n)) return 'calf_raise';
+        if (/сгибан.*запяст|разгибан.*кист|сгибан.*предплеч|forearm|wrist/i.test(n)) return 'forearm';
         if (/скручив|crunch/i.test(n)) return 'crunch';
         if (/отжиман.*брус|dip/i.test(n)) return 'dips';
         return n; // уникальное имя = уникальный паттерн
       };
       const perPatternCount: Record<string, number> = {};
-      const PER_PATTERN_MAX = 2; // максимум 2 упражнения одного паттерна на мышцу
+      // ★ C: Малые мышцы — макс 1 упражнение одного паттерна (достаточно),
+      // крупные — макс 2 (разные углы жима/тяги — нормально)
+      const SINGLE_PATTERN_MUSCLES = new Set(['glutes', 'calves', 'traps', 'forearms', 'abs', 'biceps', 'triceps', 'shoulders', 'delt_front', 'delt_mid', 'delt_rear']);
       s.exercises = s.exercises.filter(e => {
         const m = collapseKey(e.muscle || '');
         const name = (e.exerciseName || e.name || '');
@@ -2020,10 +2043,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         // Кап по мышце
         perMuscleCount[m] = (perMuscleCount[m] || 0) + 1;
         if (perMuscleCount[m] > muscleCap) return false;
-        // Кап по паттерну (не больше 2 "ягодичных мостов")
+        // Кап по паттерну (1 для малых мышц, 2 для крупных)
+        const patMax = SINGLE_PATTERN_MUSCLES.has(m) ? 1 : 2;
         const patKey = m + ':' + pat;
         perPatternCount[patKey] = (perPatternCount[patKey] || 0) + 1;
-        if (perPatternCount[patKey] > PER_PATTERN_MAX) return false;
+        if (perPatternCount[patKey] > patMax) return false;
         return true;
       });
       // Re-sort после дедупликации
@@ -2075,6 +2099,7 @@ function compensateCrossDayWeakPoints(
   workMax: Record<string, number>,
   equipment: string[],
   pedMrvMult: number,
+  avAxial: boolean = false,
 ): BBPlan {
   if (!plan.weeks || plan.weeks.length === 0) return plan;
   const weeks = plan.weeks.map((w) => ({ week: w.week, sessions: w.sessions.map((s) => ({ ...s, exercises: [...s.exercises] })) }));
@@ -2143,6 +2168,7 @@ function compensateCrossDayWeakPoints(
       if (isBBJunk(e)) return false;
       if (isInappropriateBB(e)) return false;
       if (equipment?.length && e.equipment && !equipment.includes(e.equipment)) return false;
+      if (avAxial && isAxialLoadExercise(e as any)) return false;
       if (isRearDeltExercise(e.name) && (bestSlot.session.sessionTag || '').toLowerCase().includes('push')) return false;
       return true;
     });

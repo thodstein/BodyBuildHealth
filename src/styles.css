@@ -2078,11 +2078,11 @@ input[type="range"]:active {
 .training-screen [style*="font-size: 8"],
 .training-screen [style*="fontSize:8"],
 .training-screen [style*="fontSize: 8"] {
-  font-size: 10px !important;
+  font-size: 11px !important;
 }
-/* 9px — читаемо, оставляем */
+/* 9px — поднимаем до читаемого */
 .training-screen [style*="font-size:9"] {
-  font-size: 10px !important;
+  font-size: 11px !important;
 }
 /* В герое подзаголовок 10px — оставляем, но даём line-height */
 
