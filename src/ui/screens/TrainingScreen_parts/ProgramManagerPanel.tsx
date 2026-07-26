@@ -18,6 +18,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getAllPrograms } from '../../../engines/complete-program-library.engine';
 import { expandProgramWeeks } from '../../../engines/program-progression.engine';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
+import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { getReferencedCycle } from '../../../engines/user-program/program-store';
 import {
@@ -577,7 +578,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
   const [showTableView, setShowTableView] = useState(false);
   const [methCat, setMethCat] = useState('all');
   const [methSearch, setMethSearch] = useState('');
-  const libraryPrograms = useMemo(() => getAllPrograms(), []);
+  const libraryPrograms = useMemo(() => [...getAllPrograms(), ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS], []);
   const plCycleList = useMemo(() => LMS_CYCLES, []);
   const loadIntoEditor = (p: UserProgram) => {
     onChange(p);

@@ -866,16 +866,17 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
 
       {/* Слабые точки ПЛ — диагностика по движениям */}
       <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #ef4444' }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#ef4444', marginBottom: 6 }}>🎯 Слабые точки ПЛ-движений</div>
-        {(['squat', 'bench', 'dead'] as const).map(lift => {
-          const liftLabel: Record<string, string> = { squat: 'Присед', bench: 'Жим', dead: 'Тяга' };
-          const weakPoints = (WEAK_POINTS_BY_LIFT as Record<string, WeakPoint[]>)[lift] ?? [];
+        <div style={{ fontSize: 12, fontWeight: 800, color: '#ef4444', marginBottom: 6 }}>🎯 Слабые точки ПЛ-движений</div>
+        {(['bench', 'squat', 'deadlift', 'ohp', 'row', 'pulldown', 'incline_press'] as Lift[]).map(lift => {
+          const liftLabel: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Тяга', ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга блока', incline_press: 'Жим наклон' };
+          const weakPoints = WEAK_POINTS_BY_LIFT[lift] ?? [];
+          if (weakPoints.length === 0) return null;
           return (
             <div key={lift} style={{ marginBottom: 6 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: DIM_STRONG, marginBottom: 3 }}>{liftLabel[lift] ?? lift}:</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: DIM_STRONG, marginBottom: 3 }}>{liftLabel[lift] ?? lift}:</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                 {weakPoints.map((wp: WeakPoint) => {
-                  const diag = diagnoseWeakPoint(lift as Lift, wp);
+                  const diag = diagnoseWeakPoint(lift, wp);
                   return (
                     <button
                       key={wp}
@@ -883,13 +884,13 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                         if (!weeks[0]?.days[0]) return;
                         const d0 = weeks[0].days[0];
                         const newExercises = diag.assistance.slice(0, 2).map(name => ({
-                          name, lift: 'accessory' as const, muscle: lift === 'bench' ? 'chest' : lift === 'squat' ? 'legs' : 'back',
+                          name, lift: 'accessory' as const, muscle: lift === 'bench' || lift === 'incline_press' ? 'chest' : lift === 'squat' ? 'legs' : lift === 'deadlift' ? 'back' : lift === 'ohp' ? 'shoulders' : lift === 'row' || lift === 'pulldown' ? 'back' : 'back',
                           sets: [{ pct: diag.intensityPct, reps: 6, sets: 3, rir: 2 }],
                         }));
                         updateDay(0, 0, { exercises: [...d0.exercises, ...newExercises] });
                       }}
                       title={diag.description + '\n' + diag.rationale + '\nУпр: ' + diag.assistance.join(', ')}
-                      style={{ padding: '5px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)', color: '#ef4444', fontWeight: 700, minHeight: 38, textAlign: 'left', lineHeight: 1.3 }}
+                      style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)', color: '#ef4444', fontWeight: 700, minHeight: 38, textAlign: 'left', lineHeight: 1.3 }}
                     >
                       <div>{diag.label}</div>
                       <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>{diag.assistance.slice(0, 2).join(' · ')}</div>
@@ -1021,7 +1022,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
   );
 };
 
-const WEAK_OPTS = ['chest', 'back', 'quads', 'hamstrings', 'glutes', 'shoulders', 'biceps', 'triceps', 'core', 'deadlift', 'squat', 'bench'];
+const WEAK_OPTS = ['chest', 'back', 'quads', 'hamstrings', 'glutes', 'shoulders', 'biceps', 'triceps', 'calves', 'traps', 'forearms', 'core', 'arms'];
 const WeakPointChips: React.FC<{ value: string[]; onChange: (v: string[]) => void }> = ({ value, onChange }) => {
   const toggle = (m: string) => onChange(value.includes(m) ? value.filter(x => x !== m) : [...value, m]);
   return (
