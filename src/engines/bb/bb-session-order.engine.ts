@@ -100,7 +100,19 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
   if (exercises.length <= 1) return exercises.slice();
   const tagMuscles = TAG_MUSCLES[opts.sessionTag || ''] || [];
   // Основная мышца дня: явная опция → первая из тега → иначе мышца первого primary+тяж.
-  let primaryMuscle = opts.primaryMuscle || tagMuscles[0];
+  // BUG-B11: для FullBody НЕ берём tagMuscles[0] (всегда 'chest' → день ног начинается с груди).
+  // Вместо этого ищем первый primary+тяж exercise — он отражает реальную primary-мышцу дня.
+  const isFullBody = (opts.sessionTag || '') === 'FullBody';
+  let primaryMuscle: string;
+  if (opts.primaryMuscle) {
+    primaryMuscle = opts.primaryMuscle;
+  } else if (isFullBody) {
+    // FB: primary = первый primary+тяж exercise из списка (отражает fbSchedule из buildBBPlan)
+    const firstPrimary = exercises.find(e => e.role === 'primary' && e.character === 'тяж');
+    primaryMuscle = firstPrimary?.muscle || exercises.find(e => e.role === 'primary')?.muscle || '';
+  } else {
+    primaryMuscle = tagMuscles[0] || '';
+  }
   if (!primaryMuscle) {
     const firstHeavy = exercises.find(e => e.role === 'primary' && e.character === 'тяж');
     primaryMuscle = firstHeavy?.muscle || exercises.find(e => e.role === 'primary')?.muscle || exercises[0]?.muscle || '';

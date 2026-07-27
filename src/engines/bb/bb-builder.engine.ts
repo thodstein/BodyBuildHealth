@@ -12,7 +12,7 @@
  */
 
 import { SPLIT_PATTERNS, getPattern, sessionsOf, type SplitPattern, type ScheduleDay } from './bb-split-patterns';
-import { FORCE_HEAVY_GROUPS, getPair, resolveCharacter, TAG_MUSCLES, type DayCharacter, type MuscleSlot } from './bb-day-types';
+import { FORCE_HEAVY_GROUPS, resolveCharacter, TAG_MUSCLES, type DayCharacter, type MuscleSlot } from './bb-day-types';
 import { getAllVolumeLandmarks, landmarksForRotation, getVolumeLandmarks, normLevel, type TrainingLevel, type MuscleVolumeLandmarks } from '../volume-landmarks.engine';
 import { tempoFor, REST_BY_CHARACTER, type TempoSpec } from './bb-tempo-rest';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -588,49 +588,8 @@ export function buildWarmup(workWeight: number, isCompound: boolean): { load: nu
   return warmups;
 }
 
-/** База динамических растяжек для основных мышц ББ. */
-const STRETCH_DB: Record<string, { name: string; muscle: string; instruction: string }> = {
-  chest: { name: 'Разведение рук в тренажере (пек-дек)', muscle: 'chest', instruction: '12-15 reps. Легкое растяжение груди и передней дельты. Плечи отведены назад.' },
-  back: { name: 'Подтягивание на верхнем блоке (широкий хват)', muscle: 'back', instruction: '12-15 reps. Растяжка широчайших мышц спины. Грудь прижата к блоку.' },
-  shoulders: { name: 'Разведение гантелей в стороны (сидя)', muscle: 'shoulders', instruction: '12-15 reps. Растяжка средней дельты. Без веса, концентрация на пике.' },
-  quads: { name: 'Выпад на одну ногу (подтягивание другой коленом)', muscle: 'quads', instruction: '10-12 reps на ногу. Растяжка квадрицепса. Колено выпрямляющей ноги не касается пола.' },
-  hamstrings: { name: 'Румынская тяга с гантелями (стоя)', muscle: 'hamstrings', instruction: '12-15 reps. Спина прямая. Гриф близко к голеням. Растяжка задней поверхности бедра.' },
-  glutes: { name: 'Ягодичный мостик (bodyweight)', muscle: 'glutes', instruction: '12-15 reps. Плечи на скамье. Колени под 90°. Пик вверху на 1 сек.' },
-  calves: { name: 'Растяжка икр на носках (о стены)', muscle: 'calves', instruction: '30 сек. Пятка опущена, колено прямое. Растяжка икроножечной мышцы.' },
-  abs: { name: 'Кobra stretch (растяжка пресса)', muscle: 'abs', instruction: '30 сек. Опора на пальцы ног и предплечья. Выгнуть спину дугой, голову вверх.' },
-};
-
-/**
- * Добавить динамическую растяжку в конец сессии.
- * Выбирает 1-2 упражнения на основе musclePlans дня.
- */
-function addStretching(musclePlans: MuscleGroupPlan[]): BBExercise[] {
-  if (!musclePlans || musclePlans.length === 0) return [];
-  const stretchExs: BBExercise[] = [];
-  const usedMuscles = new Set<string>();
-  
-  // Добавляем растяжку для 1-2 основных мышц (не дублируем)
-  for (const plan of musclePlans.slice(0, 2)) {
-    const canonKey = collapseKey(plan.group);
-    if (usedMuscles.has(canonKey)) continue;
-    const stretch = STRETCH_DB[canonKey];
-    if (stretch) {
-      stretchExs.push({
-        muscle: canonKey,
-        name: stretch.name,
-        role: 'accessory',
-        character: 'лёг',
-        sets: 1,
-        repsRange: [15, 20],
-        rir: 3,
-        workSets: [],
-        comment: `Растяжка: ${stretch.instruction}`,
-      });
-      usedMuscles.add(canonKey);
-    }
-  }
-  return stretchExs;
-}
+// BUG-B13/B21: STRETCH_DB и addStretching удалены как мёртвый код (вызов закомментирован с Jul 16).
+// Растяжка не относится к ББ-гипертрофии и занимала слоты в плане.
 
 // fix E: реалистичные значения workMax по умолчанию (кг) — используются,
 // только если пользователь не ввёл свои рабочие максимумы. Убирает магический «80»
@@ -682,7 +641,22 @@ function buildSession(
   const character = sched.character as DayCharacter;
   const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles);
   const exercises: BBExercise[] = [];
-  
+
+  // BUG-B11: leadMuscle для orderSessionExercises — основная мышца дня (первый compound).
+  // Раньше: orderSessionExercises брал tagMuscles[0] → FullBody всегда 'chest' даже в день ног.
+  // Теперь: вычисляем leadMuscle ОДИН раз для сессии и передаём в orderSessionExercises.
+  const LEAD_MUSCLE: Record<string, string> = {
+    Chest: 'chest', Back: 'back', Shoulders: 'shoulders', Arms: 'triceps',
+    Push: 'chest', Pull: 'back', ChestBack: 'chest', ShouldersArms: 'shoulders',
+    Upper: 'chest', UpperPower: 'chest', UpperHyp: 'chest',
+    Torso: 'chest', Limbs: 'quads', LegsBiceps: 'quads', Glutes: 'glutes', GlutesHams: 'glutes',
+    Legs: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
+    Lower: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
+    LowerPower: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
+    LowerHyp: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
+    FullBody: '', // FullBody — особый случай: primary определяется по musclePrimaryAssigned
+  };
+  const sessionLeadMuscle = LEAD_MUSCLE[sched.sessionTag || ''] || ((musclePlans[0] as any)?.group || '');
   // S-MRV: Системный бюджет утомления на день.
   // Формула: dailyCap × S_MRV_FACTOR × pedMult × levelMult
   const levelMultMap: Record<string, number> = { beginner: 0.9, intermediate: 1.0, advanced: 1.15, enhanced: 1.3 };
@@ -761,18 +735,7 @@ function buildSession(
     if (role === 'primary' && SMALL_NEVER_PRIMARY.has(muscle)) role = 'accessory';
     // Force the day's lead compound muscle to primary so the session opens with a big compound
     // (bench / squat / row / OHP / close-grip bench) instead of a small isolation on pump days.
-    const LEAD_MUSCLE: Record<string, string> = {
-      Chest: 'chest', Back: 'back', Shoulders: 'shoulders', Arms: 'triceps',
-      Push: 'chest', Pull: 'back', ChestBack: 'chest', ShouldersArms: 'shoulders',
-      Upper: 'chest', UpperPower: 'chest', UpperHyp: 'chest',
-      Torso: 'chest', Limbs: 'quads', LegsBiceps: 'quads', Glutes: 'glutes', GlutesHams: 'glutes',
-      Legs: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
-      Lower: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
-      LowerPower: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
-      LowerHyp: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
-      FullBody: '',
-    };
-    const leadMuscle = LEAD_MUSCLE[sched.sessionTag || ''] || ((musclePlans[0] as any)?.group || '');
+    const leadMuscle = sessionLeadMuscle;
     if (muscle === leadMuscle && !excludedMuscles.has(repKey)) { role = 'primary'; musclePrimaryAssigned.add(muscle); }
     const mavRot = muscleVolumeRotation[muscle] || 0;
     const sessionsForMuscle = muscleSessionCount[muscle] || 1;
@@ -1444,7 +1407,9 @@ function buildSession(
   }
   // ▓▓ Технически грамотный порядок упражнений (до обрезки по exCap) ▓▓
   // Базовые основной мышцы → базовые вторичных → изоляция (растяжка первой) → финиши.
-  const _ordered = orderSessionExercises(exercises, { sessionTag: sched.sessionTag, methodology });
+  // BUG-B11: передаём sessionLeadMuscle (для FullBody — пустая строка, но orderSessionExercises
+  // в этом случае fallback на первый primary+тяж exercise → корректно для FB day 2/3).
+  const _ordered = orderSessionExercises(exercises, { sessionTag: sched.sessionTag, methodology, primaryMuscle: sessionLeadMuscle || undefined });
   exercises.length = 0; exercises.push(..._ordered);
 
   // Кап упражнений в сессии: просто берём первые exCap из уже отсортированного массива.
@@ -1580,9 +1545,7 @@ function buildSession(
   }
 
   // Добавляем растяжку в конец сессии (динамическая растяжка для основных групп мышц)
-  // Stretching removed: не ББ-гипертрофия, занимает слоты в плане
-  // const stretchExs = addStretching(musclePlans);
-  // if (stretchExs.length > 0) { exercises.push(...stretchExs); }
+  // BUG-B13/B21: Stretching удалён (мёртвый код с Jul 16 — не ББ-гипертрофия, занимал слоты).
 
   return { day: dayInRotation, weekOffset: 0, character, sessionTag: sched.sessionTag, exercises };
 }
@@ -1819,7 +1782,15 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       if (isFB) for (const ex of sess.exercises) {
         if (ex.exerciseName) { fbUsedIds.push(ex.exerciseName); fbUsedNames.push(ex.exerciseName); }
       }
-      // Ротация: запоминаем использованные упражнения для следующих недель
+      // Ротация: запоминаем использованные упражнения для следующих недель.
+      // BUG-B19: при накоплении на 12-нед плане пул упражнений исчерпывается → fallback на
+      // повтор упражнений. Сбрасываем каждые 4 недели (ротация обновляется), сохраняя свежесть.
+      if (w > 1 && (w - 1) % 4 === 0) {
+        // Оставляем только последние 4 недели упражнений (свежая память)
+        for (const [m, arr] of rotationUsedByMuscle) {
+          if (arr.length > 8) rotationUsedByMuscle.set(m, arr.slice(-8));
+        }
+      }
       for (const ex of sess.exercises) {
         const m = collapseKey(ex.muscle);
         if (!rotationUsedByMuscle.has(m)) rotationUsedByMuscle.set(m, []);

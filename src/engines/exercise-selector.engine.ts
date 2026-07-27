@@ -507,6 +507,26 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
       // Обе разгибания/сгибания ног
       if ((exName.includes('разгиб') && sName.includes('разгиб')) ||
           (exName.includes('сгибан') && sName.includes('сгибан'))) return true;
+      // BUG-B17: доп. детекторы похожести —
+      // (1) Жимы стоя/над головой с разной шириной хвата (жим лёжа стоя/смит стоя)
+      const exIsOhp = (exName.includes('жим') && (exName.includes('стоя') || exName.includes('над голов') || exName.includes('голов')));
+      const sIsOhp = (sName.includes('жим') && (sName.includes('стоя') || sName.includes('над голов') || sName.includes('голов')));
+      if (exIsOhp && sIsOhp) return true;
+      // (2) Приседы с разной глубиной/вариантом (присед со штангой/гакк/фронтальный/смит — все приседы)
+      const exIsSquat = exName.includes('присед') || exName.includes('squat');
+      const sIsSquat = sName.includes('присед') || sName.includes('squat');
+      if (exIsSquat && sIsSquat) {
+        // Болгарский/сплит-присед — ОДНОГО типа, но если оба болгарские → дубль
+        const exBulg = exName.includes('болгар') || exName.includes('сплит-присед') || exName.includes('split squat');
+        const sBulg = sName.includes('болгар') || sName.includes('сплит-присед') || sName.includes('split squat');
+        if (exBulg && sBulg) return true;
+        // Если оба не болгарские (т.е. обычные приседы) → тоже дубль
+        if (!exBulg && !sBulg) return true;
+      }
+      // (3) Махи в стороны с разным углом (стоя/наклоне/сидя — все махи в стороны)
+      const exIsLateralRaise = (exName.includes('мах') || exName.includes('разведен')) && exName.includes('в сторон') || exName.includes('lateral raise');
+      const sIsLateralRaise = (sName.includes('мах') || sName.includes('разведен')) && sName.includes('в сторон') || sName.includes('lateral raise');
+      if (exIsLateralRaise && sIsLateralRaise) return true;
     }
     return false;
   }
