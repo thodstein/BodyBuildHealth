@@ -28,7 +28,7 @@ import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landma
 // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
-import { distributePhases, PHASE_CONFIGS, getPhaseVolumeMult, type BBPhase } from '../../ui/screens/TrainingScreen_parts/phase-periodization';
+import { distributePhases, PHASE_CONFIGS, getPhaseVolumeMult, type BBPhase } from '../periodization';
 import { orderSessionExercises, type SessionMethodology } from './bb-session-order.engine';
 import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
@@ -461,8 +461,17 @@ function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary
   const gluteBoost = isFemale && muscle === 'glutes' ? 1.2 : 1.0;
   const finalMult = pedArmBoost * gluteBoost;
   if (sessionsPerWeek <= 1) {
-    // P5: cap на 1×/нед — не более MAV×1.3. Иначе bro-split chest=25+ сетов.
-    return Math.min(Math.round(mavRot), Math.round(mavRot * 1.3 * (isFemale && muscle === 'glutes' ? 1.4 : 1.0)));
+    // P5 + BUG-B2: cap на 1×/нед — Schoenfeld 2016 оптимум 12-16 сетов/день для advanced.
+    // Раньше MAV×1.3 → chest=21+ сетов за одну сессию (перетрен в один день, MPS-окно
+    // закрывается, остальные 6 дней — катаболизм).
+    // Теперь: для primary — min(MAV×1.0, 16) (верхняя граница Schoenfeld);
+    //          для accessory — MAV×0.5 (добивка, не основная нагрузка).
+    // Glute-буст для женщин сохранён (физиология — больший гипертрофический потенциал).
+    const gluteFactor = isFemale && muscle === 'glutes' ? 1.4 : 1.0;
+    if (role === 'accessory') {
+      return Math.max(2, Math.min(Math.round(mavRot * 0.5 * gluteFactor), 8));
+    }
+    return Math.min(Math.round(mavRot * 1.0 * gluteFactor), 16);
   }
   if (sessionsPerWeek === 2) {
     const base = mavRot / 2;
@@ -487,9 +496,12 @@ function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string,
     }
   }
   for (const [m, info] of Object.entries(sums)) {
-    // Per-exercise cap: не более 8 сетов на одно упражнение
+    // Per-exercise cap: не более 8 сетов на одно упражнение (ББ-практика).
+    // BUG-B8: для малых мышц (forearms/calves/abs) cap = 6 — они не требуют
+    // большого объёма за одно упражнение (Schoenfeld: small muscles 4-6 сетов/упр).
+    const perExCap = (m === 'forearms' || m === 'calves' || m === 'abs') ? 6 : 8;
     for (const ex of info.exs) {
-      if (ex.sets > 8) ex.sets = 8;
+      if (ex.sets > perExCap) ex.sets = perExCap;
     }
     // Пересчитать total после per-exercise капа
     info.total = info.exs.reduce((s, ex) => s + ex.sets, 0);
@@ -1253,10 +1265,16 @@ function buildSession(
       if (last) (last as any)._pumpOverride = true;
     }
 
-    // P1: DUP-волна повторений внутри фазы (недельная вариация).
+    // P1 + BUG-B7: DUP-волна повторений внутри фазы (недельная вариация).
     // Ранние недели фазы → больше повторений (метаболический стресс),
     // поздние → меньше (механическое натяжение). Аналог getDupReps в phase-periodization.
-    const dupRepsOffset = phaseCfg && phaseWeek > 1 ? -Math.floor((phaseWeek - 1) * 1.5) : 0;
+    // BUG-B7: в deload reps должны РАСТИ (recovery), а не падать.
+    //   Раньше: offset = -floor((phaseWeek-1)×1.5) → всегда отрицательный →
+    //   deload wk4 = 12-4 = 8 (вместо 16-20 recovery-повторов).
+    // Теперь: deload → +offset (растём к концу deload-недели = восстановление),
+    //          accumulation/intensification/peaking → -offset (механическое натяжение растёт).
+    const dupSign = phase === 'deload' ? +1 : -1;
+    const dupRepsOffset = phaseCfg && phaseWeek > 1 ? dupSign * Math.floor((phaseWeek - 1) * 1.5) : 0;
     const adjReps = Math.max(repMin, Math.min(repMax, reps + dupRepsOffset));
 
     // P7: phaseExerciseMix — приоритет equipment по фазе (accumulation→cable, peaking→barbell).
@@ -1280,7 +1298,12 @@ function buildSession(
       for (const exData of pl.exDatas) {
         const subs = findSubstitutions((exData as any).name || exData.id, pl.muscle, new Set([pl.muscle]));
         if (subs.length > 0) {
-          const sub = subs[0];
+          // BUG-B3: для градированной травмы нужна мягкая замена (min volumePct),
+          // а не первая попавшаяся (которая может быть полной заменой volumePct=1.0).
+          // Сортируем по volumePct ascending и берём самую мягкую.
+          // Это гарантирует снижение нагрузки, а не её сохранение/рост.
+          const sortedSubs = [...subs].sort((a, b) => (a.volumePct || 1) - (b.volumePct || 1));
+          const sub = sortedSubs[0];
           const subEx = sub.exercise;
           // Keep most plan data, overwrite weight/sets/reps
           newExDatas.push({
@@ -1593,7 +1616,11 @@ function computeAcwr(): number {
 }
 
 export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BBPlan {
-  const pattern = getPattern(input.patternId) || SPLIT_PATTERNS[0];
+  const foundPattern = getPattern(input.patternId);
+  if (!foundPattern) {
+    console.warn(`[bb-builder] buildBBPlan: patternId="${input.patternId}" не найден — fallback на SPLIT_PATTERNS[0] (${SPLIT_PATTERNS[0].id}). Проверьте, что передаёте patternId (не split).`);
+  }
+  const pattern = foundPattern || SPLIT_PATTERNS[0];
   const level = normLevel(input.level) as TrainingLevel;
   const workMax = input.workMax || {};
   const weakPoints = input.weakPoints || [];
@@ -1616,11 +1643,21 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const maxGroupsPerSession = Math.max(1, ...sessions.map(s => dedupeMuscles(s.sessionTag, excludedMuscles).length));
   const dailyCap = Math.max(10, Math.min(16, Math.round(8 + maxGroupsPerSession * 2)));
 
-  // fix Z: muscleSessionCount ключом является collapseKey (delt heads→shoulders, остальные как есть)
+  // fix Z + BUG-B5: muscleSessionCount ключом является collapseKey (delt heads→shoulders, остальные как есть).
+  // BUG-B5 РАНЬШЕ: musclesForTag('Push') = [chest, delt_front, delt_mid, triceps] →
+  //   delt_front И delt_mid оба → shoulders += 2 (вместо 1 за сессию).
+  //   PPL: 2 Push × 2 delt + 2 Pull × 1 delt_rear = shoulders = 6 (вместо реальных 2×/нед).
+  // ФИКС: подсчёт ведём по Set<collapseKey> per-session → каждая мышца считается 1 раз за сессию.
   const muscleSessionCount: Record<string, number> = {};
-  for (const s of sessions) for (const m of musclesForTag(s.sessionTag)) {
-    const ck = collapseKey(m);
-    if (!excludedMuscles.has(m)) muscleSessionCount[ck] = (muscleSessionCount[ck] || 0) + 1;
+  for (const s of sessions) {
+    const seenThisSession = new Set<string>();
+    for (const m of musclesForTag(s.sessionTag)) {
+      const ck = collapseKey(m);
+      if (excludedMuscles.has(m)) continue;
+      if (seenThisSession.has(ck)) continue; // дедуп внутри одной сессии
+      seenThisSession.add(ck);
+      muscleSessionCount[ck] = (muscleSessionCount[ck] || 0) + 1;
+    }
   }
 
   const muscleVolumeRotation: Record<string, number> = {};
@@ -2142,29 +2179,32 @@ function compensateCrossDayWeakPoints(
   const normLvl = normLevel(level);
   const usedAcrossWeeks = new Set<string>(); // (weekIdx|sessionIdx|exName) — глобальная дедупликация по плану
 
+  // BUG-B1: считаем объём PER-WEEK (а не за весь план).
+  // Раньше: totalSets суммировал все недели → 12-нед план chest=6×12=72 >> MEV=8 → feeder НИКОГДА.
+  // Теперь: для каждой недели отдельно проверяем < MEV и добавляем feeder в эту конкретную неделю.
   for (const wpRaw of weakPoints) {
     const wp = collapseKey(wpRaw);
     const lm = getVolumeLandmarks(normLvl, wp);
     if (!lm) continue;
     const targetMEV = Math.round(lm.mev * (pedMrvMult || 1));
-    // Считаем текущий недельный объём по этой мышце
-    let totalSets = 0;
-    for (const w of weeks) {
-      for (const s of w.sessions) {
+    const allowedTags = WEAKPOINT_DAY_TAGS[wp] ?? ['Upper', 'FullBody'];
+
+    // Идём по каждой неделе отдельно
+    for (let wi = 0; wi < weeks.length; wi++) {
+      // Считаем недельный объём по слабой мышце
+      let weekSets = 0;
+      for (const s of weeks[wi].sessions) {
         for (const ex of s.exercises) {
-          if (collapseKey(ex.muscle) === wp) totalSets += ex.workSets?.length || ex.sets || 0;
+          if (collapseKey(ex.muscle) === wp) weekSets += ex.workSets?.length || ex.sets || 0;
         }
       }
-    }
-    if (totalSets >= targetMEV) continue; // уже достаточно
+      if (weekSets >= targetMEV) continue; // эта неделя уже достаточно нагружена
 
-    const allowedTags = WEAKPOINT_DAY_TAGS[wp] ?? ['Upper', 'FullBody'];
-    // B2: приоритет дню, в котором мышца УЖЕ есть, но объём < MEV (добиваем до MEV).
-    // Только если такого дня нет — ищем день без мышцы (cross-day compensation).
-    let bestSlot: { weekIdx: number; sessionIdx: number; session: any } | null = null;
-    let bestScore = -Infinity;
-    // Сначала — дни С мышцей (добить до MEV)
-    for (let wi = 0; wi < weeks.length; wi++) {
+      // B2: приоритет дню, в котором мышца УЖЕ есть, но объём < MEV (добиваем до MEV).
+      // Только если такого дня нет — ищем день без мышцы (cross-day compensation).
+      let bestSlot: { weekIdx: number; sessionIdx: number; session: any } | null = null;
+      let bestScore = -Infinity;
+      // Сначала — дни С мышцей (добить до MEV)
       for (let si = 0; si < weeks[wi].sessions.length; si++) {
         const sess = weeks[wi].sessions[si];
         const tag = (sess.sessionTag || '').toLowerCase();
@@ -2176,11 +2216,9 @@ function compensateCrossDayWeakPoints(
         const score = sess.exercises.length * 10 + (si === weeks[wi].sessions.length - 1 ? 5 : 0);
         if (score > bestScore) { bestScore = score; bestSlot = { weekIdx: wi, sessionIdx: si, session: sess }; }
       }
-    }
-    // B2 fallback: если день С мышцей не найден — ищем день БЕЗ мышцы (cross-day)
-    if (!bestSlot) {
-      bestScore = -Infinity;
-      for (let wi = 0; wi < weeks.length; wi++) {
+      // B2 fallback: если день С мышцей не найден — ищем день БЕЗ мышцы (cross-day)
+      if (!bestSlot) {
+        bestScore = -Infinity;
         for (let si = 0; si < weeks[wi].sessions.length; si++) {
           const sess = weeks[wi].sessions[si];
           const tag = (sess.sessionTag || '').toLowerCase();
@@ -2192,40 +2230,40 @@ function compensateCrossDayWeakPoints(
           if (score > bestScore) { bestScore = score; bestSlot = { weekIdx: wi, sessionIdx: si, session: sess }; }
         }
       }
-    }
-    if (!bestSlot) continue;
+      if (!bestSlot) continue;
 
-    // Выбрать feeder-упражнение: изоляция на wp, не rear-delt в push, не junk
-    const feederPool = (EXERCISE_CATALOG as any[]).filter((e: any) => {
-      const raw = e.group;
-      const mg = collapseKey(trueMuscleOf(e) || raw);
-      if (raw !== wp && mg !== wp) return false;
-      if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
-      if (isBBJunk(e)) return false;
-      if (isInappropriateBB(e)) return false;
-      if (equipment?.length && e.equipment && !equipment.includes(e.equipment)) return false;
-      if (avAxial && isAxialLoadExercise(e as any)) return false;
-      if (isRearDeltExercise(e.name) && (bestSlot.session.sessionTag || '').toLowerCase().includes('push')) return false;
-      return true;
-    });
-    if (!feederPool.length) continue;
-    // Берём самое короткое (минимизируем время) изоляционное упражнение
-    feederPool.sort((a, b) => (a.name?.length || 0) - (b.name?.length || 0));
-    const fData = feederPool[0];
-    const fName = fData.name || fData.id;
-    const fBase = (workMax as any)[wp] || DEFAULT_WORKMAX[wp] || 50;
-    const feederWeight = Math.max(5, Math.round(fBase * 0.3 * 10) / 10);
-    const fTempo = tempoFor('памп');
-    const feederSetCount = 2;
-    bestSlot.session.exercises.push({
-      muscle: wp, name: fName, role: 'accessory' as const, character: 'памп' as DayCharacter,
-      sets: feederSetCount, repsRange: [15, 20] as [number, number], rir: 2,
-      workSets: Array.from({ length: feederSetCount }, () => ({ reps: 18, rir: 2, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
-      exerciseName: fName, tempoSpec: fTempo.notation, restSeconds: 30,
-      comment: `Cross-day weak-point feeder для ${wp}: 2×15-20 RIR 2 @${feederWeight}кг, добивочный памп-сет в ближайшем релевантном дне (недельный объём был < MEV ${targetMEV}).`,
-      warmupSets: [], rationale: 'Weak-point coverage: вставка feeder-сетов, чтобы достичь MEV.',
-    });
-    usedAcrossWeeks.add(`${bestSlot.weekIdx}|${bestSlot.sessionIdx}|${wp}`);
-  }
+      // Выбрать feeder-упражнение: изоляция на wp, не rear-delt в push, не junk
+      const feederPool = (EXERCISE_CATALOG as any[]).filter((e: any) => {
+        const raw = e.group;
+        const mg = collapseKey(trueMuscleOf(e) || raw);
+        if (raw !== wp && mg !== wp) return false;
+        if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
+        if (isBBJunk(e)) return false;
+        if (isInappropriateBB(e)) return false;
+        if (equipment?.length && e.equipment && !equipment.includes(e.equipment)) return false;
+        if (avAxial && isAxialLoadExercise(e as any)) return false;
+        if (isRearDeltExercise(e.name) && (bestSlot.session.sessionTag || '').toLowerCase().includes('push')) return false;
+        return true;
+      });
+      if (!feederPool.length) continue;
+      // Берём самое короткое (минимизируем время) изоляционное упражнение
+      feederPool.sort((a, b) => (a.name?.length || 0) - (b.name?.length || 0));
+      const fData = feederPool[0];
+      const fName = fData.name || fData.id;
+      const fBase = (workMax as any)[wp] || DEFAULT_WORKMAX[wp] || 50;
+      const feederWeight = Math.max(5, Math.round(fBase * 0.3 * 10) / 10);
+      const fTempo = tempoFor('памп');
+      const feederSetCount = 2;
+      bestSlot.session.exercises.push({
+        muscle: wp, name: fName, role: 'accessory' as const, character: 'памп' as DayCharacter,
+        sets: feederSetCount, repsRange: [15, 20] as [number, number], rir: 2,
+        workSets: Array.from({ length: feederSetCount }, () => ({ reps: 18, rir: 2, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
+        exerciseName: fName, tempoSpec: fTempo.notation, restSeconds: 30,
+        comment: `Cross-day weak-point feeder для ${wp}: 2×15-20 RIR 2 @${feederWeight}кг, добивочный памп-сет в ближайшем релевантном дне (недельный объём < MEV ${targetMEV}).`,
+        warmupSets: [], rationale: 'Weak-point coverage: вставка feeder-сетов, чтобы достичь MEV.',
+      });
+      usedAcrossWeeks.add(`${bestSlot.weekIdx}|${bestSlot.sessionIdx}|${wp}`);
+    } // for wi
+  } // for wpRaw
   return { ...plan, weeks };
 }

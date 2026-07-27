@@ -304,7 +304,11 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
 ];
 
 export function getPattern(id: string): SplitPattern | undefined {
-  return SPLIT_PATTERNS.find(p => p.id === id);
+  const found = SPLIT_PATTERNS.find(p => p.id === id);
+  if (!found) {
+    console.warn(`[bb-split-patterns] getPattern: pattern id="${id}" не найден. Доступные: ${SPLIT_PATTERNS.map(p => p.id).join(', ')}`);
+  }
+  return found;
 }
 
 /** Сессии одного прохода ротации (без отдыхов). */

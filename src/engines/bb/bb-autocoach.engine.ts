@@ -7,7 +7,7 @@
 import type { BBWeek, BBSession, BBExercise, BBSet, BBPlan } from './bb-builder.engine';
 import { defaultWorkMax } from './bb-builder.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
-import { PHASE_CONFIGS, distributePhases } from '../../ui/screens/TrainingScreen_parts/phase-periodization';
+import { PHASE_CONFIGS, distributePhases } from '../periodization';
 import { PCT_FOR_RIR } from '../rir-table';
 
 /* ──────────── BB phase ──────────── */
@@ -625,7 +625,9 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
           });
           if (!hasMuscle) continue;
           // Добавить feeder как отдельное упражнение
-          const fWeight = Math.max(5, Math.round((workMax[f.muscle] || 30) * 0.3 * 10) / 10);
+          // BUG-B12: magic 30 → defaultWorkMax(f.muscle) — раньше forearms давали 9кг
+          // (fallback 30×0.3), хотя DEFAULT_WORKMAX.forearms=45 → правильно 13.5кг.
+          const fWeight = Math.max(5, Math.round((workMax[f.muscle] || defaultWorkMax(f.muscle)) * 0.3 * 10) / 10);
           s.exercises.push({
             muscle: f.muscle,
             name: f.exercise,
