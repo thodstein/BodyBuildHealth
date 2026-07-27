@@ -965,7 +965,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
         <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38 }} onClick={addWeek}>+ Добавить неделю</button>
       </div>
 
-      {/* PL ротация — упражнения старше 4 недель */}
+      {/* PL ротация — упражнения старше 4 недель (с кнопками замены через findSubstitutions) */}
       {(body.customWeeks?.length ?? 0) >= 4 && (() => {
         const exAge: Record<string, { weeks: number }> = {};
         for (const w of body.customWeeks ?? []) {
@@ -981,14 +981,40 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
         if (stale.length === 0) return null;
         return (
           <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #f59e0b' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 6 }}>🔄 Ротация ПЛ — устаревшие упражнения</div>
-            {stale.map(([name, { weeks: age }]) => (
-              <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', fontSize: 10, flexWrap: 'wrap' }}>
-                <span style={{ color: DIM_STRONG, fontWeight: 700 }}>{name}</span>
-                <span style={{ color: '#f59e0b', fontSize: 11 }}>{age} нед</span>
-                <span style={{ color: DIM, fontSize: 11 }}>— замените вручную через 🔬 лабораторию упражнений</span>
-              </div>
-            ))}
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 6 }}>🔄 Ротация ПЛ — устаревшие упражнения ({stale.length})</div>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Клик — заменить на аналог из каталога.</div>
+            {stale.map(([name, { weeks: age }]) => {
+              let subs: any[] = [];
+              try { subs = (findSubstitutions(name, '', new Set<string>()) || []).filter((s: any) => s?.name && s.name !== name).slice(0, 4); } catch { subs = []; }
+              return (
+                <div key={name} style={{ marginBottom: 4, padding: 6, borderRadius: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, flexWrap: 'wrap' }}>
+                    <span style={{ color: DIM_STRONG, fontWeight: 700 }}>{name}</span>
+                    <span style={{ color: '#f59e0b', fontSize: 11 }}>{age} нед</span>
+                  </div>
+                  {subs.length > 0 ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
+                      {subs.map((s, si) => (
+                        <button key={si} onClick={() => {
+                          const updatedCustomWeeks = (body.customWeeks ?? []).map((w: any) => ({
+                            ...w,
+                            days: w.days.map((d: any) => ({
+                              ...d,
+                              exercises: d.exercises.map((e: any) => (e.name === name ? { ...e, name: s.name } : e)),
+                            })),
+                          }));
+                          onChange({ ...body, customWeeks: updatedCustomWeeks });
+                        }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontWeight: 600, minHeight: 32 }}>
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 10, color: DIM, marginTop: 4, fontStyle: 'italic' }}>Аналоги не найдены — замените вручную через 🔬 лабораторию упражнений</div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         );
       })()}

@@ -490,16 +490,6 @@ export const BioStackAIUnifiedBuild: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* ── Presets ── */}
-      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:8 }}>
-        {PRESETS.map(p => (
-          <button key={p.label} onClick={() => { setFilterOrgans(p.organs); setFilterMechanisms(p.mechs); setFilterMarkers(p.markers); }} style={{
-            padding:'5px 10px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:600, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.8)',
-          }}>{p.label}</button>
-        ))}
-        <button onClick={resetAll} style={{ padding:'5px 10px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:600, background:'transparent', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.35)' }}>✕ Сброс</button>
-      </div>
-
       {/* ── Filter cards ── */}
       {(['organs','mechs','markers'] as const).map(k => {
         const config = { organs: { icon:'🫀', label:'Органы и системы', color:'#00e68a', count:filterOrgans.length },
@@ -525,6 +515,16 @@ export const BioStackAIUnifiedBuild: React.FC<Props> = ({
       <Popup title="Механизмы ТЗ" color="#a78bfa" show={popup==='mechs'} onClose={()=>setPopup(null)}>{mechChildren}</Popup>
       <Popup title="Лабораторные анализы" color="#f59e0b" show={popup==='markers'} onClose={()=>setPopup(null)}>{markerChildren}</Popup>
 
+      {/* ── Presets ── */}
+      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6, marginBottom:8 }}>
+        {PRESETS.map(p => (
+          <button key={p.label} onClick={() => { setFilterOrgans(p.organs); setFilterMechanisms(p.mechs); setFilterMarkers(p.markers); }} style={{
+            padding:'5px 10px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:600, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.8)',
+          }}>{p.label}</button>
+        ))}
+        <button onClick={resetAll} style={{ padding:'5px 10px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:600, background:'transparent', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.35)' }}>✕ Сброс</button>
+      </div>
+
       {/* ── Params row ── */}
       <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center', marginBottom:4 }}>
         {GRADE_OPTIONS.map(g => <button key={g.id} onClick={()=>setGrade(g.id)} style={{ padding:'4px 10px', borderRadius:10, cursor:'pointer', border:'none', fontSize:12, fontWeight:700, background:grade===g.id?g.color+'22':'rgba(255,255,255,0.04)', color:grade===g.id?g.color:'rgba(255,255,255,0.5)' }}>{g.label}</button>)}
@@ -535,7 +535,7 @@ export const BioStackAIUnifiedBuild: React.FC<Props> = ({
       </div>
 
       {/* ── Mode + toggles ── */}
-      <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center', marginBottom:6 }}>
+      <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
         <button onClick={()=>setFilterMode('balanced')} style={{ padding:'4px 10px', borderRadius:10, cursor:'pointer', border:'none', fontSize:11, fontWeight:600, background:filterMode==='balanced'?'rgba(96,165,250,0.15)':'rgba(255,255,255,0.04)', color:filterMode==='balanced'?'#60a5fa':'rgba(255,255,255,0.5)' }}>balanced</button>
         <button onClick={()=>setFilterMode('strict')} style={{ padding:'4px 10px', borderRadius:10, cursor:'pointer', border:'none', fontSize:11, fontWeight:600, background:filterMode==='strict'?'rgba(245,158,11,0.15)':'rgba(255,255,255,0.04)', color:filterMode==='strict'?'#f59e0b':'rgba(255,255,255,0.5)' }}>strict</button>
         <span style={{ color:'rgba(255,255,255,0.15)' }}>|</span>
@@ -547,7 +547,7 @@ export const BioStackAIUnifiedBuild: React.FC<Props> = ({
       </div>
 
       {/* ── Build buttons ── */}
-      <div style={{ display:'flex', gap:8, marginBottom:4 }}>
+      <div style={{ display:'flex', gap:8, marginBottom:8 }}>
         <button onClick={onBuild} disabled={building} style={{ flex:1, padding:'12px 0', borderRadius:14, border:'none', background:building?'rgba(0,230,138,0.4)':'linear-gradient(135deg,#00e68a,#00b4d8)', color:'#00120c', fontWeight:800, fontSize:14, cursor:'pointer', boxShadow:building?'none':'0 4px 16px rgba(0,230,138,0.2)' }}>{building?'⚙️ Собираю…':'🔧 Собрать стек'}</button>
         <button onClick={smartQuickBuild} disabled={building} style={{ padding:'12px 16px', borderRadius:14, border:'1px solid rgba(168,85,247,0.3)', background:'rgba(168,85,247,0.08)', color:'#c084fc', fontWeight:700, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>⚡ Быстро</button>
       </div>

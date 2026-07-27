@@ -35,7 +35,8 @@ import { ExerciseLabPicker } from './ExerciseLabPicker';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { BbContextPanel, PLContextPanel } from './program-editor-context-panels';
 import { BBEditor, PLEditor, BBConstraintsPanel } from './ProgramEditorComponents';
-import { DiagnosticPanel, VolumeLandmarksPanel, PhaseLegend, ExerciseInfo, RecommendationsPanel, ProgressionCoach, SplitConsultant, PlanSummaryTable, AutoPeriodizationPanel, SubstitutionPanel } from './ProgramEditorPanels';
+import { PlanDiagnosticsPanel, InteractiveVolumePanel, ExerciseInfoPanel, ProgressionCoach, SplitConsultant, PlanSummaryTable, AutoPeriodizationPanel, SubstitutionPanel } from './ProgramEditorPanels';
+import { LoadGuardPanel, RealMRVPanel, RIRCalibrationPanel, TonnageEstimatePanel, StickingPointPanel, PlateAutoPanel, WhatIfGuardPanel, ReadinessForecastPanel, CheckinGuardPanel, BiomechanicsPanel } from './ProGuardPanels';
 import { getTrainingMethods } from '../../../engines/training-methodology.engine';
 import { SET_TEMPLATES } from './program-types';
 import {
@@ -81,11 +82,75 @@ const SOURCE_LABEL: Record<string, string> = {
 const btn: React.CSSProperties = { ...BTN, flex: 1, minWidth: 0 };
 const ghostBtn: React.CSSProperties = { ...BTN_GHOST, flex: 1, minWidth: 0 };
 
+/** Режим конструктора: «Стандартный» (базовая сборка/загрузка/отчёт, без профиля)
+ *  или «Профессиональный» (все инструменты тренера). */
+export type ManualMode = 'standard' | 'pro';
+
+const MODE_META: Record<ManualMode, { label: string; icon: string; hint: string; color: string }> = {
+  standard: {
+    label: 'Стандартный',
+    icon: '✋',
+    hint: 'Базовая ручная сборка программы, загрузка и редактирование, отчёт по кнопке',
+    color: '#00e68a',
+  },
+  pro: {
+    label: 'Профессиональный',
+    icon: '🎓',
+    hint: 'Полный инструментарий тренера: профиль, лаб-коррекция, периодизация, методики, качества, замены, фидер-сеты и др.',
+    color: '#a78bfa',
+  },
+};
+
+const ManualModeToggle: React.FC<{ mode: ManualMode; onMode: (m: ManualMode) => void }> = ({ mode, onMode }) => (
+  <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 12, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)' }}>
+    {(['standard', 'pro'] as ManualMode[]).map((m) => {
+      const meta = MODE_META[m];
+      const active = mode === m;
+      return (
+        <button
+          key={m}
+          onClick={() => { hapticImpact('medium'); onMode(m); }}
+          style={{
+            flex: '0 0 auto',
+            minWidth: 120,
+            padding: '8px 12px',
+            borderRadius: 9,
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2,
+            whiteSpace: 'nowrap',
+            border: active ? `2px solid ${meta.color}` : '1px solid rgba(255,255,255,0.06)',
+            background: active ? `${meta.color}20` : 'rgba(255,255,255,0.02)',
+            color: active ? '#ffffff' : 'var(--text-dim)',
+            boxShadow: active ? `0 0 0 1px ${meta.color}40, 0 2px 10px rgba(0,0,0,0.25)` : 'none',
+          }}
+        >
+          <span style={{ fontSize: 16 }}>{meta.icon}</span>
+          <span>{meta.label}</span>
+          <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8, lineHeight: 1.2, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meta.hint}</span>
+        </button>
+      );
+    })}
+  </div>
+);
+
+import { hapticImpact } from '../../../core/telegram';
+
 export const ProgramManagerPanel: React.FC = () => {
   const [programs, setPrograms] = useState<UserProgram[]>(() => loadUserPrograms());
   const [editing, setEditing] = useState<UserProgram | null>(null);
   const [pickerOpen, setPickerOpen] = useState<'bb' | 'pl' | null>(null);
   const [toast, setToast] = useState('');
+  // Режим конструктора: «Стандартный» (базовая сборка/загрузка/отчёт) vs «Профессиональный» (все инструменты).
+  // Персистится в localStorage 'he_manual_mode', чтобы выбор пользователя сохранялся между сессиями.
+  const [manualMode, setManualMode] = useState<ManualMode>(() => {
+    try { return (localStorage.getItem('he_manual_mode') as ManualMode) || 'standard'; } catch { return 'standard'; }
+  });
+  useEffect(() => { try { localStorage.setItem('he_manual_mode', manualMode); } catch {} }, [manualMode]);
   // P2.6: поиск/сортировка/фильтр
   const [search, setSearch] = useState('');
   const [filterDir, setFilterDir] = useState<'all' | 'bb' | 'pl' | 'hybrid'>('all');
@@ -239,10 +304,31 @@ export const ProgramManagerPanel: React.FC = () => {
       onChange={setEditing}
       onSave={commit}
       onBack={() => { setEditing(null); refresh(); }}
+      mode={manualMode}
     />;
   }
 
   // P3 — Empty-state: если ни одной программы, показать яркий CTA (5 крупных кнопок)
+  // P15: Шаблоны быстрого старта для стандартного режима (без профиля/движков)
+  const QUICK_TEMPLATES: Array<{ id: string; title: string; icon: string; desc: string; dir: 'bb' | 'pl' | 'hybrid'; goal: string; level: string; days: number; weeks: number; color: string }> = [
+    { id: 'mass3', title: 'Масса 3д/нед', icon: '💪', desc: 'Full Body, 8 нед, новичок', dir: 'bb', goal: 'hypertrophy', level: 'beginner', days: 3, weeks: 8, color: '#22c55e' },
+    { id: 'mass4', title: 'Масса 4д/нед', icon: '🏋️', desc: 'Upper/Lower, 12 нед, средний', dir: 'bb', goal: 'hypertrophy', level: 'intermediate', days: 4, weeks: 12, color: '#00e68a' },
+    { id: 'strength4', title: 'Сила 4д/нед', icon: '🏆', desc: 'ПЛ-база, 12 нед, средний', dir: 'pl', goal: 'powerlifting', level: 'intermediate', days: 4, weeks: 12, color: '#a78bfa' },
+    { id: 'mass5', title: 'Масса 5д/нед', icon: '🔥', desc: 'Bro split, 16 нед, опытный', dir: 'bb', goal: 'hypertrophy', level: 'advanced', days: 5, weeks: 16, color: '#f59e0b' },
+    { id: 'cut4', title: 'Сушка 4д/нед', icon: '✂️', desc: 'Upper/Lower, 8 нед, средний', dir: 'bb', goal: 'cut', level: 'intermediate', days: 4, weeks: 8, color: '#3b82f6' },
+    { id: 'powerbuilding4', title: 'Powerbuilder 4д/нед', icon: '⚡', desc: 'ПЛ+ББ гибрид, 12 нед', dir: 'hybrid', goal: 'strength_mass', level: 'intermediate', days: 4, weeks: 12, color: '#ec4899' },
+  ];
+  const applyQuickTemplate = (tpl: typeof QUICK_TEMPLATES[0]) => {
+    const p = createBlank(tpl.dir);
+    p.meta.title = tpl.title;
+    p.meta.goal = tpl.goal;
+    p.meta.level = tpl.level;
+    p.meta.daysPerWeek = tpl.days;
+    p.meta.weeks = tpl.weeks;
+    setEditing(p);
+    flash('🚀 ' + tpl.title + ' — заполните упражнения в редакторе');
+  };
+
   if (programs.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -254,6 +340,9 @@ export const ProgramManagerPanel: React.FC = () => {
             подключить LMS-цикл и поверх него сделать свой оверлей.
           </div>
         </div>
+
+        {/* Выбор режима: «Стандартный» / «Профессиональный» */}
+        <ManualModeToggle mode={manualMode} onMode={setManualMode} />
 
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -276,6 +365,24 @@ export const ProgramManagerPanel: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* P15: Шаблоны быстрого старта — только в стандартном режиме */}
+        {manualMode === 'standard' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700 }}>🚀 Быстрый старт (шаблоны)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
+              {QUICK_TEMPLATES.map(tpl => (
+                <button key={tpl.id} onClick={() => applyQuickTemplate(tpl)} style={{ padding: '10px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', background: tpl.color + '08', border: '1px solid ' + tpl.color + '25', color: DIM_STRONG, display: 'flex', flexDirection: 'column', gap: 3, minHeight: 70 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 16 }}>{tpl.icon}</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: tpl.color }}>{tpl.title}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: DIM }}>{tpl.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700 }}>📥 Загрузить для правки</div>
@@ -302,6 +409,9 @@ export const ProgramManagerPanel: React.FC = () => {
       <div style={{ fontSize: 11, color: DIM }}>
         Создавайте программы с нуля, клонируйте готовые из библиотеки или подключайте LMS-циклы (без изменения их процентовок).
       </div>
+
+      {/* Выбор режима: «Стандартный» / «Профессиональный» */}
+      <ManualModeToggle mode={manualMode} onMode={setManualMode} />
 
       {/* Actions — P2.9: иерархия кнопок (Создать / Загрузить) */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -561,8 +671,9 @@ export const ProgramManagerPanel: React.FC = () => {
 
 /* ───────────────────────── Редактор ───────────────────────── */
 
-const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram) => void; onSave: (note?: string) => void; onBack: () => void }> = ({ program, onChange, onSave, onBack }) => {
+const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram) => void; onSave: (note?: string) => void; onBack: () => void; mode: ManualMode }> = ({ program, onChange, onSave, onBack, mode }) => {
   const dir = program.meta.direction;
+  const isPro = mode === 'pro';
   const update = (patch: Partial<UserProgram>) => onChange({ ...program, ...patch });
   const updateMeta = (patch: Partial<UserProgram['meta']>) => onChange({ ...program, meta: { ...program.meta, ...patch } });
   const linked = useDataLink();
@@ -920,7 +1031,9 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: showTableView ? 'rgba(0,230,138,0.6)' : 'rgba(255,255,255,0.15)', color: showTableView ? '#00e68a' : DIM }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Редактор' : 'Таблица плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
-          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a' }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней">⚡ Авто-черновик</button>
+          {isPro && (
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a' }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней (требует профиль тренированности)">⚡ Авто-черновик</button>
+          )}
           {/* Загрузить цикл/программу из библиотеки */}
           <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(245,158,11,0.4)', color: '#f59e0b' }}
             onClick={() => {
@@ -929,7 +1042,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
             }}
             title="Загрузить программу или цикл из библиотеки для редактирования"
           >📥 Загрузить</button>
-          {dir === 'bb' && program.bb && (program.bb.weeks?.length ?? 0) >= 4 && (
+          {isPro && dir === 'bb' && program.bb && (program.bb.weeks?.length ?? 0) >= 4 && (
             <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
               onClick={() => {
                 const updated = { ...program.bb!, weeks: applyPhaseModulation(program.bb!.weeks!, { goal: program.meta.goal, level: program.meta.level, weeksTotal: program.meta.weeks || 4 }) };
@@ -939,10 +1052,12 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
               title="Применить фазовую периодизацию (RIR/объём/повторения по неделям)"
             >📈 Применить фазы</button>
           )}
-          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}
-            onClick={() => setEditorLibOpen('methods')}
-            title="Справочник тренировочных методик"
-          >📚 Методики</button>
+          {isPro && (
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}
+              onClick={() => setEditorLibOpen('methods')}
+              title="Справочник тренировочных методик"
+            >📚 Методики</button>
+          )}
           {(dir === 'bb' || dir === 'pl') && (
             <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4, marginRight: 4 }}>
               Нед
@@ -960,6 +1075,9 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         </div>
       </div>
 
+      {/* ═════════ ПРОФЕССИОНАЛЬНЫЙ РЕЖИМ: контекстные панели, профиль, лаб-коррекция, диагностика, объём, периодизация, рекомендации, тренер ═════════ */}
+      {isPro && (
+      <>
       {/* P4 — контекстные панели (НЕ калькуляторы): отображают статус текущей программы */}
       {dir === 'bb' && program.bb && <BbContextPanel program={program} level={program.meta.level} />}
       {dir === 'pl' && program.pl && <PLContextPanel program={program} />}
@@ -995,9 +1113,8 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         );
       })()}
 
-      <DiagnosticPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
-      <VolumeLandmarksPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
-      <PhaseLegend weeks={program.meta.weeks} goal={program.meta.goal} level={program.meta.level} />
+      <PlanDiagnosticsPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
+      <InteractiveVolumePanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
       <AutoPeriodizationPanel weeks={program.meta.weeks} goal={program.meta.goal} level={program.meta.level}
         onApply={(phases) => {
           if (dir !== 'bb' || !program.bb) return;
@@ -1009,14 +1126,27 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           showToast('📈 Периодизация применена: ' + phases.map(p => p.phase).join(' → '));
         }}
       />
-      <ExerciseInfo program={program} dir={dir} />
-      <RecommendationsPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
+      <ExerciseInfoPanel program={program} dir={dir} />
       <ProgressionCoach program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} onCourse={tprofile.onCourse ?? false} courseIntensity={tprofile.courseIntensity ?? 'moderate'} />
       <SplitConsultant program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
       <SubstitutionPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
 
-      {/* 📚 Методики — всегда доступен (не внутри календаря) */}
-      {editorLibOpen === 'methods' && (
+      {/* ═══ P7-P10: Pro-панели обратной связи с дневником (читают sRPE/RIR-дневник) ═══ */}
+      <LoadGuardPanel program={program} dir={dir} />
+      <RealMRVPanel program={program} dir={dir} />
+      <RIRCalibrationPanel program={program} dir={dir} onChange={onChange} showToast={showToast} />
+      <TonnageEstimatePanel program={program} dir={dir} />
+      <StickingPointPanel program={program} dir={dir} onChange={onChange} showToast={showToast} />
+      <PlateAutoPanel program={program} dir={dir} />
+      <WhatIfGuardPanel program={program} dir={dir} />
+      <ReadinessForecastPanel program={program} dir={dir} />
+      <CheckinGuardPanel program={program} dir={dir} />
+      <BiomechanicsPanel program={program} dir={dir} />
+      </>
+      )}
+
+      {/* 📚 Методики — справочник тренера (открывается из шапки, только в про-режиме) */}
+      {isPro && editorLibOpen === 'methods' && (
         <div style={{ ...CARD, padding: 12, borderLeft: '3px solid #a78bfa' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>📚 Справочник методик</span>
@@ -1221,8 +1351,8 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         );
       })()}
 
-      {/* P2 — LIVE Quality Panel: оценка 0-100 и конкретные правки (BB + PL). */}
-      {(dir === 'bb' && program.bb || dir === 'pl' && program.pl?.customWeeks) && (() => {
+      {/* P2 — LIVE Quality Panel: оценка 0-100 и конкретные правки (BB + PL). Требует профиль + лаб-данные. */}
+      {isPro && (dir === 'bb' && program.bb || dir === 'pl' && program.pl?.customWeeks) && (() => {
         const prof = loadTrainingProfile();
         const q = computePlanQualityFor(program, program.meta.level, {
           onCourse: prof.onCourse ?? false,
@@ -1288,8 +1418,8 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         } catch { return null; }
       })()}
 
-      {/* P3.2 — Bulk-apply методик ко всем блокам */}
-      {dir === 'bb' && program.bb && program.bb.weeks.length > 0 && (() => {
+      {/* P3.2 — Bulk-apply методик ко всем блокам (инструмент тренера) */}
+      {isPro && dir === 'bb' && program.bb && program.bb.weeks.length > 0 && (() => {
         const curIntensity = (program.bb.progression?.intensityTechniques ?? ['none'])[0];
         const applyTechnique = (key: IntensityTechnique | 'none') => {
           const next: UserProgram = {
@@ -1477,8 +1607,8 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         </div>
       )}
 
-      {/* P2.11: редактирование constraints (оборудование, травмы, avoidAxialLoad, любимые/исключённые) + progression */}
-      {!showTableView && dir === 'bb' && program.bb && (
+      {/* P2.11: редактирование constraints (оборудование, травмы, avoidAxialLoad, любимые/исключённые) + progression — pro-only */}
+      {isPro && !showTableView && dir === 'bb' && program.bb && (
         <BBConstraintsPanel
           constraints={program.bb.constraints ?? { equipment: [] }}
           progression={program.bb.progression ?? { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] }}

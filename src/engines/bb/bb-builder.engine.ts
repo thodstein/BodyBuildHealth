@@ -164,9 +164,12 @@ export function getBBVolumeLandmarks(plan: BBPlan, level: string, pedMrvMult = 1
 
 // sessionTag -> мышцы (канонические EN-ключи) — импортированы из bb-day-types (FIX-8, единый источник)
 
-/** Проверить, является ли упражнение задней дельтой (rear delt). */
+/** Проверить, является ли упражнение задней дельтой (rear delt).
+ *  Включает и «чистые» rear-delt движения, и комбинированные средняя+задняя
+ *  (Lu raise, Y-raise) — они по факту нагружают заднюю дельту наравне со средней
+ *  и должны исключаться из Push/Chest-дней так же, как face pull/rear delt fly. */
 export function isRearDeltExercise(name: string): boolean {
-  return /наклон.*дельт|rear|тяга.*лиц|face.*pull|бабочка|задн.*дельт|обратн.*сведен|обратн.*бабоч/i.test(name || '');
+  return /наклон.*дельт|rear|тяга.*лиц|face.*pull|бабочка|задн.*дельт|обратн.*сведен|обратн.*бабоч|lu.?raise|y-raise|y raise/i.test(name || '');
 }
 /** Проверить, является ли день Push/Chest/Shoulders (не Pull/Back). */
 function isPushDayTag(sessionTag: string): boolean {
@@ -226,18 +229,26 @@ const ALWAYS_ISOLATION: Set<string> = new Set(['calves', 'forearms', 'abs']);
 // Приоритизируются в generic-планах (без специализации/слабых точек).
 // ББ-логика: наклонный жим > плоский (верх груди — отстающая у большинства),
 // гакк/Смит-присед > свободный присед (безопасность поясницы, изоляция квадрицепса).
+// ВНИМАНИЕ: ID должны совпадать с реальными id в exercise-catalog.ts. Ранее здесь были
+// выдуманные ID (barbell_row/t_bar_row/lat_pulldown/overhead_press/dumbbell_lateral_raise/
+// barbell_curl/dumbbell_curl/tricep_pushdown/bench_press/incline_barbell_press/...),
+// из-за чего буст +50 никогда не срабатывал — реальный каталог использует
+// row_bar/row_tbar/pulldown/ohp/lateral_raise/curl_bar/curl_db/tricep_pushdown_*/bench_bar/incline_bar/...
 const PREFERRED_BB_EXERCISES = new Set([
   // Грудь — наклонные приоритет (верх груди растёт хуже, чем средняя/нижняя)
-  'incline_barbell_press', 'incline_dumbbell_press', 'dumbbell_bench_press', 'bench_press',
-  // Спина
-  'barbell_row', 't_bar_row', 'dumbbell_row', 'lat_pulldown', 'pull_up', 'chin_up',
+  'incline_bar', 'incline_db', 'bench_bar', 'bench_db',
+  'dips_chest', 'machine_chest_press', 'machine_incline_press',
+  // Спина — тяжёлые compound-тяги приоритет (king of back: barbell row + T-bar + pulldown)
+  'row_bar', 'row_tbar', 'row_db', 'row_chest_supported', 'row_seal', 'row_pendlay', 'yates_row',
+  'pulldown', 'pulldown_wide', 'pullup', 'chinup', 'pullup_wide', 'pulldown_vbar',
   // Ноги — гакк/Смит/лег-пресс приоритет (безопасность поясницы, изоляция)
-  'hack_squat', 'smith_squat', 'leg_press', 'bulgarian_split_squat', 'dumbbell_lunge',
-  'romanian_deadlift', 'leg_curl', 'leg_extension',
+  'hack_squat', 'squat_smith', 'leg_press', 'bulgarian_split_squat', 'walking_lunge', 'walking_lunge_db',
+  'rdl', 'deadlift_romanian', 'leg_curl', 'leg_ext',
   // Плечи
-  'overhead_press', 'arnold_press', 'dumbbell_lateral_raise',
+  'ohp', 'ohp_seated', 'ohp_seated_bar', 'ohp_seated_db', 'arnold_press', 'db_press',
+  'lateral_raise', 'lateral_raise_cable', 'lateral_raise_machine',
   // Руки
-  'tricep_pushdown', 'barbell_curl', 'dumbbell_curl',
+  'tricep_pushdown_rope', 'tricep_pushdown_bar', 'curl_bar', 'curl_db', 'hammer_curl',
   // Икры/Пресс
   'calf_raise', 'crunch',
 ]);
@@ -799,9 +810,15 @@ function buildSession(
     // ★ E: Снижен exerciseCount — качество > количество.
     // Primary: 2-4 упр на мышцу (3 для multi-day, 4 single-freq natural, 5 PED single-freq)
     // Accessory: 1-2 упр (2 для arms на PED)
+    // FIX (Баг 2): ранее ACCESSORY_2X_GROUPS (delt/biceps/triceps/forearms/shoulders/arms/calves/abs)
+    // не включал chest/back/quads/hamstrings/glutes — у этих больших мышц accessory всегда
+    // был exerciseCount=1, поэтому diversity-логика выбирала ОДНО упражнение (всегда первый
+    // angle-class = fly/растяжка для груди). Расширяем ACCESSORY_2X_GROUPS на big-muscle
+    // accessory тоже — даёт 2 изоляции на добивку, что устраняет «одна и та же растяжка».
+    const isBigMuscle = ['chest','back','quads','hamstrings','glutes','shoulders'].includes(muscle);
     let exerciseCount = role === 'primary'
       ? (isMultiDay ? 3 : (isSingleFreq ? (onPED ? 4 : 3) : (onPED ? 5 : 4)))
-      : (isArm && onPED ? 2 : (isArm ? 2 : 1));
+      : (isArm && onPED ? 2 : (isArm ? 2 : (isBigMuscle ? 2 : 1)));
     // ★ B: focusGroup/weakPoint — больше СЕТОВ (не упражнений).
     // Объём уже усилен через sessionShareFor (×1.2 weak, ×1.3 focus).
     // exerciseCount НЕ повышаем — качество > количество.
@@ -1057,18 +1074,35 @@ function buildSession(
       type AngleClass = { name: string; match: (e: any) => boolean };
       const ANGLE_CLASSES: Record<string, AngleClass[]> = {
         chest: [
-          // ПРОФ-порядок: 1. тяжёлый жим (механическое натяжение)
-          //               2. разводка/fly (растяжение мышцы — критично для гипертрофии)
-          //               3. жим на наклонной (угол — верх груди)
+          // ПРОФ-порядок: 1. тяжёлый горизонтальный жим (механическое натяжение)
+          //               2. наклонный жим (верх груди — отстающая у большинства)
+          //               3. разводка/fly (растяжение мышцы — критично для гипертрофии)
           //               4. отжимания на брусьях (нижняя часть + трицепс)
+          // Ранее порядок был horizontal_press → fly_cable → incline_press → dips_press,
+          // из-за чего при exerciseCount=3 алгоритм брал 2 жима + 1 РАЗВОДКУ (всегда растяжка).
+          // Переставили incline_press перед fly_cable — теперь 3-я позиция = жим на наклонной
+          // (compound, механическое натяжение), а разводка идёт 4-й — добивка-изоляция.
           { name: 'horizontal_press', match: (e) => /жим.*(лёжа|лежа|гориз)|bench.*(press|жим)|жим штанги|жим в смите лёжа/i.test(e.name) && !/наклон|incline|decline|сниз|отриц|узк/i.test(e.name) },
+          { name: 'incline_press', match: (e) => (/жим.*(наклон|incline|верх)/i.test(e.name) || /incline.*(press|жим)/i.test(e.name)) && !/отриц|decline|сниз|нижн/i.test(e.name) },
           { name: 'fly_cable', match: (e) => /развод|fly|crossover|кроссов|сведен|пек.?дек|бабоч|сведение/i.test(e.name) },
-          { name: 'incline_press', match: (e) => /жим.*(наклон|incline|верх)/i.test(e.name) || /incline.*(press|жим)/i.test(e.name) },
+          { name: 'decline_press', match: (e) => /жим.*(отриц|decline|сниз|нижн)/i.test(e.name) || /decline.*(press|жим)/i.test(e.name) },
           { name: 'dips_press', match: (e) => /отжим.*(брус|dip|параллел)|брусь/i.test(e.name) && !/трицепс/i.test(e.name) },
         ],
         back: [
-          { name: 'vertical_pull', match: (e) => /подтяг|pull.?up|тяга.*верх|lat.?pull|пуллдаун|верхн.*блок/i.test(e.name) },
-          { name: 'horizontal_row', match: (e) => /тяга.*(наклон|блок|гантел|штанг|груд)|row|тяга к пояс/i.test(e.name) && !/верх|вертик|подтяг/i.test(e.name) },
+          // ПРОФ-порядок для спины: 1. вертикальная тяга (подтяг/пуллдаун — ширина)
+          //                          2. тяжёлая горизонтальная тяга двумя руками (толщина — row_bar/T-bar/seal/Yates/Pendlay)
+          //                          3. горизонтальная тяга одной рукой / в тренажёре (db row / chest-supported / machine — точность)
+          //                          4. пуловер (изоляция широчайших — растяжение)
+          //                          5. rear delt / face pull (задняя дельта — отдельный угол)
+          //                          6. шраги (трапеции)
+          // Ранее все 12 тяг (включая one-arm изоляции) были в одном классе horizontal_row,
+          // и offset-формула (week*31+day*17+ci*7) % candidates.length выбирала лёгкие
+          // изоляции (Тяга верхнего блока одной рукой = 24% всех back-слотов) чаще тяжёлых.
+          // Разделение на тяжёлые/одноручные даёт приоритет тяжёлым compound-тягам.
+          { name: 'vertical_pull', match: (e) => /подтяг|pull.?up|тяга.*верх|lat.?pull|пуллдаун|верхн.*блок/i.test(e.name) && !/одной рук/i.test(e.name) },
+          { name: 'heavy_row', match: (e) => (/тяга.*наклон.*штанг|тяга.*штанг.*наклон|тяга.*т-?гриф|тяга.*гриф|тяга.*пендл|тяга.*йейт|тяга.*мэдоус|тяга.*леж.*скам|seal.?row|pendlay|yates|meadows/i.test(e.name) || (/row/i.test(e.id) && !/one.?arm|single|cable|machine/i.test(e.name))) && !/верх|вертик|подтяг|одной рук|за голов/i.test(e.name) },
+          { name: 'single_arm_row', match: (e) => (/тяга.*гантел.*наклон|тяга.*одной рук|тяга.*блок.*одной|тяга.*лэндмайн|тяга.*грудь.*упор|chest.?supported|тяга.*тренаж/i.test(e.name) || (/row/i.test(e.id) && /one.?arm|single|cable|machine/i.test(e.name))) && !/подтяг|за голов/i.test(e.name) },
+          { name: 'pullover_lat_iso', match: (e) => /пуловер|pullover|пулов|прям.*рук|прямые руки|straight.?pull|жиз.*широчайш/i.test(e.name) },
           { name: 'rear_delt_facepull', match: (e) => /лиц.*тяга|face.?pull|тяга к лиц|задн.*дельт|rear.?delt|обратн.*бабоч/i.test(e.name) },
           { name: 'shrugs', match: (e) => /шраг/i.test(e.name) },
         ],
@@ -2050,8 +2084,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         if (perPatternCount[patKey] > patMax) return false;
         return true;
       });
-      // Re-sort после дедупликации
-      const reordered = orderSessionExercises(s.exercises, { sessionTag: s.sessionTag || '' });
+      // Re-sort после дедупликации (с сохранением методики пользователя — pre_exhaust/post_exhaust).
+      // Ранее здесь вызывался orderSessionExercises БЕЗ methodology, что сбрасывало pre_exhaust
+      // обратно в compound_first — выбор методики в UI не имел эффекта на финальный порядок.
+      const reordered = orderSessionExercises(s.exercises, { sessionTag: s.sessionTag || '', methodology: input.methodology });
       s.exercises.length = 0; s.exercises.push(...reordered);
       // ━━━ ИТОГОВЫЙ КАП ━━━
       const finalCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 12 : 9;

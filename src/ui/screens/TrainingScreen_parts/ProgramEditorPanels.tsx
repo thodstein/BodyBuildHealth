@@ -27,8 +27,8 @@ interface PanelProps {
 
 const PHASE_LABELS: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
 
-/* ───── Диагностическая панель ───── */
-export const DiagnosticPanel: React.FC<PanelProps> = ({ program, dir, onChange, showToast, labMrvMult }) => {
+/* ───── Единая панель диагностики и рекомендаций (объединяет DiagnosticPanel + RecommendationsPanel) ───── */
+export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onChange, showToast, labMrvMult }) => {
   if (!(dir === 'bb' && program.bb || dir === 'pl' && program.pl?.customWeeks)) return null;
   const prof = loadTrainingProfile();
   let q: ReturnType<typeof computePlanQualityFor> | null = null;
@@ -36,20 +36,31 @@ export const DiagnosticPanel: React.FC<PanelProps> = ({ program, dir, onChange, 
     q = computePlanQualityFor(program, program.meta.level, { onCourse: prof.onCourse ?? false, courseIntensity: prof.courseIntensity ?? 'moderate', labMult: labMrvMult });
   } catch { return null; }
   if (!q || q.perMuscle.length === 0) return null;
+
   const weak = q.perMuscle.filter(m => m.status === 'low');
   const overloaded = q.perMuscle.filter(m => m.status === 'over');
+  const high = q.perMuscle.filter(m => m.status === 'high');
   const ok = q.perMuscle.filter(m => m.status === 'ok');
+  const gaps = q.perMuscle.filter(m => m.status === 'low' || m.status === 'over');
   const pctCalc = q.perMuscle.length >= 2 ? (() => {
     const pcts = q.perMuscle.map(p => ({ m: p.muscle, p: p.mrv > 0 ? (p.sets / p.mrv) * 100 : 0 }));
     return Math.max(...pcts.map(p => p.p)) - Math.min(...pcts.map(p => p.p));
   })() : 0;
+  const barColor = q.score >= 75 ? '#22c55e' : q.score >= 50 ? '#f59e0b' : '#ef4444';
+
   return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + (q.score >= 75 ? '#22c55e' : q.score >= 50 ? '#f59e0b' : '#ef4444') }}>
+    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + barColor, background: 'linear-gradient(135deg, ' + barColor + '08, rgba(167,139,250,0.04))' }}>
+      {/* Заголовок: score + сводка */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>🔬 Диагностика программы</span>
-        <span style={{ fontSize: 11, fontWeight: 700, color: q.score >= 75 ? '#22c55e' : q.score >= 50 ? '#f59e0b' : '#ef4444' }}>{q.score}/100 {q.grade}</span>
-        <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>{weak.length} недобор · {overloaded.length} перегруз · {ok.length} ок</span>
+        <span style={{ fontSize: 14, fontWeight: 800, color: barColor }}>{q.score}/100 {q.grade}</span>
+        <div style={{ flex: 1, minWidth: 80, maxWidth: 120, background: 'rgba(255,255,255,0.06)', borderRadius: 6, height: 6, overflow: 'hidden' }}>
+          <div style={{ width: q.score + '%', height: '100%', background: barColor, borderRadius: 6, transition: 'width 0.3s' }} />
+        </div>
+        <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>{weak.length} недобор · {overloaded.length} перегруз · {high.length} зона · {ok.length} ок</span>
       </div>
+
+      {/* Чипсы статусов по мышцам */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
         {q.perMuscle.map(pm => {
           const c = pm.status === 'over' ? '#ef4444' : pm.status === 'low' ? '#3b82f6' : pm.status === 'high' ? '#f59e0b' : '#22c55e';
@@ -58,9 +69,11 @@ export const DiagnosticPanel: React.FC<PanelProps> = ({ program, dir, onChange, 
           return <span key={pm.muscle} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: c + '18', border: '1px solid ' + c + '30', color: c }}>{icon} {GROUP_RU[pm.muscle] ?? pm.muscle} {pm.sets}/{pm.mrv}с ({pct}%)</span>;
         })}
       </div>
+
+      {/* Рекомендации: недобор → предложить упражнения */}
       {weak.length > 0 && (
         <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', marginBottom: 6 }}>⬇ Недобор — упражнения:</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', marginBottom: 6 }}>⬇ Недобор — добавить упражнения:</div>
           {weak.map(w => {
             const exs = suggestExercisesForGroup(w.muscle, program.meta.level, 3, (prof.equipment ?? []) as string[], [], [], prof.avoidAxialLoad ?? false, (prof.favoriteExercises ?? []) as string[], (prof.excludedExercises ?? []) as string[]);
             if (exs.length === 0) return null;
@@ -83,17 +96,28 @@ export const DiagnosticPanel: React.FC<PanelProps> = ({ program, dir, onChange, 
           })}
         </div>
       )}
+
+      {/* Рекомендации: перегруз → текст */}
       {overloaded.length > 0 && (
         <div style={{ marginBottom: 8, padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444' }}>⚠ Превышение MRV:</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>⚠ Превышение MRV — снизьте объём:</div>
           {overloaded.map(o => (
-            <div key={o.muscle} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>{GROUP_RU[o.muscle] ?? o.muscle}: {o.sets} сетов {'>'} MRV {o.mrv} (снизьте на {o.sets - o.mrv})</div>
+            <div key={o.muscle} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>{GROUP_RU[o.muscle] ?? o.muscle}: {o.sets} сетов {'>'} MRV {o.mrv} (−{o.sets - o.mrv} сетов)</div>
           ))}
         </div>
       )}
+
+      {/* Дисбаланс */}
       {pctCalc >= 30 && (
         <div style={{ padding: 8, borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>⚖ Дисбаланс нагрузки ({Math.round(pctCalc)}%)</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>⚖ Дисбаланс нагрузки ({Math.round(pctCalc)}%) — выровняйте объём между группами</div>
+        </div>
+      )}
+
+      {/* Сводка issues */}
+      {q.issues.length > 0 && (
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 4 }}>
+          {q.issues.slice(0, 4).map((iss, i) => <div key={i} style={{ marginBottom: 2 }}>• {iss}</div>)}
         </div>
       )}
     </div>
@@ -335,8 +359,8 @@ export const SplitConsultant: React.FC<PanelProps> = ({ program, dir, onChange, 
   );
 };
 
-/* ───── Объём и MRV ───── */
-export const VolumeLandmarksPanel: React.FC<PanelProps> = ({ program, dir, labMrvMult }) => {
+/* ───── Интерактивный объём и MRV (±сеты прямо из панели) ───── */
+export const InteractiveVolumePanel: React.FC<PanelProps> = ({ program, dir, onChange, showToast, labMrvMult }) => {
   const MUSCLES = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;
   const prof = loadTrainingProfile();
   const peakByMuscle: Record<string, number> = {};
@@ -354,24 +378,136 @@ export const VolumeLandmarksPanel: React.FC<PanelProps> = ({ program, dir, labMr
     }
   }
   if (Object.keys(peakByMuscle).length === 0) return null;
+
+  // Добавить 1 сет к мышце в week1/session0 (добавляет сет к последнему блоку этой мышцы, или создаёт новый блок)
+  const addSetToMuscle = (muscle: string) => {
+    if (dir !== 'bb' || !program.bb?.weeks[0]?.sessions[0] || !onChange) return;
+    const w0 = program.bb.weeks[0];
+    const s0 = w0.sessions[0];
+    // Найти последний блок этой мышцы в день 1
+    const blockIdx = [...s0.blocks].map((b, i) => ({ b, i })).filter(x => x.b.muscle === muscle).pop();
+    let newBlocks;
+    if (blockIdx) {
+      // Добавить сет к существующему блоку
+      newBlocks = s0.blocks.map((b, i) => i === blockIdx.i ? { ...b, sets: [...b.sets, { ...b.sets[b.sets.length - 1] ?? { reps: 10, rir: 2, weight: 0, restSec: 90 } }] } : b);
+    } else {
+      // Создать новый блок-аксессуар
+      const exs = suggestExercisesForGroup(muscle, program.meta.level, 1, (prof.equipment ?? []) as string[], [], [], prof.avoidAxialLoad ?? false, (prof.favoriteExercises ?? []) as string[], (prof.excludedExercises ?? []) as string[]);
+      const nb: UserBlock = { id: newId('blk'), type: 'accessory' as const, exerciseName: exs[0]?.name ?? '', muscle, role: 'accessory' as const, sets: makeSetsFromTemplate(muscleAwareSets(muscle, program.meta.level), (prof.workMax ?? {})[muscle] ?? 40) };
+      newBlocks = [...s0.blocks, nb];
+    }
+    onChange({ ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((w, wi) => wi === 0 ? { ...w, sessions: w.sessions.map((s, si) => si === 0 ? { ...s, blocks: newBlocks } : s) } : w) } });
+    showToast?.('➕ +1 сет: ' + (GROUP_RU[muscle] ?? muscle));
+  };
+
+  // Убрать 1 сет у мышцы (удаляет последний сет последнего блока этой мышцы в week1/session0)
+  const removeSetFromMuscle = (muscle: string) => {
+    if (dir !== 'bb' || !program.bb?.weeks[0]?.sessions[0] || !onChange) return;
+    const w0 = program.bb.weeks[0];
+    const s0 = w0.sessions[0];
+    const blockIdx = [...s0.blocks].map((b, i) => ({ b, i })).filter(x => x.b.muscle === muscle).pop();
+    if (!blockIdx) return;
+    let newBlocks;
+    if (blockIdx.b.sets.length > 1) {
+      // Убрать последний сет
+      newBlocks = s0.blocks.map((b, i) => i === blockIdx.i ? { ...b, sets: b.sets.slice(0, -1) } : b);
+    } else {
+      // Удалить блок целиком (1 сет = удалить)
+      newBlocks = s0.blocks.filter((_, i) => i !== blockIdx.i);
+    }
+    onChange({ ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((w, wi) => wi === 0 ? { ...w, sessions: w.sessions.map((s, si) => si === 0 ? { ...s, blocks: newBlocks } : s) } : w) } });
+    showToast?.('➖ −1 сет: ' + (GROUP_RU[muscle] ?? muscle));
+  };
+
+  const canEdit = dir === 'bb' && !!onChange;
+
   return (
     <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #22c55e' }}>
-      <div style={{ fontSize: 11, fontWeight: 800, color: '#22c55e', marginBottom: 6 }}>📊 Объём и MRV по мышцам (пиковая неделя)</div>
-      <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Сравнение с MEV/MAV/MRV для уровня <b>{program.meta.level}</b>{labMrvMult < 1 && <span> (лаб ×{labMrvMult.toFixed(2)})</span>}{(prof.onCourse ?? false) && <span style={{ color: '#f59e0b' }}> · курс</span>}</div>
+      <div style={{ fontSize: 11, fontWeight: 800, color: '#22c55e', marginBottom: 6 }}>📊 Объём и MRV (интерактивно)</div>
+      <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Сравнение с MEV/MAV/MRV для уровня <b>{program.meta.level}</b>{labMrvMult < 1 && <span> (лаб ×{labMrvMult.toFixed(2)})</span>}{(prof.onCourse ?? false) && <span style={{ color: '#f59e0b' }}> · курс</span>}{canEdit && <span> · кнопки ± изменяют неделю 1</span>}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {MUSCLES.filter(m => peakByMuscle[m] > 0).map(m => {
+        {MUSCLES.filter(m => peakByMuscle[m] > 0 || canEdit).map(m => {
           const cur = peakByMuscle[m] || 0;
           const lm = getVolumeLandmarks(program.meta.level, m);
           if (!lm) return null;
           const labMrv = labMrvMult < 1 ? Math.round(lm.mrv * labMrvMult) : lm.mrv;
           const pct = labMrv > 0 ? Math.round((cur / labMrv) * 100) : 0;
           const bc = pct > 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#22c55e';
+          const statusLabel = pct > 100 ? 'перегруз' : pct >= 80 ? 'зона' : cur < lm.mev ? 'недобор' : 'ок';
           return (
-            <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
-              <span style={{ fontSize: 11, color: DIM_STRONG, flex: '0 0 80px' }}>{GROUP_RU[m] ?? m}</span>
-              <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}><div style={{ width: Math.min(100, pct) + '%', height: '100%', background: bc, borderRadius: 4 }} /></div>
-              <span style={{ fontSize: 11, fontWeight: 700, color: bc, minWidth: 60, textAlign: 'right' }}>{cur} / {labMrv}с</span>
-              <span style={{ fontSize: 11, color: DIM, minWidth: 36, textAlign: 'right' }}>{pct}%</span>
+            <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
+              <span style={{ fontSize: 11, color: DIM_STRONG, flex: '0 0 70px' }}>{GROUP_RU[m] ?? m}</span>
+              <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', minWidth: 50 }}><div style={{ width: Math.min(100, pct) + '%', height: '100%', background: bc, borderRadius: 4 }} /></div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: bc, minWidth: 54, textAlign: 'right' }}>{cur}/{labMrv}с</span>
+              <span style={{ fontSize: 10, color: bc, minWidth: 48, textAlign: 'right', fontWeight: 600 }}>{statusLabel}</span>
+              {canEdit && (
+                <div style={{ display: 'flex', gap: 2, marginLeft: 4 }}>
+                  <button onClick={() => removeSetFromMuscle(m)} disabled={cur === 0} style={{ width: 26, height: 26, borderRadius: 6, fontSize: 13, fontWeight: 800, cursor: cur === 0 ? 'not-allowed' : 'pointer', background: cur === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)', color: cur === 0 ? DIM : '#ef4444', opacity: cur === 0 ? 0.4 : 1 }}>−</button>
+                  <button onClick={() => addSetToMuscle(m)} disabled={pct > 100} style={{ width: 26, height: 26, borderRadius: 6, fontSize: 13, fontWeight: 800, cursor: pct > 100 ? 'not-allowed' : 'pointer', background: pct > 100 ? 'rgba(255,255,255,0.02)' : 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.25)', color: pct > 100 ? DIM : '#22c55e', opacity: pct > 100 ? 0.4 : 1 }}>+</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {canEdit && (
+        <div style={{ fontSize: 10, color: DIM, marginTop: 6, fontStyle: 'italic' }}>
+          «+» — добавить сет к последнему блоку мышцы в день 1 (или создать аксессуар). «−» — убрать последний сет. Блок с 1 сетом удаляется.
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ───── Фазовая легенда удалена — функционал полностью покрыт AutoPeriodizationPanel (легенда + onApply) ───── */
+
+/* ───── Инфо упражнений (показывает ВСЕ упражнения плана, кликабельно) ───── */
+export const ExerciseInfoPanel: React.FC<{ program: UserProgram; dir: string }> = ({ program, dir }) => {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const allExercises: { name: string; muscle: string }[] = [];
+  if (dir === 'bb' && program.bb) {
+    for (const w of program.bb.weeks) {
+      for (const s of w.sessions) {
+        for (const b of s.blocks) {
+          if (b.exerciseName && !allExercises.find(e => e.name === b.exerciseName)) {
+            allExercises.push({ name: b.exerciseName, muscle: b.muscle || '' });
+          }
+        }
+      }
+    }
+  }
+  if (allExercises.length === 0) return null;
+
+  return (
+    <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #06b6d4' }}>
+      <div style={{ fontSize: 11, fontWeight: 800, color: '#06b6d4', marginBottom: 6 }}>🔬 Инфо упражнений ({allExercises.length})</div>
+      <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Клик — раскрыть биомеханику, вектор, мышцы, инвентарь</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '40vh', overflow: 'auto' }}>
+        {allExercises.slice(0, 30).map(({ name, muscle }) => {
+          const ex = EXERCISE_CATALOG.find((e: Exercise) => e.name === name) as any | undefined;
+          const isExpanded = expanded === name;
+          return (
+            <div key={name} style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.04)' }}>
+              <div onClick={() => setExpanded(isExpanded ? null : name)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', cursor: 'pointer', background: isExpanded ? 'rgba(6,182,212,0.06)' : 'rgba(255,255,255,0.02)', fontSize: 11, transition: 'background 0.15s' }}>
+                <span style={{ flex: 1, fontWeight: 600, color: DIM_STRONG }}>{name}</span>
+                {muscle && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: DIM }}>{GROUP_RU[muscle] || muscle}</span>}
+                <span style={{ fontSize: 11, color: isExpanded ? '#06b6d4' : DIM }}>{isExpanded ? '▲' : '▼'}</span>
+              </div>
+              {isExpanded && ex && (
+                <div style={{ padding: '8px 10px', background: 'rgba(6,182,212,0.03)', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 4 }}>
+                    {ex.group && <div style={{ fontSize: 10, color: DIM }}>Группа: <b style={{ color: DIM_STRONG }}>{GROUP_RU[ex.group] ?? ex.group}</b></div>}
+                    {ex.type && <div style={{ fontSize: 10, color: DIM }}>Тип: <b style={{ color: DIM_STRONG }}>{ex.type}</b></div>}
+                    {ex.equipment && <div style={{ fontSize: 10, color: DIM }}>Инвентарь: <b style={{ color: DIM_STRONG }}>{typeof ex.equipment === 'string' ? ex.equipment : (ex.equipment as string[]).join(', ')}</b></div>}
+                    {ex.forceVector && <div style={{ fontSize: 10, color: DIM }}>Вектор: <b style={{ color: DIM_STRONG }}>{ex.forceVector}</b></div>}
+                    {ex.primaryMuscles && <div style={{ fontSize: 10, color: DIM }}>Мышцы: <b style={{ color: DIM_STRONG }}>{Array.isArray(ex.primaryMuscles) ? ex.primaryMuscles.join(', ') : ex.primaryMuscles}</b></div>}
+                  </div>
+                </div>
+              )}
+              {isExpanded && !ex && (
+                <div style={{ padding: '8px 10px', background: 'rgba(6,182,212,0.03)', fontSize: 10, color: DIM, fontStyle: 'italic' }}>Упражнение не найдено в каталоге</div>
+              )}
             </div>
           );
         })}
@@ -380,101 +516,7 @@ export const VolumeLandmarksPanel: React.FC<PanelProps> = ({ program, dir, labMr
   );
 };
 
-/* ───── Фазовая легенда ───── */
-export const PhaseLegend: React.FC<{ weeks: number; goal: string; level: string }> = ({ weeks, goal, level }) => {
-  if (weeks < 4) return null;
-  const phases = distributePhases(weeks, 0, goal === 'powerlifting' ? 'strength' : 'bulk');
-  if (!phases?.length) return null;
-  return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #60a5fa' }}>
-      <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>📈 Фазовая легенда ({weeks} нед)</div>
-      {phases.map((p, i) => {
-        const pc = { accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' }[p.phase] ?? '#fff';
-        return (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
-            <div style={{ width: 8, height: 8, borderRadius: 10, background: pc, flexShrink: 0 }} />
-            <span style={{ fontSize: 10, color: DIM_STRONG, flex: '0 0 100px' }}>{PHASE_LABELS[p.phase]}</span>
-            <span style={{ fontSize: 10, color: DIM }}>нед {p.startWeek}–{p.endWeek}</span>
-            <span style={{ fontSize: 10, fontWeight: 700, color: pc, marginLeft: 'auto' }}>{p.endWeek - p.startWeek + 1} нед</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
-/* ───── Инфо упражнения ───── */
-export const ExerciseInfo: React.FC<{ program: UserProgram; dir: string }> = ({ program, dir }) => {
-  let selectedEx: Exercise | undefined;
-  if (dir === 'bb' && program.bb) {
-    for (const w of program.bb.weeks) {
-      for (const s of w.sessions) {
-        for (const b of s.blocks) {
-          if (b.exerciseName) { const f = EXERCISE_CATALOG.find((e: Exercise) => e.name === b.exerciseName); if (f) { selectedEx = f; break; } }
-        }
-        if (selectedEx) break;
-      }
-      if (selectedEx) break;
-    }
-  }
-  if (!selectedEx) return null;
-  const ex = selectedEx as any;
-  return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #06b6d4' }}>
-      <div style={{ fontSize: 11, fontWeight: 800, color: '#06b6d4', marginBottom: 4 }}>🔬 Инфо: {ex.name}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 4 }}>
-        {ex.group && <div style={{ fontSize: 10, color: DIM }}>Группа: <b style={{ color: DIM_STRONG }}>{GROUP_RU[ex.group] ?? ex.group}</b></div>}
-        {ex.type && <div style={{ fontSize: 10, color: DIM }}>Тип: <b style={{ color: DIM_STRONG }}>{ex.type}</b></div>}
-        {ex.equipment && <div style={{ fontSize: 10, color: DIM }}>Инвентарь: <b style={{ color: DIM_STRONG }}>{typeof ex.equipment === 'string' ? ex.equipment : (ex.equipment as string[]).join(', ')}</b></div>}
-        {ex.forceVector && <div style={{ fontSize: 10, color: DIM }}>Вектор: <b style={{ color: DIM_STRONG }}>{ex.forceVector}</b></div>}
-        {ex.primaryMuscles && <div style={{ fontSize: 10, color: DIM }}>Мышцы: <b style={{ color: DIM_STRONG }}>{Array.isArray(ex.primaryMuscles) ? ex.primaryMuscles.join(', ') : ex.primaryMuscles}</b></div>}
-      </div>
-    </div>
-  );
-};
-
-/* ───── Рекомендации (все мышцы) ───── */
-export const RecommendationsPanel: React.FC<PanelProps> = ({ program, dir, onChange, showToast, labMrvMult }) => {
-  if (!(dir === 'bb' && program.bb || dir === 'pl' && program.pl?.customWeeks)) return null;
-  const prof = loadTrainingProfile();
-  let q: ReturnType<typeof computePlanQualityFor> | null = null;
-  try {
-    q = computePlanQualityFor(program, program.meta.level, { onCourse: prof.onCourse ?? false, courseIntensity: prof.courseIntensity ?? 'moderate', labMult: labMrvMult });
-  } catch { return null; }
-  if (!q || q.perMuscle.length === 0) return null;
-  const gaps = q.perMuscle.filter(m => m.status === 'low' || m.status === 'over');
-  if (gaps.length === 0) return null;
-  return (
-    <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa', background: 'linear-gradient(135deg, rgba(167,139,250,0.06), rgba(245,158,11,0.04))' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 13, fontWeight: 800, color: '#a78bfa' }}>💡 Рекомендации ({gaps.length})</span>
-        <span style={{ fontSize: 10, color: DIM }}>Мышцы вне зоны MEV–MRV</span>
-      </div>
-      {gaps.slice(0, 6).map((g, gi) => {
-        const recs = suggestExercisesForGroup(g.muscle, program.meta.level, 3, (prof.equipment ?? []) as string[], (prof.weakPoints ?? []) as string[], [], prof.avoidAxialLoad ?? false, (prof.favoriteExercises ?? []) as string[], (prof.excludedExercises ?? []) as string[]);
-        const isOver = g.status === 'over';
-        const c = isOver ? '#ef4444' : '#3b82f6';
-        return (
-          <div key={gi} style={{ padding: 6, marginBottom: 4, background: c + '08', borderRadius: 8, border: '1px solid ' + c + '15' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: c }}>{(isOver ? '⚠' : '⬇')} {GROUP_RU[g.muscle] ?? g.muscle}: {g.sets} из {g.mev}–{g.mrv} сетов{isOver ? ` (перегруз на ${g.sets - g.mrv})` : ` (недобор ${g.mev - Math.max(0, g.sets)})`}</div>
-            {!isOver && recs.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
-                {recs.map((r, ri) => (
-                  <button key={ri} onClick={() => {
-                    if (dir !== 'bb' || !program.bb?.weeks[0]?.sessions[0]) return;
-                    const nb: UserBlock = { id: newId('blk'), type: 'accessory' as const, exerciseName: r.name, muscle: g.muscle, role: 'accessory' as const, sets: makeSetsFromTemplate(muscleAwareSets(g.muscle, program.meta.level), (prof.workMax ?? {})[g.muscle] ?? 40) };
-                    onChange({ ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((w, wi) => wi === 0 ? { ...w, sessions: w.sessions.map((s, si) => si === 0 ? { ...s, blocks: [...s.blocks, nb] } : s) } : w) } });
-                    showToast('✅ ' + r.name);
-                  }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: c + '10', border: '1px solid ' + c + '25', color: c, fontWeight: 700, minHeight: 34 }}>+ {r.name}</button>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-};
+/* ───── RecommendationsPanel удалён — функционал полностью покрыт PlanDiagnosticsPanel ───── */
 
 /* ───── Панель замен упражнений ───── */
 export const SubstitutionPanel: React.FC<PanelProps> = ({ program, dir, onChange, showToast }) => {

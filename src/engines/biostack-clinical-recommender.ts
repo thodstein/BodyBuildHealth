@@ -548,11 +548,12 @@ export function buildClinicalStack(
       // маркеры: +5 за совпадение
       if (markerSubs.size && markerSubs.has(id)) score += 5;
       let organMatch = false;
+      let mechMatch = false;
       // механизмы: +3 за каждый совпавший
       if (filterMechanisms && filterMechanisms.length) {
         const tz = getDrugTzMechanisms(id) || [];
         const mechHits = tz.filter(m => filterMechanisms!.includes(m.mechId)).length;
-        if (mechHits > 0) score += mechHits * 3;
+        if (mechHits > 0) { score += mechHits * 3; mechMatch = true; }
       }
       // органы: +3 за каждый совпавший
       if (organFilterActive) {
@@ -560,9 +561,12 @@ export function buildClinicalStack(
         const organHits = tz.filter(m => filterOrgans!.includes(m.organId)).length;
         if (organHits > 0) { score += organHits * 3; organMatch = true; }
       }
-      // Если орган-фильтр активен, требовать хотя бы одно орган-совпадение
-      // (нельзя пройти только по маркерам или механизмам)
+      // Строгая проверка активных фильтров:
+      // Если выбран фильтр по органам, вещество ОБЯЗАНО иметь влияние на эти органы.
       if (organFilterActive && !organMatch) continue;
+      // Если выбран фильтр по механизмам, вещество ОБЯЗАНО затрагивать эти механизмы.
+      if (filterMechanisms && filterMechanisms.length && !mechMatch) continue;
+
       if (score >= minScore) filterScore.set(id, score);
     }
 
@@ -660,20 +664,16 @@ export function buildClinicalStack(
       }
 
       // Орган/механизм-фильтр в synergy pass:
-      // strict-режим: все активные фильтры обязательны
-      // balanced-режим: орган-фильтр уважается, механизм-фильтр — опционально
+      // При активном фильтре по органам добавленное по синергии вещество ОБЯЗАНО влиять на один из выбранных органов
       if (hasActiveFilters) {
         const candTz = getDrugTzMechanisms(candId) || [];
         const candOrgans = new Set(candTz.map(m => m.organId));
         const candMechs = new Set(candTz.map(m => m.mechId));
         const organHit = filterOrgans?.some(o => candOrgans.has(o));
         const mechHit = filterMechanisms?.some(m => candMechs.has(m));
-        // balanced: орган обязателен если выбран; strict: и орган, и механизм обязательны
-        if (strictFilter) {
-          if (!organHit && !mechHit) continue;
-        } else {
-          if (organFilterActive && !organHit) continue;
-        }
+        
+        if (organFilterActive && !organHit) continue;
+        if (filterMechanisms && filterMechanisms.length && !mechHit) continue;
       }
 
       if (synScore >= synThreshold) synCandidates.push({ id: candId, synScore });

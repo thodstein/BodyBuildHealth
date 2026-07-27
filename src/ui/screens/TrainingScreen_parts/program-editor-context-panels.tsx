@@ -115,13 +115,6 @@ export const BbContextPanel: React.FC<{ program: UserProgram; level: string }> =
         )}
       </div>
 
-      <div style={{ marginTop: 8, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT, marginBottom: 4 }}>🔗 Конструкторские инструменты (для этого плана)</div>
-        <div style={{ fontSize: 10, color: DIM, lineHeight: 1.5 }}>
-          Измените состав группы мышц → панель выше покажет, где вы у цели, где слишком мало/много.
-          Откройте сессию для редактирования упражнений, сетов, RIR, веса, отдыха — все поля редактируемы.
-        </div>
-      </div>
     </div>
   );
 };
@@ -268,13 +261,6 @@ export const PLContextPanel: React.FC<{ program: UserProgram }> = ({ program }) 
         ))}
       </div>
 
-      <div style={{ marginTop: 8, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', marginBottom: 4 }}>🔗 Конструкторские инструменты PL</div>
-        <div style={{ fontSize: 10, color: DIM, lineHeight: 1.5 }}>
-          Изменяйте ПМ и слабые группы → веса на всех сессиях цикла автоматически перерассчитаются из %.
-          Заметки к циклу — ваш дневник, отдельно от процентовок LMS.
-        </div>
-      </div>
     </div>
   );
 };
@@ -286,12 +272,3 @@ const WmField: React.FC<{ label: string; value: number | undefined; subHint?: st
     {subHint && <div style={{ fontSize: 11, color: DIM, marginTop: 2 }}>{subHint}</div>}
   </div>
 );
-
-/** Проверка, что LMS_CYCLES не пустой (lazy-импорт). */
-if (!LMS_CYCLES || !Array.isArray(LMS_CYCLES) || LMS_CYCLES.length === 0) {
-  // eslint-disable-next-line no-console
-  console.warn('[program-editor-context-panels] LMS_CYCLES not loaded — PLContextPanel может не работать.');
-}
-
-/** Проверка экспорта getCycleById — graceful fallback если API изменилось. */
-const _hasGetCycleById = typeof getCycleById === 'function';

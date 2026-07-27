@@ -81,6 +81,7 @@ import { SupportBioavailability } from './SupportScreen_parts/SupportBioavailabi
 import { SupportEffectiveDose } from './SupportScreen_parts/SupportEffectiveDose';
 import { UnifiedSynergyCalculator } from './SupportScreen_parts/UnifiedSynergyCalculator';
 import { SupportTimingPlanner } from './SupportScreen_parts/SupportTimingPlanner';
+import { SupportAnalogCalculator } from './SupportScreen_parts/SupportAnalogCalculator';
 import { AutoCalculator } from './Calculator';
 export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (screen: string) => void }> = ({ initialTab, onNavigate }) => {
   const linked = useDataLink();
@@ -792,7 +793,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
   const [favRefresh, setFavRefresh] = useState(0);
   const [favTab, setFavTab] = useState<string>('favorites');
   const [combinedFavDiaryTab, setCombinedFavDiaryTab] = useState<'favorites'|'diary'>('favorites');
-  const [calcToolsTab, setCalcToolsTab] = useState<'bioavailability'|'dose'|'synergy_calc'|'timing'>('bioavailability');
+  const [calcToolsTab, setCalcToolsTab] = useState<'bioavailability'|'dose'|'synergy_calc'|'timing'|'analog'>('bioavailability');
   const [showSavedPicker, setShowSavedPicker] = useState(false);
   const [researchSource, setResearchSource] = useState<'pubmed' | 'pubchem' | 'scholar' | 'fda' | 'pharma'>('pubmed');
   const [pubchemResults, setPubchemResults] = useState<any[]>([]);
@@ -3212,7 +3213,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             {renderView(infoView, 'calc_tools', () =>
               <div>
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
-                  {[['bioavailability','🧬 Биодоступность'],['dose','🧮 Расчёт дозы'],['synergy_calc','🧬 Калькулятор синергии'],['timing','⏰ Тайминг-планировщик']].map(([id,label]:any) => (
+                  {[['bioavailability','🧬 Биодоступность'],['dose','🧮 Расчёт дозы'],['synergy_calc','🧬 Калькулятор синергии'],['timing','⏰ Тайминг-планировщик'],['analog','🔄 Калькулятор аналогов']].map(([id,label]:any) => (
                     <button key={id} onClick={() => setCalcToolsTab(id as any)} style={{
                       padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
                       background: calcToolsTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
@@ -3226,6 +3227,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
                   {calcToolsTab === 'dose' && <SupportEffectiveDose />}
                   {calcToolsTab === 'synergy_calc' && <UnifiedSynergyCalculator s={s} />}
                   {calcToolsTab === 'timing' && <SupportTimingPlanner />}
+                  {calcToolsTab === 'analog' && <SupportAnalogCalculator />}
                 </div>
               </div>
             )}
