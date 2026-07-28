@@ -39,6 +39,7 @@ import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFe
 import type { SessionMethodology } from '../../../engines/bb/bb-session-order.engine';
 import { isCompoundEx } from '../../../engines/bb/bb-session-order.engine';
 import { PCT_FOR_RIR } from '../../../engines/rir-table';
+import { labTrainingAdjust } from './lab-training-adjust';
 import { getCyclesByDirection, getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 import { convertCycleToBBPlan, programToCycleTemplate, cycleTemplateToFullProgram, programToBBPlan } from '../../../engines/bb/cycle-to-plan';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
@@ -168,6 +169,8 @@ function rotationSubstitutions(week: number, totalWeeks: number, muscle: string,
 export const BbAutoConstructor: React.FC = () => {
   const linked = useDataLink();
   const prof = useMemo(() => loadTrainingProfile(), []);
+  // P0-5: лабораторная коррекция MRV (ALT/CRP/HCT/гормоны/почки → снижение объёма).
+  const labAdjust = useMemo(() => labTrainingAdjust(linked.labAnalysis ?? null), [linked.labAnalysis]);
 
   const [step, setStep] = useState<Step>('params');
   const [bbLevel, setBbLevel] = useState<string>(prof.level || 'intermediate');
@@ -545,15 +548,21 @@ export const BbAutoConstructor: React.FC = () => {
         courseIntensity,
         equipment: bbEquipment,
         methodology: bbMethodology,
+        // P0-5: лабораторная коррекция MRV
+        labMrvMultiplier: labAdjust.mrvMultiplier,
+        labWarnings: labAdjust.warnings,
+        labIntensityNote: labAdjust.intensityNote,
       }, pedAdapt);
     }
 
     const modeLabel = planMode === 'bb_cycle' ? `BB-цикл: ${customCycle?.meta.title || getCycleById(selectedCycleId)?.meta.title || selectedCycleId}` : 'Generic-сплит';
     const srpe = loadSRPESessions();
     const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : null;
-    const deloadNote = autoDeload && acwr && acwr.ratio > 1.3
-      ? `🔄 Делод: ${DELOAD_PROTOCOLS[deloadType].description}`
-      : 'Делод: нет';
+    const deloadNote = autoDeload && acwr && acwr.ratio > 1.5
+      ? `🔄 Делод (ACWR ${acwr.ratio.toFixed(2)} >1.5 — danger): ${DELOAD_PROTOCOLS[deloadType].description}`
+      : (acwr && acwr.ratio > 1.3
+        ? `⚠ ACWR ${acwr.ratio.toFixed(2)} — зона осторожности (1.3-1.5). Рассмотрите разгрузку.`
+        : 'Делод: нет (ACWR в норме)');
 
     setBuiltPlan({
       ...plan,

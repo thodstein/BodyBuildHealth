@@ -87,6 +87,15 @@ export interface BBBuilderInput {
   equipment?: string[];
   /** Методика порядка упражнений в сессии (compound_first по умолчанию; pre_exhaust — изоляция основной мышцы первой). */
   methodology?: SessionMethodology;
+  /** P0-5 (audit 2026-07): множитель MRV по данным лаборатории (0.7-1.0).
+   *  Источник: labTrainingAdjust(linked.labAnalysis).mrvMultiplier (UI-side).
+   *  Применяется ПОСЛЕ PED-множителя: effectiveMrvMult = pedMrvMult × labMrvMultiplier.
+   *  ALT↑/CRP↑/HCT↑/низкий тестостерон → снижение допустимого объёма. */
+  labMrvMultiplier?: number;
+  /** P0-5: текстовые предупреждения лаборатории (пробрасываются в rationale плана). */
+  labWarnings?: string[];
+  /** P0-5: рекомендация по интенсивности из лаборатории (пробрасывается в rationale). */
+  labIntensityNote?: string;
 }
 
 
@@ -1715,12 +1724,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       if (input.goal === 'mass' || input.goal === 'strength_mass') v = Math.round(v * 1.05);
       // PED-адаптация: увеличиваем целевой объём пропорционально MRV-множителю
       v = Math.round(v * (pedAdapt?.combinedMrvMultiplier ?? 1));
+      // P0-5: лабораторная коррекция — снижение объёма при ALT/CRP/HCT/гормонах
+      v = Math.round(v * (input.labMrvMultiplier ?? 1));
       muscleVolumeRotation[m] = v;
       // fix D: истинный MRV — потолок для капа.
       // fix C: для отстающих/фокус-групп поднимаем потолок в такт объёмному
       // бусту (weak ×1.2, focus ×1.3), иначе normalizeWeekMrv стирает акцент.
       // PED: базовый MRV умножается на combinedMrvMultiplier ДО корректировок
-      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1));
+      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1));
       if (isWeak(m, weakPoints)) capMrv = Math.round(capMrv * 1.2);
       if (focusGroup === m || (focusGroup && isWeak(m, [focusGroup]))) capMrv = Math.round(capMrv * 1.3);
       mrvByMuscle[m] = capMrv;
@@ -1733,7 +1744,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     if (mrvByMuscle[m]) continue;
     const lm = landmarksForRotation(level, m, pattern.rotationDays);
     if (lm) {
-      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1));
+      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1));
       if (isWeak(m, weakPoints)) capMrv = Math.round(capMrv * 1.2);
       mrvByMuscle[m] = capMrv;
     }
@@ -1753,7 +1764,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   } else if (input.weeks >= 4) {
     forceFinalDeload = true;
   }
-  if (acwrRatio > 1.5 && input.weeks >= 3) {
+  // P0-7 (audit 2026-07): ACWR thresholds — 1.3 = caution (display only),
+  // 1.5 = enforce deload (Grgic 2020; optimum 0.8-1.3, caution 1.3-1.5, danger >1.5).
+  const acwrCaution = acwrRatio > 1.3 && acwrRatio <= 1.5 && input.weeks >= 3;
+  const acwrDanger = acwrRatio > 1.5 && input.weeks >= 3;
+  if (acwrDanger) {
     deloadFreq = Math.max(1, Math.min(deloadFreq || 3, 3));
   }
   const phaseDist = distributePhases(input.weeks, deloadFreq, input.goal === 'strength_mass' ? 'mass' : (input.goal || 'mass'));
@@ -2051,6 +2066,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     `S-MRV: автоматический кап объёма на основе бюджета утомления сессии + потолок по MRV мышцы.`,
     ...(pedAdapt ? [`PED-адаптация: MRV×${pedAdapt.combinedMrvMultiplier.toFixed(2)}, восстановление×${pedAdapt.combinedRecoveryMultiplier.toFixed(2)}${pedAdapt.activePEDs.length > 0 ? ' (' + pedAdapt.perPED.map(p => `${p.ped}${p.dose > 0 ? ' ' + p.dose : ''}`).join(' + ') + (pedAdapt.courseIntensity !== 'moderate' ? ', ' + pedAdapt.courseIntensity : '') + ')' : ''}`] : []),
     ...(injuries.length > 0 ? [`Травмы (per-week по дате плана${input.planStartWeek ? ` со старта ${input.planStartWeek}` : ''}): исключены ${[...new Set(injuries.filter(i => i.exclude !== false).map(i => i.muscle))].join(', ') || '—'}; градация ${[...new Set(injuries.filter(i => i.exclude === false).map(i => i.muscle))].join(', ') || '—'} — упражнения заменяются на безопасные альтернативы с пониженным весом/объёмом.`] : []),
+    // P0-7: ACWR cautions
+    ...(acwrCaution ? [`⚠ ACWR=${acwrRatio.toFixed(2)} — зона осторожности (1.3-1.5). Рассмотрите снижение объёма или разгрузочную неделю.`] : []),
+    ...(acwrDanger ? [`🚨 ACWR=${acwrRatio.toFixed(2)} — опасная зона (>1.5). Принудительная разгрузка каждые 3 нед.`] : []),
   ];
 
   const basePlan = { pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale };
@@ -2075,10 +2093,25 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     });
   }
   const pedMrvMult = (pedAdapt?.combinedMrvMultiplier ?? 1);
+  // P0-5 (audit 2026-07): лабораторная коррекция MRV.
+  // labMrvMultiplier (0.7-1.0) от labTrainingAdjust(linked.labAnalysis).mrvMultiplier:
+  // ALT↑/CRP↑/HCT↑/почечный стресс/низкий тестостерон → снижение допустимого объёма.
+  // Применяется ПОСЛЕ PED-множителя (PED повышает MRV, лаборатория снижает — независимые оси).
+  const labMult = input.labMrvMultiplier ?? 1;
+  const effectiveMrvMult = pedMrvMult * labMult;
+  if (labMult < 1) {
+    rationale.push(`🧪 Лабораторная коррекция: MRV ×${labMult.toFixed(2)} (печень/почки/воспаление/гормоны) → эффективный MRV-множитель ×${effectiveMrvMult.toFixed(2)}.`);
+    if (input.labWarnings && input.labWarnings.length > 0) {
+      rationale.push(...input.labWarnings.map(w => `⚠ ${w}`));
+    }
+    if (input.labIntensityNote) {
+      rationale.push(`🧪 Интенсивность: ${input.labIntensityNote}`);
+    }
+  }
   // Cross-day weakPoints compensation: если слабая группа получает < MEV за неделю (потому что
   // не входит ни в один дневной тег), добавить feeder-сет в ближайший релевантный день.
   finalPlan = weakPoints.length > 0
-    ? compensateCrossDayWeakPoints(finalPlan, weakPoints, level, workMax, eqList, pedMrvMult, avAxial)
+    ? compensateCrossDayWeakPoints(finalPlan, weakPoints, level, workMax, eqList, effectiveMrvMult, avAxial)
     : finalPlan;
   // Final re-sort: compensateCrossDayWeakPoints may have added feeders that break grouping
   for (const w of finalPlan.weeks) {
@@ -2217,7 +2250,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       for (const s of wk1.sessions) for (const e of s.exercises) if (collapseKey(e.muscle) === m) weekSets += e.sets;
       const lm = getVolumeLandmarks(normLvl, m);
       if (!lm) continue;
-      const targetMEV = Math.round(lm.mev * pedMrvMult);
+      const targetMEV = Math.round(lm.mev * effectiveMrvMult);
       if (weekSets >= targetMEV) continue;
       // Найти ближайший день с этой мышцей (или совместимый тег)
       const allowedTags = WEAKPOINT_DAY_TAGS[m] ?? ['Legs', 'Lower', 'FullBody'];
@@ -2289,7 +2322,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // Финальный MRV-кап после auto-feeders
     for (const w of finalPlan.weeks) normalizeWeekMrv(w.sessions, mrvByMuscle);
   }
-  const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, pedMrvMult);
+  const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, effectiveMrvMult);
   // muscleFrequency: muscleSessionCount содержит число сессий на мышцу за ротацию (= неделя для 7-дн паттернов)
   const muscleFrequency: Record<string, number> = {};
   for (const [m, count] of Object.entries(muscleSessionCount)) {

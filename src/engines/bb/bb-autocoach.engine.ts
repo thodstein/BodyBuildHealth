@@ -478,13 +478,15 @@ export interface PostPhaseInput {
  *  2. Фазо-специфичный темп и отдых (вместо характер-базированных tempoFor/REST_BY_CHARACTER)
  *  3. RIR-дрейф внутри фазы (rirDrift — плавное снижение RIR)
  *  4. Стратегия прогрессии нагрузки (prescribeLoad: doubleProg/linear/wave/rpe)
- *  5. Структурированные делод-протоколы (pump/neural/full_rest) при ACWR>1.3
+ *  5. Структурированные делод-протоколы (pump/neural/full_rest) при ACWR>1.5 (P0-7: 1.3→caution, 1.5→enforce)
  *  6. Авто-регуляция (readiness → volumeMultiplier, weight, rirShift)
  */
 export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
   const { plan, totalWeeks, workMax, loadStrategy, autoDeload, deloadType, acwrRatio, autoRegResult, skipPhaseRedistribution } = input;
 
-  const needsDeload = !!autoDeload && acwrRatio != null && acwrRatio > 1.3;
+  // P0-7 (audit 2026-07): enforce deload только при ACWR>1.5 (danger zone).
+  // 1.3-1.5 = caution (display only, handled in buildBBPlan rationale).
+  const needsDeload = !!autoDeload && acwrRatio != null && acwrRatio > 1.5;
   const deloadProtocol = needsDeload && deloadType ? DELOAD_PROTOCOLS[deloadType] : null;
 
   // FIX-5: если skipPhaseRedistribution — используем фазы из buildBBPlan (уже распределены).
