@@ -68,7 +68,14 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
     // массонабор: частота 2+×/нед + высокообъёмные сплиты
     if (input.goal === 'mass' || input.goal === 'strength_mass') {
       if (avgFreq >= 2) score += 12;
-      if (['ppl_6','rolling_3_1_3_1','arnold_6','fullbody_4','tpt_o_ttp','bro_5'].includes(p.id)) score += 10;
+      // P1-2 (audit 2026-07): bro_5 убран из mass-бонуса (1×/нед — недостимул для натуралов,
+      // Schoenfeld 2016/2018: ≥2×/нед превосходит 1×/нед для гипертрофии).
+      if (['ppl_6','rolling_3_1_3_1','arnold_6','fullbody_4','tpt_o_ttp'].includes(p.id)) score += 10;
+    }
+    // P1-2: bro_5 penalty — низкая частота 1×/нед
+    if (p.id === 'bro_5') {
+      score -= 5;
+      warnings.push('⚠ Низкая частота 1×/нед на группу; ≥2×/нед результативнее для натуралов (Schoenfeld 2018).');
     }
     if (input.goal === 'maintenance') {
       if (avgFreq <= 2) score += 12;

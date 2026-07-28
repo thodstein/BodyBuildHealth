@@ -429,6 +429,22 @@ const PRO_WORKMAX_RATIO: Record<string, (wm: Record<string, number>) => number> 
   abs:        wm => wm['core'] || 40,
 };
 
+/**
+ * P1-4 (audit 2026-07): Brzycki inverse %1RM formula.
+ * weight = 1RM × (1.0278 − 0.0278 × reps)
+ * Более реп-корректная, чем PCT_FOR_RIR[rir] (которая даёт ~80% для RIR 3,
+ * независимо от target reps). Для 18 reps → ~52% (реалистично для памп),
+ * для 6 reps → ~86% (тяж), для 10 reps → ~75%.
+ * RIR-коррекция: +1 RIR ≈ −2.5% веса (через множитель rirAdj).
+ */
+function weightForRepMax(reps: number, workMax: number, rir: number, intensityMult: number): number {
+  // Brzycki: 1RM = weight / (1.0278 − 0.0278 × reps) → weight = 1RM × (1.0278 − 0.0278 × reps)
+  const brzycki = Math.max(0.4, Math.min(1.0, 1.0278 - 0.0278 * reps));
+  // RIR-коррекция: RIR 0 = 100% бrzycki, RIR 4 = ~90% (−2.5% за каждый RIR)
+  const rirAdj = Math.max(0.7, 1 - rir * 0.025);
+  return Math.round(workMax * brzycki * rirAdj * intensityMult * 10) / 10;
+}
+
 function charReps(c: DayCharacter): [number, number] {
   if (c === 'тяж') return [5, 8];
   if (c === 'памп') return [12, 20];
@@ -817,10 +833,12 @@ function buildSession(
     // RIR: bbRir (учитывает phase + phaseWeek + характер). Делод → RIR 3-4.
     const rir = bbRir(resolved, phase, phaseWeek);
     const wm = workMax[repKey] || PRO_WORKMAX_RATIO[repKey]?.(workMax) || defaultWorkMax(repKey);
-    // P1: вес = workMax × phaseConfig.intensityMultiplier × PCT_FOR_RIR[rir]
-    // intensityMultiplier уже включает понижение для делода (0.55) и пика (0.95).
-    const pct = PCT_FOR_RIR[rir] ?? 0.9;
-    let weight = Math.round(wm * phaseCfg.intensityMultiplier * pct * 10) / 10;
+    // P1-4 (audit 2026-07): Brzycki inverse %1RM formula — реп-корректный вес.
+    // Раньше: weight = workMax × intensityMult × PCT_FOR_RIR[rir] (не учитывала reps).
+    // Теперь: weight = workMax × (1.0278 − 0.0278 × reps) × rirAdj × intensityMult.
+    // Для 18 reps → ~52% (памп), для 6 reps → ~86% (тяж), для 10 reps → ~75%.
+    const pct = PCT_FOR_RIR[rir] ?? 0.9; // fallback если Brzycki не подходит
+    let weight = weightForRepMax(reps, wm, rir, phaseCfg.intensityMultiplier);
     const accessoryCount = ACCESSORY_2X_GROUPS.has(muscle) ? 2 : 1;
     // exerciseCount зависит от уровня И PED — на курсе больше тяжёлых compounds.
     // В multi-днях (Push/Pull с 3+ мышцами) ограничить big muscle primary до 3 —
@@ -1713,9 +1731,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     if (lm) {
       let v: number;
       if (input.specialization) {
-        // B10: специализация — слабые (топ-2) на MAV+10%, остальные на MAV (не MEV).
-        // Раньше не-слабые получали MEV (нижний предел) → underload для большинства мышц.
-        v = specWeak.includes(m) ? Math.round(lm.mav * 1.1) : Math.round(lm.mav * 0.85);
+        // P1-6 (audit 2026-07): специализация — слабые (топ-2) на MAV+10%,
+        // остальные на MEV×1.5 (maintenance-higher MEV, антиатрофия).
+        // Раньше: 0.85×MAV (близко к MEV) → спад массы в не-слабых.
+        // MEV×1.5 = достаточно для сохранения без атрофии (Schoenfeld 2017).
+        v = specWeak.includes(m) ? Math.round(lm.mav * 1.1) : Math.round(lm.mev * 1.5);
       } else {
         v = lm.mav;
         if (input.volumeGoal === 'mev') v = lm.mev;
@@ -1948,9 +1968,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         usedPatterns.add(derivePattern(fData));
       }
       // fix K: памп-финишер для первичных групп, у которых день — толко «тяж» (без метаболического стресса).
-      // bro-split (1 группа/день) иначе = только тяжёлые сеты. Добавляем 1 изоляцию высоким повторением.
+      // P1-1 (audit 2026-07): убран weak-gate — pump-finisher добавляется для ВСЕХ primary muscles,
+      // не только не-weak. Bro-split (1 группа/день) иначе = только тяжёлые сеты для lead-muscle.
+      // Schoenfeld 2018: metabolic stress work after heavy compounds +5-10% hypertrophy.
       for (const pm of sessMuscles) {
-        if (isWeak(pm, weakPoints)) continue;
         if (Array.from(weekExcluded).includes(pm)) continue;
         if (sess.exercises.some(e => (e.muscle === pm || collapseKey(e.muscle) === pm) && (e as any).character === 'памп')) continue;
         const pumpPool = (EXERCISE_CATALOG as any[]).filter((e: any) => {
@@ -2071,6 +2092,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // P0-7: ACWR cautions
     ...(acwrCaution ? [`⚠ ACWR=${acwrRatio.toFixed(2)} — зона осторожности (1.3-1.5). Рассмотрите снижение объёма или разгрузочную неделю.`] : []),
     ...(acwrDanger ? [`🚨 ACWR=${acwrRatio.toFixed(2)} — опасная зона (>1.5). Принудительная разгрузка каждые 3 нед.`] : []),
+    // P1-2: bro_5 warning
+    ...(pattern.id === 'bro_5' ? [`⚠ Bro Split 5×/нед — низкая частота 1×/нед на группу; ≥2×/нед результативнее для натуралов (Schoenfeld 2018 мета-анализ).`] : []),
   ];
 
   const basePlan = { pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale };

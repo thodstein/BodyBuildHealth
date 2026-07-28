@@ -13,6 +13,7 @@ export interface BBMuscleVolume {
   тяжSets: number;
   пампSets: number;
   лёгSets: number;
+  hardSets: number;      // P1-3: сеты с RIR<1 (до отказа)
   avgRir: number;
   frequencyPerRotation: number;
   mev: number; mav: number; mrv: number;
@@ -25,6 +26,8 @@ export interface BBPlanMetrics {
   тяжPct: number;     // доля тяж-сетов
   пампPct: number;
   avgRir: number;
+  hardSets: number;    // P1-3: всего hard-сетов (RIR<1) за пик-неделю
+  hardSetWarning: string | null;  // P1-3: предупреждение если превышен кап
   sessionsPerRotation: number;
   mrvMultiplier: number; // применённый PED-множитель (1.0 = натурал)
 }
@@ -32,7 +35,7 @@ export interface BBPlanMetrics {
 export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanMetrics {
   const mult = mrvMultiplier ?? 1.0;
   const level = normLevel((plan as any).level || 'intermediate');
-  const agg: Record<string, { total: number; тяж: number; памп: number; лёг: number; rirSum: number; rirN: number; freq: number }> = {};
+  const agg: Record<string, { total: number; тяж: number; памп: number; лёг: number; hard: number; rirSum: number; rirN: number; freq: number }> = {};
   // fix H: метрики считаем по ПИКОВОЙ неделе (макс объёма), а не по первой (где RIR ещё высокий)
   const weekIdx = plan.weeks.reduce((best, w, i) => {
     const exs = w.sessions.flatMap(s => s.exercises);
@@ -43,11 +46,13 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
   for (const s of sessions) {
     for (const ex of s.exercises) {
       const m = ex.muscle;
-      const a = agg[m] || (agg[m] = { total: 0, тяж: 0, памп: 0, лёг: 0, rirSum: 0, rirN: 0, freq: 0 });
+      const a = agg[m] || (agg[m] = { total: 0, тяж: 0, памп: 0, лёг: 0, hard: 0, rirSum: 0, rirN: 0, freq: 0 });
       a.total += ex.sets;
       if (ex.character === 'тяж') a.тяж += ex.sets;
       else if (ex.character === 'памп') a.памп += ex.sets;
       else a.лёг += ex.sets;
+      // P1-3: hard-сеты (RIR<1 = до отказа)
+      if (ex.rir < 1) a.hard += ex.sets;
       a.rirSum += ex.rir * ex.sets; a.rirN += ex.sets;
     }
   }
@@ -66,6 +71,7 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
     else if (a.total >= mev) status = 'optimal';
     return {
       muscle, totalSets: a.total, тяжSets: a.тяж, пампSets: a.памп, лёгSets: a.лёг,
+      hardSets: a.hard,
       avgRir: a.rirN > 0 ? a.rirSum / a.rirN : 0,
       frequencyPerRotation: freqMap[muscle] || 0,
       mev, mav, mrv, status,
@@ -74,12 +80,20 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
   const totalSets = perMuscle.reduce((s, m) => s + m.totalSets, 0);
   const тяжSets = perMuscle.reduce((s, m) => s + m.тяжSets, 0);
   const пампSets = perMuscle.reduce((s, m) => s + m.пампSets, 0);
+  const hardSets = perMuscle.reduce((s, m) => s + m.hardSets, 0);
   const rirSum = perMuscle.reduce((s, m) => s + m.avgRir * m.totalSets, 0);
+  // P1-3: hard-set cap (Helms 2018, Grgic 2021). advanced=10, intermediate=6, beginner=3.
+  const hardCap = level === 'advanced' || level === 'enhanced' ? 10 : level === 'intermediate' ? 6 : 3;
+  const hardSetWarning = hardSets > hardCap
+    ? `⚠ Hard-сетов (RIR<1): ${hardSets} > кап ${hardCap} для уровня ${level}. Риск перетренированности (Helms 2018).`
+    : null;
   return {
     perMuscle, totalSets,
     тяжPct: totalSets > 0 ? тяжSets / totalSets : 0,
     пампPct: totalSets > 0 ? пампSets / totalSets : 0,
     avgRir: totalSets > 0 ? rirSum / totalSets : 0,
+    hardSets,
+    hardSetWarning,
     sessionsPerRotation: sessions.length,
     mrvMultiplier: mult,
   };

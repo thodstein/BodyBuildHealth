@@ -40,8 +40,13 @@ export function planWeakPoints(weakPoints: string[], allMuscles: string[], level
         emphasis.push(m);
         rationale.push(`${m}: специализация — MAV+10% (${volumeMap[m].sets} сетов)`);
       } else {
-        volumeMap[m] = { sets: lm.mev, source: 'MEV' };
+        // P1-6 (audit 2026-07): не-слабые на MEV×1.5 (maintenance-higher MEV), не на MEV.
+        // MEV = minimum effective volume — ниже этого порога мышца атрофируется.
+        // Постановка ВСЕХ не-слабых на MEV в 8-12 нед мезо → спад массы в них.
+        // MEV×1.5 = maintenance volume (достаточно для сохранения, не атрофия).
+        volumeMap[m] = { sets: Math.round(lm.mev * 1.5), source: 'MEV' };
         maintenance.push(m);
+        rationale.push(`${m}: поддержание — MEV×1.5 (${volumeMap[m].sets} сетов, не чистый MEV — антиатрофия)`);
       }
     } else {
       if (isWeak) {
