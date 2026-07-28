@@ -38,7 +38,7 @@ export function applyPhaseModulation(
           ...st,
           rir: rirAdj,
           tempo: tempo || st.tempo,
-          reps: reps,
+          reps: (typeof st.reps === 'number' && st.reps > 0) ? st.reps : reps,
           restSec: isCompound ? Math.max(90, st.restSec ?? 120) : st.restSec,
         }));
         return {

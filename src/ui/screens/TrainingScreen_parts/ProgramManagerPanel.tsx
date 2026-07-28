@@ -986,10 +986,12 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
               muscleGroup: ex.group || '',
               targetSets: ex.sets.map((st) => {
                 const w = (st as { weight?: number }).weight;
+                const pct = (st as { pct?: number }).pct ?? ex.sets[0]?.pct ?? 0.7;
                 const computed = (typeof w === 'number' && w > 0)
                   ? w
-                  : (pmBase > 0 ? Math.round((pmBase * (ex.sets[0]?.pct ?? 0.7)) / 2.5) * 2.5 : 0);
-                return { weight: computed, reps: st.reps ?? 5, rir: 2 };
+                  : (pmBase > 0 ? Math.round((pmBase * pct) / 2.5) * 2.5 : 0);
+                const rir = (st as { rir?: number }).rir ?? 2;
+                return { weight: computed, reps: st.reps ?? 5, rir };
               }),
             };
           }),

@@ -7,7 +7,7 @@ import { CARD, DIM, DIM_STRONG, ACCENT, IN, BTN_GHOST } from './training-ui';
 import { GROUP_RU } from './program-types';
 import type { UserProgram, UserBlock, BBProgramBody } from '../../../engines/user-program/user-program.types';
 import { newId } from '../../../engines/user-program/user-program.types';
-import { computePlanQualityFor, muscleAwareSets, makeSetsFromTemplate, suggestExercisesForGroup } from '../../../engines/manual-constructor.engine';
+import { computePlanQualityFor, muscleAwareSets, makeSetsFromTemplate, suggestExercisesForGroup } from '../../../engines/manual-constructor';
 import { prescribeLoad } from '../../../engines/bb/bb-autocoach.engine';
 import { selectSplit } from '../../../engines/split-selector.engine';
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
