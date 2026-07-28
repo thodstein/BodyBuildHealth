@@ -365,6 +365,7 @@ export const ProgramManagerPanel: React.FC = () => {
       onSave={commit}
       onBack={() => { setEditing(null); refresh(); }}
       mode={manualMode}
+      onMode={setManualMode}
     />;
   }
 
@@ -424,6 +425,8 @@ export const ProgramManagerPanel: React.FC = () => {
               <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8 }}>гибрид ПЛ+ББ</span>
             </button>
           </div>
+          {/* P2-3: Wizard как альтернатива прямому созданию */}
+          <button style={{ ...BTN_GHOST, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => { setWizardOpen(true); setWizardStep(1); }}>🪄 Визард (пошагово)</button>
         </div>
 
         {/* P15: Шаблоны быстрого старта — только в стандартном режиме */}
@@ -693,6 +696,7 @@ export const ProgramManagerPanel: React.FC = () => {
             {wizardStep > 1 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => Math.max(1, s - 1) as any)}>← Назад</button>}
             {wizardStep < 4 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => Math.min(4, s + 1) as any)}>Далее →</button>}
             {wizardStep === 4 && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)' }} onClick={finishWizard}>✨ Создать программу</button>}
+            {wizardStep === 4 && manualMode === 'pro' && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }} onClick={() => { finishWizard(); setTimeout(() => { const ev = new CustomEvent('he_autodraft_trigger'); window.dispatchEvent(ev); }, 200); }}>⚡ Создать и заполнить</button>}
           </div>
         </div>
       )}
@@ -731,7 +735,7 @@ export const ProgramManagerPanel: React.FC = () => {
 
 /* ───────────────────────── Редактор ───────────────────────── */
 
-const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram) => void; onSave: (note?: string) => void; onBack: () => void; mode: ManualMode }> = ({ program, onChange, onSave, onBack, mode }) => {
+const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram) => void; onSave: (note?: string) => void; onBack: () => void; mode: ManualMode; onMode: (m: ManualMode) => void }> = ({ program, onChange, onSave, onBack, mode, onMode }) => {
   const dir = program.meta.direction;
   const isPro = mode === 'pro';
   const update = (patch: Partial<UserProgram>) => onChange({ ...program, ...patch });
@@ -750,6 +754,12 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
     const unsub = subscribePlannerApply((payload) => { setBridgeApply(payload); });
     return unsub;
   }, []);
+  // P2-3: wizard «⚡ Создать и заполнить» → триггер autoFillDraft
+  useEffect(() => {
+    const handler = () => autoFillDraft();
+    window.addEventListener('he_autodraft_trigger', handler);
+    return () => window.removeEventListener('he_autodraft_trigger', handler);
+  }, [program, tprofile]);
   const applyBridgePayload = useCallback((payload: PlannerApply) => {
     const p = program;
     const clampRir = (r: number) => Math.max(0, Math.min(5, Math.round(r)));
@@ -855,6 +865,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
 
   // Библиотека внутри редактора
   const [editorLibOpen, setEditorLibOpen] = useState<'bb' | 'pl' | 'methods' | null>(null);
+  const [showMore, setShowMore] = useState(false);
   const [showTableView, setShowTableView] = useState(false);
   const [methCat, setMethCat] = useState('all');
   const [methSearch, setMethSearch] = useState('');
@@ -1014,6 +1025,36 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         },
       });
       if (foundCycle) showToast('🏆 ПЛ-цикл подобран: ' + foundCycle.meta.title);
+    } else if (dir === 'hybrid' && program.hybrid) {
+      // P2-4: минимальная hybrid-интеграция — ПЛ из LMS + ББ из bb-builder
+      const sessCount = Math.max(2, Math.min(4, days));
+      let foundCycle = LMS_CYCLES.find(c => c.meta.level === program.meta.level && Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1);
+      if (!foundCycle) foundCycle = LMS_CYCLES.find(c => Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1);
+      const bbDays = Math.max(1, days - sessCount);
+      let bbWeeks: UserWeek[] = [];
+      try {
+        const bbPlan = autodraftBBPlan({
+          level: program.meta.level, goal: 'hypertrophy', daysPerWeek: bbDays,
+          weeks: Math.max(1, program.meta.weeks || 4),
+          equipment: (prof.equipment ?? []) as string[], weakPoints: (prof.weakPoints ?? []) as string[],
+          avoidAxialLoad: prof.avoidAxialLoad ?? false, workMax: prof.workMax ?? {},
+          onCourse: prof.onCourse ?? false, courseIntensity: prof.courseIntensity ?? 'moderate', injuries: prof.injuries ?? [],
+        });
+        const bbUserProg = createFromBuild(bbPlan, { title: 'hybrid-bb', goal: 'hypertrophy', level: program.meta.level });
+        if (bbUserProg.bb?.weeks && (bbUserProg.bb.weeks.length ?? 0) >= 4) {
+          bbUserProg.bb.weeks = applyPhaseModulation(bbUserProg.bb.weeks, { goal: 'hypertrophy', level: program.meta.level, weeksTotal: program.meta.weeks || 4 });
+        }
+        bbWeeks = bbUserProg.bb?.weeks ?? [];
+      } catch { bbWeeks = []; }
+      update({
+        hybrid: {
+          ...program.hybrid,
+          plRef: { sourceCycleId: foundCycle?.meta.id ?? '', sessionIndices: foundCycle ? Array.from({ length: foundCycle.meta.sessionsPerWeek }, (_, i) => i) : [] },
+          bbWeeks,
+          workMax: { squat: prof.pmSquat ?? 120, bench: prof.pmBench ?? 100, deadlift: prof.pmDead ?? 140 },
+        },
+      });
+      if (foundCycle) showToast('⚡ Hybrid: ПЛ=' + foundCycle.meta.title + ' + ББ=' + bbDays + 'д/нед');
     }
     showToast('⚡ Черновик создан из профиля — заполните упражнения и ПМ');
   };
@@ -1207,34 +1248,8 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       })()}
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {/* P2-5: основной ряд (всегда виден) */}
           <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: showTableView ? 'rgba(0,230,138,0.6)' : 'rgba(255,255,255,0.15)', color: showTableView ? '#00e68a' : DIM }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Редактор' : 'Таблица плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
-          {isPro && (
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a' }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней (требует профиль тренированности)">⚡ Авто-черновик</button>
-          )}
-          {/* Загрузить цикл/программу из библиотеки */}
-          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(245,158,11,0.4)', color: '#f59e0b' }}
-            onClick={() => {
-              if (dir === 'bb') setEditorLibOpen('bb');
-              else if (dir === 'pl') setEditorLibOpen('pl');
-            }}
-            title="Загрузить программу или цикл из библиотеки для редактирования"
-          >📥 Загрузить</button>
-          {isPro && dir === 'bb' && program.bb && (program.bb.weeks?.length ?? 0) >= 4 && (
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
-              onClick={() => {
-                const updated = { ...program.bb!, weeks: applyPhaseModulation(program.bb!.weeks!, { goal: program.meta.goal, level: program.meta.level, weeksTotal: program.meta.weeks || 4 }) };
-                update({ bb: updated });
-                showToast('📈 Фазовая периодизация применена: RIR/фазы/повторения по неделям');
-              }}
-              title="Применить фазовую периодизацию (RIR/объём/повторения по неделям)"
-            >📈 Применить фазы</button>
-          )}
-          {isPro && (
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}
-              onClick={() => setEditorLibOpen('methods')}
-              title="Справочник тренировочных методик"
-            >📚 Методики</button>
-          )}
           {(dir === 'bb' || dir === 'pl') && (
             <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4, marginRight: 4 }}>
               Нед
@@ -1249,8 +1264,50 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           )}
           <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 38 }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
           <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / сохранить в PDF">🖨 PDF</button>
+          {/* P2-5: secondary ряд (сворачиваемый «⋯ Ещё») */}
+          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38 }} onClick={() => setShowMore(v => !v)} title="Дополнительные инструменты">⋯ Ещё</button>
         </div>
+        {showMore && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingTop: 4 }}>
+            {isPro && (
+              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a' }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней (требует профиль тренированности)">⚡ Авто-черновик</button>
+            )}
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(245,158,11,0.4)', color: '#f59e0b' }}
+              onClick={() => {
+                if (dir === 'bb') setEditorLibOpen('bb');
+                else if (dir === 'pl') setEditorLibOpen('pl');
+              }}
+              title="Загрузить программу или цикл из библиотеки для редактирования"
+            >📥 Загрузить</button>
+            {isPro && dir === 'bb' && program.bb && (program.bb.weeks?.length ?? 0) >= 4 && (
+              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
+                onClick={() => {
+                  const updated = { ...program.bb!, weeks: applyPhaseModulation(program.bb!.weeks!, { goal: program.meta.goal, level: program.meta.level, weeksTotal: program.meta.weeks || 4 }) };
+                  update({ bb: updated });
+                  showToast('📈 Фазовая периодизация применена: RIR/фазы/повторения по неделям');
+                }}
+                title="Применить фазовую периодизацию (RIR/объём/повторения по неделям)"
+              >📈 Применить фазы</button>
+            )}
+            {isPro && (
+              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}
+                onClick={() => setEditorLibOpen('methods')}
+                title="Справочник тренировочных методик"
+              >📚 Методики</button>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* P2-1: подсказка при пустой программе в standard-режиме */}
+      {!isPro && program.bb && (program.bb.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0)) && (
+        <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #00e68a' }}>
+          <div style={{ fontSize: 11, color: DIM_STRONG, lineHeight: 1.5 }}>
+            💡 Пустая программа. Нажмите «📥 Загрузить» чтобы взять готовую из библиотеки, или добавьте упражнения вручную ниже.
+          </div>
+          <button style={{ ...BTN_GHOST, padding: '6px 14px', fontSize: 11, minHeight: 38, marginTop: 6, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => { onMode('pro'); }}>🎓 Перейти в Профессиональный режим для ⚡ авто-черновика</button>
+        </div>
+      )}
 
       {/* P1-1: planner-bridge баннер — рекомендация от калькулятора */}
       {bridgeApply && (
