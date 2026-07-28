@@ -12,8 +12,8 @@ const mkWorkout = (date: string, exerciseId: string, nSets: number): WorkoutLog 
 describe('generateTrainingRecommendations', () => {
   it('недотрен группы 2 недели → warn-рекомендация', () => {
     const t = new Date();
-    const cur = iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 2));
-    const prev = iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 9));
+    const cur = iso(new Date(t.getFullYear(), t.getMonth(), t.getDate()));
+    const prev = iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 7));
     const ws: WorkoutLog[] = [mkWorkout(cur, 'bench_bar', 3), mkWorkout(prev, 'bench_bar', 3)];
     const recs = generateTrainingRecommendations({ historyWorkouts: ws, level: 'intermediate', weakPoints: [] });
     expect(recs.some(r => r.text.includes('Грудь') && r.text.includes('недотрен'))).toBe(true);
@@ -21,7 +21,7 @@ describe('generateTrainingRecommendations', () => {
 
   it('слабая группа без объёма → рекомендация', () => {
     const t = new Date();
-    const cur = iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 2));
+    const cur = iso(new Date(t.getFullYear(), t.getMonth(), t.getDate()));
     const ws: WorkoutLog[] = [mkWorkout(cur, 'bench_bar', 4)]; // только грудь
     const recs = generateTrainingRecommendations({ historyWorkouts: ws, level: 'intermediate', weakPoints: ['legs'] });
     expect(recs.some(r => r.text.includes('Ноги') && r.text.includes('без объёма'))).toBe(true);
@@ -44,7 +44,7 @@ describe('generateTrainingRecommendations', () => {
 
   it('weeklySetsByGroup: массив по неделям', () => {
     const t = new Date();
-    const cur = iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 2));
+    const cur = iso(new Date(t.getFullYear(), t.getMonth(), t.getDate()));
     const ws = [mkWorkout(cur, 'bench_bar', 5)];
     const wsg = weeklySetsByGroup(ws, 3);
     expect(wsg.chest).toBeDefined();
@@ -56,7 +56,7 @@ describe('generateTrainingRecommendations', () => {
     const t = new Date();
     const ws: WorkoutLog[] = [];
     for (let i = 0; i < 8; i++) {
-      const d = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 2 - i * 7);
+      const d = new Date(t.getFullYear(), t.getMonth(), t.getDate() - i * 7);
       ws.push(mkWorkout(d.toISOString().slice(0, 10), 'bench_bar', 3));
     }
     const recs = generateTrainingRecommendations({ historyWorkouts: ws, level: 'intermediate', weakPoints: [] });
@@ -65,7 +65,7 @@ describe('generateTrainingRecommendations', () => {
 
   it('высокая суставная нагрузка за неделю', () => {
     const t = new Date();
-    const cur = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 2).toISOString().slice(0, 10);
+    const cur = new Date(t.getFullYear(), t.getMonth(), t.getDate()).toISOString().slice(0, 10);
     const ws: WorkoutLog[] = [mkWorkout(cur, 'dips_chest', 10)];
     const recs = generateTrainingRecommendations({ historyWorkouts: ws, level: 'intermediate', weakPoints: [] });
     expect(recs.some(r => r.text.includes('суставная нагрузка'))).toBe(true);
