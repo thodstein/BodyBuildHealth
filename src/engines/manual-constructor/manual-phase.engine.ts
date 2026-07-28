@@ -34,18 +34,26 @@ export function applyPhaseModulation(
       const blocks = (s.blocks ?? []).map((b) => {
         const isCompound = b.type === 'compound';
         const rirAdj = Math.max(0, Math.min(5, rir));
-        const sets = (b.sets ?? []).map((st) => ({
-          ...st,
-          rir: rirAdj,
-          tempo: isCompound ? (tempo || st.tempo) : (st.tempo || tempo),
-          reps: (typeof st.reps === 'number' && st.reps > 0) ? st.reps : reps,
-          restSec: isCompound
-            ? Math.max(90, st.restSec ?? (b.character === 'тяж' ? 180 : b.character === 'памп' ? 60 : 120))
-            : (st.restSec ?? 90),
-        }));
+        const sets = (b.sets ?? []).map((st) => {
+          const useNumericReps = typeof st.reps === 'number' && st.reps > 0;
+          return {
+            ...st,
+            rir: rirAdj,
+            tempo: isCompound ? (tempo || st.tempo) : (st.tempo || tempo),
+            reps: useNumericReps ? st.reps : reps,
+            restSec: isCompound
+              ? Math.max(90, st.restSec ?? (b.character === 'тяж' ? 180 : b.character === 'памп' ? 60 : 120))
+              : (st.restSec ?? 90),
+          };
+        });
+        // repsRange: если первый set имеет числовой reps — берём его, иначе парсим фазовый диапазон
+        const firstReps = sets[0]?.reps;
+        const repsRange: [number, number] = (typeof firstReps === 'number' && firstReps > 0)
+          ? [firstReps, firstReps]
+          : [parseInt(reps.split('-')[0]) || 8, parseInt(reps.split('-')[1] || reps.split('-')[0]) || 12];
         return {
           ...b,
-          repsRange: [parseInt(reps.split('-')[0]) || 8, parseInt(reps.split('-')[1] || reps.split('-')[0]) || 12] as [number, number],
+          repsRange,
           tempoSpec: tempo,
           sets,
         };

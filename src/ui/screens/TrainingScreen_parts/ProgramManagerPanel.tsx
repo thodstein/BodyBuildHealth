@@ -18,6 +18,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getAllPrograms } from '../../../engines/complete-program-library.engine';
 import { expandProgramWeeks } from '../../../engines/program-progression.engine';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
+import { cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { getReferencedCycle } from '../../../engines/user-program/program-store';
@@ -696,7 +697,7 @@ export const ProgramManagerPanel: React.FC = () => {
             {wizardStep > 1 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => Math.max(1, s - 1) as any)}>← Назад</button>}
             {wizardStep < 4 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => Math.min(4, s + 1) as any)}>Далее →</button>}
             {wizardStep === 4 && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)' }} onClick={finishWizard}>✨ Создать программу</button>}
-            {wizardStep === 4 && manualMode === 'pro' && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }} onClick={() => { finishWizard(); setTimeout(() => { const ev = new CustomEvent('he_autodraft_trigger'); window.dispatchEvent(ev); }, 200); }}>⚡ Создать и заполнить</button>}
+            {wizardStep === 4 && manualMode === 'pro' && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }} onClick={() => { finishWizard(); setTimeout(() => { window.dispatchEvent(new CustomEvent('he_autodraft_trigger')); }, 400); }}>⚡ Создать и заполнить</button>}
           </div>
         </div>
       )}
@@ -851,8 +852,19 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       showToast('🔗 Методика: ' + payload.label);
     } else if (payload.kind === 'program' && payload.data) {
       try {
-        const cloned = cloneFromCycle(payload.data.id ?? payload.data.meta?.id);
+        // data может быть SRCycleTemplate (из ProgramsTab) или {id} (LMS-цикл)
+        const cycleId = payload.data.id ?? payload.data.meta?.id;
+        let cloned: UserProgram | null = null;
+        if (cycleId && typeof cycleId === 'string') {
+          cloned = cloneFromCycle(cycleId);
+        }
+        if (!cloned && payload.data.meta) {
+          // SRCycleTemplate → конвертируем через expandProgramWeeks + cloneFromLibrary
+          const fullProg = cycleTemplateToFullProgram(payload.data);
+          if (fullProg) cloned = cloneFromLibrary(expandProgramWeeks(fullProg));
+        }
         if (cloned) { onChange(cloned); showToast('🔗 Программа загружена: ' + payload.label); }
+        else { showToast('⚠ Программа не найдена: ' + payload.label); }
       } catch { showToast('⚠ Не удалось загрузить программу: ' + payload.label); }
     } else {
       showToast('🔗 Рекомендация: ' + payload.label + ' (не применима к ' + dir.toUpperCase() + ')');
@@ -1477,11 +1489,12 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                     if (dir !== 'bb' || !program.bb) return;
                     // P3-4: для известных методик — трансформировать sets, не только loadStrategy
                     const knownTransforms: Record<string, (b: UserBlock) => UserBlock> = {
-                      'GVT / 10×10': (b) => b.type === 'compound' ? { ...b, sets: Array(10).fill(0).map(() => ({ reps: 10, rir: 3, weight: 0, restSec: 90 })) } : b,
-                      'Cluster 5×5': (b) => b.type === 'compound' ? { ...b, sets: Array(5).fill(0).map(() => ({ reps: 5, rir: 1, weight: 0, restSec: 180 })) } : b,
-                      'Rest-Pause': (b) => ({ ...b, sets: [{ reps: 8, rir: 0, weight: 0, restSec: 180 }] }),
-                      'Drop-Sets': (b) => b.type === 'isolation' ? { ...b, sets: [...(b.sets ?? []), { reps: 'AMRAP' as const, rir: 0, weight: ((b.sets?.[0]?.weight ?? 0) * 0.8) || 0, restSec: 10 }] } : b,
-                      'Tempo (3-1-1-0)': (b) => ({ ...b, sets: (b.sets ?? []).map((s) => ({ ...s, tempo: '3-1-1-0', weight: (s.weight ?? 0) * 0.7, rir: 2, restSec: 60 })) }),
+                      'German Volume Training (GVT / 10×10)': (b) => b.type === 'compound' ? { ...b, sets: Array(10).fill(0).map(() => ({ reps: 10, rir: 3, weight: 0, restSec: 90 })) } : b,
+                      'GVT 2×/нед (10×10 на группу)': (b) => b.type === 'compound' ? { ...b, sets: Array(10).fill(0).map(() => ({ reps: 10, rir: 3, weight: 0, restSec: 90 })) } : b,
+                      'Cluster 5×5 (для 2×/нед)': (b) => b.type === 'compound' ? { ...b, sets: Array(5).fill(0).map(() => ({ reps: 5, rir: 1, weight: 0, restSec: 180 })) } : b,
+                      'Rest-Pause Training': (b) => ({ ...b, sets: [{ reps: 8, rir: 0, weight: 0, restSec: 180 }] }),
+                      'Drop Sets (Дроп-сеты)': (b) => b.type === 'isolation' ? { ...b, sets: [...(b.sets ?? []), { reps: 'AMRAP' as const, rir: 0, weight: ((b.sets?.[0]?.weight ?? 0) * 0.8) || 0, restSec: 10 }] } : b,
+                      'Темп для гипертрофии (3-1-1-0)': (b) => ({ ...b, sets: (b.sets ?? []).map((s) => ({ ...s, tempo: '3-1-1-0', weight: (s.weight ?? 0) * 0.7, rir: 2, restSec: 60 })) }),
                     };
                     const transform = knownTransforms[m.name];
                     let updated: UserProgram;
@@ -1628,7 +1641,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
             .flatMap(s => (s.blocks ?? []).flatMap(b => (b.sets ?? []).map(st => typeof st.rir === 'number' ? st.rir : 2)));
           realWave.push(allRirs.length ? allRirs.reduce((a, b) => a + b, 0) / allRirs.length : -1);
         }
-        const wave = realWave.map(r => r >= 0 ? r : expectedWave[realWave.indexOf(r)] ?? 2);
+        const wave = realWave.map((r, i) => r >= 0 ? r : (expectedWave[i] ?? 2));
         const maxRir = 5;
         const points = wave.map((r, i) => {
           const x = (i / Math.max(1, N - 1)) * (chartW - 8) + 4;
