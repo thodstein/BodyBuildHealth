@@ -22,6 +22,8 @@ import { PCT_FOR_RIR, S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation, CourseIntensity } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
 import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
+import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau } from './bb-progression-feedback.engine';
+import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findSubstitutions } from '../exercise-substitution.engine';
 import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landmarks.engine';
@@ -2321,6 +2323,27 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     }
     // Финальный MRV-кап после auto-feeders
     for (const w of finalPlan.weeks) normalizeWeekMrv(w.sessions, mrvByMuscle);
+  }
+  // P0-6 (audit 2026-07): feedback-driven rebuild из дневника.
+  // 1) autoUpdateWeakPoints: e1RM-тренд → exit/add слабых групп
+  // 2) applyFeedbackToBuild: веса/RIR/reps из факта (prescribeLoad с фактом как current)
+  // 3) autoReplaceOnPlateau: e1RM flat 4+ нед → замена primary на альтернативу
+  // Все три — только при наличии WorkoutSession-данных в дневнике.
+  const workoutSessions = loadWorkoutSessions();
+  if (workoutSessions.length > 0) {
+    // 1) Auto-weakPoints update
+    const weakUpdate = autoUpdateWeakPoints(weakPoints, workoutSessions, workMax);
+    if (weakUpdate.changes.length > 0) {
+      rationale.push(...weakUpdate.changes);
+    }
+    // 2) Feedback-driven rebuild (веса из факта)
+    finalPlan = applyFeedbackToBuild(finalPlan, workoutSessions, workMax, input.loadStrategy || 'double_progression');
+    // 3) Auto-replace на плато
+    const plateauResult = autoReplaceOnPlateau(finalPlan, workoutSessions);
+    if (plateauResult.changes.length > 0) {
+      finalPlan = plateauResult.plan;
+      rationale.push(...plateauResult.changes);
+    }
   }
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, effectiveMrvMult);
   // muscleFrequency: muscleSessionCount содержит число сессий на мышцу за ротацию (= неделя для 7-дн паттернов)

@@ -17,6 +17,7 @@
 import type { BBPlan, BBExercise } from './bb-builder.engine';
 import type { WorkoutSession, WorkoutExercise, WorkoutSet } from '../workout-logger.engine';
 import { prescribeLoad, type LoadStrategy } from './bb-autocoach.engine';
+import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 
 export interface ExerciseLastResult {
   exerciseName: string;
@@ -61,6 +62,12 @@ function normName(s: string): string {
     .replace(/[^a-zа-яё0-9 ]/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/** Локальный collapseKey (без импорта из bb-builder для избежания circular). */
+function collapseKeyLocal(muscle: string): string {
+  if (muscle === 'delt_front' || muscle === 'delt_mid' || muscle === 'delt_rear') return 'shoulders';
+  return muscle;
 }
 
 /** e1RM (Epley) — для оценки прогрессии. */
@@ -191,4 +198,225 @@ export function applyFeedbackToNextWeek(plan: BBPlan, feedback: ExerciseFeedback
     }),
   }));
   return { ...plan, weeks: [...plan.weeks, { week: nextWeekNum, sessions: newSessions }] };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P0-6 (audit 2026-07): Полный feedback-driven rebuild + auto-weakPoints +
+// авто-replace по плато. Три функции, вызываемые из buildBBPlan.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * P0-6a: Применить факт-рекомендации ко ВСЕМ неделям плана (не только последней).
+ *
+ * Для каждой недели берём факт из дневника (если есть) и пересчитываем веса/RIR
+ * через prescribeLoad с фактом как «current». Если факта для упражнения нет —
+ * оставляем плановые веса. Прогрессия накапливается: неделя 2 берёт факт недели 1,
+ * неделя 3 — факт недели 2 (если есть), и т.д.
+ *
+ * Если sRPE-сессий нет — возвращаем план без изменений.
+ */
+export function applyFeedbackToBuild(
+  plan: BBPlan,
+  sessions: WorkoutSession[],
+  workMax: Record<string, number>,
+  strategy: LoadStrategy = 'double_progression',
+): BBPlan {
+  if (!sessions || sessions.length === 0 || plan.weeks.length === 0) return plan;
+  const lastIndex = buildLastResultIndex(sessions);
+  if (lastIndex.size === 0) return plan;
+  const tw = plan.weeks.length;
+
+  const newWeeks = plan.weeks.map((wk, wIdx) => {
+    if (wIdx === 0) return wk; // неделя 1 — без факта (нет предыдущей)
+    const newSessions = wk.sessions.map(s => ({
+      ...s,
+      exercises: s.exercises.map((ex: BBExercise) => {
+        const key = normName(ex.name || ex.exerciseName || '');
+        const last = lastIndex.get(key);
+        if (!last) return ex; // нет факта — плановые веса
+        const plannedReps = ex.repsRange?.[0] ?? (ex.workSets?.[0]?.reps ?? 10);
+        const plannedRir = ex.rir ?? 2;
+        const maxW = workMax[ex.muscle] || last.topWeight || 80;
+        const exType = ex.role === 'primary' ? 'compound' : 'isolation';
+        // prescribeLoad с фактом как current → рекомендация на следующую неделю
+        const rec = prescribeLoad(strategy, last.topWeight, last.topReps, last.actualRir, maxW, wk.week, tw, 'intensification', exType, ex.role);
+        const rirDelta = last.actualRir - plannedRir;
+        const comment = (ex.comment || '') + ` | ↻ из факта: ${last.topWeight}×${last.topReps} RIR${last.actualRir} → ${rec.nextWeight}×${rec.nextReps} RIR${rec.nextRIR}`;
+        return {
+          ...ex,
+          rir: rec.nextRIR,
+          workSets: (ex.workSets || []).map((ws, i) =>
+            i === 0
+              ? { ...ws, weight: rec.nextWeight, reps: rec.nextReps, rir: rec.nextRIR }
+              : { ...ws, rir: rec.nextRIR }
+          ),
+          comment,
+        };
+      }),
+    }));
+    return { ...wk, sessions: newSessions };
+  });
+
+  return { ...plan, weeks: newWeeks };
+}
+
+/**
+ * P0-6b: Авто-обновление weakPoints на основе e1RM-тренда из дневника.
+ *
+ * Для каждой слабой группы: считаем e1RM 4+ нед назад и текущий e1RM.
+ * - Рост ≥10% → группа больше не слабая (достигнуто) → удаляем из weakPoints.
+ * - Падение ≥5% → группа стала слабее → добавляем (если ещё не в списке).
+ *
+ * Возвращает обновлённый weakPoints + список изменений для rationale.
+ */
+export function autoUpdateWeakPoints(
+  weakPoints: string[],
+  sessions: WorkoutSession[],
+  workMax: Record<string, number>,
+): { weakPoints: string[]; changes: string[] } {
+  if (!sessions || sessions.length < 4) return { weakPoints, changes: [] };
+
+  // Группируем сессии по неделям (по дате), берём e1RM топ-упражнения каждой мышцы
+  const sorted = [...sessions].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const muscleE1rmByWeek: Record<string, number[]> = {}; // muscle → [e1rm week1, week2, ...]
+
+  for (const s of sorted) {
+    for (const ex of s.exercises || []) {
+      const muscle = ex.muscleGroup || '';
+      if (!muscle) continue;
+      const top = topSetOf(ex);
+      if (!top || top.weight <= 0) continue;
+      const e1 = e1rm(top.weight, top.reps);
+      if (e1 <= 0) continue;
+      if (!muscleE1rmByWeek[muscle]) muscleE1rmByWeek[muscle] = [];
+      muscleE1rmByWeek[muscle].push(e1);
+    }
+  }
+
+  const changes: string[] = [];
+  const updated = [...weakPoints];
+
+  // Для каждой weak группы: проверяем тренд
+  for (const wp of weakPoints) {
+    const series = muscleE1rmByWeek[wp];
+    if (!series || series.length < 4) continue; // недостаточно данных
+    const first = series[0];
+    const last = series[series.length - 1];
+    if (first <= 0) continue;
+    const growthPct = ((last - first) / first) * 100;
+    if (growthPct >= 10) {
+      // Достигнуто — убрать из weakPoints
+      const idx = updated.indexOf(wp);
+      if (idx >= 0) {
+        updated.splice(idx, 1);
+        changes.push(`✅ ${wp}: e1RM вырос на ${growthPct.toFixed(1)}% за ${series.length} нед — убрана из слабых групп (цель достигнута).`);
+      }
+    }
+  }
+
+  // Для НЕ-слабых групп: проверяем падение
+  const allMuscles = Object.keys(muscleE1rmByWeek);
+  for (const m of allMuscles) {
+    if (updated.includes(m)) continue; // уже слабая
+    const series = muscleE1rmByWeek[m];
+    if (!series || series.length < 4) continue;
+    const first = series[0];
+    const last = series[series.length - 1];
+    if (first <= 0) continue;
+    const declinePct = ((first - last) / first) * 100;
+    if (declinePct >= 5) {
+      updated.push(m);
+      changes.push(`⚠ ${m}: e1RM упал на ${declinePct.toFixed(1)}% за ${series.length} нед — добавлена в слабые группы (регресс).`);
+    }
+  }
+
+  return { weakPoints: updated, changes };
+}
+
+/**
+ * P0-6c: Авто-замена упражнений при плато (e1RM не растёт 4+ нед).
+ *
+ * Для каждого упражнения в плане: ищем e1RM-серию в дневнике.
+ * Если e1RM не растёт ≥4 нед (±2% — стабильна) → заменяем на альтернативу
+ * через findSubstitutions. Если альтернативы нет — оставляем.
+ *
+ * Возвращает обновлённый план + список замен для rationale.
+ */
+export function autoReplaceOnPlateau(
+  plan: BBPlan,
+  sessions: WorkoutSession[],
+): { plan: BBPlan; changes: string[] } {
+  if (!sessions || sessions.length < 6 || plan.weeks.length === 0) {
+    return { plan, changes: [] };
+  }
+
+  // Строим e1RM-серию по нормализованному имени упражнения
+  const sorted = [...sessions].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const exerciseE1rmSeries: Map<string, number[]> = new Map();
+  for (const s of sorted) {
+    for (const ex of s.exercises || []) {
+      const key = normName(ex.exerciseName || '');
+      if (!key) continue;
+      const top = topSetOf(ex);
+      if (!top || top.weight <= 0) continue;
+      const e1 = e1rm(top.weight, top.reps);
+      if (e1 <= 0) continue;
+      if (!exerciseE1rmSeries.has(key)) exerciseE1rmSeries.set(key, []);
+      exerciseE1rmSeries.get(key)!.push(e1);
+    }
+  }
+
+  const changes: string[] = [];
+  const plateauExercises = new Set<string>();
+
+  // Определяем плато-упражнения
+  for (const [name, series] of exerciseE1rmSeries) {
+    if (series.length < 4) continue;
+    const first = series[0];
+    const last = series[series.length - 1];
+    if (first <= 0) continue;
+    const growthPct = Math.abs(((last - first) / first) * 100);
+    if (growthPct < 2) {
+      // e1RM стабильна ±2% за 4+ нед → плато
+      plateauExercises.add(name);
+    }
+  }
+
+  if (plateauExercises.size === 0) return { plan, changes: [] };
+
+  // Заменяем упражнения в плане (только primary — accessory не критично)
+  const newWeeks = plan.weeks.map(wk => ({
+    ...wk,
+    sessions: wk.sessions.map(s => ({
+      ...s,
+      exercises: s.exercises.map((ex: BBExercise) => {
+        const key = normName(ex.name || ex.exerciseName || '');
+        if (!plateauExercises.has(key)) return ex;
+        if (ex.role !== 'primary') return ex; // только primary
+        // Ищем альтернативу по той же мышце, compound, ДРУГОЕ имя (не исходное)
+        const origName = ex.name || ex.exerciseName || '';
+        const origNorm = normName(origName);
+        const alternatives = (EXERCISE_CATALOG as any[]).filter((e: any) => {
+          if (e.id === origName || normName(e.name || '') === origNorm) return false;
+          const mg = e.group || e.muscleGroup || '';
+          if (mg !== ex.muscle && mg !== collapseKeyLocal(ex.muscle)) return false;
+          if (e.type !== 'compound' && e.exerciseType !== 'compound') return false;
+          return true;
+        });
+        if (alternatives.length === 0) return ex;
+        const sub = alternatives[0];
+        const subName = sub.name || sub.id;
+        changes.push(`🔄 ${origName} → ${subName}: e1RM на плато 4+ нед, замена для нового стимула.`);
+        return {
+          ...ex,
+          name: subName,
+          exerciseName: subName,
+          comment: (ex.comment || '') + ` | 🔄 Замена по плато: ${origName} → ${subName} (e1RM стабилен 4+ нед).`,
+          rationale: 'Авто-замена: e1RM на плато, нужна новая вариация для стимула.',
+        };
+      }),
+    })),
+  }));
+
+  return { plan: { ...plan, weeks: newWeeks }, changes: [...new Set(changes)] };
 }
