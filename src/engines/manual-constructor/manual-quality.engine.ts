@@ -96,12 +96,13 @@ export function computePlanQualityFor(
     let status: 'over' | 'high' | 'ok' | 'low';
     if (peak > mrv) {
       status = 'over'; totalScore -= 8; issues.push(`⚠ ${muscle}: пик ${peak} > MRV (${mrv}) — перетрен`);
+    } else if (avg < mev) {
+      // Пик может быть высоким, но средний ниже MEV — недогруз по мезоциклу
+      status = 'low'; totalScore -= 3; issues.push(`⬇ ${muscle}: средний ${avg} < MEV (${mev}) — недогруз`);
     } else if (peak >= mav) {
       status = 'high'; totalScore -= 2;
-    } else if (avg >= mev) {
-      status = 'ok';
     } else {
-      status = 'low'; totalScore -= 3; issues.push(`⬇ ${muscle}: средний ${avg} < MEV (${mev}) — недогруз`);
+      status = 'ok';
     }
     perMuscle.push({ muscle, peakSets: peak, avgSets: avg, status, mrv, mav, mev });
   }
