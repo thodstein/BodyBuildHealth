@@ -86,8 +86,8 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
           return (
             <div key={pm.muscle} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, background: st + '10', border: '1px solid ' + st + '30', fontSize: 11 }}>
               <span style={{ fontWeight: 700, color: '#fff' }}>{ru(pm.muscle)}</span>
-              <span style={{ color: st, fontWeight: 700 }}>{pm.sets}</span>
-              <span style={{ color: 'rgba(255,255,255,0.4)' }}>· MEV {pm.mev} · MAV {pm.mav} · MRV {pm.mrv} · {Math.round(pm.mrv > 0 ? (pm.sets / pm.mrv) * 100 : 0)}%</span>
+              <span style={{ color: st, fontWeight: 700 }}>{pm.peakSets}</span>
+              <span style={{ color: 'rgba(255,255,255,0.4)' }}>· MEV {pm.mev} · MAV {pm.mav} · MRV {pm.mrv} · {Math.round(pm.mrv > 0 ? (pm.peakSets / pm.mrv) * 100 : 0)}%</span>
             </div>
           );
         })}
