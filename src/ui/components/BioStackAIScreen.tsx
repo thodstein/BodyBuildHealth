@@ -28,6 +28,55 @@ const ANALYSIS_TABS = [
   { id: 'export', label: '📤 Экспорт' },
 ];
 
+// Stack v2 format with metadata
+interface SavedStackV2 {
+  id: string;
+  name: string;
+  ids: string[];
+  profileSnapshot: BioStackProfile | null;
+  createdAt: string;
+  version: number;
+  notes?: string;
+}
+
+const STACKS_KEY = 'he_biostack_stacks_v2';
+const IDX_KEY = 'he_biostack_active_idx';
+const LEGACY_STACKS_KEY = 'he_biostack_stacks';
+const LEGACY_ACTIVE_KEY = 'he_biostack_active';
+
+function migrateStacks(): SavedStackV2[] {
+  try {
+    // Clean up legacy profile key (now loaded from unified profile settings)
+    localStorage.removeItem('he_biostack_profile');
+    // Check if v2 already exists
+    const v2Raw = localStorage.getItem(STACKS_KEY);
+    if (v2Raw) return JSON.parse(v2Raw);
+    
+    // Migrate from legacy
+    const legacyRaw = localStorage.getItem(LEGACY_STACKS_KEY);
+    const legacyActiveRaw = localStorage.getItem(LEGACY_ACTIVE_KEY);
+    
+    if (legacyRaw) {
+      const legacy = JSON.parse(legacyRaw);
+      const activeIdx = legacyActiveRaw ? +(localStorage.getItem(LEGACY_ACTIVE_KEY) || '0') : 0;
+      const migrated: SavedStackV2[] = (Array.isArray(legacy[0]) ? legacy : [legacy]).map((ids: string[], i: number) => ({
+        id: crypto.randomUUID(),
+        name: i === activeIdx ? 'Текущий стек' : `Стек ${i + 1}`,
+        ids,
+        profileSnapshot: null,
+        createdAt: new Date().toISOString(),
+        version: 1,
+        notes: '',
+      }));
+      localStorage.setItem(STACKS_KEY, JSON.stringify(migrated));
+      localStorage.removeItem(LEGACY_STACKS_KEY);
+      localStorage.removeItem(LEGACY_ACTIVE_KEY);
+      return migrated;
+    }
+  } catch {}
+  return [{ id: crypto.randomUUID(), name: 'Стек 1', ids: [], profileSnapshot: null, createdAt: new Date().toISOString(), version: 1, notes: '' }];
+}
+
 export const BioStackAIScreen: React.FC = () => {
   const [tab, setTab] = useState<MainTab>(() => {
     try { const s = localStorage.getItem(TAB_KEY); return MAIN_TABS.find(t => t.id === s) ? (s as MainTab) : 'profile'; }
@@ -45,36 +94,25 @@ export const BioStackAIScreen: React.FC = () => {
   const linked = useDataLink();
   const labAnalysis: LabCompositeResult | null = linked?.labAnalysis || null;
 
-  /* ── Multi-stack ── */
-  const STACKS_KEY = 'he_biostack_stacks';
-  const IDX_KEY = 'he_biostack_active_idx';
-  const [allStacks, setAllStacks] = useState<string[][]>(() => {
-    try {
-      const raw = localStorage.getItem(STACKS_KEY);
-      if (raw) return JSON.parse(raw);
-      const old = localStorage.getItem('he_biostack_active');
-      if (old) { const p = JSON.parse(old); return Array.isArray(p[0]) ? p : [p]; }
-    } catch {}
-    return [[]];
-  });
+  /* ── Multi-stack v2 ── */
+  const [allStacks, setAllStacks] = useState<SavedStackV2[]>(() => migrateStacks());
   const [activeStackIdx, setActiveStackIdxRaw] = useState<number>(() => {
     try { return Math.min(+(localStorage.getItem(IDX_KEY) || '0'), allStacks.length - 1); } catch { return 0; }
   });
-  const saveStacks = (stks: string[][], idx: number) => {
-    setAllStacks(stks);
-    localStorage.setItem(STACKS_KEY, JSON.stringify(stks));
-    localStorage.setItem(IDX_KEY, String(idx));
-    localStorage.setItem('he_biostack_active', JSON.stringify(stks[idx] || []));
-  };
+   const saveStacks = (stks: SavedStackV2[], idx: number) => {
+     setAllStacks(stks);
+     localStorage.setItem(STACKS_KEY, JSON.stringify(stks));
+     localStorage.setItem(IDX_KEY, String(idx));
+   };
   const setActiveStackIdx = (idx: number) => {
     const i = Math.max(0, Math.min(idx, allStacks.length - 1));
     setActiveStackIdxRaw(i);
     localStorage.setItem(IDX_KEY, String(i));
-    localStorage.setItem('he_biostack_active', JSON.stringify(allStacks[i] || []));
   };
-  const stackIds = allStacks[activeStackIdx] || [];
+
+  const stackIds = allStacks[activeStackIdx]?.ids || [];
   const setStackIds = (ids: string[]) => {
-    const updated = allStacks.map((s, i) => i === activeStackIdx ? ids : s);
+    const updated = allStacks.map((s, i) => i === activeStackIdx ? { ...s, ids } : s);
     saveStacks(updated, activeStackIdx);
   };
 

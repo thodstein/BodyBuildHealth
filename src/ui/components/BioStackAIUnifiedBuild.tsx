@@ -133,15 +133,25 @@ function Popup({ title, color, show, onClose, children }: { title:string; color:
    Props
    ════════════════════════════════════════════════════════════════ */
 
+interface SavedStackV2 {
+  id: string;
+  name: string;
+  ids: string[];
+  profileSnapshot: BioStackProfile | null;
+  createdAt: string;
+  version: number;
+  notes?: string;
+}
+
 interface Props {
   profile: BioStackProfile;
   labAnalysis?: LabCompositeResult | null;
   linked?: any;
   stackIds: string[];
   setStackIds: (ids: string[]) => void;
-  allStacks: string[][];
+  allStacks: SavedStackV2[];
   activeStackIdx: number;
-  saveStacks: (stks: string[][], idx: number) => void;
+  saveStacks: (stks: SavedStackV2[], idx: number) => void;
   setActiveStackIdx: (idx: number) => void;
   stopIds: Set<string>;
   clearStops: () => void;
@@ -466,15 +476,15 @@ export const BioStackAIUnifiedBuild: React.FC<Props> = ({
               background: i===activeStackIdx ? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.04)',
               border: `1px solid ${i===activeStackIdx ? 'rgba(0,230,138,0.4)' : 'rgba(255,255,255,0.08)'}`,
               color: i===activeStackIdx ? '#00e68a' : 'rgba(255,255,255,0.5)',
-            }}>{name} ({stk.length})</button>
+            }}>{name} ({stk.ids.length})</button>
           );
         })}
-        <button onClick={() => saveStacks([...allStacks, []], allStacks.length)} style={{
+        <button onClick={() => saveStacks([...allStacks, { id: crypto.randomUUID(), name: `Стек ${allStacks.length + 1}`, ids: [], profileSnapshot: null, createdAt: new Date().toISOString(), version: 1, notes: '' }], allStacks.length)} style={{
           flexShrink:0, minHeight:32, padding:'6px 12px', borderRadius:12, fontSize:11, fontWeight:600,
           cursor:'pointer', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.5)',
         }}>+</button>
         {allStacks.length > 1 && activeStackIdx > 0 && (
-          <button onClick={() => { const n = allStacks.filter((_,j)=>j!==activeStackIdx); saveStacks(n.length?n:[[]], Math.min(activeStackIdx, n.length-1)); }} style={{
+          <button onClick={() => { const n = allStacks.filter((_,j)=>j!==activeStackIdx); saveStacks(n.length?n:[{ id: crypto.randomUUID(), name: 'Стек 1', ids: [], profileSnapshot: null, createdAt: new Date().toISOString(), version: 1, notes: '' }], Math.min(activeStackIdx, n.length-1)); }} style={{
             flexShrink:0, minHeight:32, padding:'6px 12px', borderRadius:12, fontSize:11, fontWeight:600,
             cursor:'pointer', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', color:'#f87171',
           }}>🗑</button>

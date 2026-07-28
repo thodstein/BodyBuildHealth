@@ -1,12 +1,10 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import ReactDOM from 'react-dom';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { type GoalType } from '../../engines/biostack-ai.engine';
 import { findSupplements, findReplacement, findComplexesForSubstance, type ReplacementType, type ReplacementResult, type ComplexMatch } from '../../engines/supplement-finder.engine';
-import { searchBioStack, type RecGoal } from '../../engines/biostack-recommender.engine';
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS } from '../../data/support-database';
 import { PillBtn, inputS, PURE_GOALS, ORGANS, SYSTEMS, TOP_MECHANISMS, SYMPTOMS, toFinderProfile, PRICE_RUB } from './BioStackAIConstants';
-import { getEvidenceGrade, checkIngredientAllergens, findMeaningfulReplacement, fuzzySearchSupplements, decomposeComplex } from '../../engines/biostack-clinical-v2.engine';
+import { getEvidenceGrade, checkIngredientAllergens, findMeaningfulReplacement, fuzzySearchSupplements, decomposeComplex, selectStack } from '../../engines/biostack-clinical-v2.engine';
 
 const SRCH_EVIDENCE: Record<string, { label: string; color: string }> = {
   A: { label: 'A', color: '#22c55e' },
@@ -146,18 +144,14 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
   ];
 
   const profileRelevantIds = useMemo(() => {
-    if (!profileOnly) return null;
-    const goals: RecGoal[] = [];
-    if (profile.jointSymptoms?.length) goals.push('joints');
-    if (profile.neuroSymptoms?.length) goals.push('stress');
-    if (profile.cnsSymptoms?.length) goals.push('focus');
-    if (profile.drugAllergies?.length) goals.push('detox');
-    if (profile.currentMeds?.length) goals.push('recovery');
-    if (profile.currentSupplements?.length) goals.push('immunity');
-    if (goals.length === 0) return null;
-    const results = searchBioStack({ goals, limit: 200 }, profile);
+    if (!profileOnly || !profile) return null;
+    const allIds = Object.keys(SUPPORT_CATALOG_DATA);
+    const result = selectStack(allIds, profile, 'comprehensive');
     const scores = new Map<string, number>();
-    results.forEach(r => scores.set(r.id, r.score));
+    const maxScore = Math.max(1, result.hardStops.length + result.drugExclusions.length);
+    result.ids.forEach(id => scores.set(id, 100));
+    result.hardStops.forEach(h => scores.set(h.substanceId, 0));
+    result.drugExclusions.forEach(e => { const s = scores.get(e.substanceId); if (s !== undefined && s > 0) scores.set(e.substanceId, Math.max(0, s - 30)); });
     return scores;
   }, [profileOnly, profile]);
 
@@ -677,8 +671,8 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
           </div>
         </div>
       ))}
-      {/* ── Replacement popup (optimized: all types with counts) ── */}
-      {replacePopup && ReactDOM.createPortal(
+      {/* ── Replacement popup (inline, no portal) ── */}
+      {replacePopup && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 251,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -838,9 +832,9 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
             </div>
           </div>
         </div>
-      , document.body)}
+      )}
       {/* ── Complex popup ── */}
-      {complexPopup && ReactDOM.createPortal(
+      {complexPopup && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 251,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -917,7 +911,7 @@ export function SearchTab({ profile, stackIds, setStackIds, linked }: { profile:
             </div>
           </div>
         </div>
-      , document.body)}
+      )}
     </div>
   );
 }

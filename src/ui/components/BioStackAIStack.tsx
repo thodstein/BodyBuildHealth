@@ -1,8 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
-import ReactDOM from 'react-dom';
 import { type BioStackProfile } from '../../engines/biostack-ai.engine';
 import { buildStack, explainStack, findReplacement, findSupplements, findComplexForStack, type ReplacementResult, type ReplacementType, type ComplexMatch } from '../../engines/supplement-finder.engine';
-import { buildSmartStack } from '../../engines/biostack-recommender.engine';
+
 import { SUPPORT_CATALOG_DATA, CATEGORY_LABELS, ALL_INTERACTIONS, ALL_SUBSTANCES } from '../../data/support-database';
 import { decodeGarbled } from '../../utils/text-sanitizer';
 import { GlassCard, StatBox, ORGANS, toFinderProfile, ConfirmModal, showToast, PRICE_RUB, estCost, SubstanceMechanismCard, SubstanceTzCard } from './BioStackAIConstants';
@@ -1337,23 +1336,24 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
 
                   <button onClick={() => {
                     setActOpen(false);
-                    const r = buildSmartStack([], { maxSubstances: stackIds.length }, profile);
-                    const curNames = stackIds.map(id => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id);
-                    const altNames = r.substances.map(s => s.nameRu || s.name);
-                    const common = curNames.filter(n => altNames.includes(n));
-                    const onlyCur = curNames.filter(n => !altNames.includes(n));
-                    const onlyAlt = altNames.filter(n => !curNames.includes(n));
-                    setActionResult({
-                      title: '⚖ Сравнение: текущий vs smart-алгоритм',
-                      sections: [
-                        { icon: '📋', text: `Текущий (${stackIds.length}): ${curNames.join(', ')}`, color: '#8b5cf6' },
-                        { icon: '🤖', text: `Smart (${r.substances.length}): ${altNames.join(', ')}`, color: '#60a5fa' },
-                        ...(common.length > 0 ? [{ icon: '🔄', text: `Общие (${common.length}): ${common.join(', ')}`, color: '#22c55e' }] : []),
-                        ...(onlyCur.length > 0 ? [{ icon: '➖', text: `Только в текущем: ${onlyCur.join(', ')}`, color: '#f59e0b' }] : []),
-                        ...(onlyAlt.length > 0 ? [{ icon: '➕', text: `Только в Smart: ${onlyAlt.join(', ')}`, color: '#22c55e' }] : []),
-                        { icon: '📊', text: `Smart оценка: ${r.totalScore} | Покрытие: ${r.coverageSummary} | ${r.synergySummary}`, color: '#60a5fa' },
-                      ],
-                    });
+                     const result = selectStack(stackIds, profile, 'comprehensive');
+                     const curNames = stackIds.map(id => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id);
+                     const altNames = result.ids.map(id => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id);
+                     const common = curNames.filter(n => altNames.includes(n));
+                     const onlyCur = curNames.filter(n => !altNames.includes(n));
+                     const onlyAlt = altNames.filter(n => !curNames.includes(n));
+                     setActionResult({
+                       title: '⚖ Сравнение: текущий vs клинический алгоритм',
+                       sections: [
+                         { icon: '📋', text: `Текущий (${stackIds.length}): ${curNames.join(', ')}`, color: '#8b5cf6' },
+                         { icon: '🩺', text: `Клинический (${result.ids.length}): ${altNames.join(', ')}`, color: '#60a5fa' },
+                         ...(common.length > 0 ? [{ icon: '🔄', text: `Общие (${common.length}): ${common.join(', ')}`, color: '#22c55e' }] : []),
+                         ...(onlyCur.length > 0 ? [{ icon: '➖', text: `Только в текущем: ${onlyCur.join(', ')}`, color: '#f59e0b' }] : []),
+                         ...(onlyAlt.length > 0 ? [{ icon: '➕', text: `Только в клиническом: ${onlyAlt.join(', ')}`, color: '#22c55e' }] : []),
+                         ...(result.hardStops.length > 0 ? [{ icon: '🛑', text: `Жёсткие стопы: ${result.hardStops.map(h => h.substanceName).join(', ')}`, color: '#ef4444' }] : []),
+                         ...(result.drugExclusions.length > 0 ? [{ icon: '⚠️', text: `Исключения по ЛС: ${result.drugExclusions.map(e => e.drug + '→' + e.substanceName).join(', ')}`, color: '#f59e0b' }] : []),
+                       ],
+                     });
                   }} style={{
                     display: 'flex', alignItems: 'center', gap: 8,
                     width: '100%', padding: '10px 14px', marginBottom: 4, borderRadius: 10,
@@ -1569,8 +1569,8 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
         })}
       </GlassCard>
 
-      {/* Global replace popup — rendered via portal to escape backdrop-filter containing-block */}
-      {replacePopup && ReactDOM.createPortal(
+      {/* Global replace popup — rendered inline (no portal needed after backdrop-filter fix) */}
+      {replacePopup && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 251,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1733,7 +1733,7 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
             </div>
           </div>
         </div>
-      , document.body)}
+      )}
     </div>
   );
 }
