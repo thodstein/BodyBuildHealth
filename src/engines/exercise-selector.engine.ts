@@ -403,8 +403,11 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
       }
     }
 
-    // Бонус для compound (базовые)
-    if (ex.type === 'compound') score += 5;
+    // Бонус для compound (базовые) — P2-6: повышен с +5 до +10.
+    // Compound (жим лёжа, присед, тяга) — основа гипертрофии (максимальное механическое натяжение).
+    // +5 было недостаточно: canonical isolation (tier+8=58) могла обойти canonical compound (50+8+5=63)
+    // за счёт angle diversity (+10). Теперь compound=50+8+10=68 — гарантированный приоритет.
+    if (ex.type === 'compound') score += 10;
 
     // ▓▓ Тиры «обычности» для ББ-гипертрофии: канонические — предпочитать, экзотику — штраф ▓▓
     const _tier = bbExerciseTier(ex);

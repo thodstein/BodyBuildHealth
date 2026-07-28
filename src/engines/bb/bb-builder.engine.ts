@@ -225,6 +225,9 @@ const WEAK_TO_MUSCLE: Record<string, string> = {
 /** Для каких мышц в BB-контексте ВСЕГДА брать только изоляцию (нет compound аналогов). */
 const ALWAYS_ISOLATION: Set<string> = new Set(['calves', 'forearms', 'abs']);
 
+/** P0-1: arms muscle set — используется в buildSession (budget reserve) и buildBBPlan (arm guarantee). */
+const ARM_MUSCLES_SET = new Set(['biceps', 'triceps', 'forearms']);
+
 // "Золотой стандарт" ББ-упражнений (максимально эффективные для гипертрофии).
 // Приоритизируются в generic-планах (без специализации/слабых точек).
 // ББ-логика: наклонный жим > плоский (верх груди — отстающая у большинства),
@@ -460,28 +463,29 @@ function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary
   // Glute boost для женщин: glutes получают +20% объёма (женская физиология — больший гипертрофический потенциал ягодичных).
   const gluteBoost = isFemale && muscle === 'glutes' ? 1.2 : 1.0;
   const finalMult = pedArmBoost * gluteBoost;
+  // P0-1: arms (biceps/triceps/forearms) — accessory factor повышен с 0.6 до 0.85.
+  // Раньше: biceps MAV=8, 2×/нед → 8/2×0.6=2.4 → 2 сета/сессию → 1 сет на упражнение (разминка!).
+  // Schoenfeld 2016: минимум 2-3 рабочих сета на упражнение, 8-12 сетов/нед на мышцу.
+  // Arms — малые мышцы, но требуют dedicated объёма, а не остаточного (как грудныеflyes).
+  const isArmMuscle = muscle === 'biceps' || muscle === 'triceps' || muscle === 'forearms';
   if (sessionsPerWeek <= 1) {
     // P5 + BUG-B2: cap на 1×/нед — Schoenfeld 2016 оптимум 12-16 сетов/день для advanced.
-    // Раньше MAV×1.3 → chest=21+ сетов за одну сессию (перетрен в один день, MPS-окно
-    // закрывается, остальные 6 дней — катаболизм).
-    // Теперь: для primary — min(MAV×1.0, 16) (верхняя граница Schoenfeld);
-    //          для accessory — MAV×0.5 (добивка, не основная нагрузка).
-    // Glute-буст для женщин сохранён (физиология — больший гипертрофический потенциал).
     const gluteFactor = isFemale && muscle === 'glutes' ? 1.4 : 1.0;
     if (role === 'accessory') {
-      return Math.max(2, Math.min(Math.round(mavRot * 0.5 * gluteFactor), 8));
+      const accFactor = isArmMuscle ? 0.7 : 0.5;
+      return Math.max(3, Math.min(Math.round(mavRot * accFactor * gluteFactor), 8));
     }
     return Math.min(Math.round(mavRot * 1.0 * gluteFactor), 16);
   }
   if (sessionsPerWeek === 2) {
     const base = mavRot / 2;
-    const factor = role === 'primary' ? 1.4 : 0.6;
-    return Math.max(1, Math.round(base * factor * finalMult));
+    const factor = role === 'primary' ? 1.4 : (isArmMuscle ? 0.85 : 0.6);
+    return Math.max(isArmMuscle ? 3 : 1, Math.round(base * factor * finalMult));
   }
   // 3+ сессии/нед
   const base = mavRot / sessionsPerWeek;
-  const factor = role === 'primary' ? 1.5 : 0.75;
-  return Math.max(1, Math.round(base * factor * finalMult));
+  const factor = role === 'primary' ? 1.5 : (isArmMuscle ? 0.9 : 0.75);
+  return Math.max(isArmMuscle ? 2 : 1, Math.round(base * factor * finalMult));
 }
 
 /** fix D: недельный кап объёма каждой мышцы по её истинному MRV (после всех множителей).
@@ -499,17 +503,36 @@ function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string,
     // Per-exercise cap: не более 8 сетов на одно упражнение (ББ-практика).
     // BUG-B8: для малых мышц (forearms/calves/abs) cap = 6 — они не требуют
     // большого объёма за одно упражнение (Schoenfeld: small muscles 4-6 сетов/упр).
+    // P1-4: per-exercise FLOOR — минимум 2 сета (1 сет = разминка, не рабочий объём).
     const perExCap = (m === 'forearms' || m === 'calves' || m === 'abs') ? 6 : 8;
     for (const ex of info.exs) {
       if (ex.sets > perExCap) ex.sets = perExCap;
+      if (ex.sets < 2) ex.sets = 2;
     }
     // Пересчитать total после per-exercise капа
     info.total = info.exs.reduce((s, ex) => s + ex.sets, 0);
     // MRV-кап
     const cap = mrvByMuscle[m];
     if (cap && info.total > cap) {
-      const factor = cap / info.total;
-      for (const ex of info.exs) ex.sets = Math.max(1, Math.round(ex.sets * factor));
+      // P0-2: пропорциональное распределение с остатком (round съедает кап).
+      // Раньше: factor=24/26=0.923, round(4×0.923)=round(3.69)=4 → ничего не изменилось.
+      // Теперь: floor для большинства + распределение остатка на первые упражнения.
+      const target = cap;
+      const factor = target / info.total;
+      let allocated = 0;
+      const rawSets = info.exs.map(ex => ex.sets * factor);
+      // Floor + собираем остаток
+      const floored = rawSets.map(v => Math.max(1, Math.floor(v)));
+      allocated = floored.reduce((s, v) => s + v, 0);
+      // Распределить остаток (target - allocated) на первые упражнения (compound primary первыми)
+      let remainder = target - allocated;
+      for (let i = 0; i < info.exs.length && remainder > 0; i++) {
+        floored[i]++;
+        remainder--;
+      }
+      for (let i = 0; i < info.exs.length; i++) {
+        info.exs[i].sets = Math.max(1, floored[i]);
+      }
     }
   }
 }
@@ -1291,7 +1314,16 @@ function buildSession(
     }
   }
 
-  // Process each muscle with proportional budget
+  // Process each muscle with proportional budget.
+  // P0-1: резервируем бюджет для arms (biceps/triceps) ДО того, как chest/back его потратят.
+  // Раньше: chest/back забирали весь fatigue budget → biceps/triceps получали 0 упражнений.
+  const armPlans = plans.filter(p => ARM_MUSCLES_SET.has(p.muscle));
+  const armReserveBudget = armPlans.length * 6 * 5; // 6 sets (2 ex × 3 sets) × fatigueCost 5 per arm muscle
+  let availableBudget = dayFatigueBudget;
+  if (armPlans.length > 0 && availableBudget > armReserveBudget) {
+    availableBudget -= armReserveBudget; // резервируем для arms
+  }
+  let armAllocatedBudget = 0;
   for (const pl of plans) {
     const phaseCfg = PHASE_CONFIGS[phase];
     const [adjMin, adjMax] = phaseCfg.repRange;
@@ -1301,20 +1333,28 @@ function buildSession(
     const isAcc = pl.role === 'accessory';
     const repMin = isAcc ? adjMin + 2 : adjMin;
     const repMax = isAcc ? adjMax + 5 : adjMax;
-    const muscleBudget = totalExpectedFatigue > 0
-      ? Math.floor(dayFatigueBudget * pl.exerciseCount * Math.max(1, Math.round(pl.sets / pl.exerciseCount)) * ((pl.exDatas[0] as any)?.fatigueCost || 5) / totalExpectedFatigue)
-      : Math.floor(dayFatigueBudget / Math.max(1, plans.length));
+    const isArmMuscle = ARM_MUSCLES_SET.has(pl.muscle);
+    // P0-1: для arms — используем зарезервированный бюджет напрямую (не пропорционально totalExpectedFatigue).
+    // Раньше: muscleBudget = floor(15 × 1 × 3 × 5 / 130) = 1 (chest/back размывают резерв).
+    // Теперь: arms получают гарантированный budget = armReserve / armPlans.length.
+    const armBudgetPerMuscle = armPlans.length > 0 ? (armReserveBudget / armPlans.length) : 0;
+    const budgetSource = isArmMuscle ? armBudgetPerMuscle : availableBudget;
+    const muscleBudget = isArmMuscle
+      ? Math.max(armBudgetPerMuscle, 15) // минимум 3 сета × 5 fatigue
+      : (totalExpectedFatigue > 0
+        ? Math.floor(budgetSource * pl.exerciseCount * Math.max(1, Math.round(pl.sets / pl.exerciseCount)) * ((pl.exDatas[0] as any)?.fatigueCost || 5) / totalExpectedFatigue)
+        : Math.floor(budgetSource / Math.max(1, plans.length)));
     // Solo-дни (1-2 мышцы): 90% бюджета; multi-дни: 60% (70% на PED — больше recovery).
     const budgetCapPct = plans.length <= 2 ? 0.90 : (pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 0.70 : 0.60);
-    let remainingBudget = Math.max(1, Math.min(muscleBudget, Math.floor(dayFatigueBudget * budgetCapPct)));
+    let remainingBudget = Math.max(1, Math.min(muscleBudget, Math.floor(budgetSource * (isArmMuscle ? 1.0 : budgetCapPct))));
     // Гарантированный минимум для arms/shoulders — на PED нужно минимум 3-4 сета
     // даже если бюджет мал (chest забирал большую часть). Без этого triceps получает 1 сет.
     // minBudget = fatigueCost(5) × minSets(3-4) × minExercises(2) = 30-40
-    const isArmMuscle = ['triceps', 'biceps', 'shoulders', 'forearms'].includes(pl.muscle);
-    const minSetsArms = isArmMuscle && pedAdapt && pedAdapt.combinedMrvMultiplier >= 1.3 ? 4 : 3;
-    const minExercisesArms = isArmMuscle && pedAdapt && pedAdapt.combinedMrvMultiplier >= 1.3 ? 2 : 1;
-    const minBudgetForArms = isArmMuscle ? minSetsArms * minExercisesArms * ((pl.exDatas[0] as any)?.fatigueCost || 5) : 0;
-    if (isArmMuscle && remainingBudget < minBudgetForArms) {
+    const isArmOrShoulder = ['triceps', 'biceps', 'shoulders', 'forearms'].includes(pl.muscle);
+    const minSetsArms = isArmOrShoulder && pedAdapt && pedAdapt.combinedMrvMultiplier >= 1.3 ? 4 : 3;
+    const minExercisesArms = isArmOrShoulder && pedAdapt && pedAdapt.combinedMrvMultiplier >= 1.3 ? 2 : 1;
+    const minBudgetForArms = isArmOrShoulder ? minSetsArms * minExercisesArms * ((pl.exDatas[0] as any)?.fatigueCost || 5) : 0;
+    if (isArmOrShoulder && remainingBudget < minBudgetForArms) {
       remainingBudget = minBudgetForArms;
     }
     // Для primary больших мышц (chest/back/quads) — ограничить per-exercise sets до 5
@@ -1325,7 +1365,8 @@ function buildSession(
       const vPct = (exData as any).substitutionVolumePct ?? 1.0;
       const isSubstituted = (exData as any).substituted === true;
       const repsCap = (exData as any).repsCap ?? 20;
-      const exSets = Math.max(1, Math.min(5, Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct)));
+      // P1-4: минимум 2 сета на упражнение (1 сет = разминка, не рабочий объём для гипертрофии).
+      const exSets = Math.max(2, Math.min(5, Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct)));
       const exWeight = (exData as any)._effWeight ?? pl.weight;
       const finalRir = isSubstituted ? Math.min(pl.rir + 1, 4) : ((exData as any)._deltRir ?? pl.rir);
       const cost = ((exData as any)?.fatigueCost || 5) * exSets;
@@ -1414,10 +1455,14 @@ function buildSession(
 
   // Кап упражнений в сессии: просто берём первые exCap из уже отсортированного массива.
   // Сортировка выше уже гарантирует: primary → accessory, мышца дня → остальные.
-  const exCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 12 : 8;
+  // P0-1: exCap зависит от числа мышц в дне — 5 мышц по 2 упражнения = 10 минимум.
+  // Раньше exCap=8 → biceps/triceps отрезались в Upper днях (5 мышц).
+  // Теперь: exCap = max(8, musclePlans.length × 2) — гарантия 2 упражнений на мышцу.
+  const exCap = Math.max(8, Math.min(12, musclePlans.length * 2));
   if (exercises.length > exCap) {
     exercises.length = exCap;
   }
+  // P0-1: arm guarantee перенесена в финальную пост-обработку (после всех обрезок/dedup).
 
   // ▓▓ A1: Pump-finisher слабых групп (структурная добивка метаболическим стрессом) ▓▓
   // Если в текущей сессии слабая группа уже представлена (но не primary этой сессии) —
@@ -2097,12 +2142,141 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // обратно в compound_first — выбор методики в UI не имел эффекта на финальный порядок.
       const reordered = orderSessionExercises(s.exercises, { sessionTag: s.sessionTag || '', methodology: input.methodology });
       s.exercises.length = 0; s.exercises.push(...reordered);
-      // ━━━ ИТОГОВЫЙ КАП ━━━
-      const finalCap = pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 12 : 9;
+      // P0-1: итоговый кап — max(9, muscles×2) для гарантии arms.
+      const sessMuscleCount = new Set(s.exercises.map(e => collapseKey(e.muscle))).size;
+      const finalCap = Math.max(9, Math.min(13, sessMuscleCount * 2));
       if (s.exercises.length > finalCap) {
         s.exercises.length = finalCap;
       }
+      // P0-1: финальная гарантия arms — ПОСЛЕ всех обрезок (exCap, finalCap, dedup).
+      // Если biceps/triceps были отрезаны — добавляем принудительно 1 упражнение на каждое.
+      const dayMusclePlans = dedupeMuscles(s.sessionTag, new Set());
+      const dayArmMuscles = new Set(dayMusclePlans.filter(mp => ARM_MUSCLES_SET.has(mp.group)).map(mp => mp.group));
+      if (dayArmMuscles.size > 0) {
+        const presentM = new Set(s.exercises.map(e => e.muscle));
+        const wPhase = phaseByWeek.get(w.week) || 'accumulation';
+        for (const m of dayArmMuscles) {
+          if (presentM.has(m)) continue;
+          // Найти изоляцию на эту мышцу в каталоге
+          const pool = (EXERCISE_CATALOG as any[]).filter((e: any) => {
+            const mg = collapseKey(trueMuscleOf(e) || e.group || '');
+            if (mg !== m) return false;
+            if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
+            if (isBBJunk(e)) return false;
+            if (isInappropriateBB(e)) return false;
+            if (eqList?.length && e.equipment && !eqList.includes(e.equipment)) return false;
+            return true;
+          });
+          if (!pool.length) continue;
+          const fData = pool[0];
+          const fName = fData.name || fData.id;
+          const fBase = (workMax as any)[m] || DEFAULT_WORKMAX[m] || 50;
+          const armSets = 3;
+          const pcfg = PHASE_CONFIGS[wPhase];
+          const armReps = Math.round((pcfg.repRange[0] + pcfg.repRange[1]) / 2) + 2;
+          const armWeight = Math.round(fBase * pcfg.intensityMultiplier * 0.88 * 10) / 10;
+          s.exercises.push({
+            muscle: m, name: fName, role: 'accessory' as const,
+            character: 'памп' as DayCharacter, sets: armSets,
+            repsRange: [pcfg.repRange[0] + 2, pcfg.repRange[1] + 5] as [number, number],
+            rir: 3,
+            workSets: Array.from({ length: armSets }, () => ({ reps: armReps, rir: 3, weight: armWeight, tempo: pcfg.tempo, restSeconds: Math.max(45, pcfg.restBase - 30) })),
+            exerciseName: fName,
+            tempoSpec: pcfg.tempo, restSeconds: Math.max(45, pcfg.restBase - 30),
+            comment: `🎯 Arm-guarantee: ${m} — P0-1 (arms защищены от обрезки exCap/finalCap/dedup).`,
+            warmupSets: [], rationale: 'Arm guarantee: P0-1',
+          });
+        }
+      }
     }
+    // P0-2: финальный MRV-кап ПОСЛЕ всех модификаций (dedup, feeders, re-sort).
+    // Раньше normalizeWeekMrv вызывался до compensateCrossDayWeakPoints/dedup,
+    // и feeders/dedup могли добавить объём выше MRV.
+    normalizeWeekMrv(w.sessions, mrvByMuscle);
+  }
+  // P1-5: auto-MEV-feeder — мышцы с объёмом < MEV получают feeder в ближайший релевантный день.
+  // Актуально для bro_5 (calves=2, glutes=4 при MEV=8) и других 1×/нед сплитов.
+  // Берём первую неделю как образец (все недели одинаковы по структуре без weakPoints).
+  if (finalPlan.weeks.length > 0) {
+    const wk1 = finalPlan.weeks[0];
+    const normLvl = normLevel(level);
+    const autoFeedMuscles = ['calves', 'glutes', 'abs', 'forearms', 'hamstrings'];
+    for (const m of autoFeedMuscles) {
+      let weekSets = 0;
+      for (const s of wk1.sessions) for (const e of s.exercises) if (collapseKey(e.muscle) === m) weekSets += e.sets;
+      const lm = getVolumeLandmarks(normLvl, m);
+      if (!lm) continue;
+      const targetMEV = Math.round(lm.mev * pedMrvMult);
+      if (weekSets >= targetMEV) continue;
+      // Найти ближайший день с этой мышцей (или совместимый тег)
+      const allowedTags = WEAKPOINT_DAY_TAGS[m] ?? ['Legs', 'Lower', 'FullBody'];
+      let bestSlot: BBSession | null = null;
+      let bestScore = -Infinity;
+      for (const w of finalPlan.weeks) {
+        for (const s of w.sessions) {
+          const tag = (s.sessionTag || '').toLowerCase();
+          if (!allowedTags.some(at => tag.includes(at.toLowerCase()))) continue;
+          const score = s.exercises.length * 10;
+          if (score > bestScore) { bestScore = score; bestSlot = s; }
+        }
+      }
+      if (!bestSlot) continue;
+      // Найти изоляцию на эту мышцу
+      const feederPool = (EXERCISE_CATALOG as any[]).filter((e: any) => {
+        const mg = collapseKey(trueMuscleOf(e) || e.group || '');
+        if (mg !== m) return false;
+        if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
+        if (isBBJunk(e)) return false;
+        if (isInappropriateBB(e)) return false;
+        if (eqList?.length && e.equipment && !eqList.includes(e.equipment)) return false;
+        if (avAxial && isAxialLoadExercise(e as any)) return false;
+        return true;
+      });
+      if (!feederPool.length) continue;
+      feederPool.sort((a, b) => (a.name?.length || 0) - (b.name?.length || 0));
+      const fBase = (workMax as any)[m] || DEFAULT_WORKMAX[m] || 50;
+      const feederWeight = Math.max(5, Math.round(fBase * 0.3 * 10) / 10);
+      const fTempo = tempoFor('памп');
+      const need = Math.max(2, targetMEV - weekSets);
+      // P1-5: если need > perExCap (6 для calves/abs/forearms, 8 для остальных) — разбить на 2 упражнения.
+      const perExCapM = (m === 'forearms' || m === 'calves' || m === 'abs') ? 6 : 8;
+      const useTwoEx = need > perExCapM && feederPool.length >= 2;
+      const setsPerEx = useTwoEx ? Math.ceil(need / 2) : need;
+      const fData = feederPool[0];
+      const fName = fData.name || fData.id;
+      const fData2 = useTwoEx ? feederPool[1] : null;
+      const fName2 = fData2 ? (fData2.name || fData2.id) : null;
+      // Добавить feeder в каждую неделю
+      for (const w of finalPlan.weeks) {
+        for (const s of w.sessions) {
+          const tag = (s.sessionTag || '').toLowerCase();
+          if (!allowedTags.some(at => tag.includes(at.toLowerCase()))) continue;
+          if (s.exercises.some(e => e.name === fName)) continue;
+          s.exercises.push({
+            muscle: m, name: fName, role: 'accessory' as const, character: 'памп' as DayCharacter,
+            sets: setsPerEx, repsRange: [15, 20] as [number, number], rir: 2,
+            workSets: Array.from({ length: setsPerEx }, () => ({ reps: 18, rir: 2, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
+            exerciseName: fName, tempoSpec: fTempo.notation, restSeconds: 30,
+            comment: `Auto-MEV-feeder для ${m}: ${setsPerEx}×15-20 RIR 2 @${feederWeight}кг (недельный объём ${weekSets} < MEV ${targetMEV}).`,
+            warmupSets: [], rationale: 'MEV coverage: auto-feeder.',
+          });
+          // Второе упражнение (если need > perExCap)
+          if (useTwoEx && fName2 && !s.exercises.some(e => e.name === fName2)) {
+            s.exercises.push({
+              muscle: m, name: fName2, role: 'accessory' as const, character: 'памп' as DayCharacter,
+              sets: need - setsPerEx, repsRange: [15, 20] as [number, number], rir: 2,
+              workSets: Array.from({ length: need - setsPerEx }, () => ({ reps: 18, rir: 2, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
+              exerciseName: fName2, tempoSpec: fTempo.notation, restSeconds: 30,
+              comment: `Auto-MEV-feeder (2) для ${m}: ${need - setsPerEx}×15-20 RIR 2 @${feederWeight}кг.`,
+              warmupSets: [], rationale: 'MEV coverage: auto-feeder (2-е упражнение).',
+            });
+          }
+          break; // только один день
+        }
+      }
+    }
+    // Финальный MRV-кап после auto-feeders
+    for (const w of finalPlan.weeks) normalizeWeekMrv(w.sessions, mrvByMuscle);
   }
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, pedMrvMult);
   // muscleFrequency: muscleSessionCount содержит число сессий на мышцу за ротацию (= неделя для 7-дн паттернов)
