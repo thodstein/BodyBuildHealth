@@ -784,13 +784,11 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       showToast('🔗 Готовность применена: ' + payload.label);
     } else if (payload.kind === 'weakpoints') {
       const groups: string[] = payload.data.groups ?? [];
-      const meta = { ...p.meta, weakPoints: groups };
-      let next = { ...p, meta };
-      if (p.bb) next = { ...next, bb: { ...p.bb, constraints: { ...(p.bb.constraints ?? { equipment: [] }), weakPoints: groups } } };
+      let next = { ...p };
+      if (p.bb) next = { ...next, bb: { ...p.bb, constraints: { ...(p.bb.constraints ?? { equipment: [] }) } } };
       if (p.pl) next = { ...next, pl: { ...p.pl, weakPoints: groups } };
       onChange(next);
-      const prof = loadTrainingProfile();
-      saveTrainingProfile({ ...prof, weakPoints: groups });
+      saveTrainingProfile({ ...tprofile, weakPoints: groups });
       showToast('🔗 Слабые группы: ' + (groups.join(', ') || 'нет'));
     } else if (payload.kind === 'pm') {
       const d = payload.data ?? {};
@@ -930,7 +928,8 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
   // Читает единый профиль тренированности (equipment, weakPoints, avoidAxialLoad,
   // workMax, onCourse, favoriteExercises, excludedExercises) + лаб. коррекцию.
   const autoFillDraft = () => {
-    const prof = loadTrainingProfile();
+    // P3-1: используем tprofile из hook (реактивен), не loadTrainingProfile (stale)
+    const prof = tprofile;
     const days = Math.max(2, Math.min(7, program.meta.daysPerWeek || 4));
     const title = '[Черновик] ' + (program.meta.title || 'Моя программа');
     updateMeta({ title });
@@ -985,6 +984,8 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         }
         update({ bb: userProg.bb });
       } catch (err) {
+        console.error('autodraftBBPlan failed:', err);
+        showToast('⚠ Авто-сборка не удалась: ' + (err as Error)?.message + ' — создана заготовка, заполните вручную');
         const weeks: UserWeek[] = Array.from({ length: Math.max(1, program.meta.weeks || 4) }, (_, wi) => ({
           week: wi + 1, phase: 'accumulation' as const, deload: false,
           sessions: Array.from({ length: days }, (_, si) => ({
@@ -1450,9 +1451,24 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                   }}
                   onDoubleClick={() => {
                     if (dir !== 'bb' || !program.bb) return;
-                    const updated = { ...program, bb: { ...program.bb!, progression: { ...program.bb!.progression, loadStrategy: m.name as any, deloadProtocol: program.bb!.progression?.deloadProtocol || 'pump' as any, intensityTechniques: program.bb!.progression?.intensityTechniques || ['none'] } } };
+                    // P3-4: для известных методик — трансформировать sets, не только loadStrategy
+                    const knownTransforms: Record<string, (b: UserBlock) => UserBlock> = {
+                      'GVT / 10×10': (b) => b.type === 'compound' ? { ...b, sets: Array(10).fill(0).map(() => ({ reps: 10, rir: 3, weight: 0, restSec: 90 })) } : b,
+                      'Cluster 5×5': (b) => b.type === 'compound' ? { ...b, sets: Array(5).fill(0).map(() => ({ reps: 5, rir: 1, weight: 0, restSec: 180 })) } : b,
+                      'Rest-Pause': (b) => ({ ...b, sets: [{ reps: 8, rir: 0, weight: 0, restSec: 180 }] }),
+                      'Drop-Sets': (b) => b.type === 'isolation' ? { ...b, sets: [...(b.sets ?? []), { reps: 'AMRAP' as const, rir: 0, weight: ((b.sets?.[0]?.weight ?? 0) * 0.8) || 0, restSec: 10 }] } : b,
+                      'Tempo (3-1-1-0)': (b) => ({ ...b, sets: (b.sets ?? []).map((s) => ({ ...s, tempo: '3-1-1-0', weight: (s.weight ?? 0) * 0.7, rir: 2, restSec: 60 })) }),
+                    };
+                    const transform = knownTransforms[m.name];
+                    let updated: UserProgram;
+                    if (transform) {
+                      updated = { ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((w) => ({ ...w, sessions: w.sessions.map((s) => ({ ...s, blocks: s.blocks.map(transform) })) })), progression: { ...program.bb!.progression, loadStrategy: m.name as any, deloadProtocol: program.bb!.progression?.deloadProtocol || 'pump' as any, intensityTechniques: program.bb!.progression?.intensityTechniques || ['none'] } } };
+                      showToast('✅ Методика применена (трансформация): ' + m.name);
+                    } else {
+                      updated = { ...program, bb: { ...program.bb!, progression: { ...program.bb!.progression, loadStrategy: m.name as any, deloadProtocol: program.bb!.progression?.deloadProtocol || 'pump' as any, intensityTechniques: program.bb!.progression?.intensityTechniques || ['none'] } } };
+                      showToast('✅ Стратегия прогрессии применена: ' + m.name + ' (трансформируйте блоки через 🔧 Применить ко всем)');
+                    }
                     onChange(updated);
-                    showToast('✅ Методика применена: ' + m.name);
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>

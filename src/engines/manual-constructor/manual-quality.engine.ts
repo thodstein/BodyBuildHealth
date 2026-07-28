@@ -8,7 +8,7 @@ import { getVolumeLandmarks } from '../volume-landmarks.engine';
 export interface PlanQualityResult {
   score: number;
   grade: string;
-  perMuscle: Array<{ muscle: string; sets: number; status: 'over' | 'high' | 'ok' | 'low'; mrv: number; mav: number; mev: number }>;
+  perMuscle: Array<{ muscle: string; peakSets: number; avgSets: number; status: 'over' | 'high' | 'ok' | 'low'; mrv: number; mav: number; mev: number }>;
   issues: string[];
 }
 
@@ -40,10 +40,13 @@ export function computePlanQualityFor(
   }
 
   // PL custom: если BB-тела нет
-  const setsByMuscle: Record<string, number> = {};
+  const peakSetsByMuscle: Record<string, number> = {};
+  const avgSetsByMuscle: Record<string, number> = {};
   for (const [mu, weeks] of Object.entries(weeklySetsByMuscle)) {
-    setsByMuscle[mu] = Math.max(...weeks, 0);
+    peakSetsByMuscle[mu] = Math.max(...weeks, 0);
+    avgSetsByMuscle[mu] = weeks.length ? Math.round(weeks.reduce((a, b) => a + b, 0) / weeks.length) : 0;
   }
+  const setsByMuscle: Record<string, number> = peakSetsByMuscle;
   if (Object.values(setsByMuscle).every(v => v === 0) && program.pl?.customWeeks) {
     for (const m of BASE_MUSCLES) weeklySetsByMuscle[m] = [];
     for (const w of program.pl.customWeeks) {
@@ -72,7 +75,7 @@ export function computePlanQualityFor(
   const courseIntensity = opts?.courseIntensity ?? 'moderate';
   const labMult = opts?.labMult ?? 1;
 
-  for (const [muscle, sets] of Object.entries(setsByMuscle)) {
+  for (const [muscle, peak] of Object.entries(setsByMuscle)) {
     const lm = getVolumeLandmarks(level, muscle);
     if (!lm) continue;
     let mrv = lm.mrv;
@@ -89,17 +92,18 @@ export function computePlanQualityFor(
       mav = Math.round(mav * labMult);
       mev = Math.round(mev * labMult);
     }
+    const avg = avgSetsByMuscle[muscle] ?? peak;
     let status: 'over' | 'high' | 'ok' | 'low';
-    if (sets > mrv) {
-      status = 'over'; totalScore -= 8; issues.push(`⚠ ${muscle}: ${sets} сетов > MRV (${mrv}) — перетрен`);
-    } else if (sets >= mav) {
+    if (peak > mrv) {
+      status = 'over'; totalScore -= 8; issues.push(`⚠ ${muscle}: пик ${peak} > MRV (${mrv}) — перетрен`);
+    } else if (peak >= mav) {
       status = 'high'; totalScore -= 2;
-    } else if (sets >= mev) {
+    } else if (avg >= mev) {
       status = 'ok';
     } else {
-      status = 'low'; totalScore -= 3; issues.push(`⬇ ${muscle}: ${sets} сетов < MEV (${mev}) — минимум не добирается`);
+      status = 'low'; totalScore -= 3; issues.push(`⬇ ${muscle}: средний ${avg} < MEV (${mev}) — недогруз`);
     }
-    perMuscle.push({ muscle, sets, status, mrv, mav, mev });
+    perMuscle.push({ muscle, peakSets: peak, avgSets: avg, status, mrv, mav, mev });
   }
   if (perMuscle.length === 0) {
     issues.push('⚠ Программа пуста — добавьте упражнения');

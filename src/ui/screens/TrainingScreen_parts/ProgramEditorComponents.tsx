@@ -822,7 +822,19 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
               >✏ Переключить на свой цикл</button>
             </div>
           ) : (
-            <div style={{ fontSize: 11, color: '#ef4444' }}>⚠ Цикл не выбран. Вернитесь и подключите цикл через «🔍 ПЛ-циклы».</div>
+            <div style={{ fontSize: 11, color: DIM_STRONG }}>
+              {/* P3-3: явный выбор — подключить LMS или создать свой */}
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>ПЛ-программа пустая. Выберите:</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button
+                  style={{ ...BTN_GHOST, padding: '8px 12px', fontSize: 11, minHeight: 38, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }}
+                  onClick={() => {
+                    set({ sourceCycleId: null, customWeeks: [{ week: 1, phase: 'accumulation', deload: false, days: [{ name: 'День 1', exercises: [{ name: 'Присед', lift: 'squat', muscle: 'legs', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }] }] }] });
+                  }}
+                >✏ Создать свой цикл с нуля</button>
+              </div>
+              <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Или вернитесь и подключите LMS-цикл через «🔍 ПЛ-циклы».</div>
+            </div>
           )}
         </div>
 

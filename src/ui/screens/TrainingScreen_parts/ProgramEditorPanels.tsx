@@ -43,7 +43,7 @@ export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onCha
   const ok = q.perMuscle.filter(m => m.status === 'ok');
   const gaps = q.perMuscle.filter(m => m.status === 'low' || m.status === 'over');
   const pctCalc = q.perMuscle.length >= 2 ? (() => {
-    const pcts = q.perMuscle.map(p => ({ m: p.muscle, p: p.mrv > 0 ? (p.sets / p.mrv) * 100 : 0 }));
+    const pcts = q.perMuscle.map(p => ({ m: p.muscle, p: p.mrv > 0 ? (p.peakSets / p.mrv) * 100 : 0 }));
     return Math.max(...pcts.map(p => p.p)) - Math.min(...pcts.map(p => p.p));
   })() : 0;
   const barColor = q.score >= 75 ? '#22c55e' : q.score >= 50 ? '#f59e0b' : '#ef4444';
@@ -65,8 +65,8 @@ export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onCha
         {q.perMuscle.map(pm => {
           const c = pm.status === 'over' ? '#ef4444' : pm.status === 'low' ? '#3b82f6' : pm.status === 'high' ? '#f59e0b' : '#22c55e';
           const icon = pm.status === 'over' ? '⚠' : pm.status === 'low' ? '⬇' : pm.status === 'high' ? '📈' : '✅';
-          const pct = pm.mrv > 0 ? Math.round((pm.sets / pm.mrv) * 100) : 0;
-          return <span key={pm.muscle} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: c + '18', border: '1px solid ' + c + '30', color: c }}>{icon} {GROUP_RU[pm.muscle] ?? pm.muscle} {pm.sets}/{pm.mrv}с ({pct}%)</span>;
+          const pct = pm.mrv > 0 ? Math.round((pm.peakSets / pm.mrv) * 100) : 0;
+          return <span key={pm.muscle} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: c + '18', border: '1px solid ' + c + '30', color: c }}>{icon} {GROUP_RU[pm.muscle] ?? pm.muscle} {pm.peakSets}/{pm.mrv}с ({pct}%)</span>;
         })}
       </div>
 
@@ -79,7 +79,7 @@ export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onCha
             if (exs.length === 0) return null;
             return (
               <div key={w.muscle} style={{ marginBottom: 4 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: DIM_STRONG }}>{GROUP_RU[w.muscle] ?? w.muscle}: +{w.mev - Math.max(0, w.sets)} сетов до MEV={w.mev}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: DIM_STRONG }}>{GROUP_RU[w.muscle] ?? w.muscle}: +{w.mev - Math.max(0, w.peakSets)} сетов до MEV={w.mev}</span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
                   {exs.slice(0, 3).map((ex, i) => (
                     <button key={i} onClick={() => {
@@ -102,7 +102,7 @@ export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onCha
         <div style={{ marginBottom: 8, padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>⚠ Превышение MRV — снизьте объём:</div>
           {overloaded.map(o => (
-            <div key={o.muscle} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>{GROUP_RU[o.muscle] ?? o.muscle}: {o.sets} сетов {'>'} MRV {o.mrv} (−{o.sets - o.mrv} сетов)</div>
+            <div key={o.muscle} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>{GROUP_RU[o.muscle] ?? o.muscle}: {o.peakSets} сетов {'>'} MRV {o.mrv} (−{o.peakSets - o.mrv} сетов)</div>
           ))}
         </div>
       )}
