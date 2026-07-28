@@ -56,8 +56,9 @@ import {
 import { tempoFor } from '../../../engines/bb/bb-tempo-rest';
 import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
-import { loadTrainingProfile, useTrainingProfile, type TrainingProfile } from './training-profile';
+import { loadTrainingProfile, saveTrainingProfile, useTrainingProfile, type TrainingProfile } from './training-profile';
 import { TrainingProfileCard } from './TrainingProfileCard';
+import { subscribePlannerApply, clearPlannerApply, type PlannerApply } from './planner-bridge';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle } from './training-ui';
 import { GROUP_RU } from './program-types';
@@ -743,6 +744,115 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
   const [editorToast, setEditorToast] = useState('');
   const showToast = (m: string) => { setEditorToast(m); setTimeout(() => setEditorToast(''), 2200); };
 
+  // P1-1: planner-bridge — приём рекомендаций из калькуляторов (split/pri/weakpoints/pm/tempo/rir/mrv/deload/volume/peak/methodology/program)
+  const [bridgeApply, setBridgeApply] = useState<PlannerApply | null>(null);
+  useEffect(() => {
+    const unsub = subscribePlannerApply((payload) => { setBridgeApply(payload); });
+    return unsub;
+  }, []);
+  const applyBridgePayload = useCallback((payload: PlannerApply) => {
+    const p = program;
+    const clampRir = (r: number) => Math.max(0, Math.min(5, Math.round(r)));
+    if (payload.kind === 'split' && dir === 'bb' && p.bb) {
+      const cycle: string[][] = payload.data.cycle ?? [];
+      const weeks: UserWeek[] = Array.from({ length: Math.max(1, p.meta.weeks || 4) }, (_, wi) => ({
+        week: wi + 1, phase: 'accumulation' as const, deload: false,
+        sessions: cycle.map((groups, si) => ({
+          id: newId('ses'), name: (payload.data.name ?? 'День') + ' ' + (si + 1), focus: groups.join('/'),
+          blocks: groups.map((g) => ({ id: newId('blk'), type: 'compound' as const, exerciseName: '', muscle: g, role: 'primary' as const, sets: [{ reps: 8, rir: 2, weight: 0, restSec: 120 }] })),
+        })),
+      }));
+      update({ bb: { ...p.bb, weeks } });
+      showToast('🔗 Сплит применён: ' + payload.label);
+    } else if (payload.kind === 'pri') {
+      const mult: number = payload.data.volumeMult ?? 1;
+      const rirShift: number = payload.data.rirShift ?? 0;
+      if (p.bb) {
+        const weeks = p.bb.weeks.map((w) => ({ ...w, sessions: w.sessions.map((s) => ({ ...s, blocks: s.blocks.map((b) => ({ ...b, sets: (b.sets ?? []).map((st) => ({ ...st, weight: st.weight ? Math.round(st.weight * mult) : st.weight, rir: clampRir((st.rir ?? 2) + rirShift) })) })) })) }));
+        update({ bb: { ...p.bb, weeks } });
+      }
+      showToast('🔗 Готовность применена: ' + payload.label);
+    } else if (payload.kind === 'weakpoints') {
+      const groups: string[] = payload.data.groups ?? [];
+      const meta = { ...p.meta, weakPoints: groups };
+      let next = { ...p, meta };
+      if (p.bb) next = { ...next, bb: { ...p.bb, constraints: { ...(p.bb.constraints ?? { equipment: [] }), weakPoints: groups } } };
+      if (p.pl) next = { ...next, pl: { ...p.pl, weakPoints: groups } };
+      onChange(next);
+      const prof = loadTrainingProfile();
+      saveTrainingProfile({ ...prof, weakPoints: groups });
+      showToast('🔗 Слабые группы: ' + (groups.join(', ') || 'нет'));
+    } else if (payload.kind === 'pm') {
+      const d = payload.data ?? {};
+      const prof = loadTrainingProfile();
+      const pmPatch: Partial<TrainingProfile> = {};
+      if (typeof d.squat === 'number') pmPatch.pmSquat = d.squat;
+      if (typeof d.bench === 'number') pmPatch.pmBench = d.bench;
+      if (typeof d.dead === 'number') pmPatch.pmDead = d.dead;
+      if (typeof d.value === 'number' && typeof d.lift === 'string') {
+        if (d.lift === 'squat') pmPatch.pmSquat = d.value;
+        else if (d.lift === 'bench') pmPatch.pmBench = d.value;
+        else if (d.lift === 'dead') pmPatch.pmDead = d.value;
+      }
+      saveTrainingProfile({ ...prof, ...pmPatch });
+      if (p.pl) onChange({ ...p, pl: { ...p.pl, workMax: { squat: pmPatch.pmSquat ?? p.pl.workMax.squat, bench: pmPatch.pmBench ?? p.pl.workMax.bench, dead: pmPatch.pmDead ?? p.pl.workMax.dead } } });
+      showToast('🔗 ПМ применён: ' + payload.label);
+    } else if (payload.kind === 'tempo' && p.bb) {
+      const notation = payload.data.label ?? [payload.data.eccentric, payload.data.bottomPause, payload.data.concentric, payload.data.topPause].join('-');
+      const weeks = p.bb.weeks.map((w) => ({ ...w, sessions: w.sessions.map((s) => ({ ...s, blocks: s.blocks.map((b) => ({ ...b, sets: (b.sets ?? []).map((st) => ({ ...st, tempo: notation })) })) })) }));
+      update({ bb: { ...p.bb, weeks } });
+      showToast('🔗 Темп применён: ' + payload.label);
+    } else if (payload.kind === 'rir' && p.bb) {
+      const rirShift: number = payload.data.rirShift ?? 0;
+      const weeks = p.bb.weeks.map((w) => ({ ...w, sessions: w.sessions.map((s) => ({ ...s, blocks: s.blocks.map((b) => ({ ...b, sets: (b.sets ?? []).map((st) => ({ ...st, rir: clampRir((st.rir ?? 2) + rirShift) })) })) })) }));
+      update({ bb: { ...p.bb, weeks } });
+      showToast('🔗 RIR-сдвиг: ' + payload.label);
+    } else if (payload.kind === 'mrv') {
+      showToast('🔗 MRV рекомендация: ' + payload.label + ' (примените вручную в PlanDiagnostics)');
+    } else if (payload.kind === 'deload' && p.bb) {
+      const deloadWeeks: number[] = payload.data.weeks ?? [];
+      const weeks = p.bb.weeks.map((w) => deloadWeeks.includes(w.week) ? { ...w, phase: 'deload' as const, deload: true, sessions: w.sessions.map((s) => ({ ...s, blocks: s.blocks.map((b) => ({ ...b, sets: (b.sets ?? []).map((st) => ({ ...st, rir: 4, weight: st.weight ? Math.round(st.weight * 0.6) : st.weight })) })) })) } : w);
+      update({ bb: { ...p.bb, weeks } });
+      showToast('🔗 Делод-недели: ' + payload.label);
+    } else if (payload.kind === 'volume' && p.bb) {
+      const setsByMuscle: Record<string, number> = payload.data.sets ?? {};
+      const weeks = p.bb.weeks.map((w, wi) => {
+        if (wi > 0) return w;
+        const sessions = w.sessions.map((s) => {
+          const blocks: UserBlock[] = [];
+          for (const [mu, cnt] of Object.entries(setsByMuscle)) {
+            for (let i = 0; i < Math.min(cnt, 5); i++) {
+              blocks.push({ id: newId('blk'), type: 'accessory' as const, exerciseName: '', muscle: mu, role: 'accessory' as const, sets: [{ reps: 10, rir: 2, weight: 0, restSec: 90 }] });
+            }
+          }
+          return { ...s, blocks: [...s.blocks, ...blocks] };
+        });
+        return { ...w, sessions };
+      });
+      update({ bb: { ...p.bb, weeks } });
+      showToast('🔗 Объём применён: ' + payload.label);
+    } else if (payload.kind === 'peak' && p.bb) {
+      const mult: number = payload.data.volumeMult ?? 0.5;
+      const rirTarget: number = payload.data.rirTarget ?? 0;
+      const weeks = p.bb.weeks.map((w, wi) => wi === p.bb!.weeks.length - 1 ? { ...w, phase: 'peaking' as const, sessions: w.sessions.map((s) => ({ ...s, blocks: s.blocks.map((b) => ({ ...b, sets: (b.sets ?? []).map((st) => ({ ...st, weight: st.weight ? Math.round(st.weight * mult) : st.weight, rir: rirTarget })) })) })) } : w);
+      update({ bb: { ...p.bb, weeks } });
+      showToast('🔗 Пиковая неделя: ' + payload.label);
+    } else if (payload.kind === 'methodology' && p.bb) {
+      const prog = { ...(p.bb.progression ?? { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] }), loadStrategy: payload.data.methodName as any };
+      update({ bb: { ...p.bb, progression: prog } });
+      showToast('🔗 Методика: ' + payload.label);
+    } else if (payload.kind === 'program' && payload.data) {
+      try {
+        const cloned = cloneFromCycle(payload.data.id ?? payload.data.meta?.id);
+        if (cloned) { onChange(cloned); showToast('🔗 Программа загружена: ' + payload.label); }
+      } catch { showToast('⚠ Не удалось загрузить программу: ' + payload.label); }
+    } else {
+      showToast('🔗 Рекомендация: ' + payload.label + ' (не применима к ' + dir.toUpperCase() + ')');
+    }
+    clearPlannerApply();
+    setBridgeApply(null);
+  }, [program, dir, onChange, update, showToast]);
+
   // Библиотека внутри редактора
   const [editorLibOpen, setEditorLibOpen] = useState<'bb' | 'pl' | 'methods' | null>(null);
   const [showTableView, setShowTableView] = useState(false);
@@ -1142,6 +1252,15 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         </div>
       </div>
 
+      {/* P1-1: planner-bridge баннер — рекомендация от калькулятора */}
+      {bridgeApply && (
+        <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', flex: 1, minWidth: 100 }}>🔗 Калькулятор рекомендует: {bridgeApply.label}</span>
+          <button style={{ ...BTN, padding: '6px 14px', fontSize: 11, minHeight: 38 }} onClick={() => applyBridgePayload(bridgeApply)}>Применить</button>
+          <button style={{ ...BTN_GHOST, padding: '6px 14px', fontSize: 11, minHeight: 38 }} onClick={() => { clearPlannerApply(); setBridgeApply(null); }}>✕</button>
+        </div>
+      )}
+
       {/* ═════════ ПРОФЕССИОНАЛЬНЫЙ РЕЖИМ: контекстные панели, профиль, лаб-коррекция, диагностика, объём, периодизация, рекомендации, тренер ═════════ */}
       {isPro && (
       <>
@@ -1391,7 +1510,8 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         };
         const goalKey = goalMap[program.meta.goal as string] ?? 'mass';
         const lvlKey = lvlMap[program.meta.level as string] ?? 'intermediate';
-        const wave: number[] = [];
+        // P1-2: реальный RIR из плана + ожидаемый (пунктир)
+        const expectedWave: number[] = [];
         for (let w = 0; w < N; w++) {
           let rir = 2;
           if (lvlKey === 'beginner') rir = Math.max(2, 4 - Math.floor(w / 4));
@@ -1400,15 +1520,31 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           else if (goalKey === 'cut') rir = 3;
           else rir = 2;
           if (program.bb?.weeks?.[w]?.deload) rir = 4;
-          wave.push(rir);
+          expectedWave.push(rir);
         }
+        // Реальный средний RIR недели из плана
+        const realWave: number[] = [];
+        for (let w = 0; w < N; w++) {
+          const week = program.bb?.weeks?.[w];
+          if (!week) { realWave.push(-1); continue; }
+          const allRirs: number[] = (week.sessions ?? [])
+            .flatMap(s => (s.blocks ?? []).flatMap(b => (b.sets ?? []).map(st => typeof st.rir === 'number' ? st.rir : 2)));
+          realWave.push(allRirs.length ? allRirs.reduce((a, b) => a + b, 0) / allRirs.length : -1);
+        }
+        const wave = realWave.map(r => r >= 0 ? r : expectedWave[realWave.indexOf(r)] ?? 2);
         const maxRir = 5;
         const points = wave.map((r, i) => {
           const x = (i / Math.max(1, N - 1)) * (chartW - 8) + 4;
           const y = chartH - 6 - (r / maxRir) * (chartH - 12);
           return [x, y] as const;
         });
+        const expPoints = expectedWave.map((r, i) => {
+          const x = (i / Math.max(1, N - 1)) * (chartW - 8) + 4;
+          const y = chartH - 6 - (r / maxRir) * (chartH - 12);
+          return [x, y] as const;
+        });
         const pathD = points.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(' ');
+        const expPathD = expPoints.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(' ');
         const areaD = `${pathD} L${points[points.length - 1][0]},${chartH - 6} L${points[0][0]},${chartH - 6} Z`;
         const isMass = program.meta.goal === 'hypertrophy' || program.meta.goal === 'recomposition';
         const stroke = '#00e68a';
@@ -1427,7 +1563,9 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
               ))}
               {/* Область */}
               <path d={areaD} fill={stroke} opacity="0.10" />
-              {/* Линия */}
+              {/* Ожидаемая линия (пунктир) */}
+              <path d={expPathD} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="1" strokeDasharray="3 3" strokeLinecap="round" />
+              {/* Фактическая линия */}
               <path d={pathD} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               {/* Точки */}
               {points.map(([x, y], i) => (
@@ -1560,7 +1698,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                   ...s,
                   blocks: s.blocks.map((b) => ({
                     ...b,
-                    sets: (b.sets ?? []).map((st, i) => i === 0 ? { ...st, restSec: restByChar[char] } : st),
+                    sets: (b.sets ?? []).map((st, i) => i === 0 ? { ...st, restSec: restByChar[char], tempo: tempo.notation } : { ...st, tempo: st.tempo || tempo.notation }),
                   })),
                 })),
               })),
@@ -1636,7 +1774,14 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                     const target = v;
                     const sessions = [...w.sessions];
                     while (sessions.length < target) {
-                      sessions.push({ id: newId('ses'), name: 'День ' + (sessions.length + 1), focus: '', blocks: [] });
+                      // P1-3: в deload-неделю добавляем разгрузочную сессию, не копию базовой
+                      if (w.deload) {
+                        sessions.push({ id: newId('ses'), name: 'Разгрузка ' + (sessions.length + 1), focus: 'deload', blocks: [
+                          { id: newId('blk'), type: 'accessory' as const, exerciseName: '', muscle: '', role: 'accessory' as const, sets: [{ reps: 15, rir: 4, weight: 0, restSec: 60 }] }
+                        ] });
+                      } else {
+                        sessions.push({ id: newId('ses'), name: 'День ' + (sessions.length + 1), focus: '', blocks: [] });
+                      }
                     }
                     while (sessions.length > target) sessions.pop();
                     return { ...w, sessions };
