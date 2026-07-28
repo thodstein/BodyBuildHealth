@@ -6,7 +6,8 @@
  *  2. Первичная / добивочная мышца дня с ротацией пар (квадр↔бицепс бедра, грудь↔плечи, ...):
  *     первичная = тяж (полный объём MAV-тяж), добивка = лёг-памп (~MEV, 1-2 упр).
  *     За ротацию каждая группа получает тяж-сессию + памп-добивку = MAV за ротацию.
- *  3. Per-group forceDayType: НОГИ всегда тяж (никогда не ставятся на памп-слот).
+ *  3. Per-group forceDayType: forearms/traps всегда тяж (P0-4, audit 2026-07).
+ *     Ноги теперь МОГУТ быть памп-днём (стандарт BB metabolic work для ног).
  */
 
 export type DayCharacter = 'тяж' | 'памп' | 'лёг';
@@ -27,8 +28,12 @@ export interface BBDay {
   comment?: string;
 }
 
-/** Per-group блокировка: группа всегда только тяж (ноги), никогда чистый памп. */
-export const FORCE_HEAVY_GROUPS: ReadonlySet<string> = new Set(['quads', 'hamstrings', 'glutes', 'calves', 'forearms', 'traps']);
+/** Per-group блокировка: группа всегда только тяж (никогда чистый памп).
+ *  P0-4 (audit 2026-07): убраны quads/hamstrings/glutes/calves — оставлены только
+ *  forearms+traps. Ноги теперь МОГУТ быть памп-днём (leg-press 4×20, leg-curl 4×15,
+ *  hip-thrust 4×15, calf-raise 4×25 — стандарт BB metabolic work, особенно при
+ *  суставных проблемах). forearms/traps — нет метаболического стимула, всегда тяж. */
+export const FORCE_HEAVY_GROUPS: ReadonlySet<string> = new Set(['forearms', 'traps']);
 
 /** FIX-8: Единый источник sessionTag→мышцы для bb-builder + bb-selector.
  *  Ранее дублировался в двух файлах (bb-selector без LegsBiceps). */
@@ -87,6 +92,6 @@ export function getPair(muscle: string): [string, string] | null {
 
 /** Разрешённый характер для мышцы с учётом forceDayType. */
 export function resolveCharacter(muscle: string, requested: DayCharacter): DayCharacter {
-  if (FORCE_HEAVY_GROUPS.has(muscle) && requested === 'памп') return 'тяж'; // ноги всегда тяж
+  if (FORCE_HEAVY_GROUPS.has(muscle) && requested === 'памп') return 'тяж'; // forearms/traps всегда тяж
   return requested;
 }

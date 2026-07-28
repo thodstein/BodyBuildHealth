@@ -5,9 +5,9 @@
  *
  * Логика:
  *  - MAV мышц берётся из volume-landmarks, масштабируется под длину ротации.
- *  - Каждая мышца в ротации: одна сессия = первичная (тяж, ~65% MAV), другие = добивка (памп, ~35%).
- *    Ноги (forceDayType) — всегда тяж; их «добивка» тоже тяж-лёг, не памп.
- *  - Сеты/репы/RIR по характеру: тяж 5-8/RIR1-2; памп 12-20/RIR3; лёг 10-15/RIR4.
+*  - Каждая мышца в ротации: одна сессия = первичная (тяж, ~65% MAV), другие = добивка (памп, ~35%).
+*    forearms/traps (forceDayType) — всегда тяж; ноги теперь МОГУТ быть памп-днём (P0-4 audit 2026-07).
+*  - Сеты/репы/RIR по характеру: тяж 5-8/RIR1-2; памп 12-20/RIR3; лёг 10-15/RIR4.
  *  - Вес = workMax × %1RM(RIR, reps). Недели 2..N: RIR ↓ (rir-matrix) → вес ↑.
  */
 
@@ -443,6 +443,9 @@ function bbRir(resolved: DayCharacter, phase: BBPhase, phaseWeek: number): numbe
   const base = phaseBaseRir(phase, phaseWeek);
   let rir = resolved === 'тяж' ? base : base + 1;
   if (phase === 'deload') rir = Math.max(3, Math.min(4, rir));
+  // P0-3 (audit 2026-07): памп-работа НИКОГДА не идёт до отказа — metabolic stress,
+  // не max motor unit recruitment. RIR >= 3 всегда для 'памп' (Schoenfeld 2017).
+  if (resolved === 'памп') rir = Math.max(3, rir);
   return Math.max(0, Math.min(5, rir));
 }
 
@@ -1265,13 +1268,9 @@ function buildSession(
     }
     for (const d of exDatas) (d as any)._weightMod = weightModFor((d as any).name || '');
 
-    // ★ A: Тяж+памп баланс — если все упражнения мышцы тяж и их >=3,
-    // последнее переводим в памп (метаболический стресс вместо чистого натяжения).
-    const PUMPABLE_MUSCLES = new Set(['glutes', 'calves', 'traps', 'forearms', 'abs', 'biceps', 'triceps', 'shoulders', 'delt_front', 'delt_mid', 'delt_rear']);
-    if (PUMPABLE_MUSCLES.has(muscle) && exDatas.length >= 3 && exDatas.every((d: any) => (d as any)._origChar !== 'памп')) {
-      const last = exDatas[exDatas.length - 1] as any;
-      if (last) (last as any)._pumpOverride = true;
-    }
+    // P0-1 (audit 2026-07): _pumpOverride УБРАН — механическое натяжение (Schoenfeld 2010/2017,
+    // последний тяж-сет — главный драйвер гипертрофии). Памп добирается отдельной изоляцией
+    // через A1 pump-finisher / fix K (L1501-1558, L1943-2000), а не ЗАМЕНЯЕТ тяж.
 
     // P1 + BUG-B7: DUP-волна повторений внутри фазы (недельная вариация).
     // Ранние недели фазы → больше повторений (метаболический стресс),
@@ -1428,20 +1427,13 @@ function buildSession(
           weight: Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10,
           tempo: tempoStr, restSeconds: exRest,
         }));
-        // ★ A: pump override — character + reps для последнего тяжёлого
-        const effChar: DayCharacter = (exData as any)._pumpOverride ? 'памп' : pl.resolved as DayCharacter;
-        const effReps: [number, number] = (exData as any)._pumpOverride
-          ? [15, 20] as [number, number]
-          : [Math.min(Math.max(repMin, adjReps - 2), repsCap), Math.min(repMax, repsCap)];
-        const effRir = (exData as any)._pumpOverride ? 3 : finalRir;
-        const effRest = (exData as any)._pumpOverride ? 45 : exRest;
-        if ((exData as any)._pumpOverride) {
-          for (const ws of workSets) { ws.reps = 18; ws.rir = 3; ws.restSeconds = 45; ws.weight = Math.round(ws.weight * 0.50 * 10) / 10; }
-        }
+        // P0-1 (audit 2026-07): _pumpOverride удалён. Тяжёлый сет остаётся тяжёлым.
+        const effChar: DayCharacter = pl.resolved as DayCharacter;
+        const effReps: [number, number] = [Math.min(Math.max(repMin, adjReps - 2), repsCap), Math.min(repMax, repsCap)];
         exercises.push({
           muscle: trueMuscleOf(exData) || pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: effChar,
           sets: adjustedSets, repsRange: effReps,
-          rir: effRir,
+          rir: finalRir,
           workSets, exerciseName: (exData as any).name || (exData as any).id,
           tempoSpec: tempoStr, restSeconds: exRest,
           comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id),
@@ -1469,9 +1461,9 @@ function buildSession(
         tempo: tempoStr, restSeconds: exRest,
       }));
       exercises.push({
-        muscle: pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: (exData as any)._pumpOverride ? 'памп' : pl.resolved as DayCharacter,
-        sets: exSets, repsRange: (exData as any)._pumpOverride ? [15,20] as [number,number] : [Math.min(Math.max(repMin, adjReps - 2), repsCap), Math.min(repMax, repsCap)] as [number,number],
-        rir: (exData as any)._pumpOverride ? 3 : finalRir,
+        muscle: pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: pl.resolved as DayCharacter,
+        sets: exSets, repsRange: [Math.min(Math.max(repMin, adjReps - 2), repsCap), Math.min(repMax, repsCap)] as [number,number],
+        rir: finalRir,
         workSets, exerciseName: (exData as any).name || (exData as any).id,
         tempoSpec: tempoStr, restSeconds: exRest,
         comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, exSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id),
@@ -1928,10 +1920,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         const feederSetCount = 2;
         sess.exercises.push({
           muscle: wm, name: fName, role: 'accessory' as const, character: 'памп' as DayCharacter,
-          sets: feederSetCount, repsRange: [15, 20] as [number, number], rir: 2,
-          workSets: Array.from({ length: feederSetCount }, () => ({ reps: 18, rir: 2, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
+          sets: feederSetCount, repsRange: [15, 20] as [number, number], rir: 3,
+          workSets: Array.from({ length: feederSetCount }, () => ({ reps: 18, rir: 3, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
           exerciseName: fName, tempoSpec: fTempo.notation, restSeconds: 30,
-          comment: `Фидер-сет (grease-the-groove) для отстающей группы ${wm}: 2×15-20 RIR 2 @${feederWeight}кг, ~30% рабочего веса, пампинг.`,
+          comment: `Фидер-сет (grease-the-groove) для отстающей группы ${wm}: 2×15-20 RIR 3 @${feederWeight}кг, ~30% рабочего веса, пампинг.`,
           warmupSets: [], rationale: 'Акцент на отстающую группу: добивочный кровенаполнительный сет в конце дня.',
         });
         addedFeeders.add(wm);
@@ -2273,20 +2265,20 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           if (s.exercises.some(e => e.name === fName)) continue;
           s.exercises.push({
             muscle: m, name: fName, role: 'accessory' as const, character: 'памп' as DayCharacter,
-            sets: setsPerEx, repsRange: [15, 20] as [number, number], rir: 2,
-            workSets: Array.from({ length: setsPerEx }, () => ({ reps: 18, rir: 2, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
+            sets: setsPerEx, repsRange: [15, 20] as [number, number], rir: 3,
+            workSets: Array.from({ length: setsPerEx }, () => ({ reps: 18, rir: 3, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
             exerciseName: fName, tempoSpec: fTempo.notation, restSeconds: 30,
-            comment: `Auto-MEV-feeder для ${m}: ${setsPerEx}×15-20 RIR 2 @${feederWeight}кг (недельный объём ${weekSets} < MEV ${targetMEV}).`,
+            comment: `Auto-MEV-feeder для ${m}: ${setsPerEx}×15-20 RIR 3 @${feederWeight}кг (недельный объём ${weekSets} < MEV ${targetMEV}).`,
             warmupSets: [], rationale: 'MEV coverage: auto-feeder.',
           });
           // Второе упражнение (если need > perExCap)
           if (useTwoEx && fName2 && !s.exercises.some(e => e.name === fName2)) {
             s.exercises.push({
               muscle: m, name: fName2, role: 'accessory' as const, character: 'памп' as DayCharacter,
-              sets: need - setsPerEx, repsRange: [15, 20] as [number, number], rir: 2,
-              workSets: Array.from({ length: need - setsPerEx }, () => ({ reps: 18, rir: 2, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
+              sets: need - setsPerEx, repsRange: [15, 20] as [number, number], rir: 3,
+              workSets: Array.from({ length: need - setsPerEx }, () => ({ reps: 18, rir: 3, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
               exerciseName: fName2, tempoSpec: fTempo.notation, restSeconds: 30,
-              comment: `Auto-MEV-feeder (2) для ${m}: ${need - setsPerEx}×15-20 RIR 2 @${feederWeight}кг.`,
+              comment: `Auto-MEV-feeder (2) для ${m}: ${need - setsPerEx}×15-20 RIR 3 @${feederWeight}кг.`,
               warmupSets: [], rationale: 'MEV coverage: auto-feeder (2-е упражнение).',
             });
           }
@@ -2420,10 +2412,10 @@ function compensateCrossDayWeakPoints(
       const feederSetCount = 2;
       bestSlot.session.exercises.push({
         muscle: wp, name: fName, role: 'accessory' as const, character: 'памп' as DayCharacter,
-        sets: feederSetCount, repsRange: [15, 20] as [number, number], rir: 2,
-        workSets: Array.from({ length: feederSetCount }, () => ({ reps: 18, rir: 2, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
+        sets: feederSetCount, repsRange: [15, 20] as [number, number], rir: 3,
+        workSets: Array.from({ length: feederSetCount }, () => ({ reps: 18, rir: 3, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
         exerciseName: fName, tempoSpec: fTempo.notation, restSeconds: 30,
-        comment: `Cross-day weak-point feeder для ${wp}: 2×15-20 RIR 2 @${feederWeight}кг, добивочный памп-сет в ближайшем релевантном дне (недельный объём < MEV ${targetMEV}).`,
+        comment: `Cross-day weak-point feeder для ${wp}: 2×15-20 RIR 3 @${feederWeight}кг, добивочный памп-сет в ближайшем релевантном дне (недельный объём < MEV ${targetMEV}).`,
         warmupSets: [], rationale: 'Weak-point coverage: вставка feeder-сетов, чтобы достичь MEV.',
       });
       usedAcrossWeeks.add(`${bestSlot.weekIdx}|${bestSlot.sessionIdx}|${wp}`);

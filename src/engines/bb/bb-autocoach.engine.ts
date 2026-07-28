@@ -212,9 +212,13 @@ export const INTENSITY_TECHNIQUES: Record<IntensityTechnique, IntensityTechnique
   },
 };
 
-/** Дефолтные техники по фазам (для primary упражнений) */
+/** Дефолтные техники по фазам (для primary упражнений).
+ *  P0-2 (audit 2026-07): accumulation → 'none' (раньше 'pause_rep').
+ *  Накопление идёт через ПРОГРЕССИЮ ОБЪЁМА, а не через pause_rep на ВСЕх primary —
+ *  pause_rep повышает RPE без роста процентов и истощает восстановление в 8-12 нед мезо
+ *  (Grgic 2021 failure-set frequency; Helms 2018). Техники — только в intensification/peaking. */
 export const DEFAULT_TECHNIQUE_BY_PHASE: Record<BBPhase, IntensityTechnique> = {
-  accumulation: 'pause_rep',
+  accumulation: 'none',
   intensification: 'rest_pause',
   peaking: 'rest_pause',
   deload: 'none',
