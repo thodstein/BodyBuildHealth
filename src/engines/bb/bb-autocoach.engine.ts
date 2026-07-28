@@ -503,6 +503,8 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
       }
     }
   } else {
+    // B20: legacy path — перестраивает фазы заново. Предупредить, если кто-то вызовет без skipPhaseRedistribution.
+    console.warn('[bb-autocoach] applyPostPhaseProcessing вызван БЕЗ skipPhaseRedistribution — фазы перестроены заново (legacy). Это может рассинхронизировать с buildBBPlan.');
     const phaseDist = distributePhases(totalWeeks, totalWeeks >= 6 ? 4 : 0, 'mass');
     for (const pd of phaseDist) {
       for (const w of pd.weeks) phaseMap.set(w, pd.phase as BBPhase);

@@ -423,10 +423,15 @@ function charReps(c: DayCharacter): [number, number] {
   if (c === 'памп') return [12, 20];
   return [10, 15];
 }
-/** Базовый RIR фазы (с дрейфом внутри фазы, как в phase-periodization). */
+/** Базовый RIR фазы (с дрейфом внутри фазы, как в phase-periodization).
+ *  B10: peaking ограничен 6 неделями — после wk3 RIR=0 (clamped), но при >6 неделях
+ *  это overtraining. distributePhases не должен давать >6 нед peaking, но на всякий случай
+ *  capped на 4 недели (после wk4 — RIR 0, но без дальнейшего дрейфа). */
 function phaseBaseRir(phase: BBPhase, phaseWeek: number): number {
   const [startRir, endRir] = PHASE_CONFIGS[phase].rirRange;
-  const drift = Math.min(startRir - endRir, Math.floor(phaseWeek / 2));
+  // B10: peaking capped at 4 weeks — после wk4 RIR=0 без дальнейшего дрейфа.
+  const effectiveWeek = phase === 'peaking' ? Math.min(phaseWeek, 4) : phaseWeek;
+  const drift = Math.min(startRir - endRir, Math.floor(effectiveWeek / 2));
   return Math.max(endRir, startRir - drift);
 }
 /**
@@ -680,6 +685,17 @@ function buildSession(
     FullBody: '', // FullBody — особый случай: primary определяется по musclePrimaryAssigned
   };
   const sessionLeadMuscle = LEAD_MUSCLE[sched.sessionTag || ''] || ((musclePlans[0] as any)?.group || '');
+  // FB primary distribution — ВНУТРИ buildSession (надёжнее, чем в buildBBPlan).
+  // Day 1: chest+back primary, Day 2: legs primary, Day 3: shoulders+arms primary.
+  // Блокируем не-fbPrimary мышцы ДО цикла, чтобы они не получили role='primary'.
+  if (sched.sessionTag === 'FullBody') {
+    musclePrimaryAssigned.clear();
+    const fbSchedule = [['chest', 'back'], ['quads', 'hamstrings'], ['shoulders', 'arms']];
+    const fbPrimary = fbSchedule[(dayInRotation - 1) % fbSchedule.length];
+    for (const mp of musclePlans) {
+      if (!fbPrimary.includes(mp.group)) musclePrimaryAssigned.add(mp.group);
+    }
+  }
   // S-MRV: Системный бюджет утомления на день.
   // Формула: dailyCap × S_MRV_FACTOR × pedMult × levelMult
   const levelMultMap: Record<string, number> = { beginner: 0.9, intermediate: 1.0, advanced: 1.15, enhanced: 1.3 };
@@ -742,7 +758,13 @@ function buildSession(
     const isGlutePriority = isFemale && muscle === 'glutes' && /leg|lower|glute|limbs/i.test(sched.sessionTag || '');
     const isMainMuscle = !tagPrimaries || tagPrimaries.has(muscle) || isGlutePriority;
     const SMALL_NEVER_PRIMARY = new Set(['traps', 'forearms', 'calves']);
-    if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж') && isMainMuscle && !SMALL_NEVER_PRIMARY.has(muscle)) {
+    // FB: проверить, является ли мышца fbPrimary для этого дня.
+    // Если нет — НЕ primary, даже если musclePrimaryAssigned почему-то не сработал.
+    const fbPrimaryToday = sched.sessionTag === 'FullBody'
+      ? [['chest', 'back'], ['quads', 'hamstrings'], ['shoulders', 'arms']][(dayInRotation - 1) % 3]
+      : null;
+    const fbAllowsPrimary = fbPrimaryToday ? fbPrimaryToday.includes(muscle) : true;
+    if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж') && isMainMuscle && !SMALL_NEVER_PRIMARY.has(muscle) && fbAllowsPrimary) {
       role = 'primary'; musclePrimaryAssigned.add(muscle);
     }
     // Слабые группы (weakPoints): структурное повышение до primary —
@@ -1272,6 +1294,18 @@ function buildSession(
     plans.push({ muscle, resolved, role, sets, exerciseCount, rir, reps, weight, pool, exDatas, selType, rationaleMap, phaseEquip });
   }
 
+  // FB: финальная проверка — заблокированные мышцы НЕ должны быть primary.
+  // Если по какой-то причине role='primary' для заблокированной мышцы — понизить до accessory.
+  if (sched.sessionTag === 'FullBody') {
+    const fbSchedule = [['chest', 'back'], ['quads', 'hamstrings'], ['shoulders', 'arms']];
+    const fbPrimary = fbSchedule[(dayInRotation - 1) % fbSchedule.length];
+    for (const pl of plans) {
+      if (!fbPrimary.includes(pl.muscle) && pl.role === 'primary') {
+        pl.role = 'accessory';
+      }
+    }
+  }
+
   // Apply substitution for graded injuries: replace exercises and adjust loads
   for (const pl of plans) {
     const phaseCfg = PHASE_CONFIGS[phase];
@@ -1536,8 +1570,8 @@ function buildSession(
     const exTypeRank = (e: BBExercise): number => {
       const cat = EXERCISE_CATALOG.find((c: any) => c.name === e.name);
       const n = (e.name || '').toLowerCase();
-      // Pump finisher — последний слой (определяем по темпу 2-1-2-0 и reps≥15)
-      if (e.repsRange[0] >= 15 && e.rir >= 4) return 4;
+      // Pump finisher — последний слой. B25: ловит rir>=3 (не только >=4).
+      if (e.repsRange[0] >= 15 && e.rir >= 3) return 4;
       if (!cat) return 3;
       // Compound
       if ((cat as any).type === 'compound') {
@@ -1777,23 +1811,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const fbUsedNames: string[] = [];
     for (let i = 0; i < sessions.length; i++) {
       const s = sessions[i];
-      // FullBody: распределяем primary равномерно по дням (fix #3)
-      // День 1: грудь+спина primary, день 2: ноги primary, день 3: плечи+руки primary
+      // FB primary distribution перенесён ВНУТРИ buildSession (надёжнее).
       const isFB = s.sessionTag === 'FullBody';
-      if (isFB) {
-        musclePrimaryAssigned.clear(); // per-day distribution: re-block non-primary muscles for THIS day only
-        const fbSchedule = [
-          ['chest', 'back'],
-          ['quads', 'hamstrings'],
-          ['shoulders', 'arms'],
-        ];
-        const fbPrimary = fbSchedule[i % fbSchedule.length];
-        // Блокируем все мышцы, кроме назначенных на этот день
-        const allFbMuscles = (musclesForTag('FullBody') || []).map(m => collapseKey(m));
-        for (const m of allFbMuscles) {
-          if (!fbPrimary.includes(m)) musclePrimaryAssigned.add(m);
-        }
-      }
       // fix Z: sessMuscles по collapseKey (delt heads→shoulders) для mrvByMuscle-lookup
       const sessMuscles = [...new Set(musclesForTag(s.sessionTag).map(m => collapseKey(m)))];
       // Ротация: собираем ID упражнений, использованных ранее для этих мышц.
@@ -2200,7 +2219,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   if (finalPlan.weeks.length > 0) {
     const wk1 = finalPlan.weeks[0];
     const normLvl = normLevel(level);
-    const autoFeedMuscles = ['calves', 'glutes', 'abs', 'forearms', 'hamstrings'];
+    const autoFeedMuscles = ['calves', 'glutes', 'abs', 'forearms', 'hamstrings', 'shoulders', 'biceps', 'triceps'];
     for (const m of autoFeedMuscles) {
       let weekSets = 0;
       for (const s of wk1.sessions) for (const e of s.exercises) if (collapseKey(e.muscle) === m) weekSets += e.sets;
