@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { calcQualityScore } from './plan-quality-score';
-import { computePlanQualityFor } from '../../../engines/manual-constructor.engine';
+import { computePlanQualityFor } from '../../../engines/manual-constructor';
 import type { UserProgram } from '../../../engines/user-program/user-program.types';
 import { GROUP_RU } from './program-types';
 import { loadTrainingProfile } from './training-profile';

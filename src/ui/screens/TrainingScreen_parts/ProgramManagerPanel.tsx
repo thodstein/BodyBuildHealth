@@ -33,10 +33,16 @@ import { newId } from '../../../engines/user-program/user-program.types';
 import { HybridPlanPanel } from './HybridPlanPanel';
 import { ExerciseLabPicker } from './ExerciseLabPicker';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
-import { BbContextPanel, PLContextPanel } from './program-editor-context-panels';
+import { BbContextPanel } from './program-editor-context-panels';
 import { BBEditor, PLEditor, BBConstraintsPanel } from './ProgramEditorComponents';
-import { PlanDiagnosticsPanel, InteractiveVolumePanel, ExerciseInfoPanel, ProgressionCoach, SplitConsultant, PlanSummaryTable, AutoPeriodizationPanel, SubstitutionPanel } from './ProgramEditorPanels';
+import { PlanDiagnosticsPanel, InteractiveVolumePanel, ExerciseInfoPanel, ProgressionCoach, SplitConsultant, PlanSummaryTable, AutoPeriodizationPanel, SubstitutionPanel } from './editor-panels';
 import { LoadGuardPanel, RealMRVPanel, RIRCalibrationPanel, TonnageEstimatePanel, StickingPointPanel, PlateAutoPanel, WhatIfGuardPanel, ReadinessForecastPanel, CheckinGuardPanel, BiomechanicsPanel } from './ProGuardPanels';
+import { QuickTemplate, QuickTemplatesGrid } from './ProgramQuickTemplates';
+import { ProPanelSection, ProPanelsGroup, ThemeToggle } from './ProPanelSection';
+import { MesoHeatmap } from './MesoHeatmap';
+import { ProgramNotes, ProgramMetricsCSV, RecoveryBadge, ProgramStrengthScore } from './ProgramExtras';
+import { ProgramRevisionsDiff } from './ProgramRevisions';
+import { StrengthDiaryPanel } from './StrengthDiaryPanel';
 import { getTrainingMethods } from '../../../engines/training-methodology.engine';
 import { SET_TEMPLATES } from './program-types';
 import {
@@ -46,7 +52,7 @@ import {
   applyPhaseModulation,
   plLmsScheduleDays,
   suggestExercisesForGroup,
-} from '../../../engines/manual-constructor.engine';
+} from '../../../engines/manual-constructor';
 import { tempoFor } from '../../../engines/bb/bb-tempo-rest';
 import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
@@ -151,6 +157,59 @@ export const ProgramManagerPanel: React.FC = () => {
     try { return (localStorage.getItem('he_manual_mode') as ManualMode) || 'standard'; } catch { return 'standard'; }
   });
   useEffect(() => { try { localStorage.setItem('he_manual_mode', manualMode); } catch {} }, [manualMode]);
+
+  // F3.1: обёртка для отслеживания истории изменений (для Undo/Redo через Ctrl+Z)
+  const onEditChange = (next: UserProgram) => {
+    try {
+      // Сохраняем текущий snapshot ПЕРЕД изменением (для последующего Undo)
+      const cur = JSON.stringify(editing);
+      if (cur !== JSON.stringify(next)) {
+        const hist = JSON.parse(localStorage.getItem('he_editor_history') || '{"past":[],"future":[]}');
+        hist.past.push(cur);
+        if (hist.past.length > 50) hist.past.shift();
+        hist.future = [];
+        localStorage.setItem('he_editor_history', JSON.stringify(hist));
+      }
+    } catch {}
+    setEditing(next);
+  };
+  // F3.1: горячие клавиши Undo/Redo
+  useEffect(() => {
+    if (!editing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        try {
+          const hist = JSON.parse(localStorage.getItem('he_editor_history') || '{"past":[],"future":[],"current":""}');
+          if (Array.isArray(hist.past) && hist.past.length > 0) {
+            const prev = hist.past.pop();
+            hist.future = hist.future || [];
+            hist.future.push(JSON.stringify(editing));
+            localStorage.setItem('he_editor_history', JSON.stringify(hist));
+            if (prev) {
+              try { setEditing(JSON.parse(prev)); } catch {}
+            }
+          }
+        } catch {}
+      } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+        e.preventDefault();
+        try {
+          const hist = JSON.parse(localStorage.getItem('he_editor_history') || '{"past":[],"future":[]}');
+          if (Array.isArray(hist.future) && hist.future.length > 0) {
+            const next = hist.future.pop();
+            hist.past = hist.past || [];
+            hist.past.push(JSON.stringify(editing));
+            localStorage.setItem('he_editor_history', JSON.stringify(hist));
+            if (next) { try { setEditing(JSON.parse(next)); } catch {} }
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [editing]);
+
   // P2.6: поиск/сортировка/фильтр
   const [search, setSearch] = useState('');
   const [filterDir, setFilterDir] = useState<'all' | 'bb' | 'pl' | 'hybrid'>('all');
@@ -301,7 +360,7 @@ export const ProgramManagerPanel: React.FC = () => {
   if (editing) {
     return <ProgramEditor
       program={editing}
-      onChange={setEditing}
+      onChange={onEditChange}
       onSave={commit}
       onBack={() => { setEditing(null); refresh(); }}
       mode={manualMode}
@@ -961,6 +1020,10 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
     html.push('</style></head><body>');
     html.push(`<h1>${program.meta.title}</h1>`);
     html.push(`<div class="meta">Цель: ${GOAL_OPTS.find(g=>g.id===program.meta.goal)?.label ?? program.meta.goal} · Уровень: ${LEVEL_OPTS.find(l=>l.id===program.meta.level)?.label ?? program.meta.level} · ${program.meta.daysPerWeek} дн/нед × ${program.meta.weeks} нед</div>`);
+    // F2.5: тренерские заметки в PDF
+    if (program.meta.notes) {
+      html.push(`<div style="white-space:pre-wrap;background:#f5f5f5;padding:10px;border-left:3px solid #60a5fa;margin:10px 0;font-size:11px;color:#333;">📝 <b>Заметки тренера:</b><br>${program.meta.notes.replace(/</g, '&lt;')}</div>`);
+    }
     if (program.bb?.weeks) {
       for (const w of program.bb.weeks) {
         html.push(`<h2>Неделя ${w.week} <span class="phase" style="background:${w.deload?'#f59e0b20':'#00e68a20'};color:${w.deload?'#f59e0b':'#00e68a'}">${w.phase}${w.deload?' · делод':''}</span></h2>`);
@@ -992,6 +1055,8 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38 }} onClick={safeBack}>← К списку</button>
         <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
+        {isPro && <RecoveryBadge onApplyAutoDeload={autoFillDraft} />}
+        <ProgramMetricsCSV program={program} dir={dir} onToast={showToast} />
         {program.meta.updatedAt && (
           <span style={{ fontSize: 11, color: DIM, fontWeight: 500 }} title={`Создано: ${new Date(program.meta.createdAt).toLocaleString('ru-RU')}\nОбновлено: ${new Date(program.meta.updatedAt).toLocaleString('ru-RU')}`}>
             · {(() => {
@@ -1078,9 +1143,9 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       {/* ═════════ ПРОФЕССИОНАЛЬНЫЙ РЕЖИМ: контекстные панели, профиль, лаб-коррекция, диагностика, объём, периодизация, рекомендации, тренер ═════════ */}
       {isPro && (
       <>
-      {/* P4 — контекстные панели (НЕ калькуляторы): отображают статус текущей программы */}
+      {/* P4 — контекстная панель ББ (ПЛ дубль PLEditor удалён — F4.5) */}
       {dir === 'bb' && program.bb && <BbContextPanel program={program} level={program.meta.level} />}
-      {dir === 'pl' && program.pl && <PLContextPanel program={program} />}
+      {dir === 'bb' && program.bb && <MesoHeatmap program={program} dir={dir} onToast={showToast} />}
 
       {/* Единый профиль тренированности: ПМ, workMax, weakPoints, оборудование, курс —
           авто-черновик и SMART-рекомендации читают эти данные. */}
@@ -1113,35 +1178,70 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         );
       })()}
 
-      <PlanDiagnosticsPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
-      <InteractiveVolumePanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
-      <AutoPeriodizationPanel weeks={program.meta.weeks} goal={program.meta.goal} level={program.meta.level}
-        onApply={(phases) => {
-          if (dir !== 'bb' || !program.bb) return;
-          const weeks = program.bb.weeks.map((w, i) => {
-            const phase = phases.find(p => i + 1 >= p.startWeek && i + 1 <= p.endWeek);
-            return { ...w, phase: (phase?.phase || w.phase) as any, deload: phase?.phase === 'deload' ? true : w.deload };
-          });
-          update({ bb: { ...program.bb!, weeks } });
-          showToast('📈 Периодизация применена: ' + phases.map(p => p.phase).join(' → '));
-        }}
-      />
-      <ExerciseInfoPanel program={program} dir={dir} />
-      <ProgressionCoach program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} onCourse={tprofile.onCourse ?? false} courseIntensity={tprofile.courseIntensity ?? 'moderate'} />
-      <SplitConsultant program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
-      <SubstitutionPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
-
-      {/* ═══ P7-P10: Pro-панели обратной связи с дневником (читают sRPE/RIR-дневник) ═══ */}
-      <LoadGuardPanel program={program} dir={dir} />
-      <RealMRVPanel program={program} dir={dir} />
-      <RIRCalibrationPanel program={program} dir={dir} onChange={onChange} showToast={showToast} />
-      <TonnageEstimatePanel program={program} dir={dir} />
-      <StickingPointPanel program={program} dir={dir} onChange={onChange} showToast={showToast} />
-      <PlateAutoPanel program={program} dir={dir} />
-      <WhatIfGuardPanel program={program} dir={dir} />
-      <ReadinessForecastPanel program={program} dir={dir} />
-      <CheckinGuardPanel program={program} dir={dir} />
-      <BiomechanicsPanel program={program} dir={dir} />
+<ProPanelsGroup sections={[
+        {
+          id: 'plan-analysis',
+          title: '📊 Анализ плана',
+          hint: 'Score, MRV, объём, периодизация, прогрессия',
+          color: '#22c55e',
+          content: <>
+            <ProgramStrengthScore program={program} dir={dir} />
+            <PlanDiagnosticsPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
+            <InteractiveVolumePanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
+            <AutoPeriodizationPanel weeks={program.meta.weeks} goal={program.meta.goal} level={program.meta.level}
+              onApply={(phases) => {
+                if (dir !== 'bb' || !program.bb) return;
+                const weeks = program.bb.weeks.map((w) => {
+                  const phase = phases.find(p => Array.isArray(p.weeks) && p.weeks.includes(w.week));
+                  return { ...w, phase: (phase?.phase || w.phase) as any, deload: phase?.phase === 'deload' ? true : w.deload };
+                });
+                update({ bb: { ...program.bb!, weeks } });
+                showToast('📈 Периодизация применена: ' + phases.map(p => p.phase).join(' → '));
+              }}
+            />
+            <ProgressionCoach program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} onCourse={tprofile.onCourse ?? false} courseIntensity={tprofile.courseIntensity ?? 'moderate'} />
+            <TonnageEstimatePanel program={program} dir={dir} />
+          </>,
+        },
+        {
+          id: 'feedback',
+          title: '🔄 Обратная связь (sRPE / RIR / чек-ин)',
+          hint: 'ACWR, RIR-bias, готовность, чек-ин, what-if',
+          color: '#3b82f6',
+          content: <>
+            <LoadGuardPanel program={program} dir={dir} />
+            <RIRCalibrationPanel program={program} dir={dir} onChange={onChange} showToast={showToast} />
+            <RealMRVPanel program={program} dir={dir} labMrvMult={labAdjust.mrvMultiplier} />
+            <ReadinessForecastPanel program={program} dir={dir} />
+            <CheckinGuardPanel program={program} dir={dir} />
+            <WhatIfGuardPanel program={program} dir={dir} />
+          </>,
+        },
+        {
+          id: 'technique',
+          title: '🦴 Техника и биомеханика',
+          hint: 'Срывы, bar-path, блины, инфо об упражнениях, прогресс из дневника',
+          color: '#06b6d4',
+          content: <>
+            <StickingPointPanel program={program} dir={dir} onChange={onChange} showToast={showToast} />
+            <BiomechanicsPanel program={program} dir={dir} />
+            <PlateAutoPanel program={program} dir={dir} />
+            <ExerciseInfoPanel program={program} dir={dir} />
+            <StrengthDiaryPanel program={program} dir={dir} />
+          </>,
+        },
+        {
+          id: 'tools',
+          title: '🔧 Инструменты тренера',
+          hint: 'Подбор сплита, замены упражнений, история ревизий',
+          color: '#a78bfa',
+          content: <>
+            <SplitConsultant program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
+            <SubstitutionPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
+            <ProgramRevisionsDiff program={program} />
+          </>,
+        },
+      ]} />
       </>
       )}
 
@@ -1565,6 +1665,9 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           </label>
         </div>
       </div>
+
+      {/* F2.5: тренерские заметки (отображаются в PDF) */}
+      <ProgramNotes program={program} onChange={onChange} />
 
       {/* Локальный toast для сообщений внутри редактора (авто-черновик, к выполнению и т.п.) */}
       {editorToast && (

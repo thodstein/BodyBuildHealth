@@ -25,6 +25,7 @@ import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type WeakPoint, type Lift } fro
 import { runWhatIf, generateReadinessForecast, type ForecastResult } from '../../../engines/predictive.engine';
 import { loadReadinessHistory } from './readiness-history';
 import { useDataLink } from '../../../core/data-link';
+import { PCT_FOR_RIR } from '../../../engines/rir-table';
 
 interface GuardPanelProps {
   program: UserProgram;
@@ -117,20 +118,21 @@ export const LoadGuardPanel: React.FC<GuardPanelProps> = ({ program }) => {
 };
 
 /* ═════════════ P-2: RealMRVPanel (индивидуальный MRV из истории) ═════════════ */
-export const RealMRVPanel: React.FC<GuardPanelProps> = ({ program }) => {
+export const RealMRVPanel: React.FC<GuardPanelProps> = ({ program, labMrvMult = 1 }) => {
   const data = useMemo(() => {
     const srpe = loadSRPESessions();
     if (srpe.length < 4) return null; // нужно минимум 4 сессии для оценки
     const daily = toDailyLoads(srpe);
     const acwr = acuteChronicRatio(daily);
-    // Если ACWR был в опасной зоне за последние 4 нед — реальный MRV ниже статического
-    // Эвристика: если ratio > 1.5 хотя бы раз → MRV × 0.85; если ratio > 1.3 стабильно → MRV × 0.9
-    let mult = 1.0;
-    if (acwr.ratio > 1.5) mult = 0.85;
-    else if (acwr.ratio > 1.3) mult = 0.9;
-    else if (acwr.ratio < 0.8) mult = 1.1; // недотрен → можно больше
-    return { mult, sessionsCount: srpe.length, ratio: acwr.ratio };
-  }, []);
+    // F1.3: перемножаем ACWR-множитель × labMrvMult (лаб-данные).
+    // Раньше был только ACWR — теперь RealMRV учитывает оба сигнала.
+    let acwrMult = 1.0;
+    if (acwr.ratio > 1.5) acwrMult = 0.85;
+    else if (acwr.ratio > 1.3) acwrMult = 0.9;
+    else if (acwr.ratio < 0.8) acwrMult = 1.1;
+    const mult = acwrMult * labMrvMult;
+    return { mult, acwrMult, labMult: labMrvMult, sessionsCount: srpe.length, ratio: acwr.ratio };
+  }, [labMrvMult]);
 
   if (!data) return null;
 
@@ -147,7 +149,14 @@ export const RealMRVPanel: React.FC<GuardPanelProps> = ({ program }) => {
   }
 
   const multColor = data.mult < 1 ? '#ef4444' : data.mult > 1 ? '#22c55e' : '#f59e0b';
-  const multLabel = data.mult < 1 ? `снижение ×${data.mult.toFixed(2)} (перетрен-риск)` : data.mult > 1 ? `повышение ×${data.mult.toFixed(2)} (недотрен)` : `норма ×1.00`;
+  const sourceLabel = data.acwrMult !== 1 && data.labMult !== 1
+    ? `ACWR ×${data.acwrMult.toFixed(2)} + лаб ×${data.labMult.toFixed(2)}`
+    : data.acwrMult !== 1
+      ? `ACWR ×${data.acwrMult.toFixed(2)} (перетрен-риск)`
+      : data.labMult !== 1
+        ? `лаб ×${data.labMult.toFixed(2)} (лаб-данные)`
+        : 'норма ×1.00';
+  const multLabel = data.mult < 1 ? `снижение (${sourceLabel})` : data.mult > 1 ? `повышение (${sourceLabel})` : sourceLabel;
 
   return (
     <div style={{ ...CARD, padding: 10, borderLeft: '3px solid ' + multColor }}>
@@ -286,8 +295,11 @@ export const TonnageEstimatePanel: React.FC<GuardPanelProps> = ({ program, dir }
           const reps = typeof set.reps === 'number' ? set.reps : parseInt(String(set.reps).replace(/[^0-9]/g, '')) || 8;
           let weight = set.weight ?? 0;
           if (!weight && wm > 0) {
+            // F1.6: используем PCT_FOR_RIR (rir-table.ts) — единый канонический маппинг
+            // RIR→%1RM. Раньше был ручной маппинг 0.65/0.72/0.80/0.87 — давал ошибки до 7%
+            // (RIR 2 давал 72% вместо правильных 78-80%).
             const rir = set.rir ?? 2;
-            const pct = rir >= 4 ? 0.65 : rir >= 2 ? 0.72 : rir >= 1 ? 0.80 : 0.87;
+            const pct = PCT_FOR_RIR[rir] ?? (rir >= 4 ? 0.84 : rir >= 2 ? 0.92 : 0.96);
             weight = Math.round((wm * pct) / 2.5) * 2.5;
           }
           totalTonnage += weight * reps;
@@ -483,7 +495,7 @@ export const PlateAutoPanel: React.FC<GuardPanelProps> = ({ program, dir }) => {
       let weight = set.weight ?? 0;
       if (!weight && wm > 0) {
         const rir = set.rir ?? 2;
-        const pct = rir >= 4 ? 0.65 : rir >= 2 ? 0.72 : rir >= 1 ? 0.80 : 0.87;
+        const pct = PCT_FOR_RIR[rir] ?? (rir >= 4 ? 0.84 : rir >= 2 ? 0.92 : 0.96);
         weight = Math.round((wm * pct) / 2.5) * 2.5;
       }
       if (weight <= 0) continue;

@@ -334,10 +334,16 @@ function pick<T>(arr: T[], seed: number): T | undefined {
 }
 
 // FIX 2: Quality-weighted pick — foods with higher bb_quality_score get proportionally higher selection probability
-// D-28+: module-scoped preference vars (set by buildDayPlan, read by pickWeighted)
-var _tasteProfile: any = undefined;
-var _deprioritizedIds: Set<string> | undefined = undefined;
-var _categoryPref: any = undefined;
+// D-28+ P0-4: module-scoped preference vars — установлены в начале buildDayPlan, ОБЯЗАТЕЛЬНО
+// очищаются в finally(). buildDayPlan НЕ РЕЕНТЕРАБЕЛЕН (синхронный JS это гарантирует при отсутствии
+// callback-yield точек); если внутри buildDayPlan появится await/Promise — refactor required.
+const _pickCtx: { tasteProfile: any; deprioritizedIds: Set<string> | undefined; categoryPref: any; _locked: boolean } = {
+  tasteProfile: undefined, deprioritizedIds: undefined, categoryPref: undefined, _locked: false,
+};
+// Совместимые алиасы (не удалять — избежать массы рефактора на pickWeighted внутри helpers).
+let _tasteProfile: any = undefined;
+let _deprioritizedIds: Set<string> | undefined = undefined;
+let _categoryPref: any = undefined;
 
 function pickWeighted(arr: FoodItem[], seed: number): FoodItem | undefined {
   if (arr.length === 0) return undefined;
@@ -1050,10 +1056,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     effectivePreferred = new Set([...combinedPreferred, ...pctFoodIds.filter(id => FOOD_DB.some(fd => fd.id === id))]);
   }
   const seedBase = (input.dayOffset + randomSalt) * 10007 + (input.isTrainingDay ? 3000 : 7000);
-  // D-28+: set module-scoped preference vars (declared at module level for pickWeighted access)
+  // P0-4: lock + set pickCtx (sync JS ensures non-reentrancy; cleanup in finally at the end of buildDayPlan).
+  if (_pickCtx._locked) { try { console.warn('[meal-plan-engine] buildDayPlan reentrant call — prefs may leak between plans.'); } catch {} }
+  _pickCtx._locked = true;
+  _pickCtx.tasteProfile = input.tasteProfile;
+  _pickCtx.deprioritizedIds = input.deprioritizedIds;
+  _pickCtx.categoryPref = input.categoryPref;
   _tasteProfile = input.tasteProfile;
   _deprioritizedIds = input.deprioritizedIds;
   _categoryPref = input.categoryPref;
+  // P0-4: тело функции под lock — освобождаем state в finally (sync JS гарантирует отсутствие reentrancy в отсутствии await).
+  try {
   // Ротация: разные группы белка в разные приёмы (раньше — одна на весь день)
   const mealRotations = pickRotationsForDay(input.dayOffset, randomSalt, 4, !!input.isVegetarian);
   function rotationForMeal(mealIdx: number): { label: string; ids: string[]; note: string } {
@@ -1792,6 +1805,16 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     microSummary: { coverage: _microRes.coverage, topDeficitNutrient: _microRes.topDeficitNutrient },
     notes,
   };
+  } finally {
+    // P0-4: освобождаем pickCtx — даже если генерация выбросила исключение, prefs не утекут в следующий план.
+    _pickCtx._locked = false;
+    _pickCtx.tasteProfile = undefined;
+    _pickCtx.deprioritizedIds = undefined;
+    _pickCtx.categoryPref = undefined;
+    _tasteProfile = undefined;
+    _deprioritizedIds = undefined;
+    _categoryPref = undefined;
+  }
 }
 
 // ─── Покрытие микронутриентов: выявление дефицитов + рекомендации ─────

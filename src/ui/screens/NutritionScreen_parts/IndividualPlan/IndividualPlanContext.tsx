@@ -15,6 +15,12 @@ import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrit
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { computePlannerTargets } from "./planner-targets";
 import { safeWriteJSON } from "./planner-storage";
+import { generateAllergenReportPure, generateNutrientReportPure, generateQualityReportPure, generateRiskReportPure, generateDrugCompatReportPure } from "./planner-reports"; // P1-7: чистые функции отчётов вынесены из context
+import { generateCheatMeal as generateCheatMealSm, generateCarbload as generateCarbloadSm, generateBUTCH as generateBUTCHSm, generateCravingPlan as generateCravingPlanSm, generateLazyDayPlan as generateLazyDayPlanSm } from "./planner-special-meals"; // P1-7: генераторы специальных режимов еды вынесены
+import { buildRecommendations } from "./planner-recommendations"; // P1-7: generateRecommendations вынесен
+import { buildMealPrep } from "./planner-mealprep"; // P1-7: generateMealPrep вынесен
+import { useRenderMealList } from "./MealListRender"; // P1-7: renderMealList вынесен
+import { getAutoExcludedFoodIds } from "./OrganLoadBadges"; // P2-12: organ-load auto restrictions
 import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplaceHistory, expandRecipePreferred, type Specificity, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
@@ -226,7 +232,7 @@ export interface PlanCtx {
   histamineSensitive: boolean; setHistamineSensitive: (v: boolean) => void;
   dietPrefs: string[]; setDietPrefs: (v: string[]) => void;
   errorMsg: string | null; setErrorMsg: (v: string | null) => void;
-  useProEngine: boolean; setUseProEngine: (v: boolean) => void;
+  // P0-2: useProEngine — всегда TRUE (мёртвый toggle удалён); защита от деградации — try/catch fallback на классический путь в generatePlan.
   // Cross-tab navigation: allows sub-tabs to switch to each other
   planTab: string; setPlanTab: (v: string) => void;
 }
@@ -803,6 +809,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // ─── Generate Plan ───
   const generatePlan = (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number) => {
     try {
+    saveUndo(); // P2-14: undo для плана целиком — snapshot в начале generatePlan позволяет вернуть прошлый план
     setPlanDays(days);
     if (dayIndex !== undefined) setSelectedDayIndex(dayIndex);
 
@@ -816,7 +823,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const trainStartMin = linkToTraining && trainStart?.includes(':') ? toMin(trainStart) : undefined;
       const excludedIds = new Set<string>(excludedFoods);
       healthIssues.forEach(hid => { const issue = HEALTH_ISSUES.find(h => h.id === hid); if (issue?.foodIds) issue.foodIds.forEach(fid => excludedIds.add(fid)); });
-      // #1 женская фаза: avoid-продукты (модуль ㅅветает в buildOneDay, но excludedIds строится здесь один раз).
+      // P2-12: organ-load auto restrictions — динамические исключения по metabolic_flags
+      getAutoExcludedFoodIds(FOOD_DB, healthIssues).forEach(fid => excludedIds.add(fid));
       // P1.2: Pass locked foods to engine
       const lockedIds = new Set<string>([...lockedFoodIds]);
       // P1.3: Build recent foods set from existing plans to avoid repetition
@@ -1085,6 +1093,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const pMod = planTypeMod?.pMult || 1.0; const fMod = planTypeMod?.fMult || 1.0; const cMod = planTypeMod?.cMult || 1.0;
     const excludedIds = new Set(excludedFoods);
     healthIssues.forEach(hid => { const issue = HEALTH_ISSUES.find(h => h.id === hid); if (issue?.foodIds) issue.foodIds.forEach(fid => excludedIds.add(fid)); });
+    // P2-12: organ-load auto restrictions — динамические исключения по metabolic_flags
+    getAutoExcludedFoodIds(FOOD_DB, healthIssues).forEach(fid => excludedIds.add(fid));
     // N2: vegetarian mode — exclude all non-vegetarian foods (meat, fish, poultry)
     if (dietPrefs.includes('vegetarian')) {
       Object.entries(FOOD_ALLERGEN_DIET).forEach(([fid, tags]) => {
@@ -1895,9 +1905,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     }
   };
 
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [useProEngine, setUseProEngine] = useState(() => true);
-  useEffect(() => { try { localStorage.setItem('he_use_pro_engine', useProEngine ? 'true' : 'false'); } catch {} }, [useProEngine]);
+const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // P0-2: Pro Engine — единственный движок (был всегда true, переключатель в UI отсутствовал).
+  // Сохраняем fallback на классический путь внутри generatePlan через try/catch для живучести.
+  const useProEngine: true = true;
   const [planTab, setPlanTab] = useState<string>(() => { try { return localStorage.getItem('he_plan_active_tab') || 'settings'; } catch { return 'settings'; } });
   useEffect(() => { try { localStorage.setItem('he_plan_active_tab', planTab); } catch {} }, [planTab]);
 
@@ -1916,199 +1927,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [lazyDayPlan, setLazyDayPlan] = useState<any>(null);
   const [recommendations, setRecommendations] = useState<string[]>([]);
 
-  const generateCheatMeal = () => {
-    const cals = Math.round(effectiveKcal * 0.35);
-    const items = FOOD_DB.filter(f => f.category === 'fast_food' || (f.kcal > 200 && (f.name.toLowerCase().includes('бургер') || f.name.toLowerCase().includes('пицц') || f.name.toLowerCase().includes('картофель фри') || f.name.toLowerCase().includes('чипс') || f.name.toLowerCase().includes('шоколад') || f.name.toLowerCase().includes('морожен') || f.name.toLowerCase().includes('пончик')))).sort(() => Math.random() - 0.5).slice(0, 2);
-    setCheatMealPlan({ items, totalKcal: items.reduce((s,i) => s + i.kcal, 0), cals, note:'Читмил ПОСЛЕ тяжёлой тренировки. Не более 1500 ккал.', principles:['🍔 Психологическая разгрузка','⏰ Только ПОСЛЕ тренировки','📏 Макс 1 раз/нед, до 1500 ккал','🔄 Не компенсировать на след.день','💧 Пить воду, не газировку'], bju:{kcal:cals,p:Math.round(cals*0.08/4),f:Math.round(cals*0.40/9),c:Math.round(cals*0.52/4)}, recommendation: goal === 'mass' ? '1-2р/нед' : goal === 'fat_loss' || goal === 'cutting' ? '1р в 7-10 дней' : '1р/нед' });
-  };
+  const generateCheatMeal = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays }; setCheatMealPlan(generateCheatMealSm(_smDeps)); };
 
-  const generateCarbload = () => {
-    const carbsPerKg = 8; const totalCarbs = Math.round(weight * carbsPerKg);
-    const carbFoods = FOOD_DB.filter(f => (f.category === 'carb' || f.category === 'grain') && f.carbs > 20).sort(() => Math.random() - 0.5).slice(0, 5);
-    setCarbloadPlan({ totalCarbs, foods: carbFoods.map(f => ({ name: f.name, carbs: f.carbs, amount: Math.round(totalCarbs * 0.3 / f.carbs * 100) })), note:'За 24-48ч до тренировки. Воды +1-1.5л.', principles:['🍚 Заполнение гликогена','⏰ За 24-48ч до тяжёлой тренировки','📏 6-8 г/кг углеводов','💧 Воды +1-1.5л','🧂 Натрий 200-500мг','⬇ Жиры до 0.5г/кг'], bju:{c:totalCarbs,p:Math.round(effectiveP),f:Math.round(weight*0.5),kcal:totalCarbs*4+Math.round(effectiveP)*4+Math.round(weight*0.5)*9} });
-  };
+  const generateCarbload = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays }; setCarbloadPlan(generateCarbloadSm(_smDeps)); };
 
-  const generateBUTCH = () => { const highCarb = Math.round(effectiveC * 1.3); const lowCarb = Math.round(effectiveC * 0.5); setButchPlan({ pattern: trainingDays.filter(Boolean).length + ' тр + ' + trainingDays.filter(d=>!d).length + ' отдых', highCarb, lowCarb, protein: effectiveP, fatHigh: Math.round(effectiveF * 0.8), fatLow: Math.round(effectiveF * 1.2), note:'Цикл по тренировочным дням', principles:['⤴️⤵️ БУЧ для жиросжигания','📊 ВУ дни: угл +30%','📊 НУ дни: угл -50%','💪 Белок 2-2.5г/кг','🧈 Жиры: ВУ 0.8×, НУ 1.2×','⏳ Макс 4 недели'] }); };
+  const generateBUTCH = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays }; setButchPlan(generateBUTCHSm(_smDeps)); };
 
-  const generateCravingPlan = () => {
-    const sweetToothKcal = Math.min(500, Math.round(effectiveKcal * 0.12));
-    const sweetItems = FOOD_DB.filter(f => {
-      const n = f.name.toLowerCase();
-      return n.includes('шоколад') || n.includes('морожен') || n.includes('печень') || n.includes('конфет') || n.includes('мед') || n.includes('варень') || n.includes('джем') || n.includes('банан') || n.includes('яблоко') || n.includes('виноград') || n.includes('финик');
-    }).sort(() => Math.random() - 0.5).slice(0, 2);
-    setCravingPlan({
-      kcal: sweetToothKcal,
-      days: cravingDays,
-      items: sweetItems,
-      bju: {
-        kcal: sweetToothKcal,
-        p: Math.round(sweetToothKcal * 0.06 / 4),
-        f: Math.round(sweetToothKcal * 0.25 / 9),
-        c: Math.round(sweetToothKcal * 0.69 / 4),
-      },
-      note: `Сладкий перекус на ${cravingDays} ${cravingDays === 1 ? 'день' : 'дня'}. Вписывайте в КБЖУ.`,
-      principles: ['🍬 Разовый десерт без чувства вины', '📏 Не более 12% дневной калорийности', '⏰ Лучше в первой половине дня', '🥜 Добавить белок/жиры для сытости', '💧 Пить воду перед десертом'],
-      recommendation: goal === 'cutting' || goal === 'fat_loss' ? '1-2р/нед' : '2-3р/нед',
-    });
-  };
+  const generateCravingPlan = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays }; setCravingPlan(generateCravingPlanSm(_smDeps)); };
 
-  const generateLazyDayPlan = () => {
-    const lazyKcal = Math.round(effectiveKcal * 0.85);
-    const lazyItems = FOOD_DB.filter(f => {
-      const n = f.name.toLowerCase();
-      return (f.category === 'dairy' && f.carbs < 10) || n.includes('яйц') || n.includes('творог') || n.includes('йогурт') || n.includes('протеин') || n.includes('кефир') || n.includes('хлеб') || n.includes('овсян') || n.includes('банан') || n.includes('орех') || n.includes('авокадо');
-    }).filter(f => f.carbs < 40).sort(() => Math.random() - 0.5).slice(0, 5);
-    setLazyDayPlan({
-      kcal: lazyKcal,
-      days: lazyDayDays,
-      items: lazyItems,
-      bju: {
-        kcal: lazyKcal,
-        p: Math.round(lazyKcal * 0.30 / 4),
-        f: Math.round(lazyKcal * 0.25 / 9),
-        c: Math.round(lazyKcal * 0.45 / 4),
-      },
-      note: `Минимум готовки: ${lazyDayDays} ${lazyDayDays === 1 ? 'день' : 'дней'}. Простые блюда за 5-10 мин.`,
-      principles: ['⏱️ Блюда до 10 минут', '🔥 Не требует варки/жарки', '🥛 Молочка + хлопья + фрукты', '🥪 Бутерброды с авокадо/рыбой', '💪 Протеиновый коктейль — база'],
-      recommendation: 'Не чаще 2-3 раз/нед, иначе замедление метаболизма',
-    });
-  };
+  const generateLazyDayPlan = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays }; setLazyDayPlan(generateLazyDayPlanSm(_smDeps)); };
 
-  const generateRecommendations = () => {
-    const recs: string[] = [];
-    if (goal === 'mass') recs.push('💪 Профицит 300-500 ккал. Белок 1.8-2.2г/кг. Углеводы 4-5г/кг.');
-    if (goal === 'fat_loss' || goal === 'cutting') recs.push('🔥 Дефицит 300-500 ккал. Белок 2.5г/кг критически важен.');
-    if (goal === 'strength') recs.push('🏋️ Профицит 200-300 ккал. Углеводы 5-6г/кг в тренировочные дни.');
-    if (goal === 'maintenance') recs.push('⚖️ Калории на уровне TDEE. Баланс 30/20/50.');
-    if (goal === 'recomposition') recs.push('🔄 Калории = TDEE или -100-200. Белок 2.5г/кг.');
-    if (goal === 'rehab') recs.push('🩹 Белок 2.5-3г/кг. ВСАА 15-20г/день. Омега-3 3-5г/день.');
-    if (phase === 'course') recs.push('💉 Курс: белок 2.5г/кг, контроль печени, вода 40мл/кг.');
-    if (phase === 'pct') recs.push('🔄 ПКТ: белок 2.2г/кг, цинк 50мг, D 5000МЕ, магний.');
-    if (phase === 'cutting') recs.push('✂️ Сушка: 5-6 приёмов, контроль натрия, клетчатка.');
-    if (injections.length > 0) {
-      const hasInsulin = injections.some(i => i.type === 'инсулин'); const hasShortInsulin = injections.some(i => i.type === 'инсулин' && i.esterType !== 'long');
-      const hasGH = injections.some(i => i.type === 'ГР' || i.type === 'GHRP' || i.type === 'CJC'); const hasIGF = injections.some(i => i.type === 'ИФР-1');
-      const hasGLP = injections.some(i => i.type === 'семаглутид' || i.type === 'тирзепатид'); const hasAAS = injections.some(i => i.type === 'ААС');
-      const totalInsulinDose = injections.filter(i => i.type === 'инсулин' && i.esterType !== 'long').reduce((s, i) => s + i.dose, 0);
-      if (hasAAS) recs.push('💉 ААС: белок +0.3г/кг, вода 40мл/кг, NAC/расторопша.');
-      if (hasShortInsulin || hasInsulin) { recs.push(`💉 Инсулин: ${totalInsulinDose}ЕД × 10г = ${totalInsulinDose*10}г угл. Минимум 150г угл/день.`); recs.push('🍔 На инсулине — минимум жиров в окне действия.'); }
-      if (hasGH) recs.push('🧬 ГР: избегать угл в окне 60мин до/после. Вода +0.5-1л.');
-      if (hasIGF) recs.push('🧬 ИФР-1: натощак за 30-45мин до еды. Контроль глюкозы.');
-      if (hasGLP) recs.push('💊 GLP-1: дробно 5-6р по 100-200г. Жиры <5г/приём.');
-    }
-    if (linkToTraining) recs.push(`🏋️ Тренировка ${trainStart}-${trainEnd}. Предтрен за 1.5-2ч, пост-трен в течение 60-90мин.`);
-    recs.push('✅ Белок с каждым приёмом. Овощи 300-500г/день. Вода 2.5-4л. Сон 7-9ч.');
-
-    // ── v2-анализ сгенерированного рациона и правил справочника ──
-    if (generated && dayPlan) {
-      const profile = getDefaultProfile();
-      profile.sex = sex;
-      profile.bodyFatPct = bodyFatPct || 15;
-      profile.discipline = (trainType === 'strength' ? 'powerlifting' : 'bodybuilding') as any;
-      profile.phase = (v2Phase as any) || 'LEAN_MASS';
-      profile.pharma.AAS_ORAL = v2Pharma.AAS_ORAL || false;
-      profile.pharma.AAS_INJECTABLE = v2Pharma.AAS_INJECTABLE || false;
-      profile.pharma.HGH = v2Pharma.HGH || false;
-      profile.pharma.DIURETICS = v2Pharma.DIURETICS || false;
-      profile.pharma.STIMULATORS = v2Pharma.STIMULATORS || false;
-      profile.pharma.INSULIN_USE = v2Pharma.INSULIN_USE || false;
-      profile.pharma.LIVER_SUPPORT = v2Pharma.LIVER_SUPPORT || false;
-      profile.pharma.GUT_SUPPORT = v2Pharma.GUT_SUPPORT || false;
-      profile.histamineSensitive = histamineSensitive;
-      profile.labs.hematocrit = v2Labs.hematocrit ? parseFloat(v2Labs.hematocrit) : undefined;
-      profile.labs.hemoglobin = v2Labs.hemoglobin ? parseFloat(v2Labs.hemoglobin) : undefined;
-      profile.labs.ldl = v2Labs.ldl ? parseFloat(v2Labs.ldl) : undefined;
-      profile.labs.alt = v2Labs.alt ? parseFloat(v2Labs.alt) : undefined;
-      profile.labs.ast = v2Labs.ast ? parseFloat(v2Labs.ast) : undefined;
-      profile.labs.crp = v2Labs.crp ? parseFloat(v2Labs.crp) : undefined;
-      profile.weightKg = weight || 80;
-      profile.lbm = profile.weightKg * (100 - profile.bodyFatPct) / 100;
-
-      const planDaysForAnalysis = planDays >= 7 ? (weekPlan?.days || [dayPlan]).filter(Boolean)
-        : planDays >= 3 ? (threeDayPlan?.days || [dayPlan]).filter(Boolean)
-        : [dayPlan].filter(Boolean);
-      const allMealsForV2 = planDaysForAnalysis.flatMap((dp: any) =>
-        (dp.meals || []).map((m: any) => ({
-          timing: (m.timing || 'regular') as any,
-          products: (m.items || []).map((it: any) => {
-            const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
-            return { foodId: food?.id || it.name || 'unknown', weightGrams: it.amount || 100 };
-          }).filter((p: any) => p.weightGrams > 0),
-        }))
-      );
-
-      const daysCount = planDaysForAnalysis.length;
-      const daily = analyzeDailyDiet(allMealsForV2, profile);
-      const totalKcal = Math.round(planDaysForAnalysis.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0) / daysCount);
-      const totalP = Math.round(planDaysForAnalysis.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0) / daysCount);
-      const mealsCount = Math.round(allMealsForV2.length / daysCount);
-
-      // mTOR
-      if (!daily.mtorTriggered) recs.push(`🧬 mTOR не запущен — дефицит ${daily.mtorDeficitMg}мг лейцина. Добавьте 30-40г сывороточного протеина или 200г курицы.`);
-      else recs.push('🧬 mTOR запущен — лейцин >3г/день ✅');
-
-      // DIAAS
-      if (daily.diaasWarning) recs.push(`💪 ${daily.diaasWarning}`);
-
-      // GI load
-      if (daily.giLoadWarning) recs.push(`🧬 Высокая гликемическая нагрузка (${Math.round(daily.giLoad)} GL). Разнесите углеводы по приёмам и замените часть быстрых углеводов на низко-GI источники.`);
-
-      // Electrolytes
-      if (daily.electrolyteRisk) recs.push(`💧 Риск электролитов: K ${Math.round(daily.potassiumMg)}мг, Mg ${Math.round(daily.magnesiumMg)}мг. Добавьте шпинат, авокадо, орехи.`);
-
-      // Omega
-      if (daily.omegaWarning) recs.push(`🐟 ${daily.omegaWarning}. Добавьте жирную рыбу 2-3р/нед или омега-3 2-4г/день.`);
-
-      // Antinutrients
-      if (daily.antinutrientWarning) recs.push(daily.antinutrientWarning);
-
-      // Glutathione
-      if (daily.glutathioneWarning) recs.push(daily.glutathioneWarning);
-
-      // Histamine
-      if (daily.histamineWarning) recs.push(daily.histamineWarning);
-
-      // Micro deficits
-      if (daily.microDeficits.length > 0) recs.push(`⚠️ Дефициты микронутриентов: ${daily.microDeficits.join(', ')}. Рассмотрите приём ВМК.`);
-
-      // ── Правила справочника ──
-      if (mealsCount < 4) recs.push('📋 Меньше 4 приёмов — распределите белок равномерно для MPS.');
-      if (mealsCount > 6) recs.push('📋 Больше 6 приёмов — возможно дробление порций, проверьте насыщение.');
-      if (totalP < weight * 1.8) recs.push(`🥩 Белок ${totalP}г (${(totalP/weight).toFixed(1)}г/кг) — ниже ${weight*1.8}г. Увеличьте белок до 2г/кг.`);
-      if (profile.labs.ldl && profile.labs.ldl > 4.2) recs.push('🩸 ЛПНП >4.2 ммоль/л — ограничьте насыщенные жиры (жирное мясо, сливочное масло).');
-      if (profile.labs.alt && profile.labs.alt > 45) recs.push('🫁 АЛТ >45 Ед/л — добавьте NAC 600-1200мг, расторопшу 280мг, TUDCA 500мг.');
-      if (profile.labs.crp && profile.labs.crp > 3) recs.push('🔥 СРБ >3 мг/л — добавьте омега-3 3-5г/день, полифенолы (куркума 500мг, зелёный чай).');
-
-      // Macros deviation
-      const targetKcal = effectiveKcal || (weight * 33);
-      if (Math.abs(totalKcal - targetKcal) > 200) {
-        const dir = totalKcal > targetKcal ? 'превышение' : 'недобор';
-        recs.push(`📊 ${dir.toUpperCase()} ${Math.abs(totalKcal - targetKcal)} ккал от цели (${targetKcal}). Откорректируйте приёмы.`);
-      }
-    }
-
-      // ── Refeed / Reverse diet рекомендации ──
-      if (goal === 'fat_loss' || goal === 'cutting') {
-        const deficitWeeks = (() => { try { const nv2 = getNutritionV2Data(); return nv2.dietWeeks || 0; } catch { return 0; } })();
-        if (deficitWeeks >= 2) {
-          const refeedCarbsG = Math.round(weight * 5);
-          const refeedKcal = Math.round(effectiveP * 4 + effectiveF * 9 + refeedCarbsG * 4);
-          recs.push(`🔄 Refeed: каждые 7-14 дней — ${refeedCarbsG}г углеводов (~${refeedKcal} ккал). Жиры ≤0.5 г/кг. Длительность: 24ч.`);
-          if (deficitWeeks >= 8) {
-            const reverseKcal = Math.round(effectiveKcal * 1.15);
-            recs.push(`📈 Reverse diet: метаболическая адаптация ${deficitWeeks}+ нед. Выход: +50-100 ккал/нед до TDEE. Текущий целевой разгон: ~${reverseKcal} ккал.`);
-          }
-        }
-      }
-      if (dietPauseMode === 'refeed') {
-        recs.push(`🍽 Refeed активен: ${weight > 0 ? Math.round(weight * 5) : '300'}г углеводов, жиры ${weight > 0 ? Math.round(weight * 0.5) : '40'}г. Не чаще 1р/нед на дефиците.`);
-      }
-      if (dietPauseMode === 'diet_5_2') {
-        recs.push(`📅 5:2 протокол: 5 дней maintenance + 2 дня дефицит (~${Math.round(effectiveKcal * 0.7)} ккал). Поддерживает метаболизм.`);
-      }
-
-    setRecommendations(recs);
-  };
+  const generateRecommendations = () => { setRecommendations(buildRecommendations({ goal, phase, weight, effectiveKcal, effectiveP, effectiveF, effectiveC, injections, linkToTraining, trainStart, trainEnd, sex, bodyFatPct, trainType, v2Phase, v2Pharma, v2Labs, histamineSensitive, generated, planDays, dayPlan, threeDayPlan, weekPlan, dietPauseMode })); };
 
   useEffect(() => { if (generated && dayPlan) generateRecommendations(); }, [injections.length]);
 
@@ -2119,122 +1948,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [mealPrepPlan, setMealPrepPlan] = useState<{ steps: MealPrepStep[]; totalTime: number; containers: number } | null>(null);
   const [mealPrepDays, setMealPrepDays] = useState<1 | 3 | 7>(1);
 
-  const generateMealPrep = () => {
-    const src = mealPrepDays === 1 ? dayPlan : mealPrepDays === 3 ? threeDayPlan : weekPlan;
-    if (!src) { generatePlan(mealPrepDays as 1|3|7); return; }
-    const days = mealPrepDays === 1 ? [src] : src?.days || [src]; if (!days || days.length === 0) return;
-    const steps: MealPrepStep[] = []; let stepNum = 1;
-    const allItems = days.flatMap((d: any) => d.meals.flatMap((m: any) => m.items.map((it: any) => ({ ...it, mealLabel: m.label, mealTime: m.time }))));
-    const uniqueItems = [...new Map(allItems.map((it: any) => [it.name, it])).values()];
-    const n = (name: string) => name?.toLowerCase() || '';
-
-    // ─── Фаза 1: Mise en place ───
-    // Подготовка всех ингредиентов перед термообработкой
-    const allNames = uniqueItems.map((it: any) => n(it.name));
-    const hasOven = allNames.some(x => x.includes('лосос')||x.includes('форел')||x.includes('запеч')||x.includes('стейк')||x.includes('голяш')||x.includes('минт')||x.includes('батат')||x.includes('картоф'));
-    const hasSimmer = allNames.some(x => x.includes('суп')||x.includes('бульон')||x.includes('туш')||x.includes('карри')||x.includes('болонь'));
-    const hasPan = allNames.some(x => x.includes('куриц')||x.includes('индейк')||x.includes('говядин')||x.includes('котл')||x.includes('фарш')||x.includes('печен')||x.includes('гриб')||x.includes('шампиньон'));
-    const hasBoilGrain = allNames.some(x => x.includes('рис')||x.includes('гречк')||x.includes('булгур')||x.includes('киноа')||x.includes('кус-кус')||x.includes('перловк')||x.includes('пшен')||x.includes('чечевиц')||x.includes('маш')||x.includes('нут')||x.includes('паст')||x.includes('макар')||x.includes('лапш'));
-    const hasFreshVeg = allNames.some(x => x.includes('огурец')||x.includes('помидор')||x.includes('салат')||x.includes('руккол')||x.includes('шпинат')||x.includes('зелен'));
-    const hasRawPrep = allNames.some(x => x.includes('брокколи')||x.includes('цветная капуст')||x.includes('морков')||x.includes('кабач')||x.includes('спарж')||x.includes('перец болгар')||x.includes('капуст')||x.includes('цукин')||x.includes('баклаж'));
-    const hasMarinate = allNames.some(x => x.includes('куриц')||x.includes('индейк')||x.includes('говядин')||x.includes('свинин')||x.includes('баранин'));
-    const hasCottageCheese = allNames.some(x => x.includes('творог')||x.includes('рикотт'));
-    const hasBoiledEgg = allNames.some(x => x.includes('яйц')||x.includes('яич')||x.includes('омлет'));
-
-    // 1. Mise en place — подготовка
-    const miseItems: string[] = [];
-    if (hasFreshVeg) miseItems.push('Овощи: вымыть, обсушить, нарезать');
-    if (hasRawPrep) miseItems.push('Термообрабатываемые овощи: вымыть, нарезать кубиками/соломкой');
-    if (hasPan || hasOven) miseItems.push('Мясо/рыбу: обсушить бумажными полотенцами');
-    if (hasBoilGrain) miseItems.push('Крупы/бобовые: отмерить, промыть до прозрачной воды');
-    if (hasCottageCheese) miseItems.push('Творог: откинуть на сито, если влажный');
-    if (hasBoiledEgg) miseItems.push('Яйца: достать заранее — комнатной температуры равномернее готовятся');
-    if (miseItems.length > 0) steps.push({ step: stepNum++, action:'🔪 Mise en place — подготовка ингредиентов', duration:15, items: miseItems });
-
-    // 2. Поставить замачиваться бобовые / крупы
-    const pulseItems = uniqueItems.filter((it: any) => { const x = n(it.name); return x.includes('маш')||x.includes('нут сух')||x.includes('чечевиц'); });
-    if (pulseItems.length > 0) steps.push({ step: stepNum++, action:'Замочить бобовые в холодной воде (1:3) на 2+ ч', duration:5, items: pulseItems.map((p:any) => `${p.name} — залить водой 1:3, щепотка соды`), items_standby: true });
-
-    // 3. Поставить разогреваться духовку
-    if (hasOven) steps.push({ step: stepNum++, action:'🔥 Разогреть духовку до 190°C', duration:3, items:['Верх-низ без конвекции', 'Противень внутри для равномерного прогрева'], items_parallel: true });
-
-    // ─── Фаза 2: Термообработка (параллельные треки) ───
-    // Трек A — крупы/гарниры
-    const grains = uniqueItems.filter((it: any) => { const x = n(it.name); return x.includes('рис')||x.includes('гречк')||x.includes('булгур')||x.includes('киноа')||x.includes('кус-кус')||x.includes('перловк')||x.includes('пшен')||x.includes('чечевиц')||x.includes('нут'); });
-    if (grains.length > 0) {
-      const grainSteps = grains.map((g: any) => {
-        const gn = n(g.name);
-        if (gn.includes('гречк')) return `${g.name}: промыть, залить водой 1:2, варить 12 мин, укутать полотенцем на 10 мин`;
-        if (gn.includes('киноа')) return `${g.name}: промыть, залить водой 1:2, варить 15 мин, дать постоять 5 мин под крышкой`;
-        if (gn.includes('кус-кус')) return `${g.name}: залить кипятком 1:1.5, накрыть, настоять 5 мин, разрыхлить вилкой`;
-        if (gn.includes('перловк')) return `${g.name}: промыть, залить водой 1:3, варить 40 мин, слить лишнее`;
-        if (gn.includes('булгур')) return `${g.name}: залить кипятком 1:1.5, накрыть, настоять 12 мин`;
-        if (gn.includes('нут')) return `${g.name}: отварить 40-50 мин (если сухой) или прогреть 5 мин (консервированный)`;
-        if (gn.includes('чечевиц')) return `${g.name}: промыть, залить водой 1:2.5, варить 15-20 мин до мягкости, не переваривать`;
-        if (gn.includes('овсянк')||gn.includes('овсян')) return `${g.name}: залить молоком/водой 1:3, варить 5 мин помешивая, снять с огня, накрыть на 2 мин`;
-        return `${g.name}: варить согласно инструкции на упаковке, промыть, заправить маслом`;
-      });
-      steps.push({ step: stepNum++, action:'🍚 Гарниры: крупы и бобовые', duration:40, items: grainSteps, items_can_boil_simultaneously: true });
-    }
-
-    // Трек B — мясо/рыба (параллельно)
-    const meats = uniqueItems.filter((it: any) => { const x = n(it.name); return x.includes('куриц')||x.includes('индейк')||x.includes('говядин')||x.includes('лосос')||x.includes('форел')||x.includes('треск')||x.includes('минт')||x.includes('хека')||x.includes('телят')||x.includes('язык')||x.includes('печен')||x.includes('сердц'); });
-    if (meats.length > 0) {
-      const meatSteps = meats.map((m: any) => {
-        const mn = n(m.name);
-        if (mn.includes('лосос')||mn.includes('форел')) return `${m.name}: обсушить, сбрызнуть лимоном+маслом, 4 мин на стороне на сильном огне (кожа хрустящая) или запечь 15 мин при 190°C`;
-        if (mn.includes('стейк')||mn.includes('говядин')&&!mn.includes('фарш')&&!mn.includes('печен')) return `${m.name}: достать за 30 мин до готовки (комнатная темп.), промокнуть, соль+перец — на раскалённую сковороду, 4 мин сторона medium rare, 6 мин — medium, отдохнуть 5 мин под фольгой`;
-        if (mn.includes('куриц')||mn.includes('индейк')) return `${m.name}: нарезать кубиками 2-3 см, обжарить партиями по 4 мин до золотистой корочки, не перегружать сковороду`;
-        if (mn.includes('печен')) return `${m.name}: промыть, удалить протоки, обжарить с луком 5 мин на сильном огне, затем 3 мин под крышкой на среднем`;
-        if (mn.includes('фарш')) return `${m.name}: обжарить на сильном огне, разбивая лопаткой, 6 мин до выпаривания жидкости, затем добавить лук/специи`;
-        return `${m.name}: нарезать поперёк волокон, обжарить партиями по 3-4 мин`;
-      });
-      steps.push({ step: stepNum++, action:'🥩 Белковая часть: мясо/рыба', duration:25, items: meatSteps });
-    }
-
-    // Трек C — овощи, требующие термообработки
-    const hotVeg = uniqueItems.filter((it: any) => { const x = n(it.name); return x.includes('брокколи')||x.includes('цветная капуст')||x.includes('брюссель')||x.includes('спарж')||x.includes('фасол стручк'); });
-    if (hotVeg.length > 0) steps.push({ step: stepNum++, action:'🥦 Овощи: бланшировать', duration:8, items: hotVeg.map((v:any)=>`${v.name}: бланшировать в подсоленном кипятке 2-3 мин, затем в ледяную воду (сохранить цвет и текстуру)`) });
-
-    // Запечённые овощи/корнеплоды
-    const rootVeg = uniqueItems.filter((it: any) => { const x = n(it.name); return (x.includes('батат')||x.includes('картоф')||x.includes('морков')||x.includes('тыкв')||x.includes('свёкл')||x.includes('кабач')||x.includes('баклаж')) && !x.includes('пюре'); });
-    if (rootVeg.length > 0) steps.push({ step: stepNum++, action:'🌿 Корнеплоды: нарезать и запечь', duration:8, items: rootVeg.map((v:any)=>`${v.name}: нарезать кубиками/дольками 2см, сбрызнуть маслом, соль+розмарин, запечь 25-30 мин при 200°C`), items_parallel: true });
-
-    // Трек D — соусы/заправки
-    const hasSauce = allNames.some(x => x.includes('соус')||x.includes('песто')||x.includes('сметан')||x.includes('сливк')||x.includes('йогурт греч')||x.includes('заправк')||x.includes('томат паст'));
-    if (hasSauce) steps.push({ step: stepNum++, action:'🧂 Соусы и заправки', duration:6, items: ['Готовить с вечера — вкус раскрывается за 8-12 ч в холодильнике', 'Сметанные/йогуртовые — хранить отдельно, смешивать перед подачей', 'Томатные — тушить 10 мин минимум для раскрытия ликопина'] });
-
-    // ─── Фаза 3: Сборка ───
-    // Свежие овощи (без термообработки)
-    const freshVegItems = uniqueItems.filter((it: any) => { const x = n(it.name); return x.includes('огурец')||x.includes('помидор')||x.includes('салат')||x.includes('руккол')||x.includes('зелен'); });
-    if (freshVegItems.length > 0) steps.push({ step: stepNum++, action:'🥗 Свежие овощи и зелень', duration:8, items: freshVegItems.map((v:any)=>`${v.name}: нарезать непосредственно перед сборкой, не хранить в нарезке дольше 24ч`) });
-
-    // ─── Фаза 4: Охлаждение и фасовка ───
-    const mealCount = days[0]?.meals?.length || 4;
-    steps.push({ step: stepNum++, action:'🧊 Охладить до комнатной температуры (20 мин, не убирать горячее в холодильник!)', duration:1, items:['Разложить на решётке/разделочной доске', 'Накрыть чистым полотенцем'] });
-    steps.push({ step: stepNum++, action:'📦 Разложить по контейнерам', duration:15, items:[
-      `${mealCount} приёмов × ${mealPrepDays} дн = ${mealCount * mealPrepDays} контейнеров`,
-      'Плотно утрамбовать — меньше воздуха = дольше свежесть',
-      'Соус/заправку — в отдельный мини-контейнер',
-      'Зелень и авокадо — добавлять утром перед едой',
-    ]});
-    steps.push({ step: stepNum++, action:'🏷️ Маркировка и хранение', duration:5, items:[
-      `Каждый контейнер: день+приём (например: «ПН обед»)`,
-      'Холодильник +2...+4°C — срок хранения 72ч (3 суток)',
-      'Морозилка -18°C — срок хранения до 3 мес',
-      'Разморозка: в холодильнике 12ч, не в микроволновке',
-    ]});
-
-    // ─── Фаза 5: Инструкции по разогреву ───
-    steps.push({ step: stepNum++, action:'♨️ Разогрев перед едой', duration:2, items:[
-      '🍚 Крупы: в микроволновке 2 мин с крышкой + 1 ст.л. воды',
-      '🥩 Мясо/рыба: на сковороде 3 мин с каплей воды под крышкой (не микроволновка — сушит)',
-      '🥦 Овощи: на пару 2 мин или микроволновка 1.5 мин',
-      '❌ Не разогревать повторно — только разовая порция',
-    ]});
-
-    setMealPrepPlan({ steps, totalTime: steps.reduce((s, st) => s + st.duration, 0), containers: mealCount * mealPrepDays });
-  };
+  const generateMealPrep = () => { const _r = buildMealPrep({ mealPrepDays, dayPlan, threeDayPlan, weekPlan }); if (!_r) { generatePlan(mealPrepDays as 1|3|7); return; } setMealPrepPlan(_r); };
 
   const [activeReports, setActiveReports] = useState<string[]>([]);
   const [allergenReport, setAllergenReport] = useState<any>(null);
@@ -2244,60 +1958,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [drugCompatReport, setDrugCompatReport] = useState<any>(null);
   const [nutritionReport, setNutritionReport] = useState<any>(null);
 
-  const generateAllergenReport = () => { if (!dayPlan) return; const conflicts: any[] = []; dayPlan.meals.flatMap((m: any) => m.items).forEach((it: any) => { const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name); if (food?.allergens) { const matched = food.allergens.filter((a: string) => allergens.includes(a)); if (matched.length > 0) conflicts.push({ food: it.name, allergens: matched }); } }); const riskLevel = conflicts.length === 0 ? 'low' : conflicts.length <= 3 ? 'medium' : 'high'; setAllergenReport({ conflicts, riskLevel, summary: conflicts.length === 0 ? '✅ Нет совпадений' : `⚠ ${conflicts.length} совпадений` }); setActiveReports(prev => prev.includes('allergen') ? prev : [...prev, 'allergen']); };
-  const generateNutrientReport = () => { if (!dayPlan) return; const micros: Record<string, number> = {}; dayPlan.meals.flatMap((m: any) => m.items).forEach((it: any) => { const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name); if (food?.micros) Object.entries(food.micros).forEach(([k, v]) => { if (v) micros[k] = (micros[k] || 0) + (v as number) * (it.amount / 100); }); }); const targets: Record<string, number> = { Ca:1000,Fe:18,Mg:400,Zn:15,K:3500,Se:55,VitC:100,VitD:15,VitB12:2.4,Omega3:1.6 }; const results: Record<string, any> = {}; const gaps: string[] = []; Object.entries(targets).forEach(([k, t]) => { const actual = Math.round((micros[k]||0)*10)/10; const pct = Math.round(actual/t*100); results[k] = { actual, target: t, pct, status: pct>=80?'ok':pct>=50?'low':'critical' }; if (pct < 80) gaps.push(`${k}: ${actual} из ${t} (${pct}%)`); }); setNutrientReport({ micros: results, gaps: gaps.length === 0 ? ['✅ Все в норме'] : gaps }); setActiveReports(prev => prev.includes('nutrient') ? prev : [...prev, 'nutrient']); };
-  const generateQualityReport = () => { if (!dayPlan) return; const scores: any[] = []; dayPlan.meals.flatMap((m: any) => m.items).forEach((it: any) => { const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name); if (!food) return; let score = 5; const pd = (food.protein*4)/Math.max(food.kcal,1); if (pd > 0.6) score += 2; else if (pd > 0.3) score += 1; if ((food.fiber||0)>=3) score += 1; if (food.tier === 'max') score = 10; else if (food.tier === 'mid') score = Math.max(score,8); else if (food.tier === 'basic') score = Math.max(score,6); scores.push({ name: it.name, score: Math.min(10, score), bbs: food.bb_quality_score || 0, category: food.category }); }); const avg = Math.round(scores.reduce((s,x)=>s+x.score,0)/Math.max(1,scores.length)*10)/10; const bbsAvg = Math.round(scores.reduce((s,x)=>s+x.bbs,0)/Math.max(1,scores.length)*10)/10; const sorted = [...scores].sort((a,b)=>b.score-a.score); const budgetRange = budget === 'low' ? '★1-5' : budget === 'medium' ? '★5-8' : budget === 'max' ? '★8-10' : '★9-10'; const budgetOk = (budget === 'low' && bbsAvg <= 5) || (budget === 'medium' && bbsAvg >= 5 && bbsAvg <= 8) || ((budget === 'max' || budget === 'enhanced') && bbsAvg >= 8); setQualityReport({ avgScore: avg, bbsAvg, budget, budgetRange, budgetOk, bestItems: sorted.filter(s=>s.score>=8).map(s=>s.name).slice(0,5), weakItems: sorted.filter(s=>s.score<=5).map(s=>s.name).slice(0,5), recommendations: !budgetOk ? [`Бюджет «${budget}» (${budgetRange}), а средний bb_quality_score рациона ${bbsAvg}. ${budget==='low'?'Снизьте бюджет или повысьте качество.':(budget==='max'||budget==='enhanced')?'Выберите более дешёвые продукты или повысьте бюджет.':'Настройте бюджет под качество.'}`] : avg<6 ? ['Повысьте качество продуктов, увеличьте бюджет'] : avg>=8 ? [`✅ Отлично! Средний bb_quality_score ${bbsAvg} соответствует бюджету ${budgetRange}.`] : [] }); setActiveReports(prev => prev.includes('quality') ? prev : [...prev, 'quality']); };
-  const generateRiskReport = () => { if (!dayPlan) return; const systems: Record<string, any> = {}; const allItems = dayPlan.meals.flatMap((m: any)=>m.items); const totalFat = allItems.reduce((s:number,it:any)=>s+(it.f||0),0); const totalKcal = allItems.reduce((s:number,it:any)=>s+(it.kcal||0),0); const fatPct = totalKcal>0?totalFat*9/totalKcal*100:0; systems.hepatic = { score: fatPct>40?7:fatPct>30?5:fatPct>20?3:1, impact: fatPct>35?'Высокожировая':'Умеренные', recommendation: fatPct>35?'Снизить жиры до 25-30%':'Норма' }; const proteinGPerKg = Math.round((allItems.reduce((s:number,it:any)=>s+(it.p||0),0)/weight)*10)/10; systems.renal = { score: proteinGPerKg>3?7:proteinGPerKg>2.5?5:proteinGPerKg>2?3:1, impact: `${proteinGPerKg.toFixed(1)} г/кг`, recommendation: proteinGPerKg>2.5?'Контроль белка':'Норма' }; const totalScore = Object.values(systems).reduce((s:number,sys:any)=>s+sys.score,0); setRiskReport({ systems, totalRisk: totalScore<=8?'Низкий':totalScore<=14?'Средний':'Высокий', summary: totalScore<=8?'✅ Рацион сбалансирован':totalScore<=14?'⚠ Есть зоны для улучшения':'🔴 Требуется коррекция' }); setActiveReports(prev => prev.includes('risk')?prev:[...prev,'risk']); };
-  const generateDrugCompatReport = () => { if (!dayPlan || injections.length === 0) return; const warnings: string[] = []; const allItems = dayPlan.meals.flatMap((m: any) => m.items); const allFoodNames = allItems.map((it: any) => ({ id: it.id, name: it.name?.toLowerCase() || '' })).join(' ');
-  injections.forEach(inj => {
-    const t = inj.type?.toLowerCase() || '';
-    const name = inj.name?.toLowerCase() || '';
-    // Insulin + carbs
-    if (t.includes('инсулин')) { const totalCarbs = dayPlan.totals.c || 0; if (totalCarbs < 150) warnings.push(`💉 ${inj.name}: ${Math.round(totalCarbs)}г угл/день — риск гипогликемии. Минимум 150г.`); }
-    // GLP-1 + high fat
-    if (t.includes('семаглутид') || t.includes('тирзепатид')) { const totalFat = dayPlan.totals.f || 0; if (totalFat > weight * 0.6) warnings.push(`💊 ${inj.name}: жиры ${totalFat}г/день — риск тошноты/панкреатита при GLP-1. Ограничьте до ${Math.round(weight*0.5)}г.`); }
-  });
-  // D-26: AAS / PCT food-drug interactions (clinical dietology for BB on course).
-  // Oral AAS detection: by name (since DrugInjection.esterType has no 'oral' value).
-  const _hasOralAAS = v2Pharma?.AAS_ORAL || injections.some(i => i.type === 'ААС' && /метан|станазол|оксан|туринаб|анадрол|анабол/i.test(i.name||''));
-  const _hasInjectAAS = v2Pharma?.AAS_INJECTABLE || injections.some(i => i.type === 'ААС');
-  const _hasPCT = phase === 'pct';
-  if (_hasOralAAS) {
-    if (/грейпфрут|grapefruit/i.test(allFoodNames)) warnings.push('🔴 Оральные ААС + грейпфрут: ингибирование CYP3A4 → рост гепатотоксичности. Полностью исключите грейпфрут!');
-    if (/алкогол|пив|вин|водк|beer|wine|alcohol/i.test(allFoodNames)) warnings.push('🔴 Оральные ААС + алкоголь: аддитивное гепатотоксическое действие. Исключите алкоголь на курсе!');
-    if (/творог|молоко|сыр|кефир|йогурт|dairy|cottage|milk|cheese|yogurt/i.test(allFoodNames)) warnings.push('🟡 Оральные ААС + молочные: кальций снижает эмульгацию/абсорбцию 17α-алкил-ААС. Интервал 2-3 ч.');
-    if (/отруби|bran|чечевиц|lentils|фасол|beans|овсян|oats/i.test(allFoodNames)) warnings.push('🟡 Оральные ААС + высоко-клетчаточные: фитаты связывают липофильные ААС (−15-25% абсорбции). Интервал 1-2 ч.');
-  }
-  if (_hasInjectAAS && /алкогол|пив|вин|водк|alcohol/i.test(allFoodNames)) warnings.push('🟡 Инъекционные ААС + алкоголь: нагрузка на печень/липиды. Ограничьте алкоголь.');
-  if (_hasPCT) {
-    if (/грейпфрут|grapefruit/i.test(allFoodNames)) warnings.push('🟠 ПКТ (SERM/AI) + грейпфрут: CYP3A4 → рост концентрации тамоксифена/кломифена. Избегайте грейпфрут.');
-    if (!/творог|молоко|сыр|kefir|dairy|cheese|tofu|сардин|sardines|кальц/i.test(allFoodNames)) warnings.push('🟠 ПКТ + ингибиторы ароматазы → деминерализация костей. Увеличьте Ca (1200 мг): творог, сыр, сардины.');
-  }
-    // 🔴3 — Drug-nutrient interaction checker (8 pairs)
-  if (takenSupplements.some(s => s.includes('statin') || s.includes('atorva') || s.includes('rosuva') || s.includes('simva'))) {
-    if (/грейпфрут|grapefruit/i.test(allFoodNames)) warnings.push('💊 Статины + грейпфрут: ингибирование CYP3A4 → риск рабдомиолиза. Исключите грейпфрут!');
-  }
-  if (takenSupplements.some(s => s.includes('warfarin') || s.includes('варфарин'))) {
-    if (/шпинат|капуст|брокколи|зелен|spinach|kale|broccoli|cabbage|green/i.test(allFoodNames)) warnings.push('💊 Варфарин + витамин K (зелень/капуста): снижение INR → риск тромбоза. Контролируйте потребление зелени.');
-  }
-  if (takenSupplements.some(s => s.includes('enalapril') || s.includes('lisino') || s.includes('ramipril') || s.includes('telmisartan') || s.includes('losartan'))) {
-    if (/банан|картоф|шпинат|авокадо|томат|potato_boiled|banana|spinach|avocado|tomato/i.test(allFoodNames)) warnings.push('💊 ACEi/ARB + калий-богатые продукты: риск гиперкалиемии. Ограничьте бананы/картофель/шпинат.');
-  }
-  if (takenSupplements.some(s => s.includes('metformin') || s.includes('метформин'))) {
-    if (/алкогол|пив|вин|водк|alcohol|beer|wine/i.test(allFoodNames)) warnings.push('💊 Метформин + алкоголь: риск лактатацидоза. Исключите алкоголь.');
-  }
-  if (takenSupplements.some(s => s.includes('nebivolol') || s.includes('metoprolol') || s.includes('bisoprolol') || s.includes('carvedilol'))) {
-    if (/грейпфрут|grapefruit/i.test(allFoodNames)) warnings.push('💊 Бета-блокаторы + грейпфрут: потенцирование гипотензии. Исключите грейпфрут.');
-  }
-  if (takenSupplements.some(s => s.includes('maoi') || s.includes('phenelzine') || s.includes('tranylcypromine'))) {
-    if (/сыр|колбас|сосис|ветчин|копч|вялен|cheese|sausage|cured|smoked/i.test(allFoodNames)) warnings.push('💊 MAOI + тирамин (сыр/копчёности): риск гипертонического криза! Исключите выдержанные сыры и копчёности.');
-  }
-  if (takenSupplements.some(s => s.includes('finasteride') || s.includes('dutasteride') || s.includes('финастерид'))) {
-    warnings.push('💊 Финастерид/Дутастерид: избегать контакта беременных с препаратом. Хранить отдельно.');
-  }
-  if (warnings.length === 0) warnings.push('✅ Все препараты совместимы с планом питания');
-  setDrugCompatReport({ interactions: [], warnings });
-  setActiveReports(prev => prev.includes('drug')?prev:[...prev,'drug']); };
+  const generateAllergenReport = () => { if (!dayPlan) return; setAllergenReport(generateAllergenReportPure(dayPlan, allergens, FOOD_DB)); setActiveReports(prev => prev.includes('allergen') ? prev : [...prev, 'allergen']); };
+  const generateNutrientReport = () => { if (!dayPlan) return; setNutrientReport(generateNutrientReportPure(dayPlan, FOOD_DB)); setActiveReports(prev => prev.includes('nutrient') ? prev : [...prev, 'nutrient']); };
+  const generateQualityReport = () => { if (!dayPlan) return; setQualityReport(generateQualityReportPure(dayPlan, budget, FOOD_DB)); setActiveReports(prev => prev.includes('quality') ? prev : [...prev, 'quality']); };
+  const generateRiskReport = () => { if (!dayPlan) return; setRiskReport(generateRiskReportPure(dayPlan, weight)); setActiveReports(prev => prev.includes('risk') ? prev : [...prev, 'risk']); };
+  const generateDrugCompatReport = () => { if (!dayPlan || injections.length === 0) return; setDrugCompatReport(generateDrugCompatReportPure({ dayPlan, injections, weight, v2Pharma, phase, takenSupplements })); setActiveReports(prev => prev.includes('drug') ? prev : [...prev, 'drug']); };
   const generateFullNutritionReport = (planArg?: any, archve = true) => {
     const src = planArg || dayPlan; if (!src) return;
     try { const rep = generateNutritionReport({ meals: src.meals.map((m:any)=>({ label:m.label, items:m.items.map((i:any)=>({name:i.name||'',id:i.id||'',amount:i.amount||100,kcal:i.kcal||0,p:i.p||0,f:i.f||0,c:i.c||0,fiber:i.fiber||0})), totals:m.totals||{kcal:0,p:0,f:0,c:0}, time:m.time||'' })), totals: src.totals||{kcal:0,p:0,f:0,c:0}, targets: planTargets, userWeight: getProfileSafe()?.settings?.weight||80, userTDEE: planTargets.kcal, healthIssues, planType, variety, budget, allergens, cyclingMode, goal: getProfileSafe()?.settings?.primaryGoal||'maintenance', waterMl: waterCalc?.total?Math.round(waterCalc.total*1000):0, injections: injections.map(i=>({type:i.type,dose:i.dose,name:i.name,time:i.time})), workoutTime: linkToTraining&&trainingDays.some(Boolean)?trainStart:undefined });
@@ -2312,273 +1977,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // so the dietology scorecard in the day card is live without opening the Отчёт tab.
   useEffect(() => { if (dayPlan) generateFullNutritionReport(dayPlan, false); }, [dayPlan]);
 
-  const renderMealList = (dayData: any, editable = false) => {
-    if (!dayData) return null;
-    const d = dayData; const totalKcal = Math.round(d.totals?.kcal || 0); const totalP = Math.round(d.totals?.p || 0); const totalF = Math.round(d.totals?.f || 0); const totalC = Math.round(d.totals?.c || 0); const totalFiber = Math.round(d.totals?.fiber || 0);
-    const pKcalPct = totalKcal > 0 ? (totalP * 4 / totalKcal) * 100 : 0; const fKcalPct = totalKcal > 0 ? (totalF * 9 / totalKcal) * 100 : 0; const cKcalPct = totalKcal > 0 ? (totalC * 4 / totalKcal) * 100 : 0;
-    return (
-      <div>
-        <div style={{marginBottom:10,borderRadius:12,overflow:'hidden',border:d.isTrainingDay?'1px solid rgba(0,230,138,0.2)':'1px solid rgba(255,255,255,0.06)'}}>
-          <div style={{padding:'10px 12px',background:d.isTrainingDay?'linear-gradient(135deg, rgba(0,230,138,0.1), rgba(0,200,160,0.03))':'#202023'}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-              <span style={{fontSize:20,filter:d.isTrainingDay?'none':'grayscale(0.5)'}}>{d.isTrainingDay?'🏋️':'😴'}</span>
-              <div style={{flex:1}}><div style={{fontSize:12,fontWeight:800,color:d.isTrainingDay?'#00e68a':'rgba(255,255,255,0.85)'}}>{d.isTrainingDay?'🏆 ТРЕНИРОВОЧНЫЙ ДЕНЬ':'😴 ДЕНЬ ОТДЫХА'}</div> <span style={{fontSize:7,fontWeight:700,color:useProEngine?'#a78bfa':'#60a5fa',background:useProEngine?'rgba(167,139,250,0.12)':'rgba(96,165,250,0.12)',padding:'1px 5px',borderRadius:6,border:useProEngine?'1px solid rgba(167,139,250,0.25)':'1px solid rgba(96,165,250,0.25)',marginLeft:4,verticalAlign:'middle'}}>{useProEngine?'Pro':'Классический'} движок</span>
-              {weightLogEntries.length >= 3 && (() => { const vals = weightLogEntries.map(e => e.weight); const min = Math.min(...vals); const max = Math.max(...vals); const range = max - min || 1; const h = 24; const w = 80; const pts = vals.map((v,i) => `${Math.round(i/(vals.length-1)*w)},${Math.round(h-(v-min)/range*h)}`).join(' '); const trend = vals.length >= 2 && vals[vals.length-1] < vals[0]; return (<div style={{display:'inline-flex',alignItems:'center',gap:3,marginLeft:6}}><svg width={w} height={h} style={{verticalAlign:'middle'}}><polyline points={pts} fill="none" stroke={trend?'#22c55e':'#ef4444'} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/></svg><span style={{fontSize:7,color:trend?'#22c55e':'#ef4444',fontWeight:600}}>{trend?'↓':'↑'} {Math.abs(vals[vals.length-1]-vals[0]).toFixed(1)} кг</span></div>); })()}</div>
-              <div style={{padding:'4px 10px',borderRadius:8,background:d.isTrainingDay?'rgba(0,230,138,0.1)':'rgba(255,255,255,0.03)',border:d.isTrainingDay?'1px solid rgba(0,230,138,0.2)':'1px solid rgba(255,255,255,0.06)'}}>
-                <div style={{fontSize:16,fontWeight:900,color:Math.abs(totalKcal-(effectiveKcal||0))<=Math.max(50,(effectiveKcal||0)*0.08)?'#00e68a':'#f59e0b',lineHeight:1}}>{totalKcal}<span style={{fontSize:8,fontWeight:400,color:'rgba(255,255,255,0.5)'}}>/{effectiveKcal||'---'}</span></div>
-                {effectiveKcal>0 && (() => { const dk=Math.round(totalKcal-effectiveKcal); const dkp=Math.round((totalKcal-effectiveKcal)/effectiveKcal*100); const ok=Math.abs(dk)<=Math.max(50,Math.round(effectiveKcal*0.05)); return <div style={{fontSize:7,fontWeight:700,color:ok?'#22c55e':(dk>0?'#f59e0b':'#60a5fa')}}>Δ{dk>=0?'+':''}{dk} ({dk>=0?'+':''}{dkp}%)</div>; })()}
-                <div style={{fontSize:7,color:'rgba(255,255,255,0.85)',textAlign:'center'}}>ккал</div>
-              </div>
-            </div>
-                        <div style={{display:'flex',gap:8,fontSize:9,flexWrap:'wrap',alignItems:'center'}}>
-              {(() => {
-                // КБЖУ: Цель/Факт/Δ явно — расхождение должно быть понятным, а не «непонятный перебор»
-                const fmt = (val:number, tgt:number, unit:string) => {
-                  if (!tgt) return `${val}${unit}`;
-                  const d = Math.round(val - tgt);
-                  const dp = Math.round((val - tgt) / tgt * 100);
-                  const ok = Math.abs(d) <= Math.max(5, Math.round(tgt * 0.05));
-                  const col = ok ? '#22c55e' : (d > 0 ? '#f59e0b' : '#60a5fa');
-                  return <><b style={{fontWeight:800}}>{val}{unit}</b><span style={{fontSize:7,color:'rgba(255,255,255,0.45)'}}>/{tgt}{unit}</span> <span style={{fontSize:7,color:col,fontWeight:700}}>Δ{d>=0?'+':''}{d}{unit} ({d>=0?'+':''}{dp}%)</span></>;
-                };
-                return <>
-                  <span style={{color:'#3b82f6',fontWeight:600}}>💪 Б {fmt(totalP, effectiveP||0, 'г')}</span>
-                  <span style={{color:'#f59e0b',fontWeight:600}}>🧈 Ж {fmt(totalF, effectiveF||0, 'г')}</span>
-                  <span style={{color:'#f97316',fontWeight:600}}>🌾 У {fmt(totalC, effectiveC||0, 'г')}</span>
-                  {totalFiber > 0 && <span style={{color:'#22c55e',fontSize:8,fontWeight:600}}>🌱 {totalFiber}г</span>}
-                  <span style={{marginLeft:'auto',color:'rgba(255,255,255,0.85)'}}>{weight>0?`${Math.round(totalP/weight)}г/кг`:''}</span>
-                </>;
-              })()}
-            </div>
-            <div style={{fontSize:7,color:'rgba(255,255,255,0.42)',marginTop:3,lineHeight:1.3}}>
-              Цель собрана из: база <b style={{color:'#3b82f6'}}>{calcTargets.protein}г</b> · множ. уровня <b style={{color:'#00e68a'}}>{(_nutrMult||1).toFixed(2)}×</b> · фаза «<b style={{color:'#a78bfa'}}>{phase}</b>»{injections.some(i=>i.type==='ААС')?(' · +AAS ' + Math.round(weight*0.3) + 'г'):''} → итого <b style={{color:'#fff'}}>{effectiveP}г</b> белка / <b style={{color:'#fff'}}>{effectiveKcal}</b> ккал
-            </div>
-          </div>
-          {nutritionReport && (() => { const r = nutritionReport; const chip = (ok: boolean, label: string, val: string) => (<div style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 6px',borderRadius:6,fontSize:7,fontWeight:600,background:ok?'rgba(0,230,138,0.08)':'rgba(245,158,11,0.08)',border:`1px solid ${ok?'rgba(0,230,138,0.2)':'rgba(245,158,11,0.25)'}`,color:ok?'#22c55e':'#f59e0b'}}><span style={{width:5,height:5,borderRadius:'50%',background:ok?'#22c55e':'#f59e0b'}} />{label} {val}</div>); const mpsOk = (r.proteinTiming?.evennessScore||0) >= 70; const fibOk = (r.fiberAnalysis?.pct||0) >= 80; const glOk = r.glycemicLoad?.status !== 'high'; const satOk = (r.fatQuality?.satPct||0) <= 15; const nakOk = r.sodiumPotassium?.status === 'ok'; const pralOk = r.pral?.status === 'ok' || r.pral?.status === 'mild'; const o3 = r.fatQuality?.omega3G||0; const o3Ok = o3 >= 1.6; return (<div style={{marginTop:6,padding:'6px 8px',borderRadius:8,background:'rgba(139,92,246,0.04)',border:'1px solid rgba(139,92,246,0.12)'}}><div style={{fontSize:8,fontWeight:700,color:'#a78bfa',marginBottom:4}}>🩺 Диетология</div><div style={{display:'flex',flexWrap:'wrap',gap:4}}>{chip(mpsOk,'MPS',(r.proteinTiming?.evennessScore||0).toFixed(0)+'%')}{chip(fibOk,'Клетч.',(r.fiberAnalysis?.totalG||0).toFixed(0)+'г')}{chip(glOk,'ГН',r.glycemicLoad?.status==='high'?'выс.':r.glycemicLoad?.status==='low'?'низк.':'норма')}{chip(satOk,'Нас.жир',(r.fatQuality?.satPct||0).toFixed(0)+'%')}{chip(nakOk,'Na:K',(r.sodiumPotassium?.ratio||0).toFixed(1)+':1')}{chip(pralOk,'PRAL',(r.pral?.mEq||0)+'мэкв')}{chip(o3Ok,'Ω3',o3.toFixed(1)+'г')}</div></div>); })()}
-          {drugCompatReport?.warnings && drugCompatReport.warnings.length > 0 && drugCompatReport.warnings[0] && !drugCompatReport.warnings[0].includes('совместимы') && (<div style={{marginTop:6,padding:'6px 8px',borderRadius:8,background:'rgba(239,68,68,0.04)',border:'1px solid rgba(239,68,68,0.12)'}}><div style={{fontSize:8,fontWeight:700,color:'#ef4444',marginBottom:4}}>⚠ Лекарства × питание</div>{drugCompatReport.warnings.slice(0,4).map((w: string, i: number) => <div key={i} style={{fontSize:7,color:'rgba(255,255,255,0.75)',marginBottom:2}}>{w}</div>)}</div>)}
-
-          <div style={{height:4,display:'flex'}}>
-            <div style={{height:'100%',width:`${Math.max(2,pKcalPct)}%`,background:'#3b82f6',minWidth:2}}/>
-            <div style={{height:'100%',width:`${Math.max(2,fKcalPct)}%`,background:'#f59e0b',minWidth:2}}/>
-            <div style={{height:'100%',width:`${Math.max(2,cKcalPct)}%`,background:'#f97316',minWidth:2,flex:1}}/>
-          </div>
-        </div>
-        {d.allergenWarnings?.length > 0 && <div style={{padding:'6px 10px',borderRadius:8,background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',fontSize:8,color:'#ef4444',marginBottom:8,display:'flex',alignItems:'center',gap:4}}><span style={{fontSize:10}}>⚠️</span><span>{d.allergenWarnings.map((w: any) => typeof w === 'string' ? w : `${w.food}: ${w.allergens.join(', ')}`).join('; ')}</span></div>}
-        {d.meals.map((m: any, mi: number) => {
-          const mealKcal = Math.round(m.totals?.kcal || 0); const mealP = Math.round(m.totals?.p || 0); const mealF = Math.round(m.totals?.f || 0); const mealC = Math.round(m.totals?.c || 0);
-          const mealDiaas = calcMealDIAAS((m.items || []).map((it: any) => ({ foodId: it.id || it.name, weightGrams: it.amount || 100 })));
-          const mealGL = Math.round((m.items || []).reduce((s: number, it: any) => { const fd = FOOD_DB.find((f: any) => f.id === it.id); const gi = fd?.gi || 0; return s + (gi * (it.c || 0) / 100); }, 0));
-          const mealII = (() => { let wII = 0, wK = 0; (m.items || []).forEach((it: any) => { const fd = FOOD_DB.find((f: any) => f.id === it.id); const ii = fd?.macro_100g?.insulin_index; const k = it.kcal || 0; if (ii != null && k > 0) { wII += ii * k; wK += k; } }); return wK > 0 ? Math.round(wII / wK) : 0; })();
-          const isPreWorkout = m.label?.toLowerCase().includes('предтрен'); const isPostWorkout = m.label?.toLowerCase().includes('пост-трен'); const accentColor = isPreWorkout ? '#8b5cf6' : isPostWorkout ? '#f59e0b' : '#00e68a';
-          return (
-            <div key={mi} style={{marginBottom:6,borderRadius:10,overflow:'hidden',border:`1px solid ${dropTarget===mi?'rgba(0,230,138,0.4)':isPreWorkout?'rgba(139,92,246,0.2)':isPostWorkout?'rgba(245,158,11,0.2)':'rgba(255,255,255,0.15)'}`,transition:'all 0.2s',background:dropTarget===mi?'rgba(0,230,138,0.04)':undefined}}
-              onDragOver={e=>{e.preventDefault();setDropTarget(mi);}} onDragLeave={()=>setDropTarget(null)} onDrop={e=>{e.preventDefault();if(draggedItem&&draggedItem.mealIdx!==mi)moveFoodItem(draggedItem.mealIdx,mi,draggedItem.itemIdx);setDropTarget(null);}}>
-              <div style={{padding:'7px 10px 5px',background:isPreWorkout?'rgba(139,92,246,0.06)':isPostWorkout?'rgba(245,158,11,0.06)':'#202023',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                <div style={{display:'flex',alignItems:'center',gap:5}}>
-                  <span style={{fontSize:8,fontWeight:600,color:'rgba(255,255,255,0.85)'}}>{m.time}</span>
-                  <span style={{width:3,height:12,borderRadius:2,background:accentColor}}/>
-                  <span style={{fontSize:10,fontWeight:700,color:accentColor}}>{m.label}</span>
-                  {isPreWorkout&&<span style={{fontSize:7,padding:'1px 5px',borderRadius:4,background:'rgba(139,92,246,0.15)',color:'#a855f7',fontWeight:600}}>ДО</span>}
-                  {isPostWorkout&&<span style={{fontSize:7,padding:'1px 5px',borderRadius:4,background:'rgba(245,158,11,0.15)',color:'#f59e0b',fontWeight:600}}>ПОСЛЕ</span>}
-                  {d.timingScores?.[mi] && (
-                    <span style={{fontSize:7,padding:'1px 5px',borderRadius:4,fontWeight:600,
-                      background:d.timingScores[mi].status==='ideal'?'rgba(34,197,94,0.1)':d.timingScores[mi].status==='good'?'rgba(245,158,11,0.1)':'rgba(239,68,68,0.08)',
-                      color:d.timingScores[mi].status==='ideal'?'#22c55e':d.timingScores[mi].status==='good'?'#f59e0b':'#ef4444',
-                      border:`1px solid ${d.timingScores[mi].status==='ideal'?'rgba(34,197,94,0.2)':d.timingScores[mi].status==='good'?'rgba(245,158,11,0.2)':'rgba(239,68,68,0.12)'}`}}
-                      title={d.timingScores[mi].note}
-                    >★{d.timingScores[mi].score}/10</span>
-                  )}
-                </div>
-                <div style={{display:'flex',alignItems:'center',gap:4}}>
-                  <span style={{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.85)'}}>{mealKcal} ккал</span>
-                  <span onClick={()=>setRecipePickerMeal({dayIdx:0,mealIdx:mi,label:m.label})} style={{fontSize:7,padding:'2px 5px',borderRadius:4,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)',color:'#a78bfa',cursor:'pointer',fontWeight:600}}>🍳</span>
-                  <span onClick={()=>{setQuickAddMealIdx(mi);setQuickAddSearch('');}} style={{fontSize:7,padding:'2px 5px',borderRadius:4,background:'rgba(0,230,138,0.08)',border:'1px solid rgba(0,230,138,0.15)',color:'#00e68a',cursor:'pointer',fontWeight:600}}>+</span>
-                  <span onClick={()=>{saveUndo();const copy=JSON.parse(JSON.stringify(dayPlan?.meals?.[mi]));if(!copy)return;setDayPlan((prev:any)=>{if(!prev)return prev;const meals=[...prev.meals];const insertAt=Math.min(mi+1,meals.length);const dup={...copy,label:copy.label+' (копия)',time:(()=>{const[h,m]=(copy.time||'12:00').split(':').map(Number);const t=h*60+m+30;return`${String(Math.floor(t/60)%24).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`})()};meals.splice(insertAt,0,dup);const totals={kcal:meals.reduce((s:number,m2:any)=>s+(m2.totals?.kcal||0),0),p:meals.reduce((s:number,m2:any)=>s+(m2.totals?.p||0),0),f:meals.reduce((s:number,m2:any)=>s+(m2.totals?.f||0),0),c:meals.reduce((s:number,m2:any)=>s+(m2.totals?.c||0),0)};return{...prev,meals,totals}});}} style={{fontSize:7,padding:'2px 5px',borderRadius:4,background:'rgba(99,102,241,0.06)',border:'1px solid rgba(99,102,241,0.12)',color:'#818cf8',cursor:'pointer',fontWeight:600}}>📋</span>
-                  <span onClick={()=>{saveUndo();setDayPlan((prev:any)=>{if(!prev)return prev;const meals=prev.meals.filter((_:any,i:number)=>i!==mi);const totals={kcal:meals.reduce((s:number,m2:any)=>s+(m2.totals?.kcal||0),0),p:meals.reduce((s:number,m2:any)=>s+(m2.totals?.p||0),0),f:meals.reduce((s:number,m2:any)=>s+(m2.totals?.f||0),0),c:meals.reduce((s:number,m2:any)=>s+(m2.totals?.c||0),0)};return{...prev,meals,totals}});}} style={{fontSize:7,padding:'2px 5px',borderRadius:4,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.12)',color:'#ef4444',cursor:'pointer',fontWeight:600}}>✕</span>
-                </div>
-              </div>
-              <div style={{padding:'6px 10px 8px',background:'#18181b'}}>
-                <div style={{display:'flex',flexWrap:'wrap',gap:3}}>{m.items.map((it:any,ii:number)=>{const isEditing=editItem?.mealIdx===mi&&editItem?.itemIdx===ii;const isReplacing=replacingItem?.mealIdx===mi&&replacingItem?.itemIdx===ii;return<span key={ii} draggable={!isEditing&&!isReplacing} onDragStart={e=>{e.dataTransfer.setData('text/plain',`${mi}:${ii}`);setDraggedItem({mealIdx:mi,itemIdx:ii});}} style={{padding:'3px 6px',borderRadius:6,fontSize:8,background:isEditing?'rgba(59,130,246,0.08)':isReplacing?'rgba(245,158,11,0.08)':'#202023',border:`1px solid ${isEditing?'rgba(59,130,246,0.2)':isReplacing?'rgba(245,158,11,0.2)':'rgba(255,255,255,0.15)'}`,cursor:'grab',color:'#fff',display:'inline-flex',alignItems:'center',gap:3,flexWrap:'wrap'}}>
-                    {isEditing?<><input type="number" defaultValue={it.amount} onChange={e=>setEditAmount(+e.target.value||0)} style={{width:40,padding:'1px 4px',borderRadius:3,border:'1px solid rgba(255,255,255,0.06)',background:'#18181b',color:'#fff',fontSize:8}}/><span style={{fontSize:7,color:'rgba(255,255,255,0.85)'}}>г</span><button onClick={()=>setEditAmount(prev=>Math.round((prev||it.amount)+25))} style={{padding:'1px 3px',borderRadius:3,border:'1px solid rgba(59,130,246,0.2)',background:'rgba(59,130,246,0.08)',color:'#60a5fa',cursor:'pointer',fontSize:6}}>+25</button><button onClick={()=>setEditAmount(prev=>Math.round((prev||it.amount)*2))} style={{padding:'1px 3px',borderRadius:3,border:'1px solid rgba(139,92,246,0.2)',background:'rgba(139,92,246,0.08)',color:'#a78bfa',cursor:'pointer',fontSize:6}}>×2</button><button onClick={()=>setEditAmount(prev=>Math.round((prev||it.amount)/2))} style={{padding:'1px 3px',borderRadius:3,border:'1px solid rgba(245,158,11,0.2)',background:'rgba(245,158,11,0.08)',color:'#f59e0b',cursor:'pointer',fontSize:6}}>÷2</button><button onClick={()=>updateItemAmount(0,mi,ii,editAmount||it.amount)} style={{padding:'1px 4px',borderRadius:3,border:'none',background:'rgba(0,230,138,0.15)',color:'#00e68a',cursor:'pointer',fontSize:7}}>✓</button><button onClick={()=>setEditItem(null)} style={{padding:'1px 4px',borderRadius:3,border:'none',background:'rgba(239,68,68,0.1)',color:'#ef4444',cursor:'pointer',fontSize:7}}>✕</button></>
-                    :isReplacing?<><span style={{fontWeight:600}}>{it.name}</span><select onChange={e=>{if(e.target.value){const f=FOOD_DB.find(x=>x.id===e.target.value);if(f)replaceFoodItem(0,mi,ii,f);}}} value="" style={{fontSize:7,padding:'1px 2px',borderRadius:3,border:'1px solid rgba(255,255,255,0.06)',background:'#18181b',color:'#fff',maxWidth:120}}><option value="">🔀 Заменить...</option>{findSimilarFoods(it).map((s:any)=><option key={s.id} value={s.id}>{s.name}</option>)}</select></>
-                    :<><span style={{fontWeight:600}}>{it.name}</span>{preferredFoods.includes(it.id)&&<span style={{fontSize:7,color:'#00e68a',padding:'0 1px'}} title="Любимый продукт">⭐</span>}<span style={{color:'rgba(255,255,255,0.9)',fontSize:8}}>{it.amount}г</span>{lockedFoodIds.has(it.id)&&<span style={{fontSize:7,color:'#f59e0b',padding:'0 2px'}} title="Закреплено — не изменится при регенерации">🔒</span>}<span onClick={()=>addToCart({name:it.name,kcal:it.kcal*(it.amount/100),amount:it.amount,category:it.category})} style={{cursor:'pointer',fontSize:7,color:'#00e68a',opacity:0.35,padding:'0 2px'}}>🛒</span><span onClick={()=>toggleLockFood(it.id)} style={{cursor:'pointer',fontSize:7,color:lockedFoodIds.has(it.id)?'#f59e0b':'rgba(255,255,255,0.4)',padding:'0 2px'}} title={lockedFoodIds.has(it.id)?'Открепить':'Закрепить (не изменится при регенерации)'}>{lockedFoodIds.has(it.id)?'🔓':'🔒'}</span><span onClick={()=>{setEditItem({dayIdx:0,mealIdx:mi,itemIdx:ii});setEditAmount(it.amount);}} style={{cursor:'pointer',fontSize:7,color:'rgba(255,255,255,0.8)',padding:'0 2px'}}>✏️</span><span onClick={()=>setReplacingItem({dayIdx:0,mealIdx:mi,itemIdx:ii})} style={{cursor:'pointer',fontSize:7,color:'rgba(245,158,11,0.4)',padding:'0 2px'}}>🔄</span><span onClick={()=>removeFoodItem(0,mi,ii)} style={{cursor:'pointer',fontSize:7,color:'rgba(239,68,68,0.3)',padding:'0 2px'}}>✕</span></>}
-                  </span>;})}</div>
-                {m.totals&&<div style={{display:'flex',gap:6,marginTop:4,fontSize:8,alignItems:'center',flexWrap:'wrap'}}>{(() => { const tg = m.target; const fmt = (v: number, t: number|undefined, color: string) => { if (!t || t <= 0) return <span style={{color,fontWeight:600}}>{v}г</span>; const dev = v - t; const ok = Math.abs(dev) <= 3; return <span style={{color,fontWeight:600}}>{v}/{t}г{ok?null:<span style={{fontSize:6,color:dev>0?'#ef4444':'#f59e0b',fontWeight:700}}>{dev>0?('+'+Math.round(dev)):(''+Math.round(dev))}</span>}</span>; }; return <span style={{display:'contents'}}>{fmt(mealP,tg?.p,'#3b82f6')}<span style={{color:'rgba(255,255,255,0.2)',margin:'0 3px'}}>·</span>{fmt(mealF,tg?.f,'#f59e0b')}<span style={{color:'rgba(255,255,255,0.2)',margin:'0 3px'}}>·</span>{fmt(mealC,tg?.c,'#f97316')}</span>; })()}{mealDiaas.diaas > 0 && <span style={{fontSize:7,fontWeight:600,color:mealDiaas.diaas >= 1 ? '#22c55e' : mealDiaas.diaas >= 0.75 ? '#f59e0b' : '#ef4444',background:(mealDiaas.diaas >= 1 ? 'rgba(34,197,94,0.08)' : mealDiaas.diaas >= 0.75 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)') + ' none repeat scroll 0% 0%',padding:'1px 5px',borderRadius:4}}>DIAAS {mealDiaas.diaas.toFixed(2)}</span>}{mealGL > 0 && <span style={{fontSize:7,fontWeight:600,color:mealGL<10?'#22c55e':mealGL<=20?'#f59e0b':'#ef4444',background:(mealGL<10?'rgba(34,197,94,0.08)':mealGL<=20?'rgba(245,158,11,0.08)':'rgba(239,68,68,0.08)'),padding:'1px 5px',borderRadius:4}} title={'Glycemic Load: ' + mealGL + (isPostWorkout ? ' (high GL ok post-workout)' : '')}>GL {mealGL}</span>}{mealII > 0 && <span style={{fontSize:7,fontWeight:600,color:mealII<40?'#22c55e':mealII<=70?'#f59e0b':'#ef4444',background:(mealII<40?'rgba(34,197,94,0.08)':mealII<=70?'rgba(245,158,11,0.08)':'rgba(239,68,68,0.08)'),padding:'1px 5px',borderRadius:4}} title={'Insulin Index (kcal-weighted): ' + mealII}>II {mealII}</span>}{m.mpsCheck && m.mpsCheck.triggers_mTOR && <span style={{fontSize:7,fontWeight:600,color:'#00e68a',background:'rgba(0,230,138,0.08)',padding:'1px 5px',borderRadius:4}} title={'+' + m.mpsCheck.leucineG + 'g leucine, MPS triggered'}>{'\uD83E\uDDEC mTOR'}</span>}{m.mpsCheck && !m.mpsCheck.triggers_mTOR && m.mpsCheck.proteinG > 0 && <span style={{fontSize:7,fontWeight:600,color:'#f59e0b',background:'rgba(245,158,11,0.08)',padding:'1px 5px',borderRadius:4}} title={'Leucine ' + m.mpsCheck.leucineG + 'g < 2.5g threshold'}>{'\u26A0\uFE0F ' + m.mpsCheck.leucineG + 'g'}</span>}{m.synergyNotes&&m.synergyNotes.length>0&&<span style={{fontSize:7,color:'#22c55e',fontWeight:600}} title={m.synergyNotes.join('; ')}>✅ {(m.synergyNotes as string[]).length} синерги{((m.synergyNotes as string[]).length>1?'й':'я')}</span>}{m.conflictWarnings&&m.conflictWarnings.length>0&&<span style={{fontSize:7,color:'#ef4444',fontWeight:600}} title={m.conflictWarnings.join('; ')}>⚠️ {(m.conflictWarnings as string[]).length} конфликт{((m.conflictWarnings as string[]).length>1?'ов':'')}</span>}</div>}
-                {quickAddMealIdx === mi && (
-                  <div style={{padding:'4px 10px 8px',background:'#18181b',borderTop:'1px solid rgba(255,255,255,0.04)'}}>
-                    <input value={quickAddSearch} onChange={e=>setQuickAddSearch(e.target.value)} placeholder="Поиск продукта..." autoFocus style={{width:'100%',padding:'4px 8px',borderRadius:6,border:'1px solid rgba(0,230,138,0.2)',background:'#202023',color:'#fff',fontSize:9,marginBottom:4}} />
-                    <div style={{maxHeight:120,overflowY:'auto',display:'flex',flexWrap:'wrap',gap:3}}>
-                      {(() => {
-                        const raw = FOOD_DB.filter(f => !quickAddSearch || f.name.toLowerCase().includes(quickAddSearch.toLowerCase())).slice(0, 20);
-                        const mealTarget = getMealKBJUTarget(dayPlan, mi);
-                        const mealCur = getMealCurrentKBJU(dayPlan, mi);
-                        const defaultTarget = mealTarget || { kcal: 600, protein: 40, fat: 20, carbs: 60 };
-                        const scored = scoreFoodsForKBJU(raw, defaultTarget, mealCur || undefined, undefined, 10);
-                        const sorted = scored.length > 0 ? scored : raw.slice(0, 10).map(f => ({ foodId: f.id, foodName: f.name, matchScore: 0, color: '#00e68a', kcal: f.kcal, protein: f.protein, fat: f.fat, carbs: f.carbs, fiber: f.fiber || 0 }));
-                        return sorted.map((r: any) => {
-                          const food = FOOD_DB.find((f: any) => f.id === r.foodId);
-                          return (
-                            <span key={r.foodId} onClick={() => { if (!food) return; setDayPlan((prev: any) => { if (!prev) return prev; const meals = prev.meals.map((m1: any, i: number) => { if (i !== mi) return m1; const items = [...m1.items, { name: food.name, id: food.id, amount: 100, kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs, fiber: food.fiber || 0 }]; const totals = { kcal: items.reduce((s: number, it: any) => s + it.kcal, 0), p: items.reduce((s: number, it: any) => s + it.p, 0), f: items.reduce((s: number, it: any) => s + it.f, 0), c: items.reduce((s: number, it: any) => s + it.c, 0), fiber: items.reduce((s: number, it: any) => s + (it.fiber || 0), 0) }; return { ...m1, items, totals }; }); const totals = { kcal: meals.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0) }; return { ...prev, meals, totals }; }); setQuickAddMealIdx(null); setQuickAddSearch(''); }}
-                              style={{padding:'3px 6px',borderRadius:4,fontSize:8,background:'#202023',border:'1px solid rgba(0,230,138,0.1)',color:'#fff',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:3}}>
-                              {r.foodName}{r.matchScore > 0 && <span style={{fontSize:6,color:r.color,fontWeight:600}}>{r.matchScore}%</span>}
-                            </span>
-                          );
-                        });
-                      })()}
-                    </div>
-                    <button onClick={() => { setQuickAddMealIdx(null); setQuickAddSearch(''); }} style={{marginTop:4,padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.04)',color:'#ef4444',cursor:'pointer',fontSize:8,width:'100%'}}>✕ Закрыть</button>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-        {d.intraWorkout && (
-          <div style={{marginBottom:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(34,197,94,0.2)'}}>
-            <div style={{padding:'7px 10px 5px',background:'rgba(34,197,94,0.05)',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-              <div style={{display:'flex',alignItems:'center',gap:5}}>
-                <span style={{fontSize:8,fontWeight:600,color:'rgba(255,255,255,0.85)'}}>{d.intraWorkout.time}</span>
-                <span style={{width:3,height:12,borderRadius:2,background:'#22c55e'}}/>
-                <span style={{fontSize:10,fontWeight:700,color:'#22c55e'}}>{d.intraWorkout.label}</span>
-                <span style={{fontSize:7,padding:'1px 5px',borderRadius:4,background:'rgba(34,197,94,0.12)',color:'#22c55e',fontWeight:600}}>ВО ВРЕМЯ</span>
-              </div>
-              <span style={{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.85)'}}>{Math.round(d.intraWorkout.totals?.kcal||0)} ккал</span>
-            </div>
-            <div style={{padding:'6px 10px 8px',background:'#18181b'}}>
-              <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
-                {d.intraWorkout.items.map((it: any, ii: number) => (
-                  <span key={ii} style={{padding:'3px 6px',borderRadius:6,fontSize:8,background:'#202023',border:'1px solid rgba(34,197,94,0.15)',color:'#fff',display:'inline-flex',alignItems:'center',gap:3}}>
-                    <span style={{fontWeight:600}}>{it.name}</span><span style={{color:'rgba(255,255,255,0.9)',fontSize:7}}>{it.amount}г</span>
-                  </span>
-                ))}
-              </div>
-              {d.intraWorkout.note && <div style={{fontSize:7,color:'rgba(255,255,255,0.5)',marginTop:3}}>{d.intraWorkout.note}</div>}
-            </div>
-          </div>
-        )}
-        {d.nutritionLogic && d.nutritionLogic.length > 0 && (
-          <details style={{marginBottom:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(168,85,247,0.15)'}}>
-            <summary style={{padding:'7px 10px',background:'rgba(168,85,247,0.04)',cursor:'pointer',fontSize:9,fontWeight:700,color:'#a78bfa',listStyle:'none'}}>🧠 Логика плана: почему выбраны эти продукты</summary>
-            <div style={{padding:'8px 10px',background:'rgba(24,24,27,0.6)'}}>
-              {d.nutritionLogic.map((nl: any, nli: number) => (
-                <div key={nli} style={{marginBottom:4,padding:'4px 8px',borderRadius:6,background:'rgba(168,85,247,0.03)',border:'1px solid rgba(168,85,247,0.06)'}}>
-                  <span style={{fontSize:8,fontWeight:700,color:'#c4b5fd'}}>{nl.label}:</span>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:3,marginTop:2}}>
-                    {nl.rules.map((r: string, ri: number) => (
-                      <span key={ri} style={{fontSize:7,color:'rgba(255,255,255,0.6)',background:'rgba(168,85,247,0.06)',padding:'1px 5px',borderRadius:3}}>{r}</span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </details>
-        )}
-        {d.dietDiversity && (
-          <div style={{marginBottom:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(245,158,11,0.15)'}}>
-            <div style={{padding:'6px 10px',background:'rgba(245,158,11,0.04)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-              <span style={{fontSize:9,fontWeight:700,color:'#f59e0b'}}>🌈 Разнообразие: {d.dietDiversity.uniqueFoods} продуктов</span>
-              <span style={{fontSize:7,fontWeight:600,color:d.dietDiversity.score >= 7 ? '#22c55e' : d.dietDiversity.score >= 4 ? '#f59e0b' : '#ef4444'}}>{d.dietDiversity.note}</span>
-            </div>
-          </div>
-        )}
-        <div style={{marginTop:8,borderRadius:10,overflow:'hidden',border:'1px solid rgba(0,230,138,0.15)'}}>
-          <div style={{padding:'10px 12px',background:'linear-gradient(135deg, rgba(0,230,138,0.06), transparent)'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><span style={{fontSize:9,fontWeight:700,color:'rgba(255,255,255,0.85)',letterSpacing:'1px'}}>ИТОГО ЗА ДЕНЬ</span><span style={{color:'#00e68a',fontWeight:900,fontSize:16}}>{totalKcal} ккал</span></div>
-            <div style={{display:'flex',gap:8}}>
-              {[{label:'Белки',val:totalP,unit:'г',color:'#3b82f6',target:effectiveP},{label:'Жиры',val:totalF,unit:'г',color:'#f59e0b',target:effectiveF},{label:'Углеводы',val:totalC,unit:'г',color:'#f97316',target:effectiveC}].map(m=>{const pct=Math.min(100,Math.round(m.val/Math.max(1,m.target)*100));const isOver=pct>100;return(<div key={m.label} style={{flex:1}}><div style={{display:'flex',justifyContent:'space-between',fontSize:8,marginBottom:2}}><span style={{color:m.color,fontWeight:600}}>{m.label}</span><span style={{color:isOver?'#ef4444':'rgba(255,255,255,0.85)',fontWeight:700}}>{m.val}/{m.target}{m.unit}</span></div><div style={{height:5,borderRadius:3,background:'#202023',overflow:'hidden'}}><div style={{height:'100%',width:`${Math.min(100,pct)}%`,borderRadius:3,background:isOver?'#ef4444':`linear-gradient(90deg, ${m.color}, ${m.color}88)`,transition:'width 0.3s'}}/></div><div style={{fontSize:7,color:isOver?'#ef4444':'rgba(255,255,255,0.85)',textAlign:'right',marginTop:1}}>{isOver?`+${pct-100}%`:`${pct}%`}</div></div>);})}
-            </div>
-          </div>
-        </div>
-        {d.meals && (() => { const allItems = d.meals.flatMap((m: any) => (m.items || []).map((it: any) => ({...it, food: FOOD_DB.find((f: any) => f.id === it.id)}))); const calcMicro = (field: string, factor: number) => Math.round(allItems.reduce((s: number, it: any) => s + ((it.food?.micros?.[field] || it.food?.['trace_elements_100g']?.[field] || it.food?.electrolytes_100g?.[field] || 0) * (it.amount||100) / 100), 0)); const micros = [ {label:'Ca',val:calcMicro('Ca',1),rda:1000,unit:'мг'}, {label:'Fe',val:calcMicro('Fe',1),rda:18,unit:'мг'}, {label:'Mg',val:calcMicro('Mg',1),rda:400,unit:'мг'}, {label:'Zn',val:calcMicro('Zn',1),rda:15,unit:'мг'}, {label:'K',val:calcMicro('K',1),rda:3500,unit:'мг'}, {label:'Omega3',val:Math.round(allItems.reduce((s:number,it:any)=>s+((it.food?.macro_100g?.omega_3_mg||it.food?.micros?.Omega3||0)*(it.amount||100)/100),0)),rda:1600,unit:'мг'} ]; const visibleMicros = micros.filter(m => m.val > 0).slice(0, 5); return visibleMicros.length > 0 ? (<div style={{marginTop:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(34,197,94,0.15)'}}><div style={{padding:'6px 10px',background:'rgba(34,197,94,0.03)'}}><div style={{fontSize:9,fontWeight:700,color:'#22c55e',marginBottom:4}}>🧪 Микронутриенты (покрытие RDA)</div><div style={{display:'flex',flexWrap:'wrap',gap:4}}>{visibleMicros.map((m,i)=>{const pct=Math.min(100,Math.round(m.val/Math.max(1,m.rda)*100));return(<div key={i} style={{display:'flex',alignItems:'center',gap:3,fontSize:8,padding:'2px 6px',borderRadius:4,background:'rgba(34,197,94,0.06)',border:'1px solid rgba(34,197,94,0.1)'}}><span style={{fontWeight:700,color:pct>=80?'#22c55e':pct>=50?'#f59e0b':'#ef4444'}}>{m.label}</span><span style={{color:'rgba(255,255,255,0.7)'}}>{m.val}{m.unit}</span><span style={{fontSize:7,color:pct>=80?'#22c55e':pct>=50?'#f59e0b':'#ef4444',fontWeight:600}}>{pct}%</span></div>)})}</div></div></div>) : null; })()}
-        {d.supplementTimeline && d.supplementTimeline.length > 0 && (
-          <div style={{marginTop:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(139,92,246,0.2)'}}>
-            <div style={{padding:'8px 10px',background:'rgba(139,92,246,0.04)'}}>
-              <div style={{fontSize:9,fontWeight:700,color:'#a78bfa',marginBottom:6}}>💊 Добавки по времени</div>
-              {d.supplementTimeline.map((st: any, si: number) => (
-                <div key={si} style={{display:'flex',alignItems:'flex-start',gap:6,marginBottom:4,padding:'4px 6px',borderRadius:6,background:'rgba(139,92,246,0.04)'}}>
-                  <span style={{fontSize:7,color:'#a78bfa',fontWeight:600,minWidth:32}}>{st.time}</span>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
-                    {st.items.map((s: any, ii: number) => (
-                      <span key={ii} style={{fontSize:7,padding:'2px 5px',borderRadius:4,background:'rgba(139,92,246,0.1)',border:'1px solid rgba(139,92,246,0.15)',color:'#c4b5fd',fontWeight:600}} title={s.note}>{s.name} {s.dose}</span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        {d.waterTimeline && d.waterTimeline.length > 0 && (
-          <div style={{marginTop:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(59,130,246,0.2)'}}>
-            <div style={{padding:'8px 10px',background:'rgba(59,130,246,0.04)'}}>
-              <div style={{fontSize:9,fontWeight:700,color:'#60a5fa',marginBottom:6}}>💧 Гидратация (~{d.waterTimeline.reduce((s:number,w:any)=>s+w.ml,0)} мл/день)</div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-                {d.waterTimeline.map((w: any, wi: number) => (
-                  <span key={wi} style={{fontSize:7,padding:'2px 6px',borderRadius:4,background:'rgba(59,130,246,0.08)',border:'1px solid rgba(59,130,246,0.12)',color:'#93c5fd',fontWeight:600}} title={w.note}>{w.time} — {w.ml}мл</span>
-                ))}
-              </div>
-              {waterCalc?.electrolytes && (
-                <div style={{marginTop:6,padding:'5px 8px',borderRadius:6,background:'rgba(59,130,246,0.06)',fontSize:7}}>
-                  <span style={{color:'#93c5fd',fontWeight:600}}>⚡ Na {waterCalc.electrolytes.sodiumMg}мг</span>
-                  <span style={{margin:'0 6px',color:'rgba(255,255,255,0.15)'}}>|</span>
-                  <span style={{color:'#f59e0b',fontWeight:600}}>K {waterCalc.electrolytes.potassiumMg}мг</span>
-                  <span style={{margin:'0 6px',color:'rgba(255,255,255,0.15)'}}>|</span>
-                  <span style={{color:'#a78bfa',fontWeight:600}}>Mg {waterCalc.electrolytes.magnesiumMg}мг</span>
-                  <div style={{color:'rgba(255,255,255,0.5)',marginTop:2}}>{waterCalc.electrolytes.note}</div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        {d.meals && d.meals.length > 0 && (() => {
-          const toMin = (t: string) => { const [h, m] = (t || '00:00').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
-          const mealMins = d.meals.map((m: any) => toMin(m.time));
-          const startMin = Math.min(...mealMins, 360);
-          const lastMeal = Math.max(...mealMins);
-          const endMin = Math.max(lastMeal + 90, 1380);
-          const span = Math.max(60, endMin - startMin);
-          const pos = (min: number) => Math.max(0, Math.min(100, ((min - startMin) / span) * 100));
-          const mealPts = d.meals.map((m: any) => ({ ...m, min: toMin(m.time) })).sort((a: any, b: any) => a.min - b.min);
-          const trainMin = (linkToTraining && d.isTrainingDay && trainStart && trainStart.includes(':')) ? toMin(trainStart) : null;
-          const trainEndMin = (trainMin != null && trainEnd && trainEnd.includes(':')) ? toMin(trainEnd) : (trainMin != null ? trainMin + 90 : null);
-          const hourTicks: number[] = []; for (let t = Math.floor(startMin / 60) * 60; t <= endMin; t += 60) hourTicks.push(t);
-          return (
-            <div style={{ marginTop: 6, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,230,138,0.18)' }}>
-              <div style={{ padding: '8px 10px', background: 'rgba(0,230,138,0.04)' }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 6 }}>Таймлайн дня</div>
-                <div style={{ position: 'relative', height: 44, background: '#202023', borderRadius: 6, overflow: 'hidden' }}>
-                  {hourTicks.map((t, i) => (
-                    <div key={i} style={{ position: 'absolute', left: pos(t) + '%', top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.06)' }}>
-                      <span style={{ position: 'absolute', top: 1, left: 2, fontSize: 6, color: 'rgba(255,255,255,0.35)' }}>{String(Math.floor(t / 60) % 24).padStart(2, '0')}</span>
-                    </div>
-                  ))}
-                  {trainMin != null && trainEndMin != null && (
-                    <div style={{ position: 'absolute', left: pos(trainMin) + '%', width: Math.max(2, pos(trainEndMin) - pos(trainMin)) + '%', top: 0, bottom: 0, background: 'linear-gradient(180deg, rgba(239,68,68,0.28), rgba(239,68,68,0.1))', borderLeft: '2px solid #ef4444', borderRight: '2px solid #ef4444' }} title='Тренировка'>
-                      <span style={{ position: 'absolute', top: 1, left: '50%', transform: 'translateX(-50%)', fontSize: 7, fontWeight: 700, color: '#ef4444' }}>T</span>
-                    </div>
-                  )}
-                  {mealPts.map((m: any, i: number) => {
-                    const isW = m.label && (m.label.toLowerCase().includes('предтрен') || m.label.toLowerCase().includes('пост') || m.label.toLowerCase().includes('intra'));
-                    const col = isW ? '#8b5cf6' : '#00e68a';
-                    return (
-                      <div key={i} style={{ position: 'absolute', left: pos(m.min) + '%', top: 14, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }} title={m.time + ' — ' + m.label + ' · ' + Math.round(m.totals?.kcal || 0) + ' ккал'}>
-                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: col, boxShadow: '0 0 4px ' + col }} />
-                        <div style={{ fontSize: 5, color: col, marginTop: 1, whiteSpace: 'nowrap', fontWeight: 600 }}>{(m.label || '').slice(0, 8)}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 6, color: 'rgba(255,255,255,0.6)' }}>
-                  <span><span style={{ color: '#00e68a' }}>●</span> Приёмы</span>
-                  <span><span style={{ color: '#8b5cf6' }}>●</span> Peri-workout</span>
-                  {trainMin != null && <span><span style={{ color: '#ef4444' }}>T</span> Тренировка</span>}
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
-    );
-  };
+  // P1-7: renderMealList вынесен в MealListRender.tsx (267 строк → 1 строка)
+  const renderMealList = useRenderMealList();
 
   const ctx = useMemo<PlanCtx>(() => ({
     profile, s, courseEntries,
@@ -2669,10 +2069,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     histamineSensitive, setHistamineSensitive,
     labAnalysis,
     errorMsg, setErrorMsg,
-    useProEngine, setUseProEngine,
+    useProEngine,
     planTab, setPlanTab,
     labs,
-  }), [weight, height, age, sex, dailySteps, cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, mealsCount, allergens, healthIssues, eveningLowCarb, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, useProEngine, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
+  }), [weight, height, age, sex, dailySteps, cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, mealsCount, allergens, healthIssues, eveningLowCarb, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   return <PlanContext.Provider value={ctx}>{children}</PlanContext.Provider>;
 };

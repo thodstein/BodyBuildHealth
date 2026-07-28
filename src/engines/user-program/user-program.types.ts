@@ -244,6 +244,8 @@ export interface ProgramMeta {
   tags?: string[];
   /** Журнал правок (дешёвая версия без полных снапшотов). */
   revisions?: { ts: string; note: string }[];
+  /** Тренерские заметки к мезоциклу (отображаются в PDF/CSV). */
+  notes?: string;
 }
 
 export interface UserProgram {

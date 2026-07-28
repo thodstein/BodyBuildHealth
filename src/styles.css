@@ -48,9 +48,43 @@
   --glass-shadow: 0 8px 32px rgba(0,0,0,0.4);
   --organ-3d-size: 200px;
   --organ-3d-bg: rgba(0,0,0,0.2);
+  /* Apple-style card defaults (для data-theme=light) */
+  --card-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  --hover-bg: rgba(255,255,255,0.04);
+  --text-faint: rgba(255,255,255,0.35);
 }
 
+/* Светлая тема: активируется через data-theme="light" на documentElement.
+   Дизайн — Apple HIG (white cards, soft shadows, SF-стиль типографики). */
+[data-theme="light"] {
+  --bg: #F5F5F7;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #F2F2F5;
+  --text: #1D1D1F;
+  --text-dim: rgba(60,60,67,0.7);
+  --text-light: rgba(60,60,67,0.85);
+  --card-bg: #FFFFFF;
+  --card-bg-hover: #F5F5F7;
+  --card-bg-active: #E8E8ED;
+  --border: #E5E5EA;
+  --border-light: #F0F0F2;
+  --border-bright: #D0D0D5;
+  --glass-bg: rgba(255,255,255,0.72);
+  --glass-border: rgba(60,60,67,0.12);
+  --card-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  --hover-bg: rgba(0,0,0,0.04);
+  --text-faint: rgba(60,60,67,0.45);
+  --glass-shadow: 0 8px 32px rgba(0,0,0,0.1);
+  --organ-3d-bg: rgba(255,255,255,0.5);
+}
+[data-theme="light"] .pro-panel-section { box-shadow: 0 2px 12px rgba(0,0,0,0.08) !important; }
+
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+/* Focus-ring для accessibility (WCAG AAA — visible focus indicator) */
+*:focus-visible { outline: 2px solid var(--accent, #00e68a); outline-offset: 2px; }
+button:focus-visible, [role="button"]:focus-visible { outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
 html, body { 
   height:100%; 
   overscroll-behavior:none;

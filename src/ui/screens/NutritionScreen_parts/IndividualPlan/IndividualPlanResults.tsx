@@ -291,17 +291,20 @@ export const IndividualPlanResults: React.FC = () => {
   };
 
 
-  const runMonthPlan = () => {
+  // P0-3: Атомарная генерация месяца — явный async-цикл по 4 неделям с коротким yield для UI.
+  // Раньше 5×setTimeout (120мс) расово перекрывали weekPlan — построенные недели терялись.
+  const runMonthPlan = async () => {
     setMonthPlanMode(true);
     setMonthPlan([]);
-    const weeks = [0, 1, 2, 3];
-    weeks.forEach((w, i) => {
-      setTimeout(() => generatePlan(7, w), 120 * (i + 1));
-    });
-    setTimeout(() => {
-      setSelectedWeek(0);
-      generatePlan(7, 0);
-    }, 700);
+    for (let w = 0; w < 4; w++) {
+      // короткий yield для UI-рендера между неделями (50мс), без расы перекрытия state.
+      await new Promise<void>(r => setTimeout(() => r(), 50));
+      generatePlan(7, w);
+    }
+    await new Promise<void>(r => setTimeout(() => r(), 50));
+    setSelectedWeek(0);
+    // Восстановление плана недели 0 для отображения в UI (после прохождения 4 недель)
+    generatePlan(7, 0);
   };
 
   return (
@@ -421,7 +424,7 @@ export const IndividualPlanResults: React.FC = () => {
             <button onClick={() => {
               const txt = dayPlan ? `🍽 План питания\n${dayPlan.meals.map((m: any) => `${m.time} ${m.label}: ${m.items.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}  [${Math.round(m.totals?.kcal || 0)}ккал]`).join('\n')}\n\n📊 Итого: ${Math.round(dayPlan.totals.kcal)} ккал, Б${Math.round(dayPlan.totals.p)}/Ж${Math.round(dayPlan.totals.f)}/У${Math.round(dayPlan.totals.c)}, клетчатка ${Math.round(dayPlan.totals.fiber||0)}г${(dayPlan as any).healthScore ? `\n\n🩺 Health-score: ${(dayPlan as any).healthScore.score}/100 (${(dayPlan as any).healthScore.status}) — микро ${(dayPlan as any).healthScore.micro}/клетч ${(dayPlan as any).healthScore.fiber}/MPS ${(dayPlan as any).healthScore.mps}/EA ${(dayPlan as any).healthScore.ea}/диверс ${(dayPlan as any).healthScore.diversity}` : ''}${(dayPlan as any).energyAvailability ? `\n⚡ EA: ${(dayPlan as any).energyAvailability.ea} ккал/кг FFM (${(dayPlan as any).energyAvailability.status})` : ''}${(dayPlan as any).menstrualPhaseNote ? `\n🌸 ${(dayPlan as any).menstrualPhaseNote}` : ''}${(dayPlan as any).categoryNote ? `\n🏋 ${(dayPlan as any).categoryNote}` : ''}${(dayPlan as any).redSNote ? `\n⚠️ ${(dayPlan as any).redSNote}` : ''}${(dayPlan as any).peakWeekNote ? `\n🏆 ${(dayPlan as any).peakWeekNote}` : ''}` : '';
               navigator.clipboard?.writeText(txt);
-            }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:7, fontWeight:600 }}>📤 Копировать</button>
+            }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:10, fontWeight:600 }}>📤 Копировать</button>
             <button onClick={() => {
               const input = prompt('Вставьте план из буфера:');
               if (!input) return;
@@ -429,7 +432,7 @@ export const IndividualPlanResults: React.FC = () => {
                 const parsed = JSON.parse(input);
                 if (parsed.meals) { setDayPlan(parsed); setGenerated(true); }
               } catch { alert('Неверный формат. Скопируйте план через кнопку "Копировать план".'); }
-            }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:7, fontWeight:600 }}>📥 Импорт</button>
+            }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:10, fontWeight:600 }}>📥 Импорт</button>
           </div>
         </GlassCard>
       </>)}
@@ -444,7 +447,7 @@ export const IndividualPlanResults: React.FC = () => {
           <div style={{ padding:'8px 12px', borderRadius:12, background:bg, border:bor, marginBottom:8, display:'flex', alignItems:'center', gap:10 }}>
             <div style={{ textAlign:'center', minWidth:54 }}>
               <div style={{ fontSize:20, fontWeight:800, color:col, lineHeight:1 }}>{hs.score}</div>
-              <div style={{ fontSize:7, color:col, fontWeight:600, textTransform:'uppercase' }}>{hs.status === 'green' ? 'отлично' : hs.status === 'yellow' ? 'норма' : 'внимание'}</div>
+              <div style={{ fontSize:10, color:col, fontWeight:600, textTransform:'uppercase' }}>{hs.status === 'green' ? 'отлично' : hs.status === 'yellow' ? 'норма' : 'внимание'}</div>
             </div>
             <div style={{ flex:1, display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:4 }}>
               {bars.map(([lab,val]) => (
@@ -455,7 +458,7 @@ export const IndividualPlanResults: React.FC = () => {
                 </div>
               ))}
             </div>
-            {hs.conflicts > 0 && <span style={{ fontSize:7, color:'#ef4444', fontWeight:600 }}>⚠ {hs.conflicts} конфликт</span>}
+            {hs.conflicts > 0 && <span style={{ fontSize:10, color:'#ef4444', fontWeight:600 }}>⚠ {hs.conflicts} конфликт</span>}
           </div>
         );
       })()}
@@ -466,23 +469,23 @@ export const IndividualPlanResults: React.FC = () => {
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
             <div style={{ textAlign:'center' }}>
               <div style={{ fontSize:14, fontWeight:800, color:'#00e68a' }}>{(dayPlan as any).mpsSummary.feedings}</div>
-              <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)' }}>MPS feedings</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>MPS feedings</div>
             </div>
             <div style={{ textAlign:'center' }}>
               <div style={{ fontSize:14, fontWeight:800, color:'#3b82f6' }}>{(dayPlan as any).mpsSummary.avg_protein_per_meal_g}г</div>
-              <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)' }}>Белок/приём</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>Белок/приём</div>
             </div>
             <div style={{ textAlign:'center' }}>
               <div style={{ fontSize:14, fontWeight:800, color:'#f59e0b' }}>{(dayPlan as any).mpsSummary.avg_leucine_g}г</div>
-              <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)' }}>Лейцин/приём</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>Лейцин/приём</div>
             </div>
           </div>
           <div style={{ display:'flex', gap:4, marginTop:6, flexWrap:'wrap' }}>
-            {(dayPlan as any).mpsSummary.prePostWindow && <span style={{ fontSize:7, padding:'2px 6px', borderRadius:4, background:'rgba(34,197,94,0.1)', color:'#22c55e', border:'1px solid rgba(34,197,94,0.2)' }}>✅ Pre/Post-W</span>}
-            {(dayPlan as any).mpsSummary.intra_workout && <span style={{ fontSize:7, padding:'2px 6px', borderRadius:4, background:'rgba(168,85,247,0.1)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.2)' }}>✅ Intra-W</span>}
+            {(dayPlan as any).mpsSummary.prePostWindow && <span style={{ fontSize:10, padding:'2px 6px', borderRadius:4, background:'rgba(34,197,94,0.1)', color:'#22c55e', border:'1px solid rgba(34,197,94,0.2)' }}>✅ Pre/Post-W</span>}
+            {(dayPlan as any).mpsSummary.intra_workout && <span style={{ fontSize:10, padding:'2px 6px', borderRadius:4, background:'rgba(168,85,247,0.1)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.2)' }}>✅ Intra-W</span>}
           </div>
           {(dayPlan as any).proNotes && (dayPlan as any).proNotes.length > 0 && (
-            <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.5 }}>
+            <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.7)', lineHeight:1.5 }}>
               {(dayPlan as any).proNotes.map((n: string, i: number) => <div key={i} style={{ marginBottom:1 }}>• {n}</div>)}
             </div>
           )}
@@ -501,7 +504,7 @@ export const IndividualPlanResults: React.FC = () => {
             <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4 }}>
               {ordered.slice(0, 16).map(c => (
                 <div key={c.nutrient} style={{ textAlign:'center', padding:'3px 2px', borderRadius:6, background:'rgba(255,255,255,0.03)' }}>
-                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)' }}>{labelMap[c.nutrient] || c.nutrient}</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>{labelMap[c.nutrient] || c.nutrient}</div>
                   <div style={{ fontSize:11, fontWeight:800, color: colorFor(c.status) }}>{c.pct}%</div>
                   <div style={{ height:3, borderRadius:2, background:'rgba(255,255,255,0.08)', marginTop:2, overflow:'hidden' }}>
                     <div style={{ height:'100%', width:`${Math.min(100, c.pct)}%`, background: colorFor(c.status) }} />
@@ -518,55 +521,55 @@ export const IndividualPlanResults: React.FC = () => {
         const color = sev === 'high' ? '#ef4444' : sev === 'medium' ? '#f59e0b' : '#10b981';
         return (
           <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:`rgba(${sev==='high'?'239,68,68':sev==='medium'?'245,158,11':'16,185,129'},0.08)`, border:`1px solid rgba(${sev==='high'?'239,68,68':sev==='medium'?'245,158,11':'16,185,129'},0.25)` }}>
-            <div style={{ fontSize:8, fontWeight:700, color, marginBottom:2 }}>📊 Адаптация по дневнику</div>
+            <div style={{ fontSize:9, fontWeight:700, color, marginBottom:2 }}>📊 Адаптация по дневнику</div>
             <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{dc.note}</div>
-            <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:3 }}>Цели на сегодня скорректированы по факту вчерашнего дня.</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginTop:3 }}>Цели на сегодня скорректированы по факту вчерашнего дня.</div>
           </div>
         );
       })()}
       {/* #1 Женская фаза цикла */}
       {generated && dayPlan && (dayPlan as any).menstrualPhaseNote && (
         <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(236,72,153,0.08)', border:'1px solid rgba(236,72,153,0.25)' }}>
-          <div style={{ fontSize:8, fontWeight:700, color:'#ec4899', marginBottom:2 }}>🌈 Фаза цикла</div>
+          <div style={{ fontSize:9, fontWeight:700, color:'#ec4899', marginBottom:2 }}>🌈 Фаза цикла</div>
           <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).menstrualPhaseNote}</div>
         </div>
       )}
       {/* #2 Кости/кальций (женское) */}
       {generated && dayPlan && (dayPlan as any).boneNotes && ((dayPlan as any).boneNotes as string[]).map((n: string, i: number) => (
-        <div key={'bone'+i} style={{ marginBottom:4, padding:'6px 10px', borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.2)', fontSize:8, color:'rgba(255,255,255,0.8)', lineHeight:1.4 }}>{n}</div>
+        <div key={'bone'+i} style={{ marginBottom:4, padding:'6px 10px', borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.2)', fontSize:9, color:'rgba(255,255,255,0.8)', lineHeight:1.4 }}>{n}</div>
       ))}
       {/* #7 Сон-питание */}
       {generated && dayPlan && (dayPlan as any).sleepNote && (
-        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.25)', fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).sleepNote}</div>
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.25)', fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).sleepNote}</div>
       )}
       {/* #6 Diet-break диагностика */}
       {generated && dayPlan && (dayPlan as any).dietBreakNote && (
-        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)', fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).dietBreakNote}</div>
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)', fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).dietBreakNote}</div>
       )}
       {/* #5 Категория бодибилдинга */}
       {generated && dayPlan && (dayPlan as any).categoryNote && (
-        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.25)', fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).categoryNote}</div>
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.25)', fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).categoryNote}</div>
       )}
       {/* #4 Peak-week protocol */}
       {generated && dayPlan && (dayPlan as any).peakWeekNote && (
-        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.3)', fontSize:8, color:'#fbbf24', fontWeight:600, lineHeight:1.4 }}>{(dayPlan as any).peakWeekNote}</div>
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.3)', fontSize:9, color:'#fbbf24', fontWeight:600, lineHeight:1.4 }}>{(dayPlan as any).peakWeekNote}</div>
       )}
       {/* #10 Жизненный этап */}
       {generated && dayPlan && (dayPlan as any).lifeStageNote && (
-        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.25)', fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).lifeStageNote}</div>
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.25)', fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).lifeStageNote}</div>
       )}
       {/* #1 RED-S / Energy Availability */}
       {generated && dayPlan && (dayPlan as any).redSNote && (
-        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.35)', fontSize:8, color:'#fca5a5', fontWeight:600, lineHeight:1.4 }}>{(dayPlan as any).redSNote}</div>
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.35)', fontSize:9, color:'#fca5a5', fontWeight:600, lineHeight:1.4 }}>{(dayPlan as any).redSNote}</div>
       )}
       {generated && dayPlan && (dayPlan as any).energyAvailability && (dayPlan as any).energyAvailability.status !== 'risk' && (
-        <div style={{ marginBottom:6, padding:'6px 10px', borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.2)', fontSize:7, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>
+        <div style={{ marginBottom:6, padding:'6px 10px', borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.2)', fontSize:10, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>
           ⚡ Energy Availability: {(dayPlan as any).energyAvailability.ea} ккал/кг FFM ({(dayPlan as any).energyAvailability.status}) — трен. расход {(dayPlan as any).energyAvailability.exerciseKcal} ккал
         </div>
       )}
       {/* #2 Голод */}
       {generated && dayPlan && (dayPlan as any).hungerNote && (
-        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.25)', fontSize:8, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).hungerNote}</div>
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.25)', fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).hungerNote}</div>
       )}
       {generated && dayPlan && <DailyDietDashboard />}
       {generated && dayPlan && (
@@ -605,7 +608,7 @@ export const IndividualPlanResults: React.FC = () => {
         <GlassCard title={`План на день${cyclingMode !== 'none' ? (dayPlan.isTrainingDay ? ' 🏋️ Тренировочный' : ' 🛌 Отдых') : ''}`} icon="📋" color={dayPlan.isTrainingDay ? '#00e68a' : '#8b5cf6'} style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
           {dayPlan.isTrainingDay !== undefined && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>{dayPlan.isTrainingDay ? 'Тренировочный день' : 'День отдыха'}{cyclingMode !== 'none' && ` · циклирование: ${{macro:'макросы',butch:'БУЧ',cheatmeal:'читмил',carbload:'угл.загрузка'}[cyclingMode] || ''}`}{workScheduleEnabled && ` · 💼${dayPlan.isWorkDay ? ' Рабочий' : ' Выходной'}${dayPlan.isWorkDay && workStartTime ? ` ${workStartTime}-${workEndTime}` : ''}`}</div>}
           {renderMealList(dayPlan)}
-          <textarea value={dayPlanNotes} onChange={e => { setDayPlanNotes(e.target.value); localStorage.setItem('he_day_notes', e.target.value); }} placeholder="Заметки на сегодня..." style={{ width:'100%', marginTop:6, padding:'6px 10px', borderRadius:8, fontSize:8, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.85)', resize:'vertical', minHeight:30, boxSizing:'border-box' }} rows={1} />
+          <textarea value={dayPlanNotes} onChange={e => { setDayPlanNotes(e.target.value); localStorage.setItem('he_day_notes', e.target.value); }} placeholder="Заметки на сегодня..." style={{ width:'100%', marginTop:6, padding:'6px 10px', borderRadius:8, fontSize:9, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.85)', resize:'vertical', minHeight:30, boxSizing:'border-box' }} rows={1} />
           <button onClick={() => generatePlan(1, undefined, selectedDayIndex)} style={{ width:'100%', padding:'10px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, marginTop:8, marginBottom:4, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>
             🔄 Перегенерировать день
           </button>
@@ -637,9 +640,9 @@ export const IndividualPlanResults: React.FC = () => {
             const kcalPct = planKcal > 0 ? Math.round(factKcal / planKcal * 100) : 0;
             return (
               <GlassCard title="📊 План vs Факт" icon="⚖️" color={kcalPct >= 90 && kcalPct <= 110 ? '#22c55e' : '#f59e0b'}>
-                <div style={{ fontSize:8 }}>
+                <div style={{ fontSize:9 }}>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4, marginBottom:6 }}>
-                    {[{label:'Ккал', plan:planKcal, fact:factKcal, unit:'', color:'#00e68a'},{label:'Белок', plan:planP, fact:factP, unit:'г', color:'#3b82f6'},{label:'Жиры', plan:dayPlan?.totals?.f||0, fact:factF, unit:'г', color:'#f59e0b'},{label:'Угл.', plan:dayPlan?.totals?.c||0, fact:factC, unit:'г', color:'#f97316'}].map(m=>(<div key={m.label} style={{textAlign:'center',padding:'4px',borderRadius:6,background:'rgba(255,255,255,0.02)'}}><div style={{color:m.color,fontWeight:700,fontSize:10}}>{m.fact}</div><div style={{color:'rgba(255,255,255,0.5)',fontSize:7}}>План: {m.plan}{m.unit}</div></div>))}
+                    {[{label:'Ккал', plan:planKcal, fact:factKcal, unit:'', color:'#00e68a'},{label:'Белок', plan:planP, fact:factP, unit:'г', color:'#3b82f6'},{label:'Жиры', plan:dayPlan?.totals?.f||0, fact:factF, unit:'г', color:'#f59e0b'},{label:'Угл.', plan:dayPlan?.totals?.c||0, fact:factC, unit:'г', color:'#f97316'}].map(m=>(<div key={m.label} style={{textAlign:'center',padding:'4px',borderRadius:6,background:'rgba(255,255,255,0.02)'}}><div style={{color:m.color,fontWeight:700,fontSize:10}}>{m.fact}</div><div style={{color:'rgba(255,255,255,0.5)',fontSize:10}}>План: {m.plan}{m.unit}</div></div>))}
                   </div>
                   <div style={{ color: kcalPct >= 90 && kcalPct <= 110 ? '#22c55e' : '#f59e0b', fontWeight:600 }}>
                     {kcalPct >= 90 && kcalPct <= 110 ? '✅ В рамках плана' : kcalPct > 110 ? `⚠️ Перебор на ${kcalPct-100}%` : `⚠️ Недобор на ${100-kcalPct}%`}
@@ -699,7 +702,7 @@ export const IndividualPlanResults: React.FC = () => {
                 }}>Н{wi + 1}</button>
               ))}
               <button onClick={() => { setMonthPlanMode(false); setMonthPlan([]); }} style={{
-                padding:'5px 8px', borderRadius:8, fontSize:8, cursor:'pointer',
+                padding:'5px 8px', borderRadius:8, fontSize:9, cursor:'pointer',
                 background:'transparent', color:'rgba(255,255,255,0.8)', border:'1px solid rgba(255,255,255,0.06)',
               }}>✕</button>
             </div>
@@ -872,13 +875,13 @@ export const IndividualPlanResults: React.FC = () => {
                     onMouseLeave={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'}>
                     <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{r.name}</div>
                     <div style={{ color:'rgba(255,255,255,0.85)', marginBottom:4 }}>⏱{r.prepTimeMin}мин · {r.kcal}ккал · Б{r.protein}/Ж{r.fat}/У{r.carbs}</div>
-                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', display:'flex', gap:2, flexWrap:'wrap' }}>{(r.tags || []).map(t => <span key={t} style={{ padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'rgba(167,139,250,0.5)' }}>{t}</span>)}</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)', display:'flex', gap:2, flexWrap:'wrap' }}>{(r.tags || []).map(t => <span key={t} style={{ padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'rgba(167,139,250,0.5)' }}>{t}</span>)}</div>
                   </button>
                   <button onClick={() => setRecipeDetail(r)} style={{ width:36, height:36, borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.4)', fontSize:14, flexShrink:0, alignSelf:'flex-start', marginTop:8 }}>ℹ️</button>
                 </div>
               ))}
             </div>
-            <button onClick={() => setRecipePickerMeal(null)} style={{ width:'100%', marginTop:8, padding:'6px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'rgba(255,255,255,0.85)', fontSize:8, fontWeight:600 }}>✕ Отмена</button>
+            <button onClick={() => setRecipePickerMeal(null)} style={{ width:'100%', marginTop:8, padding:'6px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'rgba(255,255,255,0.85)', fontSize:9, fontWeight:600 }}>✕ Отмена</button>
           </div>
         </div>
       )}
@@ -898,19 +901,19 @@ export const IndividualPlanResults: React.FC = () => {
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4, marginBottom:10 }}>
               <div style={{ padding:'6px 4px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.1)', textAlign:'center' }}>
                 <div style={{ fontSize:14, fontWeight:700, color:'#22c55e' }}>{recipeDetail.protein}</div>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>Белки</div>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>Белки</div>
               </div>
               <div style={{ padding:'6px 4px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.1)', textAlign:'center' }}>
                 <div style={{ fontSize:14, fontWeight:700, color:'#f59e0b' }}>{recipeDetail.fat}</div>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>Жиры</div>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>Жиры</div>
               </div>
               <div style={{ padding:'6px 4px', borderRadius:8, background:'rgba(249,115,22,0.06)', border:'1px solid rgba(249,115,22,0.1)', textAlign:'center' }}>
                 <div style={{ fontSize:14, fontWeight:700, color:'#f97316' }}>{recipeDetail.carbs}</div>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>Угл</div>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>Угл</div>
               </div>
               <div style={{ padding:'6px 4px', borderRadius:8, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.1)', textAlign:'center' }}>
                 <div style={{ fontSize:14, fontWeight:700, color:'#8b5cf6' }}>{Math.round(recipeDetail.protein*4/recipeDetail.kcal*100)}%</div>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)' }}>% белка</div>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>% белка</div>
               </div>
             </div>
             {recipeDetail.ingredients?.length > 0 && (
@@ -928,7 +931,7 @@ export const IndividualPlanResults: React.FC = () => {
                 <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>📝 Инструкция</div>
                 <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
                   {recipeDetail.instructions.map((step:string, i:number) => (
-                    <div key={i} style={{ fontSize:8, color:'rgba(255,255,255,0.85)', padding:'4px 6px', background:'rgba(96,165,250,0.04)', borderRadius:4, lineHeight:1.4 }}>
+                    <div key={i} style={{ fontSize:9, color:'rgba(255,255,255,0.85)', padding:'4px 6px', background:'rgba(96,165,250,0.04)', borderRadius:4, lineHeight:1.4 }}>
                       <span style={{ fontWeight:700, color:'#60a5fa', marginRight:4 }}>{i+1}.</span>{step}
                     </div>
                   ))}
@@ -938,7 +941,7 @@ export const IndividualPlanResults: React.FC = () => {
             {recipeDetail.tags?.length > 0 && (
               <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
                 {recipeDetail.tags.map((t:string, i:number) => (
-                  <span key={i} style={{ padding:'2px 7px', borderRadius:5, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.12)', color:'#a78bfa', fontSize:7, fontWeight:600 }}>{t}</span>
+                  <span key={i} style={{ padding:'2px 7px', borderRadius:5, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.12)', color:'#a78bfa', fontSize:10, fontWeight:600 }}>{t}</span>
                 ))}
               </div>
             )}
@@ -986,10 +989,10 @@ export const IndividualPlanResults: React.FC = () => {
             ].find(s => s.months.includes(month));
             return <>
               {ach.length > 0 && <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>
-                {ach.map(a => <span key={a.label} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, background:'rgba(244,114,182,0.08)', border:'1px solid rgba(244,114,182,0.15)', color:'#f472b6' }}>{a.icon} {a.label}</span>)}
+                {ach.map(a => <span key={a.label} style={{ padding:'3px 8px', borderRadius:6, fontSize:9, background:'rgba(244,114,182,0.08)', border:'1px solid rgba(244,114,182,0.15)', color:'#f472b6' }}>{a.icon} {a.label}</span>)}
               </div>}
-              {seasonal && <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', padding:'4px 8px', borderRadius:6, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.1)' }}>🌿 Сезонные продукты: {seasonal.label}</div>}
-              {ach.length === 0 && <div style={{ fontSize:8, color:'rgba(255,255,255,0.8)' }}>Начните вести дневник питания, чтобы получать достижения.</div>}
+              {seasonal && <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', padding:'4px 8px', borderRadius:6, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.1)' }}>🌿 Сезонные продукты: {seasonal.label}</div>}
+              {ach.length === 0 && <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)' }}>Начните вести дневник питания, чтобы получать достижения.</div>}
             </>;
           })()}
         </GlassCard>
@@ -1076,7 +1079,7 @@ export const IndividualPlanResults: React.FC = () => {
                   {checkedCount > 0 && <button onClick={() => { localStorage.setItem('he_shopping_checked', '[]'); setChecked(new Set()); }} style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)', color: '#ef4444', cursor: 'pointer', fontSize: 8, fontWeight: 600 }}>✕ Сброс</button>}
                 </div>
                 {checkedCount > 0 && <div style={{marginBottom:6,height:4,borderRadius:2,background:'rgba(255,255,255,0.06)',overflow:'hidden'}}><div style={{height:'100%',width:`${Math.round(checkedCount/totalItems*100)}%`,borderRadius:2,background:'#22c55e',transition:'width 0.3s'}}/></div>}
-                {(shoppingList as any)._diversity && <div style={{marginBottom:6,fontSize:8,color:((shoppingList as any)._diversity.score >= 7 ? '#22c55e' : '#f59e0b'),fontWeight:600}}>🌈 Разнообразие: {((shoppingList as any)._diversity.uniqueFoods)} видов продуктов · {((shoppingList as any)._diversity.note)}</div>}
+                {(shoppingList as any)._diversity && <div style={{marginBottom:6,fontSize:9,color:((shoppingList as any)._diversity.score >= 7 ? '#22c55e' : '#f59e0b'),fontWeight:600}}>🌈 Разнообразие: {((shoppingList as any)._diversity.uniqueFoods)} видов продуктов · {((shoppingList as any)._diversity.note)}</div>}
                 {Object.entries(groups).map(([cat, items]) => (
                   <div key={cat} style={{ marginBottom: 6 }}>
                     <div style={{ fontSize: 9, fontWeight: 700, color: '#f97316', marginBottom: 2, padding: '2px 0 2px 4px', borderLeft: '2px solid rgba(249,115,22,0.3)', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -1312,9 +1315,9 @@ export const IndividualPlanResults: React.FC = () => {
               <div style={{ fontSize:16, width:28, textAlign:'center' }}>{h.icon}</div>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:10, fontWeight:700, color:'#06b6d4' }}>{h.label}</div>
-                <div style={{ fontSize:8, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{h.desc} — Исключено {h.foodIds.length} продуктов</div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{h.desc} — Исключено {h.foodIds.length} продуктов</div>
               </div>
-              <div style={{ fontSize:8, color:'rgba(6,182,212,0.6)', background:'rgba(6,182,212,0.1)', padding:'2px 6px', borderRadius:6 }}>{h.foodIds.length}</div>
+              <div style={{ fontSize:9, color:'rgba(6,182,212,0.6)', background:'rgba(6,182,212,0.1)', padding:'2px 6px', borderRadius:6 }}>{h.foodIds.length}</div>
             </div>
           ))}
         </GlassCard>
@@ -1372,7 +1375,7 @@ export const IndividualPlanResults: React.FC = () => {
                 <div style={{ fontSize: 9, fontWeight: 700, color: qualityReport.budgetOk ? '#22c55e' : '#f59e0b' }}>
                   ⭐ Качество: {qualityReport.avgScore}/10
                 </div>
-                <div style={{ fontSize:7, padding:'1px 5px', borderRadius:4, background: qualityReport.budgetOk ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', color: qualityReport.budgetOk ? '#22c55e' : '#f59e0b' }}>
+                <div style={{ fontSize:10, padding:'1px 5px', borderRadius:4, background: qualityReport.budgetOk ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', color: qualityReport.budgetOk ? '#22c55e' : '#f59e0b' }}>
                   {qualityReport.budgetRange} · bb_quality {qualityReport.bbsAvg}
                 </div>
               </div>
@@ -1463,7 +1466,7 @@ export const IndividualPlanResults: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 3, marginBottom: 4 }}>
                 {[{l:'Ккал',v:nutritionReport.kbjuPct.kcal},{l:'Белки',v:nutritionReport.kbjuPct.p},{l:'Жиры',v:nutritionReport.kbjuPct.f},{l:'Угл.',v:nutritionReport.kbjuPct.c}].map((s: any) => (
                   <div key={s.l} style={{ background:'rgba(0,0,0,0.2)', borderRadius:4, padding:'3px', textAlign:'center' }}>
-                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)' }}>{s.l}</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.7)' }}>{s.l}</div>
                     <div style={{ fontSize:11, fontWeight:700, color: s.v >= 85 && s.v <= 115 ? '#22c55e' : s.v >= 70 ? '#f59e0b' : '#ef4444' }}>{s.v}%</div>
                   </div>
                 ))}
@@ -1494,37 +1497,37 @@ export const IndividualPlanResults: React.FC = () => {
             <button onClick={() => generateCheatMeal()} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)', color:'#f59e0b', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
               🍔 Читмил
             </button>
-            <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Один приём пищи с повышенной калорийностью</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Один приём пищи с повышенной калорийностью</div>
           </div>
           <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
             <button onClick={() => generateCarbload()} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.2)', color:'#f97316', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
               🍚 Углев. загрузка
             </button>
-            <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Повышение углеводов на 1-2 дня</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Повышение углеводов на 1-2 дня</div>
           </div>
           <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
             <button onClick={() => generateBUTCH()} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.2)', color:'#3b82f6', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
               ⤴️⤵️ БУЧ
             </button>
-            <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Белково-углеводное чередование</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Белково-углеводное чередование</div>
           </div>
           <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
             <button onClick={() => generateCravingPlan()} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background: cravingMode ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.02)', border: cravingMode ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(255,255,255,0.06)', color: cravingMode ? '#ef4444' : 'rgba(255,255,255,0.8)', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
               🍬 Хочу сладкое
             </button>
-            <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Сладкий перекус на {cravingDays} {cravingDays === 1 ? 'день' : 'дня'}</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Сладкий перекус на {cravingDays} {cravingDays === 1 ? 'день' : 'дня'}</div>
           </div>
           <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
             <button onClick={() => generateLazyDayPlan()} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background: lazyDayMode ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.02)', border: lazyDayMode ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(255,255,255,0.06)', color: lazyDayMode ? '#f59e0b' : 'rgba(255,255,255,0.8)', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
               🛋 Ленивый день
             </button>
-            <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Минимум готовки, {lazyDayDays} {lazyDayDays === 1 ? 'день' : 'дней'}</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Минимум готовки, {lazyDayDays} {lazyDayDays === 1 ? 'день' : 'дней'}</div>
           </div>
           <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
             <button onClick={() => setSpecialMealMode(!specialMealMode)} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background: specialMealMode ? 'rgba(249,115,22,0.08)' : 'rgba(255,255,255,0.02)', border: specialMealMode ? '1px solid rgba(249,115,22,0.2)' : '1px solid rgba(255,255,255,0.06)', color: specialMealMode ? '#f97316' : 'rgba(255,255,255,0.8)', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
               🍽️ Спецприём
             </button>
-            <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Приём с заданными макросами</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Приём с заданными макросами</div>
           </div>
         </div>
       </div>
@@ -1549,7 +1552,7 @@ export const IndividualPlanResults: React.FC = () => {
           {cravingPlan.items.map((it: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               <span style={{ color: '#fff' }}>• {it.name || it}</span>
-              <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:8, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
+              <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:9, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
             </div>
           ))}
           <div style={{ fontSize: 9, fontWeight: 600, color: '#ef4444', marginTop: 6, marginBottom: 4 }}>📋 Основные принципы:</div>
@@ -1581,7 +1584,7 @@ export const IndividualPlanResults: React.FC = () => {
           {lazyDayPlan.items.map((it: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               <span style={{ color: '#fff' }}>• {it.name || it}</span>
-              <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:8, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
+              <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:9, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
             </div>
           ))}
           <div style={{ fontSize: 9, fontWeight: 600, color: '#f59e0b', marginTop: 6, marginBottom: 4 }}>📋 Основные принципы:</div>
@@ -1614,7 +1617,7 @@ export const IndividualPlanResults: React.FC = () => {
           {cheatMealPlan.items.map((it: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               <span style={{ color: '#fff' }}>• {it.name || it}</span>
-              <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || (cheatMealPlan.cals / cheatMealPlan.items.length), amount: 100 })} style={{ cursor:'pointer', fontSize:8, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
+              <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || (cheatMealPlan.cals / cheatMealPlan.items.length), amount: 100 })} style={{ cursor:'pointer', fontSize:9, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
             </div>
           ))}
           <div style={{ fontSize: 9, fontWeight: 600, color: '#f59e0b', marginTop: 6, marginBottom: 4 }}>📋 Основные принципы:</div>
@@ -1647,7 +1650,7 @@ export const IndividualPlanResults: React.FC = () => {
           {carbloadPlan.foods.map((f: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               <span style={{ color: '#fff' }}>• {f.name || f}</span>
-              <span onClick={() => addToCart({ name: f.name || f, kcal: f.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:8, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
+              <span onClick={() => addToCart({ name: f.name || f, kcal: f.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:9, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
             </div>
           ))}
           <div style={{ fontSize: 9, fontWeight: 600, color: '#f97316', marginTop: 6, marginBottom: 4 }}>📋 Основные принципы:</div>
@@ -1764,7 +1767,7 @@ export const IndividualPlanResults: React.FC = () => {
             <button onClick={generateRecommendations} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.2)', color:'#a855f7', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
               💡 Выдать рекомендации
             </button>
-            <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Персональные советы по питанию</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Персональные советы по питанию</div>
           </div>
           {generated && dayPlan && (
             <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
@@ -1775,7 +1778,7 @@ export const IndividualPlanResults: React.FC = () => {
                     background: mealPrepDays === n ? 'rgba(6,182,212,0.15)' : 'transparent',
                     border: mealPrepDays === n ? '1px solid rgba(6,182,212,0.3)' : '1px solid rgba(255,255,255,0.06)',
                     color: mealPrepDays === n ? '#06b6d4' : 'rgba(255,255,255,0.6)',
-                    fontWeight:600, fontSize:8,
+                    fontWeight:600, fontSize:9,
                   }}>
                     {n === 1 ? '1 день' : n === 3 ? '3 дня' : 'Неделя'}
                   </button>
@@ -1784,14 +1787,14 @@ export const IndividualPlanResults: React.FC = () => {
               <button onClick={generateMealPrep} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(6,182,212,0.08)', border:'1px solid rgba(6,182,212,0.2)', color:'#06b6d4', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
                 👨‍🍳 Meal Prep
               </button>
-              <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>План приготовления на несколько дней</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>План приготовления на несколько дней</div>
             </div>
           )}
           {generated && (
             <>
             <div style={{ background:'rgba(139,92,246,0.04)', borderRadius:10, padding:'8px 10px', border:'1px solid rgba(139,92,246,0.08)', marginBottom:6 }}>
               <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:3 }}>🧬 v2 Скоринг — что это?</div>
-              <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.4 }}>
+              <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.4 }}>
                 <b>BB Quality Score (1-10)</b> — статический рейтинг качества продукта для бодибилдинга на основе макронутриентов, аминокислот и клетчатки.<br/>
                 <b>Overall Dietary Score</b> — динамический рейтинг с учётом фазы (набор/сушка/ПКТ), фармакологии (ААС, инсулин, HGH, диуретики), анализов крови (гематокрит, липиды, печень, CRP) и тайминга приёма.<br/>
                 <b>Почему дублируются кнопки?</b> Скоринг анализирует рацион в целом, а не отдельные приёмы. Кнопка «Рассчитать полезность» запускает общий анализ. Кнопка DIAAS на карточке приёма — показывает усвояемость белка конкретного приёма.
@@ -1801,7 +1804,7 @@ export const IndividualPlanResults: React.FC = () => {
               <button onClick={() => { setShowCalcPopup(true); setCalcResults(null); setCalcDailyReport(null); }} style={{ width:'100%', padding:'12px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(0,200,160,0.12))', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontWeight:800, fontSize:11, transition:'all 0.15s' }}>
                 🧬 Рассчитать полезность
               </button>
-              <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>v2 скоринг выбранных приёмов + спецприёмов</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>v2 скоринг выбранных приёмов + спецприёмов</div>
             </div>
             </>
           )}
@@ -1810,7 +1813,7 @@ export const IndividualPlanResults: React.FC = () => {
               <button onClick={() => { setShowCorrectPopup(true); analyzePlanIssues(); }} style={{ width:'100%', padding:'12px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'linear-gradient(135deg,rgba(249,115,22,0.12),rgba(245,158,11,0.12))', border:'1px solid rgba(249,115,22,0.3)', color:'#f97316', fontWeight:800, fontSize:11, transition:'all 0.15s' }}>
                 🔀 Корректировка рациона
               </button>
-              <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Анализ недочётов + замена продуктов + перегенерация</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Анализ недочётов + замена продуктов + перегенерация</div>
             </div>
           )}
         </div>
@@ -1922,7 +1925,7 @@ export const IndividualPlanResults: React.FC = () => {
                   <div style={{ marginBottom:10 }}>
                     <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:4, display:'flex', justifyContent:'space-between' }}>
                       <span>🍽 Приёмы пищи</span>
-                      <span onClick={() => { const all: string[] = dayPlan.meals.map((_: any, i: number) => `meal_${i}`); const next = new Set(calcSelections); all.forEach((id: string) => next.add(id)); setCalcSelections(next); }} style={{ cursor:'pointer', fontSize:7, color:'#00e68a', fontWeight:600 }}>Выбрать все</span>
+                      <span onClick={() => { const all: string[] = dayPlan.meals.map((_: any, i: number) => `meal_${i}`); const next = new Set(calcSelections); all.forEach((id: string) => next.add(id)); setCalcSelections(next); }} style={{ cursor:'pointer', fontSize:10, color:'#00e68a', fontWeight:600 }}>Выбрать все</span>
                     </div>
                     {dayPlan.meals.map((m: any, i: number) => {
                       const id = `meal_${i}`;
@@ -1932,7 +1935,7 @@ export const IndividualPlanResults: React.FC = () => {
                           <div style={{ width:20, height:20, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center', background: sel ? '#00e68a' : 'rgba(255,255,255,0.06)', color: sel ? '#000' : 'transparent', fontSize:11, fontWeight:800, border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>{sel ? '✓' : ''}</div>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{m.label || `Приём ${i+1}`} {m.time && <span style={{ color:'rgba(255,255,255,0.9)', fontWeight:400, marginLeft:3 }}>{m.time}</span>}</div>
-                            <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)' }}>{Math.round(m.totals?.kcal || 0)} ккал · Б{m.totals?.p||0}/Ж{m.totals?.f||0}/У{m.totals?.c||0} · {m.items?.length || 0} продуктов</div>
+                            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)' }}>{Math.round(m.totals?.kcal || 0)} ккал · Б{m.totals?.p||0}/Ж{m.totals?.f||0}/У{m.totals?.c||0} · {m.items?.length || 0} продуктов</div>
                           </div>
                         </div>
                       );
@@ -1958,7 +1961,7 @@ export const IndividualPlanResults: React.FC = () => {
                           <div style={{ width:20, height:20, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center', background: sel ? '#00e68a' : 'rgba(255,255,255,0.06)', color: sel ? '#000' : 'transparent', fontSize:11, fontWeight:800, border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>{sel ? '✓' : ''}</div>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{s.label}</div>
-                            <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)' }}>{s.desc}</div>
+                            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)' }}>{s.desc}</div>
                           </div>
                         </div>
                       );
@@ -1972,7 +1975,7 @@ export const IndividualPlanResults: React.FC = () => {
             {calcTab !== 'day' && (
               <div style={{ textAlign:'center', padding:16, fontSize:9, color:'rgba(255,255,255,0.75)' }}>
                 {calcTab === 'week' ? '📆 Выберите день на вкладке "День" для поимённого выбора приёмов' : '🗓 Выберите день на вкладке "День"'}
-                <div style={{ fontSize:7, marginTop:4, color:'rgba(255,255,255,0.2)' }}>Недельный/месячный расчёт доступен через выбор каждого дня отдельно</div>
+                <div style={{ fontSize:10, marginTop:4, color:'rgba(255,255,255,0.2)' }}>Недельный/месячный расчёт доступен через выбор каждого дня отдельно</div>
               </div>
             )}
 
@@ -1994,15 +1997,15 @@ export const IndividualPlanResults: React.FC = () => {
                 {/* Summary row */}
                 <div style={{ display:'flex', gap:4, marginBottom:6 }}>
                   <div style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(0,230,138,0.06)', textAlign:'center' }}>
-                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>Приёмов</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)' }}>Приёмов</div>
                     <div style={{ fontSize:14, fontWeight:800, color:'#00e68a' }}>{calcResults.length}</div>
                   </div>
                   <div style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(139,92,246,0.06)', textAlign:'center' }}>
-                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>Ср. скор</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)' }}>Ср. скор</div>
                     <div style={{ fontSize:14, fontWeight:800, color:'#8b5cf6' }}>{(calcResults.reduce((s, r) => s + r.score.compositeScore, 0) / calcResults.length).toFixed(1)}</div>
                   </div>
                   <div style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(245,158,11,0.06)', textAlign:'center' }}>
-                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>Всего ккал</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)' }}>Всего ккал</div>
                     <div style={{ fontSize:14, fontWeight:800, color:'#f59e0b' }}>{calcResults.reduce((s, r) => s + r.score.macros.kcal, 0)}</div>
                   </div>
                 </div>
@@ -2052,7 +2055,7 @@ export const IndividualPlanResults: React.FC = () => {
                       </div>
                       {/* PFC ratio bar */}
                       <div style={{ marginBottom:6 }}>
-                        <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>БЖУ %</div>
+                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>БЖУ %</div>
                         <div style={{ display:'flex', gap:3, height:5, borderRadius:3, overflow:'hidden' }}>
                           <div style={{ flex:pctP, background:'#22c55e' }} />
                           <div style={{ flex:pctF, background:'#f59e0b' }} />
@@ -2066,15 +2069,15 @@ export const IndividualPlanResults: React.FC = () => {
                       </div>
                       {/* Quality breakdown */}
                       <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginBottom:4 }}>
-                        {bestItems.length > 0 && <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#22c55e' }}>✅ {bestItems.join(', ')}</span>}
-                        {weakItems.length > 0 && <span style={{ fontSize:7, padding:'1px 5px', borderRadius:3, background:'rgba(239,68,68,0.08)', color:'#ef4444' }}>⚠️ {weakItems.join(', ')}</span>}
+                        {bestItems.length > 0 && <span style={{ fontSize:10, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#22c55e' }}>✅ {bestItems.join(', ')}</span>}
+                        {weakItems.length > 0 && <span style={{ fontSize:10, padding:'1px 5px', borderRadius:3, background:'rgba(239,68,68,0.08)', color:'#ef4444' }}>⚠️ {weakItems.join(', ')}</span>}
                       </div>
                       {/* Modifiers */}
                       {sc.modifiers.length > 0 && (
                         <div style={{ marginBottom:4 }}>
-                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>🧬 Факторы:</div>
+                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>🧬 Факторы:</div>
                           {sc.modifiers.map((m: any, mi: number) => (
-                            <div key={mi} style={{ fontSize:7, padding:'2px 5px', marginBottom:1, borderRadius:4, background: m.value > 0 ? 'rgba(0,230,138,0.04)' : 'rgba(239,68,68,0.04)', color: m.value > 0 ? '#22c55e' : '#ef4444' }}>
+                            <div key={mi} style={{ fontSize:10, padding:'2px 5px', marginBottom:1, borderRadius:4, background: m.value > 0 ? 'rgba(0,230,138,0.04)' : 'rgba(239,68,68,0.04)', color: m.value > 0 ? '#22c55e' : '#ef4444' }}>
                               {m.name} <b>({m.value > 0 ? '+' : ''}{m.value.toFixed(1)})</b>
                             </div>
                           ))}
@@ -2083,15 +2086,15 @@ export const IndividualPlanResults: React.FC = () => {
                       {/* Weak links */}
                       {sc.weakLinks.length > 0 && (
                         <div style={{ marginBottom:4, padding:'4px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.1)' }}>
-                          <div style={{ fontSize:7, color:'#f59e0b', fontWeight:600 }}>⚠️ Слабые звенья: {sc.weakLinks.join(', ')}</div>
-                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginTop:2 }}>Добавьте продукты с более высоким скором в эту категорию</div>
+                          <div style={{ fontSize:10, color:'#f59e0b', fontWeight:600 }}>⚠️ Слабые звенья: {sc.weakLinks.join(', ')}</div>
+                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:2 }}>Добавьте продукты с более высоким скором в эту категорию</div>
                         </div>
                       )}
                       {/* Product details */}
                       <div style={{ marginBottom:4 }}>
-                        <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>📦 Продукты и скоры</div>
+                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>📦 Продукты и скоры</div>
                         {sc.productScores.map((p: any) => (
-                          <div key={p.foodId} style={{ display:'flex', alignItems:'center', gap:4, padding:'2px 0', fontSize:7 }}>
+                          <div key={p.foodId} style={{ display:'flex', alignItems:'center', gap:4, padding:'2px 0', fontSize:10 }}>
                             <div style={{ width:18, height:18, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
                               fontSize:6, fontWeight:800, border:`1.5px solid ${p.score >= 7 ? '#22c55e' : p.score >= 4 ? '#f59e0b' : '#ef4444'}`,
                               color: p.score >= 7 ? '#22c55e' : p.score >= 4 ? '#f59e0b' : '#ef4444' }}>{p.score}</div>
@@ -2103,7 +2106,7 @@ export const IndividualPlanResults: React.FC = () => {
                       {/* Micro coverage */}
                       {(sc as any).microCoverage && (sc as any).microCoverage.length > 0 && (
                         <div style={{ marginTop:4 }}>
-                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>💊 Микронутриенты (% от нормы)</div>
+                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>💊 Микронутриенты (% от нормы)</div>
                           {(sc as any).microCoverage.slice(0, 8).map((m: any) => (
                             <div key={m.key} style={{ display:'flex', alignItems:'center', gap:4, marginBottom:1 }}>
                               <span style={{ fontSize:6, color:'rgba(255,255,255,0.8)', minWidth:20 }}>{m.name}</span>
@@ -2120,7 +2123,7 @@ export const IndividualPlanResults: React.FC = () => {
                         </div>
                       )}
                       {/* Recommendations */}
-                      <div style={{ marginTop:4, fontSize:7, color:'#8b5cf6' }}>
+                      <div style={{ marginTop:4, fontSize:10, color:'#8b5cf6' }}>
                         {grade === 'A' && '🏆 Отличный состав — идеально для вашей фазы'}
                         {grade === 'B' && '👍 Хороший приём — добавьте зелени или клетчатки'}
                         {grade === 'C' && '⚡ Улучшите: больше белка, овощей, замените переработанное'}
@@ -2147,11 +2150,11 @@ export const IndividualPlanResults: React.FC = () => {
                         </div>
                       );
                     })()}
-                    <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:4 }}>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:4 }}>
                       Ккал: {Math.round(calcDailyReport.totalKcal)} | DIAAS: {calcDailyReport.diaas.toFixed(2)} | Лимит.АК: {calcDailyReport.diaasLimitingAA}
                       {calcDailyReport.histamineSensitive ? ' | ⚠️ Чувствителен к гистамину' : ''}
                     </div>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:3, fontSize:7, color:'rgba(255,255,255,0.85)' }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:3, fontSize:10, color:'rgba(255,255,255,0.85)' }}>
                       <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.mtorTriggered ? 'rgba(0,230,138,0.06)' : 'rgba(239,68,68,0.06)', color: calcDailyReport.mtorTriggered ? '#22c55e' : '#ef4444' }}>
                         🧬 mTOR: {calcDailyReport.mtorTriggered ? '✅ Запущен' : `❌ Дефицит ${calcDailyReport.mtorDeficitMg}мг лейцина`}
                       </div>
@@ -2181,29 +2184,29 @@ export const IndividualPlanResults: React.FC = () => {
                       </div>
                     </div>
                     {calcDailyReport.diaasWarning && (
-                      <div style={{ marginTop:4, fontSize:7, padding:'4px 8px', borderRadius:6, background: 'rgba(139,92,246,0.06)', color: '#8b5cf6' }}>
+                      <div style={{ marginTop:4, fontSize:10, padding:'4px 8px', borderRadius:6, background: 'rgba(139,92,246,0.06)', color: '#8b5cf6' }}>
                         💪 DIAAS: {calcDailyReport.diaasWarning}
                       </div>
                     )}
                     {calcDailyReport.antinutrientWarning && (
-                      <div style={{ marginTop:3, fontSize:7, padding:'4px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', color:'#f59e0b' }}>
+                      <div style={{ marginTop:3, fontSize:10, padding:'4px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', color:'#f59e0b' }}>
                         {calcDailyReport.antinutrientWarning}
                       </div>
                     )}
                     {calcDailyReport.glutathioneWarning && (
-                      <div style={{ marginTop:3, fontSize:7, padding:'4px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', color:'#f59e0b' }}>
+                      <div style={{ marginTop:3, fontSize:10, padding:'4px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', color:'#f59e0b' }}>
                         {calcDailyReport.glutathioneWarning}
                       </div>
                     )}
                     {calcDailyReport.histamineWarning && (
-                      <div style={{ marginTop:3, fontSize:7, padding:'4px 8px', borderRadius:6, background:'rgba(239,68,68,0.06)', color:'#ef4444' }}>
+                      <div style={{ marginTop:3, fontSize:10, padding:'4px 8px', borderRadius:6, background:'rgba(239,68,68,0.06)', color:'#ef4444' }}>
                         {calcDailyReport.histamineWarning}
                       </div>
                     )}
                     {/* Micro deficits */}
                     {calcDailyReport.microDeficits.length > 0 && (
                       <div style={{ marginTop:3 }}>
-                        <div style={{ fontSize:7, color:'#f59e0b', fontWeight:600, marginBottom:2 }}>⚠️ Дефициты микронутриентов ({calcDailyReport.microDeficits.length})</div>
+                        <div style={{ fontSize:10, color:'#f59e0b', fontWeight:600, marginBottom:2 }}>⚠️ Дефициты микронутриентов ({calcDailyReport.microDeficits.length})</div>
                         <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
                           {calcDailyReport.microDeficits.map((def: string) => {
                             const criticalDefs = ['Железо','B12','Витамин D','Кальций','B9','C','Фолат','B6'];
@@ -2230,11 +2233,11 @@ export const IndividualPlanResults: React.FC = () => {
                       const color = direction === 'gain' ? '#22c55e' : direction === 'loss' ? '#ef4444' : '#8b5cf6';
                       return (
                         <div style={{ marginTop:3, padding:'4px 8px', borderRadius:6, background:'rgba(6,182,212,0.04)', border:'1px solid rgba(6,182,212,0.08)' }}>
-                          <div style={{ fontSize:7, color:'#06b6d4', fontWeight:600, marginBottom:2 }}>⚖️ Прогноз динамики веса</div>
-                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>
+                          <div style={{ fontSize:10, color:'#06b6d4', fontWeight:600, marginBottom:2 }}>⚖️ Прогноз динамики веса</div>
+                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)' }}>
                             Ккал: {Math.round(calcDailyReport.totalKcal)}/день · TDEE: ~{Math.round(tdeeEst)} · Баланс: {kcalDiff > 0 ? '+' : ''}{Math.round(kcalDiff)} ккал/день
                           </div>
-                          <div style={{ fontSize:8, fontWeight:600, color, marginTop:1 }}>
+                          <div style={{ fontSize:9, fontWeight:600, color, marginTop:1 }}>
                             {arrow} ~{Math.abs(weeklyKg).toFixed(2)} кг/нед ({direction === 'gain' ? 'набор' : direction === 'loss' ? 'снижение' : 'поддержание'})
                           </div>
                         </div>
@@ -2248,12 +2251,12 @@ export const IndividualPlanResults: React.FC = () => {
                       return (
                         <>
                           {bestItems.length > 0 && (
-                            <div style={{ marginTop:4, fontSize:7, padding:'4px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', color:'#22c55e' }}>
+                            <div style={{ marginTop:4, fontSize:10, padding:'4px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', color:'#22c55e' }}>
                               ✅ Лучшие продукты: {bestItems.join(', ')}
                             </div>
                           )}
                           {weakItems.length > 0 && (
-                            <div style={{ marginTop:3, fontSize:7, padding:'4px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', color:'#ef4444' }}>
+                            <div style={{ marginTop:3, fontSize:10, padding:'4px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', color:'#ef4444' }}>
                               ⚠️ Слабые продукты: {weakItems.join(', ')}
                             </div>
                           )}
@@ -2270,9 +2273,9 @@ export const IndividualPlanResults: React.FC = () => {
                       if (calcDailyReport.microDeficits.length > 0) recs.push('💊 Обратите внимание на дефициты: ' + calcDailyReport.microDeficits.slice(0,3).join(', '));
                       return recs.length > 0 ? (
                         <div style={{ marginTop:4 }}>
-                          <div style={{ fontSize:7, color:'#8b5cf6', fontWeight:600, marginBottom:2 }}>📋 Рекомендации</div>
+                          <div style={{ fontSize:10, color:'#8b5cf6', fontWeight:600, marginBottom:2 }}>📋 Рекомендации</div>
                           {recs.map((rec, ri) => (
-                            <div key={ri} style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:1 }}>• {rec}</div>
+                            <div key={ri} style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:1 }}>• {rec}</div>
                           ))}
                         </div>
                       ) : null;
@@ -2301,7 +2304,7 @@ export const IndividualPlanResults: React.FC = () => {
               <div style={{ textAlign:'center', padding:20 }}>
                 <div style={{ fontSize:24, marginBottom:8 }}>✅</div>
                 <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:4 }}>Рацион сбалансирован</div>
-                <div style={{ fontSize:8, color:'rgba(255,255,255,0.75)' }}>Не найдено критических недочётов</div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.75)' }}>Не найдено критических недочётов</div>
               </div>
             ) : (
               <>
@@ -2313,15 +2316,15 @@ export const IndividualPlanResults: React.FC = () => {
                   <div key={mi} style={{ marginBottom:8, borderRadius:10, background:'rgba(24,24,27,0.8)', border:'1px solid rgba(249,115,22,0.1)', overflow:'hidden' }}>
                     <div style={{ padding:'7px 10px', background:'rgba(249,115,22,0.06)', borderBottom:'1px solid rgba(249,115,22,0.08)' }}>
                       <span style={{ fontSize:10, fontWeight:700, color:'#f97316' }}>{meal.mealName}</span>
-                      <span style={{ fontSize:8, color:'rgba(255,255,255,0.75)', marginLeft:6 }}>({meal.issues.length})</span>
+                      <span style={{ fontSize:9, color:'rgba(255,255,255,0.75)', marginLeft:6 }}>({meal.issues.length})</span>
                     </div>
                     <div style={{ padding:'6px 10px' }}>
                       {meal.issues.map((issue, ii) => (
                         <div key={ii} style={{ marginBottom:6, padding:'6px 8px', borderRadius:8, background: issue.severity === 'high' ? 'rgba(239,68,68,0.04)' : 'rgba(245,158,11,0.04)', border:`1px solid ${issue.severity === 'high' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)'}` }}>
-                          <div style={{ fontSize:8, fontWeight:600, color: issue.severity === 'high' ? '#ef4444' : '#f59e0b', marginBottom:3 }}>{issue.text}</div>
+                          <div style={{ fontSize:9, fontWeight:600, color: issue.severity === 'high' ? '#ef4444' : '#f59e0b', marginBottom:3 }}>{issue.text}</div>
                           {issue.suggestion && issue.suggestion.length > 0 && (
                             <div>
-                              <div style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>🔀 Заменить на:</div>
+                              <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>🔀 Заменить на:</div>
                               <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
                                 {issue.suggestion.map((s, si) => {
                                   const dayIdx = planDays === 1 ? 0 : selectedDayIndex + 1;
@@ -2337,7 +2340,7 @@ export const IndividualPlanResults: React.FC = () => {
                                       replaceFoodItem(dayIdx, meal.mealIdx, itemIdx, FOOD_DB.find(f => f.id === s.foodId));
                                       analyzePlanIssues();
                                     }
-                                  }} style={{ padding:'3px 8px', borderRadius:6, fontSize:7, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:600 }}>
+                                  }} style={{ padding:'3px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:600 }}>
                                     {s.name} <span style={{ fontWeight:400, color:'rgba(255,255,255,0.75)' }}>({s.reason})</span>
                                   </button>
                                   );
@@ -2357,7 +2360,7 @@ export const IndividualPlanResults: React.FC = () => {
                                     }
                                   });
                                   analyzePlanIssues();
-                                }} style={{ padding:'3px 8px', borderRadius:6, fontSize:7, cursor:'pointer', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', color:'#a78bfa', fontWeight:600 }}>
+                                }} style={{ padding:'3px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', color:'#a78bfa', fontWeight:600 }}>
                                   🔄 Все
                                 </button>
                               </div>

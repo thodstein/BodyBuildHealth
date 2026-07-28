@@ -20,7 +20,7 @@ import {
   muscleAwareSets,
   makeSetsFromTemplate,
   suggestExercisesForGroup,
-} from '../../../engines/manual-constructor.engine';
+} from '../../../engines/manual-constructor';
 import { loadTrainingProfile } from './training-profile';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { findSubstitutions } from '../../../engines/exercise-substitution.engine';
@@ -71,6 +71,16 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
       })),
     };
     setWeeks([...body.weeks, cloned]);
+  };
+  // F2.3: swap two weeks (drag-and-drop lite — кнопка переставляет соседние недели)
+  const swapWeek = (a: number, b: number) => {
+    if (a < 0 || b < 0 || a >= body.weeks.length || b >= body.weeks.length || a === b) return;
+    const arr = [...body.weeks];
+    [arr[a], arr[b]] = [arr[b], arr[a]];
+    // Сохраняем week-номера (переставляем только содержимое)
+    arr[a] = { ...arr[a], week: body.weeks[a].week };
+    arr[b] = { ...arr[b], week: body.weeks[b].week };
+    setWeeks(arr);
   };
 
   /** Метрики для выбранной недели — пересчитываем при каждом изменении блоков/сетов. */
@@ -175,6 +185,9 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
               title="Показать бюджет объёма по мышцам для этой недели"
             >📊 Объём</button>
             <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38 }} onClick={() => cloneWeek(wi)} title="Клонировать неделю">⧉</button>
+            {wi < body.weeks.length - 1 && (
+              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => swapWeek(wi, wi + 1)} title="Поменять местами с следующей неделей">⇅ swap</button>
+            )}
             <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeWeek(wi)}>✕ нед</button>
           </div>
           {volWeekIdx === wi && (
@@ -287,6 +300,20 @@ const SessionList: React.FC<{ sessions: UserSession[]; onChange: (s: UserSession
 const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => void }> = ({ blocks, onChange }) => {
   const addBlock = () => onChange([...blocks, { id: newId('blk'), type: 'accessory', exerciseName: '', muscle: '', role: 'accessory', sets: [{ reps: 10, rir: 2 }] }]);
   const updateBlock = (bi: number, patch: Partial<UserBlock>) => onChange(blocks.map((b, i) => i === bi ? { ...b, ...patch } : b));
+  // F2.2: clipboard для копирования блоков между сессиями/неделями (localStorage, т.к. в SPA мало памяти)
+  const COPY_KEY = 'he_bb_block_clipboard';
+  const copyBlock = (bi: number) => {
+    try { localStorage.setItem(COPY_KEY, JSON.stringify(blocks[bi])); } catch {}
+  };
+  const pasteBlock = () => {
+    try {
+      const raw = localStorage.getItem(COPY_KEY);
+      if (!raw) return;
+      const src = JSON.parse(raw) as UserBlock;
+      const newBlock: UserBlock = { ...src, id: newId('blk') };
+      onChange([...blocks, newBlock]);
+    } catch {}
+  };
   // U4: confirm-диалог при удалении блока
   const removeBlock = (bi: number) => {
     const b = blocks[bi];
@@ -536,6 +563,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => v
               title="Подобрать замену"
             >🔄</button>
           )}
+          <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38, color: '#06b6d4', borderColor: 'rgba(6,182,212,0.3)' }} onClick={() => copyBlock(bi)} title="Скопировать упражнение в буфер">📋</button>
           <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeBlock(bi)}>✕</button>
           {substFor === bi && substResults.length > 0 && (
             <div style={{ padding: '4px 8px', marginTop: 4, background: 'rgba(245,158,11,0.06)', borderRadius: 6, border: '1px solid rgba(245,158,11,0.18)' }}>
@@ -555,7 +583,10 @@ const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => v
         </div>
         </div>
       ))}
-      <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38, alignSelf: 'flex-start' }} onClick={addBlock}>+ Упражнение</button>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38 }} onClick={addBlock}>+ Упражнение</button>
+        <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38, color: '#06b6d4', borderColor: 'rgba(6,182,212,0.3)' }} onClick={pasteBlock} title="Вставить скопированное упражнение из буфера">📥 Вставить</button>
+      </div>
     </div>
   );
 };
