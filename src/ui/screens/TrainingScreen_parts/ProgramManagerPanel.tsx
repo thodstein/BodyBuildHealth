@@ -1194,8 +1194,33 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         }
       }
     } else if (program.pl) {
-      html.push(`<h2>ПЛ-цикл: ${program.pl.sourceCycleId}</h2>`);
-      html.push(`<div class="meta">ПМ: присед ${program.pl.workMax?.squat ?? '-'} · жим ${program.pl.workMax?.bench ?? '-'} · тяга ${program.pl.workMax?.dead ?? '-'} кг</div>`);
+      // P4-4: PL в PDF — customWeeks (таблицы) или LMS-расписание
+      if (program.pl.sourceCycleId === null && program.pl.customWeeks) {
+        // Свой PL-цикл — таблицы как BB
+        for (const w of program.pl.customWeeks) {
+          html.push(`<h2>Неделя ${w.week} <span class="phase" style="background:${w.deload?'#f59e0b20':'#a78bfa20'};color:${w.deload?'#f59e0b':'#a78bfa'}">${w.phase}${w.deload?' · делод':''}</span></h2>`);
+          for (const d of w.days) {
+            html.push(`<table><thead><tr><th colspan="5">${d.name}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>%1RM</th><th>Повт</th><th>Сетов</th></tr></thead><tbody>`);
+            for (const ex of d.exercises) {
+              if (!ex.name) continue;
+              html.push(`<tr><td>${ex.name}</td><td>${ex.muscle || ex.lift || ''}</td><td>${Math.round((ex.sets[0]?.pct ?? 0) * 100)}%</td><td>${ex.sets[0]?.reps ?? '-'}</td><td>${ex.sets.length}</td></tr>`);
+            }
+            html.push('</tbody></table>');
+          }
+        }
+      } else {
+        // LMS-цикл — расписание через plLmsScheduleDays
+        const plDays = plLmsScheduleDays(program);
+        html.push(`<h2>ПЛ-цикл: ${program.pl.sourceCycleId}</h2>`);
+        html.push(`<div class="meta">ПМ: присед ${program.pl.workMax?.squat ?? '-'} · жим ${program.pl.workMax?.bench ?? '-'} · тяга ${program.pl.workMax?.dead ?? '-'} кг</div>`);
+        for (const pd of plDays) {
+          html.push(`<table><thead><tr><th colspan="4">${pd.label}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>Повт</th><th>Вес</th></tr></thead><tbody>`);
+          for (const ex of (pd.exercises as any[])) {
+            html.push(`<tr><td>${ex.name}</td><td>${ex.muscleGroup || ''}</td><td>${(ex.sets ?? []).map((s:any) => s.reps).join(', ')}</td><td>${(ex.sets ?? []).map((s:any) => s.weight ?? 0).join(', ')} кг</td></tr>`);
+          }
+          html.push('</tbody></table>');
+        }
+      }
       if (program.pl.notes) html.push(`<p>${program.pl.notes}</p>`);
     }
     html.push('</body></html>');
@@ -1332,8 +1357,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
 
       {/* Лабораторная коррекция плана: MRV× + предупреждения по анализам */}
       {labAdjust.mrvMultiplier < 1 && (() => {
-        const prof = loadTrainingProfile();
-        const feeders = suggestFeeders((prof.weakPoints ?? []) as string[], (prof.equipment ?? []) as string[]);
+        const feeders = suggestFeeders((tprofile.weakPoints ?? []) as string[], (tprofile.equipment ?? []) as string[]);
         return (
           <div style={{ ...panelStyle('#f59e0b'), padding: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 4 }}>
@@ -1666,10 +1690,9 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
 
       {/* P2 — LIVE Quality Panel: оценка 0-100 и конкретные правки (BB + PL). Требует профиль + лаб-данные. */}
       {isPro && (dir === 'bb' && program.bb || dir === 'pl' && program.pl?.customWeeks) && (() => {
-        const prof = loadTrainingProfile();
         const q = computePlanQualityFor(program, program.meta.level, {
-          onCourse: prof.onCourse ?? false,
-          courseIntensity: prof.courseIntensity ?? 'moderate',
+          onCourse: tprofile.onCourse ?? false,
+          courseIntensity: tprofile.courseIntensity ?? 'moderate',
           labMult: labAdjust.mrvMultiplier,
         });
         const bar = q.score >= 75 ? '#22c55e' : q.score >= 50 ? '#f59e0b' : '#ef4444';
@@ -1697,14 +1720,17 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
       {/* MiniBox: маленькая карточка-индикатор для грид-сетки статистики */}
       {(() => null)()}
 
-      {/* P3.1 — Статистика реального плана (calcBBPlanMetrics на weeks[0]). */}
-      {dir === 'bb' && program.bb && program.bb.weeks?.[0]?.sessions?.[0] && (() => {
+      {/* P4-3 — Статистика реального плана (calcBBPlanMetrics на выбранной неделе). */}
+      {dir === 'bb' && program.bb && (() => {
         try {
-          const m = calcBBPlanMetrics(userWeekToBBPlan(program.bb.weeks[0], program.meta.level), 1.0);
-          const onCourse = (loadTrainingProfile().onCourse ?? false) ? ' 🅿 курс' : '';
+          const wi = Math.max(0, Math.min(execWeek - 1, (program.bb.weeks?.length ?? 1) - 1));
+          const wk = program.bb.weeks?.[wi];
+          if (!wk?.sessions?.[0]) return null;
+          const m = calcBBPlanMetrics(userWeekToBBPlan(wk, program.meta.level), 1.0);
+          const onCourse = (tprofile.onCourse ?? false) ? ' 🅿 курс' : '';
           return (
             <div style={{ ...CARD, padding: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>📊 Статистика плана{onCourse}</div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>📊 Статистика плана · нед {wk.week}{onCourse}</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 6 }}>
                 <div style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
                   <div style={{ fontSize: 11, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Недель</div>
@@ -1712,15 +1738,15 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                 </div>
                 <div style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
                   <div style={{ fontSize: 11, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Сессий/нед</div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: DIM_STRONG }}>{program.bb.weeks[0]?.sessions.length ?? 0}</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: DIM_STRONG }}>{wk.sessions.length}</div>
                 </div>
                 <div style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
                   <div style={{ fontSize: 11, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Упражнений</div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: DIM_STRONG }}>{(program.bb.weeks[0]?.sessions ?? []).reduce((s, ss) => s + (ss.blocks?.length ?? 0), 0)}</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: DIM_STRONG }}>{wk.sessions.reduce((s, ss) => s + (ss.blocks?.length ?? 0), 0)}</div>
                 </div>
                 <div style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
                   <div style={{ fontSize: 11, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3 }}>Сетов/нед</div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: DIM_STRONG }}>{(program.bb.weeks[0]?.sessions ?? []).reduce((s, ss) => s + (ss.blocks ?? []).reduce((s2, b) => s2 + (b.sets?.length ?? 0), 0), 0)}</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: DIM_STRONG }}>{wk.sessions.reduce((s, ss) => s + (ss.blocks ?? []).reduce((s2, b) => s2 + (b.sets?.length ?? 0), 0), 0)}</div>
                 </div>
               </div>
               <div style={{ marginTop: 6, fontSize: 11, color: DIM, lineHeight: 1.4 }}>

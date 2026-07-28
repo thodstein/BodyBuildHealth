@@ -37,9 +37,11 @@ export function applyPhaseModulation(
         const sets = (b.sets ?? []).map((st) => ({
           ...st,
           rir: rirAdj,
-          tempo: tempo || st.tempo,
+          tempo: isCompound ? (tempo || st.tempo) : (st.tempo || tempo),
           reps: (typeof st.reps === 'number' && st.reps > 0) ? st.reps : reps,
-          restSec: isCompound ? Math.max(90, st.restSec ?? 120) : st.restSec,
+          restSec: isCompound
+            ? Math.max(90, st.restSec ?? (b.character === 'тяж' ? 180 : b.character === 'памп' ? 60 : 120))
+            : (st.restSec ?? 90),
         }));
         return {
           ...b,
