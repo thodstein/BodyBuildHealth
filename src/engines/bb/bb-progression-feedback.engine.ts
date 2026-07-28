@@ -149,7 +149,8 @@ export function computePlanFeedback(
       if (last) {
         // Факт есть: кормим prescribeLoad фактом. RIR-дельта = факт − цель (минус = тяжелее).
         rirDelta = last.actualRir - plannedRir;
-        rec = prescribeLoad(strategy, last.topWeight, last.topReps, last.actualRir, maxW, lastWeek.week, tw, 'intensification', exType, ex.role);
+        // P1-7: передаём plannedRir для success-aware коррекции
+        rec = prescribeLoad(strategy, last.topWeight, last.topReps, last.actualRir, maxW, lastWeek.week, tw, 'intensification', exType, ex.role, plannedRir);
         source = 'fact';
       } else {
         // Нет факта: по плану (целевой вес/повт/RIR плана).
@@ -238,8 +239,8 @@ export function applyFeedbackToBuild(
         const plannedRir = ex.rir ?? 2;
         const maxW = workMax[ex.muscle] || last.topWeight || 80;
         const exType = ex.role === 'primary' ? 'compound' : 'isolation';
-        // prescribeLoad с фактом как current → рекомендация на следующую неделю
-        const rec = prescribeLoad(strategy, last.topWeight, last.topReps, last.actualRir, maxW, wk.week, tw, 'intensification', exType, ex.role);
+        // P1-7: prescribeLoad с фактом + plannedRir для success-aware коррекции
+        const rec = prescribeLoad(strategy, last.topWeight, last.topReps, last.actualRir, maxW, wk.week, tw, 'intensification', exType, ex.role, plannedRir);
         const rirDelta = last.actualRir - plannedRir;
         const comment = (ex.comment || '') + ` | ↻ из факта: ${last.topWeight}×${last.topReps} RIR${last.actualRir} → ${rec.nextWeight}×${rec.nextReps} RIR${rec.nextRIR}`;
         return {

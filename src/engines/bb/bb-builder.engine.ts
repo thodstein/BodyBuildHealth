@@ -839,6 +839,12 @@ function buildSession(
     // Для 18 reps → ~52% (памп), для 6 reps → ~86% (тяж), для 10 reps → ~75%.
     const pct = PCT_FOR_RIR[rir] ?? 0.9; // fallback если Brzycki не подходит
     let weight = weightForRepMax(reps, wm, rir, phaseCfg.intensityMultiplier);
+    // P1-8 (audit 2026-07): pre_exhaust methodology → compound weight ×0.90.
+    // После pre-exhaust изоляции целевая мышца уже утомлена → compound Fails ниже
+    // обычного на ~10-15% (Augustsson 2003; Gentil 2013). Авто-снижение веса compound.
+    if (methodology === 'pre_exhaust' && role === 'primary') {
+      weight = Math.round(weight * 0.90 * 10) / 10;
+    }
     const accessoryCount = ACCESSORY_2X_GROUPS.has(muscle) ? 2 : 1;
     // exerciseCount зависит от уровня И PED — на курсе больше тяжёлых compounds.
     // В multi-днях (Push/Pull с 3+ мышцами) ограничить big muscle primary до 3 —

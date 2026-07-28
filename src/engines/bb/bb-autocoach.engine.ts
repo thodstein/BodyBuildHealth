@@ -34,7 +34,25 @@ export function prescribeLoad(
   phase: string,
   exType?: string,
   role?: 'primary' | 'accessory',
+  /** P1-7 (audit 2026-07): целевой RIR плана. Если задан, prescribeLoad корректирует
+   *  прогрессию по отклонению факта от цели: RIR≥planned+1 → +reps/+weight,
+   *  RIR≤planned−2 → −5% weight (too heavy). */
+  plannedRir?: number,
 ): LoadStrategyPrescription {
+  // P1-7: success-aware коррекция по RIR-отклонению факта от цели.
+  // Если plannedRir задан — корректируем прогрессию.
+  if (plannedRir != null) {
+    const rirDeviation = currentRIR - plannedRir;
+    if (rirDeviation >= 2) {
+      // Слишком легко (RIR на 2+ выше цели) → +1 rep или +weight
+      return { nextWeight: currentWeight, nextReps: currentReps + 1, nextRIR: Math.max(0, plannedRir - 1), label: `Успех: RIR${currentRIR} > цели ${plannedRir} → +1 повтор` };
+    }
+    if (rirDeviation <= -2) {
+      // Слишком тяжело (RIR на 2+ ниже цели) → −5% weight, сохранить reps
+      return { nextWeight: Math.round(currentWeight * 0.95 * 10) / 10, nextReps: currentReps, nextRIR: Math.min(5, plannedRir + 1), label: `Перегруз: RIR${currentRIR} < цели ${plannedRir} → −5% вес` };
+    }
+    // RIR в пределах ±1 от цели → нормальная прогрессия (fallthrough)
+  }
   switch (strategy) {
     case 'double_progression': {
       const repCap = phase === 'intensification' ? 8 : 12;
