@@ -277,19 +277,13 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [weakGroupDayMap, setWeakGroupDayMap] = useState<Record<string, number[]>>({});
   const [plWeakPointDayMap, setPlWeakPointDayMap] = useState<Record<string, number[]>>({});
   const toggleDayInMap = (mapKey: string, day: number, which: 'wg' | 'pw') => {
-    if (which === 'wg') {
-      setWeakGroupDayMap(prev => {
-        let cur = new Set(prev[mapKey] || []);
-        if (cur.has(day)) cur.delete(day); else { cur.add(day); (cur as any) = Array.from(cur).sort((a: number, b: number) => a - b); }
-        return { ...prev, [mapKey]: Array.from(cur) };
-      });
-    } else {
-      setPlWeakPointDayMap(prev => {
-        let cur = new Set(prev[mapKey] || []);
-        if (cur.has(day)) cur.delete(day); else { cur.add(day); (cur as any) = Array.from(cur).sort((a: number, b: number) => a - b); }
-        return { ...prev, [mapKey]: Array.from(cur) };
-      });
-    }
+    const upd = (prev: Record<string, number[]>) => {
+      const s = new Set(prev[mapKey] || []);
+      if (s.has(day)) s.delete(day); else s.add(day);
+      return { ...prev, [mapKey]: [...s].sort((a, b) => a - b) };
+    };
+    if (which === 'wg') setWeakGroupDayMap(upd);
+    else setPlWeakPointDayMap(upd);
   };
   // V7 расширение: тренд 1ПМ по выбранному упражнению
   const [selectedTrendEx, setSelectedTrendEx] = useState<string | null>(null);
@@ -1201,14 +1195,14 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               {weakPoints.length > 0 && (() => {
                 const GRP_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' };
                 // какой день недели соответствует какой группе мышц (по главному упражнению дня)
-                const FIND_DAY_FOR_GROUP = (group: string): number => {
+const FIND_DAY_FOR_GROUP = (group: string): number => {
                   const keywords: Record<string,string[]> = {
                     chest: ['жим'],
                     shoulders: ['жим стоя', 'overhead', 'army press', 'army-press', 'overhead press', 'army press'],
                     arms: ['жим узким', 'close grip', 'французский', 'разгибание', 'скотт', 'бицепс', 'curl'],
-                    legs: ['присед'],
-                    back: ['становая', 'тяга'],
-                    core: ['становая', 'тяга'],
+                    legs: ['присед', 'жим ногами', 'лег пресс', 'разгибание ног', 'сгибание ног', 'румынская', 'рум', 'выступ', 'болгар', 'гоблет', 'гакк', 'сгиб'],
+                    back: ['становая', 'тяга', 'подтягив', 'пуло'],
+                    core: ['пресс', 'кор', 'скручиван', 'подъём', 'планк', 'флекс'],
                   };
                   const kws = keywords[group] || [];
                   for (let di = 0; di < wk.days.length; di++) {
@@ -1242,23 +1236,30 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     { name:'Махи гантелями в стороны', note:'средняя дельта, ширина' },
                     { name:'Тяга к подбородку', note:'передняя дельта + трапеции' },
                   ],
-                  arms: [
-                    { name:'Французский жим лёжа', note:'длинная головка трицепса' },
-                    { name:'Разгибание на блоке', note:'латеральная головка трицепса' },
-                    { name:'Скотт-бенч', note:'бицепс, пик' },
-                    { name:'Молотки', note:'брахиалис + предплечья' },
-                    { name:'Жим узким хватом', note:'трицепс + локдаун' },
-                  ],
-                  back: [
-                    { name:'Тяга штанги в наклоне', note:'центр спины, фиксация лопаток' },
-                    { name:'Подтягивания (прямой хват)', note:'широчайшие, тянущая сила верха' },
-                    { name:'Тяга из ямы', note:'дефицит старта, работа с пола ниже обычного' },
-                  ],
-                  core: [
-                    { name:'Наклоны со штангой', note:'разгибатели спины, жёсткость корпуса в приседе' },
-                    { name:'Пресс в тренажере (скручивания)', note:'внутрибрюшное давление, защита поясницы' },
-                    { name:'Гиперэкстензия', note:'поясница + ягодицы, фиксация таза в тяге' },
-                  ],
+arms: [
+                     { name:'Французский жим лёжа', note:'длинная головка трицепса' },
+                     { name:'Разгибание на блоке', note:'латеральная головка трицепса' },
+                     { name:'Скотт-бенч', note:'бицепс, пик' },
+                     { name:'Молотки', note:'брахиалис + предплечья' },
+                     { name:'Жим узким хватом', note:'трицепс + локдаун' },
+                   ],
+legs: [
+                       { name:'Присед на груди', note:'акцент квадрицепсов, улучшает старт' },
+                       { name:'Жим ногами', note:'объём квадрицепсов без нагрузки на позвоночник' },
+                       { name:'Болгарские сплит-приседания', note:'изолированная работа каждой ноги' },
+                       { name:'Разгибание ног в тренажере', note:'изоляция квадрицепсов' },
+                       { name:'Румынская тяга', note:'бицепс бедра + ягодичные, posterior chain' },
+                     ],
+                     back: [
+                       { name:'Тяга штанги в наклоне', note:'центр спины, фиксация лопаток' },
+                       { name:'Подтягивания (прямой хват)', note:'широчайшие, тянущая сила верха' },
+                       { name:'Тяга из ямы', note:'дефицит старта, работа с пола ниже обычного' },
+                     ],
+                     core: [
+                      { name:'Наклоны со штангой', note:'разгибатели спины, жёсткость корпуса в приседе' },
+                      { name:'Пресс в тренажере (скручивания)', note:'внутрибрюшное давление, защита поясницы' },
+                      { name:'Гиперэкстензия', note:'поясница + ягодицы, фиксация таза в тяге' },
+                    ],
                 };
                 const eq = loadTrainingProfile().equipment;
                 const eqOk = (ex: {name:string;note:string}): boolean => {
