@@ -742,11 +742,11 @@ export function StackTab({ profile, stackIds, setStackIds, allStacks, activeStac
               background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.25)', color: '#00e68a',
             }}>🔍 Перейти к поиску</button>
             <button onClick={() => {
-              try { localStorage.setItem('he_biostack_subtab', 'build'); localStorage.setItem('he_biostack_tab', 'select'); window.location.reload(); } catch {}
+              try { localStorage.setItem('he_biostack_tab', 'build'); window.dispatchEvent(new CustomEvent('he_biostack_smart_build')); } catch {}
             }} style={{
               padding: '8px 16px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer',
               background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#8b5cf6',
-            }}>🧩 Быстрая сборка</button>
+            }}>🤖 Умная сборка</button>
           </div>
 
         {/* ═══ Saved stacks ═══ */}

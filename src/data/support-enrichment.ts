@@ -1549,12 +1549,6 @@ export const CATALOG_ENRICHMENT: Record<string, CatalogEnrichment> = {
     labMarkers: ['Уровень в крови'],
     restrictions: ['Не превышать допустимый уровень'],
   },
-  neurosteroid: {
-    targetSystems:['neuro','endocrine'], targetMechanisms:['GABA_MODULATION','NEUROSTEROID_ACTIVITY','ANXIOLYTIC','COGNITIVE'], linkedRisks:[{system:'neuro',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['pregnenolone','dhea'],
-    maxUsageWeeks: 24,
-    labMarkers: ['Кортизол', 'ТТГ', 'Глюкоза'],
-    restrictions: ['Циклировать 8 нед приём / 2 нед перерыв', 'Не при аутоиммунных заболеваниях'],
-  },
   nobiletin: {
     targetSystems:['cardio','neuro','metabolic'], targetMechanisms:['ANTIOXIDANT','COGNITIVE_ENHANCEMENT','ANTIINFLAMMATORY','AMPK_ACTIVATION','NEUROPROTECTION'], linkedRisks:[{system:'cardio',direction:'down',strength:0.2}], cvProfile:{bloodPressure:'neutral',heartRate:'neutral',vascularTone:'neutral',thrombosisRisk:'low',cnsLoad:'low'}, analog:['resveratrol','quercetin'],
     maxUsageWeeks: 24,

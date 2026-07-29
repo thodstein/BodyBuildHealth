@@ -1,9 +1,9 @@
 /**
  * BioStackAIUnifiedBuild.tsx — Единый экран сборки и управления стеком
- * 
+ *
  * Объединяет:
  *   - Multi-stack switcher (из BioStackAIScreen)
- *   - Фильтры + сборка (из BioStackAIClinicalBuild)
+ *   - Фильтры + сборка (контекст-индикатор, пресеты, 8 органов, расширенная секция)
  *   - Результат с клиническим контекстом
  *   - Таб-бар анализа стека (взаимод./дозы/время/клиника/ЛС/экспорт)
  */
@@ -25,7 +25,7 @@ import { DrugCheckTab } from './BioStackAIDrugCheck';
 import { ExportTab } from './BioStackAIExport';
 
 /* ════════════════════════════════════════════════════════════════
-   Константы (из BioStackAIClinicalBuild)
+   Константы
    ════════════════════════════════════════════════════════════════ */
 
 const ORGAN_OPTIONS: { id: string; label: string; icon: string; pseudo?: boolean; group?: string }[] = [
@@ -168,7 +168,7 @@ export const BioStackAIUnifiedBuild: React.FC<Props> = ({
   stopIds, clearStops, replaceStop,
 }) => {
   // Filter state
-  const [popup, setPopup] = useState<'organs'|'mechs'|'markers'|null>(null);
+  const [popup, setPopup] = useState<'organs'|'mechs'|'markers'|'advanced'|null>(null);
   const [filterOrgans, setFilterOrgans] = useState<string[]>([]);
   const [filterMechanisms, setFilterMechanisms] = useState<string[]>([]);
   const [filterMarkers, setFilterMarkers] = useState<string[]>([]);
@@ -337,6 +337,19 @@ export const BioStackAIUnifiedBuild: React.FC<Props> = ({
   };
 
   const resetAll = () => { setFilterOrgans([]); setFilterMechanisms([]); setFilterMarkers([]); setFilterMode('balanced'); setGrade('C'); setStrategy('comprehensive'); setMaxStackSize(0); setResult(null); };
+  const applyPreset = (p: typeof PRESETS[0]) => { setFilterOrgans(p.organs); setFilterMechanisms(p.mechs); setFilterMarkers(p.markers); setGrade('C'); };
+  const isPresetActive = (p: typeof PRESETS[0]): boolean => {
+    const so = new Set(p.organs), sm = new Set(p.mechs), smk = new Set(p.markers);
+    return so.size === filterOrgans.length && sm.size === filterMechanisms.length && smk.size === filterMarkers.length
+      && filterOrgans.every(x => so.has(x)) && filterMechanisms.every(x => sm.has(x)) && filterMarkers.every(x => smk.has(x));
+  };
+
+  // Слушаем кастомное событие «умная сборка» (от кнопки в Stack.tsx)
+  useEffect(() => {
+    const handler = () => smartQuickBuild();
+    window.addEventListener('he_biostack_smart_build', handler);
+    return () => window.removeEventListener('he_biostack_smart_build', handler);
+  }, [profile, labAnalysis, linked, useLabs, useProfile, filterMode, maxStackSize]);
 
   // ── Result pane (memoized) ──
   const resultPane = useMemo(() => {
@@ -500,80 +513,136 @@ export const BioStackAIUnifiedBuild: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* ── Filter cards ── */}
-      {(['organs','mechs','markers'] as const).map(k => {
-        const config = { organs: { icon:'🫀', label:'Органы и системы', color:'#00e68a', count:filterOrgans.length },
-                         mechs: { icon:'⚙️', label:'Механизмы ТЗ (28)', color:'#a78bfa', count:filterMechanisms.length },
-                         markers: { icon:'🧪', label:'Анализы', color:'#f59e0b', count:filterMarkers.length } }[k];
-        return (
-          <div key={k} onClick={() => setPopup(k)} style={{
-            padding:'6px 12px', borderRadius:12, cursor:'pointer', marginBottom:4,
-            background: config.count ? `${config.color}11` : 'rgba(255,255,255,0.03)',
-            border: `1px solid ${config.count ? config.color+'44' : 'rgba(255,255,255,0.08)'}`,
-            display:'flex', justifyContent:'space-between', alignItems:'center',
-          }}>
-            <span style={{ fontSize:13, fontWeight:600, color:'#fff' }}>{config.icon} {config.label}</span>
-            <span style={{ fontSize:11, padding:'2px 8px', borderRadius:8, background:config.count?config.color+'22':'rgba(255,255,255,0.06)', color:config.count?config.color:'rgba(255,255,255,0.4)', fontWeight:600 }}>
-              {config.count ? `Выбрано: ${config.count}` : 'Выбрать'}
-            </span>
-          </div>
-        );
-      })}
-
-      {/* ── Popups ── */}
-      <Popup title="Органы и системы ТЗ" color="#00e68a" show={popup==='organs'} onClose={()=>setPopup(null)}>{organChildren}</Popup>
-      <Popup title="Механизмы ТЗ" color="#a78bfa" show={popup==='mechs'} onClose={()=>setPopup(null)}>{mechChildren}</Popup>
-      <Popup title="Лабораторные анализы" color="#f59e0b" show={popup==='markers'} onClose={()=>setPopup(null)}>{markerChildren}</Popup>
-
-      {/* ── Presets ── */}
-      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6, marginBottom:8 }}>
-        {PRESETS.map(p => (
-          <button key={p.label} onClick={() => { setFilterOrgans(p.organs); setFilterMechanisms(p.mechs); setFilterMarkers(p.markers); }} style={{
-            padding:'5px 10px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:600, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.8)',
-          }}>{p.label}</button>
-        ))}
-        <button onClick={resetAll} style={{ padding:'5px 10px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:600, background:'transparent', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.35)' }}>✕ Сброс</button>
-      </div>
-
-      {/* ── Params row ── */}
-      <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center', marginBottom:4 }}>
-        {GRADE_OPTIONS.map(g => <button key={g.id} onClick={()=>setGrade(g.id)} style={{ padding:'4px 10px', borderRadius:10, cursor:'pointer', border:'none', fontSize:12, fontWeight:700, background:grade===g.id?g.color+'22':'rgba(255,255,255,0.04)', color:grade===g.id?g.color:'rgba(255,255,255,0.5)' }}>{g.label}</button>)}
-        <span style={{ color:'rgba(255,255,255,0.15)' }}>|</span>
-        {STRATEGIES.map(s => <button key={s.id} onClick={()=>setStrategy(s.id)} style={{ padding:'4px 10px', borderRadius:10, cursor:'pointer', border:'none', fontSize:12, fontWeight:600, background:strategy===s.id?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.04)', color:strategy===s.id?'#00e68a':'rgba(255,255,255,0.5)' }}>{s.label}</button>)}
-        <span style={{ color:'rgba(255,255,255,0.15)' }}>|</span>
-        {COUNT_PRESETS.map(n => <button key={n} onClick={()=>setMaxStackSize(n)} style={{ padding:'4px 8px', borderRadius:10, cursor:'pointer', border:'none', fontSize:12, fontWeight:600, background:maxStackSize===n?'rgba(232,121,249,0.15)':'rgba(255,255,255,0.04)', color:maxStackSize===n?'#e879f9':'rgba(255,255,255,0.5)' }}>{n===0?'∞':n}</button>)}
-      </div>
-
-      {/* ── Mode + toggles ── */}
-      <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
-        <button onClick={()=>setFilterMode('balanced')} style={{ padding:'4px 10px', borderRadius:10, cursor:'pointer', border:'none', fontSize:11, fontWeight:600, background:filterMode==='balanced'?'rgba(96,165,250,0.15)':'rgba(255,255,255,0.04)', color:filterMode==='balanced'?'#60a5fa':'rgba(255,255,255,0.5)' }}>balanced</button>
-        <button onClick={()=>setFilterMode('strict')} style={{ padding:'4px 10px', borderRadius:10, cursor:'pointer', border:'none', fontSize:11, fontWeight:600, background:filterMode==='strict'?'rgba(245,158,11,0.15)':'rgba(255,255,255,0.04)', color:filterMode==='strict'?'#f59e0b':'rgba(255,255,255,0.5)' }}>strict</button>
-        <span style={{ color:'rgba(255,255,255,0.15)' }}>|</span>
-        {([['Курс',useCourse,setUseCourse,'#00e68a'],['Анализы',useLabs,setUseLabs,'#f59e0b'],['Профиль',useProfile,setUseProfile,'#a78bfa']] as [string,boolean,any,string][]).map(([l,v,s,c]) => (
-          <label key={l} style={{ display:'flex', alignItems:'center', gap:3, cursor:'pointer', fontSize:11, color:v?c:'rgba(255,255,255,0.4)', fontWeight:500 }}>
-            <input type="checkbox" checked={v} onChange={e=>s(e.target.checked)} style={{ accentColor:c, width:13, height:13 }} />{l}
-          </label>
+      {/* ── Контекст-индикатор источников (с переключением) ── */}
+      <div style={{ display:'flex', gap:6, alignItems:'center', padding:'8px 12px', borderRadius:12, marginBottom:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', flexWrap:'wrap' }}>
+        <span style={{ fontSize:10, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', fontWeight:700, marginRight:2 }}>Источники:</span>
+        {([['💊','Курс',useCourse,setUseCourse,'#00e68a'],['🧪','Анализы',useLabs,setUseLabs,'#f59e0b'],['👤','Профиль',useProfile,setUseProfile,'#a78bfa']] as [string,string,boolean,(v:boolean)=>void,string][]).map(([icon,label,v,s,c]) => (
+          <button key={label} onClick={()=>s(!v)} style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 10px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:600, background:v?`${c}22`:'rgba(255,255,255,0.04)', border:`1px solid ${v?c+'66':'rgba(255,255,255,0.08)'}`, color:v?c:'rgba(255,255,255,0.4)' }}>
+            <span style={{ fontSize:13 }}>{icon}</span>
+            <span>{label}</span>
+            <span style={{ fontSize:13, marginLeft:2 }}>{v?'✅':'⊘'}</span>
+          </button>
         ))}
       </div>
 
-      {/* ── Build buttons ── */}
+      {/* ── 4 пресета стратегий (главный уровень) ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6, marginBottom:10 }}>
+        {PRESETS.map(p => {
+          const active = isPresetActive(p);
+          return (
+            <button key={p.label} onClick={() => applyPreset(p)} style={{
+              padding:'10px 6px', borderRadius:12, cursor:'pointer', fontSize:11, fontWeight:700,
+              background: active ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)',
+              border: `1.5px solid ${active ? '#00e68a' : 'rgba(255,255,255,0.1)'}`,
+              color: active ? '#00e68a' : 'rgba(255,255,255,0.75)',
+              transition: 'all 0.15s', minHeight: 56, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2,
+            }}>
+              <div style={{ fontSize:18 }}>{p.label.split(' ')[0]}</div>
+              <div style={{ fontSize:10 }}>{p.label.split(' ').slice(1).join(' ')}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── 8 органов (chips) ── */}
+      <GlassCard title="🫀 Органы и системы" icon="" color="#00e68a" style={{ marginBottom:8 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6 }}>
+          {ORGAN_OPTIONS.map(o => {
+            const active = filterOrgans.includes(o.id);
+            const color = o.group==='tz' ? '#00e68a' : '#f59e0b';
+            return (
+              <button key={o.id} onClick={() => setFilterOrgans(toggle(filterOrgans, o.id))} style={{
+                padding:'8px 4px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:600,
+                background: active ? `${color}22` : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${active ? color+'88' : 'rgba(255,255,255,0.1)'}`,
+                color: active ? color : 'rgba(255,255,255,0.7)',
+                display:'flex', flexDirection:'column', alignItems:'center', gap:2, minHeight: 52,
+              }}>
+                <div style={{ fontSize:18 }}>{o.icon}</div>
+                <div style={{ fontSize:10, lineHeight:1.1, textAlign:'center' }}>{o.label}</div>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center', flexWrap:'wrap' }}>
+          <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>Выбрано: {filterOrgans.length} / 8</span>
+          {filterOrgans.length > 0 && (
+            <button onClick={() => setFilterOrgans([])} style={{ fontSize:10, padding:'3px 8px', borderRadius:8, cursor:'pointer', background:'transparent', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.4)' }}>✕ Сбросить органы</button>
+          )}
+        </div>
+      </GlassCard>
+
+      {/* ── Большая кнопка сборки (всегда видна) ── */}
       <div style={{ display:'flex', gap:8, marginBottom:8 }}>
-        <button onClick={onBuild} disabled={building} style={{ flex:1, padding:'12px 0', borderRadius:14, border:'none', background:building?'rgba(0,230,138,0.4)':'linear-gradient(135deg,#00e68a,#00b4d8)', color:'#00120c', fontWeight:800, fontSize:14, cursor:'pointer', boxShadow:building?'none':'0 4px 16px rgba(0,230,138,0.2)' }}>{building?'⚙️ Собираю…':'🔧 Собрать стек'}</button>
-        <button onClick={smartQuickBuild} disabled={building} style={{ padding:'12px 16px', borderRadius:14, border:'1px solid rgba(168,85,247,0.3)', background:'rgba(168,85,247,0.08)', color:'#c084fc', fontWeight:700, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>⚡ Быстро</button>
+        <button
+          onClick={filterOrgans.length === 0 ? smartQuickBuild : onBuild}
+          disabled={building}
+          style={{ flex:1, padding:'14px 0', borderRadius:14, border:'none', background:building?'rgba(0,230,138,0.4)':'linear-gradient(135deg,#00e68a,#00b4d8)', color:'#00120c', fontWeight:800, fontSize:15, cursor:'pointer', boxShadow:building?'none':'0 4px 16px rgba(0,230,138,0.2)' }}
+        >
+          {building ? '⚙️ Собираю…' : filterOrgans.length === 0 ? '🤖 Умная сборка (без фильтров)' : `⚡ Собрать стек (${filterOrgans.length} орган${filterOrgans.length===1?'':'ов'})`}
+        </button>
+        {filterOrgans.length > 0 && (
+          <button onClick={() => { setFilterOrgans([]); setFilterMechanisms([]); setFilterMarkers([]); setResult(null); }} style={{ padding:'12px 14px', borderRadius:14, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.5)', fontWeight:600, fontSize:12, cursor:'pointer' }}>✕</button>
+        )}
       </div>
-      {/* ── Data indicator ── */}
-      {(() => {
-        const hasCourse = (() => { try { const r=localStorage.getItem('he_course_data'); return r&&JSON.parse(r).aas?.length>0; } catch { return false; } })();
-        const hasLabs = !!labAnalysis;
-        if (hasCourse && hasLabs) return null;
-        return (
-          <div style={{ display:'flex', gap:6, marginBottom:6, fontSize:10 }}>
-            <span style={{ color: hasCourse?'#22c55e':'rgba(255,255,255,0.3)', fontWeight:600 }}>💉 Курс: {hasCourse?'есть':'нет'}</span>
-            <span style={{ color: hasLabs?'#22c55e':'rgba(255,255,255,0.3)', fontWeight:600 }}>🧪 Анализы: {hasLabs?'есть':'нет'}</span>
-            {(!hasCourse||!hasLabs) && <span style={{ color:'rgba(255,255,255,0.25)' }}>— без них стек ориентировочный</span>}
+
+      {/* ── Расширенная секция (свёрнута по умолчанию) ── */}
+      <div style={{ marginBottom:8 }}>
+        <button onClick={() => setPopup(popup==='advanced'?null:'advanced')} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 12px', borderRadius:10, cursor:'pointer', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.7)' }}>▶ Расширенные фильтры</span>
+          <span style={{ fontSize:11, color:'rgba(255,255,255,0.4)' }}>{popup==='advanced'?'▼':'▸'}</span>
+        </button>
+        {popup === 'advanced' && (
+          <div style={{ marginTop:6, padding:8, background:'rgba(255,255,255,0.02)', borderRadius:12, border:'1px solid rgba(255,255,255,0.06)' }}>
+            {/* Механизмы ТЗ */}
+            <div style={{ marginBottom:10 }}>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', fontWeight:700, marginBottom:6, textTransform:'uppercase' }}>⚙️ Механизмы ТЗ (28) — выбрано: {filterMechanisms.length}</div>
+              <Popup title="Механизмы ТЗ" color="#a78bfa" show={false} onClose={()=>null}>
+                <></>
+              </Popup>
+              <button onClick={() => setPopup('mechs')} style={{ width:'100%', padding:'8px 12px', borderRadius:10, cursor:'pointer', fontSize:11, background: filterMechanisms.length?'rgba(167,139,250,0.14)':'rgba(255,255,255,0.04)', border: filterMechanisms.length?'1px solid #a78bfa88':'1px solid rgba(255,255,255,0.1)', color: filterMechanisms.length?'#a78bfa':'rgba(255,255,255,0.7)', fontWeight:600, marginBottom:6 }}>
+                {filterMechanisms.length ? `Выбрано: ${filterMechanisms.length} (изменить)` : 'Открыть выбор механизмов'}
+              </button>
+              {mechGroups.length === 0 && <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', textAlign:'center', padding:6 }}>Выберите органы для отображения связанных механизмов</div>}
+            </div>
+            {/* Маркеры */}
+            <div style={{ marginBottom:10 }}>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', fontWeight:700, marginBottom:6, textTransform:'uppercase' }}>🧪 Лаб-маркеры (40) — выбрано: {filterMarkers.length}</div>
+              <button onClick={() => setPopup('markers')} style={{ width:'100%', padding:'8px 12px', borderRadius:10, cursor:'pointer', fontSize:11, background: filterMarkers.length?'rgba(245,158,11,0.14)':'rgba(255,255,255,0.04)', border: filterMarkers.length?'1px solid #f59e0b88':'1px solid rgba(255,255,255,0.1)', color: filterMarkers.length?'#f59e0b':'rgba(255,255,255,0.7)', fontWeight:600, marginBottom:6 }}>
+                {filterMarkers.length ? `Выбрано: ${filterMarkers.length} (изменить)` : 'Открыть выбор маркеров'}
+              </button>
+            </div>
+            {/* Доп. параметры */}
+            <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center', marginTop:8, paddingTop:8, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize:10, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', fontWeight:700 }}>📚 Док-ть:</span>
+              {GRADE_OPTIONS.map(g => <button key={g.id} onClick={()=>setGrade(g.id)} style={{ padding:'4px 10px', borderRadius:10, cursor:'pointer', border:'none', fontSize:11, fontWeight:700, background:grade===g.id?g.color+'22':'rgba(255,255,255,0.04)', color:grade===g.id?g.color:'rgba(255,255,255,0.5)' }}>{g.label}</button>)}
+            </div>
+            <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center', marginTop:6 }}>
+              <span style={{ fontSize:10, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', fontWeight:700 }}>🎯 Стратегия:</span>
+              {STRATEGIES.map(s => <button key={s.id} onClick={()=>setStrategy(s.id)} style={{ padding:'4px 10px', borderRadius:10, cursor:'pointer', border:'none', fontSize:11, fontWeight:600, background:strategy===s.id?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.04)', color:strategy===s.id?'#00e68a':'rgba(255,255,255,0.5)' }}>{s.label}</button>)}
+            </div>
+            <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center', marginTop:6 }}>
+              <span style={{ fontSize:10, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', fontWeight:700 }}>📦 Размер:</span>
+              {COUNT_PRESETS.map(n => <button key={n} onClick={()=>setMaxStackSize(n)} style={{ padding:'4px 8px', borderRadius:10, cursor:'pointer', border:'none', fontSize:11, fontWeight:600, background:maxStackSize===n?'rgba(232,121,249,0.15)':'rgba(255,255,255,0.04)', color:maxStackSize===n?'#e879f9':'rgba(255,255,255,0.5)' }}>{n===0?'∞':n}</button>)}
+            </div>
+            <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center', marginTop:6 }}>
+              <span style={{ fontSize:10, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', fontWeight:700 }}>🎚 Режим:</span>
+              {(['balanced','strict'] as const).map(m => <button key={m} onClick={()=>setFilterMode(m)} style={{ padding:'4px 10px', borderRadius:10, cursor:'pointer', border:'none', fontSize:11, fontWeight:600, background:filterMode===m?(m==='strict'?'rgba(245,158,11,0.15)':'rgba(96,165,250,0.15)'):'rgba(255,255,255,0.04)', color:filterMode===m?(m==='strict'?'#f59e0b':'#60a5fa'):'rgba(255,255,255,0.5)' }}>{m}</button>)}
+            </div>
           </div>
-        );
-      })()}
+        )}
+      </div>
+
+      {/* ── Popups (механизмы, маркеры) — открываются из расширенной секции ── */}
+      <Popup title="Механизмы ТЗ" color="#a78bfa" show={popup==='mechs'} onClose={()=>setPopup('advanced')}>{mechChildren}</Popup>
+      <Popup title="Лабораторные анализы" color="#f59e0b" show={popup==='markers'} onClose={()=>setPopup('advanced')}>{markerChildren}</Popup>
+
+      {/* ── Индикатор ориентировочности (если отключены источники) ── */}
+      {(!useCourse || !useLabs) && (
+        <div style={{ display:'flex', gap:6, marginBottom:6, padding:'6px 10px', borderRadius:10, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.18)', fontSize:11, color:'#f59e0b', alignItems:'center' }}>
+          ⚠️ Без {(!useCourse && !useLabs) ? 'курса и анализов' : (!useCourse ? 'курса' : 'анализов')} стек будет ориентировочным
+        </div>
+      )}
 
       {/* ── RESULT ── */}
       {resultPane}

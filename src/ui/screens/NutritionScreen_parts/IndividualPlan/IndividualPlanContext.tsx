@@ -237,8 +237,10 @@ export interface PlanCtx {
   planTab: string; setPlanTab: (v: string) => void;
 }
 
-const PlanContext = createContext<PlanCtx>(null as any);
-export const usePlanCtx = () => useContext(PlanContext);
+const _DEFAULT_CALC_TARGETS = { kcal: 2500, protein: 160, fats: 70, carbs: 300, bmr: 0, tdee: 0, adjustment: 0 };
+const _DEFAULT_CTX: any = { calcTargets: _DEFAULT_CALC_TARGETS, profileTargets: _DEFAULT_CALC_TARGETS, effectiveKcal: 2500, effectiveP: 160, effectiveF: 70, effectiveC: 300, weight: 80, height: 180, age: 30, sex: 'male' as const };
+const PlanContext = createContext<PlanCtx>(_DEFAULT_CTX as PlanCtx);
+export const usePlanCtx = (): PlanCtx => useContext(PlanContext);
 
 export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; course?: any[]; labs?: LabPoint[]; labAnalysis?: LabCompositeResult | null; children: React.ReactNode }> = ({ profile: _profile, course: _course, labs = [], labAnalysis, children }) => {
   const profile = _profile || getProfileSafe();

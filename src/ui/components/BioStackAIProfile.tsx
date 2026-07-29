@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   loadBioStackProfile, saveBioStackProfile, autoFillFromMainProfile,
+  importSymptomsFromMainProfile,
   getProfileCompleteness, getDefaultBioStackProfile, BioStackProfile,
 } from '../../engines/biostack-ai.engine';
 import { getLabDiary } from '../../engines/lab-diary.engine';
@@ -175,6 +176,16 @@ function ProfileTab(props: {
     const np = { ...p, ...patch } as typeof p; setP(np);
     showToast(`Автозаполнено из профиля: ${autoKeys.length} полей`);
   };
+  const importSymptoms = () => {
+    const { patch, autoKeys, joint, neuro, cns } = importSymptomsFromMainProfile();
+    if (autoKeys.length === 0) {
+      showToast('В основном профиле нет симптомов для импорта', 'info');
+      return;
+    }
+    const np = { ...p, ...patch, autoFilledFields: [...new Set([...(p.autoFilledFields || []), ...autoKeys])] } as typeof p;
+    setP(np);
+    showToast(`Импортировано ${autoKeys.length} симптомов: 🤝${joint.length} 🧠${neuro.length} ☠️${cns.length}`, 'success');
+  };
   const toggle = (key: keyof BioStackProfile, v: string) => {
     const cur = (p[key] as string[]) || [];
     u({ [key]: cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v] } as Patch);
@@ -241,6 +252,10 @@ function ProfileTab(props: {
           <div style={rowLabel}>Симптомы ЦНС{cnsCount ? ` · ${cnsCount}` : ''}</div>
           <Checklist options={CNS_SYMPTOMS} selected={p.cnsSymptoms || []} onToggle={v => toggle('cnsSymptoms', v)} />
         </div>
+        <div style={{ ...dim, fontSize: 12, marginBottom: 6 }}>
+          Импорт подтянет симптомы из основного профиля (травмы → суставы, головные боли/тревожность → нейро, память/фокус → ЦНС)
+        </div>
+        <div style={{ ...autoChip, display: 'inline-block', marginBottom: 12 }} onClick={importSymptoms}>⟳ Импорт симптомов из профиля</div>
         {!lab || lab.length === 0
           ? <div style={{ ...dim }}>Данные анализов отсутствуют. Заполните их на вкладке «Лаборатория» — они подтянутся сюда автоматически и будут учтены при подборе.</div>
           : <div>

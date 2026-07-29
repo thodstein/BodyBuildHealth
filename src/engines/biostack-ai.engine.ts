@@ -140,6 +140,64 @@ export function autoFillFromMainProfile(): { patch: Partial<BioStackProfile>; au
   } catch { return { patch: {}, autoKeys: [] }; }
 }
 
+/** Импорт симптомов из основного профиля (только направление: основной → BioStack)
+ *  Маппинг:
+ *    jointSymptoms ← health.jointPain, backPain, ligamentIssues, injuries[].type
+ *    neuroSymptoms ← neuro.headaches, weatherDependent, serotoninScore>=4, aggressionScore>=4
+ *    cnsSymptoms   ← neuro.memoryIssues, focusIssues, slowThinking, coordinationIssues
+ *                    + psych.fearOfLoss>=4, apathyOffCycle>=4
+ */
+export function importSymptomsFromMainProfile(): {
+  patch: Partial<BioStackProfile>;
+  autoKeys: string[];
+  joint: string[];
+  neuro: string[];
+  cns: string[];
+} {
+  try {
+    const p = getProfile(); if (!p) return { patch: {}, autoKeys: [], joint: [], neuro: [], cns: [] };
+    const s = p.settings; if (!s) return { patch: {}, autoKeys: [], joint: [], neuro: [], cns: [] };
+    const ss = s as any;
+
+    const joint: string[] = [];
+    const neuro: string[] = [];
+    const cns: string[] = [];
+    const keys: string[] = [];
+
+    if (ss.health?.jointPain) { joint.push('joint_pain'); keys.push('joint_pain'); }
+    if (ss.health?.backPain) { joint.push('back_pain'); keys.push('back_pain'); }
+    if (ss.health?.ligamentIssues) { joint.push('ligament_issues'); keys.push('ligament_issues'); }
+    if (ss.health?.injuries?.length) {
+      for (const inj of ss.health.injuries) {
+        if (inj?.type) { joint.push(String(inj.type)); keys.push(`injury:${inj.type}`); }
+      }
+    }
+
+    if (ss.neuro?.headaches) { neuro.push('headaches'); keys.push('headaches'); }
+    if (ss.neuro?.weatherDependent) { neuro.push('weather_dependent'); keys.push('weather_dependent'); }
+    if ((ss.neuro?.serotoninScore ?? 0) >= 4) { neuro.push('low_serotonin'); keys.push('low_serotonin'); }
+    if ((ss.neuro?.aggressionScore ?? 0) >= 4) { neuro.push('high_aggression'); keys.push('high_aggression'); }
+
+    if (ss.neuro?.memoryIssues) { cns.push('memory_issues'); keys.push('memory_issues'); }
+    if (ss.neuro?.focusIssues) { cns.push('focus_issues'); keys.push('focus_issues'); }
+    if (ss.neuro?.slowThinking) { cns.push('slow_thinking'); keys.push('slow_thinking'); }
+    if (ss.neuro?.coordinationIssues) { cns.push('coordination_issues'); keys.push('coordination_issues'); }
+    if ((ss.psych?.fearOfLoss ?? 0) >= 4) { cns.push('anxiety'); keys.push('anxiety'); }
+    if ((ss.psych?.apathyOffCycle ?? 0) >= 4) { cns.push('apathy'); keys.push('apathy'); }
+
+    if (joint.length === 0 && neuro.length === 0 && cns.length === 0) {
+      return { patch: {}, autoKeys: [], joint: [], neuro: [], cns: [] };
+    }
+
+    const filled: Partial<BioStackProfile> = {
+      jointSymptoms: [...new Set(joint)],
+      neuroSymptoms: [...new Set(neuro)],
+      cnsSymptoms: [...new Set(cns)],
+    };
+    return { patch: filled, autoKeys: keys, joint, neuro, cns };
+  } catch { return { patch: {}, autoKeys: [], joint: [], neuro: [], cns: [] }; }
+}
+
 /** Дублировать заполненные данные BioStack-профиля в основной профиль (подвкладки Профиль) */
 export function syncBioStackToMain(p: BioStackProfile): void {
   try {
@@ -164,15 +222,44 @@ export function syncBioStackToMain(p: BioStackProfile): void {
 
 export function saveBioStackProfile(p: BioStackProfile): void {
   try {
-    localStorage.setItem('he_biostack_profile', JSON.stringify(p));
-    syncBioStackToMain(p);
+    const prof = getProfile(); if (!prof) return;
+    const s = prof.settings;
+    s.personal = { ...s.personal, age: p.age, weight: p.weight, height: p.height, sex: p.sex };
+    s.health = { ...s.health, drugAllergies: (p.drugAllergies || []).join(', ') };
+    s.nutrition = { ...(s.nutrition || {}), currentMedications: (p.currentMeds || []).map(m => ({ id: m, name: m, doseMg: 0, doseUnit: 'mg' as const, frequency: 'daily' as const })) };
+    if (p.currentSupplements?.length) {
+      s.nutrition = { ...s.nutrition, currentSupplements: p.currentSupplements.map(id => ({ id, name: SUPPORT_CATALOG_DATA[id]?.name || id, doseMg: 0, doseUnit: 'mg' as const })) };
+    }
+    if (p.jointSymptoms?.length) {
+      s.health = { ...s.health, injuries: [...(s.health?.injuries || []), ...p.jointSymptoms.map((j: string) => ({ id: `bio_${Date.now()}_${j}`, type: j, location: 'unspecified', painLevel: 3, movementLimit: false, date: new Date().toISOString().split('T')[0] }))] } as any;
+    }
+    updateProfile({ settings: s });
   } catch {}
 }
 
 export function loadBioStackProfile(): BioStackProfile {
+  const def = getDefaultBioStackProfile();
   try {
-    const raw = localStorage.getItem('he_biostack_profile');
-    if (raw) return { ...getDefaultBioStackProfile(), ...JSON.parse(raw) };
-  } catch {}
-  return getDefaultBioStackProfile();
+    const prof = getProfile();
+    if (!prof) return def;
+    const s = prof.settings;
+    const allergyStr = s.health?.drugAllergies;
+    const allergyArr = typeof allergyStr === 'string' ? (allergyStr ? allergyStr.split(',').map((x: string) => x.trim()).filter(Boolean) : []) : (Array.isArray(allergyStr) ? allergyStr : []);
+    return {
+      ...def,
+      age: s.personal?.age || def.age,
+      weight: s.personal?.weight || def.weight,
+      height: s.personal?.height || def.height,
+      sex: s.personal?.sex || def.sex,
+      currentMeds: (s.nutrition?.currentMedications || []).map((m: any) => m.id || m.name || String(m)),
+      drugAllergies: allergyArr,
+      currentSupplements: (s.nutrition?.currentSupplements || []).map((su: any) => su.id || String(su)),
+      avoidIds: def.avoidIds,
+      avoidMeds: def.avoidMeds,
+      jointSymptoms: def.jointSymptoms,
+      neuroSymptoms: def.neuroSymptoms,
+      cnsSymptoms: def.cnsSymptoms,
+      autoFilledFields: [],
+    };
+  } catch { return def; }
 }

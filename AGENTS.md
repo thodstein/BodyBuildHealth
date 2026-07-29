@@ -1,3 +1,22 @@
+## Session Summary — BioStackAIScreen TS1128 fix + multi-stack V2 migration
+
+### Goal
+Fix TS1128 error in `BioStackAIScreen.tsx` line 203 caused by stray `};` at line 112 that prematurely closed the component arrow function. Then migrate the multi-stack V2 refactoring type mismatches (SavedStackV2 vs string[][]).
+
+### ✅ Done and verified
+1. **Deleted stray `};` at BioStackAIScreen.tsx:112** — root cause of TS1128 cascade at line 203.
+2. **BioStackAIScreen.tsx line 62** — added explicit types `(ids: string[], i: number)` to `migrateStacks` map callback (was implicit any).
+3. **BioStackAIUnifiedBuild.tsx** — added `SavedStackV2` interface; changed Props `allStacks: string[][]` → `SavedStackV2[]`, `saveStacks` signature; updated 3 internal usages (`stk.length→stk.ids.length`, delete-last fallback to full object, create-new fallback to full object).
+4. **BioStackAISearch.tsx line 7** — added missing `selectStack` to import from `biostack-clinical-v2.engine`.
+5. **BioStackAIStack.tsx line 1339** — `'balanced'` → `'comprehensive'` (`StackStrategy` is `'comprehensive'|'safe'|'budget'`).
+
+### ✅ Verification
+- `tsc --noEmit` — 0 new BioStack errors (16 pre-existing in unrelated files: biostack-ai.engine, ProfileDataHub, TrainingScreen parts)
+- `vite build` — ✓ 17.95s, 0 errors
+- `git commit` — `075b81eb`
+
+---
+
 ## Session Summary (Jul 21) — CI red builds FIX (tsc 0 / vitest 154/154 / build OK)
 
 ### Goal
