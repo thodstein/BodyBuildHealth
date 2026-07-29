@@ -130,12 +130,10 @@ export const ProfileDataHub: React.FC<ProfileDataHubProps> = ({
   const bpDiary = readArr('he_bp_diary');
   const injectionDiary = readArr('he_injection_diary');
   const autoCalc = (() => { try { return JSON.parse(localStorage.getItem('he_autocalc_state') || '{}'); } catch { return {}; } })();
-  const bioProfile = (() => { try { return JSON.parse(localStorage.getItem('he_biostack_profile') || '{}'); } catch { return {}; } })();
-
   const lastSleep = sleepDiary.length ? sleepDiary.map((d: any) => d.date).sort().slice(-1)[0] : null;
   const lastBp = bpDiary.length ? bpDiary.map((d: any) => d.date).sort().slice(-1)[0] : null;
   const lastInj = injectionDiary.length ? injectionDiary.map((d: any) => d.date).sort().slice(-1)[0] : null;
-  const bioFilled = (bioProfile.goals?.length ? 1 : 0) + (bioProfile.healthConditions?.length ? 1 : 0) + (bioProfile.aasStatus ? 1 : 0);
+  const bioFilled = (settings.health?.drugAllergies?.length ? 1 : 0) + (settings.health?.chronicConditions?.length ? 1 : 0) + (settings.nutrition?.currentMedications?.length ? 1 : 0);
   const autoFilled = (autoCalc.neuro ? 1 : 0) + (autoCalc.cardio ? 1 : 0) + (autoCalc.gi ? 1 : 0) + (autoCalc.health ? 1 : 0);
 
 
@@ -229,7 +227,7 @@ export const ProfileDataHub: React.FC<ProfileDataHubProps> = ({
     {
       key: 'biostack', label: 'BioStack профиль', icon: '🧬', color: '#a855f7',
       filled: bioFilled, total: 3,
-      detail: bioProfile.aasStatus ? `Статус: ${bioProfile.aasStatus}` : 'Не заполнено',
+      detail: (settings.nutrition?.currentMedications?.length ?? 0) > 0 ? `${settings.nutrition.currentMedications.length} препаратов` : 'Не заполнено',
       go: () => onNavigate?.('biostack'),
     },
     {
