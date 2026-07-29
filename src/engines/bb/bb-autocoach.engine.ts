@@ -703,3 +703,58 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
 
   return { ...plan, weeks };
 }
+
+/**
+ * Taper protocol — постепенное снижение объёма за 2-3 нед до пика/соревнования.
+ *
+ * В отличие от deload (резкое −50% объём, −45% интенсивность за 1 нед),
+ * taper снижает объём ПОСТЕПЕННО (−25%/нед) при СОХРАНЕНИИ интенсивности.
+ * Цель: снизить утомление, сохранив адаптацию (Bosquet 2005 meta-analysis:
+ * 2-3 нед taper → +2-3% производительность; объём −25%/нед, интенсивность 100%).
+ *
+ * Применяется к последним 2-3 неделям плана ПЕРЕД финальным deload (или вместо
+ * deload если план заканчивается peaking без deload).
+ */
+export function applyTaperToFinalWeeks(plan: BBPlan, totalWeeks: number): BBPlan {
+  if (!plan || plan.weeks.length < 4) return plan; // taper только для планов ≥4 нед
+
+  // Найти последнюю deload-неделю (если есть) — taper применяется к неделям ДО неё.
+  // Если deload нет — taper к последним 2-3 неделям.
+  const weeks = plan.weeks;
+  let lastDeloadIdx = -1;
+  for (let i = weeks.length - 1; i >= 0; i--) {
+    // определяем deload по объёму упражнений (deload-неделя = ~50% объёма)
+    const totalSets = weeks[i].sessions.flatMap(s => s.exercises).reduce((sum, e) => sum + e.sets, 0);
+    const prevSets = i > 0 ? weeks[i - 1].sessions.flatMap(s => s.exercises).reduce((sum, e) => sum + e.sets, 0) : totalSets;
+    if (totalSets < prevSets * 0.6) { lastDeloadIdx = i; break; }
+  }
+
+  // Taper-недели: 2-3 нед перед deload (или перед концом плана)
+  const taperEnd = lastDeloadIdx >= 0 ? lastDeloadIdx : weeks.length;
+  const taperStart = Math.max(0, taperEnd - 3); // последние 3 нед перед deload/концом
+  if (taperEnd - taperStart < 2) return plan; // недостаточно нед для taper
+
+  const newWeeks = weeks.map((w, idx) => {
+    if (idx < taperStart || idx >= taperEnd) return w; // не taper-неделя
+    // Taper-степень: неделя 1 (taperStart) = 100%, неделя 2 = 75%, неделя 3 = 50%.
+    // Интенсивность (вес) сохраняется на 100% — снижается только объём (сеты).
+    const taperWeek = idx - taperStart; // 0, 1, 2
+    const volumeMult = taperWeek === 0 ? 1.0 : taperWeek === 1 ? 0.75 : 0.50;
+    const intensityMult = 1.0; // вес сохраняется (Bosquet 2005)
+    const newSessions = w.sessions.map(s => ({
+      ...s,
+      exercises: s.exercises.map(e => ({
+        ...e,
+        sets: Math.max(1, Math.round(e.sets * volumeMult)),
+        workSets: (e.workSets || []).map(ws => ({
+          ...ws,
+          weight: Math.round(ws.weight * intensityMult * 10) / 10,
+        })),
+        comment: (e.comment || '') + ` | 📉 Taper: объём ×${volumeMult}, интенсивность сохранена (Bosquet 2005).`,
+      })),
+    }));
+    return { ...w, sessions: newSessions };
+  });
+
+  return { ...plan, weeks: newWeeks };
+}

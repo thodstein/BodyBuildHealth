@@ -421,3 +421,64 @@ export function autoReplaceOnPlateau(
 
   return { plan: { ...plan, weeks: newWeeks }, changes: [...new Set(changes)] };
 }
+
+/**
+ * Per-muscle ACWR — соотношение объёма текущей недели к 4-недельному среднему
+ * по КАЖДОЙ мышце отдельно (не общий sRPE-ACWR).
+ *
+ * Для ББ per-muscle sets ratio релевантнее общего тоннажа: одна мышца может
+ * быть перетренирована (chest ACWR 1.8) при нормальном общем ACWR (1.2).
+ *
+ * @param sessions — WorkoutSession[] из дневника
+ * @returns Record<muscle, { ratio, zone }> — per-muscle ACWR + зона (optimal/caution/danger)
+ */
+export function computePerMuscleACWR(
+  sessions: WorkoutSession[],
+): Record<string, { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'danger' }> {
+  if (!sessions || sessions.length < 4) return {};
+
+  // Группируем сессии по неделям (ISO week start Monday)
+  const weekKey = (dateStr: string): string => {
+    const d = new Date(dateStr);
+    const day = d.getDay() || 7; // 0=Sunday → 7
+    d.setDate(d.getDate() - (day - 1)); // понедельник
+    return d.toISOString().slice(0, 10);
+  };
+
+  // muscle → week → total sets
+  const muscleWeekSets: Record<string, Record<string, number>> = {};
+  for (const s of sessions) {
+    const wk = weekKey(s.date);
+    for (const ex of s.exercises || []) {
+      const muscle = ex.muscleGroup || '';
+      if (!muscle) continue;
+      if (!muscleWeekSets[muscle]) muscleWeekSets[muscle] = {};
+      muscleWeekSets[muscle][wk] = (muscleWeekSets[muscle][wk] || 0) + (ex.sets?.length || 0);
+    }
+  }
+
+  // Для каждой мышцы: текущая неделя vs 4-нед среднее
+  const result: Record<string, { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'danger' }> = {};
+  const allWeeks = [...new Set(sessions.map(s => weekKey(s.date)))].sort();
+  const recentWeeks = allWeeks.slice(-5); // последние 5 нед (1 текущая + 4 для chronic)
+  if (recentWeeks.length < 2) return {};
+
+  const currentWeek = recentWeeks[recentWeeks.length - 1];
+  const chronicWeeks = recentWeeks.slice(0, -1).slice(-4); // 4 нед до текущей
+
+  for (const [muscle, weekSets] of Object.entries(muscleWeekSets)) {
+    const currentSets = weekSets[currentWeek] || 0;
+    const chronicAvg = chronicWeeks.length > 0
+      ? chronicWeeks.reduce((sum, wk) => sum + (weekSets[wk] || 0), 0) / chronicWeeks.length
+      : 0;
+    if (chronicAvg < 1) continue; // недостаточно данных
+    const ratio = currentSets / chronicAvg;
+    let zone: 'undertrained' | 'optimal' | 'caution' | 'danger' = 'optimal';
+    if (ratio < 0.8) zone = 'undertrained';
+    else if (ratio > 1.5) zone = 'danger';
+    else if (ratio > 1.3) zone = 'caution';
+    result[muscle] = { ratio: Math.round(ratio * 100) / 100, zone };
+  }
+
+  return result;
+}

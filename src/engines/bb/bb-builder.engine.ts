@@ -21,8 +21,8 @@ import { trueMuscleOf, musclesForRole, derivePattern } from '../movement-pattern
 import { PCT_FOR_RIR, S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation, CourseIntensity } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
-import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
-import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau } from './bb-progression-feedback.engine';
+import { prescribeLoad, applyPostPhaseProcessing, applyTaperToFinalWeeks, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
+import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, computePerMuscleACWR } from './bb-progression-feedback.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findSubstitutions } from '../exercise-substitution.engine';
@@ -2375,7 +2375,23 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       finalPlan = plateauResult.plan;
       rationale.push(...plateauResult.changes);
     }
+    // 4) Per-muscle ACWR — per-muscle sets ratio (this-week / 4-week-avg).
+    // Релевантнее общего sRPE-ACWR для ББ: одна мышца может быть перетренирована
+    // при нормальном общем ACWR. Warnings → rationale.
+    const perMuscleAcwr = computePerMuscleACWR(workoutSessions);
+    const dangerMuscles = Object.entries(perMuscleAcwr).filter(([, v]) => v.zone === 'danger');
+    const cautionMuscles = Object.entries(perMuscleAcwr).filter(([, v]) => v.zone === 'caution');
+    if (dangerMuscles.length > 0) {
+      rationale.push(`🚨 Per-muscle ACWR danger: ${dangerMuscles.map(([m, v]) => `${m}=${v.ratio}`).join(', ')} — снизить объём для этих групп.`);
+    }
+    if (cautionMuscles.length > 0) {
+      rationale.push(`⚠ Per-muscle ACWR caution: ${cautionMuscles.map(([m, v]) => `${m}=${v.ratio}`).join(', ')} — контролировать объём.`);
+    }
   }
+  // Taper protocol — постепенное снижение объёма за 2-3 нед до пика (Bosquet 2005).
+  // В отличие от deload (резкое −50% за 1 нед), taper снижает объём −25%/нед при
+  // сохранении интенсивности. Применяется к последним 2-3 нед перед deload/концом.
+  finalPlan = applyTaperToFinalWeeks(finalPlan, input.weeks);
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, effectiveMrvMult);
   // muscleFrequency: muscleSessionCount содержит число сессий на мышцу за ротацию (= неделя для 7-дн паттернов)
   const muscleFrequency: Record<string, number> = {};
