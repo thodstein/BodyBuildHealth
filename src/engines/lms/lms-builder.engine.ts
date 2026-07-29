@@ -223,7 +223,7 @@ function collectPLCorrections(lift: Lift, weakPoint: WeakPoint): { name: string;
   if (!base.assistance.length) return [];
   const diag = diagnoseLift(lift, weakPoint);
   const pct = diag ? diag.assistanceIntensityPct : base.intensityPct;
-  return base.assistance.map(a => ({ name: a, pct }));
+  return base.assistance.map((a: string) => ({ name: a, pct }));
 }
 
 export interface PLWeakPointRecommendation {
@@ -268,7 +268,8 @@ function injectPLWeakPoints(
     const dayRankByMain: { idx: number; mainSets: number }[] = [];
     for (let i = 0; i < days.length; i++) {
       const mainSets = days[i].exercises
-        .filter(e => norm(e.name) === norm(mainName))
+       .filter(e => norm(e.name) === norm(mainName))
+        .filter(e => norm(e.name) === norm(mainName) || norm(e.name).includes(norm(mainName)) || norm(mainName).includes(norm(e.name)))
         .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
       if (mainSets > 0) dayRankByMain.push({ idx: i, mainSets });
     }
@@ -305,7 +306,7 @@ function injectPLWeakPoints(
       if (!existing.has(norm(resolvedName)) && heavyDay.exercises.length < 8) {
         const exGroup = ex ? (ex.group as string) : liftGroup;
         const sets = Math.max(2, Math.round(3 * phaseVolMod));
-        const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? 80;
+        const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? Object.entries(pmRow).find(([k]) => norm(k) === norm(mainName) || norm(k).includes(norm(mainName)) || norm(mainName).includes(norm(k)))?.[1] ?? 80;
         const ref = getVolumeLandmarks(vrLevel, exGroup);
         if (ref) {
           let cur = 0;
@@ -340,14 +341,7 @@ function injectPLWeakPoints(
           const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? 80;
           const ref = getVolumeLandmarks(vrLevel, exGroup);
           if (ref) {
-            let cur = 0;
-            for (const d of days) {
-              for (const e of d.exercises) {
-                const eg = groupOfExercise(e.name, '');
-                if (eg === exGroup) cur += e.workSets.reduce((x, ws) => x + ws.sets, 0);
-              }
-            }
-            if (cur + sets > Math.round(ref.mrv * pedMrvMult)) continue;
+            
           }
           // Памп-протокол: 3×12 @ 60% 1PM, RIR 3
           const pumpPct = 0.60;
@@ -436,7 +430,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         const k = (input.weeklyPercent != null ? input.weeklyPercent
           : mode === 'on_course' ? (input.courseIntensity === 'mild' ? 0.015 : input.courseIntensity === 'heavy' ? 0.025 : 0.02)
           : mode === 'pct' ? -0.005 : template.meta.correctionPct);
-        pmRow[name] = pm0Map[name] * Math.pow(1 + k, w);
+        pmRow[name] = pm0Map[name] * Math.pow(1 + k, weekNumber - 1);
       }
     }
     const weekLayout: SRDaySpec[] = hasExplicitWeeks ? template.weeks![w] : template.week1;
@@ -568,9 +562,9 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           // Выбор exercises сделан; tfПротокол
           const pct = isHeavyDay ? 0.68 : 0.55;
           const reps = isHeavyDay ? 8 : 12;
-          const sets = 3;
+          let sets = 3;
           const rir = isHeavyDay ? 2 : 3;
-          // MRV soft-cap
+          // MRV soft-cap: урезаем sets так, чтобы вписаться в fakeMrvCap
           let weeklyMuscleSets = 0;
           for (const d of days) {
             weeklyMuscleSets += d.exercises
@@ -578,9 +572,9 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
               .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
           }
           if (weeklyMuscleSets + sets > fakeMrvCap) {
-            // По cap можно поставить только limited объёмm
             const margin = Math.max(0, fakeMrvCap - weeklyMuscleSets);
-            if (margin < 2) continue; // недостаточно бюджета на этот день
+            if (margin < 2) continue; // бюджета не хватает даже на минимум
+            sets = margin; // урезаем подходы, чтобы вписаться в cap
           }
           // Day cap: упражнений ≤ 8
           if (targetDay.exercises.length >= 8) continue;
@@ -680,3 +674,4 @@ export function getPLVolumeLandmarks(weeks: LMSPlanWeek[], level: string, pedMrv
     return { group: r.group, muscle: r.label, peakWeek: r.peakWeek ?? (peakIdx + 1), sets: r.sets, mev: r.mev, mav: r.mav, mrv: r.mrv, status };
   });
 }
+  // OHP варианты ('Жим стоя', 'Жим штанги стоя', 'Жим гантелей стоя') ловятся через norm('Жим') вхождением в любое 'Жим ... стоя'.
