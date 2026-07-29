@@ -869,12 +869,20 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               sets = Math.max(1, Math.round(sets * bridgeMult));
               return sets + 'x' + s.reps + 'x' + weight + 'кг (' + Math.round(s.pct*100) + '%)' + (typeof s.rir === 'number' ? ' · RIR ' + s.rir : '') + (autoRegOn && autoRegResult && (autoRegResult.topSetPctMultiplier !== 1 || autoRegResult.volumeMultiplier !== 1) ? ' ⚡' : '') + (bridgeMult !== 1 || bridgeRir !== 0 ? ' 🔗' : '');
             };
-            return <div style={CARD}>
+            return <div style={{ ...CARD, overflow:'hidden', boxSizing:'border-box', maxWidth:'100%' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8 }}>
-                <div style={{ ...H, margin:0 }}>План: {builtSrc.template.meta.title}</div>
-                <span style={{ fontSize:11, fontWeight:700, color: PH_COLOR[phase], background: PH_COLOR[phase]+'22', padding:'3px 8px', borderRadius:10 }}>{PH_RU[phase]}</span>
+                <div style={{ ...H, margin:0, minWidth:0, overflowWrap:'break-word' }}>План: {builtSrc.template.meta.title}</div>
+                <span style={{ fontSize:11, fontWeight:700, color: PH_COLOR[phase], background: PH_COLOR[phase]+'22', padding:'3px 8px', borderRadius:10, flexShrink:0 }}>{PH_RU[phase]}</span>
               </div>
-              <div style={{ ...SMALL, marginTop:4 }}>{builtSrc.progressionRationale}</div>
+              <div style={{ ...SMALL, marginTop:4, wordBreak:'break-word' }}>{builtSrc.progressionRationale}</div>
+              <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: PH_COLOR[phase]+'14', border:'1px solid '+PH_COLOR[phase]+'30' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                  <span style={{ width:8, height:8, borderRadius:'50%', background: PH_COLOR[phase], flexShrink:0 }} />
+                  <span style={{ fontSize:12, fontWeight:800, color: PH_COLOR[phase] }}>{PH_RU[phase]}</span>
+                  <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginLeft:'auto' }}>Неделя {wk.week} из {totalW}</span>
+                </div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.7)', lineHeight:1.4, wordBreak:'break-word' }}>{PH_DESC[phase]}</div>
+              </div>
               {methodHints.label && <div style={{ marginTop:4, fontSize:11, color:'var(--accent)', background:'var(--accent-dim)', border:'1px solid rgba(0,230,138,0.2)', padding:'3px 8px', borderRadius:8, display:'inline-block' }}>🧩 {methodHints.label}{methodHints.volumeMult !== 1 ? ' · объём×' + methodHints.volumeMult : ''}{methodHints.technique ? ' · ' + methodHints.technique : ''}</div>}
               {plWeakPoints.length > 0 && (
                 <div style={{ marginTop:8, fontSize:11, color:'#c4b5fd', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.25)', padding:'6px 8px', borderRadius:8 }}>
@@ -948,8 +956,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   <span style={{ fontWeight:700, color:'#fff' }}>Неделя {wk.week} из {totalW}</span>
                   <span style={{ fontSize:11, fontWeight:700, color:PH_COLOR[phase], background:PH_COLOR[phase]+'22', padding:'2px 10px', borderRadius:8 }}>{PH_RU[phase]}</span>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(40px, 1fr))', gap:4 }}>
-                  {W.map(w => { const ph = mesocyclePhaseForWeek(w.week, totalW); const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+PH_RU[ph]} style={{ padding:'8px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? PH_COLOR[ph] : PH_COLOR[ph]+'1a', color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:38 }}>{w.week}</button>; })}
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
+                  {W.map(w => { const ph = mesocyclePhaseForWeek(w.week, totalW); const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+PH_RU[ph]} style={{ padding:'6px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? PH_COLOR[ph] : PH_COLOR[ph]+'1a', color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:36, minWidth:0 }}>{w.week}</button>; })}
                 </div>
               </div>
               {/* Визуальный календарь мезоцикла: недели × дни с тоннажём и фазой */}
@@ -1099,64 +1107,115 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                                    {e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}
                                  </span>
                                </div>
-                              <div style={{ display:'flex', flexDirection:'column', gap:2, marginTop:4 }}>
-                                {e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); const es = effSet(wk.week, di, ei, si, ws); const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'5px 4px', fontSize:12, textAlign:'center' }; return (
-                                  <div key={si} style={{ display:'flex', gap:3, alignItems:'center' }}>
-                                    <span style={{ fontSize:11, color:'rgba(255,255,255,0.4)' }}>С{si+1}</span>
-                                    <input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], weight: +ev.target.value } }))} style={{ ...INM, flex:'1', minWidth:0 }} />
-                                    <span style={{ fontSize:11 }}>×</span>
-                                    <input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, flex:'1', minWidth:0 }} />
-                                    <span style={{ fontSize:11 }}>×</span>
-                                    <input type='number' value={es.sets} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], sets: +ev.target.value } }))} style={{ ...INM, flex:'1', minWidth:0 }} />
-                                    <input type='text' value={srcEdits[k]?.tempo || ''} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], tempo: ev.target.value } }))} style={{ ...INM, flex:'1', minWidth:0, textAlign:'center', color:'#a855f7', fontWeight:700 }} placeholder='3-1-1-0' />
-                                  </div>
-                                ); })}
-                              </div>
+                              <div style={{ display:'flex', flexDirection:'column', gap:4, marginTop:6 }}>
+                                 {e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); const es = effSet(wk.week, di, ei, si, ws); const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'5px 4px', fontSize:12, textAlign:'center', minWidth:0 }; const IN_LBL: React.CSSProperties = { fontSize:9, color:'rgba(255,255,255,0.4)', textTransform:'uppercase' as const, letterSpacing:0.5, textAlign:'center' as const }; return (
+                                   <div key={si} style={{ background:'rgba(255,255,255,0.025)', borderRadius:6, padding:'4px 6px' }}>
+                                     <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginBottom:2, fontWeight:600 }}>Сет {si+1}</div>
+                                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                                       <div>
+                                         <div style={IN_LBL}>Вес, кг</div>
+                                         <input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], weight: +ev.target.value } }))} style={{ ...INM, width:'100%' }} />
+                                       </div>
+                                       <div>
+                                         <div style={IN_LBL}>Повторы</div>
+                                         <input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:'100%' }} />
+                                       </div>
+                                       <div>
+                                         <div style={IN_LBL}>Подходы</div>
+                                         <input type='number' value={es.sets} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], sets: +ev.target.value } }))} style={{ ...INM, width:'100%' }} />
+                                       </div>
+                                       <div>
+                                         <div style={IN_LBL}>Темп</div>
+                                         <input type='text' value={srcEdits[k]?.tempo || ''} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], tempo: ev.target.value } }))} style={{ ...INM, width:'100%', color:'#a855f7', fontWeight:700 }} placeholder='3-1-1-0' />
+                                       </div>
+                                     </div>
+                                   </div>
+                                 ); })}
+                               </div>
                             </div>
                           ))}
                           {(srcAdditions[dk] || []).map(a => (
-                             <div key={a.uid} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:4, padding:'5px 0', borderBottom:'1px solid var(--accent-dim)', alignItems:'center' }}>
-                               <div style={{ fontSize:11, color:'var(--accent)', fontWeight:600, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.name}</div>
-                               <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
-                                  <span style={{ fontSize:11, color:'rgba(255,255,255,0.4)' }}>＋ добавлено</span>
-                                 <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:11, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', marginLeft:4 }}>✕</button>
+                             <div key={a.uid} style={{ display:'flex', flexDirection:'column', gap:4, padding:'5px 0', borderBottom:'1px solid var(--accent-dim)' }}>
+                               <div style={{ display:'flex', alignItems:'center', gap:4, minWidth:0 }}>
+                                 <div style={{ fontSize:11, color:'var(--accent)', fontWeight:600, flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.name}</div>
+                                 <span style={{ fontSize:10, color:'rgba(255,255,255,0.4)', flexShrink:0 }}>＋ добавлено</span>
+                                 <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:11, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', flexShrink:0 }}>✕</button>
                                </div>
-                              <div style={{ fontSize:11, color:'rgba(255,255,255,0.75)', textAlign:'right' }}>
-                                <div style={{ display:'flex', gap:3, alignItems:'center' }}>
-                                  <input type='number' value={a.sets} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, sets: +ev.target.value } : x) }; })} style={{ flex:'1', minWidth:0, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'6px 4px', fontSize: 11, textAlign:'center' }} aria-label='подходы'/>
-                                  <span style={{ fontSize:11 }}>×</span>
-                                  <input type='number' value={a.reps} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, reps: +ev.target.value } : x) }; })} style={{ flex:'1', minWidth:0, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'6px 4px', fontSize: 11, textAlign:'center' }} aria-label='повт'/>
-                                  <span style={{ fontSize:11 }}>×</span>
-                                  <input type='number' value={a.weight} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, weight: +ev.target.value } : x) }; })} style={{ flex:'1', minWidth:0, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'6px 4px', fontSize: 11, textAlign:'center' }} aria-label='вес'/>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:3 }}>
+                                 <input type='number' value={a.sets} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, sets: +ev.target.value } : x) }; })} style={{ background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'6px 2px', fontSize:11, textAlign:'center', minWidth:0, width:'100%' }} aria-label='подходы' title='подходы'/>
+                                 <input type='number' value={a.reps} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, reps: +ev.target.value } : x) }; })} style={{ background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'6px 2px', fontSize:11, textAlign:'center', minWidth:0, width:'100%' }} aria-label='повт' title='повторы'/>
+                                 <input type='number' value={a.weight} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, weight: +ev.target.value } : x) }; })} style={{ background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'6px 2px', fontSize:11, textAlign:'center', minWidth:0, width:'100%' }} aria-label='вес' title='вес, кг'/>
+                               </div>
+                             </div>
+                           ))}
                           <button onClick={() => { setPickerDay(dk); setPickerExName(''); }} style={{ marginTop:6, padding:'5px 10px', borderRadius:6, fontSize:11, fontWeight:600, border:'1px dashed rgba(0,230,138,0.4)', background:'var(--accent-dim)', color:'var(--accent)', cursor:'pointer' }}>＋ Добавить упражнение из каталога</button>
                         </>
                       ),
                     }} />
                   );
                 }
-                const exercises: PlanExerciseView[] = d.exercises.map((e, ei) => {
-                  const tmpo = getTempo(e.name, goal, e.load === 'main');
-                  const detail = e.workSets.map((ws, si) => setStr(effSet(wk.week, di, ei, si, ws))).join('  ·  ');
-                  const tempo = tempoStr || e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); return srcEdits[k]?.tempo || tmpo.tempo.toString; })[0];
-                  return { key: 'ex-' + di + '-' + ei, name: e.name, role: roleOf(e.load), detail, tempo } as PlanExerciseView;
-                });
-                (srcAdditions[dk] || []).forEach(a => {
-                  exercises.push({
-                    key: 'add-' + a.uid,
-                    name: a.name,
-                    role: 'accessory',
-                    detail: a.sets + 'x' + a.reps + 'x' + a.weight + 'кг',
-                    note: '＋ добавлено',
-                    highlighted: true,
-                    actions: <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:11, color:'#ef4444', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', borderRadius:5, padding:'4px 8px', cursor:'pointer' }}>✕ Удалить</button>,
-                  });
-                });
                 return (
-                  <DayCard key={di} day={{ key: 'day-' + di, title: `🏋️ День ${di + 1}${loadStr}`, phase: dayPhase, volumeTag, exercises }} />
+                  <DayCard key={di} day={{
+                    key: 'day-' + di,
+                    title: `🏋️ День ${di + 1}${loadStr}`,
+                    phase: dayPhase,
+                    volumeTag,
+                    renderBody: (
+                      <>
+                        {d.exercises.map((e, ei) => {
+                          const tmpo = getTempo(e.name, goal, e.load === 'main');
+                          const isCompound = !e.name.toLowerCase().includes('сгибан') && !e.name.toLowerCase().includes('разгибан') && !e.name.toLowerCase().includes('подъём') && !e.name.toLowerCase().includes('махи');
+                          const roleColor = e.load === 'main' ? '#00e68a' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.55)';
+                          const charColor = e.load === 'main' ? '#60a5fa' : e.load === 'additional' ? '#a855f7' : 'rgba(255,255,255,0.5)';
+                          const charLabel = e.load === 'main' ? '💪 Тяж' : e.load === 'additional' ? '🩸 Памп' : '🌿 Лёг';
+                          const roleLabel = e.load === 'main' ? '🎯 Основное' : e.load === 'additional' ? '📌 Добивка' : '⚙️ Аксессуар';
+                          const firstWs = e.workSets[0] ? effSet(wk.week, di, ei, 0, e.workSets[0]) : null;
+                          const firstRir = e.workSets[0]?.rir;
+                          const setSummary = firstWs ? (firstWs.sets + '×' + firstWs.reps + ' @ ' + Math.round(firstWs.pct*100) + '%') : '';
+                          const tempo = tempoStr || tmpo.tempo.toString;
+                          return (
+                            <div key={ei} style={{ padding:'8px 10px', marginBottom:6, background:'rgba(255,255,255,0.025)', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.04)', overflow:'hidden' }}>
+                              <div style={{ display:'flex', alignItems:'baseline', gap:8, marginBottom:5, minWidth:0 }}>
+                                <span style={{ minWidth:20, height:20, borderRadius:'50%', background:'rgba(0,230,138,0.15)', color:'#00e68a', fontSize:11, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{ei+1}</span>
+                                <span style={{ fontSize:13, fontWeight:800, color:'#fff', lineHeight:1.2, flex:1, minWidth:0, overflowWrap:'break-word' }}>{e.name}</span>
+                              </div>
+                              <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:6 }}>
+                                <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:5, background:(isCompound?'#00e68a':'#f59e0b')+'20', color:isCompound?'#00e68a':'#f59e0b', border:'0.5px solid '+(isCompound?'#00e68a':'#f59e0b')+'30' }}>{isCompound?'База':'Изо'}</span>
+                                <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:5, background:roleColor+'20', color:roleColor, border:'0.5px solid '+roleColor+'30' }}>{roleLabel}</span>
+                                <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:5, background:charColor+'20', color:charColor, border:'0.5px solid '+charColor+'30' }}>{charLabel}</span>
+                              </div>
+                              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(80px, 1fr))', gap:5 }}>
+                                {firstWs && <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(34,197,94,0.1)', border:'0.5px solid rgba(34,197,94,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(34,197,94,0.8)' }}>Сеты</span><b style={{color:'#fff'}}>{setSummary}</b></span>}
+                                <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(245,158,11,0.1)', border:'0.5px solid rgba(245,158,11,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(245,158,11,0.8)' }}>RIR</span><b style={{color:'#fff'}}>{firstRir ?? e.rir}</b></span>
+                                {firstWs && <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(96,165,250,0.1)', border:'0.5px solid rgba(96,165,250,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(96,165,250,0.8)' }}>Вес</span><b style={{color:'#fff'}}>{firstWs.weight}кг</b></span>}
+                                {tempo && <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(168,85,247,0.1)', border:'0.5px solid rgba(168,85,247,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(168,85,247,0.8)' }}>Темп</span><b style={{color:'#fff'}}>{tempo}</b></span>}
+                                <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.1)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(255,255,255,0.6)' }}>Группа</span><b style={{color:'#fff'}}>{e.group}</b></span>
+                              </div>
+                              {e.workSets.length > 1 && (
+                                <details style={{ marginTop:5 }}>
+                                  <summary style={{ fontSize:10, fontWeight:600, color:'rgba(0,230,138,0.7)', cursor:'pointer' }}>📋 Все сеты ({e.workSets.length})</summary>
+                                  <div style={{ display:'flex', flexDirection:'column', gap:2, marginTop:4 }}>
+                                    {e.workSets.map((ws, si) => { const es = effSet(wk.week, di, ei, si, ws); return (
+                                      <div key={si} style={{ fontSize:10, color:'rgba(255,255,255,0.7)', padding:'3px 6px', borderRadius:4, background:'rgba(255,255,255,0.02)' }}>Сет {si+1}: {es.sets}×{es.reps} @ {Math.round(es.pct*100)}% ({es.weight}кг){typeof ws.rir === 'number' ? ' · RIR '+ws.rir : ''}</div>
+                                    ); })}
+                                  </div>
+                                </details>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {(srcAdditions[dk] || []).map(a => (
+                          <div key={a.uid} style={{ padding:'6px 10px', marginBottom:6, background:'rgba(0,230,138,0.05)', borderRadius:10, border:'0.5px solid rgba(0,230,138,0.2)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:6 }}>
+                            <div style={{ minWidth:0, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                              <span style={{ fontSize:13, fontWeight:800, color:'#00e68a' }}>＋ {a.name}</span>
+                              <span style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginLeft:6 }}>{a.sets}×{a.reps}×{a.weight}кг</span>
+                            </div>
+                            <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:11, color:'#ef4444', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', borderRadius:5, padding:'4px 8px', cursor:'pointer', flexShrink:0 }}>✕</button>
+                          </div>
+                        ))}
+                      </>
+                    ),
+                  }} />
                 );
               })}
               <MetricCard title={'Итоги мезоцикла ('+totalW+' нед)'} icon="📊">
