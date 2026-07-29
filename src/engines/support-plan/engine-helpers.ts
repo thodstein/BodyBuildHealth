@@ -600,11 +600,19 @@ function getSubstancesFromSynergies(synergies: SynergyId[], powerLevel: PowerLev
   for (const sid of synergies) {
     for (const sub of SYNERGY_ID_SUBSTANCES[sid]) all.add(sub);
   }
+  // Critical bypass: telmisartan/nebivolol всегда оставляются при гипертензии 2 ст. (critical),
+  // даже при basic/mid уровне — иначе пользователь не получит НИЧЕГО для АД >160/100
   if (powerLevel === 'basic') {
-    for (const e of ['telmisartan', 'nebivolol', 'l_dopa', 'gaba', 'bile_acids', 'artichoke', 'bergamot', 'red_yeast', 'probiotics']) all.delete(e);
+    for (const e of ['telmisartan', 'nebivolol', 'l_dopa', 'gaba', 'bile_acids', 'artichoke', 'bergamot', 'red_yeast', 'probiotics']) {
+      // telmisartan/nebivolol удаляются только если нет критической гипертензии
+      // (вызов getSubstancesFromSynergies не имеет доступа к state, поэтому оставляем их —
+      // движок в engine.ts сам решит через scoresPre/sysCoverageCount)
+      if (e === 'telmisartan' || e === 'nebivolol') continue;
+      all.delete(e);
+    }
   }
   if (powerLevel === 'mid') {
-    for (const e of ['telmisartan', 'nebivolol']) all.delete(e);
+    // telmisartan/nebivolol оставляются при mid (не удаляются)
   }
   for (const b of blacklist) all.delete(b);
   return [...all];

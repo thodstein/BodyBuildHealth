@@ -76,6 +76,9 @@ export interface ReadinessInput {
   priScore: number;      // 0-1
   fatigueScore: number;  // 0-1
   recoveryScore: number; // 0-1
+  jointFatigue?: Record<string, number>; // per-joint fatigue (0-1 per joint)
+  monotony?: number;     // weekly training monotony (0-5)
+  strain?: number;       // weekly training strain
   riskLevel: 'low' | 'medium' | 'high';
   goal: string;
   plannedIntensity: number; // % 1RM (0-1 или 0-100)
@@ -86,7 +89,7 @@ export interface ReadinessInput {
 export function autoregPlan(r: ReadinessInput): AutoregOutput {
   const input: AutoregInput = {
     priScore: r.priScore, fatigueScore: r.fatigueScore, recoveryScore: r.recoveryScore,
-    jointFatigue: {}, cumulativeLoad: { overload: r.fatigueScore > 0.7, monotony: 0, strain: r.fatigueScore },
+    jointFatigue: r.jointFatigue || {}, cumulativeLoad: { overload: r.fatigueScore > 0.7, monotony: r.monotony ?? (r.fatigueScore > 0.7 ? 2.5 : 0), strain: r.strain ?? r.fatigueScore },
     riskLevel: r.riskLevel, techniqueScore: r.recoveryScore, velocityTrend: 0,
     goal: r.goal, plannedIntensity: r.plannedIntensity, plannedSets: r.plannedSets,
     plannedReps: r.plannedReps, plannedFrequency: r.plannedFrequency, exerciseJointStress: {},

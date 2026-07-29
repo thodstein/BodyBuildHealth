@@ -587,7 +587,7 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
     category: 'mineral',
     doseRange: { min: 15, max: 50, unit: 'mg', frequency: 'daily' },
     indications: ['testosterone_support', 'immune_function', 'prostate_health'],
-    mechanisms: ['COFACTOR_AROMATASE', 'COFACTOR_5AR', 'IMMUNE_SUPPORT'],
+    mechanisms: ['AROMATASE_MODULATION', '5AR_INHIBITION', 'IMMUNE_SUPPORT'],
     warnings: ['copper_depletion_longterm', 'nausea_fasting'],
     evidenceLevel: 'B',
     lastUpdated: '2024-07-19',

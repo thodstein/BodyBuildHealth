@@ -20,6 +20,10 @@ export const DRUG_INTERACTIONS: DrugInteraction[] = [
   { a: 'spironolactone', b: '@raas', severity: 'block', reason: 'Двойная K⁺-сберегающая → гиперкалиемия', action: '⛔ Не комбинировать со спиро. Уже есть telmisartan (ARB = K⁺-сберегающий)' },
   { a: 'insulin', b: '@alcohol', severity: 'block', reason: 'Тяжёлая гипогликемия (торможение глюконеогенеза)', action: '⛔ ZERO алкоголя при инсулине' },
   { a: 'cabergoline', b: '@d2_antagonist', severity: 'block', reason: 'Антагонизм D2-рецепторов (метоклопрамид, фенотиазины)', action: '⛔ Не комбинировать с прокинетиками/противорвотными D2-блокерами' },
+  { a: 'red_yeast_rice', b: '@statin', severity: 'block', reason: 'Красный дрожжевой рис содержит ловастатин — двойная доза статина → риск рабдомиолиза', action: '⛔ Не комбинировать. Выбрать один (статин OR красный рис)' },
+  { a: 'x5htp', b: '@ssri', severity: 'block', reason: '5-HTP (предшественник серотонина) + SSRI → серотониновый синдром', action: '⛔ Не комбинировать. 5-HTP только после отмены SSRI (washout 2 нед)' },
+  { a: 'x5htp', b: '@snri', severity: 'block', reason: '5-HTP + SNRI → серотониновый синдром', action: '⛔ Не комбинировать. Серотониновый синдром: гипертермия, тремор, спутанность' },
+  { a: 'tyrosine', b: '@maoi', severity: 'block', reason: 'Тирозин (предшественник катехоламинов) + ИМАО → гипертонический криз', action: '⛔ Не комбинировать. Гипертонический криз может быть жизнеугрожающим' },
 
   // ─── WARN (мониторинг, осторожно) ───
   { a: 'niacin', b: '@statin', severity: 'warn', reason: '↑ риск рабдомиолиза (редко, но серьезно)', action: '⚠ Мониторинг КФК каждые 4 нед. Бергамот — альтернатива с меньшим риском', alternatives: ['bergamot'] },

@@ -55,11 +55,11 @@ export const MECHANISM_TO_SUPPORT_SUBSTANCE: Record<string, string[]> = {
   neuro_tox_8: ['omega3','carnitine','coq10','alpha_lipoic'], // Мотонейроны
 
   // ── ENDOCRINE / hormonal ──
-  endocrine_1: ['zinc_sup','shilajit','tongkat_ali','boron','fadogia'], // HPTA
+  endocrine_1: ['zinc_sup','shilajit','tongkat_ali','boron'], // HPTA — fadogia удалён (FDA warning 2023: гепатотоксичность)
   endocrine_2: ['zinc_sup','selenium_sup','boron','shilajit','vitamin_d3'], // Тестостерон
   endocrine_3: ['ashwagandha','zinc_sup','selenium_sup','boron'], // Лейдиг
   endocrine_4: ['vitex','p5p','indinol','zinc_sup'], // Пролактин
-  endocrine_5: ['dim','indinol','mesterolone','zinc_sup'], // Эстрадиол
+  endocrine_5: ['dim','indinol','zinc_sup'], // Эстрадиол — mesterolone удалён (это ААС/DHT-производное, не support)
   endocrine_6: ['vitamin_d3','vitamin_k2','calcium','magnesium'], // Кости
   endocrine_7: ['boron','tongkat_ali','shilajit','vitamin_d3'], // SHBG
   endocrine_8: ['enclomiphene','tamoxifen','clomi','zinc_sup'], // PCT
@@ -196,6 +196,9 @@ export function getFullChainSupport(organ: string): { system: string; mechanisms
 
   const mechanisms = Object.keys(MECHANISM_TO_SUPPORT_SUBSTANCE).filter(k => k.startsWith(sysKey + '_'));
   const supportIds = Array.from(new Set(mechanisms.flatMap(m => MECHANISM_TO_SUPPORT_SUBSTANCE[m] || [])));
+
+  // Явное предупреждение для skin — механизмы не определены, возвращаем null с комментарием
+  if (sysKey === 'skin' && mechanisms.length === 0) return null;
 
   return { system: sysKey, mechanisms, supportIds };
 }

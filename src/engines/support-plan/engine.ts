@@ -17,6 +17,8 @@ import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, typ
 import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
 import { getPrioritySubstances, getSubstancePriority, type SeverityLevel } from '../../data/lab-priority-map';
+import { checkContraindications } from '../../data/substance-contraindications';
+import { checkInteractions } from '../../data/drug-interactions';
 
 // ═══════════════════════════════════════════════════════════════
 //  ЕДИНСТВЕННЫЙ движок поддержки — calculateSupportTZ
@@ -561,6 +563,36 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     // generateSynergyRecommendations уже фильтрует used substances внутри
     const synergyRecs = generateSynergyRecommendations(substances.slice(), activeSystemsList, allDb, planSystemCoverage);
 
+    // ── DDI (Drug-Drug Interactions) из drug-interactions.ts ──
+    const ddiAlerts = checkInteractions(substances);
+    const ddiAlertStrings = ddiAlerts.map(i =>
+      i.severity === 'block'
+        ? `⛔ DDI: ${i.a} + ${i.b}: ${i.reason} — ${i.action}`
+        : `⚠ DDI: ${i.a} + ${i.b}: ${i.reason} — ${i.action}`
+    );
+
+    // ── Маппинг state.contraindications → healthConditions для checkContraindications ──
+    // state.contraindications (hasCVD, hasDiabetes, ...) → condition IDs (ihd, diabetes, ...)
+    // которые проверяются в substance-contraindications.ts absoluteConditions/relativeConditions
+    const healthConditionsMapped: string[] = [...(state.healthConditions || [])];
+    const ci = state.contraindications;
+    if (ci.hasCVD || state.cardio.previousCVD) { healthConditionsMapped.push('ihd'); healthConditionsMapped.push('recent_mi'); }
+    if (ci.hasDiabetes || state.urinary.diabetes) healthConditionsMapped.push('diabetes');
+    if (ci.hasThrombophilia) healthConditionsMapped.push('thrombophilia');
+    if (ci.hasGI) healthConditionsMapped.push('peptic_ulcer');
+    if (ci.hasProstateIssues) healthConditionsMapped.push('bph');
+    if (ci.hasEpilepsy) healthConditionsMapped.push('epilepsy');
+    if (ci.hasMentalIllness) healthConditionsMapped.push('bipolar');
+    if (ci.hasLiverDisease) healthConditionsMapped.push('severe_hepatic');
+    if (ci.hasKidneyDisease) { healthConditionsMapped.push('ckd_stage4_5'); healthConditionsMapped.push('ckd_stage3'); }
+    if (state.cardio.hctElevation === 'severe') healthConditionsMapped.push('severe_polycythemia');
+    if (state.cardio.bpStage === 'hypertension2') healthConditionsMapped.push('severe_hypertension');
+    if (state.cardio.bpStage === 'hypertension1') healthConditionsMapped.push('hypertension');
+    if (state.cardio.previousCVD) healthConditionsMapped.push('recent_cabg');
+    // Демография
+    if ((state.profile.age || 30) > 65) healthConditionsMapped.push('elderly');
+    if ((state.profile.age || 30) > 50) healthConditionsMapped.push('age_over_50');
+
     const result: CalculatorResult = {
       risk: { systems: [], overallRaw, overallAfterSupport, timestamp: new Date().toISOString() },
       schedule, selectedSubstances: substances,
@@ -569,7 +601,13 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       synergyIdsUsed: synergyIds,
       titrationApplied: titration,
       labDeltas, overallRiskBefore: overallRaw, overallRiskAfter: overallAfterSupport,
-      contraindicationAlerts: getContraindicationAlerts(state),
+      contraindicationAlerts: [
+        ...getContraindicationAlerts(state),
+        ...checkContraindications(substances, healthConditionsMapped).map(a => a.severity === 'absolute'
+          ? `⛔ ${a.substanceId}: ${a.message} — ${a.action}`
+          : `⚠ ${a.substanceId}: ${a.message} — ${a.action}`),
+        ...ddiAlertStrings,
+      ],
       negativeBlocks: blacklist,
       comparisonBeforeAfter: (Object.keys(SYS_META) as RiskSystemId[]).map(id => ({
         system: id,

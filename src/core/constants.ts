@@ -585,9 +585,12 @@ export function normalizeLabValue(marker: string, rawValue: number): number {
     case 'E2':
     case 'Эстрадиол':
       // РФ: pmol/L (мужчины: 40-150). Цель: pg/mL (мужчины: 10-40).
-      // Если > 50 — точно pmol/L (pg/mL > 50 для мужчин = крайне редко)
-      // 1 pg/mL = 3.67 pmol/L → pmol/L ÷ 3.67 = pg/mL
-      if (rawValue > 50) return Math.round(rawValue / 3.67 * 10) / 10;
+      // ⚠ Эвристика >50 убрана: мужчина на TRT может иметь E2=60 pg/mL (высокая ароматизация),
+      // и эвристика ложно конвертировала бы 60 pg/mL → 16.3 pg/mL, отменяя AI.
+      // Теперь: если значение > 300 — считаем pmol/L (pg/mL > 300 = нереально для мужчин),
+      // иначе оставляем как есть (предполагаем pg/mL).
+      // Пользователь должен указать единицы в UI — это безопаснее.
+      if (rawValue > 300) return Math.round(rawValue / 3.67 * 10) / 10;
       return rawValue;
 
     case 'Prolactin':
@@ -609,15 +612,19 @@ export function normalizeLabValue(marker: string, rawValue: number): number {
     case 'Cortisol':
     case 'Кортизол':
       // РФ: nmol/L (мужчины: 100-550). Может быть μg/dL (5-25).
-      // Если < 50 — точно μg/dL. Конвертируем в nmol/L (×27.59).
-      if (rawValue < 50) return Math.round(rawValue * 27.59 * 10) / 10;
+      // ⚠ Эвристика <50 убрана: nmol/L=40 (Addisonian crisis) ложно конвертировалось → 1103 nmol/L.
+      // Теперь: если значение < 5 — считаем μg/dL (nmol/L < 5 = нереально),
+      // иначе оставляем nmol/L.
+      if (rawValue < 5) return Math.round(rawValue * 27.59 * 10) / 10;
       return rawValue;
 
     case 'DHEA-S':
     case 'ДГЭА-С':
       // РФ: μg/dL (мужчины: 80-560). Может быть μmol/L (2-15).
-      // Если < 20 — точно μmol/L. Конвертируем в μg/dL (×36.9).
-      if (rawValue < 20) return Math.round(rawValue * 36.9 * 10) / 10;
+      // ⚠ Эвристика <20 убрана: μg/dL=10 (надпочечниковая недостаточность) ложно конвертировалось → 738 μg/dL.
+      // Теперь: если значение < 2 — считаем μmol/L (μg/dL < 2 = нереально),
+      // иначе оставляем μg/dL.
+      if (rawValue < 2) return Math.round(rawValue * 36.9 * 10) / 10;
       return rawValue;
 
     case 'SHBG':

@@ -198,7 +198,7 @@ vitamin_d3: {
     ],
     contraindications: ['Гиперкальциемия', 'Саркоидоз', 'Гиперпаратиреоз'],
     sideEffects: ['Гиперкальциемия при передозировке', 'Тошнота при высоких дозах'],
-    dosage: { mg: 0.05, timing: 'с жирной едой', form: 'D3 2000 МЕ' },
+    dosage: { mg: 0.125, timing: 'с жирной едой', form: 'D3 5000 МЕ' },
     bestForCourse: true,
     specialInstructions: ['Принимать с жирной пищей', 'Контролировать 25(OH)D каждые 8 нед'],
     analog: ['vitamin_k2', 'magnesium'],
@@ -240,7 +240,7 @@ zinc: {
       { what: 'Цинк сыворотки', when: 'Каждые 8 нед', targetRange: '11-18 мкмоль/л' },
       { what: 'Медь сыворотки', when: 'Каждые 12 нед', targetRange: '11-22 мкмоль/л' },
     ],
-    contraindications: ['Болезнь Вильсона (медь)', 'Приём медьсодержащих препаратов'],
+    contraindications: ['Приём медьсодержащих препаратов'],
     sideEffects: ['Тошнота натощак', 'Металлический привкус', 'Дефицит меди при длительном приёме'],
     dosage: { mg: 30, timing: 'на ночь (пиколинат)', form: 'пиколинат' },
     bestForCourse: true,
@@ -261,7 +261,7 @@ zinc: {
     ],
     organs: ['THYROID', 'LIVER', 'IMMUNE_SYSTEM', 'REPRODUCTIVE', 'ENDOCRINE'],
     systems: ['endocrine', 'hepatic', 'hematologic'],
-    mechanisms: ['GPX_ACTIVATION', 'DIO1_ACTIVATION', 'SELENOPROTEIN_BINDING', 'SPERMATOGENESIS', 'T4_T3_CONVERSION', 'THYROID_STIMULATION', 'LIPID_PEROXIDATION_INHIBITION'],
+    mechanisms: ['GPX_ACTIVATION', 'DIO1_ACTIVATION', 'SELENOPROTEIN_BINDING', 'SPERMATOGENESIS', 'T4_T3_CONVERSION', 'DEIODINASE_COFACTOR', 'LIPID_PEROXIDATION_INHIBITION'],
     description: 'Селен — кофактор глутатионпероксидазы и дейодиназы щитовидной железы. Критически важен для антиоксидантной защиты и мужской фертильности.',
     synergies: [
       { with: 'coq10', effect: 'Защита митохондрий', mechanism: 'Se — кофактор GPx, CoQ10 — дыхательная цепь', severity: 'MEDIUM' },
@@ -388,7 +388,7 @@ ashwagandha: {
     ],
     organs: ['ADRENALS', 'BRAIN', 'THYROID', 'REPRODUCTIVE', 'ENDOCRINE'],
     systems: ['neuro', 'endocrine', 'reproductive'],
-    mechanisms: ['CORTISOL_REDUCTION', 'GABA_RECEPTOR_AGONISM', 'TESTOSTERONE_SUPPORT', 'ANXIOLYTIC', 'STRESS_ADAPTATION', 'HPA_MODULATION', 'STEROIDOGENESIS', 'THYROID_STIMULATION'],
+    mechanisms: ['CORTISOL_REDUCTION', 'GABA_RECEPTOR_AGONISM', 'TESTOSTERONE_SUPPORT', 'ANXIOLYTIC', 'STRESS_ADAPTATION', 'HPA_MODULATION', 'STEROIDOGENESIS'],
     description: 'Ашваганда KSM-66 — адаптоген, снижающий кортизол на 30%, повышающий тестостерон, улучшающий сон.',
     synergies: [
       { with: 'magnesium', effect: 'Синергия кортизол/расслабление', mechanism: 'Максимальное снижение кортизола', severity: 'HIGH' },
@@ -402,7 +402,7 @@ ashwagandha: {
       { with: 'licorice_root', effect: 'Поддержка надпочечников (осторожно)', mechanism: 'Солодка ↑ кортизол через 11β-HSD2 — баланс с ашвагандой', severity: 'LOW' },
     ],
     conflicts: [
-      { with: 'thyroid_medication', effect: 'Усиление действия гормонов щитовидной', mechanism: 'Ашваганда повышает T3/T4', severity: 'MEDIUM' },
+      { with: 'thyroid_medication', effect: 'Усиление действия гормонов щитовидной', mechanism: 'Ашваганда может модулировать уровни T3/T4 — мониторинг при гипертиреозе', severity: 'MEDIUM' },
       { with: 'alcohol', effect: 'Усиление седации', mechanism: 'Аддитивное угнетение ЦНС', severity: 'MEDIUM' },
       { with: 'sedatives', effect: 'Аддитивное угнетение ЦНС', mechanism: 'Ашваганда — ГАМК-агонист, седатики — разные рецепторы → аддитивно', severity: 'MEDIUM' },
     ],
@@ -418,7 +418,7 @@ ashwagandha: {
     analog: ['rhodiola', 'eleuthero'],
     targetOrgan: 'Кора надпочечников, нейроны, тироциты, клетки Лейдига',
     organMechanism: 'Регуляция гипоталамо-гипофизарно-надпочечниковой оси, снижение секреции кортизола, модуляция ГАМК-рецепторов',
-    mechanismOfAction: 'Снижение кортизола через блокаду CRH, агонизм ГАМК-A рецепторов (анксиолиз), повышение T3/T4, стимуляция стероидогенеза в клетках Лейдига',
+    mechanismOfAction: 'Снижение кортизола через блокаду CRH, агонизм ГАМК-A рецепторов (анксиолиз), может модулировать уровни T3/T4 (эффект вариабельный), стимуляция стероидогенеза в клетках Лейдига',
     clinicalEffect: 'Снижение кортизола на 30%, повышение тестостерона, улучшение сна и стрессоустойчивости',
     bestForm: 'Ашваганда KSM-66 600 мг вечером',
   },
@@ -621,7 +621,7 @@ vitamin_k2: {
     ],
     contraindications: ['Приём варфарина/антикоагулянтов', 'Тромбофилия'],
     sideEffects: ['Редко при передозировке'],
-    dosage: { mg: 200, timing: 'с едой (мкг)', form: 'МК-7' },
+    dosage: { mg: 0.2, timing: 'с едой', form: 'МК-7 (мкг — 200 мкг = 0.2 мг)' },
     bestForCourse: true,
     specialInstructions: ['Принимать с жирной пищей', 'МК-7 форма предпочтительнее МК-4', 'Не принимать с варфарином'],
     analog: ['vitamin_d3', 'magnesium'],
@@ -842,7 +842,7 @@ iron: {
     organs: ['BLOOD', 'LIVER', 'MUSCLES'],
     systems: ['hematologic', 'hepatic', 'musculoskeletal'],
     mechanisms: ['HEMOGLOBIN_SYNTHESIS', 'OXYGEN_TRANSPORT', 'ERYTHROPOIESIS', 'RED_BLOOD_CELL_PRODUCTION', 'IRON_METABOLISM', 'HEME_SYNTHESIS', 'HEPCIDIN_DOWN', 'FERROPORTIN_UP'],
-    description: 'Железо — ключевой компонент гемоглобина и миоглобина. На курсе ААС предотвращает анемию. Бисглицинат — лучшая форма. Синергично с витамином С.',
+    description: 'Железо — ключевой компонент гемоглобина и миоглобина. Только при подтверждённом дефиците (ферритин <30 нг/мл). ААС сами стимулируют эритропоэз — эмпирическое назначение без контроля вызывает перегрузку железом. Бисглицинат — лучшая форма. Синергично с витамином С.',
     synergies: [
       { with: 'vitamin_b12', effect: 'Синергия эритропоэза', mechanism: 'B12 + железо — кофакторы синтеза гемоглобина', severity: 'MEDIUM' },
       { with: 'vitamin_c', effect: 'Усиление всасывания железа', mechanism: 'Витамин С восстанавливает Fe3+ в Fe2+, улучшает абсорбцию 3-6x', severity: 'HIGH' },
@@ -866,7 +866,7 @@ iron: {
     contraindications: ['Гемохроматоз', 'Гемосидероз', 'Талассемия'],
     sideEffects: ['Запор (при сульфате)', 'Тёмный стул (норма)', 'Тошнота натощак'],
     dosage: { mg: 18, timing: 'натощак или с витамином С', form: 'бисглицинат железа (хелат)' },
-    bestForCourse: true,
+    bestForCourse: false,
     specialInstructions: ['Принимать натощак с витамином C', 'Интервал с кальцием — 2 ч', 'Контролировать ферритин каждые 8 нед'],
     analog: ['vitamin_b12', 'folate'],
     targetOrgan: 'Костный мозг (эритробласты), миоциты, гепатоциты',
@@ -1216,7 +1216,7 @@ vitamin_b5: {
     category: ['vitamin', 'metabolic'],
     forms: [
       { id: 'vitamin_b5', name: 'Vitamin B5', nameRu: 'Пантотенат кальция 500 мг', dose: '500 мг 2x/д', best: true },
-      { id: 'vitamin_b5_2', name: 'Vitamin B5', nameRu: 'Пантетин 300 мг', dose: '500 мг', best: false }
+      { id: 'vitamin_b5_2', name: 'Vitamin B5', nameRu: 'Пантетин 300 мг', dose: '300 мг', best: false }
     ],
     organs: ['ADRENALS', 'SKIN', 'LIVER'],
     systems: ['endocrine', 'hepatic'],
@@ -1256,7 +1256,7 @@ biotin: {
     category: ['vitamin', 'metabolic'],
     forms: [
       { id: 'biotin', name: 'Biotin', nameRu: 'Биотин 5000 мкг', dose: '5 мг', best: true },
-      { id: 'biotin_2', name: 'Biotin', nameRu: 'Биотин 10000 мкг', dose: '5 мг', best: false }
+      { id: 'biotin_2', name: 'Biotin', nameRu: 'Биотин 10000 мкг', dose: '10 мг', best: false }
     ],
     organs: ['SKIN', 'MUSCLES'],
     systems: ['endocrine', 'metabolic'],
@@ -1296,8 +1296,8 @@ folate: {
     category: ['vitamin', 'hematologic', 'methylation'],
     forms: [
       { id: 'folate', name: 'Folate', nameRu: 'Метилфолат (5-MTHF) 800 мкг', dose: '800 мкг', best: true },
-      { id: 'folate_2', name: 'Folate', nameRu: 'Фолиевая кислота 400 мкг', dose: '800 мкг', best: false },
-      { id: 'folate_3', name: 'Folate', nameRu: 'Фолиновая кислота 400 мкг', dose: '800 мкг', best: false }
+      { id: 'folate_2', name: 'Folate', nameRu: 'Фолиевая кислота 400 мкг', dose: '400 мкг', best: false },
+      { id: 'folate_3', name: 'Folate', nameRu: 'Фолиновая кислота 400 мкг', dose: '400 мкг', best: false }
     ],
     organs: ['LIVER', 'BLOOD', 'BRAIN'],
     systems: ['hematologic', 'hepatic', 'neuro'],
@@ -1342,8 +1342,8 @@ vitamin_e: {
     category: ['vitamin', 'antioxidant'],
     forms: [
       { id: 'vitamin_e', name: 'Vitamin E', nameRu: 'Смешанные токоферолы 400 МЕ', dose: '200 мг 2x/д', best: true },
-      { id: 'vitamin_e_2', name: 'Vitamin E', nameRu: 'd-Альфа-токоферол 200 МЕ', dose: '200 мг', best: false },
-      { id: 'vitamin_e_3', name: 'Vitamin E', nameRu: 'Токотриенолы 100 мг', dose: '200 мг', best: false }
+      { id: 'vitamin_e_2', name: 'Vitamin E', nameRu: 'd-Альфа-токоферол 200 МЕ', dose: '134 мг', best: false },
+      { id: 'vitamin_e_3', name: 'Vitamin E', nameRu: 'Токотриенолы 100 мг', dose: '100 мг', best: false }
     ],
     organs: ['HEART', 'VESSELS', 'SKIN', 'LIVER'],
     systems: ['cardio', 'hepatic'],
@@ -1599,7 +1599,7 @@ saw_palmetto: {
     ],
     organs: ['PROSTATE', 'REPRODUCTIVE'],
     systems: ['reproductive', 'endocrine'],
-    mechanisms: ['5AR_INHIBITION', 'DHT_REDUCTION', 'PROSTATE_SHRINKAGE', 'PROSTATE_PROTECTION', 'ZINC_COFACTOR', 'SEBUM_REGULATION', 'KERATIN_SYNTHESIS', 'NFKB_INHIBITION', 'PSA_LOWERING', 'COX_INHIBITION'],
+    mechanisms: ['5AR_INHIBITION', 'DHT_REDUCTION', 'PROSTATE_SHRINKAGE', 'PROSTATE_PROTECTION', 'ZINC_COFACTOR', 'SEBUM_REGULATION', 'NFKB_INHIBITION', 'COX_INHIBITION'],
     description: 'Сереноа — ингибитор 5-альфа-редуктазы, снижает DHT локально в простате. На курсе ААС защищает простату от гипертрофии.',
     synergies: [
       { with: 'zinc', effect: 'Поддержка простаты', mechanism: 'Zn — ингибитор 5AR, пальметто — блокатор DHT-рецепторов', severity: 'MEDIUM' },
@@ -1627,7 +1627,7 @@ saw_palmetto: {
     organMechanism: 'Ингибирование 5-α-редуктазы II типа, снижение DHT в простате, противовоспалительная защита',
     mechanismOfAction: 'Конкурентное ингибирование фермента 5-α-редуктазы (тип II), превращающего тестостерон в DHT; блокада связывания DHT с андрогенными рецепторами в простате; снижение продукции провоспалительных цитокинов (IL-6, TNF-α); ингибирование роста эпителия простаты через модуляцию TGF-β',
     clinicalEffect: 'Уменьшение объёма простаты, облегчение мочеиспускания, профилактика гиперплазии простаты, уменьшение выпадения волос по андрогенному типу',
-    bestForm: 'Экстракт сереноа 320 мг 320 мг 2x/д',
+    bestForm: 'Экстракт сереноа 320 мг 2x/д',
   },
 hcg: {
     id: 'hcg',
@@ -1642,7 +1642,7 @@ hcg: {
     organs: ['REPRODUCTIVE', 'TESTES'],
     systems: ['reproductive', 'endocrine'],
     mechanisms: ['TESTOSTERONE_PRODUCTION', 'SPERMATOGENESIS_RESTORE', 'TESTICULAR_VOLUME_PRESERVATION', 'STEROIDOGENESIS', 'HPTA_RESTORATION'],
-    description: 'ХГЧ — мимик ЛГ, стимулирует клетки Лейдига к продукции тестостерона. Стандартная схема: 500 МЕ 2 раза в неделю, 3 недели приема, 1 неделя отдыха (3/1).',
+    description: 'ХГЧ — мимик ЛГ, стимулирует клетки Лейдига к продукции тестостерона. Стандартная схема: 500 МЕ 2 раза в неделю. Схема 3/1 (3 недели приема, 1 неделя отдыха) — экспериментальная, не валидирована в RCT; стандарт — непрерывный приём на курсе ААС.',
     synergies: [
       { with: 'zinc', effect: 'Синергия стероидогенеза', mechanism: 'Zn — кофактор StAR и 3β-HSD, ХГЧ ↑ активность клеток Лейдига', severity: 'MEDIUM' },
       { with: 'vitamin_e', effect: 'Сперматогенез', mechanism: 'Вит. E защищает мембраны сперматозоидов', severity: 'MEDIUM' },
@@ -1650,10 +1650,10 @@ hcg: {
       { with: 'selenium', effect: 'Качество спермы', mechanism: 'Se — кофактор GPx, ↑ подвижность сперматозоидов', severity: 'MEDIUM' },
       { with: 'coq10', effect: 'Энергия для сперматогенеза', mechanism: 'CoQ10 ↑ АТФ в митохондриях жгутика сперматозоида', severity: 'MEDIUM' },
       { with: 'enclomiphene', effect: 'Восстановление ГГНС', mechanism: 'Энкломифен ↑ ГнРГ → ФСГ/ЛГ, ХГЧ мимикрирует ЛГ — совместно стимулируют тестостерон', severity: 'MEDIUM' },
-      { with: 'hcg', effect: 'Комбинация ХГЧ + ХГ', mechanism: 'ХГЧ ≤500 МЕ 2р/нед, ХГЧ для стероидогенеза, ХГ для фертильности — разделение функции', severity: 'MEDIUM' },
+      { with: 'hcg', effect: 'ХГЧ мимик ЛГ', mechanism: 'ХГЧ (хорионический гонадотропин) имитирует ЛГ, стимулируя клетки Лейдига', severity: 'MEDIUM' },
     ],
     conflicts: [
-        {with: "aromatase_inhibitor", effect: "Десенситизация", mechanism: "Высокие дозы ХГЧ (>1000 МЕ)", severity: "HIGH"},
+        {with: "aromatase_inhibitor", effect: "hCG может повысить ароматизацию → ↑E2", mechanism: "hCG стимулирует клетки Лейдига → ↑T → ↑E2 — может потребовать коррекции дозы AI", severity: "MEDIUM"},
         { with: 'tamoxifen', effect: 'Тамоксифен может ↓ экспрессию ЛГ-рецепторов', mechanism: 'Тамоксифен — СЕРМ, модулирует рецепторы в гипоталамусе, ослабляя ответ на ХГЧ', severity: 'MEDIUM' },
       ],
     monitoring: [
@@ -2145,7 +2145,7 @@ lithium: {
     analog: ['magnesium', 'glycine'],
     targetOrgan: 'Нейроны и глия головного мозга, периферические нервы',
     organMechanism: 'Стабилизация настроения, нейропротекция, ингибирование GSK-3β, повышение BDNF',
-    mechanismOfAction: 'Ингибирование киназы GSK-3β (гиперфосфорилирование тау-белка); активация PI3K/Akt (антиапоптотический сигналинг); повышение экспрессии BDNF и Bcl-2; стабилизация инозитол-фосфатного цикла (снижение IP3); модуляция NMDA-рецепторов через глутамат; снижение уровня NO в ЦНС; хелатирование Mg2+ (модуляция синаптической пластичности)',
+    mechanismOfAction: 'Ингибирование киназы GSK-3β (гиперфосфорилирование тау-белка); активация PI3K/Akt (антиапоптотический сигналинг); повышение экспрессии BDNF и Bcl-2; стабилизация инозитол-фосфатного цикла (снижение IP3); модуляция NMDA-рецепторов через глутамат; снижение уровня NO в ЦНС; замещение Na+/K+ на мембранах (модуляция синаптической пластичности)',
     clinicalEffect: 'Стабилизация настроения, нейропротекция, профилактика депрессии на курсе ААС, улучшение когнитивной гибкости',
     bestForm: 'Оротат лития 1 мг 1 мг',
   },
@@ -2161,7 +2161,7 @@ vanadium: {
     ],
     organs: ['LIVER', 'PANCREAS', 'MUSCLES'],
     systems: ['hepatic', 'endocrine', 'metabolic'],
-    mechanisms: ['INSULIN_SENSITIVITY', 'GLUCONEOGENESIS_INHIBITION', 'IRS1_PI3K', 'IRS1_PHOSPHORYLATION', 'GLUT4_TRANSLOCATION', 'GLUCOSE_UPTAKE', 'AMPK_ACTIVATION', 'AMPK_UP', 'PPAR_ACTIVATION', 'LIPID_METABOLISM', 'FATTY_ACID_OXIDATION', 'PROTEIN_SYNTHESIS', 'MUSCLE_PROTEIN_SYNTHESIS'],
+    mechanisms: ['INSULIN_SENSITIVITY', 'GLUCONEOGENESIS_INHIBITION', 'IRS1_PI3K', 'IRS1_PHOSPHORYLATION', 'GLUT4_TRANSLOCATION', 'GLUCOSE_UPTAKE', 'AMPK_ACTIVATION', 'AMPK_UP', 'PPAR_ACTIVATION', 'LIPID_METABOLISM', 'FATTY_ACID_OXIDATION'],
     description: 'Ванадий — инсулиномиметик. На курсе ААС поддерживает углеводный обмен.',
     synergies: [
         {with: "chromium", effect: "Метаболизм глюкозы", mechanism: "Оба имитируют инсулин", severity: "MEDIUM"},
@@ -2178,7 +2178,7 @@ vanadium: {
     sideEffects: ['Тошнота', 'Зелёный стул (ванадила сульфат)'],
     dosage: { mg: 0.1, timing: 'с едой', form: 'ванадила сульфат или BMV' },
     bestForCourse: false,
-    specialInstructions: ['Принимать с едой', 'Курс 4-6 недель, перерыв 2 нед', 'Не превышать 50 мг/сут'],
+    specialInstructions: ['Принимать с едой', 'Курс 4-6 недель, перерыв 2 нед', 'Не превышать 1 мг/сут (ванадий токсичен для печени/почек при >1 мг/дл)'],
     analog: ['chromium', 'berberine'],
     targetOrgan: 'Гепатоциты, β-клетки поджелудочной железы, миоциты',
     organMechanism: 'Инсулиномиметический эффект, ингибирование глюконеогенеза, стимуляция синтеза гликогена',
@@ -7805,12 +7805,12 @@ semaglutide: {
     tier: 'specialty',
     category: ['pharma', 'metabolic'],
     forms: [
-      { id: 'semaglutide', name: 'Semaglutide', nameRu: 'Семаглутид 0.25 мг', dose: '250 мкг 2x/д', best: true },
-      { id: 'semaglutide_2', name: 'Semaglutide', nameRu: 'Семаглутид 0.5 мг', dose: '250 мкг', best: false }
+      { id: 'semaglutide', name: 'Semaglutide', nameRu: 'Семаглутид 0.25 мг', dose: '0.25 мг 1x/нед п/к', best: true },
+      { id: 'semaglutide_2', name: 'Semaglutide', nameRu: 'Семаглутид 0.5 мг', dose: '0.5 мг 1x/нед п/к', best: false }
     ],
     organs: ['PANCREAS', 'BRAIN', 'GUT'],
     systems: ['metabolic'],
-    mechanisms: ['INSULIN_SENSITIVITY', 'AMPK_ACTIVATION', 'FATTY_ACID_OXIDATION', 'NFKB_INHIBITION', 'BDNF_INCREASE'],
+    mechanisms: ['INSULIN_SENSITIVITY', 'GLUCOSE_DEPENDENT_INSULIN_SECRETION', 'APPETITE_SUPPRESSION', 'GASTRIC_EMPTYING_DELAY'],
     description: 'Семаглутид — агонист ГПП-1 рецепторов, мощное снижение аппетита и веса. На курсе — контроль метаболизма.',
     synergies: [
         {with: "berberine", effect: "Контроль глюкозы и веса", mechanism: "Оба снижают аппетит и ↑ AMPK — синергия метаболизма", severity: "MEDIUM"},
@@ -7916,7 +7916,7 @@ testosterone: {
     tier: 'specialty',
     category: ['pharma', 'hormonal'],
     forms: [
-      { id: 'testosterone', name: 'Testosterone', nameRu: 'Тестостерон энантат 250 мг', dose: '200 мг 2x/д', best: true },
+      { id: 'testosterone', name: 'Testosterone', nameRu: 'Тестостерон энантат 250 мг', dose: '200 мг 1x/нед в/м', best: true },
       { id: 'testosterone_2', name: 'Testosterone', nameRu: 'Тестостерон ципионат 200 мг', dose: '200 мг', best: false }
     ],
     organs: ['REPRODUCTIVE', 'MUSCLES', 'BRAIN'],
@@ -7937,7 +7937,7 @@ testosterone: {
     monitoring: [
       { what: 'Тестостерон', when: 'Каждые 4 нед', targetRange: '700-1100 нг/дл' }
     ],
-    contraindications: ['Рак простаты', 'Беременность'],
+    contraindications: ['Рак простаты', 'Беременность', 'Тяжёлая полицитемия (Hct>54%)', 'Острая сердечная недостаточность', 'Тяжёлое апноэ сна'],
     sideEffects: ['Акне', 'Задержка жидкости', 'Алопеция'],
     dosage: { mg: 200, timing: '1x/нед в/м', form: 'тестостерон энантат 200 мг' },
     bestForCourse: false,
@@ -7998,7 +7998,7 @@ diclofenac: {
     ],
     organs: ['JOINTS', 'MUSCLES', 'KIDNEYS'],
     systems: ['musculoskeletal', 'renal'],
-    mechanisms: ['COX_INHIBITION', 'NFKB_INHIBITION', 'PLATELET_AGGREGATION_INHIBITION', 'CARTILAGE_PROTECTION', 'TISSUE_REPAIR', 'SEROTONIN_MODULATION', 'CORTISOL_REGULATION', 'COLLAGEN_SYNTHESIS'],
+    mechanisms: ['COX_INHIBITION', 'NFKB_INHIBITION', 'PLATELET_AGGREGATION_INHIBITION', 'CARTILAGE_PROTECTION'],
     description: 'Диклофенак — НПВС, ингибитор ЦОГ-1/2, мощное противовоспалительное и обезболивающее. На курсе — суставы (краткосрочно).',
     synergies: [
         {with: "omeprazole", effect: "Защита желудка при НПВС", mechanism: "ИПП предотвращает НПВС-гастропатию", severity: "HIGH"},
@@ -8017,7 +8017,7 @@ diclofenac: {
     dosage: { mg: 50, timing: 'с едой 2x/д (макс 5 дн)', form: 'диклофенак 50 мг' },
     bestForCourse: false,
     analog: ['meloxicam', 'ibuprofen'],
-    specialInstructions: ['Принимать с едой', 'Не превышать 150 мг/сут', 'Курс до 7 дней без назначения врача'],
+    specialInstructions: ['Принимать с едой', 'Не превышать 150 мг/сут', 'Курс до 7 дней только по назначению врача (FDA black-box: СС-риски, ЖК-кровотечение)'],
     targetOrgan: 'Синовиальные оболочки суставов, мягкие ткани, почки',
     organMechanism: 'Ингибирование ЦОГ-1/2, снижение синтеза простагландинов, мощное противовоспалительное и анальгетическое действие',
     mechanismOfAction: 'Неселективный блокатор ЦОГ-1/2 (арахидоновая кислота → ПГН2 → ПГЕ2, ПГI2) → ↓ воспалительных простагландинов; ↓ NF-κB → ↓ IL-6, IL-1β; ↓ болевой импульс через ↓ сенситизации периферических ноцицепторов',
@@ -8031,12 +8031,12 @@ meloxicam: {
     tier: 'specialty',
     category: ['pharma', 'nsaid'],
     forms: [
-      { id: 'meloxicam', name: 'Meloxicam', nameRu: 'Мелоксикам 7.5 мг', dose: '7.5 мг 2x/д', best: true },
+      { id: 'meloxicam', name: 'Meloxicam', nameRu: 'Мелоксикам 7.5 мг', dose: '7.5 мг 1x/д', best: true },
       { id: 'meloxicam_2', name: 'Meloxicam', nameRu: 'Мелоксикам 15 мг', dose: '7.5 мг', best: false }
     ],
     organs: ['JOINTS', 'MUSCLES', 'KIDNEYS'],
     systems: ['musculoskeletal', 'renal'],
-    mechanisms: ['JOINT_PROTECTION', 'NFKB_INHIBITION', 'CARTILAGE_PROTECTION', 'TISSUE_REPAIR', 'CORTISOL_REGULATION', 'COLLAGEN_SYNTHESIS'],
+    mechanisms: ['COX2_INHIBITION', 'NFKB_INHIBITION', 'CARTILAGE_PROTECTION'],
     description: 'Мелоксикам — селективный ингибитор ЦОГ-2, меньше гастротоксичности чем диклофенак. На курсе — суставы.',
     synergies: [
         {with: "omeprazole", effect: "Защита ЖКТ", mechanism: "ИПП при НПВС", severity: "MEDIUM"},
@@ -10086,37 +10086,37 @@ kpv: {
   "PHARMA_ANASTROZOLE": {
     id: 'PHARMA_ANASTROZOLE', name: 'Anastrozole', nameRu: 'Анастразол',
     tier: 'specialty', category: ['hormonal', 'pharma'],
-    forms: [{ id: 'pharma_anastrozole', name: 'Anastrozole', nameRu: 'Анастразол 1 мг', dose: '1 мг 1x/д', best: true }],
+    forms: [{ id: 'pharma_anastrozole', name: 'Anastrozole', nameRu: 'Анастразол 1 мг', dose: '0.25-0.5 мг eod', best: true }],
     organs: ['ENDOCRINE', 'REPRODUCTIVE', 'LIVER'],
     systems: ['endocrine', 'reproductive', 'hepatic'],
      mechanisms: ['AROMATASE_INHIBITION', 'ESTROGEN_MODULATION', 'LIPID_METABOLISM', 'CHOLESTEROL_LOWERING', 'LIPID_LOWERING', 'BONE_DENSITY', 'BONE_MINERALIZATION', 'CALCIUM_REGULATION', 'LH_RELEASE', 'FSH_STIMULATION', 'TESTOSTERONE_SYNTHESIS', 'STEROIDOGENESIS', 'HPTA_RESTORATION', 'GNRH_STIMULATION', 'APOPTOSIS_REGULATION'],
     description: 'Ингибитор ароматазы — снижает конверсию андрогенов в эстрогены. Применяется для контроля E2 на курсе ААС. Взаимодействие с липидным профилем.',
-    dosage: { mg: 1, timing: '1x/д', form: 'таб' },
+    dosage: { mg: 0.25, timing: 'eod (титровать по E2)', form: 'таб' },
     bestForCourse: true,
-     synergies: [{with:'tamoxifen',effect:'Контроль эстрогена',mechanism:'AI+СЕРМ — полная блокада ER',severity:'MEDIUM'},{with:'zinc',effect:'Поддержка тестостерона',mechanism:'Zn — кофактор стероидогенеза + AI',severity:'LOW'},{with:'vitamin_d3',effect:'Защита костей при подавлении E2',mechanism:'D3 + K2 компенсируют потерю костной плотности от AI',severity:'MEDIUM'},{with:'calcium_d_glucarate',effect:'Детоксикация эстрогеновых метаболитов',mechanism:'Глюкарат поддерживает фазу II детоксикации печени',severity:'MEDIUM'}],
-     conflicts: [{with:'letrozole',effect:'Конкуренция за CYP19',mechanism:'Оба AI — избыточное подавление E2',severity:'LOW'},{with:'estrogen_supplements',effect:'Антагонизм эффекта',mechanism:'AI блокирует ароматазу, экзогенный E2 обходит блок',severity:'HIGH'}],
+      synergies: [{with:'tamoxifen',effect:'Контроль эстрогена',mechanism:'AI+СЕРМ — полная блокада ER',severity:'MEDIUM'},{with:'zinc',effect:'Поддержка тестостерона',mechanism:'Zn — кофактор стероидогенеза + AI',severity:'LOW'},{with:'vitamin_d3',effect:'Защита костей при подавлении E2',mechanism:'D3 + K2 компенсируют потерю костной плотности от AI',severity:'MEDIUM'},{with:'calcium_d_glucarate',effect:'Детоксикация эстрогеновых метаболитов',mechanism:'Глюкарат поддерживает фазу II детоксикации печени',severity:'MEDIUM'}],
+      conflicts: [{with:'letrozole',effect:'Конкуренция за CYP19',mechanism:'Оба AI — избыточное подавление E2',severity:'LOW'},{with:'estrogen_supplements',effect:'Антагонизм эффекта',mechanism:'AI блокирует ароматазу, экзогенный E2 обходит блок',severity:'HIGH'}],
     monitoring: [{what:'Эстрадиол (E2)',when:'Каждые 4 нед',targetRange:'20-40 пг/мл'},{what:'ЛПВП',when:'Каждые 8 нед',targetRange:'> 40 мг/дл'},{what:'IGF-1',when:'Каждые 12 нед',targetRange:'> 150 нг/мл'}],
     contraindications: ['Остеопороз','Тяжелая гиперлипидемия','Беременность'],
     sideEffects: ['Снижение ЛПВП', 'Артралгия', 'Головная боль'],
-    analog: ['glutathione', 'nac'],
+    analog: ['letrozole', 'exemestane'],
     specialInstructions: ['Принимать с едой', 'Не превышать дозировку', 'Хранить в сухом месте'],
     targetOrgan: 'Жировая ткань (ароматаза в адипоцитах), молочные железы, печень (гепатоциты), костная ткань',
     organMechanism: 'Ингибирование ароматазы CYP19, подавление конверсии андрогенов в эстрогены',
     mechanismOfAction: 'Конкурентное ингибирование ароматазы (CYP19A1) — блокирует превращение тестостерона в E2 и андростендиона в эстрон; снижение E2 в сыворотке на ~80%; повышение ЛГ/ФСГ через снятие отрицательной обратной связи; влияние на липидный профиль (снижение ЛПВП)',
     clinicalEffect: 'Контроль эстрадиола на курсе ААС, профилактика гинекомастии, подавление эстроген-зависимых процессов',
-    bestForm: 'Анастразол 1 мг/д при необходимости',
+    bestForm: 'Анастразол 0.25-0.5 мг eod (титровать по E2)',
   },
    "PHARMA_LETROZOLE": {
     id: 'PHARMA_LETROZOLE', name: 'Letrozole', nameRu: 'Летрозол',
     tier: 'specialty', category: ['hormonal', 'pharma'],
-    forms: [{ id: 'pharma_letrozole', name: 'Letrozole', nameRu: 'Летрозол 2.5 мг', dose: '2.5 мг 1x/д', best: true }],
+    forms: [{ id: 'pharma_letrozole', name: 'Letrozole', nameRu: 'Летрозол 2.5 мг', dose: '0.25 мг eod', best: true }],
     organs: ['ENDOCRINE', 'REPRODUCTIVE', 'LIVER', 'BONES'],
     systems: ['endocrine', 'reproductive', 'hepatic', 'musculoskeletal'],
      mechanisms: ['AROMATASE_INHIBITION', 'ESTROGEN_MODULATION', 'LIPID_METABOLISM', 'CHOLESTEROL_LOWERING', 'LIPID_LOWERING', 'BONE_DENSITY', 'BONE_MINERALIZATION', 'CALCIUM_REGULATION', 'OSTEOCLAST_INHIBITION', 'LH_RELEASE', 'FSH_STIMULATION', 'TESTOSTERONE_SYNTHESIS', 'STEROIDOGENESIS', 'LIVER_LIPID_METABOLISM', 'APOPTOSIS_REGULATION'],
     description: 'Мощный ингибитор ароматазы III поколения. Блокирует превращение андрогенов в эстрогены в жировой и мышечной ткани. Применяется при гинекомастии и контроле E2.',
-    dosage: { mg: 2.5, timing: '1x/д', form: 'таб' },
+    dosage: { mg: 0.25, timing: 'eod (титровать по E2)', form: 'таб' },
     bestForCourse: true,
-     synergies: [{with:'vitamin_d3',effect:'Защита костей',mechanism:'D3+K2 — компенсация потери костной плотности от AI',severity:'MEDIUM'},{with:'calcium',effect:'Костная поддержка',mechanism:'AI+кальций — предотвращение остеопороза',severity:'MEDIUM'},{with:'vitamin_k2',effect:'Направление кальция в кости',mechanism:'K2 + D3 + AI — костный треугольник',severity:'MEDIUM'},{with:'zinc',effect:'Стероидогенез',mechanism:'Zn — кофактор синтеза тестостерона, AI повышает Т',severity:'LOW'}],
+      synergies: [{with:'vitamin_d3',effect:'Защита костей',mechanism:'D3+K2 — компенсация потери костной плотности от AI',severity:'MEDIUM'},{with:'calcium',effect:'Костная поддержка',mechanism:'AI+кальций — предотвращение остеопороза',severity:'MEDIUM'},{with:'vitamin_k2',effect:'Направление кальция в кости',mechanism:'K2 + D3 + AI — костный треугольник',severity:'MEDIUM'},{with:'zinc',effect:'Стероидогенез',mechanism:'Zn — кофактор синтеза тестостерона, AI повышает Т',severity:'LOW'}],
     conflicts: [
       { with: "pharma_anastrozole", effect: "Избыточное подавление эстрадиола (>95%) — риск остеопороза", mechanism: "Два AI — аддитивный эффект", severity: "HIGH" },
       { with: "tamoxifen", effect: "Конкуренция за CYP — снижение эффективности тамоксифена", mechanism: "Тамоксифен требует CYP2A6/3A4", severity: "MEDIUM" },
@@ -10124,13 +10124,13 @@ kpv: {
     monitoring: [{what:'Эстрадиол (E2), ultra-sensitive',when:'Каждые 4 нед',targetRange:'10-20 пг/мл'},{what:'Липидный профиль',when:'Каждые 8 нед',targetRange:'ЛПВП > 35 мг/дл'},{what:'DEXA (плотность костей)',when:'Каждые 12 мес',targetRange:'T-score > -1'},{what:'IGF-1',when:'Каждые 8 нед',targetRange:'> 150 нг/мл'}],
     contraindications: ['Остеопороз','Тяжелая гиперлипидемия','Печеночная недостаточность'],
     sideEffects: ['Снижение ЛПВП', 'Артралгия', 'Остеопороз при длительном приёме'],
-    analog: ['glutathione', 'nac'],
+    analog: ['anastrozole', 'exemestane'],
     specialInstructions: ['Принимать с едой', 'Не превышать дозировку', 'Хранить в сухом месте'],
     targetOrgan: 'Жировая ткань (ароматаза), костная ткань (остеобласты), молочные железы, печень',
     organMechanism: 'Мощное ингибирование ароматазы CYP19, подавление конверсии андрогенов в эстрогены',
     mechanismOfAction: 'Необратимое ингибирование ароматазы (CYP19A1) — связывание с гемом цитохрома P450; снижение E2 на 95-99%; повышение тестостерона за счет снятия отрицательной обратной связи; снижение IGF-1; влияние на костный метаболизм (снижение минерализации)',
     clinicalEffect: 'Мощный контроль эстрадиола на курсе ААС, подавление гинекомастии',
-    bestForm: 'Летрозол 2.5 мг/д краткосрочно',
+    bestForm: 'Летрозол 0.25 мг eod (титровать по E2)',
   },
    "PHARMA_CLOMIPHENE": {
     id: 'PHARMA_CLOMIPHENE', name: 'Clomiphene', nameRu: 'Кломифен',
@@ -10147,7 +10147,7 @@ kpv: {
     monitoring: [{what:'Эстрадиол (E2)',when:'Каждые 4 нед',targetRange:'20-40 пг/мл'},{what:'ЛГ/ФСГ',when:'Каждые 4 нед',targetRange:'ЛГ 2-8, ФСГ 2-12'}],
     contraindications: ['Гепатоцеллюлярная недостаточность','Киста яичника','Тромбофилия'],
     sideEffects: ['Нарушение зрения', 'Головная боль', 'Желудочно-кишечные расстройства'],
-    analog: ['glutathione', 'nac'],
+    analog: ['enclomiphene', 'tamoxifen'],
     specialInstructions: ['Принимать с едой', 'Не превышать дозировку', 'Хранить в сухом месте'],
     targetOrgan: 'Гипоталамус (дугообразное ядро), гипофиз (гонадотрофы), яички (клетки Лейдига)',
     organMechanism: 'Блокада эстрогеновых рецепторов в гипоталамусе, стимуляция гонадотропной оси',
@@ -10170,7 +10170,7 @@ kpv: {
     monitoring: [{what:'Тестостерон общий',when:'Каждые 4 нед',targetRange:'> 450 нг/дл'},{what:'Эстрадиол',when:'Каждые 4 нед',targetRange:'20-40 пг/мл'}],
     contraindications: ['Тромбофилия','Опухоли гипофиза','Выраженная гиперпролактинемия'],
     sideEffects: ['Меньше побочных по сравнению с кломифеном', 'Редко: головная боль'],
-    analog: ['glutathione', 'nac'],
+    analog: ['clomiphene', 'tamoxifen'],
     specialInstructions: ['Принимать с едой', 'Не превышать дозировку', 'Хранить в сухом месте'],
     targetOrgan: 'Гипоталамус (дугообразное ядро), гипофиз (гонадотрофы), яички (клетки Лейдига)',
     organMechanism: 'Блокада ER-α в гипоталамусе, стимуляция гонадотропной оси (без цитратного компонента)',
@@ -10216,7 +10216,7 @@ kpv: {
     systems: ['hepatic', 'respiratory', 'hematologic', 'renal'],
     mechanisms: ['GLUTATHIONE_PRECURSOR', 'GLUTATHIONE_SYNTHESIS', 'GLUTATHIONE_CONJUGATION', 'LIVER_DETOXIFICATION', 'DETOXIFICATION_PHASE_II', 'CHELATION', 'NRF2_ACTIVATION', 'MEMBRANE_STABILIZATION', 'NFKB_INHIBITION', 'GLUTAMATE_MODULATION', 'NMDA_MODULATION', 'LIPID_PEROXIDATION_INHIBITION', 'METHYLATION'],
     description: 'N-Ацетилцистеин — предшественник глутатиона, мощный антиоксидант и гепатопротектор. Снижает окислительный стресс, защищает печень при приёме ААС, разжижает мокроту.',
-    dosage: { mg: 1200, timing: 'натощак, 2x/д', form: 'капс/шип' },
+    dosage: { mg: 600, timing: 'натощак, 2x/д (до 1800 мг/д)', form: 'капс/шип' },
     bestForCourse: true,
     analog: ['glutathione', 'alpha_lipoic'],
     specialInstructions: ['Принимать натощак (при дискомфорте в ЖКТ — с едой)', 'Не превышать 2400 мг/сут', 'Интервал с антибиотиками 2 ч'],

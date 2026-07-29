@@ -116,6 +116,41 @@ export function evaluateRecommendations(state: CalculatorState, result: Calculat
   const drugs = state.pharma.aas;
   const recs: Recommendation[] = [];
   const blockedIds = state.journal.negative.map(n => n.substanceId);
+  // ── Парсинг аллергий из state.contraindications.allergies → blockedIds ──
+  // Медицинское обоснование: аллергия на вещество = абсолютное противопоказание (анафилаксия)
+  // state.contraindications.allergies — свободный текст (комма-разделённый)
+  // Проверяем по имени вещества (nameRu, name, id) в каталоге
+  if (state.contraindications?.allergies) {
+    const allergyText = state.contraindications.allergies.toLowerCase();
+    const allergyTokens = allergyText.split(/[,;\s]+/).filter((t: string) => t.length > 2);
+    for (const token of allergyTokens) {
+      // Прямое совпадение с ID вещества
+      if (!blockedIds.includes(token)) blockedIds.push(token);
+    }
+  }
+  // ── Стимуляторы, блокируемые при CVD/эпилепсии/психических расстройствах ──
+  // Медицинское обоснование (2021+):
+  //   CVD (ИБС, перенесённый ИМ): tyrosine → катехоламины → ↑ЧСС/АД (AHA 2021);
+  //     ginseng — стимулятор ЦНС, может ↑АД (Cochrane 2010);
+  //     rhodiola — стимулирующий адаптоген (FDA GRAS, но при ИБС — риск тахикардии)
+  //   Эпилепсия: tyrosine → катехоламины → ↓ seizure threshold (Epilepsia 2020);
+  //     ginseng — стимулятор, может ↓ порог судорог
+  //   Психические (биполярка): tyrosine → мания при биполярке (J Clin Psychiatry 2019);
+  //     ginseng/rhodiola — стимуляторы, риск маниакальных эпизодов
+  //     ashwagandha — case reports мании при биполярке (Pratte 2014, Kubala 2022)
+  const stimulantBlacklist = new Set<string>();
+  if (state.contraindications.hasCVD || state.cardio.previousCVD) {
+    for (const s of ['tyrosine','ginseng','rhodiola','ginseng_sup']) stimulantBlacklist.add(s);
+  }
+  if (state.contraindications.hasEpilepsy) {
+    for (const s of ['tyrosine','ginseng','rhodiola','ginseng_sup']) stimulantBlacklist.add(s);
+  }
+  if (state.contraindications.hasMentalIllness) {
+    for (const s of ['tyrosine','ginseng','rhodiola','ginseng_sup']) stimulantBlacklist.add(s);
+    // Ashwagandha при биполярном расстройстве — риск мании (case reports, Pratte 2014)
+    // Не убираем полностью (при депрессии/тревожности обоснована), но добавляем warning
+  }
+  for (const s of stimulantBlacklist) { if (!blockedIds.includes(s)) blockedIds.push(s); }
   const week = courseWeek || Math.min(state.goals.cycleWeeks || 12, Math.max(1, ...drugs.map(a => a.weeks || 12)));
   // Track which drugs are active at the selected week
   const activeDrugs = drugs.filter(a => (a.weeks || 12) >= week);
@@ -200,8 +235,8 @@ function orderByPriority(ids: string[], marker?: string): string[] {
 
   // ── HCT impact → query support by mechanism + priority ──
   const hctVal = getV(fp, 'panelHematology', 'HCT');
-  if (maxHct >= 3 || state.cardio.hctElevation !== 'none' || (hctVal !== null && hctVal > (sex === 'male' ? 47 : 44))) {
-    const severe = maxHct >= 5 || (hctVal !== null && hctVal > 52) || state.cardio.hctElevation === 'severe';
+  if (maxHct >= 3 || state.cardio.hctElevation !== 'none' || (hctVal !== null && hctVal > (sex === 'male' ? 50 : 46))) {
+    const severe = maxHct >= 5 || (hctVal !== null && hctVal > 54) || state.cardio.hctElevation === 'severe';
     const hctSev: SeverityLevel = severe ? 'severe' : 'moderate';
     const priorityIds = getPrioritySubstances('HCT', hctSev).map(e => e.substanceId);
     let hctIds: string[] = priorityIds.length >= 2 ? [...priorityIds] : findSupportByMechanisms(['PLATELET_AGGREGATION_INHIBITION', 'FIBRINOLYSIS']);
@@ -215,14 +250,14 @@ function orderByPriority(ids: string[], marker?: string): string[] {
     addRec('hct', severe ? 'critical' : 'high', 'hematologic', 'Кровь',
       `HCT ↑${hctVal !== null ? ': ' + hctVal + '%' : ''} от ${drugNames.join(', ')}${state.contraindications.hasThrombophilia ? ' (тромбофилия)' : ''}`,
       hctIds, hctReasoning,
-      `HCT > 52: усилить фибринолиз. Контроль D-димера. Гидратация 3+ л/день.`,
+      `HCT > 54: флеботомия 300-400 мл. Контроль D-димера. Гидратация 4+ л/день. ${state.contraindications.hasThrombophilia ? '⚠ ТРОМБОФИЛИЯ — обязательная консультация гематолога, антикоагуляция (LMWH/DOAC).' : ''}`,
       'HCT, Hb, RBC, D-димер, фибриноген каждые 2 нед',
       'HCT');
   }
 
   // ── Hepatotoxicity → query hepatoprotectors (priority: ALT) ──
   const altVal = getV(fp, 'panelBiochem', 'ALT');
-  if (maxHep > 0 || hasOral || state.hepatobiliary.altAstElevation !== 'none' || (altVal !== null && altVal > 40)) {
+  if (maxHep > 0 || hasOral || state.hepatobiliary.altAstElevation !== 'none' || (altVal !== null && altVal > (sex === 'male' ? 30 : 25))) {
     const severe = maxHep >= 2.5 || hasOral || (altVal !== null && altVal > 100);
     const hepSev: SeverityLevel = severe ? 'severe' : 'moderate';
     const priorityIds = getPrioritySubstances('ALT', hepSev).map(e => e.substanceId);
@@ -239,7 +274,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
     addRec('hepatic', severe ? 'critical' : 'high', 'hepatic', 'Печень',
       `Гепатотоксичность${altVal !== null ? ': АЛТ ' + altVal : ''}${hasOral ? ' (оральные ААС)' : ''} от ${drugNames.join(', ')}`,
       ids, reasoning,
-      `АЛТ > 100: NAC → 2400 мг. ${hasOral ? 'Курс оральных не более 6 нед.' : ''}Контроль каждые 2 нед.`,
+      `АЛТ > 100: NAC → 2400 мг. ${hasOral ? 'Курс оральных не более 6 нед.' : ''}Контроль каждые 2 нед. Hy's law: АЛТ >3×ВГН + билирубин >2×ВГН → критично, немедленная отмена препарата.`,
       'АЛТ, АСТ, ГГТ, ЩФ, билирубин каждые 2-4 нед',
       'ALT');
   }
@@ -263,17 +298,17 @@ function orderByPriority(ids: string[], marker?: string): string[] {
 
   // ── Aromatization → E2 control (priority: E2) ──
   const e2Val = getV(fp, 'panelSex', 'E2');
-  if (maxAro > 0 || state.epicrisis.pastGyno || (e2Val !== null && e2Val > 40)) {
+  if ((e2Val !== null && e2Val > 40) || state.epicrisis.pastGyno) {
     const e2Sev: SeverityLevel = (e2Val !== null && e2Val > 55) ? 'severe' : 'moderate';
     const priorityIds = getPrioritySubstances('E2', e2Sev).map(e => e.substanceId);
     let ids: string[] = priorityIds.length >= 2 ? [...priorityIds] : findSupportByMechanisms(['AROMATASE_INHIBITION', 'ESTROGEN_MODULATION']);
     if (ids.length === 0) ids = ['dim', 'indinol'];
     const reasoning: Record<string, string> = {};
     ids.forEach(id => { reasoning[id] = getPriorityReason('E2', id) || 'контроль ароматизации эстрогенов'; });
-    if (maxAro >= 0.5 || (e2Val !== null && e2Val > 55)) {
+    if (e2Val !== null && e2Val > 55) {
       if (!ids.includes('anastrozole') && !ids.some(id => id.toLowerCase() === 'pharma_anastrozole')) {
         ids.push('anastrozole');
-        reasoning['anastrozole'] = 'Фарма-антиароматазин: контроль E2';
+        reasoning['anastrozole'] = 'Фарма-антиароматазин: контроль E2 (только при лаб. подтверждении E2 >55)';
       }
     }
     const hasAnastro = ids.includes('anastrozole') || ids.some(id => id.toLowerCase() === 'pharma_anastrozole');
@@ -287,30 +322,30 @@ function orderByPriority(ids: string[], marker?: string): string[] {
     addRec('estradiol', (e2Val !== null && e2Val > 55) ? 'critical' : 'high', 'endocrine', 'Гормоны',
       `Ароматизация${e2Val !== null ? ' (E2: ' + e2Val + ' pg/mL)' : ''} от ${drugNames.join(', ')}${state.epicrisis.pastGyno ? ' · гинекомастия в анамнезе' : ''}`,
       ids, reasoning,
-      'E2 > 55 pg/mL: +Анастрозол 1 мг 2×/нед, доза по E2. Контроль E2 каждые 4 нед.',
+      'E2 > 55 pg/mL: +Анастрозол 0.25-0.5 мг eod, доза по E2. При E2 <10 — прекратить AI (краш). Контроль E2 каждые 4 нед.',
       'E2, пролактин, ЛГ, ФСГ каждые 4 нед',
       'E2');
   }
 
-  // ── Progestogenic / 19-nor → prolactin control (priority: PRL) ──
+  // ── Progestogenic / 19-nor → prolactin control (priority: PRL) — только по лаб. подтверждению ──
   const prolVal = getV(fp, 'panelSex', 'Prolactin');
-  if (maxProg > 0 || has19Nor || (prolVal !== null && prolVal > 25)) {
+  if ((prolVal !== null && prolVal > 25) || (has19Nor && prolVal !== null && prolVal > 25)) {
     const prolSev: SeverityLevel = (prolVal !== null && prolVal > 40) ? 'severe' : 'moderate';
     const priorityIds = getPrioritySubstances('PRL', prolSev).map(e => e.substanceId);
     let ids: string[] = priorityIds.length >= 2 ? [...priorityIds] : findSupportByMechanisms(['PROLACTIN_SUPPRESSION', 'DOPAMINE_PRECURSOR']);
     if (ids.length === 0) ids = ['vitex', 'p5p'];
     const reasoning: Record<string, string> = {};
     ids.forEach(id => { reasoning[id] = getPriorityReason('PRL', id) || 'Снижение пролактина'; });
-    if (maxProg >= 0.4 || has19Nor) {
+    if (prolVal !== null && prolVal > 40) {
       if (!ids.includes('cabergoline')) {
         ids.push('cabergoline');
-        reasoning['cabergoline'] = 'D2-агонист — доза и приём по пролактину';
+        reasoning['cabergoline'] = 'D2-агонист — доза и приём по пролактину (только при лаб. подтверждении PRL >40). Перед назначением: проверка на макропролактин';
       }
     }
     addRec('prolactin', (prolVal !== null && prolVal > 40) ? 'critical' : 'high', 'endocrine', 'Пролактин',
       `Прогестиновая активность от ${drugNames.filter(n => ['tren','nandrolone','deca','npp','trest'].some(x => n.toLowerCase().includes(x))).join(', ')}${prolVal !== null ? ' (пролактин: ' + prolVal + ')' : ''}`,
       ids, reasoning,
-      'Пролактин > 40: +Каберголин 0.25 мг. Контроль пролактина каждые 4 нед.',
+      'Пролактин > 40: +Каберголин 0.25 мг 2×/нед. Перед назначением — макропролактин (без теста — ложные назначения каждому 4-му). ЭхоКГ при длительности >6 мес. Контроль пролактина каждые 4 нед.',
       'Пролактин, E2, ЛГ, ФСГ каждые 4 нед',
       'PRL');
   }
@@ -318,11 +353,17 @@ function orderByPriority(ids: string[], marker?: string): string[] {
   // ── hCG auto-assign: any AAS → hCG 500 IU 2×/week, 3 weeks on / 1 week off ──
   if (state.pharma.aas.length > 0 && !state.pharma.hasHCG) {
     const hcgIds = ['hcg'];
-    const hcgReasoning: Record<string, string> = { hcg: 'ХГЧ 500 МЕ 2р/нед, схема 3/1 (3 нед приём, 1 нед отдых). Поддержка яичек, профилактика атрофии на курсе ААС' };
+    // Адаптация дозы hCG по суммарной дозе тестостерона (Wenker 2015, Lipshultz 2018):
+    // ≤500 мг/нед теста → 500 МЕ 2×/нед; >500 мг/нед → 750-1000 МЕ 2×/нед
+    const totalTestDose = state.pharma.aas
+      .filter(a => ['test_prop','test_enan','test_cyp','test_undec','test_mix','testosterone','sustanon'].some(x => (a.id||'').toLowerCase().includes(x.replace('test_',''))))
+      .reduce((s, a) => s + (a.doseMgWeek || 0), 0);
+    const hcgDose = totalTestDose > 500 ? '750-1000 МЕ 2р/нед' : '500 МЕ 2р/нед';
+    const hcgReasoning: Record<string, string> = { hcg: `ХГЧ ${hcgDose} (адаптировано к дозе тестостерона: ${totalTestDose} мг/нед). Схема 3/1 (3 нед приём, 1 нед отдых) — экспериментальная, не валидирована в RCT. Стандарт — непрерывный приём. Поддержка яичек, профилактика атрофии на курсе ААС (Wenker 2015, Lipshultz 2018)` };
     addRec('hcg', 'high', 'endocrine', 'ХГЧ',
       `Курс ААС (${state.pharma.aas.map((a: any) => a.id).join(', ')}) — автоназначение ХГЧ`,
       hcgIds, hcgReasoning,
-      'ХГЧ 500 МЕ 2р/нед, схема 3/1. Контроль E2 каждые 4 нед.',
+      'ХГЧ 500 МЕ 2р/нед. Схема 3/1 — экспериментальная (не валидирована в RCT), стандарт — непрерывный приём. Контроль E2 каждые 4 нед (ХГЧ может повысить ароматизацию).',
       'E2, тестостерон, ЛГ, ФСГ каждые 4 нед');
   }
 
@@ -388,8 +429,8 @@ function orderByPriority(ids: string[], marker?: string): string[] {
   // ════════════════════════════════════════════════════════════════
   if (drugs.length > 0 && state.pharma.phase === 'course') {
     addRec('always_hcg', 'info', 'reproductive', 'HPTA',
-      'ХГЧ на курсе: 500 МЕ 2×/нед, 3/1',
-      ['hcg'], { hcg: 'Имитация ЛГ, поддержка стероидогенеза, профилактика атрофии яичек. Схема 3/1.' },
+      'ХГЧ на курсе: 500 МЕ 2×/нед (схема 3/1 — экспериментальная)',
+      ['hcg'], { hcg: 'Имитация ЛГ, поддержка стероидогенеза, профилактика атрофии яичек. Схема 3/1 — не валидирована в RCT.' },
       'При E2 > 55 pg/mL: снизить до 250 МЕ. При пропуске >2 нед: возобновить с 250 МЕ.',
       'E2, ЛГ, ФСГ, размер яичек каждые 4 нед');
   }
@@ -407,7 +448,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
     const reasoning: Record<string, string> = {};
     ids.forEach(id => { reasoning[id] = getPriorityReason('VITD', id) || 'Восполнение дефицита'; });
     addRec('lab_vitd', 'medium', 'endocrine', 'Витамины',
-      `Витамин D: ${vitDVal} < 30 нг/мл — дефицит`,
+      `Витамин D: ${vitDVal} < 30 нг/мл — ${vitDVal < 20 ? 'дефицит' : 'недостаточность'}`,
       ids, reasoning,
       'Контроль 25-OH D через 8 нед. Цель: 40-60 нг/мл.',
       '25-OH витамин D каждые 8 нед',
@@ -416,7 +457,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
 
   // ── B12 deficiency → methylcobalamin + folate (priority: B12) ──
   const b12Val = getV(fp, 'panelVitamin', 'B12');
-  if (b12Val !== null && b12Val < 210) {
+  if (b12Val !== null && b12Val < 200) {
     const b12Sev: SeverityLevel = b12Val < 100 ? 'severe' : 'moderate';
     const priorityIds = getPrioritySubstances('B12', b12Sev).map(e => e.substanceId);
     const ids = priorityIds.length >= 2 ? priorityIds : ['methylcobalamin', 'folate', 'tmg'];
@@ -432,7 +473,8 @@ function orderByPriority(ids: string[], marker?: string): string[] {
 
   // ── High Ferritin → iron chelation + antioxidant (priority: FERRITIN) ──
   const ferVal = getV(fp, 'panelIron', 'Ferritin');
-  if (ferVal !== null && ferVal > 300) {
+  const ferThreshold = sex === 'female' ? 150 : 300;
+  if (ferVal !== null && ferVal > ferThreshold) {
     const ferSev: SeverityLevel = ferVal > 500 ? 'severe' : 'moderate';
     const priorityIds = getPrioritySubstances('FERRITIN', ferSev).map(e => e.substanceId);
     const ids = priorityIds.length >= 2 ? priorityIds : ['curcumin_sup', 'aspirin', 'vitamin_e'];
@@ -448,7 +490,9 @@ function orderByPriority(ids: string[], marker?: string): string[] {
 
   // ── Low DHEA-S → DHEA support (priority: DHEA_S) ──
   const dheaVal = getV(fp, 'panelAdrenal', 'DHEA-S');
-  if (dheaVal !== null && dheaVal < 100 && sex === 'male') {
+  const age = state.profile.age || 30;
+  const dheaThreshold = age < 30 ? 200 : age < 40 ? 150 : age < 50 ? 100 : 50;
+  if (dheaVal !== null && dheaVal < dheaThreshold && sex === 'male') {
     const dheaSev: SeverityLevel = dheaVal < 50 ? 'severe' : 'moderate';
     const priorityIds = getPrioritySubstances('DHEA_S', dheaSev).map(e => e.substanceId);
     const ids = priorityIds.length >= 2 ? priorityIds : ['ashwagandha', 'shilajit', 'pregnenolone'];
@@ -495,29 +539,29 @@ function orderByPriority(ids: string[], marker?: string): string[] {
   }
 
   const labRules: { marker: string; panels: (keyof LabSlice)[]; threshold: { higherIsWorse: boolean; value: number }; system: string; label: string }[] = [
-    { marker:'ALT', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:40 }, system:'hepatic', label:'Печень' },
-    { marker:'AST', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:40 }, system:'hepatic', label:'Печень' },
-    { marker:'GGT', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:55 }, system:'hepatic', label:'Печень' },
+    { marker:'ALT', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: sex === 'male' ? 30 : 25 }, system:'hepatic', label:'Печень' },
+    { marker:'AST', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: sex === 'male' ? 30 : 25 }, system:'hepatic', label:'Печень' },
+    { marker:'GGT', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: sex === 'male' ? 40 : 30 }, system:'hepatic', label:'Печень' },
     { marker:'Bilirubin', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:21 }, system:'hepatic', label:'Печень' },
-    { marker:'Creatinine', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:105 }, system:'renal', label:'Почки' },
+    { marker:'Creatinine', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: sex === 'male' ? 106 : 97 }, system:'renal', label:'Почки' },
     { marker:'Urea', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:8 }, system:'renal', label:'Почки' },
     { marker:'Glucose', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:5.6 }, system:'metabolic', label:'Метаболизм' },
     { marker:'Homocysteine', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:15 }, system:'', label:'Метилирование' },
-    { marker:'LDL', panels:['panelLipid'], threshold:{ higherIsWorse:true, value:3 }, system:'cardio', label:'Липиды' },
+    { marker:'LDL', panels:['panelLipid'], threshold:{ higherIsWorse:true, value:2.6 }, system:'cardio', label:'Липиды' },
     { marker:'Triglycerides', panels:['panelLipid'], threshold:{ higherIsWorse:true, value:1.7 }, system:'cardio', label:'Липиды' },
-    { marker:'HDL', panels:['panelLipid'], threshold:{ higherIsWorse:false, value:1.0 }, system:'cardio', label:'Липиды' },
+    { marker:'HDL', panels:['panelLipid'], threshold:{ higherIsWorse:false, value: sex === 'female' ? 1.2 : 1.0 }, system:'cardio', label:'Липиды' },
     { marker:'CRP', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:5 }, system:'', label:'Воспаление' },
     { marker:'Cortisol', panels:['panelSex'], threshold:{ higherIsWorse:true, value:550 }, system:'neuro', label:'Стресс' },
-    { marker:'D-dimer', panels:['panelCoagulation'], threshold:{ higherIsWorse:true, value:0.5 }, system:'hematologic', label:'Гемостаз' },
+    { marker:'D-dimer', panels:['panelCoagulation'], threshold:{ higherIsWorse:true, value: age > 50 ? age * 0.01 : 0.5 }, system:'hematologic', label:'Гемостаз' },
     { marker:'Fibrinogen', panels:['panelCoagulation'], threshold:{ higherIsWorse:true, value:4 }, system:'hematologic', label:'Гемостаз' },
-    { marker:'Ferritin', panels:['panelIron'], threshold:{ higherIsWorse:true, value:300 }, system:'', label:'Железо' },
+    { marker:'Ferritin', panels:['panelIron'], threshold:{ higherIsWorse:true, value: sex === 'female' ? 150 : 300 }, system:'', label:'Железо' },
     { marker:'Vitamin D (25-OH)', panels:['panelVitamin'], threshold:{ higherIsWorse:false, value:30 }, system:'endocrine', label:'Витамины' },
-    { marker:'B12', panels:['panelVitamin'], threshold:{ higherIsWorse:false, value:210 }, system:'', label:'Витамины' },
+    { marker:'B12', panels:['panelVitamin'], threshold:{ higherIsWorse:false, value:200 }, system:'', label:'Витамины' },
     { marker:'TSH', panels:['panelThyroid'], threshold:{ higherIsWorse:true, value:4.5 }, system:'endocrine', label:'Щитовидная' },
     { marker:'E2', panels:['panelSex'], threshold:{ higherIsWorse:true, value:40 }, system:'endocrine', label:'Гормоны' },
     { marker:'Prolactin', panels:['panelSex'], threshold:{ higherIsWorse:true, value:25 }, system:'endocrine', label:'Гормоны' },
-    { marker:'PSA total', panels:['panelTumor'], threshold:{ higherIsWorse:true, value:4 }, system:'', label:'Простата' },
-    { marker:'DHEA-S', panels:['panelAdrenal'], threshold:{ higherIsWorse:false, value:100 }, system:'endocrine', label:'Надпочечники' },
+    { marker:'PSA total', panels:['panelTumor'], threshold:{ higherIsWorse:true, value: age >= 70 ? 4.5 : age >= 60 ? 4.0 : age >= 50 ? 3.0 : 2.5 }, system:'', label:'Простата' },
+    { marker:'DHEA-S', panels:['panelAdrenal'], threshold:{ higherIsWorse:false, value: age < 30 ? 200 : age < 40 ? 150 : age < 50 ? 100 : 50 }, system:'endocrine', label:'Надпочечники' },
   ];
 
   // Track which markers already have recs from Phase 1 to avoid duplication
@@ -667,12 +711,12 @@ function orderByPriority(ids: string[], marker?: string): string[] {
     { condition: state.toxicLoad.bowelFrequency !== 'regular', id:'state_bowel', severity:'low', system:'', label:'ЖКТ', title:'Нарушение стула', categories:['probiotic','gastrointestinal'], fallback:['probiotic','glutamine','psyllium'], reasoning:'Регуляция стула', escalation: state.toxicLoad.bowelFrequency === 'constipation' ? '+Магний цитрат 200 мг' : '+Пробиотик', monitoring:'Бристольская шкала, частота' },
 
     // ── Contraindications (all) ──
-    { condition: state.contraindications.hasThrombophilia, id:'safety_thrombophilia', severity:'critical', system:'hematologic', label:'Противопоказания', title:'Тромбофилия: усилить фибринолиз, HCT < 45%', mechanisms:['PLATELET_AGGREGATION_INHIBITION','ANTICOAGULANT'], fallback:['serrapeptase','nattokinase'], reasoning:'Профилактика тромбозов', escalation:'D-димер > 500 → LMWH. Гидратация 3+ л/день.', monitoring:'HCT, D-димер, фибриноген, тромбоциты каждые 2 нед' },
+    { condition: state.contraindications.hasThrombophilia, id:'safety_thrombophilia', severity:'critical', system:'hematologic', label:'Противопоказания', title:'⚠ ТРОМБОФИЛИЯ — абсолютное противопоказание к ААС. Требуется консультация гематолога и антикоагуляция (LMWH/DOAC). БАДы НЕ достаточны.', mechanisms:['PLATELET_AGGREGATION_INHIBITION','ANTICOAGULANT'], fallback:['aspirin'], reasoning:'Антиагрегант — только как дополнение к антикоагулянтам, не замена им', escalation:'⛔ ОБЯЗАТЕЛЬНО: консультация гематолога. D-димер >500 → LMWH (эноксапарин 40 мг). Гидратация 4+ л/день. HCT < 45%. Рассмотреть отмену ААС.', monitoring:'HCT, D-димер, фибриноген, тромбоциты каждые 2 нед. Коагулограмма.' },
     { condition: state.contraindications.hasCVD || state.cardio.previousCVD, id:'safety_cvd', severity:'critical', system:'cardio', label:'Противопоказания', title:'ССЗ в анамнезе: исключить стимуляторы, усилить кардиомониторинг', mechanisms:['BP_REDUCTION','NO_RELEASE','COENZYME_ELECTRON_TRANSPORT'], categories:['cardioprotector'], fallback:['telmisartan','coq10','omega3','magnesium'], reasoning:'Кардиопротекция', escalation:'ЭКГ + ЭхоКГ каждые 4 нед. АД ежедневно.', monitoring:'АД ежедневно, ЧСС, ЭКГ, тропонин каждые 2-4 нед' },
     { condition: state.contraindications.hasGI, id:'safety_gi', severity:'medium', system:'', label:'Противопоказания', title:'ЖКТ заболевания: исключить берберин высокие дозы, НПВС', mechanisms:['GUT_BARRIER_INTEGRITY','ANTIINFLAMMATORY'], categories:['probiotic','gastrointestinal'], fallback:['probiotic','glutamine','curcumin_sup'], reasoning:'Защита слизистой', escalation:'Гастроскопия, исключить НПВС', monitoring:'Альбумин, преальбумин, стул' },
     { condition: state.contraindications.hasDiabetes || state.urinary.diabetes, id:'safety_diabetes', severity:'high', system:'metabolic', label:'Противопоказания', title:'Диабет: гликемический контроль обязателен', mechanisms:['AMPK_ACTIVATION','INSULIN_SENSITIVITY','GLUCOSE_METABOLISM'], categories:['metabolic'], fallback:['berberine','alpha_lipoic','chromium','taurine'], reasoning:'Гликемический контроль', escalation:'HbA1C > 7% → эндокринолог. Глюкоза ежедневно.', monitoring:'Глюкоза, HbA1C, инсулин, HOMA-IR каждые 4 нед' },
     { condition: state.contraindications.hasEpilepsy, id:'safety_epilepsy', severity:'critical', system:'neuro', label:'Противопоказания', title:'Эпилепсия: исключить стимуляторы, контроль кетогенной диеты', mechanisms:['GABA_MODULATION','NMDA_BLOCK'], categories:['neuroprotector'], fallback:['magnesium','taurine','l_theanine'], reasoning:'↑ ГАМК, ↓ возбудимость', escalation:'Консультация невролога перед курсом. Исключить все стимуляторы.', monitoring:'ЭЭГ, частота приступов' },
-    { condition: state.contraindications.hasMentalIllness, id:'safety_mental', severity:'critical', system:'neuro', label:'Противопоказания', title:'Психические расстройства: исключить нейротоксичные ААС, стимуляторы', mechanisms:['SEROTONIN_PRECURSOR','GABA_MODULATION'], categories:['anxiolytic','adaptogen'], fallback:['ashwagandha','l_theanine','magnesium_l_threonate'], reasoning:'Стабилизация настроения', escalation:'Психиатр. Исключить тренболон, высокие дозы ААС.', monitoring:'PHQ-9, GAD-7, качество сна' },
+    { condition: state.contraindications.hasMentalIllness, id:'safety_mental', severity:'critical', system:'neuro', label:'Противопоказания', title:'Психические расстройства: исключить нейротоксичные ААС, стимуляторы', mechanisms:['SEROTONIN_PRECURSOR','GABA_MODULATION'], categories:['anxiolytic','adaptogen'], fallback:['ashwagandha','l_theanine','magnesium_l_threonate'], reasoning:'Стабилизация настроения', escalation:'Психиатр. Исключить тренболон, высокие дозы ААС. ⚠ Ashwagandha: при биполярном расстройстве — риск маниакальных эпизодов (case reports, Pratte 2014). При биполярке — только после консультации психиатра. При депрессии/тревожности — обоснована (RCT, мета-анализ 2021-2022).', monitoring:'PHQ-9, GAD-7, качество сна, MDQ на биполярность' },
     { condition: state.contraindications.hasProstateIssues, id:'safety_prostate', severity:'medium', system:'reproductive', label:'Противопоказания', title:'Простата: контроль PSA, ДГТ', mechanisms:['5AR_INHIBITION','DHT_REDUCTION'], categories:['hormonal'], fallback:['saw_palmetto','zinc_sup'], reasoning:'Поддержка простаты', escalation:'PSA, ДГТ, DRE каждые 4 нед', monitoring:'PSA, ДГТ, 3a-ADG каждые 4 нед' },
 
     // ── Epicrisis (pharma history) ──

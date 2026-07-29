@@ -222,6 +222,27 @@ export const CONTRAINDICATIONS: Record<string, ContraindicationRule> = {
     relative: ['Камни почек (calcium oxalate)', 'Дигоксин', 'Тиреоидные препараты (T4)'],
     relativeConditions: ['nephrolithiasis', 'digoxin', 'levothyroxine'],
   },
+  vitamin_k2: {
+    substanceId: 'vitamin_k2',
+    absolute: ['Приём варфарина/антикоагулянтов (K2 — антагонист варфарина)', 'Тромбофилия (активация факторов свёртывания)'],
+    absoluteConditions: ['anticoagulant_therapy', 'thrombophilia'],
+    relative: ['Высокие дозы витамина E (>400 МЕ — антагонизм)'],
+    relativeConditions: ['high_vitamin_e'],
+  },
+  diclofenac: {
+    substanceId: 'diclofenac',
+    absolute: ['ИБС (FDA black-box: ↑СС-событий)', 'Недавний CABG (<6 нед)', 'Недавний инсульт (<6 мес)', 'Активное ЖК-кровотечение', 'Язва Ж/ДПК (активная)', 'Тяжёлая почечная недостаточность (eGFR<30)', 'Беременность III триместр'],
+    absoluteConditions: ['ihd', 'recent_cabg', 'recent_stroke', 'gi_bleeding_active', 'peptic_ulcer', 'ckd_stage4_5', 'pregnancy_3rd'],
+    relative: ['Гипертензия (↑АД)', 'Пожилые (>65)', 'Антикоагулянты (↑риск кровотечения)', 'Тяжёлая печёночная недостаточность (ALT>2×ВГН)'],
+    relativeConditions: ['hypertension', 'elderly', 'anticoagulant', 'severe_hepatic'],
+  },
+  testosterone: {
+    substanceId: 'testosterone',
+    absolute: ['Рак простаты', 'Рак груди (мужчины редко)', 'Беременность (категория X)', 'Тяжёлая полицитемия (Hct>54% — риск тромбоза)', 'Тяжёлая ОСН (NYHA III-IV)', 'Тяжёлое обструктивное апноэ сна (некомпенсированное)'],
+    absoluteConditions: ['prostate_cancer', 'breast_cancer', 'pregnancy', 'severe_polycythemia', 'severe_chf', 'severe_osa'],
+    relative: ['СД (↑инсулинорезистентность)', 'Доброкачественная гиперплазия простаты (контроль PSA)', 'Эпилепсия (↑seizure threshold редко)', 'Микроцитарная анемия (T может маскировать)'],
+    relativeConditions: ['diabetes', 'bph', 'epilepsy', 'anemia'],
+  },
 };
 
 export interface ContraAlert {

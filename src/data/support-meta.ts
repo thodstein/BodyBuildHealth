@@ -2997,18 +2997,18 @@ export const SUBSTANCE_ANALOGS: Record<string, { id: string; name: string; reaso
   ],
   anastrozole: [
     { id: 'anastrozole', name: 'Анастрозол', reason: 'Оригинал (АИ 3 поколения)', form: 'таблетки', mg: 0.5, timing: '2x/нед (титровать по E2)', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'high' },
-    { id: 'letrozole', name: 'Летрозол', reason: 'АИ 3 поколения (более мощный)', form: 'таблетки', mg: 2.5, timing: '2x/нед', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'moderate' },
+    { id: 'letrozole', name: 'Летрозол', reason: 'АИ 3 поколения (более мощный)', form: 'таблетки', mg: 0.25, timing: 'eod (титровать по E2)', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'moderate', criticalNote: '⚠ Летрозол в 10-20× мощнее анастрозола. Дефолт 0.25 мг eod. Не использовать онкологическую дозу 2.5 мг/день — риск краша E2 <5 пг/мл, остеопороз, липидный провал.' },
     { id: 'exemestane', name: 'Экземестан', reason: 'Стероидный АИ (другой механизм)', form: 'таблетки', mg: 25, timing: 'с едой', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'moderate' },
   ],
   letrozole: [
-    { id: 'letrozole', name: 'Летрозол', reason: 'Оригинал (АИ 3 поколения, мощный)', form: 'таблетки', mg: 2.5, timing: '2x/нед', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'high' },
+    { id: 'letrozole', name: 'Летрозол', reason: 'Оригинал (АИ 3 поколения, мощный)', form: 'таблетки', mg: 0.25, timing: 'eod (титровать по E2)', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'high', criticalNote: '⚠ Дефолт 0.25 мг eod. Не превышать 0.5 мг eod без лаб. подтверждения E2 >80 пг/мл. Онкологическая доза 2.5 мг/день ОПАСНА — краш E2 <5, остеопороз.' },
     { id: 'anastrozole', name: 'Анастрозол', reason: 'АИ 3 поколения (мягче)', form: 'таблетки', mg: 0.5, timing: '2x/нед', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'moderate' },
     { id: 'exemestane', name: 'Экземестан', reason: 'Стероидный АИ', form: 'таблетки', mg: 25, timing: 'с едой', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'moderate' },
   ],
   exemestane: [
     { id: 'exemestane', name: 'Экземестан', reason: 'Оригинал (стероидный АИ)', form: 'таблетки', mg: 25, timing: 'с едой', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'high' },
     { id: 'anastrozole', name: 'Анастрозол', reason: 'Нестероидный АИ', form: 'таблетки', mg: 0.5, timing: '2x/нед', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'moderate' },
-    { id: 'letrozole', name: 'Летрозол', reason: 'Нестероидный АИ (мощный)', form: 'таблетки', mg: 2.5, timing: '2x/нед', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'moderate' },
+    { id: 'letrozole', name: 'Летрозол', reason: 'Нестероидный АИ (мощный)', form: 'таблетки', mg: 0.25, timing: 'eod', therapeuticClass: 'pharma_ai', clinicalEquivalence: 'moderate', criticalNote: '⚠ 0.25 мг eod — безопасная доза. 2.5 мг/день = онкологическая доза, недопустима для контроля E2 на ААС-курсе.' },
   ],
   magnesium_l_threonate: [
     { id: 'magnesium_l_threonate', name: 'Магний L-треонат', reason: 'Оригинал (для мозга через ГЭБ)', form: 'L-треонат (Magtein®)', mg: 2000, timing: 'с едой', therapeuticClass: 'nootropic', clinicalEquivalence: 'high', criticalNote: '⚠ 2000 мг Magtein = только 144 мг элементарного Mg (7.2%). Уникально для мозга через ГЭБ. Не заменять 1:1 с другими формами Mg.' },
