@@ -316,7 +316,7 @@ const PROTEIN_ROTATION: { label: string; ids: string[]; note: string }[] = [
 ];
 
 function pickRotation(dayOffset: number): { label: string; ids: string[]; note: string } {
-  return PROTEIN_ROTATION[Math.abs(dayOffset) % PROTEIN_ROTATION.length] || PROTEIN_ROTATION[0];
+  return PROTEIN_ROTATION[Math.abs(dayOffset ?? 0) % PROTEIN_ROTATION.length] || PROTEIN_ROTATION[0];
 }
 
 // ─── Preference: common bodybuilding carbs get selection bonus ───
@@ -987,9 +987,12 @@ function pickRotationsForDay(dayOffset: number, randomSalt: number, count: numbe
   // For non-vegetarian bodybuilders, assigning legumes as a main protein rotation
   // (esp. dinner) produces a low-DIAAS, carb-heavy "kasha" meal instead of quality
   // animal protein. Exclude index 7 from the non-veg rotation candidate set entirely.
+  const safeDayOffset = Number.isFinite(dayOffset) ? Math.abs(dayOffset) : 0;
+  const safeSalt = Number.isFinite(randomSalt) ? Math.abs(randomSalt) : 0;
   for (let i = 1; i < count; i++) {
-    const seed = Math.abs(dayOffset * 10007 + randomSalt * 777 + i * 31);
+    const seed = safeDayOffset * 10007 + safeSalt * 777 + i * 31;
     let idx = Math.floor(seededRandom(seed) * PROTEIN_ROTATION.length) % PROTEIN_ROTATION.length;
+    if (!Number.isFinite(idx)) idx = 0;
     let attempts = 0;
     while ((used.has(idx) || (isVegetarian && !vegValid.has(idx)) || (!isVegetarian && idx === 7)) && attempts < PROTEIN_ROTATION.length) { idx = (idx + 1) % PROTEIN_ROTATION.length; attempts++; }
     if (!used.has(idx) && (!isVegetarian || vegValid.has(idx)) && !(idx === 7 && !isVegetarian)) {
@@ -997,7 +1000,7 @@ function pickRotationsForDay(dayOffset: number, randomSalt: number, count: numbe
       result.push(PROTEIN_ROTATION[idx]);
     }
   }
-  if (result.length === 0) result.push(PROTEIN_ROTATION[Math.abs(dayOffset) % PROTEIN_ROTATION.length]);
+  if (result.length === 0) result.push(PROTEIN_ROTATION[safeDayOffset % PROTEIN_ROTATION.length]);
   return result;
 }
 
@@ -1055,7 +1058,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const pctFoodIds = ['broccoli','cabbage','kale','cauliflower','brussels_sprouts','beef_lean','beef_liver','oysters','pumpkin_seeds','flaxseed','salmon'];
     effectivePreferred = new Set([...combinedPreferred, ...pctFoodIds.filter(id => FOOD_DB.some(fd => fd.id === id))]);
   }
-  const seedBase = (input.dayOffset + randomSalt) * 10007 + (input.isTrainingDay ? 3000 : 7000);
+  const seedBase = ((input.dayOffset ?? 0) + randomSalt) * 10007 + (input.isTrainingDay ? 3000 : 7000);
   // P0-4: lock + set pickCtx (sync JS ensures non-reentrancy; cleanup in finally at the end of buildDayPlan).
   if (_pickCtx._locked) { try { console.warn('[meal-plan-engine] buildDayPlan reentrant call — prefs may leak between plans.'); } catch {} }
   _pickCtx._locked = true;
@@ -1071,7 +1074,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const mealRotations = pickRotationsForDay(input.dayOffset, randomSalt, 4, !!input.isVegetarian);
   function rotationForMeal(mealIdx: number): { label: string; ids: string[]; note: string } {
     // Shift rotation by dayOffset so omega-3 fish lands on different meals each day
-    const shift = Math.abs(input.dayOffset) % mealRotations.length;
+    const shift = Math.abs(input.dayOffset ?? 0) % mealRotations.length;
     return mealRotations[(mealIdx + shift) % mealRotations.length] || mealRotations[0];
   }
   const meals: Meal[] = [];
@@ -1221,7 +1224,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     includeVeg: true, includeFruit: false,
     preferredIds: effectivePreferred,
     lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,
-    vegColorIdx: input.dayOffset, // lunch: green day 0, red day 1, orange day 2...
+    vegColorIdx: (input.dayOffset ?? 0), // lunch: green day 0, red day 1, orange day 2...
     rationales: [
       `Обед: цельная пища (${lunchRot.label} + злак + овощи + жиры)`,
       'Поддержание MPS — четверть суточного белка',
@@ -1313,7 +1316,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     includeVeg: true, includeFruit: false,
     preferredIds: effectivePreferred,
     lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,
-    vegColorIdx: input.dayOffset + 2, // dinner: different color than lunch
+    vegColorIdx: (input.dayOffset ?? 0) + 2, // dinner: different color than lunch
     rationales: [
       `Ужин: ${dinnerRot.label} + 30% жиров — медленная абсорбция на ночь`,
       'Поддержание MPS — обязательный приём после 4–5 ч без белка',
@@ -1796,7 +1799,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
 
   return {
-    dayIndex: input.dayOffset,
+    dayIndex: (input.dayOffset ?? 0),
     isTrainingDay: input.isTrainingDay,
     meals,
     totals,

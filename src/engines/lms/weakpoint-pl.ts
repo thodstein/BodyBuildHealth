@@ -5,6 +5,23 @@
  * Ассистентные берутся из lms-exercises (каталог СРЦ) и exercise-catalog.
  */
 import { LMS_EXERCISES } from '../../data/lms-cycles/lms-exercises';
+import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+import type { Exercise } from '../../core/types';
+
+function getNamesAvailable(): Set<string> {
+  return new Set(LMS_EXERCISES.map((e: { name: string }) => e.name));
+}
+
+function findExerciseByLabel(label: string): Exercise | undefined {
+  const n = label.toLowerCase().replace(/ё/g, 'е');
+  const ex = EXERCISE_CATALOG.find((e: Exercise) => e.name.toLowerCase().replace(/ё/g, 'е') === n);
+  if (ex) return ex;
+  // contains-match для длинных названий
+  return EXERCISE_CATALOG.find((e: Exercise) => {
+    const en = e.name.toLowerCase().replace(/ё/g, 'е');
+    return en.length > 2 && (en.includes(n) || n.includes(en));
+  });
+}
 
 export type Lift = 'bench' | 'squat' | 'deadlift' | 'ohp' | 'row' | 'pulldown' | 'incline_press';
 export type WeakPoint = 'off_chest' | 'mid' | 'lockout' | 'start' | 'bottom' | 'sticking_mid'
@@ -62,14 +79,19 @@ const DIAGNOSIS: Record<Lift, Partial<Record<WeakPoint, Omit<WeakPointDiagnosis,
   },
 };
 
-const namesAvailable = new Set(LMS_EXERCISES.map(e => e.name));
-
 export function diagnoseWeakPoint(lift: Lift, weakPoint: WeakPoint): WeakPointDiagnosis {
   const d = DIAGNOSIS[lift][weakPoint];
-  if (!d) return { lift, weakPoint, label: '—', description: 'нет данных для этой комбинации', assistance: [], intensityPct: 0.7, rationale: 'диагноз не определён' };
-  // фильтруем ассистентные, которые есть в каталоге СРЦ; если нет — оставляем как рекомендацию
-  const assistance = d.assistanceFromCatalog.filter(n => namesAvailable.has(n));
-  const missing = d.assistanceFromCatalog.filter(n => !namesAvailable.has(n));
+  if (!d) return { lift, weakPoint, label: '-', description: 'нет данных', assistance: [], intensityPct: 0.7, rationale: 'диагноз не определён' };
+  // фильтруем ассистентные, которые есть в каталоге СРЦ; если нет - ищем в EXERCISE_CATALOG по имени
+  const namesSet = getNamesAvailable();
+  const assistance: string[] = [];
+  const missing: string[] = [];
+  for (const n of d.assistanceFromCatalog) {
+    if (namesSet.has(n)) { assistance.push(n); continue; }
+    const ex = findExerciseByLabel(n);
+    if (ex) { assistance.push(ex.name); }
+    else { missing.push(n); }
+  }
   const list = assistance.length ? assistance : d.assistanceFromCatalog;
   return {
     lift, weakPoint, label: d.label, description: d.description,
