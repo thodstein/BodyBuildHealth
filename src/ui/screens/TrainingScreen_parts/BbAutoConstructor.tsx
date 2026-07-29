@@ -15,12 +15,12 @@
  */
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useDataLink } from '../../../core/data-link';
-import { EXERCISE_CATALOG, getExercisesByGroup, getSubstitutes, getExerciseById } from '../../../core/exercise-catalog';
+import { EXERCISE_CATALOG, getExercisesByGroup, getExerciseById } from '../../../core/exercise-catalog';
 import { SubstitutionPopup } from './SubstitutionPopup';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
-import { rankBBSplits, explainBBSelection, getMuscleFrequencies, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
-import { buildBBPlan, buildWarmup, type BBPlan, type BBExercise, type BBSession, type BBSet } from '../../../engines/bb/bb-builder.engine';
-import { calcBBPlanMetrics, explainBBMetrics, type BBPlanMetrics, type BBMuscleVolume } from '../../../engines/bb/bb-metrics.engine';
+import { rankBBSplits, getMuscleFrequencies, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
+import { buildBBPlan, buildWarmup, type BBPlan, type BBExercise } from '../../../engines/bb/bb-builder.engine';
+import { calcBBPlanMetrics, explainBBMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { adaptForPEDs, explainPEDAdaptation, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
@@ -29,8 +29,8 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
-import { applyToPlanner, subscribePlannerApply } from './planner-bridge';
-import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN, Chip, panelStyle } from './training-ui';
+import { subscribePlannerApply } from './planner-bridge';
+import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN, Chip } from './training-ui';
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import { PopupNumber, PopupSelect, PopupSelectSmart, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
 import { InjurySelectCard } from './InjurySelectCard';
@@ -54,7 +54,7 @@ import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } fro
 import { distributePhases as distributePhasesUnified, PHASE_CONFIGS, type PhaseDistribution } from '../../../engines/periodization';
 import { validatePlanQuality, bbPlanToQualityInput, type PlanQualityResult } from '../../../engines/plan-quality.engine';
 import { PlanExportCard } from './PlanExportCard';
-import { DayCard, ExerciseRow, PhaseBanner, WeekStrip, PHASE_COLORS, PHASE_LABELS, type PlanDayView, type PlanExerciseView, type PhaseKey } from './PlanOutput';
+import { DayCard, PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
@@ -88,10 +88,16 @@ export const PHASE_TECHNIQUES: Record<BBPhase, string[]> = {
   peaking: ['Околопредельные веса (RIR 0)', 'Кластеры 5×2'],
 };
 
+// P2-6: ограниченный кеш (max 8 записей — достаточно для типичных значений weeks 4-24).
 const _phaseMapCache = new Map<string, Map<number, BBPhase>>();
 function getPhaseMap(totalWeeks: number): Map<number, BBPhase> {
   const cacheKey = String(totalWeeks);
   if (_phaseMapCache.has(cacheKey)) return _phaseMapCache.get(cacheKey)!;
+  // P2-6: evict oldest if cache > 8 entries (anti-leak)
+  if (_phaseMapCache.size >= 8) {
+    const firstKey = _phaseMapCache.keys().next().value;
+    if (firstKey) _phaseMapCache.delete(firstKey);
+  }
   // P1: синхронизируем deloadFreq с движком buildBBPlan (deloadFreq = weeks>=6 ? 4 : 0),
   // иначе календарь/баннер показывал «без делода», а сгенерированный план содержал deload-неделю.
   const deloadFreq = totalWeeks >= 6 ? 4 : 0;
@@ -157,14 +163,6 @@ function exerciseComment(ex: BBExercise, weakPoints: string[], focusGroup: strin
   return parts.join(' · ');
 }
 
-
-function rotationSubstitutions(week: number, totalWeeks: number, muscle: string, currentName: string): string[] {
-  const catalog = EXERCISE_CATALOG.filter(e => (e.group || '') === muscle && e.name !== currentName);
-  if (catalog.length === 0) return [];
-  const phase = phaseForWeek(week, totalWeeks);
-  if (phase === 'accumulation' || phase === 'deload') return [];
-  return catalog.slice(0, 3).map(e => e.name);
-}
 
 export const BbAutoConstructor: React.FC = () => {
   const linked = useDataLink();
@@ -593,8 +591,38 @@ export const BbAutoConstructor: React.FC = () => {
     }
   };
 
+  // P2-9: применить inline-правки к плану перед сохранением/экспортом.
+  // Раньше exerciseEdits были display-only — не мутатируют builtPlan/he_pl_runtime.
+  // Теперь: если есть edits — мутируем workSets упражнений.
+  const applyEditsToPlan = (plan: BBPlan): BBPlan => {
+    if (!plan || Object.keys(exerciseEdits).length === 0) return plan;
+    const weeks = plan.weeks.map(w => ({
+      ...w,
+      sessions: w.sessions.map((s, si) => ({
+        ...s,
+        exercises: s.exercises.map((e, ei) => {
+          const editKey = `${si}-${ei}`;
+          const edit = exerciseEdits[editKey];
+          if (!edit) return e;
+          return {
+            ...e,
+            sets: edit.sets,
+            workSets: (e.workSets || []).map((ws, i) =>
+              i === 0
+                ? { ...ws, weight: edit.weight, reps: edit.reps }
+                : { ...ws, weight: edit.weight }
+            ),
+            repsRange: [edit.reps, edit.reps] as [number, number],
+            comment: (e.comment || '') + ' | ✏️ inline-правка',
+          };
+        }),
+      })),
+    }));
+    return { ...plan, weeks };
+  };
+
   const handleSavePlan = () => {
-    try { localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: builtPlan, date: new Date().toISOString() })); alert('План сохранён'); } catch { alert('Ошибка сохранения'); }
+    try { const planToSave = applyEditsToPlan(builtPlan!); setBuiltPlan(planToSave); localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: planToSave, date: new Date().toISOString() })); alert('План сохранён'); } catch { alert('Ошибка сохранения'); }
   };
 
   /** Сохранить BB-план в "Мои тренировки" (myTrainingPlans) — унификация с ручным конструктором. */
@@ -950,7 +978,7 @@ export const BbAutoConstructor: React.FC = () => {
                       return (
                         <button key={id} onClick={() => setWeakPoints(wp => on ? wp.filter(x => x !== id) : [...wp, id])}
                           style={{
-                            padding: '5px 10px', borderRadius: 999, cursor: 'pointer', fontSize: 10, fontWeight: 700,
+                            padding: '5px 10px', borderRadius: 999, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 38,
                             background: on ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)',
                             border: on ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.06)',
                             color: on ? '#fbbf24' : 'rgba(255,255,255,0.75)',
@@ -1050,7 +1078,7 @@ export const BbAutoConstructor: React.FC = () => {
           {([['barbell','Штанга'],['dumbbell','Гантели'],['cable','Блок/кроссовер'],['machine','Тренажёр'],['kettlebell','Гири'],['bodyweight','Свой вес'],['bands','Резинки']] as const).map(([id,label]) => {
             const on = bbEquipment.includes(id);
             return <button key={id} onClick={() => setBbEquipment(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
-              style={{ padding:'5px 10px', borderRadius:14, fontSize:10, fontWeight:700, cursor:'pointer', border:on?'1px solid #60a5fa':'1px solid rgba(255,255,255,0.08)', background:on?'rgba(96,165,250,0.15)':'rgba(255,255,255,0.02)', color:on?'#60a5fa':'rgba(255,255,255,0.6)' }}>{label}{on?' ✓':''}</button>;
+              style={{ padding:'5px 10px', borderRadius:14, fontSize:10, fontWeight:700, cursor:'pointer', minHeight:38, border:on?'1px solid #60a5fa':'1px solid rgba(255,255,255,0.08)', background:on?'rgba(96,165,250,0.15)':'rgba(255,255,255,0.02)', color:on?'#60a5fa':'rgba(255,255,255,0.6)' }}>{label}{on?' ✓':''}</button>;
           })}
         </div>
         <div style={{ marginTop:4, fontSize:10, color:'rgba(255,255,255,0.4)' }}>Если ничего не выбрано — используются все упражнения. Выбор ограничивает пул отбора.</div>
@@ -1501,7 +1529,10 @@ export const BbAutoConstructor: React.FC = () => {
             const exs = w.sessions.flatMap(s => s.exercises);
             const sets = exs.reduce((s, e) => s + e.sets, 0);
             const rir = sets > 0 ? exs.reduce((s, e) => s + e.rir * e.sets, 0) / sets : 0;
-            const totalWt = exs.reduce((s, e) => s + (e.workSets[0]?.weight || 80) * e.sets, 0);
+            // P2-5: тоннаж = weight × reps × sets (реальный тоннаж, не weight × sets).
+            // Раньше: weight × sets → 6 sessions×100kg=600 vs 1×200kg=200 — несравнимо.
+            // Теперь: weight × reps × sets → нормализованный тоннаж для сравнения недель.
+            const totalWt = exs.reduce((s, e) => s + (e.workSets[0]?.weight || 80) * (e.workSets[0]?.reps || 10) * e.sets, 0);
             return { week: w.week, phase: ph, sets, rir, tonnage: totalWt };
           });
           const maxSets = Math.max(1, ...wkStats.map(x => x.sets));
@@ -1972,7 +2003,7 @@ export const BbAutoConstructor: React.FC = () => {
                   {(chartData as any[]).filter((x: any, i: number) => i % 2 === 0 || i === chartData.length - 1).map((x: any) => {
                     const idx = (chartData as any[]).indexOf(x);
                     const px2 = 16 + (idx / Math.max(1, chartData.length - 1)) * 290;
-                    return <text key={'l' + String(x.week)} x={px2} y={95} fontSize={7} fill="rgba(255,255,255,0.3)" textAnchor="middle">{x.week}</text>;
+                    return <text key={'l' + String(x.week)} x={px2} y={95} fontSize={10} fill="rgba(255,255,255,0.3)" textAnchor="middle">{x.week}</text>;
                   })}
                 </svg>
                 <div style={{ display:'flex', gap:12, justifyContent:'center', marginTop:4, flexWrap:'wrap' }}>

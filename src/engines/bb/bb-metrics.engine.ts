@@ -34,7 +34,7 @@ export interface BBPlanMetrics {
 
 export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanMetrics {
   const mult = mrvMultiplier ?? 1.0;
-  const level = normLevel((plan as any).level || 'intermediate');
+  const level = normLevel(plan.level || (plan as any).level || 'intermediate');
   const agg: Record<string, { total: number; тяж: number; памп: number; лёг: number; hard: number; rirSum: number; rirN: number; freq: number }> = {};
   // fix H: метрики считаем по ПИКОВОЙ неделе (макс объёма), а не по первой (где RIR ещё высокий)
   const weekIdx = plan.weeks.reduce((best, w, i) => {
@@ -56,9 +56,16 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
       a.rirSum += ex.rir * ex.sets; a.rirN += ex.sets;
     }
   }
-  // частота — сколько сессий в ротации тренируют мышцу
-  const freqMap: Record<string, number> = {};
-  for (const s of sessions) for (const ex of s.exercises) freqMap[ex.muscle] = (freqMap[ex.muscle] || 0) + 1;
+  // P2-3: частота — среднее число сессий на мышцу за ВСЕ недели (не только пик-неделя).
+  // Раньше: только по пик-неделе → для bro_5 (1×/нед) частота=1 всегда, для PPL (2×/нед) =2.
+  // Теперь: агрегируем по всем неделям, делим на число недель → реальная частота/нед.
+  const freqMapAll: Record<string, number> = {};
+  const totalWeeks = plan.weeks.length || 1;
+  for (const w of plan.weeks) {
+    for (const s of w.sessions) for (const ex of s.exercises) {
+      freqMapAll[ex.muscle] = (freqMapAll[ex.muscle] || 0) + 1;
+    }
+  }
 
   const perMuscle: BBMuscleVolume[] = Object.entries(agg).map(([muscle, a]) => {
     const lm = getVolumeLandmarks(level, muscle) || { mev: 0, mav: 0, mrv: 0 };
@@ -73,7 +80,7 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
       muscle, totalSets: a.total, тяжSets: a.тяж, пампSets: a.памп, лёгSets: a.лёг,
       hardSets: a.hard,
       avgRir: a.rirN > 0 ? a.rirSum / a.rirN : 0,
-      frequencyPerRotation: freqMap[muscle] || 0,
+      frequencyPerRotation: Math.round((freqMapAll[muscle] || 0) / totalWeeks * 10) / 10,
       mev, mav, mrv, status,
     };
   });

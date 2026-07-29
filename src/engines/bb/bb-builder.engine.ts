@@ -145,6 +145,8 @@ export interface BBPlan {
   weeks: BBWeek[];
   rotationMuscleVolume: Record<string, number>; // MAV×ротация на мышцу
   rationale: string[];
+  /** P2-4: уровень пользователя (для bb-metrics без duck-typing). */
+  level?: string;
   /** Volume-landmarks (MEV/MAV/MRV) по пиковой неделе — единый источник, как в PL/ручном. */
   volumeLandmarks?: VolumeLandmarkRow[];
   /** Частота тренировок каждой мышцы в неделю (1×/2×/3×) — ключевой фактор гипертрофии. */
@@ -1472,7 +1474,7 @@ function buildSession(
           workSets, exerciseName: (exData as any).name || (exData as any).id,
           tempoSpec: tempoStr, restSeconds: exRest,
           comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id),
-          warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary'),
+          warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary' || (exData as any).type === 'compound'),
           rationale: pl.rationaleMap.get((exData as any).name) || '',
         });
         continue;
@@ -2380,7 +2382,13 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   for (const [m, count] of Object.entries(muscleSessionCount)) {
     muscleFrequency[collapseKey(m)] = count;
   }
-  return { ...finalPlan, volumeLandmarks, muscleFrequency };
+  // P2-1: частота мышц в rationale (ключевой фактор гипертрофии — Schoenfeld 2018).
+  const freqSummary = Object.entries(muscleFrequency)
+    .filter(([, f]) => f > 0)
+    .map(([m, f]) => `${m}=${f}×`)
+    .join(', ');
+  if (freqSummary) rationale.push(`Частота на группу/нед: ${freqSummary}`);
+  return { ...finalPlan, level, volumeLandmarks, muscleFrequency };
 }
 
 /* ───────────────────────── Cross-Day WeakPoints Compensation ───────────────────────── */
