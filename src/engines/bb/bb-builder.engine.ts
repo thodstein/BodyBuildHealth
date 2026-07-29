@@ -32,6 +32,7 @@ import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landma
 // реализация, которую использует и ручной конструктор (phase-periodization).
 import { distributePhases, PHASE_CONFIGS, getPhaseVolumeMult, type BBPhase } from '../periodization';
 import { orderSessionExercises, type SessionMethodology } from './bb-session-order.engine';
+import { type BBTrainingFocus, FOCUS_RIR_TABLE, FOCUS_REPS_TABLE, LEVEL_REP_MOD } from './bb-goal-types';
 import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
@@ -98,6 +99,24 @@ export interface BBBuilderInput {
   labWarnings?: string[];
   /** P0-5: рекомендация по интенсивности из лаборатории (пробрасывается в rationale). */
   labIntensityNote?: string;
+  /** Тип тренировки: strength/hypertrophy/endurance. Влияет на RIR/reps/tempo по Schoenfeld 2021/2022. */
+  trainingFocus?: BBTrainingFocus;
+  /** % жира в теле (0-50). Влияет на восстановление: >25% → MRV×0.9 (Helms 2022). */
+  bodyFat?: number;
+  /** Жировая масса тела в кг. Чем выше LBM, тем больше объём способен восстановить (Helms 2022). */
+  leanMass?: number;
+  /** HRV (мс). >70 = high readiness, 50-70 = medium, <50 = low (Plews 2022). */
+  hrvMs?: number;
+  /** Часы сна за ночь. >7 = high, 6-7 = medium, <6 = low (Watson 2022). */
+  sleepHours?: number;
+  /** Субъективный стресс 1-10. Low(1-3)=high readiness, Medium(4-6)=medium, High(7-10)=low (Kreher 2022). */
+  stressLevel?: number;
+  /** Множитель эксцентрической нагрузки. 1.0 = норма, 1.1-1.2 = eccentric overload (Schoenfeld 2021). */
+  eccentricMult?: number;
+  /** Профицит калорий (ккал/день). 250-500 = оптимальный рост (Helms 2014). */
+  calorieSurplus?: number;
+  /** Белок г/кг. 1.6-2.2 = оптимально (Helms 2022). <1.0 → снижение MRV. */
+  proteinPerKg?: number;
 }
 
 
@@ -447,10 +466,12 @@ function weightForRepMax(reps: number, workMax: number, rir: number, intensityMu
   return Math.round(workMax * brzycki * rirAdj * intensityMult * 10) / 10;
 }
 
-function charReps(c: DayCharacter): [number, number] {
-  if (c === 'тяж') return [5, 8];
-  if (c === 'памп') return [12, 20];
-  return [10, 15];
+/** Reps по характеру дня + training focus (Schoenfeld 2017: 6-30 reps). */
+function charReps(c: DayCharacter, focus?: BBTrainingFocus): [number, number] {
+  const cfg = focus ? FOCUS_REPS_TABLE[focus] : FOCUS_REPS_TABLE.hypertrophy;
+  if (c === 'тяж') return cfg.heavy;
+  if (c === 'памп') return cfg.pump;
+  return cfg.light;
 }
 /** Базовый RIR фазы (с дрейфом внутри фазы, как в phase-periodization).
  *  B10: peaking ограничен 6 неделями — после wk3 RIR=0 (clamped), но при >6 неделях
@@ -464,17 +485,23 @@ function phaseBaseRir(phase: BBPhase, phaseWeek: number): number {
   return Math.max(endRir, startRir - drift);
 }
 /**
- * RIR упражнения в ББ-плане = фаза (distributePhases) + характер дня.
- * Тяжёлый день — самый низкий RIR (труднее), памп/лёгкий — на +1 выше.
- * В делоде RIR принудительно лёгкий (3-4).
+ * RIR упражнения в ББ-плане = фаза + характер дня + training focus.
+ * strength: RIR 1-2 (Schoenfeld 2021), hypertrophy: RIR 2-3 (Roberts 2022), endurance: RIR 3-4.
+ * Памп всегда ≥3 (Schoenfeld 2017: metabolic stress, не failure).
  */
-function bbRir(resolved: DayCharacter, phase: BBPhase, phaseWeek: number): number {
-  const base = phaseBaseRir(phase, phaseWeek);
-  let rir = resolved === 'тяж' ? base : base + 1;
+function bbRir(resolved: DayCharacter, phase: BBPhase, phaseWeek: number, focus?: BBTrainingFocus): number {
+  const cfg = focus ? FOCUS_RIR_TABLE[focus] : FOCUS_RIR_TABLE.hypertrophy;
+  // Phase adjustment: intensification/peaking → base-1, deload → forced 4
+  let base = cfg.base;
+  if (phase === 'deload') base = 4;
+  else if (phase === 'intensification') base = Math.max(0, base - 1);
+  else if (phase === 'peaking') base = Math.max(0, base - 1);
+  // Focus drift: strength drags faster than hypertrophy
+  const drift = Math.floor(phaseWeek / 2);
+  const driftable = Math.max(0, base + cfg.driftPer2Weeks * drift);
+  let rir = resolved === 'тяж' ? driftable : driftable + 1;
   if (phase === 'deload') rir = Math.max(3, Math.min(4, rir));
-  // P0-3 (audit 2026-07): памп-работа НИКОГДА не идёт до отказа — metabolic stress,
-  // не max motor unit recruitment. RIR >= 3 всегда для 'памп' (Schoenfeld 2017).
-  if (resolved === 'памп') rir = Math.max(3, rir);
+  if (resolved === 'памп') rir = Math.max(cfg.pumpRir, rir);
   return Math.max(0, Math.min(5, rir));
 }
 
@@ -697,6 +724,8 @@ function buildSession(
   onCourse: boolean = false,
   sex: 'male' | 'female' = 'male',
   weekLocalUsed: Map<string, Set<string>> = new Map(),
+  trainingFocus?: BBTrainingFocus,
+  eccentricMult?: number,
 ): BBSession {
   const character = sched.character as DayCharacter;
   const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles);
@@ -833,7 +862,7 @@ function buildSession(
     const repMax = isAccessory ? baseMax + 5 : baseMax;
     const reps = Math.round((repMin + repMax) / 2);
     // RIR: bbRir (учитывает phase + phaseWeek + характер). Делод → RIR 3-4.
-    const rir = bbRir(resolved, phase, phaseWeek);
+    const rir = bbRir(resolved, phase, phaseWeek, trainingFocus);
     const wm = workMax[repKey] || PRO_WORKMAX_RATIO[repKey]?.(workMax) || defaultWorkMax(repKey);
     // P1-4 (audit 2026-07): Brzycki inverse %1RM formula — реп-корректный вес.
     // Раньше: weight = workMax × intensityMult × PCT_FOR_RIR[rir] (не учитывала reps).
@@ -841,6 +870,10 @@ function buildSession(
     // Для 18 reps → ~52% (памп), для 6 reps → ~86% (тяж), для 10 reps → ~75%.
     const pct = PCT_FOR_RIR[rir] ?? 0.9; // fallback если Brzycki не подходит
     let weight = weightForRepMax(reps, wm, rir, phaseCfg.intensityMultiplier);
+    // P4: Eccentric overload (Schoenfeld 2021) - advanced/enhanced can handle 110-120% eccentric
+    if (eccentricMult && eccentricMult > 1.0 && role === 'primary') {
+      weight = Math.round(weight * eccentricMult * 10) / 10;
+    }
     // P1-8 (audit 2026-07): pre_exhaust methodology → compound weight ×0.90.
     // После pre-exhaust изоляции целевая мышца уже утомлена → compound Fails ниже
     // обычного на ~10-15% (Augustsson 2003; Gentil 2013). Авто-снижение веса compound.
@@ -879,6 +912,9 @@ function buildSession(
     let exerciseCount = role === 'primary'
       ? (isMultiDay ? 3 : (isSingleFreq ? (onPED ? 4 : 3) : (onPED ? 5 : 4)))
       : (isArm && onPED ? 2 : (isArm ? 2 : (isBigMuscle ? 2 : 1)));
+    // P3: Level-based exerciseCount (Schoenfeld 2022: advanced → more exercises for detail)
+    if (levelBase <= 1 && exerciseCount > 2) exerciseCount = Math.max(2, exerciseCount - 1);
+    else if (levelBase >= 4 && role === 'primary') exerciseCount = Math.min(8, exerciseCount + 1);
     // ★ B: focusGroup/weakPoint — больше СЕТОВ (не упражнений).
     // Объём уже усилен через sessionShareFor (×1.2 weak, ×1.3 focus).
     // exerciseCount НЕ повышаем — качество > количество.
@@ -1734,6 +1770,22 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const muscleVolumeRotation: Record<string, number> = {};
   const mrvByMuscle: Record<string, number> = {};
   const specWeak = input.specialization ? expandWeakForSpecialization(input.weakPoints || []).slice(0, 2) : [];
+  // Recovery multiplier from body composition + recovery metrics (Helms 2022, Plews 2022, Watson 2022)
+  const recoveryMult = Math.max(0.6, Math.min(1.5, (() => {
+    let r = 1.0;
+    if (input.bodyFat != null) r *= input.bodyFat > 25 ? 0.9 : input.bodyFat > 20 ? 0.95 : 1.0;
+    if (input.leanMass != null) r *= input.leanMass >= 90 ? 1.15 : input.leanMass >= 75 ? 1.05 : input.leanMass >= 60 ? 1.0 : 0.9;
+    if (input.hrvMs != null) r *= input.hrvMs > 70 ? 1.1 : input.hrvMs >= 50 ? 1.0 : 0.85;
+    if (input.sleepHours != null) r *= input.sleepHours >= 7 ? 1.05 : input.sleepHours >= 6 ? 1.0 : 0.85;
+    if (input.stressLevel != null) r *= input.stressLevel < 3 ? 1.05 : input.stressLevel < 6 ? 1.0 : 0.85;
+    return r;
+  })()));
+  const nutritionMult = Math.max(0.6, Math.min(1.5, (() => {
+    let n = 1.0;
+    if (input.calorieSurplus != null) n *= input.calorieSurplus > 300 ? 1.1 : input.calorieSurplus > 100 ? 1.05 : input.calorieSurplus < -200 ? 0.8 : 1.0;
+    if (input.proteinPerKg != null) n *= input.proteinPerKg >= 2.0 ? 1.1 : input.proteinPerKg >= 1.6 ? 1.05 : input.proteinPerKg < 1.0 ? 0.85 : 1.0;
+    return n;
+  })()));
   for (const m of Object.keys(muscleSessionCount)) {
     const lm = landmarksForRotation(level, m, pattern.rotationDays);
     if (lm) {
@@ -1754,14 +1806,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       if (input.goal === 'mass' || input.goal === 'strength_mass') v = Math.round(v * 1.05);
       // PED-адаптация: увеличиваем целевой объём пропорционально MRV-множителю
       v = Math.round(v * (pedAdapt?.combinedMrvMultiplier ?? 1));
-      // P0-5: лабораторная коррекция — снижение объёма при ALT/CRP/HCT/гормонах
+      // P0-5: лабораторная коррекция - снижение объёма при ALT/CRP/HCT/гормонах
       v = Math.round(v * (input.labMrvMultiplier ?? 1));
-      muscleVolumeRotation[m] = v;
+      v = muscleVolumeRotation[m] = v;
       // fix D: истинный MRV — потолок для капа.
       // fix C: для отстающих/фокус-групп поднимаем потолок в такт объёмному
       // бусту (weak ×1.2, focus ×1.3), иначе normalizeWeekMrv стирает акцент.
       // PED: базовый MRV умножается на combinedMrvMultiplier ДО корректировок
-      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1));
+      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult);
       if (isWeak(m, weakPoints)) capMrv = Math.round(capMrv * 1.2);
       if (focusGroup === m || (focusGroup && isWeak(m, [focusGroup]))) capMrv = Math.round(capMrv * 1.3);
       mrvByMuscle[m] = capMrv;
@@ -1774,7 +1826,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     if (mrvByMuscle[m]) continue;
     const lm = landmarksForRotation(level, m, pattern.rotationDays);
     if (lm) {
-      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1));
+      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult);
       if (isWeak(m, weakPoints)) capMrv = Math.round(capMrv * 1.2);
       mrvByMuscle[m] = capMrv;
     }
@@ -1827,6 +1879,15 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const weekWeakPatterns = new Map<string, Set<string>>(); // weakMuscle → Set<pattern>
 
   for (let w = 1; w <= input.weeks; w++) {
+    // P5: Volume progression MEV→MAV→MRV (Helms 2022)
+    // Week 1 = 0.85× (MEV), mid = 1.0× (MAV), last = 1.10× (MRV), deload = 0.6×
+    const weekPhase = phaseByWeek.get(w) || 'accumulation';
+    const weekVolumeMult = weekPhase === 'deload' ? 0.6
+      : Math.min(1.10, 0.85 + ((w - 1) / Math.max(1, input.weeks - 1)) * 0.25);
+    const scaledVolumeRotation: Record<string, number> = {};
+    for (const [m, v] of Object.entries(muscleVolumeRotation)) {
+      scaledVolumeRotation[m] = Math.round(v * weekVolumeMult);
+    }
     // Ротация: НЕ сбрасываем — накапливаем все использованные упражнения
     // (каждая неделя получает новые упражнения, пока пул не исчерпан)
     // fix L: паттерны отстающих групп сбрасываются раз в неделю (свежий выбор движений)
@@ -1877,7 +1938,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const weekExcluded = getExcludedMuscles(injuries, weekDate);
       const weekGraded = getGradedInjuries(injuries, weekDate);
       const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
-      const sess = buildSession(s, i + 1, w, muscleVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female');
+      const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, new Map(), input.trainingFocus, input.eccentricMult);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {
@@ -2313,8 +2374,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       feederPool.sort((a, b) => (a.name?.length || 0) - (b.name?.length || 0));
       const fBase = (workMax as any)[m] || DEFAULT_WORKMAX[m] || 50;
       const feederWeight = Math.max(5, Math.round(fBase * 0.3 * 10) / 10);
-      const fTempo = tempoFor('памп');
-      const need = Math.max(2, targetMEV - weekSets);
+  const fTempo = tempoFor('памп');
+  const need = Math.max(2, targetMEV - weekSets);
       // P1-5: если need > perExCap (6 для calves/abs/forearms, 8 для остальных) — разбить на 2 упражнения.
       const perExCapM = (m === 'forearms' || m === 'calves' || m === 'abs') ? 6 : 8;
       const useTwoEx = need > perExCapM && feederPool.length >= 2;
@@ -2517,9 +2578,9 @@ function compensateCrossDayWeakPoints(
       const fName = fData.name || fData.id;
       const fBase = (workMax as any)[wp] || DEFAULT_WORKMAX[wp] || 50;
       const feederWeight = Math.max(5, Math.round(fBase * 0.3 * 10) / 10);
-      const fTempo = tempoFor('памп');
-      const feederSetCount = 2;
-      bestSlot.session.exercises.push({
+  const fTempo = tempoFor('памп');
+  const feederSetCount = 2;
+  bestSlot.session.exercises.push({
         muscle: wp, name: fName, role: 'accessory' as const, character: 'памп' as DayCharacter,
         sets: feederSetCount, repsRange: [15, 20] as [number, number], rir: 3,
         workSets: Array.from({ length: feederSetCount }, () => ({ reps: 18, rir: 3, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),

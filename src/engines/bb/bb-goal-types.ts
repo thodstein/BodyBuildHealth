@@ -1,0 +1,52 @@
+/**
+ * bb-goal-types.ts - BBGoal training focus type + evidence-based RIR/reps tables (2022+).
+ *
+ * Sources:
+ *   Schoenfeld 2021 (meta): 0-3 RIR optimal
+ *   Roberts 2022 (meta): failure → RIR 3+ for hypertrophy
+ *   Schoenfeld 2017: 6-30 reps for hypertrophy (RIR 0-3)
+ *   Schoenfeld 2016: 1-6 reps for strength
+ *   Helms 2022: evidence-based hypertrophy guidelines
+ *   ACSM 2023: eccentric 2-4s per phase
+ */
+
+/** Training focus - NOT body-composition goal (those are BBGoal in bb-builder, e.g. mass/cut). */
+export type BBTrainingFocus = 'strength' | 'hypertrophy' | 'endurance';
+
+export interface FocusRirConfig {
+  base: number;            // base RIR for accumulation phase
+  driftPer2Weeks: number;  // RIR change every 2 weeks (negative = harder)
+  pumpRir: number;         // RIR for pump work (metabolic stress)
+}
+
+export interface FocusRepsConfig {
+  heavy: [number, number];  // heavy day rep range (mechanical tension)
+  pump: [number, number];   // pump day rep range (metabolic stress)
+  light: [number, number];  // light / general rep range
+}
+
+export const FOCUS_RIR_TABLE: Record<BBTrainingFocus, FocusRirConfig> = {
+  strength:    { base: 1, driftPer2Weeks: -1, pumpRir: 3 },
+  hypertrophy: { base: 2, driftPer2Weeks: -1, pumpRir: 4 },
+  endurance:   { base: 3, driftPer2Weeks: -0.5, pumpRir: 5 },
+};
+
+export const FOCUS_REPS_TABLE: Record<BBTrainingFocus, FocusRepsConfig> = {
+  strength:    { heavy: [1, 5], pump: [8, 12],   light: [6, 10] },
+  hypertrophy: { heavy: [5, 10], pump: [12, 20], light: [8, 15] },
+  endurance:   { heavy: [8, 12], pump: [15, 30], light: [10, 20] },
+};
+
+export const PHASE_TEMPO: Record<string, { notation: string; eccentric: number }> = {
+  accumulation:     { notation: '3-1-1-0', eccentric: 3 },
+  intensification:  { notation: '2-1-1-0', eccentric: 2 },
+  peaking:          { notation: '2-0-1-0', eccentric: 2 },
+  deload:           { notation: '4-2-2-0', eccentric: 4 },
+};
+
+export const LEVEL_REP_MOD: Record<string, number> = {
+  beginner: 0,
+  intermediate: 1,
+  advanced: 2,
+  enhanced: 4,
+};
