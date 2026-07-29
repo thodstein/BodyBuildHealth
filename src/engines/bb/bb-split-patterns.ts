@@ -423,6 +423,23 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
     description: 'Верх/Низ 3×/нед: отдых после каждой тренировки. Полное восстановление.',
     direction: 'both',
   },
+  {
+    id: 'push_pull_legs_4',
+    name: 'Push/Pull/Legs 4×/нед',
+    rotationDays: 7, sessionsPerRotation: 4,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Push' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Pull' },
+      { kind: 'отдых', character: null },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Legs' },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'Push' },
+      { kind: 'отдых', character: null },
+      { kind: 'отдых', character: null },
+    ],
+    level: ['intermediate', 'advanced'],
+    description: 'PPL 4×/нед: Push 2×, Pull 1×, Legs 1×. Акцент на жимовые мышцы.',
+    direction: 'bodybuilding',
+  },
 ];
 
 export function getPattern(id: string): SplitPattern | undefined {

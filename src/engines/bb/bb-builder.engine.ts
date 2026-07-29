@@ -1480,7 +1480,9 @@ function buildSession(
       // Accessory получает чуть меньше отдыха (минус 30с), primary — базу.
       const tempoStr = phaseCfg.tempo;
       const baseRest = phaseCfg.restBase;
-      const exRest = pl.role === 'accessory' ? Math.max(45, baseRest - 30) : baseRest;
+      // P5: Rest progression -15s/week (Schoenfeld 2016) - min 60s
+      const restProgression = Math.max(0, (week - 1) * 15);
+      const exRest = Math.max(60, (pl.role === 'accessory' ? Math.max(45, baseRest - 30) : baseRest) - restProgression);
       if (remainingBudget < cost) {
         const reduced = Math.max(2, Math.floor(remainingBudget / ((exData as any)?.fatigueCost || 5)));
         const adjustedSets = Math.min(exSets, reduced);
