@@ -84,9 +84,7 @@ export function migratePlannerStorage(): void {
         const raw = localStorage.getItem(k);
         if (raw === null) return;
         const parsed = JSON.parse(raw);
-        if (parsed === null) return;
-        // Drop non-array/non-object data that would crash .filter/.map/.length
-        if (typeof parsed !== 'object') { localStorage.removeItem(k); wiped = true; }
+        if (parsed === null || typeof parsed !== 'object') { localStorage.removeItem(k); wiped = true; }
       } catch {}
     });
     if (wiped) { try { console.info('[Planner] Cleaned stale localStorage entries (schema v' + PLANNER_SCHEMA_VERSION + ')'); } catch {} }

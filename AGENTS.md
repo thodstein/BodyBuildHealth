@@ -5,11 +5,11 @@
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK (694+ modules)
-- `vitest` - 338 passing (excl. `_tmp_*` regression files: 2 pre-existing failures in _tmp_legs_regression, unrelated)
+- `vitest` - 434 passing (excl. `_tmp_*` regression files: 2 pre-existing failures in _tmp_legs_regression, unrelated)
 
 ### Git
 - `origin/main` - tracked
-- uncommitted changes: BB-builder priority-1 edits + ПЛ-авто годовое планирование + diary-autoreg + ручной планировщик (phase-bridge + designer-to-program + macrocycle-to-bb)
+- uncommitted changes: BB-builder priority-1 edits + ПЛ-авто годовое планирование + diary-autoreg + ручной планировщик (phase-bridge + designer-to-program + macrocycle-to-bb) + planner error fix (null value drop in migration, arrayKeys expansion, Array.isArray guards for excludedCategories/takenSupplements/userRecipes)
 
 ---
 
@@ -19,15 +19,16 @@ User reported: "не генерируется рацион - выбивает о
 
 Root cause (most likely): stale localStorage from previous app versions. When the planner's `useState` initializers called `JSON.parse(localStorage.getItem(...))` and the saved value was a string/number instead of an array (or any malformed shape), the state became a non-array, and downstream code that called `.filter/.map/.length` on it crashed.
 
-Fixes applied:
-- `planner-storage.ts`: new `readJSONSafe(key, fallback, validate)` helper + `migratePlannerStorage()` that auto-cleans 16 known planner keys whose JSON shape is expected to be an object/array
-- `IndividualPlanContext.tsx`: 
+Fixes applied (Jul 30 + Jul 30 continued):
+- `planner-storage.ts`: new `readJSONSafe(key, fallback, validate)` helper + `migratePlannerStorage()` that auto-cleans 16 known planner keys whose JSON shape is expected to be an object/array; **also drops `null` values** (typeof null === 'object was passing through); **expanded migration to 27 keys** covering plan settings, UI prefs, and pharma data
+- `IndividualPlanContext.tsx`:
   - runs `migratePlannerStorage()` once on mount (idempotent via `he_planner_schema_version` key, v4)
-  - hardens 8 useState initializers (savedPlans, monthPlan, preferredFoods, excludedFoods, dietPrefs, allergens, healthIssues, lockedFoodIds) to validate Array.isArray and filter by `typeof === 'string'`
+  - hardens 11 useState initializers (savedPlans, monthPlan, preferredFoods, excludedFoods, dietPrefs, allergens, healthIssues, lockedFoodIds, excludedCategories, takenSupplements, userRecipes) to validate Array.isArray and filter by `typeof === 'string'`
   - wraps "Сгенерировать план питания" click handler in try/catch so any future error shows in `errorMsg` UI
 - `planner-preferences.ts:328`: `(f.id || '').toLowerCase()` defensive guard for missing f.id
 - `meal-plan-engine.ts` already had `finally` cleanup of `_pickCtx` lock
 - Refactored `addMacroTopUp` (was dead-code classic path) into clean helper function
+- Added 3 new migration tests: corrupted scalar keys, null value dropping, preserved arrays/objects
 
 Tests: 63/63 in NutritionScreen_parts/IndividualPlan/__tests__/ pass (added planner-storage.test.ts with 6 new tests).
 
