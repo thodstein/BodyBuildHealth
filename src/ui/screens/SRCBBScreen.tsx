@@ -44,6 +44,7 @@ import { generateRepTempo, type RepTempoOutput } from '../../engines/rep-tempo-e
 import { MesocycleProgressionCard } from './TrainingScreen_parts/MesocycleProgressionCard';
 import { DeloadProtocolCard } from './TrainingScreen_parts/DeloadProtocolCard';
 import { MacrocyclePanel } from './SRCBBScreen_parts/MacrocyclePanel';
+import { deserializeMacro } from '../../engines/lms/macrocycle.engine';
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
 
 const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepTempoOutput => {
@@ -1734,7 +1735,27 @@ legs: [
         </div>
       )}
 
-      {subView === 'macro' && <MacrocyclePanel level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyCycle={(cycleId, weeks) => { setSelectedCycleId(cycleId); setCycleWeeks(weeks); setSubView('plan'); }} />}
+      {subView === 'macro' && <MacrocyclePanel level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyCycle={(cycleId, weeks) => {
+        if (mainTab === 'bb') {
+          // ББ-авто: применить длительность макроцикла + перестроить план с фазами из макроцикла.
+          try {
+            const raw = localStorage.getItem('he_pl_macro');
+            if (!raw) { setSubView('plan'); return; }
+            const macro = deserializeMacro(raw);
+            if (!macro) { setSubView('plan'); return; }
+            // Применить длительность макроцикла к bbWeeks и пересобрать план.
+            setBbWeeks(macro.totalWeeks);
+            // Запустить пересборку ББ-плана с новой длительностью.
+            setTimeout(() => { try { buildBb(); } catch { /* ignore */ } }, 50);
+          } catch { /* ignore */ }
+          setSubView('plan');
+        } else {
+          // ПЛ-авто: загрузить выбранный СРЦ-цикл
+          setSelectedCycleId(cycleId);
+          setCycleWeeks(weeks);
+          setSubView('plan');
+        }
+      }} />}
       {subView === 'plates' && <PlateCalcTab initialWeight={workingWeight} onApply={() => {}} />}
       {subView === 'autoreg' && <AutoregPanel />}
       {subView === 'peak' && <PeakingPanel />}

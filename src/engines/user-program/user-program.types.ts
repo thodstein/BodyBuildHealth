@@ -246,6 +246,8 @@ export interface ProgramMeta {
   revisions?: { ts: string; note: string }[];
   /** Тренерские заметки к мезоциклу (отображаются в PDF/CSV). */
   notes?: string;
+  /** Training focus (Schoenfeld 2021, Roberts 2022): 'strength' | 'hypertrophy' | 'endurance'. */
+  trainingFocus?: 'strength' | 'hypertrophy' | 'endurance';
 }
 
 export interface UserProgram {

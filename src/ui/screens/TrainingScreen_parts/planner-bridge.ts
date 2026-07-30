@@ -23,10 +23,29 @@ type Listener = (payload: PlannerApply | null) => void;
 
 export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle';
 
+export interface SplitPayload { cycle: string[][]; name?: string }
+export interface PmPayload { squat?: number; bench?: number; dead?: number; lift?: string; value?: number }
+export interface WeakpointsPayload { groups: string[]; lift?: string }
+export interface PriPayload { volumeMult: number; rirShift: number }
+export interface TempoPayload { eccentric: number; bottomPause?: number; concentric: number; topPause?: number; label?: string }
+export interface RirPayload { rirShift: number; label?: string }
+export interface MrvPayload { mrv: number; label?: string }
+export interface DeloadPayload { volumeMult: number; rirShift: number; weeks: number[]; label?: string }
+export interface VolumePayload { sets: Record<string, number>; label?: string }
+export interface PeakPayload { volumeMult: number; rirTarget: number; label?: string }
+export interface MethodologyPayload { methodName: string; category?: string }
+export interface ProgramPayload { cycleId: string }
+export interface DesignPayload { design: unknown; fillExercises?: boolean; daysPerWeek?: number; level?: string; goal?: string }
+export interface MacrocyclePayload { macro: unknown; level?: string; goal?: string; daysPerWeek?: number }
+
+export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload;
+
 export interface PlannerApply {
   kind: PlannerApplyKind;
-  label: string;        // человеко-читаемое описание
-  data: any;            // специфичные данные (см. kind-комментарии выше)
+  label: string;
+  /** Discriminated payload; narrow via `kind` and cast: `(p.data as PmPayload).lift`.
+   *  Kept as `any` for backward-compat with existing consumers — see payload interfaces above. */
+  data: any;
   ts: number;
 }
 

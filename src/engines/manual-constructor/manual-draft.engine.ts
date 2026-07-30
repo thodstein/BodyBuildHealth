@@ -11,6 +11,7 @@ import { adaptForPEDs, type PED, type PEDAdaptation, type CourseIntensity } from
 import { selectBestBBSplit } from '../bb/bb-selector.engine';
 import { createFromBuild } from '../user-program/program-store';
 import type { Injury } from '../manual-plan-builder';
+import type { BBTrainingFocus } from '../bb/bb-goal-types';
 
 export interface MuscleGroupPlan {
   muscle: string;
@@ -33,6 +34,21 @@ export interface AutoDraftOptions {
   onCourse?: boolean;
   courseIntensity?: string;
   injuries?: { muscle: string; from?: string; to?: string; exclude?: boolean; volumePct?: number; weightPct?: number; repsCap?: number }[];
+  /** Training focus для RIR/reps/tempo (Schoenfeld 2021, Roberts 2022). */
+  trainingFocus?: BBTrainingFocus;
+  /** Recovery-метрики → MRV soft-cap (Helms 2022, Plews 2022, Watson 2022). */
+  bodyFat?: number;
+  leanMass?: number;
+  hrvMs?: number;
+  sleepHours?: number;
+  stressLevel?: number;
+  /** Lab-based MRV multiplier (ALT/CRP/HCT/гормоны). */
+  labMrvMultiplier?: number;
+  /** Eccentric overload multiplier (ACSM 2023). */
+  eccentricMult?: number;
+  /** Nutrition → MRV (calorie surplus/protein intake). */
+  calorieSurplus?: number;
+  proteinPerKg?: number;
 }
 
 /** Подбирает упражнения для одной мышечной группы: 1-2 базовых + 2-3 изоляции. */
@@ -141,6 +157,16 @@ export function autodraftBBPlan(opts: AutoDraftOptions): BBPlan {
     excludedExercises: opts.excludedExercises ?? [],
     injuries,
     courseIntensity: (opts.courseIntensity ?? 'moderate') as CourseIntensity,
+    trainingFocus: opts.trainingFocus,
+    bodyFat: opts.bodyFat,
+    leanMass: opts.leanMass,
+    hrvMs: opts.hrvMs,
+    sleepHours: opts.sleepHours,
+    stressLevel: opts.stressLevel,
+    labMrvMultiplier: opts.labMrvMultiplier,
+    eccentricMult: opts.eccentricMult,
+    calorieSurplus: opts.calorieSurplus,
+    proteinPerKg: opts.proteinPerKg,
   };
   let pedAdapt: PEDAdaptation | undefined;
   if (opts.onCourse) {

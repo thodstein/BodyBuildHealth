@@ -17,15 +17,24 @@ import type { Macrocycle, MacroBlock } from './macrocycle.engine';
 import { macrocycleToActiveCycle } from './macrocycle.engine';
 import type { UserProgram, UserWeek, UserSet, Phase } from '../user-program/user-program.types';
 import { macroPhaseToUserPhase, isDeloadLikeMacroPhase } from '../periodization/phase-bridge';
+import { autodraftBBPlan } from '../manual-constructor/manual-draft.engine';
+import { createFromBuild } from '../user-program/program-store';
+import type { BBTrainingFocus } from '../bb/bb-goal-types';
 
 export interface MacrocycleToBBOptions {
   level: string;
-  goal: string;          // 'hypertrophy' | 'strength' | 'cut' | 'recomp' | ...
+  goal: string;
   daysPerWeek: number;
   weakPoints?: string[];
   equipment?: string[];
-  /** Заголовок программы (если не задан — генерируется из макроцикла). */
   title?: string;
+  trainingFocus?: BBTrainingFocus;
+  bodyFat?: number;
+  leanMass?: number;
+  hrvMs?: number;
+  sleepHours?: number;
+  stressLevel?: number;
+  labMrvMultiplier?: number;
 }
 
 /**
@@ -85,8 +94,6 @@ export function macrocycleToBBProgram(
  * Возвращает UserProgram или бросает при ошибке сборки.
  */
 function buildBaseBBProgram(total: number, opts: MacrocycleToBBOptions): UserProgram {
-  const { autodraftBBPlan } = require('../manual-constructor/manual-draft.engine');
-  const { createFromBuild } = require('../user-program/program-store');
   const bbPlan = autodraftBBPlan({
     level: opts.level,
     goal: opts.goal,
@@ -94,6 +101,13 @@ function buildBaseBBProgram(total: number, opts: MacrocycleToBBOptions): UserPro
     weeks: Math.min(total, 16), // bb-builder ограничивает 16 неделями
     equipment: opts.equipment ?? [],
     weakPoints: opts.weakPoints ?? [],
+    trainingFocus: opts.trainingFocus,
+    bodyFat: opts.bodyFat,
+    leanMass: opts.leanMass,
+    hrvMs: opts.hrvMs,
+    sleepHours: opts.sleepHours,
+    stressLevel: opts.stressLevel,
+    labMrvMultiplier: opts.labMrvMultiplier,
   });
   const userProg = createFromBuild(bbPlan, {
     goal: opts.goal,
@@ -141,12 +155,14 @@ function remapWeeksFromMacrocycle(weeks: UserWeek[], macro: Macrocycle): UserWee
 function adjustSessionRir(session: UserWeek['sessions'][number], phase: Phase, deload: boolean): UserWeek['sessions'][number] {
   const adjustedBlocks = session.blocks.map(b => {
     if (deload) {
-      // Deload: RIR +3, сохранить объём (сеты) — типичная разгрузка
+      // Deload (Helms, NSCA): RIR +3 AND volume ×0.6 (40% reduction).
       const sets = b.sets.map((s: UserSet) => ({ ...s, rir: Math.min(5, (s.rir ?? 2) + 3) }));
-      return { ...b, sets };
+      const cutSets = sets
+        .map((s, i) => i < Math.ceil(sets.length * 0.6) ? s : null)
+        .filter((s): s is UserSet => s !== null);
+      return { ...b, sets: cutSets.length > 0 ? cutSets : sets };
     }
     if (phase === 'peaking') {
-      // Peaking: RIR → 0-1 для compounds, RIR +1 для изоляций
       const isCompound = b.type === 'compound';
       const sets = b.sets.map((s: UserSet) => ({
         ...s,

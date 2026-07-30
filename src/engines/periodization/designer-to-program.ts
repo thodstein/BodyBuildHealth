@@ -16,6 +16,9 @@ import type { MacrocycleDesign, DesignerPhaseBlock, PhaseKey } from '../periodiz
 import type { UserWeek, UserSession } from '../user-program/user-program.types';
 import { newId } from '../user-program/user-program.types';
 import { designerPhaseToUserPhase, isDeloadLikePhaseKey } from './phase-bridge';
+import { autodraftBBPlan } from '../manual-constructor/manual-draft.engine';
+import { createFromBuild } from '../user-program/program-store';
+import type { BBTrainingFocus } from '../bb/bb-goal-types';
 
 export interface DesignerToUserWeeksOptions {
   /** Заполнить sessions упражнениями через autodraftBBPlan (иначе пустые). */
@@ -30,6 +33,16 @@ export interface DesignerToUserWeeksOptions {
   equipment?: string[];
   /** Слабые группы (для autodraftBBPlan). */
   weakPoints?: string[];
+  /** Training focus для RIR/reps/tempo (Schoenfeld 2021, Roberts 2022). */
+  trainingFocus?: BBTrainingFocus;
+  /** Recovery-метрики → MRV soft-cap (Helms 2022, Plews 2022, Watson 2022). */
+  bodyFat?: number;
+  leanMass?: number;
+  hrvMs?: number;
+  sleepHours?: number;
+  stressLevel?: number;
+  /** Lab-based MRV multiplier (ALT/CRP/HCT/гормоны). */
+  labMrvMultiplier?: number;
 }
 
 /**
@@ -83,9 +96,6 @@ function findBlockForWeek(blocks: DesignerPhaseBlock[], w: number): DesignerPhas
  */
 function buildFilledWeeks(total: number, opts: DesignerToUserWeeksOptions): UserWeek[] | null {
   try {
-    // Lazy import чтобы избежать циклов при отсутствии опции fillExercises.
-    const { autodraftBBPlan } = require('../manual-constructor/manual-draft.engine');
-    const { createFromBuild } = require('../user-program/program-store');
     const days = Math.max(2, Math.min(6, opts.daysPerWeek ?? 4));
     const bbPlan = autodraftBBPlan({
       level: opts.level ?? 'intermediate',
@@ -94,6 +104,13 @@ function buildFilledWeeks(total: number, opts: DesignerToUserWeeksOptions): User
       weeks: Math.min(total, 16), // bb-builder ограничивает 16 неделями
       equipment: opts.equipment ?? [],
       weakPoints: opts.weakPoints ?? [],
+      trainingFocus: opts.trainingFocus,
+      bodyFat: opts.bodyFat,
+      leanMass: opts.leanMass,
+      hrvMs: opts.hrvMs,
+      sleepHours: opts.sleepHours,
+      stressLevel: opts.stressLevel,
+      labMrvMultiplier: opts.labMrvMultiplier,
     });
     const userProg = createFromBuild(bbPlan, {
       goal: opts.goal,

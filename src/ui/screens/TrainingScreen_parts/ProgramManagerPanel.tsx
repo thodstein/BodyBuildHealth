@@ -1005,11 +1005,19 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
   // Читает единый профиль тренированности (equipment, weakPoints, avoidAxialLoad,
   // workMax, onCourse, favoriteExercises, excludedExercises) + лаб. коррекцию.
   const autoFillDraft = () => {
-    // P3-1: используем tprofile из hook (реактивен), не loadTrainingProfile (stale)
     const prof = tprofile;
     const days = Math.max(2, Math.min(7, program.meta.daysPerWeek || 4));
     const title = '[Черновик] ' + (program.meta.title || 'Моя программа');
     updateMeta({ title });
+    // Recovery-метрики из linked.profile → MRV soft-cap (Helms 2022, Plews 2022, Watson 2022).
+    const profData = linked.profile?.settings?.personal;
+    const lifeData = linked.profile?.settings?.lifestyle;
+    const bodyFat = profData?.bodyFat;
+    const leanMass = (profData?.weight && bodyFat != null) ? Math.round(profData.weight * (1 - bodyFat / 100)) : undefined;
+    const hrvMs = lifeData?.morningHRV;
+    const sleepHours = lifeData?.sleepHours;
+    const stressLevel = lifeData?.stressLevel;
+    const labMrvMultiplier = labAdjust.mrvMultiplier;
     if ((dir === 'bb' || dir === 'hybrid') && program.bb) {
       try {
         const bbPlan = autodraftBBPlan({
@@ -1026,6 +1034,8 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           onCourse: prof.onCourse ?? false,
           courseIntensity: prof.courseIntensity ?? 'moderate',
           injuries: prof.injuries ?? [],
+          trainingFocus: program.meta.trainingFocus,
+          bodyFat, leanMass, hrvMs, sleepHours, stressLevel, labMrvMultiplier,
         });
         const userProg = createFromBuild(bbPlan, {
           title: program.meta.title || `${days}д/нед · ${program.meta.weeks}нед`,
@@ -1117,6 +1127,8 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           equipment: (prof.equipment ?? []) as string[], weakPoints: (prof.weakPoints ?? []) as string[],
           avoidAxialLoad: prof.avoidAxialLoad ?? false, workMax: prof.workMax ?? {},
           onCourse: prof.onCourse ?? false, courseIntensity: prof.courseIntensity ?? 'moderate', injuries: prof.injuries ?? [],
+          trainingFocus: program.meta.trainingFocus,
+          bodyFat, leanMass, hrvMs, sleepHours, stressLevel, labMrvMultiplier,
         });
         const bbUserProg = createFromBuild(bbPlan, { title: 'hybrid-bb', goal: 'hypertrophy', level: program.meta.level });
         if (bbUserProg.bb?.weeks && (bbUserProg.bb.weeks.length ?? 0) >= 4) {
@@ -2039,8 +2051,8 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         </div>
       )}
 
-      {/* Библиотека — модальное окно внутри редактора */}
-      {editorLibOpen && (
+      {/* Библиотека — модальное окно внутри редактора (только bb/pl; methods/macro имеют отдельные модалы) */}
+      {editorLibOpen && editorLibOpen !== 'macro' && editorLibOpen !== 'methods' && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
           <div style={{ background: '#18181b', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', maxWidth: 700, width: '100%', maxHeight: '85vh', overflow: 'auto', padding: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>

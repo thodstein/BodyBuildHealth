@@ -20,6 +20,8 @@ import { trueMuscleOf } from '../movement-pattern';
 import { loadSRPESessions } from '../pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../pro/training-load.engine';
 import type { FullProgram, ProgramWeek, ProgramDay } from '../../engines/complete-program-library.engine';
+import type { BBTrainingFocus } from './bb-goal-types';
+import { FOCUS_RIR_TABLE } from './bb-goal-types';
 
 /**
  * Вычислить ACWR из реальных sRPE-сессий пользователя (отдельная функция для cycle/program mode).
@@ -360,6 +362,16 @@ export interface CycleToPlanInput {
   equipment?: string[];
   /** Режим адаптации: 'faithful' = цикл дословно (только safety-фильтры), 'adapt' = + слабые группы/фокус/пост-фаза. */
   mode?: 'faithful' | 'adapt';
+  /** Training focus для RIR-корректировки (Schoenfeld 2021, Roberts 2022). */
+  trainingFocus?: BBTrainingFocus;
+  /** Recovery-метрики → MRV soft-cap (Helms 2022, Plews 2022, Watson 2022). */
+  bodyFat?: number;
+  leanMass?: number;
+  hrvMs?: number;
+  sleepHours?: number;
+  stressLevel?: number;
+  /** Lab-based MRV multiplier. */
+  labMrvMultiplier?: number;
 }
 
 function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG): string {
@@ -728,7 +740,18 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const allLandmarks = getAllVolumeLandmarks(level);
   const landmarks = Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv]));
   const pedAdapt = adaptForPEDs(peds, landmarks, pedDoses, courseIntensity);
-  const mrvMult = pedAdapt.combinedMrvMultiplier || 1.0;
+  // Recovery multiplier from body composition + recovery metrics (Helms 2022, Plews 2022, Watson 2022).
+  const recoveryMult = Math.max(0.6, Math.min(1.5, (() => {
+    let r = 1.0;
+    if (input.bodyFat != null) r *= input.bodyFat > 25 ? 0.9 : input.bodyFat > 20 ? 0.95 : 1.0;
+    if (input.leanMass != null) r *= input.leanMass >= 90 ? 1.15 : input.leanMass >= 75 ? 1.05 : input.leanMass >= 60 ? 1.0 : 0.9;
+    if (input.hrvMs != null) r *= input.hrvMs > 70 ? 1.1 : input.hrvMs >= 50 ? 1.0 : 0.85;
+    if (input.sleepHours != null) r *= input.sleepHours >= 7 ? 1.05 : input.sleepHours >= 6 ? 1.0 : 0.85;
+    if (input.stressLevel != null) r *= input.stressLevel < 3 ? 1.05 : input.stressLevel < 6 ? 1.0 : 0.85;
+    return r;
+  })()));
+  const labMult = input.labMrvMultiplier ?? 1.0;
+  const mrvMult = (pedAdapt.combinedMrvMultiplier || 1.0) * recoveryMult * labMult;
 
   // volumeGoal scaling: MEV=0.7, MAV=1.0, MRV=1.15 (поверх шаблона).
   // Faithful: всегда 1.0 — не меняем объём программы.
@@ -837,7 +860,12 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
             if (rep) { finalExName = rep.name; }
           }
         }
-        const exRir = computeRirForEx(w, totalWeeks, rirProg, phases);
+        const exRir0 = computeRirForEx(w, totalWeeks, rirProg, phases);
+        // Training focus RIR shift (Schoenfeld 2021, Roberts 2022): strength → harder (−1), endurance → easier (+1).
+        const focusShift = input.trainingFocus
+          ? (FOCUS_RIR_TABLE[input.trainingFocus].base - FOCUS_RIR_TABLE.hypertrophy.base)
+          : 0;
+        const exRir = Math.max(0, Math.min(5, exRir0 + focusShift));
         let isPrimary = isPrimaryByLoad(exSpec.load);
         if (isPrimary && isIsolationByName(finalExName)) { isPrimary = false; }
         let character: 'тяж' | 'памп' = exSpec.load === 'Тяжелая' ? 'тяж' : 'памп';
