@@ -28,7 +28,7 @@ export interface FocusRepsConfig {
 export const FOCUS_RIR_TABLE: Record<BBTrainingFocus, FocusRirConfig> = {
   strength:    { base: 1, driftPer2Weeks: -1, pumpRir: 3 },
   hypertrophy: { base: 2, driftPer2Weeks: -1, pumpRir: 4 },
-  endurance:   { base: 3, driftPer2Weeks: -0.5, pumpRir: 5 },
+  endurance:   { base: 3, driftPer2Weeks: -1, pumpRir: 5 },
 };
 
 export const FOCUS_REPS_TABLE: Record<BBTrainingFocus, FocusRepsConfig> = {

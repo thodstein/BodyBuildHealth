@@ -332,7 +332,7 @@ export function suggestFeeders(weakPoints: string[], equipment: string[]): Feede
         feeders.push({ muscle: 'calves', exercise: 'Подъём на носки стоя', sets: 3, reps: 15, notes: 'Каждый день по 3×15. Разные углы стоп.' });
         break;
       case 'abs':
-        feeders.push({ muscle: 'abs', exercise: 'Планка', sets: 4, reps: 30, notes: 'Ежедневно 4 подхода по 30с. Прогрессия: +5с/нед.' });
+        feeders.push({ muscle: 'abs', exercise: 'Скручивания', sets: 3, reps: 15, notes: 'Ежедневно 3×15. Медленно, пиковое сокращение вверху. Прогрессия: +2 повт/нед.' });
         break;
       case 'arms':
       case 'biceps':
