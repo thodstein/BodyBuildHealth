@@ -9,7 +9,7 @@
 
 ### Git
 - `origin/main` - tracked
-- uncommitted changes: BB-builder priority-1 edits + ПЛ-авто годовое планирование + diary-autoreg + ручной планировщик (phase-bridge + designer-to-program + macrocycle-to-bb) + planner error fix (null value drop in migration, arrayKeys expansion, Array.isArray guards for excludedCategories/takenSupplements/userRecipes)
+- uncommitted changes: none (last commit 0fe1624a)
 
 ---
 
