@@ -50,12 +50,41 @@ describe('planner-storage — defensive localStorage', () => {
     expect(memStore['he_planner_schema_version']).toBe(String(PLANNER_SCHEMA_VERSION));
   });
 
-  it('migratePlannerStorage: is idempotent (no-op after first run)', () => {
-    memStore['he_excluded_foods'] = '"bad"';
-    migratePlannerStorage();
-    expect(memStore['he_planner_schema_version']).toBe(String(PLANNER_SCHEMA_VERSION));
-    memStore['he_saved_nutrition_plans'] = JSON.stringify([{ id: 1 }]);
-    migratePlannerStorage();
-    expect(memStore['he_saved_nutrition_plans']).toBe(JSON.stringify([{ id: 1 }]));
-  });
+   it('migratePlannerStorage: is idempotent (no-op after first run)', () => {
+     memStore['he_excluded_foods'] = '"bad"';
+     migratePlannerStorage();
+     expect(memStore['he_planner_schema_version']).toBe(String(PLANNER_SCHEMA_VERSION));
+     memStore['he_saved_nutrition_plans'] = JSON.stringify([{ id: 1 }]);
+     migratePlannerStorage();
+     expect(memStore['he_saved_nutrition_plans']).toBe(JSON.stringify([{ id: 1 }]));
+   });
+
+   it('migratePlannerStorage: drops corrupted array keys (string, number, boolean)', () => {
+     memStore['he_excluded_categories'] = '"low-carb"';
+     memStore['he_nutrition_supps'] = '42';
+     memStore['he_user_recipes'] = 'true';
+     memStore['he_plan_month_mode'] = '"not-a-boolean"';
+     migratePlannerStorage();
+     expect(memStore['he_excluded_categories']).toBeUndefined();
+     expect(memStore['he_nutrition_supps']).toBeUndefined();
+     expect(memStore['he_user_recipes']).toBeUndefined();
+     expect(memStore['he_plan_month_mode']).toBeUndefined();
+   });
+
+   it('migratePlannerStorage: drops null values which would crash .length', () => {
+     memStore['he_excluded_categories'] = 'null';
+     memStore['he_preferred_foods'] = 'null';
+     migratePlannerStorage();
+     expect(memStore['he_excluded_categories']).toBeUndefined();
+     expect(memStore['he_preferred_foods']).toBeUndefined();
+   });
+
+   it('migratePlannerStorage: preserves valid arrays and objects', () => {
+     memStore['he_excluded_categories'] = '["dairy","gluten"]';
+     memStore['he_planner_pharma'] = '{"insulin":true}';
+     migratePlannerStorage();
+     expect(memStore['he_excluded_categories']).toBe('["dairy","gluten"]');
+     expect(memStore['he_planner_pharma']).toBe('{"insulin":true}');
+   });
+
 });

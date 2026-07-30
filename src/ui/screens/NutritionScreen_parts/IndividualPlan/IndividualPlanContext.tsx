@@ -417,7 +417,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { try { localStorage.setItem('he_intolerances', JSON.stringify(intolerances)); } catch {} }, [intolerances]);
   const [tasteProfile, setTasteProfile] = useState<TasteProfile>(() => { try { const p = JSON.parse(localStorage.getItem('he_taste_profile') || '{"spicy":0,"sweet":0,"salty":0,"sour":0,"umami":0}'); return { spicy: 0, sweet: 0, salty: 0, sour: 0, umami: 0, ...p }; } catch { return { spicy: 0, sweet: 0, salty: 0, sour: 0, umami: 0 }; } });
   useEffect(() => { try { localStorage.setItem('he_taste_profile', JSON.stringify(tasteProfile)); } catch {} }, [tasteProfile]);
-  const [excludedCategories, setExcludedCategories] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_excluded_categories') || '[]'); } catch { return []; } });
+   const [excludedCategories, setExcludedCategories] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_excluded_categories') || '[]'); return Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []; } catch { return []; } });
   useEffect(() => { try { localStorage.setItem('he_excluded_categories', JSON.stringify(excludedCategories)); } catch {} }, [excludedCategories]);
   // Адаптация по фактическому дневнику (вчера → сегодня компенсация).
   const [diaryAdaptation, setDiaryAdaptation] = useState<boolean>(() => { try { return localStorage.getItem('he_diary_adaptation') !== 'false'; } catch { return true; } });
@@ -464,11 +464,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [draggedItem, setDraggedItem] = useState<any>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
   const [undoStack, setUndoStack] = useState<any[]>([]);
-  const [userRecipes, setUserRecipes] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_user_recipes') || '[]'); } catch { return []; } });
+   const [userRecipes, setUserRecipes] = useState<any[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_user_recipes') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } });
   const [showRecipeCreator, setShowRecipeCreator] = useState(false);
   const [showAddDrug, setShowAddDrug] = useState(false);
   const [showDrugTypePicker, setShowDrugTypePicker] = useState(false);
-  const [takenSupplements, setTakenSupplements] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_nutrition_supps') || '[]'); } catch { return []; } });
+   const [takenSupplements, setTakenSupplements] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_nutrition_supps') || '[]'); return Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []; } catch { return []; } });
   const [showSuppPicker, setShowSuppPicker] = useState(false);
   const [suppSearch, setSuppSearch] = useState('');
   const [newRecipe, setNewRecipe] = useState({ name: '', meal: 'lunch' as string, prepTime: 10, kcal: 400, protein: 30, fat: 10, carbs: 40, ingredients: '', instructions: '', tags: '' });

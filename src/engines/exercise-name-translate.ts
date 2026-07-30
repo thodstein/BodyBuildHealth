@@ -5,11 +5,11 @@
 
 export const EXERCISE_NAME_RU: Record<string, string> = {
   'Ab Wheel': 'Колесо пресса',
-  'Abductor Machine': 'Сведение ног в тренажёре (отведение)',
+  'Abductor Machine': 'Отведение ног в тренажёре',
   'Arnold Press': 'Жим Арнольда',
   'Back Extension': 'Гиперэкстензия (разгибание спины)',
   'Back Squat': 'Приседания со штангой на спине',
-  'Banded Glute Bridge': 'Ягодичный мостик с резиной',
+  'Banded Glute Bridge': 'Ягодичный мост с резиной',
   'Barbell Bench Press': 'Жим штанги лёжа',
   'Barbell Curl': 'Подъём штанги на бицепс',
   'Barbell Row': 'Тяга штанги в наклоне',
@@ -69,7 +69,7 @@ export const EXERCISE_NAME_RU: Record<string, string> = {
   'Foam Rolling + Stretch': 'МФР + растяжка',
   'Frog pumps / band abduction': 'Лягушка / отведение с резиной',
   'Front Squat': 'Фронтальный присед',
-  'Glute Bridge': 'Ягодичный мостик',
+  'Glute Bridge': 'Ягодичный мост',
   'Glute-Ham Raise': 'Глюте-хэм подъём (GHR)',
   'Goblet Squat': 'Присед с гирей (гоблет)',
   'Hack Squat': 'Хакк-присед',

@@ -5,10 +5,10 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  buildMacrocycle, rebalanceMacrocycle, macrocycleToActiveCycle,
+  buildMacrocycle, buildMacrocycleMulti, rebalanceMacrocycle, macrocycleToActiveCycle,
   serializeMacro, deserializeMacro, estimateCompetitionWeek,
   PHASE_COLOR, PHASE_LABEL_RU,
-  type Macrocycle, type MacroPhase, type MacroInput,
+  type Macrocycle, type MacroPhase, type MacroInput, type CompetitionEvent,
 } from '../../../engines/lms/macrocycle.engine';
 import { getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 
@@ -83,15 +83,23 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   const [editWeeks, setEditWeeks] = useState<Record<string, number>>({});
   // Маркер текущей недели (1-индекс). По умолчанию неделя 1 = "сегодня" (начало макро).
   const [currentWeekIdx, setCurrentWeekIdx] = useState<number>(1);
+  // Несколько соревнований: восстанавливаем из macro.competitions (если есть) или одиночное compWeek.
+  const [competitions, setCompetitions] = useState<CompetitionEvent[]>(macro?.competitions ?? []);
 
   useEffect(() => {
     if (macro) { try { localStorage.setItem(STORAGE_KEY, serializeMacro(macro)); } catch { /* ignore */ } }
   }, [macro]);
 
   const build = () => {
-    const input: MacroInput = { level: effLevel, goal: effGoal, competitionWeek: compWeek, totalWeeks };
-    const m = buildMacrocycle(input);
-    setMacro(m);
+    // Если есть список соревнований — мульти-режим, иначе одиночный (обратно-совместимый).
+    if (competitions.length > 0) {
+      const m = buildMacrocycleMulti(competitions, { level: effLevel, goal: effGoal, totalWeeks });
+      setMacro(m);
+    } else {
+      const input: MacroInput = { level: effLevel, goal: effGoal, competitionWeek: compWeek, totalWeeks };
+      const m = buildMacrocycle(input);
+      setMacro(m);
+    }
     setSelectedBlockIdx(-1);
     setEditWeeks({});
   };
@@ -158,11 +166,59 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             <div style={LABEL}>Длительность, нед</div>
             <input style={IN} type="number" min={12} max={104} value={totalWeeks} onChange={e => setTotalWeeks(+e.target.value)} />
           </div>
-          <div>
-            <div style={LABEL}>Неделя соревнований</div>
-            <input style={IN} type="number" min={1} max={totalWeeks} value={compWeek} onChange={e => setCompWeek(+e.target.value)} />
-          </div>
         </div>
+
+        {/* Менеджер соревнований (несколько) */}
+        <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>🏁 Соревнования ({competitions.length})</span>
+            <button
+              onClick={() => {
+                const newId = 'comp_' + Date.now().toString(36);
+                const newComp: CompetitionEvent = {
+                  id: newId,
+                  name: 'Соревнование ' + (competitions.length + 1),
+                  week: Math.min(totalWeeks, compWeek + competitions.length * 8),
+                  priority: competitions.length === 0 ? 'A' : 'B',
+                };
+                setCompetitions([...competitions, newComp]);
+              }}
+              style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 30 }}
+            >+ Добавить</button>
+          </div>
+          <div style={{ fontSize: 10, color: SMALL.color, marginBottom: 6 }}>
+            {competitions.length === 0
+              ? 'Одиночный режим: укажите неделю соревнований ниже. Для нескольких — добавьте события (A — главное, B — контрольное, C — тренировочное).'
+              : 'A — главное (полный пик), B — контрольное (короткий пик), C — тренировочное (встроено в подготовку).'}
+          </div>
+          {competitions.length === 0 && (
+            <div>
+              <div style={LABEL}>Неделя соревнований</div>
+              <input style={IN} type="number" min={1} max={totalWeeks} value={compWeek} onChange={e => setCompWeek(+e.target.value)} />
+            </div>
+          )}
+          {competitions.map((c, i) => (
+            <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 70px 28px', gap: 4, marginBottom: 4, alignItems: 'center' }}>
+              <input style={{ ...IN, padding: '4px 8px', fontSize: 10, minHeight: 32 }}
+                value={c.name} placeholder="Название"
+                onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, name: e.target.value } : cc))} />
+              <input style={{ ...IN, padding: '4px', fontSize: 10, minHeight: 32, textAlign: 'center' }}
+                type="number" min={1} max={totalWeeks} value={c.week} title="Неделя"
+                onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, week: Math.max(1, Math.min(totalWeeks, +e.target.value || 1)) } : cc))} />
+              <select style={{ ...IN, padding: '4px', fontSize: 10, minHeight: 32 }}
+                value={c.priority} title="Приоритет"
+                onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, priority: e.target.value as CompetitionEvent['priority'] } : cc))}>
+                <option value="A">A главн</option>
+                <option value="B">B контр</option>
+                <option value="C">C трен</option>
+              </select>
+              <button onClick={() => setCompetitions(competitions.filter((_, j) => j !== i))}
+                style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: 4, minHeight: 32 }}
+                title="Удалить">✕</button>
+            </div>
+          ))}
+        </div>
+
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
           <button onClick={build} style={BTN}>Построить макроцикл</button>
           {macro && <button onClick={() => { setMacro(null); try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ } }} style={BTN_GHOST}>Сбросить</button>}
@@ -178,7 +234,13 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             {macro.blocks.map((b, i) => {
               const pct = (b.weeks / macro.totalWeeks) * 100;
               const isSel = selectedBlockIdx === i;
-              const isComp = macro.competitionWeek != null && macro.competitionWeek >= b.weekOffset && macro.competitionWeek < b.weekOffset + b.weeks;
+              // Маркер соревнования: блок является competition-фазой ИЛИ попадает на неделю соревнования.
+              const isCompBlock = b.phase === 'competition';
+              const compForThisBlock = isCompBlock && b.competitionId
+                ? macro.competitions?.find(c => c.id === b.competitionId)
+                : undefined;
+              const isCompWeek = macro.competitionWeek != null && macro.competitionWeek >= b.weekOffset && macro.competitionWeek < b.weekOffset + b.weeks;
+              const isComp = isCompBlock || isCompWeek;
               return (
                 <div
                   key={i}
@@ -195,12 +257,12 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     padding: '2px 4px',
                     position: 'relative',
                   }}
-                  title={`${PHASE_LABEL_RU[b.phase]}: нед ${b.weekOffset}-${b.weekOffset + b.weeks - 1}`}
+                  title={`${PHASE_LABEL_RU[b.phase]}: нед ${b.weekOffset}-${b.weekOffset + b.weeks - 1}${compForThisBlock ? ' · 🏁 ' + compForThisBlock.name : ''}`}
                 >
                   <span style={{ fontSize: 16 }}>{PHASE_ICON[b.phase]}</span>
                   <span style={{ fontSize: 9, fontWeight: 700, color: isSel ? '#000' : '#fff', textAlign: 'center', lineHeight: 1.1 }}>{PHASE_LABEL_RU[b.phase]}</span>
                   <span style={{ fontSize: 8, color: isSel ? '#000' : 'rgba(255,255,255,0.7)' }}>{b.weeks}н</span>
-                  {isComp && <span style={{ position: 'absolute', top: 0, right: 2, fontSize: 10 }}>🏁</span>}
+                  {isComp && <span style={{ position: 'absolute', top: 0, right: 2, fontSize: 10 }} title={compForThisBlock?.name}>🏁{compForThisBlock?.priority}</span>}
                 </div>
               );
             })}
@@ -236,6 +298,26 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
               onChange={e => setCurrentWeekIdx(Math.max(1, Math.min(macro.totalWeeks, +e.target.value || 1)))} />
             <span style={{ color: 'rgba(255,255,255,0.4)' }}>(маркер на таймлайне)</span>
           </div>
+
+          {/* Обзор соревнований (если есть) */}
+          {macro.competitions && macro.competitions.length > 0 && (
+            <div style={{ marginBottom: 10, padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>🏁 Соревнования в макроцикле:</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {macro.competitions.map(c => {
+                  const block = macro.blocks.find(b => b.competitionId === c.id && b.phase === 'competition');
+                  const priorityColor = c.priority === 'A' ? '#ef4444' : c.priority === 'B' ? '#f59e0b' : '#a78bfa';
+                  return (
+                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>
+                      <span style={{ color: priorityColor, fontWeight: 700 }}>[{c.priority}]</span>
+                      <span style={{ fontWeight: 600 }}>{c.name}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.5)' }}>· нед {c.week}{block ? ` (блок ${block.weekOffset})` : ''}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Детали выбранного блока */}
           {activeBlock && (

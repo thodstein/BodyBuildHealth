@@ -485,7 +485,15 @@ function replacePLForBB(exName: string, group: string): { name: string; group: s
   // Становая тяга → Тяга штанги в наклоне (если спина) или Румынская (если бицепс бедра).
   // Также покрывает варианты с суффиксами: "Становая тяга 5/3/1" → "станов" срабатывает,
   // а нормализация очищает имя до "Становая тяга" — основной regex ловит.
-  if (/^станов|классич|сумо|дефицит|рывков|толчков|трап|pendlay/i.test(s)) {
+  // FIX legs-leak: `классич` совпадал с прилагательным «классические» (Отжимания классические,
+  // Приседания классические) → они заменялись на «Румынская тяга» (ноги). Теперь требуем
+  // «станов» в имени для классич/сумо/дефицит-вариаций становой. «трап» сужаем до «трап.?гриф»,
+  // иначе совпадает с «трапеции» (shrugs помечены как traps).
+  const isDeadliftVariant = /станова|станов/i.test(s) || /^станов/.test(s)
+    || (/^(классич|сумо|дефицит|рывков|толчков)/.test(s) && /станова|станов|тяга|deadlift/i.test(s))
+    || /трап.?гриф|trap.?bar/i.test(s)
+    || /pendlay/i.test(s);
+  if (isDeadliftVariant) {
     const g = (group || '').toLowerCase();
     if (g.includes('спин') || g === 'back' || g === 'спина') {
       return { name: 'Тяга штанги в наклоне', group: 'Спина' };
@@ -521,7 +529,14 @@ function replacePLForBB(exName: string, group: string): { name: string; group: s
   }
   // Good morning / Наклоны со штангой / Гудморнинг → Румынская тяга.
   // L8.1: "Наклоны" (без "со штангой") и "Нагруженные наклоны" → тоже GM → Румынская.
-  if (/гудмор|good.?morning|наклон|нaклон/i.test(s)) {
+  // ВАЖНО: regex `наклон` совпадал с прилагательным «наклонной/наклонная/наклонные»
+  // (Incline DB Press, Жим на наклонной, Сведение на наклонной, Сгибания на наклонной скамье)
+  // → они ошибочно становились «Румынская тяга» (ноги), и нога-упражнения попадали в
+  // Push/Chest-дни. Ограничиваем: совпадаем только с существительным «наклоны» (множ. число,
+  // окончание -ы — не совпадает с прилагательными -ой/-ая/-ые/-ом/-ую) либо «наклон»
+  // (единств.) с предлогом «со/с резин/с гант/с штанг» (= Good morning). Прилагательные
+  // наклонной/наклонная/наклонные НЕ совпадают → наклонные жимы/разводки/сгибания остаются.
+  if (/гудмор|good.?morning|наклоны|наклон\s+(?:со|с\s+(?:резин|гант|штанг))/i.test(s)) {
     return { name: 'Румынская тяга', group: 'Ноги' };
   }
   // Rack pull / тяга с плинт → Тяга штанги в наклоне.
@@ -552,8 +567,13 @@ function replacePLForBB(exName: string, group: string): { name: string; group: s
   }
   // L8.4: Deficit DL / Pendlay / Snatch-grip / Paused / Trap-bar ещё раз по
   // ОРИГИНАЛЬНОМУ имени (на случай если нормализатор исказил).
+  // FIX legs-leak: сужаем `классич`/`трап` как выше (требуется «станов»/«тяга» контекст).
   const rawN = (exName || '').toLowerCase().trim();
-  if (/станов|классич|сумо|дефицит|рывков|толчков|трап|pendlay/i.test(rawN)) {
+  const isDeadliftVariantRaw = /станова|станов/i.test(rawN) || /^станов/.test(rawN)
+    || (/^(классич|сумо|дефицит|рывков|толчков)/.test(rawN) && /станова|станов|тяга|deadlift/i.test(rawN))
+    || /трап.?гриф|trap.?bar/i.test(rawN)
+    || /pendlay/i.test(rawN);
+  if (isDeadliftVariantRaw) {
     const g = (group || '').toLowerCase();
     if (g.includes('спин') || g === 'back' || g === 'спина') {
       return { name: 'Тяга штанги в наклоне', group: 'Спина' };
@@ -563,7 +583,7 @@ function replacePLForBB(exName: string, group: string): { name: string; group: s
   if (/жим стоя|армейск|ohp/i.test(rawN)) {
     return { name: 'Жим гантелей сидя', group: 'Плечи' };
   }
-  if (/гудмор|good.?morning|наклон/i.test(rawN)) {
+  if (/гудмор|good.?morning|наклоны|наклон\s+(?:со|с\s+(?:резин|гант|штанг))/i.test(rawN)) {
     return { name: 'Румынская тяга', group: 'Ноги' };
   }
   return { name: exName, group };
@@ -1277,8 +1297,14 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       const sessionTag = (() => {
         const s = new Set(musclesInDay);
         const hasChest = s.has('chest'), hasBack = s.has('back'), hasShoulders = s.has('shoulders');
-        const hasQuads = s.has('quads'), hasHams = s.has('hamstrings'), hasGlutes = s.has('glutes');
-        const isLegs = hasQuads || hasHams || hasGlutes;
+        // FIX legs-leak: каталог использует композитную группу 'legs' (а не granular 'quads'/'hamstrings'/
+        // 'glutes') для большинства leg-compound'ов (Приседания, Фронтальный присед, RDL, Жим ногами,
+        // Hip Thrust, Ягодичный мост, Сведение ног и т.д.). Раньше `isLegs` проверял только
+        // quads/hamstrings/glutes — дни, состоящие из leg-compound'ов с group='legs', не
+        // определялись как нога-дни → промечались как 'Chest'/'Back'/'Push' (по мускулу-стартеру)
+        // и нога-упражнения попадали в Push/Pull/Chest-дни. Теперь учитываем и 'legs' как нога.
+        const hasQuads = s.has('quads'), hasHams = s.has('hamstrings'), hasGlutes = s.has('glutes'), hasLegs = s.has('legs') || s.has('calves');
+        const isLegs = hasQuads || hasHams || hasGlutes || hasLegs;
         const hasBi = s.has('biceps'), hasTri = s.has('triceps');
         if (hasChest && hasBack && !isLegs) return 'ChestBack';
         if (hasChest && hasTri && !hasBack && !isLegs) return 'Push';
@@ -1310,10 +1336,15 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
         // если name содержит `+` или `Суперсет:` — разбиваем на 2 упражнения.
         const isSupersetName = /суперсет|superset/i.test(ex.name) || (ex.name.includes(' + ') && ex.name.length > 12);
         if (isSupersetName) {
-          const sepIdx = ex.name.indexOf(' + ');
+          // L12.1 (legs-leak): раньше sepIdx считался на исходной строке, а slice(0, sepIdx)
+          // применялся к строке ПОСЛЕ replace("Суперсет: " удалён) — sepIdx не совпадал,
+          // leftName обрезался (например "Молотки + Разгиба" вместо "Молотки"). Теперь
+          // сначала replace, потом ищем ' + ' в уже очищенной строке.
+          const cleaned = ex.name.replace(/^.*?суперсет\s*[:—\-]?\s*/i, '').trim();
+          const sepIdx = cleaned.indexOf(' + ');
           if (sepIdx > 0) {
-            const leftName = ex.name.replace(/^.*?суперсет\s*[:—\-]?\s*/i, '').slice(0, sepIdx).trim();
-            const rightName = ex.name.slice(sepIdx + 3).trim();
+            const leftName = cleaned.slice(0, sepIdx).trim();
+            const rightName = cleaned.slice(sepIdx + 3).trim();
             if (leftName && rightName) {
               // Заменяем ex на первое упражнение, потом добавим второе в конец дня.
               ex = { ...ex, name: leftName, notes: (ex.notes || '') + ' [Суперсет с: ' + rightName + ']' };

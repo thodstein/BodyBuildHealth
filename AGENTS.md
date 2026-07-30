@@ -5,7 +5,7 @@
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK (694+ modules)
-- `vitest` - 329 passing (210 base + 18 macrocycle + 10 diary-autoreg + 17 lms-planner P1 + 5 taper + 11 weakpoint + 10 selector + 6 inject-weakpoints + 3 recovery + 7 pl-feedback + 12 phase-bridge + 11 designer-to-program + 6 macrocycle-to-bb + 3 macrocycle-migration + 5 program-editor-bugs)
+- `vitest` - 338 passing (excl. `_tmp_*` regression files: 2 pre-existing failures in _tmp_legs_regression, unrelated)
 
 ### Git
 - `origin/main` - tracked
@@ -122,6 +122,34 @@ Still needed:
 ## Ручной планировщик: доработка (done Jul 30 2026)
 
 Связал три разрозненные системы фаз через мост + интегрировал годовое планирование + баг-фиксы.
+
+### Баг-фикс: require() в ESM (Jul 30 2026)
+- **BUG**: `ProgramManagerPanel` использовал `require('../../../engines/lms/macrocycle.engine')` для `deserializeMacro` — не работает в ESM/browser (vite), `macro` всегда null → годовое планирование не работало в ручном режиме.
+- **Fix**: заменён на статический импорт `import { deserializeMacro } from '...';`.
+
+### Баг-фикс: заглушки «Методики» (Jul 30 2026)
+- **BUG**: inline-блок в `ProgramManagerPanel` (строки 1622-1686) — упрощённая заглушка с фильтром, без полных карточек.
+- **Fix**: заменён на готовый `MethodologyEncyclopedia` компонент (ExpandableCard, категории, caveats, bestFor, ConjugateDesigner для Westside). Удалены неиспользуемые state `methCat`/`methSearch` и импорт `getTrainingMethods`.
+
+### Годовое планирование: несколько соревнований (done Jul 30 2026)
+- `macrocycle.engine.ts`:
+  - `CompetitionEvent` тип: `{ id, name, week, date?, priority: 'A'|'B'|'C', notes? }`
+  - `Macrocycle.competitions?: CompetitionEvent[]` — список соревнований
+  - `MacroBlock.competitionId?: string` — связь блока с соревнованием
+  - `buildMacrocycleMulti(events, input)` — авто-размещение peak/competition блоков под каждое соревнование
+    - A (главное) → 4 нед peak + 1 нед competition
+    - B (контрольное) → 2 нед peak + 1 нед competition
+    - C (тренировочное) → встроено в подготовку, без отдельного блока
+    - Между соревнованиями — strength/endurance (подготовка)
+    - После главного (A) — transition 2-4 нед
+  - `buildMacrocycle` с `input.competitions` → авто-вызов `buildMacrocycleMulti`
+  - `serializeMacro`/`deserializeMacro` — сохранение/восстановление competitions (обратно-совместимо)
+- `MacrocyclePanel.tsx`:
+  - Менеджер соревнований: добавить/удалить/редактировать (название, неделя, приоритет)
+  - Маркеры 🏁 на таймлайне для каждого соревнования (с приоритетом A/B/C)
+  - Обзор соревнований под таймлайном
+  - Одиночный режим (compWeek) сохранён для обратно-совместимости
+- Тесты: 11 (macrocycle-multi.test.ts) — A/B/C приоритеты, сериализация, сортировка, обратно-совместимость
 
 ### Phase bridge (`src/engines/periodization/phase-bridge.ts`)
 - `DESIGNER_TO_PHASE`: PhaseKey (10) → Phase (4) — коллапс 6 неканонических ключей

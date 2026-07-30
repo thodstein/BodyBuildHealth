@@ -33,6 +33,7 @@ import type {
 import { newId } from '../../../engines/user-program/user-program.types';
 import { HybridPlanPanel } from './HybridPlanPanel';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
+import { MethodologyEncyclopedia } from './MethodologyEncyclopedia';
 import { ExerciseLabPicker } from './ExerciseLabPicker';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { BbContextPanel } from './program-editor-context-panels';
@@ -45,7 +46,6 @@ import { MesoHeatmap } from './MesoHeatmap';
 import { ProgramNotes, ProgramMetricsCSV, RecoveryBadge, ProgramStrengthScore } from './ProgramExtras';
 import { ProgramRevisionsDiff } from './ProgramRevisions';
 import { StrengthDiaryPanel } from './StrengthDiaryPanel';
-import { getTrainingMethods } from '../../../engines/training-methodology.engine';
 import { SET_TEMPLATES } from './program-types';
 import {
   autodraftBBPlan,
@@ -64,6 +64,7 @@ import { subscribePlannerApply, clearPlannerApply, type PlannerApply } from './p
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { designerToUserWeeks, applyDesignPhasesToWeeks } from '../../../engines/periodization/designer-to-program';
 import { macrocycleToBBProgram } from '../../../engines/lms/macrocycle-to-bb';
+import { deserializeMacro } from '../../../engines/lms/macrocycle.engine';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle } from './training-ui';
@@ -943,8 +944,6 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
   };
   const [showMore, setShowMore] = useState(false);
   const [showTableView, setShowTableView] = useState(false);
-  const [methCat, setMethCat] = useState('all');
-  const [methSearch, setMethSearch] = useState('');
   const libraryPrograms = useMemo(() => [...getAllPrograms(), ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS], []);
   const plCycleList = useMemo(() => LMS_CYCLES, []);
   const loadIntoEditor = (p: UserProgram) => {
@@ -1570,7 +1569,6 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                   // Восстановить макроцикл из текущего состояния MacrocyclePanel (через storage)
                   const raw = localStorage.getItem('he_pl_macro');
                   if (raw) {
-                    const { deserializeMacro } = require('../../../engines/lms/macrocycle.engine');
                     const macro = deserializeMacro(raw);
                     if (macro) {
                       const newProg = macrocycleToBBProgram(macro, {
@@ -1593,7 +1591,6 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                 try {
                   const raw = localStorage.getItem('he_pl_macro');
                   if (raw) {
-                    const { deserializeMacro } = require('../../../engines/lms/macrocycle.engine');
                     const macro = deserializeMacro(raw);
                     if (macro) {
                       const bbProg = macrocycleToBBProgram(macro, {
@@ -1626,62 +1623,10 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
             <span style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>📚 Справочник методик</span>
             <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38 }} onClick={() => setEditorLibOpen(null)}>✕ Закрыть</button>
           </div>
-          <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
-            <input style={{ ...IN, flex: 1, padding: '6px 10px', fontSize: 11, minHeight: 38 }} value={methSearch} onChange={e => setMethSearch(e.target.value)} placeholder="🔍 Поиск методик..." />
-            <select style={{ ...IN, fontSize: 11, minHeight: 38 }} value={methCat} onChange={e => setMethCat(e.target.value)}>
-              <option value="all">Все</option>
-              {(() => { const cats = [...new Set(getTrainingMethods().map(m => m.category))]; return cats.map(c => <option key={c} value={c}>{c}</option>); })()}
-            </select>
+          <div style={{ fontSize: 11, color: DIM, marginBottom: 8 }}>
+            Энциклопедия тренировочных методик по категориям. Клик «Применить» → отправляет методику в planning-bridge (loadStrategy/intensityTechniques). Двойной клик по карточке разворачивает детали.
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '55vh', overflow: 'auto' }}>
-            {(() => {
-              const allM = getTrainingMethods();
-              const f2 = allM.filter(m => (methCat === 'all' || m.category === methCat) && (!methSearch || m.name.toLowerCase().includes(methSearch.toLowerCase()))).slice(0, 50);
-              return f2.map((m, i) => (
-                <div key={i} style={{ padding: 12, borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.12)', fontSize: 11, cursor: 'pointer' }}
-                  onClick={() => {
-                    const text = `📚 ${m.name} (${m.category}, док-ть ${m.evidenceLevel})\n\n${m.description}\n\nКак работает: ${m.howItWorks}${m.example ? '\n\n📋 Пример: ' + m.example : ''}`;
-                    navigator.clipboard.writeText(text);
-                    showToast('📋 Методика скопирована: ' + m.name);
-                  }}
-                  onDoubleClick={() => {
-                    if (dir !== 'bb' || !program.bb) return;
-                    // P3-4: для известных методик — трансформировать sets, не только loadStrategy
-                    const knownTransforms: Record<string, (b: UserBlock) => UserBlock> = {
-                      'German Volume Training (GVT / 10×10)': (b) => b.type === 'compound' ? { ...b, sets: Array(10).fill(0).map(() => ({ reps: 10, rir: 3, weight: 0, restSec: 90 })) } : b,
-                      'GVT 2×/нед (10×10 на группу)': (b) => b.type === 'compound' ? { ...b, sets: Array(10).fill(0).map(() => ({ reps: 10, rir: 3, weight: 0, restSec: 90 })) } : b,
-                      'Cluster 5×5 (для 2×/нед)': (b) => b.type === 'compound' ? { ...b, sets: Array(5).fill(0).map(() => ({ reps: 5, rir: 1, weight: 0, restSec: 180 })) } : b,
-                      'Rest-Pause Training': (b) => ({ ...b, sets: [{ reps: 8, rir: 0, weight: 0, restSec: 180 }] }),
-                      'Drop Sets (Дроп-сеты)': (b) => b.type === 'isolation' ? { ...b, sets: [...(b.sets ?? []), { reps: 'AMRAP' as const, rir: 0, weight: ((b.sets?.[0]?.weight ?? 0) * 0.8) || 0, restSec: 10 }] } : b,
-                      'Темп для гипертрофии (3-1-1-0)': (b) => ({ ...b, sets: (b.sets ?? []).map((s) => ({ ...s, tempo: '3-1-1-0', weight: (s.weight ?? 0) * 0.7, rir: 2, restSec: 60 })) }),
-                    };
-                    const transform = knownTransforms[m.name];
-                    let updated: UserProgram;
-                    if (transform) {
-                      updated = { ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((w) => ({ ...w, sessions: w.sessions.map((s) => ({ ...s, blocks: s.blocks.map(transform) })) })), progression: { ...program.bb!.progression, loadStrategy: m.name as any, deloadProtocol: program.bb!.progression?.deloadProtocol || 'pump' as any, intensityTechniques: program.bb!.progression?.intensityTechniques || ['none'] } } };
-                      showToast('✅ Методика применена (трансформация): ' + m.name);
-                    } else {
-                      updated = { ...program, bb: { ...program.bb!, progression: { ...program.bb!.progression, loadStrategy: m.name as any, deloadProtocol: program.bb!.progression?.deloadProtocol || 'pump' as any, intensityTechniques: program.bb!.progression?.intensityTechniques || ['none'] } } };
-                      showToast('✅ Стратегия прогрессии применена: ' + m.name + ' (трансформируйте блоки через 🔧 Применить ко всем)');
-                    }
-                    onChange(updated);
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 800, color: DIM_STRONG }}>{m.name}</span>
-                    <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: m.evidenceLevel === 'A' ? 'rgba(34,197,94,0.15)' : m.evidenceLevel === 'B' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)', color: m.evidenceLevel === 'A' ? '#22c55e' : m.evidenceLevel === 'B' ? '#f59e0b' : '#ef4444' }}>{m.evidenceLevel}</span>
-                    <span style={{ fontSize: 11, color: DIM }}>{m.category}</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4, lineHeight: 1.4 }}>{m.description}</div>
-                  <div style={{ fontSize: 11, color: DIM, lineHeight: 1.4 }}>{m.howItWorks}</div>
-                  {m.example && <div style={{ fontSize: 11, color: DIM, marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)' }}>📋 {m.example}</div>}
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4, fontStyle: 'italic' }}>
-                    Клик — копировать · Двойной клик — применить к программе
-                  </div>
-                </div>
-              ));
-            })()}
-          </div>
+          <MethodologyEncyclopedia />
         </div>
       )}
 
