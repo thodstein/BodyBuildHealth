@@ -12,8 +12,7 @@
  *  - direction-фильтр (powerlifting/bench/...) при подборе циклов
  */
 import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
-import { LMS_CYCLES } from '../../data/lms-cycles/lms-cycle-index';
-import { normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
+import { LMS_CYCLES, normalizeCycleDirection, getCycleById } from '../../data/lms-cycles/lms-cycle-index';
 
 export type MacroPhase = 'endurance' | 'strength' | 'peak' | 'competition' | 'transition';
 export type CycleKind = 'SRC' | 'BB';
@@ -37,6 +36,8 @@ export interface CompetitionEvent {
   date?: string;             // ISO-дата (опционально)
   priority: 'A' | 'B' | 'C'; // A — главное, B — отборочное/контрольное, C — тренировочное
   notes?: string;
+  /** ID СРЦ-цикла для peak/competition фаз этого соревнования. Если не задан — автоподбор. */
+  cycleId?: string;
 }
 
 export interface Macrocycle {
@@ -280,9 +281,20 @@ export function buildMacrocycleMulti(events: CompetitionEvent[], input: Omit<Mac
     let cycleId: string | undefined;
     let desc = '';
     if (kind === 'SRC') {
-      const cyc = pickCycleForPhase(phase, level, goal);
-      cycleId = cyc?.meta.id;
-      desc = cyc ? `СРЦ «${cyc.meta.title}»` : `СРЦ-цикл под период ${phase}`;
+      // Для peak/competition фаз: проверить, есть ли пользовательский cycleId в соревновании.
+      const comp = competitionId ? sorted.find(c => c.id === competitionId) : undefined;
+      const userCycleId = comp?.cycleId;
+      if (userCycleId) {
+        // Пользователь выбрал конкретный цикл — всегда используем его (уважаем выбор).
+        const cyc = getCycleById(userCycleId);
+        cycleId = userCycleId;
+        desc = cyc ? `СРЦ «${cyc.meta.title}» (выбран)` : `СРЦ ${userCycleId} (не найден — проверьте выбор)`;
+      } else {
+        // Автоподбор цикла по фазе.
+        const cyc = pickCycleForPhase(phase, level, goal);
+        cycleId = cyc?.meta.id;
+        desc = cyc ? `СРЦ «${cyc.meta.title}»` : `СРЦ-цикл под период ${phase}`;
+      }
     } else {
       desc = `BB-мезоцикл (${phase})`;
     }
@@ -390,6 +402,7 @@ export function deserializeMacro(s: string): Macrocycle | null {
         date: ev.date ?? ev.d,
         priority: ev.priority ?? ev.p ?? 'B',
         notes: ev.notes ?? ev.no,
+        cycleId: ev.cycleId ?? ev.ci ?? ev.cy, // v3: cycleId соревнования
       }));
     }
     return {

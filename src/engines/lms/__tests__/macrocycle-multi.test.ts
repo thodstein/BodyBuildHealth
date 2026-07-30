@@ -125,3 +125,85 @@ describe('buildMacrocycleMulti — несколько соревнований',
     expect(last.weekOffset + last.weeks - 1).toBeLessThanOrEqual(40);
   });
 });
+
+describe('buildMacrocycleMulti — cycleId per competition', () => {
+  it('comp.cycleId используется для peak/competition блоков этого соревнования', () => {
+    const events: CompetitionEvent[] = [
+      { id: 'c1', name: 'Кубок', week: 12, priority: 'A', cycleId: 'test-cycle-001' },
+    ];
+    const m = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 25 });
+    // peak и competition блоки для c1 должны иметь cycleId='test-cycle-001'
+    const peakBlock = m.blocks.find(b => b.phase === 'peak' && b.competitionId === 'c1');
+    const compBlock = m.blocks.find(b => b.phase === 'competition' && b.competitionId === 'c1');
+    expect(peakBlock).toBeTruthy();
+    expect(peakBlock!.cycleId).toBe('test-cycle-001');
+    expect(compBlock).toBeTruthy();
+    expect(compBlock!.cycleId).toBe('test-cycle-001');
+  });
+
+  it('без comp.cycleId → автоподбор (cycleId из pickCycleForPhase)', () => {
+    const events: CompetitionEvent[] = [
+      { id: 'c1', name: 'Кубок', week: 12, priority: 'A' }, // без cycleId
+    ];
+    const m = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 25 });
+    const peakBlock = m.blocks.find(b => b.phase === 'peak' && b.competitionId === 'c1');
+    expect(peakBlock).toBeTruthy();
+    // cycleId должен быть задан (автоподбор) или undefined (если нет подходящих циклов)
+    // Главное — не 'test-cycle-001'
+    expect(peakBlock!.cycleId).not.toBe('test-cycle-001');
+  });
+
+  it('разные cycleId для разных соревнований', () => {
+    const events: CompetitionEvent[] = [
+      { id: 'c1', name: 'Кубок', week: 10, priority: 'B', cycleId: 'cycle-A' },
+      { id: 'c2', name: 'Чемпионат', week: 25, priority: 'A', cycleId: 'cycle-B' },
+    ];
+    const m = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 35 });
+    const peak1 = m.blocks.find(b => b.phase === 'peak' && b.competitionId === 'c1');
+    const peak2 = m.blocks.find(b => b.phase === 'peak' && b.competitionId === 'c2');
+    expect(peak1).toBeTruthy();
+    expect(peak2).toBeTruthy();
+    expect(peak1!.cycleId).toBe('cycle-A');
+    expect(peak2!.cycleId).toBe('cycle-B');
+    expect(peak1!.cycleId).not.toBe(peak2!.cycleId);
+  });
+
+  it('cycleId не найден в LMS_CYCLES → cycleId сохраняется (уважаем выбор пользователя)', () => {
+    const events: CompetitionEvent[] = [
+      { id: 'c1', name: 'Кубок', week: 12, priority: 'A', cycleId: 'nonexistent-cycle-xyz' },
+    ];
+    const m = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 25 });
+    const peakBlock = m.blocks.find(b => b.phase === 'peak' && b.competitionId === 'c1');
+    expect(peakBlock).toBeTruthy();
+    // cycleId сохраняется (пользователь явно выбрал) — description помечает "не найден"
+    expect(peakBlock!.cycleId).toBe('nonexistent-cycle-xyz');
+    expect(peakBlock!.description).toContain('не найден');
+  });
+
+  it('сериализация сохраняет comp.cycleId, десериализация восстанавливает', () => {
+    const events: CompetitionEvent[] = [
+      { id: 'c1', name: 'Кубок', week: 10, priority: 'B', cycleId: 'cycle-A' },
+      { id: 'c2', name: 'Чемпионат', week: 25, priority: 'A', cycleId: 'cycle-B' },
+    ];
+    const m = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 35 });
+    const s = serializeMacro(m);
+    const restored = deserializeMacro(s);
+    expect(restored).toBeTruthy();
+    expect(restored!.competitions).toHaveLength(2);
+    expect(restored!.competitions![0].cycleId).toBe('cycle-A');
+    expect(restored!.competitions![1].cycleId).toBe('cycle-B');
+    // Блоки тоже сохраняют cycleId
+    const peak1 = restored!.blocks.find(b => b.phase === 'peak' && b.competitionId === 'c1');
+    expect(peak1).toBeTruthy();
+    expect(peak1!.cycleId).toBe('cycle-A');
+  });
+
+  it('тренировочное соревнование (C) игнорирует cycleId (нет peak/competition блоков)', () => {
+    const events: CompetitionEvent[] = [
+      { id: 'c1', name: 'Mock meet', week: 10, priority: 'C', cycleId: 'cycle-C' },
+    ];
+    const m = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 20 });
+    const compBlocks = m.blocks.filter(b => b.competitionId === 'c1');
+    expect(compBlocks).toHaveLength(0); // C не создаёт блоков
+  });
+});

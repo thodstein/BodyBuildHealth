@@ -10,7 +10,7 @@ import {
   PHASE_COLOR, PHASE_LABEL_RU,
   type Macrocycle, type MacroPhase, type MacroInput, type CompetitionEvent,
 } from '../../../engines/lms/macrocycle.engine';
-import { getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
+import { getCycleById, LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
 
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: 12, margin: '6px 0' };
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 11, lineHeight: 1.4 };
@@ -156,6 +156,18 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 const v = e.target.value as 'powerlifting' | 'bodybuilding' | 'general';
                 if (onGoalChange) onGoalChange(v);
                 else setLocalGoal(v);
+                // Сбросить cycleId в соревнованиях, не подходящих под новое направление.
+                const newWantStrength = v === 'powerlifting';
+                const newWantBB = v === 'bodybuilding';
+                setCompetitions(prev => prev.map(comp => {
+                  if (!comp.cycleId) return comp;
+                  const cyc = getCycleById(comp.cycleId);
+                  if (!cyc) return { ...comp, cycleId: undefined }; // удалён — сбросить
+                  const nd = normalizeCycleDirection(cyc.meta.direction);
+                  if (newWantStrength && nd !== 'strength') return { ...comp, cycleId: undefined };
+                  if (newWantBB && nd !== 'bodybuilding') return { ...comp, cycleId: undefined };
+                  return comp;
+                }));
               }}>
               <option value="powerlifting">Пауэрлифтинг</option>
               <option value="bodybuilding">Бодибилдинг</option>
@@ -197,26 +209,65 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
               <input style={IN} type="number" min={1} max={totalWeeks} value={compWeek} onChange={e => setCompWeek(+e.target.value)} />
             </div>
           )}
-          {competitions.map((c, i) => (
-            <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 70px 28px', gap: 4, marginBottom: 4, alignItems: 'center' }}>
-              <input style={{ ...IN, padding: '4px 8px', fontSize: 10, minHeight: 32 }}
-                value={c.name} placeholder="Название"
-                onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, name: e.target.value } : cc))} />
-              <input style={{ ...IN, padding: '4px', fontSize: 10, minHeight: 32, textAlign: 'center' }}
-                type="number" min={1} max={totalWeeks} value={c.week} title="Неделя"
-                onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, week: Math.max(1, Math.min(totalWeeks, +e.target.value || 1)) } : cc))} />
-              <select style={{ ...IN, padding: '4px', fontSize: 10, minHeight: 32 }}
-                value={c.priority} title="Приоритет"
-                onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, priority: e.target.value as CompetitionEvent['priority'] } : cc))}>
-                <option value="A">A главн</option>
-                <option value="B">B контр</option>
-                <option value="C">C трен</option>
-              </select>
-              <button onClick={() => setCompetitions(competitions.filter((_, j) => j !== i))}
-                style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: 4, minHeight: 32 }}
-                title="Удалить">✕</button>
+          {competitions.map((c, i) => {
+            // Фильтр циклов по направлению: powerlifting → strength, bodybuilding → bodybuilding, general → все.
+            const wantStrength = effGoal === 'powerlifting';
+            const wantBB = effGoal === 'bodybuilding';
+            const filteredCycles = LMS_CYCLES.filter(cyc => {
+              const nd = normalizeCycleDirection(cyc.meta.direction);
+              if (wantStrength) return nd === 'strength';
+              if (wantBB) return nd === 'bodybuilding';
+              return true; // general — все
+            });
+            // Проверка соответствия выбранного цикла уровню
+            const selectedCycle = c.cycleId ? getCycleById(c.cycleId) : undefined;
+            const levelMismatch = selectedCycle && selectedCycle.meta.level !== effLevel;
+            return (
+            <div key={c.id}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 60px 28px', gap: 4, marginBottom: 3, alignItems: 'center' }}>
+                <input style={{ ...IN, padding: '4px 8px', fontSize: 10, minHeight: 32 }}
+                  value={c.name} placeholder="Название"
+                  onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, name: e.target.value } : cc))} />
+                <input style={{ ...IN, padding: '4px', fontSize: 10, minHeight: 32, textAlign: 'center' }}
+                  type="number" min={1} max={totalWeeks} value={c.week} title="Неделя"
+                  onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, week: Math.max(1, Math.min(totalWeeks, +e.target.value || 1)) } : cc))} />
+                <select style={{ ...IN, padding: '4px', fontSize: 10, minHeight: 32 }}
+                  value={c.priority} title="Приоритет"
+                  onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, priority: e.target.value as CompetitionEvent['priority'] } : cc))}>
+                  <option value="A">A главн</option>
+                  <option value="B">B контр</option>
+                  <option value="C">C трен</option>
+                </select>
+                <button onClick={() => setCompetitions(competitions.filter((_, j) => j !== i))}
+                  style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: 4, minHeight: 32 }}
+                  title="Удалить">✕</button>
+              </div>
+              {/* Селектор цикла для peak/competition фаз (только для A и B, не C) */}
+              {c.priority !== 'C' && (
+                <div style={{ display: 'flex', gap: 4, marginBottom: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>Цикл:</span>
+                  <select
+                    style={{ ...IN, padding: '4px 6px', fontSize: 9, minHeight: 28, flex: 1 }}
+                    value={c.cycleId ?? ''}
+                    onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, cycleId: e.target.value || undefined } : cc))}
+                    title={filteredCycles.length === 0 ? 'Нет циклов под выбранное направление' : 'Выберите СРЦ-цикл для пика этого соревнования'}
+                  >
+                    <option value="">Авто ({filteredCycles.length} циклов)</option>
+                    {filteredCycles.map(cyc => (
+                      <option key={cyc.meta.id} value={cyc.meta.id}>
+                        {cyc.meta.title} ({cyc.meta.level}, {cyc.meta.sessionsPerWeek}д/нед, {cyc.meta.weeks}нед)
+                      </option>
+                    ))}
+                  </select>
+                  {levelMismatch && (
+                    <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, flexShrink: 0 }}
+                      title={`Уровень цикла (${selectedCycle!.meta.level}) не совпадает с выбранным (${effLevel}). Возможна неоптимальная нагрузка.`}>⚠</span>
+                  )}
+                </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>

@@ -89,6 +89,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [level, setLevel] = useState<string>(_plSaved?.plLevel || 'II-KMS');
   const [goal, setGoal] = useState<string>(_plSaved?.plGoal || 'strength');
   const [dir, setDir] = useState<string>(_plSaved?.plDir || 'powerlifting');
+  // State для MacrocyclePanel (редактируемые level/goal в годовом плане)
+  const [macroLevel, setMacroLevel] = useState<string>(level);
+  const [macroGoal, setMacroGoal] = useState<'powerlifting' | 'bodybuilding' | 'general'>(
+    dir === 'bodybuilding' ? 'bodybuilding' : 'powerlifting'
+  );
   const [bw, setBw] = useState<number>(_plSaved?.plBw ?? _profPL.bodyWeight ?? 85);
   const [days, setDays] = useState<number>(_plSaved?.plDays ?? 3);
   const [pmSquat, setPmSquat] = useState<number>(_plSaved?.pmSquat ?? _profPL.pmSquat ?? 120);
@@ -1729,7 +1734,7 @@ legs: [
         </div>
       )}
 
-      {subView === 'macro' && <MacrocyclePanel level={level} goal={dir === 'bodybuilding' ? 'bodybuilding' : 'powerlifting'} onApplyCycle={(cycleId, weeks) => { setSelectedCycleId(cycleId); setCycleWeeks(weeks); setSubView('plan'); }} />}
+      {subView === 'macro' && <MacrocyclePanel level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyCycle={(cycleId, weeks) => { setSelectedCycleId(cycleId); setCycleWeeks(weeks); setSubView('plan'); }} />}
       {subView === 'plates' && <PlateCalcTab initialWeight={workingWeight} onApply={() => {}} />}
       {subView === 'autoreg' && <AutoregPanel />}
       {subView === 'peak' && <PeakingPanel />}
