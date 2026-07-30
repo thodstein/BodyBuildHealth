@@ -812,36 +812,33 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   };
 
   // ─── Generate Plan ───
-  const generatePlan = (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number) => {
-    try {
-    saveUndo(); // P2-14: undo для плана целиком — snapshot в начале generatePlan позволяет вернуть прошлый план
-    setPlanDays(days);
-    if (dayIndex !== undefined) setSelectedDayIndex(dayIndex);
+   const generatePlan = (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number) => {
+     try {
+     saveUndo();
+     setPlanDays(days);
+     if (dayIndex !== undefined) setSelectedDayIndex(dayIndex);
 
-    // ─── Pro Engine path (MPS-based, professional bodybuilding dietology) ───
-    if (useProEngine) {
-      try {
-      const toMin = (t: string) => t?.includes(':') ? parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]) : 0;
-      const bfPct = bodyFatPct > 3 ? bodyFatPct : (sex === 'male' ? 15 : 22);
-      const lbmKg = weight * (1 - bfPct / 100);
-      const nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
-      const trainStartMin = linkToTraining && trainStart?.includes(':') ? toMin(trainStart) : undefined;
-      const excludedIds = new Set<string>(excludedFoods);
-      healthIssues.forEach(hid => { const issue = HEALTH_ISSUES.find(h => h.id === hid); if (issue?.foodIds) issue.foodIds.forEach(fid => excludedIds.add(fid)); });
-      // P2-12: organ-load auto restrictions — динамические исключения по metabolic_flags
-      getAutoExcludedFoodIds(FOOD_DB, healthIssues).forEach(fid => excludedIds.add(fid));
-      // P1.2: Pass locked foods to engine
-      const lockedIds = new Set<string>([...lockedFoodIds]);
-      // P1.3: Build recent foods set from existing plans to avoid repetition
-      const recentFoodIds = new Set<string>();
-      const collectFoods = (plan: any) => { if (plan?.meals) plan.meals.forEach((m: any) => m.items?.forEach((it: any) => { if (it.id) recentFoodIds.add(it.id); })); if (plan?.days) plan.days.forEach((d: any) => d?.meals?.forEach((m: any) => m.items?.forEach((it: any) => { if (it.id) recentFoodIds.add(it.id); }))); };
-      if (days >= 3 && dayPlan) collectFoods(dayPlan);
-      if (days >= 7 && threeDayPlan) collectFoods(threeDayPlan);
-      if (dietPrefs.includes('vegetarian')) {
-        Object.entries(FOOD_ALLERGEN_DIET).forEach(([fid, tags]) => { if (tags.isVegetarian === false) excludedIds.add(fid); });
-      }
-      const dayIdx = days === 1 ? selectedDayIndex : 0;
-      const isTrainingDay = !!trainingDays[dayIdx];
+     // ─── Pro Engine path (MPS-based, professional bodybuilding dietology) ───
+     if (useProEngine) {
+       try {
+       const toMin = (t: string) => t?.includes(':') ? parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]) : 0;
+       const bfPct = bodyFatPct > 3 ? bodyFatPct : (sex === 'male' ? 15 : 22);
+       const lbmKg = weight * (1 - bfPct / 100);
+       const nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
+       const trainStartMin = linkToTraining && trainStart?.includes(':') ? toMin(trainStart) : undefined;
+       const excludedIds = new Set<string>(excludedFoods || []);
+       (healthIssues || []).forEach(hid => { const issue = HEALTH_ISSUES.find(h => h.id === hid); if (issue?.foodIds) issue.foodIds.forEach(fid => excludedIds.add(fid)); });
+       getAutoExcludedFoodIds(FOOD_DB, healthIssues || []).forEach(fid => excludedIds.add(fid));
+       const lockedIds = new Set<string>([...(lockedFoodIds || [])]);
+       const recentFoodIds = new Set<string>();
+       const collectFoods = (plan: any) => { if (plan?.meals) plan.meals.forEach((m: any) => m.items?.forEach((it: any) => { if (it.id) recentFoodIds.add(it.id); })); if (plan?.days) plan.days.forEach((d: any) => d?.meals?.forEach((m: any) => m.items?.forEach((it: any) => { if (it.id) recentFoodIds.add(it.id); }))); };
+       if (days >= 3 && dayPlan) collectFoods(dayPlan);
+       if (days >= 7 && threeDayPlan) collectFoods(threeDayPlan);
+       if ((dietPrefs || []).includes('vegetarian')) {
+         Object.entries(FOOD_ALLERGEN_DIET).forEach(([fid, tags]) => { if (tags.isVegetarian === false) excludedIds.add(fid); });
+       }
+       const dayIdx = days === 1 ? selectedDayIndex : 0;
+       const isTrainingDay = !!trainingDays[dayIdx];
       // Каждый вызов generatePlan → новый salt → разный набор продуктов
       const planRandomSalt = Math.floor(Math.random() * 1000000);
 
@@ -1077,9 +1074,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       setWaterCalc({ baseWater: Math.round(baseWaterMl / 10) / 10, pharmaBaseMl: 40, trainBonus: trainBonusL, fiberFactor: fiberBonusL, pharmaBonus: pharmaBonusL, total: totalWaterL, hasPharma, electrolytes: { sodiumMg: 3500, potassiumMg: 3500, magnesiumMg: 400, note: 'Стандарт' } });
       setGenerated(true);
       try { setPlanTab('plan'); } catch {}
-      generateRecommendations();
-      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-      return; // Bug-2 fix: Pro успешно — НЕ проваливаемся в классический путь (иначе classic перетирал Pro-план, и юзер всегда видел классический результат).
+       try { generateRecommendations(); } catch (e: any) { try { console.warn('[Planner] recommendations failed:', e); } catch {} }
+       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+       return; // Bug-2 fix: Pro успешно — НЕ проваливаемся в классический путь (иначе classic перетирал Pro-план, и юзер всегда видел классический результат).
       } catch (v2Err: any) {
         // Bug-2 fix: Pro упал — РЕАЛЬНЫЙ фоллбэк на классический движок (раньше был return = тупик без плана и ложное сообщение «переключитесь вручную»).
         const errMsg = (v2Err && (v2Err.message || String(v2Err))) || 'Unknown error';
@@ -1093,15 +1090,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const budgetFilter = (id: BudgetLevel): number[] => { const map: Record<string, number[]> = { low:[0,5],medium:[5,8],max:[8,10],enhanced:[9,15] }; return map[id] || [5,10]; };
     const [bMin, bMax] = budgetFilter(budget);
     const qualityRange = (pool: any[]) => pool.filter((f: any) => { const q = compositeQualityScore(f); return q >= bMin && q <= bMax; });
-    const effectivePlanType = dietPrefs.includes('vegetarian') ? ('vegetarian' as PlanType) : planType;
-    const planTypeMod = PLAN_TYPES.find(p => p.id === effectivePlanType);
-    const pMod = planTypeMod?.pMult || 1.0; const fMod = planTypeMod?.fMult || 1.0; const cMod = planTypeMod?.cMult || 1.0;
-    const excludedIds = new Set(excludedFoods);
-    healthIssues.forEach(hid => { const issue = HEALTH_ISSUES.find(h => h.id === hid); if (issue?.foodIds) issue.foodIds.forEach(fid => excludedIds.add(fid)); });
-    // P2-12: organ-load auto restrictions — динамические исключения по metabolic_flags
-    getAutoExcludedFoodIds(FOOD_DB, healthIssues).forEach(fid => excludedIds.add(fid));
-    // N2: vegetarian mode — exclude all non-vegetarian foods (meat, fish, poultry)
-    if (dietPrefs.includes('vegetarian')) {
+     const effectivePlanType = (dietPrefs || []).includes('vegetarian') ? ('vegetarian' as PlanType) : planType;
+     const planTypeMod = PLAN_TYPES.find(p => p.id === effectivePlanType);
+     const pMod = planTypeMod?.pMult || 1.0; const fMod = planTypeMod?.fMult || 1.0; const cMod = planTypeMod?.cMult || 1.0;
+     const excludedIds = new Set(excludedFoods || []);
+     (healthIssues || []).forEach(hid => { const issue = HEALTH_ISSUES.find(h => h.id === hid); if (issue?.foodIds) issue.foodIds.forEach(fid => excludedIds.add(fid)); });
+     // P2-12: organ-load auto restrictions — динамические исключения по metabolic_flags
+     getAutoExcludedFoodIds(FOOD_DB, healthIssues || []).forEach(fid => excludedIds.add(fid));
+     // N2: vegetarian mode — exclude all non-vegetarian foods (meat, fish, poultry)
+     if ((dietPrefs || []).includes('vegetarian')) {
       Object.entries(FOOD_ALLERGEN_DIET).forEach(([fid, tags]) => {
         if (tags.isVegetarian === false) excludedIds.add(fid);
       });
@@ -1854,9 +1851,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const weekData = { days: weekDays, totals: { kcal: weekDays.reduce((s: any,d: any) => s + d.totals.kcal, 0), p: weekDays.reduce((s: any,d: any) => s + d.totals.p, 0), f: weekDays.reduce((s: any,d: any) => s + d.totals.f, 0), c: weekDays.reduce((s: any,d: any) => s + d.totals.c, 0), fiber: weekDays.reduce((s: any,d: any) => s + (d.totals.fiber||0), 0) }};
       if (weekIndex !== undefined) { setMonthPlan(prev => { const next = [...prev]; next[weekIndex] = weekData; return next; }); }
       else setWeekPlan(weekData);
-    }
-    generateRecommendations();
-    const allDayPlans = days >= 7 ? weekDays! : days >= 3 ? [d1, d2, d3] : [d1];
+     }
+     try { generateRecommendations(); } catch (e: any) { try { console.warn('[Planner] recommendations failed (classic):', e); } catch {} }
+     const allDayPlans = days >= 7 ? weekDays! : days >= 3 ? [d1, d2, d3] : [d1];
     // T4.5 — Weekly diversity score
     const allWeekFoodIds: string[] = [];
     allDayPlans.forEach((dp: any) => { (dp.meals || []).forEach((m: any) => { (m.items || []).forEach((it: any) => { allWeekFoodIds.push(it.id); }); }); });
