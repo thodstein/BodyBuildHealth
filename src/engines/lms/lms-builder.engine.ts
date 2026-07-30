@@ -16,7 +16,8 @@ import { mesocyclePhaseForWeek, RIR_MATRIX, MesoPhaseConfigs, type MesocyclePhas
 import { diagnoseWeakPoint, type Lift, type WeakPoint } from './weakpoint-pl';
 import { diagnoseLift } from '../pro/lift-diagnostics.engine';
 
-import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.engine';
+import { computeVolumeLandmarks, getVolumeLandmarks, getAllVolumeLandmarks } from '../volume-landmarks.engine';
+import { adaptForPEDs, type PED } from '../bb/bb-ped-adaptation.engine';
 
 export interface LMSBuildInput {
   template: SRCycleTemplate;
@@ -40,6 +41,19 @@ export interface LMSBuildInput {
   /** Пользовательский выбор дней для слабых точек СРЦ-движений.
    *  Ключ формата `${lift}|${weakPointId}` → [1-based dayIdx,...]. Если не задано — авто. */
   plWeakPointDayMap?: Record<string, number[]>;
+  /** ACWR-зона для авто-делода (если передана — применяется к объёму/RIR). */
+  acwr?: { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'dangerous' };
+  /** Авторегуляция: topSetPctMultiplier/volumeMultiplier/rirShift (если передана — применяется к весам). */
+  autoReg?: { topSetPctMultiplier: number; volumeMultiplier: number; rirShift: number; deload: boolean };
+  /** PED-адаптация (dose-aware): если передана — заменяет хардкод pedMrvMult. */
+  peds?: PED[];
+  pedDoses?: Record<string, number>;
+  /** Recovery-метрики для recovery multiplier (Helms 2022, Plews 2022). */
+  bodyFat?: number;       // % жира
+  leanMass?: number;      // кг сухой массы
+  hrvMs?: number;         // RMSSD в мс
+  sleepHours?: number;    // часов сна/ночь
+  stressLevel?: number;   // 1-10
 }
 
 
@@ -268,8 +282,10 @@ function injectPLWeakPoints(
     const dayRankByMain: { idx: number; mainSets: number }[] = [];
     for (let i = 0; i < days.length; i++) {
       const mainSets = days[i].exercises
-       .filter(e => norm(e.name) === norm(mainName))
-        .filter(e => norm(e.name) === norm(mainName) || norm(e.name).includes(norm(mainName)) || norm(mainName).includes(norm(e.name)))
+        .filter(e => {
+          const en = norm(e.name), mn = norm(mainName);
+          return en === mn || en.includes(mn) || mn.includes(en);
+        })
         .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
       if (mainSets > 0) dayRankByMain.push({ idx: i, mainSets });
     }
@@ -341,7 +357,14 @@ function injectPLWeakPoints(
           const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? 80;
           const ref = getVolumeLandmarks(vrLevel, exGroup);
           if (ref) {
-            
+            let cur = 0;
+            for (const d of days) {
+              for (const e of d.exercises) {
+                const eg = groupOfExercise(e.name, '');
+                if (eg === exGroup) cur += e.workSets.reduce((x, ws) => x + ws.sets, 0);
+              }
+            }
+            if (cur + sets > Math.round(ref.mrv * pedMrvMult)) continue;
           }
           // Памп-протокол: 3×12 @ 60% 1PM, RIR 3
           const pumpPct = 0.60;
@@ -409,9 +432,45 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   const goalKey = rirGoalKey(template.meta.period);
   const levelKey = rirLevelKey(template.meta.level);
   const vrLevel = vrLevelKey(template.meta.level);
-  const pedMrvMult = input.mode === 'on_course'
-    ? (input.courseIntensity === 'heavy' ? 1.35 : input.courseIntensity === 'moderate' ? 1.25 : 1.15)
-    : 1;
+  // PED-адаптация: dose-aware через adaptForPEDs (если переданы PEDs), иначе fallback на хардкод.
+  let pedMrvMult = 1;
+  let pedRecMult = 1;
+  if (input.peds && input.peds.length > 0) {
+    const allLandmarks = getAllVolumeLandmarks(vrLevel);
+    const baseMrv = Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv]));
+    const pedAdapt = adaptForPEDs(input.peds, baseMrv, input.pedDoses, input.courseIntensity);
+    pedMrvMult = pedAdapt.combinedMrvMultiplier || 1;
+    pedRecMult = pedAdapt.combinedRecoveryMultiplier || 1;
+  } else if (input.mode === 'on_course') {
+    pedMrvMult = input.courseIntensity === 'heavy' ? 1.35 : input.courseIntensity === 'moderate' ? 1.25 : 1.15;
+  }
+
+  // Recovery multiplier из композиции тела + recovery-метрик (Helms 2022, Plews 2022, Watson 2022).
+  // Модулирует MRV soft-cap (pedMrvMult × recoveryMult) — выше восстановление → больше объём.
+  const recoveryMult = Math.max(0.6, Math.min(1.5, (() => {
+    let r = 1.0;
+    if (input.bodyFat != null) r *= input.bodyFat > 25 ? 0.9 : input.bodyFat > 20 ? 0.95 : 1.0;
+    if (input.leanMass != null) r *= input.leanMass >= 90 ? 1.15 : input.leanMass >= 75 ? 1.05 : input.leanMass >= 60 ? 1.0 : 0.9;
+    if (input.hrvMs != null) r *= input.hrvMs > 70 ? 1.1 : input.hrvMs >= 50 ? 1.0 : 0.85;
+    if (input.sleepHours != null) r *= input.sleepHours >= 7 ? 1.05 : input.sleepHours >= 6 ? 1.0 : 0.85;
+    if (input.stressLevel != null) r *= input.stressLevel < 3 ? 1.05 : input.stressLevel < 6 ? 1.0 : 0.85;
+    return r;
+  })()));
+  // Итоговый MRV-множитель: PED × recovery (комбинированный soft-cap)
+  const combinedMrvMult = pedMrvMult * recoveryMult;
+
+  // ACWR-авто-делод: если передана ACWR-зона — корректируем объём/RIR для всех недель.
+  const acwrZone = input.acwr?.zone;
+  let acwrVolMod = 1, acwrRirShift = 0, acwrDeload = false;
+  if (acwrZone === 'dangerous') { acwrVolMod = 0.65; acwrRirShift = 2; acwrDeload = true; }
+  else if (acwrZone === 'caution') { acwrVolMod = 0.85; acwrRirShift = 1; }
+  else if (acwrZone === 'undertrained') { acwrVolMod = 1.1; }
+
+  // Авторегуляция: если передана — применяется к весам (topSetPctMultiplier) и объёму/RIR.
+  const ar = input.autoReg;
+  const arTopMult = ar?.topSetPctMultiplier ?? 1;
+  const arVolMult = ar?.volumeMultiplier ?? 1;
+  const arRirShift = ar?.rirShift ?? 0;
 
   const weeks: LMSPlanWeek[] = [];
   for (let w = 0; w < totalWeeks; w++) {
@@ -460,10 +519,22 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           // S-MRV floor: аксессуары не ниже 2 подходов (иначе < MEV — бесполезный объём)
           sets = Math.max(isMain ? 1 : 2, sets);
 
+          // ACWR-авто-делод: корректируем объём (все упражнения) и RIR
+          sets = Math.max(1, Math.round(sets * acwrVolMod));
+          // Авторегуляция: объём (все) — применяется поверх ACWR
+          sets = Math.max(1, Math.round(sets * arVolMult));
+
+          // Расчётный вес с авторегуляцией (topSetPctMultiplier)
+          const baseWeight = workWeight(pm, s.pct);
+          const adjWeight = Math.round(baseWeight * arTopMult * 10) / 10;
+
+          // RIR с ACWR + авторегуляцией
+          const adjRir = Math.max(0, rirBase + acwrRirShift + arRirShift);
+
           return {
             pct: s.pct, reps: s.reps, sets: Math.max(1, sets),
-            weight: workWeight(pm, s.pct),
-            rir: rirBase,
+            weight: adjWeight,
+            rir: adjRir,
           };
         });
 
@@ -489,7 +560,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
     // Инъекция ассистентов по слабым точкам СРЦ-движений (все циклы, включая faithful с полными weeks[])
     if (input.plWeakPoints && input.plWeakPoints.length) {
-      injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, pedMrvMult, input.plWeakPointDayMap);
+      injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, combinedMrvMult, input.plWeakPointDayMap);
     }
 
     // Инъекция accessory-упражнений для слабых групп мышц — авто-распределение по 1-2 дням.
@@ -545,7 +616,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
         // Для каждого выбранного дня — добавить accessory упражнения с разным протоколом
         const listedMuscleRef = getVolumeLandmarks(vrLevel, wg);
-        const fakeMrvCap = listedMuscleRef ? Math.round(listedMuscleRef.mrv * pedMrvMult) : 99;
+        const fakeMrvCap = listedMuscleRef ? Math.round(listedMuscleRef.mrv * combinedMrvMult) : 99;
         for (let ti = 0; ti < targetDays.length; ti++) {
           const dayIdx = targetDays[ti] - 1;
           if (dayIdx < 0 || dayIdx >= days.length) continue;
@@ -620,10 +691,60 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     input.focusLift ? `Приоритет: акцент на ${input.focusLift === 'squat' ? 'присед' : input.focusLift === 'bench' ? 'жим' : 'тягу'} (+20% объёма).` : '',
     input.weakPoints?.length ? `Слабые группы: ${input.weakPoints.join(', ')} (+20% объёма для упражнений на эти группы).` : '',
     `S-MRV: объём сессий автоматически ограничен бюджетом утомления (Ready: ${input.currentReadiness || 80}%).`,
+    input.peds?.length ? `💉 PED-адаптация (dose-aware): MRV ×${pedMrvMult.toFixed(2)}, восст ×${pedRecMult.toFixed(2)}.` : '',
+    (input.bodyFat != null || input.hrvMs != null || input.sleepHours != null) ? `🔄 Recovery multiplier: ×${recoveryMult.toFixed(2)} (bodyFat/HRV/sleep/stress). Итог MRV ×${combinedMrvMult.toFixed(2)}.` : '',
+    input.acwr ? `📊 ACWR ${input.acwr.ratio.toFixed(1)} (${acwrZone}): объём×${acwrVolMod}, RIR+${acwrRirShift}${acwrDeload ? ', deload' : ''}.` : '',
+    input.autoReg ? `🧠 Авторегуляция: топ-сет×${arTopMult}, объём×${arVolMult}, RIR+${arRirShift}${input.autoReg.deload ? ', deload' : ''}.` : '',
     ...weakNotes,
   ].filter(Boolean).join(' ');
 
-  return { template, progressionRationale: proRationale, weeks, cycleMetrics, plVolumeLandmarks: getPLVolumeLandmarks(weeks, template.meta.level, pedMrvMult) };
+  // P1: Авто-taper к финальным 2 неделям (peaking phase) — снижение объёма, интенсивность сохранена.
+  // Применяется только для auto-прогрессирующих циклов (не faithful) и при отсутствии ACWR-deload.
+  const taperedWeeks = (!hasExplicitWeeks && totalWeeks >= 4 && !acwrDeload)
+    ? applyPLTaper(weeks, totalWeeks)
+    : weeks;
+
+  const taperNote = taperedWeeks !== weeks ? ' 📉 Taper: финальные 2 нед — объём ×0.65/0.45, интенсивность сохранена (Bosquet 2005).' : '';
+
+  return { template, progressionRationale: proRationale + taperNote, weeks: taperedWeeks, cycleMetrics, plVolumeLandmarks: getPLVolumeLandmarks(taperedWeeks, template.meta.level, combinedMrvMult) };
+}
+
+/**
+ * PL Taper: снижение объёма (сетов) к финальным 2 неделям цикла (peaking phase).
+ * Интенсивность (вес) сохраняется — снижается только объём (Bosquet 2005, Bosquet et al.).
+ * Неделя N-1: объём ×0.65; неделя N: объём ×0.45. RIR растёт на 1-2.
+ */
+function applyPLTaper(weeks: LMSPlanWeek[], totalWeeks: number): LMSPlanWeek[] {
+  if (weeks.length < 4) return weeks;
+  const lastIdx = weeks.length - 1;
+  const prevIdx = lastIdx - 1;
+  if (prevIdx < 0) return weeks;
+
+  return weeks.map((wk, idx) => {
+    if (idx !== prevIdx && idx !== lastIdx) return wk;
+    const volumeMult = idx === prevIdx ? 0.65 : 0.45;
+    const rirAdd = idx === prevIdx ? 1 : 2;
+    const newDays = wk.days.map(d => ({
+      ...d,
+      exercises: d.exercises.map(e => ({
+        ...e,
+        workSets: e.workSets.map(ws => ({
+          ...ws,
+          sets: Math.max(1, Math.round(ws.sets * volumeMult)),
+          rir: ws.rir + rirAdd,
+        })),
+      })),
+    }));
+    // Пересчёт метрик
+    for (const d of newDays) {
+      const metricsEx: SRExercise[] = d.exercises.map(pe => ({
+        name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
+        sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
+      }));
+      d.metrics = calcSessionMetrics(metricsEx);
+    }
+    return { ...wk, days: newDays };
+  });
 }
 
 

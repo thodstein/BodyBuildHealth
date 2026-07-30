@@ -83,5 +83,5 @@ export function progressionRationale(input: PMProgressionInput): string {
   };
   const dir = k >= 0 ? 'восходящая прогрессия' : 'нисходящая прогрессия (минимум потерь)';
   return `${modeLabel[input.mode]}: PM растёт на ${sign}${pct}%/нед (${dir}). ` +
-    `PM0=${input.pm0} кг → за ${input.weeks} нед: ${(input.pm0 * Math.pow(1 + k, input.weeks)).toFixed(1)} кг.`;
+    `PM0=${input.pm0} кг → за ${input.weeks} нед: ${(input.pm0 * Math.pow(1 + k, input.weeks - 1)).toFixed(1)} кг.`;
 }

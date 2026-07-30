@@ -5,11 +5,95 @@
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK (694+ modules)
-- `vitest` - all passing
+- `vitest` - 292 passing (210 base + 18 macrocycle + 10 diary-autoreg + 17 lms-planner P1 + 5 taper + 11 weakpoint + 10 selector + 6 inject-weakpoints + 3 recovery + 7 pl-feedback)
 
 ### Git
 - `origin/main` - tracked
-- uncommitted changes: BB-builder priority-1 edits in progress
+- uncommitted changes: BB-builder priority-1 edits + ПЛ-авто годовое планирование + diary-autoreg
+
+---
+
+## Планировщик питания: error fix (in progress Jul 30 2026)
+
+User reported: "не генерируется рацион - выбивает ошибку при нажатии" with `TypeError: cannot read properties of undefined (reading length)`.
+
+Root cause (most likely): stale localStorage from previous app versions. When the planner's `useState` initializers called `JSON.parse(localStorage.getItem(...))` and the saved value was a string/number instead of an array (or any malformed shape), the state became a non-array, and downstream code that called `.filter/.map/.length` on it crashed.
+
+Fixes applied:
+- `planner-storage.ts`: new `readJSONSafe(key, fallback, validate)` helper + `migratePlannerStorage()` that auto-cleans 16 known planner keys whose JSON shape is expected to be an object/array
+- `IndividualPlanContext.tsx`: 
+  - runs `migratePlannerStorage()` once on mount (idempotent via `he_planner_schema_version` key, v4)
+  - hardens 8 useState initializers (savedPlans, monthPlan, preferredFoods, excludedFoods, dietPrefs, allergens, healthIssues, lockedFoodIds) to validate Array.isArray and filter by `typeof === 'string'`
+  - wraps "Сгенерировать план питания" click handler in try/catch so any future error shows in `errorMsg` UI
+- `planner-preferences.ts:328`: `(f.id || '').toLowerCase()` defensive guard for missing f.id
+- `meal-plan-engine.ts` already had `finally` cleanup of `_pickCtx` lock
+- Refactored `addMacroTopUp` (was dead-code classic path) into clean helper function
+
+Tests: 63/63 in NutritionScreen_parts/IndividualPlan/__tests__/ pass (added planner-storage.test.ts with 6 new tests).
+
+---
+
+
+### Годовое планирование (macrocycle.engine.ts)
+- `buildMacrocycle(input)` — 5 фаз: endurance→strength→peak→competition→transition
+- `macrocycleToActiveCycle(macro, week)` — активный cycleId на неделе N
+- `rebalanceMacrocycle(macro, edits)` — ручная правка длительности фаз
+- `serializeMacro`/`deserializeMacro` — localStorage
+- `estimateCompetitionWeek(isoDate, total)` — неделя соревнований из даты
+- `MacrocyclePanel.tsx` — UI: таймлайн, выбор недели соревнований, клик→применить цикл
+- Вкладка `🗓 Годовой план` в ПЛ-авто (SRCBBScreen)
+
+### Авторегуляция весов — 3 режима (AutoRegMode: 'off'|'auto'|'diary')
+- **ВЫКЛ** — плановые веса без корректировки
+- **АВТО** — readiness+HRV+ACWR+sleep+fatigue → topSetPctMultiplier/volumeMultiplier/rirShift (autoRegulate)
+- **ДНЕВНИК** — per-exercise корректировка из последней сессии дневника (diary-autoreg.engine.ts):
+  - fact RPE vs target RPE (10-plannedRir) → вес через loadForRPE(e1RM, targetRPE, reps)
+  - factRPE ≥ 9.5 → -1 подход; delta > 2 → RIR +1
+  - plateau: 3+ сессии без роста e1RM → plateauWarning + RIR +1
+  - fuzzy match имён (жим лёжа ↔ жим штанги лёжа)
+  - нет данных → fallback на плановые веса
+- Сегментированный переключатель в ПЛ и ББ секциях SRCBBScreen
+- Применяется в: srcDays (SessionPlayer ПЛ), bbDaysArr (SessionPlayer ББ), BB-таблица SessionPlayer
+
+### P0-багфиксы (done Jul 30 2026)
+- BUG-1: `injectPLWeakPoints` — двойной `.filter` заменён на один fuzzy match (lms-builder.engine.ts:271)
+- BUG-2: MRV soft-cap для light-day — пустой `if (ref) {}` заменён на реальную проверку (lms-builder.engine.ts:343)
+- BUG-3: `cycleTemplateToFullProgram` — explicit weeks реализованы дословно вместо игнорирования (cycle-to-plan.ts:227)
+
+### P1: buildLMSPlan интеграции (done Jul 30 2026)
+- `LMSBuildInput` расширен: `acwr`, `autoReg`, `peds`, `pedDoses`
+- ACWR-авто-делод: zone=caution → объём×0.85, RIR+1; zone=dangerous → объём×0.65, RIR+2, deload
+- Авторегуляция: `topSetPctMultiplier` → к весам, `volumeMultiplier` → к объёму, `rirShift` → к RIR
+- PED-адаптация: хардкод `pedMrvMult` заменён на `adaptForPEDs` (dose-aware) при передаче `peds`
+- UI: `buildSrc()` передаёт `acwrData`, `autoRegResult` (при mode='auto'), `peds`, `pedDoses`
+- Тесты: 6 новых в lms-planner.test.ts (ACWR caution/dangerous, autoReg weight/RIR, PEDs, комбо)
+
+### P1: PL Taper (done Jul 30 2026)
+- `applyPLTaper(weeks, totalWeeks)` — авто-taper к финальным 2 неделям (peaking phase)
+- Финальная неделя N-1: объём ×0.65, RIR +1; неделя N: объём ×0.45, RIR +2
+- Интенсивность (вес) сохранена (Bosquet 2005)
+- Не применяется при: faithful (explicit weeks), ACWR deload, план < 4 нед
+- Тесты: 5 новых (taper объём/RIR/rationale/ACWR-делод/faithful)
+
+### P2: Тесты покрытия (done Jul 30 2026)
+- `weakpoint-pl.test.ts` — 11 тестов (7 лифтов × слабые точки, fallback, WEAK_POINTS_BY_LIFT)
+- `lms-selector.test.ts` — 10 тестов (rankCycles сортировка, direction/level/days score, selectBestCycle, explainSelection)
+- `inject-pl-weakpoints.test.ts` — 6 тестов (инъекция ассистентов, day cap ≤8, weight >0, все недели)
+- Удалён мёртвый `macrocycle-sources.ts` (не импортировался нигде)
+
+### P3: Паритет с ББ (done Jul 30 2026)
+- **Recovery multiplier**: `LMSBuildInput` расширен (`bodyFat`, `leanMass`, `hrvMs`, `sleepHours`, `stressLevel`)
+  - Helms 2022, Plews 2022, Watson 2022: композиция тела + HRV + сон + стресс → MRV soft-cap
+  - `combinedMrvMult = pedMrvMult × recoveryMult` — применяется к injectPLWeakPoints и weakGroup добивкам
+  - UI: `buildSrc()` передаёт метрики из `linked.profile`/`linked.readiness`
+  - Тесты: 3 новых (хорошие/плохие метрики, отсутствие меток)
+- **sRPE feedback loop**: `lms-progression-feedback.engine.ts` — `computePLPlanFeedback(plan, sessions)`
+  - Для каждого упражнения последней недели: последняя запись дневника → e1RM, fact RIR vs planned RIR
+  - `prescribeLoad` (double_progression) с plannedRir → success-aware коррекция (RIR≥+2 → +reps, RIR≤-2 → -5% weight)
+  - `summarizePLFeedback` — withFact/noData/plateau/avgRirDelta
+  - Fuzzy match имён (жим лёжа ↔ жим штанги лёжа)
+  - Тесты: 7 новых (source fact/plan, fuzzy match, rirDelta, summary)
+- **Double progression**: реализован через feedback loop (`prescribeLoad` strategy='double_progression')
 
 ---
 
@@ -52,6 +136,18 @@ Still needed:
 | `bb-weakpoint.ts` | Weak-point diagnostics |
 | `bb-progression-feedback.engine.ts` | sRPE feedback loop |
 | `cycle-to-plan.ts` | Cycle template → BB plan converter |
+
+### ПЛ-авто engine files
+| File | Role |
+|------|------|
+| `lms/macrocycle.engine.ts` | Годовое планирование (5 фаз, СРЦ-циклы) |
+| `lms/lms-selector.engine.ts` | Скоринг-подбор СРЦ-цикла |
+| `lms/lms-builder.engine.ts` | Генерация плана из шаблона недели 1 + PM-прогрессия |
+| `lms/lms-progression.engine.ts` | PM_нед = PM0×(1+k)^нед |
+| `lms/weakpoint-pl.ts` | Диагностика слабых точек СРЦ-движений |
+| `pro/autoregulation-pro.engine.ts` | Проф-авторегуляция (readiness+HRV+ACWR) |
+| `pro/diary-autoreg.engine.ts` | Per-exercise авторегуляция из дневника |
+| `lms/lms-progression-feedback.engine.ts` | sRPE feedback loop (дневник → план) |
 
 ### SPLIT_PATTERNS (16)
 - 3 fullbody variants (2×/3×/4× per week)

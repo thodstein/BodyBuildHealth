@@ -223,11 +223,62 @@ export function cycleTemplateToFullProgram(cycle: SRCycleTemplate): FullProgram 
     });
   }
 
-  // Если есть explicit weeks — используем их вместо сгенерированных
+  // Если есть explicit weeks — используем их дословно вместо сгенерированных из week1.
+  // explicit weeks имеют ту же структуру что week1 (SRDaySpec[]), каждая неделя — свой набор дней.
   if (explicitWeeks && explicitWeeks.length > 0) {
-    // explicit weeks имеют ту же структуру что week1 (SRDaySpec[])
-    // конвертируем их аналогично
-    // Для простоты пока игнорируем, так как у наших 12 циклов нет explicit weeks
+    generatedWeeks.length = 0; // очищаем сгенерированные
+    for (let w = 0; w < explicitWeeks.length; w++) {
+      const weekNumber = w + 1;
+      const isDeload = deloadWeeks.has(weekNumber);
+      const srDays = explicitWeeks[w];
+      // RIR для explicit-недели: берём из прогрессии если есть, иначе из meta
+      const rirProgress = explicitWeeks.length > 1 ? w / (explicitWeeks.length - 1) : 0;
+      const weekRir = Math.round(rirStart + (rirEnd - rirStart) * rirProgress);
+      const volumeMult = isDeload ? 0.5 : 1.0; // explicit — без авто-прогрессии, уважаем источник
+      const intensityMult = isDeload ? 0.7 : 1.0;
+
+      const days: ProgramDay[] = srDays.map((srDay, dayIdx) => {
+        const dayNum = dayIdx + 1;
+        const dayName = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'][dayIdx] || `День ${dayIdx + 1}`;
+        const exercises = srDay.exercises.map(srEx => {
+          const baseSet = srEx.sets?.[0];
+          const basePct = baseSet?.pct ?? 0.6;
+          const baseReps = baseSet?.reps ?? 10;
+          const baseSets = baseSet?.sets ?? 3;
+          const rirAdjustment = (3 - weekRir) * 0.025;
+          const adjustedPct = Math.min(0.95, basePct + rirAdjustment);
+          const finalPct = isDeload ? adjustedPct * 0.7 : adjustedPct;
+          return {
+            name: srEx.name,
+            sets: baseSets,
+            reps: String(baseReps),
+            rpe: Math.round(10 - weekRir),
+            rir: weekRir,
+            restSec: srEx.load === 'Тяжелая' ? 180 : srEx.load === 'Средняя' ? 120 : 90,
+            notes: srEx.load ? `Нагрузка: ${srEx.load}` : '',
+            progression: `Неделя ${weekNumber} (explicit)`,
+          };
+        });
+        return {
+          day: dayNum,
+          name: `${dayName} (нед ${weekNumber})`,
+          focus: srDay.exercises.map(e => e.group).filter(Boolean).join(', ') || 'Полное тело',
+          warmup: 'Общая разминка 5-10 мин + специфическая разминка',
+          exercises,
+          cooldown: 'Растяжение 5 мин',
+        };
+      });
+
+      generatedWeeks.push({
+        week: weekNumber,
+        phase: isDeload ? 'deload' : weekNumber <= Math.ceil(explicitWeeks.length * 0.3) ? 'accumulation' :
+          weekNumber <= Math.ceil(explicitWeeks.length * 0.7) ? 'intensification' : 'peaking',
+        volumeMultiplier: volumeMult,
+        intensityMultiplier: intensityMult,
+        days,
+        deload: isDeload,
+      });
+    }
   }
 
   // FullProgram.goal: 'strength' | 'hypertrophy' | 'powerlifting' | 'bodybuilding' | 'athletic' | 'rehab' | 'peaking'

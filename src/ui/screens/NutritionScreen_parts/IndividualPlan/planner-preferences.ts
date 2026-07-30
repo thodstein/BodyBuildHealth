@@ -325,7 +325,7 @@ export function expandRecipePreferred(preferredFoods: string[], recipes: any[], 
         for (const ing of recipe.ingredients) {
           // match ingredient name to FOOD_DB by name substring (case-insensitive)
           const ingLower = ing.toLowerCase().split(' ')[0]; // first word
-          const match = foodDb.find((f: any) => (f.name || '').toLowerCase().includes(ingLower) || f.id.toLowerCase().includes(ingLower));
+          const match = foodDb.find((f: any) => (f.name || '').toLowerCase().includes(ingLower) || (f.id || '').toLowerCase().includes(ingLower));
           if (match) result.add(match.id);
         }
       }

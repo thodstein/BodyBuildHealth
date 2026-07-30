@@ -14,7 +14,7 @@ import { getContraindications, saveContraindications } from "../../../../core/co
 import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrition-v2-data";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { computePlannerTargets } from "./planner-targets";
-import { safeWriteJSON } from "./planner-storage";
+import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
 import { generateAllergenReportPure, generateNutrientReportPure, generateQualityReportPure, generateRiskReportPure, generateDrugCompatReportPure } from "./planner-reports"; // P1-7: чистые функции отчётов вынесены из context
 import { generateCheatMeal as generateCheatMealSm, generateCarbload as generateCarbloadSm, generateBUTCH as generateBUTCHSm, generateCravingPlan as generateCravingPlanSm, generateLazyDayPlan as generateLazyDayPlanSm } from "./planner-special-meals"; // P1-7: генераторы специальных режимов еды вынесены
 import { buildRecommendations } from "./planner-recommendations"; // P1-7: generateRecommendations вынесен
@@ -243,6 +243,9 @@ const PlanContext = createContext<PlanCtx>(_DEFAULT_CTX as PlanCtx);
 export const usePlanCtx = (): PlanCtx => useContext(PlanContext);
 
 export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; course?: any[]; labs?: LabPoint[]; labAnalysis?: LabCompositeResult | null; children: React.ReactNode }> = ({ profile: _profile, course: _course, labs = [], labAnalysis, children }) => {
+  // Run schema migration first — drops stale localStorage entries that would crash
+  // with "cannot read properties of undefined (reading length)" on first render.
+  try { migratePlannerStorage(); } catch {}
   const profile = _profile || getProfileSafe();
   const s = profile?.settings;
   const courseEntries = _course || [];
@@ -296,7 +299,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [dietPauseMode, setDietPauseMode] = useState<'none' | 'refeed' | 'flex_80_20' | 'periodization_2_1' | 'diet_5_2'>('none');
   const [manualGPerKg, setManualGPerKg] = useState<Record<string, number>>({ protein: 0, fat: 0, carbs: 0 });
   const [monthPlanMode, setMonthPlanMode] = useState(() => { try { return localStorage.getItem("he_plan_month_mode") === "true"; } catch { return false; } });
-  const [monthPlan, setMonthPlan] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem("he_plan_month") || "[]"); } catch { return []; } });
+  const [monthPlan, setMonthPlan] = useState<any[]>(() => { try { const v = JSON.parse(localStorage.getItem("he_plan_month") || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } });
   const [selectedWeek, setSelectedWeek] = useState(0);
   const [goal, setGoal] = useState<GoalId>((s?.primaryGoal as GoalId) || 'maintenance');
   const [phase, setPhase] = useState<PhaseId>('course');
@@ -394,13 +397,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [mealsCount, setMealsCount] = useState(4);
   useEffect(() => { if (!wakeTime?.includes(':') || !bedTime?.includes(':')) return; const wMin = parseInt(wakeTime.split(':')[0]) * 60 + parseInt(wakeTime.split(':')[1]); const bMin = parseInt(bedTime.split(':')[0]) * 60 + parseInt(bedTime.split(':')[1]); const awakeHours = (bMin - wMin) / 60; if (awakeHours >= 16) setMealsCount(5); else if (awakeHours >= 14) setMealsCount(4); else setMealsCount(3); }, [wakeTime, bedTime]);
 
-  const [allergens, setAllergens] = useState<string[]>(() => { try { const local = JSON.parse(localStorage.getItem('he_food_allergens') || 'null'); if (local && Array.isArray(local) && local.length > 0) return local; } catch {} try { return getContraindications().foodAllergies || []; } catch { return []; } });
-  const [healthIssues, setHealthIssues] = useState<string[]>(() => { try { const local = JSON.parse(localStorage.getItem('he_health_issues') || 'null'); if (local && Array.isArray(local) && local.length > 0) return local; } catch {} try { return getContraindications().chronicConditions || []; } catch { return []; } });
+  const [allergens, setAllergens] = useState<string[]>(() => { try { const local = JSON.parse(localStorage.getItem('he_food_allergens') || 'null'); if (local && Array.isArray(local) && local.length > 0) return local.filter((x: any) => typeof x === 'string'); } catch {} try { return getContraindications().foodAllergies || []; } catch { return []; } });
+  const [healthIssues, setHealthIssues] = useState<string[]>(() => { try { const local = JSON.parse(localStorage.getItem('he_health_issues') || 'null'); if (local && Array.isArray(local) && local.length > 0) return local.filter((x: any) => typeof x === 'string'); } catch {} try { return getContraindications().chronicConditions || []; } catch { return []; } });
   const [eveningLowCarb, setEveningLowCarb] = useState(() => { try { return localStorage.getItem('he_evening_low_carb') === 'true'; } catch { return false; } });
   React.useEffect(() => { const relevantActive = healthIssues.some(h => h === 'oedema' || h === 'diabetes'); if (relevantActive && !eveningLowCarb) { setEveningLowCarb(true); localStorage.setItem('he_evening_low_carb', 'true'); } }, [healthIssues]);
 
   const [planType, setPlanType] = useState<PlanType>('classic');
-  const [preferredFoods, setPreferredFoods] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_preferred_foods') || '["chicken_breast","rice_white","broccoli","egg_whole","avocado"]'); } catch { return ['chicken_breast','rice_white','broccoli','egg_whole','avocado']; } });
+  const [preferredFoods, setPreferredFoods] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_preferred_foods') || '["chicken_breast","rice_white","broccoli","egg_whole","avocado"]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : ['chicken_breast','rice_white','broccoli','egg_whole','avocado']; } catch { return ['chicken_breast','rice_white','broccoli','egg_whole','avocado']; } });
   const [quickAddMealIdx, setQuickAddMealIdx] = useState<number | null>(null);
   const [quickAddSearch, setQuickAddSearch] = useState('');
   const [customNotes, setCustomNotes] = useState(() => { try { return localStorage.getItem('he_nutrition_notes') || ''; } catch { return ''; } });
@@ -422,8 +425,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // Smart 7-day variety: 'soft' = только deprioritize recent, 'strict' = hard-exclude последние 1-2 дня.
   const [varietyStrictness, setVarietyStrictness] = useState<'soft' | 'strict'>(() => { try { return (localStorage.getItem('he_variety_strictness') as 'soft' | 'strict') || 'strict'; } catch { return 'strict'; } });
   useEffect(() => { try { localStorage.setItem('he_variety_strictness', varietyStrictness); } catch {} }, [varietyStrictness]);
-  const [excludedFoods, setExcludedFoods] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_excluded_foods') || '[]'); } catch { return []; } });
-  const [dietPrefs, setDietPrefs] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_diet_preferences') || '[]'); } catch { return []; } });
+  const [excludedFoods, setExcludedFoods] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_excluded_foods') || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; } catch { return []; } });
+  const [dietPrefs, setDietPrefs] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_diet_preferences') || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; } catch { return []; } });
   const [allergenExcludedCount, setAllergenExcludedCount] = useState(0);
   const [planTargets, setPlanTargets] = useState<{ kcal: number; protein: number; fats: number; carbs: number }>({ kcal: 2500, protein: 160, fats: 70, carbs: 300 });
   // Bug-1 fix: planTargets must mirror effective* so the full nutrition report
@@ -448,8 +451,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [weekPlan, setWeekPlan] = useState<any>(null);
   const [shoppingList, setShoppingList] = useState<any>(null); // Bug-3: не персистим — без плана это осиротевшие данные
   const [waterCalc, setWaterCalc] = useState<any>(null); // Bug-3: не персистим — без плана это осиротевшие данные
-  const [savedPlans, setSavedPlans] = useState<SavedPlan[]>(() => { try { return JSON.parse(localStorage.getItem('he_saved_nutrition_plans') || '[]'); } catch { return []; } });
-  const [lockedFoodIds, setLockedFoodIds] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('he_locked_foods') || '[]')); } catch { return new Set<string>(); } });
+  const [savedPlans, setSavedPlans] = useState<SavedPlan[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_saved_nutrition_plans') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } });
+  const [lockedFoodIds, setLockedFoodIds] = useState<Set<string>>(() => { try { const v = JSON.parse(localStorage.getItem('he_locked_foods') || '[]'); return new Set(Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []); } catch { return new Set<string>(); } });
   const toggleLockFood = (foodId: string) => { setLockedFoodIds(prev => { const next = new Set(prev); if (next.has(foodId)) next.delete(foodId); else next.add(foodId); localStorage.setItem('he_locked_foods', JSON.stringify([...next])); return next; }); };
   const [expandedSavedId, setExpandedSavedId] = useState<number | null>(null);
   const [editItem, setEditItem] = useState<{ dayIdx: number; mealIdx: number; itemIdx: number } | null>(null);
@@ -1666,31 +1669,23 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const topperPool = macro === 'p' ? PROTEIN_TOPPERS : macro === 'f' ? FAT_TOPPERS : CARB_TOPPERS;
         const candidateId = topperPool[Math.floor(Math.random() * topperPool.length)];
         const food = FOOD_DB.find(f => f.id === candidateId);
-        if (!food) {
-          const fallbackId = macro === 'p' ? 'whey_isolate' : macro === 'f' ? 'olive_oil' : 'rice_white';
-          const fb = FOOD_DB.find(f => f.id === fallbackId);
-          if (!fb) return;
-          const per100 = macro === 'p' ? fb.protein : macro === 'f' ? fb.fat : fb.carbs;
-          if (!per100) return;
-        const rawAmount = Math.min(macro === 'f' ? 25 : 120, Math.max(macro === 'f' ? 5 : 20, Math.round(deficit / per100 * 100)));
-        const suppCap = ({ creatine:10, whey_isolate:60, whey_protein:60, casein:60, bcaa:20, supp_eaas:20, glutamine:15, supp_hmb:6, supp_beta_alanine:6 } as Record<string, number>)[fb.id];
-        const amount = suppCap ? Math.min(suppCap, rawAmount) : rawAmount;
-        const r = amount / 100;
-        const item = { name: fb.name, id: fb.id, amount, kcal: Math.round(fb.kcal * r), p: Math.round(fb.protein * r), f: Math.round(fb.fat * r), c: Math.round(fb.carbs * r) };
-        targetMeal.items.push(item);
-        targetMeal.totals = { kcal: targetMeal.items.reduce((s: number, i: any) => s + i.kcal, 0), p: targetMeal.items.reduce((s: number, i: any) => s + i.p, 0), f: targetMeal.items.reduce((s: number, i: any) => s + i.f, 0), c: targetMeal.items.reduce((s: number, i: any) => s + i.c, 0) };
-        return;
-      }
-
-      const per100 = macro === 'p' ? food.protein : macro === 'f' ? food.fat : food.carbs;
-      if (!per100) return;
-      const rawAmount = Math.min(macro === 'f' ? 25 : 120, Math.max(macro === 'f' ? 5 : 20, Math.round(deficit / per100 * 100)));
-      const suppCap2 = ({ creatine:10, whey_isolate:60, whey_protein:60, casein:60, bcaa:20, supp_eaas:20, glutamine:15, supp_hmb:6, supp_beta_alanine:6 } as Record<string, number>)[food.id];
-      const amount = suppCap2 ? Math.min(suppCap2, rawAmount) : rawAmount;
-        const r = amount / 100;
-        const item = { name: food.name, id: food.id, amount, kcal: Math.round(food.kcal * r), p: Math.round(food.protein * r), f: Math.round(food.fat * r), c: Math.round(food.carbs * r) };
-        targetMeal.items.push(item);
-        targetMeal.totals = { kcal: targetMeal.items.reduce((s: number, i: any) => s + i.kcal, 0), p: targetMeal.items.reduce((s: number, i: any) => s + i.p, 0), f: targetMeal.items.reduce((s: number, i: any) => s + i.f, 0), c: targetMeal.items.reduce((s: number, i: any) => s + i.c, 0) };
+        const SUPP_CAPS: Record<string, number> = { creatine:10, whey_isolate:60, whey_protein:60, casein:60, bcaa:20, supp_eaas:20, glutamine:15, supp_hmb:6, supp_beta_alanine:6 };
+        const pickFood = (f: any): boolean => {
+          if (!f) return false;
+          const per100 = macro === 'p' ? (f.protein || 0) : macro === 'f' ? (f.fat || 0) : (f.carbs || 0);
+          if (!per100) return false;
+          const rawAmount = Math.min(macro === 'f' ? 25 : 120, Math.max(macro === 'f' ? 5 : 20, Math.round(deficit / per100 * 100)));
+          const suppCap = SUPP_CAPS[f.id];
+          const amount = suppCap ? Math.min(suppCap, rawAmount) : rawAmount;
+          const r = amount / 100;
+          targetMeal.items.push({ name: f.name, id: f.id, amount, kcal: Math.round((f.kcal || 0) * r), p: Math.round((f.protein || 0) * r), f: Math.round((f.fat || 0) * r), c: Math.round((f.carbs || 0) * r) });
+          targetMeal.totals = { kcal: targetMeal.items.reduce((s: number, i: any) => s + i.kcal, 0), p: targetMeal.items.reduce((s: number, i: any) => s + i.p, 0), f: targetMeal.items.reduce((s: number, i: any) => s + i.f, 0), c: targetMeal.items.reduce((s: number, i: any) => s + i.c, 0) };
+          return true;
+        };
+        if (pickFood(food)) return;
+        const fallbackId = macro === 'p' ? 'whey_isolate' : macro === 'f' ? 'olive_oil' : 'rice_white';
+        const fb = FOOD_DB.find(f => f.id === fallbackId);
+        if (!pickFood(fb)) return;
       };
       for (let iter = 0; iter < 3; iter++) {
         const devK = Math.abs(totals.kcal - tK) / tK; const devP = Math.abs(totals.p - tP_) / tP_;

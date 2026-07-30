@@ -41,3 +41,51 @@ export function readJSON<T>(key: string, fallback: T): T {
     return fallback;
   }
 }
+
+/**
+ * Read JSON from localStorage with shape validation. Returns the parsed value
+ * only if `validate(parsed)` returns true, otherwise the fallback. This prevents
+ * "cannot read properties of undefined (reading length)" crashes when a user has
+ * stale or corrupted data from a previous app version.
+ */
+export function readJSONSafe<T>(key: string, fallback: T, validate: (v: any) => boolean): T {
+  try {
+    const v = localStorage.getItem(key);
+    if (v === null) return fallback;
+    const parsed = JSON.parse(v);
+    return validate(parsed) ? (parsed as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Run once on app load. Wipes localStorage keys whose JSON shape no longer matches the
+ *  expected schema. Prevents old-version corruption from breaking the planner. */
+export const PLANNER_SCHEMA_VERSION = 4;
+export function migratePlannerStorage(): void {
+  try {
+    const vRaw = localStorage.getItem('he_planner_schema_version');
+    const v = vRaw ? parseInt(vRaw, 10) : 0;
+    if (v >= PLANNER_SCHEMA_VERSION) return;
+    // Schema changed at v4: defensively drop keys that should be arrays but might be objects.
+    const arrayKeys = [
+      'he_saved_nutrition_plans', 'he_excluded_foods', 'he_preferred_foods', 'he_diet_preferences',
+      'he_excluded_categories', 'he_food_allergens', 'he_health_issues', 'he_plan_month',
+      'he_user_recipes', 'he_nutrition_supps', 'he_intolerances', 'he_preferred_by_meal',
+      'he_locked_foods', 'he_weight_log_entries', 'he_shopping_checked', 'he_special_meals',
+    ];
+    let wiped = false;
+    arrayKeys.forEach(k => {
+      try {
+        const raw = localStorage.getItem(k);
+        if (raw === null) return;
+        const parsed = JSON.parse(raw);
+        if (parsed === null) return;
+        // Drop non-array/non-object data that would crash .filter/.map/.length
+        if (typeof parsed !== 'object') { localStorage.removeItem(k); wiped = true; }
+      } catch {}
+    });
+    if (wiped) { try { console.info('[Planner] Cleaned stale localStorage entries (schema v' + PLANNER_SCHEMA_VERSION + ')'); } catch {} }
+    try { localStorage.setItem('he_planner_schema_version', String(PLANNER_SCHEMA_VERSION)); } catch {}
+  } catch {}
+}
