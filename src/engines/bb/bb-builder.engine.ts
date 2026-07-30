@@ -32,7 +32,7 @@ import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landma
 // реализация, которую использует и ручной конструктор (phase-periodization).
 import { distributePhases, PHASE_CONFIGS, getPhaseVolumeMult, type BBPhase } from '../periodization';
 import { orderSessionExercises, type SessionMethodology } from './bb-session-order.engine';
-import { type BBTrainingFocus, FOCUS_RIR_TABLE, FOCUS_REPS_TABLE, LEVEL_REP_MOD } from './bb-goal-types';
+import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
@@ -466,24 +466,6 @@ function weightForRepMax(reps: number, workMax: number, rir: number, intensityMu
   return Math.round(workMax * brzycki * rirAdj * intensityMult * 10) / 10;
 }
 
-/** Reps по характеру дня + training focus (Schoenfeld 2017: 6-30 reps). */
-function charReps(c: DayCharacter, focus?: BBTrainingFocus): [number, number] {
-  const cfg = focus ? FOCUS_REPS_TABLE[focus] : FOCUS_REPS_TABLE.hypertrophy;
-  if (c === 'тяж') return cfg.heavy;
-  if (c === 'памп') return cfg.pump;
-  return cfg.light;
-}
-/** Базовый RIR фазы (с дрейфом внутри фазы, как в phase-periodization).
- *  B10: peaking ограничен 6 неделями — после wk3 RIR=0 (clamped), но при >6 неделях
- *  это overtraining. distributePhases не должен давать >6 нед peaking, но на всякий случай
- *  capped на 4 недели (после wk4 — RIR 0, но без дальнейшего дрейфа). */
-function phaseBaseRir(phase: BBPhase, phaseWeek: number): number {
-  const [startRir, endRir] = PHASE_CONFIGS[phase].rirRange;
-  // B10: peaking capped at 4 weeks — после wk4 RIR=0 без дальнейшего дрейфа.
-  const effectiveWeek = phase === 'peaking' ? Math.min(phaseWeek, 4) : phaseWeek;
-  const drift = Math.min(startRir - endRir, Math.floor(effectiveWeek / 2));
-  return Math.max(endRir, startRir - drift);
-}
 /**
  * RIR упражнения в ББ-плане = фаза + характер дня + training focus.
  * strength: RIR 1-2 (Schoenfeld 2021), hypertrophy: RIR 2-3 (Roberts 2022), endurance: RIR 3-4.
@@ -546,9 +528,12 @@ function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary
     const factor = role === 'primary' ? 1.4 : (isArmMuscle ? 0.85 : 0.6);
     return Math.max(isArmMuscle ? 3 : 1, Math.round(base * factor * finalMult));
   }
-  // 3+ сессии/нед
+  // 3+ сессии/нед — Schoenfeld 2016: при высокой частоте каждый подход ценнее
+  // (frequency bonus), поэтому на сессию нужно МЕНЬШЕ объёма, чем при 2×/нед.
+  // Раньше: primary factor=1.5 (>1.4 при 2×/нед) → 3×/нед давало БОЛЬШЕ на сессию.
+  // Теперь: factor=1.2 (<1.4) — отражает распределение MAV на больше сессий.
   const base = mavRot / sessionsPerWeek;
-  const factor = role === 'primary' ? 1.5 : (isArmMuscle ? 0.9 : 0.75);
+  const factor = role === 'primary' ? 1.2 : (isArmMuscle ? 0.85 : 0.65);
   return Math.max(isArmMuscle ? 2 : 1, Math.round(base * factor * finalMult));
 }
 
@@ -1329,14 +1314,19 @@ function buildSession(
       }
     }
 
-    // Per-exercise weight modifier (гантели 80%, наклон 85%, блок 70% etc.)
+    // Per-exercise weight modifier. Evidence-based:
+    //  - наклон 30°: -5-10% vs flat (Biel 2017), не -15%
+    //  - машина: стабильнее → 1RM ~85% свободных (Schoenfeld 2021)
+    //  - кабель: ~80% свободных (constant tension, Schoenfeld 2021)
+    //  - Смит: ~90% (фиксированная траектория, больше стабильности)
+    //  - гантели: ~80% (стабилизация, нейтральный хват)
     function weightModFor(exName: string): number {
       const n = (exName || '').toLowerCase();
       if (n.includes('гантел') || n.includes('dumbbell')) return 0.80;
-      if (n.includes('наклон') || n.includes('incline')) return 0.85;
+      if (n.includes('наклон') || n.includes('incline')) return 0.95;
       if (n.includes('смит') || n.includes('smith')) return 0.90;
-      if (n.includes('трен') || n.includes('машин') || n.includes('machine')) return 0.75;
-      if (n.includes('блок') || n.includes('кабель') || n.includes('cable') || n.includes('кроссов')) return 0.70;
+      if (n.includes('трен') || n.includes('машин') || n.includes('machine')) return 0.85;
+      if (n.includes('блок') || n.includes('кабель') || n.includes('cable') || n.includes('кроссов')) return 0.80;
       return 1.0;
     }
     for (const d of exDatas) (d as any)._weightMod = weightModFor((d as any).name || '');
@@ -1480,9 +1470,12 @@ function buildSession(
       // Accessory получает чуть меньше отдыха (минус 30с), primary — базу.
       const tempoStr = phaseCfg.tempo;
       const baseRest = phaseCfg.restBase;
-      // P5: Rest progression -15s/week (Schoenfeld 2016) - min 60s
-      const restProgression = Math.max(0, (week - 1) * 15);
-      const exRest = Math.max(60, (pl.role === 'accessory' ? Math.max(45, baseRest - 30) : baseRest) - restProgression);
+      // P5: Rest progression. Накопление/интенсификация/пик → -15s/нед (плотность растёт).
+      // Делод → +30с (восстановление: больше отдыха = меньше утомления, Schoenfeld 2016).
+      const restProgression = phase === 'deload' ? -30 : Math.max(0, (week - 1) * 15);
+      const exRest = phase === 'deload'
+        ? Math.min(180, (pl.role === 'accessory' ? baseRest : baseRest + 30) - restProgression)
+        : Math.max(60, (pl.role === 'accessory' ? Math.max(45, baseRest - 30) : baseRest) - restProgression);
       if (remainingBudget < cost) {
         const reduced = Math.max(2, Math.floor(remainingBudget / ((exData as any)?.fatigueCost || 5)));
         const adjustedSets = Math.min(exSets, reduced);

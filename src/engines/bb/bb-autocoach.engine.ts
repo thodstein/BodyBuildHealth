@@ -736,6 +736,11 @@ export function applyTaperToFinalWeeks(plan: BBPlan, totalWeeks: number): BBPlan
 
   const newWeeks = weeks.map((w, idx) => {
     if (idx < taperStart || idx >= taperEnd) return w; // не taper-неделя
+    // P0-fix: пропускать недели, уже являющиеся deload (объём < 60% предыдущей).
+    // Иначе taper×deload = двойное снижение (0.50×0.45 = 22.5% объёма = перетрен).
+    const curSets = w.sessions.flatMap(s => s.exercises).reduce((sum, e) => sum + e.sets, 0);
+    const prevSets = idx > 0 ? weeks[idx - 1].sessions.flatMap(s => s.exercises).reduce((sum, e) => sum + e.sets, 0) : curSets;
+    if (curSets < prevSets * 0.6) return w; // уже deload-неделя — не taper
     // Taper-степень: неделя 1 (taperStart) = 100%, неделя 2 = 75%, неделя 3 = 50%.
     // Интенсивность (вес) сохраняется на 100% — снижается только объём (сеты).
     const taperWeek = idx - taperStart; // 0, 1, 2

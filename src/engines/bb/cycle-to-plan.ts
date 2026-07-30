@@ -383,21 +383,40 @@ function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG)
   }
   // fallback by name keywords
   const l = exName.toLowerCase();
+  // P0-fix (критично): приоритетные проверки ДО broad-pattern, чтобы PL-движения
+  // и triceps-доминантные жимы не попадали в chest/back-пулы ББ-плана.
+  // 1. Close-grip / узкий хват → triceps (не chest; трицепс-доминантный жим)
+  if (l.includes('узк') || l.includes('close') || l.includes('средн') && l.includes('хват')) return 'triceps';
+  // 2. Overhead triceps extension / из-за головы → triceps (не chest)
+  if (l.includes('из-за голов') || l.includes('overhead') && l.includes('tricep')) return 'triceps';
+  // 3. PL-движения → null-маркер не подходит (функция возвращает string).
+  //    Sumo/deficit/rack pull/pause DL — не для ББ; возвращаем 'back' как наименее
+  //    плохой вариант (trueMuscleOf бы вернул null, но сигнатура не позволяет).
+  //    Лучше: вызывающий код должен использовать trueMuscleOf напрямую.
+  // 4. Становая (classic) — НЕ hamstrings в BB-контексте (PL-движение, trueMuscleOf=null).
+  //    Раньше: l.includes('становая') → 'hamstrings' — включало deadlift в BB hamstrings-дни.
+  //    Исправление: только Румынская/мёртвая на прямых ногах = hamstrings (см. ниже).
   // Плечи: махи, подъёмы перед собой / в стороны
   if (l.includes('махи') || l.includes('перед собой') || l.includes('в стороны') || l.includes('в сторону')) return 'shoulders';
   // Жимы на плечи
-  if (l.includes('жим') && (l.includes('стоя') || l.includes('сидя') || l.includes('армей') || l.includes('швунг'))) return 'shoulders';
-  // Грудь: жимы + разведения
-  if (l.includes('жим') || l.includes('кроссовер') || l.includes('развод') || l.includes('сведен')) return 'chest';
+  if (l.includes('жим') && (l.includes('standing') || l.includes('сидя') || l.includes('армей') || l.includes('швунг') || l.includes('ohp') || l.includes('overhead'))) return 'shoulders';
+  // Грудь: жимы + разведения (close-grip уже отловлен выше → triceps)
+  if (l.includes('жим') || l.includes('bench') || l.includes('кроссовер') || l.includes('развод') || l.includes('сведен') || l.includes('press')) return 'chest';
   if (l.includes('пуловер')) return 'chest';
-  // Спина: тяги + подтягивания
-  if (l.includes('тяга') || l.includes('подтяг') || l.includes('шраг')) return 'back';
+  // Спина: тяги + подтягивания (но не становая — она не растит широчайшие)
+  // P0-fix: добавлены английские имена (row, pull-up, pulldown) — программы используют их.
+  if ((l.includes('тяга') || l.includes('подтяг') || l.includes('шраг') || l.includes('row') || l.includes('pull') || l.includes('pulldown') || l.includes('chin')) && !l.includes('станов') && !l.includes('deadlift')) return 'back';
   if (l.includes('гиперэкстенз') || l.includes('наклон') && l.includes('штанг')) return 'back';
-  // Ноги — квадрицепс
-  if (l.includes('присед') || l.includes('выпад') || l.includes('фронт')) return 'quads';
+  // Ноги — квадрицепс (добавлены англ: squat, lunge)
+  if (l.includes('присед') || l.includes('выпад') || l.includes('фронт') || l.includes('squat') || l.includes('lunge')) return 'quads';
   if (l.includes('разгиб') && !l.includes('трицепс') && !l.includes('француз')) return 'quads';
-  // Ноги — бицепс бедра
-  if (l.includes('румын') || l.includes('мёртв') || l.includes('мертв') || l.includes('становая')) return 'hamstrings';
+  // Ноги — бицепс бедра (только BB posterior chain: румынская, мёртвая на прямых ногах)
+  if (l.includes('румын') || l.includes('мёртв') || l.includes('мертв') || l.includes('rdl')) return 'hamstrings';
+  if (l.includes('на прямых ногах') || l.includes('stiff')) return 'hamstrings';
+  // P0-fix: deadlift (англ.) — PL-движение. В BB-контексте конвертации лучше legs
+  // (задняя цепь), чем default 'chest' (L412). trueMuscleOf бы вернул null, но
+  // сигнатура возвращает string.
+  if (l.includes('deadlift') || l.includes('станов')) return 'legs';
   if (l.includes('сгибан') && !l.includes('бицепс') && !l.includes('молотк')) return 'hamstrings';
   // Икры
   if (l.includes('икры') || l.includes('подъем на носки') || l.includes('подъём на носки')) return 'calves';
@@ -489,10 +508,15 @@ function replacePLForBB(exName: string, group: string): { name: string; group: s
   // Приседания классические) → они заменялись на «Румынская тяга» (ноги). Теперь требуем
   // «станов» в имени для классич/сумо/дефицит-вариаций становой. «трап» сужаем до «трап.?гриф»,
   // иначе совпадает с «трапеции» (shrugs помечены как traps).
-  const isDeadliftVariant = /станова|станов/i.test(s) || /^станов/.test(s)
+  // P0-fix: BB posterior chain (RDL/румынская/мёртвая на прямых ногах/гудморнинг) —
+  // это уже ББ-упражнения (trueMuscleOf=hamstrings), НЕ PL. Не заменяем их.
+  // Раньше "Румынская становая тяга" ловилась как "станов" → заменялась на саму себя
+  // или на "Тяга штанги в наклоне", теряя hamstrings-стимул.
+  const isBBPosteriorChain = /румынск|rdl|мёртв.*найк|мёртв.*прям|stiff.?leg|гудмор|good.?morning|гиперэкстенз|обратн.*гипер|reverse.?hyper/i.test(s);
+  const isDeadliftVariant = !isBBPosteriorChain && (/станова|станов/i.test(s) || /^станов/.test(s)
     || (/^(классич|сумо|дефицит|рывков|толчков)/.test(s) && /станова|станов|тяга|deadlift/i.test(s))
     || /трап.?гриф|trap.?bar/i.test(s)
-    || /pendlay/i.test(s);
+    || /pendlay/i.test(s));
   if (isDeadliftVariant) {
     const g = (group || '').toLowerCase();
     if (g.includes('спин') || g === 'back' || g === 'спина') {
@@ -545,8 +569,10 @@ function replacePLForBB(exName: string, group: string): { name: string; group: s
   }
   // L8.2: Close-grip bench / жим средним хватом → Жим штанги лёжа узким хватом (трицепс-focus).
   // (Программы иногда пишут "Жим средним хватом" без "лёжа").
+  // P0-fix: group 'Трицепс' (не 'Грудь') — close-grip это трицепс-доминантный жим,
+  // trueMuscleOf возвращает triceps. Раньше 'Грудь' → попадал в chest MRV-кап.
   if (/средним хватом|узк|close.?grip|narrow.?grip/i.test(s)) {
-    return { name: 'Жим штанги лёжа узким хватом', group: 'Грудь' };
+    return { name: 'Жим штанги лёжа узким хватом', group: 'Трицепс' };
   }
   // L8.3: "Жим гантелей" без уточнения → каталог не содержит точное имя → DB bench press (грудь).
   // "Жим гантелей лёжа" / "Жим гантелей на наклонной" / "Жим гантелей сидя" — прямые имена,
@@ -569,10 +595,12 @@ function replacePLForBB(exName: string, group: string): { name: string; group: s
   // ОРИГИНАЛЬНОМУ имени (на случай если нормализатор исказил).
   // FIX legs-leak: сужаем `классич`/`трап` как выше (требуется «станов»/«тяга» контекст).
   const rawN = (exName || '').toLowerCase().trim();
-  const isDeadliftVariantRaw = /станова|станов/i.test(rawN) || /^станов/.test(rawN)
+  // P0-fix: симметрично с основным блоком — пропускаем BB posterior chain.
+  const isBBPosteriorChainRaw = /румынск|rdl|мёртв.*найк|мёртв.*прям|stiff.?leg|гудмор|good.?morning|гиперэкстенз|обратн.*гипер|reverse.?hyper/i.test(rawN);
+  const isDeadliftVariantRaw = !isBBPosteriorChainRaw && (/станова|станов/i.test(rawN) || /^станов/.test(rawN)
     || (/^(классич|сумо|дефицит|рывков|толчков)/.test(rawN) && /станова|станов|тяга|deadlift/i.test(rawN))
     || /трап.?гриф|trap.?bar/i.test(rawN)
-    || /pendlay/i.test(rawN);
+    || /pendlay/i.test(rawN));
   if (isDeadliftVariantRaw) {
     const g = (group || '').toLowerCase();
     if (g.includes('спин') || g === 'back' || g === 'спина') {
@@ -921,12 +949,15 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
       let sessionTag = 'FullBody';
       const isChest = dayMuscles.some(m => m === 'chest');
       const isBack = dayMuscles.some(m => m === 'back');
-      const isQuads = dayMuscles.some(m => m === 'quads');
+      const isQuads = dayMuscles.some(m => m === 'quads' || m === 'legs');
       const isHams = dayMuscles.some(m => m === 'hamstrings');
       const isShoulders = dayMuscles.some(m => m === 'shoulders');
       const isBi = dayMuscles.some(m => m === 'biceps');
       const isTri = dayMuscles.some(m => m === 'triceps');
-      const isLegs = isQuads || isHams;
+      // P0-fix: isLegs должен покрывать 'legs' group (составная группа каталога),
+      // иначе Румынская тяга (group=legs) в chest+back-дне не делает isLegs=true
+      // → sessionTag ошибочно = 'ChestBack' (должен быть 'FullBody').
+      const isLegs = isQuads || isHams || dayMuscles.some(m => m === 'glutes' || m === 'calves');
       if (isChest && isBack && !isLegs) sessionTag = 'ChestBack';
       else if (isChest && isTri && !isBack && !isLegs) sessionTag = 'Push';
       else if (isBack && isBi && !isChest && !isLegs) sessionTag = 'Pull';

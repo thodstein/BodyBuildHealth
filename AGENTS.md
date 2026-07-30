@@ -1,11 +1,11 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
-## Current project state (Jul 29 2026)
+## Current project state (Jul 30 2026)
 
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK (694+ modules)
-- `vitest` - 434 passing (excl. `_tmp_*` regression files: 2 pre-existing failures in _tmp_legs_regression, unrelated)
+- `vitest` - 454 passing (29 test files, including 25 new bb-audit-fixes tests)
 
 ### Git
 - `origin/main` - tracked
@@ -98,25 +98,50 @@ Tests: 63/63 in NutritionScreen_parts/IndividualPlan/__tests__/ pass (added plan
 
 ---
 
-## BB-builder: Priority 1 - RIR by training focus (in progress)
+## BB-builder: Priority 1 - RIR by training focus (DONE Jul 30 2026)
 
 Goal: add `BBTrainingFocus` type (`'strength' | 'hypertrophy' | 'endurance'`) to control RIR/reps/tempo based on evidence 2022+.
 
-Done so far:
+Done:
 - `bb-goal-types.ts` - created with `FOCUS_RIR_TABLE`, `FOCUS_REPS_TABLE`, `PHASE_TEMPO`, `LEVEL_REP_MOD`
 - `bb-tempo-rest.ts` - `tempoFor()` accepts optional `phase` param (ACSM 2023: eccentric 2-4s)
 - `bb-builder.engine.ts`:
   - Added `trainingFocus` + `bodyFat` + `leanMass` + `hrvMs` + `sleepHours` + `stressLevel` + `eccentricMult` + `calorieSurplus` + `proteinPerKg` to `BBBuilderInput`
-  - `charReps()` now takes `focus` param - uses `FOCUS_REPS_TABLE`
-  - `bbRir()` now takes `focus` param - uses `FOCUS_RIR_TABLE` (Roberts 2022, Schoenfeld 2021)
-  - `buildSession()` now accepts `trainingFocus` and forwards to `bbRir`
+  - `bbRir()` takes `focus` param - uses `FOCUS_RIR_TABLE` (Roberts 2022, Schoenfeld 2021)
+  - `buildSession()` accepts `trainingFocus` and forwards to `bbRir`
+  - Recovery multiplier from `bodyFat/leanMass/hrvMs/sleepHours/stressLevel` → MRV adjustment
+  - Protein/calorie multiplier from `proteinPerKg/calorieSurplus` → MRV adjustment
 
-Still needed:
-- `buildSession()` call site in `buildBBPlan` (line ~1907) - needs `input.trainingFocus` passed
-- `tempoFor()` call sites (4) - pass `phase` param
-- `charReps()` call sites - pass `focus` param
-- Compute recovery multiplier from `bodyFat/leanMass/hrvMs/sleepHours/stressLevel` → MRV adjustment
-- Compute protein/calorie multiplier from `proteinPerKg/calorieSurplus` → MRV adjustment
+---
+
+## BB-builder: Critical audit fixes (DONE Jul 30 2026)
+
+Full critical analysis of BB-auto engine. Fixed PL exercises appearing on wrong muscle groups + code quality.
+
+### ФАЗА 1: Каталог + PL→BB group fixes (P0)
+- `exercise-catalog.ts`: `bench_closegrip` group `chest`→`triceps`, `face_pull` group `back`→`shoulders`, `deadlift_romanian` group `back`→`legs`
+- `lms-builder.engine.ts`: `injectPLWeakPoints` + `groupOfExercise` use `trueMuscleOf` instead of catalog `.group` (bench_closegrip→triceps MRV, face_pull→shoulders MRV); `liftToEnGroup`: deadlift `back`→`hamstrings`
+- `cycle-to-plan.ts` `muscleGroupFromExName`: priority checks for close-grip→triceps, overhead triceps→triceps; added English names (deadlift→legs, squat→quads, row→back, pull-up→back); `deadlift`→`legs` (was default `chest`)
+- `cycle-to-plan.ts` `replacePLForBB`: close-grip `Грудь`→`Трицепс`; BB posterior chain (RDL/гудморнинг/hyperextension) excluded from replacement (they're already BB exercises, not PL)
+- `cycle-to-plan.ts` `isLegs`: expanded to include `legs`/`glutes`/`calves` groups (was only `quads`/`hamstrings` — Румынская тяга with group=legs leaked into ChestBack days)
+
+### ФАЗА 2: Dead code removal (P1)
+- Deleted `charReps()` (bb-builder:470-475) — not called, replaced by `PHASE_CONFIGS[phase].repRange`
+- Deleted `phaseBaseRir()` (bb-builder:480-486) — not called, replaced by `bbRir()`
+- Removed unused imports `FOCUS_REPS_TABLE`, `LEVEL_REP_MOD` from bb-builder
+- NOTE: `rirDrift` and `bb-intensity-techniques.ts` were NOT deleted (used by BbAutoConstructor/BbToolsCard UI)
+
+### ФАЗА 3: Logic fixes (P1)
+- `restProgression` (bb-builder:1465): deload → +30s rest (recovery), other phases → -15s/week (density). Was always -15s which made deload harder.
+- `applyTaperToFinalWeeks` (bb-autocoach:737): skip weeks already at deload volume (<60% prev). Prevents double reduction (taper × deload = 22.5% volume = overtraining).
+- `weightModFor` (bb-builder:1315): наклон 0.85→0.95 (Biel 2017: 30° incline = -5-10%, not -15%), машина 0.75→0.85, кабель 0.70→0.80 (Schoenfeld 2021)
+
+### ФАЗА 4: Evidence-based (P2)
+- `sessionShareFor` 3×/нед primary factor 1.5→1.2 (Schoenfeld 2016: high frequency = less per session, not more). Was inverted: 3×/нед gave MORE volume per session than 2×/нед.
+
+### Tests
+- 25 new tests in `bb-audit-fixes.test.ts`: catalog groups, trueMuscleOf, injectPLWeakPoints, muscleGroupFromExName edge cases, restProgression deload, taper deload-skip, sessionShareFor frequency, weightModFor
+- All 454 tests pass (29 test files), 0 TS errors
 
 ---
 

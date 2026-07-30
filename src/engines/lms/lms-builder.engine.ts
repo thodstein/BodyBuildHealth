@@ -18,6 +18,7 @@ import { diagnoseLift } from '../pro/lift-diagnostics.engine';
 
 import { computeVolumeLandmarks, getVolumeLandmarks, getAllVolumeLandmarks } from '../volume-landmarks.engine';
 import { adaptForPEDs, type PED } from '../bb/bb-ped-adaptation.engine';
+import { trueMuscleOf } from '../movement-pattern';
 
 export interface LMSBuildInput {
   template: SRCycleTemplate;
@@ -129,9 +130,11 @@ function exEnGroup(g: string | undefined): string | undefined {
   return RU_TO_EN[ru];
 }
 
-/** Группа (английский ключ) основного лифта — для MRV soft-cap внедряемого аксессуара. */
+/** Группа (английский ключ) основного лифта — для MRV soft-cap внедряемого аксессуара.
+ *  deadlift → 'hamstrings' (задняя цепь), не 'back' (становая не растит широчайшие).
+ *  Иначе MRV-кап accessory считался по back, а не по hamstrings. */
 function liftToEnGroup(lift: Lift): string {
-  const m: Record<string, string> = { bench: 'chest', squat: 'legs', deadlift: 'back', ohp: 'shoulders', row: 'back', pulldown: 'back', incline_press: 'chest' };
+  const m: Record<string, string> = { bench: 'chest', squat: 'legs', deadlift: 'hamstrings', ohp: 'shoulders', row: 'back', pulldown: 'back', incline_press: 'chest' };
   return m[lift] || 'back';
 }
 
@@ -213,17 +216,19 @@ function findCatalogExerciseByLabel(label: string): Exercise | null {
   return ex || null;
 }
 
-/** Группа (английский ключ) упражнения по каталогу + фолбэк на тег шаблона. */
+/** Группа (английский ключ) упражнения по каталогу + фолбэк на тег шаблона.
+ *  P0-fix: trueMuscleOf как канон — catalog .group содержит ошибки (close-grip=chest,
+ *  face_pull=back, deadlift=back). Без trueMuscleOf MRV-подсчёт уходит не туда. */
 function groupOfExercise(name: string, fallback: string): string {
   const ex = EXERCISE_CATALOG.find(e => norm(e.name) === norm(name));
-  if (ex?.group) return ex.group as string;
+  if (ex) return trueMuscleOf(ex) ?? (ex.group as string) ?? fallback;
   // fuzzy match
   const n = norm(name);
   const fx = EXERCISE_CATALOG.find(e => {
     const en = norm(e.name);
     return en.length > 2 && (en.includes(n) || n.includes(en));
   });
-  if (fx?.group) return fx.group as string;
+  if (fx) return trueMuscleOf(fx) ?? (fx.group as string) ?? fallback;
   return fallback;
 }
 
@@ -320,7 +325,10 @@ function injectPLWeakPoints(
       const resolvedName = ex ? ex.name : c.name;
       const existing = new Set(heavyDay.exercises.map(e => norm(e.name)));
       if (!existing.has(norm(resolvedName)) && heavyDay.exercises.length < 8) {
-        const exGroup = ex ? (ex.group as string) : liftGroup;
+        // P0-fix: trueMuscleOf как канонический резолвер группы. Catalog .group
+        // содержит ошибки (bench_closegrip=chest, face_pull=back, deadlift=back),
+        // которые приводят к MRV-капу по неправильной мышце.
+        const exGroup = ex ? (trueMuscleOf(ex) ?? (ex.group as string)) : liftGroup;
         const sets = Math.max(2, Math.round(3 * phaseVolMod));
         const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? Object.entries(pmRow).find(([k]) => norm(k) === norm(mainName) || norm(k).includes(norm(mainName)) || norm(mainName).includes(norm(k)))?.[1] ?? 80;
         const ref = getVolumeLandmarks(vrLevel, exGroup);
@@ -352,7 +360,7 @@ function injectPLWeakPoints(
         const resolvedName = ex ? ex.name : c.name;
         const existing = new Set(lightDay.exercises.map(e => norm(e.name)));
         if (!existing.has(norm(resolvedName)) && lightDay.exercises.length < 8) {
-          const exGroup = ex ? (ex.group as string) : liftGroup;
+          const exGroup = ex ? (trueMuscleOf(ex) ?? (ex.group as string)) : liftGroup;
           const sets = Math.max(2, Math.round(3 * phaseVolMod));
           const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? 80;
           const ref = getVolumeLandmarks(vrLevel, exGroup);
