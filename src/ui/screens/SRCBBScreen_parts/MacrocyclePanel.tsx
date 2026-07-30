@@ -27,28 +27,69 @@ const PHASE_ICON: Record<MacroPhase, string> = {
 };
 
 const STORAGE_KEY = 'he_pl_macro';
+const SCHEMA_VERSION = 2;
+
+/** Миграция storage: v1 → v2 (добавлен kind в массив блоков). */
+function migrateStorage(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const o = JSON.parse(raw);
+    if (!o || !Array.isArray(o.b)) return raw; // не наш формат
+    // Проверить, есть ли уже kind в блоках (v2+). Если нет — мигрировать.
+    let migrated = false;
+    const b = o.b.map((block: any) => {
+      if (!block[3] || (block[3] !== 'SRC' && block[3] !== 'BB')) {
+        // v1: kind отсутствует или невалиден → default 'SRC'
+        block[3] = 'SRC';
+        migrated = true;
+      }
+      return block;
+    });
+    if (migrated) {
+      const updated = JSON.stringify({ ...o, b, v: SCHEMA_VERSION });
+      try { localStorage.setItem(STORAGE_KEY, updated); } catch { /* ignore */ }
+      return updated;
+    }
+    return raw;
+  } catch { return raw; }
+}
 
 interface Props {
   level: string;
   goal: 'powerlifting' | 'bodybuilding' | 'general';
   onApplyCycle: (cycleId: string, weeks: number) => void;
+  /** Опционально: callback при изменении level (для редактируемого селектора). */
+  onLevelChange?: (level: string) => void;
+  /** Опционально: callback при изменении goal (для редактируемого селектора). */
+  onGoalChange?: (goal: 'powerlifting' | 'bodybuilding' | 'general') => void;
 }
 
-export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle }) => {
+export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, onLevelChange, onGoalChange }) => {
+  // Локальные редактируемые значения (если onLevelChange/onGoalChange не переданы — селекторы disabled)
+  const [localLevel, setLocalLevel] = useState<string>(level);
+  const [localGoal, setLocalGoal] = useState<'powerlifting' | 'bodybuilding' | 'general'>(goal);
+  const effLevel = onLevelChange ? level : localLevel;
+  const effGoal = onGoalChange ? goal : localGoal;
   const [macro, setMacro] = useState<Macrocycle | null>(() => {
-    try { const s = localStorage.getItem(STORAGE_KEY); return s ? deserializeMacro(s) : null; } catch { return null; }
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const migrated = migrateStorage(raw);
+      return migrated ? deserializeMacro(migrated) : null;
+    } catch { return null; }
   });
   const [compWeek, setCompWeek] = useState<number>(macro?.competitionWeek ?? 44);
   const [totalWeeks, setTotalWeeks] = useState<number>(macro?.totalWeeks ?? 52);
   const [selectedBlockIdx, setSelectedBlockIdx] = useState<number>(-1);
   const [editWeeks, setEditWeeks] = useState<Record<string, number>>({});
+  // Маркер текущей недели (1-индекс). По умолчанию неделя 1 = "сегодня" (начало макро).
+  const [currentWeekIdx, setCurrentWeekIdx] = useState<number>(1);
 
   useEffect(() => {
     if (macro) { try { localStorage.setItem(STORAGE_KEY, serializeMacro(macro)); } catch { /* ignore */ } }
   }, [macro]);
 
   const build = () => {
-    const input: MacroInput = { level, goal, competitionWeek: compWeek, totalWeeks };
+    const input: MacroInput = { level: effLevel, goal: effGoal, competitionWeek: compWeek, totalWeeks };
     const m = buildMacrocycle(input);
     setMacro(m);
     setSelectedBlockIdx(-1);
@@ -84,13 +125,30 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle }) 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <div>
             <div style={LABEL}>Уровень</div>
-            <select style={SEL} value={level} disabled>
-              <option value={level}>{level}</option>
+            <select style={SEL} value={effLevel}
+              disabled={!onLevelChange}
+              onChange={e => {
+                if (onLevelChange) onLevelChange(e.target.value);
+                else setLocalLevel(e.target.value);
+              }}>
+              {onLevelChange ? (
+                <option value={effLevel}>{effLevel}</option>
+              ) : (
+                ['beginner', 'novice', 'III-KMS', 'II-KMS', 'I-KMS', 'MS', 'intermediate', 'advanced', 'enhanced'].map(lvl => (
+                  <option key={lvl} value={lvl}>{lvl}</option>
+                ))
+              )}
             </select>
           </div>
           <div>
             <div style={LABEL}>Цель</div>
-            <select style={SEL} value={goal} disabled>
+            <select style={SEL} value={effGoal}
+              disabled={!onGoalChange}
+              onChange={e => {
+                const v = e.target.value as 'powerlifting' | 'bodybuilding' | 'general';
+                if (onGoalChange) onGoalChange(v);
+                else setLocalGoal(v);
+              }}>
               <option value="powerlifting">Пауэрлифтинг</option>
               <option value="bodybuilding">Бодибилдинг</option>
               <option value="general">Общее</option>
@@ -115,8 +173,8 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle }) 
       {macro && (
         <div style={CARD}>
           <div style={H}>📅 Таймлайн ({macro.totalWeeks} нед)</div>
-          {/* Горизонтальная полоса с блоками */}
-          <div style={{ display: 'flex', height: 56, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 8 }}>
+          {/* Горизонтальная полоса с блоками + маркер текущей недели */}
+          <div style={{ display: 'flex', height: 56, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 8, position: 'relative' }}>
             {macro.blocks.map((b, i) => {
               const pct = (b.weeks / macro.totalWeeks) * 100;
               const isSel = selectedBlockIdx === i;
@@ -146,15 +204,37 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle }) 
                 </div>
               );
             })}
+            {/* Маркер текущей недели (неделя 1 = "сегодня", начало макроцикла).
+                Показывает вертикальную линию на позиции currentWeekIdx. */}
+            {currentWeekIdx >= 1 && currentWeekIdx <= macro.totalWeeks && (() => {
+              const posPct = ((currentWeekIdx - 1) / macro.totalWeeks) * 100;
+              return (
+                <div style={{
+                  position: 'absolute', top: 0, bottom: 0, left: `${posPct}%`, width: 2,
+                  background: '#fff', boxShadow: '0 0 4px rgba(255,255,255,0.8)', pointerEvents: 'none', zIndex: 5,
+                }} title={`Текущая неделя ${currentWeekIdx}`}>
+                  <span style={{ position: 'absolute', top: -14, left: -8, fontSize: 8, color: '#fff', fontWeight: 700, background: 'rgba(0,0,0,0.6)', padding: '1px 3px', borderRadius: 3 }}>●{currentWeekIdx}</span>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Линейка недель */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
             <span>Нед 1</span>
             <span>Нед {Math.round(macro.totalWeeks / 4)}</span>
             <span>Нед {Math.round(macro.totalWeeks / 2)}</span>
             <span>Нед {Math.round(macro.totalWeeks * 3 / 4)}</span>
             <span>Нед {macro.totalWeeks}</span>
+          </div>
+          {/* Маркер текущей недели — редактор */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+            <span>📍 Текущая неделя:</span>
+            <input style={{ ...IN, padding: '3px 6px', fontSize: 11, width: 50, minHeight: 30, textAlign: 'center' }}
+              type="number" min={1} max={macro.totalWeeks}
+              value={currentWeekIdx}
+              onChange={e => setCurrentWeekIdx(Math.max(1, Math.min(macro.totalWeeks, +e.target.value || 1)))} />
+            <span style={{ color: 'rgba(255,255,255,0.4)' }}>(маркер на таймлайне)</span>
           </div>
 
           {/* Детали выбранного блока */}

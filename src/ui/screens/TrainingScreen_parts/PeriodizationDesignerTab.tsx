@@ -119,6 +119,13 @@ export const PeriodizationDesignerTab: React.FC = () => {
     setCurrentId(dup.id);
   }, [current, refresh]);
 
+  const handleSaveSport = useCallback((sport: MacrocycleDesign['sport']) => {
+    if (!current) return;
+    const updated = { ...current, sport, updatedAt: new Date().toISOString() };
+    saveDesign(updated);
+    refresh();
+  }, [current, refresh]);
+
   const editBlock = useMemo(() => {
     if (!editBlockId || !current) return null;
     return current.blocks.find(b => b.id === editBlockId) || null;
@@ -168,6 +175,21 @@ export const PeriodizationDesignerTab: React.FC = () => {
               <input value={current.name} onChange={e => handleSaveName(e.target.value)}
                 style={{ background: 'transparent', border: 'none', borderBottom: '1px dashed rgba(255,255,255,0.2)', color: '#fff', fontSize: 14, fontWeight: 700, width: '60%', outline: 'none' }} />
               <span style={{ fontSize: 10, color: DIM }}>{current.totalWeeks} нед · {current.blocks.length} блоков</span>
+            </div>
+            {/* Sport selector — определяет направление программы при применении дизайнера */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <span style={{ fontSize: 10, color: DIM }}>Вид спорта:</span>
+              <select
+                value={current.sport}
+                onChange={e => handleSaveSport(e.target.value as MacrocycleDesign['sport'])}
+                style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '4px 8px', fontSize: 10, cursor: 'pointer' }}
+              >
+                <option value="powerlifting">Пауэрлифтинг</option>
+                <option value="bodybuilding">Бодибилдинг</option>
+                <option value="general">Общее</option>
+                <option value="weightlifting">Тяжёлая атлетика</option>
+                <option value="crossfit">Crossfit</option>
+              </select>
             </div>
             {stats && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 10, color: DIM }}>
@@ -379,7 +401,25 @@ export const PeriodizationDesignerTab: React.FC = () => {
         return (
           <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить первый блок «{PHASE_LABELS_RU[fb.phaseKey] || fb.phaseKey}» к планировщику. Полная последовательность: {seq}.</div>
-            <button onClick={() => applyToPlanner({ kind: r.kind, label: 'Периодизация: ' + seq, data: r.data })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить периодизацию к планировщику</button>
+            <button onClick={() => applyToPlanner({ kind: r.kind, label: 'Периодизация: ' + seq, data: r.data })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44, marginBottom: 8 }}>🛠 Применить первый блок к планировщику</button>
+            {/* Новая кнопка: применить весь дизайн как новую программу (через bridge kind='design') */}
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 6, marginTop: 4 }}>📥 Применить ВЕСЬ дизайн ({current.blocks.length} блоков, {current.totalWeeks} нед) к ручному планировщику как новую программу с правильными фазами по всем неделям.</div>
+            <button
+              onClick={() => applyToPlanner({
+                kind: 'design',
+                label: 'Дизайн: ' + current.name + ' (' + current.totalWeeks + ' нед, ' + current.blocks.length + ' блоков)',
+                data: { design: current, fillExercises: false, daysPerWeek: 4 },
+              })}
+              style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff', fontWeight: 800, fontSize: 13, minHeight: 44, marginBottom: 8 }}
+            >📥 Применить к новой программе (скелет)</button>
+            <button
+              onClick={() => applyToPlanner({
+                kind: 'design',
+                label: 'Дизайн+упражнения: ' + current.name + ' (' + current.totalWeeks + ' нед)',
+                data: { design: current, fillExercises: true, daysPerWeek: 4 },
+              })}
+              style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', color: '#fff', fontWeight: 700, fontSize: 12, minHeight: 40 }}
+            >🏋️ Применить с упражнениями (autodraft)</button>
           </div>
         );
       })()}

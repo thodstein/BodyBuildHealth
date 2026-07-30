@@ -1,0 +1,433 @@
+import { describe, it, expect } from 'vitest';
+import { buildLMSPlan, extractExercises } from '../lms/lms-builder.engine';
+import { pmProgression, workWeight, pmForWeek } from '../lms/lms-progression.engine';
+import { lmsPlanToSessions } from '../training-integration.engine';
+import { CYCLE_01 } from '../../data/lms-cycles/cycle-01';
+import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
+
+// ── Helpers ──
+const pmMap = { 'Присед': 150, 'Жим лежа': 110, 'Становая тяга': 180 };
+
+function buildCycle01Plan(overrides: Partial<Parameters<typeof buildLMSPlan>[0]> = {}) {
+  return buildLMSPlan({
+    template: CYCLE_01,
+    pmMap,
+    fallbackPm: 80,
+    mode: 'natural',
+    weeksOverride: 12,
+    ...overrides,
+  });
+}
+
+// ── buildLMSPlan ──
+describe('buildLMSPlan', () => {
+  it('генерирует 12 недель для cycle-01', () => {
+    const plan = buildCycle01Plan();
+    expect(plan.weeks).toHaveLength(12);
+  });
+
+  it('неделя 1 содержит 3 дня', () => {
+    const plan = buildCycle01Plan();
+    expect(plan.weeks[0].days).toHaveLength(3);
+  });
+
+  it('PM растёт по неделям (natural, +0.5%/нед)', () => {
+    const plan = buildCycle01Plan();
+    const w1pm = plan.weeks[0].pmRow['Присед'];
+    const w12pm = plan.weeks[11].pmRow['Присед'];
+    expect(w12pm).toBeGreaterThan(w1pm);
+    // (1.005)^11 ≈ 1.056
+    expect(w12pm / w1pm).toBeCloseTo(1.056, 2);
+  });
+
+  it('PM week 1 = входной PM (без прогрессии в первую неделю)', () => {
+    const plan = buildCycle01Plan();
+    expect(plan.weeks[0].pmRow['Присед']).toBe(150);
+    expect(plan.weeks[0].pmRow['Жим лежа']).toBe(110);
+    expect(plan.weeks[0].pmRow['Становая тяга']).toBe(180);
+  });
+
+  it('каждое упражнение имеет workSets с weight > 0', () => {
+    const plan = buildCycle01Plan();
+    for (const wk of plan.weeks) {
+      for (const day of wk.days) {
+        for (const ex of day.exercises) {
+          for (const ws of ex.workSets) {
+            expect(ws.weight).toBeGreaterThan(0);
+            expect(ws.sets).toBeGreaterThan(0);
+            expect(ws.reps).toBeGreaterThan(0);
+        }
+      }
+    }
+    }
+  });
+
+  it('все упражнения имеют rir (фаза мезоцикла)', () => {
+    const plan = buildCycle01Plan();
+    for (const wk of plan.weeks) {
+      for (const day of wk.days) {
+        for (const ex of day.exercises) {
+          for (const ws of ex.workSets) {
+            expect(ws.rir).toBeGreaterThanOrEqual(0);
+            expect(ws.rir).toBeLessThanOrEqual(5);
+          }
+        }
+      }
+    }
+  });
+
+  it('дельнейшая неделя при делоде имеет более высокий RIR', () => {
+    const plan = buildCycle01Plan({ weeksOverride: 8 });
+    // week 4 — deload (каждая 4-я неделя в base phase)
+    const wk3Rir = plan.weeks[2].days[0].exercises[0].workSets[0].rir;
+    const wk4Rir = plan.weeks[3].days[0].exercises[0].workSets[0].rir;
+    expect(wk4Rir).toBeGreaterThanOrEqual(wk3Rir);
+  });
+
+  it('S-MRV floor: аксессуары ≥ 2 подходов (до taper)', () => {
+    const plan = buildCycle01Plan();
+    // Проверяем только первые недели (taper к финальным 2 неделям может снижать ниже 2)
+    for (const wk of plan.weeks.slice(0, -2)) {
+      for (const day of wk.days) {
+        for (const ex of day.exercises) {
+          if (ex.load !== 'Тяжелая') {
+            for (const ws of ex.workSets) {
+              expect(ws.sets).toBeGreaterThanOrEqual(2);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('volumeGoal=mrv даёт больше сетов аксессуарам чем mev', () => {
+    const planMev = buildCycle01Plan({ volumeGoal: 'mev' });
+    const planMrv = buildCycle01Plan({ volumeGoal: 'mrv' });
+    // Сравниваем общее число сетов на неделе 1
+    const setsMev = planMev.weeks[0].days[0].exercises.filter(e => e.load !== 'Тяжелая')
+      .reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+    const setsMrv = planMrv.weeks[0].days[0].exercises.filter(e => e.load !== 'Тяжелая')
+      .reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+    expect(setsMrv).toBeGreaterThanOrEqual(setsMev);
+  });
+
+  it('on_course mode увеличивает прогрессию', () => {
+    const planNat = buildCycle01Plan({ mode: 'natural' });
+    const planCourse = buildCycle01Plan({ mode: 'on_course', courseIntensity: 'moderate' });
+    const w12Nat = planNat.weeks[11].pmRow['Присед'];
+    const w12Course = planCourse.weeks[11].pmRow['Присед'];
+    expect(w12Course).toBeGreaterThan(w12Nat);
+  });
+
+  it('focusLift = squat увеличивает объём приседаний', () => {
+    const planBase = buildCycle01Plan();
+    const planFocus = buildCycle01Plan({ focusLift: 'squat' });
+    const setsBase = planBase.weeks[0].days.flatMap(d => d.exercises)
+      .filter(e => e.name.toLowerCase().includes('присед'))
+      .reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+    const setsFocus = planFocus.weeks[0].days.flatMap(d => d.exercises)
+      .filter(e => e.name.toLowerCase().includes('присед'))
+      .reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+    expect(setsFocus).toBeGreaterThanOrEqual(setsBase);
+  });
+
+  it('метрики цикла присутствуют', () => {
+    const plan = buildCycle01Plan();
+    expect(plan.cycleMetrics).toBeDefined();
+    expect(plan.cycleMetrics.tonnage).toBeGreaterThan(0);
+    expect(plan.cycleMetrics.kpsh).toBeGreaterThan(0);
+    expect(plan.cycleMetrics.sessions).toBeGreaterThan(0);
+  });
+
+  it('plVolumeLandmarks содержат группы', () => {
+    const plan = buildCycle01Plan();
+    expect(plan.plVolumeLandmarks.length).toBeGreaterThan(0);
+    for (const r of plan.plVolumeLandmarks) {
+      expect(r.group).toBeTruthy();
+      expect(r.mrv).toBeGreaterThan(0);
+      expect(r.mev).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('бросает ошибку при невалидном шаблоне (no week1)', () => {
+    const badTpl: SRCycleTemplate = {
+      meta: { ...CYCLE_01.meta },
+      week1: [],
+    };
+    expect(() => buildLMSPlan({ template: badTpl, pmMap, fallbackPm: 80 }))
+      .toThrow('week1 must be a non-empty array');
+  });
+
+  it('бросает ошибку при невалидном fallbackPm', () => {
+    expect(() => buildCycle01Plan({ fallbackPm: 0 }))
+      .toThrow('fallbackPm must be > 0');
+  });
+
+  it('бросает ошибку при невалидном pct', () => {
+    const badTpl: SRCycleTemplate = {
+      ...CYCLE_01,
+      week1: [{ exercises: [{ name: 'Присед', group: 'ЖМ', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{ pct: 1.5, reps: 6, sets: 4 }] }] }],
+    };
+    expect(() => buildLMSPlan({ template: badTpl, pmMap, fallbackPm: 80 }))
+      .toThrow('invalid pct');
+  });
+
+  it('бросает ошибку при 0 sets', () => {
+    const badTpl: SRCycleTemplate = {
+      ...CYCLE_01,
+      week1: [{ exercises: [{ name: 'Присед', group: 'ЖМ', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{ pct: 0.5, reps: 6, sets: 0 }] }] }],
+    };
+    expect(() => buildLMSPlan({ template: badTpl, pmMap, fallbackPm: 80 }))
+      .toThrow('invalid sets count');
+  });
+
+  it('extractExercises извлекает уникальные имена', () => {
+    const names = extractExercises(CYCLE_01);
+    expect(names.length).toBeGreaterThan(0);
+    expect(names).toContain('Присед');
+    expect(names).toContain('Жим лежа');
+    expect(names).toContain('Становая тяга');
+    // должны быть уникальными
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('faithful multi-week: weeks[1] не дублирует week[0]', () => {
+    // Создаём faithful цикл с 2 явными неделями
+    const week2Layout = CYCLE_01.week1.map(day => ({
+      exercises: day.exercises.map(ex => ({
+        ...ex,
+        sets: ex.sets.map(s => ({ ...s, pct: s.pct * 1.02 })),
+      })),
+    }));
+    const faithfulTpl: SRCycleTemplate = {
+      ...CYCLE_01,
+      weeks: [CYCLE_01.week1, week2Layout],
+    };
+    const plan = buildLMSPlan({ template: faithfulTpl, pmMap, fallbackPm: 80 });
+    expect(plan.weeks).toHaveLength(2);
+    // PM должен быть одинаковым (faithful = без авто-прогрессии)
+    expect(plan.weeks[0].pmRow['Присед']).toBe(plan.weeks[1].pmRow['Присед']);
+  });
+
+  // ── P1: ACWR / autoReg / PEDs интеграция ──
+
+  it('ACWR zone=caution → объём снижен, RIR повышен', () => {
+    const planBase = buildCycle01Plan();
+    const planCaution = buildCycle01Plan({
+      acwr: { ratio: 1.4, zone: 'caution' },
+    });
+    const baseSets = planBase.weeks[0].days[0].exercises.reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+    const cautionSets = planCaution.weeks[0].days[0].exercises.reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+    expect(cautionSets).toBeLessThanOrEqual(baseSets);
+    // RIR должен быть выше при caution
+    const baseRir = planBase.weeks[0].days[0].exercises[0].workSets[0].rir;
+    const cautionRir = planCaution.weeks[0].days[0].exercises[0].workSets[0].rir;
+    expect(cautionRir).toBeGreaterThanOrEqual(baseRir);
+  });
+
+  it('ACWR zone=dangerous → deload (объём ×0.65)', () => {
+    const plan = buildCycle01Plan({
+      acwr: { ratio: 1.6, zone: 'dangerous' },
+    });
+    const planBase = buildCycle01Plan();
+    const baseSets = planBase.weeks[0].days[0].exercises.reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+    const dangerSets = plan.weeks[0].days[0].exercises.reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+    expect(dangerSets).toBeLessThan(baseSets);
+  });
+
+  it('autoReg topSetPctMultiplier < 1 → вес снижен', () => {
+    const planBase = buildCycle01Plan();
+    const planReg = buildCycle01Plan({
+      autoReg: { topSetPctMultiplier: 0.9, volumeMultiplier: 1, rirShift: 1, deload: false },
+    });
+    const baseW = planBase.weeks[0].days[0].exercises[0].workSets[0].weight;
+    const regW = planReg.weeks[0].days[0].exercises[0].workSets[0].weight;
+    expect(regW).toBeLessThan(baseW);
+  });
+
+  it('autoReg rirShift → RIR увеличен', () => {
+    const plan = buildCycle01Plan({
+      autoReg: { topSetPctMultiplier: 1, volumeMultiplier: 1, rirShift: 2, deload: false },
+    });
+    const planBase = buildCycle01Plan();
+    const baseRir = planBase.weeks[0].days[0].exercises[0].workSets[0].rir;
+    const regRir = plan.weeks[0].days[0].exercises[0].workSets[0].rir;
+    expect(regRir).toBe(baseRir + 2);
+  });
+
+  it('PEDs (AAS) → pedMrvMult > 1 (dose-aware)', () => {
+    const plan = buildCycle01Plan({
+      mode: 'on_course',
+      peds: ['AAS' as any],
+      pedDoses: { AAS: 500 },
+      courseIntensity: 'moderate',
+    });
+    // PED-адаптация должна упоминаться в rationale
+    expect(plan.progressionRationale).toContain('PED');
+  });
+
+  it('ACWR + autoReg комбинируются (объём и вес снижены)', () => {
+    const plan = buildCycle01Plan({
+      acwr: { ratio: 1.4, zone: 'caution' },
+      autoReg: { topSetPctMultiplier: 0.92, volumeMultiplier: 0.85, rirShift: 1, deload: false },
+    });
+    const planBase = buildCycle01Plan();
+    const baseW = planBase.weeks[0].days[0].exercises[0].workSets[0].weight;
+    const regW = plan.weeks[0].days[0].exercises[0].workSets[0].weight;
+    expect(regW).toBeLessThan(baseW);
+  });
+
+  // ── P1: PL Taper к финальным неделям ──
+
+  it('Taper: финальная неделя имеет меньше сетов чем первая', () => {
+    const plan = buildCycle01Plan();
+    const firstWeekSets = plan.weeks[0].days[0].exercises.reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+    const lastWeekSets = plan.weeks[plan.weeks.length - 1].days[0].exercises.reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+    expect(lastWeekSets).toBeLessThan(firstWeekSets);
+  });
+
+  it('Taper: RIR финальной недели выше чем первой', () => {
+    const plan = buildCycle01Plan();
+    const firstRir = plan.weeks[0].days[0].exercises[0].workSets[0].rir;
+    const lastRir = plan.weeks[plan.weeks.length - 1].days[0].exercises[0].workSets[0].rir;
+    expect(lastRir).toBeGreaterThanOrEqual(firstRir);
+  });
+
+  it('Taper: rationale содержит упоминание taper', () => {
+    const plan = buildCycle01Plan();
+    expect(plan.progressionRationale).toContain('Taper');
+  });
+
+  it('Taper не применяется при ACWR deload (опасная зона)', () => {
+    const plan = buildCycle01Plan({ acwr: { ratio: 1.6, zone: 'dangerous' } });
+    // при ACWR deload taper не применяется (acwrDeload=true)
+    expect(plan.progressionRationale).not.toContain('Taper');
+  });
+
+  it('Taper не применяется для faithful (explicit weeks)', () => {
+    const week2Layout = CYCLE_01.week1.map(day => ({
+      exercises: day.exercises.map(ex => ({ ...ex, sets: ex.sets.map(s => ({ ...s, pct: s.pct * 1.02 })) })),
+    }));
+    const faithfulTpl: SRCycleTemplate = { ...CYCLE_01, weeks: [CYCLE_01.week1, week2Layout] };
+    const plan = buildLMSPlan({ template: faithfulTpl, pmMap, fallbackPm: 80 });
+    // 2-недельный план < 4 нед → taper не применяется
+    expect(plan.progressionRationale).not.toContain('Taper');
+  });
+
+  // ── P3: Recovery multiplier ──
+
+  it('Recovery multiplier: хорошие метрики → упоминание в rationale', () => {
+    const plan = buildCycle01Plan({
+      bodyFat: 15, leanMass: 80, hrvMs: 75, sleepHours: 8, stressLevel: 2,
+    });
+    expect(plan.progressionRationale).toContain('Recovery multiplier');
+    expect(plan.progressionRationale).toContain('×1.');
+  });
+
+  it('Recovery multiplier: плохой сон → множитель < 1', () => {
+    const plan = buildCycle01Plan({
+      bodyFat: 30, hrvMs: 30, sleepHours: 4, stressLevel: 8,
+    });
+    expect(plan.progressionRationale).toContain('Recovery multiplier');
+    // множитель должен быть < 1 (плохие метрики)
+    expect(plan.progressionRationale).toContain('×0.');
+  });
+
+  it('Recovery multiplier отсутствует если метрики не переданы', () => {
+    const plan = buildCycle01Plan();
+    expect(plan.progressionRationale).not.toContain('Recovery multiplier');
+  });
+});
+
+// ── pmProgression ──
+describe('pmProgression', () => {
+  it('week 1 = pm0 (без роста)', () => {
+    const result = pmProgression({ pm0: 100, weeks: 8, mode: 'natural' });
+    expect(result[0]).toBe(100);
+  });
+
+  it('натуральный режим: +0.5%/нед', () => {
+    const result = pmProgression({ pm0: 100, weeks: 8, mode: 'natural' });
+    expect(result[7]).toBeCloseTo(100 * Math.pow(1.005, 7), 0);
+  });
+
+  it('on_course moderate: ~+2%/нед', () => {
+    const result = pmProgression({ pm0: 100, weeks: 4, mode: 'on_course', courseIntensity: 'moderate' });
+    expect(result[3]).toBeCloseTo(100 * Math.pow(1.02, 3), 0);
+  });
+
+  it('PCT: −0.5%/нед', () => {
+    const result = pmProgression({ pm0: 100, weeks: 4, mode: 'pct' });
+    expect(result[3]).toBeCloseTo(100 * Math.pow(0.995, 3), 0);
+  });
+
+  it('weeklyPercent override', () => {
+    const result = pmProgression({ pm0: 100, weeks: 4, mode: 'natural', weeklyPercent: 0.01 });
+    expect(result[3]).toBeCloseTo(100 * Math.pow(1.01, 3), 0);
+  });
+
+  it('pmForWeek: единичная неделя', () => {
+    expect(pmForWeek({ pm0: 200, weeks: 12, mode: 'natural' }, 5))
+      .toBeCloseTo(200 * Math.pow(1.005, 4), 0);
+  });
+});
+
+// ── workWeight ──
+describe('workWeight', () => {
+  it('workWeight = PM × pct (с точностью до десятых)', () => {
+    const w = workWeight(137, 0.68);
+    expect(w).toBeCloseTo(137 * 0.68, 1);
+  });
+});
+
+// ── lmsPlanToSessions ──
+describe('lmsPlanToSessions', () => {
+  it('конвертирует план в сессии', () => {
+    const plan = buildCycle01Plan();
+    const sessions = lmsPlanToSessions(plan);
+    expect(sessions.length).toBe(12 * 3); // 12 недель × 3 дня
+  });
+
+  it('focus содержит номер дня (Нед1 День1)', () => {
+    const plan = buildCycle01Plan({ weeksOverride: 1 });
+    const sessions = lmsPlanToSessions(plan);
+    expect(sessions[0].focus).toMatch(/Нед1 День1/);
+    expect(sessions[1].focus).toMatch(/Нед1 День2/);
+    expect(sessions[2].focus).toMatch(/Нед1 День3/);
+  });
+
+  it('totalReps > 0', () => {
+    const plan = buildCycle01Plan({ weeksOverride: 1 });
+    const sessions = lmsPlanToSessions(plan);
+    for (const s of sessions) {
+      expect(s.totalReps).toBeGreaterThan(0);
+    }
+  });
+
+  it('каждый set имеет weight > 0 и RPE = 10 - RIR', () => {
+    const plan = buildCycle01Plan({ weeksOverride: 1 });
+    const sessions = lmsPlanToSessions(plan);
+    for (const s of sessions) {
+      for (const ex of s.exercises) {
+        for (const set of ex.sets) {
+          expect(set.weightKg).toBeGreaterThan(0);
+          expect(set.rpe + set.rir).toBe(10);
+        }
+      }
+    }
+  });
+
+  it('source = SRC', () => {
+    const plan = buildCycle01Plan({ weeksOverride: 1 });
+    const sessions = lmsPlanToSessions(plan);
+    for (const s of sessions) {
+      expect(s.source).toBe('SRC');
+    }
+  });
+
+  it('weekNumber корректен', () => {
+    const plan = buildCycle01Plan({ weeksOverride: 1 });
+    const sessions = lmsPlanToSessions(plan);
+    expect(sessions[0].weekNumber).toBe(1);
+  });
+});

@@ -32,6 +32,7 @@ import type {
 } from '../../../engines/user-program/user-program.types';
 import { newId } from '../../../engines/user-program/user-program.types';
 import { HybridPlanPanel } from './HybridPlanPanel';
+import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { ExerciseLabPicker } from './ExerciseLabPicker';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { BbContextPanel } from './program-editor-context-panels';
@@ -61,6 +62,10 @@ import { loadTrainingProfile, saveTrainingProfile, useTrainingProfile, type Trai
 import { TrainingProfileCard } from './TrainingProfileCard';
 import { subscribePlannerApply, clearPlannerApply, type PlannerApply } from './planner-bridge';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
+import { designerToUserWeeks, applyDesignPhasesToWeeks } from '../../../engines/periodization/designer-to-program';
+import { macrocycleToBBProgram } from '../../../engines/lms/macrocycle-to-bb';
+import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
+import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle } from './training-ui';
 import { GROUP_RU } from './program-types';
 import { labTrainingAdjust } from './lab-training-adjust';
@@ -71,6 +76,7 @@ import { findSubstitutions } from '../../../engines/exercise-substitution.engine
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import type { Exercise } from '../../../core/types';
+import { detectLift } from '../../../engines/lms/lms-to-pl';
 
 const GOAL_OPTS = [
   { id: 'hypertrophy', label: 'Масса' }, { id: 'powerlifting', label: 'Сила (ПЛ)' },
@@ -866,6 +872,52 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         if (cloned) { onChange(cloned); showToast('🔗 Программа загружена: ' + payload.label); }
         else { showToast('⚠ Программа не найдена: ' + payload.label); }
       } catch { showToast('⚠ Не удалось загрузить программу: ' + payload.label); }
+    } else if (payload.kind === 'design' && payload.data?.design) {
+      // Дизайнер периодизации → применить к новой или текущей программе
+      try {
+        const design = payload.data.design as MacrocycleDesign;
+        const fillExercises: boolean = !!payload.data.fillExercises;
+        const daysPerWeek: number = payload.data.daysPerWeek ?? 4;
+        if (dir === 'bb' && p.bb) {
+          // К текущей программе: переразметить phase/deload в существующих weeks, сохранить упражнения
+          const existingWeeks = p.bb.weeks;
+          const remapped = applyDesignPhasesToWeeks(existingWeeks, design);
+          update({ bb: { ...p.bb, weeks: remapped } });
+          showToast('🔗 Фазы дизайнера применены к текущей программе: ' + payload.label);
+        } else {
+          // К новой программе: создать blank('bb') и заполнить weeks из дизайнера
+          const weeks = designerToUserWeeks(design, {
+            fillExercises,
+            level: p.meta.level,
+            goal: p.meta.goal,
+            daysPerWeek,
+            equipment: p.bb?.constraints?.equipment ?? [],
+            weakPoints: (tprofile.weakPoints ?? []) as string[],
+          });
+          const blank = createBlank('bb');
+          const newProg: UserProgram = {
+            ...blank,
+            meta: { ...blank.meta, title: design.name + ' (дизайн)', weeks: design.totalWeeks, goal: design.sport === 'powerlifting' ? 'powerlifting' : 'hypertrophy' },
+            bb: { ...blank.bb!, weeks },
+          };
+          onChange(newProg);
+          showToast('🔗 Дизайн применён как новая программа: ' + payload.label);
+        }
+      } catch (e) { showToast('⚠ Не удалось применить дизайн: ' + (e as Error)?.message); }
+    } else if (payload.kind === 'macrocycle' && payload.data?.macro) {
+      // Макроцикл ПЛ-авто → ББ-программа (для ручного планировщика)
+      try {
+        const macro = payload.data.macro as Macrocycle;
+        const newProg = macrocycleToBBProgram(macro, {
+          level: payload.data.level ?? p.meta.level,
+          goal: payload.data.goal ?? p.meta.goal,
+          daysPerWeek: payload.data.daysPerWeek ?? p.meta.daysPerWeek,
+          weakPoints: (tprofile.weakPoints ?? []) as string[],
+          equipment: p.bb?.constraints?.equipment ?? [],
+        });
+        onChange(newProg);
+        showToast('🔗 Макроцикл применён как ББ-программа: ' + payload.label);
+      } catch (e) { showToast('⚠ Не удалось применить макроцикл: ' + (e as Error)?.message); }
     } else {
       showToast('🔗 Рекомендация: ' + payload.label + ' (не применима к ' + dir.toUpperCase() + ')');
     }
@@ -874,7 +926,21 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
   }, [program, dir, onChange, update, showToast]);
 
   // Библиотека внутри редактора
-  const [editorLibOpen, setEditorLibOpen] = useState<'bb' | 'pl' | 'methods' | null>(null);
+  const [editorLibOpen, setEditorLibOpen] = useState<'bb' | 'pl' | 'methods' | 'macro' | null>(null);
+  // State для MacrocyclePanel (редактируемые level/goal макроцикла)
+  const [macroLevel, setMacroLevel] = useState<string>(program.meta.level);
+  const [macroGoal, setMacroGoal] = useState<'powerlifting' | 'bodybuilding' | 'general'>(
+    program.meta.goal === 'powerlifting' ? 'powerlifting'
+    : program.meta.goal === 'hypertrophy' || program.meta.goal === 'bodybuilding' ? 'bodybuilding'
+    : 'general'
+  );
+
+  /** Маппинг goal UserProgram → goal MacrocyclePanel. */
+  const mapGoalToMacro = (g: string): 'powerlifting' | 'bodybuilding' | 'general' => {
+    if (g === 'powerlifting' || g === 'peaking' || g === 'strength') return 'powerlifting';
+    if (g === 'hypertrophy' || g === 'bodybuilding' || g === 'mass' || g === 'cut' || g === 'recomp') return 'bodybuilding';
+    return 'general';
+  };
   const [showMore, setShowMore] = useState(false);
   const [showTableView, setShowTableView] = useState(false);
   const [methCat, setMethCat] = useState('all');
@@ -1136,15 +1202,19 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           return;
         }
         const wm = program.pl.workMax || {};
-        const wmVal = (liftStr: string): number => {
-          if (/жим/i.test(liftStr)) return wm.bench ?? 0;
-          if (/тяг/i.test(liftStr)) return wm.dead ?? 0;
-          return wm.squat ?? 0;
+        // Используем detectLift (lms-to-pl.ts) для надёжного определения лифта по имени/группе,
+        // вместо regex по русским названиям (хрупко к вариациям имён).
+        const wmVal = (liftStr: string, group: string): number => {
+          const lift = detectLift(liftStr, group);
+          if (lift === 'bench') return wm.bench ?? 0;
+          if (lift === 'dead') return wm.dead ?? 0;
+          if (lift === 'squat') return wm.squat ?? 0;
+          return wm.squat ?? 0; // accessory fallback на squat (для расчёта процентов)
         };
         days = plDays.map((pd) => ({
           label: pd.label,
           exercises: (pd.exercises as Array<{ name: string; group: string; sets: Array<{ pct: number; reps: number; weight: number }> }>).map((ex) => {
-            const pmBase = wmVal(ex.name);
+            const pmBase = wmVal(ex.name, ex.group || '');
             return {
               name: ex.name,
               muscleGroup: ex.group || '',
@@ -1327,6 +1397,17 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                 title="Применить фазовую периодизацию (RIR/объём/повторения по неделям)"
               >📈 Применить фазы</button>
             )}
+            {/* 🗓 Годовой план — MacrocyclePanel (для всех направлений: BB/PL/Hybrid) */}
+            {isPro && (
+              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(245,158,11,0.5)', color: '#f59e0b' }}
+                onClick={() => {
+                  setMacroLevel(program.meta.level);
+                  setMacroGoal(mapGoalToMacro(program.meta.goal));
+                  setEditorLibOpen('macro');
+                }}
+                title="Годовое планирование: построить макроцикл (5 фаз) и применить к программе"
+              >🗓 Годовой план</button>
+            )}
             {isPro && (
               <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}
                 onClick={() => setEditorLibOpen('methods')}
@@ -1458,6 +1539,84 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         },
       ]} />
       </>
+      )}
+
+      {/* 🗓 Годовой план — MacrocyclePanel (модал, только в про-режиме) */}
+      {isPro && editorLibOpen === 'macro' && (
+        <div style={{ ...CARD, padding: 12, borderLeft: '3px solid #f59e0b' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#f59e0b' }}>🗓 Годовое планирование</span>
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38 }} onClick={() => setEditorLibOpen(null)}>✕ Закрыть</button>
+          </div>
+          <div style={{ fontSize: 11, color: DIM, marginBottom: 8 }}>
+            Постройте макроцикл (5 фаз: выносливость → сила → пик → соревнования → переход).
+            Клик по блоку → применить как активный цикл/программу. Текущее направление: <b style={{ color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]}</b>.
+          </div>
+          <MacrocyclePanel
+            level={macroLevel}
+            goal={macroGoal}
+            onLevelChange={setMacroLevel}
+            onGoalChange={setMacroGoal}
+            onApplyCycle={(cycleId, weeks) => {
+              if (dir === 'pl') {
+                // PL: загрузить LMS-цикл + установить weeks
+                loadCycleIntoEditor(cycleId);
+                updateMeta({ weeks });
+                setEditorLibOpen(null);
+                showToast('🗓 ПЛ-цикл применён: ' + cycleId + ' (' + weeks + ' нед)');
+              } else if (dir === 'bb') {
+                // BB: применить макроцикл как ББ-программу (macrocycleToBBProgram)
+                try {
+                  // Восстановить макроцикл из текущего состояния MacrocyclePanel (через storage)
+                  const raw = localStorage.getItem('he_pl_macro');
+                  if (raw) {
+                    const { deserializeMacro } = require('../../../engines/lms/macrocycle.engine');
+                    const macro = deserializeMacro(raw);
+                    if (macro) {
+                      const newProg = macrocycleToBBProgram(macro, {
+                        level: macroLevel,
+                        goal: program.meta.goal,
+                        daysPerWeek: program.meta.daysPerWeek,
+                        weakPoints: (tprofile.weakPoints ?? []) as string[],
+                        equipment: program.bb?.constraints?.equipment ?? [],
+                      });
+                      onChange(newProg);
+                      setEditorLibOpen(null);
+                      showToast('🗓 Годовой план ББ создан: ' + weeks + ' нед, 5 фаз');
+                    }
+                  }
+                } catch (e) {
+                  showToast('⚠ Не удалось создать ББ-план: ' + (e as Error)?.message);
+                }
+              } else if (dir === 'hybrid') {
+                // Hybrid: применить макроцикл для bb-части, pl-часть не трогается
+                try {
+                  const raw = localStorage.getItem('he_pl_macro');
+                  if (raw) {
+                    const { deserializeMacro } = require('../../../engines/lms/macrocycle.engine');
+                    const macro = deserializeMacro(raw);
+                    if (macro) {
+                      const bbProg = macrocycleToBBProgram(macro, {
+                        level: macroLevel,
+                        goal: 'hypertrophy',
+                        daysPerWeek: Math.max(1, program.meta.daysPerWeek - 3),
+                        weakPoints: (tprofile.weakPoints ?? []) as string[],
+                        equipment: program.bb?.constraints?.equipment ?? [],
+                      });
+                      if (bbProg.bb) {
+                        update({ hybrid: { ...program.hybrid!, bbWeeks: bbProg.bb.weeks } });
+                        setEditorLibOpen(null);
+                        showToast('🗓 Hybrid: ББ-недели обновлены из макроцикла (' + weeks + ' нед)');
+                      }
+                    }
+                  }
+                } catch (e) {
+                  showToast('⚠ Hybrid: ' + (e as Error)?.message);
+                }
+              }
+            }}
+          />
+        </div>
       )}
 
       {/* 📚 Методики — справочник тренера (открывается из шапки, только в про-режиме) */}

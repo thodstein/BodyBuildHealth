@@ -106,7 +106,9 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           if (recs.length === 0) return;
           const w0 = body.weeks[0];
           const s0 = w0.sessions[0];
-          const newBlocks: UserBlock[] = recs.slice(0, 2).map((r) => ({
+          // Генерируем блоки один раз (с одинаковыми id нельзя переиспользовать в разных сессиях,
+          // поэтому генерируем свежие id для каждой недели через factory).
+          const makeBlocks = (): UserBlock[] => recs.slice(0, 2).map((r) => ({
             id: newId('blk'),
             type: 'accessory' as const,
             exerciseName: r.name,
@@ -114,10 +116,11 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
             role: 'accessory' as const,
             sets: makeSetsFromTemplate(muscleAwareSets(muscle, level), (prof.workMax ?? {})[muscle] ?? 40),
           }));
-          const updatedWeeks = body.weeks.map((w, i) => i === 0 ? {
+          // Добавлять во все недели, кроме deload (в deload объём снижен, слабые группы не добавляем).
+          const updatedWeeks = body.weeks.map((w) => w.deload ? w : {
             ...w,
-            sessions: w.sessions.map((s, si) => si === 0 ? { ...s, blocks: [...s.blocks, ...newBlocks] } : s),
-          } : w);
+            sessions: w.sessions.map((s, si) => si === 0 ? { ...s, blocks: [...s.blocks, ...makeBlocks()] } : s),
+          });
           setWeeks(updatedWeeks);
         };
         return (
@@ -712,7 +715,9 @@ const PLSetEditor: React.FC<{ sets: PLSet[]; lift: PLExercise['lift']; workMax: 
   const updSet = (i: number, patch: Partial<PLSet>) => onChange(sets.map((s, j) => j === i ? { ...s, ...patch } : s));
   const removeSet = (i: number) => onChange(sets.filter((_, j) => j !== i));
   const calcW = (pct: number) => {
-    const pm = workMax[lift === 'accessory' ? 'squat' : lift];
+    // Для accessory упражнений процентка не применима (нет 1RM подсобки) → вес вводится вручную.
+    if (lift === 'accessory') return null;
+    const pm = workMax[lift];
     if (!pm || pm <= 0) return null;
     return Math.round((pm * pct) / 2.5) * 2.5;
   };

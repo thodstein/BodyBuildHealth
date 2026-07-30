@@ -5,11 +5,11 @@
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK (694+ modules)
-- `vitest` - 292 passing (210 base + 18 macrocycle + 10 diary-autoreg + 17 lms-planner P1 + 5 taper + 11 weakpoint + 10 selector + 6 inject-weakpoints + 3 recovery + 7 pl-feedback)
+- `vitest` - 329 passing (210 base + 18 macrocycle + 10 diary-autoreg + 17 lms-planner P1 + 5 taper + 11 weakpoint + 10 selector + 6 inject-weakpoints + 3 recovery + 7 pl-feedback + 12 phase-bridge + 11 designer-to-program + 6 macrocycle-to-bb + 3 macrocycle-migration + 5 program-editor-bugs)
 
 ### Git
 - `origin/main` - tracked
-- uncommitted changes: BB-builder priority-1 edits + ПЛ-авто годовое планирование + diary-autoreg
+- uncommitted changes: BB-builder priority-1 edits + ПЛ-авто годовое планирование + diary-autoreg + ручной планировщик (phase-bridge + designer-to-program + macrocycle-to-bb)
 
 ---
 
@@ -116,6 +116,65 @@ Still needed:
 - `charReps()` call sites - pass `focus` param
 - Compute recovery multiplier from `bodyFat/leanMass/hrvMs/sleepHours/stressLevel` → MRV adjustment
 - Compute protein/calorie multiplier from `proteinPerKg/calorieSurplus` → MRV adjustment
+
+---
+
+## Ручной планировщик: доработка (done Jul 30 2026)
+
+Связал три разрозненные системы фаз через мост + интегрировал годовое планирование + баг-фиксы.
+
+### Phase bridge (`src/engines/periodization/phase-bridge.ts`)
+- `DESIGNER_TO_PHASE`: PhaseKey (10) → Phase (4) — коллапс 6 неканонических ключей
+- `MACRO_TO_PHASE`: MacroPhase (5) → Phase (4)
+- `designerPhaseToUserPhase()`, `macroPhaseToUserPhase()` — функции-мапперы
+- `PHASE_TO_DESIGNER`, `PHASE_TO_MACRO` — обратные маппинги
+- `isDeloadLikePhaseKey()`, `isDeloadLikeMacroPhase()` — deload-проверки
+- Тесты: 12 (phase-bridge.test.ts)
+
+### Designer → UserProgram (`src/engines/periodization/designer-to-program.ts`)
+- `designerToUserWeeks(design, opts)` — конвертация MacrocycleDesign → UserWeek[]
+  - По умолчанию: `sessions: []` (рендер из microcycleTemplate)
+  - При `opts.fillExercises: true` — autodraftBBPlan на totalWeeks → weeks с упражнениями
+  - Незакрытые недели → accumulation
+- `applyDesignPhasesToWeeks(weeks, design)` — переразметка phase/deload в существующих неделях (сохраняет упражнения)
+- `makeEmptySessionsForWeek(days)` — скелет пустых сессий
+- Тесты: 11 (designer-to-program.test.ts)
+
+### Macrocycle → BB program (`src/engines/lms/macrocycle-to-bb.ts`)
+- `macrocycleToBBProgram(macro, opts)` — макроцикл ПЛ-авто → UserProgram (ББ)
+  - autodraftBBPlan ОДИН раз на totalWeeks → createFromBuild → UserProgram
+  - Переразметка weeks[i].phase через macrocycleToActiveCycle + macroPhaseToUserPhase
+  - Для deload/peaking фаз — корректировка RIR (deload: +3, peaking: 0-1 для compounds)
+  - Fallback: скелет с пустыми sessions при ошибке сборки
+- Тесты: 6 (macrocycle-to-bb.test.ts)
+
+### Bridge расширение (`planner-bridge.ts`)
+- `PlannerApplyKind` += `'design'` | `'macrocycle'`
+- PeriodizationDesignerTab: НОВАЯ кнопка «📥 Применить к новой программе» (kind='design')
+  + кнопка «🏋️ Применить с упражнениями» (fillExercises=true)
+  + sport селектор (powerlifting/bodybuilding/general/weightlifting/crossfit)
+- ProgramManagerPanel.applyBridgePayload: новые case 'design' (к новой/текущей программе) и 'macrocycle' (ББ-программа)
+
+### MacrocyclePanel в ручном планировщике
+- `MacrocyclePanel.tsx`: снят `disabled` с level/goal селекторов (редактируемые через onLevelChange/onGoalChange)
+- Storage migration v1→v2: если `kind` falsy → default 'SRC'
+- Маркер текущей недели на таймлайне (вертикальная линия + input)
+- ProgramManagerPanel:
+  - `editorLibOpen` += `'macro'`
+  - Кнопка «🗓 Годовой план» в secondary toolbar (isPro, все направления)
+  - Модал с MacrocyclePanel: onApplyCycle для PL (loadCycleIntoEditor), BB (macrocycleToBBProgram), Hybrid (bbWeeks)
+  - `mapGoalToMacro()` — маппинг goal UserProgram → goal MacrocyclePanel
+
+### Баг-фиксы (Jul 30 2026)
+- **BUG-6.1**: `addWeakToWeek` (`ProgramEditorComponents.tsx:103`) — добавлял слабые группы только в week 0. Исправлено: добавляет во все недели (кроме deload), с уникальными id блоков для каждой недели.
+- **BUG-6.2**: `PLSetEditor.calcW` (`ProgramEditorComponents.tsx:714`) — для accessory использовал `workMax['squat']` (абсурдные веса для трицепса). Исправлено: для accessory возвращает `null` (вес вводится вручную).
+- **BUG-6.3**: `sendToExecution` (`ProgramManagerPanel.tsx:1204`) — regex `/жим/i`, `/тяг/i` для определения лифта. Заменён на `detectLift(name, group)` из `lms-to-pl.ts`.
+- Тесты: 5 (program-editor-bugs.test.ts) + 3 (macrocycle.migration.test.ts)
+
+### Связь с ПЛ-авто (что НЕ ломаем)
+- MacrocyclePanel в SRCBBScreen — продолжает работать как вкладка
+- buildLMSPlan, lms-builder.engine.ts, lms-to-pl.ts, weakpoint-pl.ts, diary-autoreg.engine.ts — не тронуты
+- macrocycle.engine.ts — не тронут (только импортируем deserializeMacro для hybrid-ветки)
 
 ---
 

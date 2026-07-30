@@ -35,6 +35,9 @@ temp-*
 tmp_*
 tmp-*
 _*
+# ...но НЕ игнорировать __tests__/ директории с тестами
+!__tests__/
+!**/__tests__/
 fix-*.cjs
 gen-*.cjs
 gen-*.mjs

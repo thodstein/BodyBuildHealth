@@ -1,0 +1,103 @@
+import { describe, it, expect } from 'vitest';
+import { macrocycleToBBProgram, type MacrocycleToBBOptions } from '../macrocycle-to-bb';
+import { buildMacrocycle, type Macrocycle } from '../macrocycle.engine';
+
+const baseOpts: MacrocycleToBBOptions = {
+  level: 'intermediate',
+  goal: 'hypertrophy',
+  daysPerWeek: 4,
+  weakPoints: [],
+  equipment: ['barbell', 'dumbbell'],
+};
+
+describe('macrocycleToBBProgram', () => {
+  it('создаёт UserProgram с direction=bb и корректной meta', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 12 });
+    const prog = macrocycleToBBProgram(macro, baseOpts);
+    expect(prog.meta.direction).toBe('bb');
+    expect(prog.meta.weeks).toBe(12);
+    expect(prog.meta.daysPerWeek).toBe(4);
+    expect(prog.bb).toBeTruthy();
+    expect(prog.bb!.direction).toBe('bb');
+  });
+
+  it('число недель = macro.totalWeeks', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 12 });
+    const prog = macrocycleToBBProgram(macro, baseOpts);
+    expect(prog.bb!.weeks).toHaveLength(12);
+    expect(prog.bb!.weeks.map(w => w.week)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  });
+
+  it('фазы недель переразмечены по макроциклу (5 фаз)', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 12 });
+    const prog = macrocycleToBBProgram(macro, baseOpts);
+    const phases = prog.bb!.weeks.map(w => w.phase);
+    // Все phase ∈ {accumulation, intensification, deload, peaking}
+    for (const p of phases) {
+      expect(['accumulation', 'intensification', 'deload', 'peaking']).toContain(p);
+    }
+    // endurance → accumulation (первые недели)
+    expect(phases[0]).toBe('accumulation');
+    // competition → peaking (последняя неделя 12 попадает в competition при 12 неделях)
+    expect(phases[phases.length - 1]).toBe('peaking');
+  });
+
+  it('deload-фазы (transition) выставляют deload=true', () => {
+    // 52 недели гарантируют непустой transition-блок (15% = ~8 нед)
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 52 });
+    const prog = macrocycleToBBProgram(macro, baseOpts);
+    // Найти недели в transition-блоке
+    const transitionBlock = macro.blocks.find(b => b.phase === 'transition' && b.weeks > 0);
+    expect(transitionBlock).toBeTruthy();
+    if (transitionBlock) {
+      const transitionWeeks = prog.bb!.weeks.filter(w =>
+        w.week >= transitionBlock.weekOffset && w.week < transitionBlock.weekOffset + transitionBlock.weeks
+      );
+      expect(transitionWeeks.length).toBeGreaterThan(0);
+      for (const w of transitionWeeks) {
+        expect(w.deload).toBe(true);
+        expect(w.phase).toBe('deload');
+      }
+    }
+  });
+
+  it('peaking-фаза корректирует RIR compounds в 0-1', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 16 });
+    const prog = macrocycleToBBProgram(macro, baseOpts);
+    // Найти неделю в peak-блоке
+    const peakBlock = macro.blocks.find(b => b.phase === 'peak');
+    expect(peakBlock).toBeTruthy();
+    if (peakBlock) {
+      const peakWeek = prog.bb!.weeks.find(w =>
+        w.week >= peakBlock.weekOffset && w.week < peakBlock.weekOffset + peakBlock.weeks
+      );
+      expect(peakWeek).toBeTruthy();
+      if (peakWeek && peakWeek.sessions.length > 0) {
+        // Хотя бы один compound сет должен иметь RIR 0 или 1
+        const compoundSets = peakWeek.sessions.flatMap(s =>
+          s.blocks.filter(b => b.type === 'compound').flatMap(b => b.sets)
+        );
+        if (compoundSets.length > 0) {
+          for (const s of compoundSets) {
+            expect(s.rir).toBeGreaterThanOrEqual(0);
+            expect(s.rir).toBeLessThanOrEqual(1);
+          }
+        }
+      }
+    }
+  });
+
+  it('fallback: при ошибке сборки создаёт скелет с пустыми sessions', () => {
+    // Некорректные опции, чтобы autodraftBBPlan бросил
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 8 });
+    const prog = macrocycleToBBProgram(macro, {
+      ...baseOpts,
+      level: 'invalid_level_xyz',
+      goal: 'invalid_goal_xyz',
+    });
+    // Должен вернуть валидный UserProgram (fallback)
+    expect(prog.meta.direction).toBe('bb');
+    expect(prog.bb!.weeks).toHaveLength(8);
+    expect(prog.meta.title).toContain('Годовой план ББ');
+  });
+});
