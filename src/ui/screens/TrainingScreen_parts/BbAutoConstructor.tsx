@@ -1878,7 +1878,7 @@ export const BbAutoConstructor: React.FC = () => {
                         {/* Rationale */}
                         {e.rationale && (
                           <details style={{ marginTop:4 }}>
-                            <summary style={{ fontSize:11, fontWeight:600, color:'rgba(96,165,250,0.6)', cursor:'pointer' }}>🧠 Почему это упражнение?</summary>
+                            <summary style={{ fontSize:11, fontWeight:600, color:'rgba(96,165,250,0.6)', cursor:'pointer' }}>🧠 Почему это упражнение и позиция?</summary>
                             <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', padding:'2px 6px', lineHeight:1.4, marginTop:2 }}>{e.rationale}</div>
                           </details>
                         )}
