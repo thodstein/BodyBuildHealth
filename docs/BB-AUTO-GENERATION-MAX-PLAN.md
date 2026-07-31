@@ -269,6 +269,7 @@
 
 - **P1: единый compound classifier.** `bb-builder` и `bb-session-order` используют разные источники истины (`catalog.type` против name-regex/role). Объединить их через catalog profile с безопасным fallback; добавить property-тесты для primary/accessory и PL-leakage.
 - Реализовано: `isCompoundEx()` использует catalog `type` по имени/id, regex остаётся только fallback для неизвестных упражнений.
+- Финальная позиция каждого упражнения добавляется в `rationale` после order/budget passes и доступна UI/export (`primary/lead`, `secondary compound`, `accessory`, `pump finisher`).
 - **P1: session working-set cap.** Exercise cap уже существует, но отдельного явного cap по суммарным рабочим сетам сессии нет. Добавить target-aware cap, который сначала режет вторичные isolation/feeders, сохраняя primary и единственный стимул мышцы.
 - Shared fatigue budget теперь применяет default `maxWorkingSets=24` для всех adaptive sources; cap режет вторичные sets до удаления упражнений.
 - **P2: hamstring angle diversity.** Расширить canonical angle classes: seated/lying curl, RDL, good morning, glute-ham/Nordic при доступности и safety restrictions.

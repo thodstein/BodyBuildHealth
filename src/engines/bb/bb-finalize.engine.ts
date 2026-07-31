@@ -242,14 +242,15 @@ function applyAdaptivePhaseSafety(plan: BBPlan): void {
 }
 
 function enrichExerciseRationale(plan: BBPlan): void {
-  for (const week of plan.weeks) for (const session of week.sessions) for (const exercise of session.exercises) {
+  for (const week of plan.weeks) for (const session of week.sessions) for (const [index, exercise] of session.exercises.entries()) {
     const contributions = exerciseVolumeContributions(exercise);
     const direct = contributions.find(item => item.source === 'direct');
     const indirect = contributions.filter(item => item.source === 'indirect').map(item => `${item.muscle} +${item.effectiveSets.toFixed(1)}`).join(', ');
     const tags = [exercise.role === 'primary' ? 'primary' : 'accessory', `direct ${direct?.directSets ?? exercise.sets} sets`];
     if (indirect) tags.push(`effective overlap: ${indirect}`);
     if ((exercise as any).substituted) tags.push(`замена: ${(exercise as any).originalName || 'исходное упражнение'}`);
-    exercise.rationale = [exercise.rationale, tags.join('; ')].filter(Boolean).join(' | ');
+    const position = index === 0 ? 'primary/lead' : exercise.role === 'primary' ? 'secondary compound' : exercise.character === 'памп' ? 'pump finisher' : 'accessory';
+    exercise.rationale = [exercise.rationale, tags.join('; '), `final position: ${position} (#${index + 1})`].filter(Boolean).join(' | ');
   }
 }
 
