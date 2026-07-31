@@ -111,7 +111,12 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
     const firstPrimary = exercises.find(e => e.role === 'primary' && e.character === 'тяж');
     primaryMuscle = firstPrimary?.muscle || exercises.find(e => e.role === 'primary')?.muscle || '';
   } else {
-    primaryMuscle = tagMuscles[0] || '';
+    // ★ Arms day: triceps первым (compound-first — больше мышечная масса, жим узким хватом),
+    // не biceps (tagMuscles[0]='biceps'). Для Legs: quads первым (присед перед RDL).
+    const tag = opts.sessionTag || '';
+    if (tag === 'Arms') primaryMuscle = 'triceps';
+    else if (tag === 'Legs' || tag === 'Lower' || tag === 'LowerPower' || tag === 'LowerHyp') primaryMuscle = 'quads';
+    else primaryMuscle = tagMuscles[0] || '';
   }
   if (!primaryMuscle) {
     const firstHeavy = exercises.find(e => e.role === 'primary' && e.character === 'тяж');
@@ -142,11 +147,12 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
  */
 
 /** Порядок мышц в сессии: большие compound-мышцы → малые изолирующие → финишные.
- *  Гарантирует: все упражнения одной мышцы идут ПОДРЯД, без вкраплений других мышц. */
+ *  Гарантирует: все упражнения одной мышцы идут ПОДРЯД, без вкраплений других мышц.
+ *  ★ triceps (7) раньше biceps (8) — triceps больше мышечная масса, compound-first. */
 const MUSCLE_ORDER: Record<string, number> = {
   quads: 0, back: 1, chest: 2, hamstrings: 3, glutes: 4,
   legs: 4, shoulders: 5, delt_front: 5, delt_mid: 5, delt_rear: 5,
-  traps: 6, trapezius: 6, biceps: 7, triceps: 8, arms: 9,
+  traps: 6, trapezius: 6, triceps: 7, biceps: 8, arms: 9,
   calves: 10, forearms: 11, abs: 12, core: 12, lower_back: 12,
 };
 function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string>, methodology: SessionMethodology = 'compound_first'): number[] {
@@ -243,7 +249,9 @@ export function capExercisesPerMuscle(exercises: BBExercise[]): BBExercise[] {
 }
 
 // Cap redundancy then apply coaching-grade ordering for a session.
-export function tidySessionExercises(exercises: BBExercise[], primaryMuscle?: string): BBExercise[] {
+// sessionTag preferred — lets orderSessionExercises derive primaryMuscle from TAG_MUSCLES
+// (chest for ChestBack, back for Pull, etc.). Falls back to explicit primaryMuscle.
+export function tidySessionExercises(exercises: BBExercise[], primaryMuscle?: string, sessionTag?: string): BBExercise[] {
   const capped = capExercisesPerMuscle(exercises);
-  return orderSessionExercises(capped, { primaryMuscle, methodology: "compound_first" });
+  return orderSessionExercises(capped, { primaryMuscle, sessionTag, methodology: "compound_first" });
 }

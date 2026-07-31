@@ -36,6 +36,7 @@ import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
+import type { Macrocycle, MacroPhase } from '../lms/macrocycle.engine';
 
 // P7: приоритет equipment по фазе (формирует пропорцию compound/isolation/cable/machine из PHASE_CONFIGS)
 export const PHASE_EQUIPMENT_PREF: Record<string, string[]> = {
@@ -360,7 +361,7 @@ function strengthRank(ex: any): number {
  * Эти упражнения не дают механического натяжения/метаболического стресса для роста мышц.
  * Разрешены: скручивания (crunch), подъём ног, гиперэкстензия (ягодицы/разгибатели спины).
  */
-const BB_JUNK_PATTERNS: RegExp = /паллоф|pallof|bird.?dog|птиц.*собак|monster.?walk|резин|banded|band.?walk|планк|plank|copenhagen|копенгаген|spiderman|человек.?паук|plank.?jack|планк.*прыжк|walkout|шагающ.*планк|супермен|superman|gator.?walk|аллигатор|inchworm|гусениц|dead.?bug|мёртв.*жук|мертв.*жук|медбол|med.?ball|medicine.?ball|бросок.*мяч|рубк.*дров|рубк.*дерев|wood.?chop|ротацион|rotational|bradford|брэдфорд|наклон.*сидя.*штанг|seated.*good.?morning|отжиман|push.?up|русск.*твист|russian.*twist|тяга.*за голов|pulldown.*behind|pike.*отжим|pike.*push|индийск|hindu.*push|скольжен.*стен|wall.?slide|кубан|cuban|мельниц.*гир|windmill|пугало|scarecrow|жим.*гир|kb.?press|bent.?press|наклонн.*жим.*гир|лэндмайн|landmine/;
+const BB_JUNK_PATTERNS: RegExp = /паллоф|pallof|bird.?dog|птиц.*собак|monster.?walk|резин|banded|band.?walk|планк|plank|copenhagen|копенгаген|spiderman|человек.?паук|plank.?jack|планк.*прыжк|walkout|шагающ.*планк|супермен|superman|gator.?walk|аллигатор|inchworm|гусениц|dead.?bug|мёртв.*жук|мертв.*жук|медбол|med.?ball|medicine.?ball|бросок.*мяч|рубк.*дров|рубк.*дерев|wood.?chop|ротацион|rotational|bradford|брэдфорд|наклон.*сидя.*штанг|seated.*good.?morning|отжиман|push.?up|русск.*твист|russian.?twist|тяга.*за голов|pulldown.*behind|pike.*отжим|pike.*push|индийск|hindu.*push|скольжен.*стен|wall.?slide|кубан|cuban|мельниц.*гир|windmill|пугало|scarecrow|жим.*гир|kb.?press|bent.?press|наклонн.*жим.*гир|лэндмайн|landmine|вис.*полотен|вис.*гриф|вис.*турник|l.?сит|l.?sit|растяжк|stretch|мобильн|mobility|кошк.*корова|cat.?cow|колесо|ab.?wheel|горн.*ключ|mountain.*climb|90\/90|world.?greatest| йога|yoga/i;
 
 /** Проверить, является ли упражнение BB-мусором (не для гипертрофии). */
 function isBBJunk(ex: any): boolean {
@@ -810,7 +811,17 @@ function buildSession(
       ? [['chest', 'back'], ['quads', 'hamstrings'], ['shoulders', 'arms']][(dayInRotation - 1) % 3]
       : null;
     const fbAllowsPrimary = fbPrimaryToday ? fbPrimaryToday.includes(muscle) : true;
-    if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж') && isMainMuscle && !SMALL_NEVER_PRIMARY.has(muscle) && fbAllowsPrimary) {
+    // ★ Primary-dominance: в multi-day только lead-мышца (back в Pull, chest в Push)
+    // должна стать primary. Раньше ЛЮБАЯ mainMuscle в тяж-дне (biceps/traps в Pull,
+    // triceps в Push) получала primary → exerciseCount=4 и sessionShareFor factor=1.4
+    // → accessories перевешивали lead-мышцу (back=3ex vs biceps+traps+delt=7ex).
+    // Теперь: primary назначается только если ещё нет primary (size===0) ИЛИ это
+    // lead-мышца дня. WeakPoints обходят через отдельное условие ниже.
+    // ИСКЛЮЧЕНИЕ: dual-primary теги (ChestBack, ShouldersArms, Upper, Torso) — 2 primary
+    // (chest+back, shoulders+arms), иначе back=1ex в ChestBack — недопустимо.
+    const DUAL_PRIMARY_TAGS = new Set(['ChestBack', 'ShouldersArms', 'Upper', 'UpperPower', 'UpperHyp', 'Torso']);
+    const maxPrimaries = DUAL_PRIMARY_TAGS.has(sched.sessionTag || '') ? 2 : 1;
+    if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж') && isMainMuscle && !SMALL_NEVER_PRIMARY.has(muscle) && fbAllowsPrimary && (musclePrimaryAssigned.size < maxPrimaries || muscle === sessionLeadMuscle)) {
       role = 'primary'; musclePrimaryAssigned.add(muscle);
     }
     // Слабые группы (weakPoints): структурное повышение до primary —
@@ -894,9 +905,16 @@ function buildSession(
     // angle-class = fly/растяжка для груди). Расширяем ACCESSORY_2X_GROUPS на big-muscle
     // accessory тоже — даёт 2 изоляции на добивку, что устраняет «одна и та же растяжка».
     const isBigMuscle = ['chest','back','quads','hamstrings','glutes','shoulders'].includes(muscle);
+    // ★ Primary-dominance fix: primary мышца дня должна иметь больше упражнений, чем
+    // любая accessory. Раньше в multi-day (Pull: back/biceps/shoulders/traps/forearms)
+    // primary=3, а accessories суммарно = 2+2+2+1 = 7 (back=3 vs accessories=7 — бред!).
+    // Теперь: multi-day primary = 4 (доминирует), multi-day accessory = 1 (добивка),
+    // кроме biceps/triceps на PED (=2). В solo-day (1-2 мышцы) — как раньше (accessory=2).
     let exerciseCount = role === 'primary'
-      ? (isMultiDay ? 3 : (isSingleFreq ? (onPED ? 4 : 3) : (onPED ? 5 : 4)))
-      : (isArm && onPED ? 2 : (isArm ? 2 : (isBigMuscle ? 2 : 1)));
+      ? (isMultiDay ? 4 : (isSingleFreq ? (onPED ? 4 : 3) : (onPED ? 5 : 4)))
+      : (isMultiDay
+          ? (isArm && onPED && (muscle === 'biceps' || muscle === 'triceps') ? 2 : 1)
+          : (isArm && onPED ? 4 : (isArm ? 2 : (isBigMuscle ? 2 : 1))));
     // P3: Level-based exerciseCount (Schoenfeld 2022: advanced → more exercises for detail)
     if (levelBase <= 1 && exerciseCount > 2) exerciseCount = Math.max(2, exerciseCount - 1);
     else if (levelBase >= 4 && role === 'primary') exerciseCount = Math.min(8, exerciseCount + 1);
@@ -2016,7 +2034,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         if (sess.exercises.some(e => e.exerciseName === fName) || addedFeeders.has(fName)) continue;
         const fBase = (workMax as any)[wm] || DEFAULT_WORKMAX[wm] || 50;
         const feederWeight = Math.max(5, Math.round(fBase * 0.3 * 10) / 10);
-        const fTempo = tempoFor('памп');
+        const fTempo = tempoFor('памп', undefined, phase);
         // Realistic weak-feeder: 2×15-20 (а не 1×18) — даёт значимый объём для достижения MEV.
         const feederSetCount = 2;
         sess.exercises.push({
@@ -2035,8 +2053,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // P1-1 (audit 2026-07): убран weak-gate — pump-finisher добавляется для ВСЕХ primary muscles,
       // не только не-weak. Bro-split (1 группа/день) иначе = только тяжёлые сеты для lead-muscle.
       // Schoenfeld 2018: metabolic stress work after heavy compounds +5-10% hypertrophy.
+      // ★ Primary-dominance fix: pump-finisher только для lead-мышцы + weakPoints.
+      // Раньше добавлялся для ВСЕХ sessMuscles (biceps/traps в Pull) → accessory получали
+      // 2-е упражнение (pump) → biceps=2ex при back=4ex, и сеты accessories > primary.
       for (const pm of sessMuscles) {
         if (Array.from(weekExcluded).includes(pm)) continue;
+        if (pm !== sessMuscles[0] && !isWeak(pm, weakPoints)) continue;
         if (sess.exercises.some(e => (e.muscle === pm || collapseKey(e.muscle) === pm) && (e as any).character === 'памп')) continue;
         const pumpPool = (EXERCISE_CATALOG as any[]).filter((e: any) => {
           const raw = e.group;
@@ -2070,7 +2092,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         if (sess.exercises.some(e => e.exerciseName === pName) || addedFeeders.has(pName)) continue;
         const pBase = (workMax as any)[pm] || DEFAULT_WORKMAX[pm] || 50;
         const pumpWeight = Math.max(5, Math.round(pBase * 0.3 * 10) / 10);
-        const pTempo = tempoFor('памп');
+        const pTempo = tempoFor('памп', undefined, phase);
         // B3/B11: реалистичный pump-finisher с MRV-капом. Считаем текущие сеты мышцы pm,
         // и уменьшаем pumpSetCount, если добавление 2×15-20 превысит недельный MRV.
         const mrvCap = mrvByMuscle[pm] || 0;
@@ -2200,7 +2222,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // Cross-day weakPoints compensation: если слабая группа получает < MEV за неделю (потому что
   // не входит ни в один дневной тег), добавить feeder-сет в ближайший релевантный день.
   finalPlan = weakPoints.length > 0
-    ? compensateCrossDayWeakPoints(finalPlan, weakPoints, level, workMax, eqList, effectiveMrvMult, avAxial)
+    ? compensateCrossDayWeakPoints(finalPlan, weakPoints, level, workMax, eqList, effectiveMrvMult, avAxial, phaseByWeek)
     : finalPlan;
   // Final re-sort: compensateCrossDayWeakPoints may have added feeders that break grouping
   for (const w of finalPlan.weeks) {
@@ -2275,9 +2297,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // обратно в compound_first — выбор методики в UI не имел эффекта на финальный порядок.
       const reordered = orderSessionExercises(s.exercises, { sessionTag: s.sessionTag || '', methodology: input.methodology });
       s.exercises.length = 0; s.exercises.push(...reordered);
-      // P0-1: итоговый кап — max(9, muscles×2) для гарантии arms.
+      // P0-1: итоговый кап — профессиональный предел 6-10 упражнений на сессию.
+      // Раньше: max(9, min(13, muscles×2)) → FullBody (6 мышц × 2 = 12, cap 12) = 19 упражнений!
+      // Теперь: max(6, min(10, muscles+2)) → FullBody (6+2=8) = 8 упражнений. Профессионал
+      // ставит 6-8 упражнений в полный день, 4-6 в специализированный.
       const sessMuscleCount = new Set(s.exercises.map(e => collapseKey(e.muscle))).size;
-      const finalCap = Math.max(9, Math.min(13, sessMuscleCount * 2));
+      const finalCap = Math.max(6, Math.min(10, sessMuscleCount + 2));
       if (s.exercises.length > finalCap) {
         s.exercises.length = finalCap;
       }
@@ -2369,7 +2394,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       feederPool.sort((a, b) => (a.name?.length || 0) - (b.name?.length || 0));
       const fBase = (workMax as any)[m] || DEFAULT_WORKMAX[m] || 50;
       const feederWeight = Math.max(5, Math.round(fBase * 0.3 * 10) / 10);
-  const fTempo = tempoFor('памп');
+  const fTempo = tempoFor('памп', undefined, phaseByWeek.get(wk1.week) || 'accumulation');
   const need = Math.max(2, targetMEV - weekSets);
       // P1-5: если need > perExCap (6 для calves/abs/forearms, 8 для остальных) — разбить на 2 упражнения.
       const perExCapM = (m === 'forearms' || m === 'calves' || m === 'abs') ? 6 : 8;
@@ -2460,6 +2485,16 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     .map(([m, f]) => `${m}=${f}×`)
     .join(', ');
   if (freqSummary) rationale.push(`Частота на группу/нед: ${freqSummary}`);
+  // ★ FINAL HARD CAP: после ВСЕХ модификаций (feeders, pump, auto-MEV, feedback) —
+  // ни одна сессия не должна превышать 10 упражнений. Профессиональный предел.
+  // Обрезаем с конца (там feeders/finishers), сохраняя lead-muscle compounds.
+  for (const w of finalPlan.weeks) {
+    for (const s of w.sessions) {
+      if (s.exercises.length > 10) {
+        s.exercises.length = 10;
+      }
+    }
+  }
   return { ...finalPlan, level, volumeLandmarks, muscleFrequency };
 }
 
@@ -2494,6 +2529,7 @@ function compensateCrossDayWeakPoints(
   equipment: string[],
   pedMrvMult: number,
   avAxial: boolean = false,
+  phaseByWeek?: Map<number, BBPhase>,
 ): BBPlan {
   if (!plan.weeks || plan.weeks.length === 0) return plan;
   const weeks = plan.weeks.map((w) => ({ week: w.week, sessions: w.sessions.map((s) => ({ ...s, exercises: [...s.exercises] })) }));
@@ -2573,7 +2609,7 @@ function compensateCrossDayWeakPoints(
       const fName = fData.name || fData.id;
       const fBase = (workMax as any)[wp] || DEFAULT_WORKMAX[wp] || 50;
       const feederWeight = Math.max(5, Math.round(fBase * 0.3 * 10) / 10);
-  const fTempo = tempoFor('памп');
+  const fTempo = tempoFor('памп', undefined, phaseByWeek?.get(weeks[bestSlot.weekIdx].week) || 'accumulation');
   const feederSetCount = 2;
   bestSlot.session.exercises.push({
         muscle: wp, name: fName, role: 'accessory' as const, character: 'памп' as DayCharacter,
@@ -2587,4 +2623,77 @@ function compensateCrossDayWeakPoints(
     } // for wi
   } // for wpRaw
   return { ...plan, weeks };
+}
+
+/* ──────────── Применение макроцикла к ББ-плану ──────────── */
+
+/**
+ * Применить фазы макроцикла (5 фаз: endurance/strength/peak/competition/transition)
+ * к существующему BBPlan. Перераспределяет объём/интенсивность по неделям.
+ *
+ * Логика:
+ *  - Для каждой недели плана находим макро-блок (по weekOffset+weeks).
+ *  - Маппим MacroPhase → BBPhase через phase-bridge (endurance→accumulation, и т.д.).
+ *  - Применяем getPhaseVolumeMult() к кол-ву сетов на упражнение.
+ *  - Корректируем RIR: competition/peaking → RIR→0-1, transition/deload → +3, остальные → базовый.
+ *  - Корректируем deload-флаг: transition/deload → deload=true.
+ *  - Возвращаем НОВЫЙ план (immutable). Старый не трогаем.
+ */
+export function applyMacrocycleToBBPlan(plan: BBPlan, macro: Macrocycle): BBPlan {
+  if (!macro?.blocks || macro.blocks.length === 0 || plan.weeks.length === 0) return plan;
+
+  // Найти фазу недели в макроцикле (1-индекс → 0-индекс для массива).
+  const findBlockForWeek = (weekNum: number) => {
+    for (const block of macro.blocks) {
+      if (weekNum >= block.weekOffset && weekNum < block.weekOffset + block.weeks) return block;
+    }
+    return null;
+  };
+
+  const macroPhaseToBBPhase: Record<MacroPhase, BBPhase> = {
+    endurance: 'accumulation',
+    strength: 'intensification',
+    peak: 'peaking',
+    competition: 'peaking',
+    transition: 'deload',
+  };
+
+  const newWeeks = plan.weeks.map((wk, wi) => {
+    const weekNum = wi + 1;
+    const block = findBlockForWeek(weekNum);
+    if (!block) return wk;
+    const bbPhase: BBPhase = macroPhaseToBBPhase[block.phase] ?? 'accumulation';
+    const volMult = getPhaseVolumeMult(bbPhase);
+    const isDeload = bbPhase === 'deload';
+    const rirShift = bbPhase === 'peaking' ? -2 : bbPhase === 'deload' ? +3 : 0;
+    const sessions = wk.sessions.map((ses) => ({
+      ...ses,
+      exercises: ses.exercises.map((ex) => {
+        const targetSets = Math.max(1, Math.round((ex.sets || 0) * volMult));
+        const newRir = Math.max(0, Math.min(5, (ex.rir ?? 2) + rirShift));
+        const workSets = Array.from({ length: targetSets }, (_, i) => {
+          const src = ex.workSets[i];
+          if (src) {
+            return { ...src, rir: Math.max(0, Math.min(5, (src.rir ?? 2) + rirShift)) };
+          }
+          // Не хватает сетов — генерируем по шаблону первого
+          const tpl = ex.workSets[0] ?? { reps: 8, rir: 2, weight: 0, restSeconds: 90 };
+          return { ...tpl, rir: Math.max(0, Math.min(5, (tpl.rir ?? 2) + rirShift)) };
+        });
+        return {
+          ...ex,
+          sets: targetSets,
+          rir: newRir,
+          workSets,
+        };
+      }),
+    }));
+    return { ...wk, sessions };
+  });
+
+  // rationale: добавить запись о применённых фазах
+  const phaseList = macro.blocks.map(b => `${b.phase}×${b.weeks}`).join(' → ');
+  const newRationale = [...(plan.rationale ?? []), `Макроцикл применён: ${phaseList} (фазы маппированы, объём × ${getPhaseVolumeMult('accumulation')}/${getPhaseVolumeMult('intensification')}/${getPhaseVolumeMult('peaking')}/${getPhaseVolumeMult('deload')})`];
+
+  return { ...plan, weeks: newWeeks, rationale: newRationale };
 }

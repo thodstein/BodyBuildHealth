@@ -377,11 +377,18 @@ export interface CycleToPlanInput {
 function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG): string {
   const _l = (exName || '').toLowerCase();
   // Name-based overrides for cycle/SRC2 naming not matched exactly by the catalog.
-  if (_l.includes("\u0448\u0440\u0430\u0433")) return 'traps';            // shrugs -> traps (catalog lists them as 'back')
-  if (_l.includes("\u0444\u0440\u0430\u043d\u0446\u0443\u0437") || _l.includes("\u0443\u0437\u043a\u0438\u043c \u0445\u0432\u0430\u0442\u043e\u043c")) return 'triceps';  // french press / close-grip bench
-  if (_l.includes("\u0440\u0430\u0437\u0433\u0438\u0431") && _l.includes("\u0433\u043e\u043b\u043e\u0432\u044b")) return 'triceps';  // overhead triceps extension
-  if (_l.includes("\u0440\u0430\u0437\u0433\u0438\u0431") && _l.includes("\u0431\u043b\u043e\u043a") && !_l.includes("\u043d\u043e\u0433")) return 'triceps';  // triceps pushdown (not leg extension)
-  if (_l.includes("\u043d\u0430 \u043f\u0440\u044f\u043c\u044b\u0445 \u043d\u043e\u0433\u0430\u0445")) return 'hamstrings'; // straight-leg / RDL deadlift
+  if (_l.includes("шраг")) return 'traps';
+  if (_l.includes("француз") || _l.includes("узким хватом")) return 'triceps';
+  if (_l.includes("разгиб") && _l.includes("головы")) return 'triceps';
+  if (_l.includes("разгиб") && _l.includes("блок") && !_l.includes("ног")) return 'triceps';
+  if (_l.includes("на прямых ногах")) return 'hamstrings';
+  // ★ Legs granular: каталог использует композитную группу 'legs' для всех ног-упражнений.
+  // Для профессионального порядка (quads compound первым, затем hamstrings, затем calves)
+  // нужно различать: присед/жим ногами/выпад = quads, RDL/мёртвая = hamstrings, мост = glutes.
+  if (/присед|squat|жим.*ног|leg.?press|выпад|lunge|болгар|разгибан.*ног|leg.?ext/i.test(_l) && !/румын|rdl|мёртв|stiff/i.test(_l)) return 'quads';
+  if (/румын|rdl|мёртв|merтв|stiff|сгибан.*ног|leg.?curl|на прямых ногах|тяга.*прям/i.test(_l)) return 'hamstrings';
+  if (/ягодичн|hip.?thrust|glute|мост/i.test(_l)) return 'glutes';
+  if (/икры|подъём.*носк|подъем.*носк|calf/i.test(_l)) return 'calves';
   const found = catalog.find(e => e.name === exName);
   if (found?.group) {
     const mg = found.group.toLowerCase();
@@ -429,7 +436,9 @@ function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG)
   // (задняя цепь), чем default 'chest' (L412). trueMuscleOf бы вернул null, но
   // сигнатура возвращает string.
   if (l.includes('deadlift') || l.includes('станов')) return 'legs';
-  if (l.includes('сгибан') && !l.includes('бицепс') && !l.includes('молотк')) return 'hamstrings';
+  if (l.includes('сгибан') && !l.includes('бицепс') && !l.includes('молотк') && !l.includes('запяст') && !l.includes('wrist') && !l.includes('предплеч') && !l.includes('ez') && !l.includes('ног') && !l.includes('leg')) return 'hamstrings';
+  // Предплечья (ДО сгибан-проверки, иначе "Сгибания запястий" → hamstrings)
+  if (l.includes('запяст') || l.includes('wrist') || l.includes('предплеч') || l.includes('forearm')) return 'forearms';
   // Икры
   if (l.includes('икры') || l.includes('подъем на носки') || l.includes('подъём на носки')) return 'calves';
   // Бицепс
@@ -812,6 +821,9 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     const sessions: BBSession[] = currentWeekDays.map((daySpec: any, dayIdx: number) => {
       const seenNames = new Set<string>(); // дедупликация по имени внутри дня
       const exercises: BBExercise[] = (daySpec.exercises || []).map((exSpec: any) => {
+        // ★ JUNK-фильтр: выбрасываем нерабочие «упражнения» (кардио, МФР, растяжка, etc.)
+        const CYCLE_JUNK = /кардио|cardio|liss|hiit|мфр|foam.?roll|растяжк|stretch|мобильн|mobility|кошк.*корова|cat.?cow|практика|practice|стойк.*рук|handstand|выход.*сил|muscle.?up|вис.*полотен|вис.*гриф|вис.*турник|l.?сит|l.?sit|йога|yoga|отдых|rest|med.?ball|медбол|ходьб|walking|колесо|ab.?wheel|dead.?bug|мертв.*жук|русск.*твист|russian.*twist|горн.*ключ|mountain.*climb|супермен|superman|гусениц|inchworm|аллигатор|gator|птиц.*собак|bird.?dog|планк|plank|поворот|rotation|рубк|chop|wood/i;
+        if (CYCLE_JUNK.test((exSpec.name || '').toLowerCase())) return null as any;
         const exGroup = exSpec.group || muscleGroupFromExName(exSpec.name, EXERCISE_CATALOG);
         // PL→BB замена — safety-фильтр, применяется в ОБИХ режимах (faithful/adapt).
         // ПЛ-упражнения (становая, жим стоя, рывок и др.) несовместимы с ББ-гипертрофией.
@@ -964,15 +976,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         if (eq.includes('bodyweight') || eq.includes('suspension')) return 5;
         return 5;
       };
-      // Faithful: сохраняем оригинальный порядок программы (не переупорядочиваем).
-      if (mode !== 'faithful') {
-        const _tidy = tidySessionExercises(exercises, exercises.find(e => e.role === 'primary')?.muscle);
-        exercises.length = 0; exercises.push(..._tidy);
-      }
-
-      // Determine session character from exercises
-      const hasHeavy = exercises.some(e => e.character === 'тяж');
-      // Determine session tag from actual exercises (not day index)
+      // Determine session tag from actual exercises (BEFORE tidy, so tidy can use it)
       const dayMuscles = [...new Set(exercises.map(e => e.muscle))];
       let sessionTag = 'FullBody';
       const isChest = dayMuscles.some(m => m === 'chest');
@@ -982,9 +986,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
       const isShoulders = dayMuscles.some(m => m === 'shoulders');
       const isBi = dayMuscles.some(m => m === 'biceps');
       const isTri = dayMuscles.some(m => m === 'triceps');
-      // P0-fix: isLegs должен покрывать 'legs' group (составная группа каталога),
-      // иначе Румынская тяга (group=legs) в chest+back-дне не делает isLegs=true
-      // → sessionTag ошибочно = 'ChestBack' (должен быть 'FullBody').
+      // P0-fix: isLegs должен покрывать 'legs' group (составная группа каталога)
       const isLegs = isQuads || isHams || dayMuscles.some(m => m === 'glutes' || m === 'calves');
       if (isChest && isBack && !isLegs) sessionTag = 'ChestBack';
       else if (isChest && isTri && !isBack && !isLegs) sessionTag = 'Push';
@@ -996,6 +998,14 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
       else if ((isBi || isTri) && !isChest && !isBack && !isLegs && !isShoulders) sessionTag = 'Arms';
       else if (isLegs && !isChest && !isBack) sessionTag = 'Legs';
       else if (isChest && isBack && isLegs) sessionTag = 'FullBody';
+      // Determine session character from exercises
+      const hasHeavy = exercises.some(e => e.character === 'тяж');
+      // Faithful: сохраняем оригинальный порядок программы (не переупорядочиваем).
+      // Adapt: tidy с sessionTag → orderSessionExercises ставит lead-muscle compound первым.
+      if (mode !== 'faithful') {
+        const _tidy = tidySessionExercises(exercises, undefined, sessionTag);
+        exercises.length = 0; exercises.push(..._tidy);
+      }
       const session: BBSession = {
         day: dayIdx + 1,
         weekOffset: (w - 1) * daysPerWeek + dayIdx + 1,
@@ -1353,7 +1363,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       const musclesInDay = pd.exercises.map(e => muscleGroupFromExName(e.name, EXERCISE_CATALOG));
       // Determine primary muscle of day (first muscle appearing with RPE >= 8 or just first exercise)
       const firstExerciseMuscle = musclesInDay[0] || 'chest';
-      const sessionTag = (() => {
+      let sessionTag = (() => {
         const s = new Set(musclesInDay);
         const hasChest = s.has('chest'), hasBack = s.has('back'), hasShoulders = s.has('shoulders');
         // FIX legs-leak: каталог использует композитную группу 'legs' (а не granular 'quads'/'hamstrings'/
@@ -1385,8 +1395,15 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       // L12: очередь суперсет-пар для добавления в конец дня (чтобы не сломать порядок)
       const pendingSupersets: { rightName: string; leftName: string; exIdx: number }[] = [];
 
-      for (let eIdx = 0; eIdx < pd.exercises.length; eIdx++) {
-        let ex = pd.exercises[eIdx];
+      // ★ JUNK-фильтр: выбрасываем нерабочие «упражнения» — кардио, МФР, растяжка, мобильность,
+      // практика стоек/выходов, висы, йога, кошка-корова, колесо пресса, dead bug,
+      // русский твист, горный ключ, медбол и т.д. Скручивания на пресс (crunches) — НЕ мусор,
+      // это легитимное ab-упражнение, оставляем.
+      const BB_JUNK_NAME = /кардио|cardio|liss|hiit|мфр|foam.?roll|растяжк|stretch|мобильн|mobility|кошк.*корова|cat.?cow|практика|practice|стойк.*рук|handstand|выход.*сил|muscle.?up|вис.*полотен|вис.*гриф|вис.*турник|l.?сит|l.?sit|йога|yoga|отдых|rest|med.?ball|медбол|ходьб|walking|скольжен.*стен|wall.?slide|медицинск|колесо|ab.?wheel|dead.?bug|мертв.*жук|русск.*твист|russian.*twist|горн.*ключ|mountain.*climb|супермен|superman|гусениц|inchworm|аллигатор|gator|птиц.*собак|bird.?dog|планк|plank|поворот|rotation|рубк|chop|wood/i;
+      const bbFiltered = pd.exercises.filter(e => !BB_JUNK_NAME.test((e.name || '').toLowerCase()));
+
+      for (let eIdx = 0; eIdx < bbFiltered.length; eIdx++) {
+        let ex = bbFiltered[eIdx];
         let muscle = muscleGroupFromExName(ex.name, EXERCISE_CATALOG);
         if (excludedMuscles.has(muscle)) continue;
 
@@ -1631,10 +1648,45 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       }
 
       // Sort: primary first, then compound → isolation → pump finisher; faithful: respect original order
-      // Adapt: keep original order + finisher в конце (уже так pushились), но primary в начало
+      // Adapt: tidy с sessionTag → orderSessionExercises ставит lead-muscle compound первым.
       if (mode !== 'faithful') {
-        const _tidy = tidySessionExercises(exercises, exercises.find(e => e.role === 'primary')?.muscle);
+        const _tidy = tidySessionExercises(exercises, undefined, sessionTag);
         exercises.length = 0; exercises.push(..._tidy);
+      }
+
+      // ★ DUPE-дедупликация: удаляем упражнения с одинаковым именем (оставляем первое).
+      // Дубликаты появляются когда программа содержит то же упражнение в разных ролях
+      // (Deadlift → Row + Barbell Row → оба становятся "Тяга штанги в наклоне").
+      {
+        const seen = new Set<string>();
+        for (let i = exercises.length - 1; i >= 0; i--) {
+          const name = exercises[i].exerciseName || exercises[i].name || '';
+          if (seen.has(name)) { exercises.splice(i, 1); }
+          else seen.add(name);
+        }
+      }
+
+      // ★ Пересчёт sessionTag ПОСЛЕ всех преобразований (JUNK-фильтр, замены, дедупликация).
+      // Раньше sessionTag вычислялся из исходных pd.exercises — после фильтрации состав
+      // менялся (chest отфильтрован → остался только back → tag=ChestBack, но должен быть Back).
+      // Теперь пересчитываем из финального состава упражлений → корректный tag для tidy.
+      {
+        const finalMuscles = new Set(exercises.map(e => e.muscle));
+        const fChest = finalMuscles.has('chest'), fBack = finalMuscles.has('back'), fShoulders = finalMuscles.has('shoulders');
+        const fQuads = finalMuscles.has('quads'), fHams = finalMuscles.has('hamstrings'), fGlutes = finalMuscles.has('glutes');
+        const fLegs = finalMuscles.has('legs') || finalMuscles.has('calves');
+        const fIsLegs = fQuads || fHams || fGlutes || fLegs;
+        const fBi = finalMuscles.has('biceps'), fTri = finalMuscles.has('triceps');
+        if (fChest && fBack && !fIsLegs) sessionTag = 'ChestBack';
+        else if (fChest && fTri && !fBack && !fIsLegs) sessionTag = 'Push';
+        else if (fBack && fBi && !fChest && !fIsLegs) sessionTag = 'Pull';
+        else if (fShoulders && (fBi || fTri) && !fChest && !fBack && !fIsLegs) sessionTag = 'ShouldersArms';
+        else if (fChest && !fBack && !fIsLegs) sessionTag = 'Chest';
+        else if (fBack && !fChest && !fIsLegs) sessionTag = 'Back';
+        else if (fShoulders && !fChest && !fBack && !fIsLegs) sessionTag = 'Shoulders';
+        else if ((fBi || fTri) && !fChest && !fBack && !fIsLegs && !fShoulders) sessionTag = 'Arms';
+        else if (fIsLegs && !fChest && !fBack) sessionTag = 'Legs';
+        else sessionTag = 'FullBody';
       }
 
       // L12: добавить суперсет-пары в конец дня (как отдельные упражнения)
