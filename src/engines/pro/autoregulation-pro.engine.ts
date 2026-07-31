@@ -118,7 +118,11 @@ export function autoRegulate(input: AutoRegInput): AutoRegOutput {
 
   volMult = r2(clamp(volMult, 0.4, 1.25));
   topMult = r2(clamp(topMult, 0.85, 1.05));
-  rirShift = Math.round(clamp(rirShift, 0, 5));
+  // Avoid stacking every signal into an unsafe RIR jump. Readiness/HRV are
+  // intensity signals; ACWR/fatigue/RPE are load signals.
+  const intensityRir = Math.min(3, (r < 35 ? 3 : r < 50 ? 2 : r < 65 ? 1 : 0) + (hrv < 0.75 ? 1 : 0));
+  const loadRir = Math.min(2, (z === 'caution' || z === 'dangerous' ? 1 : 0) + (fat > 75 ? 2 : fat > 60 ? 1 : 0) + (lrpe >= 9.5 ? 2 : lrpe >= 9 ? 1 : 0));
+  rirShift = Math.round(clamp(intensityRir + loadRir, 0, 4));
 
   const out: AutoRegOutput = {
     topSetPctMultiplier: topMult,

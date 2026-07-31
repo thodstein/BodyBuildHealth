@@ -18,6 +18,7 @@
  */
 import { TAG_MUSCLES } from './bb-day-types';
 import type { BBExercise } from './bb-builder.engine';
+import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 
 /* ───────────────────────── Приоритет мышц ───────────────────────── */
 // Большие/compound-доминантные мышцы раньше в пределах одного тира.
@@ -44,6 +45,8 @@ export function isIsolationByName(name: string): boolean {
 export function isCompoundEx(ex: BBExercise): boolean {
   const n = (ex.name || '').toLowerCase();
   if (ISOLATION_RE.test(n)) return false; // isolation never treated as compound, even if role=primary
+  const catalog = EXERCISE_CATALOG.find(item => item.name === ex.name || item.id === ex.exerciseName);
+  if (catalog) return catalog.type === 'compound';
   if (ex.role === 'primary') return true;
   return (
     /жим|присед|становая|тяга|выпад|пулловер|pull-?up|подтяг|отжимание|dip|bench|press|squat|deadlift|row|lunge|hip.?thrust|rdl|good.?morning/i.test(n)

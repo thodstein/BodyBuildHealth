@@ -15,6 +15,7 @@
  * что и в плане), но с «текущим» = ФАКТ, а не «плановым».
  */
 import type { BBPlan, BBExercise } from './bb-builder.engine';
+import { epley1RM } from '../e1rm';
 import type { WorkoutSession, WorkoutExercise, WorkoutSet } from '../workout-logger.engine';
 import { prescribeLoad, type LoadStrategy } from './bb-autocoach.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -71,17 +72,14 @@ function collapseKeyLocal(muscle: string): string {
 }
 
 /** e1RM (Epley) — для оценки прогрессии. */
-function e1rm(weight: number, reps: number): number {
-  if (weight <= 0 || reps <= 0) return 0;
-  return Math.round(weight / (1 - reps / 36));
-}
+const e1rm = epley1RM;
 
-/** Топ-сет сессии упражнения (максимальный по весу×повторения-прокси). */
+/** Топ-сет сессии упражнения: максимальный рабочий вес. */
 function topSetOf(ex: WorkoutExercise): { weight: number; reps: number; rir: number } | null {
   if (!ex.sets || ex.sets.length === 0) return null;
   let best = ex.sets[0];
   for (const s of ex.sets) {
-    if (s.weightKg * s.reps > best.weightKg * best.reps) best = s;
+    if (s.weightKg > best.weightKg) best = s;
   }
   return { weight: best.weightKg, reps: best.reps, rir: best.rir };
 }

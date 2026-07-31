@@ -268,11 +268,15 @@
 Проверены предложения из внешнего анализа BB-auto. В план включены только подтверждённые текущим кодом улучшения:
 
 - **P1: единый compound classifier.** `bb-builder` и `bb-session-order` используют разные источники истины (`catalog.type` против name-regex/role). Объединить их через catalog profile с безопасным fallback; добавить property-тесты для primary/accessory и PL-leakage.
+- Реализовано: `isCompoundEx()` использует catalog `type` по имени/id, regex остаётся только fallback для неизвестных упражнений.
 - **P1: session working-set cap.** Exercise cap уже существует, но отдельного явного cap по суммарным рабочим сетам сессии нет. Добавить target-aware cap, который сначала режет вторичные isolation/feeders, сохраняя primary и единственный стимул мышцы.
 - Shared fatigue budget теперь применяет default `maxWorkingSets=24` для всех adaptive sources; cap режет вторичные sets до удаления упражнений.
 - **P2: hamstring angle diversity.** Расширить canonical angle classes: seated/lying curl, RDL, good morning, glute-ham/Nordic при доступности и safety restrictions.
 - **P2: glute angle diversity.** Расширить canonical classes: hip-thrust variations, kickback, abduction и 45-degree extension с equipment/injury фильтрами.
+- Реализовано: hamstring classes расширены seated curl/good morning/GHR-Nordic, glute classes — abduction/45-degree extension; общий pool safety фильтрует недоступное оборудование и травмы.
 - **P2: fatigue-aware DUP.** Учитывать накопленную усталость при распределении reps/weight между рабочими сетами, сохраняя phase/training-focus диапазоны.
+- Реализовано: middle DUP sets после первых тяжёлых сетов получают мягкое снижение reps в пределах заданного phase/training-focus диапазона; deload не изменяется.
+- Реализовано: BB plan-vs-fact использует canonical Epley e1RM и выбирает top set по максимальному весу; autorег RIR shift ограничен категориями intensity/load общим потолком 4.
 
 Отклонено как уже реализованное или неподтверждённое:
 

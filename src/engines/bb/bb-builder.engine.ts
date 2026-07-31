@@ -1262,13 +1262,18 @@ function buildSession(
         ],
         hamstrings: [
           { name: 'curl', match: (e) => /сгибан.*ног|leg.?curl|сгибания ног/i.test(e.name) },
+          { name: 'seated_curl', match: (e) => /сгибан.*сидя|seated.*curl/i.test(e.name) },
           { name: 'rdl_bridge', match: (e) => /румын|rdl|ягодичн.*мост|hip.?thrust|glute.?bridge/i.test(e.name) },
+          { name: 'good_morning', match: (e) => /гудморнинг|good.?morning|гиперэкстенз|back.?extension/i.test(e.name) },
+          { name: 'nordic_ghr', match: (e) => /норд|nordic|glute.?ham|ghr/i.test(e.name) },
           { name: 'lunge', match: (e) => /выпад|lunge/i.test(e.name) },
         ],
         glutes: [
           { name: 'hip_thrust', match: (e) => /ягодичн.*мост|hip.?thrust|glute.?bridge/i.test(e.name) },
           { name: 'squat_variant', match: (e) => /присед|squat|выпад|lunge|болгар/i.test(e.name) },
           { name: 'kickback', match: (e) => /отведен.*ног|kick.?back|мах.*ног|glute.?kick/i.test(e.name) },
+          { name: 'abduction', match: (e) => /отведен.*бедр|abduction|разведен.*ног/i.test(e.name) },
+          { name: 'extension', match: (e) => /гиперэкстенз|back.?extension|45.?degree/i.test(e.name) },
         ],
         calves: [
           { name: 'standing_calf', match: (e) => /подъём.*носки.*стоя|подъем.*носки.*стоя|standing.*calf|calf.*stand/i.test(e.name) },
@@ -1586,6 +1591,9 @@ function buildSession(
         if (k === 0) wave = repMin;
         else if (k === exSets - 1) wave = repMax; // последний — высокий reps (finish)
         else wave = k % 2 === 1 ? repMax : repMin;
+        // Fatigue-aware DUP: middle sets are nudged down after the first
+        // hard set, without leaving the phase/focus rep range.
+        if (k >= 2 && exSets >= 4 && phase !== 'deload') wave = Math.max(repMin, wave - 1);
         dupReps.push(Math.min(wave, repsCap));
       }
       const workSets: BBSet[] = dupReps.map(reps => ({
