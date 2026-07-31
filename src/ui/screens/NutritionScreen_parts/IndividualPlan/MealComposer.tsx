@@ -191,7 +191,7 @@ export const MealComposer: React.FC = () => {
             targetC={effectiveC}
           />
 
-          {composerMode === 'targeting' && gapResult && comboResult && comboResult.suggestions.length > 0 && (
+          {composerMode === 'targeting' && gapResult && comboResult && Array.isArray(comboResult.suggestions) && comboResult.suggestions.length > 0 && (
             <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(6,182,212,0.04)', border: '1px solid rgba(6,182,212,0.12)', marginBottom: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <span style={{ fontSize: 9, fontWeight: 700, color: '#06b6d4' }}>🎯 Продукты для закрытия дефицитов</span>
@@ -247,7 +247,7 @@ export const MealComposer: React.FC = () => {
                   </div>
                 ))}
               </div>
-              {comboResult.suggestions.length === 0 && (
+              {Array.isArray(comboResult.suggestions) && comboResult.suggestions.length === 0 && (
                 <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', textAlign: 'center', padding: 8 }}>
                   Все дефициты покрыты текущими продуктами
                 </div>

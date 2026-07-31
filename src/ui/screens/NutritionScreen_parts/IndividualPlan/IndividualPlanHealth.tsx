@@ -38,10 +38,10 @@ export const IndividualPlanHealth: React.FC = () => {
     return foodIds.filter(fid => planFoodIds.has(fid)).map(fid => getFoodName(fid));
   };
 
-  const totalExcluded = [...new Set(activeIssues.flatMap(h => h.foodIds))].length;
+  const totalExcluded = [...new Set(activeIssues.flatMap(h => Array.isArray(h.foodIds) ? h.foodIds : []))].length;
 
   const getIssueCompliance = (issue: typeof HEALTH_ISSUES[0]) => {
-    const conflicts = getConflicts(issue.foodIds);
+    const conflicts = getConflicts(Array.isArray(issue.foodIds) ? issue.foodIds : []);
     if (!hasPlan) return { status: 'info', label: 'Нет плана' };
     if (conflicts.length === 0) return { status: 'ok', label: '✓ Нет нарушений' };
     return { status: 'warn', label: `⚠ ${conflicts.length} наруш.` };

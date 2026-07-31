@@ -10,6 +10,33 @@ import { usePlanCtx } from "./IndividualPlanContext";
 
 type PlanTab = 'settings' | 'plan' | 'composer' | 'report' | 'organload';
 
+type PlannerBoundaryState = { error: Error | null };
+
+class PlannerErrorBoundary extends React.Component<React.PropsWithChildren, PlannerBoundaryState> {
+  state: PlannerBoundaryState = { error: null };
+
+  static getDerivedStateFromError(error: Error): PlannerBoundaryState {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    const payload = { message: error.message, stack: error.stack, componentStack: info.componentStack, at: new Date().toISOString() };
+    try { console.error('[PlannerBoundary] Render error:', error, info); } catch {}
+    try { localStorage.setItem('he_planner_last_render_error', JSON.stringify(payload)); } catch {}
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div style={{ margin: 8, padding: 14, borderRadius: 12, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#fff' }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: '#ef4444', marginBottom: 6 }}>Ошибка отображения планировщика</div>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>{this.state.error.message || 'Неизвестная ошибка'}</div>
+        <button onClick={() => this.setState({ error: null })} style={{ marginTop: 10, padding: '7px 12px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: 9, fontWeight: 700 }}>Повторить отображение</button>
+      </div>
+    );
+  }
+}
+
 const TAB_META: { key: PlanTab; label: string; icon: string }[] = [
   { key: 'settings', label: 'Настройки', icon: '⚙️' },
   { key: 'plan', label: 'План', icon: '🥗' },
@@ -56,9 +83,11 @@ const IndividualPlanInner: React.FC = () => {
 
 export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: any[]; labs?: LabPoint[]; labAnalysis?: LabCompositeResult | null }> = ({ profile, course, labs, labAnalysis }) => {
   return (
-    <IndividualPlanProvider profile={profile} course={course} labs={labs} labAnalysis={labAnalysis}>
-      <IndividualPlanInner />
-    </IndividualPlanProvider>
+    <PlannerErrorBoundary>
+      <IndividualPlanProvider profile={profile} course={course} labs={labs} labAnalysis={labAnalysis}>
+        <IndividualPlanInner />
+      </IndividualPlanProvider>
+    </PlannerErrorBoundary>
   );
 };
 

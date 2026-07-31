@@ -422,7 +422,7 @@ export const IndividualPlanResults: React.FC = () => {
           )}
           <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
             <button onClick={() => {
-              const txt = dayPlan ? `🍽 План питания\n${dayPlan.meals.map((m: any) => `${m.time} ${m.label}: ${m.items.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}  [${Math.round(m.totals?.kcal || 0)}ккал]`).join('\n')}\n\n📊 Итого: ${Math.round(dayPlan.totals.kcal)} ккал, Б${Math.round(dayPlan.totals.p)}/Ж${Math.round(dayPlan.totals.f)}/У${Math.round(dayPlan.totals.c)}, клетчатка ${Math.round(dayPlan.totals.fiber||0)}г${(dayPlan as any).healthScore ? `\n\n🩺 Health-score: ${(dayPlan as any).healthScore.score}/100 (${(dayPlan as any).healthScore.status}) — микро ${(dayPlan as any).healthScore.micro}/клетч ${(dayPlan as any).healthScore.fiber}/MPS ${(dayPlan as any).healthScore.mps}/EA ${(dayPlan as any).healthScore.ea}/диверс ${(dayPlan as any).healthScore.diversity}` : ''}${(dayPlan as any).energyAvailability ? `\n⚡ EA: ${(dayPlan as any).energyAvailability.ea} ккал/кг FFM (${(dayPlan as any).energyAvailability.status})` : ''}${(dayPlan as any).menstrualPhaseNote ? `\n🌸 ${(dayPlan as any).menstrualPhaseNote}` : ''}${(dayPlan as any).categoryNote ? `\n🏋 ${(dayPlan as any).categoryNote}` : ''}${(dayPlan as any).redSNote ? `\n⚠️ ${(dayPlan as any).redSNote}` : ''}${(dayPlan as any).peakWeekNote ? `\n🏆 ${(dayPlan as any).peakWeekNote}` : ''}` : '';
+              const txt = dayPlan ? `🍽 План питания\n${(Array.isArray(dayPlan.meals) ? dayPlan.meals : []).map((m: any) => `${m.time} ${m.label}: ${(Array.isArray(m.items) ? m.items : []).map((it: any) => `${it.name} ${it.amount}г`).join(', ')}  [${Math.round(m.totals?.kcal || 0)}ккал]`).join('\n')}\n\n📊 Итого: ${Math.round(dayPlan.totals?.kcal || 0)} ккал, Б${Math.round(dayPlan.totals?.p || 0)}/Ж${Math.round(dayPlan.totals?.f || 0)}/У${Math.round(dayPlan.totals?.c || 0)}, клетчатка ${Math.round(dayPlan.totals?.fiber||0)}г${(dayPlan as any).healthScore ? `\n\n🩺 Health-score: ${(dayPlan as any).healthScore.score}/100 (${(dayPlan as any).healthScore.status}) — микро ${(dayPlan as any).healthScore.micro}/клетч ${(dayPlan as any).healthScore.fiber}/MPS ${(dayPlan as any).healthScore.mps}/EA ${(dayPlan as any).healthScore.ea}/диверс ${(dayPlan as any).healthScore.diversity}` : ''}${(dayPlan as any).energyAvailability ? `\n⚡ EA: ${(dayPlan as any).energyAvailability.ea} ккал/кг FFM (${(dayPlan as any).energyAvailability.status})` : ''}${(dayPlan as any).menstrualPhaseNote ? `\n🌸 ${(dayPlan as any).menstrualPhaseNote}` : ''}${(dayPlan as any).categoryNote ? `\n🏋 ${(dayPlan as any).categoryNote}` : ''}${(dayPlan as any).redSNote ? `\n⚠️ ${(dayPlan as any).redSNote}` : ''}${(dayPlan as any).peakWeekNote ? `\n🏆 ${(dayPlan as any).peakWeekNote}` : ''}` : '';
               try { void navigator.clipboard?.writeText(txt); } catch { setErrorMsg('Не удалось скопировать план.'); }
             }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:10, fontWeight:600 }}>📤 Копировать</button>
             <button onClick={() => {
@@ -717,7 +717,7 @@ export const IndividualPlanResults: React.FC = () => {
              <span style={{ color: '#f97316' }}>● У: {Math.round(weekPlan.totals?.c || 0)}г</span>
           </div>
           <div style={{ maxHeight: 500, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {weekPlan.days.map((d: any, di: number) => {
+             {(Array.isArray(weekPlan.days) ? weekPlan.days : []).map((d: any, di: number) => {
               const wKcal = Math.round(d.totals?.kcal || 0);
               const wP = Math.round(d.totals?.p || 0);
               const wF = Math.round(d.totals?.f || 0);
@@ -771,10 +771,10 @@ export const IndividualPlanResults: React.FC = () => {
                 <thead>
                   <tr>
                     <th style={{ padding: '4px 6px', textAlign: 'center', background: '#202023', borderRadius: 6, fontSize: 7, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>Приём</th>
-                    {weekPlan.days.map((d: any, di: number) => (
+                    {(Array.isArray(weekPlan.days) ? weekPlan.days : []).map((d: any, di: number) => (
                       <th key={di} style={{ padding: '4px 6px', textAlign: 'center', background: d.isTrainingDay ? 'rgba(0,230,138,0.12)' : '#202023', borderRadius: 6, fontSize: 7, color: d.isTrainingDay ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: 700 }}>
                         {DAY_LABELS[di]}
-                        <div style={{ fontWeight: 400, color: 'rgba(255,255,255,0.85)' }}>{Math.round(d.totals.kcal)} ккал</div>
+                        <div style={{ fontWeight: 400, color: 'rgba(255,255,255,0.85)' }}>{Math.round(d.totals?.kcal || 0)} ккал</div>
                       </th>
                     ))}
                   </tr>
@@ -783,7 +783,7 @@ export const IndividualPlanResults: React.FC = () => {
                   {allMealLabels.map((label: any) => (
                     <tr key={label}>
                       <td style={{ padding: '4px 6px', background: '#202023', borderRadius: 6, fontSize: 7, color: 'rgba(255,255,255,0.85)', fontWeight: 600, whiteSpace: 'nowrap' }}>{label}</td>
-                      {weekPlan.days.map((d: any, di: number) => {
+                       {(Array.isArray(weekPlan.days) ? weekPlan.days : []).map((d: any, di: number) => {
                          const meal = (Array.isArray(d?.meals) ? d.meals : []).find((m: any) => m.label === label);
                         if (!meal) return <td key={di} style={{ padding: '4px', textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: 6 }}>—</td>;
                         const kcal = Math.round(meal.totals?.kcal || 0);
@@ -813,7 +813,7 @@ export const IndividualPlanResults: React.FC = () => {
         <GlassCard title="⏳ Таймлайн дня" icon="⏳" color="#06b6d4">
           <div style={{ position: 'relative', paddingLeft: 20 }}>
             <div style={{ position: 'absolute', left: 8, top: 0, bottom: 0, width: 2, background: 'rgba(6,182,212,0.2)', borderRadius: 1 }} />
-            {dayPlan.meals.map((m: any, mi: number) => {
+            {(Array.isArray(dayPlan.meals) ? dayPlan.meals : []).map((m: any, mi: number) => {
               const k = Math.round(m.totals?.kcal || 0);
               const w = Math.max(10, Math.round(k / Math.max(1, dayPlan.totals?.kcal) * 100));
               return (
@@ -1549,7 +1549,7 @@ export const IndividualPlanResults: React.FC = () => {
               <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444' }}>{cravingPlan.bju.c}г</div>
             </div>
           </div>
-          {cravingPlan.items.map((it: any, i: number) => (
+          {(Array.isArray(cravingPlan.items) ? cravingPlan.items : []).map((it: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               <span style={{ color: '#fff' }}>• {it.name || it}</span>
               <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:9, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
@@ -1581,7 +1581,7 @@ export const IndividualPlanResults: React.FC = () => {
               <div style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6' }}>{lazyDayPlan.bju.c}г</div>
             </div>
           </div>
-          {lazyDayPlan.items.map((it: any, i: number) => (
+          {(Array.isArray(lazyDayPlan.items) ? lazyDayPlan.items : []).map((it: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               <span style={{ color: '#fff' }}>• {it.name || it}</span>
               <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:9, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
@@ -1614,7 +1614,7 @@ export const IndividualPlanResults: React.FC = () => {
             </div>
           </div>
           <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 6, textAlign: 'center' }}>{cheatMealPlan.bjuBreakdown}</div>
-          {cheatMealPlan.items.map((it: any, i: number) => (
+          {(Array.isArray(cheatMealPlan.items) ? cheatMealPlan.items : []).map((it: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               <span style={{ color: '#fff' }}>• {it.name || it}</span>
               <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || (cheatMealPlan.cals / cheatMealPlan.items.length), amount: 100 })} style={{ cursor:'pointer', fontSize:9, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
@@ -1925,9 +1925,9 @@ export const IndividualPlanResults: React.FC = () => {
                   <div style={{ marginBottom:10 }}>
                     <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:4, display:'flex', justifyContent:'space-between' }}>
                       <span>🍽 Приёмы пищи</span>
-                      <span onClick={() => { const all: string[] = dayPlan.meals.map((_: any, i: number) => `meal_${i}`); const next = new Set(calcSelections); all.forEach((id: string) => next.add(id)); setCalcSelections(next); }} style={{ cursor:'pointer', fontSize:10, color:'#00e68a', fontWeight:600 }}>Выбрать все</span>
+                      <span onClick={() => { const all: string[] = (Array.isArray(dayPlan.meals) ? dayPlan.meals : []).map((_: any, i: number) => `meal_${i}`); const next = new Set(calcSelections); all.forEach((id: string) => next.add(id)); setCalcSelections(next); }} style={{ cursor:'pointer', fontSize:10, color:'#00e68a', fontWeight:600 }}>Выбрать все</span>
                     </div>
-                    {dayPlan.meals.map((m: any, i: number) => {
+                    {(Array.isArray(dayPlan.meals) ? dayPlan.meals : []).map((m: any, i: number) => {
                       const id = `meal_${i}`;
                       const sel = calcSelections.has(id);
                       return (
