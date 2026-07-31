@@ -35,6 +35,11 @@ export interface SavedBBPlan {
     qualityScore: number;
     muscleCount: number;
     mrvMult: number;
+    peakWeek?: number;
+    peakDirectSets?: number;
+    peakEffectiveSets?: number;
+    maxSessionMinutes?: number;
+    maxAxialCost?: number;
   };
 }
 
@@ -46,8 +51,29 @@ export function loadSavedBBPlans(): SavedBBPlan[] {
     const raw = localStorage.getItem(KEY);
     if (!raw) return [];
     const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : [];
+    return Array.isArray(arr) ? arr.filter(item => item && typeof item === 'object').map(migrateSavedPlan) : [];
   } catch { return []; }
+}
+
+function migrateSavedPlan(value: any): SavedBBPlan {
+  return {
+    ...value,
+    params: {
+      patternId: '', patternName: value.params?.patternName || value.plan?.pattern?.name || '',
+      level: value.params?.level || value.plan?.level || 'intermediate', goal: value.params?.goal || 'mass',
+      weeks: value.params?.weeks || value.plan?.weeks?.length || 1, volumeGoal: value.params?.volumeGoal || 'mav',
+      peds: Array.isArray(value.params?.peds) ? value.params.peds : [], weakPoints: Array.isArray(value.params?.weakPoints) ? value.params.weakPoints : [],
+      focusGroup: value.params?.focusGroup || '', intensityTechnique: value.params?.intensityTechnique || 'none',
+      loadStrategy: value.params?.loadStrategy || 'double_progression', autoDeload: Boolean(value.params?.autoDeload),
+      deloadType: value.params?.deloadType || 'pump', planMode: value.params?.planMode || 'generic_split', ...value.params,
+    },
+    metrics: {
+      totalSets: value.metrics?.totalSets || 0, avgRir: value.metrics?.avgRir || 0,
+      sessionsPerWeek: value.metrics?.sessionsPerWeek || value.plan?.pattern?.sessionsPerRotation || 0,
+      phases: Array.isArray(value.metrics?.phases) ? value.metrics.phases : [], qualityScore: value.metrics?.qualityScore || 0,
+      muscleCount: value.metrics?.muscleCount || 0, mrvMult: value.metrics?.mrvMult || 1, ...value.metrics,
+    },
+  } as SavedBBPlan;
 }
 
 export function saveBBPlanVariant(name: string, plan: any, params: SavedBBPlan['params'], metrics: SavedBBPlan['metrics']): SavedBBPlan[] {

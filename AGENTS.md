@@ -5,7 +5,13 @@
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK
-- `vitest` - 480 passing (31 test files, including 19 new training-focus-and-taper tests)
+- `vitest` - 644 passing (77 test files; BB-auto generation, safety, migration and round-trip coverage included)
+
+### BB-auto max plan status
+- Generic, BB-cycle and FullProgram paths use the shared finalizer for volume, fatigue budget, phase/taper safety, validation, report and export snapshots.
+- `adapt` paths use diary feedback/double progression; `faithful` preserves source selection/order while retaining safety and derived metadata.
+- Saved BB variants and UserProgram imports migrate legacy records and retain phase, volume, fatigue, report, validation and safety metadata.
+- Remaining risks are limited to non-blocking UI smoke coverage and deeper future integration of target-volume planning with feeder selection.
 
 ### Git
 - `origin/main` - tracked

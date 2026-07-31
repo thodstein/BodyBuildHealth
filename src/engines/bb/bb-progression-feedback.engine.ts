@@ -229,6 +229,7 @@ export function applyFeedbackToBuild(
 
   const newWeeks = plan.weeks.map((wk, wIdx) => {
     if (wIdx === 0) return wk; // неделя 1 — без факта (нет предыдущей)
+    if ((wk as any).deload || String((wk as any).phase || '').toLowerCase() === 'deload') return wk;
     const newSessions = wk.sessions.map(s => ({
       ...s,
       exercises: s.exercises.map((ex: BBExercise) => {
@@ -240,7 +241,8 @@ export function applyFeedbackToBuild(
         const maxW = workMax[ex.muscle] || last.topWeight || 80;
         const exType = ex.role === 'primary' ? 'compound' : 'isolation';
         // P1-7: prescribeLoad с фактом + plannedRir для success-aware коррекции
-        const rec = prescribeLoad(strategy, last.topWeight, last.topReps, last.actualRir, maxW, wk.week, tw, 'intensification', exType, ex.role, plannedRir);
+        const phase = ((wk as any).phase || 'intensification') as any;
+        const rec = prescribeLoad(strategy, last.topWeight, last.topReps, last.actualRir, maxW, wk.week, tw, phase, exType, ex.role, plannedRir);
         const rirDelta = last.actualRir - plannedRir;
         const comment = (ex.comment || '') + ` | ↻ из факта: ${last.topWeight}×${last.topReps} RIR${last.actualRir} → ${rec.nextWeight}×${rec.nextReps} RIR${rec.nextRIR}`;
         return {

@@ -165,6 +165,15 @@ export interface BBProgramBody {
   volumeBudget: VolumeBudget;
   progression: ProgramProgression;
   constraints: ProgramConstraints;
+  /** Final BB-auto snapshot retained across import/save round-trips. */
+  derived?: {
+    volumeTargets?: Record<string, unknown>;
+    weeklyVolume?: Record<number, unknown>;
+    fatigueReport?: unknown[];
+    rotationReport?: unknown;
+    report?: unknown;
+    validation?: unknown;
+  };
 }
 
 /** ПЛ-тело: ссылка на иммутабельный LMS-цикл + пользовательский оверлей.

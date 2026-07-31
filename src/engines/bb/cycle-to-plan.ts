@@ -22,6 +22,10 @@ import { acuteChronicRatio, toDailyLoads } from '../pro/training-load.engine';
 import type { FullProgram, ProgramWeek, ProgramDay } from '../../engines/complete-program-library.engine';
 import type { BBTrainingFocus } from './bb-goal-types';
 import { FOCUS_RIR_TABLE } from './bb-goal-types';
+import { finalizeBBPlan } from './bb-finalize.engine';
+import { computeBBRecoveryMultiplier } from './bb-volume.engine';
+import { applyFeedbackToBuild, autoReplaceOnPlateau } from './bb-progression-feedback.engine';
+import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 
 /**
  * Вычислить ACWR из реальных sRPE-сессий пользователя (отдельная функция для cycle/program mode).
@@ -362,6 +366,8 @@ export interface CycleToPlanInput {
   equipment?: string[];
   /** Режим адаптации: 'faithful' = цикл дословно (только safety-фильтры), 'adapt' = + слабые группы/фокус/пост-фаза. */
   mode?: 'faithful' | 'adapt';
+  /** Единая методика порядка упражнений для всех BB-источников. */
+  methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
   /** Training focus для RIR-корректировки (Schoenfeld 2021, Roberts 2022). */
   trainingFocus?: BBTrainingFocus;
   /** Recovery-метрики → MRV soft-cap (Helms 2022, Plews 2022, Watson 2022). */
@@ -750,15 +756,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const landmarks = Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv]));
   const pedAdapt = adaptForPEDs(peds, landmarks, pedDoses, courseIntensity);
   // Recovery multiplier from body composition + recovery metrics (Helms 2022, Plews 2022, Watson 2022).
-  const recoveryMult = Math.max(0.6, Math.min(1.5, (() => {
-    let r = 1.0;
-    if (input.bodyFat != null) r *= input.bodyFat > 25 ? 0.9 : input.bodyFat > 20 ? 0.95 : 1.0;
-    if (input.leanMass != null) r *= input.leanMass >= 90 ? 1.15 : input.leanMass >= 75 ? 1.05 : input.leanMass >= 60 ? 1.0 : 0.9;
-    if (input.hrvMs != null) r *= input.hrvMs > 70 ? 1.1 : input.hrvMs >= 50 ? 1.0 : 0.85;
-    if (input.sleepHours != null) r *= input.sleepHours >= 7 ? 1.05 : input.sleepHours >= 6 ? 1.0 : 0.85;
-    if (input.stressLevel != null) r *= input.stressLevel < 3 ? 1.05 : input.stressLevel < 6 ? 1.0 : 0.85;
-    return r;
-  })()));
+  const recoveryMult = computeBBRecoveryMultiplier(input);
   const labMult = input.labMrvMultiplier ?? 1.0;
   const mrvMult = (pedAdapt.combinedMrvMultiplier || 1.0) * recoveryMult * labMult;
 
@@ -1090,6 +1088,21 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     });
   }
 
+  // Plan-vs-fact feedback is shared with generic BB generation. Faithful
+  // intentionally remains source-preserving; adapt consumes the same diary
+  // data and double-progression strategy as the generic path.
+  if (mode === 'adapt') {
+    const workoutSessions = loadWorkoutSessions();
+    if (workoutSessions.length > 0) {
+      finalPlan = applyFeedbackToBuild(finalPlan, workoutSessions, workMax, loadStrategy as LoadStrategy);
+      const plateau = autoReplaceOnPlateau(finalPlan, workoutSessions);
+      if (plateau.changes.length > 0) {
+        finalPlan = plateau.plan;
+        rationale.push(...plateau.changes);
+      }
+    }
+  }
+
   // Volume-landmarks (единый источник, как в generic split)
   const pedMrvMult = pedAdapt.combinedMrvMultiplier ?? 1;
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, pedMrvMult);
@@ -1109,7 +1122,26 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     }
   }
 
-  return { ...finalPlan, volumeLandmarks, muscleFrequency };
+  return finalizeBBPlan({ ...finalPlan, volumeLandmarks, muscleFrequency }, {
+    reorder: mode !== 'faithful',
+    priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+    methodology: input.methodology,
+    level,
+    volumeGoal,
+    // Phase invariants are safety checks, not an adaptive rewrite. Faithful
+    // keeps exercise selection/order but still receives deload validation.
+    phaseSafety: true,
+    controlledRotation: mode !== 'faithful',
+    equipment,
+    excludedExercises,
+    avoidAxialLoad,
+    excludedMuscles: [...excludedMuscles],
+    ensureMinimumVolume: mode !== 'faithful',
+    workMax,
+    mrvMultiplier: mrvMult,
+    checkOrder: mode !== 'faithful',
+    preserveSource: mode === 'faithful',
+  });
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -1141,6 +1173,15 @@ export interface ProgramToBBPlanOpts {
   specialization?: boolean;
   /** Режим адаптации: 'faithful' = программа дословно (только safety-фильтры), 'adapt' = + добивка слабых групп */
   mode?: 'faithful' | 'adapt';
+  /** Единая методика порядка упражнений для всех BB-источников. */
+  methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
+  trainingFocus?: BBTrainingFocus;
+  bodyFat?: number;
+  leanMass?: number;
+  hrvMs?: number;
+  sleepHours?: number;
+  stressLevel?: number;
+  labMrvMultiplier?: number;
 }
 
 function parseReps(repsStr: string | undefined): number {
@@ -1331,7 +1372,9 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const landmarks = Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv]));
   const pedAdapt = adaptForPEDs(opts.peds || [], landmarks, opts.pedDoses, opts.courseIntensity);
   const mrvMult = pedAdapt.combinedMrvMultiplier || 1.0;
-  const pedMrvMult = mrvMult;
+  const recoveryMult = computeBBRecoveryMultiplier(opts);
+  const effectiveMrvMult = mrvMult * recoveryMult * (opts.labMrvMultiplier ?? 1);
+  const pedMrvMult = effectiveMrvMult;
 
   const rationale: string[] = [];
   rationale.push(`📚 Программа: ${program.name} (${program.author})`);
@@ -1809,9 +1852,38 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     });
   }
 
+  if (mode === 'adapt') {
+    const workoutSessions = loadWorkoutSessions();
+    if (workoutSessions.length > 0) {
+      finalPlan = applyFeedbackToBuild(finalPlan, workoutSessions, workMax, opts.loadStrategy as LoadStrategy);
+      const plateau = autoReplaceOnPlateau(finalPlan, workoutSessions);
+      if (plateau.changes.length > 0) {
+        finalPlan = plateau.plan;
+        rationale.push(...plateau.changes);
+      }
+    }
+  }
+
   // Volume-landmarks
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, levelForLandmarks, pedMrvMult);
-  return { ...finalPlan, volumeLandmarks, muscleFrequency };
+  return finalizeBBPlan({ ...finalPlan, volumeLandmarks, muscleFrequency }, {
+    reorder: mode !== 'faithful',
+    priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+    methodology: opts.methodology,
+    level: levelForLandmarks,
+    volumeGoal: opts.volumeGoal,
+    phaseSafety: true,
+    controlledRotation: mode !== 'faithful',
+    equipment: eqList,
+    excludedExercises: opts.excludedExercises,
+    avoidAxialLoad: avAxial,
+    excludedMuscles: [...excludedMuscles],
+    ensureMinimumVolume: mode !== 'faithful',
+    workMax,
+    mrvMultiplier: pedMrvMult,
+    checkOrder: mode !== 'faithful',
+    preserveSource: mode === 'faithful',
+  });
 }
 
 // helper: get volume landmarks wrapper (used in adapt mode)

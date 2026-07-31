@@ -33,8 +33,31 @@ export function loadUserPrograms(): UserProgram[] {
     const raw = localStorage.getItem(KEY);
     if (!raw) return [];
     const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? (arr as UserProgram[]) : [];
+    return Array.isArray(arr) ? arr.filter(Boolean).map(migrateUserProgram) : [];
   } catch(_e) { return []; }
+}
+
+/** Normalize programs saved before BB derived metadata was introduced. */
+function migrateUserProgram(value: any): UserProgram {
+  if (!value || typeof value !== 'object') return value;
+  const program = { ...value } as UserProgram;
+  if (program.bb) {
+    const weeks = (program.bb.weeks || []).map((week: any, index: number) => ({
+      ...week,
+      week: week.week || index + 1,
+      phase: week.phase || 'accumulation',
+      deload: Boolean(week.deload || week.phase === 'deload'),
+      sessions: Array.isArray(week.sessions) ? week.sessions : [],
+    }));
+    program.bb = {
+      ...program.bb,
+      weeks,
+      volumeBudget: program.bb.volumeBudget || {},
+      progression: program.bb.progression || { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] },
+      constraints: program.bb.constraints || { equipment: [] },
+    };
+  }
+  return program;
 }
 
 export function getUserProgram(id: string): UserProgram | null {
@@ -328,13 +351,32 @@ export function createFromBuild(
     direction: 'bb',
     microcycleTemplate: microcycle,
     weeks,
-    volumeBudget: {},
+    volumeBudget: Object.fromEntries(Object.entries(plan.volumeTargets || {}).map(([muscle, target]) => [muscle, {
+      muscle,
+      mev: target.mev,
+      mav: target.mav,
+      mrv: target.mrv,
+      target: target.targetSets,
+    }])),
     progression: {
       loadStrategy: 'double_progression',
       deloadProtocol: 'pump',
       intensityTechniques: ['none'],
     },
-    constraints: { equipment: params.equipment ?? [] },
+    constraints: {
+      equipment: params.equipment ?? plan.safetyConstraints?.equipment ?? [],
+      avoidAxialLoad: plan.safetyConstraints?.avoidAxialLoad,
+      excludedExercises: plan.safetyConstraints?.excludedExercises,
+      injuries: plan.safetyConstraints?.excludedMuscles?.map(muscle => ({ muscle, grade: 'excluded' })),
+    },
+    derived: {
+      volumeTargets: plan.volumeTargets,
+      weeklyVolume: plan.weeklyVolume,
+      fatigueReport: plan.fatigueReport,
+      rotationReport: plan.rotationReport,
+      report: plan.report,
+      validation: plan.validation,
+    },
   };
   const meta = baseMeta({
     title: params.title ?? (plan.pattern?.name ?? 'ББ-программа') + ' (из сборки)',
@@ -378,7 +420,7 @@ function weekFromBuild(w: BBWeek, totalWeeks: number, original?: FullProgram): U
   // Приоритет: originalProgram.weeks[w.week - 1] (если есть) — точные phase/deload.
   const origWeek = original?.weeks?.[w.week - 1];
   const phase: Phase = (origWeek?.phase as Phase) ?? phaseFromWeek(w.week, totalWeeks);
-  const deload = origWeek ? !!origWeek.deload : false;
+  const deload = origWeek ? !!origWeek.deload : Boolean(w.deload || w.phase === 'deload');
   return {
     week: w.week,
     phase,

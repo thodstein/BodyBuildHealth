@@ -20,6 +20,8 @@ import { SubstitutionPopup } from './SubstitutionPopup';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { rankBBSplits, getMuscleFrequencies, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
 import { buildBBPlan, buildWarmup, type BBPlan, type BBExercise } from '../../../engines/bb/bb-builder.engine';
+import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
+import { finalizeBBPlan } from '../../../engines/bb/bb-finalize.engine';
 import { calcBBPlanMetrics, explainBBMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
@@ -60,6 +62,7 @@ import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveU
 import { getBBSuggestions } from './bb-compat';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { WhatIfCard } from './WhatIfCard';
+import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 
 type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -177,6 +180,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [bbWeeks, setBbWeeks] = useState<number>(8);
   const [bbVolGoal, setBbVolGoal] = useState<string>('mav');
   const [bbFocus, setBbFocus] = useState<string>('');
+  const bbTrainingFocus = 'hypertrophy' as const;
   const [planMode, setPlanMode] = useState<PlanMode>(prof.planMode === 'bb_cycle' ? 'bb_cycle' : 'generic_split');
   const [selectedCycleId, setSelectedCycleId] = useState<string>(prof.bbCycleId || '');
   const [loadStrategy, setLoadStrategy] = useState<LoadStrategy>((prof.loadStrategy as LoadStrategy) || 'double_progression');
@@ -220,6 +224,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [savedPlans, setSavedPlans] = useState<SavedBBPlan[]>([]);
   const [showCompare, setShowCompare] = useState(false);
   const [showTools, setShowTools] = useState(false);
+  const [showMacrocycle, setShowMacrocycle] = useState(false);
   const refreshSavedPlans = useCallback(() => setSavedPlans(loadSavedBBPlans()), []);
   useEffect(() => { refreshSavedPlans(); }, [refreshSavedPlans]);
 
@@ -370,7 +375,7 @@ export const BbAutoConstructor: React.FC = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.plan && parsed.date) {
-          setBuiltPlan(parsed.plan);
+          setBuiltPlan(revalidateEditedPlan(parsed.plan as BBPlan));
           setBbWeekSel(1);
           setStep('plan');
         }
@@ -378,13 +383,28 @@ export const BbAutoConstructor: React.FC = () => {
     } catch {}
   }, []);
 
+  const revalidateEditedPlan = (plan: BBPlan): BBPlan => {
+    const edited = structuredClone(plan) as BBPlan;
+    return finalizeBBPlan(edited, {
+      reorder: false,
+      phaseSafety: true,
+      methodology: bbMethodology,
+      level: bbLevel,
+      volumeGoal: bbVolGoal as any,
+      equipment: edited.safetyConstraints?.equipment,
+      excludedExercises: edited.safetyConstraints?.excludedExercises,
+      excludedMuscles: edited.safetyConstraints?.excludedMuscles,
+      avoidAxialLoad: edited.safetyConstraints?.avoidAxialLoad,
+    });
+  };
+
   const adjustVolume = (mult: number) => {
     if (!builtPlan) return;
     const w2 = structuredClone(builtPlan.weeks);
     for (const w of w2) for (const s of w.sessions) for (const e of s.exercises) {
       e.sets = Math.max(1, Math.round(e.sets * mult));
     }
-    setBuiltPlan({ ...builtPlan, weeks: w2 });
+    setBuiltPlan(revalidateEditedPlan({ ...builtPlan, weeks: w2 }));
   };
   const adjustWeight = (mult: number) => {
     if (!builtPlan) return;
@@ -392,7 +412,7 @@ export const BbAutoConstructor: React.FC = () => {
     for (const w of w2) for (const s of w.sessions) for (const e of s.exercises) for (const ws of e.workSets) {
       ws.weight = Math.round(ws.weight * mult * 10) / 10;
     }
-    setBuiltPlan({ ...builtPlan, weeks: w2 });
+    setBuiltPlan(revalidateEditedPlan({ ...builtPlan, weeks: w2 }));
   };
 
   const bbCyclesList = useMemo(() => {
@@ -449,7 +469,7 @@ export const BbAutoConstructor: React.FC = () => {
     const w2 = structuredClone(builtPlan.weeks);
     const targetSession = w2[bbWeekSel - 1].sessions[si];
     targetSession.exercises[ei] = { ...oldEx, name: rep.name, muscle: (rep as any).group || oldEx.muscle || 'chest', workSets: [{ ...oldEx.workSets[0], weight }] };
-    setBuiltPlan({ ...builtPlan, weeks: w2 });
+    setBuiltPlan(revalidateEditedPlan({ ...builtPlan, weeks: w2 }));
     setSubTarget(null);
   }, [subTarget, builtPlan, bbWeekSel, bbWorkMax]);
 
@@ -488,7 +508,15 @@ export const BbAutoConstructor: React.FC = () => {
           level: bbLevel,
           volumeGoal: bbVolGoal as any,
           specialization: specializationMode,
-          mode: bbAdaptMode,
+           mode: bbAdaptMode,
+           methodology: bbMethodology,
+           trainingFocus: bbTrainingFocus,
+           bodyFat: linked.profile.settings.personal.bodyFat,
+           leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
+           hrvMs: linked.profile.settings.lifestyle.morningHRV,
+           sleepHours: linked.profile.settings.lifestyle.sleepHours,
+           stressLevel: linked.profile.settings.lifestyle.stressLevel,
+           labMrvMultiplier: labAdjust.mrvMultiplier,
         });
         if (bbDays !== customProgram.daysPerWeek) setBbDays(customProgram.daysPerWeek);
         if (bbWeeks !== customProgram.durationWeeks) setBbWeeks(customProgram.durationWeeks);
@@ -517,7 +545,15 @@ export const BbAutoConstructor: React.FC = () => {
           focusGroup: bbFocus,
           level: bbLevel,
           equipment: bbEquipment,
-          mode: bbAdaptMode,
+           mode: bbAdaptMode,
+           methodology: bbMethodology,
+           trainingFocus: bbTrainingFocus,
+            bodyFat: linked.profile.settings.personal.bodyFat,
+            leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
+            hrvMs: linked.profile.settings.lifestyle.morningHRV,
+            sleepHours: linked.profile.settings.lifestyle.sleepHours,
+            stressLevel: linked.profile.settings.lifestyle.stressLevel,
+           labMrvMultiplier: labAdjust.mrvMultiplier,
         });
         const cycleWeeks = cycle.meta.sessionsPerWeek;
         if (bbDays !== cycleWeeks) setBbDays(cycleWeeks);
@@ -618,20 +654,27 @@ export const BbAutoConstructor: React.FC = () => {
         }),
       })),
     }));
-    return { ...plan, weeks };
+    const editedPlan = { ...plan, weeks };
+    return revalidateEditedPlan(editedPlan);
   };
 
   const handleSavePlan = () => {
-    try { const planToSave = applyEditsToPlan(builtPlan!); setBuiltPlan(planToSave); localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: planToSave, date: new Date().toISOString() })); alert('План сохранён'); } catch { alert('Ошибка сохранения'); }
+    try {
+      const planToSave = applyEditsToPlan(builtPlan!);
+      if (!planToSave.validation?.valid) { alert('План нельзя сохранить: исправьте ошибки валидации.'); return; }
+      setBuiltPlan(planToSave); localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: planToSave, date: new Date().toISOString() })); alert('План сохранён');
+    } catch { alert('Ошибка сохранения'); }
   };
 
   /** Сохранить BB-план в "Мои тренировки" (myTrainingPlans) — унификация с ручным конструктором. */
   const handleSaveToMyPlans = () => {
     if (!builtPlan) return;
-    const name = prompt('Название плана:', `${builtPlan.pattern.name} ${bbWeeks}нед`);
+    const exportPlan = applyEditsToPlan(builtPlan);
+    if (!exportPlan.validation?.valid) { alert('План нельзя сохранить: исправьте ошибки валидации.'); return; }
+    const name = prompt('Название плана:', `${exportPlan.pattern.name} ${bbWeeks}нед`);
     if (!name) return;
     // Конвертация BB-плана в flat-формат Моих тренировок: все упражнения недели 1
-    const week1 = builtPlan.weeks[0];
+    const week1 = exportPlan.weeks[0];
     const exs = week1.sessions.flatMap(s => s.exercises.map(e => ({
       name: e.name,
       sets: e.sets,
@@ -649,11 +692,15 @@ export const BbAutoConstructor: React.FC = () => {
 
   const handleSaveVariant = () => {
     if (!builtPlan || !metrics) return;
-    const name = prompt('Название варианта:', `${builtPlan.pattern.name} ${bbWeeks}нед ${peds.length > 0 ? peds.join('+') : 'натурал'}`);
+    const exportPlan = applyEditsToPlan(builtPlan);
+    if (!exportPlan.validation?.valid) { alert('Вариант нельзя сохранить: исправьте ошибки валидации.'); return; }
+    const exportMetrics = calcBBPlanMetrics(exportPlan, pedAdapt.combinedMrvMultiplier);
+    const exportQuality = validatePlanQuality(bbPlanToQualityInput(exportPlan, { level: bbLevel, weakPoints, hasDeload: autoDeload, onCourse: peds.length > 0 }));
+    const name = prompt('Название варианта:', `${exportPlan.pattern.name} ${bbWeeks}нед ${peds.length > 0 ? peds.join('+') : 'натурал'}`);
     if (!name) return;
     const params: SavedBBPlan['params'] = {
       patternId: selectedSplitId,
-      patternName: builtPlan.pattern.name,
+       patternName: exportPlan.pattern.name,
       level: bbLevel, goal: bbGoal, weeks: bbWeeks, volumeGoal: bbVolGoal,
       peds, pedDoses, courseIntensity: courseIntensity as string,
       weakPoints, focusGroup: bbFocus, intensityTechnique: intensityTech,
@@ -661,15 +708,20 @@ export const BbAutoConstructor: React.FC = () => {
       cycleId: planMode === 'bb_cycle' ? selectedCycleId : undefined,
     };
     const planMetrics: SavedBBPlan['metrics'] = {
-      totalSets: metrics.totalSets,
-      avgRir: metrics.avgRir,
-      sessionsPerWeek: builtPlan.pattern.sessionsPerRotation,
+       totalSets: exportMetrics.totalSets,
+       avgRir: exportMetrics.avgRir,
+       sessionsPerWeek: exportPlan.pattern.sessionsPerRotation,
       phases: phases.map(p => p.phase),
-      qualityScore: quality?.score ?? 0,
-      muscleCount: Object.keys(builtPlan.muscleFrequency || {}).length,
+       qualityScore: exportQuality.score,
+       muscleCount: Object.keys(exportPlan.muscleFrequency || {}).length,
       mrvMult: pedAdapt.combinedMrvMultiplier,
+       peakWeek: exportPlan.report?.peakWeek,
+       peakDirectSets: exportPlan.report?.peakDirectSets,
+       peakEffectiveSets: exportPlan.report ? Object.values(exportPlan.report.peakVolume).reduce((sum, item) => sum + item.effectiveSets, 0) : undefined,
+       maxSessionMinutes: exportPlan.report?.maxSessionMinutes,
+       maxAxialCost: exportPlan.report?.maxAxialCost,
     };
-    const updated = saveBBPlanVariant(name, builtPlan, params, planMetrics);
+    const updated = saveBBPlanVariant(name, exportPlan, params, planMetrics);
     setSavedPlans(updated);
     setShowCompare(true);
   };
@@ -682,11 +734,13 @@ export const BbAutoConstructor: React.FC = () => {
   /** Сохранить собранный ББ-план в «Мои программы» (UserProgram) — канонический путь редактирования. */
   const handleSaveAsUserProgram = () => {
     if (!builtPlan) return;
-    const fallbackName = `${builtPlan.pattern.name} ${bbWeeks}нед`;
+    const exportPlan = applyEditsToPlan(builtPlan);
+    if (!exportPlan.validation?.valid) { alert('Программу нельзя сохранить: исправьте ошибки валидации.'); return; }
+    const fallbackName = `${exportPlan.pattern.name} ${bbWeeks}нед`;
     const name = window.prompt('📂 Название программы (Мои программы):', fallbackName);
     if (!name) return;
     try {
-      const userProg = createUserProgramFromBuild(builtPlan, {
+      const userProg = createUserProgramFromBuild(exportPlan, {
         title: name,
         goal: bbGoal,
         level: bbLevel,
@@ -703,7 +757,8 @@ export const BbAutoConstructor: React.FC = () => {
 
   const handleLoadVariant = (v: SavedBBPlan) => {
     if (!v.plan) return;
-    setBuiltPlan(v.plan);
+    const loaded = structuredClone(v.plan) as BBPlan;
+    setBuiltPlan(revalidateEditedPlan(loaded));
     setBbWeekSel(1);
     setStep('plan');
   };
@@ -714,11 +769,20 @@ export const BbAutoConstructor: React.FC = () => {
     const w3 = structuredClone(builtPlan.weeks);
     const wLen = w3.length;
     const weekIdx = Math.min(bbWeekSel, wLen) - 1;
-    if (w3[weekIdx]?.sessions[si]?.exercises[ei]) {
-      w3[weekIdx].sessions[si].exercises[ei].name = found.name;
-      w3[weekIdx].sessions[si].exercises[ei].muscle = found.group || w3[weekIdx].sessions[si].exercises[ei].muscle;
-    }
-    setBuiltPlan({ ...builtPlan, weeks: w3 });
+    const target = w3[weekIdx]?.sessions[si]?.exercises[ei];
+    if (!target) return;
+    const oldEquipment = String((EXERCISE_CATALOG.find(x => x.name === target.name)?.equipment) || '');
+    const newEquipment = String(found.equipment || '');
+    const ratio: Record<string, number> = { barbell: 1, smith: 0.9, machine: 0.85, dumbbell: 0.8, cable: 0.8, bodyweight: 0.7 };
+    const loadRatio = (ratio[newEquipment] || 1) / (ratio[oldEquipment] || 1);
+    target.name = found.name;
+    target.exerciseName = found.name;
+    target.muscle = found.group || target.muscle;
+    target.workSets = target.workSets.map(ws => ({ ...ws, weight: Math.round(ws.weight * loadRatio * 10) / 10 }));
+    target.comment = `${target.comment || ''} | Ручная замена: ${oldEquipment || 'unknown'} → ${newEquipment || 'unknown'}, вес ×${loadRatio.toFixed(2)}`;
+    target.rationale = `${target.rationale || ''} | Manual replacement: ${found.name}`;
+    const editedPlan = { ...builtPlan, weeks: w3 };
+    setBuiltPlan(revalidateEditedPlan(editedPlan));
   };
 
   // Фаза 5: Перестановка упражнений внутри дня (↑↓ — mobile-friendly вместо HTML5 DnD)
@@ -734,20 +798,27 @@ export const BbAutoConstructor: React.FC = () => {
     const tmp = sess.exercises[ei];
     sess.exercises[ei] = sess.exercises[newIdx];
     sess.exercises[newIdx] = tmp;
-    setBuiltPlan({ ...builtPlan, weeks: w3 });
+     setBuiltPlan(revalidateEditedPlan({ ...builtPlan, weeks: w3 }));
   };
 
   const handleSendToExecution = () => {
     if (!builtPlan) return;
+    const executionPlan = applyEditsToPlan(builtPlan);
+    const validation = executionPlan.validation || validateBBPlan(executionPlan, executionPlan.safetyConstraints);
+    if (!validation.valid) {
+      alert('План нельзя отправить на выполнение: сначала исправьте ошибки валидации.');
+      return;
+    }
+    setBuiltPlan(executionPlan);
     try {
-      const playerDays = builtPlan.weeks.flatMap(w => w.sessions.map((s, si) => ({
+      const playerDays = executionPlan.weeks.flatMap(w => w.sessions.map((s, si) => ({
         label: 'Нед' + w.week + ' Д' + (si+1),
         exercises: s.exercises.map(e => {
           const tgt: { weight: number; reps: number; rir: number } = { weight: e.workSets[0]?.weight || 60, reps: e.workSets[0]?.reps || 10, rir: e.rir ?? 2 };
           return { name: e.name, muscleGroup: e.muscle, targetSets: Array.from({ length: e.sets || 3 }, () => ({ ...tgt })), restSec: 90 };
         }),
       })));
-      localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: builtPlan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
+       localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: executionPlan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
       // FIX-12: Авто-переход на вкладку «Тренировка» (как ручной конструктор)
       localStorage.setItem('he_training_tab', 'runtime');
       window.dispatchEvent(new StorageEvent('storage', { key: 'he_training_tab' }));
@@ -1370,10 +1441,27 @@ export const BbAutoConstructor: React.FC = () => {
 
         {/* Overload targets for this week */}
         {(() => {
-          // Per-muscle частота и объём
-          const freq = builtPlan.muscleFrequency || {};
-          const vol = builtPlan.rotationMuscleVolume || {};
-          const muscleEntries = Object.keys(freq).map(m => ({ muscle: m, freq: freq[m] || 0, sets: vol[m] || 0 })).sort((a, b) => b.sets - a.sets);
+           // Per-muscle частота и объём
+           const freq = builtPlan.muscleFrequency || {};
+           const vol = builtPlan.rotationMuscleVolume || {};
+           const actualVolume = builtPlan.weeklyVolume?.[wk.week] || {};
+            const muscleEntries = Object.keys(freq).map(m => {
+              const metric = metrics?.perMuscle.find(x => x.muscle === m);
+              const target = builtPlan.volumeTargets?.[m];
+               const actual = actualVolume[m];
+              const landmarks = metric ? { mev: metric.mev, mav: metric.mav, mrv: metric.mrv } : null;
+              const status = landmarks
+                ? ((actual?.effectiveSets ?? metric?.effectiveSets ?? 0) > landmarks.mrv ? 'MRV+' : (actual?.effectiveSets ?? metric?.effectiveSets ?? 0) > landmarks.mav ? 'MAV+' : (actual?.effectiveSets ?? metric?.effectiveSets ?? 0) >= landmarks.mev ? 'OK' : 'MEV-')
+                : '—';
+              return {
+                muscle: m,
+                freq: freq[m] || 0,
+                sets: actual?.directSets ?? metric?.directSets ?? vol[m] ?? 0,
+                effectiveSets: actual?.effectiveSets ?? metric?.effectiveSets ?? metric?.totalSets ?? vol[m] ?? 0,
+               targetSets: target?.targetSets ?? vol[m] ?? 0,
+                 status,
+               };
+           }).sort((a, b) => b.effectiveSets - a.effectiveSets);
           if (muscleEntries.length === 0) return null;
           const MUSCLE_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', quads: 'Квадрицепс', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предплечье', abs: 'Пресс', traps: 'Трапеции', arms: 'Руки', legs: 'Ноги', core: 'Кор' };
           const freqColor = (f: number) => f >= 3 ? '#ef4444' : f === 2 ? '#22c55e' : '#f59e0b';
@@ -1383,12 +1471,12 @@ export const BbAutoConstructor: React.FC = () => {
               short={`${muscleEntries.length} групп · ${muscleEntries.filter(e => e.freq >= 2).length} ×2+/нед`}
               full={
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                  {muscleEntries.map(({ muscle, freq: f, sets }) => (
+                    {muscleEntries.map(({ muscle, freq: f, sets, effectiveSets, targetSets, status }) => (
                     <div key={muscle} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                       <div style={{ width: 8, height: 8, borderRadius: '50%', background: freqColor(f), flexShrink: 0 }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{MUSCLE_RU[muscle] || muscle}</div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{freqLabel(f)} · {sets} сет/нед</div>
+                         <div style={{ fontSize: 10, color: status === 'MRV+' ? '#ef4444' : status === 'MEV-' ? '#f59e0b' : '#22c55e' }}>{freqLabel(f)} · нед. direct {sets} · effective {Math.round(effectiveSets * 10) / 10} · target {targetSets} · {status}</div>
                       </div>
                     </div>
                   ))}
@@ -1397,6 +1485,86 @@ export const BbAutoConstructor: React.FC = () => {
             />
           );
         })()}
+
+        {builtPlan.rotationReport && (() => {
+          const report = builtPlan.rotationReport;
+          const primaryCount = Object.keys(report.primaryByMuscle).length;
+          const warningCount = report.issues.length;
+          return (
+            <ExpandableCard title="🔁 Ротация упражнений" icon="🔁"
+              short={`${primaryCount} primary · ${warningCount} предупреждений`}
+              full={
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)' }}>
+                    Primary сохраняются стабильными, аксессуары ротируются по паттернам и фазе.
+                  </div>
+                  {report.issues.length === 0
+                    ? <div style={{ fontSize:11, color:'#22c55e' }}>✅ Конфликтов ротации не обнаружено.</div>
+                    : report.issues.slice(0, 8).map((issue, i) => (
+                      <div key={i} style={{ fontSize:11, color: issue.code === 'primary_changed' ? '#f59e0b' : 'rgba(255,255,255,0.75)' }}>
+                        {issue.message}
+                      </div>
+                    ))}
+                </div>
+              }
+            />
+          );
+        })()}
+
+        {builtPlan.fatigueReport && (() => {
+          const current = builtPlan.fatigueReport.find(item => item.week === wk.week) || builtPlan.fatigueReport[0];
+          const time = current.sessions.reduce((sum, session) => sum + session.timeSeconds, 0);
+          const axial = current.sessions.reduce((sum, session) => sum + session.axial, 0);
+          const systemic = current.sessions.reduce((sum, session) => sum + session.systemic, 0);
+          return (
+            <ExpandableCard title="⚙️ Усталость и длительность" icon="⚙️"
+              short={`${Math.round(time / 60)} мин · axial ${axial.toFixed(1)}`}
+              full={<div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6, fontSize:11 }}>
+                <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Время<br/><b>{Math.round(time / 60)} мин</b></div>
+                <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Systemic<br/><b>{systemic.toFixed(1)}</b></div>
+                <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Axial<br/><b>{axial.toFixed(1)}</b></div>
+              </div>}
+            />
+          );
+        })()}
+
+        {builtPlan.report && (() => {
+          const report = builtPlan.report;
+          const REPORT_MUSCLE_RU: Record<string, string> = { chest:'Грудь', back:'Спина', shoulders:'Плечи', quads:'Квадрицепс', hamstrings:'Бицепс бедра', glutes:'Ягодицы', calves:'Икры', biceps:'Бицепс', triceps:'Трицепс', forearms:'Предплечье', abs:'Пресс', traps:'Трапеции' };
+          return (
+            <ExpandableCard title="📋 Итоговый отчёт программы" icon="📋"
+              short={`${report.weeks} нед · ${report.totalDirectSets} direct-сетов · пик Н${report.peakWeek}`}
+              full={
+                <div style={{ display:'flex', flexDirection:'column', gap:6, fontSize:11 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6 }}>
+                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Ротация<br/><b>{report.sessionsPerWeek} сессий</b></div>
+                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Пик объёма<br/><b>неделя {report.peakWeek}</b></div>
+                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Ротация warnings<br/><b>{report.rotationWarnings}</b></div>
+                  </div>
+                  <div style={{ color:'rgba(255,255,255,0.65)' }}>
+                    Максимум за сессию: {report.maxSessionMinutes} мин · axial cost: {report.maxAxialCost.toFixed(1)} · muscle leakage: {report.sessionLeakWarnings}
+                  </div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                    {Object.entries(report.peakVolume).map(([muscle, volume]) => (
+                      <div key={muscle} style={{ color:'rgba(255,255,255,0.7)' }}>
+                         {REPORT_MUSCLE_RU[muscle] || muscle}: direct {volume.directSets}, effective {Math.round(volume.effectiveSets * 10) / 10}, fatigue {Math.round(volume.fatigueWeightedSets * 10) / 10}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              }
+            />
+          );
+        })()}
+
+        {builtPlan.validation && !builtPlan.validation.valid && (
+          <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.3)' }}>
+            <div style={{ fontSize:12, fontWeight:800, color:'#ef4444', marginBottom:5 }}>🚫 План требует исправления</div>
+            {builtPlan.validation.issues.filter(i => i.level === 'error').slice(0, 5).map((issue, i) => (
+              <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.8)', lineHeight:1.4 }}>{issue.message}</div>
+            ))}
+          </div>
+        )}
 
         {(() => {
           const targets = computeOverloadTargets(wk, loadStrategy, bbWorkMax, bbWeeks, currentPhase).slice(0, 6);
@@ -2191,18 +2359,19 @@ export const BbAutoConstructor: React.FC = () => {
         <PlanFeedbackCard plan={builtPlan} workMax={bbWorkMax} strategy={loadStrategy} onApply={setBuiltPlan} />
         <div style={{ ...CARD, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)', marginBottom:10 }}>
           <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>🔧 Инструменты коррекции</div>
-          <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+           <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+             {builtPlan.validation && !builtPlan.validation.valid && <div style={{ width:'100%', fontSize:11, color:'#ef4444' }}>🚫 Сохранение и выполнение заблокированы до исправления ошибок.</div>}
             <button style={BTN_GHOST} onClick={() => adjustVolume(0.8)}>📦 Объём -20%</button>
             <button style={BTN_GHOST} onClick={() => adjustVolume(1.1)}>📦 Объём +10%</button>
             <button style={BTN_GHOST} onClick={() => adjustWeight(1.05)}>⚖ Вес +5%</button>
             <button style={BTN_GHOST} onClick={() => adjustWeight(0.95)}>⚖ Вес -5%</button>
             <button style={BTN_GHOST} onClick={() => { setExerciseEdits({}); setStep('split'); }}>🔄 Перестроить план</button>
-            <button style={BTN_GHOST} onClick={handleSavePlan}>💾 Сохранить план</button>
-            <button style={{ ...BTN_GHOST, borderColor:'#60a5fa', color:'#60a5fa' }} onClick={handleSaveToMyPlans}>💾 В Мои тренировки</button>
-            <button style={{ ...BTN_GHOST, borderColor:'#a78bfa', color:'#a78bfa' }} onClick={handleSaveAsUserProgram}>📂 В Мои программы</button>
-            <button style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e' }} onClick={handleSaveVariant}>💾 Вариант ({savedPlans.length})</button>
+             <button disabled={!!builtPlan.validation && !builtPlan.validation.valid} style={BTN_GHOST} onClick={handleSavePlan}>💾 Сохранить план</button>
+             <button disabled={!!builtPlan.validation && !builtPlan.validation.valid} style={{ ...BTN_GHOST, borderColor:'#60a5fa', color:'#60a5fa' }} onClick={handleSaveToMyPlans}>💾 В Мои тренировки</button>
+             <button disabled={!!builtPlan.validation && !builtPlan.validation.valid} style={{ ...BTN_GHOST, borderColor:'#a78bfa', color:'#a78bfa' }} onClick={handleSaveAsUserProgram}>📂 В Мои программы</button>
+             <button disabled={!!builtPlan.validation && !builtPlan.validation.valid} style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e' }} onClick={handleSaveVariant}>💾 Вариант ({savedPlans.length})</button>
             <button style={{ ...BTN_GHOST, borderColor:'#f59e0b', color:'#f59e0b' }} onClick={() => setShowCompare(s => !s)}>⚖ Сравнить</button>
-            <button style={{ ...BTN_GHOST, borderColor:'#a855f7', color:'#a855f7' }} onClick={handleSendToExecution}>▶ К выполнению</button>
+             <button disabled={!!builtPlan.validation && !builtPlan.validation.valid} style={{ ...BTN_GHOST, borderColor:'#a855f7', color:'#a855f7' }} onClick={handleSendToExecution}>▶ К выполнению</button>
           </div>
 
           {/* Мульти-планы: сравнение вариантов */}
@@ -2218,7 +2387,9 @@ export const BbAutoConstructor: React.FC = () => {
                       <th style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)', textAlign:'center' }}>RIR</th>
                       <th style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)', textAlign:'center' }}>Дней</th>
                       <th style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)', textAlign:'center' }}>Групп</th>
-                      <th style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)', textAlign:'center' }}>PED MRV</th>
+                       <th style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)', textAlign:'center' }}>PED MRV</th>
+                       <th style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)', textAlign:'center' }}>Пик direct/effective</th>
+                       <th style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)', textAlign:'center' }}>Время/axial</th>
                       <th style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)', textAlign:'center' }}>Кач-во</th>
                       <th style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)' }}></th>
                     </tr>
@@ -2232,6 +2403,8 @@ export const BbAutoConstructor: React.FC = () => {
                         <td style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)', textAlign:'center' }}>{v.metrics.sessionsPerWeek}</td>
                         <td style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)', textAlign:'center' }}>{v.metrics.muscleCount}</td>
                         <td style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)', textAlign:'center' }}>×{v.metrics.mrvMult.toFixed(2)}</td>
+                         <td style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)', textAlign:'center' }}>{v.metrics.peakDirectSets ?? '—'} / {v.metrics.peakEffectiveSets != null ? Math.round(v.metrics.peakEffectiveSets * 10) / 10 : '—'}</td>
+                         <td style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)', textAlign:'center' }}>{v.metrics.maxSessionMinutes ?? '—'} / {v.metrics.maxAxialCost != null ? v.metrics.maxAxialCost.toFixed(1) : '—'}</td>
                         <td style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)', textAlign:'center' }}>
                           <span style={{ color: v.metrics.qualityScore >= 75 ? '#22c55e' : v.metrics.qualityScore >= 50 ? '#f59e0b' : '#ef4444', fontWeight:700 }}>{v.metrics.qualityScore}</span>
                         </td>
@@ -2337,6 +2510,7 @@ export const BbAutoConstructor: React.FC = () => {
           title="Библиотека инструментов"
           style={{ padding:'9px 12px', borderRadius:12, fontSize:16, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.8)', minWidth:38, minHeight:38, flexShrink:0 }}
         >⚙️</button>
+        <button onClick={() => setShowMacrocycle(true)} title="Годовое планирование" style={{ padding:'9px 12px', borderRadius:12, fontSize:16, cursor:'pointer', border:'1px solid rgba(0,230,138,0.35)', background:'rgba(0,230,138,0.08)', color:'#00e68a', minWidth:38, minHeight:38, flexShrink:0 }}>🗓</button>
       </div>
       {showTools && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding: 8 }} onClick={() => setShowTools(false)}>
@@ -2345,12 +2519,13 @@ export const BbAutoConstructor: React.FC = () => {
             aria-label="Библиотека инструментов"
             onClick={e => e.stopPropagation()}
             style={{
-              width: '100%', maxWidth: 560,
-              maxHeight: '92vh',
+               width: '100%', maxWidth: 560,
+               maxHeight: '92vh',
               display: 'flex', flexDirection: 'column',
               borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.1)',
               boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-              overflow: 'hidden',
+                 overflow: 'hidden',
+                 minHeight: 0,
             }}
           >
             <div style={{
@@ -2382,6 +2557,24 @@ export const BbAutoConstructor: React.FC = () => {
             >
               <PlannerToolsPanel mode="bb" />
             </div>
+          </div>
+        </div>
+      )}
+      {showMacrocycle && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 61, background: 'rgba(0,0,0,0.72)', overflowY: 'auto', padding: 12 }} onClick={() => setShowMacrocycle(false)}>
+          <div role="dialog" aria-label="Годовой план ББ" onClick={e => e.stopPropagation()} style={{ maxWidth: 760, margin: '0 auto', background: '#09090b', borderRadius: 16, padding: 12, maxHeight: 'calc(100vh - 24px)', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontWeight: 800, color: '#00e68a' }}>🗓 Годовое планирование ББ</div>
+              <button onClick={() => setShowMacrocycle(false)} style={BTN_GHOST}>Закрыть</button>
+            </div>
+            <MacrocyclePanel level={bbLevel} goal="bodybuilding" onLevelChange={setBbLevel} onGoalChange={() => undefined} onApplyCycle={(cycleId, weeks) => {
+              setPlanMode('bb_cycle');
+              setBbProgramPath('cycle');
+              setSelectedCycleId(cycleId);
+              setBbWeeks(weeks);
+              setShowMacrocycle(false);
+              setStep('params');
+            }} />
           </div>
         </div>
       )}

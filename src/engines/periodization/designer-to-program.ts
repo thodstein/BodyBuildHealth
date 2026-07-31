@@ -43,6 +43,11 @@ export interface DesignerToUserWeeksOptions {
   stressLevel?: number;
   /** Lab-based MRV multiplier (ALT/CRP/HCT/гормоны). */
   labMrvMultiplier?: number;
+  /** Training injuries and safety restrictions forwarded to BB-auto. */
+  injuries?: any[];
+  avoidAxialLoad?: boolean;
+  excludedExercises?: string[];
+  favoriteExercises?: string[];
 }
 
 /**
@@ -111,6 +116,10 @@ function buildFilledWeeks(total: number, opts: DesignerToUserWeeksOptions): User
       sleepHours: opts.sleepHours,
       stressLevel: opts.stressLevel,
       labMrvMultiplier: opts.labMrvMultiplier,
+      injuries: opts.injuries,
+      avoidAxialLoad: opts.avoidAxialLoad,
+      excludedExercises: opts.excludedExercises,
+      favoriteExercises: opts.favoriteExercises,
     });
     const userProg = createFromBuild(bbPlan, {
       goal: opts.goal,

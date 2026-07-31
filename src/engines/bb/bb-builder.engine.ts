@@ -21,7 +21,7 @@ import { trueMuscleOf, musclesForRole, derivePattern } from '../movement-pattern
 import { PCT_FOR_RIR, S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation, CourseIntensity } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
-import { prescribeLoad, applyPostPhaseProcessing, applyTaperToFinalWeeks, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
+import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, computePerMuscleACWR } from './bb-progression-feedback.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
@@ -37,6 +37,13 @@ import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import type { Macrocycle, MacroPhase } from '../lms/macrocycle.engine';
+import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
+import { finalizeBBPlan } from './bb-finalize.engine';
+import { buildBBVolumeTarget, type BBVolumeTarget } from './bb-volume.engine';
+import type { BBRotationReport } from './bb-rotation.engine';
+import type { BBSessionCost } from './bb-fatigue.engine';
+import type { BBPlanReport } from './bb-report.engine';
+import type { BBPlanValidationResult } from './bb-validator.engine';
 
 // P7: приоритет equipment по фазе (формирует пропорцию compound/isolation/cable/machine из PHASE_CONFIGS)
 export const PHASE_EQUIPMENT_PREF: Record<string, string[]> = {
@@ -157,6 +164,9 @@ export interface BBSession {
 
 export interface BBWeek {
   week: number;
+  phase?: BBPhase;
+  deload?: boolean;
+  taper?: boolean;
   sessions: BBSession[];
 }
 
@@ -171,6 +181,18 @@ export interface BBPlan {
   volumeLandmarks?: VolumeLandmarkRow[];
   /** Частота тренировок каждой мышцы в неделю (1×/2×/3×) — ключевой фактор гипертрофии. */
   muscleFrequency?: Record<string, number>;
+  volumeTargets?: Record<string, BBVolumeTarget>;
+  rotationReport?: BBRotationReport;
+  fatigueReport?: Array<{ week: number; sessions: Array<BBSessionCost> }>;
+  weeklyVolume?: Record<number, Record<string, { directSets: number; effectiveSets: number; fatigueWeightedSets: number }>>;
+  report?: BBPlanReport;
+  validation?: BBPlanValidationResult;
+  safetyConstraints?: {
+    equipment?: string[];
+    excludedExercises?: string[];
+    excludedMuscles?: string[];
+    avoidAxialLoad?: boolean;
+  };
 }
 
 /**
@@ -541,6 +563,16 @@ function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary
 /** fix D: недельный кап объёма каждой мышцы по её истинному MRV (после всех множителей).
  *  + per-exercise кап: максимум 8 сетов на упражнение (ББ-практика). */
 function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string, number>): void {
+  const syncWorkSets = (ex: BBExercise): void => {
+    const target = Math.max(0, ex.sets || 0);
+    const current = Array.isArray(ex.workSets) ? ex.workSets : [];
+    if (current.length > target) {
+      ex.workSets = current.slice(0, target);
+    } else if (current.length < target && current.length > 0) {
+      const template = current[current.length - 1];
+      ex.workSets = [...current, ...Array.from({ length: target - current.length }, () => ({ ...template }))];
+    }
+  };
   const sums: Record<string, { total: number; exs: BBExercise[] }> = {};
   for (const s of weekSessions) {
     for (const ex of s.exercises) {
@@ -558,6 +590,7 @@ function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string,
     for (const ex of info.exs) {
       if (ex.sets > perExCap) ex.sets = perExCap;
       if (ex.sets < 2) ex.sets = 2;
+      syncWorkSets(ex);
     }
     // Пересчитать total после per-exercise капа
     info.total = info.exs.reduce((s, ex) => s + ex.sets, 0);
@@ -582,6 +615,7 @@ function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string,
       }
       for (let i = 0; i < info.exs.length; i++) {
         info.exs[i].sets = Math.max(1, floored[i]);
+        syncWorkSets(info.exs[i]);
       }
     }
   }
@@ -710,6 +744,7 @@ function buildSession(
   onCourse: boolean = false,
   sex: 'male' | 'female' = 'male',
   weekLocalUsed: Map<string, Set<string>> = new Map(),
+  primaryBySlot: Map<string, string> = new Map(),
   trainingFocus?: BBTrainingFocus,
   eccentricMult?: number,
 ): BBSession {
@@ -1055,6 +1090,18 @@ function buildSession(
     });
     for (const s of selected) { if (s && s.id) sessionSelectedIds.push(s.id); if (s && s.name) sessionSelectedNames.push(s.name); }
     let exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5 }];
+    // Keep the first compound stable for the same session slot across weeks;
+    // accessory movements remain eligible for phase rotation.
+    const primarySlot = `${phase}|${sched.sessionTag || dayInRotation}|${muscle}`;
+    const stablePrimary = primaryBySlot.get(primarySlot);
+    if (stablePrimary && (muscle === sessionLeadMuscle || (exDatas[0] as any)?.type === 'compound')) {
+      const stable = pool.find(ex => ex.name === stablePrimary);
+      if (stable) {
+        exDatas = [stable, ...exDatas.filter(ex => ex.name !== stable.name)].slice(0, exerciseCount);
+      }
+    } else if ((exDatas[0] as any)?.type === 'compound' && muscle !== 'traps' && muscle !== 'calves' && muscle !== 'forearms') {
+      primaryBySlot.set(primarySlot, (exDatas[0] as any).name);
+    }
     // Freshness guard: не повторять упражнение в той же неделе на той же мышце.
     {
       const weekUsedForMuscle = weekLocalUsed.get(muscle) || new Set<string>();
@@ -1562,7 +1609,12 @@ function buildSession(
   // Базовые основной мышцы → базовые вторичных → изоляция (растяжка первой) → финиши.
   // BUG-B11: передаём sessionLeadMuscle (для FullBody — пустая строка, но orderSessionExercises
   // в этом случае fallback на первый primary+тяж exercise → корректно для FB day 2/3).
-  const _ordered = orderSessionExercises(exercises, { sessionTag: sched.sessionTag, methodology, primaryMuscle: sessionLeadMuscle || undefined });
+  const _ordered = orderSessionExercises(exercises, {
+    sessionTag: sched.sessionTag,
+    methodology,
+    primaryMuscle: sessionLeadMuscle || undefined,
+    priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+  });
   exercises.length = 0; exercises.push(..._ordered);
 
   // Кап упражнений в сессии: просто берём первые exCap из уже отсортированного массива.
@@ -1635,71 +1687,17 @@ function buildSession(
     }
   }
 
-  // ▓▓ A3: Финальная PRO-сортировка упражнений в сессии ▓▓
-  // Тренерский PRO-протокол порядка упражнений (Dr. Mike Israetel / RP Strength):
-  //   Слой 1: Primary тяжёлые compound (bench, squat, deadlift, row, OHP) — самое тяжёлое первым
-  //   Слой 2: Secondary compound вариации (incline DB, front squat, RDL)
-  //   Слой 3: Accessory isolations (multi-angle:chest upper/lower, delts front/mid/rear)
-  //   Слой 4: Pump-finisher (слабые группы, метаболический стресс)
-  //
-  // Внутри каждого слоя — compound по strength rank (барбелл > гантель > тренажёр > блок).
-  // Для слабых групп приоритет повышается (+1 слой → они идут раньше в аксессуарном блоке).
-  {
-    const exTypeRank = (e: BBExercise): number => {
-      const cat = EXERCISE_CATALOG.find((c: any) => c.name === e.name);
-      const n = (e.name || '').toLowerCase();
-      // Pump finisher — последний слой. B25: ловит rir>=3 (не только >=4).
-      if (e.repsRange[0] >= 15 && e.rir >= 3) return 4;
-      if (!cat) return 3;
-      // Compound
-      if ((cat as any).type === 'compound') {
-        // Primary compound = слой 1; accessory compound = слой 2
-        return e.role === 'primary' ? 1 : 2;
-      }
-      // Isolation → слой 3
-      return 3;
-    };
-    const eqRank = (e: BBExercise): number => {
-      const cat = EXERCISE_CATALOG.find((c: any) => c.name === e.name);
-      const n = (e.name || '').toLowerCase();
-      if (/одной рукой|одной руке|single.?arm|unilateral/i.test(n)) return 6;
-      if (!cat) return 5;
-      const eq = String((cat as any).equipment || '').toLowerCase();
-      if (eq.includes('barbell') || eq.includes('smith')) return 1;
-      if (eq.includes('dumbbell')) return 2;
-      if (eq.includes('machine')) return 3;
-      if (eq.includes('cable')) return 4;
-      if (eq.includes('bodyweight') || eq.includes('suspension') || eq.includes('band')) return 5;
-      return 5;
-    };
-    // Слабые группы: их primary идёт в начало слоя 1 (раньше других primary);
-    // их accessory — в начало слоя 3.
-    const weakBoost = (e: BBExercise): number => {
-      return isWeak(e.muscle, weakPoints) ? -1 : 0;
-    };
-    // Focus group: +ещё выше приоритет (в начало primary, в начало accessory)
-    const focusBoost = (e: BBExercise): number => {
-      if (!focusGroup) return 0;
-      return (e.muscle === focusGroup || isWeak(e.muscle, [focusGroup])) ? -2 : 0;
-    };
-    exercises.sort((a, b) => {
-      // Слой (1..4)
-      const sa = exTypeRank(a) + weakBoost(a) + focusBoost(a);
-      const sb = exTypeRank(b) + weakBoost(b) + focusBoost(b);
-      if (sa !== sb) return sa - sb;
-      // Внутри слоя: primary раньше accessory
-      const ra = a.role === 'primary' ? -1 : 1;
-      const rb = b.role === 'primary' ? -1 : 1;
-      if (ra !== rb) return ra - rb;
-      // Внутри роли: equipment rank (barbell → dumbbell → machine → cable)
-      const ea = eqRank(a), eb = eqRank(b);
-      if (ea !== eb) return ea - eb;
-      // Конечный tie-breaker: слабая группа раньше (structural: weak → first stimulus)
-      const wa = isWeak(a.muscle, weakPoints) ? -1 : 0;
-      const wb = isWeak(b.muscle, weakPoints) ? -1 : 0;
-      return wa - wb;
-    });
-  }
+  // The shared order engine is intentionally the last ordering authority.
+  // Do not add a second role/equipment sort here: it can move a weak-point
+  // isolation ahead of the day's primary compound and undo methodology rules.
+  const finalOrdered = orderSessionExercises(exercises, {
+    sessionTag: sched.sessionTag,
+    methodology,
+    primaryMuscle: sessionLeadMuscle || undefined,
+    priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+  });
+  exercises.length = 0;
+  exercises.push(...finalOrdered);
 
   // Добавляем растяжку в конец сессии (динамическая растяжка для основных групп мышц)
   // BUG-B13/B21: Stretching удалён (мёртвый код с Jul 16 — не ББ-гипертрофия, занимал слоты).
@@ -1782,6 +1780,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
 
   const muscleVolumeRotation: Record<string, number> = {};
   const mrvByMuscle: Record<string, number> = {};
+  const volumeTargets: Record<string, BBVolumeTarget> = {};
   const specWeak = input.specialization ? expandWeakForSpecialization(input.weakPoints || []).slice(0, 2) : [];
   // Recovery multiplier from body composition + recovery metrics (Helms 2022, Plews 2022, Watson 2022)
   const recoveryMult = Math.max(0.6, Math.min(1.5, (() => {
@@ -1822,6 +1821,16 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // P0-5: лабораторная коррекция - снижение объёма при ALT/CRP/HCT/гормонах
       v = Math.round(v * (input.labMrvMultiplier ?? 1));
       v = muscleVolumeRotation[m] = v;
+      volumeTargets[m] = buildBBVolumeTarget({
+        muscle: m,
+        frequency: muscleSessionCount[m] || 1,
+        landmarks: lm,
+        rotationSets: v,
+        volumeGoal: input.volumeGoal || 'mav',
+        weakPoint: isWeak(m, weakPoints),
+        focus: focusGroup === m || (focusGroup ? isWeak(m, [focusGroup]) : false),
+        recoveryMultiplier: recoveryMult * nutritionMult,
+      });
       // fix D: истинный MRV — потолок для капа.
       // fix C: для отстающих/фокус-групп поднимаем потолок в такт объёмному
       // бусту (weak ×1.2, focus ×1.3), иначе normalizeWeekMrv стирает акцент.
@@ -1875,7 +1884,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     }
   }
   const phaseByWeek = new Map<number, BBPhase>();
-  for (const pd of phaseDist) phaseByWeek.set(pd.startWeek, pd.phase);
+  // Store the phase for every week in the block, not only its first week.
+  // Otherwise weeks inside a multi-week phase silently fall back to
+  // accumulation and receive the wrong volume/RIR/tempo.
+  for (const pd of phaseDist) {
+    for (const week of pd.weeks) phaseByWeek.set(week, pd.phase);
+  }
   const phaseWeekCounter: Record<string, number> = { accumulation: 0, intensification: 0, deload: 0, peaking: 0 };
 
   const weeks: BBWeek[] = [];
@@ -1885,6 +1899,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // Fallback: если пул исчерпан (все исключены) — selectExercisesSmart вернёт 0,
   // тогда buildSession очистит rotationIds для этой мышцы и пересоберёт.
   const rotationUsedByMuscle = new Map<string, string[]>(); // muscle → [exerciseName, ...]
+  const primaryBySlot = new Map<string, string>();
   const weekRotationByMuscle = new Map<string, Set<string>>(); // muscle →Set<name> внутри недели
   const prevWeekUsedByMuscle = new Map<string, Set<string>>(); // muscle →Set<name> за предыдущую неделю
   // fix L: паттерны движений, уже задействованные для отстающих групп внутри текущей недели.
@@ -1929,7 +1944,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // Ротация: собираем ID упражнений, использованных ранее для этих мышц.
       // rotationUsedByMuscle хранит exerciseName (имена) → конвертируем в IDs для selectExercisesSmart.
       const rotationIds: string[] = [];
-      const rotationNames: string[] = [...prevWeekNames];
+      const rotationNames: string[] = [];
       for (const m of sessMuscles) {
         const prevNames = rotationUsedByMuscle.get(m) || [];
         rotationNames.push(...prevNames);
@@ -1951,13 +1966,15 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const weekExcluded = getExcludedMuscles(injuries, weekDate);
       const weekGraded = getGradedInjuries(injuries, weekDate);
       const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
-      const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, new Map(), input.trainingFocus, input.eccentricMult);
+       const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, new Map(), primaryBySlot, input.trainingFocus, input.eccentricMult);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {
         if (ex.exerciseName) { fbUsedIds.push(ex.exerciseName); fbUsedNames.push(ex.exerciseName); }
       }
-      // Ротация: запоминаем использованные упражнения для следующих недель.
+      // Ротация: запоминаем только accessory-упражнения для следующих недель.
+      // Primary lifts are deliberately stable across the phase block; putting
+      // them into the rotation blacklist made the main compound change weekly.
       // BUG-B19: при накоплении на 12-нед плане пул упражнений исчерпывается → fallback на
       // повтор упражнений. Сбрасываем каждые 4 недели (ротация обновляется), сохраняя свежесть.
       if (w > 1 && (w - 1) % 4 === 0) {
@@ -1967,6 +1984,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         }
       }
       for (const ex of sess.exercises) {
+        if (ex.role === 'primary') continue;
         const m = collapseKey(ex.muscle);
         if (!rotationUsedByMuscle.has(m)) rotationUsedByMuscle.set(m, []);
         const arr = rotationUsedByMuscle.get(m)!;
@@ -2115,13 +2133,17 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         addedFeeders.add(pName);
       }
       // Re-sort after feeders/pump-finishers to restore muscle grouping
-      const reordered = orderSessionExercises(sess.exercises, { sessionTag: s.sessionTag, methodology: input.methodology as any });
+      const reordered = orderSessionExercises(sess.exercises, {
+        sessionTag: s.sessionTag,
+        methodology: input.methodology as any,
+        priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+      });
       sess.exercises.length = 0; sess.exercises.push(...reordered);
       weekSessions.push(sess);
     }
     // fix D: капаем недельный объём каждой мышцы по её истинному MRV
     normalizeWeekMrv(weekSessions, mrvByMuscle);
-    weeks.push({ week: w, sessions: weekSessions });
+    weeks.push({ week: w, phase, deload: phase === 'deload', sessions: weekSessions });
     // Запоминаем упражнения этой недели для мягкого freshness блокировки следующей.
     prevWeekUsedByMuscle.clear();
     for (const sess of weekSessions) {
@@ -2182,7 +2204,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     ...(pattern.id === 'bro_5' ? [`⚠ Bro Split 5×/нед — низкая частота 1×/нед на группу; ≥2×/нед результативнее для натуралов (Schoenfeld 2018 мета-анализ).`] : []),
   ];
 
-  const basePlan = { pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale };
+  const basePlan: BBPlan = { pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale, volumeTargets };
   let finalPlan = basePlan;
   // Применяем пост-обработку (техники/фидеры/авто-делод/загрузка/авторег) внутри buildBBPlan,
   // чтобы оба вызывающих пути (BbAutoConstructor и TrainingConstructor) получали результат.
@@ -2295,7 +2317,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // Re-sort после дедупликации (с сохранением методики пользователя — pre_exhaust/post_exhaust).
       // Ранее здесь вызывался orderSessionExercises БЕЗ methodology, что сбрасывало pre_exhaust
       // обратно в compound_first — выбор методики в UI не имел эффекта на финальный порядок.
-      const reordered = orderSessionExercises(s.exercises, { sessionTag: s.sessionTag || '', methodology: input.methodology });
+      const reordered = orderSessionExercises(s.exercises, {
+        sessionTag: s.sessionTag || '',
+        methodology: input.methodology,
+        priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+      });
       s.exercises.length = 0; s.exercises.push(...reordered);
       // P0-1: итоговый кап — профессиональный предел 6-10 упражнений на сессию.
       // Раньше: max(9, min(13, muscles×2)) → FullBody (6 мышц × 2 = 12, cap 12) = 19 упражнений!
@@ -2469,10 +2495,6 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       rationale.push(`⚠ Per-muscle ACWR caution: ${cautionMuscles.map(([m, v]) => `${m}=${v.ratio}`).join(', ')} — контролировать объём.`);
     }
   }
-  // Taper protocol — постепенное снижение объёма за 2-3 нед до пика (Bosquet 2005).
-  // В отличие от deload (резкое −50% за 1 нед), taper снижает объём −25%/нед при
-  // сохранении интенсивности. Применяется к последним 2-3 нед перед deload/концом.
-  finalPlan = applyTaperToFinalWeeks(finalPlan, input.weeks);
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, effectiveMrvMult);
   // muscleFrequency: muscleSessionCount содержит число сессий на мышцу за ротацию (= неделя для 7-дн паттернов)
   const muscleFrequency: Record<string, number> = {};
@@ -2485,17 +2507,34 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     .map(([m, f]) => `${m}=${f}×`)
     .join(', ');
   if (freqSummary) rationale.push(`Частота на группу/нед: ${freqSummary}`);
-  // ★ FINAL HARD CAP: после ВСЕХ модификаций (feeders, pump, auto-MEV, feedback) —
-  // ни одна сессия не должна превышать 10 упражнений. Профессиональный предел.
-  // Обрезаем с конца (там feeders/finishers), сохраняя lead-muscle compounds.
-  for (const w of finalPlan.weeks) {
-    for (const s of w.sessions) {
-      if (s.exercises.length > 10) {
-        s.exercises.length = 10;
-      }
-    }
-  }
-  return { ...finalPlan, level, volumeLandmarks, muscleFrequency };
+  // Exercise cap is enforced by the shared finalizer's priority-aware
+  // fatigue budget. Do not truncate the array here: raw tail deletion can
+  // remove the only exercise for a muscle or a protected primary.
+  const output = { ...finalPlan, level, volumeLandmarks, muscleFrequency, volumeTargets };
+  syncBBPlanSetShape(output);
+  const validation = validateBBPlan(output, { level });
+  const validationWarnings = validation.issues
+    .filter(issue => issue.level === 'warning')
+    .slice(0, 20)
+    .map(issue => `⚠ Валидация: ${issue.message}`);
+  if (validationWarnings.length > 0) output.rationale.push(...validationWarnings);
+  return finalizeBBPlan(output, {
+    reorder: true,
+    methodology: input.methodology,
+    priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+    level,
+    volumeGoal: input.volumeGoal,
+    phaseSafety: true,
+    controlledRotation: true,
+    equipment: eqList,
+    excludedExercises: exclIds,
+    avoidAxialLoad: avAxial,
+    excludedMuscles: [...excludedMuscles],
+    ensureMinimumVolume: true,
+    workMax,
+    mrvMultiplier: effectiveMrvMult,
+    checkOrder: true,
+  });
 }
 
 /* ───────────────────────── Cross-Day WeakPoints Compensation ───────────────────────── */

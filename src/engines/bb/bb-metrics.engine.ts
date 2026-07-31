@@ -6,10 +6,14 @@
  */
 import type { BBPlan, BBSession } from './bb-builder.engine';
 import { getVolumeLandmarks, normLevel } from '../volume-landmarks.engine';
+import { aggregateBBVolume, normalizeBBMuscle } from './bb-volume.engine';
 
 export interface BBMuscleVolume {
   muscle: string;
   totalSets: number;
+  directSets: number;
+  effectiveSets: number;
+  fatigueWeightedSets: number;
   тяжSets: number;
   пампSets: number;
   лёгSets: number;
@@ -45,7 +49,7 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
   const sessions = (weekIdx >= 0 ? plan.weeks[weekIdx] : plan.weeks[0])?.sessions || [];
   for (const s of sessions) {
     for (const ex of s.exercises) {
-      const m = ex.muscle;
+      const m = normalizeBBMuscle(ex.muscle);
       const a = agg[m] || (agg[m] = { total: 0, тяж: 0, памп: 0, лёг: 0, hard: 0, rirSum: 0, rirN: 0, freq: 0 });
       a.total += ex.sets;
       if (ex.character === 'тяж') a.тяж += ex.sets;
@@ -56,6 +60,7 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
       a.rirSum += ex.rir * ex.sets; a.rirN += ex.sets;
     }
   }
+  const effectiveByMuscle = aggregateBBVolume(sessions);
   // P2-3: частота — среднее число сессий на мышцу за ВСЕ недели (не только пик-неделя).
   // Раньше: только по пик-неделе → для bro_5 (1×/нед) частота=1 всегда, для PPL (2×/нед) =2.
   // Теперь: агрегируем по всем неделям, делим на число недель → реальная частота/нед.
@@ -63,21 +68,28 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
   const totalWeeks = plan.weeks.length || 1;
   for (const w of plan.weeks) {
     for (const s of w.sessions) for (const ex of s.exercises) {
-      freqMapAll[ex.muscle] = (freqMapAll[ex.muscle] || 0) + 1;
+      const muscle = normalizeBBMuscle(ex.muscle);
+      freqMapAll[muscle] = (freqMapAll[muscle] || 0) + 1;
     }
   }
 
   const perMuscle: BBMuscleVolume[] = Object.entries(agg).map(([muscle, a]) => {
     const lm = getVolumeLandmarks(level, muscle) || { mev: 0, mav: 0, mrv: 0 };
-    const mev = Math.round(lm.mev * mult);
-    const mav = Math.round(lm.mav * mult);
-    const mrv = Math.round(lm.mrv * mult);
+    const finalLm = plan.volumeLandmarks?.find(row => row.group === muscle);
+    const effective = effectiveByMuscle[muscle]?.effectiveSets ?? a.total;
+    const mev = finalLm?.mev ?? Math.round(lm.mev * mult);
+    const mav = finalLm?.mav ?? Math.round(lm.mav * mult);
+    const mrv = finalLm?.mrv ?? Math.round(lm.mrv * mult);
     let status: BBMuscleVolume['status'] = 'below_mev';
-    if (a.total >= mrv) status = 'exceeding_mrv';
-    else if (a.total > mav) status = 'approaching_mrv';
-    else if (a.total >= mev) status = 'optimal';
+    if (effective >= mrv) status = 'exceeding_mrv';
+    else if (effective > mav) status = 'approaching_mrv';
+    else if (effective >= mev) status = 'optimal';
     return {
-      muscle, totalSets: a.total, тяжSets: a.тяж, пампSets: a.памп, лёгSets: a.лёг,
+      muscle, totalSets: a.total,
+      directSets: effectiveByMuscle[muscle]?.directSets ?? a.total,
+      effectiveSets: Math.round(effective * 10) / 10,
+      fatigueWeightedSets: Math.round((effectiveByMuscle[muscle]?.fatigueWeightedSets ?? a.total) * 10) / 10,
+      тяжSets: a.тяж, пампSets: a.памп, лёгSets: a.лёг,
       hardSets: a.hard,
       avgRir: a.rirN > 0 ? a.rirSum / a.rirN : 0,
       frequencyPerRotation: Math.round((freqMapAll[muscle] || 0) / totalWeeks * 10) / 10,
@@ -109,11 +121,11 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
 /** Человекочитаемая сводка. */
 export function explainBBMetrics(m: BBPlanMetrics): string {
   const lines = [
-    `Всего сетов/ротация: ${m.totalSets} | тяж ${(m.тяжPct * 100).toFixed(0)}% | памп ${(m.пампPct * 100).toFixed(0)}% | ср.RIR ${m.avgRir.toFixed(1)}`,
+    `Всего direct-сетов/ротация: ${m.totalSets} | тяж ${(m.тяжPct * 100).toFixed(0)}% | памп ${(m.пампPct * 100).toFixed(0)}% | ср.RIR ${m.avgRir.toFixed(1)}`,
     'Объём на мышцу (vs MEV/MAV/MRV):',
   ];
   for (const mm of m.perMuscle) {
-    lines.push(`  ${mm.muscle}: ${mm.totalSets} сетов (тяж ${mm.тяжSets}/памп ${mm.пампSets}/лёг ${mm.лёгSets}), RIR ${mm.avgRir.toFixed(1)}, частота ${mm.frequencyPerRotation}× — ${mm.status} (MEV${mm.mev}/MAV${mm.mav}/MRV${mm.mrv})`);
+    lines.push(`  ${mm.muscle}: direct ${mm.directSets}, effective ${mm.effectiveSets} сетов (тяж ${mm.тяжSets}/памп ${mm.пампSets}/лёг ${mm.лёгSets}), RIR ${mm.avgRir.toFixed(1)}, частота ${mm.frequencyPerRotation}× — ${mm.status} (MEV${mm.mev}/MAV${mm.mav}/MRV${mm.mrv})`);
   }
   return lines.join('\n');
 }

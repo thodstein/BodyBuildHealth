@@ -94,6 +94,8 @@ export interface OrderOpts {
    *  pre_exhaust — изоляция основной мышцы ПЕРВОЙ (предварительное утомление), затем compound.
    *  post_exhaust — compound, затем изоляция (то же что compound_first, явно). */
   methodology?: SessionMethodology;
+  /** Дополнительный приоритет мышц, которые должны получить первый качественный стимул. */
+  priorityMuscles?: string[];
 }
 
 export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts = {}): BBExercise[] {
@@ -125,7 +127,8 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
   const tagMuscleSet = new Set(tagMuscles.map(m => collapseMuscle(m)));
 
   const methodology = opts.methodology || 'compound_first';
-  const indexed = exercises.map((ex, idx) => ({ ex, idx, key: rankKey(ex, primaryMuscle, tagMuscleSet, methodology) }));
+  const priorityMuscles = new Set((opts.priorityMuscles || []).map(collapseMuscle));
+  const indexed = exercises.map((ex, idx) => ({ ex, idx, key: rankKey(ex, primaryMuscle, tagMuscleSet, methodology, priorityMuscles) }));
   // Лексикографическое сравнение кортежа.
   indexed.sort((a, b) => {
     const ka = a.key, kb = b.key;
@@ -155,7 +158,7 @@ const MUSCLE_ORDER: Record<string, number> = {
   traps: 6, trapezius: 6, triceps: 7, biceps: 8, arms: 9,
   calves: 10, forearms: 11, abs: 12, core: 12, lower_back: 12,
 };
-function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string>, methodology: SessionMethodology = 'compound_first'): number[] {
+function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string>, methodology: SessionMethodology = 'compound_first', priorityMuscles: Set<string> = new Set()): number[] {
   const exMuscle = collapseMuscle(ex.muscle || '');
   const isPrimaryMuscle = exMuscle === collapseMuscle(primaryMuscle);
   const compound = isCompoundEx(ex);
@@ -163,16 +166,19 @@ function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string
   const plSpec = isPLSpec(ex.name || '');
   const isFinisher = ex.role === 'accessory' && !compound && (ex.character === 'памп' || (ex.workSets?.[0]?.reps ?? 0) >= 12);
 
-  const isPrimaryIsolation = isPrimaryMuscle && !compound && !isFinisher;
+  // In pre-exhaust, a primary-muscle pump isolation is still the pre-fatigue
+  // movement, not a finisher that belongs at the end.
+  const isPrimaryIsolation = isPrimaryMuscle && !compound;
   let tier: number;
-  if (isFinisher) tier = 3;
-  else if (methodology === 'pre_exhaust' && isPrimaryIsolation) tier = -1;
+  if (methodology === 'pre_exhaust' && isPrimaryIsolation) tier = -1;
+  else if (isFinisher) tier = 3;
   else if (isPrimaryHeavy) tier = 0;
   else if (compound) tier = 1;
   else tier = 2;
 
   // isPrimaryFlag: мышца дня ВСЕГДА первая (0), остальные после (1)
   const isPrimaryFlag = isPrimaryMuscle ? 0 : 1;
+  const priorityFlag = priorityMuscles.has(exMuscle) ? 0 : 1;
   // muscleGroup: внутри primary/не-primary — группировка по мышце
   const muscleGroup = MUSCLE_ORDER[exMuscle] ?? 12;
 
@@ -183,7 +189,7 @@ function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string
   if (plSpec) subOrder += 50;
 
   const load = loadRank(ex);
-  return [isPrimaryFlag, muscleGroup, tier, subOrder, load];
+  return [isPrimaryFlag, priorityFlag, muscleGroup, tier, subOrder, load];
 }
 
 function collapseMuscle(m: string): string {
@@ -251,7 +257,7 @@ export function capExercisesPerMuscle(exercises: BBExercise[]): BBExercise[] {
 // Cap redundancy then apply coaching-grade ordering for a session.
 // sessionTag preferred — lets orderSessionExercises derive primaryMuscle from TAG_MUSCLES
 // (chest for ChestBack, back for Pull, etc.). Falls back to explicit primaryMuscle.
-export function tidySessionExercises(exercises: BBExercise[], primaryMuscle?: string, sessionTag?: string): BBExercise[] {
+export function tidySessionExercises(exercises: BBExercise[], primaryMuscle?: string, sessionTag?: string, priorityMuscles?: string[]): BBExercise[] {
   const capped = capExercisesPerMuscle(exercises);
-  return orderSessionExercises(capped, { primaryMuscle, sessionTag, methodology: "compound_first" });
+  return orderSessionExercises(capped, { primaryMuscle, sessionTag, methodology: "compound_first", priorityMuscles });
 }

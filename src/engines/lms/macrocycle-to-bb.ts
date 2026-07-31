@@ -35,6 +35,10 @@ export interface MacrocycleToBBOptions {
   sleepHours?: number;
   stressLevel?: number;
   labMrvMultiplier?: number;
+  injuries?: any[];
+  avoidAxialLoad?: boolean;
+  excludedExercises?: string[];
+  favoriteExercises?: string[];
 }
 
 /**
@@ -108,6 +112,10 @@ function buildBaseBBProgram(total: number, opts: MacrocycleToBBOptions): UserPro
     sleepHours: opts.sleepHours,
     stressLevel: opts.stressLevel,
     labMrvMultiplier: opts.labMrvMultiplier,
+    injuries: opts.injuries,
+    avoidAxialLoad: opts.avoidAxialLoad,
+    excludedExercises: opts.excludedExercises,
+    favoriteExercises: opts.favoriteExercises,
   });
   const userProg = createFromBuild(bbPlan, {
     goal: opts.goal,

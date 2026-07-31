@@ -511,20 +511,17 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
   // Иначе — перестраиваем distributePhases заново (legacy-поведение).
   const phaseMap = new Map<number, BBPhase>();
   if (skipPhaseRedistribution) {
-    // Извлекаем фазы из плана: проверяем комментарии упражнений на маркеры фаз
-    // или используем упрощённую карту: первые ~60% accumulation, остальное intensification,
-    // последняя неделя — deload (если weeks >= 6).
-    const deloadFreq = totalWeeks >= 6 ? 4 : 0;
-    if (deloadFreq > 0) {
-      for (let wk = 1; wk <= totalWeeks; wk++) {
-        if (wk % deloadFreq === 0) phaseMap.set(wk, 'deload');
-        else if (wk <= Math.ceil(totalWeeks * 0.6)) phaseMap.set(wk, 'accumulation');
-        else phaseMap.set(wk, 'intensification');
-      }
-    } else {
-      for (let wk = 1; wk <= totalWeeks; wk++) {
-        phaseMap.set(wk, wk <= Math.ceil(totalWeeks * 0.6) ? 'accumulation' : 'intensification');
-      }
+    // The source plan already owns phase labels. Never replace explicit
+    // cycle/program phases with a guessed 60/40 map.
+    for (const week of plan.weeks) {
+      const raw = String((week as any).phase || '').toLowerCase();
+      const phase: BBPhase = raw === 'deload' || (week as any).deload ? 'deload'
+        : raw === 'peaking' || raw === 'peak' ? 'peaking'
+          : raw === 'intensification' ? 'intensification' : 'accumulation';
+      phaseMap.set(week.week, phase);
+    }
+    for (let wk = 1; wk <= totalWeeks; wk++) {
+      if (!phaseMap.has(wk)) phaseMap.set(wk, 'accumulation');
     }
   } else {
     // B20: legacy path — перестраивает фазы заново. Предупредить, если кто-то вызовет без skipPhaseRedistribution.
@@ -612,6 +609,12 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
           }
         }
       }
+    }
+
+    // Every source, including faithful programs, receives an explicit phase
+    // marker even when no load strategy or intensity technique is selected.
+    for (const session of w.sessions) {
+      for (const exercise of session.exercises) rebuildComment(exercise, cfg.label);
     }
 
     // P6: intensity-techniques (применяется к primary упражнениям фазо-уместными техниками).
