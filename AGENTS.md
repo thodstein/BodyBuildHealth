@@ -1,15 +1,42 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
-## Current project state (Jul 30 2026)
+## Current project state (Jul 31 2026)
 
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
-- `vite build` - OK (694+ modules)
-- `vitest` - 454 passing (29 test files, including 25 new bb-audit-fixes tests)
+- `vite build` - OK
+- `vitest` - 480 passing (31 test files, including 19 new training-focus-and-taper tests)
 
 ### Git
 - `origin/main` - tracked
-- uncommitted changes: none (last commit 0fe1624a)
+- uncommitted changes: 7 files (audit fixes re-applied after other agent's commit overwrote them)
+- last commit: 8a163f027 (other agent) / 44be2c068 (partial audit fixes committed)
+
+---
+
+## Audit fixes (Jul 31 2026) — re-applied after overwrite
+
+After a full audit of ПЛ-авто, ББ-авто, and ручной планировщик, the following fixes were applied:
+
+### P0 — Critical bugs
+1. **`require()` in ESM/browser** — `designer-to-program.ts` and `macrocycle-to-bb.ts` used `require()` (not available in Vite/browser). try/catch silently returned null → "Применить с упражнениями" and MacrocyclePanel "apply as BB" produced **empty programs**. Fixed: replaced with static imports.
+2. **`trainingFocus` mertворождённый** — `BBBuilderInput.trainingFocus` existed, `bbRir()` used it, but **NO UI path** forwarded it. Fixed: added `trainingFocus` + recovery metrics (`bodyFat`, `leanMass`, `hrvMs`, `sleepHours`, `stressLevel`, `labMrvMultiplier`) to `AutoDraftOptions`, `CycleToPlanInput`, `DesignerToUserWeeksOptions`, `MacrocycleToBBOptions`, `ProgramMeta`. Wired in `SRCBBScreen.buildBb`, `ProgramManagerPanel.autoFillDraft`, MacrocyclePanel modal. Added UI selector in BB-auto.
+
+### P1 — Important fixes
+3. **`tempoFor(phase?)`** — 4 call sites in `bb-builder.engine.ts` called `tempoFor('памп')` without passing `phase`, ignoring ACSM 2023 eccentric modulation. Fixed: all 4 now pass phase (3 from week loop scope, 1 via `phaseByWeek` Map parameter added to `compensateCrossDayWeakPoints`).
+4. **`applyPLTaper` guard** — always cut volume on final 2 weeks, even if already low-volume (< 60% of previous). Could produce 1 set with RIR 6 (overtraining). Fixed: added `weekVolume()` check — skip taper if week already deloaded.
+5. **Deload volume cut in `macrocycle-to-bb`** — `adjustSessionRir` for deload only increased RIR +3 without cutting sets (incomplete deload per Helms/NSCA). Fixed: now cuts sets to 60% (Math.ceil(sets.length * 0.6)).
+6. **Silent failure in MacrocyclePanel modal** — if `deserializeMacro` returned null (corrupted/missing storage), code silently did nothing. Fixed: added toast warnings for missing/damaged macrocycle.
+
+### P2 — Quality
+7. **`norm()` dedup** — 4 separate `function norm()` definitions across codebase with different behavior (lms-builder had no null-guard/trim, diary-autoreg had both). Fixed: created `src/engines/norm.ts` shared helper (null-guard + trim + ё→е), replaced lms-builder and diary-autoreg local copies.
+8. **`pedMrvMult` misleading param name** — `injectPLWeakPoints` parameter named `pedMrvMult` but actually received `combinedMrvMult` (pedMrvMult × recoveryMult). Fixed: renamed to `mrvMult`.
+9. **`PlannerApply.data` typing** — was `any`. Added typed payload interfaces (`SplitPayload`, `PmPayload`, etc.) for future narrowing. `data` kept as `any` for backward-compat with ~20 consumer call sites.
+10. **`undertrained` ACWR comment** — `volMod=1.1, rirShift=0` had no explanation. Added: "Растренированность: стимул +10% объёма без RIR-shift".
+
+### Tests
+- `src/engines/bb/__tests__/training-focus-and-taper.test.ts` — 19 tests: trainingFocus RIR (strength vs endurance), tempoFor phase param, taper guard, ACWR+taper intersection, deload volume cut, recovery metrics.
+- Cleaned up 4 `_tmp_*.test.ts` temp files from other agent (broken imports, no assertions).
 
 ---
 

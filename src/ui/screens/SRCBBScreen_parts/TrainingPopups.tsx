@@ -36,6 +36,9 @@ export const cardBtnStyle = (active: boolean): React.CSSProperties => ({
   background: active ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.03)',
   border: active ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.06)',
   color: active ? ACCENT : 'rgba(255,255,255,0.7)',
+  minWidth: 0,
+  maxWidth: '100%',
+  overflow: 'hidden',
 });
 
 export const PopupNumber: React.FC<{
@@ -47,8 +50,8 @@ export const PopupNumber: React.FC<{
   const display = value ? `${value}${suffix}` : `—${suffix ? ' ' + suffix : ''}`;
   return <>
     <button onClick={() => { setEdit(String(value)); setOpen(true); }} style={cardBtnStyle(!!value)}>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 14, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{display}</div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+      <div style={{ fontSize: 14, color: value ? ACCENT : 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{display}</div>
     </button>
     {open && <PortalOverlay onClose={() => setOpen(false)}>
       <div onClick={e => e.stopPropagation()} style={sheet()}>
@@ -81,8 +84,8 @@ export const PopupSelect: React.FC<{
   return (
     <>
       <button onClick={() => setOpen(true)} style={cardBtnStyle(!!value)}>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
-        <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{sel ? sel.label : 'Выбрать…'}</div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+        <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sel ? sel.label : 'Выбрать…'}</div>
       </button>
       {open && (
         <PortalOverlay onClose={() => setOpen(false)}>
@@ -227,13 +230,13 @@ export const ExpandableCard: React.FC<{
   children?: React.ReactNode;
 }> = ({ title, short, full, accent = ACCENT, icon, children }) => {
   const [open, setOpen] = useState(false);
-  return <div style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: `1px solid ${accent}22`, padding: 12, margin: '6px 0' }}>
-    <div onClick={() => full && setOpen(o => !o)} style={{ cursor: full ? 'pointer' : 'default', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: accent }}>{icon ? icon + ' ' : ''}{title}</div>
+  return <div style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: `1px solid ${accent}22`, padding: 12, margin: '6px 0', minWidth: 0, maxWidth: '100%' }}>
+    <div onClick={() => full && setOpen(o => !o)} style={{ cursor: full ? 'pointer' : 'default', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: accent, minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{icon ? icon + ' ' : ''}{title}</div>
       {full && <span style={{ fontSize: 10, color: accent, flexShrink: 0 }}>{open ? '▲ свернуть' : '▼ подробнее'}</span>}
     </div>
-    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, marginTop: 6 }}>{short}</div>
-    {open && full && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', lineHeight: 1.55, marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>{full}</div>}
+    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, marginTop: 6, overflow: 'hidden', wordBreak: 'break-word' }}>{short}</div>
+    {open && full && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', lineHeight: 1.55, marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', wordBreak: 'break-word' }}>{full}</div>}
     {children}
   </div>;
 };

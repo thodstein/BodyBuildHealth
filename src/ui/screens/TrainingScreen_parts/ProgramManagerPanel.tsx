@@ -238,12 +238,84 @@ export const ProgramManagerPanel: React.FC = () => {
   const [wizardDays, setWizardDays] = useState(4);
   const [wizardWeeks, setWizardWeeks] = useState(8);
   const startCreate = (dir: 'bb' | 'pl' | 'hybrid') => {
-    // Прямое создание — без визарда. Пользователь видит результат сразу и редактирует.
-    const p = createBlank(dir);
-    p.meta.daysPerWeek = 4;
-    p.meta.weeks = 8;
-    setEditing(p);
-    flash('🆕 Создана пустая программа — заполните упражнениями или нажмите ⚡ авто-черновик');
+    // Прямое создание — открываем скелет с автозаполнением через профиль.
+    const prof = loadTrainingProfile();
+    const days = 4, weeks = 8;
+    try {
+      if (dir === 'bb') {
+        const bbPlan = autodraftBBPlan({
+          level: 'intermediate', goal: 'hypertrophy', daysPerWeek: days, weeks,
+          equipment: (prof.equipment ?? []) as string[],
+          weakPoints: (prof.weakPoints ?? []) as string[],
+          avoidAxialLoad: prof.avoidAxialLoad ?? false,
+          favoriteExercises: (prof.favoriteExercises ?? []) as string[],
+          excludedExercises: (prof.excludedExercises ?? []) as string[],
+          workMax: prof.workMax ?? {},
+          onCourse: prof.onCourse ?? false,
+          courseIntensity: prof.courseIntensity ?? 'moderate',
+          injuries: prof.injuries ?? [],
+        });
+        const userProg = createFromBuild(bbPlan, {
+          title: 'Новая ББ-программа', goal: 'hypertrophy', level: 'intermediate',
+          weakPoints: (prof.weakPoints ?? []) as string[],
+          equipment: (prof.equipment ?? []) as string[],
+        });
+        if (userProg.bb && userProg.bb.weeks.length >= 4) {
+          userProg.bb.weeks = applyPhaseModulation(userProg.bb.weeks, { goal: 'hypertrophy', level: 'intermediate', weeksTotal: weeks });
+        }
+        setEditing(userProg);
+        const totalEx = userProg.bb?.weeks?.reduce((s, w) => s + w.sessions.reduce((ss, sess) => ss + sess.blocks.length, 0), 0) ?? 0;
+        flash('🆕 ББ создана автозаполнением: ' + weeks + ' нед, ' + totalEx + ' упр');
+        return;
+      }
+      if (dir === 'pl') {
+        const p = createBlank('pl');
+        const foundCycle = LMS_CYCLES.find(c => c.meta.level === 'intermediate' && Math.abs(c.meta.sessionsPerWeek - days) <= 1)
+          ?? LMS_CYCLES.find(c => Math.abs(c.meta.sessionsPerWeek - days) <= 1);
+        if (p.pl && foundCycle) {
+          p.pl.sourceCycleId = foundCycle.meta.id;
+          p.pl.schedule = Array.from({ length: days }, (_, i) => ({ sessionIdx: i, dayOfWeek: i }));
+          p.pl.workMax = { squat: prof.pmSquat, bench: prof.pmBench, dead: prof.pmDead };
+          p.pl.notes = 'Цикл: ' + foundCycle.meta.title + '. Процентки неизменны — ваш оверлей.';
+        }
+        setEditing(p);
+        flash('🆕 ПЛ: ' + (foundCycle ? 'цикл «' + foundCycle.meta.title + '»' : 'подберите цикл вручную'));
+        return;
+      }
+      if (dir === 'hybrid') {
+        const p = createBlank('hybrid');
+        const sessCount = 3;
+        const bbDays = Math.max(1, days - sessCount);
+        const foundCycle = LMS_CYCLES.find(c => c.meta.level === 'intermediate' && Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1)
+          ?? LMS_CYCLES.find(c => Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1);
+        try {
+          const bbPlan = autodraftBBPlan({
+            level: 'intermediate', goal: 'hypertrophy', daysPerWeek: bbDays, weeks,
+            equipment: (prof.equipment ?? []) as string[],
+            weakPoints: (prof.weakPoints ?? []) as string[],
+            avoidAxialLoad: prof.avoidAxialLoad ?? false,
+            workMax: prof.workMax ?? {},
+            onCourse: prof.onCourse ?? false,
+            courseIntensity: prof.courseIntensity ?? 'moderate',
+            injuries: prof.injuries ?? [],
+          });
+          const bbUserProg = createFromBuild(bbPlan, { title: 'hybrid-bb', goal: 'hypertrophy', level: 'intermediate' });
+          if (p.hybrid) {
+            p.hybrid.plRef = { sourceCycleId: foundCycle?.meta.id ?? '', sessionIndices: foundCycle ? Array.from({ length: foundCycle.meta.sessionsPerWeek }, (_, i) => i) : [] };
+            p.hybrid.bbWeeks = bbUserProg.bb?.weeks ?? [];
+            p.hybrid.workMax = { squat: prof.pmSquat ?? 120, bench: prof.pmBench ?? 100, deadlift: prof.pmDead ?? 140 };
+          }
+        } catch { /* ignore */ }
+        setEditing(p);
+        flash('🆕 Powerbuilder: ПЛ «' + (foundCycle?.meta.title ?? '—') + '» + ББ ' + bbDays + 'д/нед');
+        return;
+      }
+    } catch {
+      // Fallback: пустой скелет
+      const p = createBlank(dir);
+      setEditing(p);
+      flash('🆕 Создана пустая программа — заполните упражнениями');
+    }
   };
   const finishWizard = () => {
     const p = createBlank(wizardDir);
@@ -343,7 +415,12 @@ export const ProgramManagerPanel: React.FC = () => {
     flash('✅ Сохранено');
   };
 
-  const allLibraryPrograms = useMemo(() => getAllPrograms(), []);
+  // Полный каталог программ: библиотека + женские + авторские. Используется в обоих ветках UI.
+  const allLibraryPrograms = useMemo(() => [
+    ...getAllPrograms(),
+    ...WOMENS_PROGRAMS,
+    ...CUSTOM_PROGRAMS,
+  ], []);
   const plCycles = useMemo(() => LMS_CYCLES, []);
 
   // P2.6: фильтрация + сортировка
@@ -387,15 +464,114 @@ export const ProgramManagerPanel: React.FC = () => {
     { id: 'cut4', title: 'Сушка 4д/нед', icon: '✂️', desc: 'Upper/Lower, 8 нед, средний', dir: 'bb', goal: 'cut', level: 'intermediate', days: 4, weeks: 8, color: '#3b82f6' },
     { id: 'powerbuilding4', title: 'Powerbuilder 4д/нед', icon: '⚡', desc: 'ПЛ+ББ гибрид, 12 нед', dir: 'hybrid', goal: 'strength_mass', level: 'intermediate', days: 4, weeks: 12, color: '#ec4899' },
   ];
+  // Применить быстрый шаблон: создать UserProgram с реальным контентом (не пустышку).
+  // Для ББ — autodraftBBPlan генерирует недели/сессии/блоки/упражнения с весами.
+  // Для ПЛ — подбирается LMS-цикл под уровень/дни, заполняется customWeeks.
+  // Для Powerbuilder — и то и другое.
   const applyQuickTemplate = (tpl: typeof QUICK_TEMPLATES[0]) => {
-    const p = createBlank(tpl.dir);
-    p.meta.title = tpl.title;
-    p.meta.goal = tpl.goal;
-    p.meta.level = tpl.level;
-    p.meta.daysPerWeek = tpl.days;
-    p.meta.weeks = tpl.weeks;
-    setEditing(p);
-    flash('🚀 ' + tpl.title + ' — заполните упражнения в редакторе');
+    const prof = loadTrainingProfile();
+    try {
+      if (tpl.dir === 'bb') {
+        const bbPlan = autodraftBBPlan({
+          level: tpl.level,
+          goal: tpl.goal,
+          daysPerWeek: tpl.days,
+          weeks: tpl.weeks,
+          equipment: (prof.equipment ?? []) as string[],
+          weakPoints: (prof.weakPoints ?? []) as string[],
+          avoidAxialLoad: prof.avoidAxialLoad ?? false,
+          favoriteExercises: (prof.favoriteExercises ?? []) as string[],
+          excludedExercises: (prof.excludedExercises ?? []) as string[],
+          workMax: prof.workMax ?? {},
+          onCourse: prof.onCourse ?? false,
+          courseIntensity: prof.courseIntensity ?? 'moderate',
+          injuries: prof.injuries ?? [],
+        });
+        const userProg = createFromBuild(bbPlan, {
+          title: tpl.title, goal: tpl.goal, level: tpl.level,
+          weakPoints: (prof.weakPoints ?? []) as string[],
+          equipment: (prof.equipment ?? []) as string[],
+        });
+        userProg.meta.title = tpl.title;
+        userProg.meta.weeks = tpl.weeks;
+        userProg.meta.daysPerWeek = tpl.days;
+        if (userProg.bb && userProg.bb.weeks.length >= 4) {
+          userProg.bb.weeks = applyPhaseModulation(userProg.bb.weeks, {
+            goal: tpl.goal, level: tpl.level, weeksTotal: tpl.weeks,
+          });
+        }
+        setEditing(userProg);
+        const totalEx = userProg.bb?.weeks?.reduce((s, w) => s + w.sessions.reduce((ss, sess) => ss + sess.blocks.length, 0), 0) ?? 0;
+        flash('🚀 ' + tpl.title + ' — готово: ' + userProg.bb?.weeks.length + ' нед, ' + totalEx + ' упр');
+        return;
+      }
+      if (tpl.dir === 'pl') {
+        const sessCount = tpl.days;
+        let foundCycle = LMS_CYCLES.find(c => c.meta.level === tpl.level && Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1);
+        if (!foundCycle) foundCycle = LMS_CYCLES.find(c => Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1);
+        const p = createBlank('pl');
+        p.meta.title = tpl.title;
+        p.meta.goal = 'powerlifting';
+        p.meta.level = tpl.level;
+        p.meta.daysPerWeek = tpl.days;
+        p.meta.weeks = tpl.weeks;
+        if (p.pl && foundCycle) {
+          p.pl.sourceCycleId = foundCycle.meta.id;
+          p.pl.schedule = Array.from({ length: sessCount }, (_, i) => ({ sessionIdx: i, dayOfWeek: i }));
+          p.pl.workMax = { squat: prof.pmSquat, bench: prof.pmBench, dead: prof.pmDead };
+          p.pl.notes = 'Цикл: ' + foundCycle.meta.title + ' (' + foundCycle.meta.weeks + ' нед, ' + foundCycle.meta.sessionsPerWeek + 'д/нед). Процентки неизменны — ваш оверлей.';
+        }
+        setEditing(p);
+        flash('🏆 ' + tpl.title + (foundCycle ? ' — цикл «' + foundCycle.meta.title + '»' : ' — цикл не подобран'));
+        return;
+      }
+      if (tpl.dir === 'hybrid') {
+        const p = createBlank('hybrid');
+        p.meta.title = tpl.title;
+        p.meta.goal = 'strength_mass';
+        p.meta.level = tpl.level;
+        p.meta.daysPerWeek = tpl.days;
+        p.meta.weeks = tpl.weeks;
+        const sessCount = Math.max(2, Math.min(4, tpl.days));
+        const bbDays = Math.max(1, tpl.days - sessCount);
+        const foundCycle = LMS_CYCLES.find(c => c.meta.level === tpl.level && Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1)
+          ?? LMS_CYCLES.find(c => Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1);
+        try {
+          const bbPlan = autodraftBBPlan({
+            level: tpl.level, goal: 'hypertrophy', daysPerWeek: bbDays, weeks: tpl.weeks,
+            equipment: (prof.equipment ?? []) as string[],
+            weakPoints: (prof.weakPoints ?? []) as string[],
+            avoidAxialLoad: prof.avoidAxialLoad ?? false,
+            workMax: prof.workMax ?? {},
+            onCourse: prof.onCourse ?? false,
+            courseIntensity: prof.courseIntensity ?? 'moderate',
+            injuries: prof.injuries ?? [],
+          });
+          const bbUserProg = createFromBuild(bbPlan, { title: 'hybrid-bb', goal: 'hypertrophy', level: tpl.level });
+          if (bbUserProg.bb?.weeks && bbUserProg.bb.weeks.length >= 4) {
+            bbUserProg.bb.weeks = applyPhaseModulation(bbUserProg.bb.weeks, { goal: 'hypertrophy', level: tpl.level, weeksTotal: tpl.weeks });
+          }
+          if (p.hybrid) {
+            p.hybrid.plRef = { sourceCycleId: foundCycle?.meta.id ?? '', sessionIndices: foundCycle ? Array.from({ length: foundCycle.meta.sessionsPerWeek }, (_, i) => i) : [] };
+            p.hybrid.bbWeeks = bbUserProg.bb?.weeks ?? [];
+            p.hybrid.workMax = { squat: prof.pmSquat ?? 120, bench: prof.pmBench ?? 100, deadlift: prof.pmDead ?? 140 };
+          }
+        } catch { /* ignore, останется пустой hybrid скелет */ }
+        setEditing(p);
+        flash('⚡ ' + tpl.title + (foundCycle ? ' — ПЛ «' + foundCycle.meta.title + '» + ББ ' + bbDays + 'д/нед' : ' — цикл не подобран'));
+        return;
+      }
+    } catch (err) {
+      // Fallback: пустой скелет с тем же мета
+      const p = createBlank(tpl.dir);
+      p.meta.title = tpl.title;
+      p.meta.goal = tpl.goal;
+      p.meta.level = tpl.level;
+      p.meta.daysPerWeek = tpl.days;
+      p.meta.weeks = tpl.weeks;
+      setEditing(p);
+      flash('⚠ ' + tpl.title + ' — заполните упражнения в редакторе (авто-сборка не удалась)');
+    }
   };
 
   if (programs.length === 0) {
@@ -419,18 +595,15 @@ export const ProgramManagerPanel: React.FC = () => {
           <div style={{ display: 'flex', gap: 6 }}>
             <button style={{ ...BTN, flex: 1, minHeight: 56, flexDirection: 'column', gap: 2 }} onClick={() => startCreate('bb')}>
               <span style={{ fontSize: 16 }}>💪</span>
-              <span>ББ программа</span>
-              <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8 }}>бодибилдинг: weeks→sessions→blocks</span>
+              <span>ББ</span>
             </button>
             <button style={{ ...BTN, flex: 1, minHeight: 56, flexDirection: 'column', gap: 2, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => startCreate('pl')}>
               <span style={{ fontSize: 16 }}>🏆</span>
-              <span>ПЛ программа</span>
-              <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8 }}>LMS-цикл + оверлей</span>
+              <span>ПЛ</span>
             </button>
             <button style={{ ...BTN, flex: 1, minHeight: 56, flexDirection: 'column', gap: 2, color: '#3b82f6', borderColor: 'rgba(59,130,246,0.3)' }} onClick={() => startCreate('hybrid')}>
               <span style={{ fontSize: 16 }}>⚡</span>
-              <span>Powerbuilder</span>
-              <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8 }}>гибрид ПЛ+ББ</span>
+              <span>БВ</span>
             </button>
           </div>
           {/* P2-3: Wizard как альтернатива прямому созданию */}
@@ -458,18 +631,110 @@ export const ProgramManagerPanel: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700 }}>📥 Загрузить для правки</div>
           <div style={{ display: 'flex', gap: 6 }}>
-            <button style={{ ...BTN_GHOST, flex: 1, minHeight: 48, display: 'flex', flexDirection: 'column', gap: 2 }} onClick={() => setPickerOpen('bb')}>
-              <span style={{ fontSize: 13 }}>🔍 Библиотека полных программ</span>
-              <span style={{ fontSize: 11, color: DIM }}>FullProgram → редактируемая копия</span>
+            <button style={{ ...BTN_GHOST, flex: 1, minHeight: 48 }} onClick={() => setPickerOpen('bb')}>
+              <span style={{ fontSize: 13 }}>🔍 Библиотека</span>
             </button>
-            <button style={{ ...BTN_GHOST, flex: 1, minHeight: 48, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.2)', display: 'flex', flexDirection: 'column', gap: 2 }} onClick={() => setPickerOpen('pl')}>
-              <span style={{ fontSize: 13 }}>📥 Подключить LMS-цикл</span>
-              <span style={{ fontSize: 11, color: DIM }}>процентки неизменны, оверлей ваш</span>
+            <button style={{ ...BTN_GHOST, flex: 1, minHeight: 48, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.2)' }} onClick={() => setPickerOpen('pl')}>
+              <span style={{ fontSize: 13 }}>📥 LMS-цикл</span>
             </button>
           </div>
         </div>
 
         {toast && <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, padding: '4px 0' }}>{toast}</div>}
+
+        {/* P2.1: Визард создания программы (модал для пустого состояния) */}
+        {wizardOpen && (
+          <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>🪄 Визард создания программы — шаг {wizardStep} из 4</span>
+              <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 38 }} onClick={() => setWizardOpen(false)}>Отмена</button>
+            </div>
+            {wizardStep === 1 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>1. Направление</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {([['bb','💪 Бодибилдинг','hypertrophy'], ['pl','🏋 Пауэрлифтинг','powerlifting'], ['hybrid','⚡ Powerbuilder','powerbuilding']] as const).map(([d,lbl,defGoal]) => (
+                    <button key={d} onClick={() => { setWizardDir(d); setWizardGoal(defGoal); }} style={{ ...BTN, flex: 1, minHeight: 44, background: wizardDir === d ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : '#7c3aed20', color: wizardDir === d ? '#fff' : '#a78bfa' }}>{lbl}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {wizardStep === 2 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>2. Цель</div>
+                <select style={IN} value={wizardGoal} onChange={e => setWizardGoal(e.target.value)} disabled={wizardDir === 'pl'}>
+                  <option value="hypertrophy">💪 Мышечная масса</option>
+                  <option value="cut">✂️ Сушка</option>
+                  <option value="recomp">🔁 Рекомпозиция</option>
+                  <option value="maintenance">⚖ Поддержание</option>
+                  <option value="strength_mass">🎯 Сила + Масса</option>
+                  <option value="athletic">🏅 Атлетизм</option>
+                </select>
+              </div>
+            )}
+            {wizardStep === 3 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>3. Уровень и частота</div>
+                <select style={IN} value={wizardLevel} onChange={e => setWizardLevel(e.target.value)}>
+                  {LEVEL_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column' }}>Дней/нед
+                    <input type="number" style={IN} min={2} max={6} value={wizardDays} onChange={e => setWizardDays(parseInt(e.target.value) || 4)} />
+                  </label>
+                  <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column' }}>Недель
+                    <input type="number" style={IN} min={4} max={24} value={wizardWeeks} onChange={e => setWizardWeeks(parseInt(e.target.value) || 8)} />
+                  </label>
+                </div>
+              </div>
+            )}
+            {wizardStep === 4 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>4. Превью</div>
+                <div style={{ ...CARD, padding: 10, background: 'rgba(167,139,250,0.06)' }}>
+                  <div style={{ fontSize: 12, color: '#fff' }}>📋 <b>{wizardDir === 'bb' ? 'Бодибилдинг' : wizardDir === 'pl' ? 'Пауэрлифтинг' : 'Powerbuilder'}</b></div>
+                  <div style={{ fontSize: 11, color: DIM }}>Цель: {wizardGoal} | Уровень: {wizardLevel}</div>
+                  <div style={{ fontSize: 11, color: DIM }}>{wizardDays} дн/нед × {wizardWeeks} нед</div>
+                  <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Программа будет пустой — добавьте упражнения после создания.</div>
+                </div>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              {wizardStep > 1 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => Math.max(1, s - 1) as any)}>← Назад</button>}
+              {wizardStep < 4 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => Math.min(4, s + 1) as any)}>Далее →</button>}
+              {wizardStep === 4 && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)' }} onClick={finishWizard}>✨ Создать программу</button>}
+              {wizardStep === 4 && manualMode === 'pro' && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }} onClick={() => { finishWizard(); setTimeout(() => { window.dispatchEvent(new CustomEvent('he_autodraft_trigger')); }, 400); }}>⚡ Создать и заполнить</button>}
+            </div>
+          </div>
+        )}
+
+        {/* Пикеры: Библиотека ББ / LMS-цикл (модалы для пустого состояния) */}
+        {pickerOpen === 'bb' && (
+          <div style={{ ...CARD, padding: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: ACCENT }}>Библиотека программ</span>
+              <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 38 }} onClick={() => setPickerOpen(null)}>Закрыть</button>
+            </div>
+            <BbProgramLibraryPicker value={null} label="Выбрать программу" programs={allLibraryPrograms} onSelect={startCloneLibrary} />
+          </div>
+        )}
+
+        {pickerOpen === 'pl' && (
+          <div style={{ ...CARD, padding: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>Проф. LMS-циклы (immutable)</span>
+              <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 38 }} onClick={() => setPickerOpen(null)}>Закрыть</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
+              {plCycles.map(c => (
+                <button key={c.meta.id} onClick={() => startCloneCycle(c.meta.id)} style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.18)', color: DIM_STRONG, cursor: 'pointer' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>{c.meta.title}</div>
+                  <div style={{ fontSize: 10, color: DIM }}>{c.meta.sessionsPerWeek}д/нед · {c.meta.weeks} нед · {c.meta.level} · {c.meta.period}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1578,17 +1843,26 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
               } else if (dir === 'bb') {
                 // BB: применить макроцикл как ББ-программу (macrocycleToBBProgram)
                 try {
-                  // Восстановить макроцикл из текущего состояния MacrocyclePanel (через storage)
                   const raw = localStorage.getItem('he_pl_macro');
-                  if (raw) {
+                  if (!raw) {
+                    showToast('⚠ Годовой план не найден — постройте макроцикл сначала');
+                  } else {
                     const macro = deserializeMacro(raw);
-                    if (macro) {
+                    if (!macro) {
+                      showToast('⚠ Годовой план повреждён — пересоберите в MacrocyclePanel');
+                    } else {
+                      const mProfData = linked.profile?.settings?.personal;
+                      const mLifeData = linked.profile?.settings?.lifestyle;
+                      const mBodyFat = mProfData?.bodyFat;
+                      const mLeanMass = (mProfData?.weight && mBodyFat != null) ? Math.round(mProfData.weight * (1 - mBodyFat / 100)) : undefined;
                       const newProg = macrocycleToBBProgram(macro, {
                         level: macroLevel,
                         goal: program.meta.goal,
                         daysPerWeek: program.meta.daysPerWeek,
                         weakPoints: (tprofile.weakPoints ?? []) as string[],
                         equipment: program.bb?.constraints?.equipment ?? [],
+                        trainingFocus: program.meta.trainingFocus,
+                        bodyFat: mBodyFat, leanMass: mLeanMass, hrvMs: mLifeData?.morningHRV, sleepHours: mLifeData?.sleepHours, stressLevel: mLifeData?.stressLevel, labMrvMultiplier: labAdjust.mrvMultiplier,
                       });
                       onChange(newProg);
                       setEditorLibOpen(null);
@@ -1602,15 +1876,25 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                 // Hybrid: применить макроцикл для bb-части, pl-часть не трогается
                 try {
                   const raw = localStorage.getItem('he_pl_macro');
-                  if (raw) {
+                  if (!raw) {
+                    showToast('⚠ Годовой план не найден — постройте макроцикл сначала');
+                  } else {
                     const macro = deserializeMacro(raw);
-                    if (macro) {
+                    if (!macro) {
+                      showToast('⚠ Годовой план повреждён — пересоберите в MacrocyclePanel');
+                    } else {
+                      const mProfData = linked.profile?.settings?.personal;
+                      const mLifeData = linked.profile?.settings?.lifestyle;
+                      const mBodyFat = mProfData?.bodyFat;
+                      const mLeanMass = (mProfData?.weight && mBodyFat != null) ? Math.round(mProfData.weight * (1 - mBodyFat / 100)) : undefined;
                       const bbProg = macrocycleToBBProgram(macro, {
                         level: macroLevel,
                         goal: 'hypertrophy',
                         daysPerWeek: Math.max(1, program.meta.daysPerWeek - 3),
                         weakPoints: (tprofile.weakPoints ?? []) as string[],
                         equipment: program.bb?.constraints?.equipment ?? [],
+                        trainingFocus: program.meta.trainingFocus,
+                        bodyFat: mBodyFat, leanMass: mLeanMass, hrvMs: mLifeData?.morningHRV, sleepHours: mLifeData?.sleepHours, stressLevel: mLifeData?.stressLevel, labMrvMultiplier: labAdjust.mrvMultiplier,
                       });
                       if (bbProg.bb) {
                         update({ hybrid: { ...program.hybrid!, bbWeeks: bbProg.bb.weeks } });

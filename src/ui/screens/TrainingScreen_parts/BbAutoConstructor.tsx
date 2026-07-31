@@ -2339,13 +2339,49 @@ export const BbAutoConstructor: React.FC = () => {
         >⚙️</button>
       </div>
       {showTools && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={() => setShowTools(false)}>
-          <div style={{ width:'100%', maxWidth:560, maxHeight:'85vh', overflowY:'auto', padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-              <div style={{ fontSize:14, fontWeight:800, color:'#00e68a' }}>📚 Библиотека инструментов</div>
-              <button onClick={() => setShowTools(false)} style={{ padding:'4px 10px', borderRadius:8, fontSize:12, cursor:'pointer', border:'none', background:'rgba(255,255,255,0.1)', color:'var(--text-dim)' }}>✕</button>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding: 8 }} onClick={() => setShowTools(false)}>
+          <div
+            role="dialog"
+            aria-label="Библиотека инструментов"
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 560,
+              maxHeight: '92vh',
+              display: 'flex', flexDirection: 'column',
+              borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.1)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+              flexShrink: 0, background: 'rgba(24,24,27,0.95)', position: 'sticky', top: 0, zIndex: 1,
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>📚 Библиотека инструментов</div>
+              <button
+                onClick={() => setShowTools(false)}
+                aria-label="Закрыть"
+                style={{
+                  padding: '6px 12px', borderRadius: 8, fontSize: 14, cursor: 'pointer',
+                  border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)',
+                  color: 'var(--text-dim)', minHeight: 32, minWidth: 32, lineHeight: 1,
+                }}
+              >✕</button>
             </div>
-            <PlannerToolsPanel mode="bb" />
+            <div
+              style={{
+                flex: '1 1 auto',
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                WebkitOverflowScrolling: 'touch',
+                overscrollBehavior: 'contain',
+                padding: '12px 12px 24px 12px',
+                minHeight: 0,
+              }}
+            >
+              <PlannerToolsPanel mode="bb" />
+            </div>
           </div>
         </div>
       )}

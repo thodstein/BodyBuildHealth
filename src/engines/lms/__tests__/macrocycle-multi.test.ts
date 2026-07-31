@@ -207,3 +207,61 @@ describe('buildMacrocycleMulti — cycleId per competition', () => {
     expect(compBlocks).toHaveLength(0); // C не создаёт блоков
   });
 });
+
+describe('buildMacrocycleMulti — несколько циклов на одно соревнование (cycleIds)', () => {
+  it('comp.cycleIds делит peak на под-блоки, каждому присваивается свой cycleId', () => {
+    const events: CompetitionEvent[] = [
+      { id: 'c1', name: 'Чемпионат', week: 12, priority: 'A', cycleIds: ['cycle-X', 'cycle-Y', 'cycle-Z'] },
+    ];
+    const m = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 20 });
+    const peakBlocks = m.blocks.filter(b => b.phase === 'peak' && b.competitionId === 'c1');
+    expect(peakBlocks).toHaveLength(3); // 3 под-блока для 3 циклов
+    const cycleIds = peakBlocks.map(b => b.cycleId);
+    expect(cycleIds).toEqual(['cycle-X', 'cycle-Y', 'cycle-Z']);
+  });
+
+  it('cycleIds распределяются равномерно по неделям пика', () => {
+    const events: CompetitionEvent[] = [
+      { id: 'c1', name: 'A', week: 8, priority: 'A', cycleIds: ['c1', 'c2', 'c3', 'c4'] },
+    ];
+    const m = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 16 });
+    const peakBlocks = m.blocks.filter(b => b.phase === 'peak' && b.competitionId === 'c1');
+    // A-приоритет → 4 недели peak, делённые на 4 цикла = 1 неделя каждому
+    expect(peakBlocks.reduce((s, b) => s + b.weeks, 0)).toBe(4);
+    expect(peakBlocks).toHaveLength(4);
+    expect(peakBlocks.every(b => b.weeks === 1)).toBe(true);
+  });
+
+  it('cycleId используется как fallback, если cycleIds не задан (обратная совместимость)', () => {
+    const events: CompetitionEvent[] = [
+      { id: 'c1', name: 'A', week: 12, priority: 'A', cycleId: 'legacy-cycle' },
+    ];
+    const m = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 20 });
+    const peakBlocks = m.blocks.filter(b => b.phase === 'peak' && b.competitionId === 'c1');
+    expect(peakBlocks).toHaveLength(1);
+    expect(peakBlocks[0].cycleId).toBe('legacy-cycle');
+  });
+
+  it('сериализация/десериализация сохраняет cycleIds', () => {
+    const events: CompetitionEvent[] = [
+      { id: 'c1', name: 'A', week: 12, priority: 'A', cycleIds: ['x', 'y', 'z'] },
+    ];
+    const m = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 20 });
+    const s = serializeMacro(m);
+    const restored = deserializeMacro(s);
+    expect(restored).toBeTruthy();
+    expect(restored!.competitions![0].cycleIds).toEqual(['x', 'y', 'z']);
+    const peakBlocks = restored!.blocks.filter(b => b.phase === 'peak' && b.competitionId === 'c1');
+    expect(peakBlocks.map(b => b.cycleId)).toEqual(['x', 'y', 'z']);
+  });
+
+  it('cycleIds из 1 элемента = один под-блок', () => {
+    const events: CompetitionEvent[] = [
+      { id: 'c1', name: 'A', week: 10, priority: 'A', cycleIds: ['single-cycle'] },
+    ];
+    const m = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 18 });
+    const peakBlocks = m.blocks.filter(b => b.phase === 'peak' && b.competitionId === 'c1');
+    expect(peakBlocks).toHaveLength(1);
+    expect(peakBlocks[0].cycleId).toBe('single-cycle');
+  });
+});

@@ -9,7 +9,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { SPLIT_PATTERNS } from '../../engines/bb/bb-split-patterns';
 import { rankBBSplits, selectBestBBSplit, explainBBSelection, type BBSelectorInput } from '../../engines/bb/bb-selector.engine';
-import { buildBBPlan, type BBPlan } from '../../engines/bb/bb-builder.engine';
+import { buildBBPlan, applyMacrocycleToBBPlan, type BBPlan } from '../../engines/bb/bb-builder.engine';
 import { calcBBPlanMetrics, explainBBMetrics } from '../../engines/bb/bb-metrics.engine';
 import { adaptForPEDs, explainPEDAdaptation, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../engines/volume-landmarks.engine';
@@ -79,7 +79,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
     pl: [['plan', '📋 План цикла'], ['macro', '🗓 Годовой план'], ['bridge', '🔗 Мост план→сессия'], ['plates', '🧮 Калькулятор блинов'], ['autoreg', '🧠 Авторегуляция'], ['peak', '🏁 Пик/Соревнования'], ['recovery', '🔋 Восстановление'], ['safety', '🛡 Безопасность'], ['demo', '🎬 Демонстрация']].map(([k, l]) => ({ key: k, label: l })),
-    bb: [['plan', '📋 План сплита'], ['bridge', '🔗 Мост план→сессия'], ['peak_bb', '🏆 Шоу ББ'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
+    bb: [['plan', '📋 План сплита'], ['macro', '🗓 Годовой план'], ['bridge', '🔗 Мост план→сессия'], ['peak_bb', '🏆 Шоу ББ'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
     manual: [],
   };
   const [subView, setSubView] = useState<string>('plan');
@@ -268,6 +268,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [bbWeeks, setBbWeeks] = useState<number>(_bbSaved?.bbWeeks ?? 4);
   const [bbVolGoal, setBbVolGoal] = useState<string>(_bbSaved?.bbVolGoal || 'mav');
   const [bbFocus, setBbFocus] = useState<string>(_bbSaved?.bbFocus || '');
+  const [bbTrainingFocus, setBbTrainingFocus] = useState<'strength' | 'hypertrophy' | 'endurance'>(_bbSaved?.bbTrainingFocus || 'hypertrophy');
   const [peds, setPeds] = useState<PED[]>(_bbSaved?.peds ?? (_profPL.onCourse ? (['AAS'] as PED[]) : []));
   const [pedDoses, setPedDoses] = useState<Record<string, number>>(_plSaved?.pedDoses ?? _bbSaved?.pedDoses ?? { AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
   const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(_plSaved?.courseIntensity ?? _profPL.courseIntensity ?? 'moderate');
@@ -339,7 +340,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const BB_WM_RU: Record<string,string> = { chest:'Грудь', back:'Спина', quads:'Квадрицепсы', hamstrings:'Бицепс бедра', shoulders:'Плечи', biceps:'Бицепс', triceps:'Трицепс', glutes:'Ягодичные', calves:'Икры', abs:'Пресс' };
   const [bbWorkMax, setBbWorkMax] = useState<Record<string, number>>({ chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60, ...(_profPL?.workMax || {}), ...(_bbSaved?.bbWorkMax || {}) });
   const setBbWm = (k: string, v: number) => setBbWorkMax(p => ({ ...p, [k]: v }));
-  useEffect(() => { try { localStorage.setItem('he_bb_session', JSON.stringify({ bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel, bbWorkMax })); } catch { /* ignore */ } }, [bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel]);
+  useEffect(() => { try { localStorage.setItem('he_bb_session', JSON.stringify({ bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel, bbWorkMax, bbTrainingFocus })); } catch { /* ignore */ } }, [bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel, bbTrainingFocus]);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax }); } catch { /* ignore */ } }, [bbWorkMax]);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), onCourse: peds.length > 0 }); } catch {} }, [peds]);
   const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
@@ -442,9 +443,15 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
 
   const buildBb = () => {
     if (!bbBest) return;
+    const profData = linked.profile?.settings?.personal;
+    const lifeData = linked.profile?.settings?.lifestyle;
+    const bodyFat = profData?.bodyFat;
+    const leanMass = (profData?.weight && bodyFat != null) ? Math.round(profData.weight * (1 - bodyFat / 100)) : undefined;
     const plan = buildBBPlan({ 
       patternId: bbBest.pattern.id, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks, 
-      workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any 
+      workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any,
+      trainingFocus: bbTrainingFocus,
+      bodyFat, leanMass, hrvMs: lifeData?.morningHRV, sleepHours: lifeData?.sleepHours, stressLevel: lifeData?.stressLevel,
     }, pedAdapt);
     setBuiltBb(plan); setBbWeekSel(1);
     // TRAINING INTEGRATION: конвертировать BB план в сессии
@@ -689,9 +696,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       )}
 
       {mainTab === 'pl' && subView === 'plan' && (
-        <div>
+        <div style={{ minWidth: 0, maxWidth: '100%' }}>
           <div style={H}>🏆 Авто-подбор силового цикла</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, minWidth: 0 }}>
             <PopupSelect label="Уровень спортсмена" value={level} onChange={setLevel} options={[['novice','Новичок'],['II-KMS','II разряд — КМС'],['KMS-MS','КМС — МС'],['MS-MSMK','МС — МСМК'],['II-MS','II разряд — МС'],['intermediate','Средний']].map(([id,label]) => ({ id, label }))} />
             <PopupSelect label="Цель тренировок" value={goal} onChange={setGoal} options={[['strength','Сила'],['mass','Мышечная масса'],['endurance','Выносливость'],['peak','Выход на пик'],['mixed','Смешанная']].map(([id,label]) => ({ id, label }))} />
             <PopupSelect label="Направление" value={dir} onChange={setDir} options={[['powerlifting','Троеборье'],['bench','Жим лёжа'],['deadlift_bench','Тяга + Жим'],['armwrestling','Армрестлинг']].map(([id,label]) => ({ id, label }))} />
@@ -753,14 +760,14 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               </>
             );
           })()}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginTop: 8, minWidth: 0 }}>
             <PopupSelect label="Длина мезоцикла" value={String(cycleWeeks)} onChange={v => setCycleWeeks(+v)} options={[['12','12 недель'],['16','16 недель'],['20','20 недель'],['24','24 недели']].map(([id,label]) => ({ id, label }))} />
           </div>
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: ACCENT }}>🎯 Слабые группы мышц (ПЛ + ББ-акцент, сохраняются в профиль)</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2, marginBottom: 4 }}>
             💪 Добавляются accessory-упражнения в 1-2 дня (малые → 2 дня: тяжёлый + памп).
           </div>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6 }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)" }}>{l}{on ? " ✓" : ""}</button>; })}</div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6, minWidth: 0, maxWidth: '100%' }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)", minWidth: 0, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l}{on ? " ✓" : ""}</button>; })}</div>
           {/* 📅 Выбор дней для слабых групп — авто-распределение если не выбрано */}
           {weakPoints.length > 0 && (() => {
             const tpl = getCycleById(selectedCycleId);
@@ -774,7 +781,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   return (
                     <div key={wg} style={{ marginBottom: 6 }}>
                       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 3 }}>{WEAK_GROUP_LABELS_RU[wg] || wg}{days.length > 0 ? ` → день ${days.join(', ')}` : ' → авто (малые: 2 дня, крупные: 1 день)'}</div>
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
                         {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => {
                           const on = days.includes(d);
                           return <button key={d} onClick={() => toggleDayInMap(wg, d, 'wg')} style={{ padding:'4px 10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', border: on ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}>{'Д' + d}{on ? ' ✓' : ''}</button>;
@@ -806,10 +813,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             return PL_WEAKPOINT_OPTIONS.map((opt) => (
             <div key={opt.lift} style={{ marginTop: 4 }}>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>{opt.lift === 'bench' ? 'Жим лёжа' : opt.lift === 'squat' ? 'Присед' : opt.lift === 'deadlift' ? 'Становая' : opt.lift === 'ohp' ? 'Жим стоя' : opt.lift === 'row' ? 'Тяга в наклоне' : opt.lift === 'pulldown' ? 'Тяга верхн. блока' : opt.lift === 'incline_press' ? 'Жим на наклонной' : opt.lift}</div>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", minWidth: 0, maxWidth: '100%' }}>
                 {opt.weakPoints.map((wp) => {
                   const on = plWeakPoints.some(x => x.lift === opt.lift && x.weakPoint === wp.id);
-                  return <button key={wp.id} onClick={() => togglePlWeak(opt.lift as Lift, wp.id as WeakPoint)} style={{ padding: "5px 9px", borderRadius: 12, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid #8b5cf6" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.02)", color: on ? "#8b5cf6" : "rgba(255,255,255,0.6)" }}>{wp.label}{on ? " ✓" : ""}</button>;
+                  return <button key={wp.id} onClick={() => togglePlWeak(opt.lift as Lift, wp.id as WeakPoint)} style={{ padding: "5px 9px", borderRadius: 12, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid #8b5cf6" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.02)", color: on ? "#8b5cf6" : "rgba(255,255,255,0.6)", minWidth: 0, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{wp.label}{on ? " ✓" : ""}</button>;
                 })}
               </div>
             </div>
@@ -827,9 +834,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   const mapKey = `${wp.lift}|${wp.weakPoint}`;
                   const days = plWeakPointDayMap[mapKey] || [];
                   return (
-                    <div key={mapKey} style={{ marginBottom: 6 }}>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 3 }}>{liftLabelMap[wp.lift] || wp.lift} · {wp.weakPoint}{days.length > 0 ? ` → день ${days.join(', ')}` : ' → авто (2 дня: тяжёлый + памп)'}</div>
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    <div key={mapKey} style={{ marginBottom: 6, minWidth: 0, maxWidth: '100%' }}>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis' }}>{liftLabelMap[wp.lift] || wp.lift} · {wp.weakPoint}{days.length > 0 ? ` → день ${days.join(', ')}` : ' → авто (2 дня: тяжёлый + памп)'}</div>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
                         {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => {
                           const on = days.includes(d);
                           return <button key={d} onClick={() => toggleDayInMap(mapKey, d, 'pw')} style={{ padding:'4px 10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', border: on ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#8b5cf6' : 'rgba(255,255,255,0.6)' }}>{'Д' + d}{on ? ' ✓' : ''}</button>;
@@ -1452,6 +1459,7 @@ legs: [
              <PopupNumber label="Недель мезоцикла" value={bbWeeks} min={4} max={24} suffix=" нед" onChange={v => setBbWeeks(v)} />
              <PopupSelect label="Цель по объёму" value={bbVolGoal} onChange={setBbVolGoal} options={[['mev','Минимум (MEV)'],['mav','Оптимум (MAV)'],['mrv','Максимум (MRV)']].map(([id,label]) => ({ id, label }))} />
               <PopupSelect label="Группа фокуса" value={bbFocus} onChange={setBbFocus} options={[{ id: '', label: 'Нет' }, ...WEAK_GROUPS.map(([id,l]) => ({ id, label: l }))]} />
+              <PopupSelect label="Training focus (RIR)" value={bbTrainingFocus} onChange={(v) => setBbTrainingFocus(v as 'strength' | 'hypertrophy' | 'endurance')} options={[['strength','Сила (RIR 1-2)'],['hypertrophy','Гипертрофия (RIR 2-3)'],['endurance','Выносливость (RIR 3-4)']].map(([id,label]) => ({ id, label }))} />
            </div>
 
           {bbBest && <ExpandableCard title={'🏆 Рекомендован: ' + bbBest.pattern.name} icon='🏆' short={bbBest.pattern.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот сплит:</b> {explainBBSelection(bbBest)}</div><button onClick={buildBb} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,var(--accent),#00c853)', color: '#000', fontWeight: 700, fontSize: 12 }}>✅ Применить сплит и собрать план</button></>} />}
@@ -1468,7 +1476,7 @@ legs: [
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2, marginBottom: 4 }}>
             💪 ББ: pump-finisher (3×15 @ RIR 4) для каждой слабой группы; +accessoryCompound-первым.
           </div>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6 }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)" }}>{l}{on ? " ✓" : ""}</button>; })}</div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6, minWidth: 0, maxWidth: '100%' }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)", minWidth: 0, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l}{on ? " ✓" : ""}</button>; })}</div>
           <button style={{ ...BTN, width: '100%', marginTop: 10 }} onClick={buildBb}>Сгенерировать BB-план ({bbWeeks} нед)</button>
           {builtBb && Array.isArray(builtBb.weeks) && builtBb.weeks.length > 0 && (() => {
             const W = builtBb.weeks;
@@ -1737,7 +1745,7 @@ legs: [
 
       {subView === 'macro' && <MacrocyclePanel level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyCycle={(cycleId, weeks) => {
         if (mainTab === 'bb') {
-          // ББ-авто: применить длительность макроцикла + перестроить план с фазами из макроцикла.
+          // ББ-авто: применить длительность макроцикла + фазы (объём/RIR по 5 фазам) к плану.
           try {
             const raw = localStorage.getItem('he_pl_macro');
             if (!raw) { setSubView('plan'); return; }
@@ -1745,8 +1753,31 @@ legs: [
             if (!macro) { setSubView('plan'); return; }
             // Применить длительность макроцикла к bbWeeks и пересобрать план.
             setBbWeeks(macro.totalWeeks);
-            // Запустить пересборку ББ-плана с новой длительностью.
-            setTimeout(() => { try { buildBb(); } catch { /* ignore */ } }, 50);
+            // Запустить пересборку ББ-плана с новой длительностью + фазовой модуляцией.
+            setTimeout(() => {
+              try {
+                if (bbBest) {
+                  const profData = linked.profile?.settings?.personal;
+                  const lifeData = linked.profile?.settings?.lifestyle;
+                  const bodyFat = profData?.bodyFat;
+                  const leanMass = (profData?.weight && bodyFat != null) ? Math.round(profData.weight * (1 - bodyFat / 100)) : undefined;
+                  const plan = buildBBPlan({
+                    patternId: bbBest.pattern.id, level: bbLevel, goal: bbGoal as any, weeks: macro.totalWeeks,
+                    workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any,
+                    trainingFocus: bbTrainingFocus,
+                    bodyFat, leanMass, hrvMs: lifeData?.morningHRV, sleepHours: lifeData?.sleepHours, stressLevel: lifeData?.stressLevel,
+                  }, pedAdapt);
+                  // Применить фазы макроцикла (5 фаз: endurance/strength/peak/competition/transition)
+                  // → перераспределение объёма/RIR по неделям.
+                  const phased = applyMacrocycleToBBPlan(plan, macro);
+                  setBuiltBb(phased);
+                  setBbWeekSel(1);
+                  try { const sessions = bbPlanToSessions(phased); saveBridgeSessions(sessions); } catch { /* ignore */ }
+                } else {
+                  buildBb();
+                }
+              } catch { buildBb(); }
+            }, 50);
           } catch { /* ignore */ }
           setSubView('plan');
         } else {

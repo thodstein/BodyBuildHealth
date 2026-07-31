@@ -89,23 +89,23 @@ export const PlannerToolsPanel: React.FC<{ mode: 'pl' | 'bb' }> = ({ mode }) => 
   const [openId, setOpenId] = useState<string | null>(null);
   const tools = TOOLS[mode] || [];
   return (
-    <div style={{ marginTop: 10 }}>
-      <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)', margin: '12px 0 6px', textTransform: 'uppercase', letterSpacing: 0.3 }}>
+    <div style={{ marginTop: 6, minWidth: 0, maxWidth: '100%' }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)', margin: '8px 0 4px', textTransform: 'uppercase', letterSpacing: 0.3 }}>
         🔧 Инструменты планирования ({tools.length})
       </div>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8, lineHeight: 1.4 }}>
         {TITLE_RU[mode]} — раскройте нужный инструмент, он откроется прямо здесь. Каждый имеет кнопку «🛠 Применить к планировщику».
       </div>
       {tools.map(t => {
         const open = openId === t.id;
         return (
-          <div key={t.id} style={{ background: 'rgba(24,24,27,0.5)', borderRadius: 10, border: '1px solid rgba(0,230,138,0.12)', margin: '6px 0', overflow: 'hidden' }}>
-            <button onClick={() => setOpenId(open ? null : t.id)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff', textAlign: 'left' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#00e68a' }}>{t.icon} {t.title}</span>
-              <span style={{ fontSize: 10, color: '#00e68a' }}>{open ? '▲' : '▼'}</span>
+          <div key={t.id} style={{ background: 'rgba(24,24,27,0.5)', borderRadius: 10, border: '1px solid rgba(0,230,138,0.12)', margin: '6px 0', overflow: 'hidden', minWidth: 0, maxWidth: '100%' }}>
+            <button onClick={() => setOpenId(open ? null : t.id)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff', textAlign: 'left', minHeight: 38, minWidth: 0 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#00e68a', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>{t.icon} {t.title}</span>
+              <span style={{ fontSize: 10, color: '#00e68a', flexShrink: 0, marginLeft: 8 }}>{open ? '▲' : '▼'}</span>
             </button>
-            {!open && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', padding: '0 12px 8px' }}>{t.short}</div>}
-            {open && <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: 4 }}>{t.render()}</div>}
+            {!open && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', padding: '0 12px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.short}</div>}
+            {open && <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: 4, minWidth: 0, maxWidth: '100%', overflowX: 'hidden' }}>{t.render()}</div>}
           </div>
         );
       })}

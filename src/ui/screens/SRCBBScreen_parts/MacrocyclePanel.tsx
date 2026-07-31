@@ -156,17 +156,26 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 const v = e.target.value as 'powerlifting' | 'bodybuilding' | 'general';
                 if (onGoalChange) onGoalChange(v);
                 else setLocalGoal(v);
-                // Сбросить cycleId в соревнованиях, не подходящих под новое направление.
+                // Сбросить cycleId/cycleIds в соревнованиях, не подходящих под новое направление.
                 const newWantStrength = v === 'powerlifting';
                 const newWantBB = v === 'bodybuilding';
-                setCompetitions(prev => prev.map(comp => {
-                  if (!comp.cycleId) return comp;
-                  const cyc = getCycleById(comp.cycleId);
-                  if (!cyc) return { ...comp, cycleId: undefined }; // удалён — сбросить
+                const dropBad = (cid?: string): string | undefined => {
+                  if (!cid) return undefined;
+                  const cyc = getCycleById(cid);
+                  if (!cyc) return undefined;
                   const nd = normalizeCycleDirection(cyc.meta.direction);
-                  if (newWantStrength && nd !== 'strength') return { ...comp, cycleId: undefined };
-                  if (newWantBB && nd !== 'bodybuilding') return { ...comp, cycleId: undefined };
-                  return comp;
+                  if (newWantStrength && nd !== 'strength') return undefined;
+                  if (newWantBB && nd !== 'bodybuilding') return undefined;
+                  return cid;
+                };
+                setCompetitions(prev => prev.map(comp => {
+                  const cleanCycleIds = comp.cycleIds
+                    ? (comp.cycleIds.map(dropBad).filter((x): x is string => Boolean(x)))
+                    : undefined;
+                  const cleanCycleId = cleanCycleIds && cleanCycleIds.length > 0
+                    ? cleanCycleIds[0]
+                    : dropBad(comp.cycleId);
+                  return { ...comp, cycleId: cleanCycleId, cycleIds: cleanCycleIds && cleanCycleIds.length > 0 ? cleanCycleIds : undefined };
                 }));
               }}>
               <option value="powerlifting">Пауэрлифтинг</option>
@@ -242,27 +251,86 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: 4, minHeight: 32 }}
                   title="Удалить">✕</button>
               </div>
-              {/* Селектор цикла для peak/competition фаз (только для A и B, не C) */}
+              {/* Мульти-цикл: список циклов для пика соревнования (только A и B).
+                  Пользователь может назначить несколько циклов — пик делится на под-блоки. */}
               {c.priority !== 'C' && (
-                <div style={{ display: 'flex', gap: 4, marginBottom: 6, alignItems: 'center' }}>
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>Цикл:</span>
-                  <select
-                    style={{ ...IN, padding: '4px 6px', fontSize: 9, minHeight: 28, flex: 1 }}
-                    value={c.cycleId ?? ''}
-                    onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, cycleId: e.target.value || undefined } : cc))}
-                    title={filteredCycles.length === 0 ? 'Нет циклов под выбранное направление' : 'Выберите СРЦ-цикл для пика этого соревнования'}
-                  >
-                    <option value="">Авто ({filteredCycles.length} циклов)</option>
-                    {filteredCycles.map(cyc => (
-                      <option key={cyc.meta.id} value={cyc.meta.id}>
-                        {cyc.meta.title} ({cyc.meta.level}, {cyc.meta.sessionsPerWeek}д/нед, {cyc.meta.weeks}нед)
-                      </option>
-                    ))}
-                  </select>
-                  {levelMismatch && (
-                    <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, flexShrink: 0 }}
-                      title={`Уровень цикла (${selectedCycle!.meta.level}) не совпадает с выбранным (${effLevel}). Возможна неоптимальная нагрузка.`}>⚠</span>
-                  )}
+                <div style={{ marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>
+                      Циклы на пик: {((c.cycleIds && c.cycleIds.length > 0) ? c.cycleIds.length : (c.cycleId ? 1 : 0))}
+                    </span>
+                    <button
+                      onClick={() => {
+                        // Добавить ещё один цикл (по умолчанию — пустой = автоподбор)
+                        const current = c.cycleIds && c.cycleIds.length > 0
+                          ? c.cycleIds
+                          : (c.cycleId ? [c.cycleId] : []);
+                        setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, cycleIds: [...current, ''] } : cc));
+                      }}
+                      style={{ ...BTN_GHOST, padding: '2px 6px', fontSize: 9, minHeight: 22, lineHeight: 1 }}
+                      title="Добавить ещё один цикл на пик"
+                    >+ Цикл</button>
+                  </div>
+                  {(() => {
+                    // Список циклов: либо cycleIds[] (новое), либо [cycleId] (legacy) для отображения
+                    const list: string[] = c.cycleIds && c.cycleIds.length > 0
+                      ? c.cycleIds
+                      : (c.cycleId ? [c.cycleId] : []);
+                    // Если list пустой — показать один пустой селектор (автоподбор)
+                    const display = list.length > 0 ? list : [''];
+                    return display.map((cid, k) => {
+                      const sel = cid ? getCycleById(cid) : undefined;
+                      const mismatch = sel && sel.meta.level !== effLevel;
+                      return (
+                        <div key={k} style={{ display: 'flex', gap: 4, marginBottom: 3, alignItems: 'center' }}>
+                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', minWidth: 14, textAlign: 'center' }}>{k + 1}.</span>
+                          <select
+                            style={{ ...IN, padding: '3px 6px', fontSize: 9, minHeight: 26, flex: 1 }}
+                            value={cid}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setCompetitions(competitions.map((cc, j) => {
+                                if (j !== i) return cc;
+                                const cur = cc.cycleIds && cc.cycleIds.length > 0
+                                  ? [...cc.cycleIds]
+                                  : (cc.cycleId ? [cc.cycleId] : ['']);
+                                cur[k] = val;
+                                const cleaned = cur.filter((x): x is string => Boolean(x));
+                                return { ...cc, cycleIds: cleaned.length > 0 ? cleaned : undefined, cycleId: cleaned[0] };
+                              }));
+                            }}
+                            title={filteredCycles.length === 0 ? 'Нет циклов под выбранное направление' : 'Цикл на под-фазу пика'}
+                          >
+                            <option value="">Авто</option>
+                            {filteredCycles.map(cyc => (
+                              <option key={cyc.meta.id} value={cyc.meta.id}>
+                                {cyc.meta.title} ({cyc.meta.level}, {cyc.meta.sessionsPerWeek}д/нед, {cyc.meta.weeks}нед)
+                              </option>
+                            ))}
+                          </select>
+                          {mismatch && (
+                            <span style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700 }}
+                              title={`Уровень цикла не совпадает с ${effLevel}`}>⚠</span>
+                          )}
+                          {display.length > 1 && (
+                            <button
+                              onClick={() => {
+                                setCompetitions(competitions.map((cc, j) => {
+                                  if (j !== i) return cc;
+                                  const cur = (cc.cycleIds && cc.cycleIds.length > 0 ? [...cc.cycleIds] : (cc.cycleId ? [cc.cycleId] : []));
+                                  cur.splice(k, 1);
+                                  const cleaned = cur.filter((x): x is string => Boolean(x));
+                                  return { ...cc, cycleIds: cleaned.length > 0 ? cleaned : undefined, cycleId: cleaned[0] };
+                                }));
+                              }}
+                              style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: 2, minHeight: 22, lineHeight: 1 }}
+                              title="Удалить цикл"
+                            >✕</button>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               )}
             </div>

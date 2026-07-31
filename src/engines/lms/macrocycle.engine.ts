@@ -36,8 +36,11 @@ export interface CompetitionEvent {
   date?: string;             // ISO-дата (опционально)
   priority: 'A' | 'B' | 'C'; // A — главное, B — отборочное/контрольное, C — тренировочное
   notes?: string;
-  /** ID СРЦ-цикла для peak/competition фаз этого соревнования. Если не задан — автоподбор. */
+  /** ID СРЦ-цикла для peak/competition фаз (обратно-совместимый, первый/основной цикл). */
   cycleId?: string;
+  /** Список ID СРЦ-циклов (несколько циклов на одно соревнование, последовательно по неделям пика).
+   *  Если задан — пик делится на под-блоки, каждому присваивается свой cycleId по индексу. */
+  cycleIds?: string[];
 }
 
 export interface Macrocycle {
@@ -224,11 +227,29 @@ export function buildMacrocycleMulti(events: CompetitionEvent[], input: Omit<Mac
         pushPhaseBlock('strength', gap);
       }
     }
-    // Peak блок (привязан к соревнованию) — ровно до comp.week
-    pushPhaseBlock('peak', effPeakWeeks, comp.id);
-    // Competition блок (1 неделя) — ровно на comp.week
-    pushPhaseBlock('competition', compWeeks, comp.id);
-    rationale.push(`🏁 «${comp.name}» (${comp.priority}, нед ${comp.week}): peak ${effPeakWeeks} нед + competition ${compWeeks} нед.`);
+    // Peak блок (привязан к соревнованию) — ровно до comp.week.
+    // Если задан comp.cycleIds[] (multi-cycle, ≥1 элемент) — пик делится на под-блоки по числу циклов.
+    // Если cycleIds = [single] — один под-блок с этим циклом.
+    const compCycles = comp.cycleIds && comp.cycleIds.length > 0
+      ? comp.cycleIds.filter((cid): cid is string => Boolean(cid))
+      : null;
+    if (compCycles && compCycles.length > 0 && effPeakWeeks >= compCycles.length) {
+      // Равномерно распределяем недели пика по циклам.
+      const base = Math.floor(effPeakWeeks / compCycles.length);
+      const remainder = effPeakWeeks - base * compCycles.length;
+      for (let ci = 0; ci < compCycles.length; ci++) {
+        const subWeeks = base + (ci < remainder ? 1 : 0);
+        if (subWeeks <= 0) continue;
+        pushPhaseBlock('peak', subWeeks, comp.id, compCycles[ci]);
+      }
+      // cursor уже обновлён внутри pushPhaseBlock — продолжаем как обычно.
+    } else {
+      pushPhaseBlock('peak', effPeakWeeks, comp.id);
+    }
+    // Competition блок (1 неделя) — ровно на comp.week. Берём первый цикл из comp.cycleIds[] или comp.cycleId.
+    const compWeekCycle = compCycles && compCycles.length > 0 ? compCycles[0] : comp.cycleId;
+    pushPhaseBlock('competition', compWeeks, comp.id, compWeekCycle);
+    rationale.push(`🏁 «${comp.name}» (${comp.priority}, нед ${comp.week}): peak ${effPeakWeeks} нед${compCycles && compCycles.length > 1 ? ` (${compCycles.length} циклов)` : ''} + competition ${compWeeks} нед.`);
 
     // После главного (A) соревнования — переход (transition) 2-4 нед, если не последнее.
     if (isMain && !isLast) {
@@ -274,16 +295,17 @@ export function buildMacrocycleMulti(events: CompetitionEvent[], input: Omit<Mac
   };
 
   // Вспомогательная функция — добавить блок фазы.
-  function pushPhaseBlock(phase: MacroPhase, weeks: number, competitionId?: string): void {
+  // forceCycleId: если задан — используется вместо comp.cycleId/автоподбора (для multi-cycle).
+  function pushPhaseBlock(phase: MacroPhase, weeks: number, competitionId?: string, forceCycleId?: string): void {
     if (weeks <= 0) return;
     const isBB = goal === 'bodybuilding' && (phase === 'endurance' || phase === 'strength' || phase === 'transition');
     const kind: CycleKind = isBB ? 'BB' : 'SRC';
     let cycleId: string | undefined;
     let desc = '';
     if (kind === 'SRC') {
-      // Для peak/competition фаз: проверить, есть ли пользовательский cycleId в соревновании.
+      // Приоритет: forceCycleId (multi-cycle) > comp.cycleId (обратно-совместимый) > автоподбор.
       const comp = competitionId ? sorted.find(c => c.id === competitionId) : undefined;
-      const userCycleId = comp?.cycleId;
+      const userCycleId = forceCycleId ?? comp?.cycleId;
       if (userCycleId) {
         // Пользователь выбрал конкретный цикл — всегда используем его (уважаем выбор).
         const cyc = getCycleById(userCycleId);
@@ -374,7 +396,10 @@ export function serializeMacro(macro: Macrocycle): string {
     t: macro.totalWeeks,
     c: macro.competitionWeek ?? null,
     d: macro.competitionDate ?? null,
-    e: macro.competitions ?? null, // новые: список соревнований
+    e: macro.competitions ? macro.competitions.map(co => [
+      co.id, co.name, co.week, co.date ?? null, co.priority, co.notes ?? null,
+      co.cycleId ?? null, co.cycleIds ?? null, // v4: cycleIds (массив)
+    ]) : null, // список соревнований (компактный массив)
     r: macro.rationale,
   });
 }
@@ -395,15 +420,33 @@ export function deserializeMacro(s: string): Macrocycle | null {
     // Десериализация competitions (опционально, для обратно-совместимости)
     let competitions: CompetitionEvent[] | undefined;
     if (Array.isArray(o.e)) {
-      competitions = o.e.map((ev: any) => ({
-        id: ev.id ?? ev.i ?? 'comp_' + Math.random().toString(36).slice(2, 8),
-        name: ev.name ?? ev.n ?? '',
-        week: ev.week ?? ev.w ?? 1,
-        date: ev.date ?? ev.d,
-        priority: ev.priority ?? ev.p ?? 'B',
-        notes: ev.notes ?? ev.no,
-        cycleId: ev.cycleId ?? ev.ci ?? ev.cy, // v3: cycleId соревнования
-      }));
+      competitions = o.e.map((ev: any) => {
+        // Поддержка двух форматов:
+        // v4+ (компактный массив): [id, name, week, date, priority, notes, cycleId, cycleIds]
+        // v3- (объект): { id, name, week, date, priority, notes, cycleId, cycleIds }
+        if (Array.isArray(ev)) {
+          return {
+            id: ev[0] ?? 'comp_' + Math.random().toString(36).slice(2, 8),
+            name: ev[1] ?? '',
+            week: ev[2] ?? 1,
+            date: ev[3] ?? undefined,
+            priority: ev[4] ?? 'B',
+            notes: ev[5] ?? undefined,
+            cycleId: ev[6] ?? undefined,
+            cycleIds: Array.isArray(ev[7]) ? ev[7] : undefined, // v4: cycleIds
+          };
+        }
+        return {
+          id: ev.id ?? ev.i ?? 'comp_' + Math.random().toString(36).slice(2, 8),
+          name: ev.name ?? ev.n ?? '',
+          week: ev.week ?? ev.w ?? 1,
+          date: ev.date ?? ev.d,
+          priority: ev.priority ?? ev.p ?? 'B',
+          notes: ev.notes ?? ev.no,
+          cycleId: ev.cycleId ?? ev.ci ?? ev.cy, // v3: cycleId соревнования
+          cycleIds: Array.isArray(ev.cycleIds) ? ev.cycleIds : undefined, // v4: cycleIds
+        };
+      });
     }
     return {
       blocks,

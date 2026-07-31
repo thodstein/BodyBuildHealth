@@ -409,14 +409,15 @@ describe('ФАЗА 3.3: weightModFor — evidence-based', () => {
       weakPoints: [],
     });
     expect(plan).toBeDefined();
-    // Находим наклонный жим в плане
+    // Находим наклонный жим в плане — берём МАКСИМАЛЬНЫЙ вес (compound, не pump-feeder).
     let inclineWeight = 0;
     let flatWeight = 0;
     for (const w of plan.weeks) {
       for (const s of w.sessions) {
         for (const e of s.exercises) {
-          if (/наклон|incline/i.test(e.name)) inclineWeight = e.workSets[0]?.weight || 0;
-          if (/жим.*лёж|bench.*press/i.test(e.name) && !/наклон|incline/i.test(e.name)) flatWeight = e.workSets[0]?.weight || 0;
+          const w0 = e.workSets[0]?.weight || 0;
+          if (/наклон|incline/i.test(e.name) && w0 > inclineWeight) inclineWeight = w0;
+          if (/жим.*лёж|bench.*press/i.test(e.name) && !/наклон|incline/i.test(e.name) && w0 > flatWeight) flatWeight = w0;
         }
       }
     }

@@ -19,6 +19,7 @@ import { diagnoseLift } from '../pro/lift-diagnostics.engine';
 import { computeVolumeLandmarks, getVolumeLandmarks, getAllVolumeLandmarks } from '../volume-landmarks.engine';
 import { adaptForPEDs, type PED } from '../bb/bb-ped-adaptation.engine';
 import { trueMuscleOf } from '../movement-pattern';
+import { norm } from '../norm';
 
 export interface LMSBuildInput {
   template: SRCycleTemplate;
@@ -145,8 +146,6 @@ export function extractExercises(tpl: SRCycleTemplate): string[] {
   for (const day of source) for (const ex of day.exercises) set.add(ex.name);
   return [...set];
 }
-
-function norm(s: string): string { return s.toLowerCase().replace(/ё/g, 'е'); }
 
 function pmFor(exName: string, pmMap: Record<string, number>, fallback: number): number {
   if (pmMap[exName] != null) return pmMap[exName];
@@ -276,7 +275,7 @@ function injectPLWeakPoints(
   rirBase: number,
   phaseVolMod: number,
   vrLevel: 'beginner' | 'intermediate' | 'advanced',
-  pedMrvMult: number,
+  mrvMult: number,
   plWeakPointDayMap?: Record<string, number[]>,
 ): void {
   const mainNameMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга', pulldown: 'Тяга', incline_press: 'Жим гантелей' };
@@ -340,7 +339,7 @@ function injectPLWeakPoints(
               if (eg === exGroup) cur += e.workSets.reduce((x, ws) => x + ws.sets, 0);
             }
           }
-          if (cur + sets > Math.round(ref.mrv * pedMrvMult)) continue;
+          if (cur + sets > Math.round(ref.mrv * mrvMult)) continue;
         }
         heavyDay.exercises.push({
           name: resolvedName, group: exGroup, coef: 0.7, mnosz: 1,
@@ -372,7 +371,7 @@ function injectPLWeakPoints(
                 if (eg === exGroup) cur += e.workSets.reduce((x, ws) => x + ws.sets, 0);
               }
             }
-            if (cur + sets > Math.round(ref.mrv * pedMrvMult)) continue;
+            if (cur + sets > Math.round(ref.mrv * mrvMult)) continue;
           }
           // Памп-протокол: 3×12 @ 60% 1PM, RIR 3
           const pumpPct = 0.60;
@@ -472,7 +471,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   let acwrVolMod = 1, acwrRirShift = 0, acwrDeload = false;
   if (acwrZone === 'dangerous') { acwrVolMod = 0.65; acwrRirShift = 2; acwrDeload = true; }
   else if (acwrZone === 'caution') { acwrVolMod = 0.85; acwrRirShift = 1; }
-  else if (acwrZone === 'undertrained') { acwrVolMod = 1.1; }
+  else if (acwrZone === 'undertrained') { acwrVolMod = 1.1; } // Растренированность: стимул +10% объёма без RIR-shift (восстановление через объём, не интенсивность).
 
   // Авторегуляция: если передана — применяется к весам (topSetPctMultiplier) и объёму/RIR.
   const ar = input.autoReg;
@@ -728,8 +727,17 @@ function applyPLTaper(weeks: LMSPlanWeek[], totalWeeks: number): LMSPlanWeek[] {
   const prevIdx = lastIdx - 1;
   if (prevIdx < 0) return weeks;
 
+  const weekVolume = (wk: LMSPlanWeek): number => {
+    let v = 0;
+    for (const d of wk.days) for (const e of d.exercises) for (const ws of e.workSets) v += ws.sets;
+    return v;
+  };
+  const refVolume = prevIdx > 0 ? weekVolume(weeks[prevIdx - 1]) : 0;
+
   return weeks.map((wk, idx) => {
     if (idx !== prevIdx && idx !== lastIdx) return wk;
+    // Guard: если неделя уже low-volume (< 60% от предыдущей) — не применять taper.
+    if (refVolume > 0 && weekVolume(wk) < refVolume * 0.6) return wk;
     const volumeMult = idx === prevIdx ? 0.65 : 0.45;
     const rirAdd = idx === prevIdx ? 1 : 2;
     const newDays = wk.days.map(d => ({
@@ -743,7 +751,6 @@ function applyPLTaper(weeks: LMSPlanWeek[], totalWeeks: number): LMSPlanWeek[] {
         })),
       })),
     }));
-    // Пересчёт метрик
     for (const d of newDays) {
       const metricsEx: SRExercise[] = d.exercises.map(pe => ({
         name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,

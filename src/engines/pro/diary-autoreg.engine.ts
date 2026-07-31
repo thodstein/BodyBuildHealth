@@ -18,6 +18,7 @@
  */
 import type { WorkoutLog, StrengthLogEntry } from '../../core/types';
 import { rpeFromLoad, loadForRPE } from './autoregulation-pro.engine';
+import { norm } from '../norm';
 
 export type AutoRegMode = 'off' | 'auto' | 'diary';
 
@@ -54,8 +55,6 @@ export interface DiaryAutoregResult {
   plateauWarnings: string[];
   decisions: string[];
 }
-
-function norm(s: string): string { return (s || '').toLowerCase().replace(/ё/g, 'е').trim(); }
 
 /** Epley: 1RM = w × (1 + reps/30). */
 function epley1RM(weight: number, reps: number): number {
