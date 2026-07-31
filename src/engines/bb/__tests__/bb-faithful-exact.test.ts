@@ -11,5 +11,6 @@ describe('BB faithful exact mode', () => {
     const result = finalizeBBPlan(plan, { preserveSource: true, reorder: false, phaseSafety: true, ensureMinimumVolume: true, controlledRotation: true, level: 'intermediate' });
     expect(result.weeks.map(week => week.sessions[0].exercises[0].sets)).toEqual([5, 5, 5, 5, 5]);
     expect(result.weeks[0].sessions[0].exercises).toHaveLength(1);
+    expect(result.weeks[0].sessions[0].exercises[0].rationale).toContain('final position:');
   });
 });

@@ -29,6 +29,7 @@ function expectValid(plan: ReturnType<typeof convertCycleToBBPlan>) {
   expect(plan.volumeTargets).toBeTruthy();
   for (const week of plan.weeks) for (const session of week.sessions) for (const exercise of session.exercises) {
     expect(exercise.workSets).toHaveLength(exercise.sets);
+    expect(exercise.rationale).toContain('final position:');
   }
 }
 
