@@ -74,7 +74,7 @@ export const IndividualPlanResults: React.FC = () => {
     generateFullNutritionReport, nutritionReport, activeReports,
     editItem, setEditItem, editAmount, setEditAmount, replacingItem, setReplacingItem,
     removeFoodItem, replaceFoodItem, findSimilarFoods, updateItemAmount,
-    setDayPlan, planTargets, planType, variety,
+    setDayPlan, setThreeDayPlan, planTargets, planType, variety,
     linkToTraining, trainStart,
     workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType,
     v2Phase, v2Pharma, v2Labs, histamineSensitive,
@@ -89,7 +89,7 @@ export const IndividualPlanResults: React.FC = () => {
   const [recipeDetail, setRecipeDetail] = useState<any | null>(null);
   const [calcDailyReport, setCalcDailyReport] = useState<DailyDietReport | null>(null);
   // 🟠8 — Checked shopping items state (must be at top level — Rules of Hooks)
-  const [checked, setChecked] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('he_shopping_checked') || '[]')); } catch { return new Set<string>(); } });
+  const [checked, setChecked] = useState<Set<string>>(() => { try { const v = JSON.parse(localStorage.getItem('he_shopping_checked') || '[]'); return new Set(Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []); } catch { return new Set<string>(); } });
 
   const [showCorrectPopup, setShowCorrectPopup] = useState(false);
   const [correctIssues, setCorrectIssues] = useState<{ mealIdx: number; mealName: string; issues: { type: string; text: string; severity: 'low' | 'medium' | 'high'; suggestion?: { foodId: string; name: string; reason: string }[] }[] }[] | null>(null);
@@ -299,12 +299,12 @@ export const IndividualPlanResults: React.FC = () => {
     for (let w = 0; w < 4; w++) {
       // короткий yield для UI-рендера между неделями (50мс), без расы перекрытия state.
       await new Promise<void>(r => setTimeout(() => r(), 50));
-      generatePlan(7, w);
+      try { generatePlan(7, w); } catch (e: any) { try { console.warn('[Planner] month week', w, 'failed:', e); } catch {} }
     }
     await new Promise<void>(r => setTimeout(() => r(), 50));
     setSelectedWeek(0);
     // Восстановление плана недели 0 для отображения в UI (после прохождения 4 недель)
-    generatePlan(7, 0);
+    try { generatePlan(7, 0); } catch (e: any) { try { console.warn('[Planner] month week 0 restore failed:', e); } catch {} }
   };
 
   return (
@@ -950,7 +950,7 @@ export const IndividualPlanResults: React.FC = () => {
       )}
 
       {generated && undoStack.length > 0 && (
-        <button onClick={() => { setDayPlan(undoStack[0]); setUndoStack(undoStack.slice(1)); }} style={{ width:'100%', padding:'8px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:10, fontWeight:600 }}>
+        <button onClick={() => { const snap = undoStack[0]; if (snap) { if ('dayPlan' in snap) setDayPlan(snap.dayPlan); if ('threeDayPlan' in snap) setThreeDayPlan(snap.threeDayPlan); if ('weekPlan' in snap) setWeekPlan(snap.weekPlan); setUndoStack(undoStack.slice(1)); } }} style={{ width:'100%', padding:'8px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:10, fontWeight:600 }}>
           ↩ Отменить ({undoStack.length})
         </button>
       )}

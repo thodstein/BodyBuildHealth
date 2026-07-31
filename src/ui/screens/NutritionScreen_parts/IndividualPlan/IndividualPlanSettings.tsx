@@ -19,7 +19,7 @@ import { getRecipes, type Recipe } from '../../../../engines/nutrition-periodiza
 const SETTINGS_SECTIONS_KEY = 'he_plan_settings_collapsed';
 const useCollapsedSections = () => {
   const [collapsed, setCollapsed] = React.useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem(SETTINGS_SECTIONS_KEY) || '[]')); } catch { return new Set(); }
+    try { const v = JSON.parse(localStorage.getItem(SETTINGS_SECTIONS_KEY) || '[]'); return new Set(Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []); } catch { return new Set(); }
   });
   const toggle = (id: string) => setCollapsed(prev => {
     const next = new Set(prev);
@@ -153,7 +153,7 @@ export const IndividualPlanSettings: React.FC = () => {
   const [specialMealNotes, setSpecialMealNotes] = useState('');
   const [selectedMealToReplace, setSelectedMealToReplace] = useState('');
   const [specialMeals, setSpecialMeals] = useState<{ type: string; typeLabel: string; date: string; notes: string; replaceMeal?: string }[]>(() => {
-    try { return JSON.parse(localStorage.getItem('he_special_meals') || '[]'); } catch { return []; }
+    try { const v = JSON.parse(localStorage.getItem('he_special_meals') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
   });
   const [showSexPicker, setShowSexPicker] = useState(false);
   const [showTrainTypePicker, setShowTrainTypePicker] = useState(false);
@@ -2240,7 +2240,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 const isHeavy = trainingDays[idx];
                 return (
                   <button key={idx} onClick={() => {
-                    setTrainingDays(trainingDays.map((_, i) => i === idx));
+                    setTrainingDays(trainingDays.map((d, i) => i === idx ? !d : d));
                   }} style={{
                     width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
                     border: isHeavy ? '2px solid #22c55e' : '2px solid #3f3f46',

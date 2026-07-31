@@ -61,7 +61,7 @@ export function readJSONSafe<T>(key: string, fallback: T, validate: (v: any) => 
 
 /** Run once on app load. Wipes localStorage keys whose JSON shape no longer matches the
  *  expected schema. Prevents old-version corruption from breaking the planner. */
-export const PLANNER_SCHEMA_VERSION = 4;
+export const PLANNER_SCHEMA_VERSION = 5;
 export function migratePlannerStorage(): void {
   try {
     const vRaw = localStorage.getItem('he_planner_schema_version');
@@ -77,6 +77,7 @@ export function migratePlannerStorage(): void {
       'he_bb_category', 'he_peak_week', 'he_peak_show_day', 'he_life_stage',
       'he_surplus_pct', 'he_variety_strictness', 'he_diary_adaptation', 'he_nutrition_notes',
       'he_planner_labs', 'he_planner_pharma', 'he_planner_histamine',
+      'he_taste_profile', 'he_plan_settings_collapsed',
     ];
     let wiped = false;
     arrayKeys.forEach(k => {

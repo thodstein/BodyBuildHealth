@@ -408,12 +408,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [quickAddSearch, setQuickAddSearch] = useState('');
   const [customNotes, setCustomNotes] = useState(() => { try { return localStorage.getItem('he_nutrition_notes') || ''; } catch { return ''; } });
   // D-28: meal-bound preferred foods (e.g. rice_cream → breakfast only)
-  const [preferredByMeal, setPreferredByMeal] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('he_preferred_by_meal') || '{}'); } catch { return {}; } });
+  const [preferredByMeal, setPreferredByMeal] = useState<Record<string, string[]>>(() => { try { const v = JSON.parse(localStorage.getItem('he_preferred_by_meal') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } });
   useEffect(() => { try { localStorage.setItem('he_preferred_by_meal', JSON.stringify(preferredByMeal)); } catch {} }, [preferredByMeal]);
   // D-28+: advanced preference states
   const [specificity, setSpecificity] = useState<Specificity>(() => { try { return (localStorage.getItem('he_specificity') as Specificity) || 'varied'; } catch { return 'varied'; } });
   useEffect(() => { try { localStorage.setItem('he_specificity', specificity); } catch {} }, [specificity]);
-  const [intolerances, setIntolerances] = useState<Intolerances>(() => { try { return JSON.parse(localStorage.getItem('he_intolerances') || '{}'); } catch { return {}; } });
+  const [intolerances, setIntolerances] = useState<Intolerances>(() => { try { const v = JSON.parse(localStorage.getItem('he_intolerances') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } });
   useEffect(() => { try { localStorage.setItem('he_intolerances', JSON.stringify(intolerances)); } catch {} }, [intolerances]);
   const [tasteProfile, setTasteProfile] = useState<TasteProfile>(() => { try { const p = JSON.parse(localStorage.getItem('he_taste_profile') || '{"spicy":0,"sweet":0,"salty":0,"sour":0,"umami":0}'); return { spicy: 0, sweet: 0, salty: 0, sour: 0, umami: 0, ...p }; } catch { return { spicy: 0, sweet: 0, salty: 0, sour: 0, umami: 0 }; } });
   useEffect(() => { try { localStorage.setItem('he_taste_profile', JSON.stringify(tasteProfile)); } catch {} }, [tasteProfile]);
@@ -473,8 +473,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [suppSearch, setSuppSearch] = useState('');
   const [newRecipe, setNewRecipe] = useState({ name: '', meal: 'lunch' as string, prepTime: 10, kcal: 400, protein: 30, fat: 10, carbs: 40, ingredients: '', instructions: '', tags: '' });
   const [v2Phase, setV2Phase] = useState('LEAN_MASS');
-  const [v2Labs, setV2Labs] = useState<Record<string, string>>(() => { try { return JSON.parse(localStorage.getItem('he_planner_labs') || '{}'); } catch { return {}; } });
-  const [v2Pharma, setV2Pharma] = useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem('he_planner_pharma') || '{}'); } catch { return {}; } });
+  const [v2Labs, setV2Labs] = useState<Record<string, string>>(() => { try { const v = JSON.parse(localStorage.getItem('he_planner_labs') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } });
+  const [v2Pharma, setV2Pharma] = useState<Record<string, boolean>>(() => { try { const v = JSON.parse(localStorage.getItem('he_planner_pharma') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } });
   const [histamineSensitive, setHistamineSensitive] = useState(() => { try { return localStorage.getItem('he_planner_histamine') === 'true'; } catch { return false; } });
   useEffect(() => { try { localStorage.setItem('he_planner_labs', JSON.stringify(v2Labs)); } catch {} }, [v2Labs]);
   useEffect(() => { try { localStorage.setItem('he_planner_pharma', JSON.stringify(v2Pharma)); } catch {} }, [v2Pharma]);
@@ -949,7 +949,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           trainDurationMin: (s?.avgWorkoutMinutes || 60),
           excludedIds: (() => { const s = new Set(excludedIds); if (_mp) _mp.avoidIds.forEach((id: string) => s.add(id)); return s; })(),
           preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); if (hungerLevel >= 6) ['broccoli','cucumber','cabbage','zucchini','spinach','kale','green_bean','oats','lentils','cottage_cheese_5'].forEach((id: string) => s.add(id)); return s; })(),
-          preferredByMeal: Object.fromEntries(Object.entries(preferredByMeal).map(([k, v]) => [k, new Set(v)])),
+          preferredByMeal: Object.fromEntries(Object.entries(preferredByMeal || {}).map(([k, v]) => [k, new Set(v as string[] || [])])),
           specificity, intolerances, tasteProfile,
           categoryPref: { preferred: [], excluded: excludedCategories },
           deprioritizedIds: getDeprioritizedIds(),
@@ -1933,7 +1933,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const generateRecommendations = () => { setRecommendations(buildRecommendations({ goal, phase, weight, effectiveKcal, effectiveP, effectiveF, effectiveC, injections, linkToTraining, trainStart, trainEnd, sex, bodyFatPct, trainType, v2Phase, v2Pharma, v2Labs, histamineSensitive, generated, planDays, dayPlan, threeDayPlan, weekPlan, dietPauseMode })); };
 
-  useEffect(() => { if (generated && dayPlan) generateRecommendations(); }, [injections.length]);
+  useEffect(() => { if (generated && dayPlan) { try { generateRecommendations(); } catch (e: any) { try { console.warn('[Planner] recommendations useEffect failed:', e); } catch {} } } }, [injections.length]);
 
   const saveCurrentPlan = () => { const name = prompt('Название плана:', `${new Date().toLocaleDateString('ru-RU')} · ${Math.round(dayPlan?.totals?.kcal || 0)} ккал`); if (name === null) return; const plan: SavedPlan = { id: Date.now(), date: new Date().toISOString().split('T')[0], name, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc }; const updated = [plan, ...savedPlans.filter(p => p.id !== plan.id)].slice(0, 10); setSavedPlans(updated); if (!safeWriteJSON('he_saved_nutrition_plans', updated)) { try { console.warn('[Planner] saved plans not saved (quota?)'); } catch {} } };
 
@@ -1966,7 +1966,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     } catch(e) { try { console.error('Report failed:', e); } catch {} }
   };
   // D-26: auto-run drug-compat check when the plan changes (live food-drug warnings).
-  useEffect(() => { generateDrugCompatReport(); }, [dayPlan, injections, v2Pharma, phase, takenSupplements]);
+  useEffect(() => { try { generateDrugCompatReport(); } catch (e: any) { try { console.warn('[Planner] drug-compat report failed:', e); } catch {} } }, [dayPlan, injections, v2Pharma, phase, takenSupplements]);
   // D-25: auto-generate the report (without archiving) whenever the day plan changes,
   // so the dietology scorecard in the day card is live without opening the Отчёт tab.
   useEffect(() => { if (dayPlan) generateFullNutritionReport(dayPlan, false); }, [dayPlan]);

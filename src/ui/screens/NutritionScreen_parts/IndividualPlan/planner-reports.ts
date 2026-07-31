@@ -155,25 +155,26 @@ export function generateDrugCompatReportPure(input: DrugCompatInput): { interact
     if (!/творог|молоко|сыр|kefir|dairy|cheese|tofu|сардин|sardines|кальц/i.test(allFoodNames)) warnings.push('🟠 ПКТ + ингибиторы ароматазы → деминерализация костей. Увеличьте Ca (1200 мг): творог, сыр, сардины.');
   }
 
-  if (input.takenSupplements.some(s => s.includes('statin') || s.includes('atorva') || s.includes('rosuva') || s.includes('simva'))) {
+  const supps = input.takenSupplements || [];
+  if (supps.some(s => s.includes('statin') || s.includes('atorva') || s.includes('rosuva') || s.includes('simva'))) {
     if (/грейпфрут|grapefruit/i.test(allFoodNames)) warnings.push('💊 Статины + грейпфрут: ингибирование CYP3A4 → риск рабдомиолиза. Исключите грейпфрут!');
   }
-  if (input.takenSupplements.some(s => s.includes('warfarin') || s.includes('варфарин'))) {
+  if (supps.some(s => s.includes('warfarin') || s.includes('варфарин'))) {
     if (/шпинат|капуст|брокколи|зелен|spinach|kale|broccoli|cabbage|green/i.test(allFoodNames)) warnings.push('💊 Варфарин + витамин K (зелень/капуста): снижение INR → риск тромбоза. Контролируйте потребление зелени.');
   }
-  if (input.takenSupplements.some(s => s.includes('enalapril') || s.includes('lisino') || s.includes('ramipril') || s.includes('telmisartan') || s.includes('losartan'))) {
+  if (supps.some(s => s.includes('enalapril') || s.includes('lisino') || s.includes('ramipril') || s.includes('telmisartan') || s.includes('losartan'))) {
     if (/банан|картоф|шпинат|авокадо|томат|potato_boiled|banana|spinach|avocado|tomato/i.test(allFoodNames)) warnings.push('💊 ACEi/ARB + калий-богатые продукты: риск гиперкалиемии. Ограничьте бананы/картофель/шпинат.');
   }
-  if (input.takenSupplements.some(s => s.includes('metformin') || s.includes('метформин'))) {
+  if (supps.some(s => s.includes('metformin') || s.includes('метформин'))) {
     if (/алкогол|пив|вин|водк|alcohol|beer|wine/i.test(allFoodNames)) warnings.push('💊 Метформин + алкоголь: риск лактатацидоза. Исключите алкоголь.');
   }
-  if (input.takenSupplements.some(s => s.includes('nebivolol') || s.includes('metoprolol') || s.includes('bisoprolol') || s.includes('carvedilol'))) {
+  if (supps.some(s => s.includes('nebivolol') || s.includes('metoprolol') || s.includes('bisoprolol') || s.includes('carvedilol'))) {
     if (/грейпфрут|grapefruit/i.test(allFoodNames)) warnings.push('💊 Бета-блокаторы + грейпфрут: потенцирование гипотензии. Исключите грейпфрут.');
   }
-  if (input.takenSupplements.some(s => s.includes('maoi') || s.includes('phenelzine') || s.includes('tranylcypromine'))) {
+  if (supps.some(s => s.includes('maoi') || s.includes('phenelzine') || s.includes('tranylcypromine'))) {
     if (/сыр|колбас|сосис|ветчин|копч|вялен|cheese|sausage|cured|smoked/i.test(allFoodNames)) warnings.push('💊 MAOI + тирамин (сыр/копчёности): риск гипертонического криза! Исключите выдержанные сыры и копчёности.');
   }
-  if (input.takenSupplements.some(s => s.includes('finasteride') || s.includes('dutasteride') || s.includes('финастерид'))) {
+  if (supps.some(s => s.includes('finasteride') || s.includes('dutasteride') || s.includes('финастерид'))) {
     warnings.push('💊 Финастерид/Дутастерид: избегать контакта беременных с препаратом. Хранить отдельно.');
   }
 
