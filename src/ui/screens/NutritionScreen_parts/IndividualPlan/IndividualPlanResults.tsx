@@ -423,7 +423,7 @@ export const IndividualPlanResults: React.FC = () => {
           <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
             <button onClick={() => {
               const txt = dayPlan ? `🍽 План питания\n${dayPlan.meals.map((m: any) => `${m.time} ${m.label}: ${m.items.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}  [${Math.round(m.totals?.kcal || 0)}ккал]`).join('\n')}\n\n📊 Итого: ${Math.round(dayPlan.totals.kcal)} ккал, Б${Math.round(dayPlan.totals.p)}/Ж${Math.round(dayPlan.totals.f)}/У${Math.round(dayPlan.totals.c)}, клетчатка ${Math.round(dayPlan.totals.fiber||0)}г${(dayPlan as any).healthScore ? `\n\n🩺 Health-score: ${(dayPlan as any).healthScore.score}/100 (${(dayPlan as any).healthScore.status}) — микро ${(dayPlan as any).healthScore.micro}/клетч ${(dayPlan as any).healthScore.fiber}/MPS ${(dayPlan as any).healthScore.mps}/EA ${(dayPlan as any).healthScore.ea}/диверс ${(dayPlan as any).healthScore.diversity}` : ''}${(dayPlan as any).energyAvailability ? `\n⚡ EA: ${(dayPlan as any).energyAvailability.ea} ккал/кг FFM (${(dayPlan as any).energyAvailability.status})` : ''}${(dayPlan as any).menstrualPhaseNote ? `\n🌸 ${(dayPlan as any).menstrualPhaseNote}` : ''}${(dayPlan as any).categoryNote ? `\n🏋 ${(dayPlan as any).categoryNote}` : ''}${(dayPlan as any).redSNote ? `\n⚠️ ${(dayPlan as any).redSNote}` : ''}${(dayPlan as any).peakWeekNote ? `\n🏆 ${(dayPlan as any).peakWeekNote}` : ''}` : '';
-              navigator.clipboard?.writeText(txt);
+              try { void navigator.clipboard?.writeText(txt); } catch { setErrorMsg('Не удалось скопировать план.'); }
             }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:10, fontWeight:600 }}>📤 Копировать</button>
             <button onClick={() => {
               const input = prompt('Вставьте план из буфера:');
@@ -431,7 +431,7 @@ export const IndividualPlanResults: React.FC = () => {
               try {
                 const parsed = JSON.parse(input);
                 if (parsed.meals) { setDayPlan(parsed); setGenerated(true); }
-              } catch { alert('Неверный формат. Скопируйте план через кнопку "Копировать план".'); }
+              } catch { setErrorMsg('Неверный формат. Скопируйте план через кнопку «Копировать».'); }
             }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:10, fontWeight:600 }}>📥 Импорт</button>
           </div>
         </GlassCard>
@@ -608,7 +608,7 @@ export const IndividualPlanResults: React.FC = () => {
         <GlassCard title={`План на день${cyclingMode !== 'none' ? (dayPlan.isTrainingDay ? ' 🏋️ Тренировочный' : ' 🛌 Отдых') : ''}`} icon="📋" color={dayPlan.isTrainingDay ? '#00e68a' : '#8b5cf6'} style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
           {dayPlan.isTrainingDay !== undefined && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>{dayPlan.isTrainingDay ? 'Тренировочный день' : 'День отдыха'}{cyclingMode !== 'none' && ` · циклирование: ${{macro:'макросы',butch:'БУЧ',cheatmeal:'читмил',carbload:'угл.загрузка'}[cyclingMode] || ''}`}{workScheduleEnabled && ` · 💼${dayPlan.isWorkDay ? ' Рабочий' : ' Выходной'}${dayPlan.isWorkDay && workStartTime ? ` ${workStartTime}-${workEndTime}` : ''}`}</div>}
           {renderMealList(dayPlan)}
-          <textarea value={dayPlanNotes} onChange={e => { setDayPlanNotes(e.target.value); localStorage.setItem('he_day_notes', e.target.value); }} placeholder="Заметки на сегодня..." style={{ width:'100%', marginTop:6, padding:'6px 10px', borderRadius:8, fontSize:9, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.85)', resize:'vertical', minHeight:30, boxSizing:'border-box' }} rows={1} />
+          <textarea value={dayPlanNotes} onChange={e => { const value = e.target.value; setDayPlanNotes(value); try { localStorage.setItem('he_day_notes', value); } catch {} }} placeholder="Заметки на сегодня..." style={{ width:'100%', marginTop:6, padding:'6px 10px', borderRadius:8, fontSize:9, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.85)', resize:'vertical', minHeight:30, boxSizing:'border-box' }} rows={1} />
           <button onClick={() => generatePlan(1, undefined, selectedDayIndex)} style={{ width:'100%', padding:'10px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, marginTop:8, marginBottom:4, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>
             🔄 Перегенерировать день
           </button>
@@ -658,8 +658,8 @@ export const IndividualPlanResults: React.FC = () => {
       {generated && planDays === 3 && threeDayPlan && (
         <GlassCard title="План на 3 дня" icon="📋" color="#00e68a" style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.1)' }}>
-            <span style={{ color: '#00e68a', fontWeight: 700 }}>📊 Всего: {Math.round(threeDayPlan.totals.kcal)} ккал</span>
-            <span style={{ color: 'rgba(255,255,255,0.85)' }}>Среднее: {Math.round(threeDayPlan.totals.kcal / 3)} ккал/день</span>
+            <span style={{ color: '#00e68a', fontWeight: 700 }}>📊 Всего: {Math.round(threeDayPlan.totals?.kcal || 0)} ккал</span>
+            <span style={{ color: 'rgba(255,255,255,0.85)' }}>Среднее: {Math.round((threeDayPlan.totals?.kcal || 0) / 3)} ккал/день</span>
           </div>
           {threeDayPlan.days.map((d: any, di: number) => {
             const dKcal = Math.round(d.totals?.kcal || 0);
@@ -707,21 +707,21 @@ export const IndividualPlanResults: React.FC = () => {
               }}>✕</button>
             </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.1)' }}>
-            <span style={{ color: '#00e68a', fontWeight: 700 }}>📊 За неделю: {Math.round(weekPlan.totals.kcal)} ккал</span>
-            <span style={{ color: 'rgba(255,255,255,0.85)' }}>Среднее: {Math.round(weekPlan.totals.kcal / 7)} ккал/день</span>
+           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.1)' }}>
+             <span style={{ color: '#00e68a', fontWeight: 700 }}>📊 За неделю: {Math.round(weekPlan.totals?.kcal || 0)} ккал</span>
+             <span style={{ color: 'rgba(255,255,255,0.85)' }}>Среднее: {Math.round((weekPlan.totals?.kcal || 0) / 7)} ккал/день</span>
           </div>
           <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 6, display: 'flex', gap: 6, justifyContent: 'center' }}>
-            <span style={{ color: '#3b82f6' }}>● Б: {Math.round(weekPlan.totals.p)}г</span>
-            <span style={{ color: '#f59e0b' }}>● Ж: {Math.round(weekPlan.totals.f)}г</span>
-            <span style={{ color: '#f97316' }}>● У: {Math.round(weekPlan.totals.c)}г</span>
+             <span style={{ color: '#3b82f6' }}>● Б: {Math.round(weekPlan.totals?.p || 0)}г</span>
+             <span style={{ color: '#f59e0b' }}>● Ж: {Math.round(weekPlan.totals?.f || 0)}г</span>
+             <span style={{ color: '#f97316' }}>● У: {Math.round(weekPlan.totals?.c || 0)}г</span>
           </div>
           <div style={{ maxHeight: 500, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
             {weekPlan.days.map((d: any, di: number) => {
-              const wKcal = Math.round(d.totals.kcal);
-              const wP = Math.round(d.totals.p);
-              const wF = Math.round(d.totals.f);
-              const wC = Math.round(d.totals.c);
+              const wKcal = Math.round(d.totals?.kcal || 0);
+              const wP = Math.round(d.totals?.p || 0);
+              const wF = Math.round(d.totals?.f || 0);
+              const wC = Math.round(d.totals?.c || 0);
               const wIsTraining = d.isTrainingDay;
               return (
                 <div key={di} onClick={() => { if (weekPlan?.days?.[di]) { setDayPlan(weekPlan.days[di]); setPlanDays(1); setSelectedDayIndex(di); } }} style={{
@@ -746,7 +746,7 @@ export const IndividualPlanResults: React.FC = () => {
                     <span style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{wKcal} ккал</span>
                   </div>
                   <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>
-                    {d.meals.map((m: any, mi: number) => (
+                    {(Array.isArray(d.meals) ? d.meals : []).map((m: any, mi: number) => (
                       <div key={mi} style={{ padding: '2px 0', display: 'flex', gap: 4 }}>
                         <span style={{ color: '#00e68a', fontWeight: 600, minWidth: 50 }}>{m.time}</span>
                         <span style={{ color: '#00e68a', minWidth: 55 }}>{m.label}</span>
@@ -765,7 +765,7 @@ export const IndividualPlanResults: React.FC = () => {
       {generated && planDays === 7 && weekPlan && planView === 'calendar' && (
         <GlassCard title="📅 Календарь питания на неделю" icon="📅" color="#a78bfa">
           {(() => {
-            const allMealLabels = Array.from(new Set(weekPlan.days.flatMap((d: any) => d.meals.map((m: any) => m.label))));
+             const allMealLabels = Array.from(new Set((Array.isArray(weekPlan.days) ? weekPlan.days : []).flatMap((d: any) => (Array.isArray(d?.meals) ? d.meals : []).map((m: any) => m.label))));
             return <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 3, fontSize: 7 }}>
                 <thead>
@@ -784,7 +784,7 @@ export const IndividualPlanResults: React.FC = () => {
                     <tr key={label}>
                       <td style={{ padding: '4px 6px', background: '#202023', borderRadius: 6, fontSize: 7, color: 'rgba(255,255,255,0.85)', fontWeight: 600, whiteSpace: 'nowrap' }}>{label}</td>
                       {weekPlan.days.map((d: any, di: number) => {
-                        const meal = d.meals.find((m: any) => m.label === label);
+                         const meal = (Array.isArray(d?.meals) ? d.meals : []).find((m: any) => m.label === label);
                         if (!meal) return <td key={di} style={{ padding: '4px', textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: 6 }}>—</td>;
                         const kcal = Math.round(meal.totals?.kcal || 0);
                         return (
@@ -793,7 +793,7 @@ export const IndividualPlanResults: React.FC = () => {
                             {(meal.items || []).slice(0, 2).map((it: any, ii: number) => (
                               <div key={ii} style={{ color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, fontSize: 6 }}>{it.name} {it.amount}г</div>
                             ))}
-                            {meal.items.length > 2 && <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 5 }}>+{meal.items.length - 2} ещё</div>}
+                             {(Array.isArray(meal.items) ? meal.items.length : 0) > 2 && <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 5 }}>+{(meal.items?.length || 0) - 2} ещё</div>}
                           </td>
                         );
                       })}
@@ -1062,7 +1062,7 @@ export const IndividualPlanResults: React.FC = () => {
             const estCost = Math.round(totalGrams / 1000 * (pricePerKg[budget] || 7));
             const exportText = allItems.map((i: any) => `${i.name} — ${i.amount >= 1000 ? `${(i.amount/1000).toFixed(1)} кг` : `${Math.round(i.amount)} г`}`).join('\n');
             // 🟠8 — Checked items state (already declared at top of component)
-            const toggleChecked = (id: string) => { setChecked(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); localStorage.setItem('he_shopping_checked', JSON.stringify([...n])); return n; }); };
+            const toggleChecked = (id: string) => { setChecked(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); try { localStorage.setItem('he_shopping_checked', JSON.stringify([...n])); } catch {} return n; }); };
             const checkedCount = allItems.filter((i: any) => checked.has(i.id)).length;
             // 🟡13 — Pack estimates
             const PACK_SIZES: Record<string, number> = { chicken_breast:500, turkey_breast:500, beef_steak:400, salmon:300, cod:400, tuna:200, egg_whole:600, egg_white:500, rice_white:900, buckwheat:800, pasta:500, oatmeal:500, potato:1000, broccoli:400, cauliflower:500, carrot:1000, tomato:500, cucumber:400, spinach:200, milk:1000, yogurt_greek:500, cottage_cheese_5:250, cheese:200, butter:200, olive_oil:500, avocado:200, nuts_almonds:200, banana:1000, apple:1000, berries:300, bread_white:500, whey_isolate:1000, casein:1000, creatine:500 };
@@ -1075,8 +1075,8 @@ export const IndividualPlanResults: React.FC = () => {
                   <div style={{ padding: '5px 8px', borderRadius: 8, background: checkedCount === totalItems && totalItems > 0 ? 'rgba(34,197,94,0.1)' : 'rgba(0,230,138,0.06)', border: checkedCount === totalItems && totalItems > 0 ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(0,230,138,0.15)', color: checkedCount === totalItems && totalItems > 0 ? '#22c55e' : '#00e68a', fontSize: 8, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                     💰 ~{estCost * 100}₽
                   </div>
-                  <button onClick={() => { navigator.clipboard?.writeText(exportText); }} style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.06)', color: '#60a5fa', cursor: 'pointer', fontSize: 8, fontWeight: 600 }}>📋</button>
-                  {checkedCount > 0 && <button onClick={() => { localStorage.setItem('he_shopping_checked', '[]'); setChecked(new Set()); }} style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)', color: '#ef4444', cursor: 'pointer', fontSize: 8, fontWeight: 600 }}>✕ Сброс</button>}
+                  <button onClick={() => { try { void navigator.clipboard?.writeText(exportText).catch(() => setErrorMsg('Не удалось скопировать список покупок.')); } catch { setErrorMsg('Не удалось скопировать список покупок.'); } }} style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.06)', color: '#60a5fa', cursor: 'pointer', fontSize: 8, fontWeight: 600 }}>📋</button>
+                  {checkedCount > 0 && <button onClick={() => { try { localStorage.setItem('he_shopping_checked', '[]'); } catch {} setChecked(new Set()); }} style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)', color: '#ef4444', cursor: 'pointer', fontSize: 8, fontWeight: 600 }}>✕ Сброс</button>}
                 </div>
                 {checkedCount > 0 && <div style={{marginBottom:6,height:4,borderRadius:2,background:'rgba(255,255,255,0.06)',overflow:'hidden'}}><div style={{height:'100%',width:`${Math.round(checkedCount/totalItems*100)}%`,borderRadius:2,background:'#22c55e',transition:'width 0.3s'}}/></div>}
                 {(shoppingList as any)._diversity && <div style={{marginBottom:6,fontSize:9,color:((shoppingList as any)._diversity.score >= 7 ? '#22c55e' : '#f59e0b'),fontWeight:600}}>🌈 Разнообразие: {((shoppingList as any)._diversity.uniqueFoods)} видов продуктов · {((shoppingList as any)._diversity.note)}</div>}
@@ -1116,7 +1116,7 @@ export const IndividualPlanResults: React.FC = () => {
         </GlassCard>
       )}
 
-      {generated && injections.length > 0 && (
+      {generated && (Array.isArray(injections) ? injections.length : 0) > 0 && (
         <GlassCard title="Тайминг препаратов и приёмов пищи" icon="💊" color="#8b5cf6" style={{ border: '1px solid rgba(139,92,246,0.15)' }}>
           {injections.map((inj: DrugInjection) => {
             const isInsulin = inj.type === 'инсулин';
@@ -1330,14 +1330,14 @@ export const IndividualPlanResults: React.FC = () => {
             <button onClick={generateNutrientReport} style={reportPillStyle('#22c55e', activeReports.includes('nutrient') && !!nutrientReport)}>🧬 Нутриенты</button>
             <button onClick={generateQualityReport} style={reportPillStyle('#f59e0b', activeReports.includes('quality') && !!qualityReport)}>⭐ Качество</button>
             <button onClick={generateRiskReport} style={reportPillStyle('#ef4444', activeReports.includes('risk') && !!riskReport)}>🩺 Риски здоровья</button>
-            {injections.length > 0 && <button onClick={generateDrugCompatReport} style={reportPillStyle('#8b5cf6', activeReports.includes('drug') && !!drugCompatReport)}>💉 Совместимость</button>}
+              {(Array.isArray(injections) ? injections.length : 0) > 0 && <button onClick={generateDrugCompatReport} style={reportPillStyle('#8b5cf6', activeReports.includes('drug') && !!drugCompatReport)}>💉 Совместимость</button>}
             <button onClick={generateFullNutritionReport} style={reportPillStyle('#3b82f6', activeReports.includes('nutrition') && !!nutritionReport)}>📋 Полный отчёт</button>
             <button onClick={() => {
               generateAllergenReport();
               generateNutrientReport();
               generateQualityReport();
               generateRiskReport();
-              if (injections.length > 0) generateDrugCompatReport();
+              if ((Array.isArray(injections) ? injections.length : 0) > 0) generateDrugCompatReport();
               generateRecommendations();
             }} style={reportPillStyle('#3b82f6', activeReports.length >= 3)}>📋 Общий отчёт</button>
           </div>
@@ -1860,17 +1860,17 @@ export const IndividualPlanResults: React.FC = () => {
                   onClick={() => setExpandedSavedId(isExpanded ? null : p.id)}>
                   <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>{p.name || p.date}</span>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <span style={{ fontSize: 8, color: '#00e68a', fontWeight: 600 }}>{p.dayPlan ? `${Math.round(p.dayPlan.totals.kcal)} ккал` : ''}</span>
+                     <span style={{ fontSize: 8, color: '#00e68a', fontWeight: 600 }}>{p.dayPlan ? `${Math.round(p.dayPlan.totals?.kcal || 0)} ккал` : ''}</span>
                     <button onClick={(e) => { e.stopPropagation(); loadSavedPlan(p); }} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 7, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', fontWeight: 600 }}>📋</button>
-                    <button onClick={(e) => { e.stopPropagation(); const txt = `🍽 План питания ${p.name || p.date}\n${p.dayPlan?.meals?.map((m: any) => `${m.time} ${m.label}: ${m.items?.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}`).join('\n') || ''}`; navigator.clipboard?.writeText(txt); }} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 7, cursor: 'pointer', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', color: '#60a5fa', fontWeight: 600 }}>📤</button>
-                    <button onClick={(e) => { e.stopPropagation(); const updated = savedPlans.filter((_: any, j: number) => j !== pi); setSavedPlans(updated); localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated)); }} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 7, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}>✕</button>
+                     <button onClick={(e) => { e.stopPropagation(); const txt = `🍽 План питания ${p.name || p.date}\n${p.dayPlan?.meals?.map((m: any) => `${m.time} ${m.label}: ${m.items?.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}`).join('\n') || ''}`; try { void navigator.clipboard?.writeText(txt).catch(() => setErrorMsg('Не удалось скопировать сохранённый план.')); } catch { setErrorMsg('Не удалось скопировать сохранённый план.'); } }} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 7, cursor: 'pointer', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', color: '#60a5fa', fontWeight: 600 }}>📤</button>
+                     <button onClick={(e) => { e.stopPropagation(); const updated = savedPlans.filter((_: any, j: number) => j !== pi); setSavedPlans(updated); try { localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated)); } catch {} }} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 7, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}>✕</button>
                   </div>
                 </div>
                 {isExpanded && (
                   <div style={{ padding: '6px 10px 8px', borderTop: '1px solid rgba(255,255,255,0.04)', fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>
                     {p.dayPlan && (
                       <div>
-                        <div style={{ fontWeight: 700, color: '#00e68a', marginBottom: 4, fontSize: 9 }}>🍽 План на день: {Math.round(p.dayPlan.totals.kcal)} ккал</div>
+                         <div style={{ fontWeight: 700, color: '#00e68a', marginBottom: 4, fontSize: 9 }}>🍽 План на день: {Math.round(p.dayPlan.totals?.kcal || 0)} ккал</div>
                         {p.dayPlan.meals?.map((m: any, mi: number) => (
                           <div key={mi} style={{ padding: '2px 0', display: 'flex', gap: 4 }}>
                             <span style={{ color: 'rgba(255,255,255,0.85)' }}>{m.time}</span>

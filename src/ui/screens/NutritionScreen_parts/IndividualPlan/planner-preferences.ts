@@ -316,16 +316,18 @@ export function clearReplaceHistory(): void {
 // decompose it into its ingredient food IDs by matching ingredient names to FOOD_DB.
 export function expandRecipePreferred(preferredFoods: string[], recipes: any[], foodDb: any[]): string[] {
   const result = new Set<string>();
-  for (const pf of preferredFoods) {
+  for (const pf of Array.isArray(preferredFoods) ? preferredFoods : []) {
+    if (typeof pf !== 'string') continue;
     if (pf.startsWith('__recipe__') || pf.startsWith('__user_recipe__')) {
       // extract recipe name from id
       const rname = pf.replace(/^__user_recipe__|^__recipe__/, '');
-      const recipe = recipes.find((r: any) => r.name === rname);
-      if (recipe && recipe.ingredients) {
+      const recipe = (Array.isArray(recipes) ? recipes : []).find((r: any) => r.name === rname);
+      if (recipe && Array.isArray(recipe.ingredients)) {
         for (const ing of recipe.ingredients) {
+          if (typeof ing !== 'string') continue;
           // match ingredient name to FOOD_DB by name substring (case-insensitive)
           const ingLower = ing.toLowerCase().split(' ')[0]; // first word
-          const match = foodDb.find((f: any) => (f.name || '').toLowerCase().includes(ingLower) || (f.id || '').toLowerCase().includes(ingLower));
+          const match = (Array.isArray(foodDb) ? foodDb : []).find((f: any) => (f.name || '').toLowerCase().includes(ingLower) || (f.id || '').toLowerCase().includes(ingLower));
           if (match) result.add(match.id);
         }
       }

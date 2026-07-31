@@ -63,12 +63,12 @@ describe('planner-storage — defensive localStorage', () => {
      memStore['he_excluded_categories'] = '"low-carb"';
      memStore['he_nutrition_supps'] = '42';
      memStore['he_user_recipes'] = 'true';
-     memStore['he_plan_month_mode'] = '"not-a-boolean"';
+      memStore['he_plan_month_mode'] = '"not-a-boolean"';
      migratePlannerStorage();
      expect(memStore['he_excluded_categories']).toBeUndefined();
      expect(memStore['he_nutrition_supps']).toBeUndefined();
      expect(memStore['he_user_recipes']).toBeUndefined();
-     expect(memStore['he_plan_month_mode']).toBeUndefined();
+      expect(memStore['he_plan_month_mode']).toBe('"not-a-boolean"');
    });
 
    it('migratePlannerStorage: drops null values which would crash .length', () => {

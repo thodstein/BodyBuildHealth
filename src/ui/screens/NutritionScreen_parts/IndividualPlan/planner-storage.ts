@@ -68,19 +68,16 @@ export function migratePlannerStorage(): void {
     const v = vRaw ? parseInt(vRaw, 10) : 0;
     if (v >= PLANNER_SCHEMA_VERSION) return;
     // Schema changed at v4: defensively drop keys that should be arrays but might be objects.
-    const arrayKeys = [
+    const objectKeys = [
       'he_saved_nutrition_plans', 'he_excluded_foods', 'he_preferred_foods', 'he_diet_preferences',
       'he_excluded_categories', 'he_food_allergens', 'he_health_issues', 'he_plan_month',
       'he_user_recipes', 'he_nutrition_supps', 'he_intolerances', 'he_preferred_by_meal',
       'he_locked_foods', 'he_weight_log_entries', 'he_shopping_checked', 'he_special_meals',
-      'he_plan_days', 'he_plan_day_idx', 'he_plan_view', 'he_plan_month_mode',
-      'he_bb_category', 'he_peak_week', 'he_peak_show_day', 'he_life_stage',
-      'he_surplus_pct', 'he_variety_strictness', 'he_diary_adaptation', 'he_nutrition_notes',
       'he_planner_labs', 'he_planner_pharma', 'he_planner_histamine',
       'he_taste_profile', 'he_plan_settings_collapsed',
     ];
     let wiped = false;
-    arrayKeys.forEach(k => {
+    objectKeys.forEach(k => {
       try {
         const raw = localStorage.getItem(k);
         if (raw === null) return;

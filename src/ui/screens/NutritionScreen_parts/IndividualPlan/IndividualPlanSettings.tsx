@@ -185,10 +185,26 @@ export const IndividualPlanSettings: React.FC = () => {
   const timingLabels: Record<string,string> = { breakfast:'🌅 Завтрак', lunch:'☀️ Обед', dinner:'🌆 Ужин', snack:'🍪 Перекус', before_bed:'🌙 Перед сном' };
   const specialMealGoalLabel = goalLabels[specialMealGoal] || specialMealGoal;
   const specialMealTimingLabel = timingLabels[specialMealTiming] || specialMealTiming;
+  useEffect(() => {
+    const templates: Record<string, { p: number; f: number; c: number }> = {
+      pre_workout: { p: 25, f: 5, c: 40 }, post_workout: { p: 35, f: 3, c: 55 },
+      before_bed: { p: 35, f: 15, c: 5 }, high_protein: { p: 50, f: 10, c: 20 },
+      keto: { p: 30, f: 35, c: 5 }, low_cal_day: { p: 20, f: 5, c: 15 },
+    };
+    const tpl = templates[specialMealGoal];
+    if (tpl && (specialMealProteinG !== tpl.p || specialMealFatG !== tpl.f || specialMealCarbsG !== tpl.c)) {
+      setSpecialMealProteinG(tpl.p);
+      setSpecialMealFatG(tpl.f);
+      setSpecialMealCarbsG(tpl.c);
+    }
+  }, [specialMealGoal]);
   const TIME_OPTIONS = Array.from({length:48},(_,i)=>{const h=Math.floor(i/2);const m=i%2===0?'00':'30';return{id:`${String(h).padStart(2,'0')}:${m}`,label:`${String(h).padStart(2,'0')}:${m}`};});
 
   const [recentPreset, setRecentPreset] = useState<string | null>(null);
   const settingsSection = 'all';
+  const persistPlannerValue = (key: string, value: unknown) => {
+    try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); } catch {}
+  };
 
   return (
     <>
@@ -473,7 +489,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               </span>
               <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)' }}>{surplusPct < 10 ? 'Мягкий' : surplusPct < 18 ? 'Умеренный' : 'Агрессивный'}</span>
             </div>
-            <input type="range" min="5" max="25" value={surplusPct} onChange={e => { const v = +e.target.value; setSurplusPct(v); localStorage.setItem('he_surplus_pct', v.toString()); }} style={{ width:'100%', margin:'2px 0' }} />
+            <input type="range" min="5" max="25" value={surplusPct} onChange={e => { const v = +e.target.value; setSurplusPct(v); try { localStorage.setItem('he_surplus_pct', v.toString()); } catch {} }} style={{ width:'100%', margin:'2px 0' }} />
             <div style={{ display:'flex', justifyContent:'space-between', fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>
               <span>+5% (мин.)</span>
               <span>+15%</span>
@@ -805,10 +821,10 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               const dispC = effectiveC;
               return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
                 {[
-                  { l:'Калории', v: dispKcal, c:'#00e68a', unit:'ккал', perKg: Math.round(dispKcal / weight) },
-                  { l:'Белки', v: dispP, c:'#3b82f6', unit:'г', perKg: Math.round(dispP / weight) },
-                  { l:'Жиры', v: dispF, c:'#f59e0b', unit:'г', perKg: Math.round(dispF / weight) },
-                  { l:'Углеводы', v: dispC, c:'#f97316', unit:'г', perKg: Math.round(dispC / weight) },
+                   { l:'Калории', v: dispKcal, c:'#00e68a', unit:'ккал', perKg: Math.round(dispKcal / Math.max(1, weight)) },
+                   { l:'Белки', v: dispP, c:'#3b82f6', unit:'г', perKg: Math.round(dispP / Math.max(1, weight)) },
+                   { l:'Жиры', v: dispF, c:'#f59e0b', unit:'г', perKg: Math.round(dispF / Math.max(1, weight)) },
+                   { l:'Углеводы', v: dispC, c:'#f97316', unit:'г', perKg: Math.round(dispC / Math.max(1, weight)) },
                 ].map(m => {
                   const pct = dispKcal > 0 && m.l !== 'Калории'
                     ? Math.round(({ 'Калории': dispKcal, 'Белки': dispP * 4, 'Жиры': dispF * 9, 'Углеводы': dispC * 4 }[m.l] || 0) / dispKcal * 100)
@@ -1291,7 +1307,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
             <div style={{ fontSize: 10, fontWeight: 600, color: eveningLowCarb ? '#6366f1' : '#fff' }}>Вечер — минимум углеводов</div>
             <div style={{ fontSize: 8, color: eveningLowCarb ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.6)' }}>Углеводы ужина → обед</div>
           </div>
-          <button onClick={() => { const nv = !eveningLowCarb; setEveningLowCarb(nv); localStorage.setItem('he_evening_low_carb', nv ? 'true' : 'false'); }} style={{
+          <button onClick={() => { const nv = !eveningLowCarb; setEveningLowCarb(nv); try { localStorage.setItem('he_evening_low_carb', nv ? 'true' : 'false'); } catch {} }} style={{
             width: 48, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', position: 'relative', transition: 'all 0.2s',
             background: eveningLowCarb ? '#6366f1' : 'rgba(255,255,255,0.15)',
           }}>
@@ -1375,22 +1391,22 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
         {/* P2.1: 3 categories, 12 presets */}
         {([
           { cat: '🎯 По цели', color: '#00e68a', presets: [
-            { id: 'cut', label: '🔥 Сушка', desc: 'Дефицит, 2.5г белка/кг, низкий GI', fn: () => { setGoal('cutting'); setBudget('medium'); setVariety('max'); setPreferredFoods(['chicken_breast','turkey_breast','cod','egg_white','cottage_cheese_5','broccoli','spinach','cucumber']); localStorage.setItem('he_preferred_foods', JSON.stringify(['chicken_breast','turkey_breast','cod','egg_white','cottage_cheese_5','broccoli','spinach','cucumber'])); } },
-            { id: 'mass', label: '💪 Масса', desc: 'Профицит, 2г/кг, высоко-углеводные', fn: () => { setGoal('mass'); setBudget('medium'); setVariety('max'); setPreferredFoods(['beef_lean','chicken_breast','salmon','egg_whole','rice_white','buckwheat','pasta_durum','banana','nuts_almonds']); localStorage.setItem('he_preferred_foods', JSON.stringify(['beef_lean','chicken_breast','salmon','egg_whole','rice_white','buckwheat','pasta_durum','banana','nuts_almonds'])); } },
-            { id: 'recomp', label: '🔄 Рекомпозиция', desc: 'Maintenance, 2.5г/кг, carb cycling', fn: () => { setGoal('recomposition'); setBudget('medium'); setVariety('max'); setCyclingMode('macro'); setPreferredFoods(['chicken_breast','salmon','egg_whole','cottage_cheese_5','rice_brown','quinoa','broccoli','avocado','olive_oil']); localStorage.setItem('he_preferred_foods', JSON.stringify(['chicken_breast','salmon','egg_whole','cottage_cheese_5','rice_brown','quinoa','broccoli','avocado','olive_oil'])); } },
-            { id: 'maint', label: '⚖️ Поддержание', desc: 'Баланс 30/25/45', fn: () => { setGoal('maintenance'); setBudget('medium'); setVariety('medium'); setPreferredFoods(['chicken_breast','beef_lean','salmon','egg_whole','rice_brown','buckwheat','broccoli','tomato','olive_oil','yogurt_greek']); localStorage.setItem('he_preferred_foods', JSON.stringify(['chicken_breast','beef_lean','salmon','egg_whole','rice_brown','buckwheat','broccoli','tomato','olive_oil','yogurt_greek'])); } },
+            { id: 'cut', label: '🔥 Сушка', desc: 'Дефицит, 2.5г белка/кг, низкий GI', fn: () => { const foods = ['chicken_breast','turkey_breast','cod','egg_white','cottage_cheese_5','broccoli','spinach','cucumber']; setGoal('cutting'); setBudget('medium'); setVariety('max'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
+            { id: 'mass', label: '💪 Масса', desc: 'Профицит, 2г/кг, высоко-углеводные', fn: () => { const foods = ['beef_lean','chicken_breast','salmon','egg_whole','rice_white','buckwheat','pasta_durum','banana','nuts_almonds']; setGoal('mass'); setBudget('medium'); setVariety('max'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
+            { id: 'recomp', label: '🔄 Рекомпозиция', desc: 'Maintenance, 2.5г/кг, carb cycling', fn: () => { const foods = ['chicken_breast','salmon','egg_whole','cottage_cheese_5','rice_brown','quinoa','broccoli','avocado','olive_oil']; setGoal('recomposition'); setBudget('medium'); setVariety('max'); setCyclingMode('macro'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
+            { id: 'maint', label: '⚖️ Поддержание', desc: 'Баланс 30/25/45', fn: () => { const foods = ['chicken_breast','beef_lean','salmon','egg_whole','rice_brown','buckwheat','broccoli','tomato','olive_oil','yogurt_greek']; setGoal('maintenance'); setBudget('medium'); setVariety('medium'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
           ]},
           { cat: '🥗 По типу питания', color: '#3b82f6', presets: [
-            { id: 'meat', label: '🥩 Мясной', desc: 'Курица, говядина, индейка', fn: () => { setPlanType('classic'); setPreferredFoods(['chicken_breast','beef_lean','turkey_breast','rice_white','broccoli']); localStorage.setItem('he_preferred_foods', JSON.stringify(['chicken_breast','beef_lean','turkey_breast','rice_white','broccoli'])); } },
-            { id: 'fish', label: '🐟 Рыбный', desc: 'Лосось, тунец, треска', fn: () => { setPlanType('mediterranean'); setPreferredFoods(['salmon','tuna_canned','cod','rice_brown','broccoli','olive_oil']); localStorage.setItem('he_preferred_foods', JSON.stringify(['salmon','tuna_canned','cod','rice_brown','broccoli','olive_oil'])); } },
-            { id: 'vegan', label: '🌱 Веган', desc: 'Бобовые, тофу, киноа', fn: () => { setPlanType('vegetarian'); setPreferredFoods(['tofu','tempeh','lentils','quinoa','broccoli','avocado']); localStorage.setItem('he_preferred_foods', JSON.stringify(['tofu','tempeh','lentils','quinoa','broccoli','avocado'])); } },
-            { id: 'budget', label: '💰 Бюджет', desc: 'Яйца, курица, гречка', fn: () => { setBudget('low'); setPreferredFoods(['egg_whole','chicken_thigh','buckwheat','cabbage','apple']); localStorage.setItem('he_preferred_foods', JSON.stringify(['egg_whole','chicken_thigh','buckwheat','cabbage','apple'])); } },
+             { id: 'meat', label: '🥩 Мясной', desc: 'Курица, говядина, индейка', fn: () => { const foods = ['chicken_breast','beef_lean','turkey_breast','rice_white','broccoli']; setPlanType('classic'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
+             { id: 'fish', label: '🐟 Рыбный', desc: 'Лосось, тунец, треска', fn: () => { const foods = ['salmon','tuna_canned','cod','rice_brown','broccoli','olive_oil']; setPlanType('mediterranean'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
+             { id: 'vegan', label: '🌱 Веган', desc: 'Бобовые, тофу, киноа', fn: () => { const foods = ['tofu','tempeh','lentils','quinoa','broccoli','avocado']; setPlanType('vegetarian'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
+             { id: 'budget', label: '💰 Бюджет', desc: 'Яйца, курица, гречка', fn: () => { const foods = ['egg_whole','chicken_thigh','buckwheat','cabbage','apple']; setBudget('low'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
             { id: 'max', label: '🚀 Максимум', desc: 'Топ-рейтинг + макс. разнообразие', fn: () => { setBudget('max'); setNutrLevel('max'); setVariety('max'); } },
           ]},
           { cat: '💉 По фазе', color: '#a78bfa', presets: [
-             { id: 'course', label: '💉 Курс', desc: 'Высокий белок, печень-суппорт', fn: () => { setPhase('course'); setGoal('mass'); setPreferredFoods(['chicken_breast','beef_lean','salmon','egg_whole','rice_white','buckwheat','broccoli','spinach','cottage_cheese_5','olive_oil']); localStorage.setItem('he_preferred_foods', JSON.stringify(['chicken_breast','beef_lean','salmon','egg_whole','rice_white','buckwheat','broccoli','spinach','cottage_cheese_5','olive_oil'])); } },
-            { id: 'pct', label: '🔄 ПКТ', desc: 'Цинк, витамин D, антиоксиданты', fn: () => { setPhase('pct'); setGoal('maintenance'); setPreferredFoods(['beef_lean','egg_whole','oysters','pumpkin_seeds','nuts_almonds','broccoli','spinach','salmon','yogurt_greek','kiwi']); localStorage.setItem('he_preferred_foods', JSON.stringify(['beef_lean','egg_whole','oysters','pumpkin_seeds','nuts_almonds','broccoli','spinach','salmon','yogurt_greek','kiwi'])); } },
-             { id: 'train', label: '🏋️ Тренировочный', desc: 'Peri-workout акцент, carb cycling', fn: () => { setLinkToTraining(true); setCyclingMode('macro'); setPreferredFoods(['chicken_breast','whey_protein','rice_white','banana','salmon','sweet_potato','broccoli']); localStorage.setItem('he_preferred_foods', JSON.stringify(['chicken_breast','whey_protein','rice_white','banana','salmon','sweet_potato','broccoli'])); } },
+             { id: 'course', label: '💉 Курс', desc: 'Высокий белок, печень-суппорт', fn: () => { const foods = ['chicken_breast','beef_lean','salmon','egg_whole','rice_white','buckwheat','broccoli','spinach','cottage_cheese_5','olive_oil']; setPhase('course'); setGoal('mass'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
+             { id: 'pct', label: '🔄 ПКТ', desc: 'Цинк, витамин D, антиоксиданты', fn: () => { const foods = ['beef_lean','egg_whole','oysters','pumpkin_seeds','nuts_almonds','broccoli','spinach','salmon','yogurt_greek','kiwi']; setPhase('pct'); setGoal('maintenance'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
+             { id: 'train', label: '🏋️ Тренировочный', desc: 'Peri-workout акцент, carb cycling', fn: () => { const foods = ['chicken_breast','whey_protein','rice_white','banana','salmon','sweet_potato','broccoli']; setLinkToTraining(true); setCyclingMode('macro'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
           ]},
         ] as { cat: string; color: string; presets: { id: string; label: string; desc: string; fn: () => void }[] }[]).map(group => (
           <div key={group.cat} style={{ marginBottom: 8 }}>
@@ -1436,7 +1452,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 return name ? (
                   <span key={pf} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a', display: 'flex', alignItems: 'center', gap: 3 }}>
                     {name}
-                    <span onClick={() => { const upd = preferredFoods.filter(p => p !== pf); setPreferredFoods(upd); localStorage.setItem('he_preferred_foods', JSON.stringify(upd)); }} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 7 }}>✕</span>
+                    <span onClick={() => { const upd = preferredFoods.filter(p => p !== pf); setPreferredFoods(upd); persistPlannerValue('he_preferred_foods', upd); }} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 7 }}>✕</span>
                   </span>
                 ) : null;
               });
@@ -1467,7 +1483,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 return name ? (
                   <span key={ef} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3 }}>
                     {name}
-                    <span onClick={() => { const upd = excludedFoods.filter(p => p !== ef); setExcludedFoods(upd); localStorage.setItem('he_excluded_foods', JSON.stringify(upd)); }} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 7 }}>✕</span>
+                    <span onClick={() => { const upd = excludedFoods.filter(p => p !== ef); setExcludedFoods(upd); persistPlannerValue('he_excluded_foods', upd); }} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 7 }}>✕</span>
                   </span>
                 ) : null;
               });
@@ -1507,7 +1523,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 <span key={opt.id} onClick={() => {
                   const upd = sel ? dietPrefs.filter(p => p !== opt.id) : [...dietPrefs, opt.id];
                   setDietPrefs(upd);
-                  localStorage.setItem('he_diet_preferences', JSON.stringify(upd));
+                  persistPlannerValue('he_diet_preferences', upd);
                 }} style={{
                   display:'inline-flex', alignItems:'center', gap:3, marginRight:3, marginBottom:3,
                   padding:'2px 6px', borderRadius:6, cursor:'pointer', fontSize:10,
@@ -1521,7 +1537,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
             })}
           </div>
         </div>
-        <PopupText label="📝 Заметки по питанию" value={customNotes} onChange={v => { setCustomNotes(v); localStorage.setItem('he_nutrition_notes', v); }} placeholder="Например: не ем после 20:00, аллергия на пенициллин, проблемы с ЖКТ..." />
+        <PopupText label="📝 Заметки по питанию" value={customNotes} onChange={v => { setCustomNotes(v); persistPlannerValue('he_nutrition_notes', v); }} placeholder="Например: не ем после 20:00, аллергия на пенициллин, проблемы с ЖКТ..." />
       </GlassCard>
       )}
 
@@ -1536,7 +1552,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               <div key={rid} onClick={() => {
                 const id = r.name.startsWith('user_') ? urid : rid;
                 const upd = sel ? current.filter(x => x !== id) : [...current, id];
-                setFn(upd); localStorage.setItem(lsKey, JSON.stringify(upd));
+                    setFn(upd); persistPlannerValue(lsKey, upd);
               }} style={{
                 padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9,
                 background: sel ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.02)',
@@ -1978,24 +1994,6 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                     ))}
                   </div>
                 </div>
-                {(() => {
-                  const templates: Record<string, { p: number; f: number; c: number }> = {
-                    pre_workout: { p: 25, f: 5, c: 40 },
-                    post_workout: { p: 35, f: 3, c: 55 },
-                    before_bed: { p: 35, f: 15, c: 5 },
-                    high_protein: { p: 50, f: 10, c: 20 },
-                    keto: { p: 30, f: 35, c: 5 },
-                    low_cal_day: { p: 20, f: 5, c: 15 },
-                    custom: { p: specialMealProteinG, f: specialMealFatG, c: specialMealCarbsG },
-                  };
-                  const tpl = templates[specialMealGoal] || templates.custom;
-                  if (specialMealGoal !== 'custom') {
-                    if (specialMealProteinG !== tpl.p || specialMealFatG !== tpl.f || specialMealCarbsG !== tpl.c) {
-                      setTimeout(() => { setSpecialMealProteinG(tpl.p); setSpecialMealFatG(tpl.f); setSpecialMealCarbsG(tpl.c); }, 0);
-                    }
-                  }
-                  return null;
-                })()}
                 <div style={{ marginBottom:12 }}>
                   <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:6 }}>Макросы (г)</div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>

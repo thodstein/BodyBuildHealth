@@ -107,6 +107,7 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
     }
     if (p.mode === 'duplicate_meal') {
       saveUndo();
+      if (!meals[idx]) { closePopup(); return; }
       const copy = JSON.parse(JSON.stringify(meals[idx]));
       if (!copy) return;
       setDayPlan((prev: any) => {

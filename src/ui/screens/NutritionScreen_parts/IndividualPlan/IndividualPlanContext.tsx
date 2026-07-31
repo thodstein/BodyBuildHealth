@@ -658,17 +658,18 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const manualGPerKgRef = useRef(manualGPerKg);
   manualGPerKgRef.current = manualGPerKg;
   useEffect(() => {
-    const aasCount = injections.filter(i => i.type === 'ААС').length;
+    const safeInjections = Array.isArray(injections) ? injections : [];
+    const aasCount = safeInjections.filter(i => i.type === 'ААС').length;
     if (aasCount > 0 && goal === 'mass') {
       setManualGPerKg(prev => ({ ...prev, protein: 2.5 }));
     } else if (aasCount === 0 && manualGPerKgRef.current.protein > 2.2) {
       setManualGPerKg(prev => ({ ...prev, protein: 1.8 }));
     }
-    const insulinCount = injections.filter(i => i.type === 'инсулин').length;
+    const insulinCount = safeInjections.filter(i => i.type === 'инсулин').length;
     if (insulinCount > 0) {
       setManualKcal(prev => prev || Math.round(effectiveKcalRef.current * 1.1));
     }
-  }, [injections.length]);
+  }, [Array.isArray(injections) ? injections.length : 0]);
 
   // Sync from Profile Planner data (he_nutrition_profile)
   useEffect(() => {
@@ -1063,9 +1064,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       }).sort((a: any, b: any) => b.amount - a.amount);
       setShoppingList(shoppingArr);
       // Water
-      const hasPharma = injections.length > 0 || (courseEntries?.length || 0) > 0;
-      const aasCount = injections.filter(i => i.type === 'ААС').length;
-      const pharmaHeavy = aasCount + injections.filter(i => i.type === 'инсулин').length + injections.filter(i => i.type === 'ГР').length;
+      const safeInjections = Array.isArray(injections) ? injections : [];
+      const hasPharma = safeInjections.length > 0 || (courseEntries?.length || 0) > 0;
+      const aasCount = safeInjections.filter(i => i.type === 'ААС').length;
+      const pharmaHeavy = aasCount + safeInjections.filter(i => i.type === 'инсулин').length + safeInjections.filter(i => i.type === 'ГР').length;
       const baseWaterMl = weight * Math.min(45, 40 + pharmaHeavy * 1.5);
       const trainBonusL = trainingDays.some(Boolean) ? 0.5 : 0.2;
       const fiberBonusL = 0.1;
@@ -1871,8 +1873,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const shoppingArr = Array.from(shoppingMap.values()).sort((a, b) => b.amount - a.amount);
     (shoppingArr as any)._diversity = { uniqueFoods: uniqueWeekFoods, totalItems: allWeekFoodIds.length, score: Math.min(10, Math.round(uniqueWeekFoods / Math.max(1, allDayPlans.length) * 10) / 10), note: uniqueWeekFoods < 8 ? 'Низкое недельное разнообразие — увеличьте ротацию' : uniqueWeekFoods < 15 ? 'Среднее разнообразие' : 'Отличное недельное разнообразие' };
     setShoppingList(shoppingArr);
-    const hasPharma = injections.length > 0 || (courseEntries?.length || 0) > 0;
-    const aasCount = injections.filter(i => i.type === 'ААС').length; const insulinCount = injections.filter(i => i.type === 'инсулин').length; const ghCount = injections.filter(i => i.type === 'ГР').length;
+    const safeInjections = Array.isArray(injections) ? injections : [];
+    const hasPharma = safeInjections.length > 0 || (courseEntries?.length || 0) > 0;
+    const aasCount = safeInjections.filter(i => i.type === 'ААС').length; const insulinCount = safeInjections.filter(i => i.type === 'инсулин').length; const ghCount = safeInjections.filter(i => i.type === 'ГР').length;
     const pharmaHeavy = aasCount + insulinCount + ghCount; const pharmaBaseMl = hasPharma ? Math.min(45, 40 + pharmaHeavy * 1.5) : 30;
     const baseWaterMl = weight * pharmaBaseMl; const baseWater = baseWaterMl / 1000;
     const weeklyTrainMin = (s?.workoutsPerWeek || 0) * (s?.avgWorkoutMinutes || 60); const trainBonus = Math.round((weeklyTrainMin / 60) * 0.3 * 10) / 10;
@@ -1894,8 +1897,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     setGenerated(true);
     setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
     } catch (e: any) {
-      console.warn('[PlanGen] Error:', e?.message || e);
-      setErrorMsg(e?.message || 'Ошибка генерации плана. Проверьте введённые данные.');
+      const message = e?.message || String(e) || 'Ошибка генерации плана. Проверьте введённые данные.';
+      console.error('[PlanGen] Error:', e);
+      try { localStorage.setItem('he_planner_last_error', JSON.stringify({ message, at: new Date().toISOString() })); } catch {}
+      setErrorMsg(message);
     }
   };
 
@@ -1931,9 +1936,9 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const generateLazyDayPlan = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays }; setLazyDayPlan(generateLazyDayPlanSm(_smDeps)); };
 
-  const generateRecommendations = () => { setRecommendations(buildRecommendations({ goal, phase, weight, effectiveKcal, effectiveP, effectiveF, effectiveC, injections, linkToTraining, trainStart, trainEnd, sex, bodyFatPct, trainType, v2Phase, v2Pharma, v2Labs, histamineSensitive, generated, planDays, dayPlan, threeDayPlan, weekPlan, dietPauseMode })); };
+  const generateRecommendations = () => { setRecommendations(buildRecommendations({ goal, phase, weight, effectiveKcal, effectiveP, effectiveF, effectiveC, injections: Array.isArray(injections) ? injections : [], linkToTraining, trainStart, trainEnd, sex, bodyFatPct, trainType, v2Phase, v2Pharma: v2Pharma && typeof v2Pharma === 'object' ? v2Pharma : {}, v2Labs: v2Labs && typeof v2Labs === 'object' ? v2Labs : {}, histamineSensitive, generated, planDays, dayPlan, threeDayPlan, weekPlan, dietPauseMode })); };
 
-  useEffect(() => { if (generated && dayPlan) { try { generateRecommendations(); } catch (e: any) { try { console.warn('[Planner] recommendations useEffect failed:', e); } catch {} } } }, [injections.length]);
+  useEffect(() => { if (generated && dayPlan) { try { generateRecommendations(); } catch (e: any) { try { console.warn('[Planner] recommendations useEffect failed:', e); } catch {} } } }, [Array.isArray(injections) ? injections.length : 0]);
 
   const saveCurrentPlan = () => { const name = prompt('Название плана:', `${new Date().toLocaleDateString('ru-RU')} · ${Math.round(dayPlan?.totals?.kcal || 0)} ккал`); if (name === null) return; const plan: SavedPlan = { id: Date.now(), date: new Date().toISOString().split('T')[0], name, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc }; const updated = [plan, ...savedPlans.filter(p => p.id !== plan.id)].slice(0, 10); setSavedPlans(updated); if (!safeWriteJSON('he_saved_nutrition_plans', updated)) { try { console.warn('[Planner] saved plans not saved (quota?)'); } catch {} } };
 
@@ -1956,7 +1961,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const generateNutrientReport = () => { if (!dayPlan) return; setNutrientReport(generateNutrientReportPure(dayPlan, FOOD_DB)); setActiveReports(prev => prev.includes('nutrient') ? prev : [...prev, 'nutrient']); };
   const generateQualityReport = () => { if (!dayPlan) return; setQualityReport(generateQualityReportPure(dayPlan, budget, FOOD_DB)); setActiveReports(prev => prev.includes('quality') ? prev : [...prev, 'quality']); };
   const generateRiskReport = () => { if (!dayPlan) return; setRiskReport(generateRiskReportPure(dayPlan, weight)); setActiveReports(prev => prev.includes('risk') ? prev : [...prev, 'risk']); };
-  const generateDrugCompatReport = () => { if (!dayPlan || injections.length === 0) return; setDrugCompatReport(generateDrugCompatReportPure({ dayPlan, injections, weight, v2Pharma, phase, takenSupplements })); setActiveReports(prev => prev.includes('drug') ? prev : [...prev, 'drug']); };
+  const generateDrugCompatReport = () => { const safeInjections = Array.isArray(injections) ? injections : []; if (!dayPlan || safeInjections.length === 0) return; setDrugCompatReport(generateDrugCompatReportPure({ dayPlan, injections: safeInjections, weight, v2Pharma: v2Pharma && typeof v2Pharma === 'object' ? v2Pharma : {}, phase, takenSupplements: Array.isArray(takenSupplements) ? takenSupplements : [] })); setActiveReports(prev => prev.includes('drug') ? prev : [...prev, 'drug']); };
   const generateFullNutritionReport = (planArg?: any, archve = true) => {
     const src = planArg || dayPlan; if (!src) return;
     try { const rep = generateNutritionReport({ meals: src.meals.map((m:any)=>({ label:m.label, items:m.items.map((i:any)=>({name:i.name||'',id:i.id||'',amount:i.amount||100,kcal:i.kcal||0,p:i.p||0,f:i.f||0,c:i.c||0,fiber:i.fiber||0})), totals:m.totals||{kcal:0,p:0,f:0,c:0}, time:m.time||'' })), totals: src.totals||{kcal:0,p:0,f:0,c:0}, targets: planTargets, userWeight: getProfileSafe()?.settings?.weight||80, userTDEE: planTargets.kcal, healthIssues, planType, variety, budget, allergens, cyclingMode, goal: getProfileSafe()?.settings?.primaryGoal||'maintenance', waterMl: waterCalc?.total?Math.round(waterCalc.total*1000):0, injections: injections.map(i=>({type:i.type,dose:i.dose,name:i.name,time:i.time})), workoutTime: linkToTraining&&trainingDays.some(Boolean)?trainStart:undefined });

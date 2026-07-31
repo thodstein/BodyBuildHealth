@@ -22,11 +22,16 @@ function matchesSelectedAllergen(food: any, allergen: string): boolean {
   return fa.some(a => a.toLowerCase().includes(allergen.toLowerCase()) || allergen.toLowerCase().includes(a.toLowerCase()));
 }
 
+function planItems(dayPlan: any): any[] {
+  const meals = Array.isArray(dayPlan?.meals) ? dayPlan.meals : [];
+  return meals.flatMap((m: any) => Array.isArray(m?.items) ? m.items : []);
+}
+
 export function generateAllergenReportPure(dayPlan: any, allergens: string[], foodDb: FoodItem[]): AllergenReport {
   if (!dayPlan) return { conflicts: [], riskLevel: 'low', summary: 'Нет плана' };
   const allergenIds = new Set(allergens);
   const conflicts: { food: string; allergens: string[] }[] = [];
-  dayPlan.meals.flatMap((m: any) => m.items).forEach((it: any) => {
+  planItems(dayPlan).forEach((it: any) => {
     const food = foodDb.find(f => f.id === it.id || f.name === it.name);
     if (food?.allergens) {
       const matched = [...allergenIds].filter(a => matchesSelectedAllergen(food, a));
@@ -44,7 +49,7 @@ export function generateAllergenReportPure(dayPlan: any, allergens: string[], fo
 export function generateNutrientReportPure(dayPlan: any, foodDb: FoodItem[]): NutrientReport {
   if (!dayPlan) return { micros: {}, gaps: [] };
   const micros: Record<string, number> = {};
-  dayPlan.meals.flatMap((m: any) => m.items).forEach((it: any) => {
+  planItems(dayPlan).forEach((it: any) => {
     const food = foodDb.find(f => f.id === it.id || f.name === it.name);
     if (food?.micros) Object.entries(food.micros).forEach(([k, v]) => { if (v) micros[k] = (micros[k] || 0) + (v as number) * (it.amount / 100); });
   });
@@ -63,7 +68,7 @@ export function generateNutrientReportPure(dayPlan: any, foodDb: FoodItem[]): Nu
 export function generateQualityReportPure(dayPlan: any, budget: string, foodDb: FoodItem[]): QualityReport {
   if (!dayPlan) return { avgScore: 0, bbsAvg: 0, budget, budgetRange: '?', budgetOk: true, bestItems: [], weakItems: [], recommendations: [] };
   const scores: any[] = [];
-  dayPlan.meals.flatMap((m: any) => m.items).forEach((it: any) => {
+  planItems(dayPlan).forEach((it: any) => {
     const food = foodDb.find(f => f.id === it.id || f.name === it.name);
     if (!food) return;
     let score = 5;
@@ -94,7 +99,7 @@ export function generateQualityReportPure(dayPlan: any, budget: string, foodDb: 
 export function generateRiskReportPure(dayPlan: any, weight: number): RiskReport {
   if (!dayPlan) return { systems: {}, totalRisk: '—', summary: 'Нет плана' };
   const systems: Record<string, any> = {};
-  const allItems = dayPlan.meals.flatMap((m: any) => m.items);
+  const allItems = planItems(dayPlan);
   const totalFat = allItems.reduce((s: number, it: any) => s + (it.f || 0), 0);
   const totalKcal = allItems.reduce((s: number, it: any) => s + (it.kcal || 0), 0);
   const fatPct = totalKcal > 0 ? totalFat * 9 / totalKcal * 100 : 0;
@@ -128,19 +133,21 @@ export interface DrugCompatInput {
 }
 
 export function generateDrugCompatReportPure(input: DrugCompatInput): { interactions: any[]; warnings: string[] } {
-  if (!input.dayPlan || input.injections.length === 0) return { interactions: [], warnings: [] };
+  const injections = Array.isArray(input.injections) ? input.injections : [];
+  if (!input.dayPlan || injections.length === 0) return { interactions: [], warnings: [] };
   const warnings: string[] = [];
-  const allItems = input.dayPlan.meals.flatMap((m: any) => m.items);
+  const meals = Array.isArray(input.dayPlan.meals) ? input.dayPlan.meals : [];
+  const allItems = meals.flatMap((m: any) => Array.isArray(m?.items) ? m.items : []);
   const allFoodNames = allItems.map((it: any) => ({ id: it.id, name: it.name?.toLowerCase() || '' })).join(' ');
 
-  input.injections.forEach(inj => {
+  injections.forEach(inj => {
     const t = inj.type?.toLowerCase() || '';
-    if (t.includes('инсулин')) { const totalCarbs = input.dayPlan.totals.c || 0; if (totalCarbs < 150) warnings.push(`💉 ${inj.name}: ${Math.round(totalCarbs)}г угл/день — риск гипогликемии. Минимум 150г.`); }
-    if (t.includes('семаглутид') || t.includes('тирзепатид')) { const totalFat = input.dayPlan.totals.f || 0; if (totalFat > input.weight * 0.6) warnings.push(`💊 ${inj.name}: жиры ${totalFat}г/день — риск тошноты/панкреатита при GLP-1. Ограничьте до ${Math.round(input.weight * 0.5)}г.`); }
+    if (t.includes('инсулин')) { const totalCarbs = input.dayPlan.totals?.c || 0; if (totalCarbs < 150) warnings.push(`💉 ${inj.name}: ${Math.round(totalCarbs)}г угл/день — риск гипогликемии. Минимум 150г.`); }
+    if (t.includes('семаглутид') || t.includes('тирзепатид')) { const totalFat = input.dayPlan.totals?.f || 0; if (totalFat > input.weight * 0.6) warnings.push(`💊 ${inj.name}: жиры ${totalFat}г/день — риск тошноты/панкреатита при GLP-1. Ограничьте до ${Math.round(input.weight * 0.5)}г.`); }
   });
 
-  const _hasOralAAS = input.v2Pharma?.AAS_ORAL || input.injections.some(i => i.type === 'ААС' && /метан|станазол|оксан|туринаб|анадрол|анабол/i.test(i.name || ''));
-  const _hasInjectAAS = input.v2Pharma?.AAS_INJECTABLE || input.injections.some(i => i.type === 'ААС');
+  const _hasOralAAS = input.v2Pharma?.AAS_ORAL || injections.some(i => i.type === 'ААС' && /метан|станазол|оксан|туринаб|анадрол|анабол/i.test(i.name || ''));
+  const _hasInjectAAS = input.v2Pharma?.AAS_INJECTABLE || injections.some(i => i.type === 'ААС');
   const _hasPCT = input.phase === 'pct';
 
   if (_hasOralAAS) {
