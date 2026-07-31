@@ -272,6 +272,7 @@
 - Финальная позиция каждого упражнения добавляется в `rationale` после order/budget passes и доступна UI/export (`primary/lead`, `secondary compound`, `accessory`, `pump finisher`).
 - **P1: session working-set cap.** Exercise cap уже существует, но отдельного явного cap по суммарным рабочим сетам сессии нет. Добавить target-aware cap, который сначала режет вторичные isolation/feeders, сохраняя primary и единственный стимул мышцы.
 - Shared fatigue budget теперь применяет default `maxWorkingSets=24` для всех adaptive sources; cap режет вторичные sets до удаления упражнений.
+- Feeder allocation теперь уважает `volumeTargets.maxSetsPerSession`, а не только общий exercise cap; избыток MEV-дефицита объясняется через target/session ceiling.
 - **P2: hamstring angle diversity.** Расширить canonical angle classes: seated/lying curl, RDL, good morning, glute-ham/Nordic при доступности и safety restrictions.
 - **P2: glute angle diversity.** Расширить canonical classes: hip-thrust variations, kickback, abduction и 45-degree extension с equipment/injury фильтрами.
 - Реализовано: hamstring classes расширены seated curl/good morning/GHR-Nordic, glute classes — abduction/45-degree extension; общий pool safety фильтрует недоступное оборудование и травмы.

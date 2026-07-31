@@ -84,6 +84,11 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
       const session = week.sessions.find(item => item.exercises.some(exercise => (trueMuscleOf({ name: exercise.name, muscle: exercise.muscle } as any) || exercise.muscle) === muscle));
       if (!session || session.exercises.length >= 10) continue;
       let remaining = Math.max(0, landmarks.mev - effectiveSets);
+      const target = plan.volumeTargets?.[muscle];
+      const sessionVolume = aggregateBBVolume([session])[muscle]?.directSets || 0;
+      const maxSetsPerSession = target?.maxSetsPerSession ?? Math.max(2, Math.ceil(landmarks.mrv / Math.max(1, target?.frequency || 1)));
+      remaining = Math.min(remaining, Math.max(0, maxSetsPerSession - sessionVolume));
+      if (remaining <= 0) continue;
       const used = new Set(session.exercises.map(exercise => exercise.name));
       const baseWeight = options.workMax?.[muscle] || 50;
       const weight = Math.max(5, Math.round(baseWeight * 0.3 * 10) / 10);
@@ -94,7 +99,7 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
         session.exercises.push({
           muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп', sets,
           repsRange: [12, 20], rir: 3, workSets, tempoSpec: '3-0-1-0', restSeconds: 45,
-          comment: `MEV feeder: ${sets}×15-20 для покрытия effective MEV ${landmarks.mev} сетов @${weight} кг.`,
+          comment: `MEV feeder: ${sets}×15-20 для покрытия effective MEV ${landmarks.mev} сетов @${weight} кг; session cap ${maxSetsPerSession}.`,
           rationale: 'Adaptive MEV coverage feeder', warmupSets: [],
         });
         used.add(candidate.name);

@@ -67,4 +67,17 @@ describe('BB adaptive MEV coverage', () => {
     expect(feeders.reduce((sum, feeder) => sum + feeder.sets, 0)).toBeGreaterThanOrEqual(2);
     expect(result.weeks[0].sessions[0].exercises.length).toBeLessThanOrEqual(10);
   });
+
+  it('respects volume target max sets per session', () => {
+    const plan: any = {
+      pattern: {}, weeks: [{ week: 1, phase: 'accumulation', sessions: [{
+        day: 1, weekOffset: 1, character: 'тяж', sessionTag: 'Chest', exercises: [exercise('Жим лёжа')],
+      }] }],
+      volumeTargets: { chest: { muscle: 'chest', frequency: 2, mev: 8, mav: 12, mrv: 16, targetSets: 10, minSetsPerSession: 2, maxSetsPerSession: 2, rationale: [] } },
+      rotationMuscleVolume: {}, rationale: [],
+    };
+    const result = finalizeBBPlan(plan, { reorder: true, ensureMinimumVolume: true, level: 'intermediate', workMax: { chest: 100 } });
+    const feeders = result.weeks[0].sessions[0].exercises.filter(ex => ex.rationale?.includes('Adaptive MEV coverage feeder'));
+    expect(feeders).toHaveLength(0);
+  });
 });
