@@ -49,11 +49,11 @@ const IndividualPlanInner: React.FC = () => {
   const { planTab, setPlanTab } = usePlanCtx();
   const tab = planTab as PlanTab;
   const setTab = (t: PlanTab) => setPlanTab(t);
-  const [disclaimerDismissed, setDisclaimerDismissed] = useState(() => localStorage.getItem('he_disclaimer_dismissed') === 'true');
+  const [disclaimerDismissed, setDisclaimerDismissed] = useState(() => { try { return localStorage.getItem('he_disclaimer_dismissed') === 'true'; } catch { return false; } });
 
   return (
     <>
-      {!disclaimerDismissed && <MedicalDisclaimer onDismiss={() => { setDisclaimerDismissed(true); localStorage.setItem('he_disclaimer_dismissed', 'true'); }} />}
+      {!disclaimerDismissed && <MedicalDisclaimer onDismiss={() => { setDisclaimerDismissed(true); try { localStorage.setItem('he_disclaimer_dismissed', 'true'); } catch {} }} />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 80, maxWidth: 540, margin: '0 auto' }}>
         <div style={{ display:'flex', gap:3, padding:'4px 0', overflowX:'auto', scrollbarWidth:'none' }}>
           {TAB_META.map(t => (

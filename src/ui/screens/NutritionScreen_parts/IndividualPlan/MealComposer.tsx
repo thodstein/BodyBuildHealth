@@ -197,7 +197,7 @@ export const MealComposer: React.FC = () => {
                 <span style={{ fontSize: 9, fontWeight: 700, color: '#06b6d4' }}>🎯 Продукты для закрытия дефицитов</span>
                 <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)' }}>Выберите приём для добавления</span>
               </div>
-              {selectedMealForTargeting === null && dayPlan?.meals ? (
+              {selectedMealForTargeting === null && Array.isArray(dayPlan?.meals) ? (
                 <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
                   {dayPlan.meals.map((m: any, i: number) => (
                     <button key={i} onClick={() => setSelectedMealForTargeting(i)} style={{
