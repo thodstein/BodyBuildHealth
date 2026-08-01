@@ -163,10 +163,12 @@ function remapWeeksFromMacrocycle(weeks: UserWeek[], macro: Macrocycle): UserWee
 function adjustSessionRir(session: UserWeek['sessions'][number], phase: Phase, deload: boolean): UserWeek['sessions'][number] {
   const adjustedBlocks = session.blocks.map(b => {
     if (deload) {
-      // Deload (Helms, NSCA): RIR +3 AND volume ×0.6 (40% reduction).
+      // Deload (Helms, NSCA): RIR +3 and volume reduction. Keep at least one
+      // set per block; accessory blocks are reduced a little more than compounds.
       const sets = b.sets.map((s: UserSet) => ({ ...s, rir: Math.min(5, (s.rir ?? 2) + 3) }));
+      const volumeMultiplier = b.type === 'compound' ? 0.6 : 0.5;
       const cutSets = sets
-        .map((s, i) => i < Math.ceil(sets.length * 0.6) ? s : null)
+        .map((s, i) => i < Math.max(1, Math.ceil(sets.length * volumeMultiplier)) ? s : null)
         .filter((s): s is UserSet => s !== null);
       return { ...b, sets: cutSets.length > 0 ? cutSets : sets };
     }

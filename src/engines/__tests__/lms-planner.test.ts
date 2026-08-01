@@ -31,6 +31,13 @@ describe('buildLMSPlan', () => {
     expect(plan.weeks[0].days).toHaveLength(3);
   });
 
+  it('clamps readiness for fatigue budget and charges trimmed accessory sets', () => {
+    const plan = buildCycle01Plan({ currentReadiness: 0 });
+    for (const day of plan.weeks[0].days) {
+      expect(day.exercises.every(ex => ex.workSets.every(ws => ws.sets >= 1))).toBe(true);
+    }
+  });
+
   it('PM растёт по неделям (natural, +0.5%/нед)', () => {
     const plan = buildCycle01Plan();
     const w1pm = plan.weeks[0].pmRow['Присед'];

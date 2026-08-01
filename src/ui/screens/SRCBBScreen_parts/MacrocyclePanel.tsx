@@ -3,7 +3,7 @@
  * Таймлайн 5 фаз года (endurance→strength→peak→competition→transition),
  * выбор недели соревнований, клик по блоку → применить активный цикл.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildMacrocycle, buildMacrocycleMulti, rebalanceMacrocycle, macrocycleToActiveCycle,
   serializeMacro, deserializeMacro, estimateCompetitionWeek,
@@ -58,13 +58,15 @@ interface Props {
   level: string;
   goal: 'powerlifting' | 'bodybuilding' | 'general';
   onApplyCycle: (cycleId: string, weeks: number) => void;
+  /** Применить весь макроцикл; если не задан, доступно только применение блока. */
+  onApplyMacrocycle?: (macro: Macrocycle) => void;
   /** Опционально: callback при изменении level (для редактируемого селектора). */
   onLevelChange?: (level: string) => void;
   /** Опционально: callback при изменении goal (для редактируемого селектора). */
   onGoalChange?: (goal: 'powerlifting' | 'bodybuilding' | 'general') => void;
 }
 
-export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, onLevelChange, onGoalChange }) => {
+export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, onApplyMacrocycle, onLevelChange, onGoalChange }) => {
   // Локальные редактируемые значения (если onLevelChange/onGoalChange не переданы — селекторы disabled)
   const [localLevel, setLocalLevel] = useState<string>(level);
   const [localGoal, setLocalGoal] = useState<'powerlifting' | 'bodybuilding' | 'general'>(goal);
@@ -77,6 +79,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       return migrated ? deserializeMacro(migrated) : null;
     } catch { return null; }
   });
+  const macroSerializedRef = useRef<string | null>(null);
   const [compWeek, setCompWeek] = useState<number>(macro?.competitionWeek ?? 44);
   const [totalWeeks, setTotalWeeks] = useState<number>(macro?.totalWeeks ?? 52);
   const [selectedBlockIdx, setSelectedBlockIdx] = useState<number>(-1);
@@ -85,28 +88,87 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   const [currentWeekIdx, setCurrentWeekIdx] = useState<number>(1);
   // Несколько соревнований: восстанавливаем из macro.competitions (если есть) или одиночное compWeek.
   const [competitions, setCompetitions] = useState<CompetitionEvent[]>(macro?.competitions ?? []);
+  const [buildError, setBuildError] = useState<string | null>(null);
+  const competitionValidation = useMemo(() => {
+    const seen = new Set<number>();
+    for (const competition of competitions) {
+      if (!Number.isFinite(competition.week) || competition.week < 1 || competition.week > totalWeeks) {
+        return 'Неделя соревнования должна быть внутри макроцикла.';
+      }
+      if (seen.has(competition.week)) return 'Нельзя назначить два соревнования на одну неделю.';
+      seen.add(competition.week);
+    }
+    return null;
+  }, [competitions, totalWeeks]);
 
   useEffect(() => {
-    if (macro) { try { localStorage.setItem(STORAGE_KEY, serializeMacro(macro)); } catch { /* ignore */ } }
+    if (macro) {
+      try {
+        const serialized = serializeMacro(macro);
+        macroSerializedRef.current = serialized;
+        localStorage.setItem(STORAGE_KEY, serialized);
+        window.dispatchEvent(new CustomEvent('he-pl-macrocycle-updated', { detail: serialized }));
+      } catch { /* ignore */ }
+    }
   }, [macro]);
 
+  useEffect(() => {
+    const sync = (raw?: string | null) => {
+      const serialized = raw ?? localStorage.getItem(STORAGE_KEY);
+      if (!serialized) return;
+      if (serialized === macroSerializedRef.current) return;
+      const restored = deserializeMacro(serialized);
+      if (!restored) return;
+      setMacro(restored);
+      setTotalWeeks(restored.totalWeeks);
+      setCompWeek(restored.competitionWeek ?? 44);
+      setCompetitions(restored.competitions ?? []);
+      setSelectedBlockIdx(-1);
+      setEditWeeks({});
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === STORAGE_KEY) sync(event.newValue);
+    };
+    const onMacroUpdated = (event: Event) => {
+      sync((event as CustomEvent<string>).detail);
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('he-pl-macrocycle-updated', onMacroUpdated);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('he-pl-macrocycle-updated', onMacroUpdated);
+    };
+  }, []);
+
   const build = () => {
-    // Если есть список соревнований — мульти-режим, иначе одиночный (обратно-совместимый).
-    if (competitions.length > 0) {
-      const m = buildMacrocycleMulti(competitions, { level: effLevel, goal: effGoal, totalWeeks });
-      setMacro(m);
-    } else {
-      const input: MacroInput = { level: effLevel, goal: effGoal, competitionWeek: compWeek, totalWeeks };
-      const m = buildMacrocycle(input);
-      setMacro(m);
+    if (competitionValidation) {
+      setBuildError(competitionValidation);
+      return;
     }
-    setSelectedBlockIdx(-1);
-    setEditWeeks({});
+    try {
+      // Если есть список соревнований — мульти-режим, иначе одиночный (обратно-совместимый).
+      if (competitions.length > 0) {
+        const m = buildMacrocycleMulti(competitions, { level: effLevel, goal: effGoal, totalWeeks });
+        setMacro(m);
+      } else {
+        const input: MacroInput = { level: effLevel, goal: effGoal, competitionWeek: compWeek, totalWeeks };
+        const m = buildMacrocycle(input);
+        setMacro(m);
+      }
+      setBuildError(null);
+      setSelectedBlockIdx(-1);
+      setEditWeeks({});
+    } catch (error) {
+      setBuildError((error as Error).message || 'Не удалось построить макроцикл.');
+    }
   };
 
   const applyEdit = () => {
     if (!macro) return;
-    const edits = PHASES.map(p => ({ phase: p, weeks: editWeeks[p] ?? macro.blocks.find(b => b.phase === p)?.weeks ?? 0 })).filter(e => e.weeks > 0);
+    const edits = PHASES.map(phase => ({
+      phase,
+      weeks: editWeeks[phase] ?? macro.blocks.filter(block => block.phase === phase).reduce((sum, block) => sum + block.weeks, 0),
+    })).filter(edit => edit.weeks > 0);
     setMacro(rebalanceMacrocycle(macro, edits));
   };
 
@@ -342,6 +404,16 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           <button onClick={build} style={BTN}>Построить макроцикл</button>
           {macro && <button onClick={() => { setMacro(null); try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ } }} style={BTN_GHOST}>Сбросить</button>}
         </div>
+        {competitionValidation && (
+          <div role="alert" style={{ marginTop: 8, color: '#fca5a5', fontSize: 11 }}>
+            ⚠ {competitionValidation}
+          </div>
+        )}
+        {buildError && !competitionValidation && (
+          <div role="alert" style={{ marginTop: 8, color: '#fca5a5', fontSize: 11 }}>
+            ⚠ {buildError}
+          </div>
+        )}
       </div>
 
       {/* Таймлайн */}
@@ -468,21 +540,32 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             </div>
           )}
 
+          {onApplyMacrocycle && (
+            <button onClick={() => onApplyMacrocycle(macro)} style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 34, marginTop: 6, width: '100%' }}>
+              🗓 Применить весь макроцикл
+            </button>
+          )}
+
           {/* Правка длительности фаз */}
           <div style={{ marginTop: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>⚙️ Правка длительности фаз</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
-              {macro.blocks.map((b, i) => (
-                <div key={i}>
-                  <div style={{ fontSize: 9, color: PHASE_COLOR[b.phase], textAlign: 'center', fontWeight: 700 }}>{PHASE_ICON[b.phase]} {PHASE_LABEL_RU[b.phase]}</div>
+              {PHASES.map(phase => {
+                const phaseWeeks = macro.blocks.filter(block => block.phase === phase).reduce((sum, block) => sum + block.weeks, 0);
+                if (phaseWeeks === 0) return null;
+                return (
+                <div key={phase}>
+                  <div style={{ fontSize: 9, color: PHASE_COLOR[phase], textAlign: 'center', fontWeight: 700 }}>{PHASE_ICON[phase]} {PHASE_LABEL_RU[phase]}</div>
                   <input
                     style={{ ...IN, padding: '4px', fontSize: 11, textAlign: 'center', minHeight: 30, marginTop: 2 }}
                     type="number" min={1} max={52}
-                    value={editWeeks[b.phase] ?? b.weeks}
-                    onChange={e => setEditWeeks(prev => ({ ...prev, [b.phase]: +e.target.value }))}
+                    value={editWeeks[phase] ?? phaseWeeks}
+                    onChange={e => setEditWeeks(prev => ({ ...prev, [phase]: +e.target.value }))}
                   />
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>сумма блоков</div>
                 </div>
-              ))}
+                );
+              })}
             </div>
             <button onClick={applyEdit} style={{ ...BTN_GHOST, fontSize: 11, padding: '6px 12px', minHeight: 32, marginTop: 6 }}>Пересчитать</button>
           </div>

@@ -524,7 +524,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       const dayTag = dayLoadTag(day.exercises as { load?: string }[]);
 
       // S-MRV: Бюджет утомления на сессию
-      let dayFatigueBudget = 60 * ((input.currentReadiness || 80) / 100);
+      let dayFatigueBudget = 60 * (Math.max(0, Math.min(100, input.currentReadiness ?? 80)) / 100);
 
       const planEx: LMSPlanExercise[] = day.exercises.map((spec: SRExerciseSpec) => {
         const pm = pmRow[spec.name];
@@ -566,12 +566,13 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         });
 
         // Проверка S-MRV: срезаем аксессуары, чтобы влезть в бюджет утомления
-        const totalWorkSets = workSets.reduce((sum, ws) => sum + ws.sets, 0);
+        let totalWorkSets = workSets.reduce((sum, ws) => sum + ws.sets, 0);
         const fatigueCost = EXERCISE_CATALOG.find(e => e.name === spec.name)?.fatigueCost || 5;
         const exCost = fatigueCost * totalWorkSets;
         if (dayFatigueBudget < exCost && !isMain) {
-          const fit = Math.max(2, Math.floor(dayFatigueBudget / fatigueCost));
+          const fit = Math.max(2, Math.floor(Math.max(0, dayFatigueBudget) / fatigueCost));
           workSets.forEach(ws => { ws.sets = Math.min(ws.sets, fit); });
+          totalWorkSets = workSets.reduce((sum, ws) => sum + ws.sets, 0);
         }
         dayFatigueBudget -= fatigueCost * totalWorkSets;
 

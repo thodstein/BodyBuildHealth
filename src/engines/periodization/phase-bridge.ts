@@ -15,6 +15,7 @@
 import type { Phase } from '../user-program/user-program.types';
 import type { PhaseKey } from '../periodization-designer.engine';
 import type { MacroPhase } from '../lms/macrocycle.engine';
+import type { MesocyclePhase } from '../rir-matrix.engine';
 
 /** Маппинг PhaseKey дизайнера (10) → Phase (4). 6 ключей коллапсируют. */
 export const DESIGNER_TO_PHASE: Record<PhaseKey, Phase> = {
@@ -38,6 +39,15 @@ export const MACRO_TO_PHASE: Record<MacroPhase, Phase> = {
   peak: 'peaking',              // выход на пик → пик
   competition: 'peaking',       // соревнования → пик
   transition: 'deload',         // переход → разгрузка
+};
+
+/** Маппинг MacroPhase в фазу LMS/UI с сохранением смысла годового блока. */
+export const MACRO_TO_LMS_PHASE: Record<MacroPhase, MesocyclePhase> = {
+  endurance: 'base',
+  strength: 'build',
+  peak: 'peak',
+  competition: 'peak',
+  transition: 'deload',
 };
 
 /** Обратный маппинг Phase (4) → основная PhaseKey дизайнера. */
@@ -64,6 +74,10 @@ export function designerPhaseToUserPhase(pk: PhaseKey): Phase {
 /** Преобразовать MacroPhase макроцикла → каноническую Phase. Fallback: 'accumulation'. */
 export function macroPhaseToUserPhase(mp: MacroPhase): Phase {
   return MACRO_TO_PHASE[mp] ?? 'accumulation';
+}
+
+export function macroPhaseToLmsPhase(mp: MacroPhase): MesocyclePhase {
+  return MACRO_TO_LMS_PHASE[mp] ?? 'base';
 }
 
 /** Является ли PhaseKey делод-подобной фазой (deload или transition). */

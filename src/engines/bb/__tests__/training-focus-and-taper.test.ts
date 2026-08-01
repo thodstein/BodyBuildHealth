@@ -210,6 +210,19 @@ describe('macrocycle-to-bb: deload volume cut (Helms, NSCA)', () => {
       }
     }
   });
+
+  it('deload keeps at least one set in compound and accessory blocks', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 52 });
+    const prog = macrocycleToBBProgram(macro, {
+      level: 'intermediate', goal: 'hypertrophy', daysPerWeek: 4,
+      equipment: ['barbell', 'dumbbell'],
+    });
+    const deload = prog.bb!.weeks.find(w => w.deload && w.sessions.some(s => s.blocks.length > 0));
+    expect(deload).toBeTruthy();
+    for (const session of deload!.sessions) {
+      for (const block of session.blocks) expect(block.sets.length).toBeGreaterThanOrEqual(1);
+    }
+  });
 });
 
 // ── 6. Recovery metrics forwarded to BB plan ──

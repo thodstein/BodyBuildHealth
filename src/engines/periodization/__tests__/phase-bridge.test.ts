@@ -6,6 +6,7 @@ import {
   PHASE_TO_MACRO,
   designerPhaseToUserPhase,
   macroPhaseToUserPhase,
+  macroPhaseToLmsPhase,
   isDeloadLikePhaseKey,
   isDeloadLikeMacroPhase,
 } from '../phase-bridge';
@@ -60,6 +61,16 @@ describe('phase-bridge: MACRO_TO_PHASE', () => {
     expect(MACRO_TO_PHASE.peak).toBe('peaking');
     expect(MACRO_TO_PHASE.competition).toBe('peaking');
     expect(MACRO_TO_PHASE.transition).toBe('deload');
+  });
+});
+
+describe('phase-bridge: MACRO_TO_LMS_PHASE', () => {
+  it('сохраняет смысл всех фаз годового плана для LMS/UI', () => {
+    expect(macroPhaseToLmsPhase('endurance')).toBe('base');
+    expect(macroPhaseToLmsPhase('strength')).toBe('build');
+    expect(macroPhaseToLmsPhase('peak')).toBe('peak');
+    expect(macroPhaseToLmsPhase('competition')).toBe('peak');
+    expect(macroPhaseToLmsPhase('transition')).toBe('deload');
   });
 });
 

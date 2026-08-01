@@ -124,6 +124,13 @@ describe('buildMacrocycleMulti — несколько соревнований',
     const last = m.blocks[m.blocks.length - 1];
     expect(last.weekOffset + last.weeks - 1).toBeLessThanOrEqual(40);
   });
+
+  it('отклоняет два соревнования на одной неделе', () => {
+    expect(() => buildMacrocycleMulti([
+      makeComp('a', 12, 'A'),
+      makeComp('b', 12, 'B'),
+    ], { level: 'intermediate', goal: 'powerlifting', totalWeeks: 30 })).toThrow(/одной неделе/);
+  });
 });
 
 describe('buildMacrocycleMulti — cycleId per competition', () => {

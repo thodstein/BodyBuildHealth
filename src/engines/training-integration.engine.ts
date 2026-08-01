@@ -15,7 +15,7 @@ import { generatePLPeaking, generateBBPeaking, type PLPeakingInput, type BBPeaki
 // ── workout-logger shape (локальные типы-мосты, чтобы не тащить весь workout-logger) ──
 export interface BridgeSet { setNumber: number; weightKg: number; reps: number; rpe: number; rir: number; isPR: boolean; notes: string; }
 export interface BridgeExercise { exerciseId: string; exerciseName: string; pattern: string; muscleGroup: string; order: number; sets: BridgeSet[]; totalVolume: number; best1RM: number; avgRPE: number; }
-export interface BridgeSession { sessionId: string; date: string; focus: string; exercises: BridgeExercise[]; totalVolume: number; totalSets: number; totalReps: number; weekNumber: number; planned: boolean; source: 'SRC' | 'BB'; }
+export interface BridgeSession { sessionId: string; date: string; focus: string; exercises: BridgeExercise[]; totalVolume: number; totalSets: number; totalReps: number; weekNumber: number; planned: boolean; source: 'SRC' | 'BB'; macroPhase?: string; }
 
 // ── INT1: конвертация планов в сессии workout-logger ──
 function uid(prefix: string, i: number): string { return `${prefix}-${i}`; }
@@ -40,7 +40,7 @@ export function lmsPlanToSessions(plan: LMSBuildOutput): BridgeSession[] {
       const totalVolume = exercises.reduce((s, e) => s + e.totalVolume, 0);
       const totalSets = exercises.reduce((s, e) => s + e.sets.length, 0);
       const totalReps = exercises.reduce((sum, e) => sum + e.sets.reduce((ss, s) => ss + s.reps, 0), 0);
-      out.push({ sessionId: uid('src', i), date: '', focus: `Нед${wk.week} День${dayIdx + 1}`, exercises, totalVolume, totalSets, totalReps, weekNumber: wk.week, planned: true, source: 'SRC' });
+      out.push({ sessionId: uid('src', i), date: '', focus: `Нед${wk.week} День${dayIdx + 1}`, exercises, totalVolume, totalSets, totalReps, weekNumber: wk.week, planned: true, source: 'SRC', macroPhase: wk.macroPhase });
       i++;
     }
   }
