@@ -1564,6 +1564,7 @@ export const BbAutoConstructor: React.FC = () => {
               <div>Верх: тяги/жимы ratio <b>{builtPlan.balanceReport.pullPressRatio}</b> ({builtPlan.balanceReport.upperPull}/{builtPlan.balanceReport.upperPress})</div>
               <div>Compound: {builtPlan.balanceReport.compound} · Isolation: {builtPlan.balanceReport.isolation}</div>
               <div>Растянутая: {builtPlan.balanceReport.lengthened} · Средняя: {builtPlan.balanceReport.midRange} · Сокращённая: {builtPlan.balanceReport.shortened}</div>
+              <div style={{ marginTop: 4 }}>По мышцам: {Object.entries(builtPlan.balanceReport.byMuscle).map(([muscle, coverage]) => `${muscle} ${Object.keys(coverage.patterns).length} патт. / ${coverage.lengthened}-${coverage.midRange}-${coverage.shortened}`).join(' · ')}</div>
               {builtPlan.balanceReport.issues.map((issue, index) => <div key={index} style={{ color: '#f59e0b' }}>⚠ {issue}</div>)}
             </div>}
           />

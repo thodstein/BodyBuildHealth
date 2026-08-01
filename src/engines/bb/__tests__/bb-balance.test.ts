@@ -7,5 +7,6 @@ describe('BB final balance report', () => {
     expect(plan.balanceReport).toBeTruthy();
     expect(plan.balanceReport!.press + plan.balanceReport!.pull).toBeGreaterThan(0);
     expect(Object.keys(plan.balanceReport!.patterns).length).toBeGreaterThan(0);
+    expect(Object.keys(plan.balanceReport!.byMuscle).length).toBeGreaterThan(0);
   });
 });
