@@ -28,7 +28,7 @@ export function analyzeBBRotation(plan: BBPlan): BBRotationReport {
   // Stability is measured inside a phase block. A deliberate phase boundary
   // may rotate the primary, but it must not change mid-block.
   const primaryNames = new Map<string, string>();
-  const previousAccessories = new Map<string, string>();
+   const previousAccessories = new Map<string, string>();
 
   for (const week of plan.weeks) {
     for (const session of week.sessions) {
@@ -47,11 +47,11 @@ export function analyzeBBRotation(plan: BBPlan): BBRotationReport {
           }
         } else {
           (accessoryPatternsByMuscle[muscle] ||= []).push(pattern);
-          const previous = previousAccessories.get(muscle);
-          if (previous === pattern && !issues.some(issue => issue.code === 'accessory_repeated' && issue.muscle === muscle)) {
+           const previous = previousAccessories.get(phaseMuscle);
+           if (previous === pattern && !issues.some(issue => issue.code === 'accessory_repeated' && issue.muscle === muscle && issue.phase === phase)) {
              issues.push({ code: 'accessory_repeated', muscle, phase, message: `${muscle}: accessory pattern «${pattern}» повторяется последовательно.` });
           }
-          previousAccessories.set(muscle, pattern);
+           previousAccessories.set(phaseMuscle, pattern);
         }
       }
     }

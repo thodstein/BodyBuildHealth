@@ -231,6 +231,7 @@
 - Ротация primary/accessory проверяется по slot/phase: вариация primary может измениться только на границе phase block, не внутри одного блока.
 - `bb-rotation.engine.ts` теперь диагностирует primary stability внутри phase block; смена на границе phase не считается ошибкой.
 - Rotation issues сохраняют `phase` и BB-auto UI показывает фазу рядом с диагностикой; metadata входит в export-safe `rotationReport`.
+- Accessory repetition diagnostics scoped to `phase|muscle`, поэтому одинаковый аксессуар на границе фаз не считается ложным последовательным повтором; repeated finalization сохраняет report/weeklyVolume/validation snapshot.
 - Plan-vs-fact feedback и double progression применяются одинаково в generic, cycle и FullProgram `adapt`; фактическая фаза недели передаётся в `prescribeLoad`, а deload защищён от feedback-перезаписи.
 - `faithful` сохраняет исходные данные программы и получает только общие safety/metrics passes.
 - Recovery soft-cap вынесен в общий `computeBBRecoveryMultiplier`; cycle и FullProgram используют те же body-fat/lean-mass/HRV/sleep/stress правила, что и generic.
