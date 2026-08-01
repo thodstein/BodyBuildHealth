@@ -19,6 +19,7 @@
 import type { WorkoutLog, StrengthLogEntry } from '../../core/types';
 import { rpeFromLoad, loadForRPE } from './autoregulation-pro.engine';
 import { norm } from '../norm';
+import { epley1RM } from '../e1rm';
 
 export type AutoRegMode = 'off' | 'auto' | 'diary';
 
@@ -56,12 +57,6 @@ export interface DiaryAutoregResult {
   decisions: string[];
 }
 
-/** Epley: 1RM = w × (1 + reps/30). */
-function epley1RM(weight: number, reps: number): number {
-  if (weight <= 0 || reps <= 0) return 0;
-  return Math.round(weight * (1 + reps / 30));
-}
-
 /** Fuzzy match имён упражнений (как в lms-builder.engine + извлечение ядра). */
 function nameMatch(a: string, b: string): boolean {
   const na = norm(a), nb = norm(b);
@@ -89,11 +84,19 @@ function findLastFact(historyWorkouts: WorkoutLog[], exerciseName: string): Fact
       if (nameMatch(ex.exerciseName, exerciseName)) {
         const sets = ex.sets || [];
         if (sets.length === 0) continue;
-        const lastSet = sets[sets.length - 1];
-        const e1RM = ex.estimated1RM || epley1RM(lastSet.weight, lastSet.reps);
+        let bestSet = sets[0];
+        let bestE1RM = epley1RM(bestSet.weight, bestSet.reps);
+        for (const set of sets.slice(1)) {
+          const candidateE1RM = epley1RM(set.weight, set.reps);
+          if (candidateE1RM > bestE1RM) {
+            bestSet = set;
+            bestE1RM = candidateE1RM;
+          }
+        }
+        const e1RM = ex.estimated1RM || bestE1RM;
         const date = ex.date || wl.date;
         if (!best || date > best.date) {
-          best = { entry: ex, lastSet: { weight: lastSet.weight, reps: lastSet.reps, rpe: lastSet.rpe, rir: lastSet.rir }, e1RM, date };
+          best = { entry: ex, lastSet: { weight: bestSet.weight, reps: bestSet.reps, rpe: bestSet.rpe, rir: bestSet.rir }, e1RM, date };
         }
       }
     }

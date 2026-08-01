@@ -1450,7 +1450,10 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         const wmFor = (lift: string): number => {
           if (lift === 'bench') return wm.bench ?? 0;
           if (lift === 'dead') return wm.dead ?? 0;
-          return wm.squat ?? 0;
+          if (lift === 'squat') return wm.squat ?? 0;
+          // Accessories do not have a competition-lift work max; keep their
+          // stored/manual weight rather than deriving one from squat PM.
+          return 0;
         };
         const wiPL = Math.max(0, Math.min(execWeek - 1, program.pl.customWeeks!.length - 1));
         const wk0 = program.pl.customWeeks[wiPL];
@@ -1866,7 +1869,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                       });
                       onChange(newProg);
                       setEditorLibOpen(null);
-                      showToast('🗓 Годовой план ББ создан: ' + weeks + ' нед, 5 фаз');
+                      showToast('🗓 Годовой план ББ создан: ' + macro.totalWeeks + ' нед, 5 фаз');
                     }
                   }
                 } catch (e) {
@@ -1890,7 +1893,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                       const bbProg = macrocycleToBBProgram(macro, {
                         level: macroLevel,
                         goal: 'hypertrophy',
-                        daysPerWeek: Math.max(1, program.meta.daysPerWeek - 3),
+                        daysPerWeek: Math.max(2, program.meta.daysPerWeek - 3),
                         weakPoints: (tprofile.weakPoints ?? []) as string[],
                         equipment: program.bb?.constraints?.equipment ?? [],
                         trainingFocus: program.meta.trainingFocus,
@@ -1899,7 +1902,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
                       if (bbProg.bb) {
                         update({ hybrid: { ...program.hybrid!, bbWeeks: bbProg.bb.weeks } });
                         setEditorLibOpen(null);
-                        showToast('🗓 Hybrid: ББ-недели обновлены из макроцикла (' + weeks + ' нед)');
+                        showToast('🗓 Hybrid: ББ-недели обновлены из макроцикла (' + macro.totalWeeks + ' нед)');
                       }
                     }
                   }
@@ -2198,26 +2201,30 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
           showToast('🔧 Применено ко всем блокам: ' + (key === 'none' ? 'без техники' : INTENSITY_TECHNIQUES[key as IntensityTechnique].label));
         };
         const applyCharacter = (char: 'тяж' | 'памп' | 'лёг') => {
-          const tempo = tempoFor(char);
-          const restByChar = { тяж: 180, памп: 60, лёг: 90 } as const;
+           const restByChar = { тяж: 180, памп: 60, лёг: 90 } as const;
           const next: UserProgram = {
             ...program,
             bb: {
               ...program.bb!,
-              weeks: program.bb!.weeks.map((w) => ({
-                ...w,
-                sessions: w.sessions.map((s) => ({
-                  ...s,
-                  blocks: s.blocks.map((b) => ({
-                    ...b,
-                    sets: (b.sets ?? []).map((st, i) => i === 0 ? { ...st, restSec: restByChar[char], tempo: tempo.notation } : { ...st, tempo: st.tempo || tempo.notation }),
-                  })),
-                })),
-              })),
+                weeks: program.bb!.weeks.map((w) => {
+                  const tempo = tempoFor(char, undefined, w.phase);
+                  return {
+                    ...w,
+                    sessions: w.sessions.map((s) => ({
+                      ...s,
+                      blocks: s.blocks.map((b) => ({
+                        ...b,
+                        sets: (b.sets ?? []).map((st, i) => i === 0
+                          ? { ...st, restSec: restByChar[char], tempo: tempo.notation }
+                          : { ...st, tempo: st.tempo || tempo.notation }),
+                      })),
+                    })),
+                  };
+                }),
             },
           };
           onChange(next);
-          showToast('🏋 Характер дня: ' + char + ' → отдых ' + restByChar[char] + 'с, темп ' + tempo.notation);
+           showToast('🏋 Характер дня: ' + char + ' → отдых ' + restByChar[char] + 'с, темп адаптирован по фазе');
         };
         return (
           <div style={{ ...CARD, padding: 10 }}>
@@ -2247,7 +2254,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
               {(['тяж', 'памп', 'лёг'] as const).map((char) => (
                 <button
                   key={char}
-                  title={`${char}-характер дня: темп ${tempoFor(char).notation}, отдых ${{тяж:180,памп:60,лёг:90}[char]}с`}
+                   title={`${char}-характер дня: темп адаптируется по фазе, отдых ${{тяж:180,памп:60,лёг:90}[char]}с`}
                   onClick={() => applyCharacter(char)}
                   style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.25)', color: '#22c55e', fontWeight: 700, minHeight: 38 }}
                 >

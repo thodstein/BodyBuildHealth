@@ -87,6 +87,8 @@ export interface LMSPlanWeek {
   week: number;
   pmRow: Record<string, number>; // PM по упражнениям на эту неделю
   days: LMSPlanDay[];
+  /** Фаза годового макроцикла, если план собран из Macrocycle. */
+  macroPhase?: string;
 }
 
 export interface LMSBuildOutput {
@@ -178,6 +180,7 @@ function rirGoalKey(period: string): keyof typeof RIR_MATRIX {
     case 'strength': case 'peak': return 'strength';
     case 'mass': return 'hypertrophy';
     case 'endurance': return 'maintenance';
+    case 'mixed': return 'hypertrophy';
     default: return 'strength';
   }
 }
@@ -231,6 +234,12 @@ function groupOfExercise(name: string, fallback: string): string {
   return fallback;
 }
 
+function weeklyMuscleSets(days: LMSPlanDay[], group: string): number {
+  return days.reduce((total, day) => total + day.exercises
+    .filter(ex => groupOfExercise(ex.name, ex.group) === group)
+    .reduce((dayTotal, ex) => dayTotal + ex.workSets.reduce((sets, workSet) => sets + workSet.sets, 0), 0), 0);
+}
+
 /**
  * Собрать список корректирующих упражнений для слабой точки.
  * Упражнения ВСЕГДА из diagnoseWeakPoint (проверенный каталог weakpoint-pl).
@@ -277,6 +286,7 @@ function injectPLWeakPoints(
   vrLevel: 'beginner' | 'intermediate' | 'advanced',
   mrvMult: number,
   plWeakPointDayMap?: Record<string, number[]>,
+  fallbackPm: number = 80,
 ): void {
   const mainNameMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга', pulldown: 'Тяга', incline_press: 'Жим гантелей' };
   const MAX_CORRECTIONS = 2;
@@ -329,16 +339,10 @@ function injectPLWeakPoints(
         // которые приводят к MRV-капу по неправильной мышце.
         const exGroup = ex ? (trueMuscleOf(ex) ?? (ex.group as string)) : liftGroup;
         const sets = Math.max(2, Math.round(3 * phaseVolMod));
-        const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? Object.entries(pmRow).find(([k]) => norm(k) === norm(mainName) || norm(k).includes(norm(mainName)) || norm(mainName).includes(norm(k)))?.[1] ?? 80;
+        const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? Object.entries(pmRow).find(([k]) => norm(k) === norm(mainName) || norm(k).includes(norm(mainName)) || norm(mainName).includes(norm(k)))?.[1] ?? fallbackPm;
         const ref = getVolumeLandmarks(vrLevel, exGroup);
         if (ref) {
-          let cur = 0;
-          for (const d of days) {
-            for (const e of d.exercises) {
-              const eg = groupOfExercise(e.name, '');
-              if (eg === exGroup) cur += e.workSets.reduce((x, ws) => x + ws.sets, 0);
-            }
-          }
+          const cur = weeklyMuscleSets(days, exGroup);
           if (cur + sets > Math.round(ref.mrv * mrvMult)) continue;
         }
         heavyDay.exercises.push({
@@ -361,16 +365,10 @@ function injectPLWeakPoints(
         if (!existing.has(norm(resolvedName)) && lightDay.exercises.length < 8) {
           const exGroup = ex ? (trueMuscleOf(ex) ?? (ex.group as string)) : liftGroup;
           const sets = Math.max(2, Math.round(3 * phaseVolMod));
-          const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? 80;
+          const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? fallbackPm;
           const ref = getVolumeLandmarks(vrLevel, exGroup);
           if (ref) {
-            let cur = 0;
-            for (const d of days) {
-              for (const e of d.exercises) {
-                const eg = groupOfExercise(e.name, '');
-                if (eg === exGroup) cur += e.workSets.reduce((x, ws) => x + ws.sets, 0);
-              }
-            }
+            const cur = weeklyMuscleSets(days, exGroup);
             if (cur + sets > Math.round(ref.mrv * mrvMult)) continue;
           }
           // Памп-протокол: 3×12 @ 60% 1PM, RIR 3
@@ -410,10 +408,28 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     for (let wi = 0; wi < template.weeks.length; wi++) {
       const w = template.weeks[wi];
       if (!Array.isArray(w) || w.length === 0) throw new Error(`buildLMSPlan: template.weeks[${wi}] must be a non-empty array of days`);
+      for (const day of w) {
+        if (!day || !Array.isArray(day.exercises)) throw new Error(`buildLMSPlan: template.weeks[${wi}] contains an invalid day`);
+        for (const ex of day.exercises) {
+          if (!ex.sets || !Array.isArray(ex.sets)) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid sets`);
+          for (const s of ex.sets) {
+            if (typeof s.pct !== 'number' || !Number.isFinite(s.pct) || s.pct <= 0 || s.pct > 1) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid pct (${s.pct})`);
+            if (typeof s.sets !== 'number' || !Number.isFinite(s.sets) || s.sets <= 0) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid sets count (${s.sets})`);
+            if (typeof s.reps !== 'number' || !Number.isFinite(s.reps) || s.reps <= 0) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid reps (${s.reps})`);
+          }
+        }
+      }
     }
   }
 
   const mode = input.mode ?? 'natural';
+  if (input.weeksOverride != null && (!Number.isFinite(input.weeksOverride) || input.weeksOverride < 1)) {
+    throw new Error('buildLMSPlan: weeksOverride must be a finite number >= 1');
+  }
+  if (input.weeklyPercent != null && (!Number.isFinite(input.weeklyPercent) || input.weeklyPercent <= -1)) {
+    throw new Error('buildLMSPlan: weeklyPercent must be finite and greater than -100%');
+  }
+  if (template.meta.correctionPct <= -1) throw new Error('buildLMSPlan: correctionPct must be greater than -100%');
   const exercises = extractExercises(template);
 
   // Faithful multi-week: если задана явная раскладка ВСЕХ недель — используем её
@@ -424,7 +440,11 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     : Math.max(1, Math.round(input.weeksOverride ?? template.meta.weeks));
 
   const pm0Map: Record<string, number> = {};
-  for (const name of exercises) pm0Map[name] = pmFor(name, pmMap, fallbackPm);
+  for (const name of exercises) {
+    const pm = pmFor(name, pmMap, fallbackPm);
+    if (!Number.isFinite(pm) || pm <= 0) throw new Error(`buildLMSPlan: PM for exercise "${name}" must be > 0`);
+    pm0Map[name] = pm;
+  }
 
   // прогрессия PM для каждого упражнения
   const progInput: PMProgressionInput = {
@@ -567,7 +587,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
     // Инъекция ассистентов по слабым точкам СРЦ-движений (все циклы, включая faithful с полными weeks[])
     if (input.plWeakPoints && input.plWeakPoints.length) {
-      injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, combinedMrvMult, input.plWeakPointDayMap);
+      injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, combinedMrvMult, input.plWeakPointDayMap, input.fallbackPm ?? 80);
     }
 
     // Инъекция accessory-упражнений для слабых групп мышц — авто-распределение по 1-2 дням.
@@ -580,6 +600,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       const SMALL_GROUPS_2X = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'delt_rear', 'delt_mid']);
       const userDayMap = input.weakGroupDayMap;
       const allWeekNames = new Set(days.flatMap(d => d.exercises.map(e => norm(e.name))));
+      const fallbackPm = input.fallbackPm ?? 80;
 
       for (const wg of input.weakPoints) {
         const candidates = getExercisesByGroup(wg)
@@ -634,8 +655,8 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           const poolFiltered = candidates.filter(ex => !targetDay.exercises.some(e => norm(e.name) === norm(ex.name)));
           if (poolFiltered.length === 0) continue;
           const pick = (isHeavyDay
-            ? (poolFiltered.find(e => (e as any).type === 'compound') || poolFiltered[0])
-            : (poolFiltered.find(e => (e as any).type === 'isolation') || poolFiltered[0])) as Exercise;
+            ? (poolFiltered.find(e => e.type === 'compound' || e.movementType === 'compound') || poolFiltered[0])
+            : (poolFiltered.find(e => e.type === 'isolation' || e.movementType === 'isolation') || poolFiltered[0])) as Exercise;
 
           // Выбор exercises сделан; tfПротокол
           const pct = isHeavyDay ? 0.68 : 0.55;
@@ -643,21 +664,16 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           let sets = 3;
           const rir = isHeavyDay ? 2 : 3;
           // MRV soft-cap: урезаем sets так, чтобы вписаться в fakeMrvCap
-          let weeklyMuscleSets = 0;
-          for (const d of days) {
-            weeklyMuscleSets += d.exercises
-              .filter(e => groupOfExercise(e.name, exEnGroup(e.group) || '') === wg)
-              .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
-          }
-          if (weeklyMuscleSets + sets > fakeMrvCap) {
-            const margin = Math.max(0, fakeMrvCap - weeklyMuscleSets);
+           const currentMuscleSets = weeklyMuscleSets(days, wg);
+           if (currentMuscleSets + sets > fakeMrvCap) {
+             const margin = Math.max(0, fakeMrvCap - currentMuscleSets);
             if (margin < 2) continue; // бюджета не хватает даже на минимум
             sets = margin; // урезаем подходы, чтобы вписаться в cap
           }
           // Day cap: упражнений ≤ 8
           if (targetDay.exercises.length >= 8) continue;
 
-          const wPm = pmRow[pick.name] ?? 80;
+           const wPm = pmRow[pick.name] ?? fallbackPm;
           targetDay.exercises.push({
             name: pick.name,
             group: wg,
@@ -737,7 +753,8 @@ function applyPLTaper(weeks: LMSPlanWeek[], totalWeeks: number): LMSPlanWeek[] {
   return weeks.map((wk, idx) => {
     if (idx !== prevIdx && idx !== lastIdx) return wk;
     // Guard: если неделя уже low-volume (< 60% от предыдущей) — не применять taper.
-    if (refVolume > 0 && weekVolume(wk) < refVolume * 0.6) return wk;
+     if (mesocyclePhaseForWeek(wk.week, totalWeeks) === 'deload') return wk;
+     if (refVolume > 0 && weekVolume(wk) < refVolume * 0.6) return wk;
     const volumeMult = idx === prevIdx ? 0.65 : 0.45;
     const rirAdd = idx === prevIdx ? 1 : 2;
     const newDays = wk.days.map(d => ({

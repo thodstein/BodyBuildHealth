@@ -5,7 +5,7 @@
  * Критерии скоринга: направление(цель), уровень, период, мин.вес тела, доступные
  * тренировочные дни/нед, режим (натурал/курс/ПКТ). Возвращает ранжированный список.
  */
-import { LMS_CYCLES } from '../../data/lms-cycles/lms-cycle-index';
+import { LMS_CYCLES, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
 
 export type UserGoal = 'strength' | 'mass' | 'endurance' | 'peak' | 'mixed';
@@ -42,14 +42,9 @@ function levelRank(lvl: string): number {
   return i < 0 ? 3 : i;
 }
 
-/** Нормализовать уровень пользователя под ключи циклов. */
-function normUserLevel(lvl: UserLevel): string {
-  return lvl;
-}
-
 export function rankCycles(input: LMSSelectorInput): LMSRankedCycle[] {
   const out: LMSRankedCycle[] = [];
-  const userLevelRank = levelRank(normUserLevel(input.level));
+  const userLevelRank = levelRank(input.level);
   const acceptablePeriods = GOAL_TO_PERIOD[input.goal] || [input.goal];
 
   for (const cycle of LMS_CYCLES) {
@@ -68,9 +63,14 @@ export function rankCycles(input: LMSSelectorInput): LMSRankedCycle[] {
     }
 
     // направление
+    const requestedDirection = input.direction ? normalizeCycleDirection(input.direction) : undefined;
+    const cycleDirection = normalizeCycleDirection(m.direction);
     if (input.direction && m.direction === input.direction) {
       score += 25;
       rationale.push(`направление «${m.direction}» совпадает`);
+    } else if (input.direction && requestedDirection === cycleDirection) {
+      score += 12;
+      rationale.push(`направление «${m.direction}» совместимо с «${input.direction}»`);
     } else if (input.direction) {
       score -= 15;
       warnings.push(`направление «${m.direction}» отличается от запрошенного «${input.direction}»`);

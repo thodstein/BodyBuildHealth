@@ -115,5 +115,13 @@ describe('summarizePLFeedback', () => {
     expect(summary.withFact).toBe(0);
     expect(summary.noData).toBe(feedback.length);
     expect(summary.avgRirDelta).toBeNull();
+    expect(summary.plateau).toBe(0);
+  });
+
+  it('не называет единичный тяжёлый подход плато', () => {
+    const plan = buildPlan();
+    const exName = plan.weeks.at(-1)!.days[0].exercises[0].name;
+    const feedback = computePLPlanFeedback(plan, [makeSession(exName, '2026-07-01', [{ weight: 100, reps: 5, rir: 0 }])]);
+    expect(summarizePLFeedback(feedback).plateau).toBe(0);
   });
 });

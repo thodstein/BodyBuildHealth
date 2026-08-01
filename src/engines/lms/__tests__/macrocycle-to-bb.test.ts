@@ -87,17 +87,17 @@ describe('macrocycleToBBProgram', () => {
     }
   });
 
-  it('fallback: при ошибке сборки создаёт скелет с пустыми sessions', () => {
-    // Некорректные опции, чтобы autodraftBBPlan бросил
-    const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 8 });
+  it('invalid options still produce a valid macrocycle-sized BB program', () => {
+    // The current autodraft path normalizes invalid labels instead of throwing.
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 12 });
     const prog = macrocycleToBBProgram(macro, {
       ...baseOpts,
       level: 'invalid_level_xyz',
       goal: 'invalid_goal_xyz',
     });
-    // Должен вернуть валидный UserProgram (fallback)
+    // Должен вернуть валидный UserProgram соответствующего размера.
     expect(prog.meta.direction).toBe('bb');
-    expect(prog.bb!.weeks).toHaveLength(8);
+    expect(prog.bb!.weeks).toHaveLength(12);
     expect(prog.meta.title).toContain('Годовой план ББ');
   });
 });

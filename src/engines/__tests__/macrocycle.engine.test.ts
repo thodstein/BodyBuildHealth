@@ -2,11 +2,23 @@ import { describe, it, expect } from 'vitest';
 import {
   buildMacrocycle, rebalanceMacrocycle, macrocycleToActiveCycle,
   serializeMacro, deserializeMacro, estimateCompetitionWeek,
+  findBlockByPhase,
   PHASE_LABEL_RU,
   type Macrocycle, type MacroRebalanceEdit,
 } from '../lms/macrocycle.engine';
 
 describe('buildMacrocycle', () => {
+  it('ограничивает длину макроцикла безопасным диапазоном', () => {
+    expect(buildMacrocycle({ level: 'intermediate', goal: 'general', totalWeeks: 0 }).totalWeeks).toBe(52);
+    expect(buildMacrocycle({ level: 'intermediate', goal: 'general', totalWeeks: -2 }).totalWeeks).toBe(12);
+    expect(buildMacrocycle({ level: 'intermediate', goal: 'general', totalWeeks: 200 }).totalWeeks).toBe(104);
+  });
+  it('findBlockByPhase returns the first matching block or undefined', () => {
+    const m = buildMacrocycle({ level: 'II-KMS', goal: 'powerlifting', totalWeeks: 52 });
+    expect(findBlockByPhase(m, 'strength')?.phase).toBe('strength');
+    expect(findBlockByPhase(m, 'competition')?.weekOffset).toBeGreaterThan(0);
+    expect(findBlockByPhase({ ...m, blocks: [] }, 'strength')).toBeUndefined();
+  });
   it('создаёт 5 блоков фаз', () => {
     const m = buildMacrocycle({ level: 'II-KMS', goal: 'powerlifting', totalWeeks: 52 });
     expect(m.blocks).toHaveLength(5);
@@ -31,6 +43,8 @@ describe('buildMacrocycle', () => {
   it('competitionWeek передаётся в результат', () => {
     const m = buildMacrocycle({ level: 'II-KMS', goal: 'powerlifting', totalWeeks: 52, competitionWeek: 44 });
     expect(m.competitionWeek).toBe(44);
+    const competition = m.blocks.find(b => b.phase === 'competition');
+    expect(competition?.weekOffset).toBe(44);
   });
 
   it('каждый блок имеет cycleId или описание для BB', () => {
@@ -72,6 +86,7 @@ describe('macrocycleToActiveCycle', () => {
   it('неделя 0 (вне диапазона) → fallback на первый блок', () => {
     const r = macrocycleToActiveCycle(m, 0);
     expect(r).not.toBeNull();
+    expect(r!.block.phase).toBe('endurance');
   });
 
   it('неделя > total → fallback на последний блок', () => {
@@ -110,6 +125,25 @@ describe('rebalanceMacrocycle', () => {
     const sum = r.blocks.reduce((s, b) => s + b.weeks, 0);
     expect(sum).toBe(52);
   });
+
+  it('пропорционально распределяет правку между повторяющимися фазами', () => {
+    const m: Macrocycle = {
+      blocks: [
+        { phase: 'peak', weeks: 2, weekOffset: 1, kind: 'SRC', description: 'a', competitionId: 'a' },
+        { phase: 'competition', weeks: 1, weekOffset: 3, kind: 'SRC', description: 'a' },
+        { phase: 'peak', weeks: 4, weekOffset: 4, kind: 'SRC', description: 'b', competitionId: 'b' },
+        { phase: 'competition', weeks: 1, weekOffset: 8, kind: 'SRC', description: 'b' },
+      ],
+      totalWeeks: 14,
+      competitions: [],
+      rationale: [],
+    };
+    const result = rebalanceMacrocycle(m, [{ phase: 'peak', weeks: 9 }]);
+    const peaks = result.blocks.filter(block => block.phase === 'peak');
+    expect(peaks.map(block => block.weeks)).toEqual([3, 6]);
+    expect(result.competitions).toEqual([]);
+    expect(result.blocks.reduce((sum, block) => sum + block.weeks, 0)).toBe(14);
+  });
 });
 
 describe('serialize / deserialize', () => {
@@ -118,9 +152,10 @@ describe('serialize / deserialize', () => {
     const s = serializeMacro(m);
     const r = deserializeMacro(s);
     expect(r).not.toBeNull();
-    expect(r!.blocks).toHaveLength(5);
+    expect(r!.blocks.find(block => block.phase === 'competition')?.weekOffset).toBe(44);
     expect(r!.totalWeeks).toBe(52);
     expect(r!.competitionWeek).toBe(44);
+    expect(r!.competitions?.[0]?.week).toBe(44);
     expect(r!.blocks[0].phase).toBe('endurance');
     expect(r!.blocks[0].weekOffset).toBe(1);
   });
@@ -143,6 +178,14 @@ describe('estimateCompetitionWeek', () => {
     const past = new Date(Date.now() - 365 * 86400000).toISOString();
     const w = estimateCompetitionWeek(past, 52);
     expect(w).toBeGreaterThanOrEqual(1);
+  });
+
+  it('accepts a deterministic reference date', () => {
+    expect(estimateCompetitionWeek('2026-08-15', 12, '2026-08-01')).toBe(3);
+  });
+
+  it('невалидная дата → безопасный fallback', () => {
+    expect(estimateCompetitionWeek('not-a-date', 52)).toBe(44);
   });
 });
 

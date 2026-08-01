@@ -203,7 +203,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
               }
             </div>
           )}
-          <SessionList sessions={w.sessions} onChange={(sessions) => updateWeek(wi, { sessions })} />
+          <SessionList sessions={w.sessions} phase={w.phase} onChange={(sessions) => updateWeek(wi, { sessions })} />
         </div>
       ))}
       {/* P0-1: Ротация — упражнения старше 4 недель */}
@@ -255,7 +255,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
   );
 };
 
-const SessionList: React.FC<{ sessions: UserSession[]; onChange: (s: UserSession[]) => void }> = ({ sessions, onChange }) => {
+const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']; onChange: (s: UserSession[]) => void }> = ({ sessions, phase, onChange }) => {
   const addSession = () => onChange([...sessions, { id: newId('ses'), name: 'День ' + (sessions.length + 1), focus: '', blocks: [] }]);
   const updateSession = (si: number, patch: Partial<UserSession>) => onChange(sessions.map((s, i) => i === si ? { ...s, ...patch } : s));
   // U4: confirm-диалог при удалении сессии
@@ -292,7 +292,7 @@ const SessionList: React.FC<{ sessions: UserSession[]; onChange: (s: UserSession
             <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38 }} onClick={() => cloneSession(si)} title="Клонировать сессию">⧉</button>
             <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeSession(si)}>✕</button>
           </div>
-          <BlockList blocks={s.blocks} onChange={(blocks) => updateSession(si, { blocks })} />
+          <BlockList blocks={s.blocks} phase={phase} onChange={(blocks) => updateSession(si, { blocks })} />
         </div>
       ))}
       <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38 }} onClick={addSession}>+ Сессия</button>
@@ -300,7 +300,7 @@ const SessionList: React.FC<{ sessions: UserSession[]; onChange: (s: UserSession
   );
 };
 
-const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => void }> = ({ blocks, onChange }) => {
+const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onChange: (b: UserBlock[]) => void }> = ({ blocks, phase, onChange }) => {
   const addBlock = () => onChange([...blocks, { id: newId('blk'), type: 'accessory', exerciseName: '', muscle: '', role: 'accessory', sets: [{ reps: 10, rir: 2 }] }]);
   const updateBlock = (bi: number, patch: Partial<UserBlock>) => onChange(blocks.map((b, i) => i === bi ? { ...b, ...patch } : b));
   // F2.2: clipboard для копирования блоков между сессиями/неделями (localStorage, т.к. в SPA мало памяти)
@@ -503,7 +503,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; onChange: (b: UserBlock[]) => v
           {/* P0-3: Гид по темпу и отдыху */}
           {b.type === 'compound' || b.type === 'accessory' ? (() => {
             const ch = b.character || (b.type === 'compound' ? 'тяж' : 'памп');
-            const spec = tempoFor(ch as 'тяж' | 'памп' | 'лёг');
+             const spec = tempoFor(ch as 'тяж' | 'памп' | 'лёг', undefined, phase);
             const rest = REST_BY_CHARACTER[ch as 'тяж' | 'памп' | 'лёг'] ?? 90;
             const reps = typeof b.sets[0]?.reps === 'number' ? b.sets[0].reps as number : 10;
             const tut = spec.tutPerRep * reps;

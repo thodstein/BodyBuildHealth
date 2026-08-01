@@ -36,13 +36,16 @@ export function courseDefaultPercent(intensity?: 'mild' | 'moderate' | 'heavy'):
 }
 
 export function resolveWeeklyPercent(input: PMProgressionInput): number {
-  if (input.weeklyPercent != null) return input.weeklyPercent;
-  if (input.mode === 'on_course') return courseDefaultPercent(input.courseIntensity);
-  return DEFAULT_WEEKLY_PERCENT[input.mode] ?? 0.005;
+  const value = input.weeklyPercent != null
+    ? input.weeklyPercent
+    : input.mode === 'on_course' ? courseDefaultPercent(input.courseIntensity) : DEFAULT_WEEKLY_PERCENT[input.mode] ?? 0.005;
+  if (!Number.isFinite(value) || value <= -1) throw new Error('resolveWeeklyPercent: weekly percent must be finite and greater than -100%');
+  return value;
 }
 
 /** PM на конкретной неделе (1-индекс: неделя 1 = PM0, прирост начинается со 2-й недели). */
 export function pmForWeek(input: PMProgressionInput, weekNumber: number): number {
+  if (!Number.isFinite(input.pm0) || input.pm0 <= 0) throw new Error('pmForWeek: pm0 must be > 0');
   const k = resolveWeeklyPercent(input);
   if (weekNumber <= 1) return input.pm0;
   return input.pm0 * Math.pow(1 + k, weekNumber - 1);
@@ -50,6 +53,8 @@ export function pmForWeek(input: PMProgressionInput, weekNumber: number): number
 
 /** Полный ряд PM по всем неделям цикла. */
 export function pmProgression(input: PMProgressionInput): number[] {
+  if (!Number.isFinite(input.pm0) || input.pm0 <= 0) throw new Error('pmProgression: pm0 must be > 0');
+  if (!Number.isFinite(input.weeks) || input.weeks < 0) throw new Error('pmProgression: weeks must be >= 0');
   const k = resolveWeeklyPercent(input);
   const out: number[] = [];
   for (let w = 0; w < input.weeks; w++) {

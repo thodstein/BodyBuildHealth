@@ -44,7 +44,9 @@ import { generateRepTempo, type RepTempoOutput } from '../../engines/rep-tempo-e
 import { MesocycleProgressionCard } from './TrainingScreen_parts/MesocycleProgressionCard';
 import { DeloadProtocolCard } from './TrainingScreen_parts/DeloadProtocolCard';
 import { MacrocyclePanel } from './SRCBBScreen_parts/MacrocyclePanel';
-import { deserializeMacro } from '../../engines/lms/macrocycle.engine';
+import { deserializeMacro, type Macrocycle } from '../../engines/lms/macrocycle.engine';
+import { macroPhaseToLmsPhase } from '../../engines/periodization/phase-bridge';
+import { calcCycleMetrics, type SRExercise } from '../../engines/lms/lms-metrics.engine';
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
 
 const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepTempoOutput => {
@@ -172,8 +174,18 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     return saved || 'cycle-01';
   });
   const [cycleWeeks, setCycleWeeks] = useState<number>(_plSaved?.cycleWeeks ?? 12);
-  const [builtSrc, setBuiltSrc] = useState<LMSBuildOutput | null>(_plSaved?.builtSrc ?? null);
+  const validateSavedSrc = (plan: any): LMSBuildOutput | null => {
+    if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return null;
+    if (!plan.weeks.every((week: any) => week && Number.isFinite(week.week) && Array.isArray(week.days))) return null;
+    if (!plan.weeks.every((week: any) => week.days.every((day: any) => day && Array.isArray(day.exercises)))) return null;
+    return plan as LMSBuildOutput;
+  };
+  const [builtSrc, setBuiltSrc] = useState<LMSBuildOutput | null>(() => validateSavedSrc(_plSaved?.builtSrc));
   const [srcWeek, setSrcWeek] = useState<number>(_plSaved?.srcWeek ?? 1);
+  useEffect(() => {
+    if (!builtSrc) return;
+    setSrcWeek(current => Math.max(1, Math.min(builtSrc.weeks.length, current)));
+  }, [builtSrc]);
   useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs]);
   useEffect(() => { initExercisePMs(selectedCycleId); }, [selectedCycleId]);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), pmSquat, pmBench, pmDead, bodyWeight: bw }); } catch { /* ignore */ } }, [pmSquat, pmBench, pmDead, bw]);
@@ -229,15 +241,15 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const ranked = useMemo(() => rankCycles({ goal: goal as any, level: level as any, bodyWeight: bw, daysPerWeek: days, direction: dir as any, mode: 'natural' }).filter(r => normalizeCycleDirection(r.cycle.meta.direction) !== 'bodybuilding'), [goal, level, bw, days, dir]);
   const best = ranked[0];
 
-  const buildSrc = () => {
-    const tpl = getCycleById(selectedCycleId);
+  const buildSrc = (cycleId = selectedCycleId, weeks = cycleWeeks) => {
+    const tpl = getCycleById(cycleId);
     if (!tpl) return;
     const pmMap: Record<string, number> = { ...exercisePMs };
     if (!pmMap['Присед']) pmMap['Присед'] = pmSquat;
     if (!pmMap['Жим лежа']) pmMap['Жим лежа'] = pmBench;
     if (!pmMap['Становая тяга']) pmMap['Становая тяга'] = pmDead;
     const plan = buildLMSPlan({
-      template: tpl, pmMap, fallbackPm: 80, mode: peds.length ? 'on_course' : 'natural', courseIntensity, weeksOverride: cycleWeeks,
+      template: tpl, pmMap, fallbackPm: 80, mode: peds.length ? 'on_course' : 'natural', courseIntensity, weeksOverride: weeks,
       volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
       focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
       currentReadiness: linked.readiness?.recovery,
@@ -258,6 +270,72 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     setBuiltSrc(plan); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setSrcAdditions({}); setPickerDay(null);
     // TRAINING INTEGRATION: конвертировать PL план в сессии
     try { const sessions = lmsPlanToSessions(plan); saveBridgeSessions(sessions); } catch { /* ignore */ }
+  };
+
+  const buildSrcMacrocycle = (macro: Macrocycle) => {
+    const unsupported = macro.blocks.find(block => block.kind !== 'SRC' || !block.cycleId);
+    if (unsupported) {
+      throw new Error(`Фаза «${unsupported.phase}» не содержит доступного СРЦ-цикла для PL-плана`);
+    }
+    const outputs = macro.blocks
+      .map(block => {
+        const cycle = getCycleById(block.cycleId!);
+        if (!cycle) return null;
+        const output = buildLMSPlan({
+          template: cycle,
+          pmMap: { ...exercisePMs, 'Присед': exercisePMs['Присед'] || pmSquat, 'Жим лежа': exercisePMs['Жим лежа'] || pmBench, 'Становая тяга': exercisePMs['Становая тяга'] || pmDead },
+          fallbackPm: 80,
+          mode: peds.length ? 'on_course' : 'natural',
+          courseIntensity,
+          weeksOverride: block.weeks,
+          volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
+          focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
+          currentReadiness: linked.readiness?.recovery,
+          equipment: (linked.profile?.settings as Record<string, any> | undefined)?.equipment,
+          weakPoints,
+          plWeakPoints,
+          weakGroupDayMap,
+          plWeakPointDayMap,
+          peds: peds.length ? peds : undefined,
+          pedDoses,
+          acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
+          autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
+        });
+        const blockWeeks = Array.from({ length: block.weeks }, (_, index) => {
+          const source = output.weeks[index % output.weeks.length];
+          return { ...source, week: index + 1 };
+        });
+        return { block, output: { ...output, weeks: blockWeeks } };
+      })
+      .filter((item): item is { block: Macrocycle['blocks'][number]; output: LMSBuildOutput } => item !== null);
+    if (outputs.length === 0) throw new Error('В макроцикле нет доступных СРЦ-циклов');
+    const weeks = outputs.flatMap(({ block, output }) => output.weeks.map(week => ({
+      ...week,
+      week: block.weekOffset + week.week - 1,
+      macroPhase: block.phase,
+    })));
+    if (weeks.length !== macro.totalWeeks || weeks.some((week, index) => week.week !== index + 1)) {
+      throw new Error('Блоки макроцикла не покрывают все недели последовательно');
+    }
+    const sessions = weeks.flatMap(week => week.days.map(day => day.exercises.map(exercise => ({
+      name: exercise.name, group: exercise.group, coef: exercise.coef, mnosz: exercise.mnosz, pm: exercise.pm,
+      sets: exercise.workSets.map(set => ({ weight: set.weight, reps: set.reps, sets: set.sets })),
+    } as SRExercise))));
+    const first = outputs[0].output;
+    const combined: LMSBuildOutput = {
+      ...first,
+      template: first.template,
+      weeks,
+      cycleMetrics: calcCycleMetrics(sessions),
+      progressionRationale: `Макроцикл: ${outputs.length} СРЦ-блок(ов), ${weeks.length} недель. ` + outputs.map(({ block, output }) => `${block.phase} ${block.weekOffset}-${block.weekOffset + block.weeks - 1}: ${output.template.meta.title}`).join('; '),
+    };
+    setBuiltSrc(combined);
+    setCycleWeeks(macro.totalWeeks);
+    setSrcWeek(1);
+    setSrcEdits({});
+    setEditMode(false);
+    setSubView('plan');
+    try { saveBridgeSessions(lmsPlanToSessions(combined)); } catch { /* ignore */ }
   };
 
   // ── BB ──
@@ -434,9 +512,16 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     return bridgeSessions.filter(s => s.weekNumber === bridgeWeek);
   }, [bridgeSessions, bridgeWeek]);
   const bridgeWeekPhase = useMemo(() => {
+    const explicit = bridgeWeekSessions.find(session => session.macroPhase)?.macroPhase;
+    if (explicit) return explicit;
     const totalW = bridgeWeeks.length || 12;
     return mesocyclePhaseForWeek(bridgeWeek, Math.max(totalW, bridgeWeek));
-  }, [bridgeWeek, bridgeWeeks]);
+  }, [bridgeWeek, bridgeWeeks, bridgeWeekSessions]);
+  const displayPhaseForWeek = (week: LMSBuildOutput['weeks'][number], totalWeeks: number): string => {
+    return week.macroPhase
+      ? macroPhaseToLmsPhase(week.macroPhase as Macrocycle['blocks'][number]['phase'])
+      : mesocyclePhaseForWeek(week.week, totalWeeks);
+  };
 
   const bbRanked = useMemo(() => rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays }), [bbLevel, bbGoal, bbDays]);
   const bbBest = bbRanked[0];
@@ -516,7 +601,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const togglePed = (p: PED) => setPeds(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
   const srcDays: PlayerDay[] = useMemo(() => {
     if (!builtSrc || !Array.isArray(builtSrc.weeks) || !builtSrc.weeks.length) return [];
-    const wk0 = builtSrc.weeks[0]; const w0 = wk0.week;
+     const wk0 = builtSrc.weeks[Math.min(Math.max(srcWeek - 1, 0), builtSrc.weeks.length - 1)]; const w0 = wk0.week;
     return wk0.days.map((d, i) => ({
       label: `Д${i + 1}`,
       exercises: [
@@ -532,7 +617,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
         })),
       ],
     }));
-  }, [builtSrc, srcEdits, srcAdditions, autoRegOn, autoRegMode, autoRegResult, diaryAutoreg, priAdjust, tempoAdjust, rirShiftAdjust, deloadAdjust, peakAdjust]);
+  }, [builtSrc, srcWeek, srcEdits, srcAdditions, autoRegOn, autoRegMode, autoRegResult, diaryAutoreg, priAdjust, tempoAdjust, rirShiftAdjust, deloadAdjust, peakAdjust]);
 
   const bbDaysArr: PlayerDay[] = useMemo(() => {
     if (!builtBb || !Array.isArray(builtBb.weeks) || !builtBb.weeks.length) return [];
@@ -705,7 +790,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             <PopupNumber label="Дней в неделю" value={days} min={2} max={7} suffix="" onChange={v => setDays(v)} />
             <PopupNumber label="Вес тела" value={bw} min={40} max={200} suffix=" кг" onChange={v => setBw(v)} />
           </div>
-          {best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { setSelectedCycleId(best.cycle.meta.id); setTimeout(buildSrc, 0); }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,var(--accent),#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
+          {best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { setSelectedCycleId(best.cycle.meta.id); buildSrc(best.cycle.meta.id); }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,var(--accent),#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
           <div style={H}>📂 Каталог силовых циклов ({plCycles.length})</div>
           <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={plCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${({ powerlifting: 'Троеборье', bench: 'Жим лёжа', deadlift_bench: 'Тяга+Жим', armwrestling: 'Армрестлинг' } as Record<string,string>)[c.meta.direction] || c.meta.direction} · ${c.meta.period} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
           {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
@@ -899,12 +984,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               </div>
             )}
           </div>
-          <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={buildSrc}>Сгенерировать план ({cycleWeeks} нед)</button>
+           <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={() => buildSrc()}>Сгенерировать план ({cycleWeeks} нед)</button>
           {builtSrc && (() => {
             const W = builtSrc.weeks;
             const wk = W[Math.min(srcWeek, W.length) - 1] || W[0];
             const totalW = W.length;
-            const phase = mesocyclePhaseForWeek(wk.week, totalW);
+            const phase = displayPhaseForWeek(wk, totalW);
             const PH_RU: Record<string,string> = { base: 'База (накопление)', build: 'Накопление (рост объёма)', peak: 'Пик (интенсификация)', deload: 'Разгрузка' };
             const PH_COLOR: Record<string,string> = { base: '#22c55e', build: '#eab308', peak: '#ef4444', deload: '#60a5fa' };
             const PH_DESC: Record<string,string> = {
@@ -1022,14 +1107,14 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   <span style={{ fontSize:11, fontWeight:700, color:PH_COLOR[phase], background:PH_COLOR[phase]+'22', padding:'2px 10px', borderRadius:8 }}>{PH_RU[phase]}</span>
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
-                  {W.map(w => { const ph = mesocyclePhaseForWeek(w.week, totalW); const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+PH_RU[ph]} style={{ padding:'6px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? PH_COLOR[ph] : PH_COLOR[ph]+'1a', color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:36, minWidth:0 }}>{w.week}</button>; })}
+                  {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+PH_RU[ph]} style={{ padding:'6px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? PH_COLOR[ph] : PH_COLOR[ph]+'1a', color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:36, minWidth:0 }}>{w.week}</button>; })}
                 </div>
               </div>
               {/* Визуальный календарь мезоцикла: недели × дни с тоннажём и фазой */}
               <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>📅 Календарь мезоцикла (нед × дни, тоннаж)</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {W.map(w => { const ph = mesocyclePhaseForWeek(w.week, totalW); const active = w.week === wk.week; const maxT = Math.max(1, ...W.map(ww => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0))); const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0); return (
+                  {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const active = w.week === wk.week; const maxT = Math.max(1, ...W.map(ww => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0))); const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0); return (
                     <div key={w.week} onClick={() => setSrcWeek(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', background: active ? 'var(--accent-dim)' : 'transparent', border: active ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent' }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: active ? 'var(--accent)' : 'rgba(255,255,255,0.7)', minWidth: 26 }}>Н{w.week}</span>
                       <span style={{ width: 4, height: 14, borderRadius: 2, background: PH_COLOR[ph], flexShrink: 0 }} title={PH_RU[ph]} />
@@ -1743,7 +1828,14 @@ legs: [
         </div>
       )}
 
-      {subView === 'macro' && <MacrocyclePanel level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyCycle={(cycleId, weeks) => {
+      {subView === 'macro' && <MacrocyclePanel level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyMacrocycle={mainTab === 'pl' ? (macro) => {
+        try {
+          buildSrcMacrocycle(macro);
+        } catch (error) {
+          setMethodNote(`⚠ Макроцикл не применён: ${(error as Error).message}`);
+          setSubView('plan');
+        }
+      } : undefined} onApplyCycle={(cycleId, weeks) => {
         if (mainTab === 'bb') {
           // ББ-авто: применить длительность макроцикла + фазы (объём/RIR по 5 фазам) к плану.
           try {
@@ -1782,8 +1874,9 @@ legs: [
           setSubView('plan');
         } else {
           // ПЛ-авто: загрузить выбранный СРЦ-цикл
-          setSelectedCycleId(cycleId);
-          setCycleWeeks(weeks);
+           setSelectedCycleId(cycleId);
+           setCycleWeeks(weeks);
+           buildSrc(cycleId, weeks);
           setSubView('plan');
         }
       }} />}

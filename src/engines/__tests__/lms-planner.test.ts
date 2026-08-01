@@ -366,6 +366,26 @@ describe('pmProgression', () => {
     expect(result[3]).toBeCloseTo(100 * Math.pow(1.01, 3), 0);
   });
 
+  it('rejects invalid PM and progression inputs', () => {
+    expect(() => pmProgression({ pm0: 0, weeks: 4, mode: 'natural' })).toThrow('pm0 must be > 0');
+    expect(() => pmProgression({ pm0: 100, weeks: 4, mode: 'natural', weeklyPercent: -1 })).toThrow('greater than -100%');
+    expect(() => pmProgression({ pm0: 100, weeks: -1, mode: 'natural' })).toThrow('weeks must be >= 0');
+  });
+
+  it('rejects invalid builder week overrides and progression rates', () => {
+    expect(() => buildLMSPlan({ template: CYCLE_01, pmMap, weeksOverride: Number.NaN })).toThrow('weeksOverride');
+    expect(() => buildLMSPlan({ template: CYCLE_01, pmMap, weeklyPercent: -1 })).toThrow('weeklyPercent');
+    expect(() => buildLMSPlan({ template: CYCLE_01, pmMap, weeksOverride: 0 })).toThrow('weeksOverride');
+  });
+
+  it('validates sets in explicit weeks, not only week1', () => {
+    const explicit = {
+      ...CYCLE_01,
+      weeks: [CYCLE_01.week1, [{ ...CYCLE_01.week1[0], exercises: [{ ...CYCLE_01.week1[0].exercises[0], sets: [{ pct: 0, reps: 5, sets: 3 }] }] }]],
+    };
+    expect(() => buildLMSPlan({ template: explicit, pmMap })).toThrow('explicit week 2');
+  });
+
   it('pmForWeek: единичная неделя', () => {
     expect(pmForWeek({ pm0: 200, weeks: 12, mode: 'natural' }, 5))
       .toBeCloseTo(200 * Math.pow(1.005, 4), 0);
@@ -429,5 +449,12 @@ describe('lmsPlanToSessions', () => {
     const plan = buildCycle01Plan({ weeksOverride: 1 });
     const sessions = lmsPlanToSessions(plan);
     expect(sessions[0].weekNumber).toBe(1);
+  });
+
+  it('сохраняет фазу макроцикла в bridge-сессиях', () => {
+    const plan = buildLMSPlan({ template: CYCLE_01, pmMap, fallbackPm: 80, weeksOverride: 2 });
+    plan.weeks[0].macroPhase = 'strength';
+    const sessions = lmsPlanToSessions(plan);
+    expect(sessions[0].macroPhase).toBe('strength');
   });
 });

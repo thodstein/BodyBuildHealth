@@ -45,6 +45,13 @@ describe('rankCycles', () => {
     expect(hasWarning).toBe(true);
   });
 
+  it('считает родственное PL-направление совместимым', () => {
+    const ranked = rankCycles({ goal: 'strength', level: 'II-KMS', direction: 'bench' });
+    const powerlifting = ranked.find(r => r.cycle.meta.direction === 'powerlifting');
+    expect(powerlifting).toBeTruthy();
+    expect(powerlifting!.rationale.some(x => x.includes('совместимо'))).toBe(true);
+  });
+
   it('каждый элемент имеет rationale и warnings массивы', () => {
     const ranked = rankCycles({ goal: 'strength', level: 'II-KMS' });
     for (const r of ranked) {

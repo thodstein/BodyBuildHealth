@@ -11,6 +11,8 @@
 import type { LMSBuildOutput, LMSPlanExercise } from './lms-builder.engine';
 import type { WorkoutSession, WorkoutExercise } from '../workout-logger.engine';
 import { prescribeLoad, type LoadStrategy } from '../bb/bb-autocoach.engine';
+import { epley1RM } from '../e1rm';
+import { mesocyclePhaseForWeek } from '../rir-matrix.engine';
 
 export interface PLExerciseLastResult {
   exerciseName: string;
@@ -51,17 +53,11 @@ function normName(s: string): string {
     .trim();
 }
 
-/** Epley: 1RM = w / (1 - reps/36). */
-function e1rm(weight: number, reps: number): number {
-  if (weight <= 0 || reps <= 0) return 0;
-  return Math.round(weight / (1 - reps / 36));
-}
-
 function topSetOf(ex: WorkoutExercise): { weight: number; reps: number; rir: number } | null {
   if (!ex.sets || ex.sets.length === 0) return null;
   let best = ex.sets[0];
   for (const s of ex.sets) {
-    if (s.weightKg * s.reps > best.weightKg * best.reps) best = s;
+    if (s.weightKg > best.weightKg) best = s;
   }
   return { weight: best.weightKg, reps: best.reps, rir: best.rir };
 }
@@ -82,7 +78,7 @@ function buildLastResultIndex(sessions: WorkoutSession[]): Map<string, PLExercis
         topWeight: top.weight,
         topReps: top.reps,
         actualRir: top.rir,
-        e1rm: e1rm(top.weight, top.reps),
+        e1rm: epley1RM(top.weight, top.reps),
         totalVolume: ex.totalVolume || 0,
         setsDone: (ex.sets || []).length,
       });
@@ -117,9 +113,14 @@ export function computePLPlanFeedback(
       // fuzzy match: ищем по точному ключу, иначе по includes
       let last: PLExerciseLastResult | null = idx.get(key) || null;
       if (!last) {
-        for (const [k, v] of idx) {
-          if (k.length > 2 && key.length > 2 && (k.includes(key) || key.includes(k))) { last = v; break; }
-        }
+        const candidates = [...idx.entries()].filter(([k]) => {
+          if (k.length <= 2 || key.length <= 2) return false;
+          const keyTokens = new Set(key.split(' '));
+          const candidateTokens = new Set(k.split(' '));
+          const tokenOverlap = [...keyTokens].filter(token => candidateTokens.has(token)).length;
+          return tokenOverlap >= Math.min(keyTokens.size, candidateTokens.size) && (k.includes(key) || key.includes(k));
+        });
+        if (candidates.length === 1) last = candidates[0][1];
       }
 
       const plannedWeight = ex.workSets[0]?.weight ?? 0;
@@ -133,7 +134,7 @@ export function computePLPlanFeedback(
       if (last) {
         rirDelta = last.actualRir - plannedRir;
         // prescribeLoad с plannedRir — success-aware коррекция
-        const phase = 'intensification'; // последняя неделя → intensification/peak
+        const phase = mesocyclePhaseForWeek(weekNum, totalWeeks);
         const presc = prescribeLoad(
           strategy,
           last.topWeight,
@@ -150,7 +151,8 @@ export function computePLPlanFeedback(
         recommendation = { nextWeight: presc.nextWeight, nextReps: presc.nextReps, nextRir: presc.nextRIR, label: presc.label, source: 'fact' };
       } else {
         // нет данных — рекомендация по плану
-        const presc = prescribeLoad(strategy, plannedWeight, plannedReps, plannedRir, maxWeight, weekNum, totalWeeks, 'intensification', 'compound', 'primary');
+        const phase = mesocyclePhaseForWeek(weekNum, totalWeeks);
+        const presc = prescribeLoad(strategy, plannedWeight, plannedReps, plannedRir, maxWeight, weekNum, totalWeeks, phase, 'compound', 'primary');
         recommendation = { nextWeight: presc.nextWeight, nextReps: presc.nextReps, nextRir: presc.nextRIR, label: presc.label, source: 'plan' };
       }
 
@@ -175,7 +177,9 @@ export function computePLPlanFeedback(
 export function summarizePLFeedback(feedback: PLExerciseFeedback[]): { withFact: number; noData: number; plateau: number; avgRirDelta: number | null } {
   const withFact = feedback.filter(f => f.last != null).length;
   const noData = feedback.length - withFact;
-  const plateau = feedback.filter(f => f.last != null && f.last.e1rm > 0 && f.rirDelta != null && f.rirDelta <= -2).length;
+  // RIR delta describes session difficulty, not a longitudinal plateau. A
+  // plateau requires repeated e1RM observations and is not inferable here.
+  const plateau = 0;
   const deltas = feedback.filter(f => f.rirDelta != null).map(f => f.rirDelta!);
   const avgRirDelta = deltas.length > 0 ? deltas.reduce((a, b) => a + b, 0) / deltas.length : null;
   return { withFact, noData, plateau, avgRirDelta };

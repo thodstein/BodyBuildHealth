@@ -82,9 +82,10 @@ function pickCycleForPhase(phase: MacroPhase, level: string, goal: 'powerlifting
   const periods = PHASE_TO_PERIOD[phase];
   const wantStrength = goal === 'powerlifting';
   const candidates = LMS_CYCLES.filter(c => periods.includes(c.meta.period));
-  // Фильтр по направлению: для powerlifting — только strength-циклы, для bodybuilding — BB
+  // Для general направление не ограничиваем: выбираем прежде всего по периоду и уровню.
   const dirFiltered = candidates.filter(c => {
     const nd = normalizeCycleDirection(c.meta.direction);
+    if (goal === 'general') return true;
     return wantStrength ? nd === 'strength' : nd !== 'strength';
   });
   // 1) точное совпадение уровня + направления
@@ -114,8 +115,23 @@ export function buildMacrocycle(input: MacroInput): Macrocycle {
   if (input.competitions && input.competitions.length > 0) {
     return buildMacrocycleMulti(input.competitions, input);
   }
+  // Явная дата/неделя соревнования должна влиять на timeline, а не только
+  // сохраняться в metadata. Используем тот же алгоритм, что и для multi-mode.
+  if (input.competitionWeek != null || input.competitionDate) {
+    const total = Math.max(12, Math.min(104, input.totalWeeks || 52));
+    const week = input.competitionWeek != null
+      ? Math.max(1, Math.min(total, Math.round(input.competitionWeek)))
+      : estimateCompetitionWeek(input.competitionDate!, total);
+    return buildMacrocycleMulti([{
+      id: 'competition_main',
+      name: 'Главное соревнование',
+      week,
+      date: input.competitionDate,
+      priority: 'A',
+    }], { level: input.level, goal: input.goal, totalWeeks: total });
+  }
   // Одиночный режим (обратно-совместимый с предыдущей версией).
-  const total = input.totalWeeks || 52;
+  const total = Math.max(12, Math.min(104, input.totalWeeks || 52));
   const blocks: MacroBlock[] = [];
   const rationale: string[] = [];
   // распределение фаз (доли года): endurance 25%, strength 40%, peak 15%, competition 5%, transition 15%
@@ -162,15 +178,24 @@ export function buildMacrocycle(input: MacroInput): Macrocycle {
  * @param input — базовые параметры (level, goal, totalWeeks)
  */
 export function buildMacrocycleMulti(events: CompetitionEvent[], input: Omit<MacroInput, 'competitions' | 'competitionWeek' | 'competitionDate'>): Macrocycle {
-  const total = input.totalWeeks || 52;
+  const total = Math.max(12, Math.min(104, input.totalWeeks || 52));
   const goal = input.goal;
   const level = input.level;
+  const normalizedEvents = events.map(event => ({
+    ...event,
+    week: Math.max(1, Math.min(total, Math.round(event.week))),
+  }));
   // Сортируем события по неделе, главное (A) — приоритетнее при равенстве.
-  const sorted = [...events].sort((a, b) => {
+  const sorted = normalizedEvents.sort((a, b) => {
     if (a.week !== b.week) return a.week - b.week;
     const pr = { A: 0, B: 1, C: 2 };
     return pr[a.priority] - pr[b.priority];
   });
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].week === sorted[i - 1].week) {
+      throw new Error(`Соревнования не могут проходить на одной неделе (${sorted[i].week})`);
+    }
+  }
 
   const blocks: MacroBlock[] = [];
   const rationale: string[] = [];
@@ -327,14 +352,18 @@ export function buildMacrocycleMulti(events: CompetitionEvent[], input: Omit<Mac
 }
 
 /** Грубая оценка недели соревнований из даты (отсчёт от сегодня). */
-export function estimateCompetitionWeek(isoDate: string, totalWeeks: number = 52): number {
+export function estimateCompetitionWeek(isoDate: string, totalWeeks: number = 52, referenceDate?: string | Date): number {
   try {
     const target = new Date(isoDate).getTime();
-    const now = Date.now();
+    if (!Number.isFinite(target)) return Math.max(1, Math.min(totalWeeks, Math.round(totalWeeks * 0.85)));
+    const reference = referenceDate == null
+      ? Date.now()
+      : (referenceDate instanceof Date ? referenceDate.getTime() : new Date(referenceDate).getTime());
+    const now = Number.isFinite(reference) ? reference : Date.now();
     const daysDiff = Math.round((target - now) / 86400000);
-    const week = Math.round(daysDiff / 7);
+    const week = Math.round(daysDiff / 7) + 1;
     return Math.max(1, Math.min(totalWeeks, week));
-  } catch { return Math.round(totalWeeks * 0.85); }
+  } catch { return Math.max(1, Math.min(totalWeeks, Math.round(totalWeeks * 0.85))); }
 }
 
 /**
@@ -342,6 +371,11 @@ export function estimateCompetitionWeek(isoDate: string, totalWeeks: number = 52
  * Возвращает блок и cycleId, который должен быть активен.
  */
 export function macrocycleToActiveCycle(macro: Macrocycle, weekNumber: number): { block: MacroBlock; cycleId?: string } | null {
+  if (macro.blocks.length === 0) return null;
+  if (weekNumber < macro.blocks[0].weekOffset) {
+    const first = macro.blocks[0];
+    return { block: first, cycleId: first.cycleId };
+  }
   for (const block of macro.blocks) {
     if (weekNumber >= block.weekOffset && weekNumber < block.weekOffset + block.weeks) {
       return { block, cycleId: block.cycleId };
@@ -369,29 +403,66 @@ export interface MacroRebalanceEdit {
  */
 export function rebalanceMacrocycle(macro: Macrocycle, edits: MacroRebalanceEdit[]): Macrocycle {
   const editMap = new Map(edits.map(e => [e.phase, Math.max(1, e.weeks)]));
+  const phaseGroups = new Map<MacroPhase, MacroBlock[]>();
+  for (const block of macro.blocks) {
+    const group = phaseGroups.get(block.phase) ?? [];
+    group.push(block);
+    phaseGroups.set(block.phase, group);
+  }
   const newBlocks: MacroBlock[] = [];
   let offset = 1;
+  const allocations = new Map<MacroBlock, number>();
+  for (const group of phaseGroups.values()) {
+    const requested = editMap.get(group[0].phase);
+    const originalTotal = group.reduce((sum, block) => sum + block.weeks, 0);
+    const target = requested == null ? originalTotal : Math.max(group.length, requested);
+    let allocated = 0;
+    group.forEach((block, index) => {
+      const weeks = index === group.length - 1
+        ? Math.max(1, target - allocated)
+        : Math.max(1, Math.floor(target * block.weeks / Math.max(1, originalTotal)));
+      allocated += weeks;
+      allocations.set(block, weeks);
+    });
+  }
   for (const block of macro.blocks) {
-    const weeks = editMap.get(block.phase) ?? block.weeks;
+    const weeks = allocations.get(block) ?? block.weeks;
     newBlocks.push({ ...block, weeks, weekOffset: offset });
     offset += weeks;
   }
   // подогнать под totalWeeks: разницу в последний блок
   const sum = newBlocks.reduce((s, b) => s + b.weeks, 0);
   if (sum !== macro.totalWeeks && newBlocks.length > 0) {
-    newBlocks[newBlocks.length - 1].weeks += macro.totalWeeks - sum;
+    let difference = macro.totalWeeks - sum;
+    if (difference > 0) {
+      newBlocks[newBlocks.length - 1].weeks += difference;
+    } else {
+      for (let i = newBlocks.length - 1; i >= 0 && difference < 0; i--) {
+        const reducible = Math.min(newBlocks[i].weeks - 1, -difference);
+        newBlocks[i].weeks -= reducible;
+        difference += reducible;
+      }
+    }
     // пересчитать offsets
     let off = 1;
     for (const b of newBlocks) { b.weekOffset = off; off += b.weeks; }
   }
   const newTotal = newBlocks.reduce((s, b) => s + b.weeks, 0);
   const rationale = newBlocks.map(b => `${b.phase}: ${b.weeks} нед (с ${b.weekOffset}), ${b.kind}${b.cycleId ? ' (' + b.cycleId + ')' : ''}`);
-  return { blocks: newBlocks, totalWeeks: newTotal, competitionWeek: macro.competitionWeek, competitionDate: macro.competitionDate, rationale };
+  return {
+    blocks: newBlocks,
+    totalWeeks: newTotal,
+    competitionWeek: macro.competitionWeek,
+    competitionDate: macro.competitionDate,
+    competitions: macro.competitions,
+    rationale,
+  };
 }
 
 /** Сериализация для localStorage (компактная, без лишних полей). */
 export function serializeMacro(macro: Macrocycle): string {
   return JSON.stringify({
+    v: 5,
     b: macro.blocks.map(b => [b.phase, b.weeks, b.weekOffset, b.kind, b.cycleId ?? null, b.description, b.competitionId ?? null]),
     t: macro.totalWeeks,
     c: macro.competitionWeek ?? null,
@@ -408,46 +479,100 @@ export function deserializeMacro(s: string): Macrocycle | null {
   try {
     const o = JSON.parse(s);
     if (!o || !Array.isArray(o.b)) return null;
-    const blocks: MacroBlock[] = o.b.map((b: any) => ({
-      phase: b[0] as MacroPhase,
-      weeks: b[1],
-      weekOffset: b[2],
-      kind: (b[3] || 'SRC') as CycleKind, // v1-миграция: если kind falsy → 'SRC'
-      cycleId: b[4] || undefined,
-      description: b[5] || '',
-      competitionId: b[6] || undefined, // v2: competitionId (может отсутствовать в старых данных)
-    }));
+    if (o.v != null && o.v !== 5 && o.v !== 4 && o.v !== 3 && o.v !== 2 && o.v !== 1) return null;
+    const validPhases: MacroPhase[] = ['endurance', 'strength', 'peak', 'competition', 'transition'];
+    const blocks: MacroBlock[] = o.b.map((b: unknown) => {
+      if (!Array.isArray(b) || !validPhases.includes(b[0]) || !Number.isFinite(b[1]) || b[1] <= 0 || !Number.isFinite(b[2]) || b[2] < 1) {
+        throw new Error('invalid macro block');
+      }
+      const kind = b[3] || 'SRC';
+      if (kind !== 'SRC' && kind !== 'BB') throw new Error('invalid macro block kind');
+      if (b[4] != null && typeof b[4] !== 'string') throw new Error('invalid macro cycleId');
+      if (b[5] != null && typeof b[5] !== 'string') throw new Error('invalid macro description');
+      if (b[6] != null && typeof b[6] !== 'string') throw new Error('invalid macro competitionId');
+      return {
+        phase: b[0] as MacroPhase,
+        weeks: b[1],
+        weekOffset: b[2],
+        kind: kind as CycleKind, // v1-миграция: если kind falsy → 'SRC'
+        cycleId: b[4] || undefined,
+        description: b[5] || '',
+        competitionId: b[6] || undefined, // v2: competitionId (может отсутствовать в старых данных)
+      };
+    });
+    // Старые сохранённые планы могут быть короче 12 недель. Минимум 12
+    // применяется только к новой генерации, но не к валидной миграции storage.
+    if (!Number.isFinite(o.t) || o.t < 1 || o.t > 104 || blocks.length === 0) return null;
+    let expectedOffset = 1;
+    for (const block of blocks) {
+      if (block.weekOffset !== expectedOffset) return null;
+      expectedOffset += block.weeks;
+    }
+    if (expectedOffset - 1 !== o.t) return null;
+    if (blocks.some(block => block.weekOffset + block.weeks - 1 > o.t)) return null;
     // Десериализация competitions (опционально, для обратно-совместимости)
     let competitions: CompetitionEvent[] | undefined;
     if (Array.isArray(o.e)) {
-      competitions = o.e.map((ev: any) => {
+      competitions = o.e.map((ev: unknown, index: number) => {
         // Поддержка двух форматов:
         // v4+ (компактный массив): [id, name, week, date, priority, notes, cycleId, cycleIds]
         // v3- (объект): { id, name, week, date, priority, notes, cycleId, cycleIds }
         if (Array.isArray(ev)) {
+          const priority = ev[4] ?? 'B';
+          if (!['A', 'B', 'C'].includes(priority) || !Number.isFinite(ev[2]) || ev[2] < 1 || ev[2] > o.t) throw new Error('invalid competition');
+          if (ev[0] != null && typeof ev[0] !== 'string') throw new Error('invalid competition id');
+          if (ev[1] != null && typeof ev[1] !== 'string') throw new Error('invalid competition name');
+          if (ev[3] != null && typeof ev[3] !== 'string') throw new Error('invalid competition date');
+          if (ev[5] != null && typeof ev[5] !== 'string') throw new Error('invalid competition notes');
+          if (ev[6] != null && typeof ev[6] !== 'string') throw new Error('invalid competition cycleId');
+          if (ev[7] != null && (!Array.isArray(ev[7]) || ev[7].some((id: unknown) => typeof id !== 'string'))) throw new Error('invalid competition cycleIds');
           return {
-            id: ev[0] ?? 'comp_' + Math.random().toString(36).slice(2, 8),
-            name: ev[1] ?? '',
+             id: ev[0] ?? `comp_${index + 1}`,
+             name: ev[1] ?? '',
             week: ev[2] ?? 1,
             date: ev[3] ?? undefined,
-            priority: ev[4] ?? 'B',
+            priority: priority as CompetitionEvent['priority'],
             notes: ev[5] ?? undefined,
             cycleId: ev[6] ?? undefined,
             cycleIds: Array.isArray(ev[7]) ? ev[7] : undefined, // v4: cycleIds
-          };
+           };
         }
+        if (!ev || typeof ev !== 'object') throw new Error('invalid competition');
+        const record = ev as Record<string, unknown>;
+        const priority = record.priority ?? record.p ?? 'B';
+        const rawWeek = record.week ?? record.w ?? 1;
+        if (typeof priority !== 'string' || !['A', 'B', 'C'].includes(priority) || typeof rawWeek !== 'number' || !Number.isFinite(rawWeek) || rawWeek < 1 || rawWeek > (o.t as number)) throw new Error('invalid competition');
+        const week = rawWeek;
+        const id = record.id ?? record.i;
+        const name = record.name ?? record.n;
+        const date = record.date ?? record.d;
+        const notes = record.notes ?? record.no;
+        const cycleId = record.cycleId ?? record.ci ?? record.cy;
+        const cycleIds = record.cycleIds;
+        if (id != null && typeof id !== 'string') throw new Error('invalid competition id');
+        if (name != null && typeof name !== 'string') throw new Error('invalid competition name');
+        if (date != null && typeof date !== 'string') throw new Error('invalid competition date');
+        if (notes != null && typeof notes !== 'string') throw new Error('invalid competition notes');
+        if (cycleId != null && typeof cycleId !== 'string') throw new Error('invalid competition cycleId');
+        if (cycleIds != null && (!Array.isArray(cycleIds) || cycleIds.some((value: unknown) => typeof value !== 'string'))) throw new Error('invalid competition cycleIds');
         return {
-          id: ev.id ?? ev.i ?? 'comp_' + Math.random().toString(36).slice(2, 8),
-          name: ev.name ?? ev.n ?? '',
-          week: ev.week ?? ev.w ?? 1,
-          date: ev.date ?? ev.d,
-          priority: ev.priority ?? ev.p ?? 'B',
-          notes: ev.notes ?? ev.no,
-          cycleId: ev.cycleId ?? ev.ci ?? ev.cy, // v3: cycleId соревнования
-          cycleIds: Array.isArray(ev.cycleIds) ? ev.cycleIds : undefined, // v4: cycleIds
+          id: id as string ?? `comp_${index + 1}`,
+          name: name as string ?? '',
+          week,
+          date: date as string | undefined,
+          priority: priority as CompetitionEvent['priority'],
+          notes: notes as string | undefined,
+          cycleId: cycleId as string | undefined, // v3: cycleId соревнования
+          cycleIds: cycleIds as string[] | undefined, // v4: cycleIds
         };
       });
+      const competitionWeeks = new Set<number>();
+      for (const competition of competitions!) {
+        if (competitionWeeks.has(competition.week)) throw new Error('duplicate competition week');
+        competitionWeeks.add(competition.week);
+      }
     }
+    if (o.r != null && (!Array.isArray(o.r) || o.r.some((line: unknown) => typeof line !== 'string'))) return null;
     return {
       blocks,
       totalWeeks: o.t,

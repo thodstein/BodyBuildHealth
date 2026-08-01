@@ -8,8 +8,10 @@ import { LMS_EXERCISES } from '../../data/lms-cycles/lms-exercises';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import type { Exercise } from '../../core/types';
 
+const AVAILABLE_NAMES = new Set<string>(LMS_EXERCISES.map((e: { name: string }) => e.name));
+
 function getNamesAvailable(): Set<string> {
-  return new Set(LMS_EXERCISES.map((e: { name: string }) => e.name));
+  return AVAILABLE_NAMES;
 }
 
 function findExerciseByLabel(label: string): Exercise | undefined {
@@ -92,7 +94,9 @@ export function diagnoseWeakPoint(lift: Lift, weakPoint: WeakPoint): WeakPointDi
     if (ex) { assistance.push(ex.name); }
     else { missing.push(n); }
   }
-  const list = assistance.length ? assistance : d.assistanceFromCatalog;
+  // Never leak unresolved labels downstream: builders expect catalog-backed
+  // names and otherwise silently create unusable prescriptions.
+  const list = assistance;
   return {
     lift, weakPoint, label: d.label, description: d.description,
     assistance: list, intensityPct: d.intensityPct,

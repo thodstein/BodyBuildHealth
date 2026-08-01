@@ -58,4 +58,30 @@ describe('macrocycle storage migration', () => {
     expect(deserializeMacro(JSON.stringify({ b: 'not-array' }))).toBeNull();
     expect(deserializeMacro(null as any)).toBeNull();
   });
+
+  it('отбрасывает повреждённые блоки и соревнования', () => {
+    expect(deserializeMacro(JSON.stringify({
+      b: [['unknown', 4, 1, 'SRC', null, 'bad']], t: 4,
+    }))).toBeNull();
+    expect(deserializeMacro(JSON.stringify({
+      b: [['strength', -2, 1, 'SRC', null, 'bad']], t: 4,
+    }))).toBeNull();
+    expect(deserializeMacro(JSON.stringify({
+      b: [['strength', 4, 1, 'SRC', null, 'ok']], t: 4,
+      e: [['c1', 'Bad', 2, null, 'X']],
+    }))).toBeNull();
+    expect(deserializeMacro(JSON.stringify({
+      b: [['strength', 12, 1, 'SRC', null, 'ok']], t: 12,
+      e: [
+        ['c1', 'A', 6, null, 'A'],
+        ['c2', 'B', 6, null, 'B'],
+      ],
+    }))).toBeNull();
+    expect(deserializeMacro(JSON.stringify({
+      b: [['strength', 4, 1, 'SRC', null, 'ok']], t: 4, r: 'not-array',
+    }))).toBeNull();
+    expect(deserializeMacro(JSON.stringify({
+      b: [['strength', 4, 1, 'SRC', 123, 'ok']], t: 4,
+    }))).toBeNull();
+  });
 });
