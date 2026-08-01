@@ -1561,6 +1561,7 @@ export const BbAutoConstructor: React.FC = () => {
             short={`жимы ${builtPlan.balanceReport.press} · тяги ${builtPlan.balanceReport.pull} · растяжка ${builtPlan.balanceReport.lengthened}`}
             full={<div style={{ fontSize: 11, lineHeight: 1.5 }}>
               <div>Жимы: <b>{builtPlan.balanceReport.press}</b> сетов · Тяги: <b>{builtPlan.balanceReport.pull}</b> · Подъёмы/разводки: <b>{builtPlan.balanceReport.raise}</b></div>
+              <div>Верх: тяги/жимы ratio <b>{builtPlan.balanceReport.pullPressRatio}</b> ({builtPlan.balanceReport.upperPull}/{builtPlan.balanceReport.upperPress})</div>
               <div>Compound: {builtPlan.balanceReport.compound} · Isolation: {builtPlan.balanceReport.isolation}</div>
               <div>Растянутая: {builtPlan.balanceReport.lengthened} · Средняя: {builtPlan.balanceReport.midRange} · Сокращённая: {builtPlan.balanceReport.shortened}</div>
               {builtPlan.balanceReport.issues.map((issue, index) => <div key={index} style={{ color: '#f59e0b' }}>⚠ {issue}</div>)}
