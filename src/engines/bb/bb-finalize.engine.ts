@@ -10,6 +10,7 @@ import { bbExerciseTier } from './bb-exercise-tier.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.engine';
 import { buildBBPlanReport } from './bb-report.engine';
+import { analyzeBBBalance } from './bb-balance.engine';
 import { applyTaperToFinalWeeks } from './bb-autocoach.engine';
 
 const SMALL_MUSCLES = new Set(['biceps', 'triceps', 'forearms', 'calves', 'traps', 'abs', 'shoulders']);
@@ -393,5 +394,6 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     .map(issue => `🚫 Валидация: ${issue.message}`);
   if (errors.length) next.rationale = [...next.rationale, ...errors];
   next.report = buildBBPlanReport(next);
+  next.balanceReport = analyzeBBBalance(next);
   return next;
 }

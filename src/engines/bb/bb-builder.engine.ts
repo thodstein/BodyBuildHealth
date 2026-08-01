@@ -186,6 +186,7 @@ export interface BBPlan {
   fatigueReport?: Array<{ week: number; sessions: Array<BBSessionCost> }>;
   weeklyVolume?: Record<number, Record<string, { directSets: number; effectiveSets: number; fatigueWeightedSets: number }>>;
   report?: BBPlanReport;
+  balanceReport?: import('./bb-balance.engine').BBBalanceReport;
   validation?: BBPlanValidationResult;
   safetyConstraints?: {
     equipment?: string[];

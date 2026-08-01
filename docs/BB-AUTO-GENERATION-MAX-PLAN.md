@@ -278,6 +278,7 @@
 - Feeder allocation теперь уважает `volumeTargets.maxSetsPerSession`, а не только общий exercise cap; избыток MEV-дефицита объясняется через target/session ceiling.
 - Validator показывает non-blocking `target_volume_deficit` и `session_working_set_cap` warnings, чтобы пользователь видел причину недобора после feeder/session safety caps.
 - BB-auto UI теперь выводит эти warnings отдельным блоком рядом с blocking validation errors; report/export сохраняет warning count.
+- Все новые BB passes, включая balance report (press/pull/raise, compound/isolation, lengthened/mid/shortened и movement patterns), подключаются через общий finalizer и проверяются для generic, BB-cycle и FullProgram в adapt/faithful режимах.
 - Severity contract зафиксирован: equipment/injury/axial/structure errors блокируют export/execution, а target-volume/session-cap diagnostics остаются объясняющими warnings; composite session leakage не переводится в error без отдельного benchmark.
 - **P2: hamstring angle diversity.** Расширить canonical angle classes: seated/lying curl, RDL, good morning, glute-ham/Nordic при доступности и safety restrictions.
 - **P2: glute angle diversity.** Расширить canonical classes: hip-thrust variations, kickback, abduction и 45-degree extension с equipment/injury фильтрами.

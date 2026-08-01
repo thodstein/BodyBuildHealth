@@ -1556,6 +1556,17 @@ export const BbAutoConstructor: React.FC = () => {
             />
           );
         })()}
+        {builtPlan.balanceReport && (
+          <ExpandableCard title="⚖️ Баланс паттернов и позиций" icon="⚖️"
+            short={`жимы ${builtPlan.balanceReport.press} · тяги ${builtPlan.balanceReport.pull} · растяжка ${builtPlan.balanceReport.lengthened}`}
+            full={<div style={{ fontSize: 11, lineHeight: 1.5 }}>
+              <div>Жимы: <b>{builtPlan.balanceReport.press}</b> сетов · Тяги: <b>{builtPlan.balanceReport.pull}</b> · Подъёмы/разводки: <b>{builtPlan.balanceReport.raise}</b></div>
+              <div>Compound: {builtPlan.balanceReport.compound} · Isolation: {builtPlan.balanceReport.isolation}</div>
+              <div>Растянутая: {builtPlan.balanceReport.lengthened} · Средняя: {builtPlan.balanceReport.midRange} · Сокращённая: {builtPlan.balanceReport.shortened}</div>
+              {builtPlan.balanceReport.issues.map((issue, index) => <div key={index} style={{ color: '#f59e0b' }}>⚠ {issue}</div>)}
+            </div>}
+          />
+        )}
 
         {builtPlan.validation && !builtPlan.validation.valid && (
           <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.3)' }}>

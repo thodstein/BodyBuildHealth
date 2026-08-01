@@ -27,6 +27,7 @@ function expectValid(plan: ReturnType<typeof convertCycleToBBPlan>) {
   const result = validateBBPlan(plan);
   expect(result.issues.filter(i => i.level === 'error')).toHaveLength(0);
   expect(plan.volumeTargets).toBeTruthy();
+  expect(plan.balanceReport).toBeTruthy();
   for (const week of plan.weeks) for (const session of week.sessions) for (const exercise of session.exercises) {
     expect(exercise.workSets).toHaveLength(exercise.sets);
     expect(exercise.rationale).toContain('final position:');
