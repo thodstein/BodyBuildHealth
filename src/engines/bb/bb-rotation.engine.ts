@@ -5,6 +5,7 @@ export interface BBRotationIssue {
   code: 'primary_changed' | 'accessory_repeated' | 'no_accessory_rotation';
   message: string;
   muscle: string;
+  phase?: string;
 }
 
 export interface BBRotationReport {
@@ -40,7 +41,7 @@ export function analyzeBBRotation(plan: BBPlan): BBRotationReport {
           (primaryByMuscle[muscle] ||= []).push(exercise.name);
           const previous = primaryNames.get(phaseMuscle);
           if (previous && previous !== exercise.name) {
-            issues.push({ code: 'primary_changed', muscle, message: `${muscle}: primary lift changed within ${phase} from «${previous}» to «${exercise.name}».` });
+            issues.push({ code: 'primary_changed', muscle, phase, message: `${muscle}: primary lift changed within ${phase} from «${previous}» to «${exercise.name}».` });
           } else if (!previous) {
             primaryNames.set(phaseMuscle, exercise.name);
           }
@@ -48,7 +49,7 @@ export function analyzeBBRotation(plan: BBPlan): BBRotationReport {
           (accessoryPatternsByMuscle[muscle] ||= []).push(pattern);
           const previous = previousAccessories.get(muscle);
           if (previous === pattern && !issues.some(issue => issue.code === 'accessory_repeated' && issue.muscle === muscle)) {
-            issues.push({ code: 'accessory_repeated', muscle, message: `${muscle}: accessory pattern «${pattern}» повторяется последовательно.` });
+             issues.push({ code: 'accessory_repeated', muscle, phase, message: `${muscle}: accessory pattern «${pattern}» повторяется последовательно.` });
           }
           previousAccessories.set(muscle, pattern);
         }
