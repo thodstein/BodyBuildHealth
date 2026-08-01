@@ -287,6 +287,7 @@
 - Feeder attribution через `e.group`: текущий feeder pipeline уже использует `trueMuscleOf` с canonical fallback.
 - Отсутствие pump-finisher duplicate guard: текущий pipeline проверяет существующий pump и паттерны.
 - Безусловное снижение natural `exerciseCount`: текущий level/role/PED planner и fatigue budget уже ограничивают результат; изменение требует отдельного volume-quality benchmark.
+- Benchmark подтверждает решение: natural все 24 split patterns удерживаются в пределах 10 упражнений/24 рабочих сетов на сессию; enhanced detail разрешён только при явном PED/level input и также ограничен cap. Безусловное снижение natural exerciseCount не требуется.
 - BB-auto UI содержит отдельный entrypoint `🗓` для годового планирования; tools popup имеет независимый mobile-safe scroll container.
 - Faithful exact mode не применяет незапрошенные taper, budget trimming, rotation, feeders или phase rewrite; сохраняется только обязательная shape/validation metadata обработка.
 
