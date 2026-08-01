@@ -120,6 +120,10 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
       const allowed = allowedMuscles.includes(canonical) || (canonical === 'shoulders' && allowedMuscles.some(muscle => /^delt_/.test(muscle)));
       if (!allowed) issues.push({ level: 'warning', code: 'session_muscle_leak', message: `${exercise.name}: мышца ${canonical} не соответствует тегу дня ${session.sessionTag}.`, week: week.week || wi + 1, session: si + 1, exercise: exercise.name });
     }
+    const sessionSets = session.exercises.reduce((sum, exercise) => sum + exercise.sets, 0);
+    if (sessionSets > 24) {
+      issues.push({ level: 'warning', code: 'session_working_set_cap', message: `Сессия содержит ${sessionSets} рабочих сетов; target/session cap равен 24.`, week: week.week || wi + 1, session: si + 1 });
+    }
   }));
   for (let index = 1; index < plan.weeks.length; index++) {
     const week = plan.weeks[index] as any;
@@ -160,6 +164,16 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
       const cap = Math.round(lm.mrv * (options.mrvMultiplier ?? 1));
       if (values.effectiveSets > cap) {
         issues.push({ level: 'warning', code: 'effective_mrv_overflow', message: `${muscle}: effective ${Math.round(values.effectiveSets * 10) / 10} > MRV ${cap}.` });
+      }
+    }
+  }
+  if (plan.volumeTargets) {
+    for (const [muscle, target] of Object.entries(plan.volumeTargets)) {
+      const peakVolume = plan.weeklyVolume
+        ? Math.max(...Object.values(plan.weeklyVolume).map(week => week[muscle]?.effectiveSets || 0))
+        : 0;
+      if (peakVolume < target.mev) {
+        issues.push({ level: 'warning', code: 'target_volume_deficit', message: `${muscle}: effective volume ${Math.round(peakVolume * 10) / 10} ниже MEV ${target.mev}; проверьте feeder/session cap или ограничения оборудования.`, exercise: muscle });
       }
     }
   }
