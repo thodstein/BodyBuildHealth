@@ -24,6 +24,8 @@ export function analyzeBBRotation(plan: BBPlan): BBRotationReport {
   const primaryByMuscle: Record<string, string[]> = {};
   const accessoryPatternsByMuscle: Record<string, string[]> = {};
   const issues: BBRotationIssue[] = [];
+  // Stability is measured inside a phase block. A deliberate phase boundary
+  // may rotate the primary, but it must not change mid-block.
   const primaryNames = new Map<string, string>();
   const previousAccessories = new Map<string, string>();
 
@@ -31,14 +33,16 @@ export function analyzeBBRotation(plan: BBPlan): BBRotationReport {
     for (const session of week.sessions) {
       for (const exercise of session.exercises) {
         const muscle = exercise.muscle;
+        const phase = String((week as any).phase || 'accumulation').toLowerCase();
+        const phaseMuscle = `${phase}|${muscle}`;
         const pattern = derivePattern(exercise);
         if (exercise.role === 'primary') {
           (primaryByMuscle[muscle] ||= []).push(exercise.name);
-          const previous = primaryNames.get(muscle);
+          const previous = primaryNames.get(phaseMuscle);
           if (previous && previous !== exercise.name) {
-            issues.push({ code: 'primary_changed', muscle, message: `${muscle}: primary lift changed from «${previous}» to «${exercise.name}».` });
+            issues.push({ code: 'primary_changed', muscle, message: `${muscle}: primary lift changed within ${phase} from «${previous}» to «${exercise.name}».` });
           } else if (!previous) {
-            primaryNames.set(muscle, exercise.name);
+            primaryNames.set(phaseMuscle, exercise.name);
           }
         } else {
           (accessoryPatternsByMuscle[muscle] ||= []).push(pattern);

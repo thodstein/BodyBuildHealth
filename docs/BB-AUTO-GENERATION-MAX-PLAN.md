@@ -229,6 +229,7 @@
 - Runtime boundary проверен для ручных замен, перестановок, inline set/weight edits, сохранённых вариантов и отправки в SessionPlayer.
 - Generic weeks сохраняют явные `phase`/`deload` поля; deterministic/property matrix покрывает все 24 split patterns, cap, set shape и диапазоны рабочих сетов.
 - Ротация primary/accessory проверяется по slot/phase: вариация primary может измениться только на границе phase block, не внутри одного блока.
+- `bb-rotation.engine.ts` теперь диагностирует primary stability внутри phase block; смена на границе phase не считается ошибкой.
 - Plan-vs-fact feedback и double progression применяются одинаково в generic, cycle и FullProgram `adapt`; фактическая фаза недели передаётся в `prescribeLoad`, а deload защищён от feedback-перезаписи.
 - `faithful` сохраняет исходные данные программы и получает только общие safety/metrics passes.
 - Recovery soft-cap вынесен в общий `computeBBRecoveryMultiplier`; cycle и FullProgram используют те же body-fat/lean-mass/HRV/sleep/stress правила, что и generic.
