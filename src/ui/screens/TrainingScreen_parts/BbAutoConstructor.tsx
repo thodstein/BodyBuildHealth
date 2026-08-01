@@ -1502,7 +1502,7 @@ export const BbAutoConstructor: React.FC = () => {
                     ? <div style={{ fontSize:11, color:'#22c55e' }}>✅ Конфликтов ротации не обнаружено.</div>
                     : report.issues.slice(0, 8).map((issue, i) => (
                       <div key={i} style={{ fontSize:11, color: issue.code === 'primary_changed' ? '#f59e0b' : 'rgba(255,255,255,0.75)' }}>
-                        {issue.message}
+                         {issue.phase ? `[${PHASE_LABELS[issue.phase as BBPhase] || issue.phase}] ` : ''}{issue.message}
                       </div>
                     ))}
                 </div>
@@ -1565,6 +1565,18 @@ export const BbAutoConstructor: React.FC = () => {
             ))}
           </div>
         )}
+
+        {builtPlan.validation && (() => {
+          const warnings = builtPlan.validation.issues.filter(issue => issue.level === 'warning' && ['target_volume_deficit', 'session_working_set_cap', 'effective_mrv_overflow'].includes(issue.code));
+          if (warnings.length === 0) return null;
+          return (
+            <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.25)' }}>
+              <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b', marginBottom:5 }}>⚠️ Объём и бюджет требуют внимания</div>
+              {warnings.slice(0, 8).map((issue, i) => <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.8)', lineHeight:1.4 }}>{issue.message}</div>)}
+              <div style={{ marginTop:5, fontSize:10, color:'rgba(255,255,255,0.5)' }}>Это предупреждения, а не блокировка. Ограничения оборудования, времени и восстановления могут объяснять недобор.</div>
+            </div>
+          );
+        })()}
 
         {(() => {
           const targets = computeOverloadTargets(wk, loadStrategy, bbWorkMax, bbWeeks, currentPhase).slice(0, 6);
