@@ -20,8 +20,10 @@ export interface BBBalanceReport {
   peakWork?: { press: number; pull: number; pullPressRatio: number };
 }
 
-function position(name: string): 'lengthened' | 'midRange' | 'shortened' {
+function position(name: string, catalog?: typeof EXERCISE_CATALOG[number]): 'lengthened' | 'midRange' | 'shortened' {
   const n = name.toLowerCase();
+  if (catalog?.stretchPhase && !catalog.peakContraction) return 'lengthened';
+  if (catalog?.peakContraction && !catalog.stretchPhase) return 'shortened';
   if (/наклон|incline|rdl|румын|overhead|француз|french|seated.*curl|stretch|растяж/i.test(n)) return 'lengthened';
   if (/кроссовер|crossover|kickback|концентр|concentration|пик|peak|сокращ/i.test(n)) return 'shortened';
   return 'midRange';
@@ -48,7 +50,7 @@ export function analyzeBBBalance(plan: BBPlan): BBBalanceReport {
     if (isRaise) report.raise += sets;
     if (exercise.role === 'primary' || /присед|squat|жим|press|row|тяга|pull|lunge|hip.?thrust|rdl/i.test(name)) report.compound += sets;
     else report.isolation += sets;
-    const positionName = position(name);
+    const positionName = position(name, catalog);
     report[positionName] += sets;
     muscle[positionName] += sets;
     const upper = !['quads', 'hamstrings', 'glutes', 'calves', 'legs'].includes(exercise.muscle);

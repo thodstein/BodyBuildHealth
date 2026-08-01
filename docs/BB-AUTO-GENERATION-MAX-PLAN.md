@@ -283,6 +283,7 @@
 - Balance snapshot теперь входит также в `BBPlan.report` и UserProgram derived metadata, поэтому не теряется при export/round-trip.
 - Balance report теперь хранит coverage `byMuscle`: patterns и sets в lengthened/midRange/shortened позициях для каждой мышцы; UI показывает coverage, warnings объясняют отсутствующие позиции или доминирование одного паттерна.
 - Balance categories используют catalog `movementPattern/type` с name fallback, чтобы face pull/RDL/hip thrust не ошибочно считались raise/press; добавлены classifier tests.
+- Position categories используют catalog `stretchPhase/peakContraction` перед name fallback, поэтому stretch/peak coverage устойчив к локализации названий упражнений.
 - Quality audit стал weekly-aware: MRV overflow проверяется по каждой неделе, а balance ratio строится по рабочим неделям без deload/taper contamination.
 - Severity contract зафиксирован: equipment/injury/axial/structure errors блокируют export/execution, а target-volume/session-cap diagnostics остаются объясняющими warnings; composite session leakage не переводится в error без отдельного benchmark.
 - **P2: hamstring angle diversity.** Расширить canonical angle classes: seated/lying curl, RDL, good morning, glute-ham/Nordic при доступности и safety restrictions.
