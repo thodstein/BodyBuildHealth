@@ -274,6 +274,7 @@
 - Shared fatigue budget теперь применяет default `maxWorkingSets=24` для всех adaptive sources; cap режет вторичные sets до удаления упражнений.
 - Feeder allocation теперь уважает `volumeTargets.maxSetsPerSession`, а не только общий exercise cap; избыток MEV-дефицита объясняется через target/session ceiling.
 - Validator показывает non-blocking `target_volume_deficit` и `session_working_set_cap` warnings, чтобы пользователь видел причину недобора после feeder/session safety caps.
+- Severity contract зафиксирован: equipment/injury/axial/structure errors блокируют export/execution, а target-volume/session-cap diagnostics остаются объясняющими warnings; composite session leakage не переводится в error без отдельного benchmark.
 - **P2: hamstring angle diversity.** Расширить canonical angle classes: seated/lying curl, RDL, good morning, glute-ham/Nordic при доступности и safety restrictions.
 - **P2: glute angle diversity.** Расширить canonical classes: hip-thrust variations, kickback, abduction и 45-degree extension с equipment/injury фильтрами.
 - Реализовано: hamstring classes расширены seated curl/good morning/GHR-Nordic, glute classes — abduction/45-degree extension; общий pool safety фильтрует недоступное оборудование и травмы.
