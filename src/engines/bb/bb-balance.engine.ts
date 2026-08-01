@@ -1,5 +1,6 @@
 import type { BBPlan } from './bb-builder.engine';
 import { derivePattern } from '../movement-pattern';
+import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 
 export interface BBBalanceReport {
   press: number;
@@ -33,21 +34,26 @@ export function analyzeBBBalance(plan: BBPlan): BBBalanceReport {
   for (const session of sessions) for (const exercise of session.exercises) {
     const sets = exercise.sets;
     const name = exercise.name.toLowerCase();
+    const catalog = EXERCISE_CATALOG.find(item => item.name === exercise.name || item.id === exercise.exerciseName);
+    const movement = String(catalog?.movementPattern || '').toLowerCase();
     const pattern = derivePattern(exercise);
     const muscle = report.byMuscle[exercise.muscle] || (report.byMuscle[exercise.muscle] = { patterns: {}, lengthened: 0, midRange: 0, shortened: 0 });
     muscle.patterns[pattern] = (muscle.patterns[pattern] || 0) + sets;
     report.patterns[pattern] = (report.patterns[pattern] || 0) + sets;
-    if (/жим|press|bench|push|отжим/i.test(name)) report.press += sets;
-    if (/тяга|row|pull|подтяг|pulldown/i.test(name)) report.pull += sets;
-    if (/мах|raise|отведен|развод|fly/i.test(name)) report.raise += sets;
+    const isPress = movement.includes('push') || /жим|press|bench|push|отжим/i.test(name);
+    const isPull = movement.includes('pull') || /тяга|row|pull|подтяг|pulldown/i.test(name);
+    const isRaise = catalog?.type === 'isolation' && (/мах|raise|отведен|развод|fly/i.test(name) || movement.includes('isolation_shoulders'));
+    if (isPress) report.press += sets;
+    if (isPull) report.pull += sets;
+    if (isRaise) report.raise += sets;
     if (exercise.role === 'primary' || /присед|squat|жим|press|row|тяга|pull|lunge|hip.?thrust|rdl/i.test(name)) report.compound += sets;
     else report.isolation += sets;
     const positionName = position(name);
     report[positionName] += sets;
     muscle[positionName] += sets;
     const upper = !['quads', 'hamstrings', 'glutes', 'calves', 'legs'].includes(exercise.muscle);
-    if (upper && /жим|press|bench|push|отжим/i.test(name)) report.upperPress += sets;
-    if (upper && /тяга|row|pull|подтяг|pulldown/i.test(name)) report.upperPull += sets;
+    if (upper && isPress) report.upperPress += sets;
+    if (upper && isPull) report.upperPull += sets;
   }
   report.pullPressRatio = report.upperPress > 0 ? Math.round((report.upperPull / report.upperPress) * 100) / 100 : 0;
   report.peakWork = { press: report.upperPress, pull: report.upperPull, pullPressRatio: report.pullPressRatio };
