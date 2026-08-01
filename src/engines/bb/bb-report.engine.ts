@@ -1,4 +1,5 @@
 import type { BBPlan } from './bb-builder.engine';
+import type { BBBalanceReport } from './bb-balance.engine';
 
 export interface BBPlanReport {
   pattern: string;
@@ -15,6 +16,7 @@ export interface BBPlanReport {
   validationErrors: number;
   validationWarnings: number;
   sessionLeakWarnings: number;
+  balance?: BBBalanceReport;
 }
 
 export function buildBBPlanReport(plan: BBPlan): BBPlanReport {
@@ -39,5 +41,6 @@ export function buildBBPlanReport(plan: BBPlan): BBPlanReport {
     validationErrors: plan.validation?.issues.filter(issue => issue.level === 'error').length || 0,
     validationWarnings: plan.validation?.issues.filter(issue => issue.level === 'warning').length || 0,
     sessionLeakWarnings: plan.validation?.issues.filter(issue => issue.code === 'session_muscle_leak').length || 0,
+    balance: plan.balanceReport,
   };
 }

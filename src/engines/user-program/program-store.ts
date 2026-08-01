@@ -375,6 +375,7 @@ export function createFromBuild(
       fatigueReport: plan.fatigueReport,
       rotationReport: plan.rotationReport,
       report: plan.report,
+      balanceReport: plan.balanceReport,
       validation: plan.validation,
     },
   };

@@ -172,6 +172,7 @@ export interface BBProgramBody {
     fatigueReport?: unknown[];
     rotationReport?: unknown;
     report?: unknown;
+    balanceReport?: unknown;
     validation?: unknown;
   };
 }

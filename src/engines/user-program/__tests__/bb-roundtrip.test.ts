@@ -14,6 +14,7 @@ describe('BB auto round-trip metadata', () => {
       fatigueReport: [{ week: 1, sessions: [] }],
       rotationReport: { issues: [] },
       report: { validationValid: true },
+      balanceReport: { pullPressRatio: 1 },
       validation: { valid: true, issues: [] },
       safetyConstraints: { equipment: ['machine'], avoidAxialLoad: true, excludedExercises: ['deadlift'], excludedMuscles: ['back'] },
       rotationMuscleVolume: {}, rationale: [],
@@ -23,6 +24,7 @@ describe('BB auto round-trip metadata', () => {
     expect(program.bb?.derived?.weeklyVolume).toEqual(plan.weeklyVolume);
     expect(program.bb?.derived?.fatigueReport).toEqual(plan.fatigueReport);
     expect(program.bb?.derived?.validation).toEqual(plan.validation);
+    expect(program.bb?.derived?.balanceReport).toEqual(plan.balanceReport);
     expect(program.bb?.constraints.equipment).toEqual(['machine']);
     expect(program.bb?.constraints.avoidAxialLoad).toBe(true);
     expect(program.bb?.weeks[0].deload).toBe(true);

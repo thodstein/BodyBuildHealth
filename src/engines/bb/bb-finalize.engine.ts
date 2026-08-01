@@ -393,7 +393,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     .slice(0, 20)
     .map(issue => `🚫 Валидация: ${issue.message}`);
   if (errors.length) next.rationale = [...next.rationale, ...errors];
-  next.report = buildBBPlanReport(next);
   next.balanceReport = analyzeBBBalance(next);
+  next.report = buildBBPlanReport(next);
   return next;
 }
