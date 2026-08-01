@@ -15,6 +15,7 @@ export interface BBBalanceReport {
   shortened: number;
   patterns: Record<string, number>;
   issues: string[];
+  peakWork?: { press: number; pull: number; pullPressRatio: number };
 }
 
 function position(name: string): 'lengthened' | 'midRange' | 'shortened' {
@@ -26,7 +27,8 @@ function position(name: string): 'lengthened' | 'midRange' | 'shortened' {
 
 export function analyzeBBBalance(plan: BBPlan): BBBalanceReport {
   const report: BBBalanceReport = { press: 0, pull: 0, raise: 0, upperPress: 0, upperPull: 0, pullPressRatio: 0, compound: 0, isolation: 0, lengthened: 0, midRange: 0, shortened: 0, patterns: {}, issues: [] };
-  const sessions = plan.weeks.flatMap(week => week.sessions);
+  const workWeeks = plan.weeks.filter(week => String((week as any).phase || '').toLowerCase() !== 'deload' && !(week as any).taper);
+  const sessions = (workWeeks.length > 0 ? workWeeks : plan.weeks).flatMap(week => week.sessions);
   for (const session of sessions) for (const exercise of session.exercises) {
     const sets = exercise.sets;
     const name = exercise.name.toLowerCase();
@@ -43,6 +45,7 @@ export function analyzeBBBalance(plan: BBPlan): BBBalanceReport {
     if (upper && /тяга|row|pull|подтяг|pulldown/i.test(name)) report.upperPull += sets;
   }
   report.pullPressRatio = report.upperPress > 0 ? Math.round((report.upperPull / report.upperPress) * 100) / 100 : 0;
+  report.peakWork = { press: report.upperPress, pull: report.upperPull, pullPressRatio: report.pullPressRatio };
   if (report.upperPress > 0 && report.upperPull < report.upperPress * 0.75) report.issues.push(`Перекос верхней части: тяги ${report.upperPull} против жимов ${report.upperPress} сетов (ratio ${report.pullPressRatio}).`);
   if (report.upperPull > 0 && report.upperPress < report.upperPull * 0.4) report.issues.push(`Перекос верхней части: жимы ${report.upperPress} против тяг ${report.upperPull} сетов.`);
   if (report.press > 0 && report.pull === 0) report.issues.push('Нет тягового объёма при наличии жимов.');

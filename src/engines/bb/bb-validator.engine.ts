@@ -153,17 +153,15 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
     }
   }
   if (options.level && plan.weeks.length > 0) {
-    const peak = plan.weeks.reduce((best, week) => {
-      const total = week.sessions.reduce((sum, session) => sum + session.exercises.reduce((s, exercise) => s + exercise.sets, 0), 0);
-      return total > best.total ? { total, week } : best;
-    }, { total: -1, week: plan.weeks[0] }).week;
-    const volume = aggregateBBVolume(peak.sessions);
-    for (const [muscle, values] of Object.entries(volume)) {
-      const lm = getVolumeLandmarks(options.level, muscle);
-      if (!lm) continue;
-      const cap = Math.round(lm.mrv * (options.mrvMultiplier ?? 1));
-      if (values.effectiveSets > cap) {
-        issues.push({ level: 'warning', code: 'effective_mrv_overflow', message: `${muscle}: effective ${Math.round(values.effectiveSets * 10) / 10} > MRV ${cap}.` });
+    for (const week of plan.weeks) {
+      const volume = aggregateBBVolume(week.sessions);
+      for (const [muscle, values] of Object.entries(volume)) {
+        const lm = getVolumeLandmarks(options.level, muscle);
+        if (!lm) continue;
+        const cap = Math.round(lm.mrv * (options.mrvMultiplier ?? 1));
+        if (values.effectiveSets > cap) {
+          issues.push({ level: 'warning', code: 'effective_mrv_overflow', message: `Неделя ${week.week}: ${muscle}: effective ${Math.round(values.effectiveSets * 10) / 10} > MRV ${cap}.`, week: week.week });
+        }
       }
     }
   }
