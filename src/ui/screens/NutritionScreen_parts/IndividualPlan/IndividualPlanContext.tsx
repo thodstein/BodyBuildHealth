@@ -1035,11 +1035,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       setDayPlan(d1);
       if (days >= 3) {
         d2 = buildOneDay(1); d3 = buildOneDay(2);
-        setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: d1.totals.kcal + d2.totals.kcal + d3.totals.kcal, p: d1.totals.p + d2.totals.p + d3.totals.p, f: d1.totals.f + d2.totals.f + d3.totals.f, c: d1.totals.c + d2.totals.c + d3.totals.c, fiber: (d1.totals.fiber||0) + (d2.totals.fiber||0) + (d3.totals.fiber||0) } });
+        setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: (d1?.totals?.kcal || 0) + (d2?.totals?.kcal || 0) + (d3?.totals?.kcal || 0), p: (d1?.totals?.p || 0) + (d2?.totals?.p || 0) + (d3?.totals?.p || 0), f: (d1?.totals?.f || 0) + (d2?.totals?.f || 0) + (d3?.totals?.f || 0), c: (d1?.totals?.c || 0) + (d2?.totals?.c || 0) + (d3?.totals?.c || 0), fiber: (d1?.totals?.fiber||0) + (d2?.totals?.fiber||0) + (d3?.totals?.fiber||0) } });
       }
       if (days >= 7) {
         weekDays = Array.from({ length: 7 }, (_, i) => buildOneDay(i));
-        weekData = { days: weekDays, totals: { kcal: weekDays.reduce((s: any,d: any) => s + d.totals.kcal, 0), p: weekDays.reduce((s: any,d: any) => s + d.totals.p, 0), f: weekDays.reduce((s: any,d: any) => s + d.totals.f, 0), c: weekDays.reduce((s: any,d: any) => s + d.totals.c, 0) }};
+        weekData = { days: weekDays, totals: { kcal: weekDays.reduce((s: any,d: any) => s + (d?.totals?.kcal || 0), 0), p: weekDays.reduce((s: any,d: any) => s + (d?.totals?.p || 0), 0), f: weekDays.reduce((s: any,d: any) => s + (d?.totals?.f || 0), 0), c: weekDays.reduce((s: any,d: any) => s + (d?.totals?.c || 0), 0) }};
         if (weekIndex !== undefined) { setMonthPlan(prev => { const next = [...prev]; next[weekIndex] = weekData; return next; }); }
         else setWeekPlan(weekData);
       }
@@ -1845,12 +1845,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (periodizationEnabled) {
         const pWeek = weekIndex !== undefined ? weekIndex % 5 : 0;
         if (pWeek === 0 || pWeek === 4) {
-          weekDays = weekDays.map((d: any) => ({ ...d, meals: d.meals.map((m: any) => ({ ...m, items: m.items.map((it: any) => ({ ...it, amount: Math.round(it.amount * 1.15), kcal: Math.round(it.kcal * 1.15), p: Math.round(it.p * 1.15), f: Math.round(it.f * 1.15), c: Math.round(it.c * 1.15) })) })), totals: { kcal: Math.round(d.totals.kcal * 1.15), p: Math.round(d.totals.p * 1.15), f: Math.round(d.totals.f * 1.15), c: Math.round(d.totals.c * 1.15) } }));
+          weekDays = weekDays.map((d: any) => ({ ...d, meals: (Array.isArray(d?.meals) ? d.meals : []).map((m: any) => ({ ...m, items: (Array.isArray(m?.items) ? m.items : []).map((it: any) => ({ ...it, amount: Math.round((it.amount || 0) * 1.15), kcal: Math.round((it.kcal || 0) * 1.15), p: Math.round((it.p || 0) * 1.15), f: Math.round((it.f || 0) * 1.15), c: Math.round((it.c || 0) * 1.15) })) })), totals: { kcal: Math.round((d?.totals?.kcal || 0) * 1.15), p: Math.round((d?.totals?.p || 0) * 1.15), f: Math.round((d?.totals?.f || 0) * 1.15), c: Math.round((d?.totals?.c || 0) * 1.15) } }));
         } else if (pWeek === 2) {
-          weekDays = weekDays.map((d: any) => ({ ...d, meals: d.meals.map((m: any) => ({ ...m, items: m.items.map((it: any) => ({ ...it, amount: Math.round(it.amount * 0.8), kcal: Math.round(it.kcal * 0.8), p: Math.round(it.p * 0.8), f: Math.round(it.f * 0.8), c: Math.round(it.c * 0.8) })) })), totals: { kcal: Math.round(d.totals.kcal * 0.8), p: Math.round(d.totals.p * 0.8), f: Math.round(d.totals.f * 0.8), c: Math.round(d.totals.c * 0.8) } }));
+          weekDays = weekDays.map((d: any) => ({ ...d, meals: (Array.isArray(d?.meals) ? d.meals : []).map((m: any) => ({ ...m, items: (Array.isArray(m?.items) ? m.items : []).map((it: any) => ({ ...it, amount: Math.round((it.amount || 0) * 0.8), kcal: Math.round((it.kcal || 0) * 0.8), p: Math.round((it.p || 0) * 0.8), f: Math.round((it.f || 0) * 0.8), c: Math.round((it.c || 0) * 0.8) })) })), totals: { kcal: Math.round((d?.totals?.kcal || 0) * 0.8), p: Math.round((d?.totals?.p || 0) * 0.8), f: Math.round((d?.totals?.f || 0) * 0.8), c: Math.round((d?.totals?.c || 0) * 0.8) } }));
         }
       }
-      const weekData = { days: weekDays, totals: { kcal: weekDays.reduce((s: any,d: any) => s + d.totals.kcal, 0), p: weekDays.reduce((s: any,d: any) => s + d.totals.p, 0), f: weekDays.reduce((s: any,d: any) => s + d.totals.f, 0), c: weekDays.reduce((s: any,d: any) => s + d.totals.c, 0), fiber: weekDays.reduce((s: any,d: any) => s + (d.totals.fiber||0), 0) }};
+      const weekData = { days: weekDays, totals: { kcal: weekDays.reduce((s: any,d: any) => s + (d?.totals?.kcal || 0), 0), p: weekDays.reduce((s: any,d: any) => s + (d?.totals?.p || 0), 0), f: weekDays.reduce((s: any,d: any) => s + (d?.totals?.f || 0), 0), c: weekDays.reduce((s: any,d: any) => s + (d?.totals?.c || 0), 0), fiber: weekDays.reduce((s: any,d: any) => s + (d?.totals?.fiber||0), 0) }};
       if (weekIndex !== undefined) { setMonthPlan(prev => { const next = [...prev]; next[weekIndex] = weekData; return next; }); }
       else setWeekPlan(weekData);
      }

@@ -30,7 +30,8 @@ class PlannerErrorBoundary extends React.Component<React.PropsWithChildren, Plan
     return (
       <div style={{ margin: 8, padding: 14, borderRadius: 12, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#fff' }}>
         <div style={{ fontSize: 12, fontWeight: 800, color: '#ef4444', marginBottom: 6 }}>Ошибка отображения планировщика</div>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>{this.state.error.message || 'Неизвестная ошибка'}</div>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5, wordBreak: 'break-word' }}>{this.state.error.message || 'Неизвестная ошибка'}</div>
+        <div style={{ marginTop: 6, fontSize: 7, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4 }}>Код: he_planner_last_render_error. Ошибка сохранена автоматически.</div>
         <button onClick={() => this.setState({ error: null })} style={{ marginTop: 10, padding: '7px 12px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: 9, fontWeight: 700 }}>Повторить отображение</button>
       </div>
     );
