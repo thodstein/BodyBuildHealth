@@ -9,12 +9,11 @@ import { addToCart } from "../../../../core/nutrition-utils";
 import { FOOD_DB } from "../../../../core/nutrition-database";
 import { calcMealDIAAS } from "../../../../engines/product-usefulness-v2.engine";
 import { scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU } from "../../../../engines/kbju-food-match.engine";
-import { usePlanCtx } from "./IndividualPlanContext";
+import type { PlanCtx } from "./IndividualPlanContext";
 import { NUTRITION_LEVELS } from "./types";
 import { OrganLoadBadgeGroup } from "./OrganLoadBadges";
 
-export function useRenderMealList() {
-  const ctx = usePlanCtx();
+export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
   const { calcTargets, dayPlan, draggedItem, dropTarget, drugCompatReport, editAmount, editItem, effectiveC, effectiveF, effectiveKcal, effectiveP, excludedFoods, findSimilarFoods, healthIssues, injections, linkToTraining, lockedFoodIds, moveFoodItem, nutritionReport, nutrLevel, phase, preferredFoods, quickAddMealIdx, quickAddSearch, removeFoodItem, replaceFoodItem, replacingItem, saveUndo, setDayPlan: _setDayPlan, setDraggedItem, setDropTarget, setEditAmount: _setEditAmount, setEditItem, setExcludedFoods, setQuickAddMealIdx, setQuickAddSearch, setRecipePickerMeal, setReplacingItem, toggleLockFood, trainEnd, trainStart, updateItemAmount, waterCalc, weight, weightLogEntries } = ctx;
   const _nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
   const setDayPlan = _setDayPlan as any;

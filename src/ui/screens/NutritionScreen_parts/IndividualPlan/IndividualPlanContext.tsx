@@ -977,7 +977,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // #2 Голод: высокий → белок/клетчатка/объхм; хронический → refeed.
         const _hungerNote: string | undefined = hungerLevel >= 8 ? '🔥 Высокий голод: +белок (сытость), добавлены объхмные овощи/клетчатка. Если хронически — refeed/повышение калорий.' : hungerLevel >= 6 ? '🔥 Повышенный голод: акцент на объхмную плотность.' : undefined;
         const _redSNote: string | undefined = _ea.note || undefined;
-        const v2 = buildDayPlanV2(input);
+        const rawV2 = buildDayPlanV2(input);
+        const v2: any = {
+          ...rawV2,
+          meals: Array.isArray(rawV2?.meals) ? rawV2.meals : [],
+          totals: rawV2?.totals || { kcal: 0, p: 0, f: 0, c: 0, fiber: 0 },
+          diversity: rawV2?.diversity || { uniqueFoods: 0, categories: {} },
+          mpsSummary: rawV2?.mpsSummary || { feedings: 0 },
+          microSummary: rawV2?.microSummary || { coverage: [] },
+        };
         // #8 Health-score дня: composite 0-100 (микро/fiber/MPS/EA/диверс − конфликты).
         const _fiberT = sex === 'female' ? 25 : 35;
         const _cov = (v2.microSummary?.coverage || []).filter((c:any) => !['Na','VitA'].includes(c.nutrient));
@@ -990,15 +998,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _healthScore = Math.max(0, Math.min(100, Math.round(_microAvg*0.3 + _fiberScore*0.15 + _mpsScore*0.2 + _eaScore*0.2 + _divScore*0.15) - _conflicts*5));
         const _healthStatus: 'green' | 'yellow' | 'red' = _healthScore >= 75 ? 'green' : _healthScore >= 55 ? 'yellow' : 'red';
         // Преобразуем DayPlanV2 → совместимый формат старого dayPlan
-        const meals = v2.meals.map(m => ({
-          label: m.label, time: m.time, items: m.items.map(it => ({
+        const meals = v2.meals.map((m: any) => ({
+          label: m?.label || 'Приём пищи', time: m?.time || '', items: (Array.isArray(m?.items) ? m.items : []).map((it: any) => ({
             name: it.name, id: it.id, amount: it.amount, kcal: it.kcal, p: it.p, f: it.f, c: it.c, fiber: it.fiber, leucine_mg: it.leucine_mg,
-          })), totals: { kcal: m.totals.kcal, p: m.totals.p, f: m.totals.f, c: m.totals.c, fiber: m.totals.fiber },
+          })), totals: { kcal: m?.totals?.kcal || 0, p: m?.totals?.p || 0, f: m?.totals?.f || 0, c: m?.totals?.c || 0, fiber: m?.totals?.fiber || 0 },
           conflictWarnings: undefined, synergyNotes: undefined,
           rationale: m.rationale, mpsCheck: m.mpsCheck, target: m.target,
         }));
         const dayKcalForPct = Math.max(1, v2.totals.kcal);
-        const mealTimesPro = meals.map(m => ({ time: m.time, label: m.label, pct: Math.round((m.totals.kcal / dayKcalForPct) * 100) }));
+        const mealTimesPro = meals.map((m: { time: string; label: string; totals: { kcal: number } }) => ({ time: m.time, label: m.label, pct: Math.round((m.totals.kcal / dayKcalForPct) * 100) }));
         // Smart 7-day variety: collect this day's foods so subsequent days see them (soft + hard window).
         const _dayFoodIds = collectDayFoods({ meals });
         _dayFoodIds.forEach((id: string) => recentFoodIds.add(id));
@@ -1977,9 +1985,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   useEffect(() => { if (dayPlan) generateFullNutritionReport(dayPlan, false); }, [dayPlan]);
 
   // P1-7: renderMealList вынесен в MealListRender.tsx (267 строк → 1 строка)
-  const renderMealList = useRenderMealList();
-
-  const ctx = useMemo<PlanCtx>(() => ({
+  const ctx = useMemo<Omit<PlanCtx, 'renderMealList'>>(() => ({
     profile, s, courseEntries,
     weight, setWeight, height, setHeight, age, setAge, sex, setSex,
     dailySteps, setDailySteps, cookTimeMin, setCookTimeMin,
@@ -2061,8 +2067,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     drugCompatReport, setDrugCompatReport, nutritionReport, setNutritionReport,
     generateAllergenReport, generateNutrientReport, generateQualityReport,
     generateRiskReport, generateDrugCompatReport, generateFullNutritionReport,
-    renderMealList,
-    customNotes, setCustomNotes,
+     customNotes, setCustomNotes,
     dietPrefs, setDietPrefs,
     v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
     histamineSensitive, setHistamineSensitive,
@@ -2073,5 +2078,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     labs,
   }), [weight, height, age, sex, dailySteps, cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, mealsCount, allergens, healthIssues, eveningLowCarb, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
-  return <PlanContext.Provider value={ctx}>{children}</PlanContext.Provider>;
+  const renderMealList = useRenderMealList(ctx);
+  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, renderMealList }), [ctx, renderMealList]);
+  return <PlanContext.Provider value={finalCtx}>{children}</PlanContext.Provider>;
 };
