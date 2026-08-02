@@ -1,20 +1,21 @@
-/**
- * macrocycle-to-bb.ts — конвертация макроцикла ПЛ-авто (Macrocycle) → UserProgram (ББ).
+﻿/**
+ * macrocycle-to-bb.ts - конвертация макроцикла ПЛ-авто (Macrocycle) → UserProgram (ББ).
  *
- * Macrocycle (5 фаз: endurance→strength→peak→competition→transition) — годовой план
+ * Macrocycle (5 фаз: endurance→strength→peak→competition→transition) - годовой план
  * ПЛ-авто. Для ручного планировщика ББ нужна UserProgram с weeks[] и канонической
  * Phase (4 значения). Стратегия:
  *
  *  1. autodraftBBPlan ОДИН раз на totalWeeks → BBPlan с прогрессией по всем неделям.
  *  2. createFromBuild → UserProgram с weeks[] (упражнения/блоки/сеты).
  *  3. Переразметить weeks[i].phase через macrocycleToActiveCycle + macroPhaseToUserPhase.
- *  4. Для deload/peaking фаз скорректировать объём/RIR (Bosquet 2005 / Helms).
+ *  4. Для всех фаз макроцикла корректировать объём/RIR (Bosquet 2005 / Helms 2022).
  *
- * Не вызываем buildBBPlan для каждой фазы — получили бы 5 разрывных планов с разными
- * сплитами. Один непрерывный план + переразметка фаз — корректнее.
+ * Не вызываем buildBBPlan для каждой фазы - получили бы 5 разрывных планов с разными
+ * сплитами. Один непрерывный план + переразметка фаз + phase-specific volume - корректнее.
  */
-import type { Macrocycle, MacroBlock } from './macrocycle.engine';
+import type { Macrocycle, MacroBlock, MacroPhase } from './macrocycle.engine';
 import { macrocycleToActiveCycle } from './macrocycle.engine';
+import { newId } from '../user-program/user-program.types';
 import type { UserProgram, UserWeek, UserSet, Phase } from '../user-program/user-program.types';
 import { macroPhaseToUserPhase, isDeloadLikeMacroPhase } from '../periodization/phase-bridge';
 import { autodraftBBPlan } from '../manual-constructor/manual-draft.engine';
@@ -42,9 +43,28 @@ export interface MacrocycleToBBOptions {
 }
 
 /**
+ * Phase-specific volume multipliers for BB year plan (Helms 2022, Bompa 2009).
+ * When a 16-week BB plan is cycled to fill a longer macrocycle, each macro phase
+ * gets different volume/RIR to provide real periodization across the year.
+ */
+const PHASE_VOLUME_MULT: Record<MacroPhase, { compound: number; accessory: number }> = {
+  endurance:   { compound: 1.0,  accessory: 1.0 },
+  strength:    { compound: 0.85, accessory: 0.8 },
+  peak:        { compound: 0.5,  accessory: 0.3 },
+  competition: { compound: 0.3,  accessory: 0.0 },
+  transition:  { compound: 0.5,  accessory: 0.4 },
+};
+
+/** Volume multiplier for a specific block type within a macro phase. */
+function volumeMultiplierFor(phase: MacroPhase, isCompound: boolean): number {
+  const m = PHASE_VOLUME_MULT[phase];
+  return isCompound ? m.compound : m.accessory;
+}
+
+/**
  * Конвертировать макроцикл ПЛ-авто → UserProgram (ББ).
  * Возвращает UserProgram с direction='bb' и заполненными weeks (упражнения/фазы).
- * При ошибке сборки (autodraftBBPlan бросает) — fallback на createBlank-подобный
+ * При ошибке сборки (autodraftBBPlan бросает) - fallback на createBlank-подобный
  * скелет с переразмеченными фазами и пустыми sessions.
  */
 export function macrocycleToBBProgram(
@@ -60,7 +80,7 @@ export function macrocycleToBBProgram(
     baseProgram = null;
   }
 
-  // 2. Если сборка удалась — переразметить фазы недель из макроцикла.
+  // 2. Если сборка удалась - переразметить фазы недель из макроцикла.
   let weeks: UserWeek[];
   let meta: UserProgram['meta'];
   if (baseProgram && baseProgram.bb && baseProgram.bb.weeks.length > 0) {
@@ -129,7 +149,7 @@ function buildBaseBBProgram(total: number, opts: MacrocycleToBBOptions): UserPro
     const fullWeeks: UserWeek[] = [];
     for (let w = 1; w <= total; w++) {
       const src = srcWeeks[(w - 1) % srcWeeks.length];
-      fullWeeks.push({ ...src, week: w });
+      fullWeeks.push(cloneWeekWithFreshIds(src, w));
     }
     userProg.bb.weeks = fullWeeks;
   }
@@ -138,7 +158,8 @@ function buildBaseBBProgram(total: number, opts: MacrocycleToBBOptions): UserPro
 
 /**
  * Переразметить phase/deload недель UserProgram из макроцикла.
- * Сохраняет все упражнения/блоки/сеты. Для deload/peaking фаз корректирует RIR.
+ * Сохраняет все упражнения/блоки/сеты. Применяет phase-specific volume/RIR
+ * для каждой фазы макроцикла (Helms 2022, Bompa 2009, NSCA 2021).
  */
 function remapWeeksFromMacrocycle(weeks: UserWeek[], macro: Macrocycle): UserWeek[] {
   return weeks.map(w => {
@@ -147,42 +168,88 @@ function remapWeeksFromMacrocycle(weeks: UserWeek[], macro: Macrocycle): UserWee
     if (!block) return w;
     const phase = macroPhaseToUserPhase(block.phase);
     const deload = isDeloadLikeMacroPhase(block.phase);
-    // Корректировка RIR для deload/peaking фаз
-    const adjustedSessions = deload || phase === 'peaking'
-      ? w.sessions.map(s => adjustSessionRir(s, phase, deload))
-      : w.sessions;
-    return { ...w, phase, deload, sessions: adjustedSessions };
+    const periodicDeload = !deload
+      && (block.phase === 'endurance' || block.phase === 'strength')
+      && ((w.week - block.weekOffset + 1) % 4 === 0);
+    // Phase-specific volume and RIR adjustments for ALL macro phases
+    const adjustedSessions = w.sessions
+      .map(s => adjustSessionForPhase(s, block.phase, phase, deload || periodicDeload))
+      .filter((s): s is UserWeek['sessions'][number] => s !== null);
+    return { ...w, phase, deload: deload || periodicDeload, sessions: adjustedSessions };
   });
 }
 
+/** Clone a generated week without sharing editor identities across weeks. */
+function cloneWeekWithFreshIds(source: UserWeek, week: number): UserWeek {
+  return {
+    ...source,
+    week,
+    sessions: source.sessions.map(session => ({
+      ...session,
+      id: newId('ses'),
+      blocks: session.blocks.map(block => ({ ...block, id: newId('blk') })),
+    })),
+  };
+}
+
 /**
- * Скорректировать RIR сетов в сессии для deload/peaking фазы.
- * deload: RIR +3 (лёгкая неделя, восстановление).
- * peaking: RIR → 0-1 (максимальная интенсивность).
+ * Скорректировать объём и RIR сетов для фазы макроцикла.
+ *
+ * Каждая фаза имеет свои множители объёма и целевые RIR:
+ * - endurance: объём ×1.0, RIR baseline (Schoenfeld 2016)
+ * - strength: объём ×0.85, RIR 1-2 (Helms 2022)
+ * - peak: compounds ×0.5 RIR 0-1, accessory ×0.3 RIR 2-3 (Bompa 2009)
+ * - competition: compounds ×0.3 RIR 0, accessory ×0.0 (только сорев. движения)
+ * - transition/deload: compounds ×0.5 RIR +3, accessory ×0.4 (восстановление)
  */
-function adjustSessionRir(session: UserWeek['sessions'][number], phase: Phase, deload: boolean): UserWeek['sessions'][number] {
+function adjustSessionForPhase(
+  session: UserWeek['sessions'][number],
+  macroPhase: MacroPhase,
+  phase: Phase,
+  deload: boolean,
+): UserWeek['sessions'][number] | null {
   const adjustedBlocks = session.blocks.map(b => {
+    const isCompound = b.type === 'compound';
+    const volMult = volumeMultiplierFor(macroPhase, isCompound);
+    // Additional deload/peaking multiplier on top of phase volume
+    const phaseMult = deload ? 0.75 : phase === 'peaking' ? 0.75 : 1.0;
+    const volumeMult = volMult * phaseMult;
+
+    if (macroPhase === 'competition' && !isCompound) {
+      return null;
+    }
+
     if (deload) {
-      // Deload (Helms, NSCA): RIR +3 and volume reduction. Keep at least one
-      // set per block; accessory blocks are reduced a little more than compounds.
+      // Deload (Helms, NSCA): RIR +3, volume scaled by phase
       const sets = b.sets.map((s: UserSet) => ({ ...s, rir: Math.min(5, (s.rir ?? 2) + 3) }));
-      const volumeMultiplier = b.type === 'compound' ? 0.6 : 0.5;
       const cutSets = sets
-        .map((s, i) => i < Math.max(1, Math.ceil(sets.length * volumeMultiplier)) ? s : null)
+        .map((s, i) => i < Math.max(1, Math.ceil(sets.length * volumeMult)) ? s : null)
         .filter((s): s is UserSet => s !== null);
       return { ...b, sets: cutSets.length > 0 ? cutSets : sets };
     }
+
     if (phase === 'peaking') {
-      const isCompound = b.type === 'compound';
+      // Peaking: compounds RIR 0-1 (Bosquet 2005), accessory gets controlled RIR
       const sets = b.sets.map((s: UserSet) => ({
         ...s,
-        rir: isCompound ? Math.max(0, Math.min(1, s.rir ?? 1)) : Math.min(5, (s.rir ?? 2) + 1),
+        rir: isCompound ? Math.max(0, Math.min(1, s.rir ?? 1)) : Math.min(3, (s.rir ?? 2) + 1),
       }));
-      return { ...b, sets };
+      const cutSets = sets
+        .map((s, i) => i < Math.max(1, Math.ceil(sets.length * volumeMult)) ? s : null)
+        .filter((s): s is UserSet => s !== null);
+      return { ...b, sets: cutSets.length > 0 ? cutSets : sets };
+    }
+
+    // All other phases: apply volume multiplier
+    if (volumeMult < 1) {
+      const cutSets = b.sets
+        .map((s: UserSet, i: number) => i < Math.max(1, Math.ceil(b.sets.length * volumeMult)) ? s : null)
+        .filter((s): s is UserSet => s !== null);
+      return { ...b, sets: cutSets.length > 0 ? cutSets : b.sets };
     }
     return b;
-  });
-  return { ...session, blocks: adjustedBlocks };
+  }).filter((b): b is NonNullable<typeof b> => b !== null);
+  return adjustedBlocks.length > 0 ? { ...session, blocks: adjustedBlocks } : null;
 }
 
 /**
@@ -191,7 +258,6 @@ function adjustSessionRir(session: UserWeek['sessions'][number], phase: Phase, d
 function skeletonWeeksFromMacrocycle(macro: Macrocycle, daysPerWeek: number): UserWeek[] {
   const total = macro.totalWeeks;
   const weeks: UserWeek[] = [];
-  // Паттерн дней недели (Пн/Вт/Чт/Пт для 4д)
   const dowPattern = [0, 1, 3, 4, 2, 5, 6];
   for (let w = 1; w <= total; w++) {
     const active = macrocycleToActiveCycle(macro, w);

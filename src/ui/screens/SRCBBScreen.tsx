@@ -542,6 +542,38 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     // TRAINING INTEGRATION: конвертировать BB план в сессии
     try { const sessions = bbPlanToSessions(plan); saveBridgeSessions(sessions); } catch { /* ignore */ }
   };
+
+  const applyBBMacrocycle = (macro: Macrocycle) => {
+    if (!bbBest) throw new Error('Не найден подходящий ББ-сплит');
+    const profData = linked.profile?.settings?.personal;
+    const lifeData = linked.profile?.settings?.lifestyle;
+    const bodyFat = profData?.bodyFat;
+    const leanMass = (profData?.weight && bodyFat != null)
+      ? Math.round(profData.weight * (1 - bodyFat / 100))
+      : undefined;
+    const plan = buildBBPlan({
+      patternId: bbBest.pattern.id,
+      level: bbLevel,
+      goal: bbGoal as any,
+      weeks: macro.totalWeeks,
+      workMax: bbWorkMax,
+      weakPoints,
+      focusGroup: bbFocus,
+      volumeGoal: bbVolGoal as any,
+      trainingFocus: bbTrainingFocus,
+      bodyFat,
+      leanMass,
+      hrvMs: lifeData?.morningHRV,
+      sleepHours: lifeData?.sleepHours,
+      stressLevel: lifeData?.stressLevel,
+    }, pedAdapt);
+    const phased = applyMacrocycleToBBPlan(plan, macro);
+    setBbWeeks(macro.totalWeeks);
+    setBuiltBb(phased);
+    setBbWeekSel(1);
+    try { saveBridgeSessions(bbPlanToSessions(phased)); } catch { /* ignore */ }
+    setSubView('plan');
+  };
   // 🔗 применение корректировок из калькуляторов к активному плану (ПЛ/ББ)
   const applyExternal = () => {
     const p = getPlannerApply();
@@ -1828,50 +1860,24 @@ legs: [
         </div>
       )}
 
-      {subView === 'macro' && <MacrocyclePanel level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyMacrocycle={mainTab === 'pl' ? (macro) => {
+      {subView === 'macro' && <MacrocyclePanel level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyMacrocycle={(macro) => {
         try {
-          buildSrcMacrocycle(macro);
+          if (mainTab === 'pl') buildSrcMacrocycle(macro);
+          else applyBBMacrocycle(macro);
         } catch (error) {
           setMethodNote(`⚠ Макроцикл не применён: ${(error as Error).message}`);
           setSubView('plan');
         }
-      } : undefined} onApplyCycle={(cycleId, weeks) => {
+      }} onApplyCycle={(cycleId, weeks) => {
         if (mainTab === 'bb') {
-          // ББ-авто: применить длительность макроцикла + фазы (объём/RIR по 5 фазам) к плану.
+          // ББ-авто: legacy-кнопка блока, применяем сохранённый макроцикл целиком.
           try {
             const raw = localStorage.getItem('he_pl_macro');
             if (!raw) { setSubView('plan'); return; }
             const macro = deserializeMacro(raw);
             if (!macro) { setSubView('plan'); return; }
-            // Применить длительность макроцикла к bbWeeks и пересобрать план.
-            setBbWeeks(macro.totalWeeks);
-            // Запустить пересборку ББ-плана с новой длительностью + фазовой модуляцией.
-            setTimeout(() => {
-              try {
-                if (bbBest) {
-                  const profData = linked.profile?.settings?.personal;
-                  const lifeData = linked.profile?.settings?.lifestyle;
-                  const bodyFat = profData?.bodyFat;
-                  const leanMass = (profData?.weight && bodyFat != null) ? Math.round(profData.weight * (1 - bodyFat / 100)) : undefined;
-                  const plan = buildBBPlan({
-                    patternId: bbBest.pattern.id, level: bbLevel, goal: bbGoal as any, weeks: macro.totalWeeks,
-                    workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any,
-                    trainingFocus: bbTrainingFocus,
-                    bodyFat, leanMass, hrvMs: lifeData?.morningHRV, sleepHours: lifeData?.sleepHours, stressLevel: lifeData?.stressLevel,
-                  }, pedAdapt);
-                  // Применить фазы макроцикла (5 фаз: endurance/strength/peak/competition/transition)
-                  // → перераспределение объёма/RIR по неделям.
-                  const phased = applyMacrocycleToBBPlan(plan, macro);
-                  setBuiltBb(phased);
-                  setBbWeekSel(1);
-                  try { const sessions = bbPlanToSessions(phased); saveBridgeSessions(sessions); } catch { /* ignore */ }
-                } else {
-                  buildBb();
-                }
-              } catch { buildBb(); }
-            }, 50);
+            applyBBMacrocycle(macro);
           } catch { /* ignore */ }
-          setSubView('plan');
         } else {
           // ПЛ-авто: загрузить выбранный СРЦ-цикл
            setSelectedCycleId(cycleId);

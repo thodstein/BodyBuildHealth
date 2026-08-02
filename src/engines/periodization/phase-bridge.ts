@@ -1,15 +1,15 @@
-/**
- * phase-bridge.ts — мост между тремя системами фаз периодизации.
+﻿/**
+ * phase-bridge.ts - мост между тремя системами фаз периодизации.
  *
  * Три источника фаз в коде:
- *  1. `Phase` (user-program.types.ts) — 4 значения: accumulation/intensification/deload/peaking.
- *     Каноническая фаза UserWeek — минимальный набор для ручного конструктора.
- *  2. `PhaseKey` (periodization-designer.engine.ts) — 10 значений для дизайнера макроцикла:
+ *  1. `Phase` (user-program.types.ts) - 4 значения: accumulation/intensification/deload/peaking.
+ *     Каноническая фаза UserWeek - минимальный набор для ручного конструктора.
+ *  2. `PhaseKey` (periodization-designer.engine.ts) - 10 значений для дизайнера макроцикла:
  *     добавлены technique/conditioning/power/gpp/transition и разделён accumulation на hypertrophy/strength.
- *  3. `MacroPhase` (lms/macrocycle.engine.ts) — 5 значений годового макроцикла ПЛ-авто:
+ *  3. `MacroPhase` (lms/macrocycle.engine.ts) - 5 значений годового макроцикла ПЛ-авто:
  *     endurance/strength/peak/competition/transition.
  *
- * Этот модуль — единственное место преобразования. Существующие типы НЕ меняем,
+ * Этот модуль - единственное место преобразования. Существующие типы НЕ меняем,
  * `UserWeek.phase` остаётся каноническим (4 значения).
  */
 import type { Phase } from '../user-program/user-program.types';
@@ -66,6 +66,19 @@ export const PHASE_TO_MACRO: Record<Phase, MacroPhase> = {
   peaking: 'peak',
 };
 
+/**
+ * Lossless reverse mapping: MacroPhase → PhaseKey.
+ * Unlike Phase→PhaseKey which loses info, this preserves the full semantics.
+ * Used when converting macrocycle phases back to designer blocks.
+ */
+export const MACRO_TO_DESIGNER: Record<MacroPhase, PhaseKey> = {
+  endurance: 'gpp',              // endurance ≈ GPP (general physical preparation)
+  strength: 'accumulation_strength',
+  peak: 'peaking',
+  competition: 'peaking',
+  transition: 'transition',
+};
+
 /** Преобразовать PhaseKey дизайнера → каноническую Phase. Fallback: 'accumulation'. */
 export function designerPhaseToUserPhase(pk: PhaseKey): Phase {
   return DESIGNER_TO_PHASE[pk] ?? 'accumulation';
@@ -78,6 +91,15 @@ export function macroPhaseToUserPhase(mp: MacroPhase): Phase {
 
 export function macroPhaseToLmsPhase(mp: MacroPhase): MesocyclePhase {
   return MACRO_TO_LMS_PHASE[mp] ?? 'base';
+}
+
+/**
+ * Преобразовать MacroPhase → PhaseKey (lossless).
+ * Returns the most appropriate designer phase key for a macro phase.
+ * Used when converting macrocycle blocks back to designer format.
+ */
+export function macroToDesignerPhaseKey(mp: MacroPhase): PhaseKey {
+  return MACRO_TO_DESIGNER[mp] ?? 'accumulation_hypertrophy';
 }
 
 /** Является ли PhaseKey делод-подобной фазой (deload или transition). */

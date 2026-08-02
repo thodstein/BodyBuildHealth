@@ -132,7 +132,15 @@ function buildFilledWeeks(total: number, opts: DesignerToUserWeeksOptions): User
     for (let w = 1; w <= total; w++) {
       const srcWeek = src[(w - 1) % Math.max(1, src.length)];
       if (srcWeek) {
-        out.push({ ...srcWeek, week: w });
+        out.push({
+          ...srcWeek,
+          week: w,
+          sessions: srcWeek.sessions.map(session => ({
+            ...session,
+            id: newId('ses'),
+            blocks: session.blocks.map(block => ({ ...block, id: newId('blk') })),
+          })),
+        });
       } else {
         out.push({ week: w, phase: 'accumulation' as const, deload: false, sessions: [] });
       }

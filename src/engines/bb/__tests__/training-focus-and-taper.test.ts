@@ -281,6 +281,18 @@ describe('applyMacrocycleToBBPlan — 5 фаз макроцикла', () => {
     expect(phased.rationale?.join(' ') ?? '').toContain('Макроцикл применён');
   });
 
+  it('длинные endurance/strength блоки получают mini-deload на 4-й неделе', () => {
+    const plan = buildSimpleBBPlan({ weeks: 12 });
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 12 });
+    const phased = applyMacrocycleToBBPlan(plan, macro);
+    const endurance = macro.blocks.find(block => block.phase === 'endurance');
+    expect(endurance).toBeTruthy();
+    if (endurance && endurance.weeks >= 4) {
+      expect(phased.weeks[endurance.weekOffset + 2].deload).toBe(false);
+      expect(phased.weeks[endurance.weekOffset + 3].deload).toBe(true);
+    }
+  });
+
   it('transition-фаза повышает RIR (deload сдвиг → RIR ↑)', () => {
     const plan = buildSimpleBBPlan({ weeks: 8 });
     // base RIR в обычной неделе

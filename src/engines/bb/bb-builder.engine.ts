@@ -2713,20 +2713,26 @@ export function applyMacrocycleToBBPlan(plan: BBPlan, macro: Macrocycle): BBPlan
     const bbPhase: BBPhase = macroPhaseToBBPhase[block.phase] ?? 'accumulation';
     const volMult = getPhaseVolumeMult(bbPhase);
     const isDeload = bbPhase === 'deload';
+    const blockWeek = weekNum - block.weekOffset + 1;
+    const periodicDeload = !isDeload
+      && (block.phase === 'endurance' || block.phase === 'strength')
+      && blockWeek % 4 === 0;
     const rirShift = bbPhase === 'peaking' ? -2 : bbPhase === 'deload' ? +3 : 0;
     const sessions = wk.sessions.map((ses) => ({
       ...ses,
       exercises: ses.exercises.map((ex) => {
-        const targetSets = Math.max(1, Math.round((ex.sets || 0) * volMult));
-        const newRir = Math.max(0, Math.min(5, (ex.rir ?? 2) + rirShift));
+        const effectiveVolMult = periodicDeload ? volMult * 0.6 : volMult;
+        const effectiveRirShift = periodicDeload ? Math.max(rirShift, 2) : rirShift;
+        const targetSets = Math.max(1, Math.round((ex.sets || 0) * effectiveVolMult));
+        const newRir = Math.max(0, Math.min(5, (ex.rir ?? 2) + effectiveRirShift));
         const workSets = Array.from({ length: targetSets }, (_, i) => {
           const src = ex.workSets[i];
           if (src) {
-            return { ...src, rir: Math.max(0, Math.min(5, (src.rir ?? 2) + rirShift)) };
+            return { ...src, rir: Math.max(0, Math.min(5, (src.rir ?? 2) + effectiveRirShift)) };
           }
           // Не хватает сетов — генерируем по шаблону первого
           const tpl = ex.workSets[0] ?? { reps: 8, rir: 2, weight: 0, restSeconds: 90 };
-          return { ...tpl, rir: Math.max(0, Math.min(5, (tpl.rir ?? 2) + rirShift)) };
+          return { ...tpl, rir: Math.max(0, Math.min(5, (tpl.rir ?? 2) + effectiveRirShift)) };
         });
         return {
           ...ex,
@@ -2734,9 +2740,9 @@ export function applyMacrocycleToBBPlan(plan: BBPlan, macro: Macrocycle): BBPlan
           rir: newRir,
           workSets,
         };
-      }),
+      }).filter((ex) => !(block.phase === 'competition' && ex.role !== 'primary')),
     }));
-    return { ...wk, sessions };
+    return { ...wk, deload: isDeload || periodicDeload, sessions };
   });
 
   // rationale: добавить запись о применённых фазах

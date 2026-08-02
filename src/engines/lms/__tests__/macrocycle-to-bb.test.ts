@@ -120,4 +120,22 @@ describe('macrocycleToBBProgram', () => {
       session.blocks.every(block => block.type === 'compound'),
     )).toBe(true);
   });
+
+  it('expanded weeks have independent session and block ids', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 52 });
+    const weeks = macrocycleToBBProgram(macro, baseOpts).bb!.weeks;
+    const sessionIds = weeks.flatMap(week => week.sessions.map(session => session.id));
+    const blockIds = weeks.flatMap(week => week.sessions.flatMap(session => session.blocks.map(block => block.id)));
+    expect(new Set(sessionIds).size).toBe(sessionIds.length);
+    expect(new Set(blockIds).size).toBe(blockIds.length);
+  });
+
+  it('inserts a mini-deload at the fourth week of long preparation blocks', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 52 });
+    const program = macrocycleToBBProgram(macro, baseOpts);
+    const preparation = macro.blocks.find(block => block.phase === 'endurance' && block.weeks >= 4);
+    expect(preparation).toBeTruthy();
+    const fourth = program.bb!.weeks.find(week => week.week === preparation!.weekOffset + 3);
+    expect(fourth?.deload).toBe(true);
+  });
 });

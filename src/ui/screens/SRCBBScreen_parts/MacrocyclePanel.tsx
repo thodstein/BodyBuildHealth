@@ -256,12 +256,17 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>🏁 Соревнования ({competitions.length})</span>
             <button
-              onClick={() => {
-                const newId = 'comp_' + Date.now().toString(36);
-                const newComp: CompetitionEvent = {
-                  id: newId,
-                  name: 'Соревнование ' + (competitions.length + 1),
-                  week: Math.min(totalWeeks, compWeek + competitions.length * 8),
+               onClick={() => {
+                 const newId = 'comp_' + Date.now().toString(36);
+                 const usedWeeks = new Set(competitions.map(competition => competition.week));
+                 const preferredWeek = Math.min(totalWeeks, compWeek + competitions.length * 8);
+                 const week = Array.from({ length: totalWeeks }, (_, index) => index + 1)
+                   .find(candidate => candidate >= preferredWeek && !usedWeeks.has(candidate))
+                   ?? Array.from({ length: totalWeeks }, (_, index) => index + 1).find(candidate => !usedWeeks.has(candidate));
+                 const newComp: CompetitionEvent = {
+                   id: newId,
+                   name: 'Соревнование ' + (competitions.length + 1),
+                   week: week ?? 1,
                   priority: competitions.length === 0 ? 'A' : 'B',
                 };
                 setCompetitions([...competitions, newComp]);
