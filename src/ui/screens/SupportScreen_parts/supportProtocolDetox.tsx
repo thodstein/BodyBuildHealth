@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, CrossModuleLimitBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolDetox: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -73,7 +73,7 @@ export const SupportProtocolDetox: React.FC<{ s: Record<string, any> }> = ({ s }
                         { name:'NAC 1200 мг', dose:'1200 мг', timing:'2×/день', note:'Хелатор переходных металлов (Cu, Hg, Pb). ↑ экскреции с мочой' },
                         { name:'АЛК 600 мг', dose:'600 мг', timing:'2×/день', note:'Хелатор переходных металлов (Fe, Cu). Проходит ГЭБ — хелатирует Hg в мозге' },
                         { name:'Кордицепс (Cordyceps sinensis)', dose:'1-3 г', timing:'Утро', note:'↑ экскреции токсинов через почки. Адаптоген + иммуномодулятор' },
-                        { name:'Кинза (cilantro) — экстракт', dose:'30-50 капель', timing:'2×/день', note:'Кинза (cilantro): мобилизация ртути — альтернативная медицина, нет качественных РКИ. Опасно при реальной ртутной интоксикации (может перераспределить Hg в ЦНС). Не использовать как замену хелатотерапии.' },
+                         { name:'Кинза (cilantro) — экстракт', dose:'30-50 капель', timing:'2×/день', note:'⚠️ КРИТИЧЕСКИ: кинза НЕ является хелатоагентом. Нет РКИ, подтверждающих эффективность. Может ПЕРЕРАСПРЕДЕЛЯТЬ Hg из тканей в ЦНС, усугубляя интоксикацию. При подозрении на ртутную интоксикацию — КАТЕГОРИЧЕСКИ ПРОТИВОПОКАЗАНО. Только назначение врача-токсиколога.' },
                       ]},
                   ].map((p: any, i: any) => (
                     <div key={i} style={{ borderRadius:12, background:p.color+'08', border:'1px solid '+p.color+'22', padding:10 }}>
@@ -115,7 +115,7 @@ export const SupportProtocolDetox: React.FC<{ s: Record<string, any> }> = ({ s }
                       { n:'NAC 600-1200 мг (вторая доза)', why:'Вечером перед сном. Детоксикация во сне' },
                       { n:'TUDCA 500-1000 мг', why:'Строго натощак (2-3 ч после еды). Макс. холеретический эффект' },
                       { n:'АЛК 300 мг (вторая доза)', why:'С ужином. Продолжение Nrf2-активации' },
-                      { n:'Кинза (экстракт) 30-50 капель', why:'С водой. ⚠ Альтернативная медицина — нет РКИ. Опасно при ртутной интоксикации (перераспределение Hg в ЦНС). Не замена хелатотерапии' },
+                       { n:'Кинза (экстракт) 30-50 капель', why:'С водой. ⚠️ КРИТИЧЕСКИ: НЕТ доказательной базы. Может ПЕРЕРАСПРЕДЕЛЯТЬ Hg в ЦНС. При ртутной интоксикации — КАТЕГОРИЧЕСКИ ПРОТИВОПОКАЗАНО. Не является заменой хелатотерапии' },
                     ]},
                   ].map((slot: any, si: any) =>(
                     <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:slot.color+'0a', border:'1px solid '+slot.color+'22' }}>
@@ -158,13 +158,15 @@ export const SupportProtocolDetox: React.FC<{ s: Record<string, any> }> = ({ s }
             <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
               <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
               <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
-                • ❤️ <b>Кардио:</b> NAC {'>'}2400 мг/сут → ↑ АД (редко). Контроль АД на высоких дозах NAC<br/>
+                 • ❤️ <b>Кардио:</b> NAC {'>'}2400 мг/сут → ↑ АД (редко). Контроль АД на высоких дозах NAC<br/>
                 • 🫁 <b>Печень:</b> TUDCA не применять при полной обструкции желчевыводящих путей. NAC с антибиотиками — интервал 2 ч<br/>
-                • 🧠 <b>Нейро:</b> SAM-e может вызывать тревогу при {'>'}1200 мг/сут. Начинать с 400 мг<br/>
+                 • 🧠 <b>Нейро:</b> SAM-e может вызывать тревогу при {'>'}1200 мг/сут. Начинать с 400 мг<br/>
                 • 🩸 <b>Гематология:</b> Хлорелла — богата витамином K. Контроль МНО при варфарине. Отменить за 2 нед до операции<br/>
                 • ⚠ <b>Кросс-модульный лимит NAC:</b> NAC используется в Детоксе, Иммунитете (фаза 3) и Печени. Суммарно НЕ превышать 3000 мг/сут из всех протоколов
               </div>
             </div>
+
+            <CrossModuleLimitBanner substance="NAC" limit="≤4000 мг/сут" current="Детокс 2400 + Иммунитет 1800 + Печень 1200-2400 = до 6600 мг/сут" warning="Суммарная доза >4000 мг/сут повышает риск головной боли, тошноты, редко — повышение АД. Снизить дозу в одном из модулей" />
 
           </InfoErrorBoundary>
   );

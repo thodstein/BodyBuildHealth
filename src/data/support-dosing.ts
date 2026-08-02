@@ -12,13 +12,14 @@ export interface DosingRecord {
   nameRu: string;
   category: 'supplement' | 'pharma' | 'peptide' | 'vitamin' | 'mineral' | 'amino' | 'herb';
   doseRange: { min: number; max: number; unit: string; frequency: string };
+  phaseDosing?: Record<string, { min: number; max: number; unit: string; frequency: string }>;
   indications: string[];
   mechanisms: string[];
   warnings: string[];
   evidenceLevel: 'A' | 'B' | 'C';
   lastUpdated: string;
   protocolRefs: string[];
-  riskThresholdKey?: string; // ключ в DRUG_THRESHOLDS_V7
+  riskThresholdKey?: string;
 }
 
 export const SUPPORT_DOSING: Record<string, DosingRecord> = {
@@ -41,7 +42,7 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
   nebivolol: {
     id: 'nebivolol', name: 'Nebivolol', nameRu: 'Небиволол',
     category: 'pharma',
-    doseRange: { min: 2.5, max: 5, unit: 'mg', frequency: 'daily' },
+    doseRange: { min: 2.5, max: 20, unit: 'mg', frequency: 'daily' },
     indications: ['hypertension', 'tachycardia', 'cardioprotection', 'no_enhancement'],
     mechanisms: ['BETA1_BLOCKADE', 'NO_RELEASE', 'ANTIOXIDANT'],
     warnings: ['bradycardia', 'hypotension', 'monitor_hr'],
@@ -68,10 +69,10 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
   atorvastatin: {
     id: 'atorvastatin', name: 'Atorvastatin', nameRu: 'Аторвастатин',
     category: 'pharma',
-    doseRange: { min: 10, max: 80, unit: 'mg', frequency: 'evening' },
+    doseRange: { min: 10, max: 80, unit: 'mg', frequency: 'any' },
     indications: ['dyslipidemia', 'ldl_reduction', 'cardiovascular_prevention'],
     mechanisms: ['HMG_COA_REDUCTASE_INHIBITION', 'LDL_RECEPTOR_UPREGULATION'],
-    warnings: ['hepatotoxicity', 'myopathy', 'ck_elevation'],
+    warnings: ['hepatotoxicity', 'myopathy', 'ck_elevation', 'long_half_life_14h_timing_irrelevant'],
     evidenceLevel: 'A',
     lastUpdated: '2024-07-19',
     protocolRefs: ['Cardio_Phase3'],
@@ -79,10 +80,10 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
   rosuvastatin: {
     id: 'rosuvastatin', name: 'Rosuvastatin', nameRu: 'Розувастатин',
     category: 'pharma',
-    doseRange: { min: 5, max: 40, unit: 'mg', frequency: 'evening' },
+    doseRange: { min: 5, max: 40, unit: 'mg', frequency: 'any' },
     indications: ['dyslipidemia', 'ldl_reduction'],
     mechanisms: ['HMG_COA_REDUCTASE_INHIBITION', 'LDL_RECEPTOR_UPREGULATION'],
-    warnings: ['myopathy', 'hepatotoxicity'],
+    warnings: ['myopathy', 'hepatotoxicity', 'long_half_life_19h_timing_irrelevant'],
     evidenceLevel: 'A',
     lastUpdated: '2024-07-19',
     protocolRefs: ['Cardio_Phase3'],
@@ -117,8 +118,8 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
     doseRange: { min: 500, max: 1500, unit: 'mg', frequency: 'night' },
     indications: ['hdl_increase', 'lipid_management'],
     mechanisms: ['HDL_AUGMENTATION', 'TRIGLYCERIDE_REDUCTION'],
-    warnings: ['flushing', 'hepatotoxicity_high_dose', 'glucose_elevation'],
-    evidenceLevel: 'B',
+    warnings: ['flushing', 'hepatotoxicity_high_dose', 'glucose_elevation', 'AIM_HIGH_HPS2_no_CV_benefit'],
+    evidenceLevel: 'C',
     lastUpdated: '2024-07-19',
     protocolRefs: ['Cardio_Phase2', 'Cardio_Phase3'],
   },
@@ -254,10 +255,11 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
   tudca: {
     id: 'tudca', name: 'TUDCA', nameRu: 'Тауроурсодезоксихолевая кислота',
     category: 'supplement',
-    doseRange: { min: 500, max: 1000, unit: 'mg', frequency: 'bid' },
+    doseRange: { min: 250, max: 500, unit: 'mg', frequency: 'daily' },
+    phaseDosing: { 'Hepatic_Phase3': { min: 500, max: 1000, unit: 'mg', frequency: 'bid' }, 'Hepatic_Phase4': { min: 0, max: 0, unit: 'mg', frequency: 'CONTRAINDICATED' } },
     indications: ['cholestasis', 'liver_protection', 'bile_flow'],
     mechanisms: ['BSEP_ACTIVATION', 'CHOLERESIS', 'ER_STRESS_REDUCTION'],
-    warnings: ['diarrhea_initial', 'biliary_obstruction_contraindication'],
+    warnings: ['diarrhea_initial', 'biliary_obstruction_contraindication', 'CONTRAINDICATED_at_ALT_5x_ULN'],
     evidenceLevel: 'B',
     lastUpdated: '2024-07-19',
     protocolRefs: ['Hepatic_Phase1', 'Hepatic_Phase2', 'Hepatic_Phase3'],
@@ -415,10 +417,10 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
   berberine: {
     id: 'berberine', name: 'Berberine', nameRu: 'Берберин',
     category: 'supplement',
-    doseRange: { min: 500, max: 2000, unit: 'mg', frequency: 'bid_before_meals' },
+    doseRange: { min: 500, max: 1500, unit: 'mg', frequency: 'bid_before_meals' },
     indications: ['insulin_resistance', 'lipid_management', 'ampk_activation'],
     mechanisms: ['AMPK_ACTIVATION', 'INSULIN_SENSITIVITY', 'LDL_RECEPTOR_UPREGULATION'],
-    warnings: ['hypoglycemia_with_diabetes_meds', 'gastrointestinal'],
+    warnings: ['hypoglycemia_with_diabetes_meds', 'gastrointestinal', 'max_2000_mg_day'],
     evidenceLevel: 'B',
     lastUpdated: '2024-07-19',
     protocolRefs: ['Metabolic_Phase1', 'Metabolic_Phase2'],
@@ -426,10 +428,10 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
   metformin: {
     id: 'metformin', name: 'Metformin', nameRu: 'Метформин',
     category: 'pharma',
-    doseRange: { min: 500, max: 2000, unit: 'mg', frequency: 'bid' },
+    doseRange: { min: 500, max: 2550, unit: 'mg', frequency: 'bid' },
     indications: ['insulin_resistance', 'gh_induced_hyperglycemia', 'diabetes'],
     mechanisms: ['AMPK_ACTIVATION', 'HEPATIC_GLUCOSE_OUTPUT_REDUCTION', 'INSULIN_SENSITIVITY'],
-    warnings: ['lactic_acidosis_risk', 'gi_distress', 'stop_before_contrast'],
+    warnings: ['lactic_acidosis_risk', 'gi_distress', 'stop_before_contrast', 'max_2550_mg_day_FDA'],
     evidenceLevel: 'A',
     lastUpdated: '2024-07-19',
     protocolRefs: ['Metabolic_Phase2'],
@@ -463,7 +465,7 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
   potassium: {
     id: 'potassium', name: 'Potassium', nameRu: 'Калий',
     category: 'mineral',
-    doseRange: { min: 200, max: 600, unit: 'mg', frequency: 'daily' },
+    doseRange: { min: 400, max: 2000, unit: 'mg', frequency: 'daily' },
     indications: ['electrolyte_repletion', 'cramp_prevention', 'clenbuterol'],
     mechanisms: ['ELECTROLYTE_BALANCE', 'MEMBRANE_POTENTIAL'],
     warnings: ['hyperkalemia_with_acei_arb'],
@@ -548,10 +550,11 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
   dim: {
     id: 'dim', name: 'DIM', nameRu: 'Дииндолилметан',
     category: 'supplement',
-    doseRange: { min: 100, max: 400, unit: 'mg', frequency: 'bid' },
+    doseRange: { min: 100, max: 600, unit: 'mg', frequency: 'daily' },
+    phaseDosing: { 'E2_Phase2': { min: 200, max: 400, unit: 'mg', frequency: 'bid' }, 'E2_Phase3': { min: 400, max: 600, unit: 'mg', frequency: 'bid' } },
     indications: ['estrogen_metabolism', 'aromatase_modulation', 'prostate_health'],
     mechanisms: ['ESTROGEN_METABOLISM', '2_HYDROXY_ESTRONE_FAVORING', 'AROMATASE_MODULATION'],
-    warnings: ['none_significant'],
+    warnings: ['none_significant', 'max_600_mg_day'],
     evidenceLevel: 'C',
     lastUpdated: '2024-07-19',
     protocolRefs: ['E2_Phase1'],
@@ -559,10 +562,10 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
   calcium_d_glucarate: {
     id: 'calcium_d_glucarate', name: 'Calcium D-Glucarate', nameRu: 'Кальций-D-глюкарат',
     category: 'supplement',
-    doseRange: { min: 1000, max: 2000, unit: 'mg', frequency: 'bid' },
+    doseRange: { min: 500, max: 2000, unit: 'mg', frequency: 'daily' },
     indications: ['estrogen_clearance', 'glucuronidation'],
     mechanisms: ['GLUCURONIDATION', 'ESTROGEN_EXCRETION', 'BETA_GLUCURONIDASE_INHIBITION'],
-    warnings: ['none_significant'],
+    warnings: ['none_significant', 'max_2000_mg_day'],
     evidenceLevel: 'C',
     lastUpdated: '2024-07-19',
     protocolRefs: ['E2_Phase1'],
@@ -618,10 +621,10 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
   melatonin: {
     id: 'melatonin', name: 'Melatonin', nameRu: 'Мелатонин',
     category: 'supplement',
-    doseRange: { min: 0.3, max: 3, unit: 'mg', frequency: 'bedtime' },
+    doseRange: { min: 1, max: 5, unit: 'mg', frequency: 'bedtime' },
     indications: ['sleep', 'circadian_rhythm', 'antioxidant'],
     mechanisms: ['MT1_MT2_AGONISM', 'CIRCADIAN_REGULATION'],
-    warnings: ['daytime_sedation_high_dose'],
+    warnings: ['daytime_sedation_high_dose', 'phase3_option_10mg_for_severe_cases'],
     evidenceLevel: 'A',
     lastUpdated: '2024-07-19',
     protocolRefs: ['Neuro_Phase1'],
@@ -650,7 +653,8 @@ export function getDosingRecord(id: string): DosingRecord | undefined {
 export function getProtocolDose(id: string, protocolPhase: string): string {
   const record = getDosingRecord(id);
   if (!record) return '';
-  const { min, max, unit, frequency } = record.doseRange;
+  const range = record.phaseDosing?.[protocolPhase] || record.doseRange;
+  const { min, max, unit, frequency } = range;
   return min === max
     ? `${min} ${unit} ${frequency}`
     : `${min}-${max} ${unit} ${frequency}`;

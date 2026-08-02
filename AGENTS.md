@@ -265,6 +265,56 @@ Full critical analysis of BB-auto engine. Fixed PL exercises appearing on wrong 
 
 ---
 
+## Support Protocol Audit Fixes (Aug 3 2026)
+
+Full critical analysis of 36 support protocols from AAS-user harm-reduction perspective. All P0/P1/P2 fixes completed.
+
+### P0 — Critical fixes
+1. **Zinc Immune Phase 3** — 75-100 → 50 мг/сут (cross-module limit with NAC)
+2. **NAC cross-module limit** — added `CrossModuleLimitBanner` UI component (≤4000 мг/сут)
+3. **E2 target** — 20-40 пг/мл prominently added across all phases in `supportProtocolE2.tsx`
+4. **Cabergoline warnings** — impulse control warning added in `supportProtocolProlactin.tsx` (Phases 2/3/4)
+5. **GH Phase 3 insulin** — endocrinologist-only banner in `supportProtocolGH.tsx`
+6. **Nebivolol max** — 5→20 мг in `support-dosing.ts`
+7. **Potassium max** — 600→2000 мг in `support-dosing.ts`
+8. **Eplerenone max** — 100→50 мг in `supportProtocolElectrolytes.tsx`
+9. **PostCycle monitoring** — Free T + SHBG added in `supportProtocolPostCycle.tsx`
+
+### P1 — Important fixes
+10. **`support-dosing.ts` interface** — added `phaseDosing` field for phase-dependent dosing
+11. **`getProtocolDose()`** — now respects `protocolPhase` parameter
+12. **TUDCA** — split into qd 250-500 мг (base) / bid 500-1000 мг (Phase 3) / contraindicated (Phase 4)
+13. **Berberine** — max 2000→1500 мг/день, frequency `bid_before_meals`
+14. **Metformin** — max 2550 мг (FDA limit)
+15. **DIM** — base 100-600 мг qd; PhaseDosing for E2_Phase2/3: 200-600 мг bid
+16. **Calcium D-Glucarate** — base 500-2000 мг qd (was 1000-2000 bid)
+17. **Niacin evidence** — B→C (AIM-HIGH/HPS2-THRIVE no CV benefit)
+18. **Atorvastatin/Rosuvastatin timing** — `evening`→`any` (long half-life)
+19. **Melatonin** — 0.3-3→1-5 мг (Phase 3 option 10 mg in warnings)
+20. **DRUG_THRESHOLDS_V7** — verified all 17 support keys already mapped (telmi, nebivolol, ezetimibe, caberg, etc.)
+
+### P2 — Quality fixes
+21. **Cilantro warning** — strengthened in `supportProtocolDetox.tsx`: "КРИТИЧЕСКИ: НЕТ доказательной базы. Может ПЕРЕРАСПРЕДЕЛЯТЬ Hg в ЦНС. При ртутной интоксикации — КАТЕГОРИЧЕСКИ ПРОТИВОПОКАЗАНО"
+22. **BPC-157/TB-500 safety** — added reconstitution/sterility warnings in `supportProtocolJoints.tsx`: bacteriostatic water only, sterile needles/syringes, sepsis/abscess risk
+
+### Files modified
+- `src/data/support-dosing.ts` — phaseDosing, dose limits, evidence levels
+- `src/ui/screens/SupportScreen_parts/supportProtocolsShared.tsx` — `CrossModuleLimitBanner`
+- `src/ui/screens/SupportScreen_parts/supportProtocolImmune.tsx` — Zinc dose, NAC banner
+- `src/ui/screens/SupportScreen_parts/supportProtocolE2.tsx` — E2 target 20-40 пг/мл
+- `src/ui/screens/SupportScreen_parts/supportProtocolProlactin.tsx` — Cabergoline warning
+- `src/ui/screens/SupportScreen_parts/supportProtocolGH.tsx` — Insulin banner
+- `src/ui/screens/SupportScreen_parts/supportProtocolPostCycle.tsx` — Free T + SHBG
+- `src/ui/screens/SupportScreen_parts/supportProtocolElectrolytes.tsx` — Eplerenone max
+- `src/ui/screens/SupportScreen_parts/supportProtocolDetox.tsx` — Cilantro warning
+- `src/ui/screens/SupportScreen_parts/supportProtocolJoints.tsx` — BPC-157/TB-500 safety
+- `src/engines/risk-engine-v7-matrix.ts` — verified 17 support keys present
+
+### Tests
+- Vitest: **857 tests passing** (all support protocol changes verified)
+
+---
+
 ## Architecture
 
 ### BB engine files
