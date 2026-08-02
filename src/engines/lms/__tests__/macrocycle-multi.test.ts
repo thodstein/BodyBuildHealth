@@ -22,6 +22,11 @@ describe('buildMacrocycleMulti — несколько соревнований',
     expect(peakBlocks.length).toBeGreaterThanOrEqual(1);
   });
 
+  it('rejects malformed competition events', () => {
+    expect(() => buildMacrocycleMulti([{ id: '', name: 'bad', week: 10, priority: 'A' }], { level: 'intermediate', goal: 'powerlifting', totalWeeks: 20 })).toThrow('Некорректное');
+    expect(() => buildMacrocycleMulti([{ id: 'c1', name: 'bad', week: Number.NaN, priority: 'A' }], { level: 'intermediate', goal: 'powerlifting', totalWeeks: 20 })).toThrow('Некорректное');
+  });
+
   it('главное соревнование (A) → 4 нед peak + 1 нед competition', () => {
     const events = [makeComp('main', 20, 'A')];
     const m = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 30 });
@@ -130,6 +135,47 @@ describe('buildMacrocycleMulti — несколько соревнований',
       makeComp('a', 12, 'A'),
       makeComp('b', 12, 'B'),
     ], { level: 'intermediate', goal: 'powerlifting', totalWeeks: 30 })).toThrow(/одной неделе/);
+  });
+
+  it('отклоняет дублирующиеся ID соревнований', () => {
+    expect(() => buildMacrocycleMulti([
+      makeComp('same', 10, 'B'),
+      makeComp('same', 20, 'A'),
+    ], { level: 'intermediate', goal: 'powerlifting', totalWeeks: 30 })).toThrow(/Дублирующийся ID/);
+  });
+
+  it('отклоняет соревнование за пределами макроцикла', () => {
+    expect(() => buildMacrocycleMulti([makeComp('late', 31, 'A')], {
+      level: 'intermediate', goal: 'powerlifting', totalWeeks: 30,
+    })).toThrow('Некорректное');
+    expect(() => buildMacrocycleMulti([makeComp('fractional', 10.5, 'A')], {
+      level: 'intermediate', goal: 'powerlifting', totalWeeks: 30,
+    })).toThrow('Некорректное');
+  });
+
+  it('отклоняет некорректную дату соревнования', () => {
+    expect(() => buildMacrocycleMulti([{
+      ...makeComp('bad-date', 10, 'A'), date: 'not-a-date',
+    }], { level: 'intermediate', goal: 'powerlifting', totalWeeks: 30 })).toThrow('Некорректное');
+    expect(() => buildMacrocycleMulti([{
+      ...makeComp('invalid-day', 10, 'A'), date: '2025-02-30',
+    }], { level: 'intermediate', goal: 'powerlifting', totalWeeks: 30 })).toThrow('Некорректное');
+  });
+
+  it('отклоняет больше циклов пика, чем доступно недель', () => {
+    expect(() => buildMacrocycleMulti([{
+      id: 'c1', name: 'Early', week: 3, priority: 'A',
+      cycleIds: ['a', 'b', 'c', 'd'],
+    }], { level: 'intermediate', goal: 'powerlifting', totalWeeks: 20 })).toThrow(/циклов/);
+  });
+
+  it('допускает соревнование на первой неделе без фиктивного peak-блока', () => {
+    const macro = buildMacrocycleMulti([makeComp('early', 1, 'A')], {
+      level: 'intermediate', goal: 'powerlifting', totalWeeks: 12,
+    });
+    const competition = macro.blocks.find(block => block.phase === 'competition');
+    expect(competition?.weekOffset).toBe(1);
+    expect(macro.blocks.some(block => block.phase === 'peak' && block.weeks <= 0)).toBe(false);
   });
 });
 

@@ -77,6 +77,8 @@ export function workWeight(pmWeek: number, pctIntensity: number): number {
 
 /** Описание режима прогрессии для UI. */
 export function progressionRationale(input: PMProgressionInput): string {
+  if (!Number.isFinite(input.pm0) || input.pm0 <= 0) throw new Error('progressionRationale: pm0 must be > 0');
+  if (!Number.isFinite(input.weeks) || input.weeks < 1) throw new Error('progressionRationale: weeks must be >= 1');
   const k = resolveWeeklyPercent(input);
   const sign = k >= 0 ? '+' : '';
   const pct = (k * 100).toFixed(2);
@@ -87,6 +89,7 @@ export function progressionRationale(input: PMProgressionInput): string {
     custom: 'Ручная настройка',
   };
   const dir = k >= 0 ? 'восходящая прогрессия' : 'нисходящая прогрессия (минимум потерь)';
-  return `${modeLabel[input.mode]}: PM растёт на ${sign}${pct}%/нед (${dir}). ` +
+  const verb = k >= 0 ? 'растёт' : 'снижается';
+  return `${modeLabel[input.mode]}: PM ${verb} на ${sign}${pct}%/нед (${dir}). ` +
     `PM0=${input.pm0} кг → за ${input.weeks} нед: ${(input.pm0 * Math.pow(1 + k, input.weeks - 1)).toFixed(1)} кг.`;
 }

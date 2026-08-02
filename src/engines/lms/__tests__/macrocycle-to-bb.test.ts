@@ -38,8 +38,9 @@ describe('macrocycleToBBProgram', () => {
     }
     // endurance → accumulation (первые недели)
     expect(phases[0]).toBe('accumulation');
-    // competition → peaking (последняя неделя 12 попадает в competition при 12 неделях)
-    expect(phases[phases.length - 1]).toBe('peaking');
+    // Короткий одиночный макроцикл заканчивается transition-разгрузкой.
+    expect(phases[phases.length - 1]).toBe('deload');
+    expect(phases).toContain('peaking');
   });
 
   it('deload-фазы (transition) выставляют deload=true', () => {
@@ -99,5 +100,24 @@ describe('macrocycleToBBProgram', () => {
     expect(prog.meta.direction).toBe('bb');
     expect(prog.bb!.weeks).toHaveLength(12);
     expect(prog.meta.title).toContain('Годовой план ББ');
+  });
+
+  it('competition week removes accessory blocks instead of keeping fake work', () => {
+    const macro = buildMacrocycle({
+      level: 'intermediate',
+      goal: 'bodybuilding',
+      totalWeeks: 20,
+      competitionWeek: 15,
+    });
+    const competitionBlock = macro.blocks.find(block => block.phase === 'competition');
+    expect(competitionBlock).toBeTruthy();
+    const week = macrocycleToBBProgram(macro, baseOpts).bb!.weeks.find(candidate =>
+      candidate.week >= competitionBlock!.weekOffset
+      && candidate.week < competitionBlock!.weekOffset + competitionBlock!.weeks,
+    );
+    expect(week).toBeTruthy();
+    expect(week!.sessions.every(session =>
+      session.blocks.every(block => block.type === 'compound'),
+    )).toBe(true);
   });
 });

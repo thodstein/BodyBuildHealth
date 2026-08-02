@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildLMSPlan, extractExercises } from '../lms/lms-builder.engine';
-import { pmProgression, workWeight, pmForWeek } from '../lms/lms-progression.engine';
+import { pmProgression, workWeight, pmForWeek, progressionRationale } from '../lms/lms-progression.engine';
 import { lmsPlanToSessions } from '../training-integration.engine';
 import { CYCLE_01 } from '../../data/lms-cycles/cycle-01';
 import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
@@ -38,6 +38,15 @@ describe('buildLMSPlan', () => {
     }
   });
 
+  it('applies fatigue budget after weak-point injections', () => {
+    const plan = buildCycle01Plan({ currentReadiness: 0, weakPoints: ['arms', 'back', 'chest'] });
+    for (const day of plan.weeks[0].days) {
+      const accessories = day.exercises.filter(ex => ex.load !== 'Тяжелая');
+      expect(accessories.every(ex => ex.workSets.every(workSet => workSet.sets >= 2))).toBe(true);
+      expect(day.exercises.length).toBeLessThanOrEqual(8);
+    }
+  });
+
   it('PM растёт по неделям (natural, +0.5%/нед)', () => {
     const plan = buildCycle01Plan();
     const w1pm = plan.weeks[0].pmRow['Присед'];
@@ -45,6 +54,17 @@ describe('buildLMSPlan', () => {
     expect(w12pm).toBeGreaterThan(w1pm);
     // (1.005)^11 ≈ 1.056
     expect(w12pm / w1pm).toBeCloseTo(1.056, 2);
+  });
+
+  it('rationale uses actual PM data, not a dummy PM0', () => {
+    const plan = buildCycle01Plan();
+    expect(plan.progressionRationale).not.toContain('PM0=100 кг');
+    expect(plan.progressionRationale).toContain('PM0=');
+  });
+
+  it('rationale preserves an explicitly provided zero readiness', () => {
+    const plan = buildCycle01Plan({ currentReadiness: 0 });
+    expect(plan.progressionRationale).toContain('Ready: 0%');
   });
 
   it('PM week 1 = входной PM (без прогрессии в первую неделю)', () => {
@@ -377,6 +397,11 @@ describe('pmProgression', () => {
     expect(() => pmProgression({ pm0: 0, weeks: 4, mode: 'natural' })).toThrow('pm0 must be > 0');
     expect(() => pmProgression({ pm0: 100, weeks: 4, mode: 'natural', weeklyPercent: -1 })).toThrow('greater than -100%');
     expect(() => pmProgression({ pm0: 100, weeks: -1, mode: 'natural' })).toThrow('weeks must be >= 0');
+    expect(() => progressionRationale({ pm0: 100, weeks: 0, mode: 'natural' })).toThrow('weeks must be >= 1');
+  });
+
+  it('uses descending wording for PCT rationale', () => {
+    expect(progressionRationale({ pm0: 100, weeks: 4, mode: 'pct' })).toContain('PM снижается');
   });
 
   it('rejects invalid builder week overrides and progression rates', () => {
@@ -391,6 +416,42 @@ describe('pmProgression', () => {
       weeks: [CYCLE_01.week1, [{ ...CYCLE_01.week1[0], exercises: [{ ...CYCLE_01.week1[0].exercises[0], sets: [{ pct: 0, reps: 5, sets: 3 }] }] }]],
     };
     expect(() => buildLMSPlan({ template: explicit, pmMap })).toThrow('explicit week 2');
+  });
+
+  it('rejects empty exercise names and invalid readiness', () => {
+    const emptyName = {
+      ...CYCLE_01,
+      week1: [{ ...CYCLE_01.week1[0], exercises: [{ ...CYCLE_01.week1[0].exercises[0], name: '   ' }] }],
+    };
+    expect(() => buildLMSPlan({ template: emptyName, pmMap })).toThrow('exercise name');
+    expect(() => buildLMSPlan({ template: CYCLE_01, pmMap, currentReadiness: Number.NaN })).toThrow('currentReadiness');
+  });
+
+  it('ignores invalid PM map values and uses fallback', () => {
+    const plan = buildLMSPlan({ template: CYCLE_01, pmMap: { 'Присед': Number.NaN, 'Жим лежа': -10 }, fallbackPm: 90, weeksOverride: 1 });
+    const exercise = plan.weeks[0].days.flatMap(day => day.exercises).find(ex => ex.name === 'Присед');
+    expect(exercise?.pm).toBe(90);
+  });
+
+  it('prefers the most specific PM fuzzy match', () => {
+    const template = {
+      ...CYCLE_01,
+      week1: CYCLE_01.week1.map(day => ({
+        ...day,
+        exercises: day.exercises.map(ex => ex.name === 'Жим лежа'
+          ? { ...ex, name: 'Жим лежа узким хватом' }
+          : ex),
+      })),
+    };
+    const plan = buildLMSPlan({
+      template,
+      pmMap: { 'Жим': 80, 'Жим лежа узким хватом': 120 },
+      fallbackPm: 90,
+      weeksOverride: 1,
+    });
+    const exercise = plan.weeks[0].days.flatMap(day => day.exercises)
+      .find(ex => ex.name === 'Жим лежа узким хватом');
+    expect(exercise?.pm).toBe(120);
   });
 
   it('pmForWeek: единичная неделя', () => {

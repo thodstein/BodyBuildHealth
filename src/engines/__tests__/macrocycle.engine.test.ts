@@ -12,6 +12,9 @@ describe('buildMacrocycle', () => {
     expect(buildMacrocycle({ level: 'intermediate', goal: 'general', totalWeeks: 0 }).totalWeeks).toBe(52);
     expect(buildMacrocycle({ level: 'intermediate', goal: 'general', totalWeeks: -2 }).totalWeeks).toBe(12);
     expect(buildMacrocycle({ level: 'intermediate', goal: 'general', totalWeeks: 200 }).totalWeeks).toBe(104);
+    const short = buildMacrocycle({ level: 'intermediate', goal: 'general', totalWeeks: 12 });
+    expect(short.blocks.reduce((sum, block) => sum + block.weeks, 0)).toBe(12);
+    expect(short.blocks.every(block => block.weeks > 0)).toBe(true);
   });
   it('findBlockByPhase returns the first matching block or undefined', () => {
     const m = buildMacrocycle({ level: 'II-KMS', goal: 'powerlifting', totalWeeks: 52 });
@@ -51,7 +54,8 @@ describe('buildMacrocycle', () => {
     const m = buildMacrocycle({ level: 'II-KMS', goal: 'powerlifting', totalWeeks: 52 });
     for (const b of m.blocks) {
       if (b.kind === 'SRC') {
-        expect(b.cycleId).toBeTruthy();
+        // Competition is a calendar week, not a training cycle.
+        if (b.phase !== 'competition') expect(b.cycleId).toBeTruthy();
       }
       expect(b.description).toBeTruthy();
     }
@@ -126,6 +130,18 @@ describe('rebalanceMacrocycle', () => {
     expect(sum).toBe(52);
   });
 
+  it('rebalance синхронизирует week соревнования с competition-блоками', () => {
+    const macro = buildMacrocycle({
+      level: 'intermediate', goal: 'powerlifting', totalWeeks: 30,
+      competitions: [{ id: 'main', name: 'Главное', week: 20, priority: 'A' }],
+    });
+    const result = rebalanceMacrocycle(macro, [{ phase: 'strength', weeks: 4 }]);
+    const competitionBlock = result.blocks.find(block => block.phase === 'competition');
+    expect(competitionBlock).toBeTruthy();
+    expect(result.competitions?.[0].week).toBe(competitionBlock!.weekOffset);
+    expect(result.competitionWeek).toBe(competitionBlock!.weekOffset);
+  });
+
   it('пропорционально распределяет правку между повторяющимися фазами', () => {
     const m: Macrocycle = {
       blocks: [
@@ -163,6 +179,26 @@ describe('serialize / deserialize', () => {
   it('невалидный JSON → null', () => {
     expect(deserializeMacro('not json')).toBeNull();
     expect(deserializeMacro('{}')).toBeNull();
+  });
+
+  it('отбрасывает дробные недели, дубли ID и невалидные legacy-поля', () => {
+    const valid = buildMacrocycle({ level: 'intermediate', goal: 'powerlifting', totalWeeks: 12 });
+    const serialized = JSON.parse(serializeMacro(valid));
+    serialized.b[0][1] = 1.5;
+    expect(deserializeMacro(JSON.stringify(serialized))).toBeNull();
+
+    const withDuplicateIds = JSON.parse(serializeMacro({
+      ...valid,
+      competitions: [
+        { id: 'same', name: 'A', week: 5, priority: 'A' },
+        { id: 'same', name: 'B', week: 8, priority: 'B' },
+      ],
+    }));
+    expect(deserializeMacro(JSON.stringify(withDuplicateIds))).toBeNull();
+
+    const withInvalidAlias = JSON.parse(serializeMacro(valid));
+    withInvalidAlias.c = 0;
+    expect(deserializeMacro(JSON.stringify(withInvalidAlias))).toBeNull();
   });
 });
 

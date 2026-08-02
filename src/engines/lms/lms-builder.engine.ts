@@ -150,10 +150,12 @@ export function extractExercises(tpl: SRCycleTemplate): string[] {
 }
 
 function pmFor(exName: string, pmMap: Record<string, number>, fallback: number): number {
-  if (pmMap[exName] != null) return pmMap[exName];
+  if (pmMap[exName] != null && Number.isFinite(pmMap[exName]) && pmMap[exName] > 0) return pmMap[exName];
   // эвристика: жимовые/присед/тяга — попытка сопоставления по ключам (с нормализацией ё→е)
   const n = norm(exName);
-  const keys = Object.keys(pmMap);
+  const keys = Object.keys(pmMap)
+    .filter(k => Number.isFinite(pmMap[k]) && pmMap[k] > 0)
+    .sort((a, b) => norm(b).length - norm(a).length);
   for (const k of keys) {
     const nk = norm(k);
     if (n.includes(nk) || nk.includes(n)) {
@@ -238,6 +240,25 @@ function weeklyMuscleSets(days: LMSPlanDay[], group: string): number {
   return days.reduce((total, day) => total + day.exercises
     .filter(ex => groupOfExercise(ex.name, ex.group) === group)
     .reduce((dayTotal, ex) => dayTotal + ex.workSets.reduce((sets, workSet) => sets + workSet.sets, 0), 0), 0);
+}
+
+/** Apply the same session fatigue budget to exercises injected after base generation. */
+function enforceInjectedFatigueBudget(days: LMSPlanDay[], baseExerciseCounts: number[], readiness?: number): void {
+  const budget = 60 * (Math.max(0, Math.min(100, readiness ?? 80)) / 100);
+  for (const [dayIndex, day] of days.entries()) {
+    const fatigueCost = (exercise: LMSPlanExercise): number =>
+      EXERCISE_CATALOG.find(candidate => candidate.name === exercise.name)?.fatigueCost ?? 5;
+    const sessionCost = () => day.exercises.reduce((total, exercise) =>
+      total + fatigueCost(exercise) * exercise.workSets.reduce((sets, workSet) => sets + workSet.sets, 0), 0);
+
+    // Remove only exercises added after base generation. This preserves the
+    // base template's minimum-set contract while preventing weak-point
+    // injection from bypassing the session budget.
+    const baseCount = baseExerciseCounts[dayIndex] ?? day.exercises.length;
+    while (sessionCost() > budget && day.exercises.length > baseCount) {
+      day.exercises.pop();
+    }
+  }
 }
 
 /**
@@ -394,7 +415,9 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   if (!template.week1 || !Array.isArray(template.week1) || template.week1.length === 0) throw new Error('buildLMSPlan: template.week1 must be a non-empty array of days');
   if (typeof template.meta.correctionPct !== 'number' || isNaN(template.meta.correctionPct)) throw new Error('buildLMSPlan: template.meta.correctionPct must be a number');
   for (const day of template.week1) {
+    if (!day || !Array.isArray(day.exercises)) throw new Error('buildLMSPlan: week1 contains an invalid day');
     for (const ex of day.exercises) {
+      if (!ex || typeof ex.name !== 'string' || !ex.name.trim()) throw new Error('buildLMSPlan: exercise name must be non-empty');
       if (!ex.sets || !Array.isArray(ex.sets)) throw new Error(`buildLMSPlan: exercise "${ex.name}" has missing or invalid sets`);
       for (const s of ex.sets) {
         if (typeof s.pct !== 'number' || s.pct <= 0 || s.pct > 1) throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid pct (${s.pct}), expected 0..1`);
@@ -411,6 +434,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       for (const day of w) {
         if (!day || !Array.isArray(day.exercises)) throw new Error(`buildLMSPlan: template.weeks[${wi}] contains an invalid day`);
         for (const ex of day.exercises) {
+          if (!ex || typeof ex.name !== 'string' || !ex.name.trim()) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise name must be non-empty`);
           if (!ex.sets || !Array.isArray(ex.sets)) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid sets`);
           for (const s of ex.sets) {
             if (typeof s.pct !== 'number' || !Number.isFinite(s.pct) || s.pct <= 0 || s.pct > 1) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid pct (${s.pct})`);
@@ -430,6 +454,9 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     throw new Error('buildLMSPlan: weeklyPercent must be finite and greater than -100%');
   }
   if (template.meta.correctionPct <= -1) throw new Error('buildLMSPlan: correctionPct must be greater than -100%');
+  if (input.currentReadiness != null && !Number.isFinite(input.currentReadiness)) {
+    throw new Error('buildLMSPlan: currentReadiness must be finite');
+  }
   const exercises = extractExercises(template);
 
   // Faithful multi-week: если задана явная раскладка ВСЕХ недель — используем её
@@ -447,13 +474,14 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   }
 
   // прогрессия PM для каждого упражнения
+  const rationalePm0 = Object.values(pm0Map).reduce((sum, pm) => sum + pm, 0) / Math.max(1, Object.values(pm0Map).length);
   const progInput: PMProgressionInput = {
-    pm0: 100, weeks: totalWeeks, mode,
+    pm0: rationalePm0, weeks: totalWeeks, mode,
     weeklyPercent: input.weeklyPercent, courseIntensity: input.courseIntensity,
   };
   const rationale = hasExplicitWeeks
     ? 'Программа задана дословно по источнику (явная раскладка всех недель, без авто-прогрессии PM).'
-    : progressionRationale({ ...progInput, pm0: 100 });
+     : progressionRationale(progInput);
   const weakNotes: string[] = [];
 
   const goalKey = rirGoalKey(template.meta.period);
@@ -585,6 +613,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       }));
       return { exercises: planEx, metrics: calcSessionMetrics(metricsEx) };
     });
+    const baseExerciseCounts = days.map(day => day.exercises.length);
 
     // Инъекция ассистентов по слабым точкам СРЦ-движений (все циклы, включая faithful с полными weeks[])
     if (input.plWeakPoints && input.plWeakPoints.length) {
@@ -691,6 +720,8 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       }
     }
 
+    enforceInjectedFatigueBudget(days, baseExerciseCounts, input.currentReadiness);
+
     // Пересчёт метрик сессий (после возможной инъекции слабых точек)
     for (const d of days) {
       const metricsEx: SRExercise[] = d.exercises.map(pe => ({
@@ -714,7 +745,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     input.volumeGoal ? `Объём аксессуаров: ${input.volumeGoal === 'mev' ? 'минимальный (MEV)' : input.volumeGoal === 'mrv' ? 'максимальный (MRV)' : 'оптимальный (MAV)'}.` : '',
     input.focusLift ? `Приоритет: акцент на ${input.focusLift === 'squat' ? 'присед' : input.focusLift === 'bench' ? 'жим' : 'тягу'} (+20% объёма).` : '',
     input.weakPoints?.length ? `Слабые группы: ${input.weakPoints.join(', ')} (+20% объёма для упражнений на эти группы).` : '',
-    `S-MRV: объём сессий автоматически ограничен бюджетом утомления (Ready: ${input.currentReadiness || 80}%).`,
+    `S-MRV: объём сессий автоматически ограничен бюджетом утомления (Ready: ${input.currentReadiness ?? 80}%).`,
     input.peds?.length ? `💉 PED-адаптация (dose-aware): MRV ×${pedMrvMult.toFixed(2)}, восст ×${pedRecMult.toFixed(2)}.` : '',
     (input.bodyFat != null || input.hrvMs != null || input.sleepHours != null) ? `🔄 Recovery multiplier: ×${recoveryMult.toFixed(2)} (bodyFat/HRV/sleep/stress). Итог MRV ×${combinedMrvMult.toFixed(2)}.` : '',
     input.acwr ? `📊 ACWR ${input.acwr.ratio.toFixed(1)} (${acwrZone}): объём×${acwrVolMod}, RIR+${acwrRirShift}${acwrDeload ? ', deload' : ''}.` : '',
