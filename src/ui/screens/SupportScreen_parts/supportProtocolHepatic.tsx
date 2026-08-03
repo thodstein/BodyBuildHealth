@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner, CrossModuleLimitBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolHepatic: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -131,6 +131,7 @@ export const SupportProtocolHepatic: React.FC<{ s: Record<string, any> }> = ({ s
                       ⚠ Комбинация 2+ оральных препаратов мультиплицирует гепатотоксичность (x3-5)
                     </div>
                   </div>
+                  <CrossModuleLimitBanner substance="NAC" limit="≤4000 мг/сут" current="Детокс 2400 + Иммунитет 1800 + Печень 1200-2400 = до 6600 мг/сут" warning="Суммарная доза >4000 мг/сут повышает риск головной боли, тошноты, редко — повышение АД. Снизить дозу в одном из модулей" />
                 </div>
               )}
 

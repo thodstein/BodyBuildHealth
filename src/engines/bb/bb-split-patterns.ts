@@ -443,7 +443,12 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
 ];
 
 export function getPattern(id: string): SplitPattern | undefined {
-  const found = SPLIT_PATTERNS.find(p => p.id === id);
+  const legacyIds: Record<string, string> = {
+    ppl_6day: 'ppl_6',
+    fullbody_3x: 'fullbody_3',
+  };
+  const resolvedId = legacyIds[id] ?? id;
+  const found = SPLIT_PATTERNS.find(p => p.id === resolvedId);
   if (!found) {
     console.warn(`[bb-split-patterns] getPattern: pattern id="${id}" не найден. Доступные: ${SPLIT_PATTERNS.map(p => p.id).join(', ')}`);
   }

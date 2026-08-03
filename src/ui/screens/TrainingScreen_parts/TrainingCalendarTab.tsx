@@ -47,6 +47,50 @@ const STATUS_LABELS: Record<string, string> = {
   none: '',
 };
 
+export function runtimeDaysToBridgeSessions(runtime: any, year: number, month: number) {
+  if (!runtime || !Array.isArray(runtime.days) || runtime.days.length === 0) return null;
+  const startWeek = Number(runtime.week) > 0 ? Number(runtime.week) : 1;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  return runtime.days.map((day: any, index: number) => {
+    const exercises = Array.isArray(day.exercises) ? day.exercises : [];
+    const bridgeExercises = exercises.map((exercise: any, exerciseIndex: number) => {
+      const sets = Array.isArray(exercise.targetSets) ? exercise.targetSets : [];
+      const bridgeSets = sets.map((set: any, setIndex: number) => ({
+        setNumber: setIndex + 1,
+        weightKg: Number(set.weight) || 0,
+        reps: Number(set.reps) || 0,
+        rpe: 10 - (Number(set.rir) || 0),
+        rir: Number(set.rir) || 0,
+        isPR: false,
+        notes: '',
+      }));
+      return {
+        exerciseId: `runtime-${index}-${exerciseIndex}`,
+        exerciseName: exercise.name || 'Упражнение',
+        pattern: exercise.muscleGroup || '',
+        muscleGroup: exercise.muscleGroup || '',
+        order: exerciseIndex + 1,
+        sets: bridgeSets,
+        totalVolume: bridgeSets.reduce((sum: number, set: any) => sum + set.weightKg * set.reps, 0),
+        best1RM: 0,
+        avgRPE: 0,
+      };
+    });
+    return {
+      sessionId: `runtime-${index}`,
+      date: `${year}-${String(month + 1).padStart(2, '0')}-${String((index % daysInMonth) + 1).padStart(2, '0')}`,
+      focus: day.label || runtime.focus || 'Тренировка',
+      exercises: bridgeExercises,
+      totalVolume: bridgeExercises.reduce((sum: number, exercise: any) => sum + exercise.totalVolume, 0),
+      totalSets: bridgeExercises.reduce((sum: number, exercise: any) => sum + exercise.sets.length, 0),
+      totalReps: bridgeExercises.reduce((sum: number, exercise: any) => sum + exercise.sets.reduce((inner: number, set: any) => inner + set.reps, 0), 0),
+      weekNumber: startWeek,
+      planned: true,
+      source: runtime.track === 'bb' ? 'BB' : 'SRC',
+    };
+  });
+}
+
 export const TrainingCalendarTab: React.FC = () => {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -96,6 +140,13 @@ export const TrainingCalendarTab: React.FC = () => {
           totalSets: r.totalSets || 15,
           focus: r.focus || 'Тренировка',
         })), startStr, endStr);
+      }
+      const runtimeSessions = runtimeDaysToBridgeSessions(runtime, year, month);
+      if (runtimeSessions?.length) {
+        const startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+        const endDate = new Date(year, month + 1, 0);
+        const endStr = endDate.toISOString().slice(0, 10);
+        return buildPlannedMapFromBridgeSessions(runtimeSessions, startStr, endStr);
       }
     } catch { /* ignore */ }
     return null;

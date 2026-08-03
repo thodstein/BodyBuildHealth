@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, CrossModuleLimitBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolImmune: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -64,7 +64,7 @@ export const SupportProtocolImmune: React.FC<{ s: Record<string, any> }> = ({ s 
                         { name:'NAC 600 мг', dose:'600 мг', timing:'3×/день на 5-7 дней', note:'Муколитик + антиоксидант. ↓ репликации вирусов in vitro. Разжижает мокроту' },
                         { name:'Витамин C в/в (аскорбат Na) 10-15 г', dose:'10-15 г', timing:'В/в капельно', note:'При пневмонии/тяжёлой инфекции. Противовирусный + антиоксидантный эффект' },
                         { name:'Андрографис (Andrographis paniculata)', dose:'200-400 мг', timing:'3×/день', note:'Растительный иммуномодулятор. ↓ длительности ОРВИ на 3-5 дней. ↓ IL-6' },
-                        { name:'Цинк 50 мг + лозенги с цинком (25 мг)', dose:'75-100 мг/сут', timing:'Каждые 3-4 ч', note:'Лозенги — при боли в горле. ↓ длительности симптомов на 33%' },
+                         { name:'Цинк 50 мг (таблетки) или лозенги 25 мг', dose:'50 мг/сут — НЕ БОЛЕЕ', timing:'Вечер / при боли в горле', note:'Лозенги — при боли в горле. ↓ длительности симптомов на 33%. Общий лимит Zn ≤50 мг/сут по всем модулям' },
                       ]},
                     { phase:'ФАЗА 4 · ПОСТ-ИНФЕКЦИОННАЯ', label:'Восстановление', color:'#ef4444', condition:'После инфекции / затяжной COVID', desc:'Восстановление иммунного ответа и энергии',
                       items:[
@@ -157,10 +157,12 @@ export const SupportProtocolImmune: React.FC<{ s: Record<string, any> }> = ({ s 
                 • 🫁 <b>Печень:</b> Высокие дозы витамина D3 — контроль АЛТ/АСТ при жировом гепатозе<br/>
                 • 💧 <b>Почки:</b> Эхинацея противопоказана при аутоиммунных заболеваниях (СКВ, ревматоидный артрит)<br/>
                 • 🫀 <b>ЖКТ:</b> Пробиотики + иммуносупрессия (кортикостероиды) — редкий риск бактериемии. Не для пациентов с ЦВК<br/>
-                • 🧠 <b>Нейро:</b> NAC {'>'}2400 мг/сут → головная боль, тошнота<br/>
-                • ⚠ <b>Кросс-модульные лимиты:</b> Zn ≤50 мг/сут суммарно (Акне+Волосы+Иммунитет). NAC ≤3000 мг/сут суммарно (Детокс+Иммунитет+Печень). D3 ≤4000 МЕ/сут (все модули)
+                 • 🧠 <b>Нейро:</b> NAC {'>'}2400 мг/сут → головная боль, тошнота<br/>
+                • ⚠ <b>Кросс-модульные лимиты:</b> Zn ≤50 мг/сут суммарно (Акне+Волосы+Иммунитет). NAC ≤4000 мг/сут суммарно (Детокс+Иммунитет+Печень). D3 ≤4000 МЕ/сут (все модули)
               </div>
             </div>
+
+            <CrossModuleLimitBanner substance="NAC" limit="≤4000 мг/сут" current="Детокс 2400 + Иммунитет 1800 + Печень 1200-2400 = до 6600 мг/сут" warning="Суммарная доза >4000 мг/сут повышает риск головной боли, тошноты, редко — повышение АД. Снизить дозу в одном из модулей" />
 
           </InfoErrorBoundary>
   );

@@ -389,6 +389,11 @@ Critical analysis of the manual program constructor (ручной планиро
 - **P1-4 floating point progression** — the `Math.round(weight * progression / 2.5) * 2.5` formula is intentional rounding to nearest 2.5 kg (plate step), not a bug. The "0.6 kg error" in the analysis is the expected rounding behavior.
 - **P1-1 `data: any` in planner-bridge** — deliberate trade-off documented in code comment. 30+ call sites pass fields not in the typed interfaces (e.g., `techniques` in `VolumePayload`, `SRCycleTemplate` in `ProgramPayload`). Changing to discriminated union would require updating 30+ files — refactor, not bugfix.
 
+### Refactoring (structural improvements)
+6. **P0-1 Extract ProgramEditor** — ProgramEditor (1443 lines, inline in ProgramManagerPanel.tsx) extracted to `ProgramEditorView.tsx` as a separate, independently-testable component. ProgramManagerPanel reduced from 2454 to 1011 lines.
+7. **P0-3 Dispatch table for applyBridgePayload** — 155-line if/else chain (14 kinds) replaced with dispatch table in `planner-bridge-handlers.ts`. Each `PlannerApplyKind` has its own handler function; adding a new kind requires no modification of existing handlers.
+8. **P0-4 Per-direction autoFillDraft** — 143-line `autoFillDraft` (3 direction branches: BB/PL/Hybrid) extracted to `auto-fill-draft.ts` with 3 standalone functions: `autoFillBBDraft`, `autoFillPLDraft`, `autoFillHybridDraft`. Each is independently testable.
+
 ### Files modified
 - `src/engines/periodization-designer.engine.ts` — `checkBlockOverlap()`, overlap marking, gap/overlap stats
 - `src/ui/screens/TrainingScreen_parts/PeriodizationDesignerTab.tsx` — slider max fix, warning banner

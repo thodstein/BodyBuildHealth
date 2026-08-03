@@ -136,6 +136,15 @@ export const ContraBanner: React.FC<{ items: string[] }> = ({ items }) => (
   </div>
 );
 
+export const CrossModuleLimitBanner: React.FC<{ substance: string; limit: string; current: string; warning: string }> = ({ substance, limit, current, warning }) => (
+  <div style={{ borderRadius:10, padding:'10px 12px', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.3)' }}>
+    <div style={{ fontSize:9, fontWeight:800, color:'#ef4444', marginBottom:4 }}>🚫 Кросс-модульный лимит: {substance}</div>
+    <div style={{ fontSize:8, color:'#fca5a5', lineHeight:1.4, marginBottom:2 }}>• Текущая сумма из нескольких протоколов: {current}</div>
+    <div style={{ fontSize:8, color:'#fca5a5', lineHeight:1.4, marginBottom:2 }}>• Максимум по всем модулям: {limit}</div>
+    <div style={{ fontSize:8, color:'#fca5a5', lineHeight:1.4 }}>• {warning}</div>
+  </div>
+);
+
 export const PROTOCOL_CARDS = [
   { id:'symptoms', icon:'🩺', label:'Симптомы', desc:'Поиск и коррекция симптомов: база решений, дневник, приверженность', color:'#ef4444', system:'Общее', tags:['Симптомы','Решения','Дневник','Лабы'], kind:'reference' },
   { id:'emergency', icon:'🚑', label:'Экстренные состояния', desc:'Когда ехать в больницу: боль в груди, одышка, ТГВ, инсульт, ЖКТ-кровотечение, анафилаксия', color:'#ef4444', system:'Общее', tags:['Скорая','Инфаркт','ТЭЛА','Инсульт'], kind:'reference' },

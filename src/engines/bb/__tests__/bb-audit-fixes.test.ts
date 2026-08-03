@@ -15,6 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { buildBBPlan, type BBBuilderInput, DEFAULT_WORKMAX } from '../bb-builder.engine';
+import { getPattern } from '../bb-split-patterns';
 import { applyTaperToFinalWeeks, type BBPlan, type BBWeek, type BBSession, type BBExercise } from '../bb-autocoach.engine';
 import { programToBBPlan } from '../cycle-to-plan';
 import { FULL_PROGRAM_LIBRARY } from '../../complete-program-library.engine';
@@ -483,6 +484,10 @@ describe('ФАЗА 4.1: sessionShareFor — частота и объём', () =>
  * ФАЗА 2: Мёртвый код удалён — проверка через сборку
  * ═══════════════════════════════════════════════════════════════════ */
 describe('ФАЗА 2: Мёртвый код удалён', () => {
+  it('legacy split ids resolve to current patterns without fallback', () => {
+    expect(getPattern('ppl_6day')?.id).toBe('ppl_6');
+    expect(getPattern('fullbody_3x')?.id).toBe('fullbody_3');
+  });
   it('charReps / phaseBaseRir удалены — buildBBPlan работает без них', () => {
     // Функции были не-экспортируемыми (function, не export).
     // После удаления buildBBPlan должна работать без ошибок.

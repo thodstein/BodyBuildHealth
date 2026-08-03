@@ -38,9 +38,9 @@ export const SupportProtocolPostCycle: React.FC<{ s: Record<string, any> }> = ({
                   <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>ФАЗА 3 · ВОССТАНОВЛЕНИЕ (8-16 нед)</div>
                   <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>• Липиды: омега-3 EPA 4 г, бергамот 1000 мг, ниацин 500 мг<br/>• HCT: кровопускание при {'>'}54, аспирин 100 мг (при ≥2 факторах тромботического риска), куркумин<br/>• Нейро: NAC 1200 мг, АЛК 600 мг, PS 400 мг, Mg 600 мг</div>
                 </div>
-                <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)' }}>
+                 <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)' }}>
                   <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>ФАЗА 4 · МОНИТОРИНГ (16-24+ нед)</div>
-                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>• Цель: T {'>'}15 нмоль/л, E2 80-150, ЛГ/ФСГ в норме<br/>• Полное восстановление HPTA — 4-12 мес<br/>• Следующий курс — только при T {'>'}15, ЛГ {'>'}3, липиды в норме</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>• Цель: T {'>'}15 нмоль/л, свободный T в норме, SHBG в норме, E2 80-150, ЛГ/ФСГ в норме<br/>• Полное восстановление HPTA — 4-12 мес<br/>• Следующий курс — только при T {'>'}15, ЛГ {'>'}3, липиды в норме, свободный T и SHBG в диапазоне</div>
                 </div>
               </div>)}
               {postCycleTab==='lipids'&&(<div style={cardBg}>
@@ -55,8 +55,9 @@ export const SupportProtocolPostCycle: React.FC<{ s: Record<string, any> }> = ({
                 <div style={{ fontSize:11, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>🧠 Нейрореабилитация</div>
                 {[{n:'NAC 1200 мг',d:'1200 мг',t:'Утро+вечер',o:'↑ глутатион. ↓ глутамат-токсичность'},{n:'Mg глицинат 400-600 мг',d:'400-600 мг',t:'Вечер',o:'↓ глутамат, ГАМК-агонист'},{n:'PS 300-400 мг',d:'300-400 мг',t:'200 утро+200 вечер',o:'↓ кортизол. ↑ дофаминовые рецепторы'},{n:'АЛК 600 мг',d:'600 мг',t:'Утро',o:'Антиоксидант. ↑ глутатион в мозге'},{n:'L-теанин 200-400 мг',d:'200-400 мг',t:'Утро+день',o:'↑ α-волны. Анксиолитик'},{n:'Глицин 3 г',d:'3 г',t:'Перед сном',o:'ГАМК-агонист. Качество сна'},{n:'Куркумин Meriva 500-1000 мг',d:'500-1000 мг',t:'С едой',o:'↓ нейровоспаление NF-κB'}].map((x:any,i:any)=>renderRow(x,i,'#8b5cf6'))}
               </div>)}
-              {postCycleTab==='monitoring' && monitoringBlock([
-                {marker:'T общий/свободный', target:'>15 нмоль/л', when:'Каждые 4 нед (фазы 1-2)', action:'<10 → add SERM/энкломифен'},
+               {postCycleTab==='monitoring' && monitoringBlock([
+                {marker:'T общий/свободный', target:'Общий >15 нмоль/л; Свободный 5-25 нг/дл', when:'Каждые 4 нед (фазы 1-2)', action:'<10 → add SERM/энкломифен. Свободный T ↓ при низком SHBG → ↑ риск симптомов при "нормальном" общем T'},
+                {marker:'ГСПГ/SHBG', target:'10-50 нмоль/л', when:'Каждые 8 нед', action:'SHBG <10 → ↑ свободного T (↑ ароматизация, эстрогенные симптомы). SHBG >60 → ↓ свободного T (дефицит)'},
                 {marker:'ЛГ, ФСГ', target:'ЛГ 1-8 МЕ/л', when:'Каждые 4 нед', action:'ЛГ <1 → HPTA подавлена'},
                 {marker:'E2', target:'80-150 пмоль/л', when:'Каждые 4 нед', action:'>200 → AI. <30 → add SERM'},
                 {marker:'Липиды (ЛПВП, ЛПНП, ТГ)', target:'ЛПВП >1.0', when:'Каждые 4-8 нед', action:'ЛПВП <0.8 → старт коррекции'},

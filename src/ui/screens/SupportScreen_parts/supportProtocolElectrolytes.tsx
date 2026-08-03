@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner, CrossModuleLimitBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolElectrolytes: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -43,7 +43,7 @@ export const SupportProtocolElectrolytes: React.FC<{ s: Record<string, any> }> =
                       items:[
                         {name:'Калий (цитрат)', dose:'800-1200 мг', timing:'3×/день с едой', note:triageBadge('ess')+' Дробно. Не превышать 1200 мг/день без контроля'},
                         {name:'Магний (цитрат + глицинат)', dose:'600-800 мг', timing:'200 мг утро + 400-600 мг вечер', note:triageBadge('ess')+' Комбинация форм: цитрат (биодоступность) + глицинат (противосудорожное)'},
-                        {name:'Калий-сберегающие — эплеренон 💊', dose:'50-100 мг', timing:'Утро', note:triageBadge('rec')+' Селективный MR-антагонист. БЕЗ антиандрогенных эффектов. При K⁺ <3.8. Контроль K⁺ 2×/нед. ЭКГ при K⁺ <3.0'},
+                         {name:'Калий-сберегающие — эплеренон 💊', dose:'25-50 мг', timing:'Утро', note:triageBadge('rec')+' Селективный MR-антагонист. БЕЗ антиандрогенных эффектов. При K⁺ <3.8. Контроль K⁺ 2×/нед. ЭКГ при K⁺ <3.0'},
                         {name:'Кальций (цитрат)', dose:'500 мг', timing:'Вечер, отдельно от Mg', note:triageBadge('rec')+' При судорогах. Дефицит Ca²⁺ усугубляет гипомагниемию. Не принимать с Mg — конкурентное всасывание'},
                       ]},
                     {phase:'ФАЗА 4 · КРИТИЧЕСКИЙ ДИСБАЛАНС', label:'Госпитализация?', color:'#ef4444', condition:'K⁺<3.0 / K⁺>6.0 / Na⁺<125 / Mg⁺²<0.5', desc:'Экстренная коррекция',
@@ -88,16 +88,18 @@ export const SupportProtocolElectrolytes: React.FC<{ s: Record<string, any> }> =
               ])}
             </div>
 
-            <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+             <div style={{ borderRadius:12, padding:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
               <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>🔗 Перекрёстные предупреждения</div>
               <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.5 }}>
                 • 🫀 <b>RAAS (АД/Почки):</b> Эплеренон используется в обоих модулях — НЕ дублировать. Суммарная K⁺-сберегающая нагрузка опасна. Мониторинг K⁺ 1×/нед при совместной терапии<br/>
                 • 🍪 <b>GLP-1:</b> Семаглутид/лираглутид → риск дегидратации (↓ потребления жидкости). Принудительная гидратация 2+ л/день. Контроль Na⁺ и СКФ<br/>
                 • 💧 <b>Почки:</b> НПВС + РААС-блокада → двойное снижение СКФ, риск ОПП. Контроль креатинина каждые 2 нед<br/>
-                • ❤️ <b>Кардио:</b> Гипокалиемия (K⁺ {'<'}3.5) → риск аритмий на фоне ААС. Коррекция калия обязательна<br/>
+                 • ❤️ <b>Кардио:</b> Гипокалиемия (K⁺ {'<'}3.5) → риск аритмий на фоне ААС. Коррекция калия обязательна<br/>
                 • ⚠ <b>Кросс-модульный лимит Mg:</b> Mg используется в Электролитах, Кардио, Сне, Адаптогенах, Метаболизме, Суставах. Суммарно НЕ превышать 800 мг/сут из всех протоколов. Избыток → диарея, гипотензия, угнетение ЦНС
               </div>
             </div>
+
+            <CrossModuleLimitBanner substance="NAC" limit="≤4000 мг/сут" current="Детокс 2400 + Иммунитет 1800 + Печень 1200-2400 = до 6600 мг/сут" warning="Суммарная доза >4000 мг/сут повышает риск головной боли, тошноты, редко — повышение АД. Снизить дозу в одном из модулей" />
 
           </InfoErrorBoundary>
   );
