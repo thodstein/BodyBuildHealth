@@ -87,6 +87,16 @@ describe('buildDiaryAutoreg', () => {
     expect(r.plateauWarnings[0]).toContain('Жим лёжа');
   });
 
+  it('не считает плато, если средняя из трёх сессий была заметно сильнее', () => {
+    const history = [
+      makeWorkoutLog('Жим лёжа', '2026-06-01', [{ weight: 80, reps: 5 }], 93),
+      makeWorkoutLog('Жим лёжа', '2026-06-15', [{ weight: 80, reps: 5 }], 100),
+      makeWorkoutLog('Жим лёжа', '2026-07-01', [{ weight: 80, reps: 5 }], 93),
+    ];
+    const r = buildDiaryAutoreg({ historyWorkouts: history, plannedExercises });
+    expect(r.plateauWarnings).toHaveLength(0);
+  });
+
   it('fuzzy match: «Жим лёжа» в плане, «Жим штанги лёжа» в дневнике', () => {
     const history = [makeWorkoutLog('Жим штанги лёжа', '2026-07-01', [{ weight: 82, reps: 5, rpe: 9 }])];
     const r = buildDiaryAutoreg({ historyWorkouts: history, plannedExercises });

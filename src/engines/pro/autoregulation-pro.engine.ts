@@ -70,7 +70,6 @@ export function rpeFromLoad(e1RM: number, weight: number, reps: number): number 
 export function autoRegulate(input: AutoRegInput): AutoRegOutput {
   const decisions: string[] = [];
   let volMult = input.plannedVolumeMult ?? 1;
-  let rirShift = 0;
   let topMult = 1;
   let deload = false;
   let intensityNote: string | undefined;
@@ -78,37 +77,37 @@ export function autoRegulate(input: AutoRegInput): AutoRegOutput {
   // ACWR (P3)
   const z = input.acwr.zone;
   if (z === "dangerous") { volMult *= 0.65; deload = true; decisions.push(`ACWR ${input.acwr.ratio.toFixed(1)}>1.5 (опасно) → объём×0.65, deload`); }
-  else if (z === "caution") { volMult *= 0.85; rirShift += 1; decisions.push(`ACWR ${input.acwr.ratio.toFixed(1)} (caution) → объём×0.85, RIR+1`); }
+  else if (z === "caution") { volMult *= 0.85; decisions.push(`ACWR ${input.acwr.ratio.toFixed(1)} (caution) → объём×0.85, RIR+1`); }
   else if (z === "undertrained") { volMult *= 1.1; decisions.push(`ACWR ${input.acwr.ratio.toFixed(1)}<0.8 (недотрен) → объём×1.1`); }
   else { decisions.push(`ACWR ${input.acwr.ratio.toFixed(1)} optimal → базовый объём`); }
 
   // Readiness
   const r = input.readiness;
-  if (r < 35) { rirShift += 3; topMult *= 0.88; volMult *= 0.85; intensityNote = 'восстановительная'; decisions.push(`Готовность ${r}<35 → RIR+3, топ-сет×0.88, объём×0.85 (восстановительная)`); }
-  else if (r < 50) { rirShift += 2; topMult *= 0.94; volMult *= 0.92; intensityNote = 'лёгкая'; decisions.push(`Готовность ${r}<50 → RIR+2, топ-сет×0.94, объём×0.92 (лёгкая)`); }
-  else if (r < 65) { rirShift += 1; topMult *= 0.97; decisions.push(`Готовность ${r}<65 → RIR+1, топ-сет×0.97`); }
+  if (r < 35) { topMult *= 0.88; volMult *= 0.85; intensityNote = 'восстановительная'; decisions.push(`Готовность ${r}<35 → RIR+3, топ-сет×0.88, объём×0.85 (восстановительная)`); }
+  else if (r < 50) { topMult *= 0.94; volMult *= 0.92; intensityNote = 'лёгкая'; decisions.push(`Готовность ${r}<50 → RIR+2, топ-сет×0.94, объём×0.92 (лёгкая)`); }
+  else if (r < 65) { topMult *= 0.97; decisions.push(`Готовность ${r}<65 → RIR+1, топ-сет×0.97`); }
   else if (r >= 80 && z === "optimal") { topMult *= 1.03; intensityNote = 'силовая'; decisions.push(`Готовность ${r}≥80 + ACWR optimal → топ-сет×1.03 (силовая)`); }
   else { decisions.push(`Готовность ${r} → без корректировки`); }
 
   // HRV-specific: RMSSD ratio ниже baseline → ЦНС утомлена → снижаем интенсивность, не объём
   const hrv = input.hrvRatio ?? 1.0;
-  if (hrv < 0.75) { topMult *= 0.92; rirShift += 1; decisions.push(`HRV-ratio ${hrv.toFixed(2)}<0.75 (ЦНС подавлена) → топ-сет×0.92, RIR+1`); }
+  if (hrv < 0.75) { topMult *= 0.92; decisions.push(`HRV-ratio ${hrv.toFixed(2)}<0.75 (ЦНС подавлена) → топ-сет×0.92, RIR+1`); }
   else if (hrv < 0.88) { topMult *= 0.96; decisions.push(`HRV-ratio ${hrv.toFixed(2)}<0.88 (снижена) → топ-сет×0.96`); }
   else if (hrv > 1.15) { topMult *= 1.02; volMult *= 1.05; decisions.push(`HRV-ratio ${hrv.toFixed(2)}>1.15 (суперкомпенсация) → топ-сет×1.02, объём×1.05`); }
 
   // Sleep quality
   const sleep = input.sleepScore ?? 0;
-  if (sleep > 0 && sleep < 45) { rirShift += 1; volMult *= 0.9; decisions.push(`Сон ${sleep}<45 → RIR+1, объём×0.9`); }
+  if (sleep > 0 && sleep < 45) { volMult *= 0.9; decisions.push(`Сон ${sleep}<45 → RIR+1, объём×0.9`); }
 
   // Fatigue
   const fat = input.fatigue ?? 0;
-  if (fat > 75) { volMult *= 0.8; rirShift += 2; deload = true; decisions.push(`Усталость ${fat}>75 → объём×0.8, RIR+2, deload`); }
-  else if (fat > 60) { volMult *= 0.9; rirShift += 1; decisions.push(`Усталость ${fat}>60 → объём×0.9, RIR+1`); }
+  if (fat > 75) { volMult *= 0.8; deload = true; decisions.push(`Усталость ${fat}>75 → объём×0.8, RIR+2, deload`); }
+  else if (fat > 60) { volMult *= 0.9; decisions.push(`Усталость ${fat}>60 → объём×0.9, RIR+1`); }
 
   // Last session RPE
   const lrpe = input.lastSessionRPE ?? 0;
-  if (lrpe >= 9.5) { rirShift += 2; volMult *= 0.85; decisions.push(`RPE прошлой сессии ${lrpe}≥9.5 → RIR+2, объём×0.85`); }
-  else if (lrpe >= 9 && lrpe > 0) { rirShift += 1; decisions.push(`RPE прошлой сессии ${lrpe}≥9 → RIR+1, контроль`); }
+  if (lrpe >= 9.5) { volMult *= 0.85; decisions.push(`RPE прошлой сессии ${lrpe}≥9.5 → RIR+2, объём×0.85`); }
+  else if (lrpe >= 9 && lrpe > 0) { decisions.push(`RPE прошлой сессии ${lrpe}≥9 → RIR+1, контроль`); }
 
   // Velocity loss (P2)
   const vl = input.lastVelocityLossPct ?? 0;
@@ -122,7 +121,7 @@ export function autoRegulate(input: AutoRegInput): AutoRegOutput {
   // intensity signals; ACWR/fatigue/RPE are load signals.
   const intensityRir = Math.min(3, (r < 35 ? 3 : r < 50 ? 2 : r < 65 ? 1 : 0) + (hrv < 0.75 ? 1 : 0));
   const loadRir = Math.min(2, (z === 'caution' || z === 'dangerous' ? 1 : 0) + (fat > 75 ? 2 : fat > 60 ? 1 : 0) + (lrpe >= 9.5 ? 2 : lrpe >= 9 ? 1 : 0));
-  rirShift = Math.round(clamp(intensityRir + loadRir, 0, 4));
+  const rirShift = Math.round(clamp(intensityRir + loadRir, 0, 4));
 
   const out: AutoRegOutput = {
     topSetPctMultiplier: topMult,

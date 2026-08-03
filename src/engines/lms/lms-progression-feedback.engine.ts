@@ -13,6 +13,8 @@ import type { WorkoutSession, WorkoutExercise } from '../workout-logger.engine';
 import { prescribeLoad, type LoadStrategy } from '../bb/bb-autocoach.engine';
 import { epley1RM } from '../e1rm';
 import { mesocyclePhaseForWeek } from '../rir-matrix.engine';
+import { macroPhaseToLmsPhase } from '../periodization/phase-bridge';
+import type { MacroPhase } from './macrocycle.engine';
 
 export interface PLExerciseLastResult {
   exerciseName: string;
@@ -87,6 +89,14 @@ function buildLastResultIndex(sessions: WorkoutSession[]): Map<string, PLExercis
   return idx;
 }
 
+function planPhase(week: LMSBuildOutput['weeks'][number], totalWeeks: number) {
+  const macroPhase = week.macroPhase;
+  if (macroPhase && ['endurance', 'strength', 'peak', 'competition', 'transition'].includes(macroPhase)) {
+    return macroPhaseToLmsPhase(macroPhase as MacroPhase);
+  }
+  return mesocyclePhaseForWeek(week.week, totalWeeks);
+}
+
 /**
  * Рассчитать обратную связь ПЛ-плана с дневником.
  * @param plan — собранный LMS-план (берём последнюю неделю).
@@ -100,6 +110,9 @@ export function computePLPlanFeedback(
   fallbackPm: number = 80,
   strategy: LoadStrategy = 'double_progression',
 ): PLExerciseFeedback[] {
+  if (!Number.isFinite(fallbackPm) || fallbackPm <= 0) {
+    throw new Error('computePLPlanFeedback: fallbackPm must be > 0');
+  }
   const lastWeek = plan.weeks[plan.weeks.length - 1];
   if (!lastWeek) return [];
   const idx = buildLastResultIndex(sessions);
@@ -126,7 +139,7 @@ export function computePLPlanFeedback(
       const plannedWeight = ex.workSets[0]?.weight ?? 0;
       const plannedReps = ex.workSets[0]?.reps ?? 5;
       const plannedRir = ex.workSets[0]?.rir ?? 2;
-      const maxWeight = ex.pm || fallbackPm;
+      const maxWeight = Number.isFinite(ex.pm) && ex.pm > 0 ? ex.pm : fallbackPm;
 
       let rirDelta: number | null = null;
       let recommendation: PLExerciseFeedback['recommendation'];
@@ -134,7 +147,7 @@ export function computePLPlanFeedback(
       if (last) {
         rirDelta = last.actualRir - plannedRir;
         // prescribeLoad с plannedRir — success-aware коррекция
-        const phase = mesocyclePhaseForWeek(weekNum, totalWeeks);
+        const phase = planPhase(lastWeek, totalWeeks);
         const presc = prescribeLoad(
           strategy,
           last.topWeight,
@@ -151,7 +164,7 @@ export function computePLPlanFeedback(
         recommendation = { nextWeight: presc.nextWeight, nextReps: presc.nextReps, nextRir: presc.nextRIR, label: presc.label, source: 'fact' };
       } else {
         // нет данных — рекомендация по плану
-        const phase = mesocyclePhaseForWeek(weekNum, totalWeeks);
+        const phase = planPhase(lastWeek, totalWeeks);
         const presc = prescribeLoad(strategy, plannedWeight, plannedReps, plannedRir, maxWeight, weekNum, totalWeeks, phase, 'compound', 'primary');
         recommendation = { nextWeight: presc.nextWeight, nextReps: presc.nextReps, nextRir: presc.nextRIR, label: presc.label, source: 'plan' };
       }

@@ -59,6 +59,11 @@ describe('computePLPlanFeedback', () => {
     }
   });
 
+  it('rejects invalid fallback PM', () => {
+    expect(() => computePLPlanFeedback(buildPlan(), [], 0)).toThrow('fallbackPm');
+    expect(() => computePLPlanFeedback(buildPlan(), [], Number.NaN)).toThrow('fallbackPm');
+  });
+
   it('есть данные дневника → source=fact', () => {
     const plan = buildPlan();
     const lastDay = plan.weeks[plan.weeks.length - 1].days[0];
@@ -92,6 +97,20 @@ describe('computePLPlanFeedback', () => {
     const f = feedback.find(fb => fb.planExerciseName === exName);
     expect(f).toBeDefined();
     expect(f!.rirDelta).toBe(0 - plannedRir);
+  });
+
+  it('использует фазу макроцикла вместо фазы, выведенной только из номера недели', () => {
+    const plan = buildPlan();
+    plan.weeks.at(-1)!.macroPhase = 'transition';
+    const exName = plan.weeks.at(-1)!.days[0].exercises[0].name;
+    const feedback = computePLPlanFeedback(
+      plan,
+      [makeSession(exName, '2026-07-01', [{ weight: 100, reps: 5, rir: 2 }])],
+      80,
+      'rpe_based',
+    );
+    const result = feedback.find(item => item.planExerciseName === exName);
+    expect(result?.recommendation.nextRir).toBe(4);
   });
 });
 

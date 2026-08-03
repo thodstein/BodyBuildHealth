@@ -122,8 +122,23 @@ function vrLevelKey(level: string): 'beginner' | 'intermediate' | 'advanced' {
 const RU_TO_EN: Record<string, string> = { 'Грудь': 'chest', 'Спина': 'back', 'Ноги': 'legs', 'Плечи': 'shoulders', 'Руки': 'arms', 'Кор': 'core' };
 const SENT_TO_RU: Record<string, string> = { 'ПР': 'Грудь', 'ЖМ': 'Ноги', 'ТГ': 'Спина', 'ЖИМ': 'Грудь', 'ТЯГА': 'Спина', 'ОФП': 'Кор', 'СФП': 'Кор' };
 const EN_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
-/** focusLift (английский ключ из UI) → русская подстрока для сопоставления с именем упражнения. */
-const FOCUS_RU: Record<string, string> = { squat: 'присед', bench: 'жим', deadlift: 'тяга' };
+/**
+ * Проверяет, является ли упражнение вариантом приоритетного лифта.
+ * Простого `includes('жим'/'тяга')` недостаточно: оно ошибочно включает
+ * жим ногами, жим стоя и тяги для спины в фокус bench/deadlift.
+ */
+function matchesFocusLift(name: string, focusLift?: 'squat' | 'bench' | 'deadlift'): boolean {
+  if (!focusLift) return false;
+  const n = norm(name);
+  switch (focusLift) {
+    case 'squat':
+      return /присед|сквот/.test(n);
+    case 'bench':
+      return /жим/.test(n) && !/ногами|стоя|армейск|над голов/.test(n);
+    case 'deadlift':
+      return /станов|румын|прямых ног|плинт|из ям/.test(n);
+  }
+}
 
 /** Нормализовать группу упражнения (рус/сентимент) → английский ключ для volume-landmarks. */
 function exEnGroup(g: string | undefined): string | undefined {
@@ -163,6 +178,20 @@ function pmFor(exName: string, pmMap: Record<string, number>, fallback: number):
     }
   }
   return fallback;
+}
+
+/** Разрешить PM для инъецированного упражнения с тем же fuzzy-поведением, что и для шаблона. */
+function pmForInjected(exName: string, mainName: string, pmRow: Record<string, number>, fallback: number): number {
+  return pmRow[exName]
+    ?? pmRow[mainName]
+    ?? Object.entries(pmRow).find(([key]) => {
+      const n = norm(key);
+      const target = norm(exName);
+      const main = norm(mainName);
+      return n === target || n.includes(target) || target.includes(n)
+        || n === main || n.includes(main) || main.includes(n);
+    })?.[1]
+    ?? fallback;
 }
 
 // Нормализация load (Тяжелая/Средняя/Легкая): в шаблонах поле load иногда содержало
@@ -360,7 +389,7 @@ function injectPLWeakPoints(
         // которые приводят к MRV-капу по неправильной мышце.
         const exGroup = ex ? (trueMuscleOf(ex) ?? (ex.group as string)) : liftGroup;
         const sets = Math.max(2, Math.round(3 * phaseVolMod));
-        const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? Object.entries(pmRow).find(([k]) => norm(k) === norm(mainName) || norm(k).includes(norm(mainName)) || norm(mainName).includes(norm(k)))?.[1] ?? fallbackPm;
+        const pm = pmForInjected(resolvedName, mainName, pmRow, fallbackPm);
         const ref = getVolumeLandmarks(vrLevel, exGroup);
         if (ref) {
           const cur = weeklyMuscleSets(days, exGroup);
@@ -386,7 +415,7 @@ function injectPLWeakPoints(
         if (!existing.has(norm(resolvedName)) && lightDay.exercises.length < 8) {
           const exGroup = ex ? (trueMuscleOf(ex) ?? (ex.group as string)) : liftGroup;
           const sets = Math.max(2, Math.round(3 * phaseVolMod));
-          const pm = pmRow[resolvedName] ?? pmRow[mainName] ?? fallbackPm;
+          const pm = pmForInjected(resolvedName, mainName, pmRow, fallbackPm);
           const ref = getVolumeLandmarks(vrLevel, exGroup);
           if (ref) {
             const cur = weeklyMuscleSets(days, exGroup);
@@ -563,8 +592,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           // Коррекция объёма по VolumeGoal + фазе мезоцикла (только для аксессуаров)
           if (!isMain) {
             const vMult = input.volumeGoal === 'mev' ? 0.8 : input.volumeGoal === 'mrv' ? 1.2 : 1.0;
-            const focusRu = input.focusLift ? FOCUS_RU[input.focusLift] : undefined;
-            const focusMult = (focusRu && norm(spec.name).includes(focusRu)) ? 1.2 : 1.0;
+            const focusMult = matchesFocusLift(spec.name, input.focusLift) ? 1.2 : 1.0;
             const weakEn = exEnGroup(spec.group);
             const weakMult = (input.weakPoints && weakEn && input.weakPoints.includes(weakEn)) ? 1.2 : 1.0;
             const totalMult = vMult * phaseVolMod * focusMult * weakMult;

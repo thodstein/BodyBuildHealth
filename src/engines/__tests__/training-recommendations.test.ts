@@ -3,6 +3,7 @@ import { generateTrainingRecommendations, weeklySetsByGroup } from '../training-
 import type { WorkoutLog } from '../../core/types';
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
+const localIso = (d: Date) => [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
 const mkWorkout = (date: string, exerciseId: string, nSets: number): WorkoutLog => ({
   id: 'w' + date + exerciseId, date, duration: 60,
   exercises: [{ id: 'e1', date, exerciseId, exerciseName: exerciseId, sets: Array.from({ length: nSets }, () => ({ weight: 80, reps: 5, rir: 2 })), totalVolume: 80 * 5 * nSets, estimated1RM: 100, isCompound: true }],
@@ -65,7 +66,7 @@ describe('generateTrainingRecommendations', () => {
 
   it('высокая суставная нагрузка за неделю', () => {
     const t = new Date();
-    const cur = new Date(t.getFullYear(), t.getMonth(), t.getDate()).toISOString().slice(0, 10);
+    const cur = localIso(t);
     const ws: WorkoutLog[] = [mkWorkout(cur, 'dips_chest', 10)];
     const recs = generateTrainingRecommendations({ historyWorkouts: ws, level: 'intermediate', weakPoints: [] });
     expect(recs.some(r => r.text.includes('суставная нагрузка'))).toBe(true);

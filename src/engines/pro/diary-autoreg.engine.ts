@@ -132,9 +132,8 @@ function findAllFacts(historyWorkouts: WorkoutLog[], exerciseName: string): Fact
 function detectPlateau(facts: FactEntry[]): boolean {
   if (facts.length < 3) return false;
   const recent = facts.slice(-3);
-  const first = recent[0].e1RM;
-  const last = recent[recent.length - 1].e1RM;
-  return Math.abs(last - first) <= 2.5;
+  const values = recent.map(fact => fact.e1RM);
+  return Math.max(...values) - Math.min(...values) <= 2.5;
 }
 
 export function buildDiaryAutoreg(input: DiaryAutoregInput): DiaryAutoregResult {

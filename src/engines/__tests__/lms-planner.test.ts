@@ -158,6 +158,24 @@ describe('buildLMSPlan', () => {
     expect(setsFocus).toBeGreaterThanOrEqual(setsBase);
   });
 
+  it('focusLift = bench не увеличивает объём жима ногами', () => {
+    const legPress = {
+      name: 'Жим ногами', group: 'Ноги', coef: 0.5, mnosz: 1,
+      load: 'Средняя', sets: [{ pct: 0.5, reps: 10, sets: 3 }],
+    };
+    const template = {
+      ...CYCLE_01,
+      week1: CYCLE_01.week1.map((day, index) => index === 0
+        ? { ...day, exercises: [...day.exercises, legPress] }
+        : day),
+    };
+    const base = buildLMSPlan({ template, pmMap, fallbackPm: 80, weeksOverride: 1 });
+    const focused = buildLMSPlan({ template, pmMap, fallbackPm: 80, weeksOverride: 1, focusLift: 'bench' });
+    const getSets = (plan: ReturnType<typeof buildLMSPlan>) => plan.weeks[0].days[0].exercises
+      .find(ex => ex.name === 'Жим ногами')!.workSets[0].sets;
+    expect(getSets(focused)).toBe(getSets(base));
+  });
+
   it('метрики цикла присутствуют', () => {
     const plan = buildCycle01Plan();
     expect(plan.cycleMetrics).toBeDefined();

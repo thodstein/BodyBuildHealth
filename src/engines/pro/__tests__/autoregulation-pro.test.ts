@@ -47,6 +47,13 @@ describe('autoRegulate - signal stacking', () => {
     expect(out.deload).toBe(false);
   });
 
+  it('отсутствие sleepScore не считается плохим сном', () => {
+    const withoutSleep = autoRegulate(baseInput());
+    const withNormalSleep = autoRegulate(baseInput({ sleepScore: 80 }));
+    expect(withoutSleep.volumeMultiplier).toBe(withNormalSleep.volumeMultiplier);
+    expect(withoutSleep.rirShift).toBe(withNormalSleep.rirShift);
+  });
+
   it('dangerous ACWR triggers deload', () => {
     const out = autoRegulate(baseInput({ acwr: { ratio: 1.6, zone: 'dangerous' } }));
     expect(out.deload).toBe(true);

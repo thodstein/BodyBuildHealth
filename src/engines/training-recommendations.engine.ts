@@ -109,9 +109,21 @@ export function generateTrainingRecommendations(input: RecommendationInput): Tra
   // 5.3: накопленная суставная нагрузка за последнюю неделю
   {
     const jointByGroup: Record<string, number> = {};
+    const latestWorkoutDate = historyWorkouts
+      .map(workout => workout.date)
+      .filter(Boolean)
+      .sort()
+      .at(-1);
+    const latestWorkout = latestWorkoutDate ? new Date(`${latestWorkoutDate}T00:00:00Z`) : new Date();
+    const day = latestWorkout.getUTCDay();
+    const start = new Date(latestWorkout);
+    start.setUTCDate(start.getUTCDate() - ((day + 6) % 7));
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 6);
+    const weekStartKey = start.toISOString().slice(0, 10);
+    const weekEndKey = end.toISOString().slice(0, 10);
     historyWorkouts.forEach(w => {
-      const now = new Date(); const s = new Date(now); const day = (s.getDay() + 6) % 7; s.setDate(s.getDate() - day); const e = new Date(s); e.setDate(e.getDate() + 6);
-      if (w.date < s.toISOString().slice(0, 10) || w.date > e.toISOString().slice(0, 10)) return;
+      if (w.date < weekStartKey || w.date > weekEndKey) return;
       (w.exercises || []).forEach(ex => { const cat = getExerciseById(ex.exerciseId); if (!cat) return; const score = cat.jointStress === 'high' ? 3 : cat.jointStress === 'med' ? 2 : 1; jointByGroup[cat.group] = (jointByGroup[cat.group] || 0) + score * (ex.sets?.length || 0); });
     });
     Object.entries(jointByGroup).forEach(([g, score]) => { if (score >= 30) recs.push({ id: `joint-${g}`, severity: 'warn', text: `Высокая суставная нагрузка на «${ru(g)}» за неделю — добавьте предаб-упражнения и mobility в разминку, рассмите изолирующие замены базовых.` }); });
