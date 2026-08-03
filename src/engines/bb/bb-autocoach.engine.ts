@@ -776,20 +776,26 @@ export function applyTaperToFinalWeeks(plan: BBPlan, totalWeeks: number): BBPlan
     // Taper-степень: неделя 1 (taperStart) = 100%, неделя 2 = 75%, неделя 3 = 50%.
     // Интенсивность (вес) сохраняется на 100% — снижается только объём (сеты).
     const taperWeek = idx - taperStart; // 0, 1, 2
-    const volumeMult = taperWeek === 0 ? 1.0 : taperWeek === 1 ? 0.75 : 0.50;
-    const intensityMult = 1.0; // вес сохраняется (Bosquet 2005)
-    const newSessions = w.sessions.map(s => ({
-      ...s,
-      exercises: s.exercises.map(e => ({
-        ...e,
-        sets: Math.max(1, Math.round(e.sets * volumeMult)),
-        workSets: (e.workSets || []).map(ws => ({
-          ...ws,
-          weight: Math.round(ws.weight * intensityMult * 10) / 10,
-        })),
-        comment: (e.comment || '') + ` | 📉 Taper: объём ×${volumeMult}, интенсивность сохранена (Bosquet 2005).`,
-      })),
-    }));
+      const volumeMult = taperWeek === 0 ? 1.0 : taperWeek === 1 ? 0.75 : 0.50;
+      const intensityMult = 1.0; // вес сохраняется (Bosquet 2005)
+      const newSessions = w.sessions.map(s => ({
+        ...s,
+        exercises: s.exercises.map(e => {
+          const sets = Math.max(1, Math.round(e.sets * volumeMult));
+          const source = e.workSets || [];
+          const template = source[source.length - 1] || { reps: e.repsRange[0], rir: e.rir, weight: 0 };
+          const workSets = Array.from({ length: sets }, (_, setIndex) => ({
+            ...(source[setIndex] || template),
+            weight: Math.round((source[setIndex]?.weight ?? template.weight) * intensityMult * 10) / 10,
+          }));
+          return {
+            ...e,
+            sets,
+            workSets,
+            comment: (e.comment || '') + ` | 📉 Taper: объём ×${volumeMult}, интенсивность сохранена (Bosquet 2005).`,
+          };
+        }),
+      }));
     return { ...w, sessions: newSessions };
   });
 

@@ -19,5 +19,6 @@ describe('BB universal taper', () => {
     expect(result.weeks[3].sessions[0].exercises[0].sets).toBeLessThan(4);
     expect(result.weeks[4].sessions[0].exercises[0].sets).toBeLessThan(4);
     expect(result.weeks[4].sessions[0].exercises[0].workSets[0].weight).toBe(80);
+    expect(result.weeks[4].sessions[0].exercises[0].workSets).toHaveLength(result.weeks[4].sessions[0].exercises[0].sets);
   });
 });
