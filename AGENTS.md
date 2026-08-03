@@ -315,6 +315,92 @@ Full critical analysis of 36 support protocols from AAS-user harm-reduction pers
 
 ---
 
+## Nutrition Planner + Product Usefulness Audit Fixes (Aug 3 2026)
+
+Full critical analysis of the Nutrition Planner (IndividualPlan) and the Product Usefulness engine (V1 + V2). All P0/P1/P2 fixes completed and verified.
+
+### P0 — Critical bugs
+1. **`weeklyAvgLoss` double-division** — `planner-targets.ts:103` computed weekly average weight loss as `actualLoss / (n-1) * 7 / (n-1)`, dividing by `(n-1)` TWICE. This understated the real loss rate by a factor of `(n-1)`, causing the weight-adaptation kcal correction to fire too late or not at all during genuine weight loss. Fixed: `weeklyAvgLoss = (actualLoss / intervals) * 7` (single division on `intervals = max(1, n-1)`).
+2. **Leucine estimate 42 → 75 mg/g protein** — `product-usefulness-v2.engine.ts:675` used `f.protein * 42` as the fallback leucine estimate when `amino_acid_profile_100g.leucine_mg` was missing. Real leucine content of common proteins is 65-85 mg/g (whey ~81, egg ~85, casein ~77, chicken ~77, rice ~81, soy ~80, tofu ~65). The 42 constant understated leucine by ~45%, producing false "mTOR not triggered" warnings for high-protein meals. Fixed: `f.protein * 75` (median of animal+plant sources, conservative lower bound).
+3. **`cortisolRisk` summed ALL meals** — `product-usefulness-v2.engine.ts:691` computed `sumF(f => f.carbs * (f.gi > 60 ? 1 : 0))` across ALL meals in `analyzeDailyDiet`, then compared against the post-workout threshold `weightKg * 0.5`. Since `sumF` iterates the entire day's products, the condition evaluated the day's total fast-carb load against a per-meal threshold — producing false negatives whenever any non-post-workout meal contained carbs. Fixed: now evaluates ONLY `postMeal.products` via a targeted reduce that sums `(f.carbs * weightGrams/100)` for foods with `gi > 60`.
+
+### P1 — Important fixes
+4. **DIAAS contribution 1.5 → 3.0** — `product-usefulness-v2.engine.ts:606` scored `DIAAS ≥ 1.0` as `+1.5` and `DIAAS < 0.75` as `-2.0`. A single phase/pharma modifier often applied `-4 to -5`, easily overriding the DIAAS signal. DIAAS is the FAO/WHO gold standard for protein quality and should meaningfully boost the overall score. Fixed: `+3.0` for complete protein, `-2.5` for incomplete, `0` for intermediate.
+5. **PRAL warning threshold 10 → 100 mEq** — `product-usefulness-v2.engine.ts:714` triggered `'Закисление'` when `pralTotal > 10`. PRAL (Remer & Manz) for a high-protein bodybuilding diet typically sums to 150-400 mEq/day across 5 meals (protein foods carry +5..+15 mEq/100g). A 10 mEq threshold flagged virtually every high-protein plan as "закисление", making the warning noise. Fixed: threshold raised to 100 mEq (lower bound where alkalizing countermeasures are genuinely advisable).
+6. **`useEffect` injection dependency** — `IndividualPlanContext.tsx:672` depended on `injections.length`, which missed dose/type changes on an existing injection (same length, different drug). Auto-recalc of protein/kcal on AAS/insulin course edits did not fire when a user changed the drug type or dose without adding/removing an entry. Fixed: dependency changed to `injectionsSignature = injections.map(i => `${i.type}:${i.dose}`).join('|')` so any type or dose change triggers recalculation.
+
+### P2 — Quality fixes
+7. **`DIGEST` missing categories** — `product-usefulness-v2.engine.ts:572-576` only covered `protein/dairy/egg/fish/grain/legume/nut/vegetable/fruit/other`. Categories `veg_fruit`, `carb`, `fat`, `supplement`, `fast_food` fell through to the `0.85` default, which overstated DIAAS for raw veg (real 0.5-0.7) and understated it for refined fats (real 0.95+). Fixed: added `veg_fruit: 0.78`, `carb: 0.88`, `fat: 0.95`, `supplement: 0.95`, `fast_food: 0.85` sourced from FAO/WHO 2013 digestibility tables.
+8. **`calcMealQuality` side effect** — `nutrition-quality.engine.ts:102-108` called `saveNutritionV2Data(...)` inside a pure scoring function, writing to `localStorage` on every invocation. This made the function non-idempotent (test runs mutated shared state) and violated function purity. Fixed: removed the `saveNutritionV2Data` side effect; callers that want to persist the quality score should do so explicitly.
+
+### Files modified
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/planner-targets.ts` — weeklyAvgLoss single-division fix
+- `src/engines/product-usefulness-v2.engine.ts` — leucine 75, cortisolRisk post-workout-only, DIAAS 3.0, PRAL 100, DIGEST categories
+- `src/engines/nutrition-quality.engine.ts` — removed saveNutritionV2Data side effect
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/IndividualPlanContext.tsx` — injectionsSignature useEffect dependency
+
+### Tests
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/__tests__/planner-audit-fixes.test.ts` — **31 new tests**: P0-1 weeklyAvgLoss (4 tests), P0-2 leucine (2 tests), P0-3 cortisolRisk (4 tests), P1-4 DIAAS (3 tests), P1-5 PRAL (3 tests), P2-7 DIGEST (3 tests), P2-8 calcMealQuality purity (3 tests), P0-16 Urea/Cr GFR check (3 tests), P0-13 bb_quality_score recalc (2 tests), P1-7 Array.isArray migration (2 tests), P1-6 role removal order (2 tests).
+- Full suite: **952 tests passing** (120 test files), 0 TS errors, vite build OK.
+
+### Round 2 — additional audit fixes (Aug 3 2026)
+
+After re-reviewing the original analysis, 6 additional bugs were identified and fixed:
+
+9. **Urea/Creatinine protein penalty without GFR check** — `product-usefulness-v2.engine.ts:284` penalized ALL protein foods by -3.5 when urea > 8.5 or creatinine > 115, regardless of GFR. Elevated creatinine is normal in bodybuilding (high-protein diet, creatine supplementation, GFR > 60), but the penalty fired unconditionally. Fixed: protein penalty now requires `L.gfr < 60` (real renal impairment); the alkalinizing bonus (pral < -3) remains unconditional.
+10. **`bb_quality_score` frozen at load time** — `product-usefulness-v2.engine.ts:417` used `product.bb_quality_score ?? calcBBQualityScore(product)`, which kept a potentially stale pre-computed value. If metabolic_flags or other inputs changed after FOOD_DB load, the score would not update. Fixed: always recalculate via `calcBBQualityScore(product)`, falling back to stored value only if calc returns 0.
+11. **`profileTargets` duplicate TDEE calculation** — `IndividualPlanContext.tsx:361-373` computed a second TDEE via legacy `calcNutrition` (ignoring phase/course/weight-adapt), diverging from `calcTargets` which uses `computePlannerTargets`. The "profile" KBJU mode showed different numbers than "auto" mode for the same profile. Fixed: `profileTargets` now uses `computePlannerTargets` with neutral settings (maintenance phase, no injections, no adaptations). Removed unused `calcNutrition` and `calcNutritionV2` imports.
+12. **Migration missing `Array.isArray` check** — `planner-storage.ts:85` only checked `typeof parsed !== 'object'`, which let plain objects `{}` pass through for keys that should be arrays. A stored `{foo: 'bar'}` for `he_excluded_foods` (expected array) would crash downstream `.filter/.map` calls. Fixed: added `arrayKeys` set and `!Array.isArray(parsed)` check for keys that must be arrays.
+13. **`mealsCount` role removal order** — `meal-plan-engine.ts:1127` removed roles in order `['intra','snack','preSleep','prew']`, dropping intra first. For a 7-meal training day (8 roles: core3 + prew + postw + preSleep + intra + snack2), intra was lost while snack2 (less important) stayed. Fixed: order changed to `['snack2','intra','snack','preSleep','prew']` so snack2 is dropped first, preserving intra for long sessions.
+14. **`isMeatId` hardcoded 200+ keywords** — `meal-plan-engine.ts:176` relied on a 200+ string keyword array to identify meat/fish foods, which is fragile and can't adapt to new products. Fixed: `isMeatId` now checks `FOOD_ALLERGEN_DIET` first (canonical source with `isVegetarian` flag), falling back to the keyword heuristic only for unlabeled foods.
+
+### Files modified (round 2)
+- `src/engines/product-usefulness-v2.engine.ts` — Urea/Cr GFR check (P0-16), bb_quality_score always recalc (P0-13)
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/IndividualPlanContext.tsx` — profileTargets via computePlannerTargets (P1-23), removed unused imports
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/planner-storage.ts` — Array.isArray check for array keys (P1-7)
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/meal-plan-engine.ts` — role removal order snack2→intra (P1-6), isMeatId via FOOD_ALLERGEN_DIET (P2-10)
+
+### Identified but deferred (non-blocking)
+- God-Component `IndividualPlanContext.tsx` (2084 lines, 120+ useState) — split into sub-contexts (future refactor).
+- Classic `buildDay` path (~500 lines in context) duplicates V2 engine — remove after confirming V2 stability.
+- Module-level mutable state `_pickCtx` in `meal-plan-engine.ts` — pass via parameters (future refactor for concurrent safety).
+- No dedicated tests for `product-usefulness.engine.ts` (V1) — V2 is covered now.
+
+---
+
+## Manual Program Constructor Audit Fixes (Aug 3 2026)
+
+Critical analysis of the manual program constructor (ручной планировщик) in the training block. All real bugs fixed; analysis items that turned out to be intended behavior were cancelled.
+
+### P0 — Critical fixes
+1. **Periodization Designer overlap detection** — `addBlockToDesign` and `moveBlockInDesign` now mark overlapping blocks in `notes` via new `checkBlockOverlap()` helper. `getDesignStats()` returns `overlapWeeks` count and `gapRanges` array. UI shows red warning banner when overlaps or gaps exist.
+   - `periodization-designer.engine.ts`: added `checkBlockOverlap()`, overlap marking in `addBlockToDesign`/`moveBlockInDesign`, gap/overlap detection in `getDesignStats()`.
+   - `PeriodizationDesignerTab.tsx`: warning banner after phase distribution overview.
+
+### P1 — Important fixes
+2. **`handleResize` slider overflow** — slider `max` was hardcoded to 12, allowing `endWeek` to exceed `totalWeeks`. Fixed: `max={Math.min(12, current!.totalWeeks - editBlock.startWeek + 1)}`. Engine `resizeBlockInDesign` already clamped, but UI now prevents the invalid state.
+3. **`sendToExecution` PL accessory fallback** — `wmVal` returned `wm.squat` for accessory exercises (null lift from `detectLift`), producing absurd weights (e.g., 98 kg for triceps work at 70% of squat 1RM). Fixed: returns `0` for accessory (consistent with `PLSetEditor.calcW` which returns `null` for accessory). Users enter accessory weights manually.
+
+### P2 — Quality fixes
+4. **PDF title XSS** — `program.meta.title` was not HTML-escaped in `printProgram()`, unlike `notes`. A program named `<script>alert(1)</script>` would execute on print. Fixed: added `const safeTitle = (program.meta.title || '').replace(/</g, '&lt;')` used in both `<title>` and `<h1>`.
+5. **Touch DnD scroll interference** — long-press timer (350ms) was not cancelled when user scrolled vertically/horizontally >10px, causing accidental drag activation during scroll. Fixed: `onTouchMove` now tracks `touchStartPosRef` and cancels `longPressTimer` if movement exceeds 10px threshold before arming.
+
+### Cancelled (analysis was incorrect)
+- **P1-4 floating point progression** — the `Math.round(weight * progression / 2.5) * 2.5` formula is intentional rounding to nearest 2.5 kg (plate step), not a bug. The "0.6 kg error" in the analysis is the expected rounding behavior.
+- **P1-1 `data: any` in planner-bridge** — deliberate trade-off documented in code comment. 30+ call sites pass fields not in the typed interfaces (e.g., `techniques` in `VolumePayload`, `SRCycleTemplate` in `ProgramPayload`). Changing to discriminated union would require updating 30+ files — refactor, not bugfix.
+
+### Files modified
+- `src/engines/periodization-designer.engine.ts` — `checkBlockOverlap()`, overlap marking, gap/overlap stats
+- `src/ui/screens/TrainingScreen_parts/PeriodizationDesignerTab.tsx` — slider max fix, warning banner
+- `src/ui/screens/TrainingScreen_parts/ProgramManagerPanel.tsx` — PDF XSS fix, PL accessory fallback fix
+- `src/ui/screens/TrainingScreen_parts/ProgramEditorComponents.tsx` — touch DnD scroll cancellation
+
+### Tests
+- `src/engines/__tests__/periodization-designer-overlap.test.ts` — 10 new tests: overlap detection (add/move), gap reporting, gap consolidation, resize clamping.
+- Full suite: **962 tests passing** (121 test files), 0 TS errors, vite build OK.
+
+---
+
 ## Architecture
 
 ### BB engine files

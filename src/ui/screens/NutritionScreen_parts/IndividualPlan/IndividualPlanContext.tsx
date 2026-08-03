@@ -2,8 +2,6 @@ import React, { useState, useMemo, useEffect, useRef, createContext, useContext 
 import { addToCart } from "../../../../core/nutrition-utils";
 import { FOOD_DB, FOOD_ALLERGEN_DIET, compositeQualityScore } from "../../../../core/nutrition-database";
 import { PHARMA_DB } from "../../../../core/pharma-database";
-import { calcNutrition } from "../../../../engines/nutrition.engine";
-import { calcNutritionV2 } from "../../../../engines/nutrition-v2.engine";
 import { updateProfile } from "../../../../core/profile-manager";
 import { getRecipes, getRecipesByMeal, type Recipe } from "../../../../engines/nutrition-periodization.engine";
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type DailyDietReport, type MealScoreV2 } from "../../../../engines/product-usefulness-v2.engine";
@@ -359,18 +357,26 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [kbjuMode, setKbjuMode] = useState<'auto' | 'manual' | 'profile'>('auto');
 
   const profileTargets = useMemo(() => {
+    // P1-fix: replaced legacy calcNutrition (which ignored phase/course/weight-adapt)
+    // with computePlannerTargets using neutral settings (maintenance phase, no
+    // injections, no adaptations) so "profile" mode gives the raw profile-based
+    // TDEE+macros without the planner's phase/course modifiers. This eliminates
+    // the duplicate TDEE calculation that diverged from calcTargets.
     try {
-      const wpw = s?.workoutsPerWeek || 3; const awm = s?.avgWorkoutMinutes || 60;
-      let pal = 1.2 + wpw * 0.075; if (awm > 60) pal += 0.1; if (awm > 90) pal += 0.05; if (wpw >= 6) pal += 0.05;
-      if (dailySteps >= 15000) pal += 0.15; else if (dailySteps >= 10000) pal += 0.1; else if (dailySteps >= 7500) pal += 0.05;
-      if (householdActivity === 'active') pal += 0.15; else if (householdActivity === 'moderate') pal += 0.1; else if (householdActivity === 'light') pal += 0.05;
-      if (trainType === 'hiit') pal += 0.1; else if (trainType === 'cardio') pal += 0.05; else if (trainType === 'mixed') pal += 0.03;
-      if (trainIntensity === 'high') pal += 0.1; else if (trainIntensity === 'medium') pal += 0.05;
-      pal = Math.min(1.9, Math.max(1.2, Math.round(pal * 1000) / 1000));
-      const gm: Record<string, string> = { mass:'bulk',strength:'strength',fat_loss:'cut',cutting:'cut',post_cut:'maintenance',maintenance:'maintenance',recomposition:'recomp',rehab:'rehab' };
-      return calcNutrition({ weightKg: s?.weight || weight, heightCm: s?.height || height, age: s?.age || age, sex: s?.sex || sex, pal, goal: gm[goal] || 'maintenance' });
-    } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300 }; }
-  }, [s?.weight, s?.height, s?.age, s?.sex, s?.workoutsPerWeek, s?.avgWorkoutMinutes, goal, dailySteps, householdActivity, trainType, trainIntensity]);
+      return computePlannerTargets({
+        weightKg: s?.weight || weight, heightCm: s?.height || height,
+        age: s?.age || age, sex: s?.sex || sex,
+        goal: 'maintenance', phase: 'maintenance', bodyFatPct,
+        workoutsPerWeek: s?.workoutsPerWeek || 3, avgWorkoutMinutes: s?.avgWorkoutMinutes || 60,
+        dailySteps, householdActivity, trainType, trainIntensity, surplusPct: 10,
+        injections: [],
+        weightAdaptMode: false, weightLogWeek: [], expectedLossKgWeek: 0,
+        metabolicAdaptEnabled: false, metabolicAdaptPct: 0,
+        manualGPerKg: { protein: 0, fat: 0, carbs: 0 },
+      });
+    } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300, adjustment: 0 }; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s?.weight, s?.height, s?.age, s?.sex, s?.workoutsPerWeek, s?.avgWorkoutMinutes, bodyFatPct, dailySteps, householdActivity, trainType, trainIntensity]);
 
   // D-22: nutrition-level multiplier folded INTO effective* so the KБЖУ target shown and
   // the goal passed to the engine are the SAME number. Previously the engine built at
@@ -653,10 +659,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { if (profile) { try { const ps = profile.settings; if (ps?.weight !== weight || ps?.height !== height || ps?.age !== age || ps?.sex !== sex || ps?.bodyFat !== bodyFatPct) { updateProfile({ settings: { ...profile.settings, weight, height, age, sex, bodyFat: bodyFatPct } } as any); } } catch {} } }, [weight, height, age, sex, bodyFatPct]);
 
   // Auto-recalc macros when course changes
+  // P1-fix: dependency was `injections.length` which missed dose/type changes on
+  // an existing injection (same length, different drug). Now keyed on a serialized
+  // signature of types+doses so adding/removing/changing a drug all trigger recalc.
   const effectiveKcalRef = useRef(effectiveKcal);
   effectiveKcalRef.current = effectiveKcal;
   const manualGPerKgRef = useRef(manualGPerKg);
   manualGPerKgRef.current = manualGPerKg;
+  const injectionsSignature = (Array.isArray(injections) ? injections : [])
+    .map(i => `${i?.type || ''}:${i?.dose || 0}`).join('|');
   useEffect(() => {
     const safeInjections = Array.isArray(injections) ? injections : [];
     const aasCount = safeInjections.filter(i => i.type === 'ААС').length;
@@ -669,7 +680,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (insulinCount > 0) {
       setManualKcal(prev => prev || Math.round(effectiveKcalRef.current * 1.1));
     }
-  }, [Array.isArray(injections) ? injections.length : 0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [injectionsSignature, goal]);
 
   // Sync from Profile Planner data (he_nutrition_profile)
   useEffect(() => {

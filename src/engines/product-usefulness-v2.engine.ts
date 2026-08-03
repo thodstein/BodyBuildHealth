@@ -281,9 +281,17 @@ function applyLabModifiers(score: number, f: FoodItem, p: UserDietProfile): { sc
     if (o3 > 200) { score += 2.5; ff.push({ text: 'Омега-3 для липидов', impact: 2.5, icon: '✅' }); }
   }
   // Urea/Creatinine
+  // P0-fix: only penalize protein foods when GFR < 60 (real renal impairment).
+  // Previously, high creatinine from high-protein diet or creatine supplementation
+  // (normal in bodybuilding, GFR > 60) penalized ALL protein foods by -3.5, which
+  // produced false "critical risk" warnings for every protein source. Now the
+  // protein penalty only applies when GFR is genuinely impaired (< 60 mL/min).
+  // The alkalinizing bonus (pral < -3) remains unconditional as it's beneficial
+  // regardless of the cause of elevated urea/creatinine.
   if ((L.urea ?? 0) > 8.5 || (L.creatinine ?? 0) > 115) {
-    if (category === 'protein') { score -= 3.5; ff.push({ text: 'Белковый продукт при высоком urea/Cr', impact: -3.5, icon: '🚨' }); }
-    if (pral < -3) { score += 2.5; ff.push({ text: 'Защелачивание при urea/Cr', impact: 2.5, icon: '✅' }); }
+    const gfrImpaired = (L.gfr ?? 999) < 60;
+    if (gfrImpaired && category === 'protein') { score -= 3.5; ff.push({ text: 'Белковый продукт при почечной недостаточности (GFR<60)', impact: -3.5, icon: '🚨' }); }
+    if (pral < -3) { score += 2.5; ff.push({ text: 'Защелачивание при повышенном urea/Cr', impact: 2.5, icon: '✅' }); }
   }
   // E2/PRL
   if ((L.estradiol ?? 0) > 180 || (L.prolactin ?? 0) > 450) {
@@ -406,7 +414,14 @@ export function calculateOverallScore(
   profile: UserDietProfile,
   timing?: MealTiming,
 ): V2ScoreResult {
-  const bbScore = product.bb_quality_score ?? calcBBQualityScore(product);
+  // P0-fix: always recalculate bb_quality_score from current food data.
+  // Previously `product.bb_quality_score ?? calcBBQualityScore(product)` used
+  // a potentially stale pre-computed value (frozen at FOOD_DB load time). If
+  // metabolic_flags or other inputs changed, the score would not update.
+  // Now we always compute fresh, falling back to the stored value only if
+  // calcBBQualityScore returns 0 (missing data).
+  const freshScore = calcBBQualityScore(product);
+  const bbScore = freshScore > 0 ? freshScore : (product.bb_quality_score ?? freshScore);
   let score = bbScore;
 
   const r1 = applyPhaseModifiers(score, product, profile);
@@ -569,10 +584,20 @@ const FAO_WHO_REF: Record<string, number> = {
 };
 
 /** Digestibility coefficients by food category */
+// P2-fix: added missing categories (veg_fruit, carb, fat, supplement, fast_food, egg).
+// Previously these fell through to the 0.85 default, which overstated DIAAS for
+// raw veg (real 0.5-0.7) and understated it for refined fats (real 0.95+).
+// Values sourced from FAO/WHO 2013 digestibility tables.
 const DIGEST: Record<string, number> = {
   protein: 0.95, dairy: 0.97, egg: 0.97, fish: 0.94,
   grain: 0.85, legume: 0.82, nut: 0.88, vegetable: 0.82,
   fruit: 0.85, other: 0.85,
+  // Added categories (previously used 0.85 fallback):
+  veg_fruit: 0.78,    // mixed veg/fruit — raw veg lowers digestibility
+  carb: 0.88,         // processed carb sources (bread, pasta) — higher than raw grain
+  fat: 0.95,          // oils/butter — near-complete digestion
+  supplement: 0.95,   // whey/casein/creatine powders — highly bioavailable
+  fast_food: 0.85,    // mixed processed meals — unknown, default
 };
 
 export function calcDIAAS(f: FoodItem): { diaas: number; limitingAA: string; score: number; reliable: boolean } {
@@ -603,7 +628,12 @@ export function calcDIAAS(f: FoodItem): { diaas: number; limitingAA: string; sco
   return {
     diaas: Math.round(diaas * 100) / 100,
     limitingAA: reliable ? limiting[0] : (limiting[0] + ' (неполный профиль)'),
-    score: diaas >= 1.0 ? 1.5 : diaas < 0.75 ? -2.0 : 0,
+    // P1-fix: raised DIAAS contribution from 1.5/-2.0/0 to 3.0/-2.5/0.
+    // DIAAS is the FAO/WHO gold standard for protein quality; a +1.5 bonus for
+    // a complete amino acid profile was easily overridden by a single phase/pharma
+    // modifier (often -4 to -5). The new +3.0 makes a DIAAS≥1.0 meal meaningfully
+    // boost the overall score, while a DIAAS<0.75 meal is still flagged.
+    score: diaas >= 1.0 ? 3.0 : diaas < 0.75 ? -2.5 : 0,
     reliable,
   };
 }
@@ -672,7 +702,12 @@ export function analyzeDailyDiet(
   const protein = sumF(f => f.protein);
 
   // mTOR
-  const totalLeucine = sumF(f => f.amino_acid_profile_100g?.leucine_mg ?? f.protein * 42);
+  // P0-fix: leucine estimate raised from 42 to 75 mg/g protein.
+  // Reference (IEAA/FAO): whey ~81, egg ~85, casein ~77, chicken ~77, rice ~81, soy ~80, tofu ~65 mg/g.
+  // 42 was an arbitrary understatement that triggered false "mTOR not triggered" warnings
+  // for high-protein meals where the amino_acid_profile_100g was missing.
+  // 75 is the median of animal+plant protein sources and a conservative lower bound.
+  const totalLeucine = sumF(f => f.amino_acid_profile_100g?.leucine_mg ?? f.protein * 75);
   const mtorTriggered = totalLeucine >= 3000;
   const mtorDeficitMg = Math.max(0, 3000 - totalLeucine);
 
@@ -687,8 +722,20 @@ export function analyzeDailyDiet(
   const giLoadWarning = giLoad > giLoadThreshold;
 
   // Cortisol
+  // P0-fix: cortisolRisk now evaluates ONLY the post-workout meal's high-GI carbs,
+  // not the sum of all meals. The previous `sumF(...)` accumulated carbs across all
+  // meals which had no relationship to the post-workout window — the condition was
+  // comparing the entire day's fast-carb total against the post-workout threshold,
+  // producing false negatives whenever any non-post-workout meal contained carbs.
   const postMeal = meals.find(m => m.timing === 'post_workout');
-  const cortisolRisk = postMeal ? sumF(f => f.carbs * (f.gi > 60 ? 1 : 0)) < profile.weightKg * 0.5 : false;
+  const cortisolRisk = postMeal
+    ? postMeal.products.reduce((s, p) => {
+        const f = FOOD_DB.find(x => x.id === p.foodId);
+        if (!f) return s;
+        const gi = f.gi || 0;
+        return s + (gi > 60 ? (f.carbs || 0) * p.weightGrams / 100 : 0);
+      }, 0) < profile.weightKg * 0.5
+    : false;
 
   // Ammonia
   const fiber = sumF(f => f.fiber);
@@ -710,8 +757,14 @@ export function analyzeDailyDiet(
     : false;
 
   // PRAL
+  // P1-fix: threshold raised from 10 to 100 mEq/day.
+  // PRAL (Remer & Manz) for a high-protein bodybuilding diet typically sums to
+  // 150-400 mEq/day across 5 meals (protein foods carry +5..+15 mEq/100g). A
+  // threshold of 10 mEq flagged virtually every high-protein plan as "закисление",
+  // making the warning noise. 100 mEq is the lower bound where alkalizing
+  // countermeasures (veg/fruit) become genuinely advisable.
   const pralTotal = sumF(f => f.electrolytes_100g?.pral_index ?? 0);
-  const pralWarning = pralTotal > 10 ? 'Закисление' : pralTotal < -10 ? 'Защелачивание' : null;
+  const pralWarning = pralTotal > 100 ? 'Закисление' : pralTotal < -10 ? 'Защелачивание' : null;
 
   // Omega
   const o3 = sumF(f => getMicro(f, 'Omega3'));

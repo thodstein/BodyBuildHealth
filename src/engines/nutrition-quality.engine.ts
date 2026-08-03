@@ -1,6 +1,5 @@
 import { FOOD_DB } from '../core/nutrition-database';
 import { getMicro } from '../core/nutrition-micros';
-import { saveNutritionV2Data } from '../core/nutrition-v2-data';
 
 interface MealItem { name: string; kcal: number; p: number; f: number; c: number; category?: string; id?: string; amount?: number; qty?: number }
 
@@ -98,16 +97,10 @@ export function calcMealQuality(items: MealItem[]): QualityScore {
 
   const total = microDensity + macroBalance + fiber + fatQuality + wholeFoods;
 
-  // Save to shared module
-  try {
-    saveNutritionV2Data({
-      qualityScore: total,
-      qualityBreakdown: { microDensity, macroBalance, fiber, fatQuality, wholeFoods },
-      microDeficiencies: microDeficiencies.map(d => ({ nutrient: d.nutrient, current: d.current, target: d.target })),
-      glycemicLoad,
-    });
-  } catch {}
-
+  // P2-fix: removed saveNutritionV2Data side effect — calcMealQuality is a pure
+  // scoring function and should not write to localStorage. Callers that want to
+  // persist the quality score should do so explicitly. This was causing test
+  // runs to mutate shared localStorage state and made the function non-idempotent.
   return { total, breakdown: { microDensity, macroBalance, fiber, fatQuality, wholeFoods }, microDeficiencies, glycemicLoad };
 }
 

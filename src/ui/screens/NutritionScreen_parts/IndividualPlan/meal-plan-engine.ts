@@ -174,7 +174,20 @@ function carbPortionCap(food: FoodItem): number {
 }
 
 const MEAT_KEYWORDS = ['beef','pork','chicken','turkey','lamb','veal','duck','salmon','tuna','shrimp','cod','mackerel','trout','sardine','crab','lobster','squid','octopus','venison','rabbit','goose','pate','sausage','bacon','ham','pepperoni','salami','bologna','hot_dog','meatball','cutlet','steak','pollock','tilapia','herring','anchovy','clam','mussel','oyster','scallops','catfish','flounder','sole','white_fish','whelk','cockles','seafood_','fish_','_fish','mintai','mahi','trumpeter','shellfish','cockle','abalone','conch','snail','escargot','sea_urchin','sea_cucumber','caviar','roe','liver','kidney','heart_tripe','tongue','brain','sweetbread','gizzard','bison','frog','elk','boar','quail','pheasant','goat','mutton','crayfish','krill','eel','sturgeon','halibut','perch','carp','pike','bream','bass','grouper','snapper','tongue','tripe','oxtail','trotters','wings','drumstick','thigh','breast_','_breast','mince','_minced'];
-const isMeatId = (id: string): boolean => MEAT_KEYWORDS.some(k => id.toLowerCase().includes(k));
+// P2-fix: isMeatId now checks FOOD_ALLERGEN_DIET first (canonical source), then
+// falls back to the keyword heuristic for unlabeled foods. This reduces reliance
+// on the 200+ hardcoded keywords and uses the structured diet-tag database.
+const isMeatId = (id: string): boolean => {
+  const diet = FOOD_ALLERGEN_DIET[id];
+  if (diet) {
+    // If the food is explicitly tagged as non-vegetarian, it's meat/fish.
+    if (diet.isVegetarian === false) return true;
+    // If explicitly tagged as vegetarian/vegan, it's not meat.
+    if (diet.isVegetarian === true || diet.isVegan === true) return false;
+  }
+  // Fallback: keyword heuristic for unlabeled foods
+  return MEAT_KEYWORDS.some(k => id.toLowerCase().includes(k));
+};
 
 // Д-3: Premium / exotic / rare foods that should NOT appear in a low/medium-budget plan.
 // 'low'/'medium' budget previously filtered only by bb_quality_score, letting luxury items
@@ -1122,9 +1135,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   if (intraEligible) _builtRoles.push('intra');
   if (input.mealsCount >= 6) _builtRoles.push('snack2');  // второй перекус для 6-8 приёмов
   // mealsCount cap: core (breakfast/lunch/dinner) + postw на тренинге — неприкосновенны;
-  // лишнее выбрасываем в порядке приоритета: intra → snack → preSleep → prew.
+  // лишнее выбрасываем в порядке приоритета: snack2 → intra → snack → preSleep → prew.
+  // P1-fix: reordered so snack2 (second snack, least important for MPS) is dropped
+  // before intra (which matters for long sessions). Previous order dropped intra
+  // first, leaving snack2 — less useful for training days.
   let _roles = [..._builtRoles];
-  for (const r of ['intra','snack','preSleep','prew']) { if (_roles.length <= input.mealsCount) break; _roles = _roles.filter(x => x !== r); }
+  for (const r of ['snack2','intra','snack','preSleep','prew']) { if (_roles.length <= input.mealsCount) break; _roles = _roles.filter(x => x !== r); }
   if (_roles.length > input.mealsCount) _roles = _roles.slice(0, Math.max(3, input.mealsCount));
   const _keep = new Set(_roles);
   const _wOf = (r: string): number => { let v = CARB_W[r] ?? 0.5; if (r === 'dinner' && input.eveningLowCarb) v *= 0.5; return v; };

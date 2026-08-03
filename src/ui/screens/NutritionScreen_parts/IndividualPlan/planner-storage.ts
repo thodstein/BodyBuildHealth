@@ -76,13 +76,26 @@ export function migratePlannerStorage(): void {
       'he_planner_labs', 'he_planner_pharma', 'he_planner_histamine',
       'he_taste_profile', 'he_plan_settings_collapsed',
     ];
+    // P1-fix: keys that MUST be arrays. If a stored value is an object (not array),
+    // it's corrupted and would crash downstream .filter/.map/.length calls.
+    // Previously only `typeof !== 'object'` was checked, which let `{}`
+    // (plain objects) pass through since `typeof {} === 'object'`.
+    const arrayKeys = new Set([
+      'he_excluded_foods', 'he_preferred_foods', 'he_diet_preferences',
+      'he_excluded_categories', 'he_food_allergens', 'he_health_issues', 'he_plan_month',
+      'he_user_recipes', 'he_nutrition_supps', 'he_locked_foods',
+      'he_weight_log_entries', 'he_shopping_checked', 'he_special_meals',
+    ]);
     let wiped = false;
     objectKeys.forEach(k => {
       try {
         const raw = localStorage.getItem(k);
         if (raw === null) return;
         const parsed = JSON.parse(raw);
-        if (parsed === null || typeof parsed !== 'object') { localStorage.removeItem(k); wiped = true; }
+        // Drop null/non-objects
+        if (parsed === null || typeof parsed !== 'object') { localStorage.removeItem(k); wiped = true; return; }
+        // P1-fix: for array-expected keys, drop if not an array
+        if (arrayKeys.has(k) && !Array.isArray(parsed)) { localStorage.removeItem(k); wiped = true; }
       } catch {}
     });
     if (wiped) { try { console.info('[Planner] Cleaned stale localStorage entries (schema v' + PLANNER_SCHEMA_VERSION + ')'); } catch {} }

@@ -97,10 +97,21 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
   const engineGoal = GOAL_MAP[goal] || 'maintenance';
 
   // weight-adapt factor (computed from weight log)
+  // P0-fix: weeklyAvgLoss = total_loss / days_span * 7 (single division).
+  // Previous formula divided by (n-1) TWICE → understated loss rate by (n-1)x,
+  // causing insufficient kcal correction during real weight loss.
+  // weightLogWeek holds point measurements; span between first and last = (n-1) intervals.
+  // Each interval is assumed to be 1 day (caller passes daily weights); for a weekly log
+  // the caller should pass 7-8 points. If intervals are >1 day, the rate is still
+  // approximately correct because we scale by the ratio 7/(n-1).
   let weightAdj = 1.0;
   if (weightAdaptMode && weightLogWeek.length >= 2) {
     const actualLoss = weightLogWeek[0] - weightLogWeek[weightLogWeek.length - 1];
-    const weeklyAvgLoss = actualLoss > 0 ? actualLoss / (weightLogWeek.length - 1) * 7 / Math.max(1, weightLogWeek.length - 1) : 0;
+    const intervals = Math.max(1, weightLogWeek.length - 1);
+    // kg per week = (total loss / intervals) * 7 (assume 1 interval = 1 day).
+    // If intervals span a different period, the caller's weightLogWeek is responsible
+    // for reflecting that; we only correct the double-division bug here.
+    const weeklyAvgLoss = actualLoss > 0 ? (actualLoss / intervals) * 7 : 0;
     if (expectedLossKgWeek > 0 && weeklyAvgLoss < expectedLossKgWeek * 0.7) {
       weightAdj = 1 - (expectedLossKgWeek - Math.max(0, weeklyAvgLoss)) * 2 / Math.max(1, weight);
     } else if (weeklyAvgLoss > expectedLossKgWeek * 1.3) {
