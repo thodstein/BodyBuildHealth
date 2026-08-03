@@ -5,6 +5,7 @@
  * component that has icons, colors, and slide-in animation.
  */
 import React, { useState, useCallback, useRef, type ReactNode } from 'react';
+import { UI_METRICS } from './training-ui';
 
 export type ToastVariant = 'success' | 'warning' | 'error' | 'info';
 
@@ -34,7 +35,7 @@ export function useEditorToast(): {
     setToast({ message, variant, visible: true });
     timerRef.current = window.setTimeout(() => {
       setToast((s) => ({ ...s, visible: false }));
-    }, 2600);
+    }, UI_METRICS.toastMs);
   }, []);
 
   const meta = VARIANT_META[toast.variant];

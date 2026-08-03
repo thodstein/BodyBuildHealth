@@ -161,6 +161,7 @@ export const ProgramManagerPanel: React.FC = () => {
   const { confirm } = useConfirmDialog();
   const [programs, setPrograms] = useState<UserProgram[]>(() => loadUserPrograms());
   const [editing, setEditing] = useState<UserProgram | null>(null);
+  const [pendingAutoFill, setPendingAutoFill] = useState(false);
   const [pickerOpen, setPickerOpen] = useState<'bb' | 'pl' | null>(null);
   const [toast, setToast] = useState('');
   // Режим конструктора: «Стандартный» (базовая сборка/загрузка/отчёт) vs «Профессиональный» (все инструменты).
@@ -320,7 +321,7 @@ export const ProgramManagerPanel: React.FC = () => {
       flash('🆕 Создана пустая программа — заполните упражнениями');
     }
   };
-  const finishWizard = () => {
+  const finishWizard = (autoFill = false) => {
     const p = createBlank(wizardDir);
     p.meta.title = wizardDir === 'bb' ? 'Моя ББ-программа' : wizardDir === 'pl' ? 'Моя ПЛ-программа' : 'Мой Powerbuilder-план';
     p.meta.goal = wizardDir === 'pl' ? 'powerlifting' : wizardGoal;
@@ -328,6 +329,7 @@ export const ProgramManagerPanel: React.FC = () => {
     p.meta.daysPerWeek = wizardDays;
     p.meta.weeks = wizardWeeks;
     setWizardOpen(false);
+    setPendingAutoFill(autoFill);
     setEditing(p);
   };
 
@@ -453,9 +455,10 @@ export const ProgramManagerPanel: React.FC = () => {
         program={editing}
         onChange={onEditChange}
         onSave={commit}
-        onBack={() => { setEditing(null); refresh(); }}
-        mode={manualMode}
-        onMode={setManualMode}
+          onBack={() => { setEditing(null); setPendingAutoFill(false); refresh(); }}
+          mode={manualMode}
+          onMode={setManualMode}
+          autoFillOnMount={pendingAutoFill}
       />
     );
   }
@@ -708,8 +711,8 @@ export const ProgramManagerPanel: React.FC = () => {
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
               {wizardStep > 1 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => Math.max(1, s - 1) as any)}>← Назад</button>}
               {wizardStep < 4 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => Math.min(4, s + 1) as any)}>Далее →</button>}
-              {wizardStep === 4 && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)' }} onClick={finishWizard}>✨ Создать программу</button>}
-              {wizardStep === 4 && manualMode === 'pro' && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }} onClick={() => { finishWizard(); setTimeout(() => { window.dispatchEvent(new CustomEvent('he_autodraft_trigger')); }, 400); }}>⚡ Создать и заполнить</button>}
+              {wizardStep === 4 && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)' }} onClick={() => finishWizard()}>✨ Создать программу</button>}
+              {wizardStep === 4 && manualMode === 'pro' && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }} onClick={() => finishWizard(true)}>⚡ Создать и заполнить</button>}
             </div>
           </div>
         )}
@@ -974,8 +977,8 @@ export const ProgramManagerPanel: React.FC = () => {
           <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
             {wizardStep > 1 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => Math.max(1, s - 1) as any)}>← Назад</button>}
             {wizardStep < 4 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => Math.min(4, s + 1) as any)}>Далее →</button>}
-            {wizardStep === 4 && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)' }} onClick={finishWizard}>✨ Создать программу</button>}
-            {wizardStep === 4 && manualMode === 'pro' && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }} onClick={() => { finishWizard(); setTimeout(() => { window.dispatchEvent(new CustomEvent('he_autodraft_trigger')); }, 400); }}>⚡ Создать и заполнить</button>}
+            {wizardStep === 4 && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)' }} onClick={() => finishWizard()}>✨ Создать программу</button>}
+            {wizardStep === 4 && manualMode === 'pro' && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }} onClick={() => finishWizard(true)}>⚡ Создать и заполнить</button>}
           </div>
         </div>
       )}

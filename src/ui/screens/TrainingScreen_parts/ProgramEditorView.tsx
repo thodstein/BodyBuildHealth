@@ -35,7 +35,7 @@ import { macrocycleToBBProgram } from '../../../engines/lms/macrocycle-to-bb';
 import { deserializeMacro } from '../../../engines/lms/macrocycle.engine';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
-import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle } from './training-ui';
+import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, UI_METRICS } from './training-ui';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { suggestFeeders } from '../../../engines/bb/bb-autocoach.engine';
 import { useDataLink } from '../../../core/data-link';
@@ -73,9 +73,10 @@ export interface ProgramEditorProps {
   onBack: () => void;
   mode: ManualMode;
   onMode: (m: ManualMode) => void;
+  autoFillOnMount?: boolean;
 }
 
-export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange, onSave, onBack, mode, onMode }) => {
+export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange, onSave, onBack, mode, onMode, autoFillOnMount = false }) => {
   const dir = program.meta.direction;
   const isPro = mode === 'pro';
   const update = (patch: Partial<UserProgram>) => onChange({ ...program, ...patch });
@@ -83,6 +84,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   const linked = useDataLink();
   const labAdjust = useMemo(() => labTrainingAdjust(linked.labAnalysis ?? null), [linked.labAnalysis]);
   const [tprofile, updateTProfile] = useTrainingProfile();
+  const [isAutoFilling, setIsAutoFilling] = useState(false);
 
   // V6: Toast with variants — replaces plain editorToast div
   const { showToast: showToastRaw, ToastNode } = useEditorToast();
@@ -94,12 +96,12 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     const unsub = subscribePlannerApply((payload) => { setBridgeApply(payload); });
     return unsub;
   }, []);
-  // P2-3: wizard «⚡ Создать и заполнить» → триггер autoFillDraft
+  // A3: wizard auto-fill is requested through a typed prop, not a window event.
   useEffect(() => {
-    const handler = () => autoFillDraft();
-    window.addEventListener('he_autodraft_trigger', handler);
-    return () => window.removeEventListener('he_autodraft_trigger', handler);
-  }, [program, tprofile]);
+    if (!autoFillOnMount) return;
+    const timer = window.setTimeout(() => autoFillDraft(), 0);
+    return () => window.clearTimeout(timer);
+  }, [autoFillOnMount]);
   const applyBridgePayload = useCallback((payload: PlannerApply) => {
     // P0-3: dispatch table replaces 14-branch if/else chain
     const ctx: BridgeCtx = { program, dir, update, onChange, showToast, tprofile };
@@ -139,7 +141,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     if (!p) { showToast('⚠ Цикл не найден'); return; }
     onChange(p);
     setEditorLibOpen(null);
-    showToast('📥 Загружен ПЛ-цикл: ' + p.meta.title);
+    showToast('📥 Загружен ПЛ-цикл: ' + (p.meta?.title ?? cycleId));
   };
 
   const revisions = program.meta.revisions ?? [];
@@ -163,7 +165,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         lastSavedRef.current = current;
         setIsDirty(false);
       }
-    }, 30_000);
+    }, UI_METRICS.autosaveMs);
     return () => clearInterval(timer);
   }, [program, onSave]);
   // F4: ConfirmDialog replaces window.confirm
@@ -208,7 +210,11 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
       labMrvMultiplier: labAdjust.mrvMultiplier,
       update, showToast,
     };
-    autoFillDraftDispatch(ctx);
+    setIsAutoFilling(true);
+    window.setTimeout(() => {
+      try { autoFillDraftDispatch(ctx); }
+      finally { setIsAutoFilling(false); }
+    }, 0);
   };
 
 
@@ -458,7 +464,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         {showMore && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingTop: 4 }}>
             {isPro && (
-              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a' }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней (требует профиль тренированности)">⚡ Авто-черновик</button>
+              <button disabled={isAutoFilling} style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a', opacity: isAutoFilling ? 0.65 : 1 }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней (требует профиль тренированности)">{isAutoFilling ? '⏳ Создание...' : '⚡ Авто-черновик'}</button>
             )}
             <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(245,158,11,0.4)', color: '#f59e0b' }}
               onClick={() => {
@@ -506,7 +512,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 40 }} onClick={() => autoFillDraft()} title="Автоматическая сборка на основе цели/уровня/дней">
-              ⚡ Создать автоматически
+              {isAutoFilling ? '⏳ Создание...' : '⚡ Создать автоматически'}
             </button>
             <button style={{ ...BTN_GHOST, padding: '8px 16px', fontSize: 12, minHeight: 40, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => setEditorLibOpen('bb')}>
               📥 Загрузить из библиотеки
@@ -816,20 +822,15 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
 
       </> )}
 
-      {/* P5.3 — RIR-progression chart (A1: extracted to RirWaveChart) */}
-      <RirWaveChart program={program} />
-
-
-      {/* F1: Timeline heatmap — visual overview of volume × weeks × muscles */}
-      {dir === 'bb' && program.bb && program.bb.weeks.length > 0 && (
-        <ProgramTimeline program={program} selectedWeek={execWeek - 1} onSelectWeek={(wi) => setExecWeek(wi + 1)} />
-      )}
-
-      {/* P2 — LIVE Quality Panel (A1: extracted to QualityScorePanel) */}
-      {isPro && <QualityScorePanel program={program} level={program.meta.level} tprofile={tprofile} labMrvMult={labAdjust.mrvMultiplier} />}
-
-      {/* P4-3 — Статистика реального плана (A1: extracted to PlanStatsPanel) */}
-      {dir === 'bb' && <PlanStatsPanel program={program} execWeek={execWeek} onCourse={tprofile.onCourse ?? false} />}
+      {/* V3: compact dashboard keeps the key signals together and tied to execWeek. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
+        <RirWaveChart program={program} />
+        {dir === 'bb' && program.bb && program.bb.weeks.length > 0 && (
+          <ProgramTimeline program={program} selectedWeek={execWeek - 1} onSelectWeek={(wi) => setExecWeek(wi + 1)} />
+        )}
+        {isPro && <QualityScorePanel program={program} level={program.meta.level} tprofile={tprofile} labMrvMult={labAdjust.mrvMultiplier} />}
+        {dir === 'bb' && <PlanStatsPanel program={program} execWeek={execWeek} onCourse={tprofile.onCourse ?? false} />}
+      </div>
 
 
       {/* P3.2 — Bulk-apply методик ко всем блокам (инструмент тренера) */}

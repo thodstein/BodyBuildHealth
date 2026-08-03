@@ -228,11 +228,16 @@ export const BRIDGE_HANDLERS: Record<string, Handler> = {
   macrocycle: macrocycleHandler,
 };
 
-/** Apply a bridge payload using the dispatch table. Returns true if a handler matched. */
+/** Apply a bridge payload using the dispatch table. Returns true if a handler matched.
+ *  F6: universal try/catch wrapper — prevents crashes from malformed payload.data. */
 export function applyBridgePayloadDispatch(payload: PlannerApply, ctx: BridgeCtx): boolean {
   const handler = BRIDGE_HANDLERS[payload.kind];
   if (handler) {
-    handler(payload, ctx);
+    try {
+      handler(payload, ctx);
+    } catch (e) {
+      ctx.showToast('⚠ Ошибка применения: ' + payload.label + ' (' + (e as Error)?.message + ')');
+    }
     return true;
   }
   ctx.showToast('🔗 Рекомендация: ' + payload.label + ' (не применима к ' + ctx.dir.toUpperCase() + ')');

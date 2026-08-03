@@ -17,6 +17,15 @@ export const DIM_STRONG = 'rgba(255,255,255,0.92)';
 /** Радиусы — единая шкала (крупнее для мобильных тап-зон). */
 export const R = { card: 16, pill: 18, btn: 12, in: 10, chip: 10, bar: 6 } as const;
 
+/** Shared interaction timings and control sizes. */
+export const UI_METRICS = {
+  toastMs: 2600,
+  autosaveMs: 30_000,
+  touchMoveCancelPx: 10,
+  tapMinHeight: 38,
+  primaryMinHeight: 44,
+} as const;
+
 /** Общий фрост-гласс фон для карточек. */
 const GLASS: React.CSSProperties = {
   background: 'rgba(26,28,38,0.55)',

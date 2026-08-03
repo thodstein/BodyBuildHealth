@@ -8,7 +8,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { SET_TEMPLATES, GROUP_RU } from './program-types';
-import { ACCENT, ACCENT_LINE, BTN_GHOST, CARD, DIM, DIM_STRONG, IN, SMALL, panelStyle } from './training-ui';
+import { ACCENT, ACCENT_LINE, BTN_GHOST, CARD, DIM, DIM_STRONG, IN, SMALL, panelStyle, UI_METRICS } from './training-ui';
 import { useConfirmDialog } from './ConfirmDialog';
 import { getReferencedCycle, userWeekToBBPlan } from '../../../engines/user-program/program-store';
 import type {
@@ -85,6 +85,15 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
     arr[b] = { ...arr[b], week: body.weeks[b].week };
     setWeeks(arr);
   };
+  // F3: reorder full weeks with desktop drag-and-drop; preserves week numbers.
+  const weekDragRef = React.useRef<number | null>(null);
+  const moveWeek = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= body.weeks.length || to >= body.weeks.length) return;
+    const arr = [...body.weeks];
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
+    setWeeks(arr.map((w, i) => ({ ...w, week: i + 1 })));
+  };
 
   /** Метрики для выбранной недели — пересчитываем при каждом изменении блоков/сетов. */
   const volMetrics = useMemo(() => {
@@ -144,7 +153,15 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
         );
       })()}
       {body.weeks.map((w, wi) => (
-        <div key={wi} style={{ ...CARD, padding: 10 }}>
+        <div
+          key={wi}
+          draggable
+          onDragStart={e => { weekDragRef.current = wi; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(wi)); }}
+          onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+          onDrop={e => { e.preventDefault(); const from = weekDragRef.current; weekDragRef.current = null; if (from != null) moveWeek(from, wi); }}
+          onDragEnd={() => { weekDragRef.current = null; }}
+          style={{ ...CARD, padding: 10 }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
             {(() => {
               const pc = { accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' }[w.phase];
@@ -411,7 +428,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
       const t = e.touches[0];
       const dx = Math.abs(t.clientX - touchStartPosRef.current.x);
       const dy = Math.abs(t.clientY - touchStartPosRef.current.y);
-      if (dx > 10 || dy > 10) {
+      if (dx > UI_METRICS.touchMoveCancelPx || dy > UI_METRICS.touchMoveCancelPx) {
         if (longPressTimer.current) { window.clearTimeout(longPressTimer.current); longPressTimer.current = null; }
         touchSrcRef.current = null;
         touchStartPosRef.current = null;
@@ -452,7 +469,12 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }} onTouchEnd={onTouchEnd} onTouchCancel={onTouchCancel}>
+    <div className="bb-block-list" style={{ display: 'flex', flexDirection: 'column', gap: 4 }} onTouchEnd={onTouchEnd} onTouchCancel={onTouchCancel}>
+      <style>{`@media (max-width: 640px) {
+        .bb-block-list > div { overflow: hidden; }
+        .bb-block-list input, .bb-block-list select { max-width: 100%; }
+        .bb-block-list .bb-set-editor { width: 100%; overflow-x: auto; }
+      }`}</style>
       {blocks.map((b, bi) => (
         <div
           key={b.id}
@@ -653,7 +675,7 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
   };
   const hasTechnique = (s: UserSet, tech: IntensityTechnique) => (s.techniques || []).includes(tech);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 auto' }}>
+    <div className="bb-set-editor" style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 auto' }}>
       {sets.map((s, i) => (
         <div key={i} style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 6, padding: '6px 8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
