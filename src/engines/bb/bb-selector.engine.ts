@@ -15,6 +15,10 @@ export interface BBSelectorInput {
   daysPerWeek?: number;
   weakPoints?: string[];
   mode?: 'natural' | 'on_course' | 'pct';
+  /** D1: Female glute focus — даёт бонус female_glute_5 сплиту. */
+  sex?: 'male' | 'female';
+  /** D1: Focus group — даёт бонус сплитам с приоритетом этой мышцы. */
+  focusGroup?: string;
 }
 
 export interface BBRankedPattern {
@@ -56,8 +60,22 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
 
     if (input.daysPerWeek != null) {
       const eff = p.sessionsPerRotation * 7 / p.rotationDays;
-      if (eff <= input.daysPerWeek + 0.5) { score += 25; rationale.push(`~${eff.toFixed(1)} сессий/нед — укладывается`); }
-      else { score -= 20; warnings.push(`~${eff.toFixed(1)} сессий/нед > ${input.daysPerWeek} доступных`); }
+      const overage = eff - input.daysPerWeek;
+      // FIX-B6: graduated penalty вместо бинарного +25/-20.
+      // 0 дней сверх → +25, 1 день сверх → +10, 2 дня сверх → -5, 3+ → -15
+      if (overage <= 0.5) {
+        score += 25;
+        rationale.push(`~${eff.toFixed(1)} сессий/нед — укладывается`);
+      } else if (overage <= 1.5) {
+        score += 10;
+        rationale.push(`~${eff.toFixed(1)} сессий/нед — чуть больше ${input.daysPerWeek}, но допустимо`);
+      } else if (overage <= 2.5) {
+        score -= 5;
+        warnings.push(`~${eff.toFixed(1)} сессий/нед > ${input.daysPerWeek} (превышение +${overage.toFixed(1)})`);
+      } else {
+        score -= 15;
+        warnings.push(`~${eff.toFixed(1)} сессий/нед > ${input.daysPerWeek} (превышение +${overage.toFixed(1)})`);
+      }
     }
 
     // частота: 2-3×/нед = оптимально для гипертрофии
@@ -91,6 +109,18 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
       const wpFreq = input.weakPoints.map(w => freq[w] || 0);
       const wpAvg = wpFreq.reduce((a,b)=>a+b,0)/wpFreq.length;
       if (wpAvg >= 2) score += 10;
+    }
+
+    // D1: Female glute focus — бонус для female_glute_5 сплита.
+    if (input.sex === 'female' && input.focusGroup === 'glutes') {
+      if (p.id === 'female_glute_5') {
+        score += 25;
+        rationale.push('♀ Женский glute-фокус: 3 glute-сессии/нед (Schoenfeld 2016)');
+      }
+      if (p.id === 'glute_focus_4') {
+        score += 15;
+        rationale.push('♀ Glute focus 4×/нед — альтернатива для 4 дней');
+      }
     }
 
     if (lvl === 'enhanced' && ['ppl_6','rolling_3_1_3_1','tpt_o_ttp','fullbody_4','arnold_6'].includes(p.id)) {

@@ -359,6 +359,13 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     next.volumeTargets = targets;
   }
   enrichExerciseRationale(next);
+  // FIX-B3: autoAssignIntensityTechniques — автоматическое назначение
+  // техник интенсивности (dropset/rest_pause/myo_rep) для ≥intermediate.
+  // Проф-тренер назначает: cable fly → dropset, leg extension → myo_rep,
+  // curl → rest_pause. Без этого 0% планов имеют intensity techniques.
+  if (!options.preserveSource) {
+    autoAssignIntensityTechniques(next, options.level || 'intermediate');
+  }
   const rotation = analyzeBBRotation(next);
   next.rotationReport = rotation;
   const rotationWarnings = rotation.issues
@@ -408,4 +415,74 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
   next.balanceReport = analyzeBBBalance(next);
   next.report = buildBBPlanReport(next);
   return next;
+}
+
+/**
+ * FIX-B3: autoAssignIntensityTechniques — автоматическое назначение
+ * техник интенсивности для упражнений в памп-днях (≥intermediate).
+ *
+ * Проф-тренер назначает intensity techniques не всем упражнениям, а выборочно:
+ *  - Cable fly / сведение → dropset (метаболический стресс)
+ *  - Leg extension / разгибание ног → myo_rep (высокая эффективность изоляции)
+ *  - Curl / сгибание на бицепс → rest_pause (добивка до отказа)
+ *  - Triceps pushdown / разгибание на блоке → dropset
+ *  - Lateral raise / махи → rest_pause
+ *
+ * Только для level >= intermediate. Только для accessory/памп упражнений.
+ * Не более 1 техники на упражнение, не более 2-3 на сессию.
+ */
+function autoAssignIntensityTechniques(plan: BBPlan, level: string): void {
+  if (level === 'beginner') return; // новички не используют intensity techniques
+  for (const week of plan.weeks) {
+    if (week.phase === 'deload') continue; // deload — без intensity techniques
+    for (const session of week.sessions) {
+      let techniquesInSession = 0;
+      const maxPerSession = level === 'enhanced' ? 3 : level === 'advanced' ? 3 : 2;
+      for (const ex of session.exercises) {
+        if (techniquesInSession >= maxPerSession) break;
+        // Только accessory/памп упражнения получают intensity technique
+        if (ex.role !== 'accessory') continue;
+        if (ex.character !== 'памп') continue;
+        // Не перезаписывать если уже есть technique
+        if (ex.workSets?.some(ws => ws.technique)) continue;
+        const name = (ex.exerciseName || ex.name || '').toLowerCase();
+        let technique: string | undefined;
+        // Cable fly / сведение → dropset
+        if (/кроссовер|crossover|сведение|fly|пек.?дек|бабоч/i.test(name)) {
+          technique = 'dropset';
+        }
+        // Leg extension → myo_rep
+        else if (/разгибан.*ног|leg.?extension/i.test(name)) {
+          technique = 'myo_rep';
+        }
+        // Biceps curl → rest_pause
+        else if (/сгибан.*бицепс|curl|подъём.*бицепс|подъем.*бицепс/i.test(name) && !/молот|hammer/i.test(name)) {
+          technique = 'rest_pause';
+        }
+        // Triceps pushdown → dropset
+        else if (/разгибан.*рук|разгибан.*блок|pushdown|трицепс.*блок/i.test(name)) {
+          technique = 'dropset';
+        }
+        // Lateral raise → rest_pause
+        else if (/махи|lateral.?raise|отведен.*рук/i.test(name)) {
+          technique = 'rest_pause';
+        }
+        // Leg curl → dropset
+        else if (/сгибан.*ног|leg.?curl/i.test(name)) {
+          technique = 'dropset';
+        }
+        if (technique && ex.workSets && ex.workSets.length > 0) {
+          // Назначить технику на последний сет
+          const lastSet = ex.workSets[ex.workSets.length - 1];
+          lastSet.technique = technique;
+          techniquesInSession++;
+          // Добавить комментарий
+          const techNames: Record<string, string> = {
+            dropset: 'Дроп-сет', rest_pause: 'Rest-pause', myo_rep: 'Myo-reps',
+          };
+          ex.comment = (ex.comment || '') + ` | 💥 ${techNames[technique] || technique} на последнем подходе.`;
+        }
+      }
+    }
+  }
 }

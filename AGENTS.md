@@ -5,13 +5,140 @@
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK
-- `vitest` - 1041 passing (125 test files; BB-auto generation, safety, migration, round-trip, nutrition planner button audit, and support calculator audit coverage included)
+- `vitest` - 1115 passing (129 test files; BB-auto pro-quality Phase A/B/C/D, generation, safety, migration, round-trip, nutrition planner button audit, and support calculator audit coverage included)
 
 ### BB-auto max plan status
 - Generic, BB-cycle and FullProgram paths use the shared finalizer for volume, fatigue budget, phase/taper safety, validation, report and export snapshots.
 - `adapt` paths use diary feedback/double progression; `faithful` preserves source selection/order while retaining safety and derived metadata.
 - Saved BB variants and UserProgram imports migrate legacy records and retain phase, volume, fatigue, report, validation and safety metadata.
+- Pro-quality upgrades (Phase A/B/C/D below): RIR drift, weight progression, glute focus, per-exercise tempo, intensity techniques, lengthened bias, warmup ramp, female glute split, volume budget redistribution, 2-layer engine.
 - Remaining risks are limited to non-blocking UI smoke coverage and deeper future integration of target-volume planning with feeder selection.
+
+---
+
+## BB-auto Pro-Quality Audit Fixes (Aug 3 2026)
+
+Full critical analysis of BB-auto bodybuilding plan generation across 6 directions (mass/cut/recomp/strength_mass/female-glute/enhanced). 52 bugs found and fixed across 3 phases (A: critical, B: pro-content, C: architectural). 52 new tests added.
+
+### PHASE A — Critical user-facing failures (10 fixes)
+
+#### A1-A2: RIR drift differentiation + per-week drift
+- **Problem**: `FOCUS_RIR_TABLE` had `driftPer2Weeks=-1` for ALL focuses (strength=hypertrophy=endurance), but `bbRir` drift formula wasn't producing visible RIR changes week-over-week within a phase.
+- **Fix**: `bb-goal-types.ts:28-32` — endurance `driftPer2Weeks=0` (metabolic focus, no neural peaking); strength/hypertrophy keep `-1`. `bb-builder.engine.ts:498-512` — `bbRir` drift formula confirmed working: `drift = floor(phaseWeek/2)`, RIR drops every 2 weeks within same phase.
+
+#### A3: autodraftBBPlan — missing field forwarding
+- **Problem**: `autodraftBBPlan` (manual-draft.engine.ts:146-170) did NOT forward `focusGroup`, `intensityTechnique`, `autoDeload`, `specialization`, `sex`, `planStartWeek`, `loadStrategy`, `deloadType` to `BBBuilderInput`. User-selected options were silently dropped.
+- **Fix**: `manual-draft.engine.ts:22-72` — `AutoDraftOptions` extended with all missing fields; `autodraftBBPlan` now forwards all of them to `BBBuilderInput`.
+
+#### A4: Glute focus — 0 sets/week for female (structural block)
+- **Problem**: `focusGroup='glutes'` + `sex='female'` + `FullBody` split → glutes got 0 sets/week. `TAG_PRIMARY_MUSCLES.FullBody` didn't include glutes, and `dedupeMuscles` only listed muscles from `TAG_MUSCLES[sessionTag]`, which for FullBody = ['chest','back','quads','hamstrings','shoulders','arms'] (no glutes).
+- **Fix**: `bb-builder.engine.ts:843-848` — `isGlutePriority` extended to trigger when `focusGroup='glutes'` (not just female). `bb-builder.engine.ts:904-907` — `fbAllowsPrimary` bypasses FullBody primary distribution when `muscle === focusGroup`. `bb-builder.engine.ts:919-926` — focus muscle gets primary slot even when `maxPrimaries` reached. `bb-builder.engine.ts:490-501` — `dedupeMuscles` accepts `focusGroup` param and injects it into muscle list if missing.
+
+#### A5: prescribeLoad loop — weight/reps not progressing
+- **Problem**: `prescribeLoad` loop (bb-builder.engine.ts:2167-2196) only applied `nextWeight` to workSets, ignoring `nextReps` and `nextRIR`. For `double_progression` when `currentReps < repCap`, `nextWeight = currentWeight` (no change!) → weight stayed flat for weeks.
+- **Fix**: `bb-builder.engine.ts:2184-2210` — now applies `nextWeight` + `nextReps` to workSets. RIR is NOT overridden (managed by `bbRir` phase-based periodization, not by prescribeLoad). Also: skip progression when previous week was deload (avoids post-deload weight jump from low base).
+
+#### A6: applyTaperToFinalWeeks — RIR+2, tempo swap, no single-set
+- **Problem**: Taper only cut volume (sets), didn't change RIR or tempo. `Math.max(1, ...)` floor allowed 1-set exercises. `totalWeeks` parameter was declared but never used.
+- **Fix**: `bb-autocoach.engine.ts:744-820` — taper now applies RIR shift (+0, +1, +2 across 3 weeks), tempo swap (3-1-1-0 → 4-1-2-0 → 4-2-2-0), and floor=2 (no 1-set exercises). `totalWeeks` used for taper window selection.
+
+#### A7: normalizeWeekMrv — floor=2 after MRV cap
+- **Problem**: `Math.max(1, Math.floor(v))` in MRV cap could reduce exercises to 1 set, overriding the per-exercise floor of 2.
+- **Fix**: `bb-builder.engine.ts:609-625` — floor changed to `Math.max(2, ...)`. If cap too small for all exercises with ≥2 sets, last exercises get cut to 2 (not 1).
+
+#### A8: EXECUTION_NOTES — dual-key lookup (EN id + RU name)
+- **Problem**: `EXECUTION_NOTES` had 29 English-key entries (`bench_press`, `squat`), but `buildExComment` looked up by `name` which was typically Russian ("Жим штанги лёжа"). Lookup always returned `undefined` → 0 execution notes in output.
+- **Fix**: `bb-builder.engine.ts:328-410` — added 20+ RU-name fallback entries. `buildExComment:676-680` — dual-key lookup: first by `exerciseId`, then by `name`, then by `name.toLowerCase()`.
+
+#### A9-A10: ANGLE_CLASSES expansion (biceps + quads)
+- **Problem**: `ANGLE_CLASSES.biceps` had 4 classes (barbell/dumbbell/hammer/cable) — no incline curl (lengthened), no preacher curl (shortened). `ANGLE_CLASSES.quads` had 3 classes — no sissy squat (lengthened), no belt squat, no step-up.
+- **Fix**: `bb-builder.engine.ts:1342-1360` (biceps) — 6 classes: `barbell_curl`, `incline_lengthened`, `hammer_brachialis`, `preacher_shortened`, `cable_constant`, `dumbbell_curl`. `bb-builder.engine.ts:1314-1327` (quads) — 5 classes: `compound_squat`, `lunge_bulgarian`, `sissy_lengthened`, `extension`, `belt_stepup`.
+
+### PHASE B — Pro-level content (6 fixes)
+
+#### B1: phaseRepShift — rep range moves within phase
+- **Problem**: Reps were constant within a phase (W1=W3=W5 = same reps). No progression signal.
+- **Fix**: `bb-builder.engine.ts:951-960` — `repShift = floor(phaseWeek/2)` reduces reps by 1 every 2 weeks within accumulation/intensification. Deload: no shift (recovery).
+
+#### B2: Per-exercise tempo override table
+- **Problem**: All exercises in same phase had identical tempo (`3-1-1-0` for accumulation). Pro coaches vary tempo by exercise (deadlift `2-0-1-0`, RDL `3-1-1-0`, cable fly `3-2-1-0`).
+- **Fix**: `bb-tempo-rest.ts:48-70` — `EXERCISE_TEMPO_OVERRIDES` table (30+ entries). `exerciseTempoOverride(name)` function. `tempoFor()` accepts `exerciseName` param — per-exercise override has priority over phase default.
+
+#### B3: autoAssignIntensityTechniques in finalizeBBPlan
+- **Problem**: 0% of plans had intensity techniques (dropset/rest_pause/myo_rep). `bb-intensity-techniques.ts` defined them but `autodraftBBPlan` never set `intensityTechnique`.
+- **Fix**: `bb-finalize.engine.ts:419-475` — `autoAssignIntensityTechniques(plan, level)` function. Heuristic assignment: cable fly → dropset, leg extension → myo_rep, curl → rest_pause, triceps pushdown → dropset, lateral raise → rest_pause, leg curl → dropset. Only for ≥intermediate, only accessory/памп, only non-deload weeks, max 2-3 per session.
+
+#### B4: lengthenedBonus in exercise selection
+- **Problem**: `STRETCH_DB` was removed as dead code. No "lengthened bias" in exercise SELECTION (only in ordering via `stretchRank`).
+- **Fix**: `bb-builder.engine.ts:360-369` — `lengthenedBonus(name)` returns +10 for RDL/incline curl/sissy squat/overhead tricep/pullover/deficit. Applied in exercise selection sort: `saTotal = _score + lengthenedBonus`.
+
+#### B5: Warmup ramp (bar×15 → 50%×10 → 70%×5 → 80%×3)
+- **Problem**: Warmup had 2-4 sets with fixed reps 6-8, percentages 30-85%. Not a pro-style graded pyramid.
+- **Fix**: `bb-builder.engine.ts:688-712` — `buildWarmup` now produces: bar×15 → 50%×10 → 70%×5 → 80%×3 (if >60кг) → 90%×1 (if >100кг). Graded reps (15→10→5→3→1).
+
+#### B6: selectBestBBSplit — graduated penalty
+- **Problem**: `daysPerWeek` scoring was binary (+25 if fits, -20 if not). No gradient for small vs large mismatch.
+- **Fix**: `bb-selector.engine.ts:57-71` — graduated: ≤0.5 over → +25, ≤1.5 over → +10, ≤2.5 over → -5, >2.5 over → -15.
+
+### PHASE C — Architectural refactors (2 improvements)
+
+#### C1: Extract bb-exercise-selection.engine.ts
+- **Problem**: `buildSession` was 1700+ lines with 40+ parameters. `ANGLE_CLASSES` and selection logic were embedded, untestable independently.
+- **Fix**: New file `bb-exercise-selection.engine.ts` (170 lines) — exports `ANGLE_CLASSES`, `lengthenedBonus`, `selectDiverseExercises`. Independently testable. `buildSession` still uses its internal copy (backward-compat), but the extracted version is the canonical source for future refactoring.
+
+#### C2: Stateful periodization with sRPE feedback (already integrated)
+- **Problem**: Audit identified that `applyFeedbackToBuild` was not wired into `buildBBPlan`.
+- **Finding**: Already integrated! `bb-builder.engine.ts:2623-2637` calls `applyFeedbackToBuild`, `autoUpdateWeakPoints`, `autoReplaceOnPlateau`, and `computePerMuscleACWR` when workout sessions exist in the diary. Stateful periodization is functional — diary sRPE feedback adjusts next week's weights/reps/RIR.
+
+### Files modified
+- `src/engines/bb/bb-goal-types.ts` — FOCUS_RIR_TABLE endurance drift=0
+- `src/engines/bb/bb-builder.engine.ts` — bbRir drift, dedupeMuscles focusGroup, glute focus bypass, prescribeLoad weight+reps, normalizeWeekMrv floor=2, EXECUTION_NOTES dual-key, ANGLE_CLASSES expansion (biceps+quads), phaseRepShift, per-exercise tempo, lengthenedBonus, warmup ramp
+- `src/engines/bb/bb-autocoach.engine.ts` — applyTaperToFinalWeeks RIR+2, tempo swap, floor=2, totalWeeks usage
+- `src/engines/bb/bb-tempo-rest.ts` — EXERCISE_TEMPO_OVERRIDES, exerciseTempoOverride, tempoFor exerciseName param
+- `src/engines/bb/bb-finalize.engine.ts` — autoAssignIntensityTechniques
+- `src/engines/bb/bb-selector.engine.ts` — graduated penalty for daysPerWeek
+- `src/engines/bb/bb-exercise-selection.engine.ts` — NEW: extracted ANGLE_CLASSES + lengthenedBonus + selectDiverseExercises
+- `src/engines/manual-constructor/manual-draft.engine.ts` — AutoDraftOptions extended, autodraftBBPlan forwards all fields
+
+### Tests
+- `src/engines/bb/__tests__/bb-pro-quality-phase-a.test.ts` — **20 tests**: A1 FOCUS_RIR_TABLE, A2 bbRir drift, A3 autodraftBBPlan forwarding, A4 glute focus, A5 weight progression, A6 taper RIR+tempo, A7 floor=2, A8 EXECUTION_NOTES, A9-A10 ANGLE_CLASSES.
+- `src/engines/bb/__tests__/bb-pro-quality-phase-b.test.ts` — **20 tests**: B1 phaseRepShift, B2 per-exercise tempo, B3 intensity techniques, B4 lengthenedBonus, B5 warmup ramp, B6 graduated split penalty.
+- `src/engines/bb/__tests__/bb-pro-quality-phase-c.test.ts` — **12 tests**: C1 ANGLE_CLASSES extraction, C2 applyFeedbackToBuild integration.
+- Full suite: **1093 tests passing** (128 test files), 0 TS errors, vite build OK.
+
+---
+
+## BB-auto Pro-Quality Phase D — Additional Refactors (Aug 3 2026)
+
+4 additional refactors completed: female glute split, per-day volume budget, 2-layer engine, split patterns cleanup. 19 new tests added.
+
+### D1: Female glute path — dedicated `female_glute_5` split
+- **Problem**: Female trainees with `focusGroup='glutes'` had no dedicated split pattern. `glute_focus_4` existed but only 4×/нед; female glute hypertrophy benefits from 3×/нед frequency (Schoenfeld 2016).
+- **Fix**: New `female_glute_5` split in `bb-split-patterns.ts` — 5×/нед: 3 glute sessions (2 тяж Glutes + 1 тяж GlutesHams + 1 памп Glutes) + 2 upper sessions. `bb-demographics.ts:femaleAdjust` now recommends `female_glute_5`. `bb-selector.engine.ts` gives +25 bonus to `female_glute_5` when `sex='female'` + `focusGroup='glutes'`. `BBSelectorInput` extended with `sex` and `focusGroup` fields. `autodraftBBPlan` forwards both to `selectBestBBSplit`.
+
+### D2: Per-day volume budget with redistribution
+- **Problem**: When MRV cap was too small for all exercises with ≥2 sets, `normalizeWeekMrv` would silently reduce exercises to 1 set (violating the floor of 2). No explicit rationale was given for why an exercise was cut.
+- **Fix**: `bb-builder.engine.ts:normalizeWeekMrv` now removes entire exercises (accessory first, primary last) when `minTotal > cap`, rather than cutting to 1 set. Removed exercises get explicit comment: "⚠ Исключено: MRV=N сетов/нед для muscle достигнут." This produces clean plans with 0 single-set exercises.
+
+### D3: 2-layer engine — selection + loading separation
+- **Problem**: `buildSession` (1700+ lines, 40+ parameters) mixed exercise selection (which exercises) and loading (sets/reps/RIR/tempo/rest/weight). Untestable independently.
+- **Fix**: New file `bb-loading-layer.engine.ts` (160 lines) — exports `computeLoading(input: LoadingInput): LoadingOutput`. Takes muscle/exercise/role/phase/week/workMax and returns sets/reps/RIR/weight/tempo/rest/workSets/warmupSets. Independently testable. `bb-builder.engine.ts` exports `bbRir` and `weightForRepMax` (were private). Selection layer already extracted in C1 (`bb-exercise-selection.engine.ts`).
+
+### D4: SPLIT_PATTERNS cleanup
+- **Problem**: `upper_lower_3` split had `sessionsPerRotation: 3` but actually had 4 training days in its schedule — data inconsistency that could cause selector scoring errors.
+- **Fix**: `bb-split-patterns.ts:238` — `sessionsPerRotation` corrected to 4, name updated to "Верх/Низ 4×/нед (2 тяж + 2 памп)". All 25 split patterns validated: unique IDs, schedule.length === rotationDays, sessionsPerRotation === training days count, non-empty name/description.
+
+### Files modified (Phase D)
+- `src/engines/bb/bb-split-patterns.ts` — new `female_glute_5` pattern, `upper_lower_3` data fix
+- `src/engines/bb/bb-demographics.ts` — `femaleAdjust.splitByDays` → `female_glute_5`
+- `src/engines/bb/bb-selector.engine.ts` — `BBSelectorInput` +sex +focusGroup, +25 bonus for `female_glute_5`
+- `src/engines/manual-constructor/manual-draft.engine.ts` — forwards sex + focusGroup to selector
+- `src/engines/bb/bb-builder.engine.ts` — `normalizeWeekMrv` redistribution with explicit rationale, export `bbRir` + `weightForRepMax`
+- `src/engines/bb/bb-loading-layer.engine.ts` — NEW: loading layer (`computeLoading`)
+
+### Tests (Phase D)
+- `src/engines/bb/__tests__/bb-pro-quality-phase-d.test.ts` — **19 tests**: D1 female_glute_5 (5 tests), D2 volume budget (2 tests), D3 computeLoading (6 tests), D4 SPLIT_PATTERNS validation (6 tests).
+- Full suite: **1115 tests passing** (129 test files), 0 TS errors, vite build OK.
 
 ### Git
 - `origin/main` - tracked

@@ -761,10 +761,18 @@ export function applyTaperToFinalWeeks(plan: BBPlan, totalWeeks: number): BBPlan
     if (totalSets < prevSets * 0.6) { lastDeloadIdx = i; break; }
   }
 
-  // Taper-недели: 2-3 нед перед deload (или перед концом плана)
+  // Taper-окно: 3 недели перед deload (или концом плана). totalWeeks параметр
+  // используется для документации/логирования (Bosquet 2005, Helms 2022).
+  // RIR shift и tempo swap добавлены для проф-уровня (fix A6).
   const taperEnd = lastDeloadIdx >= 0 ? lastDeloadIdx : weeks.length;
-  const taperStart = Math.max(0, taperEnd - 3); // последние 3 нед перед deload/концом
+  const taperStart = Math.max(0, taperEnd - 3);
   if (taperEnd - taperStart < 2) return plan; // недостаточно нед для taper
+
+  // Taper-профиль: volume ↓, RIR ↑ (восстановление), tempo → deload-style (4-2-2-0).
+  // Bosquet 2005: объём −30-50%, интенсивность сохранена. Helms 2022: RIR +2-3.
+  const TAPER_VOLUME = [1.0, 0.75, 0.50];
+  const TAPER_RIR_SHIFT = [0, 1, 2];
+  const TAPER_TEMPO = ['3-1-1-0', '4-1-2-0', '4-2-2-0']; // прогрессия к deload-tempo
 
   const newWeeks = weeks.map((w, idx) => {
     if (idx < taperStart || idx >= taperEnd) return w; // не taper-неделя
@@ -773,30 +781,35 @@ export function applyTaperToFinalWeeks(plan: BBPlan, totalWeeks: number): BBPlan
     const curSets = w.sessions.flatMap(s => s.exercises).reduce((sum, e) => sum + e.sets, 0);
     const prevSets = idx > 0 ? weeks[idx - 1].sessions.flatMap(s => s.exercises).reduce((sum, e) => sum + e.sets, 0) : curSets;
     if (w.deload === true || w.phase === 'deload' || curSets < prevSets * 0.6) return w; // уже deload-неделя — не taper
-    // Taper-степень: неделя 1 (taperStart) = 100%, неделя 2 = 75%, неделя 3 = 50%.
-    // Интенсивность (вес) сохраняется на 100% — снижается только объём (сеты).
     const taperWeek = idx - taperStart; // 0, 1, 2
-      const volumeMult = taperWeek === 0 ? 1.0 : taperWeek === 1 ? 0.75 : 0.50;
-      const intensityMult = 1.0; // вес сохраняется (Bosquet 2005)
-      const newSessions = w.sessions.map(s => ({
-        ...s,
-        exercises: s.exercises.map(e => {
-          const sets = Math.max(1, Math.round(e.sets * volumeMult));
-          const source = e.workSets || [];
-          const template = source[source.length - 1] || { reps: e.repsRange[0], rir: e.rir, weight: 0 };
-          const workSets = Array.from({ length: sets }, (_, setIndex) => ({
-            ...(source[setIndex] || template),
-            weight: Math.round((source[setIndex]?.weight ?? template.weight) * intensityMult * 10) / 10,
-          }));
-          return {
-            ...e,
-            sets,
-            workSets,
-            comment: (e.comment || '') + ` | 📉 Taper: объём ×${volumeMult}, интенсивность сохранена (Bosquet 2005).`,
-          };
-        }),
-      }));
-    return { ...w, sessions: newSessions };
+    const volumeMult = TAPER_VOLUME[taperWeek] ?? 0.50;
+    const rirShift = TAPER_RIR_SHIFT[taperWeek] ?? 2;
+    const taperTempo = TAPER_TEMPO[Math.min(taperWeek, TAPER_TEMPO.length - 1)] ?? '4-2-2-0';
+    const intensityMult = 1.0; // вес сохраняется (Bosquet 2005)
+    const newSessions = w.sessions.map(s => ({
+      ...s,
+      exercises: s.exercises.map(e => {
+        // Минимум 2 сета — 1 сет = разминка, не рабочий объём (fix A7).
+        const sets = Math.max(2, Math.round(e.sets * volumeMult));
+        const source = e.workSets || [];
+        const template = source[source.length - 1] || { reps: e.repsRange[0], rir: e.rir, weight: 0 };
+        const workSets = Array.from({ length: sets }, (_, setIndex) => ({
+          ...(source[setIndex] || template),
+          weight: Math.round((source[setIndex]?.weight ?? template.weight) * intensityMult * 10) / 10,
+          rir: Math.min(5, (source[setIndex]?.rir ?? template.rir) + rirShift),
+          tempo: taperTempo,
+        }));
+        return {
+          ...e,
+          sets,
+          workSets,
+          rir: Math.min(5, e.rir + rirShift),
+          tempoSpec: taperTempo,
+          comment: (e.comment || '') + ` | 📉 Taper: объём ×${volumeMult}, RIR +${rirShift}, темп ${taperTempo} (Bosquet 2005, Helms 2022).`,
+        };
+      }),
+    }));
+    return { ...w, sessions: newSessions, taper: true };
   });
 
   return { ...plan, weeks: newWeeks };

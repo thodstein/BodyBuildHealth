@@ -23,6 +23,10 @@ export interface AutoDraftOptions {
   level: string;
   goal: string;
   weakPoints?: string[];
+  /** Группа специализации → MAV×1.3, primary-boost во всех сессиях. */
+  focusGroup?: string;
+  /** True = слабые на MAV+10%, остальные на MEV×1.5 (специализация). */
+  specialization?: boolean;
   equipment?: string[];
   avoidAxialLoad?: boolean;
   daysPerWeek: number;
@@ -34,6 +38,18 @@ export interface AutoDraftOptions {
   onCourse?: boolean;
   courseIntensity?: string;
   injuries?: { muscle: string; from?: string; to?: string; exclude?: boolean; volumePct?: number; weightPct?: number; repsCap?: number }[];
+  /** Техника интенсивности для primary (dropset/rest_pause/myo_rep/etc). */
+  intensityTechnique?: import('../bb/bb-autocoach.engine').IntensityTechnique;
+  /** Авто-делод по ACWR (true = движок сам режет объём при ACWR>1.3). */
+  autoDeload?: boolean;
+  /** Тип делода (pump/neural/full_rest/mini). */
+  deloadType?: import('../bb/bb-autocoach.engine').DeloadType;
+  /** Стратегия прогрессии нагрузки (double_progression/linear/wave/rpe_based). */
+  loadStrategy?: import('../bb/bb-autocoach.engine').LoadStrategy;
+  /** Пол — для glute-приоритета в ножных днях. */
+  sex?: 'male' | 'female';
+  /** ISO-дата начала мезоцикла (для per-week оценки травм). */
+  planStartWeek?: string;
   /** Training focus для RIR/reps/tempo (Schoenfeld 2021, Roberts 2022). */
   trainingFocus?: BBTrainingFocus;
   /** Recovery-метрики → MRV soft-cap (Helms 2022, Plews 2022, Watson 2022). */
@@ -135,6 +151,8 @@ export function autodraftBBPlan(opts: AutoDraftOptions): BBPlan {
           daysPerWeek: opts.daysPerWeek,
           weakPoints: opts.weakPoints,
           mode: opts.onCourse ? 'on_course' : 'natural',
+          sex: opts.sex,
+          focusGroup: opts.focusGroup,
         });
         return best?.pattern.id ?? (opts.daysPerWeek <= 3 ? 'fullbody_3' : opts.daysPerWeek <= 4 ? 'upper_lower_4' : 'ppl_6');
       } catch {
@@ -150,12 +168,20 @@ export function autodraftBBPlan(opts: AutoDraftOptions): BBPlan {
     weeks: Math.max(1, Math.min(opts.weeks, 16)),
     workMax: opts.workMax ?? defaultWorkMax(),
     weakPoints: opts.weakPoints ?? [],
+    focusGroup: opts.focusGroup,
+    specialization: opts.specialization,
     equipment: opts.equipment ?? [],
     volumeGoal: 'mav',
     avoidAxialLoad: opts.avoidAxialLoad ?? false,
     favoriteExercises: opts.favoriteExercises ?? [],
     excludedExercises: opts.excludedExercises ?? [],
     injuries,
+    intensityTechnique: opts.intensityTechnique,
+    autoDeload: opts.autoDeload,
+    deloadType: opts.deloadType,
+    loadStrategy: opts.loadStrategy,
+    sex: opts.sex,
+    planStartWeek: opts.planStartWeek,
     courseIntensity: (opts.courseIntensity ?? 'moderate') as CourseIntensity,
     trainingFocus: opts.trainingFocus,
     bodyFat: opts.bodyFat,

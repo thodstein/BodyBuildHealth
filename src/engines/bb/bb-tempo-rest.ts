@@ -22,9 +22,75 @@ export function tutForSet(reps: number, character: DayCharacter): number {
   return TEMPO_BY_CHARACTER[character].tutPerRep * reps;
 }
 
+/**
+ * FIX-B2: Per-exercise tempo overrides — проф-тренер назначает разный темп
+ * разным упражнениям (не один темп на всю фазу).
+ * - Тяжёлые многосуставные (присед/становая/жим): 2-0-1-0 (взрывной концентрический)
+ * - Растянутые упражнения (RDL/наклонный жим): 3-1-1-0 (пик растяжения)
+ * - Изоляция на пиковое сокращение (cable fly/leg curl): 3-2-1-0 (задержка в пике)
+ * - Махи/face pull: 2-1-1-1 (ритм, контроль)
+ */
+const EXERCISE_TEMPO_OVERRIDES: Record<string, string> = {
+  // Тяжёлые compound — взрывной концентрический, пауза внизу для натяжения
+  'присед': '2-0-1-0',
+  'squat': '2-0-1-0',
+  'становая': '2-0-1-0',
+  'deadlift': '2-0-1-0',
+  'жим штанги': '2-0-1-0',
+  'bench press': '2-0-1-0',
+  'жим лёжа': '2-0-1-0',
+  'army press': '2-0-1-0',
+  'жим стоя': '2-0-1-0',
+  // Растянутые — длинный эксцентрик, пауза в растянутой позиции
+  'румынская': '3-1-1-0',
+  'rdl': '3-1-1-0',
+  'наклон': '3-1-1-0',
+  'incline': '3-1-1-0',
+  'сисси': '4-1-1-0',
+  'sissy': '4-1-1-0',
+  // Пиковое сокращение — задержка в укороченной позиции
+  'кроссовер': '3-2-1-0',
+  'crossover': '3-2-1-0',
+  'сведение': '3-2-1-0',
+  'fly': '3-2-1-0',
+  'leg curl': '3-2-1-0',
+  'сгибание ног': '3-2-1-0',
+  'leg extension': '3-0-1-1',
+  'разгибание ног': '3-0-1-1',
+  // Ритм/контроль — махи, face pull
+  'махи': '2-1-1-1',
+  'lateral raise': '2-1-1-1',
+  'face pull': '2-1-1-1',
+  'тяга к лицу': '2-1-1-1',
+};
+
+/** Найти per-exercise tempo override по имени упражнения. */
+export function exerciseTempoOverride(name: string): string | undefined {
+  const n = (name || '').toLowerCase();
+  for (const key of Object.keys(EXERCISE_TEMPO_OVERRIDES)) {
+    if (n.includes(key)) return EXERCISE_TEMPO_OVERRIDES[key];
+  }
+  return undefined;
+}
+
 /** Темп под характер + опционально phase (ACSM 2023: eccentric 2-4с) + интенс-технику. */
-export function tempoFor(character: DayCharacter, technique?: string, phase?: string): TempoSpec {
+export function tempoFor(character: DayCharacter, technique?: string, phase?: string, exerciseName?: string): TempoSpec {
   const base = { ...TEMPO_BY_CHARACTER[character] };
+  // FIX-B2: per-exercise override имеет приоритет над phase (проф-тренер > шаблон)
+  if (exerciseName) {
+    const override = exerciseTempoOverride(exerciseName);
+    if (override) {
+      const parts = override.split('-').map(Number);
+      if (parts.length === 4 && parts.every(p => !isNaN(p))) {
+        base.eccentric = parts[0];
+        base.pause = parts[1];
+        base.concentric = parts[2];
+        base.notation = override;
+        base.tutPerRep = base.eccentric + base.pause + base.concentric + parts[3];
+        return base;
+      }
+    }
+  }
   // Phase-based eccentric emphasis (ACSM 2023: accumulation 3с, peaking 2с, deload 4с)
   if (phase) {
     const phaseTempo: Record<string, { notation: string; eccentric: number }> = {

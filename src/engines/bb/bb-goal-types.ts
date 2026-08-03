@@ -26,9 +26,15 @@ export interface FocusRepsConfig {
 }
 
 export const FOCUS_RIR_TABLE: Record<BBTrainingFocus, FocusRirConfig> = {
+  // Strength: aggressive RIR drop — fast progression to failure (Schoenfeld 2017: 1-5 reps, RIR 0-2).
+  // Drift -1 per 2 weeks: W1 RIR=1 → W3 RIR=0 → W5 RIR=0 (clamped).
   strength:    { base: 1, driftPer2Weeks: -1, pumpRir: 3 },
+  // Hypertrophy: moderate RIR drop — Roberts 2022 meta: RIR 2-3 optimal, drift to RIR 0-1 by peak.
+  // Drift -1 per 2 weeks: W1 RIR=2 → W3 RIR=1 → W5 RIR=0.
   hypertrophy: { base: 2, driftPer2Weeks: -1, pumpRir: 4 },
-  endurance:   { base: 3, driftPer2Weeks: -1, pumpRir: 5 },
+  // Endurance: no RIR drift — metabolic stress focus stays at RIR 3-4 throughout (Schoenfeld 2017: 15-30 reps).
+  // Drift 0: RIR stays constant, progression via volume/reps only.
+  endurance:   { base: 3, driftPer2Weeks: 0, pumpRir: 5 },
 };
 
 export const FOCUS_REPS_TABLE: Record<BBTrainingFocus, FocusRepsConfig> = {

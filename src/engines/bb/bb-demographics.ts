@@ -26,9 +26,11 @@ export function femaleAdjust(): DemographicAdjust {
     emphasisMuscles: ['glutes', 'hamstrings', 'quads', 'calves'],
     mrvMultiplier: 0.95,
     extraPrehab: ['таз/симфиз', 'колени'],
-    splitByDays: 'upper_lower_4',
+    // D1: Female glute focus — dedicated 5×/нед split with 3 glute sessions.
+    splitByDays: 'female_glute_5',
     notes: [
       'Акцент на нижнюю часть (ягодицы/бицепс бедра) — больший объём.',
+      'Женский сплит 5×/нед: 3 glute-сессии (2 тяж + 1 памп) + 2 upper.',
       'Фолликулярная фаза (1-14дн): выше толерантность к интенсивности/объёму.',
       'Лютеальная фаза (15-28дн): возможен больший объём, но больше утомления → следить за восстановлением.',
     ],

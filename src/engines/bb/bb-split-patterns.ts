@@ -234,8 +234,8 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
   },
   {
     id: 'upper_lower_3',
-    name: 'Верх/Низ 3×/нед (чередование)',
-    rotationDays: 7, sessionsPerRotation: 3,
+    name: 'Верх/Низ 4×/нед (2 тяж + 2 памп)',
+    rotationDays: 7, sessionsPerRotation: 4,
     schedule: [
       { kind: 'тренировка', character: 'тяж', sessionTag: 'Upper' },
       { kind: 'тренировка', character: 'тяж', sessionTag: 'Lower' },
@@ -438,6 +438,29 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
     ],
     level: ['intermediate', 'advanced'],
     description: 'PPL 4×/нед: Push 2×, Pull 1×, Legs 1×. Акцент на жимовые мышцы.',
+    direction: 'bodybuilding',
+  },
+  // ════════════════════════════════════════════════════════════
+  // D1: Female glute specialization 5×/нед — dedicated split for
+  // female trainees prioritizing glute hypertrophy.
+  // 3 glute-focused sessions (2 тяж + 1 памп) + 2 upper body sessions.
+  // Glutes hit 3×/нед (evidence: Schoenfeld 2016 — 2-3×/нед optimal).
+  // ════════════════════════════════════════════════════════════
+  {
+    id: 'female_glute_5',
+    name: 'Женский Glute Focus 5×/нед',
+    rotationDays: 7, sessionsPerRotation: 5,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Glutes' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'Upper' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'GlutesHams' },
+      { kind: 'отдых', character: null },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'Glutes' },
+      { kind: 'тренировка', character: 'памп', sessionTag: 'Upper' },
+      { kind: 'отдых', character: null },
+    ],
+    level: ['intermediate', 'advanced', 'enhanced'],
+    description: 'Женский сплит 5×/нед с приоритетом ягодичных: 3 glute-сессии (2 тяж + 1 памп) + 2 upper. Ягодичные 3×/нед (Schoenfeld 2016), верх тела 2×/нед.',
     direction: 'bodybuilding',
   },
 ];
