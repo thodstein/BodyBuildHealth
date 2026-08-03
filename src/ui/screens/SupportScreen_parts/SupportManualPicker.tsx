@@ -290,7 +290,7 @@ export const SupportManualPicker: React.FC<ManualPickerProps> = ({
                 {/* My stacks (he_my_stacks) */}
                 {myStacks.length > 0 && (
                   <div>
-                    <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginTop:8, marginBottom:4 }}>📦 Мои стеки (из BioStack, {myStacks.length})</div>
+                    <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginTop:8, marginBottom:4 }}>📦 Мои сохранённые стеки ({myStacks.length})</div>
                     {[...myStacks].reverse().slice(0, 10).map((st: any, i: number) => {
                       const stackSubIds: string[] = (st.subs || st.substances || []).map((s: any) => typeof s === 'string' ? s : (s.id || s));
                       return (

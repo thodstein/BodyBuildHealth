@@ -3,6 +3,22 @@ import { useState, useEffect } from "react";
 
 const STORAGE_KEY = "he_profile_v2";
 const MIGRATED_FLAG = 'he_profile_migrated_v2';
+const REMOVED_BIOSTACK_KEYS = [
+  'he_biostack_stacks_v2', 'he_biostack_active_idx', 'he_biostack_active',
+  'he_biostack_favorites', 'he_biostack_gate_cache', 'he_biostack_to_plan',
+  'he_biostack_compliance', 'he_biostack_start_date', 'he_biostack_tab',
+  'he_biostack_profile', 'he_biostack_reminders',
+];
+
+function cleanupRemovedBioStackStorage(): void {
+  try {
+    for (const key of REMOVED_BIOSTACK_KEYS) localStorage.removeItem(key);
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('he_biostack_name_')) localStorage.removeItem(key);
+    }
+  } catch {}
+}
 
 type ProfileListener = () => void;
 const listeners: Set<ProfileListener> = new Set();
@@ -98,6 +114,7 @@ function makeSettingsProxy(s: UnifiedSettings): UnifiedSettings {
 /* Читает профиль из localStorage с backward-compat proxy для settings. */
 export function getProfile(): UserProfile {
   try {
+    cleanupRemovedBioStackStorage();
     const saved = localStorage.getItem(STORAGE_KEY);
     const p: UserProfile = saved ? JSON.parse(saved) : getDefaultProfile();
     p.settings = makeSettingsProxy(p.settings);

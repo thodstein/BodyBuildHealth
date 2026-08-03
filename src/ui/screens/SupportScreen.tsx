@@ -59,11 +59,10 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
 type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'plan' | 'reports';
-type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'calc_tools' | 'dose' | 'synergy_calc' | 'timing' | 'research' | 'favorites' | 'protocols' | 'biostack' | 'diary' | 'bioavailability';
+type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'calc_tools' | 'dose' | 'synergy_calc' | 'timing' | 'research' | 'favorites' | 'protocols' | 'diary' | 'bioavailability';
 
 import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { PopupBool, PopupNumber, PopupSelect } from '../components/PopupXxx';
-import { BioStackAIScreen } from '../components/BioStackAIScreen';
 import { SupportPeptideCalc } from './SupportScreen_parts/SupportPeptideCalc';
 import { SupportResearch } from './SupportScreen_parts/SupportResearch';
 import { SupportGeneratorInfo } from './SupportScreen_parts/SupportGeneratorInfo';
@@ -73,7 +72,7 @@ import { SupportInteractionsView } from './SupportScreen_parts/SupportInteractio
 import { SupportFavoritesView } from './SupportScreen_parts/SupportFavoritesView';
 import { SupportDiaryView } from './SupportScreen_parts/SupportDiaryView';
 import { SupportStacksView } from './SupportScreen_parts/SupportStacksView';
-import { readBioStackStacks, writeBioStackStacks } from '../../engines/biostack-storage';
+import { readSupportStacks, writeSupportStacks } from '../../engines/stack-storage';
 import { SupportManualPicker } from './SupportScreen_parts/SupportManualPicker';
 
 
@@ -123,7 +122,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
   const showToast = (msg: string, type: string = 'success') => { setToast({ msg, type: type as 'success' | 'warning' | 'error' }); setTimeout(() => setToast(null), 3000); };
   const [selectedAnalogs, setSelectedAnalogs] = useState<Record<string, string>>({});
   const [enhancedSubs, setEnhancedSubs] = useState<string[]>([]);
-  // Внешние добавки (миксы/BioStack/питание) — идут ТОЛЬКО в общий план (he_general_plan), НЕ в план калькулятора
+  // Внешние добавки (миксы/питание) — идут ТОЛЬКО в общий план (he_general_plan), НЕ в план калькулятора
   const [externalSubs, setExternalSubs] = useState<string[]>(() => {
     try { return getMergedExternalSubIds(); } catch { return []; }
   });
@@ -529,12 +528,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
         dosages[enhId] = d ? { mg: d.mg, timing: d.timing } : { mg: 500, timing: 'с едой' };
       }
     }
-    // ПЛАН 1 (калькулятор): risk-driven вещества + ручные правки поддержки. БЕЗ миксов/BioStack/питания.
+    // ПЛАН 1 (калькулятор): risk-driven вещества + ручные правки поддержки. БЕЗ миксов/питания.
     try { localStorage.setItem('he_support_plan_result', JSON.stringify(subs)); } catch {}
     return { subs, dosages };
   }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, linked.course, linked.profile, courseWeekState, boostEnabled, jointMode, reproMode, neuroMode]);
 
-  // ПЛАН 2 (общий): калькулятор ∪ внешние добавки (миксы/BioStack/питание). Для удобства, без привязки к рискам.
+    // ПЛАН 2 (общий): калькулятор ∪ внешние добавки (миксы/питание). Для удобства, без привязки к рискам.
   useEffect(() => {
     try {
       const calcSubs: string[] = effectiveLevel?.subs || [];
@@ -727,36 +726,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
   const [reportGenerated, setReportGenerated] = useState(false);
   useEffect(() => { try { const saved = localStorage.getItem('he_support_report_current'); if (saved) { setReportGenerated(true); setSupportReportCurrent(JSON.parse(saved)); } } catch {} }, []);
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('he_biostack_to_plan');
-      if (raw) {
-        const data = JSON.parse(raw);
-        if (data.stackIds && Array.isArray(data.stackIds) && data.stackIds.length > 0) {
-          setExternalSubs(prev => [...new Set([...prev, ...data.stackIds])]);
-          localStorage.removeItem('he_biostack_to_plan');
-          showToast(`BioStack: +${data.stackIds.length} веществ добавлено в общий план`, 'success');
-        }
-      }
-    } catch {}
-  }, []);
-  // Live-приём стеков из BioStack через CustomEvent (работает даже когда SupportScreen уже смонтирован)
-  useEffect(() => {
-    const handler = (e: Event) => {
-      try {
-        const detail = (e as CustomEvent).detail;
-        if (detail?.stackIds && Array.isArray(detail.stackIds) && detail.stackIds.length > 0) {
-          setExternalSubs(prev => [...new Set([...prev, ...detail.stackIds])]);
-          // Переключаем на вкладку калькулятора чтобы пользователь видел результат
-          setGenTab('calculator');
-          showToast(`BioStack: +${detail.stackIds.length} веществ добавлено в план`, 'success');
-        }
-      } catch {}
-    };
-    window.addEventListener('he_biostack_to_plan', handler);
-    return () => window.removeEventListener('he_biostack_to_plan', handler);
-  }, []);
-  useEffect(() => {
-    const SOURCE_RU: Record<string, string> = { mix: 'Миксы', nutrition: 'Питание', biostack: 'BioStack' };
+    const SOURCE_RU: Record<string, string> = { mix: 'Миксы', nutrition: 'Питание' };
     const consume = () => {
       try {
         const entries = drainExternalSubsQueue();
@@ -785,8 +755,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
   const [pharmaSearchQ, setPharmaSearchQ] = useState('');
   const [pharmaSearchResults, setPharmaSearchResults] = useState<{ name: string; id: string; cls: string; desc: string }[]>([]);
   const [stackBuilder, setStackBuilder] = useState<string[]>([]);
-  const [savedStacks, setSavedStacks] = useState<{ id: string; name: string; date: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }>; notes?: string }[]>(() => readBioStackStacks().map(stack => ({
-    id: stack.id, name: stack.name, date: stack.createdAt, subs: stack.subs || stack.ids, dosages: (stack.dosages || {}) as Record<string, { mg: number; timing: string }>, notes: stack.notes,
+  const [savedStacks, setSavedStacks] = useState<{ id: string; name: string; date: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }>; notes?: string }[]>(() => readSupportStacks().map(stack => ({
+    id: stack.id, name: stack.name, date: stack.date, subs: stack.subs, dosages: (stack.dosages || {}) as Record<string, { mg: number; timing: string }>, notes: stack.notes,
   })));
   const [stackName, setStackName] = useState('');
   const [stackNotes, setStackNotes] = useState('');
@@ -968,7 +938,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
     const newStack = { id, name: stackName || level.label + ' ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), subs: level.subs, dosages: level.dosages || {}, notes: stackNotes || '' };
     const updated = [...savedStacks, newStack];
     setSavedStacks(updated);
-    writeBioStackStacks(updated);
+    writeSupportStacks(updated);
     setStackName('');
     setStackNotes('');
   };
@@ -980,14 +950,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
     const newStack = { id, name: `Стек: ${label}`, date: new Date().toISOString(), subs: stackBuilder, dosages: {} };
     const updated = [...savedStacks, newStack];
     setSavedStacks(updated);
-    writeBioStackStacks(updated);
+    writeSupportStacks(updated);
     setStackBuilder([]);
   };
 
   const deleteStack = (id: string) => {
     const updated = savedStacks.filter(s => s.id !== id);
     setSavedStacks(updated);
-    writeBioStackStacks(updated);
+    writeSupportStacks(updated);
   };
 
   const availableMechs = useMemo(() => {
@@ -2566,7 +2536,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     ALL_STACKS,
     ALL_SUBSTANCES,
     BackNav,
-    BioStackAIScreen,
     CANONICAL_ID_MAP,
     CATALOG_IDS,
     CATEGORY_LABELS,
@@ -3139,7 +3108,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
             <BackNav />
           </div>
           <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['biostack','🧬 BioStack AI'],['calc_tools','🧮 Расчёты выбора препаратов'],['research','Исследования'],['favorites','⭐ Избранное · Дневник']].map(([id,label]) => (
+            {[['peptides','Пептиды'],['catalog','Каталог'],['calc_tools','🧮 Расчёты выбора препаратов'],['research','Исследования'],['favorites','⭐ Избранное · Дневник']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
                 else { setTab('main'); setSupportView('calc'); setCalcView('info'); setSection('home'); setInfoView(id as InfoView); }
@@ -3208,11 +3177,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       {renderView(infoView, 'research', () =>
         <SupportResearch s={s} />
       )}
-            {renderView(infoView, 'biostack', () =>
-              <div style={{ padding: '0 4px' }}>
-                <BioStackAIScreen />
-              </div>
-            )}
             {renderView(infoView, 'calc_tools', () =>
               <div>
                 <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>

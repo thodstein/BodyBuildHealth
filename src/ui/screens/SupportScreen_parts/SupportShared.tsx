@@ -11,7 +11,7 @@ import type { PlanResult } from '../../../engines/support-plan';
 export type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 export type SupportView = 'main' | 'calc' | 'fertility';
 export type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'plan' | 'reports' | 'mixcalc';
-export type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'favorites' | 'protocols' | 'biostack' | 'bioavailability';
+export type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'research' | 'favorites' | 'protocols' | 'bioavailability';
 
 // ─── Общие стили ───
 export const S = {

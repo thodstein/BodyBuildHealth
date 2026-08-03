@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { findMeaningfulReplacement, type MeaningfulReplacement, getEvidenceGrade } from '../../../engines/biostack-clinical-v2.engine';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
-import type { BioStackProfile } from '../../../engines/biostack-ai.engine';
 
 const GLASS: React.CSSProperties = {
   background: 'rgba(24,24,27,0.55)',
@@ -20,6 +19,8 @@ const INPUT_STYLE: React.CSSProperties = {
   fontSize: 13,
   outline: 'none',
 };
+
+import type { BioStackProfile } from '../../../engines/biostack-ai.engine';
 
 export const SupportAnalogCalculator: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -44,10 +45,7 @@ export const SupportAnalogCalculator: React.FC = () => {
   }, [search, allSubstances]);
 
   const profile: BioStackProfile = useMemo(() => ({
-    age: 30,
-    weight: 80,
-    height: 180,
-    sex: 'male',
+    age: 30, weight: 80, height: 180, sex: 'male',
     avoidIds: excludeIds,
     avoidMeds: [],
     currentMeds: [],
@@ -272,116 +270,116 @@ export const SupportAnalogCalculator: React.FC = () => {
             borderRadius: 10,
             padding: '10px 12px',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
-                {replacement.replacementName}
-              </span>
-              {repGradeInfo && (
-                <span style={{
-                  fontSize: 9,
-                  padding: '2px 6px',
-                  borderRadius: 4,
-                  background: repGradeInfo.gradeColor + '22',
-                  color: repGradeInfo.gradeColor,
-                  fontWeight: 600,
-                }}>
-                  {repGradeInfo.gradeLabel}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
+                  {replacement.replacementName}
                 </span>
+                {repGradeInfo && (
+                  <span style={{
+                    fontSize: 9,
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    background: repGradeInfo.gradeColor + '22',
+                    color: repGradeInfo.gradeColor,
+                    fontWeight: 600,
+                  }}>
+                    {repGradeInfo.gradeLabel}
+                  </span>
+                )}
+                {repGradeInfo?.upgrade && (
+                  <span style={{
+                    fontSize: 9,
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    background: 'rgba(34,197,94,0.15)',
+                    color: '#22c55e',
+                  }}>
+                    ↑ Грейд улучшен
+                  </span>
+                )}
+              </div>
+
+              {replacement.therapeuticClass && (
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
+                  Терапевтический класс: {replacement.therapeuticClass}
+                </div>
               )}
-              {repGradeInfo?.upgrade && (
-                <span style={{
-                  fontSize: 9,
-                  padding: '2px 6px',
-                  borderRadius: 4,
-                  background: 'rgba(34,197,94,0.15)',
-                  color: '#22c55e',
+
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 8 }}>
+                {replacement.reason}
+              </div>
+
+              {replacement.clinicalNote && (
+                <div style={{
+                  fontSize: 10,
+                  color: 'rgba(255,255,255,0.6)',
+                  fontStyle: 'italic',
+                  marginBottom: 6,
+                  padding: '6px 8px',
+                  background: 'rgba(255,255,255,0.03)',
+                  borderRadius: 6,
                 }}>
-                  ↑ Грейд улучшен
-                </span>
+                  💡 {replacement.clinicalNote}
+                </div>
               )}
-            </div>
 
-            {replacement.therapeuticClass && (
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
-                Терапевтический класс: {replacement.therapeuticClass}
-              </div>
-            )}
+              {(replacement.form || replacement.doseMg || replacement.timing) && (
+                <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                  {replacement.form && (
+                    <div>
+                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Форма: </span>
+                      <span style={{ fontSize: 10, color: '#fff' }}>{replacement.form}</span>
+                    </div>
+                  )}
+                  {replacement.doseMg && (
+                    <div>
+                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Доза: </span>
+                      <span style={{ fontSize: 10, color: '#fff' }}>{replacement.doseMg} мг</span>
+                    </div>
+                  )}
+                  {replacement.timing && (
+                    <div>
+                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Тайминг: </span>
+                      <span style={{ fontSize: 10, color: '#fff' }}>{replacement.timing}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 8 }}>
-              {replacement.reason}
-            </div>
+              {replacement.doseWarning && (
+                <div style={{
+                  marginTop: 8,
+                  padding: '8px 10px',
+                  background: 'rgba(245,158,11,0.1)',
+                  borderRadius: 8,
+                  borderLeft: '3px solid #f59e0b',
+                }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: '#f59e0b', marginBottom: 2 }}>
+                    ⚠️ Внимание к дозировке
+                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                    {replacement.doseWarning}
+                  </div>
+                  {replacement.recommendedDoseMg && (
+                    <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>
+                      Рекомендуемая доза: {replacement.recommendedDoseMg} мг
+                    </div>
+                  )}
+                </div>
+              )}
 
-            {replacement.clinicalNote && (
               <div style={{
-                fontSize: 10,
-                color: 'rgba(255,255,255,0.6)',
-                fontStyle: 'italic',
-                marginBottom: 6,
-                padding: '6px 8px',
-                background: 'rgba(255,255,255,0.03)',
-                borderRadius: 6,
-              }}>
-                💡 {replacement.clinicalNote}
-              </div>
-            )}
-
-            {(replacement.form || replacement.doseMg || replacement.timing) && (
-              <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-                {replacement.form && (
-                  <div>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Форма: </span>
-                    <span style={{ fontSize: 10, color: '#fff' }}>{replacement.form}</span>
-                  </div>
-                )}
-                {replacement.doseMg && (
-                  <div>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Доза: </span>
-                    <span style={{ fontSize: 10, color: '#fff' }}>{replacement.doseMg} мг</span>
-                  </div>
-                )}
-                {replacement.timing && (
-                  <div>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Тайминг: </span>
-                    <span style={{ fontSize: 10, color: '#fff' }}>{replacement.timing}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {replacement.doseWarning && (
-              <div style={{
-                marginTop: 8,
+                marginTop: 10,
                 padding: '8px 10px',
-                background: 'rgba(245,158,11,0.1)',
+                background: 'rgba(34,197,94,0.08)',
                 borderRadius: 8,
-                borderLeft: '3px solid #f59e0b',
               }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: '#f59e0b', marginBottom: 2 }}>
-                  ⚠️ Внимание к дозировке
+                <div style={{ fontSize: 10, color: '#22c55e' }}>
+                  ✓ {replacement.safetyNote}
                 </div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
-                  {replacement.doseWarning}
-                </div>
-                {replacement.recommendedDoseMg && (
-                  <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>
-                    Рекомендуемая доза: {replacement.recommendedDoseMg} мг
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div style={{
-              marginTop: 10,
-              padding: '8px 10px',
-              background: 'rgba(34,197,94,0.08)',
-              borderRadius: 8,
-            }}>
-              <div style={{ fontSize: 10, color: '#22c55e' }}>
-                ✓ {replacement.safetyNote}
               </div>
             </div>
           </div>
-        </div>
       )}
 
       {selectedId && !replacement && (

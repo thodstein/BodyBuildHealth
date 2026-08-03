@@ -946,6 +946,39 @@ export function findComplexForStack(substanceIds: string[]): ComplexMatch[] {
   return results.sort((a, b) => b.coverage - a.coverage).slice(0, 10);
 }
 
+// ─── EVIDENCE GRADE ────────────────────────────────────────────────────────
+export type EvidenceGrade = 'A' | 'B' | 'C';
+
+export const EVIDENCE_GRADE: Record<string, EvidenceGrade> = {
+  // A — strong clinical / guideline
+  zinc: 'A', zinc_picolinate: 'A', zinc_carnosine: 'A',
+  magnesium: 'A', magnesium_glycinate: 'A', magnesium_citrate: 'A', magnesium_l_threonate: 'A',
+  vitamin_d3: 'A', vitamin_c: 'A', vitamin_b6: 'A', vitamin_b12: 'A',
+  folate: 'A', iron: 'A', creatine: 'A', nac: 'A',
+  omega3: 'A', fish_oil: 'A', krill_oil: 'A', coq10: 'A',
+  vitamin_k2: 'A', calcium: 'A', selenium: 'A', iodine: 'A',
+  milk_thistle: 'A', tudca: 'A', berberine: 'A', curcumin: 'A',
+  ashwagandha: 'A', melatonin: 'A', l_carnitine: 'A', alpha_lipoic: 'A',
+  citrulline: 'A', taurine: 'A',
+  // B — moderate / plausible
+  vitamin_e: 'B', vitamin_a: 'B', copper: 'B', manganese: 'B', boron: 'B',
+  chromium: 'B', potassium: 'B', glycine: 'B', theanine: 'B', glutamine: 'B',
+  agmatine: 'B', tongkat_ali: 'B', fadogia: 'B', dhea: 'B',
+  rhodiola: 'B', bacopa: 'B', ginseng: 'B', cordyceps: 'B', reishi: 'B',
+  chaga: 'B', turkey_tail: 'B', lion_mane: 'B', astaxanthin: 'B',
+  resveratrol: 'B', pqq: 'B', tyrosine: 'B', '5htp': 'B', gaba: 'B', l_dopa: 'B',
+  hesperidin: 'B', diosmin: 'B', bromelain: 'B', serrapeptase: 'B', natokinase: 'B',
+  // C — mechanistic / traditional (everything else falls back to C)
+};
+
+export function getEvidenceGrade(id: string): EvidenceGrade {
+  return EVIDENCE_GRADE[id] || 'C';
+}
+
+export function evidenceWeight(g: EvidenceGrade): number {
+  return g === 'A' ? 1.0 : g === 'B' ? 0.7 : 0.4;
+}
+
 // ─── DEFAULT PROFILE ────────────────────────────────────────────────────────
 export function getDefaultProfile(): FinderProfile {
   return {

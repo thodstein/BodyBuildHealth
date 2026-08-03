@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from 'react';
-import { readBioStackStacks } from '../../../engines/biostack-storage';
+import { readSupportStacks } from '../../../engines/stack-storage';
 import { ALL_INTERACTIONS } from '../../../data/support-database';
 import { CATEGORY_LABELS } from './SupportScreenData';
 import { getMergedExternalSubIds } from '../TrainingScreen_parts/support-plan-bridge';
@@ -103,7 +103,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
             <div style={{ padding:24, textAlign:'center' }}>
               <div style={{ fontSize:24, marginBottom:6 }}>💊</div>
               <div style={{ fontSize:11, color:'var(--text-dim)' }}>Нет сохранённых препаратов.</div>
-              <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>Добавьте из каталога или BioStack AI (кнопка ★ или «В мои препараты»).</div>
+              <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>Добавьте из каталога или сохранённых стеков.</div>
             </div>
           );
           return (
@@ -146,7 +146,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
             <div style={{ padding:24, textAlign:'center' }}>
               <div style={{ fontSize:24, marginBottom:6 }}>📦</div>
               <div style={{ fontSize:11, color:'var(--text-dim)' }}>Нет сохранённых стеков.</div>
-              <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>Добавьте из каталога стеков или BioStack AI (кнопка «В мои стеки»).</div>
+              <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:2 }}>Добавьте из каталога готовых стеков или сохранённых стеков.</div>
             </div>
           );
           return (
@@ -222,7 +222,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                 {/* Action buttons */}
                 <div style={{ display:'flex', gap:4, marginBottom:10, flexWrap:'wrap' }}>
                   <button onClick={() => {
-                    const stacks = readBioStackStacks();
+                    const stacks = readSupportStacks();
                     if (stacks.length === 0) { alert('Нет сохранённых стеков'); return; }
                     const names = stacks.map((s: any,i: number) => `${i+1}. ${s.name || ''}`).join('\n');
                     const idx = parseInt(prompt(`Выберите стек:\n${names}`) || '-1') - 1;
@@ -583,7 +583,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
             let computedIds: string[] = [];
             try { computedIds = JSON.parse(localStorage.getItem('he_support_plan_result') || '[]'); } catch {}
             const calcSubIds = [...new Set([...(SUPPORT_LEVELS[supportLevel]?.subs || []), ...computedIds])];
-            // ПЛАН 2 (общий): внешние вещества (миксы/BioStack/питание), которых нет в плане калькулятора
+             // ПЛАН 2 (общий): внешние вещества (миксы/питание), которых нет в плане калькулятора
             let extIds: string[] = [];
             try {
               const generalData = JSON.parse(localStorage.getItem('he_general_plan') || 'null');

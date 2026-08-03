@@ -708,7 +708,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 <input value={suppSearch} onChange={e => setSuppSearch(e.target.value)} placeholder="Поиск БАД..." style={{ ...inputStyle, flex: 1, fontSize:11, padding:'8px 10px', boxSizing:'border-box' }} />
                 <button onClick={() => {
                   try {
-                    // Общий план (he_general_plan) = калькулятор ∪ внешние вещества (миксы/BioStack/питание)
+                    // Общий план (he_general_plan) = калькулятор ∪ внешние вещества (миксы/питание)
                     const generalData = JSON.parse(localStorage.getItem('he_general_plan') || 'null');
                     let merged: string[] = (generalData && Array.isArray(generalData)) ? generalData : [];
                     // Фолбэк: если общий план ещё не сформирован — берём план калькулятора + внешние
@@ -978,7 +978,8 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                   ))}
                 </div>
                 <div style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:4}}>Введите любые значения — недостающие рассчитаются автоматически</div>
-                <button onClick={() => setKbjuMode('auto')} style={greenBtn}>✓ Применить</button>
+                {/* Keep manual mode active: switching to auto here discarded the user's values on generation. */}
+                <button onClick={() => setKbjuMode('manual')} style={greenBtn}>✓ Применить</button>
               </>;
             })()}
           </div>

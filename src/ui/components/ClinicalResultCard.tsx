@@ -1,9 +1,12 @@
-// BioStackAIClinicalCard.tsx — клинический вердикт selectStack: карточка врачебного уровня
+// ClinicalResultCard.tsx — клинический вердикт selectStack: карточка врачебного уровня
 import React, { useMemo } from 'react';
 import type { SelectStackResult } from '../../engines/biostack-clinical-v2.engine';
 import { findMeaningfulReplacement, type MeaningfulReplacement } from '../../engines/biostack-clinical-v2.engine';
 import type { BioStackProfile } from '../../engines/biostack-ai.engine';
-import { GlassCard } from './BioStackAIConstants';
+
+function GlassCard({ title, color, style, children }: { title: string; icon?: string; color: string; style?: React.CSSProperties; children: React.ReactNode }) {
+  return <div style={{ padding: 12, borderRadius: 12, background: 'rgba(24,24,27,0.55)', border: `1px solid ${color}33`, ...style }}><div style={{ fontSize: 13, fontWeight: 700, color, marginBottom: 8 }}>{title}</div>{children}</div>;
+}
 
 type AnyRes = SelectStackResult & Record<string, any>;
 

@@ -133,7 +133,6 @@ export const ProfileDataHub: React.FC<ProfileDataHubProps> = ({
   const lastSleep = sleepDiary.length ? sleepDiary.map((d: any) => d.date).sort().slice(-1)[0] : null;
   const lastBp = bpDiary.length ? bpDiary.map((d: any) => d.date).sort().slice(-1)[0] : null;
   const lastInj = injectionDiary.length ? injectionDiary.map((d: any) => d.date).sort().slice(-1)[0] : null;
-  const bioFilled = (settings.health?.drugAllergies?.length ? 1 : 0) + (settings.health?.chronicConditions?.length ? 1 : 0) + (settings.nutrition?.currentMedications?.length ? 1 : 0);
   const autoFilled = (autoCalc.neuro ? 1 : 0) + (autoCalc.cardio ? 1 : 0) + (autoCalc.gi ? 1 : 0) + (autoCalc.health ? 1 : 0);
 
 
@@ -223,12 +222,6 @@ export const ProfileDataHub: React.FC<ProfileDataHubProps> = ({
       filled: injectionDiary.length > 0 ? 1 : 0, total: 1,
       detail: injectionDiary.length > 0 ? `${injectionDiary.length} записей · ${lastInj}` : 'Нет записей',
       go: () => onOpenProfileTab('diaries'),
-    },
-    {
-      key: 'biostack', label: 'BioStack профиль', icon: '🧬', color: '#a855f7',
-      filled: bioFilled, total: 3,
-      detail: (settings.nutrition?.currentMedications?.length ?? 0) > 0 ? `${settings.nutrition.currentMedications.length} препаратов` : 'Не заполнено',
-      go: () => onNavigate?.('biostack'),
     },
     {
       key: 'autocalc', label: 'Калькулятор подбора', icon: '🧮', color: '#0ea5e9',

@@ -1,12 +1,11 @@
 /** support-plan-bridge.ts — канонический канал «внешние добавки → план поддержки».
- *  Единый store для источников: тренировочные миксы (mix), питание (nutrition), BioStack (biostack).
- *  SupportScreen потребляет очередь параллельно BioStack-мосту (he_biostack_to_plan)
+ *  Единый store для источников: тренировочные миксы (mix), питание (nutrition).
  *  и мержит id веществ в enhancedSubs. Использует localStorage + CustomEvent (как planner-bridge). */
 
 export const SUPPORT_EXTERNAL_KEY = 'he_support_external_subs';
 export const SUPPORT_EXTERNAL_EVENT = 'he-support-external-subs';
 
-export type ExternalSubSource = 'mix' | 'nutrition' | 'biostack';
+export type ExternalSubSource = 'mix' | 'nutrition';
 
 export interface ExternalSubEntry {
   ids: string[];

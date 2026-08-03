@@ -626,7 +626,6 @@ export interface UnifiedSettings {
     targetWeight?: number;         // кг
     targetBodyFat?: number;        // %
     goalTimelineWeeks?: number;    // срок достижения
-    biostackGoals?: string[];      // цели BioStack AI
   };
 
   // ─────────── 9. АНАЛИЗЫ (зеркало сводки из IndexedDB labs_log) ───────────
@@ -767,7 +766,6 @@ export function getDefaultSettings(): UnifiedSettings {
       primaryGoal: 'hypertrophy', cycleGoal: undefined, cycleWeeks: undefined,
       previousCycles: undefined, timeSinceLastCycle: undefined, secondaryGoals: undefined,
       targetWeight: undefined, targetBodyFat: undefined, goalTimelineWeeks: undefined,
-      biostackGoals: undefined,
     },
     labs: {
       lastEnteredDate: undefined, enteredCount: 0, status: 'none', summary: {},

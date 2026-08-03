@@ -1,9 +1,9 @@
-// SupplementClinicScreen_parts/ClinicalPanel.tsx — клинический контроль (BioStack v2)
+// SupplementClinicScreen_parts/ClinicalPanel.tsx — клинический контроль
 import React, { useMemo } from 'react';
 import { selectStack } from '../../../engines/biostack-clinical-v2.engine';
 import type { LabCompositeResult } from '../../../engines/lab-analysis.engine';
 import { loadProfile, entryName } from './shared';
-import { ClinicalResultCard } from '../../components/BioStackAIClinicalCard';
+import { ClinicalResultCard } from '../../components/ClinicalResultCard';
 
 export const ClinicalPanel: React.FC<{
   stackIds: string[];
