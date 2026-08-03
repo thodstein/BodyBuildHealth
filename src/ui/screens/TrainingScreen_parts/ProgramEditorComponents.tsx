@@ -382,11 +382,14 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
   const touchSrcRef = React.useRef<number | null>(null);
   const touchArmedRef = React.useRef<number | null>(null);
   const longPressTimer = React.useRef<number | null>(null);
+  const touchStartPosRef = React.useRef<{ x: number; y: number } | null>(null);
   const rowRefs = React.useRef<(HTMLDivElement | null)[]>([]);
   const [overIdx, setOverIdx] = useState<number | null>(null);
 
   const onTouchStart = (bi: number) => (e: React.TouchEvent) => {
     touchSrcRef.current = bi;
+    const t = e.touches[0];
+    touchStartPosRef.current = { x: t.clientX, y: t.clientY };
     if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
     longPressTimer.current = window.setTimeout(() => {
       touchArmedRef.current = bi;
@@ -395,6 +398,18 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
     }, 350);
   };
   const onTouchMove = (e: React.TouchEvent) => {
+    // P2-2: cancel long-press if user scrolled >10px (vertical or horizontal) — distinguishes scroll from drag
+    if (touchArmedRef.current == null && touchStartPosRef.current) {
+      const t = e.touches[0];
+      const dx = Math.abs(t.clientX - touchStartPosRef.current.x);
+      const dy = Math.abs(t.clientY - touchStartPosRef.current.y);
+      if (dx > 10 || dy > 10) {
+        if (longPressTimer.current) { window.clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+        touchSrcRef.current = null;
+        touchStartPosRef.current = null;
+      }
+      return;
+    }
     if (touchArmedRef.current == null) return;
     e.preventDefault();
     const t = e.touches[0];
@@ -417,12 +432,14 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
     }
     touchSrcRef.current = null;
     touchArmedRef.current = null;
+    touchStartPosRef.current = null;
     setOverIdx(null);
   };
   const onTouchCancel = () => {
     if (longPressTimer.current) { window.clearTimeout(longPressTimer.current); longPressTimer.current = null; }
     touchSrcRef.current = null;
     touchArmedRef.current = null;
+    touchStartPosRef.current = null;
     setOverIdx(null);
   };
 

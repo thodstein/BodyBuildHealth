@@ -333,7 +333,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
               </div>
               <div style={{ marginTop: 6 }}>
                 <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Длительность (недель):</div>
-                <input type="range" min={1} max={12} value={editBlock.endWeek - editBlock.startWeek + 1}
+                <input type="range" min={1} max={Math.min(12, current!.totalWeeks - editBlock.startWeek + 1)} value={editBlock.endWeek - editBlock.startWeek + 1}
                   onChange={e => handleResize(editBlock.id, editBlock.startWeek + parseInt(e.target.value) - 1)}
                   style={{ width: '100%' }} />
               </div>
@@ -383,6 +383,23 @@ export const PeriodizationDesignerTab: React.FC = () => {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* P0-2/P1-2: Overlap + gap warnings */}
+          {stats && ((stats as any).overlapWeeks > 0 || ((stats as any).gapRanges?.length ?? 0) > 0) && (
+            <div style={{ ...CARD, borderLeft: '3px solid #ef4444' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#ef4444', marginBottom: 6 }}>⚠ Проблемы структуры</div>
+              {(stats as any).overlapWeeks > 0 && (
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>
+                  🔴 Перекрытие блоков: {(stats as any).overlapWeeks} нед. Недели с перекрытием получат непредсказуемую фазу при применении.
+                </div>
+              )}
+              {(stats as any).gapRanges?.length > 0 && (
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
+                  🟡 Пропуски (недели без блока → accumulation по умолчанию): {(stats as any).gapRanges.join(', ')}
+                </div>
+              )}
             </div>
           )}
         </>

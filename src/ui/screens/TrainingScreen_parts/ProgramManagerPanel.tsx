@@ -1483,12 +1483,13 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
         const wm = program.pl.workMax || {};
         // Используем detectLift (lms-to-pl.ts) для надёжного определения лифта по имени/группе,
         // вместо regex по русским названиям (хрупко к вариациям имён).
+        // P1-5: accessory (null lift) не имеет 1ПМ — вес вводится вручную, не от squat PM.
         const wmVal = (liftStr: string, group: string): number => {
           const lift = detectLift(liftStr, group);
           if (lift === 'bench') return wm.bench ?? 0;
           if (lift === 'dead') return wm.dead ?? 0;
           if (lift === 'squat') return wm.squat ?? 0;
-          return wm.squat ?? 0; // accessory fallback на squat (для расчёта процентов)
+          return 0; // accessory: нет 1ПМ, вес не вычисляется из процентов
         };
         days = plDays.map((pd) => ({
           label: pd.label,
@@ -1524,8 +1525,9 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
   const printProgram = () => {
     const w = window.open('', '_blank', 'width=800,height=900');
     if (!w) { showToast('⚠ Разрешите всплывающие окна'); return; }
+    const safeTitle = (program.meta.title || '').replace(/</g, '&lt;');
     const html: string[] = [];
-    html.push(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${program.meta.title}</title><style>`);
+    html.push(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safeTitle}</title><style>`);
     html.push('body{font-family:Arial,sans-serif;margin:20px;color:#1a1a1a;background:#fff}');
     html.push('h1{font-size:20px;margin:0 0 6px}h2{font-size:14px;margin:16px 0 6px;color:#333}');
     html.push('table{border-collapse:collapse;width:100%;margin:6px 0;font-size:12px}');
@@ -1533,7 +1535,7 @@ const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram)
     html.push('.meta{color:#666;font-size:11px;margin-bottom:12px}');
     html.push('.phase{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;margin-left:6px}');
     html.push('</style></head><body>');
-    html.push(`<h1>${program.meta.title}</h1>`);
+    html.push(`<h1>${safeTitle}</h1>`);
     html.push(`<div class="meta">Цель: ${GOAL_OPTS.find(g=>g.id===program.meta.goal)?.label ?? program.meta.goal} · Уровень: ${LEVEL_OPTS.find(l=>l.id===program.meta.level)?.label ?? program.meta.level} · ${program.meta.daysPerWeek} дн/нед × ${program.meta.weeks} нед</div>`);
     // F2.5: тренерские заметки в PDF
     if (program.meta.notes) {

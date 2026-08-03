@@ -173,6 +173,19 @@ export function deleteDesign(id: string): MacrocycleDesign[] {
   return list;
 }
 
+
+/** Check if a new block would overlap existing blocks. */
+function checkBlockOverlap(
+  blocks: DesignerPhaseBlock[],
+  startWeek: number,
+  endWeek: number,
+  excludeId?: string,
+): DesignerPhaseBlock[] {
+  return blocks.filter(
+    (b) => b.id !== excludeId && startWeek <= b.endWeek && endWeek >= b.startWeek,
+  );
+}
+
 export function addBlockToDesign(design: MacrocycleDesign, phaseKey: PhaseKey, startWeek: number): MacrocycleDesign {
   const block = getPhaseTemplate(phaseKey);
   if (!block) return design;
@@ -181,6 +194,11 @@ export function addBlockToDesign(design: MacrocycleDesign, phaseKey: PhaseKey, s
     id: 'blk_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
     phaseKey, startWeek, endWeek, notes: '',
   };
+  // P0-2: warn if overlapping existing blocks (UI should prevent this, but engine enforces)
+  const overlaps = checkBlockOverlap(design.blocks, newBlock.startWeek, newBlock.endWeek);
+  if (overlaps.length > 0) {
+    newBlock.notes = (newBlock.notes ? newBlock.notes + ' ' : '') + overlaps.map((b) => b.phaseKey + ' ' + b.startWeek + '-' + b.endWeek).join(', ');
+  }
   return { ...design, blocks: [...design.blocks, newBlock].sort((a, b) => a.startWeek - b.startWeek), updatedAt: new Date().toISOString() };
 }
 
@@ -197,6 +215,12 @@ export function moveBlockInDesign(design: MacrocycleDesign, blockId: string, new
   const updated: DesignerPhaseBlock = { ...block, startWeek: Math.max(1, newStart), endWeek };
   const blocks = [...design.blocks];
   blocks[idx] = updated;
+  // P0-2: mark overlaps in notes
+  const moveOverlaps = checkBlockOverlap(blocks.filter((b) => b.id !== blockId), updated.startWeek, updated.endWeek);
+  if (moveOverlaps.length > 0) {
+    updated.notes = (updated.notes ? updated.notes + ' ' : '') + '[OVERLAP: ' + moveOverlaps.map((b) => b.phaseKey + ' ' + b.startWeek + '-' + b.endWeek).join(', ') + ']';
+    blocks[idx] = updated;
+  }
   return { ...design, blocks: blocks.sort((a, b) => a.startWeek - b.startWeek), updatedAt: new Date().toISOString() };
 }
 
@@ -227,7 +251,34 @@ export function getDesignStats(design: MacrocycleDesign) {
   for (const b of design.blocks) {
     phaseCount[b.phaseKey] = (phaseCount[b.phaseKey] || 0) + 1;
   }
-  return { totalWeeks, usedWeeks, freeWeeks, blockCount: design.blocks.length, phaseCount };
+  // P1-2: detect gaps (uncovered weeks) and overlaps
+  const covered = new Set<number>();
+  const overlaps: Array<{ a: string; b: string; week: number }> = [];
+  for (const b of design.blocks) {
+    for (let w = b.startWeek; w <= b.endWeek; w++) {
+      if (covered.has(w)) {
+        // find the other block covering this week
+        const other = design.blocks.find((ob) => ob.id !== b.id && w >= ob.startWeek && w <= ob.endWeek);
+        if (other) overlaps.push({ a: b.phaseKey, b: other.phaseKey, week: w });
+      }
+      covered.add(w);
+    }
+  }
+  const gapWeeks: number[] = [];
+  for (let w = 1; w <= totalWeeks; w++) {
+    if (!covered.has(w)) gapWeeks.push(w);
+  }
+  // Consolidate consecutive gap weeks into ranges
+  const gapRanges: string[] = [];
+  if (gapWeeks.length > 0) {
+    let start = gapWeeks[0], prev = gapWeeks[0];
+    for (let i = 1; i < gapWeeks.length; i++) {
+      if (gapWeeks[i] === prev + 1) { prev = gapWeeks[i]; }
+      else { gapRanges.push(start === prev ? String(start) : start + '-' + prev); start = gapWeeks[i]; prev = gapWeeks[i]; }
+    }
+    gapRanges.push(start === prev ? String(start) : start + '-' + prev);
+  }
+  return { totalWeeks, usedWeeks, freeWeeks, blockCount: design.blocks.length, phaseCount, overlapWeeks: overlaps.length, gapRanges, warnings: [...gapRanges.map((g) => '  ' + g + '  '), ...overlaps.map((o) => ' ' + o.a + '  ' + o.b + '  ' + o.week + '-')] };
 }
 
 export function getDefaultPresetDesigns(): MacrocycleDesign[] {
