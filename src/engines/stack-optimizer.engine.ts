@@ -9,6 +9,8 @@ import {
   SYNERGY_PAIRS,
   type SynergyPair,
 } from './support.engine';
+import { buildClinicalStack, type ClinicalStackResult } from './biostack-clinical-recommender';
+import type { BioStackProfile } from './biostack-ai.engine';
 
 export const RISK_SYSTEMS_8 = ['cardio', 'hepatic', 'renal', 'neuro', 'endocrine', 'hematologic', 'reproductive', 'musculoskeletal'] as const;
 export type RiskSystem = typeof RISK_SYSTEMS_8[number];
@@ -308,10 +310,21 @@ export interface StackResult {
   conflictsInStack: StackSynergyInfo[];
 }
 
+export interface StackOptimizerOptions {
+  maxSize?: number;
+  minIncrementalCoverage?: number;
+}
+
+export interface ClinicalStackOptimization {
+  clinical: ClinicalStackResult;
+  coverage: StackResult;
+}
+
 /* ---------- Stack Optimizer ---------- */
 export function optimizeStack(
   availableIds: string[],
   targets?: Partial<Record<string, number>>,
+  options: StackOptimizerOptions = {},
 ): StackResult {
   const uniqueIds = [...new Set(availableIds)].filter(Boolean);
   const systemNames = [...RISK_SYSTEMS_8];
@@ -342,7 +355,8 @@ export function optimizeStack(
   const remaining = [...uniqueIds];
   let previousTotal = 0;
 
-  const maxSteps = Math.min(uniqueIds.length, 50);
+  const maxSteps = Math.min(uniqueIds.length, Math.max(1, options.maxSize ?? 10));
+  const minIncrementalCoverage = options.minIncrementalCoverage ?? 0.01;
 
   for (let step = 0; step < maxSteps; step++) {
     let bestId: string | null = null;
@@ -446,7 +460,7 @@ export function optimizeStack(
     const idx = remaining.indexOf(bestId);
     if (idx >= 0) remaining.splice(idx, 1);
 
-    if (avgDelta < 0.005) break;
+    if (avgDelta < minIncrementalCoverage) break;
   }
 
   const finalSysCov: Record<string, number> = {};
@@ -491,6 +505,29 @@ export function optimizeStack(
     synergiesInStack,
     conflictsInStack,
   };
+}
+
+/**
+ * Canonical entry point when a profile is available. The clinical builder
+ * decides what is safe and relevant; the coverage optimizer only explains
+ * marginal system coverage for the already-gated result.
+ */
+export function optimizeClinicalStack(
+  profile: BioStackProfile,
+  options: { maxStackSize?: number; useCourse?: boolean; useLabs?: boolean } = {},
+): ClinicalStackOptimization {
+  const clinical = buildClinicalStack(profile, {
+    maxStackSize: options.maxStackSize ?? 8,
+    useCourse: options.useCourse ?? true,
+    useLabs: options.useLabs ?? true,
+    filterMode: 'balanced',
+  });
+  const coverage = optimizeStack(
+    clinical.substances.map(substance => substance.id),
+    undefined,
+    { maxSize: options.maxStackSize ?? 8 },
+  );
+  return { clinical, coverage };
 }
 
 /* ---------- Generate text description for UI ---------- */

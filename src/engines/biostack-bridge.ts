@@ -3,6 +3,7 @@ import { resolveInteractionId } from '../data/support-interactions-db';
 import type { SupportCatalogEntry } from '../data/support-catalog-data';
 import { SUPPLEMENTS_DB } from '../data/support-db/supplements';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../data/support-db';
+import { readBioStackStacks } from './biostack-storage';
 
 const BIO_STACK_KEY = 'he_biostack_active';
 const BIO_FAV_KEY = 'he_biostack_favorites';
@@ -28,6 +29,9 @@ export const RISK_SYSTEM_LABELS: Record<string, string> = {
 
 export function getBioStackStackIds(): string[] {
   try {
+    const stacks = readBioStackStacks();
+    const activeIdx = Math.max(0, Math.min(Number(localStorage.getItem('he_biostack_active_idx') || 0), stacks.length - 1));
+    if (stacks[activeIdx]) return stacks[activeIdx].ids;
     const raw = localStorage.getItem(BIO_STACK_KEY);
     if (raw) return JSON.parse(raw);
     const saved = localStorage.getItem('he_finder_saved_stacks');

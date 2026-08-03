@@ -1,6 +1,6 @@
 import { SUPPORT_CATALOG_DATA } from '../data/support-database';
 import type { LabCompositeResult } from './lab-analysis.engine';
-import { KNOWN_DRUG_SUP_INTERACTIONS } from './biostack-clinical';
+import { INTERACTIONS_DB, resolveInteractionId } from '../data/support-interactions-db';
 import { hasBlockingInteraction, getDDIForPair, getDDIForDrug } from '../data/drug-drug-interactions';
 
 /* ─── Daily Upper Limits (UL) in mg ─── */
@@ -574,6 +574,15 @@ function normId(s: string): string {
   return s.toLowerCase().replace(/[^a-zа-яё0-9]/gi, '');
 }
 
+function interactionTokens(value: string): string[] {
+  const normalized = normId(value);
+  return [...new Set([
+    normalized,
+    normalized.replace(/^pharma/, ''),
+    ...expandDrug(value).map(normId),
+  ].filter(Boolean))];
+}
+
 /* ════════════════════════════════════════════════════════════════════
    DRUG ALIASES — единый источник en↔ru синонимов ЛС.
    РАНЕЕ: взаимодействия ЛС↔БАД матчились ТОЛЬКО по русским именам →
@@ -774,41 +783,50 @@ export function getDrugSafetyExclusions(
     }
   }
 
-  // 4. Drug-Supplement interactions (existing logic)
+  // 4. Drug-Supplement interactions (from INTERACTIONS_DB)
   for (const subId of candidateIds) {
     const cat = SUPPORT_CATALOG_DATA[subId];
     if (!cat) continue;
-    // кандидаты для матча: id + nameRu + name (нормализованные)
-    const subIds = [subId, cat.nameRu || '', cat.name || ''].map(s => normId(s));
+    const candidateTokens = new Set([
+      ...interactionTokens(subId),
+      ...interactionTokens(cat.nameRu || ''),
+      ...interactionTokens(cat.name || ''),
+    ]);
 
-    for (const inter of KNOWN_DRUG_SUP_INTERACTIONS) {
-      // alias-aware пересечение токенов ЛС (en↔ru теперь матчится корректно)
-      const drugTok = expandDrug(inter.drug);
-      const drugMatch = medTokens.some(m => drugTok.includes(m));
-      const subNorm = normId(inter.substance);
-      const subMatch = subIds.some(id => id.includes(subNorm) || subNorm.includes(id));
-      if (drugMatch && subMatch) {
-        if (inter.severity === 'HIGH') {
-          // Absolute contraindication with the user's medication → hard exclude
-          excluded.push({
-            substanceId: subId,
-            substanceName: cat.nameRu || cat.name || subId,
-            drug: inter.drug,
-            effect: inter.effect,
-            severity: inter.severity,
-            mechanism: inter.mechanism,
-          });
-        } else {
-          // MEDIUM severity → keep but flag for dose titration / alternative
-          titrations.push({
-            substanceId: subId,
-            substanceName: cat.nameRu || cat.name || subId,
-            drug: inter.drug,
-            effect: inter.effect,
-            mechanism: inter.mechanism,
-            recommendation: `⚠ Снизить дозу и контролировать анализы (риск ${inter.severity}). ${inter.effect}`,
-          });
-        }
+    for (const inter of INTERACTIONS_DB) {
+      const aTokens = interactionTokens(inter.substanceA);
+      const bTokens = interactionTokens(inter.substanceB);
+      const aIsCandidate = aTokens.some(token => candidateTokens.has(token));
+      const bIsCandidate = bTokens.some(token => candidateTokens.has(token));
+      // Check if this interaction involves the candidate supplement
+      if (aIsCandidate === bIsCandidate) continue;
+
+      // Determine which side is the drug and which is the supplement
+      // Check if the other side matches any user medication (using drug aliases)
+      const otherSide = aIsCandidate ? inter.substanceB : inter.substanceA;
+      const otherTokens = interactionTokens(otherSide);
+      const drugMatch = medTokens.some(tok => otherTokens.some(other => tok.includes(other) || other.includes(tok)));
+      if (!drugMatch) continue;
+
+      const drugName = otherSide;
+      if (inter.severity === 'HIGH') {
+        excluded.push({
+          substanceId: subId,
+          substanceName: cat.nameRu || cat.name || subId,
+          drug: drugName,
+          effect: inter.effect,
+          severity: inter.severity,
+          mechanism: (inter.mechanisms || []).join('; '),
+        });
+      } else {
+        titrations.push({
+          substanceId: subId,
+          substanceName: cat.nameRu || cat.name || subId,
+          drug: drugName,
+          effect: inter.effect,
+          mechanism: (inter.mechanisms || []).join('; '),
+          recommendation: `⚠ Снизить дозу и контролировать анализы (риск ${inter.severity}). ${inter.effect}`,
+        });
       }
     }
   }
@@ -877,4 +895,3 @@ export function scheduleTelegramReminder(config: ReminderConfig): void {
     }
   } catch {}
 }
-

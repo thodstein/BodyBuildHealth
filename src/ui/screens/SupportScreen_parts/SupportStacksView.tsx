@@ -26,7 +26,6 @@ export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) =
             const newStack = { id: 'stack_'+Date.now(), name: stackName.trim(), date: new Date().toISOString(), subs: [...level.subs], dosages: { ...(level.dosages||{}) }, notes: '' };
             const updated = [...savedStacks, newStack];
             setSavedStacks(updated);
-            localStorage.setItem('savedStacks', JSON.stringify(updated));
             setStackName('');
           }} style={{ padding:'6px 12px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:10 }}>Сохранить</button>
         </div>
@@ -71,7 +70,7 @@ export const SupportStacksView: React.FC<{ s: Record<string, any> }> = ({ s }) =
                   </div>
                   <div style={{ display:'flex', gap:4 }}>
                     <button onClick={() => {
-                      try { localStorage.setItem('savedStacks', JSON.stringify(savedStacks.filter((s: any) => s.id !== stack.id))); setSavedStacks((prev: any[]) => prev.filter((s: any) => s.id !== stack.id)); } catch {}
+                       setSavedStacks((prev: any[]) => prev.filter((s: any) => s.id !== stack.id));
                     }} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444', fontWeight:600 }}>✕ Удалить</button>
                   </div>
                 </div>

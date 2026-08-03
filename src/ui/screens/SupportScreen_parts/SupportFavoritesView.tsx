@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React from 'react';
+import { readBioStackStacks } from '../../../engines/biostack-storage';
 import { ALL_INTERACTIONS } from '../../../data/support-database';
 import { CATEGORY_LABELS } from './SupportScreenData';
 import { getMergedExternalSubIds } from '../TrainingScreen_parts/support-plan-bridge';
@@ -221,9 +222,8 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                 {/* Action buttons */}
                 <div style={{ display:'flex', gap:4, marginBottom:10, flexWrap:'wrap' }}>
                   <button onClick={() => {
-                    const saved = localStorage.getItem('savedStacks');
-                    if (!saved || JSON.parse(saved).length === 0) { alert('Нет сохранённых стеков'); return; }
-                    const stacks = JSON.parse(saved);
+                    const stacks = readBioStackStacks();
+                    if (stacks.length === 0) { alert('Нет сохранённых стеков'); return; }
                     const names = stacks.map((s: any,i: number) => `${i+1}. ${s.name || ''}`).join('\n');
                     const idx = parseInt(prompt(`Выберите стек:\n${names}`) || '-1') - 1;
                     if (idx < 0 || idx >= stacks.length) return;

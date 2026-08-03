@@ -11,6 +11,7 @@ import { ExportTab } from './BioStackAIExport';
 import { RisksTab } from './BioStackAIRisks';
 import { CompareTab } from './BioStackAICompare';
 import { ReportsTab } from './BioStackAIReports';
+import { readBioStackStacks, writeBioStackStacks, type StoredBioStack } from '../../engines/biostack-storage';
 
 type MainTab = 'profile' | 'build' | 'analysis';
 const TAB_KEY = 'he_biostack_tab';
@@ -29,19 +30,9 @@ const ANALYSIS_TABS = [
 ];
 
 // Stack v2 format with metadata
-interface SavedStackV2 {
-  id: string;
-  name: string;
-  ids: string[];
-  profileSnapshot: BioStackProfile | null;
-  createdAt: string;
-  version: number;
-  notes?: string;
-}
+type SavedStackV2 = StoredBioStack & { profileSnapshot: BioStackProfile | null };
 
-const STACKS_KEY = 'he_biostack_stacks_v2';
 const IDX_KEY = 'he_biostack_active_idx';
-const LEGACY_STACKS_KEY = 'he_biostack_stacks';
 const LEGACY_ACTIVE_KEY = 'he_biostack_active';
 
 function migrateStacks(): SavedStackV2[] {
@@ -49,29 +40,15 @@ function migrateStacks(): SavedStackV2[] {
     // Clean up legacy profile key (now loaded from unified profile settings)
     localStorage.removeItem('he_biostack_profile');
     // Check if v2 already exists
-    const v2Raw = localStorage.getItem(STACKS_KEY);
-    if (v2Raw) return JSON.parse(v2Raw);
+    const v2 = readBioStackStacks();
+    if (v2.length) return v2 as SavedStackV2[];
     
-    // Migrate from legacy
-    const legacyRaw = localStorage.getItem(LEGACY_STACKS_KEY);
-    const legacyActiveRaw = localStorage.getItem(LEGACY_ACTIVE_KEY);
-    
-    if (legacyRaw) {
-      const legacy = JSON.parse(legacyRaw);
-      const activeIdx = legacyActiveRaw ? +(localStorage.getItem(LEGACY_ACTIVE_KEY) || '0') : 0;
-      const migrated: SavedStackV2[] = (Array.isArray(legacy[0]) ? legacy : [legacy]).map((ids: string[], i: number) => ({
-        id: crypto.randomUUID(),
-        name: i === activeIdx ? 'Текущий стек' : `Стек ${i + 1}`,
-        ids,
-        profileSnapshot: null,
-        createdAt: new Date().toISOString(),
-        version: 1,
-        notes: '',
-      }));
-      localStorage.setItem(STACKS_KEY, JSON.stringify(migrated));
-      localStorage.removeItem(LEGACY_STACKS_KEY);
+    const migrated = readBioStackStacks();
+    if (migrated.length) {
+      const activeIdx = Number(localStorage.getItem(LEGACY_ACTIVE_KEY) || '0');
+      const result = migrated.map((stack, index) => index === activeIdx ? { ...stack, name: stack.name || 'Текущий стек' } : stack) as SavedStackV2[];
       localStorage.removeItem(LEGACY_ACTIVE_KEY);
-      return migrated;
+      return result;
     }
   } catch {}
   return [{ id: crypto.randomUUID(), name: 'Стек 1', ids: [], profileSnapshot: null, createdAt: new Date().toISOString(), version: 1, notes: '' }];
@@ -101,7 +78,7 @@ export const BioStackAIScreen: React.FC = () => {
   });
    const saveStacks = (stks: SavedStackV2[], idx: number) => {
      setAllStacks(stks);
-     localStorage.setItem(STACKS_KEY, JSON.stringify(stks));
+      writeBioStackStacks(stks);
      localStorage.setItem(IDX_KEY, String(idx));
    };
   const setActiveStackIdx = (idx: number) => {

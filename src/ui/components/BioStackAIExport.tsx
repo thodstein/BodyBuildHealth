@@ -4,13 +4,9 @@ import { explainStack } from '../../engines/supplement-finder.engine';
 import { selectStack } from '../../engines/biostack-clinical-v2.engine';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { toFinderProfile, GlassCard, showToast } from './BioStackAIConstants';
+import { estCost } from '../../data/support-pricing';
 import type { LinkedData } from '../../core/data-link';
 
-function estCost(id: string): number {
-  const e = SUPPORT_CATALOG_DATA[id];
-  const price = (e as any)?.priceRub ?? (e as any)?.price ?? 0;
-  return typeof price === 'number' ? price : 0;
-}
 function name(id: string): string { const e = SUPPORT_CATALOG_DATA[id]; return e?.nameRu || e?.name || id; }
 
 export function ExportTab({ profile, stackIds, setStackIds, linked }: { profile: BioStackProfile; stackIds: string[]; setStackIds: (ids: string[]) => void; linked?: LinkedData }) {

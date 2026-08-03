@@ -1,7 +1,7 @@
 import { findSupplements, buildStack, type FinderQuery } from './supplement-finder.engine';
 import type { FinderProfile } from './supplement-finder.engine';
 import { SUPPORT_CATALOG_DATA } from '../data/support-database';
-import { PRICE_RUB, estCost } from '../ui/components/BioStackAIConstants';
+import { PRICE_RUB, estCost } from '../data/support-pricing';
 
 /* ─── Cost per substance ─── */
 export function getCost(id: string): number {

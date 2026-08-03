@@ -73,6 +73,7 @@ import { SupportInteractionsView } from './SupportScreen_parts/SupportInteractio
 import { SupportFavoritesView } from './SupportScreen_parts/SupportFavoritesView';
 import { SupportDiaryView } from './SupportScreen_parts/SupportDiaryView';
 import { SupportStacksView } from './SupportScreen_parts/SupportStacksView';
+import { readBioStackStacks, writeBioStackStacks } from '../../engines/biostack-storage';
 import { SupportManualPicker } from './SupportScreen_parts/SupportManualPicker';
 
 
@@ -784,7 +785,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
   const [pharmaSearchQ, setPharmaSearchQ] = useState('');
   const [pharmaSearchResults, setPharmaSearchResults] = useState<{ name: string; id: string; cls: string; desc: string }[]>([]);
   const [stackBuilder, setStackBuilder] = useState<string[]>([]);
-  const [savedStacks, setSavedStacks] = useState<{ id: string; name: string; date: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }>; notes?: string }[]>(() => { try { return JSON.parse(localStorage.getItem('savedStacks') || '[]'); } catch { return []; } });
+  const [savedStacks, setSavedStacks] = useState<{ id: string; name: string; date: string; subs: string[]; dosages: Record<string, { mg: number; timing: string }>; notes?: string }[]>(() => readBioStackStacks().map(stack => ({
+    id: stack.id, name: stack.name, date: stack.createdAt, subs: stack.subs || stack.ids, dosages: (stack.dosages || {}) as Record<string, { mg: number; timing: string }>, notes: stack.notes,
+  })));
   const [stackName, setStackName] = useState('');
   const [stackNotes, setStackNotes] = useState('');
   const [editingStackNotes, setEditingStackNotes] = useState<string | null>(null);
@@ -965,7 +968,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
     const newStack = { id, name: stackName || level.label + ' ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), subs: level.subs, dosages: level.dosages || {}, notes: stackNotes || '' };
     const updated = [...savedStacks, newStack];
     setSavedStacks(updated);
-    localStorage.setItem('savedStacks', JSON.stringify(updated));
+    writeBioStackStacks(updated);
     setStackName('');
     setStackNotes('');
   };
@@ -977,14 +980,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
     const newStack = { id, name: `Стек: ${label}`, date: new Date().toISOString(), subs: stackBuilder, dosages: {} };
     const updated = [...savedStacks, newStack];
     setSavedStacks(updated);
-    localStorage.setItem('savedStacks', JSON.stringify(updated));
+    writeBioStackStacks(updated);
     setStackBuilder([]);
   };
 
   const deleteStack = (id: string) => {
     const updated = savedStacks.filter(s => s.id !== id);
     setSavedStacks(updated);
-    localStorage.setItem('savedStacks', JSON.stringify(updated));
+    writeBioStackStacks(updated);
   };
 
   const availableMechs = useMemo(() => {

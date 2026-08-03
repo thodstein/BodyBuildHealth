@@ -481,7 +481,7 @@ export const BioStackAIUnifiedBuild: React.FC<Props> = ({
       {/* ── Multi-stack switcher ── */}
       <div style={{ display:'flex', gap:4, marginBottom:10, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }}>
         {allStacks.map((stk, i) => {
-          const name = localStorage.getItem(`he_biostack_name_${i}`) || `Стек ${i+1}`;
+          const name = stk.name || `Стек ${i+1}`;
           return (
             <button key={i} onClick={() => setActiveStackIdx(i)} style={{
               flexShrink:0, minHeight:32, padding:'6px 14px', borderRadius:12, fontSize:11, fontWeight:700,
