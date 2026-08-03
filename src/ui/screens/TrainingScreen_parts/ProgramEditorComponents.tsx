@@ -303,14 +303,15 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
 const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onChange: (b: UserBlock[]) => void }> = ({ blocks, phase, onChange }) => {
   const addBlock = () => onChange([...blocks, { id: newId('blk'), type: 'accessory', exerciseName: '', muscle: '', role: 'accessory', sets: [{ reps: 10, rir: 2 }] }]);
   const updateBlock = (bi: number, patch: Partial<UserBlock>) => onChange(blocks.map((b, i) => i === bi ? { ...b, ...patch } : b));
-  // F2.2: clipboard для копирования блоков между сессиями/неделями (localStorage, т.к. в SPA мало памяти)
+  // F2.2: clipboard для копирования блоков между сессиями/неделями.
+  // P2-4: sessionStorage instead of localStorage — clipboard clears on tab close, not persisted across sessions.
   const COPY_KEY = 'he_bb_block_clipboard';
   const copyBlock = (bi: number) => {
-    try { localStorage.setItem(COPY_KEY, JSON.stringify(blocks[bi])); } catch {}
+    try { sessionStorage.setItem(COPY_KEY, JSON.stringify(blocks[bi])); } catch {}
   };
   const pasteBlock = () => {
     try {
-      const raw = localStorage.getItem(COPY_KEY);
+      const raw = sessionStorage.getItem(COPY_KEY);
       if (!raw) return;
       const src = JSON.parse(raw) as UserBlock;
       const newBlock: UserBlock = { ...src, id: newId('blk') };

@@ -45,6 +45,7 @@ import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { getReferencedCycle, userWeekToBBPlan, validateProgram, cloneFromCycle, cloneFromLibrary, createBlank, createFromBuild, deleteRevision } from '../../../engines/user-program/program-store';
 import { autodraftBBPlan, applyPhaseModulation, plLmsScheduleDays, computePlanQualityFor } from '../../../engines/manual-constructor';
 import { GROUP_RU } from './program-types';
+import { BulkApplyCard } from './BulkApplyCard';
 import type { ManualMode } from './ProgramManagerPanel';
 
 const GOAL_OPTS = [
@@ -958,100 +959,11 @@ export const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserP
       })()}
 
       {/* P3.2 — Bulk-apply методик ко всем блокам (инструмент тренера) */}
-      {isPro && dir === 'bb' && program.bb && program.bb.weeks.length > 0 && (() => {
-        const curIntensity = (program.bb.progression?.intensityTechniques ?? ['none'])[0];
-        const applyTechnique = (key: IntensityTechnique | 'none') => {
-          const next: UserProgram = {
-            ...program,
-            bb: {
-              ...program.bb!,
-              weeks: program.bb!.weeks.map((w) => ({
-                ...w,
-                sessions: w.sessions.map((s) => ({
-                  ...s,
-                  blocks: s.blocks.map((b) => ({
-                    ...b,
-                    sets: (b.sets ?? []).map((st) => ({ ...st, technique: key === 'none' ? undefined : key })),
-                  })),
-                })),
-              })),
-              progression: {
-                ...(program.bb!.progression ?? { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] }),
-                intensityTechniques: key === 'none' ? ['none'] : [key],
-              },
-            },
-          };
-          onChange(next);
-          showToast('🔧 Применено ко всем блокам: ' + (key === 'none' ? 'без техники' : INTENSITY_TECHNIQUES[key as IntensityTechnique].label));
-        };
-        const applyCharacter = (char: 'тяж' | 'памп' | 'лёг') => {
-           const restByChar = { тяж: 180, памп: 60, лёг: 90 } as const;
-          const next: UserProgram = {
-            ...program,
-            bb: {
-              ...program.bb!,
-                weeks: program.bb!.weeks.map((w) => {
-                  const tempo = tempoFor(char, undefined, w.phase);
-                  return {
-                    ...w,
-                    sessions: w.sessions.map((s) => ({
-                      ...s,
-                      blocks: s.blocks.map((b) => ({
-                        ...b,
-                        sets: (b.sets ?? []).map((st, i) => i === 0
-                          ? { ...st, restSec: restByChar[char], tempo: tempo.notation }
-                          : { ...st, tempo: st.tempo || tempo.notation }),
-                      })),
-                    })),
-                  };
-                }),
-            },
-          };
-          onChange(next);
-           showToast('🏋 Характер дня: ' + char + ' → отдых ' + restByChar[char] + 'с, темп адаптирован по фазе');
-        };
-        return (
-          <div style={{ ...CARD, padding: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>
-              🔧 Применить ко всем блокам
-              <span style={{ fontSize: 11, color: DIM, marginLeft: 6, fontWeight: 500 }}>(сейчас: {INTENSITY_TECHNIQUES[curIntensity as IntensityTechnique]?.label ?? curIntensity})</span>
-            </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(167,139,250,0.7)', marginBottom: 4 }}>
-              Интенсив-техника:
-            </div>
-             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
-              {(Object.entries(INTENSITY_TECHNIQUES) as [IntensityTechnique, { label: string; description: string }][]).map(([key, meta]) => (
-                <button
-                  key={key}
-                  title={meta.description}
-                  onClick={() => applyTechnique(key)}
-                  style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700, minHeight: 38 }}
-                >
-                  {meta.label}
-                </button>
-              ))}
-            </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(34,197,94,0.7)', marginBottom: 4 }}>
-              Характер дня (отдых + темп):
-            </div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {(['тяж', 'памп', 'лёг'] as const).map((char) => (
-                <button
-                  key={char}
-                   title={`${char}-характер дня: темп адаптируется по фазе, отдых ${{тяж:180,памп:60,лёг:90}[char]}с`}
-                  onClick={() => applyCharacter(char)}
-                  style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.25)', color: '#22c55e', fontWeight: 700, minHeight: 38 }}
-                >
-                  {char === 'тяж' ? 'Тяж. день → 180с/отдых' : char === 'памп' ? 'Памп день → 60с/отдых' : 'Лёгкий день → 90с/отдых'}
-                </button>
-              ))}
-            </div>
-            <div style={{ fontSize: 11, color: DIM, marginTop: 4, fontStyle: 'italic' }}>
-              Применяет выбор ко всем Weeks→Sessions→Blocks. Темп/RIR правила — из RIR_MATRIX[goal][level].
-            </div>
-          </div>
-        );
-      })()}
+      {/* P2-3: extracted to BulkApplyCard with week-range selector */}
+      {isPro && dir === 'bb' && program.bb && program.bb.weeks.length > 0 && (
+        <BulkApplyCard program={program} onChange={onChange} showToast={showToast} />
+      )}
+
 
       {/* Meta */}
       <div style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
