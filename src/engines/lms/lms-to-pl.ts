@@ -15,24 +15,41 @@ export interface PLScheduledDay {
   exercises: Array<{ name: string; muscleGroup: string; sets: Array<{ sets: number; reps: number; pct: number; weight: number; rir: number }> }>;
 }
 
-/** Поднимает week1 + weeks[1..N] (если есть), иначе повторяет week1 N раз. */
+/** Поднимает week1 + weeks[1..N] (если есть), иначе повторяет week1 N раз.
+ *  P1-fix: previously `weeks[0]` was silently dropped (loop started at i=1), assuming
+ *  `weeks[0] === week1`. If data was inconsistent (weeks[0] had different exercises or
+ *  percentages than week1), the mismatch was lost without warning. Now we validate:
+ *  if `weeks[0]` differs from `week1`, we use `weeks[0]` as the authoritative week 1.
+ */
 export function expandCycleWeeks(cycle: SRCycleTemplate): SRDaySpec[][] {
   const out: SRDaySpec[][] = [];
   if (!cycle.week1) return out;
-  out.push(cycle.week1);
   if (cycle.weeks && cycle.weeks.length > 0) {
+    // Prefer explicit weeks[0] if present; it's the authoritative week 1 in multi-week cycles.
+    out.push(cycle.weeks[0]);
     for (let i = 1; i < cycle.weeks.length; i++) out.push(cycle.weeks[i]);
   } else {
+    out.push(cycle.week1);
     for (let w = 1; w < cycle.meta.weeks; w++) out.push(cycle.week1);
   }
   return out;
 }
 
-/** Детектит lift по названию/группе упражнения (для расчёта веса из ПМ). */
+/** Детектит lift по названию/группе упражнения (для расчёта веса из ПМ).
+ *  P1-fix: "жим" alone matched OHP ("Жим стоя", "Жим гантелей сидя") and "Жим ногами",
+ *  producing absurd bench-1RM-derived weights for non-bench exercises. Now excludes
+ *  overhead/leg-press variants explicitly before classifying as bench.
+ *  Similarly, "тяг" alone matched row variants ("Тяга штанги в наклоне", "Тяга верхнего
+ *  блока") as deadlift. Now requires deadlift-specific keywords or excludes row variants.
+ */
 export function detectLift(name: string, group: string): 'squat' | 'bench' | 'dead' | null {
   const haystack = (name || '') + ' ' + (group || '');
-  if (/жим/i.test(haystack)) return 'bench';
-  if (/тяг|стан/i.test(haystack)) return 'dead';
+  // Bench: "жим" but NOT overhead/leg-press/arnold/push-press variants.
+  if (/жим/i.test(haystack) && !/стоя|сидя|армейск|над голов|ногами|гантел|швунг|push.?press|армолд|арнолд/i.test(haystack)) return 'bench';
+  // Deadlift: explicit deadlift keywords (становая/румынская/сумо/с плинтов/из ямы/на прямых ногах)
+  if (/станов|румын|сумо|прямых ног|плинт|из ямы/i.test(haystack)) return 'dead';
+  // Deadlift: "тяг" but NOT row/pulldown variants.
+  if (/тяг/i.test(haystack) && !/верхнего|нижнего|горизонтального|блока|в наклон|к поясу|гантел|штанг|к груди/i.test(haystack)) return 'dead';
   if (/прис|скв/i.test(haystack)) return 'squat';
   return null;
 }

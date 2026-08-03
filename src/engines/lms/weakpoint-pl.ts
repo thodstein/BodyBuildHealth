@@ -61,7 +61,7 @@ const DIAGNOSIS: Record<Lift, Partial<Record<WeakPoint, Omit<WeakPointDiagnosis,
   },
   ohp: {
     ohp_start: { weakPoint: 'ohp_start', label: 'Старт с плеч', description: 'Не хватает стартовой силы — слабые передние дельты в нижней точке.', assistanceFromCatalog: ['Армейский жим', 'Жим гантелей', 'Махи гантелями в стороны'], intensityPct: 0.65, rationale: 'Армейский жим + жим гантелей для силы дельт в старте.' },
-    ohp_mid: { weakPoint: 'ohp_mid', label: 'Середина (переход)', description: 'Зависание по ходу — переход дельты→трицепс.', assistanceFromCatalog: ['Армейский жим', 'Жим гантелей', 'Махи гантелями в стороны'], intensityPct: 0.7, rationale: 'Скоростной жим + средний хват для мощности в средней фазе.' },
+    ohp_mid: { weakPoint: 'ohp_mid', label: 'Середина (переход)', description: 'Зависание по ходу — переход дельты→трицепс.', assistanceFromCatalog: ['Армейский жим', 'Жим гантелей', 'Махи гантелями в стороны'], intensityPct: 0.7, rationale: 'Скоростной армейский жим + жим гантелей для мощности в средней фазе overhead.' },
     ohp_lockout: { weakPoint: 'ohp_lockout', label: 'Дожим вверх', description: 'Не дожимает вверху — слабый трицепс/трапеции.', assistanceFromCatalog: ['Французский жим', 'Махи гантелями в стороны', 'Армейский жим'], intensityPct: 0.75, rationale: 'Французский жим изолирует трицепс в локдауне.' },
   },
   row: {
@@ -72,7 +72,7 @@ const DIAGNOSIS: Record<Lift, Partial<Record<WeakPoint, Omit<WeakPointDiagnosis,
   pulldown: {
     pd_top: { weakPoint: 'pd_top', label: 'Верх (старт сверху)', description: 'Лопатки не опущены при старте — слабые широчайшие в верхней точке.', assistanceFromCatalog: ['Тяга верхнего блока', 'Подтягивания', 'Тяга гантели в наклоне'], intensityPct: 0.65, rationale: 'Подтягивания + тяга верхнего блока для силы в старте сверху.' },
     pd_mid: { weakPoint: 'pd_mid', label: 'Середина (на грудь)', description: 'Зависание по ходу — слабый переход.', assistanceFromCatalog: ['Тяга верхнего блока', 'Тяга гантели в наклоне'], intensityPct: 0.7, rationale: 'Тяга блока к груди + гантели для мощности в средней фазе.' },
-    pd_squeeze: { weakPoint: 'pd_squeeze', label: 'Сведение к груди', description: 'Не дотянуть до груди — слабые широчайшие/большая круглая.', assistanceFromCatalog: ['Подтягивания', 'Тяга верхнего блока'], intensityPct: 0.75, rationale: 'Подтягивания — изолированная работа широчайших в нижней точке.' },
+    pd_squeeze: { weakPoint: 'pd_squeeze', label: 'Сведение к груди', description: 'Не дотянуть до груди — слабые широчайшие/большая круглая.', assistanceFromCatalog: ['Подтягивания', 'Тяга верхнего блока', 'Тяга гантели в наклоне'], intensityPct: 0.75, rationale: 'Подтягивания — изолированная работа широчайших в нижней точке; горизонтальная тяга гантели — для сведения лопаток.' },
   },
   incline_press: {
     inc_off: { weakPoint: 'inc_off', label: 'Сход с груди (верх)', description: 'Не хватает стартовой силы верха груди — слабые ключичные пучки.', assistanceFromCatalog: ['Жим гантелей на наклонной', 'Жим гантелей', 'Армейский жим'], intensityPct: 0.65, rationale: 'Жим гантелей на наклонной акцентирует верх груди в старте.' },

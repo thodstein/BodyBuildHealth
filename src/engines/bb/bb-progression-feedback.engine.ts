@@ -430,11 +430,11 @@ export function autoReplaceOnPlateau(
  * быть перетренирована (chest ACWR 1.8) при нормальном общем ACWR (1.2).
  *
  * @param sessions — WorkoutSession[] из дневника
- * @returns Record<muscle, { ratio, zone }> — per-muscle ACWR + зона (optimal/caution/danger)
+ * @returns Record<muscle, { ratio, zone }> — per-muscle ACWR + зона (optimal/caution/dangerous)
  */
 export function computePerMuscleACWR(
   sessions: WorkoutSession[],
-): Record<string, { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'danger' }> {
+): Record<string, { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'dangerous' }> {
   if (!sessions || sessions.length < 4) return {};
 
   // Группируем сессии по неделям (ISO week start Monday)
@@ -458,7 +458,7 @@ export function computePerMuscleACWR(
   }
 
   // Для каждой мышцы: текущая неделя vs 4-нед среднее
-  const result: Record<string, { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'danger' }> = {};
+  const result: Record<string, { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'dangerous' }> = {};
   const allWeeks = [...new Set(sessions.map(s => weekKey(s.date)))].sort();
   const recentWeeks = allWeeks.slice(-5); // последние 5 нед (1 текущая + 4 для chronic)
   if (recentWeeks.length < 2) return {};
@@ -473,9 +473,9 @@ export function computePerMuscleACWR(
       : 0;
     if (chronicAvg < 1) continue; // недостаточно данных
     const ratio = currentSets / chronicAvg;
-    let zone: 'undertrained' | 'optimal' | 'caution' | 'danger' = 'optimal';
+    let zone: 'undertrained' | 'optimal' | 'caution' | 'dangerous' = 'optimal';
     if (ratio < 0.8) zone = 'undertrained';
-    else if (ratio > 1.5) zone = 'danger';
+    else if (ratio > 1.5) zone = 'dangerous';
     else if (ratio > 1.3) zone = 'caution';
     result[muscle] = { ratio: Math.round(ratio * 100) / 100, zone };
   }

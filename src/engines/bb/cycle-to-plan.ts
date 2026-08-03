@@ -33,14 +33,14 @@ import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
  * дублируем логику здесь, чтобы MODE 2 (cycle/program) тоже учитывал PED-логику первого режима
  * (autoDeload по ACWR).
  */
-function computeAcwrCyclePlan(): { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'danger' } {
+function computeAcwrCyclePlan(): { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'dangerous' } {
   try {
     const sessions = loadSRPESessions();
     if (!sessions || sessions.length < 2) return { ratio: 1, zone: 'optimal' };
     const daily = toDailyLoads(sessions as any);
     const r = acuteChronicRatio(daily);
     if (!r || !isFinite(r.ratio)) return { ratio: 1, zone: 'optimal' };
-    const zone = r.ratio < 0.8 ? 'undertrained' : r.ratio <= 1.3 ? 'optimal' : r.ratio <= 1.5 ? 'caution' : 'danger';
+    const zone = r.ratio < 0.8 ? 'undertrained' : r.ratio <= 1.3 ? 'optimal' : r.ratio <= 1.5 ? 'caution' : 'dangerous';
     return { ratio: r.ratio, zone };
   } catch {
     return { ratio: 1, zone: 'optimal' };
@@ -455,7 +455,9 @@ function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG)
   if (l.includes('разгиб') && l.includes('блок') && !l.includes('ног')) return 'triceps';
   // Пресс
   if (l.includes('пресс') || l.includes('скручив') || l.includes('планк')) return 'abs';
-  return 'chest';
+  // P2-fix: default was 'chest' which incorrectly applied chest MRV to unknown exercises.
+  // 'core' is a safer neutral default — core MRV is high and rarely overflows.
+  return 'core';
 }
 
 function calcWorkMaxForEx(exName: string, workMax: Record<string, number>): number {
@@ -642,14 +644,6 @@ function replacePLForBB(exName: string, group: string): { name: string; group: s
     return { name: 'Румынская тяга', group: 'Ноги' };
   }
   return { name: exName, group };
-}
-
-/** Проверить, что заменённое упражнение существует в каталоге (fallback). */
-function validateReplacement(rep: { name: string; group: string }): { name: string; group: string } {
-  const found = EXERCISE_CATALOG.find(e => e.name === rep.name);
-  if (found) return rep;
-  // Fallback: Тяга штанги в наклоне (всегда есть в каталоге)
-  return { name: 'Тяга штанги в наклоне', group: 'Спина' };
 }
 
 /** Маппинг из канонического EN-ключа мышцы (chest/back/...) в человеко-читаемую группу,

@@ -5,7 +5,80 @@
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK
-- `vitest` - 1115 passing (129 test files; BB-auto pro-quality Phase A/B/C/D, generation, safety, migration, round-trip, nutrition planner button audit, and support calculator audit coverage included)
+- `vitest` - 1140 passing (130 test files; BB-auto pro-quality Phase A/B/C/D, generation, safety, migration, round-trip, nutrition planner button audit, support calculator audit, and PL-auto critical audit coverage included)
+
+---
+
+## PL-auto Critical Audit Fixes (Aug 3 2026)
+
+Full critical analysis of the ПЛ-авто (PowerLifting auto-planner) system across 4 directions: core engine (6 files), supporting engines (7 files), test coverage (13 test files), and UI integration (SRCBBScreen.tsx). 5 P0 + 11 P1 + 6 P2 issues found and fixed. 25 new tests added.
+
+### P0 — Critical fixes (recovery multiplier + focus lift)
+
+1. **`buildSrc()` bodyFat wrong path** — `SRCBBScreen.tsx:265` read `(linked.profile).bodyFatPct` (non-existent root field) → always `undefined`. Body composition recovery multiplier (Helms 2022) never fired for PL-auto. Fixed: canonical path `linked.profile.settings.personal.bodyFat` (matching `BbAutoConstructor.tsx:518`).
+
+2. **`buildSrc()` leanMass not passed** — `LMSBuildInput.leanMass` used by engine for MRV adjustment (`leanMass >= 90 → ×1.15`, `< 60 → ×0.9`) but UI never forwarded it. Fixed: computed `leanMass = weight × (1 - bodyFat/100)` inline, matching BB-auto.
+
+3. **`buildSrc()` stressLevel wrong source/scale** — read `linked.readiness.stress` which doesn't exist in `ReadinessScores` (the readiness engine doesn't populate it). Even if present, the 0-100 scale would always trigger the worst-case `×0.85` multiplier (engine expects 1-10). Fixed: canonical path `linked.profile.settings.lifestyle.stressLevel` (1-10).
+
+4. **`buildSrc()` hrvMs + sleepHours wrong paths** — `hrvMs` read from `linked.profile.settings.hrvMs` (wrong; should be `.lifestyle.morningHRV`). `sleepHours` derived from composite `sleepScore/10` (lossy: 8h perfect sleep → 10.0h overestimate; 6h → 9.0h). Fixed: canonical `.lifestyle.morningHRV` and `.lifestyle.sleepHours`.
+
+5. **`buildSrcMacrocycle()` passed ZERO recovery metrics** — the macrocycle path (year-round plans) called `buildLMSPlan` for each block without `bodyFat/leanMass/hrvMs/sleepHours/stressLevel`. All 5 recovery multipliers always ×1.0. Fixed: all 5 now forwarded with same canonical paths as `buildSrc()`.
+
+6. **`matchesFocusLift` deadlift regex caught squat** — `lms-builder.engine.ts:139` regex `из ям` matched "приседания из ямы" (a squat variant). With `focusLift='deadlift'`, squat exercises received +20% volume as deadlift variants. Fixed: `из ям` alone no longer matches; requires deadlift context (`станов|тяга`) alongside.
+
+### P1 — Important fixes
+
+7. **PM unbounded growth** — `lms-progression.engine.ts:51` `pm0 × (1+k)^(week-1)` had no cap. A 52-week `on_course` heavy cycle (k=0.025) projected PM ×3.56 (200kg squat → 712kg). Fixed: `pmCap()` clamps to ×1.25 (natural), ×1.35 (mild on_course), ×1.5 (heavy on_course). Descending progression (PCT) uncapped. `lms-builder.engine.ts:576` now delegates to `pmForWeek()` to inherit the cap.
+
+8. **`detectLift` classified OHP as bench** — `lms-to-pl.ts:34` `/жим/i` matched "Жим стоя", "Жим гантелей сидя", "Жим ногами" → weights calculated from bench 1RM. Fixed: explicit exclusion of overhead/leg-press/arnold/push-press variants. Row variants ("Тяга верхнего блока", "Тяга штанги в наклоне") also excluded from deadlift.
+
+9. **Fuzzy match false positives AND false negatives** — `lms-progression-feedback.engine.ts:133-134` required BOTH token overlap AND substring includes. "жим лёжа" vs "жим штанги лёжа" (same exercise): overlap OK but `.includes()` failed → no match (false negative). "жим" vs "жим гантелей стоя" (different exercises): overlap 1/1 + includes → matched (false positive). Fixed: new logic requires 2+ meaningful tokens overlap OR (1+ overlap + substring for names with 2+ tokens only). Tokens ≤2 chars filtered out.
+
+10. **`expandCycleWeeks` silently dropped `weeks[0]`** — `lms-to-pl.ts:23-24` loop started at `i=1`, assuming `weeks[0] === week1`. Data inconsistency was lost without warning. Fixed: `weeks[0]` now used as authoritative week 1 when `weeks` array is present.
+
+11. **`topSetOf` selected by weight not e1RM** — `lms-progression-feedback.engine.ts:60-64` picked highest `weightKg`, but 80kg×5 (e1RM=88.3) is better than 82kg×1 (e1RM=82). Fixed: selection by `epley1RM(weight, reps)`.
+
+12. **`rebalanceMacrocycle` stale competition week** — `macrocycle.engine.ts:565-568` when a competition's block was removed during clamping, the competition retained its OLD week value (stale reference). Fixed: orphaned competitions now get `week: 0` and are filtered out.
+
+13. **`diary-autoreg` zero e1RM → weight increase** — `diary-autoreg.engine.ts:160` when `fact.e1RM=0` (bodyweight-only or zero-data), `rpeFromLoad(0,...)` returned 5 (fallback). This created `delta=-3` → system INCREASED planned weight (opposite of correct). Fixed: explicit guard for `e1RM <= 0 || weight <= 0` → fallback source, no weight change.
+
+14. **`buildSrc()` button no error handler** — `SRCBBScreen.tsx:1031` `onClick={() => buildSrc()}` had no try/catch. If `buildLMSPlan` threw (invalid template, PM=0), error propagated uncaught with no user feedback. Fixed: try/catch with `setMethodNote(error message)`.
+
+15. **`buildLastResultIndex` ignored heavy/pump day context** — `lms-progression-feedback.engine.ts:68-90` kept only the MOST RECENT session's data per exercise name. If "Тяга штанги в наклоне" was done 80kg (heavy, Mon) and 60kg (pump, Tue), only Tue's 60kg data survived → plan's heavy-day exercise referenced pump-day e1RM. Fixed: now tracks entry with HIGHEST e1RM across recent sessions (within 90 days), preserving heavy-day performance.
+
+16. **ACWR zone `'danger'` vs `'dangerous'` type mismatch** — `cycle-to-plan.ts:43` and `bb-progression-feedback.engine.ts:478` returned `zone: 'danger'`, but canonical `ACWRZone` type uses `'dangerous'`. If results were passed to `autoRegulate()` or `buildLMSPlan`, the dangerous-zone check (`=== 'dangerous'`) would silently fail. Fixed: all 3 producers now use `'dangerous'`; consumer in `bb-builder.engine.ts:2678` updated.
+
+### P2 — Quality fixes
+
+17. **`weakpoint-pl.ts` ohp_mid rationale copy-pasted** — line 64 was identical to bench.mid ("Скоростной жим + средний хват..."). Fixed: overhead-specific rationale.
+
+18. **`weakpoint-pl.ts` pd_squeeze too narrow** — only 2 vertical pulls (Подтягивания, Тяга верхнего блока). Fixed: added horizontal pull (Тяга гантели в наклоне) for scapular retraction.
+
+19. **`diary-autoreg` plateau absolute threshold** — 2.5kg for ALL exercises. Squat 180kg: 2.5kg = 1.4% (noise). Lateral raise 8kg: 2.5kg = 31% (huge progress ignored). Fixed: percentage-based `max(1, maxE1RM × 0.02)`.
+
+20. **`cycle-to-plan.ts` muscleGroupFromExName default `'chest'`** — unknown exercises defaulted to chest → chest MRV applied. Fixed: neutral `'core'` default.
+
+21. **`cycle-to-plan.ts` `validateReplacement` dead code** — defined but never called. Removed.
+
+### Files modified
+- `src/ui/screens/SRCBBScreen.tsx` — P0-1/2/3/4/5/9 (buildSrc + buildSrcMacrocycle recovery wiring, try/catch)
+- `src/engines/lms/lms-builder.engine.ts` — P0-5 (deadlift regex), P1-1 (pmForWeek delegation)
+- `src/engines/lms/lms-progression.engine.ts` — P1-1 (pmCap function)
+- `src/engines/lms/lms-to-pl.ts` — P1-2 (detectLift OHP exclusion), P1-4 (expandCycleWeeks weeks[0])
+- `src/engines/lms/lms-progression-feedback.engine.ts` — P1-3 (fuzzy match), P1-5 (topSetOf e1RM), P1-10 (buildLastResultIndex best e1RM)
+- `src/engines/lms/macrocycle.engine.ts` — P1-6 (orphaned competition removal)
+- `src/engines/pro/diary-autoreg.engine.ts` — P1-7 (zero e1RM guard), P2-4 (plateau %threshold)
+- `src/engines/bb/cycle-to-plan.ts` — P1-11 (zone 'dangerous'), P2-5 (default 'core'), P2-6 (dead code removal)
+- `src/engines/bb/bb-progression-feedback.engine.ts` — P1-11 (zone 'dangerous')
+- `src/engines/bb/bb-builder.engine.ts` — P1-11 (consumer zone 'dangerous')
+- `src/engines/lms/weakpoint-pl.ts` — P2-2 (ohp_mid rationale), P2-3 (pd_squeeze assistance)
+
+### Tests
+- `src/engines/lms/__tests__/pl-auto-audit-fixes.test.ts` — **25 new tests**: P1-1 PM cap (6), P1-2 detectLift (7), P1-3 fuzzy match (2), P1-4 expandCycleWeeks (2), P1-5 topSetOf e1RM (1), P1-6 rebalance orphaned competitions (2), P1-7 diary-autoreg zero e1RM (2), P1-11 ACWR zone 'dangerous' (1), P2-4 plateau %threshold (2).
+- Full suite: **1140 tests passing** (130 test files), 0 TS errors, vite build OK.
+
+---
 
 ### BB-auto max plan status
 - Generic, BB-cycle and FullProgram paths use the shared finalizer for volume, fatigue budget, phase/taper safety, validation, report and export snapshots.

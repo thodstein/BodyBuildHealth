@@ -564,8 +564,11 @@ export function rebalanceMacrocycle(macro: Macrocycle, edits: MacroRebalanceEdit
   const rationale = newBlocks.map(b => `${b.phase}: ${b.weeks} нед (с ${b.weekOffset}), ${b.kind}${b.cycleId ? ' (' + b.cycleId + ')' : ''}`);
   const competitions = macro.competitions?.map(competition => {
     const block = newBlocks.find(candidate => candidate.phase === 'competition' && candidate.competitionId === competition.id);
-    return block ? { ...competition, week: block.weekOffset } : competition;
-  });
+    // P1-fix: if the competition's block was removed during clamping, the competition
+    // previously retained its OLD week value (stale). Now we mark it as orphaned by
+    // setting week to 0 so downstream code can detect and handle it (or filter it out).
+    return block ? { ...competition, week: block.weekOffset } : { ...competition, week: 0 };
+  }).filter(c => c.week > 0);
   const mainCompetition = competitions?.find(competition => competition.priority === 'A') ?? competitions?.[0];
   return {
     blocks: newBlocks,

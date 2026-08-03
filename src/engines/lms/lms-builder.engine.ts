@@ -7,7 +7,7 @@
  */
 
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec } from '../../data/lms-cycles/lms-types';
-import { pmProgression, workWeight, progressionRationale, type ProgressionMode, type PMProgressionInput } from './lms-progression.engine';
+import { pmProgression, pmForWeek, workWeight, progressionRationale, type ProgressionMode, type PMProgressionInput } from './lms-progression.engine';
 import { calcSessionMetrics, type SRExercise, type SRSessionMetrics, type SRCycleMetrics } from './lms-metrics.engine';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
 import { type Exercise } from '../../core/types';
@@ -136,7 +136,10 @@ function matchesFocusLift(name: string, focusLift?: 'squat' | 'bench' | 'deadlif
     case 'bench':
       return /жим/.test(n) && !/ногами|стоя|армейск|над голов/.test(n);
     case 'deadlift':
-      return /станов|румын|прямых ног|плинт|из ям/.test(n);
+      // P0-fix: "из ям" alone matched "приседания из ямы" (a squat variant).
+      // Now requires deadlift context (станов/румын/плинт/тяга) AND optionally "из ям",
+      // or the explicit "становая ... из ямы" compound. Bare "из ямы" no longer matches.
+      return /станов|румын|прямых ног|плинт/.test(n) || (/из ям/.test(n) && /станов|тяга/.test(n));
   }
 }
 
@@ -573,7 +576,10 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         const k = (input.weeklyPercent != null ? input.weeklyPercent
           : mode === 'on_course' ? (input.courseIntensity === 'mild' ? 0.015 : input.courseIntensity === 'heavy' ? 0.025 : 0.02)
           : mode === 'pct' ? -0.005 : template.meta.correctionPct);
-        pmRow[name] = pm0Map[name] * Math.pow(1 + k, weekNumber - 1);
+        // P1-fix: use pmForWeek instead of raw formula to inherit the growth cap (×1.25–1.5)
+        // that prevents runaway progression on long weeksOverride cycles (e.g. 52-week on_course).
+        const progInput: PMProgressionInput = { pm0: pm0Map[name], weeks: totalWeeks, mode, weeklyPercent: k, courseIntensity: input.courseIntensity };
+        pmRow[name] = pmForWeek(progInput, weekNumber);
       }
     }
     const weekLayout: SRDaySpec[] = hasExplicitWeeks ? template.weeks![w] : template.week1;

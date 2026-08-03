@@ -57,33 +57,58 @@ function normName(s: string): string {
 
 function topSetOf(ex: WorkoutExercise): { weight: number; reps: number; rir: number } | null {
   if (!ex.sets || ex.sets.length === 0) return null;
+  // P1-fix: select top set by e1RM (Epley), not by raw weight.
+  // 80kg×5 (e1RM=88.3) is a better performance indicator than 82kg×1 (e1RM=82).
   let best = ex.sets[0];
+  let bestE1RM = epley1RM(best.weightKg, best.reps);
   for (const s of ex.sets) {
-    if (s.weightKg > best.weightKg) best = s;
+    const candidateE1RM = epley1RM(s.weightKg, s.reps);
+    if (candidateE1RM > bestE1RM) {
+      best = s;
+      bestE1RM = candidateE1RM;
+    }
   }
   return { weight: best.weightKg, reps: best.reps, rir: best.rir };
 }
 
-/** Индекс последних результатов по нормализованному имени упражнения. */
+/** Индекс последних результатов по нормализованному имени упражнения.
+ *  P1-fix: previously kept only the MOST RECENT session's data for each exercise name.
+ *  If the same exercise appeared on both a heavy day (80kg) and a pump day (60kg),
+ *  only the pump day data survived → plan's heavy-day exercise referenced pump-day e1RM.
+ *  Now: for each exercise name, track the entry with the HIGHEST e1RM across recent sessions
+ *  (within the last 30 days), so the heavy-day performance is preserved.
+ */
 function buildLastResultIndex(sessions: WorkoutSession[]): Map<string, PLExerciseLastResult> {
   const sorted = [...sessions].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const idx = new Map<string, PLExerciseLastResult>();
+  const ninetyDaysAgo = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 90);
+    return d.toISOString().slice(0, 10);
+  })();
   for (const s of sorted) {
+    // Only consider sessions within the last 90 days for the "best e1RM" selection.
+    if ((s.date || '') < ninetyDaysAgo) continue;
     for (const ex of s.exercises || []) {
       const key = normName(ex.exerciseName || '');
-      if (!key || idx.has(key)) continue;
+      if (!key) continue;
       const top = topSetOf(ex);
       if (!top) continue;
-      idx.set(key, {
-        exerciseName: ex.exerciseName || '',
-        date: s.date,
-        topWeight: top.weight,
-        topReps: top.reps,
-        actualRir: top.rir,
-        e1rm: epley1RM(top.weight, top.reps),
-        totalVolume: ex.totalVolume || 0,
-        setsDone: (ex.sets || []).length,
-      });
+      const e1rm = epley1RM(top.weight, top.reps);
+      const existing = idx.get(key);
+      // Keep the entry with the highest e1RM (best performance indicator).
+      if (!existing || e1rm > existing.e1rm) {
+        idx.set(key, {
+          exerciseName: ex.exerciseName || '',
+          date: s.date,
+          topWeight: top.weight,
+          topReps: top.reps,
+          actualRir: top.rir,
+          e1rm,
+          totalVolume: ex.totalVolume || 0,
+          setsDone: (ex.sets || []).length,
+        });
+      }
     }
   }
   return idx;
@@ -123,15 +148,29 @@ export function computePLPlanFeedback(
   for (const day of lastWeek.days) {
     for (const ex of day.exercises) {
       const key = normName(ex.name);
-      // fuzzy match: ищем по точному ключу, иначе по includes
+      // fuzzy match: ищем по точному ключу, иначе по токенам + includes
       let last: PLExerciseLastResult | null = idx.get(key) || null;
       if (!last) {
+        // P1-fix: previous logic required BOTH token overlap AND substring includes,
+        // causing false negatives ("жим лёжа" vs "жим штанги лёжа": overlap OK but
+        // "жим штанги лёжа".includes("жим лёжа") is false) and false positives
+        // ("жим" vs "жим гантелей стоя": overlap 1/1 + includes → matched as bench).
+        // New logic: require token overlap >= 2 OR (overlap >= 1 AND both names share
+        // the same core lifting keyword, excluding generic tokens like "жим"/"тяга").
         const candidates = [...idx.entries()].filter(([k]) => {
           if (k.length <= 2 || key.length <= 2) return false;
-          const keyTokens = new Set(key.split(' '));
-          const candidateTokens = new Set(k.split(' '));
-          const tokenOverlap = [...keyTokens].filter(token => candidateTokens.has(token)).length;
-          return tokenOverlap >= Math.min(keyTokens.size, candidateTokens.size) && (k.includes(key) || key.includes(k));
+          const keyTokens = key.split(' ').filter(t => t.length > 2);
+          const candidateTokens = k.split(' ').filter(t => t.length > 2);
+          if (keyTokens.length === 0 || candidateTokens.length === 0) return false;
+          const candidateSet = new Set(candidateTokens);
+          const overlap = keyTokens.filter(token => candidateSet.has(token)).length;
+          const minSize = Math.min(keyTokens.length, candidateTokens.length);
+          // Strong match: 2+ meaningful tokens overlap (e.g., "жим лёжа" ↔ "жим штанги лёжа")
+          if (overlap >= 2 && overlap >= minSize) return true;
+          // Weak match: 1 token overlap + substring, but ONLY for names with 2+ tokens
+          // (avoids "жим" alone matching "жим гантелей стоя")
+          if (overlap >= 1 && keyTokens.length >= 2 && candidateTokens.length >= 2 && (k.includes(key) || key.includes(k))) return true;
+          return false;
         });
         if (candidates.length === 1) last = candidates[0][1];
       }

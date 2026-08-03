@@ -262,10 +262,20 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       pedDoses,
       acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
       autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
-      bodyFat: (linked.profile as Record<string, any> | undefined)?.bodyFatPct,
-      hrvMs: (linked.profile?.settings as Record<string, any> | undefined)?.hrvMs,
-      sleepHours: (linked.readiness as Record<string, any> | undefined)?.sleep ? (linked.readiness as any).sleep / 10 : undefined,
-      stressLevel: (linked.readiness as Record<string, any> | undefined)?.stress ? (linked.readiness as any).stress : undefined,
+      // P0-fix: recovery metrics wired from canonical profile paths (matching BbAutoConstructor).
+      // Previously: bodyFatPct (non-existent root field) → undefined; hrvMs (wrong settings path);
+      // sleepHours (lossy /10 of composite score); stressLevel (0-100 scale, wrong source).
+      // Now: same 5 canonical paths as BbAutoConstructor.tsx:518-522.
+      bodyFat: (linked.profile?.settings as Record<string, any> | undefined)?.personal?.bodyFat,
+      leanMass: (() => {
+        const prof = (linked.profile?.settings as Record<string, any> | undefined);
+        const w = prof?.personal?.weight;
+        const bf = prof?.personal?.bodyFat;
+        return (w && bf != null) ? Math.round(w * (1 - bf / 100)) : undefined;
+      })(),
+      hrvMs: (linked.profile?.settings as Record<string, any> | undefined)?.lifestyle?.morningHRV,
+      sleepHours: (linked.profile?.settings as Record<string, any> | undefined)?.lifestyle?.sleepHours,
+      stressLevel: (linked.profile?.settings as Record<string, any> | undefined)?.lifestyle?.stressLevel,
     });
     setBuiltSrc(plan); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setSrcAdditions({}); setPickerDay(null);
     // TRAINING INTEGRATION: конвертировать PL план в сессии
@@ -300,6 +310,18 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           pedDoses,
           acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
           autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
+          // P0-fix: macrocycle path previously passed ZERO recovery metrics,
+          // disabling the entire recovery multiplier (Helms/Plews/Watson) for year-round plans.
+          bodyFat: (linked.profile?.settings as Record<string, any> | undefined)?.personal?.bodyFat,
+          leanMass: (() => {
+            const prof = (linked.profile?.settings as Record<string, any> | undefined);
+            const w = prof?.personal?.weight;
+            const bf = prof?.personal?.bodyFat;
+            return (w && bf != null) ? Math.round(w * (1 - bf / 100)) : undefined;
+          })(),
+          hrvMs: (linked.profile?.settings as Record<string, any> | undefined)?.lifestyle?.morningHRV,
+          sleepHours: (linked.profile?.settings as Record<string, any> | undefined)?.lifestyle?.sleepHours,
+          stressLevel: (linked.profile?.settings as Record<string, any> | undefined)?.lifestyle?.stressLevel,
         });
         const blockWeeks = Array.from({ length: block.weeks }, (_, index) => {
           const source = output.weeks[index % output.weeks.length];
@@ -1028,7 +1050,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               </div>
             )}
           </div>
-           <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={() => buildSrc()}>Сгенерировать план ({cycleWeeks} нед)</button>
+           <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={() => { try { buildSrc(); } catch (error) { setMethodNote(`Ошибка генерации плана: ${(error as Error).message}`); } }}>Сгенерировать план ({cycleWeeks} нед)</button>
           {builtSrc && (() => {
             const W = builtSrc.weeks;
             const wk = W[Math.min(srcWeek, W.length) - 1] || W[0];

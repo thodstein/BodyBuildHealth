@@ -128,12 +128,19 @@ function findAllFacts(historyWorkouts: WorkoutLog[], exerciseName: string): Fact
   return out;
 }
 
-/** Детекция плато: 3+ последние сессии без роста e1RM (±2.5 кг). */
+/** Детекция плато: 3+ последние сессии без роста e1RM.
+ *  P2-fix: previously used absolute 2.5kg threshold for ALL exercises. For a squat at 180kg,
+ *  2.5kg = 1.4% (essentially no progress). For a lateral raise at 8kg, 2.5kg = 31% (huge progress).
+ *  Now uses percentage-based threshold: 2% of max e1RM (squat 180kg → 3.6kg, lateral raise 8kg → 0.16kg).
+ */
 function detectPlateau(facts: FactEntry[]): boolean {
   if (facts.length < 3) return false;
   const recent = facts.slice(-3);
   const values = recent.map(fact => fact.e1RM);
-  return Math.max(...values) - Math.min(...values) <= 2.5;
+  const maxVal = Math.max(...values);
+  // Percentage-based threshold: 2% of max e1RM, with a minimum of 1kg for very light exercises.
+  const threshold = Math.max(1, maxVal * 0.02);
+  return Math.max(...values) - Math.min(...values) <= threshold;
 }
 
 export function buildDiaryAutoreg(input: DiaryAutoregInput): DiaryAutoregResult {
@@ -157,7 +164,24 @@ export function buildDiaryAutoreg(input: DiaryAutoregInput): DiaryAutoregResult 
       continue;
     }
 
-    const factRPE = fact.lastSet.rpe != null ? fact.lastSet.rpe : rpeFromLoad(fact.e1RM, fact.lastSet.weight, fact.lastSet.reps);
+    const factRPE = fact.lastSet.rpe != null
+      ? fact.lastSet.rpe
+      : (fact.e1RM > 0 && fact.lastSet.weight > 0
+        ? rpeFromLoad(fact.e1RM, fact.lastSet.weight, fact.lastSet.reps)
+        : null);
+    // P1-fix: when e1RM=0 (bodyweight-only or zero-data entry), rpeFromLoad returns 5 (fallback),
+    // which creates delta=-3 and triggers a weight INCREASE. Instead, treat as no-data → fallback.
+    if (factRPE == null) {
+      noData++;
+      perExercise.set(planned.name, {
+        adjustedWeight: planned.plannedWeight,
+        adjustedSets: planned.plannedSets,
+        adjustedRir: planned.plannedRir,
+        note: 'нет валидных данных (e1RM=0 или вес=0)',
+        source: 'fallback',
+      });
+      continue;
+    }
     const targetRPE = 10 - planned.plannedRir;
     const delta = factRPE - targetRPE;
 

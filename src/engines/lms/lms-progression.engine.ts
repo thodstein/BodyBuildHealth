@@ -48,7 +48,24 @@ export function pmForWeek(input: PMProgressionInput, weekNumber: number): number
   if (!Number.isFinite(input.pm0) || input.pm0 <= 0) throw new Error('pmForWeek: pm0 must be > 0');
   const k = resolveWeeklyPercent(input);
   if (weekNumber <= 1) return input.pm0;
-  return input.pm0 * Math.pow(1 + k, weekNumber - 1);
+  return pmCap(input.pm0, k, input.pm0 * Math.pow(1 + k, weekNumber - 1));
+}
+
+/**
+ * Cap PM growth to avoid runaway progression on long `weeksOverride` cycles.
+ * Without a cap, a 52-week `on_course` heavy cycle (k=0.025) would project
+ * PM × 3.56 (e.g., 200kg squat → 712kg). Real-world strength gains plateau
+ * well before that. Caps:
+ *   - on_course (heavy/moderate): ×1.5 (anabolics extend but don't eliminate ceiling)
+ *   - on_course (mild): ×1.35
+ *   - pct (PCТ): ×1.0 (no growth expected; cap is a safety net against rounding)
+ *   - natural: ×1.25 (genetic ceiling, ~5-7% gain per 12-week mesocycle)
+ *   - custom: ×1.5 (conservative; user takes responsibility)
+ */
+function pmCap(pm0: number, k: number, computed: number): number {
+  if (k <= 0) return computed; // descending progression (PCT): no cap needed
+  const capMultiplier = k > 0.02 ? 1.5 : k > 0.01 ? 1.35 : 1.25;
+  return Math.min(computed, pm0 * capMultiplier);
 }
 
 /** Полный ряд PM по всем неделям цикла. */
@@ -58,7 +75,8 @@ export function pmProgression(input: PMProgressionInput): number[] {
   const k = resolveWeeklyPercent(input);
   const out: number[] = [];
   for (let w = 0; w < input.weeks; w++) {
-    out.push(input.pm0 * Math.pow(1 + k, w));
+    const raw = input.pm0 * Math.pow(1 + k, w);
+    out.push(pmCap(input.pm0, k, raw));
   }
   return out;
 }
