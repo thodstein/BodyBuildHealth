@@ -11,8 +11,8 @@ import React from 'react';
 export const ACCENT = '#00e68a';
 export const ACCENT_SOFT = 'rgba(0,230,138,0.14)';
 export const ACCENT_LINE = 'rgba(0,230,138,0.45)';
-export const DIM = 'rgba(255,255,255,0.6)';
-export const DIM_STRONG = 'rgba(255,255,255,0.92)';
+export const DIM = 'var(--text-dim, rgba(255,255,255,0.6))';
+export const DIM_STRONG = 'var(--text-light, rgba(255,255,255,0.92))';
 
 /** Радиусы — единая шкала (крупнее для мобильных тап-зон). */
 export const R = { card: 16, pill: 18, btn: 12, in: 10, chip: 10, bar: 6 } as const;
@@ -28,11 +28,11 @@ export const UI_METRICS = {
 
 /** Общий фрост-гласс фон для карточек. */
 const GLASS: React.CSSProperties = {
-  background: 'rgba(26,28,38,0.55)',
+  background: 'var(--glass-bg, rgba(26,28,38,0.55))',
   backdropFilter: 'blur(18px) saturate(150%)',
   WebkitBackdropFilter: 'blur(18px) saturate(150%)',
-  border: '1px solid rgba(255,255,255,0.09)',
-  boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+  border: '1px solid var(--glass-border, rgba(255,255,255,0.09))',
+  boxShadow: 'var(--glass-shadow, 0 10px 30px rgba(0,0,0,0.35))',
 };
 
 /** Базовая карточка (фон/рамка/радиус/тень — одинаковы везде). */
@@ -55,8 +55,8 @@ export const H: React.CSSProperties = {
 
 /** Основная кнопка (акцентная). */
 export const BTN: React.CSSProperties = {
-  background: `linear-gradient(135deg,${ACCENT},#00c8a0)`,
-  color: '#06281c', border: 'none',
+  background: 'var(--accent-gradient, linear-gradient(135deg,#00e68a,#00c8a0))',
+  color: 'var(--accent-contrast, #06281c)', border: 'none',
   borderRadius: R.btn, padding: '12px 16px', fontWeight: 700,
   fontSize: 13, minHeight: 44, cursor: 'pointer',
   boxShadow: '0 6px 18px rgba(0,230,138,0.25)',
@@ -64,7 +64,7 @@ export const BTN: React.CSSProperties = {
 
 /** Призрачная кнопка (контур акцента). */
 export const BTN_GHOST: React.CSSProperties = {
-  ...BTN, background: 'transparent', color: ACCENT, border: `1px solid ${ACCENT_LINE}`, boxShadow: 'none',
+  ...BTN, background: 'transparent', color: 'var(--accent, #00e68a)', border: '1px solid var(--accent-line, rgba(0,230,138,0.45))', boxShadow: 'none',
 };
 
 /** Шаговая пилюля (активная / неактивная). */
@@ -79,8 +79,8 @@ export const STEP_PILL = (active: boolean): React.CSSProperties => ({
 
 /** Поле ввода. */
 export const IN: React.CSSProperties = {
-  background: 'rgba(118,118,128,0.14)', color: '#fff',
-  border: '1px solid rgba(255,255,255,0.1)', borderRadius: R.in,
+  background: 'var(--input-bg, rgba(118,118,128,0.14))', color: 'var(--text, #fff)',
+  border: '1px solid var(--input-border, rgba(255,255,255,0.1))', borderRadius: R.in,
   padding: '9px 10px', fontSize: 13, outline: 'none',
   boxSizing: 'border-box', minHeight: 40,
 };
