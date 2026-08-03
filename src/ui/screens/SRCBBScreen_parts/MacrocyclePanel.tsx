@@ -589,6 +589,15 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 <div
                   key={i}
                   onClick={() => setSelectedBlockIdx(i)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${phaseLabel}: недели ${b.weekOffset}-${b.weekOffset + b.weeks - 1}`}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setSelectedBlockIdx(i);
+                    }
+                  }}
                   style={{
                     flex: `${pct} 1 0`,
                    background: phaseColor + (isSel ? 'cc' : (isHighContrast ? '70' : '44')),

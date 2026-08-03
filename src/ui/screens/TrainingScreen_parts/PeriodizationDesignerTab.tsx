@@ -270,6 +270,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
                 <div key={pk}
                   draggable
                   onDragStart={() => setDragPhase(pk)}
+                  onDragEnd={() => setDragPhase(null)}
                   style={{
                     padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 600, cursor: 'grab',
                     background: PHASE_COLORS[pk] + '22', border: '1px solid ' + PHASE_COLORS[pk] + '55',
@@ -344,6 +345,15 @@ export const PeriodizationDesignerTab: React.FC = () => {
                   return (
                     <div key={block.id}
                       onClick={() => setEditBlockId(block.id === editBlockId ? null : block.id)}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${PHASE_LABELS_RU[block.phaseKey]}: недели ${block.startWeek}-${block.endWeek}`}
+                      onKeyDown={event => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setEditBlockId(block.id === editBlockId ? null : block.id);
+                        }
+                      }}
                       style={{
                         position: 'absolute', left, top: 4, width, height: 36,
                         borderRadius: 6,
