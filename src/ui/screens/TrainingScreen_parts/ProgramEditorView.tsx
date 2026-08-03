@@ -397,9 +397,9 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="manual-constructor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* V2: Sticky header — always visible during scroll */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(15,17,22,0.92)', backdropFilter: 'blur(12px) saturate(140%)', WebkitBackdropFilter: 'blur(12px) saturate(140%)', borderRadius: 12, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+      <div className="manual-constructor__sticky-header" style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(15,17,22,0.92)', backdropFilter: 'blur(12px) saturate(140%)', WebkitBackdropFilter: 'blur(12px) saturate(140%)', borderRadius: 12, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
         <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38 }} onClick={safeBack}>← К списку</button>
         <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
         {isPro && <RecoveryBadge onApplyAutoDeload={autoFillDraft} />}

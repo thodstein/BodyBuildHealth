@@ -182,11 +182,16 @@ export const PeriodizationDesignerTab: React.FC = () => {
 
   // Viewport for the timeline
   const weeksPerQuarter = 13;
+  const quarterCount = Math.max(1, Math.ceil((current?.totalWeeks || 52) / weeksPerQuarter));
   const quarterStart = viewQuarter * weeksPerQuarter + 1;
   const quarterEnd = Math.min(quarterStart + weeksPerQuarter - 1, current?.totalWeeks || 52);
 
+  useEffect(() => {
+    if (viewQuarter >= quarterCount) setViewQuarter(Math.max(0, quarterCount - 1));
+  }, [quarterCount, viewQuarter]);
+
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: 12, color: '#fff' }}>
+    <div className="manual-constructor periodization-designer" style={{ maxWidth: 800, margin: '0 auto', padding: 12, color: '#fff' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -282,10 +287,16 @@ export const PeriodizationDesignerTab: React.FC = () => {
           <div style={{ ...CARD, padding: 0, overflowX: 'auto' }}>
             <div style={{ minWidth: 380, padding: 12 }}>
               {/* Quarter nav */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <button onClick={() => setViewQuarter(Math.max(0, viewQuarter - 1))} disabled={viewQuarter === 0} style={{ ...btn, opacity: viewQuarter === 0 ? 0.3 : 1 }}>◀</button>
-                <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT }}>Недели {quarterStart}–{quarterEnd}</span>
-                <button onClick={() => setViewQuarter(Math.min(3, viewQuarter + 1))} disabled={quarterEnd >= (current?.totalWeeks || 52)} style={{ ...btn, opacity: quarterEnd >= (current?.totalWeeks || 52) ? 0.3 : 1 }}>▶</button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <button aria-label="Предыдущий квартал" onClick={() => setViewQuarter(Math.max(0, viewQuarter - 1))} disabled={viewQuarter === 0} style={{ ...btn, opacity: viewQuarter === 0 ? 0.3 : 1 }}>◀</button>
+                <select aria-label="Квартал таймлайна" value={viewQuarter} onChange={e => setViewQuarter(Number(e.target.value))} style={{ ...btn, flex: 1, textAlign: 'center', background: 'rgba(24,24,27,0.6)' }}>
+                  {Array.from({ length: Math.max(1, Math.ceil((current?.totalWeeks || 52) / weeksPerQuarter)) }, (_, quarter) => {
+                    const start = quarter * weeksPerQuarter + 1;
+                    const end = Math.min(start + weeksPerQuarter - 1, current?.totalWeeks || 52);
+                    return <option key={quarter} value={quarter}>Недели {start}–{end}</option>;
+                  })}
+                </select>
+                <button aria-label="Следующий квартал" onClick={() => setViewQuarter(Math.min(quarterCount - 1, viewQuarter + 1))} disabled={quarterEnd >= (current?.totalWeeks || 52)} style={{ ...btn, opacity: quarterEnd >= (current?.totalWeeks || 52) ? 0.3 : 1 }}>▶</button>
               </div>
 
               {/* Week column headers */}

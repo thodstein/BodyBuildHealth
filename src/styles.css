@@ -87,6 +87,44 @@
 }
 [data-theme="light"] .pro-panel-section { box-shadow: 0 2px 12px rgba(0,0,0,0.08) !important; }
 
+/* Manual constructor theme surface. Inline component styles inherit these tokens
+   through the scoped root without changing unrelated training screens. */
+.manual-constructor {
+  --constructor-surface: var(--glass-bg);
+  --constructor-border: var(--glass-border);
+  --constructor-text: var(--text);
+  --constructor-muted: var(--text-dim);
+  --constructor-control: var(--input-bg);
+  color: var(--constructor-text);
+}
+.manual-constructor__sticky-header {
+  background: color-mix(in srgb, var(--bg) 88%, transparent) !important;
+  border-color: var(--constructor-border) !important;
+  box-shadow: var(--glass-shadow) !important;
+}
+.manual-constructor input,
+.manual-constructor select,
+.manual-constructor textarea {
+  color: var(--constructor-text);
+  caret-color: var(--accent);
+}
+.manual-constructor button:disabled { cursor: wait; }
+.periodization-designer { color: var(--constructor-text) !important; }
+.periodization-designer > div,
+.periodization-designer [style*="background: rgba(24,24,27"] {
+  background: var(--constructor-surface) !important;
+  border-color: var(--constructor-border) !important;
+}
+[data-theme="light"] .manual-constructor {
+  --constructor-surface: rgba(255,255,255,0.78);
+  --constructor-border: rgba(60,60,67,0.14);
+  --constructor-text: #1d1d1f;
+  --constructor-muted: rgba(60,60,67,0.7);
+  --constructor-control: rgba(60,60,67,0.06);
+}
+[data-theme="light"] .manual-constructor [style*="color: #fff"],
+[data-theme="light"] .manual-constructor [style*="color: '#fff'"] { color: var(--constructor-text) !important; }
+
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 
 /* Focus-ring для accessibility (WCAG AAA — visible focus indicator) */
