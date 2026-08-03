@@ -31,7 +31,32 @@ const PHASE_ICON: Record<MacroPhase, string> = {
 
 const STORAGE_KEY = 'he_pl_macro';
 const BB_STORAGE_KEY = 'he_bb_macro';
+const UI_PREFS_KEY = 'he_macrocycle_ui_prefs';
 const SCHEMA_VERSION = 2;
+
+interface MacrocycleUiPrefs {
+  density: 'comfortable' | 'compact';
+  contrast: 'normal' | 'high';
+  showIcons: boolean;
+}
+
+const DEFAULT_UI_PREFS: MacrocycleUiPrefs = { density: 'comfortable', contrast: 'normal', showIcons: true };
+
+export function normalizeMacrocycleUiPrefs(value: unknown): MacrocycleUiPrefs {
+  const parsed = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  return {
+    density: parsed.density === 'compact' ? 'compact' : DEFAULT_UI_PREFS.density,
+    contrast: parsed.contrast === 'high' ? 'high' : DEFAULT_UI_PREFS.contrast,
+    showIcons: parsed.showIcons !== false,
+  };
+}
+
+function loadUiPrefs(): MacrocycleUiPrefs {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(UI_PREFS_KEY) || 'null');
+    return normalizeMacrocycleUiPrefs(parsed);
+  } catch { return DEFAULT_UI_PREFS; }
+}
 
 /** Миграция storage: v1 → v2 (добавлен kind в массив блоков). */
 function migrateStorage(raw: string | null): string | null {
@@ -106,6 +131,14 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   // Несколько соревнований: восстанавливаем из macro.competitions (если есть) или одиночное compWeek.
   const [competitions, setCompetitions] = useState<CompetitionEvent[]>(macro?.competitions ?? bbMacro?.competitions ?? []);
   const [buildError, setBuildError] = useState<string | null>(null);
+  const [uiPrefs, setUiPrefs] = useState<MacrocycleUiPrefs>(loadUiPrefs);
+  const [showUiPrefs, setShowUiPrefs] = useState(false);
+  const isCompact = uiPrefs.density === 'compact';
+  const isHighContrast = uiPrefs.contrast === 'high';
+  const cardStyle = { ...CARD, padding: isCompact ? 8 : 12 };
+  useEffect(() => {
+    try { localStorage.setItem(UI_PREFS_KEY, JSON.stringify(uiPrefs)); } catch { /* ignore */ }
+  }, [uiPrefs]);
   useEffect(() => {
     if (isBB && bbMacro) {
       setTrainingFocus(bbMacro.trainingFocus);
@@ -255,12 +288,36 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   }, [macro, bbMacro, selectedBlockIdx, isBB]);
 
   return (
-    <div>
+    <div style={{ '--macro-card-border': isHighContrast ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.04)' } as React.CSSProperties}>
       {/* Параметры */}
-      <div style={CARD}>
-        <div style={H}>🗓 Годовое планирование ПЛ</div>
+      <div style={{ ...cardStyle, borderColor: isHighContrast ? 'rgba(255,255,255,0.14)' : CARD.borderColor }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <div style={H}>🗓 Годовое планирование {isBB ? 'ББ' : 'ПЛ'}</div>
+          <button type="button" onClick={() => setShowUiPrefs(value => !value)} style={{ ...BTN_GHOST, minHeight: 30, padding: '5px 8px', fontSize: 10 }} aria-expanded={showUiPrefs}>
+            ⚙ Вид
+          </button>
+        </div>
+        {showUiPrefs && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6, marginBottom: 8, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <label style={LABEL}>Плотность
+              <select style={{ ...SEL, minHeight: 34, marginTop: 2 }} value={uiPrefs.density} onChange={e => setUiPrefs(prev => ({ ...prev, density: e.target.value as MacrocycleUiPrefs['density'] }))}>
+                <option value="comfortable">Комфортная</option>
+                <option value="compact">Компактная</option>
+              </select>
+            </label>
+            <label style={LABEL}>Контраст
+              <select style={{ ...SEL, minHeight: 34, marginTop: 2 }} value={uiPrefs.contrast} onChange={e => setUiPrefs(prev => ({ ...prev, contrast: e.target.value as MacrocycleUiPrefs['contrast'] }))}>
+                <option value="normal">Обычный</option>
+                <option value="high">Высокий</option>
+              </select>
+            </label>
+            <label style={{ ...LABEL, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={uiPrefs.showIcons} onChange={e => setUiPrefs(prev => ({ ...prev, showIcons: e.target.checked }))} /> Иконки фаз
+            </label>
+          </div>
+        )}
         <div style={{ ...SMALL, marginBottom: 8 }}>Последовательность фаз: выносливость → силовой → выход на пик → соревнования → переход. Клик по блоку → применить цикл.</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: isCompact ? 6 : 8 }}>
           <div>
             <div style={LABEL}>Уровень</div>
             <select style={SEL} value={effLevel}
@@ -514,7 +571,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
         <div style={CARD}>
           <div style={H}>📅 Таймлайн ({(isBB ? bbMacro!.totalWeeks : macro!.totalWeeks)} нед)</div>
           {/* Горизонтальная полоса с блоками + маркер текущей недели */}
-          <div style={{ display: 'flex', height: 56, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 8, position: 'relative' }}>
+          <div style={{ display: 'flex', height: isCompact ? 48 : 64, borderRadius: 8, overflow: 'hidden', border: `1px solid ${isHighContrast ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)'}`, marginBottom: 8, position: 'relative' }}>
             {(isBB ? bbMacro!.blocks : macro!.blocks).map((b: MacroBlock | BBMacroBlock, i: number) => {
               const src = isBB ? bbMacro! : macro!;
               const pct = (b.weeks / src.totalWeeks) * 100;
@@ -534,7 +591,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   onClick={() => setSelectedBlockIdx(i)}
                   style={{
                     flex: `${pct} 1 0`,
-                    background: phaseColor + (isSel ? 'cc' : '44'),
+                   background: phaseColor + (isSel ? 'cc' : (isHighContrast ? '70' : '44')),
                     borderRight: '1px solid rgba(0,0,0,0.2)',
                     cursor: 'pointer',
                     display: 'flex',
@@ -546,7 +603,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   }}
                   title={`${phaseLabel}: нед ${b.weekOffset}-${b.weekOffset + b.weeks - 1}${compForThisBlock ? ' · 🏁 ' + compForThisBlock.name : ''}`}
                 >
-                  <span style={{ fontSize: 16 }}>{phaseIcon}</span>
+                   {uiPrefs.showIcons && <span style={{ fontSize: isCompact ? 13 : 16 }}>{phaseIcon}</span>}
                   <span style={{ fontSize: 9, fontWeight: 700, color: isSel ? '#000' : '#fff', textAlign: 'center', lineHeight: 1.1 }}>{phaseLabel}</span>
                   <span style={{ fontSize: 8, color: isSel ? '#000' : 'rgba(255,255,255,0.7)' }}>{b.weeks}н</span>
                   {isComp && <span style={{ position: 'absolute', top: 0, right: 2, fontSize: 10 }} title={compForThisBlock?.name}>🏁{compForThisBlock?.priority}</span>}
@@ -652,7 +709,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           {/* Правка длительности фаз */}
           <div style={{ marginTop: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>⚙️ Правка длительности фаз</div>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isBB ? 4 : 5}, 1fr)`, gap: 6 }}>
+             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(82px, 1fr))', gap: isCompact ? 4 : 6 }}>
               {(isBB ? BB_PHASES : PL_PHASES).map((phase: BBMacroPhase | MacroPhase) => {
                 const src = isBB ? bbMacro! : macro!;
                 const phaseWeeks = src.blocks.filter(b => b.phase === phase).reduce((sum, b) => sum + b.weeks, 0);
