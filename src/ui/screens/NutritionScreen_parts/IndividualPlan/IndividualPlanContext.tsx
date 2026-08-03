@@ -295,7 +295,21 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [metabolicAdaptEnabled, setMetabolicAdaptEnabled] = useState(false);
   const [metabolicAdaptPct, setMetabolicAdaptPct] = useState(10);
   const [dietPauseMode, setDietPauseMode] = useState<'none' | 'refeed' | 'flex_80_20' | 'periodization_2_1' | 'diet_5_2'>('none');
-  const [manualGPerKg, setManualGPerKg] = useState<Record<string, number>>({ protein: 0, fat: 0, carbs: 0 });
+  // FIX: manualGPerKg теперь инициализируется из localStorage и персистится при изменениях.
+  // Раньше всегда сбрасывался на {protein:0,fat:0,carbs:0} при перезагрузке страницы.
+  const [manualGPerKg, setManualGPerKg] = useState<Record<string, number>>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('he_manual_g_per_kg') || 'null');
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        return {
+          protein: typeof v.protein === 'number' && !isNaN(v.protein) ? v.protein : 0,
+          fat: typeof v.fat === 'number' && !isNaN(v.fat) ? v.fat : 0,
+          carbs: typeof v.carbs === 'number' && !isNaN(v.carbs) ? v.carbs : 0,
+        };
+      }
+    } catch {}
+    return { protein: 0, fat: 0, carbs: 0 };
+  });
   const [monthPlanMode, setMonthPlanMode] = useState(() => { try { return localStorage.getItem("he_plan_month_mode") === "true"; } catch { return false; } });
   const [monthPlan, setMonthPlan] = useState<any[]>(() => { try { const v = JSON.parse(localStorage.getItem("he_plan_month") || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } });
   const [selectedWeek, setSelectedWeek] = useState(0);
@@ -350,11 +364,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300, adjustment: 0 }; }
   }, [weight, height, age, sex, goal, s?.workoutsPerWeek, s?.avgWorkoutMinutes, injections, phase, bodyFatPct, weightAdaptMode, weightLogWeek, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, dailySteps, householdActivity, trainType, trainIntensity]);
 
-  const [manualKcal, setManualKcal] = useState<number | null>(null);
-  const [manualP, setManualP] = useState<number | null>(null);
-  const [manualF, setManualF] = useState<number | null>(null);
-  const [manualC, setManualC] = useState<number | null>(null);
-  const [kbjuMode, setKbjuMode] = useState<'auto' | 'manual' | 'profile'>('auto');
+  // FIX: manual KBJU + kbjuMode теперь инициализируются из localStorage и персистятся.
+  // Раньше при перезагрузке страницы все ручные цели КБЖУ сбрасывались на null, а режим — на 'auto'.
+  const [manualKcal, setManualKcal] = useState<number | null>(() => { try { const v = localStorage.getItem('he_manual_kcal'); return v !== null ? Number(v) : null; } catch { return null; } });
+  const [manualP, setManualP] = useState<number | null>(() => { try { const v = localStorage.getItem('he_manual_p'); return v !== null ? Number(v) : null; } catch { return null; } });
+  const [manualF, setManualF] = useState<number | null>(() => { try { const v = localStorage.getItem('he_manual_f'); return v !== null ? Number(v) : null; } catch { return null; } });
+  const [manualC, setManualC] = useState<number | null>(() => { try { const v = localStorage.getItem('he_manual_c'); return v !== null ? Number(v) : null; } catch { return null; } });
+  const [kbjuMode, setKbjuMode] = useState<'auto' | 'manual' | 'profile'>(() => { try { const v = localStorage.getItem('he_kbju_mode'); return v === 'manual' || v === 'profile' ? v : 'auto'; } catch { return 'auto'; } });
 
   const profileTargets = useMemo(() => {
     // P1-fix: replaced legacy calcNutrition (which ignored phase/course/weight-adapt)
@@ -486,6 +502,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { try { localStorage.setItem('he_planner_pharma', JSON.stringify(v2Pharma)); } catch {} }, [v2Pharma]);
   useEffect(() => { try { localStorage.setItem('he_planner_histamine', histamineSensitive ? 'true' : 'false'); } catch {} }, [histamineSensitive]);
   useEffect(() => { try { localStorage.setItem('he_nutrition_supps', JSON.stringify(takenSupplements)); } catch {} }, [takenSupplements]);
+
+  // FIX: персистентность ручных целей КБЖУ и режима
+  useEffect(() => { try { if (manualGPerKg.protein > 0 || manualGPerKg.fat > 0 || manualGPerKg.carbs > 0) localStorage.setItem('he_manual_g_per_kg', JSON.stringify(manualGPerKg)); else localStorage.removeItem('he_manual_g_per_kg'); } catch {} }, [manualGPerKg]);
+  useEffect(() => { try { if (manualKcal !== null) localStorage.setItem('he_manual_kcal', String(manualKcal)); else localStorage.removeItem('he_manual_kcal'); } catch {} }, [manualKcal]);
+  useEffect(() => { try { if (manualP !== null) localStorage.setItem('he_manual_p', String(manualP)); else localStorage.removeItem('he_manual_p'); } catch {} }, [manualP]);
+  useEffect(() => { try { if (manualF !== null) localStorage.setItem('he_manual_f', String(manualF)); else localStorage.removeItem('he_manual_f'); } catch {} }, [manualF]);
+  useEffect(() => { try { if (manualC !== null) localStorage.setItem('he_manual_c', String(manualC)); else localStorage.removeItem('he_manual_c'); } catch {} }, [manualC]);
+  useEffect(() => { try { localStorage.setItem('he_kbju_mode', kbjuMode); } catch {} }, [kbjuMode]);
 
   // B1: Persist generated plan data so it survives tab switching / remounts
   useEffect(() => { try { localStorage.setItem("he_plan_days", String(planDays)); } catch {} }, [planDays]);

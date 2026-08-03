@@ -68,13 +68,14 @@ export function migratePlannerStorage(): void {
     const v = vRaw ? parseInt(vRaw, 10) : 0;
     if (v >= PLANNER_SCHEMA_VERSION) return;
     // Schema changed at v4: defensively drop keys that should be arrays but might be objects.
+    // v5: added he_manual_g_per_kg (object with protein/fat/carbs numbers)
     const objectKeys = [
       'he_saved_nutrition_plans', 'he_excluded_foods', 'he_preferred_foods', 'he_diet_preferences',
       'he_excluded_categories', 'he_food_allergens', 'he_health_issues', 'he_plan_month',
       'he_user_recipes', 'he_nutrition_supps', 'he_intolerances', 'he_preferred_by_meal',
       'he_locked_foods', 'he_weight_log_entries', 'he_shopping_checked', 'he_special_meals',
       'he_planner_labs', 'he_planner_pharma', 'he_planner_histamine',
-      'he_taste_profile', 'he_plan_settings_collapsed',
+      'he_taste_profile', 'he_plan_settings_collapsed', 'he_manual_g_per_kg',
     ];
     // P1-fix: keys that MUST be arrays. If a stored value is an object (not array),
     // it's corrupted and would crash downstream .filter/.map/.length calls.
