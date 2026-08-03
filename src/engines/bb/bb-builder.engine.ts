@@ -36,7 +36,7 @@ import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
-import type { Macrocycle, MacroPhase } from '../lms/macrocycle.engine';
+import type { Macrocycle, MacroPhase, BBMacrocycle, BBMacroPhase } from '../lms/macrocycle.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
 import { finalizeBBPlan } from './bb-finalize.engine';
 import { buildBBVolumeTarget, type BBVolumeTarget } from './bb-volume.engine';
@@ -2687,10 +2687,15 @@ function compensateCrossDayWeakPoints(
  *  - Корректируем deload-флаг: transition/deload → deload=true.
  *  - Возвращаем НОВЫЙ план (immutable). Старый не трогаем.
  */
-export function applyMacrocycleToBBPlan(plan: BBPlan, macro: Macrocycle): BBPlan {
+export function applyMacrocycleToBBPlan(plan: BBPlan, macro: Macrocycle | BBMacrocycle): BBPlan {
   if (!macro?.blocks || macro.blocks.length === 0 || plan.weeks.length === 0) return plan;
 
-  // Найти фазу недели в макроцикле (1-индекс → 0-индекс для массива).
+  const isBbMacro = 'trainingFocus' in macro;
+  if (isBbMacro) {
+    return applyBbMacroToBBPlan(plan, macro as BBMacrocycle);
+  }
+
+  // PL-макроцикл (Macrocycle, 5 фаз)
   const findBlockForWeek = (weekNum: number) => {
     for (const block of macro.blocks) {
       if (weekNum >= block.weekOffset && weekNum < block.weekOffset + block.weeks) return block;
@@ -2730,7 +2735,6 @@ export function applyMacrocycleToBBPlan(plan: BBPlan, macro: Macrocycle): BBPlan
           if (src) {
             return { ...src, rir: Math.max(0, Math.min(5, (src.rir ?? 2) + effectiveRirShift)) };
           }
-          // Не хватает сетов — генерируем по шаблону первого
           const tpl = ex.workSets[0] ?? { reps: 8, rir: 2, weight: 0, restSeconds: 90 };
           return { ...tpl, rir: Math.max(0, Math.min(5, (tpl.rir ?? 2) + effectiveRirShift)) };
         });
@@ -2745,9 +2749,86 @@ export function applyMacrocycleToBBPlan(plan: BBPlan, macro: Macrocycle): BBPlan
     return { ...wk, deload: isDeload || periodicDeload, sessions };
   });
 
-  // rationale: добавить запись о применённых фазах
   const phaseList = macro.blocks.map(b => `${b.phase}×${b.weeks}`).join(' → ');
   const newRationale = [...(plan.rationale ?? []), `Макроцикл применён: ${phaseList} (фазы маппированы, объём × ${getPhaseVolumeMult('accumulation')}/${getPhaseVolumeMult('intensification')}/${getPhaseVolumeMult('peaking')}/${getPhaseVolumeMult('deload')})`];
+
+  return { ...plan, weeks: newWeeks, rationale: newRationale };
+}
+
+/**
+ * BB-макроцикл → BBPlan. Применяет BB-специфичные volume mult и RIR.
+ */
+function applyBbMacroToBBPlan(plan: BBPlan, macro: BBMacrocycle): BBPlan {
+  const BB_VOLUME = {
+    hypertrophy:   { compound: 1.0,  accessory: 1.0 },
+    strength:      { compound: 0.85, accessory: 0.8 },
+    contest_prep:  { compound: 0.5,  accessory: 0.3 },
+    transition:    { compound: 0.5,  accessory: 0.3 },
+  };
+  const BB_RIR = {
+    hypertrophy:  { compound: [2, 3] as [number, number], accessory: [3, 4] as [number, number] },
+    strength:     { compound: [1, 2] as [number, number], accessory: [2, 3] as [number, number] },
+    contest_prep: { compound: [0, 1] as [number, number], accessory: [1, 2] as [number, number] },
+    transition:   { compound: [3, 4] as [number, number], accessory: [4, 5] as [number, number] },
+  };
+
+  const findBlockForWeek = (weekNum: number) => {
+    for (const block of macro.blocks) {
+      if (weekNum >= block.weekOffset && weekNum < block.weekOffset + block.weeks) return block;
+    }
+    return null;
+  };
+
+  const newWeeks = plan.weeks.map((wk, wi) => {
+    const weekNum = wi + 1;
+    const block = findBlockForWeek(weekNum);
+    if (!block) return wk;
+
+    const volC = BB_VOLUME[block.phase].compound;
+    const volA = BB_VOLUME[block.phase].accessory;
+    const [compRirMin] = BB_RIR[block.phase].compound;
+    const [accRirMin] = BB_RIR[block.phase].accessory;
+
+    const isDeload = block.phase === 'transition';
+    const blockWeek = weekNum - block.weekOffset + 1;
+    const periodicDeload = !isDeload
+      && (block.phase === 'hypertrophy' || block.phase === 'strength')
+      && blockWeek % 4 === 0;
+
+    const sessions = wk.sessions.map((ses) => ({
+      ...ses,
+      exercises: ses.exercises.map((ex) => {
+        const isCompound = ex.role === 'primary';
+        const effectiveVol = periodicDeload
+          ? (isCompound ? volC * 0.6 : volA * 0.6)
+          : (isCompound ? volC : volA);
+
+        const targetSets = Math.max(1, Math.round((ex.sets || 0) * effectiveVol));
+        const targetRir = Math.max(0, Math.min(5, isCompound ? compRirMin : accRirMin));
+
+        const workSets = Array.from({ length: targetSets }, (_, i) => {
+          const src = ex.workSets[i];
+          if (src) return { ...src, rir: targetRir };
+          const tpl = ex.workSets[0] ?? { reps: 8, rir: 2, weight: 0, restSeconds: 90 };
+          return { ...tpl, rir: targetRir };
+        });
+
+        if (block.phase === 'contest_prep' && ex.role !== 'primary') return null;
+
+        return {
+          ...ex,
+          sets: targetSets,
+          rir: targetRir,
+          workSets,
+        };
+      }).filter((ex): ex is BBExercise => ex !== null),
+    }));
+
+    return { ...wk, deload: isDeload || periodicDeload, sessions };
+  });
+
+  const phaseList = macro.blocks.map(b => `${b.phase}×${b.weeks}`).join(' → ');
+  const newRationale = [...(plan.rationale ?? []), `BB-макроцикл применён: ${phaseList} (BB-фазы, объём × ${BB_VOLUME.hypertrophy.compound}/${BB_VOLUME.strength.compound}/${BB_VOLUME.contest_prep.compound}/${BB_VOLUME.transition.compound})`];
 
   return { ...plan, weeks: newWeeks, rationale: newRationale };
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { macrocycleToBBProgram, type MacrocycleToBBOptions } from '../macrocycle-to-bb';
-import { buildMacrocycle, type Macrocycle } from '../macrocycle.engine';
+import { buildBbMacrocycle, buildMacrocycle, type Macrocycle } from '../macrocycle.engine';
 
 const baseOpts: MacrocycleToBBOptions = {
   level: 'intermediate',
@@ -130,6 +130,22 @@ describe('macrocycleToBBProgram', () => {
     expect(new Set(blockIds).size).toBe(blockIds.length);
   });
 
+  it('continues load progression when a 16-week base plan is repeated', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 32 });
+    const weeks = macrocycleToBBProgram(macro, baseOpts).bb!.weeks;
+    const firstWeight = weeks[0].sessions.flatMap(session => session.blocks)
+      .flatMap(block => block.sets)
+      .map(set => set.weight)
+      .find((weight): weight is number => typeof weight === 'number' && weight > 0);
+    const repeatedWeight = weeks[16].sessions.flatMap(session => session.blocks)
+      .flatMap(block => block.sets)
+      .map(set => set.weight)
+      .find((weight): weight is number => typeof weight === 'number' && weight > 0);
+    expect(firstWeight).toBeDefined();
+    expect(repeatedWeight).toBeDefined();
+    expect(repeatedWeight!).toBeGreaterThan(firstWeight!);
+  });
+
   it('inserts a mini-deload at the fourth week of long preparation blocks', () => {
     const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 52 });
     const program = macrocycleToBBProgram(macro, baseOpts);
@@ -137,5 +153,13 @@ describe('macrocycleToBBProgram', () => {
     expect(preparation).toBeTruthy();
     const fourth = program.bb!.weeks.find(week => week.week === preparation!.weekOffset + 3);
     expect(fourth?.deload).toBe(true);
+  });
+
+  it('uses trainingFocus stored in a BB macrocycle over fallback options', () => {
+    const macro = buildBbMacrocycle({ level: 'intermediate', totalWeeks: 12, trainingFocus: 'strength' });
+    const program = macrocycleToBBProgram(macro, { ...baseOpts, trainingFocus: 'hypertrophy' });
+    expect(program.bb?.weeks).toHaveLength(12);
+    expect(macro.trainingFocus).toBe('strength');
+    expect(program.meta.trainingFocus).toBe('strength');
   });
 });

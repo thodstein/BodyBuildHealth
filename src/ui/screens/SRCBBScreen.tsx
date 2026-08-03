@@ -44,8 +44,8 @@ import { generateRepTempo, type RepTempoOutput } from '../../engines/rep-tempo-e
 import { MesocycleProgressionCard } from './TrainingScreen_parts/MesocycleProgressionCard';
 import { DeloadProtocolCard } from './TrainingScreen_parts/DeloadProtocolCard';
 import { MacrocyclePanel } from './SRCBBScreen_parts/MacrocyclePanel';
-import { deserializeMacro, type Macrocycle } from '../../engines/lms/macrocycle.engine';
-import { macroPhaseToLmsPhase } from '../../engines/periodization/phase-bridge';
+import { deserializeMacro, deserializeBbMacro, buildBbMacrocycle, type Macrocycle, type BBMacrocycle } from '../../engines/lms/macrocycle.engine';
+import { macroPhaseToLmsPhase, bbMacroPhaseToUserPhase, isDeloadLikeBbMacroPhase } from '../../engines/periodization/phase-bridge';
 import { calcCycleMetrics, type SRExercise } from '../../engines/lms/lms-metrics.engine';
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
 
@@ -543,7 +543,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     try { const sessions = bbPlanToSessions(plan); saveBridgeSessions(sessions); } catch { /* ignore */ }
   };
 
-  const applyBBMacrocycle = (macro: Macrocycle) => {
+  const applyBBMacrocycle = (macro: Macrocycle | BBMacrocycle) => {
     if (!bbBest) throw new Error('Не найден подходящий ББ-сплит');
     const profData = linked.profile?.settings?.personal;
     const lifeData = linked.profile?.settings?.lifestyle;
@@ -560,7 +560,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       weakPoints,
       focusGroup: bbFocus,
       volumeGoal: bbVolGoal as any,
-      trainingFocus: bbTrainingFocus,
+      trainingFocus: 'trainingFocus' in macro ? macro.trainingFocus : bbTrainingFocus,
       bodyFat,
       leanMass,
       hrvMs: lifeData?.morningHRV,
@@ -653,34 +653,46 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
 
   const bbDaysArr: PlayerDay[] = useMemo(() => {
     if (!builtBb || !Array.isArray(builtBb.weeks) || !builtBb.weeks.length) return [];
-    const wk = builtBb.weeks[0];
+     const wk = builtBb.weeks[Math.min(Math.max(bbWeekSel - 1, 0), builtBb.weeks.length - 1)];
     return wk.sessions.map((sess, i) => ({
       label: `Д${i + 1} ${sess.character}`,
       exercises: sess.exercises.map(e => {
-        let w = e.workSets[0].weight;
-        let reps = e.workSets[0].reps;
-        let sets = e.sets;
+        const sourceSets = e.workSets.length > 0
+          ? e.workSets
+          : [{ weight: 0, reps: 0, rir: e.rir }];
+        const exName = e.name || e.exerciseName || e.muscle;
+        const diaryAdj = autoRegMode === 'diary' && diaryAutoreg
+          ? diaryAutoreg.perExercise.get(exName)
+          : undefined;
+        let volumeMult = 1;
+        let weightMult = 1;
         if (autoRegMode === 'auto' && autoRegResult) {
-          w = Math.round(w * autoRegResult.topSetPctMultiplier * 10) / 10;
-          sets = Math.max(1, Math.round(sets * autoRegResult.volumeMultiplier));
-        } else if (autoRegMode === 'diary' && diaryAutoreg) {
-          const adj = diaryAutoreg.perExercise.get(e.name || e.exerciseName || e.muscle);
-          if (adj) { w = adj.adjustedWeight; sets = adj.adjustedSets; }
+          volumeMult = autoRegResult.volumeMultiplier;
+          weightMult = autoRegResult.topSetPctMultiplier;
         }
+        const sets = Math.max(1, Math.round((diaryAdj?.adjustedSets ?? e.sets) * volumeMult));
         const priMult = (priAdjust ? priAdjust.volumeMult : 1) * (deloadAdjust ? deloadAdjust.volumeMult : 1) * (peakAdjust ? peakAdjust.volumeMult : 1);
         const priRir = peakAdjust ? peakAdjust.rirTarget : ((priAdjust ? priAdjust.rirShift : 0) + rirShiftAdjust + (deloadAdjust ? deloadAdjust.rirShift : 0));
-        sets = Math.max(1, Math.round(sets * priMult));
-        const exName = e.name || e.exerciseName || e.muscle;
+        const outputSets = Math.max(1, Math.round(sets * priMult));
         let diaryRir = 0;
-        if (autoRegMode === 'diary' && diaryAutoreg) { const adj = diaryAutoreg.perExercise.get(exName); if (adj) diaryRir = adj.adjustedRir - e.rir; }
+        if (diaryAdj) diaryRir = diaryAdj.adjustedRir - e.rir;
         const rirOut = Math.max(0, peakAdjust ? peakAdjust.rirTarget : (e.rir + priRir + diaryRir));
+        const targetSets = Array.from({ length: outputSets }, (_, index) => {
+          const source = sourceSets[index % sourceSets.length];
+          return {
+            weight: diaryAdj ? diaryAdj.adjustedWeight : Math.round(source.weight * weightMult * 10) / 10,
+            reps: source.reps,
+            rir: rirOut,
+            tempo: tempoAdjust ? tempoAdjust : source.tempo,
+          };
+        });
         return {
           name: exName, muscleGroup: e.muscle,
-          targetSets: Array.from({ length: sets }, () => ({ weight: w, reps, rir: rirOut, tempo: tempoAdjust ? tempoAdjust : undefined })),
+          targetSets,
         };
       }),
     }));
-  }, [builtBb, autoRegOn, autoRegMode, autoRegResult, diaryAutoreg, priAdjust, tempoAdjust, rirShiftAdjust, deloadAdjust, peakAdjust]);
+  }, [builtBb, bbWeekSel, autoRegOn, autoRegMode, autoRegResult, diaryAutoreg, priAdjust, tempoAdjust, rirShiftAdjust, deloadAdjust, peakAdjust]);
 
   const playerDays: PlayerDay[] = mainTab === 'pl' ? srcDays : bbDaysArr;
   const workingWeight = useMemo(() => {
@@ -710,7 +722,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   // вкладка «Тренировки» (runtime) могла запустить его выполнение.
   useEffect(() => {
     if (playerDays.length > 0) {
-      try { localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: runFocus, week: srcWeek, track: mainTab })); } catch { /* ignore */ }
+       try { localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: runFocus, week: mainTab === 'bb' ? bbWeekSel : srcWeek, track: mainTab })); } catch { /* ignore */ }
     }
   }, [playerDays, runFocus, srcWeek, mainTab]);
 
@@ -1862,19 +1874,25 @@ legs: [
 
       {subView === 'macro' && <MacrocyclePanel level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyMacrocycle={(macro) => {
         try {
-          if (mainTab === 'pl') buildSrcMacrocycle(macro);
-          else applyBBMacrocycle(macro);
+          if (mainTab === 'pl') buildSrcMacrocycle(macro as Macrocycle);
+          else applyBBMacrocycle(macro as Macrocycle | BBMacrocycle);
         } catch (error) {
           setMethodNote(`⚠ Макроцикл не применён: ${(error as Error).message}`);
           setSubView('plan');
         }
       }} onApplyCycle={(cycleId, weeks) => {
         if (mainTab === 'bb') {
-          // ББ-авто: legacy-кнопка блока, применяем сохранённый макроцикл целиком.
+          // ББ-авто: legacy-кнопка блока, применяем сохранённый BB-макроцикл целиком.
           try {
-            const raw = localStorage.getItem('he_pl_macro');
-            if (!raw) { setSubView('plan'); return; }
-            const macro = deserializeMacro(raw);
+            const raw = localStorage.getItem('he_bb_macro');
+            if (raw) {
+              const bbMacro = deserializeBbMacro(raw);
+              if (bbMacro) { applyBBMacrocycle(bbMacro); return; }
+            }
+            // Fallback на PL-макроцикл
+            const rawPl = localStorage.getItem('he_pl_macro');
+            if (!rawPl) { setSubView('plan'); return; }
+            const macro = deserializeMacro(rawPl);
             if (!macro) { setSubView('plan'); return; }
             applyBBMacrocycle(macro);
           } catch { /* ignore */ }

@@ -13,6 +13,9 @@
  */
 import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
 import { LMS_CYCLES, normalizeCycleDirection, getCycleById } from '../../data/lms-cycles/lms-cycle-index';
+import type { BBTrainingFocus } from '../bb/bb-goal-types';
+
+// ─── PL-макроцикл (5 фаз: endurance → strength → peak → competition → transition) ───
 
 export type MacroPhase = 'endurance' | 'strength' | 'peak' | 'competition' | 'transition';
 export type CycleKind = 'SRC' | 'BB';
@@ -28,7 +31,43 @@ export interface MacroBlock {
   competitionId?: string;
 }
 
-/** Соревнование в макроцикле. */
+export interface Macrocycle {
+  blocks: MacroBlock[];
+  totalWeeks: number;
+  competitionWeek?: number;  // устаревшее: неделя главного соревнования (обратно-совместимо)
+  competitionDate?: string;  // устаревшее: ISO-дата главного соревнования
+  /** Несколько соревнований (новое поле). competitionWeek - алиас для events[0].week. */
+  competitions?: CompetitionEvent[];
+  rationale: string[];
+}
+
+// ─── BB-макроцикл (4 фазы: hypertrophy → strength → contest_prep → transition) ───
+
+/** BB-специфичные фазы годового планирования (бодибилдинг). */
+export type BBMacroPhase = 'hypertrophy' | 'strength' | 'contest_prep' | 'transition';
+
+/** Блок BB-макроцикла. Всегда BB, без СРЦ-циклов. */
+export interface BBMacroBlock {
+  phase: BBMacroPhase;
+  weeks: number;
+  weekOffset: number;
+  description: string;
+  /** id соревнования, к которому относится блок (contest_prep). */
+  competitionId?: string;
+  /** Training focus для фазы (по умолчанию - hypertrophy для hypertrophy, strength для strength и т.д.). */
+  trainingFocus?: BBTrainingFocus;
+}
+
+/** BB-макроцикл: 4 фазы со своими кол-вами недель, соревнованиями и training focus. */
+export interface BBMacrocycle {
+  blocks: BBMacroBlock[];
+  totalWeeks: number;
+  competitions?: CompetitionEvent[];
+  trainingFocus: BBTrainingFocus;  // общий focus на цикл
+  rationale: string[];
+}
+
+/** Соревнование в макроцикле (общий для PL/BB). */
 export interface CompetitionEvent {
   id: string;                // уникальный id (для связи с блоками)
   name: string;              // название (например, "Первенство области")
@@ -43,14 +82,14 @@ export interface CompetitionEvent {
   cycleIds?: string[];
 }
 
-export interface Macrocycle {
-  blocks: MacroBlock[];
-  totalWeeks: number;
-  competitionWeek?: number;  // устаревшее: неделя главного соревнования (обратно-совместимо)
-  competitionDate?: string;  // устаревшее: ISO-дата главного соревнования
-  /** Несколько соревнований (новое поле). competitionWeek - алиас для events[0].week. */
+/**
+ * Входные параметры для buildBbMacrocycle.
+ */
+export interface BbMacroInput {
+  level: string;
+  totalWeeks?: number;         // по умолчанию 52
   competitions?: CompetitionEvent[];
-  rationale: string[];
+  trainingFocus?: BBTrainingFocus;  // общий focus на весь макроцикл
 }
 
 const PHASE_TO_PERIOD: Record<MacroPhase, string[]> = {
@@ -585,6 +624,8 @@ export function deserializeMacro(s: string): Macrocycle | null {
           if (ev[5] != null && typeof ev[5] !== 'string') throw new Error('invalid competition notes');
           if (ev[6] != null && typeof ev[6] !== 'string') throw new Error('invalid competition cycleId');
           if (ev[7] != null && (!Array.isArray(ev[7]) || ev[7].some((id: unknown) => typeof id !== 'string'))) throw new Error('invalid competition cycleIds');
+          if (ev[6] != null && typeof ev[6] !== 'string') throw new Error('invalid competition cycleId');
+          if (ev[7] != null && (!Array.isArray(ev[7]) || ev[7].some((id: unknown) => typeof id !== 'string'))) throw new Error('invalid competition cycleIds');
           return {
              id: ev[0] ?? `comp_${index + 1}`,
              name: ev[1] ?? '',
@@ -648,4 +689,430 @@ export function deserializeMacro(s: string): Macrocycle | null {
   } catch { return null; }
 }
 
-export { PHASE_COLOR, PHASE_LABEL_RU };
+// ─── BB-макроцикл константы ─────────────────────────────────────────────────
+
+export const BB_PHASES: BBMacroPhase[] = ['hypertrophy', 'strength', 'contest_prep', 'transition'];
+
+const BB_PHASE_ORDER: BBMacroPhase[] = ['hypertrophy', 'strength', 'contest_prep', 'transition'];
+
+const BB_PHASE_COLOR: Record<BBMacroPhase, string> = {
+  hypertrophy: '#22c55e',
+  strength: '#3b82f6',
+  contest_prep: '#f59e0b',
+  transition: '#71717a',
+};
+
+const BB_PHASE_LABEL_RU: Record<BBMacroPhase, string> = {
+  hypertrophy: 'Гипертрофия',
+  strength: 'Силовой',
+  contest_prep: 'Подготовка',
+  transition: 'Переход',
+};
+
+const BB_PHASE_ICON: Record<BBMacroPhase, string> = {
+  hypertrophy: '💪',
+  strength: '🏋️',
+  contest_prep: '🏁',
+  transition: '🧘',
+};
+
+/**
+ * Распределение долей фаз BB-макроцикла (Bompa 2009, Helms 2022).
+ * - hypertrophy: 40% - массонабор, MEV→MAV→MRV прогрессия
+ * - strength: 25% - интенсификация, нейромоторика, lower volume
+ * - contest_prep: 20% - пик формы, taper, définition
+ * - transition: 15% - восстановление, deload
+ */
+const BB_DISTRIBUTION: Record<BBMacroPhase, number> = {
+  hypertrophy: 0.40,
+  strength: 0.25,
+  contest_prep: 0.20,
+  transition: 0.15,
+};
+
+/**
+ * Default training focus per BB macro phase (auto-assigned if not overridden).
+ */
+const BB_PHASE_FOCUS: Record<BBMacroPhase, BBTrainingFocus> = {
+  hypertrophy: 'hypertrophy',
+  strength: 'strength',
+  contest_prep: 'endurance',
+  transition: 'hypertrophy',
+};
+
+/**
+ * Построить BB-макроцикл (4 фазы: hypertrophy → strength → contest_prep → transition).
+ *
+ * В отличие от PL-макроцикла (5 фаз с СРЦ-циклами), BB-макроцикл:
+ *   - использует BB-специфичные фазы (гипертрофия вместо выносливости)
+ *   - не назначает СРЦ-циклы (все блоки kind='BB')
+ *   - для соревнований: contest_prep блок (перед шоу) вместо peak+competition
+ *   - мульти-соревнования: A → полный prep-блок, B → короткий, C → встроено
+ *
+ * @param input - параметры макроцикла (уровень, соревнования, focus, длительность)
+ */
+export function buildBbMacrocycle(input: BbMacroInput): BBMacrocycle {
+  const total = Math.max(12, Math.min(104, input.totalWeeks || 52));
+  const focus = input.trainingFocus ?? 'hypertrophy';
+  const events = input.competitions ?? [];
+  const blocks: BBMacroBlock[] = [];
+  const rationale: string[] = [];
+
+  // Валидация событий
+  const eventIds = new Set<string>();
+  for (const event of events) {
+    if (!event || !event.id || !event.name || !Number.isFinite(event.week) ||
+        !Number.isInteger(event.week) || event.week < 1 || event.week > total ||
+        !['A', 'B', 'C'].includes(event.priority) ||
+        (event.date != null && !isValidCompetitionDate(event.date))) {
+      throw new Error('Некорректное соревнование в BB-макроцикле');
+    }
+    if (eventIds.has(event.id)) {
+      throw new Error(`Дублирующийся ID соревнования: ${event.id}`);
+    }
+    eventIds.add(event.id);
+  }
+
+  const sorted = [...events].sort((a, b) => {
+    if (a.week !== b.week) return a.week - b.week;
+    const pr = { A: 0, B: 1, C: 2 };
+    return pr[a.priority] - pr[b.priority];
+  });
+
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].week === sorted[i - 1].week) {
+      throw new Error(`Соревнования не могут проходить на одной неделе (${sorted[i].week})`);
+    }
+  }
+
+  let cursor = 1;
+
+  if (events.length === 0) {
+    // Режим без соревнований: простое распределение 4 фаз
+    for (const phase of BB_PHASE_ORDER) {
+      const weeks = Math.max(2, Math.round(total * BB_DISTRIBUTION[phase]));
+      pushPhase(phase, weeks);
+    }
+    normalizeToTotal(total);
+    return buildResult();
+  }
+
+  // Режим с соревнованиями
+  // 1. Начало: hypertrophy до первого peak-старта
+  const firstComp = sorted[0];
+  // prepWeeks здесь означает недели до show-week; сама show-week добавляется ниже.
+  const firstPrepWeeks = firstComp.priority === 'A' ? 11 : firstComp.priority === 'B' ? 5 : 0;
+  const prepStart = firstComp.week - firstPrepWeeks;
+  const gapBefore = prepStart - cursor;
+
+  if (gapBefore >= 8) {
+    const hypWeeks = Math.max(2, Math.round(gapBefore * 0.6));
+    const strWeeks = Math.max(2, gapBefore - hypWeeks);
+    pushPhase('hypertrophy', hypWeeks);
+    pushPhase('strength', strWeeks);
+  } else if (gapBefore >= 4) {
+    pushPhase('hypertrophy', gapBefore);
+  } else if (gapBefore > 0) {
+    pushPhase('hypertrophy', gapBefore);
+  }
+
+  // 2. По каждому соревнованию
+  for (let i = 0; i < sorted.length; i++) {
+    const comp = sorted[i];
+    const isLast = i === sorted.length - 1;
+    const isMain = comp.priority === 'A';
+    const isControl = comp.priority === 'B';
+
+    if (comp.priority === 'C') {
+      rationale.push(`🏁 «${comp.name}» (C, нед ${comp.week}): тренировочное, встроено в подготовку.`);
+      continue;
+    }
+
+    // Contest-prep включает show-week, поэтому до неё резервируем 11/5 недель.
+    const prepWeeks = isMain ? 11 : isControl ? 5 : 5;
+    if (cursor > comp.week) {
+      throw new Error(`Недостаточно места до соревнования «${comp.name}» (неделя ${comp.week})`);
+    }
+    // prepWeeks includes the competition week itself. Keep the block bounded by
+    // its requested window even when an earlier block ends immediately before it.
+    const start = comp.week - prepWeeks + 1;
+    const effStart = Math.max(cursor, start);
+    // Включаем неделю соревнования в contest-prep: отдельной BB-фазы
+    // competition нет, поэтому show-week должна оставаться в этом блоке.
+    const effWeeks = Math.min(prepWeeks, Math.max(1, comp.week - effStart + 1));
+
+    // Gap перед prep: strength (если достаточно места)
+    if (effStart > cursor) {
+      const gap = effStart - cursor;
+      if (gap >= 4) {
+        pushPhase('strength', gap);
+      } else {
+        pushPhase('hypertrophy', gap);
+      }
+    }
+
+    // Contest prep блок
+    if (effWeeks > 0) {
+      const focusForPrep: BBTrainingFocus = isMain ? 'endurance' : 'hypertrophy';
+      pushPhase('contest_prep', effWeeks, comp.id, focusForPrep);
+    }
+    rationale.push(`🏁 «${comp.name}» (${comp.priority}, нед ${comp.week}): prep ${effWeeks} нед.`);
+
+    // Main competition gets transition после
+    if (isMain && !isLast) {
+      const next = sorted[i + 1];
+      const gapAfter = next.week - (comp.week + 1);
+      if (gapAfter >= 4) {
+        pushPhase('transition', Math.min(4, Math.round(gapAfter * 0.5)));
+      }
+    }
+  }
+
+  // 3. Хвост: transition → finish
+  if (cursor <= total) {
+    const tail = total - cursor + 1;
+    if (tail >= 6) {
+      pushPhase('transition', Math.max(2, Math.round(tail * 0.4)));
+      pushPhase('hypertrophy', tail - Math.round(tail * 0.4));
+    } else {
+      pushPhase('transition', tail);
+    }
+  }
+
+  // Trim overflow
+  normalizeToTotal(total);
+
+  return buildResult();
+
+  // ─── Внутренние функции ─────────────────────────────────────
+
+  function pushPhase(phase: BBMacroPhase, weeks: number, competitionId?: string, tFocus?: BBTrainingFocus): void {
+    if (weeks <= 0) return;
+    const desc = competitionId
+      ? `Подготовка к «${sorted.find(c => c.id === competitionId)?.name ?? competitionId}»`
+      : `BB-мезоцикл (${BB_PHASE_LABEL_RU[phase]})`;
+    blocks.push({
+      phase,
+      weeks,
+      weekOffset: cursor,
+      description: desc,
+      competitionId,
+      trainingFocus: tFocus ?? BB_PHASE_FOCUS[phase],
+    });
+    rationale.push(`${BB_PHASE_LABEL_RU[phase]}: ${weeks} нед (с ${cursor})${competitionId ? ' [🏁 ' + competitionId + ']' : ''}`);
+    cursor += weeks;
+  }
+
+  function normalizeToTotal(target: number): void {
+    while (blocks.length > 0 && blocks[blocks.length - 1].weekOffset + blocks[blocks.length - 1].weeks - 1 > target) {
+      const last = blocks[blocks.length - 1];
+      const overflow = last.weekOffset + last.weeks - 1 - target;
+      if (last.weeks > overflow) {
+        last.weeks -= overflow;
+      } else {
+        blocks.pop();
+      }
+    }
+    // Adjust offsets
+    let off = 1;
+    for (const b of blocks) {
+      b.weekOffset = off;
+      off += b.weeks;
+    }
+  }
+
+  function buildResult(): BBMacrocycle {
+    return {
+      blocks,
+      totalWeeks: total,
+      competitions: sorted,
+      trainingFocus: focus,
+      rationale,
+    };
+  }
+}
+
+/**
+ * Найти активный блок BB-макроцикла на неделе N (1-индекс).
+ */
+export function bbMacroToActiveBlock(macro: BBMacrocycle, weekNumber: number): BBMacroBlock | null {
+  if (macro.blocks.length === 0) return null;
+  for (const block of macro.blocks) {
+    if (weekNumber >= block.weekOffset && weekNumber < block.weekOffset + block.weeks) {
+      return block;
+    }
+  }
+  return macro.blocks[macro.blocks.length - 1] ?? null;
+}
+
+/**
+ * Определить training focus для заданной недели BB-макроцикла.
+ */
+export function bbTrainingFocusForWeek(macro: BBMacrocycle, weekNumber: number): BBTrainingFocus {
+  const block = bbMacroToActiveBlock(macro, weekNumber);
+  return block?.trainingFocus ?? macro.trainingFocus;
+}
+
+/** Перебалансировать длительность BB-фаз, не меняя порядок блоков. */
+export function rebalanceBbMacrocycle(
+  macro: BBMacrocycle,
+  edits: Partial<Record<BBMacroPhase, number>>,
+): BBMacrocycle {
+  const targetByPhase = new Map<BBMacroPhase, number>();
+  for (const phase of BB_PHASES) {
+    const current = macro.blocks
+      .filter(block => block.phase === phase)
+      .reduce((sum, block) => sum + block.weeks, 0);
+    if (current > 0 || edits[phase] != null) {
+      targetByPhase.set(phase, Math.max(1, Math.round(edits[phase] ?? current)));
+    }
+  }
+
+  const allocatedByPhase = new Map<BBMacroPhase, number>();
+  const blocks = macro.blocks.map((block, index) => {
+    const target = targetByPhase.get(block.phase) ?? block.weeks;
+    const siblings = macro.blocks.filter(candidate => candidate.phase === block.phase);
+    const siblingIndex = siblings.indexOf(block);
+    const original = siblings.reduce((sum, candidate) => sum + candidate.weeks, 0);
+    const allocated = allocatedByPhase.get(block.phase) ?? 0;
+    const weeks = siblingIndex === siblings.length - 1
+      ? Math.max(1, target - allocated)
+      : Math.max(1, Math.floor(target * block.weeks / Math.max(1, original)));
+    allocatedByPhase.set(block.phase, allocated + weeks);
+    return { ...block, weeks };
+  });
+
+  let difference = macro.totalWeeks - blocks.reduce((sum, block) => sum + block.weeks, 0);
+  for (let i = blocks.length - 1; i >= 0 && difference < 0; i--) {
+    const reduction = Math.min(blocks[i].weeks - 1, -difference);
+    blocks[i].weeks -= reduction;
+    difference += reduction;
+  }
+  if (difference > 0 && blocks.length > 0) blocks[blocks.length - 1].weeks += difference;
+
+  let offset = 1;
+  const rebasedBlocks = blocks.map(block => {
+    const rebased = { ...block, weekOffset: offset };
+    offset += rebased.weeks;
+    return rebased;
+  });
+  const competitions = macro.competitions?.map(competition => {
+    const block = rebasedBlocks.find(candidate => candidate.competitionId === competition.id);
+    return block ? { ...competition, week: block.weekOffset + block.weeks - 1 } : competition;
+  });
+
+  return {
+    ...macro,
+    blocks: rebasedBlocks,
+    competitions,
+    rationale: rebasedBlocks.map(block => `${block.phase}: ${block.weeks} нед (с ${block.weekOffset})`),
+  };
+}
+
+/**
+ * Сериализация BB-макроцикла для localStorage.
+ * Формат: v7 (null для блоков BB+PL, т.к. у BB отсутствуют cycleId/kind).
+ */
+export function serializeBbMacro(macro: BBMacrocycle): string {
+  return JSON.stringify({
+    v: 7,
+    t: macro.totalWeeks,
+    b: macro.blocks.map(b => [b.phase, b.weeks, b.weekOffset, b.description, b.competitionId ?? null, b.trainingFocus ?? null]),
+    e: macro.competitions ? macro.competitions.map(c => [
+      c.id, c.name, c.week, c.date ?? null, c.priority, c.notes ?? null,
+      c.cycleId ?? null, c.cycleIds ?? null,
+    ]) : null,
+    f: macro.trainingFocus,
+    r: macro.rationale,
+  });
+}
+
+/**
+ * Десериализация BB-макроцикла из localStorage.
+ */
+export function deserializeBbMacro(s: string): BBMacrocycle | null {
+  try {
+    const o = JSON.parse(s);
+    if (!o || !Array.isArray(o.b) || o.v !== 7) return null;
+    const validPhases: BBMacroPhase[] = ['hypertrophy', 'strength', 'contest_prep', 'transition'];
+    const blocks: BBMacroBlock[] = o.b.map((b: unknown) => {
+      if (!Array.isArray(b) || !validPhases.includes(b[0]) || !Number.isInteger(b[1]) || b[1] <= 0 || !Number.isInteger(b[2]) || b[2] < 1) {
+        throw new Error('invalid bb macro block');
+      }
+      if (b[3] != null && typeof b[3] !== 'string') throw new Error('invalid bb macro description');
+      if (b[4] != null && typeof b[4] !== 'string') throw new Error('invalid bb macro competitionId');
+      const trainingFocus = b[5];
+      if (trainingFocus != null && !['hypertrophy', 'strength', 'endurance'].includes(trainingFocus)) {
+        throw new Error('invalid bb training focus');
+      }
+      return {
+        phase: b[0] as BBMacroPhase,
+        weeks: b[1],
+        weekOffset: b[2],
+        description: (b[3] as string) ?? '',
+        competitionId: (b[4] as string) ?? undefined,
+        trainingFocus: (trainingFocus as BBTrainingFocus) ?? undefined,
+      };
+    });
+    if (!Number.isFinite(o.t) || o.t < 1 || o.t > 104 || blocks.length === 0) return null;
+    let expectedOffset = 1;
+    for (const block of blocks) {
+      if (block.weekOffset !== expectedOffset) return null;
+      expectedOffset += block.weeks;
+    }
+    if (expectedOffset - 1 !== o.t) return null;
+
+    let competitions: CompetitionEvent[] | undefined;
+    if (Array.isArray(o.e)) {
+      competitions = o.e.map((ev: unknown, index: number) => {
+        if (Array.isArray(ev)) {
+          const priority = ev[4] ?? 'B';
+          if (!['A', 'B', 'C'].includes(priority) || !Number.isInteger(ev[2]) || ev[2] < 1 || ev[2] > o.t) throw new Error('invalid competition');
+          if (ev[0] != null && typeof ev[0] !== 'string') throw new Error('invalid competition id');
+          if (ev[1] != null && typeof ev[1] !== 'string') throw new Error('invalid competition name');
+          if (ev[3] != null && !isValidCompetitionDate(ev[3])) throw new Error('invalid competition date');
+          if (ev[5] != null && typeof ev[5] !== 'string') throw new Error('invalid competition notes');
+          return {
+            id: (ev[0] as string) ?? `comp_${index + 1}`,
+            name: (ev[1] as string) ?? '',
+            week: ev[2] as number,
+            date: (ev[3] as string) ?? undefined,
+            priority: priority as CompetitionEvent['priority'],
+            notes: (ev[5] as string) ?? undefined,
+            cycleId: (ev[6] as string) ?? undefined,
+            cycleIds: Array.isArray(ev[7]) ? ev[7] : undefined,
+          };
+        }
+        return null;
+      }).filter(Boolean) as CompetitionEvent[];
+      const competitionIds = new Set<string>();
+      const competitionWeeks = new Set<number>();
+      for (const competition of competitions) {
+        if (competitionIds.has(competition.id)) throw new Error('duplicate competition id');
+        if (competitionWeeks.has(competition.week)) throw new Error('duplicate competition week');
+        competitionIds.add(competition.id);
+        competitionWeeks.add(competition.week);
+      }
+      for (const block of blocks) {
+        if (block.competitionId && !competitionIds.has(block.competitionId)) {
+          throw new Error('orphan bb competition block');
+        }
+      }
+    } else if (blocks.some(block => Boolean(block.competitionId))) {
+      throw new Error('bb competition blocks require competition list');
+    }
+
+    const tFocus = o.f;
+    if (tFocus && !['hypertrophy', 'strength', 'endurance'].includes(tFocus)) return null;
+
+    return {
+      blocks,
+      totalWeeks: o.t,
+      competitions,
+      trainingFocus: (tFocus as BBTrainingFocus) ?? 'hypertrophy',
+      rationale: Array.isArray(o.r) ? o.r : [],
+    };
+  } catch { return null; }
+}
+
+export { PHASE_COLOR, PHASE_LABEL_RU, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, BB_PHASE_ICON };

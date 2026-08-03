@@ -8,13 +8,15 @@
  *     добавлены technique/conditioning/power/gpp/transition и разделён accumulation на hypertrophy/strength.
  *  3. `MacroPhase` (lms/macrocycle.engine.ts) - 5 значений годового макроцикла ПЛ-авто:
  *     endurance/strength/peak/competition/transition.
+ *  4. `BBMacroPhase` (lms/macrocycle.engine.ts) - 4 значения годового BB-макроцикла:
+ *     hypertrophy/strength/contest_prep/transition.
  *
  * Этот модуль - единственное место преобразования. Существующие типы НЕ меняем,
  * `UserWeek.phase` остаётся каноническим (4 значения).
  */
 import type { Phase } from '../user-program/user-program.types';
 import type { PhaseKey } from '../periodization-designer.engine';
-import type { MacroPhase } from '../lms/macrocycle.engine';
+import type { MacroPhase, BBMacroPhase } from '../lms/macrocycle.engine';
 import type { MesocyclePhase } from '../rir-matrix.engine';
 
 /** Маппинг PhaseKey дизайнера (10) → Phase (4). 6 ключей коллапсируют. */
@@ -109,5 +111,41 @@ export function isDeloadLikePhaseKey(pk: PhaseKey): boolean {
 
 /** Является ли MacroPhase делод-подобной фазой (transition). */
 export function isDeloadLikeMacroPhase(mp: MacroPhase): boolean {
+  return mp === 'transition';
+}
+
+// ─── BB-макроцикл маппинги ─────────────────────────────────────────────────
+
+/** Маппинг BBMacroPhase (4) → Phase (4). */
+export const BB_MACRO_TO_PHASE: Record<BBMacroPhase, Phase> = {
+  hypertrophy: 'accumulation',     // гипертрофия → накопление (объём)
+  strength: 'intensification',     // силовой → интенсификация
+  contest_prep: 'peaking',         // подготовка к шоу → пик
+  transition: 'deload',            // переход → разгрузка
+};
+
+/** Маппинг BBMacroPhase → MesocyclePhase LMS. */
+export const BB_MACRO_TO_LMS_PHASE: Record<BBMacroPhase, MesocyclePhase> = {
+  hypertrophy: 'base',
+  strength: 'build',
+  contest_prep: 'peak',
+  transition: 'deload',
+};
+
+/** Обратный маппинг Phase (4) → BB-фаза (основная/дефолтная). */
+export const PHASE_TO_BB_MACRO: Record<Phase, BBMacroPhase> = {
+  accumulation: 'hypertrophy',
+  intensification: 'strength',
+  deload: 'transition',
+  peaking: 'contest_prep',
+};
+
+/** Преобразовать BBMacroPhase → каноническую Phase. Fallback: 'accumulation'. */
+export function bbMacroPhaseToUserPhase(mp: BBMacroPhase): Phase {
+  return BB_MACRO_TO_PHASE[mp] ?? 'accumulation';
+}
+
+/** Является ли BBMacroPhase делод-подобной (transition). */
+export function isDeloadLikeBbMacroPhase(mp: BBMacroPhase): boolean {
   return mp === 'transition';
 }

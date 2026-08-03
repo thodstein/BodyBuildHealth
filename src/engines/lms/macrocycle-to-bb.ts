@@ -14,10 +14,10 @@
  * сплитами. Один непрерывный план + переразметка фаз + phase-specific volume - корректнее.
  */
 import type { Macrocycle, MacroBlock, MacroPhase } from './macrocycle.engine';
-import { macrocycleToActiveCycle } from './macrocycle.engine';
+import { macrocycleToActiveCycle, bbMacroToActiveBlock, BBMacroPhase, BBMacrocycle } from './macrocycle.engine';
 import { newId } from '../user-program/user-program.types';
 import type { UserProgram, UserWeek, UserSet, Phase } from '../user-program/user-program.types';
-import { macroPhaseToUserPhase, isDeloadLikeMacroPhase } from '../periodization/phase-bridge';
+import { macroPhaseToUserPhase, isDeloadLikeMacroPhase, bbMacroPhaseToUserPhase, isDeloadLikeBbMacroPhase } from '../periodization/phase-bridge';
 import { autodraftBBPlan } from '../manual-constructor/manual-draft.engine';
 import { createFromBuild } from '../user-program/program-store';
 import type { BBTrainingFocus } from '../bb/bb-goal-types';
@@ -42,40 +42,83 @@ export interface MacrocycleToBBOptions {
   favoriteExercises?: string[];
 }
 
+// ─── BB-макроцикл: volume multipliers и RIR ─────────────────────────────────
+
 /**
  * Phase-specific volume multipliers for BB year plan (Helms 2022, Bompa 2009).
- * When a 16-week BB plan is cycled to fill a longer macrocycle, each macro phase
- * gets different volume/RIR to provide real periodization across the year.
+ * compound = compound exercises, accessory = assistance/finisher.
  */
-const PHASE_VOLUME_MULT: Record<MacroPhase, { compound: number; accessory: number }> = {
-  endurance:   { compound: 1.0,  accessory: 1.0 },
-  strength:    { compound: 0.85, accessory: 0.8 },
-  peak:        { compound: 0.5,  accessory: 0.3 },
-  competition: { compound: 0.3,  accessory: 0.0 },
-  transition:  { compound: 0.5,  accessory: 0.4 },
+const BB_PHASE_VOLUME_MULT: Record<BBMacroPhase, { compound: number; accessory: number }> = {
+  hypertrophy:   { compound: 1.0,  accessory: 1.0 },
+  strength:      { compound: 0.85, accessory: 0.8 },
+  contest_prep:  { compound: 0.5,  accessory: 0.3 },
+  transition:    { compound: 0.5,  accessory: 0.3 },  // transition normal=0.5, deload=0.5*0.75=0.375
 };
 
-/** Volume multiplier for a specific block type within a macro phase. */
-function volumeMultiplierFor(phase: MacroPhase, isCompound: boolean): number {
-  const m = PHASE_VOLUME_MULT[phase];
+/**
+ * Target RIR ranges per macro phase.
+ * compound = compounds (squat, bench, deadlift, OHP), accessory = others.
+ * Format: [minRIR, maxRIR] - sets get adjusted to fall within this range.
+ */
+const BB_PHASE_RIR: Record<BBMacroPhase, { compound: [number, number]; accessory: [number, number] }> = {
+  hypertrophy:  { compound: [2, 3], accessory: [3, 4] },
+  strength:     { compound: [1, 2], accessory: [2, 3] },
+  contest_prep: { compound: [0, 1], accessory: [1, 2] },
+  transition:   { compound: [3, 4], accessory: [4, 5] },
+};
+
+/** Volume multiplier for a specific phase and block type. */
+function bbVolumeMultiplierFor(phase: BBMacroPhase, isCompound: boolean): number {
+  const m = BB_PHASE_VOLUME_MULT[phase];
   return isCompound ? m.compound : m.accessory;
 }
 
 /**
- * Конвертировать макроцикл ПЛ-авто → UserProgram (ББ).
+ * Target RIR range for a given phase and block type.
+ */
+function bbTargetRirRange(phase: BBMacroPhase, isCompound: boolean): [number, number] {
+  const r = BB_PHASE_RIR[phase];
+  return isCompound ? r.compound : r.accessory;
+}
+
+/**
+ * Сопоставить фазу MacroPhase → BBMacroPhase (для PL-макроциклов).
+ * Используется при конвертации PL-макроцикла → BB-план.
+ */
+const MACRO_PHASE_TO_BB: Record<MacroPhase, BBMacroPhase> = {
+  endurance: 'hypertrophy',
+  strength: 'strength',
+  peak: 'contest_prep',
+  competition: 'contest_prep',
+  transition: 'transition',
+};
+
+/**
+ * Конвертировать MacroPhase → BBMacroPhase.
+ * Позволяет использовать единый BB_PHASE_VOLUME_MULT для обоих путей.
+ */
+function macroPhaseToBbPhase(mp: MacroPhase): BBMacroPhase {
+  return MACRO_PHASE_TO_BB[mp];
+}
+
+/**
+ * Конвертировать макроцикл → UserProgram (ББ).
+ * Поддерживает и Macrocycle (PL, 5 фаз), и BBMacrocycle (BB, 4 фазы).
  * Возвращает UserProgram с direction='bb' и заполненными weeks (упражнения/фазы).
- * При ошибке сборки (autodraftBBPlan бросает) - fallback на createBlank-подобный
- * скелет с переразмеченными фазами и пустыми sessions.
  */
 export function macrocycleToBBProgram(
-  macro: Macrocycle,
+  macro: Macrocycle | BBMacrocycle,
   opts: MacrocycleToBBOptions,
 ): UserProgram {
   const total = Math.max(1, macro.totalWeeks || 1);
+  const isBbMacro = 'trainingFocus' in macro;
+  const effectiveOpts = isBbMacro
+    ? { ...opts, trainingFocus: (macro as BBMacrocycle).trainingFocus }
+    : opts;
   // 1. Попытаться собрать ББ-план с упражнениями.
   let baseProgram: UserProgram | null = null;
   try {
-    baseProgram = buildBaseBBProgram(total, opts);
+    baseProgram = buildBaseBBProgram(total, effectiveOpts);
   } catch {
     baseProgram = null;
   }
@@ -84,17 +127,24 @@ export function macrocycleToBBProgram(
   let weeks: UserWeek[];
   let meta: UserProgram['meta'];
   if (baseProgram && baseProgram.bb && baseProgram.bb.weeks.length > 0) {
-    weeks = remapWeeksFromMacrocycle(baseProgram.bb.weeks, macro);
+    weeks = isBbMacro
+      ? remapWeeksFromBbMacrocycle(baseProgram.bb.weeks, macro as BBMacrocycle)
+      : remapWeeksFromMacrocycle(baseProgram.bb.weeks, macro as Macrocycle);
     meta = baseProgram.meta;
   } else {
     // Fallback: скелет с пустыми sessions + переразмеченные фазы.
-    weeks = skeletonWeeksFromMacrocycle(macro, opts.daysPerWeek);
+    weeks = skeletonWeeksFromBbMacrocycle(macro as any, opts.daysPerWeek);
     meta = makeMeta(opts, total);
   }
 
   // 3. Заголовок
   const title = opts.title ?? `Годовой план ББ (${total} нед)`;
-  meta = { ...meta, title, weeks: total };
+  meta = {
+    ...meta,
+    title,
+    weeks: total,
+    ...(effectiveOpts.trainingFocus ? { trainingFocus: effectiveOpts.trainingFocus } : {}),
+  };
 
   return {
     meta,
@@ -149,7 +199,11 @@ function buildBaseBBProgram(total: number, opts: MacrocycleToBBOptions): UserPro
     const fullWeeks: UserWeek[] = [];
     for (let w = 1; w <= total; w++) {
       const src = srcWeeks[(w - 1) % srcWeeks.length];
-      fullWeeks.push(cloneWeekWithFreshIds(src, w));
+      // The BB builder is capped at 16 weeks. Continue the underlying
+      // progression between repeated blocks instead of copying identical loads.
+      const blockIndex = Math.floor((w - 1) / srcWeeks.length);
+      const progressionFactor = Math.pow(1.005, blockIndex * srcWeeks.length);
+      fullWeeks.push(cloneWeekWithFreshIds(src, w, progressionFactor));
     }
     userProg.bb.weeks = fullWeeks;
   }
@@ -157,70 +211,108 @@ function buildBaseBBProgram(total: number, opts: MacrocycleToBBOptions): UserPro
 }
 
 /**
- * Переразметить phase/deload недель UserProgram из макроцикла.
+ * Переразметить phase/deload недель UserProgram из BB-макроцикла.
  * Сохраняет все упражнения/блоки/сеты. Применяет phase-specific volume/RIR
- * для каждой фазы макроцикла (Helms 2022, Bompa 2009, NSCA 2021).
+ * для каждой фазы BB-макроцикла (Helms 2022, Bompa 2009, NSCA 2021).
+ */
+function remapWeeksFromBbMacrocycle(weeks: UserWeek[], macro: BBMacrocycle): UserWeek[] {
+  return weeks.map(w => {
+    const active = bbMacroToActiveBlock(macro, w.week);
+    if (!active) return w;
+    const phase = bbMacroPhaseToUserPhase(active.phase);
+    const deload = isDeloadLikeBbMacroPhase(active.phase);
+    const periodicDeload = !deload
+      && (active.phase === 'hypertrophy' || active.phase === 'strength')
+      && ((w.week - active.weekOffset + 1) % 4 === 0);
+    const adjustedSessions = w.sessions
+      .map(s => adjustBbSessionForPhase(s, active.phase, phase, deload || periodicDeload))
+      .filter((s): s is UserWeek['sessions'][number] => s !== null);
+    return { ...w, phase, deload: deload || periodicDeload, sessions: adjustedSessions };
+  });
+}
+
+/**
+ * Переразметить phase/deload недель UserProgram из PL-макроцикла (Macrocycle).
+ * Использует MACRO_PHASE_TO_BB для маппинга фаз в BB-фазы.
  */
 function remapWeeksFromMacrocycle(weeks: UserWeek[], macro: Macrocycle): UserWeek[] {
   return weeks.map(w => {
     const active = macrocycleToActiveCycle(macro, w.week);
     const block: MacroBlock | undefined = active?.block;
     if (!block) return w;
-    const phase = macroPhaseToUserPhase(block.phase);
+    const bbPhase = macroPhaseToBbPhase(block.phase);
+    const phase = bbMacroPhaseToUserPhase(bbPhase);
     const deload = isDeloadLikeMacroPhase(block.phase);
     const periodicDeload = !deload
       && (block.phase === 'endurance' || block.phase === 'strength')
       && ((w.week - block.weekOffset + 1) % 4 === 0);
-    // Phase-specific volume and RIR adjustments for ALL macro phases
     const adjustedSessions = w.sessions
-      .map(s => adjustSessionForPhase(s, block.phase, phase, deload || periodicDeload))
+      .map(s => adjustBbSessionForPhase(s, bbPhase, phase, deload || periodicDeload, block.phase))
       .filter((s): s is UserWeek['sessions'][number] => s !== null);
     return { ...w, phase, deload: deload || periodicDeload, sessions: adjustedSessions };
   });
 }
 
 /** Clone a generated week without sharing editor identities across weeks. */
-function cloneWeekWithFreshIds(source: UserWeek, week: number): UserWeek {
+function cloneWeekWithFreshIds(source: UserWeek, week: number, weightFactor = 1): UserWeek {
   return {
     ...source,
     week,
     sessions: source.sessions.map(session => ({
       ...session,
       id: newId('ses'),
-      blocks: session.blocks.map(block => ({ ...block, id: newId('blk') })),
+      blocks: session.blocks.map(block => ({
+        ...block,
+        id: newId('blk'),
+        sets: block.sets.map(set => ({
+          ...set,
+          weight: typeof set.weight === 'number'
+            ? Math.round(set.weight * weightFactor * 10) / 10
+            : set.weight,
+        })),
+      })),
     })),
   };
 }
 
 /**
- * Скорректировать объём и RIR сетов для фазы макроцикла.
+ * Скорректировать объём и RIR сетов для BB-фазы макроцикла.
+ * Использует единую логику для BB и PL макроциклов через BBMacroPhase.
  *
- * Каждая фаза имеет свои множители объёма и целевые RIR:
- * - endurance: объём ×1.0, RIR baseline (Schoenfeld 2016)
+ * Каждая фаза BB-макроцикла:
+ * - hypertrophy: объём ×1.0, RIR 2-3 (Schoenfeld 2016)
  * - strength: объём ×0.85, RIR 1-2 (Helms 2022)
- * - peak: compounds ×0.5 RIR 0-1, accessory ×0.3 RIR 2-3 (Bompa 2009)
- * - competition: compounds ×0.3 RIR 0, accessory ×0.0 (только сорев. движения)
- * - transition/deload: compounds ×0.5 RIR +3, accessory ×0.4 (восстановление)
+ * - contest_prep: compounds ×0.5 RIR 0-1, accessory ×0.3 RIR 1-2 (Bompa 2009)
+ * - transition/deload: compounds ×0.4 RIR 3-4, accessory ×0.3 RIR 4-5 (NSCA 2021)
+ *
+ * @param origMacroPhase - оригинальная MacroPhase для различения peak vs competition.
+ *   peak (contest_prep в BB) сохраняет accessory с пониженным объёмом.
+ *   competition (contest_prep в BB) удаляет accessory (только сорев. движения).
  */
-function adjustSessionForPhase(
+function adjustBbSessionForPhase(
   session: UserWeek['sessions'][number],
-  macroPhase: MacroPhase,
+  bbMacroPhase: BBMacroPhase,
   phase: Phase,
   deload: boolean,
+  origMacroPhase?: MacroPhase,
 ): UserWeek['sessions'][number] | null {
   const adjustedBlocks = session.blocks.map(b => {
     const isCompound = b.type === 'compound';
-    const volMult = volumeMultiplierFor(macroPhase, isCompound);
+    const volMult = bbVolumeMultiplierFor(bbMacroPhase, isCompound);
+    const [targetMin, targetMax] = bbTargetRirRange(bbMacroPhase, isCompound);
     // Additional deload/peaking multiplier on top of phase volume
     const phaseMult = deload ? 0.75 : phase === 'peaking' ? 0.75 : 1.0;
     const volumeMult = volMult * phaseMult;
 
-    if (macroPhase === 'competition' && !isCompound) {
+    // Contest prep: remove accessory blocks ONLY for competition (not peak).
+    // Peak keeps accessory with reduced volume for taper.
+    if (bbMacroPhase === 'contest_prep' && !isCompound && origMacroPhase === 'competition') {
       return null;
     }
 
     if (deload) {
       // Deload (Helms, NSCA): RIR +3, volume scaled by phase
+      const targetRir = Math.min(5, Math.max(targetMax, (b.sets[0]?.rir ?? 2) + 3));
       const sets = b.sets.map((s: UserSet) => ({ ...s, rir: Math.min(5, (s.rir ?? 2) + 3) }));
       const cutSets = sets
         .map((s, i) => i < Math.max(1, Math.ceil(sets.length * volumeMult)) ? s : null)
@@ -229,10 +321,12 @@ function adjustSessionForPhase(
     }
 
     if (phase === 'peaking') {
-      // Peaking: compounds RIR 0-1 (Bosquet 2005), accessory gets controlled RIR
+      // Peaking: compounds RIR targetMin-targetMax (Bosquet 2005), accessory controlled
       const sets = b.sets.map((s: UserSet) => ({
         ...s,
-        rir: isCompound ? Math.max(0, Math.min(1, s.rir ?? 1)) : Math.min(3, (s.rir ?? 2) + 1),
+        rir: isCompound
+          ? Math.max(targetMin, Math.min(targetMax, s.rir ?? targetMin))
+          : Math.max(targetMin, Math.min(targetMax, (s.rir ?? targetMin) + 1)),
       }));
       const cutSets = sets
         .map((s, i) => i < Math.max(1, Math.ceil(sets.length * volumeMult)) ? s : null)
@@ -240,30 +334,52 @@ function adjustSessionForPhase(
       return { ...b, sets: cutSets.length > 0 ? cutSets : sets };
     }
 
-    // All other phases: apply volume multiplier
+    // All other phases: apply volume multiplier + target RIR
+    const sets = b.sets.map((s: UserSet) => ({
+      ...s,
+      rir: Math.max(targetMin, Math.min(targetMax, s.rir ?? targetMin)),
+    }));
     if (volumeMult < 1) {
-      const cutSets = b.sets
+      const cutSets = sets
         .map((s: UserSet, i: number) => i < Math.max(1, Math.ceil(b.sets.length * volumeMult)) ? s : null)
         .filter((s): s is UserSet => s !== null);
-      return { ...b, sets: cutSets.length > 0 ? cutSets : b.sets };
+      return { ...b, sets: cutSets.length > 0 ? cutSets : sets };
     }
-    return b;
+    return { ...b, sets };
   }).filter((b): b is NonNullable<typeof b> => b !== null);
   return adjustedBlocks.length > 0 ? { ...session, blocks: adjustedBlocks } : null;
 }
 
 /**
  * Скелет недель с пустыми sessions (fallback при ошибке сборки).
+ * Работает и с BBMacrocycle, и с Macrocycle.
  */
-function skeletonWeeksFromMacrocycle(macro: Macrocycle, daysPerWeek: number): UserWeek[] {
+function skeletonWeeksFromBbMacrocycle(macro: BBMacrocycle, daysPerWeek: number): UserWeek[];
+function skeletonWeeksFromBbMacrocycle(macro: Macrocycle, daysPerWeek: number): UserWeek[];
+function skeletonWeeksFromBbMacrocycle(macro: BBMacrocycle | Macrocycle, daysPerWeek: number): UserWeek[] {
   const total = macro.totalWeeks;
   const weeks: UserWeek[] = [];
-  const dowPattern = [0, 1, 3, 4, 2, 5, 6];
   for (let w = 1; w <= total; w++) {
-    const active = macrocycleToActiveCycle(macro, w);
-    const block = active?.block;
-    const phase = block ? macroPhaseToUserPhase(block.phase) : 'accumulation' as Phase;
-    const deload = block ? isDeloadLikeMacroPhase(block.phase) : false;
+    let phase: Phase = 'accumulation';
+    let deload = false;
+
+    if ('blocks' in macro && 'totalWeeks' in macro && 'competitions' in macro && 'trainingFocus' in macro) {
+      // BBMacrocycle (4 фазы)
+      const block = bbMacroToActiveBlock(macro as BBMacrocycle, w);
+      if (block) {
+        phase = bbMacroPhaseToUserPhase(block.phase);
+        deload = isDeloadLikeBbMacroPhase(block.phase);
+      }
+    } else {
+      // Macrocycle (5 фаз, PL)
+      const active = macrocycleToActiveCycle(macro as Macrocycle, w);
+      const block = active?.block;
+      if (block) {
+        phase = macroPhaseToUserPhase(block.phase);
+        deload = isDeloadLikeMacroPhase(block.phase);
+      }
+    }
+
     weeks.push({
       week: w,
       phase,
