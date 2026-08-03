@@ -660,12 +660,12 @@ export function getProtocolDose(id: string, protocolPhase: string): string {
     : `${min}-${max} ${unit} ${frequency}`;
 }
 
-export function getMinDose(id: string, unit: string): number {
+export function getMinDose(id: string): number {
   const record = getDosingRecord(id);
   return record?.doseRange.min || 0;
 }
 
-export function getMaxDose(id: string, unit: string): number {
+export function getMaxDose(id: string): number {
   const record = getDosingRecord(id);
   return record?.doseRange.max || 0;
 }

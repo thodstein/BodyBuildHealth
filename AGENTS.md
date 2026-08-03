@@ -5,7 +5,7 @@
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK
-- `vitest` - 999 passing (124 test files; BB-auto generation, safety, migration, round-trip and nutrition planner button audit coverage included)
+- `vitest` - 1041 passing (125 test files; BB-auto generation, safety, migration, round-trip, nutrition planner button audit, and support calculator audit coverage included)
 
 ### BB-auto max plan status
 - Generic, BB-cycle and FullProgram paths use the shared finalizer for volume, fatigue budget, phase/taper safety, validation, report and export snapshots.
@@ -504,3 +504,34 @@ Critical analysis of the manual program constructor (ручной планиро
 - PPL 6×, Arnold 6×, Bro 5×, PRO 8-day
 - 3 rolling patterns (3/1/3/1, 4/1, ТПТ-О-ТТП)
 - Push/Pull 4×, Torso/Limb 4×, Glute Focus 4×
+
+---
+
+## Support Calculator Audit Fixes (Aug 3 2026)
+
+Full critical analysis of the support calculator (`калькулятор поддержки`) — dosing engine, protocol generation, and UI state management. 7 bugs fixed (1 P0, 3 P1, 3 P2), 42 new tests added.
+
+### P0 — Critical fixes
+1. **Vitamin D3 toxic dose (20× UL)** — `engine-helpers.ts:650` passed `2000` (interpreted as mcg) to `normalizeDoseByWeight`, then `doseStr` multiplied by 40 (mcg→IU) → 80,000 IU at 70kg. UL = 4,000 IU (100 mcg). Fixed: base dose changed to `50` mcg (= 2,000 IU at reference weight). Additionally added a universal UL-cap loop in `applyTitration` that clamps all substances to their `NUTRIENT_UL` values after weight normalization — protects magnesium, NAC, zinc, selenium, vitamin C, ALA at extreme body weights (200kg+).
+
+### P1 — Important fixes
+2. **`classifyPed` missing `'eq'` ID** — `ped-potency-table.ts:152` used `k.includes('eq'+'_')` which produced `'eq_'`, but the common boldenone abbreviation `'eq'` doesn't contain `'eq_'`. The ID `'eq'` fell through to `'other'` → `derivePEDFlags().hasBold = false` → boldenone protocol (cabergoline, hesperidin, serrapeptase) never activated. Fixed: `k === 'eq' || k.startsWith('eq_')`.
+3. **Dead `'anastro'`/`'caberg'` checks in `applyTitration`** — `engine-helpers.ts:636,641` checked `s === 'anastro'` and `s === 'caberg'` — no substance in the system has these IDs. Replaced with `substances.includes('anastrozole')` / `substances.includes('cabergoline')` for clarity.
+4. **10 missing substance defaults in `generateSchedule`** — `computeProtocol` in `tz-mapper-engine.ts` adds tadalafil, agmatine, pycnogenol, astaxanthin, hesperidin, dandelion, serrapeptase, garlic, metformin, chromium — but `doseStr` defs didn't have entries → displayed "по инструкции" instead of actual doses. Fixed: added all 10 to `defs`, `SUB_NAMES`, morning/afternoon/evening groups, and `chromium` to the mcg-unit list.
+
+### P2 — Quality fixes
+5. **Dual `CalcView` type definitions** — `SupportScreen.tsx:61` defined a local `CalcView` without `'mixcalc'`, while `SupportShared.tsx:13` exported it with `'mixcalc'`. Child components calling `setCalcView('mixcalc')` worked only due to `any` typing in the state bag. Fixed: added `'mixcalc'` to the local type.
+6. **Dead code removal (~40 lines)** — Removed orphan state variables `stackCalcSize`, `stackCalcOrgans`, `stackCalcMech`, `stackCalcMode`, `generatedStack`, `generatedStacks` and the `availableMechs` useMemo from `SupportScreen.tsx` — none were read by any child component. Removed `useCalculatorState` hook (never imported/called by any component) and deleted `Calc.state.ts`. Removed unused `ORGAN_MECHANISMS` import. Cleaned barrel export in `Calculator/index.ts`.
+7. **`getMinDose`/`getMaxDose` unused `unit` parameter** — `support-dosing.ts:663,668` accepted a `unit` parameter but never used it. Fixed: removed the dead parameter.
+
+### Files modified
+- `src/engines/support-plan/engine-helpers.ts` — D3 dose fix, UL-cap loop, dead check removal, new substance defaults/names/groups
+- `src/data/ped-potency-table.ts` — `eq` classification fix
+- `src/data/support-dosing.ts` — `getMinDose`/`getMaxDose` signature cleanup
+- `src/ui/screens/SupportScreen.tsx` — CalcView type, dead code removal, unused import cleanup
+- `src/ui/screens/Calculator/index.ts` — barrel export cleanup
+- `src/ui/screens/Calculator/Calc.state.ts` — deleted (dead code)
+
+### Tests
+- `src/engines/__tests__/support-calc-audit.test.ts` — **42 new tests**: P0-1 vitamin D3 UL (4 tests), P0-1b UL cap for all substances (6 tests), normalizeDoseByWeight (3 tests), P1 classifyPed boldenone (6 tests), P1 applyTitration anastrozole/cabergoline guardrail-aware (4 tests), P1 generateSchedule new substances (13 tests), P2 getMinDose/getMaxDose (5 tests), P2 CalcView type (1 test).
+- Full suite: **1041 tests passing** (125 test files), 0 TS errors, vite build OK.

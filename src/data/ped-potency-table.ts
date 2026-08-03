@@ -149,7 +149,7 @@ export function classifyPed(id: string): PEDClass {
   // Трен
   if (k.includes('tren') || k.includes('parabolan')) return 'aas_tren';
   // Болденон
-  if (k.includes('bold') || k.includes('equipoise') || k.includes('eq'+'_')) return 'aas_bold';
+  if (k.includes('bold') || k.includes('equipoise') || k === 'eq' || k.startsWith('eq_')) return 'aas_bold';
   // ДГТ-inject
   if (k.includes('masteron') || k.includes('drostanolone') || k.includes('primobolan') || k.includes('methenolone')) return 'aas_dht_inject';
   // 17α Оралы

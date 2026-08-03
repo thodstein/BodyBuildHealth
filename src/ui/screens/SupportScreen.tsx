@@ -58,10 +58,10 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 
 type SupportTab = 'main' | 'catalog' | 'synergies' | 'calculator' | 'interactions' | 'stacks' | 'peptides' | 'fertility-pct';
 type SupportView = 'main' | 'calc' | 'fertility';
-type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'plan' | 'reports';
+type CalcView = 'main' | 'calculator' | 'peptides' | 'info' | 'stackcalc' | 'mystacks' | 'plan' | 'reports' | 'mixcalc';
 type InfoView = 'main' | 'catalog' | 'interactions' | 'stacks' | 'calc_tools' | 'dose' | 'synergy_calc' | 'timing' | 'research' | 'favorites' | 'protocols' | 'diary' | 'bioavailability';
 
-import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, ORGAN_MECHANISMS, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
+import { INTERACTION_TYPE_LABELS, EFFECT_LABELS, INTERACTION_SEVERITY_LABELS, CATEGORY_LABELS, MECH_TRANSLATIONS_RU, getCategoryInfo, TYPE_LABELS_RU, CLASS_BASE_NAMES, SYNERGY_COLORS, SUPPORT_CLASS_LABELS, MECH_LABELS, SUPPORT_MED_DETAIL, InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { PopupBool, PopupNumber, PopupSelect } from '../components/PopupXxx';
 import { SupportPeptideCalc } from './SupportScreen_parts/SupportPeptideCalc';
 import { SupportResearch } from './SupportScreen_parts/SupportResearch';
@@ -712,12 +712,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
       setPharmaInteractIds(courseIds.slice(0, Math.min(4, courseIds.length)));
     }
   }, [(linked.course || []).length]);
-  const [stackCalcSize, setStackCalcSize] = useState<string>('5-7');
-  const [stackCalcOrgans, setStackCalcOrgans] = useState<string[]>([]);
-  const [stackCalcMech, setStackCalcMech] = useState<string[]>([]);
-  const [stackCalcMode, setStackCalcMode] = useState<'auto'|'manual'>('auto');
-  const [generatedStack, setGeneratedStack] = useState<any>(null);
-  const [generatedStacks, setGeneratedStacks] = useState<any[]>([]);
   const [pubMedQuery, setPubMedQuery] = useState('');
   const [pubMedResults, setPubMedResults] = useState<PubMedArticle[]>([]);
   const [pubMedLoading, setPubMedLoading] = useState(false);
@@ -959,18 +953,6 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
     setSavedStacks(updated);
     writeSupportStacks(updated);
   };
-
-  const availableMechs = useMemo(() => {
-    if (stackCalcOrgans.length === 0) {
-      return [];
-    }
-    const mechSet = new Set<string>();
-    for (const key of stackCalcOrgans) {
-      const mechs = ORGAN_MECHANISMS[key];
-      if (mechs) { mechs.forEach(m => mechSet.add(m)); }
-    }
-    return [...mechSet].sort();
-  }, [stackCalcOrgans]);
 
   // Combine SUPPLEMENT_DESCRIPTIONS with support substances from PHARMA_DB
   const supplementList = useMemo(() => {
@@ -2598,7 +2580,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     archivedPlans,
     autoCalcResult,
     autoLevel,
-    availableMechs,
     boostEnabled,
     buildBestRecipe,
     buildPreApplyCard,
@@ -2673,8 +2654,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     generateMechanismReport,
     generatePeptideProtocol,
     generateWeeklyPlan,
-    generatedStack,
-    generatedStacks,
     getBpRiskLevel,
     getCategoryInfo,
     getDrugTzMechanisms,
@@ -2860,8 +2839,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     setFdaLoading,
     setFdaResults,
     setGenTab,
-    setGeneratedStack,
-    setGeneratedStacks,
     setGoalRecommendations,
     setGrowthId,
     setInfoSynergySeverity,
@@ -2975,10 +2952,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     setShowSavedPicker,
     setShowTemplates,
     setStackBuilder,
-    setStackCalcMech,
-    setStackCalcMode,
-    setStackCalcOrgans,
-    setStackCalcSize,
     setStackExpanded,
     setStackName,
     setStackNotes,
@@ -3016,10 +2989,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     showTemplates,
     showToast,
     stackBuilder,
-    stackCalcMech,
-    stackCalcMode,
-    stackCalcOrgans,
-    stackCalcSize,
     stackDetailMap,
     stackExpanded,
     stackName,

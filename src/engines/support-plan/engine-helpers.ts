@@ -633,12 +633,12 @@ export function applyTitration(substances: string[], state: CalculatorState): Re
     const baseDose = c.heartRate > 95 ? 7.5 : c.heartRate > 85 ? 5 : 2.5;
     d.nebivolol = Math.round(baseDose * weekScale * 2) / 2;
   }
-  if (p.hasAI && substances.some(s => s === 'anastro' || s === 'anastrozole')) {
+  if (p.hasAI && substances.includes('anastrozole')) {
     const totalTest = p.aas.filter(a => ['test_prop','test_enan','test_cyp','test_undec','test_mix'].includes(a.id)).reduce((s, a) => s + a.doseMgWeek, 0);
     const baseDose = totalTest > 700 ? 1.5 : totalTest > 500 ? 1 : 0.5;
     d.anastrozole = Math.round(baseDose * Math.max(0.75, weekScale) * 2) / 2;
   }
-  if (p.hasCaber && substances.some(s => s === 'caberg' || s === 'cabergoline')) {
+  if (p.hasCaber && substances.includes('cabergoline')) {
     d.cabergoline = cw <= 2 ? 0.125 : 0.25;
   }
   // NAC / TUDCA titration: build up to avoid GI upset
@@ -647,7 +647,9 @@ export function applyTitration(substances: string[], state: CalculatorState): Re
   // Body-weight normalized minerals/vitamins
   if (substances.includes('magnesium')) d.magnesium = normalizeDoseByWeight(200, bw);
   if (substances.includes('zinc')) d.zinc = normalizeDoseByWeight(15, bw);
-  if (substances.includes('vitamin_d3')) d.vitamin_d3 = normalizeDoseByWeight(2000, bw, 70);
+  // 50 мкг = 2000 МЕ (1 мкг = 40 МЕ). UL = 100 мкг = 4000 МЕ (IOM 2011).
+  // Ранее передавалось 2000 (как мкг), что после ×40 в doseStr давало 80 000 МЕ — в 20× выше UL.
+  if (substances.includes('vitamin_d3')) d.vitamin_d3 = normalizeDoseByWeight(50, bw, 70);
   if (substances.includes('omega3')) d.omega3 = normalizeDoseByWeight(2000, bw);
   if (substances.includes('alpha_lipoic')) d.alpha_lipoic = normalizeDoseByWeight(300, bw);
   if (substances.includes('coq10')) d.coq10 = normalizeDoseByWeight(100, bw);
@@ -655,6 +657,12 @@ export function applyTitration(substances: string[], state: CalculatorState): Re
   if (substances.includes('potassium')) d.potassium = normalizeDoseByWeight(200, bw);
   if (substances.includes('vitamin_c')) d.vitamin_c = normalizeDoseByWeight(500, bw);
   if (substances.includes('selenium')) d.selenium = normalizeDoseByWeight(50, bw, 70);
+  // UL-cap: гарантия, что нормализация по весу не превысит верхний допустимый уровень (NUTRIENT_UL).
+  // Единицы доз в `d` совпадают с единицами NUTRIENT_UL (мг для макро, мкг для микродоз).
+  for (const id of Object.keys(d)) {
+    const ul = NUTRIENT_UL[id];
+    if (ul !== undefined && d[id] > ul) d[id] = ul;
+  }
   return d;
 }
 
@@ -688,13 +696,16 @@ export const SUB_NAMES: Record<string, string> = {
   niacin:'Ниацин', pantethine:'Пантетин', red_yeast_rice:'Красный дрожжевой рис',
   celadrin:'Целадрин', emu_oil:'Эму масло', cissus:'Циссус',
   l_citrulline:'L-Цитруллин', beet_root:'Свёкла',
+  tadalafil:'Тадалафил', agmatine:'Агматин', pycnogenol:'Пикногенол',
+  astaxanthin:'Астаксантин', hesperidin:'Гесперидин', dandelion:'Одуванчик',
+  serrapeptase:'Серрапептаза', garlic:'Чеснок', metformin:'Метформин', chromium:'Хром',
 };
 
 export function generateSchedule(substances: string[], synergyIds: SynergyId[], doses: Record<string, number>, state: CalculatorState): ScheduleItem[] {
   const schedule: ScheduleItem[] = [];
   const used = new Set<string>();
-  const morningGroup = ['vitamin_c','vitamin_d3','vitamin_e','coq10','alpha_lipoic','selenium','boron','zinc','telmisartan','nebivolol','ashwagandha','calcium','vitamin_k2','probiotics','anastrozole','cabergoline','hcg','curcumin','dhea','pregnenolone','collagen','l_citrulline','DIM','saw_palmetto','tyrosine'];
-  const afternoonGroup = ['berberine','bromelain','nattokinase','betaine','folate','vitamin_b12','magnesium','potassium','artichoke','bile_acids','omega3','glucosamine','msm','boswellia','chondroitin_sulfate','taurine','inositol','piperine','reishi','maitake','shilajit','chaga','cordyceps','lions_mane'];
+  const morningGroup = ['vitamin_c','vitamin_d3','vitamin_e','coq10','alpha_lipoic','selenium','boron','zinc','telmisartan','nebivolol','ashwagandha','calcium','vitamin_k2','probiotics','anastrozole','cabergoline','hcg','curcumin','dhea','pregnenolone','collagen','l_citrulline','DIM','saw_palmetto','tyrosine','tadalafil','pycnogenol','astaxanthin','agmatine','chromium','serrapeptase','garlic','dandelion'];
+  const afternoonGroup = ['berberine','bromelain','nattokinase','betaine','folate','vitamin_b12','magnesium','potassium','artichoke','bile_acids','omega3','glucosamine','msm','boswellia','chondroitin_sulfate','taurine','inositol','piperine','reishi','maitake','shilajit','chaga','cordyceps','lions_mane','hesperidin','metformin'];
   const eveningGroup = ['nac','tudca','milk_thistle','glycine','theanine','gaba','x5htp','vitamin_b6','astragalus','celery_extract','glutathione','bergamot','red_yeast','aspirin','tamoxifen','5htp','hyaluronic_acid','bpc157','tb500','melatonin'];
   const timeOf = (id: string): TimeBlock => morningGroup.includes(id) ? 'morning' : afternoonGroup.includes(id) ? 'afternoon' : 'evening';
   const bw = state.profile?.weight || 80;
@@ -703,7 +714,7 @@ export function generateSchedule(substances: string[], synergyIds: SynergyId[], 
     if (doses[id]) {
       const val = doses[id];
       // МКГ-единицы для микродоз
-      if (id === 'selenium' || id === 'folate' || id === 'vitamin_k2' || id === 'boron')
+      if (id === 'selenium' || id === 'folate' || id === 'vitamin_k2' || id === 'boron' || id === 'chromium')
         return val + ' мкг';
       // МЕ для витамина D
       if (id === 'vitamin_d3') {
@@ -735,6 +746,9 @@ export function generateSchedule(substances: string[], synergyIds: SynergyId[], 
       chondroitin_sulfate:'1200 мг', hyaluronic_acid:'200 мг',
       bpc157:'250 мкг', tb500:'5 мг', melatonin:'3 мг', '5htp':'100 мг',
       DIM:'100 мг', l_citrulline:'3000 мг',
+      tadalafil:'5 мг', agmatine:'1000 мг', pycnogenol:'150 мг',
+      astaxanthin:'4 мг', hesperidin:'500 мг', dandelion:'500 мг',
+      serrapeptase:'10 мг', garlic:'1200 мг', metformin:'500 мг', chromium:'200 мкг',
     };
     return defs[id] || 'по инструкции';
   };
