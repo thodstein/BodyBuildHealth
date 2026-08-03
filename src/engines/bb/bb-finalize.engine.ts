@@ -78,14 +78,26 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
     const phase = String((week as any).phase || '').toLowerCase();
     if (phase === 'deload' || week.sessions.some(session => session.exercises.some(exercise => /разгруз|deload/i.test(exercise.comment || '')))) continue;
     const weekVolume = aggregateBBVolume(week.sessions);
-    for (const muscle of muscles) {
-      const landmarks = getVolumeLandmarks(options.level, muscle);
+    // Prioritize muscles by target-volume deficit (target vs effective), not just MEV.
+    const deficitByMuscle = muscles.map((muscle: string) => {
+      const landmarks = getVolumeLandmarks(options.level!, muscle);
       const effectiveSets = weekVolume[muscle]?.effectiveSets || 0;
+      const target = plan.volumeTargets?.[muscle];
+      const targetSets = target?.targetSets ?? landmarks?.mav ?? 0;
+      const mev = landmarks?.mev ?? 0;
+      const deficit = Math.max(0, targetSets - effectiveSets);
+      const mevDeficit = Math.max(0, mev - effectiveSets);
+      return { muscle, landmarks, effectiveSets, target, targetSets, deficit, mevDeficit };
+    }).filter(item => item.landmarks && item.mevDeficit > 0)
+      .sort((a, b) => b.deficit - a.deficit || b.mevDeficit - a.mevDeficit);
+
+    for (const { muscle, landmarks, effectiveSets, target } of deficitByMuscle) {
       if (!landmarks || effectiveSets >= landmarks.mev) continue;
       const session = week.sessions.find(item => item.exercises.some(exercise => (trueMuscleOf({ name: exercise.name, muscle: exercise.muscle } as any) || exercise.muscle) === muscle));
       if (!session || session.exercises.length >= 10) continue;
+      // Feeder volume is capped by MEV deficit, not full target deficit,
+      // to avoid overloading the session with isolation feeders.
       let remaining = Math.max(0, landmarks.mev - effectiveSets);
-      const target = plan.volumeTargets?.[muscle];
       const sessionVolume = aggregateBBVolume([session])[muscle]?.directSets || 0;
       const maxSetsPerSession = target?.maxSetsPerSession ?? Math.max(2, Math.ceil(landmarks.mrv / Math.max(1, target?.frequency || 1)));
       remaining = Math.min(remaining, Math.max(0, maxSetsPerSession - sessionVolume));
@@ -100,7 +112,7 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
         session.exercises.push({
           muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп', sets,
           repsRange: [12, 20], rir: 3, workSets, tempoSpec: '3-0-1-0', restSeconds: 45,
-          comment: `MEV feeder: ${sets}×15-20 для покрытия effective MEV ${landmarks.mev} сетов @${weight} кг; session cap ${maxSetsPerSession}.`,
+          comment: `MEV feeder: ${sets}×15-20 для покрытия effective MEV ${landmarks.mev} сетов @${weight} кг; session cap ${maxSetsPerSession}. Target deficit: ${target ? target.targetSets - effectiveSets : 0} sets.`,
           rationale: 'Adaptive MEV coverage feeder', warmupSets: [],
         });
         used.add(candidate.name);
