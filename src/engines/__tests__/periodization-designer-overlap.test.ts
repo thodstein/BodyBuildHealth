@@ -9,6 +9,7 @@ import {
   addBlockToDesign,
   moveBlockInDesign,
   resizeBlockInDesign,
+  resolveDesignOverlaps,
   getDesignStats,
   type MacrocycleDesign,
 } from '../periodization-designer.engine';
@@ -124,5 +125,28 @@ describe('P1-3: resizeBlockInDesign clamps to totalWeeks', () => {
     const d2 = resizeBlockInDesign(d1, d1.blocks[0].id, 3);
     const resized = d2.blocks[0];
     expect(resized.endWeek).toBe(5); // Math.max(block.startWeek, ...)
+  });
+
+  it('resolveDesignOverlaps moves later blocks and removes conflicts', () => {
+    const design = createEmptyDesign('test');
+    design.totalWeeks = 12;
+    const d1 = addBlockToDesign(design, 'accumulation_hypertrophy', 1);
+    const d2 = addBlockToDesign(d1, 'intensification', 3);
+    const resolved = resolveDesignOverlaps(d2);
+    const stats = getDesignStats(resolved);
+    expect(stats.overlapWeeks).toBe(0);
+    expect(resolved.blocks[1].startWeek).toBeGreaterThan(resolved.blocks[0].endWeek);
+  });
+
+  it('move clears stale overlap notes after the conflict is removed', () => {
+    const design = createEmptyDesign('test');
+    design.totalWeeks = 20;
+    const d1 = addBlockToDesign(design, 'accumulation_hypertrophy', 1);
+    const d2 = addBlockToDesign(d1, 'intensification', 3);
+    const secondId = d2.blocks.find(block => block.phaseKey === 'intensification')!.id;
+    const d3 = moveBlockInDesign(d2, secondId, 10);
+    const second = d3.blocks.find(block => block.id === secondId)!;
+    expect(second.notes).not.toContain('OVERLAP');
+    expect(second.notes).not.toContain('accumulation_hypertrophy');
   });
 });

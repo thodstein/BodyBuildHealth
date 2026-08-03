@@ -31,7 +31,7 @@ const clampRir = (r: number) => Math.max(0, Math.min(5, Math.round(r)));
 type Handler = (payload: PlannerApply, ctx: BridgeCtx) => void;
 
 const splitHandler: Handler = (payload, { program: p, dir, update, showToast }) => {
-  if (dir !== 'bb' || !p.bb) return false as any;
+  if (dir !== 'bb' || !p.bb) return;
   const cycle: string[][] = payload.data.cycle ?? [];
   const weeks: UserWeek[] = Array.from({ length: Math.max(1, p.meta.weeks || 4) }, (_, wi) => ({
     week: wi + 1, phase: 'accumulation' as const, deload: false,
@@ -40,7 +40,7 @@ const splitHandler: Handler = (payload, { program: p, dir, update, showToast }) 
       blocks: groups.map((g) => ({ id: newId('blk'), type: 'compound' as const, exerciseName: '', muscle: g, role: 'primary' as const, sets: [{ reps: 8, rir: 2, weight: 0, restSec: 120 }] })),
     })),
   }));
-  update({ bb: { ...p.bb, weeks } });
+  update({ bb: { ...p.bb, microcycleTemplate: { daySlots: [] }, weeks } });
   showToast('🔗 Сплит применён: ' + payload.label);
   return undefined;
 };

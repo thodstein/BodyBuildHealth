@@ -42,6 +42,12 @@ export interface MacrocycleToBBOptions {
   favoriteExercises?: string[];
 }
 
+/** Структурированная разгрузка каждые 4 недели внутри базовых фаз. */
+export function shouldPeriodicDeload(phase: string, weekNumber: number, weekOffset: number): boolean {
+  if (phase !== 'hypertrophy' && phase !== 'strength' && phase !== 'endurance') return false;
+  return (weekNumber - weekOffset + 1) % 4 === 0;
+}
+
 // ─── BB-макроцикл: volume multipliers и RIR ─────────────────────────────────
 
 /**
@@ -221,9 +227,7 @@ function remapWeeksFromBbMacrocycle(weeks: UserWeek[], macro: BBMacrocycle): Use
     if (!active) return w;
     const phase = bbMacroPhaseToUserPhase(active.phase);
     const deload = isDeloadLikeBbMacroPhase(active.phase);
-    const periodicDeload = !deload
-      && (active.phase === 'hypertrophy' || active.phase === 'strength')
-      && ((w.week - active.weekOffset + 1) % 4 === 0);
+    const periodicDeload = !deload && shouldPeriodicDeload(active.phase, w.week, active.weekOffset);
     const adjustedSessions = w.sessions
       .map(s => adjustBbSessionForPhase(s, active.phase, phase, deload || periodicDeload))
       .filter((s): s is UserWeek['sessions'][number] => s !== null);
@@ -243,9 +247,7 @@ function remapWeeksFromMacrocycle(weeks: UserWeek[], macro: Macrocycle): UserWee
     const bbPhase = macroPhaseToBbPhase(block.phase);
     const phase = bbMacroPhaseToUserPhase(bbPhase);
     const deload = isDeloadLikeMacroPhase(block.phase);
-    const periodicDeload = !deload
-      && (block.phase === 'endurance' || block.phase === 'strength')
-      && ((w.week - block.weekOffset + 1) % 4 === 0);
+    const periodicDeload = !deload && shouldPeriodicDeload(block.phase, w.week, block.weekOffset);
     const adjustedSessions = w.sessions
       .map(s => adjustBbSessionForPhase(s, bbPhase, phase, deload || periodicDeload, block.phase))
       .filter((s): s is UserWeek['sessions'][number] => s !== null);

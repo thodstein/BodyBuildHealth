@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildMacrocycleMulti, buildMacrocycle, serializeMacro, deserializeMacro,
+  rebalanceMacrocycle,
   type CompetitionEvent, type Macrocycle,
 } from '../macrocycle.engine';
 
@@ -9,6 +10,11 @@ function makeComp(id: string, week: number, priority: CompetitionEvent['priority
 }
 
 describe('buildMacrocycleMulti — несколько соревнований', () => {
+  it('пустой список использует обычное распределение без пустого макроцикла', () => {
+    const macro = buildMacrocycleMulti([], { level: 'intermediate', goal: 'powerlifting', totalWeeks: 20 });
+    expect(macro.blocks.length).toBeGreaterThan(0);
+    expect(macro.blocks.reduce((sum, block) => sum + block.weeks, 0)).toBe(20);
+  });
   it('одно соревнование A → создаёт peak + competition блоки привязанные к событию', () => {
     const events = [makeComp('c1', 20, 'A', 'Чемпионат')];
     const m = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 30 });
@@ -176,6 +182,20 @@ describe('buildMacrocycleMulti — несколько соревнований',
     const competition = macro.blocks.find(block => block.phase === 'competition');
     expect(competition?.weekOffset).toBe(1);
     expect(macro.blocks.some(block => block.phase === 'peak' && block.weeks <= 0)).toBe(false);
+  });
+
+  it('rebalance сохраняет каждую competition-неделю отдельной', () => {
+    const macro = buildMacrocycleMulti([
+      makeComp('a', 15, 'A'),
+      makeComp('b', 30, 'B'),
+    ], { level: 'intermediate', goal: 'powerlifting', totalWeeks: 40 });
+    const rebalanced = rebalanceMacrocycle(macro, [{ phase: 'competition', weeks: 8 }]);
+    const competitions = rebalanced.blocks.filter(block => block.phase === 'competition');
+    expect(competitions).toHaveLength(2);
+    expect(competitions.every(block => block.weeks === 1)).toBe(true);
+    expect(rebalanced.competitions?.map(event => event.week)).toEqual(
+      competitions.map(block => block.weekOffset),
+    );
   });
 });
 

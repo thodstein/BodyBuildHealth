@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type MacrocycleDesign,
   type DesignerPhaseBlock,
@@ -16,6 +16,7 @@ import {
   resizeBlockInDesign,
   updateBlockNotes,
   getDesignStats,
+  resolveDesignOverlaps,
   getDefaultPresetDesigns,
 } from '../../../engines/periodization-designer.engine';
 import { applyToPlanner } from './planner-bridge';
@@ -32,6 +33,9 @@ export const PeriodizationDesignerTab: React.FC = () => {
   const [editBlockId, setEditBlockId] = useState<string | null>(null);
   const [dragPhase, setDragPhase] = useState<PhaseKey | null>(null);
   const [viewQuarter, setViewQuarter] = useState(0); // 0-3 for 52-week view
+  const pastRef = useRef<MacrocycleDesign[]>([]);
+  const futureRef = useRef<MacrocycleDesign[]>([]);
+  const [, setHistoryTick] = useState(0);
 
   useEffect(() => {
     const list = loadDesigns();
@@ -46,37 +50,84 @@ export const PeriodizationDesignerTab: React.FC = () => {
     setDesigns(list);
   }, []);
 
+  const commitDesign = useCallback((updated: MacrocycleDesign) => {
+    if (current) pastRef.current = [...pastRef.current, JSON.parse(JSON.stringify(current))].slice(-20);
+    futureRef.current = [];
+    saveDesign(updated);
+    refresh();
+    setHistoryTick(tick => tick + 1);
+  }, [current, refresh]);
+
+  useEffect(() => {
+    pastRef.current = [];
+    futureRef.current = [];
+    setHistoryTick(tick => tick + 1);
+  }, [currentId]);
+
+  const undo = useCallback(() => {
+    if (!current || pastRef.current.length === 0) return;
+    const previous = pastRef.current[pastRef.current.length - 1];
+    pastRef.current = pastRef.current.slice(0, -1);
+    futureRef.current = [JSON.parse(JSON.stringify(current)), ...futureRef.current].slice(0, 20);
+    saveDesign(previous);
+    refresh();
+    setHistoryTick(tick => tick + 1);
+  }, [current, refresh]);
+
+  const redo = useCallback(() => {
+    if (!current || futureRef.current.length === 0) return;
+    const next = futureRef.current[0];
+    futureRef.current = futureRef.current.slice(1);
+    pastRef.current = [...pastRef.current, JSON.parse(JSON.stringify(current))].slice(-20);
+    saveDesign(next);
+    refresh();
+    setHistoryTick(tick => tick + 1);
+  }, [current, refresh]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z') return;
+      const target = event.target as HTMLElement | null;
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return;
+      event.preventDefault();
+      if (event.shiftKey) redo(); else undo();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [redo, undo]);
+
   const stats = useMemo(() => current ? getDesignStats(current) : null, [current]);
 
   // Resize helpers
   const handleResize = useCallback((blockId: string, newEnd: number) => {
     if (!current) return;
     const updated = resizeBlockInDesign(current, blockId, newEnd);
-    saveDesign(updated);
-    refresh();
-  }, [current, refresh]);
+    commitDesign(updated);
+  }, [current, commitDesign]);
 
   const handleDeleteBlock = useCallback((blockId: string) => {
     if (!current) return;
     const updated = removeBlockFromDesign(current, blockId);
-    saveDesign(updated);
-    refresh();
-  }, [current, refresh]);
+    commitDesign(updated);
+  }, [current, commitDesign]);
 
   const handleMoveBlock = useCallback((blockId: string, newStart: number) => {
     if (!current) return;
     const updated = moveBlockInDesign(current, blockId, newStart);
-    saveDesign(updated);
-    refresh();
-  }, [current, refresh]);
+    commitDesign(updated);
+  }, [current, commitDesign]);
+
+  const handleResolveOverlaps = useCallback(() => {
+    if (!current) return;
+    commitDesign(resolveDesignOverlaps(current));
+  }, [current, commitDesign]);
 
   const handleDropOnCanvas = useCallback((weekNum: number, phaseKey: PhaseKey) => {
     if (!current) return;
     const updated = addBlockToDesign(current, phaseKey, weekNum);
-    saveDesign(updated);
-    refresh();
+    commitDesign(updated);
     setDragPhase(null);
-  }, [current, refresh]);
+  }, [current, commitDesign]);
 
   const handleAddPreset = useCallback((preset: MacrocycleDesign) => {
     saveDesign(preset);
@@ -101,9 +152,8 @@ export const PeriodizationDesignerTab: React.FC = () => {
   const handleSaveName = useCallback((name: string) => {
     if (!current) return;
     const updated = { ...current, name };
-    saveDesign(updated);
-    refresh();
-  }, [current, refresh]);
+    commitDesign(updated);
+  }, [current, commitDesign]);
 
   const handleDuplicate = useCallback(() => {
     if (!current) return;
@@ -122,9 +172,8 @@ export const PeriodizationDesignerTab: React.FC = () => {
   const handleSaveSport = useCallback((sport: MacrocycleDesign['sport']) => {
     if (!current) return;
     const updated = { ...current, sport, updatedAt: new Date().toISOString() };
-    saveDesign(updated);
-    refresh();
-  }, [current, refresh]);
+    commitDesign(updated);
+  }, [current, commitDesign]);
 
   const editBlock = useMemo(() => {
     if (!editBlockId || !current) return null;
@@ -175,6 +224,11 @@ export const PeriodizationDesignerTab: React.FC = () => {
               <input value={current.name} onChange={e => handleSaveName(e.target.value)}
                 style={{ background: 'transparent', border: 'none', borderBottom: '1px dashed rgba(255,255,255,0.2)', color: '#fff', fontSize: 14, fontWeight: 700, width: '60%', outline: 'none' }} />
               <span style={{ fontSize: 10, color: DIM }}>{current.totalWeeks} нед · {current.blocks.length} блоков</span>
+            </div>
+            <div style={{ display: 'flex', gap: 5, marginBottom: 8 }}>
+              <button onClick={undo} disabled={pastRef.current.length === 0} style={{ ...btn, opacity: pastRef.current.length > 0 ? 1 : 0.4 }}>↶ Отменить</button>
+              <button onClick={redo} disabled={futureRef.current.length === 0} style={{ ...btn, opacity: futureRef.current.length > 0 ? 1 : 0.4 }}>↷ Повторить</button>
+              <span style={{ ...btn, cursor: 'default', color: DIM }}>Ctrl/Cmd+Z</span>
             </div>
             {/* Sport selector — определяет направление программы при применении дизайнера */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -354,9 +408,8 @@ export const PeriodizationDesignerTab: React.FC = () => {
               <div style={{ marginTop: 6 }}>
                 <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Заметки:</div>
                 <textarea value={editBlock.notes} onChange={e => {
-                  const updated = updateBlockNotes(current!, editBlock.id, e.target.value);
-                  saveDesign(updated);
-                  refresh();
+                const updated = updateBlockNotes(current!, editBlock.id, e.target.value);
+                  commitDesign(updated);
                 }}
                   style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: '#fff', fontSize: 10, padding: 6, resize: 'vertical', minHeight: 40 }} />
               </div>
@@ -393,6 +446,9 @@ export const PeriodizationDesignerTab: React.FC = () => {
               {(stats as any).overlapWeeks > 0 && (
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>
                   🔴 Перекрытие блоков: {(stats as any).overlapWeeks} нед. Недели с перекрытием получат непредсказуемую фазу при применении.
+                  <button onClick={handleResolveOverlaps} style={{ ...btn, marginLeft: 8, color: '#ef4444', borderColor: 'rgba(239,68,68,0.45)' }}>
+                    Исправить автоматически
+                  </button>
                 </div>
               )}
               {(stats as any).gapRanges?.length > 0 && (

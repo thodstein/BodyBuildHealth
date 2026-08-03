@@ -42,15 +42,19 @@ function migrateStorage(raw: string | null): string | null {
     // Проверить, есть ли уже kind в блоках (v2+). Если нет — мигрировать.
     let migrated = false;
     const b = o.b.map((block: any) => {
-      if (!block[3] || (block[3] !== 'SRC' && block[3] !== 'BB')) {
+      const next = Array.isArray(block) ? [...block] : block;
+      if (Array.isArray(next) && (!next[3] || (next[3] !== 'SRC' && next[3] !== 'BB'))) {
         // v1: kind отсутствует или невалиден → default 'SRC'
-        block[3] = 'SRC';
+        next[3] = 'SRC';
         migrated = true;
       }
-      return block;
+      return next;
     });
     if (migrated) {
-      const updated = JSON.stringify({ ...o, b, v: SCHEMA_VERSION });
+      // Не понижать уже мигрированную запись v3-v6 до v2: десериализатор
+      // поддерживает все эти версии, а новые поля должны сохраниться.
+      const version = Number.isInteger(o.v) && o.v >= SCHEMA_VERSION ? o.v : SCHEMA_VERSION;
+      const updated = JSON.stringify({ ...o, b, v: version });
       try { localStorage.setItem(STORAGE_KEY, updated); } catch { /* ignore */ }
       return updated;
     }
@@ -137,6 +141,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
         const serialized = serializeBbMacro(bbMacro);
         bbSerializedRef.current = serialized;
         localStorage.setItem(BB_STORAGE_KEY, serialized);
+        window.dispatchEvent(new CustomEvent('he-bb-macrocycle-updated', { detail: serialized }));
       } catch { /* ignore */ }
     }
   }, [bbMacro, isBB]);
@@ -156,19 +161,37 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       setSelectedBlockIdx(-1);
       setEditWeeks({});
     };
+    const syncBb = (raw?: string | null) => {
+      const serialized = raw ?? localStorage.getItem(BB_STORAGE_KEY);
+      if (!serialized || serialized === bbSerializedRef.current) return;
+      const restored = deserializeBbMacro(serialized);
+      if (!restored || !isBB) return;
+      setBbMacro(restored);
+      setTotalWeeks(restored.totalWeeks);
+      setTrainingFocus(restored.trainingFocus);
+      setCompetitions(restored.competitions ?? []);
+      setSelectedBlockIdx(-1);
+      setEditWeeks({});
+    };
     const onStorage = (event: StorageEvent) => {
       if (event.key === STORAGE_KEY) sync(event.newValue);
+      if (event.key === BB_STORAGE_KEY) syncBb(event.newValue);
     };
     const onMacroUpdated = (event: Event) => {
       sync((event as CustomEvent<string>).detail);
     };
+    const onBbMacroUpdated = (event: Event) => {
+      syncBb((event as CustomEvent<string>).detail);
+    };
     window.addEventListener('storage', onStorage);
     window.addEventListener('he-pl-macrocycle-updated', onMacroUpdated);
+    window.addEventListener('he-bb-macrocycle-updated', onBbMacroUpdated);
     return () => {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('he-pl-macrocycle-updated', onMacroUpdated);
+      window.removeEventListener('he-bb-macrocycle-updated', onBbMacroUpdated);
     };
-  }, []);
+  }, [isBB]);
 
   const build = () => {
     if (competitionValidation) {
@@ -292,7 +315,10 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           </div>
           <div>
             <div style={LABEL}>Длительность, нед</div>
-            <input style={IN} type="number" min={12} max={104} value={totalWeeks} onChange={e => setTotalWeeks(+e.target.value)} />
+           <input style={IN} type="number" min={12} max={104} value={totalWeeks} onChange={e => {
+             const value = Number(e.target.value);
+             setTotalWeeks(Number.isFinite(value) ? Math.max(12, Math.min(104, Math.round(value))) : 12);
+           }} />
           </div>
           {isBB && (
             <div>
@@ -314,7 +340,11 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                onClick={() => {
                  const newId = 'comp_' + Date.now().toString(36);
                  const usedWeeks = new Set(competitions.map(competition => competition.week));
-                 const preferredWeek = Math.min(totalWeeks, compWeek + competitions.length * 8);
+                  const lastCompetitionWeek = competitions.reduce(
+                    (latest, competition) => Math.max(latest, competition.week),
+                    compWeek,
+                  );
+                  const preferredWeek = Math.min(totalWeeks, lastCompetitionWeek + 8);
                  const week = Array.from({ length: totalWeeks }, (_, index) => index + 1)
                    .find(candidate => candidate >= preferredWeek && !usedWeeks.has(candidate))
                    ?? Array.from({ length: totalWeeks }, (_, index) => index + 1).find(candidate => !usedWeeks.has(candidate));
@@ -337,7 +367,10 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           {competitions.length === 0 && (
             <div>
               <div style={LABEL}>Неделя соревнований</div>
-              <input style={IN} type="number" min={1} max={totalWeeks} value={compWeek} onChange={e => setCompWeek(+e.target.value)} />
+               <input style={IN} type="number" min={1} max={totalWeeks} value={compWeek} onChange={e => {
+                 const value = Number(e.target.value);
+                 setCompWeek(Number.isFinite(value) ? Math.max(1, Math.min(totalWeeks, Math.round(value))) : 1);
+               }} />
             </div>
           )}
           {competitions.map((c, i) => {

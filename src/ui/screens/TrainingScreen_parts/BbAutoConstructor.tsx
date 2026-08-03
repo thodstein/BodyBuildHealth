@@ -63,6 +63,7 @@ import { getBBSuggestions } from './bb-compat';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { WhatIfCard } from './WhatIfCard';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
+import { bbMacroToActiveBlock, type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 
 type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -178,6 +179,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [bbGoal, setBbGoal] = useState<string>(prof.goal === 'bulk' ? 'mass' : prof.goal || 'mass');
   const [bbDays, setBbDays] = useState<number>(prof.daysPerWeek || 4);
   const [bbWeeks, setBbWeeks] = useState<number>(8);
+  const [bbAnnualMacrocycle, setBbAnnualMacrocycle] = useState<BBMacrocycle | null>(null);
   const [bbVolGoal, setBbVolGoal] = useState<string>('mav');
   const [bbFocus, setBbFocus] = useState<string>('');
   const [bbTrainingFocus, setBbTrainingFocus] = useState<'strength' | 'hypertrophy' | 'endurance'>(
@@ -597,7 +599,30 @@ export const BbAutoConstructor: React.FC = () => {
        }, pedAdapt);
     }
 
-    const modeLabel = planMode === 'bb_cycle' ? `BB-цикл: ${customCycle?.meta.title || getCycleById(selectedCycleId)?.meta.title || selectedCycleId}` : 'Generic-сплит';
+    if (bbAnnualMacrocycle) {
+      const phaseMap = {
+        hypertrophy: 'accumulation',
+        strength: 'intensification',
+        contest_prep: 'peaking',
+        transition: 'deload',
+      } as const;
+      plan = {
+        ...plan,
+        weeks: plan.weeks.map(week => {
+          const active = bbMacroToActiveBlock(bbAnnualMacrocycle, week.week);
+          if (!active) return week;
+          return {
+            ...week,
+            phase: phaseMap[active.phase],
+            deload: active.phase === 'transition',
+          };
+        }),
+      };
+    }
+
+    const modeLabel = bbAnnualMacrocycle
+      ? `Годовой BB-макроцикл (${bbAnnualMacrocycle.totalWeeks} нед)`
+      : planMode === 'bb_cycle' ? `BB-цикл: ${customCycle?.meta.title || getCycleById(selectedCycleId)?.meta.title || selectedCycleId}` : 'Generic-сплит';
     const srpe = loadSRPESessions();
     const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : null;
     const deloadNote = autoDeload && acwr && acwr.ratio > 1.5
@@ -2648,7 +2673,16 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={{ fontWeight: 800, color: '#00e68a' }}>🗓 Годовое планирование ББ</div>
               <button onClick={() => setShowMacrocycle(false)} style={BTN_GHOST}>Закрыть</button>
             </div>
-            <MacrocyclePanel level={bbLevel} goal="bodybuilding" onLevelChange={setBbLevel} onGoalChange={() => undefined} onApplyCycle={(cycleId, weeks) => {
+            <MacrocyclePanel level={bbLevel} goal="bodybuilding" onLevelChange={setBbLevel} onGoalChange={() => undefined} onApplyMacrocycle={source => {
+              if (!('trainingFocus' in source)) return;
+              setBbAnnualMacrocycle(source as BBMacrocycle);
+              setPlanMode('generic_split');
+              setBbWeeks(source.totalWeeks);
+              setBbTrainingFocus(source.trainingFocus);
+              setShowMacrocycle(false);
+              setStep('params');
+            }} onApplyCycle={(cycleId, weeks) => {
+              setBbAnnualMacrocycle(null);
               setPlanMode('bb_cycle');
               setBbProgramPath('cycle');
               setSelectedCycleId(cycleId);

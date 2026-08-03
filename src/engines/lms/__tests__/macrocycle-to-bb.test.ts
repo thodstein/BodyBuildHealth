@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { macrocycleToBBProgram, type MacrocycleToBBOptions } from '../macrocycle-to-bb';
+import { macrocycleToBBProgram, shouldPeriodicDeload, type MacrocycleToBBOptions } from '../macrocycle-to-bb';
 import { buildBbMacrocycle, buildMacrocycle, type Macrocycle } from '../macrocycle.engine';
 
 const baseOpts: MacrocycleToBBOptions = {
@@ -11,6 +11,12 @@ const baseOpts: MacrocycleToBBOptions = {
 };
 
 describe('macrocycleToBBProgram', () => {
+  it('shouldPeriodicDeload применяет разгрузку на каждой четвёртой неделе базовой фазы', () => {
+    expect(shouldPeriodicDeload('strength', 4, 1)).toBe(true);
+    expect(shouldPeriodicDeload('strength', 5, 1)).toBe(false);
+    expect(shouldPeriodicDeload('transition', 4, 1)).toBe(false);
+    expect(shouldPeriodicDeload('endurance', 8, 5)).toBe(true);
+  });
   it('создаёт UserProgram с direction=bb и корректной meta', () => {
     const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 12 });
     const prog = macrocycleToBBProgram(macro, baseOpts);

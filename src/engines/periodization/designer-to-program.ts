@@ -132,13 +132,24 @@ function buildFilledWeeks(total: number, opts: DesignerToUserWeeksOptions): User
     for (let w = 1; w <= total; w++) {
       const srcWeek = src[(w - 1) % Math.max(1, src.length)];
       if (srcWeek) {
+        const blockIndex = Math.floor((w - 1) / Math.max(1, src.length));
+        const progressionFactor = Math.pow(1.005, blockIndex * Math.max(1, src.length));
         out.push({
           ...srcWeek,
           week: w,
           sessions: srcWeek.sessions.map(session => ({
             ...session,
             id: newId('ses'),
-            blocks: session.blocks.map(block => ({ ...block, id: newId('blk') })),
+            blocks: session.blocks.map(block => ({
+              ...block,
+              id: newId('blk'),
+              sets: block.sets.map(set => ({
+                ...set,
+                weight: typeof set.weight === 'number'
+                  ? Math.round(set.weight * progressionFactor * 10) / 10
+                  : set.weight,
+              })),
+            })),
           })),
         });
       } else {
