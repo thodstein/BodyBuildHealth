@@ -47,10 +47,10 @@ export const IndividualPlanResults: React.FC = () => {
     renderMealList, effectiveKcal, effectiveP, effectiveF, effectiveC,
     dayPlanNotes, setDayPlanNotes,
     autoCorrectPlan, allergens, allergenExcludedCount, excludedFoods, healthIssues,
-    cyclingMode, waterCalc,
+    cyclingMode, waterCalc, setWaterCalc,
     showRecipeCreator, setShowRecipeCreator, newRecipe, setNewRecipe,
     userRecipes, setUserRecipes,
-    shoppingList, injections,
+    shoppingList, setShoppingList, injections,
     recipePickerMeal, setRecipePickerMeal,
     replaceMealWithRecipe, undoStack, setUndoStack,
     saveCurrentPlan, savedPlans, setSavedPlans, expandedSavedId, setExpandedSavedId,
@@ -269,7 +269,8 @@ export const IndividualPlanResults: React.FC = () => {
           if (products.length > 0) {
             const score = calcMealScoreV2(products, profile, 'regular');
             const diaas = calcMealDIAAS(products);
-            allMeals.push({ products });
+            // P1-fix: добавлен timing для консистентности с другими special meals
+            allMeals.push({ timing: 'regular', products });
             results.push({ id, name: '🛋 Ленивый день', score, diaas });
           }
         }
@@ -278,7 +279,8 @@ export const IndividualPlanResults: React.FC = () => {
           if (products.length > 0) {
             const score = calcMealScoreV2(products, profile, 'regular');
             const diaas = calcMealDIAAS(products);
-            allMeals.push({ products });
+            // P1-fix: добавлен timing для консистентности
+            allMeals.push({ timing: 'regular', products });
             results.push({ id, name: '🍬 Хочу сладкое', score, diaas });
           }
         }
@@ -293,18 +295,22 @@ export const IndividualPlanResults: React.FC = () => {
 
   // P0-3: Атомарная генерация месяца — явный async-цикл по 4 неделям с коротким yield для UI.
   // Раньше 5×setTimeout (120мс) расово перекрывали weekPlan — построенные недели терялись.
+  // P1-fix: увеличен yield до 100мс (было 50мс) + skipUndo=true для генерации недели
+  // (раньше 5×saveUndo заполняли undoStack cap=5, уничтожая историю отмен пользователя).
   const runMonthPlan = async () => {
+    // P1-fix: один saveUndo до начала массовой генерации, а не 5 раз внутри
+    saveUndo();
     setMonthPlanMode(true);
     setMonthPlan([]);
     for (let w = 0; w < 4; w++) {
-      // короткий yield для UI-рендера между неделями (50мс), без расы перекрытия state.
-      await new Promise<void>(r => setTimeout(() => r(), 50));
-      try { generatePlan(7, w); } catch (e: any) { try { console.warn('[Planner] month week', w, 'failed:', e); } catch {} }
+      // короткий yield для UI-рендера между неделями (100мс), без расы перекрытия state.
+      await new Promise<void>(r => setTimeout(() => r(), 100));
+      try { generatePlan(7, w, undefined, { skipUndo: true }); } catch (e: any) { try { console.warn('[Planner] month week', w, 'failed:', e); } catch {} }
     }
-    await new Promise<void>(r => setTimeout(() => r(), 50));
+    await new Promise<void>(r => setTimeout(() => r(), 100));
     setSelectedWeek(0);
     // Восстановление плана недели 0 для отображения в UI (после прохождения 4 недель)
-    try { generatePlan(7, 0); } catch (e: any) { try { console.warn('[Planner] month week 0 restore failed:', e); } catch {} }
+    try { generatePlan(7, 0, undefined, { skipUndo: true }); } catch (e: any) { try { console.warn('[Planner] month week 0 restore failed:', e); } catch {} }
   };
 
   return (
@@ -950,7 +956,20 @@ export const IndividualPlanResults: React.FC = () => {
       )}
 
       {generated && undoStack.length > 0 && (
-        <button onClick={() => { const snap = undoStack[0]; if (snap) { if ('dayPlan' in snap) setDayPlan(snap.dayPlan); if ('threeDayPlan' in snap) setThreeDayPlan(snap.threeDayPlan); if ('weekPlan' in snap) setWeekPlan(snap.weekPlan); setUndoStack(undoStack.slice(1)); } }} style={{ width:'100%', padding:'8px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:10, fontWeight:600 }}>
+        <button onClick={() => {
+          // P1-fix: functional updater для undoStack — избегаем stale closure при двойном клике
+          setUndoStack((prev: any[]) => {
+            if (prev.length === 0) return prev;
+            const snap = prev[0];
+            if (snap.dayPlan) setDayPlan(snap.dayPlan);
+            if (snap.threeDayPlan) setThreeDayPlan(snap.threeDayPlan);
+            if (snap.weekPlan) setWeekPlan(snap.weekPlan);
+            // P1-fix: восстанавливаем shoppingList/waterCalc/recommendations если есть в снапшоте
+            if (snap.shoppingList) setShoppingList(snap.shoppingList);
+            if (snap.waterCalc) setWaterCalc(snap.waterCalc);
+            return prev.slice(1);
+          });
+        }} style={{ width:'100%', padding:'8px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:10, fontWeight:600 }}>
           ↩ Отменить ({undoStack.length})
         </button>
       )}
@@ -1333,6 +1352,8 @@ export const IndividualPlanResults: React.FC = () => {
               {(Array.isArray(injections) ? injections.length : 0) > 0 && <button onClick={generateDrugCompatReport} style={reportPillStyle('#8b5cf6', activeReports.includes('drug') && !!drugCompatReport)}>💉 Совместимость</button>}
             <button onClick={generateFullNutritionReport} style={reportPillStyle('#3b82f6', activeReports.includes('nutrition') && !!nutritionReport)}>📋 Полный отчёт</button>
             <button onClick={() => {
+              // P2-fix: проверка dayPlan перед массовой генерацией отчётов
+              if (!dayPlan) { setErrorMsg('Сначала создайте план питания.'); return; }
               generateAllergenReport();
               generateNutrientReport();
               generateQualityReport();
@@ -1408,7 +1429,8 @@ export const IndividualPlanResults: React.FC = () => {
             <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.12)' }}>
               <div style={{ fontSize: 9, fontWeight: 700, color: '#3b82f6', marginBottom: 3 }}>🍬 Гликемическая нагрузка</div>
               {(() => {
-                const items = (dayPlan.meals || []).flatMap((m: any) => m.items || []);
+                // P1-fix: null guard на dayPlan.meals — был crash при meals=null
+                const items = (Array.isArray(dayPlan.meals) ? dayPlan.meals : []).flatMap((m: any) => m.items || []);
                 const gl = Math.round(items.reduce((sum: number, it: any) => {
                   const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
                   if (!food?.gi) return sum;
@@ -1647,7 +1669,7 @@ export const IndividualPlanResults: React.FC = () => {
             </div>
           </div>
           <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 6, textAlign: 'center' }}>~{carbloadPlan.bju.kcal} ккал всего</div>
-          {carbloadPlan.foods.map((f: any, i: number) => (
+          {(Array.isArray(carbloadPlan.foods) ? carbloadPlan.foods : []).map((f: any, i: number) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               <span style={{ color: '#fff' }}>• {f.name || f}</span>
               <span onClick={() => addToCart({ name: f.name || f, kcal: f.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:9, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>

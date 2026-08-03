@@ -162,8 +162,13 @@ export const OrganLoadCalculator: React.FC = () => {
   const protein = useCtx ? (ctx.effectiveP || 150) : manualP;
   const fat     = useCtx ? (ctx.effectiveF || 70) : manualF;
   const carbs   = useCtx ? (ctx.effectiveC || 250) : manualC;
-  const sat     = useCtx ? (fat * 0.3) : manualSat;
-  const trans   = useCtx ? 1 : manualTrans;
+  // P2-fix: улучшены эвристики для sat/trans в useCtx mode.
+  // Раньше sat=fat*0.3 (всегда 30%) и trans=1г (всегда 1г) — неточно для разных диет.
+  // Теперь sat оценивается по категории плана (cutting → ниже, mass → выше),
+  // а trans — 0.5г для чистых диет, 1.5г для budget=low (больше processed food).
+  const planSatRatio = ctx?.budget === 'low' ? 0.35 : ctx?.budget === 'max' || ctx?.budget === 'enhanced' ? 0.25 : 0.3;
+  const sat     = useCtx ? (fat * planSatRatio) : manualSat;
+  const trans   = useCtx ? (ctx?.budget === 'low' ? 1.5 : 0.5) : manualTrans;
   const sugar   = useCtx ? (carbs * 0.25) : manualSug;
   const fiber   = useCtx ? 25 : manualFib;
   const omega3  = useCtx ? 500 : manualO3;

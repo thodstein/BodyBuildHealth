@@ -1,11 +1,11 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
-## Current project state (Jul 31 2026)
+## Current project state (Aug 3 2026)
 
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK
-- `vitest` - 644 passing (77 test files; BB-auto generation, safety, migration and round-trip coverage included)
+- `vitest` - 999 passing (124 test files; BB-auto generation, safety, migration, round-trip and nutrition planner button audit coverage included)
 
 ### BB-auto max plan status
 - Generic, BB-cycle and FullProgram paths use the shared finalizer for volume, fatigue budget, phase/taper safety, validation, report and export snapshots.
@@ -17,6 +17,68 @@
 - `origin/main` - tracked
 - uncommitted changes: 7 files (audit fixes re-applied after other agent's commit overwrote them)
 - last commit: 8a163f027 (other agent) / 44be2c068 (partial audit fixes committed)
+
+---
+
+## Nutrition Planner Button Audit Fixes (Aug 3 2026)
+
+Full critical analysis of all buttons and functions in the nutrition planner. 43 bugs found (7 P0, 18 P1, 18 P2). All P0 + P1 + key P2 fixes applied.
+
+### P0 — Critical fixes (crashes / broken functionality)
+1. **BUTCH bjuHigh/bjuLow crash** — `generateBUTCH()` in `planner-special-meals.ts` didn't return `bjuHigh`/`bjuLow`, but UI accessed `butchPlan.bjuHigh.kcal` → TypeError on every "БУЧ" button click. Fixed: added `bjuHigh`/`bjuLow` computed from highCarb/protein/fatHigh/lowCarb/fatLow.
+2. **replaceMealWithRecipe hardcoded 100g** — `IndividualPlanContext.tsx:626` set `amount: 100` for ALL recipe ingredients regardless of actual proportions. Fixed: grams computed from per-item kcal = recipe.kcal/N, scaled to food.kcal density. Also added bounds check on `mealIdx`.
+3. **allergenReport `new Set(null)` crash** — `planner-reports.ts:32` passed `allergens` directly to `new Set()` without null-guard. Fixed: `new Set(Array.isArray(allergens) ? allergens : [])`.
+4. **riskReport `weight=0` → Infinity** — `planner-reports.ts:111` divided protein by weight without guard. Fixed: `const w = weight && weight > 0 ? weight : 80`.
+5. **mealsCount undefined → 3-meal plan** — `meal-plan-engine.ts:1031` had no validation on `input.mealsCount`. `undefined <= N` is always false → all workout roles removed. Fixed: `if (!input.mealsCount || isNaN(input.mealsCount) || input.mealsCount < 3) input.mealsCount = 5`.
+6. **mealsCount < 3 protein overload** — `meal-plan-engine.ts:1184` dumped entire `residualP` into lunch, producing 60-80g protein meals (violates MPS ceiling ~40g). Fixed: split residualP 50/50 between breakfast and lunch.
+
+### P1 — Important fixes (incorrect data / state loss)
+7. **cheatMealPlan.bjuBreakdown undefined** — `generateCheatMeal` didn't return `bjuBreakdown`, UI rendered empty. Fixed: added `bjuBreakdown` computed from bju percentages.
+8. **carbloadPlan.bju.p = daily protein** — `generateCarbload` set `bju.p = effectiveP` (~160g) instead of protocol protein (~1.2g/kg = 96g). Fixed: `proteinG = Math.round(deps.weight * 1.2)`.
+9. **lazyDayPlan/cravingPlan missing timing** — `IndividualPlanResults.tsx:272` pushed `{ products }` without `timing` field, inconsistent with cheatMeal/carbload. Fixed: added `timing: 'regular'`.
+10. **undo snapshot incomplete** — `saveUndo()` in `IndividualPlanContext.tsx:497` only saved dayPlan/threeDayPlan/weekPlan, not shoppingList/waterCalc/recommendations. Fixed: added all three to snapshot.
+11. **undoLast stale closure** — `MealQuickControls.tsx:308` read `undoStack` from closure instead of functional updater. Double-click lost second undo. Fixed: `setUndoStack(prev => ...)` pattern.
+12. **saveCurrentPlan quota failure silent** — `IndividualPlanContext.tsx:1963` only `console.warn` on quota exceeded. Fixed: now calls `setErrorMsg` to show user-visible error.
+13. **autoCorrectPlan no undo** — `IndividualPlanContext.tsx:1965` didn't call `saveUndo()` before modifying. Fixed: added `saveUndo()` at function start.
+14. **autoCorrectPlan uniform ratio** — applied single kcal-ratio to P/F/C. Failed on mixed imbalances. Fixed: per-macro ratios (ratioP/ratioF/ratioC) based on item's dominant macro.
+15. **removeFoodItem/replaceFoodItem stale closure** — `updateMultiDayPlan` used `plan === threeDayPlan` reference comparison which failed on stale closures. Fixed: determine plan type by `days.length` (3=threeDay, 7=week).
+16. **runMonthPlan race condition** — 50ms setTimeout yield didn't guarantee React commit. Fixed: increased to 100ms + `skipUndo: true` option in generatePlan.
+17. **runMonthPlan undo corruption** — 5×saveUndo filled undoStack (cap=5), destroying user's history. Fixed: single `saveUndo()` before loop + `{ skipUndo: true }` per iteration.
+18. **generatePlan days=1 builds d2/d3** — `IndividualPlanContext.tsx:1857` built all 3 days even for days=1, wasting CPU and polluting usedFoodIds. Fixed: conditional `days >= 3 ? buildDay(...) : null`.
+19. **buildRecommendations daysCount=0 → NaN** — `planner-recommendations.ts:103` divided by `planDaysForAnalysis.length` which could be 0. Fixed: `Math.max(1, planDaysForAnalysis.length)`.
+20. **carbloadPlan.foods.map no Array guard** — `IndividualPlanResults.tsx:1650` called `.map()` without Array.isArray. Fixed: `(Array.isArray(carbloadPlan.foods) ? carbloadPlan.foods : []).map(...)`.
+21. **dayPlan.meals.flatMap no null guard** — `IndividualPlanResults.tsx:1411` accessed `dayPlan.meals.flatMap` without checking meals=null. Fixed: `(Array.isArray(dayPlan.meals) ? dayPlan.meals : []).flatMap(...)`.
+
+### P2 — Quality fixes
+22. **PopupNumber parseInt truncates fractional** — `PopupXxx.tsx:55` used `parseInt(edit)` for slider position, truncating 14.5 → 14. Fixed: `parseFloat(edit)`.
+23. **PopupNumber no min/max clamp on OK** — could type 99999 for height (max=250). Fixed: `if (min !== undefined) v = Math.max(min, v); if (max !== undefined) v = Math.min(max, v)`.
+24. **PopupNumber stale edit state** — didn't sync with external prop changes when popup closed. Fixed: `useEffect(() => { if (!open) setEdit(String(value)); }, [value, open])`.
+25. **Time parsing no try/catch** — `meal-plan-engine.ts:1039,1045` produced "NaN:NaN" on malformed input. Fixed: try/catch with fallback defaults.
+26. **Doc/code mismatch 150 vs 60 min** — comment said ">=150 min gap" but code used 60. Fixed: comment updated to ">=60 min".
+27. **nutrMult dead code** — `IndividualPlanContext.tsx:1166` computed but never used. Removed.
+28. **budget=null → "undefined" in UI** — `planner-reports.ts:86` didn't guard budget. Fixed: `const b = budget || 'medium'`.
+29. **Pre/post-workout rationale hardcoded** — showed constant 40g/60g instead of actual carbG. Fixed: use `carbG` parameter in rationale text.
+30. **Post-build carb cap division by zero** — `meal-plan-engine.ts:759` divided by `it.amount` which could be 0. Fixed: `if (it.amount > 0)` guard.
+31. **Intermediate totals missing fiber/leucine** — fat/protein/iterative correction blocks didn't update `totals.fiber`/`totals.leucine_mg`. Fixed: added reduce calls for both fields.
+32. **OrganLoad hardcoded sat/trans** — `OrganLoadCalculator.tsx:165` used `sat=fat*0.3`, `trans=1g` regardless of diet. Fixed: budget-aware heuristics.
+33. **"Общий отчёт" no dayPlan check** — `IndividualPlanResults.tsx:1335` batch-generated reports without checking dayPlan exists. Fixed: `if (!dayPlan) { setErrorMsg(...); return; }`.
+34. **planner-mealprep null m.items** — `planner-mealprep.ts:29` called `m.items.map()` without guard. Fixed: Array.isArray checks on meals and items.
+
+### Files modified
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/planner-special-meals.ts` — BUTCH bjuHigh/bjuLow, cheatMeal bjuBreakdown, carbload protein
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/IndividualPlanContext.tsx` — replaceMealWithRecipe, saveUndo completeness, autoCorrectPlan, updateMultiDayPlan, generatePlan skipUndo, dead code removal
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/planner-reports.ts` — allergen null-guard, weight guard, budget guard
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/planner-recommendations.ts` — daysCount guard
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/IndividualPlanResults.tsx` — undoLast functional updater, lazyDay timing, carbload Array guard, dayPlan.meals guard, "Общий отчёт" check, runMonthPlan yield+skipUndo
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/MealQuickControls.tsx` — undoLast functional updater
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/meal-plan-engine.ts` — mealsCount validation, protein distribution, time parsing try/catch, carb cap guard, intermediate totals, rationale fix
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/planner-mealprep.ts` — null m.items guard
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/OrganLoadCalculator.tsx` — budget-aware sat/trans heuristics
+- `src/ui/components/PopupXxx.tsx` — parseFloat, min/max clamp, useEffect sync
+
+### Tests
+- `src/ui/screens/NutritionScreen_parts/IndividualPlan/__tests__/button-audit-fixes.test.ts` — **21 new tests**: P0-1 BUTCH bjuHigh/bjuLow (3 tests), P0-2 cheatMeal bjuBreakdown (1 test), P0-3 carbload protein (3 tests), P0-4 allergen null-guard (3 tests), P0-5 riskReport weight guard (3 tests), P0-6 mealsCount validation (4 tests), P1-7 budget null guard (3 tests), P1-8 buildRecommendations daysCount (1 test).
+- Full suite: **999 tests passing** (124 test files), 0 TS errors, vite build OK.
 
 ---
 

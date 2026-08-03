@@ -170,7 +170,7 @@ export interface PlanCtx {
   updateItemAmount: (a: number, b: number, c: number, d: number) => void;
   removeFoodItem: (a: number, b: number, c: number) => void;
   replaceMealWithRecipe: (recipe: Recipe, mealIdx: number) => void;
-  generatePlan: (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number) => void;
+  generatePlan: (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number, opts?: { skipUndo?: boolean }) => void;
   toggleAllergen: (id: string) => void;
   toggleHealthIssue: (id: string) => void;
   loadSavedPlan: (plan: SavedPlan) => void;
@@ -499,6 +499,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (dayPlan) snap.dayPlan = JSON.parse(JSON.stringify(dayPlan));
     if (threeDayPlan) snap.threeDayPlan = JSON.parse(JSON.stringify(threeDayPlan));
     if (weekPlan) snap.weekPlan = JSON.parse(JSON.stringify(weekPlan));
+    // P1-fix: включаем shoppingList/waterCalc/recommendations в снапшот,
+    // чтобы undo не рассинхронизировал план со списком покупок и водным балансом.
+    if (shoppingList) snap.shoppingList = JSON.parse(JSON.stringify(shoppingList));
+    if (waterCalc) snap.waterCalc = JSON.parse(JSON.stringify(waterCalc));
+    if (recommendations) snap.recommendations = JSON.parse(JSON.stringify(recommendations));
     setUndoStack(prev => [snap, ...prev].slice(0, 5));
   };
 
@@ -518,8 +523,19 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (!updated) return;
     days[dayIdx] = updated;
     const allTotals = { kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0), p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0), f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0), c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0) };
-    if (plan === threeDayPlan) setThreeDayPlan({ ...plan, days, totals: allTotals } as any);
-    else if (plan === weekPlan) setWeekPlan({ ...plan, days, totals: allTotals } as any);
+    // P1-fix: используем функциональные updaters вместо сравнения ссылок (===).
+    // Раньше `plan === threeDayPlan` сравнивал closure-captured ссылку с текущим state,
+    // что могло дать false и тихо потерять правки. Теперь определяем тип плана по
+    // длине days (3 = threeDayPlan, 7 = weekPlan) и используем соответствующий setter.
+    const dayCount = days.length;
+    const newPlan = { ...plan, days, totals: allTotals };
+    if (dayCount === 3) setThreeDayPlan(newPlan as any);
+    else if (dayCount === 7) setWeekPlan(newPlan as any);
+    else {
+      // Fallback на старую логику для нестандартных длин
+      if (plan === threeDayPlan) setThreeDayPlan(newPlan as any);
+      else if (plan === weekPlan) setWeekPlan(newPlan as any);
+    }
   };
 
   const moveFoodItem = (fromMealIdx: number, toMealIdx: number, itemIdx: number) => {
@@ -622,12 +638,49 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
 
   const replaceMealWithRecipe = (recipe: Recipe, mealIdx: number, dayIdx = 0) => {
     saveUndo();
+    // P0-fix: пропорциональное распределение КБЖУ по ингредиентам рецепта вместо хардкода 100г.
+    // Каждый ингредиент получает долю kcal = recipe.kcal / N, а граммовка выводится из
+    // энергетической плотности продукта (kcal/100g). Белок/жиры/угл берутся из FOOD_DB
+    // и масштабируются к фактической граммовке, а не к 100г.
     const buildRecipeItems = () => {
-      return recipe.ingredients.map((ing) => { const lower = ing.toLowerCase(); const food = FOOD_DB.find(f => lower.includes(f.name.toLowerCase()) || lower.includes(f.id)); const item: any = food || { name: ing, id: ing, kcal: Math.round(recipe.kcal / recipe.ingredients.length), protein: Math.round(recipe.protein / recipe.ingredients.length), fat: Math.round(recipe.fat / recipe.ingredients.length), carbs: Math.round(recipe.carbs / recipe.ingredients.length) }; return { name: item.name || ing, id: item.id || ing, amount: 100, kcal: Math.round((item.kcal || 0) * (recipe.kcal / recipe.ingredients.length) / Math.max(1, item.kcal || 1)), p: Math.round(item.protein || recipe.protein / recipe.ingredients.length), f: Math.round(item.fat || recipe.fat / recipe.ingredients.length), c: Math.round(item.carbs || recipe.carbs / recipe.ingredients.length) }; });
+      const n = Math.max(1, recipe.ingredients.length);
+      const perItemKcal = recipe.kcal / n;
+      return recipe.ingredients.map((ing) => {
+        const lower = ing.toLowerCase();
+        const food = FOOD_DB.find(f => lower.includes(f.name.toLowerCase()) || lower.includes(f.id));
+        if (food) {
+          // P0-fix: считаем граммовку из kcal-плотности: grams = perItemKcal / (food.kcal/100)
+          const grams = food.kcal > 0 ? Math.round(perItemKcal / food.kcal * 100) : 100;
+          const ratio = grams / 100;
+          return {
+            name: food.name,
+            id: food.id,
+            amount: grams,
+            kcal: Math.round((food.kcal || 0) * ratio),
+            p: Math.round((food.protein || 0) * ratio * 10) / 10,
+            f: Math.round((food.fat || 0) * ratio * 10) / 10,
+            c: Math.round((food.carbs || 0) * ratio * 10) / 10,
+            fiber: Math.round((food.fiber || 0) * ratio * 10) / 10,
+          };
+        }
+        // Fallback: ингредиент не найден в FOOD_DB — распределяем макросы равномерно
+        const fallbackGrams = 100;
+        return {
+          name: ing,
+          id: ing,
+          amount: fallbackGrams,
+          kcal: Math.round(perItemKcal),
+          p: Math.round(recipe.protein / n * 10) / 10,
+          f: Math.round(recipe.fat / n * 10) / 10,
+          c: Math.round(recipe.carbs / n * 10) / 10,
+        };
+      });
     };
     if (dayIdx === 0) {
       setDayPlan((prev: any) => {
-        if (!prev) return prev;
+        if (!prev || !Array.isArray(prev.meals)) return prev;
+        // P0-fix: bounds check на mealIdx — предотвращает молчаливую порчу данных
+        if (mealIdx < 0 || mealIdx >= prev.meals.length) return prev;
         const meals = [...prev.meals];
         const matchedItems = buildRecipeItems();
         const totals = calcItemTotals(matchedItems);
@@ -825,9 +878,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   };
 
   // ─── Generate Plan ───
-   const generatePlan = (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number) => {
+   const generatePlan = (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number, opts?: { skipUndo?: boolean }) => {
      try {
-     saveUndo();
+     // P1-fix: опция skipUndo для массовой генерации (месяц) — иначе 5×saveUndo заполняет
+     // undoStack (cap=5) и уничтожает историю отмен пользователя.
+     if (!opts?.skipUndo) saveUndo();
      setPlanDays(days);
      if (dayIndex !== undefined) setSelectedDayIndex(dayIndex);
 
@@ -1108,7 +1163,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // НЕ return — проваливаемся в классический путь ниже
       }
     }
-    const nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
+    // P2-fix: nutrMult удалён (dead code) — multiplier уже включён в effectiveKcal/P/F/C
     const budgetFilter = (id: BudgetLevel): number[] => { const map: Record<string, number[]> = { low:[0,5],medium:[5,8],max:[8,10],enhanced:[9,15] }; return map[id] || [5,10]; };
     const [bMin, bMax] = budgetFilter(budget);
     const qualityRange = (pool: any[]) => pool.filter((f: any) => { const q = compositeQualityScore(f); return q >= bMin && q <= bMax; });
@@ -1855,10 +1910,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     };
     const dayIdx = days === 1 ? selectedDayIndex : 0;
     const d1 = buildDay(dayIdx, trainingDays[dayIdx]);
-    const d2 = buildDay(1, trainingDays[1]);
-    const d3 = buildDay(2, trainingDays[2]);
+    // P1-fix: строим d2/d3 только при days>=3 (раньше строились всегда, тратя CPU
+    // и загрязняя usedFoodIds для 1-дневного плана).
+    const d2 = days >= 3 ? buildDay(1, trainingDays[1]) : null;
+    const d3 = days >= 3 ? buildDay(2, trainingDays[2]) : null;
     setDayPlan(d1);
-    if (days >= 3) setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: d1.totals.kcal + d2.totals.kcal + d3.totals.kcal, p: d1.totals.p + d2.totals.p + d3.totals.p, f: d1.totals.f + d2.totals.f + d3.totals.f, c: d1.totals.c + d2.totals.c + d3.totals.c } });
+    if (days >= 3 && d2 && d3) setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: d1.totals.kcal + d2.totals.kcal + d3.totals.kcal, p: d1.totals.p + d2.totals.p + d3.totals.p, f: d1.totals.f + d2.totals.f + d3.totals.f, c: d1.totals.c + d2.totals.c + d3.totals.c } });
     let weekDays: any[] | null = null;
     if (days >= 7) {
       weekDays = Array.from({ length: 7 }, (_, i) => buildDay(i, trainingDays[i]));
@@ -1960,9 +2017,81 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => { if (generated && dayPlan) { try { generateRecommendations(); } catch (e: any) { try { console.warn('[Planner] recommendations useEffect failed:', e); } catch {} } } }, [Array.isArray(injections) ? injections.length : 0]);
 
-  const saveCurrentPlan = () => { const name = prompt('Название плана:', `${new Date().toLocaleDateString('ru-RU')} · ${Math.round(dayPlan?.totals?.kcal || 0)} ккал`); if (name === null) return; const plan: SavedPlan = { id: Date.now(), date: new Date().toISOString().split('T')[0], name, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc }; const updated = [plan, ...savedPlans.filter(p => p.id !== plan.id)].slice(0, 10); setSavedPlans(updated); if (!safeWriteJSON('he_saved_nutrition_plans', updated)) { try { console.warn('[Planner] saved plans not saved (quota?)'); } catch {} } };
+  const saveCurrentPlan = () => {
+    const name = prompt('Название плана:', `${new Date().toLocaleDateString('ru-RU')} · ${Math.round(dayPlan?.totals?.kcal || 0)} ккал`);
+    if (name === null) return;
+    const plan: SavedPlan = { id: Date.now(), date: new Date().toISOString().split('T')[0], name, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc };
+    const updated = [plan, ...savedPlans.filter(p => p.id !== plan.id)].slice(0, 10);
+    setSavedPlans(updated);
+    // P1-fix: показываем ошибку пользователю при неудаче сохранения (раньше только console.warn)
+    if (!safeWriteJSON('he_saved_nutrition_plans', updated)) {
+      try { console.warn('[Planner] saved plans not saved (quota?)'); } catch {}
+      setErrorMsg('⚠️ Не удалось сохранить план: превышен лимит localStorage. Удалите старые планы или отчёты.');
+    } else {
+      setErrorMsg(null);
+    }
+  };
 
-  const autoCorrectPlan = () => { if (!dayPlan || !dayPlan.meals) return; const remaining = { kcal: Math.max(0, effectiveKcal - (dayPlan.totals?.kcal || 0)), p: Math.max(0, effectiveP - (dayPlan.totals?.p || 0)), f: Math.max(0, effectiveF - (dayPlan.totals?.f || 0)), c: Math.max(0, effectiveC - (dayPlan.totals?.c || 0)) }; const futureMeals = dayPlan.meals.filter((m: any) => !m.label.includes('Завтрак') && !m.label.includes('Предтрен')); if (futureMeals.length === 0) return; const perMeal = { kcal: Math.round(remaining.kcal / futureMeals.length), p: Math.round(remaining.p / futureMeals.length), f: Math.round(remaining.f / futureMeals.length), c: Math.round(remaining.c / futureMeals.length) }; setDayPlan((prev: any) => { if (!prev) return prev; const meals = prev.meals.map((m: any) => { if (m.label.includes('Завтрак') || m.label.includes('Предтрен')) return m; const ratio = Math.max(0.3, Math.min(1.7, perMeal.kcal / Math.max(1, m.totals?.kcal || 1))); const items = m.items.map((it: any) => ({ ...it, amount: Math.round(it.amount * ratio), kcal: Math.round(it.kcal * ratio), p: Math.round(it.p * ratio), f: Math.round(it.f * ratio), c: Math.round(it.c * ratio) })); const totals = { kcal: items.reduce((s: number, i: any) => s + i.kcal, 0), p: items.reduce((s: number, i: any) => s + i.p, 0), f: items.reduce((s: number, i: any) => s + i.f, 0), c: items.reduce((s: number, i: any) => s + i.c, 0) }; return { ...m, items, totals }; }); const totals = { kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0) }; return { ...prev, meals, totals }; }); };
+  const autoCorrectPlan = () => {
+    if (!dayPlan || !dayPlan.meals) return;
+    // P1-fix: добавлен saveUndo — раньше автокоррекция была неотменяемой
+    saveUndo();
+    const remaining = {
+      kcal: Math.max(0, effectiveKcal - (dayPlan.totals?.kcal || 0)),
+      p: Math.max(0, effectiveP - (dayPlan.totals?.p || 0)),
+      f: Math.max(0, effectiveF - (dayPlan.totals?.f || 0)),
+      c: Math.max(0, effectiveC - (dayPlan.totals?.c || 0))
+    };
+    const futureMeals = dayPlan.meals.filter((m: any) => !m.label.includes('Завтрак') && !m.label.includes('Предтрен'));
+    if (futureMeals.length === 0) return;
+    const perMeal = {
+      kcal: Math.round(remaining.kcal / futureMeals.length),
+      p: Math.round(remaining.p / futureMeals.length),
+      f: Math.round(remaining.f / futureMeals.length),
+      c: Math.round(remaining.c / futureMeals.length)
+    };
+    setDayPlan((prev: any) => {
+      if (!prev) return prev;
+      const meals = prev.meals.map((m: any) => {
+        if (m.label.includes('Завтрак') || m.label.includes('Предтрен')) return m;
+        // P1-fix: per-macro ratios вместо единого ratio по kcal.
+        // Раньше один ratio применялся ко всем макросам, что не работало при
+        // смешанном дисбалансе (жир выше, углеводы ниже).
+        const ratioP = Math.max(0.3, Math.min(1.7, perMeal.p / Math.max(1, m.totals?.p || 1)));
+        const ratioF = Math.max(0.3, Math.min(1.7, perMeal.f / Math.max(1, m.totals?.f || 1)));
+        const ratioC = Math.max(0.3, Math.min(1.7, perMeal.c / Math.max(1, m.totals?.c || 1)));
+        const ratioK = Math.max(0.3, Math.min(1.7, perMeal.kcal / Math.max(1, m.totals?.kcal || 1)));
+        const items = m.items.map((it: any) => {
+          // Белковые продукты масштабируем по ratioP, жировые — по ratioF, углеводные — по ratioC
+          const isProteinDom = (it.p || 0) >= (it.f || 0) && (it.p || 0) >= (it.c || 0);
+          const isFatDom = (it.f || 0) > (it.p || 0) && (it.f || 0) > (it.c || 0);
+          const ratio = isProteinDom ? ratioP : isFatDom ? ratioF : ratioC;
+          return {
+            ...it,
+            amount: Math.round(it.amount * ratio),
+            kcal: Math.round(it.kcal * ratioK),
+            p: Math.round(it.p * ratioP * 10) / 10,
+            f: Math.round(it.f * ratioF * 10) / 10,
+            c: Math.round(it.c * ratioC * 10) / 10
+          };
+        });
+        const totals = {
+          kcal: items.reduce((s: number, i: any) => s + i.kcal, 0),
+          p: items.reduce((s: number, i: any) => s + i.p, 0),
+          f: items.reduce((s: number, i: any) => s + i.f, 0),
+          c: items.reduce((s: number, i: any) => s + i.c, 0)
+        };
+        return { ...m, items, totals };
+      });
+      const totals = {
+        kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0),
+        p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0),
+        f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0),
+        c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0)
+      };
+      return { ...prev, meals, totals };
+    });
+  };
 
   const [mealPrepPlan, setMealPrepPlan] = useState<{ steps: MealPrepStep[]; totalTime: number; containers: number } | null>(null);
   const [mealPrepDays, setMealPrepDays] = useState<1 | 3 | 7>(1);

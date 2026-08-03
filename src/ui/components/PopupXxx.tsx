@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const ACCENT = '#00e68a';
 
@@ -42,6 +42,8 @@ export const PopupNumber: React.FC<{ label: string; value: number; min?: number;
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState(String(value));
   const display = value + (suffix ? ' ' + suffix : '');
+  // P2-fix: sync edit с внешним value когда попап закрыт (избегает stale state)
+  useEffect(() => { if (!open) setEdit(String(value)); }, [value, open]);
   return <>
     <button onClick={() => { setEdit(String(value)); setOpen(true); }} style={cardBtn(false)}>
       <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{label}</div>
@@ -52,13 +54,22 @@ export const PopupNumber: React.FC<{ label: string; value: number; min?: number;
         <div style={{ height:3, background:'linear-gradient(90deg,#00e68a,#00c853)' }} />
         <div style={sheetPad}>
           <div style={sheetTitle}>{label}</div>
-          <input type="range" min={min ?? 0} max={max ?? 300} step={step} value={parseInt(edit) || 0}
+          {/* P2-fix: parseFloat вместо parseInt — теперь slider корректно показывает дробные значения (14.5) */}
+          <input type="range" min={min ?? 0} max={max ?? 300} step={step} value={parseFloat(edit) || 0}
             onChange={e => setEdit(e.target.value)}
             style={{ width:'100%', height:4, accentColor:ACCENT, cursor:'pointer', marginBottom:6 }} />
           <div style={{ display:'flex', gap:6, alignItems:'center' }}>
             <input type="number" value={edit} onChange={e => setEdit(e.target.value)}
               style={{ flex:1, padding:'6px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:16, fontWeight:700, textAlign:'center' }} />
-            <button onClick={() => { const v = parseFloat(edit); if (!isNaN(v)) onChange(v); setOpen(false); }} style={{ padding:'8px 16px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:12 }}>OK</button>
+            <button onClick={() => {
+              // P2-fix: clamp min/max при нажатии OK — раньше можно было ввести 99999 для роста (max=250)
+              let v = parseFloat(edit);
+              if (isNaN(v)) v = min ?? 0;
+              if (min !== undefined) v = Math.max(min, v);
+              if (max !== undefined) v = Math.min(max, v);
+              onChange(v);
+              setOpen(false);
+            }} style={{ padding:'8px 16px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:12 }}>OK</button>
           </div>
         </div>
       </div>

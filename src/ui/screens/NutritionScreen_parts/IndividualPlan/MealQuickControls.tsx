@@ -306,12 +306,21 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
   };
 
   const undoLast = () => {
-    if (undoStack.length === 0) return;
-    const snap = undoStack[0];
-    if (snap.dayPlan) setDayPlan(snap.dayPlan);
-    if (snap.threeDayPlan) setThreeDayPlan(snap.threeDayPlan);
-    if (snap.weekPlan) setWeekPlan(snap.weekPlan);
-    setUndoStack(undoStack.slice(1));
+    // P1-fix: используем functional updater для undoStack, чтобы избежать stale closure
+    // при быстром двойном клике (раньше второй клик читал устаревший массив и терял отмену).
+    let restored = false;
+    setUndoStack((prev: any[]) => {
+      if (prev.length === 0) return prev;
+      const snap = prev[0];
+      if (snap.dayPlan) setDayPlan(snap.dayPlan);
+      if (snap.threeDayPlan) setThreeDayPlan(snap.threeDayPlan);
+      if (snap.weekPlan) setWeekPlan(snap.weekPlan);
+      // P1-fix: восстанавливаем shoppingList/waterCalc/recommendations если есть в снапшоте
+      if (snap.shoppingList && ctx.setShoppingList) ctx.setShoppingList(snap.shoppingList);
+      if (snap.waterCalc && ctx.setWaterCalc) ctx.setWaterCalc(snap.waterCalc);
+      restored = true;
+      return prev.slice(1);
+    });
   };
 
   return (

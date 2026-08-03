@@ -29,7 +29,8 @@ function planItems(dayPlan: any): any[] {
 
 export function generateAllergenReportPure(dayPlan: any, allergens: string[], foodDb: FoodItem[]): AllergenReport {
   if (!dayPlan) return { conflicts: [], riskLevel: 'low', summary: 'Нет плана' };
-  const allergenIds = new Set(allergens);
+  // P0-fix: null-guard на allergens — new Set(null) бросает TypeError
+  const allergenIds = new Set(Array.isArray(allergens) ? allergens : []);
   const conflicts: { food: string; allergens: string[] }[] = [];
   planItems(dayPlan).forEach((it: any) => {
     const food = foodDb.find(f => f.id === it.id || f.name === it.name);
@@ -66,7 +67,9 @@ export function generateNutrientReportPure(dayPlan: any, foodDb: FoodItem[]): Nu
 }
 
 export function generateQualityReportPure(dayPlan: any, budget: string, foodDb: FoodItem[]): QualityReport {
-  if (!dayPlan) return { avgScore: 0, bbsAvg: 0, budget, budgetRange: '?', budgetOk: true, bestItems: [], weakItems: [], recommendations: [] };
+  // P2-fix: guard на budget=null — раньше давал "Ваш бюджет «undefined»" в UI
+  const b = budget || 'medium';
+  if (!dayPlan) return { avgScore: 0, bbsAvg: 0, budget: b, budgetRange: '?', budgetOk: true, bestItems: [], weakItems: [], recommendations: [] };
   const scores: any[] = [];
   planItems(dayPlan).forEach((it: any) => {
     const food = foodDb.find(f => f.id === it.id || f.name === it.name);
@@ -83,13 +86,13 @@ export function generateQualityReportPure(dayPlan: any, budget: string, foodDb: 
   const avg = Math.round(scores.reduce((s, x) => s + x.score, 0) / Math.max(1, scores.length) * 10) / 10;
   const bbsAvg = Math.round(scores.reduce((s, x) => s + x.bbs, 0) / Math.max(1, scores.length) * 10) / 10;
   const sorted = [...scores].sort((a, b) => b.score - a.score);
-  const budgetRange = budget === 'low' ? '?1-5' : budget === 'medium' ? '?5-8' : budget === 'max' ? '?8-10' : '?9-10';
-  const budgetOk = (budget === 'low' && bbsAvg <= 5) || (budget === 'medium' && bbsAvg >= 5 && bbsAvg <= 8) || ((budget === 'max' || budget === 'enhanced') && bbsAvg >= 8);
+  const budgetRange = b === 'low' ? '?1-5' : b === 'medium' ? '?5-8' : b === 'max' ? '?8-10' : '?9-10';
+  const budgetOk = (b === 'low' && bbsAvg <= 5) || (b === 'medium' && bbsAvg >= 5 && bbsAvg <= 8) || ((b === 'max' || b === 'enhanced') && bbsAvg >= 8);
   const recommendations: string[] = !budgetOk
-    ? [`Ваш бюджет «${budget}» (${budgetRange}), но средний bb_quality_score составил ${bbsAvg}. ${budget === 'low' ? 'Смените категорию на более дорогие продукты.' : (budget === 'max' || budget === 'enhanced') ? 'Попробуйте подобрать более качественные продукты.' : 'Откорректируйте бюджет или продуктовую корзину.'}`]
+    ? [`Ваш бюджет «${b}» (${budgetRange}), но средний bb_quality_score составил ${bbsAvg}. ${b === 'low' ? 'Смените категорию на более дорогие продукты.' : (b === 'max' || b === 'enhanced') ? 'Попробуйте подобрать более качественные продукты.' : 'Откорректируйте бюджет или продуктовую корзину.'}`]
     : avg < 6 ? ['Качество продуктов слабое, пересмотрите подбор'] : avg >= 8 ? [`✅: Отлично! Средний bb_quality_score ${bbsAvg} соответствуют категории ${budgetRange}.`] : [];
   return {
-    avgScore: avg, bbsAvg, budget, budgetRange, budgetOk,
+    avgScore: avg, bbsAvg, budget: b, budgetRange, budgetOk,
     bestItems: sorted.filter(s => s.score >= 8).map(s => s.name).slice(0, 5),
     weakItems: sorted.filter(s => s.score <= 5).map(s => s.name).slice(0, 5),
     recommendations,
@@ -98,6 +101,8 @@ export function generateQualityReportPure(dayPlan: any, budget: string, foodDb: 
 
 export function generateRiskReportPure(dayPlan: any, weight: number): RiskReport {
   if (!dayPlan) return { systems: {}, totalRisk: '—', summary: 'Нет плана' };
+  // P0-fix: weight guard — деление на 0/null даёт Infinity, ломая медклассификацию
+  const w = weight && weight > 0 ? weight : 80;
   const systems: Record<string, any> = {};
   const allItems = planItems(dayPlan);
   const totalFat = allItems.reduce((s: number, it: any) => s + (it.f || 0), 0);
@@ -108,7 +113,7 @@ export function generateRiskReportPure(dayPlan: any, weight: number): RiskReport
     impact: fatPct > 35 ? 'перегрузка печени' : 'в норме',
     recommendation: fatPct > 35 ? 'Снизьте жиры до 25-30%' : 'в норме',
   };
-  const proteinGPerKg = Math.round((allItems.reduce((s: number, it: any) => s + (it.p || 0), 0) / weight) * 10) / 10;
+  const proteinGPerKg = Math.round((allItems.reduce((s: number, it: any) => s + (it.p || 0), 0) / w) * 10) / 10;
   systems.renal = {
     score: proteinGPerKg > 3 ? 7 : proteinGPerKg > 2.5 ? 5 : proteinGPerKg > 2 ? 3 : 1,
     impact: `${proteinGPerKg.toFixed(1)} г/кг`,

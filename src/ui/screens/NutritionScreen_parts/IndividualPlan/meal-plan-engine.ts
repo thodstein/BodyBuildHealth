@@ -755,7 +755,8 @@ function buildWholeMeal(
             carbItemIdxs.forEach(x => {
               const it = items[x.i];
               const newGrams = Math.max(0, Math.round(it.amount * scale));
-              if (newGrams < it.amount) {
+              // P2-fix: guard от деления на ноль при amount=0 (NaN propagation)
+              if (newGrams < it.amount && it.amount > 0) {
                 const r = newGrams / it.amount;
                 it.amount = newGrams;
                 it.kcal = Math.round(it.kcal * r);
@@ -833,7 +834,8 @@ function buildPreWorkout(
     label, time, items, totals, type: 'preworkout', target: { p: PREW_PROTEIN_G, c: PREW_CARB_SLOW_G, f: PREW_FAT_MAX_G },
     rationale: [
       `Pre-workout за ~90 мин: белок ${PREW_PROTEIN_G} г (снижение катаболизма)`,
-      `Медленные углеводы ${PREW_CARB_SLOW_G} г (гликоген, стабильная глюкоза)`,
+      // P2-fix: используем фактический carbG вместо захардкоженной константы PREW_CARB_SLOW_G
+      `Медленные углеводы ${carbG} г (гликоген, стабильная глюкоза)`,
       `Жиры ≤ ${PREW_FAT_MAX_G} г — не задерживают gastric emptying`,
     ],
     mpsCheck: { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg) / 1000, triggers_mTOR: totals.leucine_mg >= LEU_THRESHOLD_MG },
@@ -890,7 +892,8 @@ function buildPostWorkout(
     label, time, items, totals, type: 'postworkout', target: { p: POSTW_FAST_PROTEIN_G, c: POSTW_FAST_CARB_G, f: 0 },
     rationale: [
       `Post-workout +60 мин: сывороточный белок ${POSTW_FAST_PROTEIN_G} г — пик аминокислот в крови через 60 мин`,
-      `Быстрые углеводы ${POSTW_FAST_CARB_G} г — быстрое гликоген-восстановление, ↑инсулин (vs глюкагон)`,
+      // P2-fix: используем фактический carbG вместо захардкоженной константы POSTW_FAST_CARB_G
+      `Быстрые углеводы ${carbG} г — быстрое гликоген-восстановление, ↑инсулин (vs глюкагон)`,
       `Жиры ≤ 5 г — не тормозят абсорбцию`,
     ],
     mpsCheck: { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg) / 1000, triggers_mTOR: totals.leucine_mg >= LEU_THRESHOLD_MG && totals.p >= 25 },
@@ -1029,6 +1032,11 @@ const VEG_COLOR_GROUPS = [
 
 // ─── ОСНОВНОЙ ВХОД: построить дневной план ───────────────────────────
 export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
+  // P0-fix: валидация mealsCount — undefined/0/NaN ломают сравнения _roles.length <= N,
+  // приводя к тихой генерации только 3 базовых приёмов без pre/post-workout.
+  if (!input.mealsCount || typeof input.mealsCount !== 'number' || isNaN(input.mealsCount) || input.mealsCount < 3) {
+    input = { ...input, mealsCount: 5 };
+  }
   const randomSalt = input.randomSalt ?? 0;
   // FIX 4: Use user-set times (fallback to defaults)
   const tBreakfast = input.wakeTime || '07:30';
@@ -1036,13 +1044,31 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const tDinner = input.dinnerTime || '19:00';
   const tBed = input.bedTime || '22:00';
   // Pre-sleep 30 min before bed
-  const tPreSleep = (() => { const [h, m] = tBed.split(':').map(Number); const min = (h * 60 + m - 30 + 1440) % 1440; return String(Math.floor(min/60)).padStart(2,'0') + ':' + String(min%60).padStart(2,'0'); })();
-  // Д-14: pre-sleep only if there is a real gap (>=150 min) between dinner and bed, otherwise the
+  // P2-fix: try/catch на time parsing — malformed tBed давал "NaN:NaN" в таймах
+  const tPreSleep = (() => {
+    try {
+      const [h, m] = tBed.split(':').map(Number);
+      if (isNaN(h) || isNaN(m)) return '21:30';
+      const min = (h * 60 + m - 30 + 1440) % 1440;
+      return String(Math.floor(min/60)).padStart(2,'0') + ':' + String(min%60).padStart(2,'0');
+    } catch { return '21:30'; }
+  })();
+  // Д-14: pre-sleep only if there is a real gap (>=60 min) between dinner and bed, otherwise the
   // dinner already covers the night MPS window and a second protein meal is redundant.
-  const _dinnerToBedGap = (() => { try { const [dh, dm] = tDinner.split(':').map(Number); const [bh, bm] = tBed.split(':').map(Number); return ((bh * 60 + bm) - (dh * 60 + dm) + 1440) % 1440; } catch { return 240; } })();
+  // P2-fix: комментарий исправлен с "150 min" на "60 min" — соответствует фактическому порогу в коде.
+  const _dinnerToBedGap = (() => { try { const [dh, dm] = tDinner.split(':').map(Number); const [bh, bm] = tBed.split(':').map(Number); if (isNaN(dh) || isNaN(dm) || isNaN(bh) || isNaN(bm)) return 240; return ((bh * 60 + bm) - (dh * 60 + dm) + 1440) % 1440; } catch { return 240; } })();
   const wantPreSleep = input.mealsCount >= 3 && _dinnerToBedGap >= 60;
   // Snack time: midpoint between lunch and dinner
-  const tSnack = (() => { const [lh, lm] = tLunch.split(':').map(Number); const [dh, dm] = tDinner.split(':').map(Number); const mid = Math.round(((lh*60+lm) + (dh*60+dm)) / 2); return String(Math.floor(mid/60)).padStart(2,'0') + ':' + String(mid%60).padStart(2,'0'); })();
+  // P2-fix: try/catch на time parsing
+  const tSnack = (() => {
+    try {
+      const [lh, lm] = tLunch.split(':').map(Number);
+      const [dh, dm] = tDinner.split(':').map(Number);
+      if (isNaN(lh) || isNaN(lm) || isNaN(dh) || isNaN(dm)) return '15:30';
+      const mid = Math.round(((lh*60+lm) + (dh*60+dm)) / 2);
+      return String(Math.floor(mid/60)).padStart(2,'0') + ':' + String(mid%60).padStart(2,'0');
+    } catch { return '15:30'; }
+  })();
   const variety = input.variety ?? 'max';
   const varietyPoolSize = variety === 'max' ? 20 : variety === 'medium' ? 10 : 5;
 
@@ -1177,11 +1203,18 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     snack2: _keep.has('snack2') ? { p: snackP, c: snack2C, f: snackF } : null,
   };
 
-  const usedP = mealBudget.breakfast.p + mealBudget.lunch.p + mealBudget.dinner.p + (mealBudget.prew?.p || 0) + (mealBudget.postw?.p || 0) + (mealBudget.snack?.p || 0);
+  const usedP = mealBudget.breakfast.p + mealBudget.lunch.p + mealBudget.dinner.p + (mealBudget.prew?.p || 0) + (mealBudget.postw?.p || 0) + (mealBudget.snack?.p || 0) + (mealBudget.snack2?.p || 0);
   const goalProteinTarget = adjustedProteinG || input.goalProteinG;
   let residualP = usedP >= goalProteinTarget ? 0 : Math.max(20, goalProteinTarget - usedP);
-  // Если pre-sleep исключён (мало приёмов) — остаток белка уходит в обед, а не теряется.
-  if (!_keep.has('preSleep') && residualP > 0) { mealBudget.lunch.p += residualP; residualP = 0; }
+  // Если pre-sleep исключён (мало приёмов) — остаток белка распределяется между
+  // завтраком и обедом 50/50, чтобы не превышать MPS-потолок ~40г за один приём.
+  // Раньше весь residualP сливался в обед, что давало 60-80г белка за один приём.
+  if (!_keep.has('preSleep') && residualP > 0) {
+    const halfP = Math.round(residualP / 2);
+    mealBudget.breakfast.p += halfP;
+    mealBudget.lunch.p += residualP - halfP;
+    residualP = 0;
+  }
 
     const allFoodsUsed: string[] = [];
   // Д-4: intra-day diversity — foods already used today are deprioritized for subsequent meals
@@ -1471,7 +1504,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
         });
         meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
-        totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0);
+        // P2-fix: добавлены fiber и leucine_mg в day totals (были stale после fat scaling)
+        totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.fiber = meals.reduce((s, m) => s + (m.totals.fiber||0), 0); totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg||0), 0);
       }
     }
   }
@@ -1494,7 +1528,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
         });
         meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
-        totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0);
+        // P2-fix: добавлены fiber и leucine_mg (были stale после protein scaling)
+        totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + (m.totals.fiber||0), 0); totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg||0), 0);
       }
     }
   }
@@ -1532,7 +1567,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
         });
         meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
-        totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0);
+        // P2-fix: добавлены fiber и leucine_mg (были stale после iterative correction)
+        totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + (m.totals.fiber||0), 0); totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg||0), 0);
       }
     }
   }

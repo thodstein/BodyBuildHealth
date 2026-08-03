@@ -100,7 +100,9 @@ export function buildRecommendations(d: RecsInput): string[] {
         }).filter((p: any) => p.weightGrams > 0),
       }))
     );
-    const daysCount = planDaysForAnalysis.length;
+    // P1-fix: guard от деления на 0 — если planDaysForAnalysis пуст (dayPlan=null),
+    // daysCount был 0 → reduce/0 = NaN в рекомендациях
+    const daysCount = Math.max(1, planDaysForAnalysis.length);
     const daily = analyzeDailyDiet(allMealsForV2, profile);
     const totalKcal = Math.round(planDaysForAnalysis.reduce((s: number, dp: any) => s + (dp.totals?.kcal || 0), 0) / daysCount);
     const totalP = Math.round(planDaysForAnalysis.reduce((s: number, dp: any) => s + (dp.totals?.p || 0), 0) / daysCount);

@@ -26,7 +26,12 @@ export function buildMealPrep(input: MealPrepInput): MealPrepResult | null {
   if (!days || days.length === 0) return null;
   const steps: MealPrepStep[] = [];
   let stepNum = 1;
-  const allItems = days.flatMap((d: any) => d.meals.flatMap((m: any) => m.items.map((it: any) => ({ ...it, mealLabel: m.label, mealTime: m.time }))));
+  // P2-fix: null guard на m.items — был TypeError при corrupted dayPlan
+  const allItems = days.flatMap((d: any) =>
+    (Array.isArray(d?.meals) ? d.meals : []).flatMap((m: any) =>
+      (Array.isArray(m?.items) ? m.items : []).map((it: any) => ({ ...it, mealLabel: m.label, mealTime: m.time }))
+    )
+  );
   const uniqueItems = [...new Map(allItems.map((it: any) => [it.name, it])).values()];
   const n = (name: string) => name?.toLowerCase() || '';
 
