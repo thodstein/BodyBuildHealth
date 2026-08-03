@@ -380,6 +380,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
   };
   // 🔄 Замена упражнения: findSubstitutions подбирает альтернативы
   const [substFor, setSubstFor] = useState<number | null>(null);
+  const [expandedBlock, setExpandedBlock] = useState<number | null>(null);
   const substResults = useMemo(() => {
     if (substFor == null) return [];
     const b = blocks[substFor];
@@ -474,6 +475,18 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
         .bb-block-list > div { overflow: hidden; }
         .bb-block-list input, .bb-block-list select { max-width: 100%; }
         .bb-block-list .bb-set-editor { width: 100%; overflow-x: auto; }
+        .bb-block-row { padding: 8px 0 !important; }
+        .bb-block-row > div:first-of-type { width: 100%; }
+        .bb-block-expand { display: inline-flex; }
+        .bb-block-row:not(.is-expanded) .bb-set-editor { display: none; }
+        .bb-block-row:not(.is-expanded) > div:not(:first-of-type) { display: none; }
+      }
+      .bb-block-expand {
+        display: none;
+        margin-left: auto; padding: 5px 8px; border-radius: 6px;
+        border: 1px solid var(--accent-line, rgba(0,230,138,0.45));
+        background: transparent; color: var(--accent, #00e68a);
+        font-size: 10px; cursor: pointer; min-height: 30px;
       }`}</style>
       {blocks.map((b, bi) => (
         <div
@@ -493,6 +506,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
           onDragEnd={() => { dragSrcRef.current = null; setOverIdx(null); }}
           onTouchStart={onTouchStart(bi)}
           onTouchMove={onTouchMove}
+          className={`bb-block-row${expandedBlock === bi ? ' is-expanded' : ''}`}
           style={{
             display: 'flex', flexDirection: 'column', gap: 4, padding: '6px 0',
             borderTop: overIdx === bi ? '2px solid #00e68a' : '2px solid transparent',
@@ -516,7 +530,13 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
           </select>
           <ExerciseLabPicker value={b.exerciseName} muscle={b.muscle} onSelect={ex => updateBlock(bi, { exerciseName: ex.name, muscle: ex.group || b.muscle, type: (ex.type === 'compound' ? 'compound' : ex.type === 'isolation' ? 'isolation' : 'accessory') as UserBlock['type'], role: ex.type === 'compound' ? 'primary' : 'accessory' })} />
           <input style={{ ...IN, padding: '6px 10px', fontSize: 11, width: 80, minHeight: 38 }} value={b.muscle} onChange={e => updateBlock(bi, { muscle: e.target.value })} placeholder="Мышца" list="muscle-list" />
-          <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} muscle={b.muscle} workMax={(loadTrainingProfile().workMax ?? {}) as Record<string, number>} />
+           <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} muscle={b.muscle} workMax={(loadTrainingProfile().workMax ?? {}) as Record<string, number>} />
+           <button
+             className="bb-block-expand"
+             type="button"
+             onClick={() => setExpandedBlock(expandedBlock === bi ? null : bi)}
+             aria-expanded={expandedBlock === bi}
+           >{expandedBlock === bi ? '▲ Детали' : '▼ Детали'}</button>
           </div>
           
           {/* Авто-разминка для compound с заданным весом */}
