@@ -9,6 +9,7 @@
 import React, { useMemo, useState } from 'react';
 import { SET_TEMPLATES, GROUP_RU } from './program-types';
 import { ACCENT, ACCENT_LINE, BTN_GHOST, CARD, DIM, DIM_STRONG, IN, SMALL, panelStyle } from './training-ui';
+import { useConfirmDialog } from './ConfirmDialog';
 import { getReferencedCycle, userWeekToBBPlan } from '../../../engines/user-program/program-store';
 import type {
   UserProgram, BBProgramBody, PLProgramBody, UserWeek, UserSession, UserBlock, UserSet,
@@ -35,6 +36,7 @@ import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
 
 const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => void; level: string }> = ({ body, onChange, level }) => {
   const [volWeekIdx, setVolWeekIdx] = useState<number | null>(null);
+  const { confirm } = useConfirmDialog();
   const setWeeks = (weeks: UserWeek[]) => onChange({ ...body, weeks });
   const addWeek = () => {
     const n = body.weeks.length + 1;
@@ -44,11 +46,12 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
     const w2 = body.weeks.map((w, i) => i === wi ? { ...w, ...patch } : w);
     setWeeks(w2);
   };
-  // U4: confirm-диалог при удалении недели
-  const removeWeek = (wi: number) => {
+  // U4/F4: confirm-диалог при удалении недели — ConfirmDialog вместо window.confirm
+  const removeWeek = async (wi: number) => {
     const wk = body.weeks[wi];
     const sessCount = wk?.sessions?.length ?? 0;
-    if (!window.confirm(`Удалить неделю ${wk?.week}? Будет потеряно ${sessCount} сессий. Это нельзя отменить.`)) return;
+    const ok = await confirm({ title: `Удалить неделю ${wk?.week}?`, message: `Будет потеряно ${sessCount} сессий. Это нельзя отменить.`, confirmLabel: 'Удалить', danger: true });
+    if (!ok) return;
     setWeeks(body.weeks.filter((_, i) => i !== wi).map((w, i) => ({ ...w, week: i + 1 })));
   };
   // U12: клонировать неделю с прогрессией весов +2.5%
@@ -256,12 +259,14 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
 };
 
 const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']; onChange: (s: UserSession[]) => void }> = ({ sessions, phase, onChange }) => {
+  const { confirm } = useConfirmDialog();
   const addSession = () => onChange([...sessions, { id: newId('ses'), name: 'День ' + (sessions.length + 1), focus: '', blocks: [] }]);
   const updateSession = (si: number, patch: Partial<UserSession>) => onChange(sessions.map((s, i) => i === si ? { ...s, ...patch } : s));
-  // U4: confirm-диалог при удалении сессии
-  const removeSession = (si: number) => {
+  // U4/F4: confirm-диалог при удалении сессии — ConfirmDialog
+  const removeSession = async (si: number) => {
     const s = sessions[si];
-    if (!window.confirm(`Удалить "${s.name}"? Будет потеряно ${s.blocks.length} упражнений. Это нельзя отменить.`)) return;
+    const ok = await confirm({ title: `Удалить "${s.name}"?`, message: `Будет потеряно ${s.blocks.length} упражнений. Это нельзя отменить.`, confirmLabel: 'Удалить', danger: true });
+    if (!ok) return;
     onChange(sessions.filter((_, i) => i !== si));
   };
   // U12: клонировать сессию
@@ -301,6 +306,7 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
 };
 
 const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onChange: (b: UserBlock[]) => void }> = ({ blocks, phase, onChange }) => {
+  const { confirm } = useConfirmDialog();
   const addBlock = () => onChange([...blocks, { id: newId('blk'), type: 'accessory', exerciseName: '', muscle: '', role: 'accessory', sets: [{ reps: 10, rir: 2 }] }]);
   const updateBlock = (bi: number, patch: Partial<UserBlock>) => onChange(blocks.map((b, i) => i === bi ? { ...b, ...patch } : b));
   // F2.2: clipboard для копирования блоков между сессиями/неделями.
@@ -318,10 +324,11 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
       onChange([...blocks, newBlock]);
     } catch {}
   };
-  // U4: confirm-диалог при удалении блока
-  const removeBlock = (bi: number) => {
+  // U4/F4: confirm-диалог при удалении блока — ConfirmDialog
+  const removeBlock = async (bi: number) => {
     const b = blocks[bi];
-    if (!window.confirm(`Удалить "${b.exerciseName || 'упражнение'}"? Будет потеряно ${b.sets.length} сетов. Это нельзя отменить.`)) return;
+    const ok = await confirm({ title: `Удалить "${b.exerciseName || 'упражнение'}"?`, message: `Будет потеряно ${b.sets.length} сетов. Это нельзя отменить.`, confirmLabel: 'Удалить', danger: true });
+    if (!ok) return;
     onChange(blocks.filter((_, i) => i !== bi));
   };
   // U12: клонировать блок
@@ -613,12 +620,14 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
 };
 
 const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; muscle?: string; workMax?: Record<string, number> }> = ({ sets, onChange, muscle, workMax }) => {
+  const { confirm } = useConfirmDialog();
   const add = () => onChange([...sets, { reps: 10, rir: 2, weight: 0, restSec: 90 }]);
   const upd = (i: number, patch: Partial<UserSet>) => onChange(sets.map((s, j) => j === i ? { ...s, ...patch } : s));
   const del = (i: number) => onChange(sets.filter((_, j) => j !== i));
-  const confirmDelete = (i: number) => {
+  const confirmDelete = async (i: number) => {
     if (sets.length === 1) {
-      if (!window.confirm('Удалить последний сет? Блок останется без сетов (можно добавить заново).')) return;
+      const ok = await confirm({ title: 'Удалить последний сет?', message: 'Блок останется без сетов (можно добавить заново).', confirmLabel: 'Удалить', danger: true });
+      if (!ok) return;
     }
     del(i);
   };
@@ -772,6 +781,7 @@ const PLSetEditor: React.FC<{ sets: PLSet[]; lift: PLExercise['lift']; workMax: 
 };
 
 const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => void }> = ({ body, onChange }) => {
+  const { confirm } = useConfirmDialog();
   const cycle = useMemo(() => getReferencedCycle({ meta: {} as any, pl: body } as UserProgram), [body.sourceCycleId]);
   const set = (patch: Partial<PLProgramBody>) => onChange({ ...body, ...patch });
   const isCustom = !body.sourceCycleId;
@@ -838,8 +848,9 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
               <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Процентки/сеты/повторения цикла не редактируются — это профессиональная методика. Ниже — ваш оверлей.</div>
               <button
                 style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, marginTop: 6, minHeight: 38, color: '#f59e0b', borderColor: 'rgba(245,158,11,0.3)' }}
-                onClick={() => {
-                  if (!window.confirm('Переключиться на свой ПЛ-цикл? Процентки LMS-цикла будут отсоединены — вы сможете редактировать недели/дни/упражнения/процентки самостоятельно. Это нельзя отменить.')) return;
+                onClick={async () => {
+                  const ok = await confirm({ title: 'Переключиться на свой ПЛ-цикл?', message: 'Процентки LMS-цикла будут отсоединены — вы сможете редактировать недели/дни/упражнения/процентки самостоятельно. Это нельзя отменить.', confirmLabel: 'Переключить', danger: true });
+                  if (!ok) return;
                   set({ sourceCycleId: null, customWeeks: [{ week: 1, phase: 'accumulation', deload: false, days: [{ name: 'День 1', exercises: [{ name: 'Присед', lift: 'squat', muscle: 'legs', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }] }] }] });
                 }}
               >✏ Переключить на свой цикл</button>

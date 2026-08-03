@@ -39,6 +39,7 @@ import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { BbContextPanel } from './program-editor-context-panels';
 import { BBEditor, PLEditor, BBConstraintsPanel } from './ProgramEditorComponents';
 import { ProgramEditor } from './ProgramEditorView';
+import { ConfirmDialogProvider, useConfirmDialog } from './ConfirmDialog';
 import { PlanDiagnosticsPanel, InteractiveVolumePanel, ExerciseInfoPanel, ProgressionCoach, SplitConsultant, PlanSummaryTable, AutoPeriodizationPanel, SubstitutionPanel } from './editor-panels';
 import { LoadGuardPanel, RealMRVPanel, RIRCalibrationPanel, TonnageEstimatePanel, StickingPointPanel, PlateAutoPanel, WhatIfGuardPanel, ReadinessForecastPanel, CheckinGuardPanel, BiomechanicsPanel } from './ProGuardPanels';
 import { QuickTemplate, QuickTemplatesGrid } from './ProgramQuickTemplates';
@@ -157,6 +158,7 @@ const ManualModeToggle: React.FC<{ mode: ManualMode; onMode: (m: ManualMode) => 
 import { hapticImpact } from '../../../core/telegram';
 
 export const ProgramManagerPanel: React.FC = () => {
+  const { confirm } = useConfirmDialog();
   const [programs, setPrograms] = useState<UserProgram[]>(() => loadUserPrograms());
   const [editing, setEditing] = useState<UserProgram | null>(null);
   const [pickerOpen, setPickerOpen] = useState<'bb' | 'pl' | null>(null);
@@ -400,9 +402,10 @@ export const ProgramManagerPanel: React.FC = () => {
     setEditing(p);
   };
 
-  const removeProgram = (id: string) => {
-    // U4: confirm-диалог при удалении (защита от случайного клика)
-    if (!window.confirm('Удалить программу безвозвратно? Это действие нельзя отменить.')) return;
+  const removeProgram = async (id: string) => {
+    // F4: ConfirmDialog вместо window.confirm
+    const ok = await confirm({ title: 'Удалить программу безвозвратно?', message: 'Это действие нельзя отменить.', confirmLabel: 'Удалить', danger: true });
+    if (!ok) return;
     deleteUserProgram(id);
     refresh();
     if (editing?.meta.id === id) setEditing(null);
@@ -445,14 +448,16 @@ export const ProgramManagerPanel: React.FC = () => {
   }, [programs, search, filterDir, sortBy]);
 
   if (editing) {
-    return <ProgramEditor
-      program={editing}
-      onChange={onEditChange}
-      onSave={commit}
-      onBack={() => { setEditing(null); refresh(); }}
-      mode={manualMode}
-      onMode={setManualMode}
-    />;
+    return (
+      <ProgramEditor
+        program={editing}
+        onChange={onEditChange}
+        onSave={commit}
+        onBack={() => { setEditing(null); refresh(); }}
+        mode={manualMode}
+        onMode={setManualMode}
+      />
+    );
   }
 
   // P3 — Empty-state: если ни одной программы, показать яркий CTA (5 крупных кнопок)
@@ -1006,6 +1011,13 @@ export const ProgramManagerPanel: React.FC = () => {
     </div>
   );
 };
+
+// F4: Wrap in ConfirmDialogProvider for all confirm dialogs
+export const ProgramManagerPanelWithProvider: React.FC = () => (
+  <ConfirmDialogProvider>
+    <ProgramManagerPanel />
+  </ConfirmDialogProvider>
+);
 
 /* ───────────────────────── Редактор ───────────────────────── */
 /* P0-1: ProgramEditor extracted to ProgramEditorView.tsx for isolated testing and reuse. */

@@ -26,7 +26,7 @@ import { getStrengthLevel, getNextLevelTarget } from '../../engines/performance-
 import { computeStructuredAnalytics } from '../../engines/structured-analytics.engine';
 import { PlannerPlAuto } from './TrainingScreen_parts/PlannerPlAuto';
 import { PlannerBbAuto } from './TrainingScreen_parts/PlannerBbAuto';
-import { ProgramManagerPanel } from './TrainingScreen_parts/ProgramManagerPanel';
+import { ProgramManagerPanelWithProvider as ProgramManagerPanel } from './TrainingScreen_parts/ProgramManagerPanel';
 import { DiaryAnalyticsZone } from './TrainingScreen_parts/DiaryAnalyticsZone';
 import { LibraryZone } from './TrainingScreen_parts/LibraryZone';
 import { LoadSafetyCard } from './TrainingScreen_parts/LoadSafetyCard';

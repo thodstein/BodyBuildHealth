@@ -46,6 +46,9 @@ import { getReferencedCycle, userWeekToBBPlan, validateProgram, cloneFromCycle, 
 import { autodraftBBPlan, applyPhaseModulation, plLmsScheduleDays, computePlanQualityFor } from '../../../engines/manual-constructor';
 import { GROUP_RU } from './program-types';
 import { BulkApplyCard } from './BulkApplyCard';
+import { useEditorToast } from './EditorToast';
+import { useConfirmDialog } from './ConfirmDialog';
+import { ProgramTimeline } from './ProgramTimeline';
 import type { ManualMode } from './ProgramManagerPanel';
 
 const GOAL_OPTS = [
@@ -61,10 +64,17 @@ const DIR_LABEL: Record<string, string> = { bb: 'ББ', pl: 'ПЛ', hybrid: 'Hyb
 const SOURCE_LABEL: Record<string, string> = {
   custom: 'своя', cloned_library: 'из библиотеки', cloned_cycle: 'клон цикла', from_build: 'из сборки',
 };
-const btn: React.CSSProperties = { ...BTN, flex: 1, minWidth: 0 };
-const ghostBtn: React.CSSProperties = { ...BTN_GHOST, flex: 1, minWidth: 0 };
 
-export const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserProgram) => void; onSave: (note?: string) => void; onBack: () => void; mode: ManualMode; onMode: (m: ManualMode) => void }> = ({ program, onChange, onSave, onBack, mode, onMode }) => {
+export interface ProgramEditorProps {
+  program: UserProgram;
+  onChange: (p: UserProgram) => void;
+  onSave: (note?: string) => void;
+  onBack: () => void;
+  mode: ManualMode;
+  onMode: (m: ManualMode) => void;
+}
+
+export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange, onSave, onBack, mode, onMode }) => {
   const dir = program.meta.direction;
   const isPro = mode === 'pro';
   const update = (patch: Partial<UserProgram>) => onChange({ ...program, ...patch });
@@ -73,9 +83,9 @@ export const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserP
   const labAdjust = useMemo(() => labTrainingAdjust(linked.labAnalysis ?? null), [linked.labAnalysis]);
   const [tprofile, updateTProfile] = useTrainingProfile();
 
-  // Локальный toast — сам ProgramEditor не имеет доступа к flash() родителя.
-  const [editorToast, setEditorToast] = useState('');
-  const showToast = (m: string) => { setEditorToast(m); setTimeout(() => setEditorToast(''), 2200); };
+  // V6: Toast with variants — replaces plain editorToast div
+  const { showToast: showToastRaw, ToastNode } = useEditorToast();
+  const showToast = (m: string, variant?: import('./EditorToast').ToastVariant) => showToastRaw(m, variant);
 
   // P1-1: planner-bridge — приём рекомендаций из калькуляторов (split/pri/weakpoints/pm/tempo/rir/mrv/deload/volume/peak/methodology/program)
   const [bridgeApply, setBridgeApply] = useState<PlannerApply | null>(null);
@@ -155,9 +165,13 @@ export const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserP
     }, 30_000);
     return () => clearInterval(timer);
   }, [program, onSave]);
+  // F4: ConfirmDialog replaces window.confirm
+  const { confirm } = useConfirmDialog();
   // U4: подтверждение выхода без сохранения
-  const safeBack = () => {
-    if (!isDirty || window.confirm('Есть несохранённые изменения. Выйти без сохранения?')) {
+  const safeBack = async () => {
+    if (!isDirty) { onBack(); return; }
+    const ok = await confirm({ title: 'Несохранённые изменения', message: 'Есть несохранённые изменения. Выйти без сохранения?', confirmLabel: 'Выйти', cancelLabel: 'Сохранить', danger: true });
+    if (ok) {
       onBack();
     } else {
       onSave('Ручная правка');
@@ -482,13 +496,20 @@ export const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserP
         )}
       </div>
 
-      {/* P2-1: подсказка при пустой программе в standard-режиме */}
+      {/* P2-1/F5: подсказка при пустой программе в standard-режиме — прямая CTA авто-черновика */}
       {!isPro && program.bb && (program.bb.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0)) && (
-        <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #00e68a' }}>
-          <div style={{ fontSize: 11, color: DIM_STRONG, lineHeight: 1.5 }}>
-            💡 Пустая программа. Нажмите «📥 Загрузить» чтобы взять готовую из библиотеки, или добавьте упражнения вручную ниже.
+        <div style={{ ...CARD, padding: 14, borderLeft: '3px solid #00e68a' }}>
+          <div style={{ fontSize: 12, color: DIM_STRONG, lineHeight: 1.5, marginBottom: 8 }}>
+            💡 Пустая программа. Заполните автоматически на основе вашего профиля или возьмите готовую из библиотеки.
           </div>
-          <button style={{ ...BTN_GHOST, padding: '6px 14px', fontSize: 11, minHeight: 38, marginTop: 6, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => { onMode('pro'); }}>🎓 Перейти в Профессиональный режим для ⚡ авто-черновика</button>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 40 }} onClick={() => autoFillDraft()} title="Автоматическая сборка на основе цели/уровня/дней">
+              ⚡ Создать автоматически
+            </button>
+            <button style={{ ...BTN_GHOST, padding: '8px 16px', fontSize: 12, minHeight: 40, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => setEditorLibOpen('bb')}>
+              📥 Загрузить из библиотеки
+            </button>
+          </div>
         </div>
       )}
 
@@ -889,6 +910,11 @@ export const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserP
         );
       })()}
 
+      {/* F1: Timeline heatmap — visual overview of volume × weeks × muscles */}
+      {dir === 'bb' && program.bb && program.bb.weeks.length > 0 && (
+        <ProgramTimeline program={program} selectedWeek={execWeek - 1} onSelectWeek={(wi) => setExecWeek(wi + 1)} />
+      )}
+
       {/* P2 — LIVE Quality Panel: оценка 0-100 и конкретные правки (BB + PL). Требует профиль + лаб-данные. */}
       {isPro && (dir === 'bb' && program.bb || dir === 'pl' && program.pl?.customWeeks) && (() => {
         const q = computePlanQualityFor(program, program.meta.level, {
@@ -1032,11 +1058,7 @@ export const ProgramEditor: React.FC<{ program: UserProgram; onChange: (p: UserP
       <ProgramNotes program={program} onChange={onChange} />
 
       {/* Локальный toast для сообщений внутри редактора (авто-черновик, к выполнению и т.п.) */}
-      {editorToast && (
-        <div style={{ padding: '6px 10px', background: 'rgba(0,230,138,0.10)', borderLeft: '2px solid rgba(0,230,138,0.4)', borderRadius: 6, fontSize: 11, fontWeight: 700, color: '#fff' }}>
-          {editorToast}
-        </div>
-      )}
+      {ToastNode}
 
       {/* Библиотека — модальное окно внутри редактора (только bb/pl; methods/macro имеют отдельные модалы) */}
       {editorLibOpen && editorLibOpen !== 'macro' && editorLibOpen !== 'methods' && (
