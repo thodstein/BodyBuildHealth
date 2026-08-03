@@ -210,7 +210,10 @@ export function buildMacrocycle(input: MacroInput): Macrocycle {
   const order: MacroPhase[] = ['endurance', 'strength', 'peak', 'competition', 'transition'];
   let w = 0;
   for (const phase of order) {
-    const weeks = Math.max(2, Math.round(total * dist[phase]));
+    // Соревнование занимает одну неделю; остальные фазы получают минимум две.
+    const weeks = phase === 'competition'
+      ? Math.max(1, Math.round(total * dist[phase]))
+      : Math.max(2, Math.round(total * dist[phase]));
     const isBB = input.goal === 'bodybuilding' && (phase === 'endurance' || phase === 'strength' || phase === 'transition');
     const kind: CycleKind = isBB ? 'BB' : 'SRC';
     let cycleId: string | undefined;
@@ -274,15 +277,20 @@ export function buildMacrocycleMulti(events: CompetitionEvent[], input: Omit<Mac
     return buildMacrocycle({ ...input, totalWeeks: total });
   }
   const eventIds = new Set<string>();
+  let mainCompetitionCount = 0;
   for (const event of events) {
     if (!event || typeof event.id !== 'string' || !event.id || typeof event.name !== 'string' || !Number.isFinite(event.week) || !Number.isInteger(event.week) || event.week < 1 || event.week > total || !['A', 'B', 'C'].includes(event.priority) || (event.date != null && !isValidCompetitionDate(event.date))) {
       throw new Error('Некорректное соревнование в макроцикле');
     }
     if (eventIds.has(event.id)) throw new Error(`Дублирующийся ID соревнования: ${event.id}`);
     eventIds.add(event.id);
+    if (event.priority === 'A') mainCompetitionCount += 1;
     if (event.cycleIds && (!Array.isArray(event.cycleIds) || event.cycleIds.some(id => typeof id !== 'string'))) {
       throw new Error(`Некорректные циклы соревнования: ${event.id}`);
     }
+  }
+  if (mainCompetitionCount > 1) {
+    throw new Error('В макроцикле может быть только одно соревнование приоритета A');
   }
   const normalizedEvents = events.map(event => ({
     ...event,
@@ -442,7 +450,11 @@ export function buildMacrocycleMulti(events: CompetitionEvent[], input: Omit<Mac
   }
 }
 
-/** Грубая оценка недели соревнований из даты (отсчёт от сегодня). */
+/** Грубая оценка недели соревнований из даты (отсчёт от сегодня).
+ *  P2-10: если дата в прошлом (daysDiff < 0), возвращаем последнюю неделю макроцикла
+ *  (соревнование уже прошло — не имеет смысла планировать к нему). Раньше Math.max(1, ...)
+ *  молча маппило прошедшую дату на неделю 1, что могло сбить peak/competition блоки.
+ */
 export function estimateCompetitionWeek(isoDate: string, totalWeeks: number = 52, referenceDate?: string | Date): number {
   try {
     const target = new Date(isoDate).getTime();
@@ -452,6 +464,11 @@ export function estimateCompetitionWeek(isoDate: string, totalWeeks: number = 52
       : (referenceDate instanceof Date ? referenceDate.getTime() : new Date(referenceDate).getTime());
     const now = Number.isFinite(reference) ? reference : Date.now();
     const daysDiff = Math.round((target - now) / 86400000);
+    // Прошедшая дата не должна незаметно превращаться в первую неделю нового
+    // макроцикла. Используем тот же безопасный fallback, что и для битой даты.
+    if (daysDiff < 0) return Math.max(1, Math.min(totalWeeks, Math.round(totalWeeks * 0.85)));
+    // Past competition: return last week (no point planning for a past event).
+    if (daysDiff < 0) return totalWeeks;
     // Use Math.floor for consistent week boundaries: day 0 = week 1, day 7 = week 2.
     // Math.round caused off-by-one: day 4 would round to week 2 instead of week 1.
     const week = Math.floor(daysDiff / 7) + 1;
@@ -1013,7 +1030,12 @@ export function rebalanceBbMacrocycle(
   });
   const competitions = macro.competitions?.map(competition => {
     const block = rebasedBlocks.find(candidate => candidate.competitionId === competition.id);
-    return block ? { ...competition, week: block.weekOffset + block.weeks - 1 } : competition;
+    if (!block) return competition;
+    // Сохраняем исходную неделю события, если она ещё попадает в блок. При
+    // сокращении блока безопасно прижимаем её к ближайшей границе, а не
+    // молча переносим на новую последнюю неделю фазы.
+    const week = Math.max(block.weekOffset, Math.min(competition.week, block.weekOffset + block.weeks - 1));
+    return { ...competition, week };
   });
 
   return {

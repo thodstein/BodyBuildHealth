@@ -235,9 +235,14 @@ function findCatalogExerciseByLabel(label: string): Exercise | null {
   const n = norm(label);
   let ex = EXERCISE_CATALOG.find(e => norm(e.name) === n);
   if (ex) return ex;
+  // P2-fix: bidirectional includes was too greedy — a 3-char label "жим" matched "жим ногами".
+  // Now require the SHORTER string to be at least 4 chars for substring matching.
   ex = EXERCISE_CATALOG.find(e => {
     const en = norm(e.name);
-    return en.length > 2 && (en.includes(n) || n.includes(en));
+    if (en.length <= 2 || n.length <= 2) return false;
+    const shorter = en.length <= n.length ? en : n;
+    const longer = en.length <= n.length ? n : en;
+    return shorter.length >= 4 && longer.includes(shorter);
   });
   if (ex) return ex;
   // Fallback: извлечь ядро имени (до скобок, слэша, тире), убрать обёртки типа «(акцент ...)»
@@ -246,7 +251,10 @@ function findCatalogExerciseByLabel(label: string): Exercise | null {
     const cn = norm(core);
     ex = EXERCISE_CATALOG.find(e => {
       const en = norm(e.name);
-      return en.length > 2 && (en.includes(cn) || cn.includes(en));
+      if (en.length <= 2 || cn.length <= 2) return false;
+      const shorter = en.length <= cn.length ? en : cn;
+      const longer = en.length <= cn.length ? cn : en;
+      return shorter.length >= 4 && longer.includes(shorter);
     });
   }
   return ex || null;
@@ -274,9 +282,15 @@ function weeklyMuscleSets(days: LMSPlanDay[], group: string): number {
     .reduce((dayTotal, ex) => dayTotal + ex.workSets.reduce((sets, workSet) => sets + workSet.sets, 0), 0), 0);
 }
 
+/** P2-8: Shared fatigue budget formula — previously duplicated in enforceInjectedFatigueBudget
+ *  and the main week loop (line ~584). Now a single source of truth. */
+function fatigueBudget(readiness?: number): number {
+  return 60 * (Math.max(0, Math.min(100, readiness ?? 80)) / 100);
+}
+
 /** Apply the same session fatigue budget to exercises injected after base generation. */
 function enforceInjectedFatigueBudget(days: LMSPlanDay[], baseExerciseCounts: number[], readiness?: number): void {
-  const budget = 60 * (Math.max(0, Math.min(100, readiness ?? 80)) / 100);
+  const budget = fatigueBudget(readiness);
   for (const [dayIndex, day] of days.entries()) {
     const fatigueCost = (exercise: LMSPlanExercise): number =>
       EXERCISE_CATALOG.find(candidate => candidate.name === exercise.name)?.fatigueCost ?? 5;
@@ -587,7 +601,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       const dayTag = dayLoadTag(day.exercises as { load?: string }[]);
 
       // S-MRV: Бюджет утомления на сессию
-      let dayFatigueBudget = 60 * (Math.max(0, Math.min(100, input.currentReadiness ?? 80)) / 100);
+      let dayFatigueBudget = fatigueBudget(input.currentReadiness);
 
       const planEx: LMSPlanExercise[] = day.exercises.map((spec: SRExerciseSpec) => {
         const pm = pmRow[spec.name];

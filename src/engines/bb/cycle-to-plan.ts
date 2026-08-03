@@ -659,6 +659,29 @@ function exGroupForPLMap(muscle: string): string {
   return 'Кор';
 }
 
+/** P2-7: Единая функция классификации sessionTag по составу мышц дня.
+ *  Ранее дублировалась в 3 местах (lines ~975, ~1395, ~1705) с вариациями.
+ *  Теперь — единый источник правды. */
+function classifySessionTag(muscles: string[]): string {
+  const s = new Set(muscles);
+  const hasChest = s.has('chest'), hasBack = s.has('back'), hasShoulders = s.has('shoulders');
+  const hasQuads = s.has('quads'), hasHams = s.has('hamstrings'), hasGlutes = s.has('glutes');
+  const hasLegs = s.has('legs') || s.has('calves');
+  const isLegs = hasQuads || hasHams || hasGlutes || hasLegs;
+  const hasBi = s.has('biceps'), hasTri = s.has('triceps');
+  if (hasChest && hasBack && !isLegs) return 'ChestBack';
+  if (hasChest && hasTri && !hasBack && !isLegs) return 'Push';
+  if (hasBack && hasBi && !hasChest && !isLegs) return 'Pull';
+  if (hasShoulders && (hasBi || hasTri) && !hasChest && !hasBack && !isLegs) return 'ShouldersArms';
+  if (hasChest && !hasBack && !isLegs) return 'Chest';
+  if (hasBack && !hasChest && !isLegs) return 'Back';
+  if (hasShoulders && !hasChest && !hasBack && !isLegs) return 'Shoulders';
+  if ((hasBi || hasTri) && !hasChest && !hasBack && !isLegs && !hasShoulders) return 'Arms';
+  if (isLegs && !hasChest && !hasBack) return 'Legs';
+  if (hasChest && hasBack && isLegs) return 'FullBody';
+  return 'FullBody';
+}
+
 /** Найти замену для исключённого/осевого упражнения из той же группы, с учётом угла.
  *  Пытается выбрать упражнение с ДРУГИМ углом, чем уже есть в дне (diversity). */
 function findReplacementForCycle(exName: string, muscle: string, favNames: Set<string>, favIdSet: Set<string>, alreadyInDay: Set<string>): { name: string; group: string } | null {
@@ -970,26 +993,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
       };
       // Determine session tag from actual exercises (BEFORE tidy, so tidy can use it)
       const dayMuscles = [...new Set(exercises.map(e => e.muscle))];
-      let sessionTag = 'FullBody';
-      const isChest = dayMuscles.some(m => m === 'chest');
-      const isBack = dayMuscles.some(m => m === 'back');
-      const isQuads = dayMuscles.some(m => m === 'quads' || m === 'legs');
-      const isHams = dayMuscles.some(m => m === 'hamstrings');
-      const isShoulders = dayMuscles.some(m => m === 'shoulders');
-      const isBi = dayMuscles.some(m => m === 'biceps');
-      const isTri = dayMuscles.some(m => m === 'triceps');
-      // P0-fix: isLegs должен покрывать 'legs' group (составная группа каталога)
-      const isLegs = isQuads || isHams || dayMuscles.some(m => m === 'glutes' || m === 'calves');
-      if (isChest && isBack && !isLegs) sessionTag = 'ChestBack';
-      else if (isChest && isTri && !isBack && !isLegs) sessionTag = 'Push';
-      else if (isBack && isBi && !isChest && !isLegs) sessionTag = 'Pull';
-      else if (isShoulders && (isBi || isTri) && !isChest && !isBack && !isLegs) sessionTag = 'ShouldersArms';
-      else if (isChest && !isBack && !isLegs) sessionTag = 'Chest';
-      else if (isBack && !isChest && !isLegs) sessionTag = 'Back';
-      else if (isShoulders && !isChest && !isBack && !isLegs) sessionTag = 'Shoulders';
-      else if ((isBi || isTri) && !isChest && !isBack && !isLegs && !isShoulders) sessionTag = 'Arms';
-      else if (isLegs && !isChest && !isBack) sessionTag = 'Legs';
-      else if (isChest && isBack && isLegs) sessionTag = 'FullBody';
+      const sessionTag = classifySessionTag(dayMuscles);
       // Determine session character from exercises
       const hasHeavy = exercises.some(e => e.character === 'тяж');
       // Faithful: сохраняем оригинальный порядок программы (не переупорядочиваем).
@@ -1391,30 +1395,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       const musclesInDay = pd.exercises.map(e => muscleGroupFromExName(e.name, EXERCISE_CATALOG));
       // Determine primary muscle of day (first muscle appearing with RPE >= 8 or just first exercise)
       const firstExerciseMuscle = musclesInDay[0] || 'chest';
-      let sessionTag = (() => {
-        const s = new Set(musclesInDay);
-        const hasChest = s.has('chest'), hasBack = s.has('back'), hasShoulders = s.has('shoulders');
-        // FIX legs-leak: каталог использует композитную группу 'legs' (а не granular 'quads'/'hamstrings'/
-        // 'glutes') для большинства leg-compound'ов (Приседания, Фронтальный присед, RDL, Жим ногами,
-        // Hip Thrust, Ягодичный мост, Сведение ног и т.д.). Раньше `isLegs` проверял только
-        // quads/hamstrings/glutes — дни, состоящие из leg-compound'ов с group='legs', не
-        // определялись как нога-дни → промечались как 'Chest'/'Back'/'Push' (по мускулу-стартеру)
-        // и нога-упражнения попадали в Push/Pull/Chest-дни. Теперь учитываем и 'legs' как нога.
-        const hasQuads = s.has('quads'), hasHams = s.has('hamstrings'), hasGlutes = s.has('glutes'), hasLegs = s.has('legs') || s.has('calves');
-        const isLegs = hasQuads || hasHams || hasGlutes || hasLegs;
-        const hasBi = s.has('biceps'), hasTri = s.has('triceps');
-        if (hasChest && hasBack && !isLegs) return 'ChestBack';
-        if (hasChest && hasTri && !hasBack && !isLegs) return 'Push';
-        if (hasBack && hasBi && !hasChest && !isLegs) return 'Pull';
-        if (hasShoulders && (hasBi || hasTri) && !hasChest && !hasBack && !isLegs) return 'ShouldersArms';
-        if (hasChest && !hasBack && !isLegs) return 'Chest';
-        if (hasBack && !hasChest && !isLegs) return 'Back';
-        if (hasShoulders && !hasChest && !hasBack && !isLegs) return 'Shoulders';
-        if ((hasBi || hasTri) && !hasChest && !hasBack && !isLegs && !hasShoulders) return 'Arms';
-        if (isLegs && !hasChest && !hasBack) return 'Legs';
-        if (hasChest && hasBack && isLegs) return 'FullBody';
-        return 'FullBody';
-      })();
+      let sessionTag = classifySessionTag(musclesInDay);
       const hasHeavy = pd.exercises.some(e => (e.rpe || 7) >= 8);
 
       // Track per-muscle первичного упражнения — для primary/accessory роли
@@ -1699,22 +1680,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       // менялся (chest отфильтрован → остался только back → tag=ChestBack, но должен быть Back).
       // Теперь пересчитываем из финального состава упражлений → корректный tag для tidy.
       {
-        const finalMuscles = new Set(exercises.map(e => e.muscle));
-        const fChest = finalMuscles.has('chest'), fBack = finalMuscles.has('back'), fShoulders = finalMuscles.has('shoulders');
-        const fQuads = finalMuscles.has('quads'), fHams = finalMuscles.has('hamstrings'), fGlutes = finalMuscles.has('glutes');
-        const fLegs = finalMuscles.has('legs') || finalMuscles.has('calves');
-        const fIsLegs = fQuads || fHams || fGlutes || fLegs;
-        const fBi = finalMuscles.has('biceps'), fTri = finalMuscles.has('triceps');
-        if (fChest && fBack && !fIsLegs) sessionTag = 'ChestBack';
-        else if (fChest && fTri && !fBack && !fIsLegs) sessionTag = 'Push';
-        else if (fBack && fBi && !fChest && !fIsLegs) sessionTag = 'Pull';
-        else if (fShoulders && (fBi || fTri) && !fChest && !fBack && !fIsLegs) sessionTag = 'ShouldersArms';
-        else if (fChest && !fBack && !fIsLegs) sessionTag = 'Chest';
-        else if (fBack && !fChest && !fIsLegs) sessionTag = 'Back';
-        else if (fShoulders && !fChest && !fBack && !fIsLegs) sessionTag = 'Shoulders';
-        else if ((fBi || fTri) && !fChest && !fBack && !fIsLegs && !fShoulders) sessionTag = 'Arms';
-        else if (fIsLegs && !fChest && !fBack) sessionTag = 'Legs';
-        else sessionTag = 'FullBody';
+        const finalMuscles = exercises.map(e => e.muscle);
+        sessionTag = classifySessionTag(finalMuscles);
       }
 
       // L12: добавить суперсет-пары в конец дня (как отдельные упражнения)

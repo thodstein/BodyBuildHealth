@@ -117,7 +117,7 @@ export function macrocycleToBBProgram(
   opts: MacrocycleToBBOptions,
 ): UserProgram {
   const total = Math.max(1, macro.totalWeeks || 1);
-  const isBbMacro = 'trainingFocus' in macro;
+  const isBbMacro = isBBMacrocycle(macro);
   const effectiveOpts = isBbMacro
     ? { ...opts, trainingFocus: (macro as BBMacrocycle).trainingFocus }
     : opts;
@@ -125,7 +125,10 @@ export function macrocycleToBBProgram(
   let baseProgram: UserProgram | null = null;
   try {
     baseProgram = buildBaseBBProgram(total, effectiveOpts);
-  } catch {
+  } catch (error) {
+    // P2-11: previously silently swallowed build errors — user saw empty program with no
+    // diagnostic info. Now logs a warning so the fallback path is traceable.
+    console.warn('macrocycleToBBProgram: buildBaseBBProgram failed, using skeleton fallback:', (error as Error).message);
     baseProgram = null;
   }
 
@@ -268,13 +271,26 @@ function cloneWeekWithFreshIds(source: UserWeek, week: number, weightFactor = 1)
         id: newId('blk'),
         sets: block.sets.map(set => ({
           ...set,
-          weight: typeof set.weight === 'number'
+          weight: typeof set.weight === 'number' && set.weight > 0 && !isBodyweightExercise(block.exerciseName)
             ? Math.round(set.weight * weightFactor * 10) / 10
             : set.weight,
         })),
       })),
     })),
   };
+}
+
+function isBodyweightExercise(name: string): boolean {
+  return /подтяг|отжим|планк|планка|гиперэкстенз|body\s*weight|pull[- ]?up|push[- ]?up|plank|hyperextension/i.test(name);
+}
+
+function isBBMacrocycle(macro: Macrocycle | BBMacrocycle): macro is BBMacrocycle {
+  // BB blocks intentionally do not have the PL-only `kind` field. Checking
+  // both the discriminating field and the block shape avoids relying on one
+  // optional property alone when the models evolve.
+  return 'trainingFocus' in macro
+    && Array.isArray(macro.blocks)
+    && macro.blocks.every(block => !('kind' in block));
 }
 
 /**
@@ -365,7 +381,7 @@ function skeletonWeeksFromBbMacrocycle(macro: BBMacrocycle | Macrocycle, daysPer
     let phase: Phase = 'accumulation';
     let deload = false;
 
-    if ('blocks' in macro && 'totalWeeks' in macro && 'competitions' in macro && 'trainingFocus' in macro) {
+    if (isBBMacrocycle(macro)) {
       // BBMacrocycle (4 фазы)
       const block = bbMacroToActiveBlock(macro as BBMacrocycle, w);
       if (block) {

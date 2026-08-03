@@ -102,6 +102,16 @@ export function rankCycles(input: LMSSelectorInput): LMSRankedCycle[] {
     if (input.mode === 'pct' && (m.period === 'endurance' || m.period === 'strength')) {
       score += 5; rationale.push('подходит для ПКТ (умеренная прогрессия)');
     }
+    // P2-9: mode mismatch penalty — natural user shouldn't get on_course cycle (too aggressive),
+    // on_course user shouldn't get natural cycle (too conservative), PCT user shouldn't get
+    // peak cycles (too intense for recovery). Previously no penalty → wrong cycles recommended.
+    if (input.mode === 'natural' && m.period === 'peak') {
+      score -= 15; warnings.push('пиковый цикл не рекомендуется натуралу (восстановление ограничено)');
+    } else if (input.mode === 'pct' && m.period === 'peak') {
+      score -= 20; warnings.push('пиковый цикл противопоказан на ПКТ (риск перетренированности)');
+    } else if (input.mode === 'on_course' && m.period === 'endurance') {
+      score -= 10; warnings.push('выносливостный цикл не использует потенциал курса (низкая прогрессия)');
+    }
 
     out.push({ cycle, score, rationale, warnings });
   }

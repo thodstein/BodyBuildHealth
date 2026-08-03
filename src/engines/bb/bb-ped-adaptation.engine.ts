@@ -191,7 +191,13 @@ export function adaptForPEDs(
   for (const ped of activePEDs) {
     const base = PED_EFFECTS[ped];
     if (!base) continue;
-    const dose = Number(doses[ped]) || 0;
+    // P2-12: previously `Number(doses[ped]) || 0` silently returned 0 for string doses
+    // like "500mg" (NaN → 0 → fallback to base multiplier, losing dose-aware precision).
+    // Now strips non-numeric suffixes before parsing.
+    const rawDose = doses[ped];
+    const dose = typeof rawDose === 'number' ? rawDose
+      : rawDose != null ? (parseFloat(String(rawDose).replace(/[^0-9.]/g, '')) || 0)
+      : 0;
     // Dose-aware множитель (если доза передана и > 0 — интерполяция по кривой;
     // иначе — fallback на базовый множитель PED_EFFECTS)
     let doseMrv: number, doseRec: number;
