@@ -12,4 +12,29 @@ describe('Saved BB plan legacy migration', () => {
     expect(plans[0].metrics.mrvMult).toBe(1);
     expect(plans[0].params.weeks).toBe(1);
   });
+
+  it('drops malformed variants without a valid weeks/sessions structure', () => {
+    localStorage.setItem('he_bb_plans', JSON.stringify([
+      { id: 'missing-plan', name: 'bad' },
+      { id: 'bad-weeks', plan: { weeks: 'not-an-array' } },
+      { id: 'valid', plan: { weeks: [{ week: 1, sessions: [] }], pattern: { name: 'Generic' } } },
+    ]));
+    const plans = loadSavedBBPlans();
+    expect(plans).toHaveLength(1);
+    expect(plans[0].id).toBe('valid');
+  });
+
+  it('sanitizes legacy parameter arrays and enum values', () => {
+    localStorage.setItem('he_bb_plans', JSON.stringify([{
+      id: 'legacy',
+      plan: { weeks: [{ week: 1, sessions: [] }] },
+      params: { peds: ['AAS', 42], weakPoints: ['chest', null], trainingFocus: 'invalid', methodology: 'invalid', planMode: 'invalid' },
+    }]));
+    const plan = loadSavedBBPlans()[0];
+    expect(plan.params.peds).toEqual(['AAS']);
+    expect(plan.params.weakPoints).toEqual(['chest']);
+    expect(plan.params.trainingFocus).toBeUndefined();
+    expect(plan.params.methodology).toBeUndefined();
+    expect(plan.params.planMode).toBe('generic_split');
+  });
 });

@@ -20,6 +20,13 @@ describe('BB shared finalizer', () => {
     expect(result.volumeTargets).toBeTruthy();
   });
 
+  it('rebuilds missing workSets from exercise defaults', () => {
+    const result = finalizeBBPlan(plan(0, 2), { reorder: false });
+    const exercise = result.weeks[0].sessions[0].exercises[0];
+    expect(exercise.workSets).toHaveLength(2);
+    expect(exercise.workSets.every(set => set.reps === 6 && set.rir === 2 && set.weight === 0)).toBe(true);
+  });
+
   it('applies the same order path when adapt mode requests reorder', () => {
     const result = finalizeBBPlan(plan(2, 2), { reorder: true });
     expect(result.weeks[0].sessions[0].exercises[0].name).toMatch(/жим/i);

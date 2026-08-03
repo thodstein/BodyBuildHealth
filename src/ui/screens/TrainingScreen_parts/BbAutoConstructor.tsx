@@ -180,7 +180,9 @@ export const BbAutoConstructor: React.FC = () => {
   const [bbWeeks, setBbWeeks] = useState<number>(8);
   const [bbVolGoal, setBbVolGoal] = useState<string>('mav');
   const [bbFocus, setBbFocus] = useState<string>('');
-  const bbTrainingFocus = 'hypertrophy' as const;
+  const [bbTrainingFocus, setBbTrainingFocus] = useState<'strength' | 'hypertrophy' | 'endurance'>(
+    ((prof as any).trainingFocus || 'hypertrophy') as 'strength' | 'hypertrophy' | 'endurance',
+  );
   const [planMode, setPlanMode] = useState<PlanMode>(prof.planMode === 'bb_cycle' ? 'bb_cycle' : 'generic_split');
   const [selectedCycleId, setSelectedCycleId] = useState<string>(prof.bbCycleId || '');
   const [loadStrategy, setLoadStrategy] = useState<LoadStrategy>((prof.loadStrategy as LoadStrategy) || 'double_progression');
@@ -516,8 +518,8 @@ export const BbAutoConstructor: React.FC = () => {
            hrvMs: linked.profile.settings.lifestyle.morningHRV,
            sleepHours: linked.profile.settings.lifestyle.sleepHours,
            stressLevel: linked.profile.settings.lifestyle.stressLevel,
-           labMrvMultiplier: labAdjust.mrvMultiplier,
-        });
+          labMrvMultiplier: labAdjust.mrvMultiplier,
+         });
         if (bbDays !== customProgram.daysPerWeek) setBbDays(customProgram.daysPerWeek);
         if (bbWeeks !== customProgram.durationWeeks) setBbWeeks(customProgram.durationWeeks);
       } else if (selectedCycleId || customCycle) {
@@ -584,9 +586,15 @@ export const BbAutoConstructor: React.FC = () => {
         methodology: bbMethodology,
         // P0-5: лабораторная коррекция MRV
         labMrvMultiplier: labAdjust.mrvMultiplier,
-        labWarnings: labAdjust.warnings,
-        labIntensityNote: labAdjust.intensityNote,
-      }, pedAdapt);
+         labWarnings: labAdjust.warnings,
+         labIntensityNote: labAdjust.intensityNote,
+         trainingFocus: bbTrainingFocus,
+         bodyFat: linked.profile.settings.personal.bodyFat,
+         leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
+         hrvMs: linked.profile.settings.lifestyle.morningHRV,
+         sleepHours: linked.profile.settings.lifestyle.sleepHours,
+         stressLevel: linked.profile.settings.lifestyle.stressLevel,
+       }, pedAdapt);
     }
 
     const modeLabel = planMode === 'bb_cycle' ? `BB-цикл: ${customCycle?.meta.title || getCycleById(selectedCycleId)?.meta.title || selectedCycleId}` : 'Generic-сплит';
@@ -613,8 +621,8 @@ export const BbAutoConstructor: React.FC = () => {
       const playerDays = plan.weeks.flatMap(w => w.sessions.map((s, si) => ({
         label: 'Нед' + w.week + ' Д' + (si+1),
         exercises: s.exercises.map(e => {
-          const tgt: { weight: number; reps: number; rir: number } = { weight: e.workSets[0]?.weight || 60, reps: e.workSets[0]?.reps || 10, rir: e.rir ?? 2 };
-          return { name: e.name, muscleGroup: e.muscle, targetSets: Array.from({ length: e.sets || 3 }, () => ({ ...tgt })), restSec: 90 };
+           const targetSets = (e.workSets || []).map(ws => ({ weight: ws.weight || 0, reps: ws.reps || 0, rir: ws.rir ?? e.rir ?? 2 }));
+           return { name: e.name, muscleGroup: e.muscle, targetSets, restSec: e.restSeconds || 90 };
         }),
       })));
       localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: plan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
@@ -703,9 +711,17 @@ export const BbAutoConstructor: React.FC = () => {
        patternName: exportPlan.pattern.name,
       level: bbLevel, goal: bbGoal, weeks: bbWeeks, volumeGoal: bbVolGoal,
       peds, pedDoses, courseIntensity: courseIntensity as string,
-      weakPoints, focusGroup: bbFocus, intensityTechnique: intensityTech,
-      loadStrategy, autoDeload, deloadType, planMode,
-      cycleId: planMode === 'bb_cycle' ? selectedCycleId : undefined,
+       weakPoints, focusGroup: bbFocus, intensityTechnique: intensityTech,
+       loadStrategy, autoDeload, deloadType, planMode,
+       trainingFocus: bbTrainingFocus,
+       methodology: bbMethodology,
+       equipment: bbEquipment.slice(),
+       specialization: specializationMode,
+       daysPerWeek: bbDays,
+       source: bbSource,
+       programPath: bbProgramPath,
+       programId: selectedProgramId || undefined,
+       cycleId: planMode === 'bb_cycle' ? selectedCycleId : undefined,
     };
     const planMetrics: SavedBBPlan['metrics'] = {
        totalSets: exportMetrics.totalSets,
@@ -759,6 +775,37 @@ export const BbAutoConstructor: React.FC = () => {
     if (!v.plan) return;
     const loaded = structuredClone(v.plan) as BBPlan;
     setBuiltPlan(revalidateEditedPlan(loaded));
+    if (v.params.trainingFocus) setBbTrainingFocus(v.params.trainingFocus);
+    if (v.params.level) setBbLevel(v.params.level);
+    if (v.params.goal) setBbGoal(v.params.goal);
+    if (v.params.daysPerWeek) setBbDays(v.params.daysPerWeek);
+    if (v.params.weeks) setBbWeeks(v.params.weeks);
+    if (v.params.volumeGoal) setBbVolGoal(v.params.volumeGoal);
+    if (Array.isArray(v.params.peds)) setPeds(v.params.peds as PED[]);
+    if (Array.isArray(v.params.weakPoints)) setWeakPoints(v.params.weakPoints);
+    if (v.params.focusGroup != null) setBbFocus(v.params.focusGroup);
+    if (v.params.loadStrategy) setLoadStrategy(v.params.loadStrategy as LoadStrategy);
+    if (v.params.deloadType) setDeloadType(v.params.deloadType as DeloadType);
+    if (v.params.intensityTechnique) setIntensityTech(v.params.intensityTechnique as IntensityTechnique);
+    if (v.params.methodology) setBbMethodology(v.params.methodology as SessionMethodology);
+    if (Array.isArray(v.params.equipment)) setBbEquipment(v.params.equipment);
+    if (v.params.specialization != null) setSpecializationMode(Boolean(v.params.specialization));
+    if (v.params.pedDoses) setPedDoses({ ...v.params.pedDoses });
+    if (v.params.courseIntensity) setCourseIntensity(v.params.courseIntensity as 'mild' | 'moderate' | 'heavy');
+    if (v.params.autoDeload != null) setAutoDeload(Boolean(v.params.autoDeload));
+    if (v.params.planMode === 'bb_cycle' || v.params.planMode === 'generic_split') setPlanMode(v.params.planMode as PlanMode);
+    if (v.params.patternId) setSelectedSplitId(v.params.patternId);
+    if (v.params.source) setBbSource(v.params.source);
+    if (v.params.programPath) setBbProgramPath(v.params.programPath);
+    if (v.params.programId) {
+      setSelectedProgramId(v.params.programId);
+      const sourceProgram = bbLibraryPrograms.find(program => program.id === v.params.programId);
+      if (sourceProgram && v.params.programPath === 'library') {
+        setCustomProgram(expandProgramWeeks(sourceProgram));
+        setCustomCycle(null);
+      }
+    }
+    if (v.params.cycleId) setSelectedCycleId(v.params.cycleId);
     setBbWeekSel(1);
     setStep('plan');
   };
@@ -814,8 +861,12 @@ export const BbAutoConstructor: React.FC = () => {
       const playerDays = executionPlan.weeks.flatMap(w => w.sessions.map((s, si) => ({
         label: 'Нед' + w.week + ' Д' + (si+1),
         exercises: s.exercises.map(e => {
-          const tgt: { weight: number; reps: number; rir: number } = { weight: e.workSets[0]?.weight || 60, reps: e.workSets[0]?.reps || 10, rir: e.rir ?? 2 };
-          return { name: e.name, muscleGroup: e.muscle, targetSets: Array.from({ length: e.sets || 3 }, () => ({ ...tgt })), restSec: 90 };
+          const targetSets = (e.workSets || []).map(ws => ({
+            weight: ws.weight || 0,
+            reps: ws.reps || 0,
+            rir: ws.rir ?? e.rir ?? 2,
+          }));
+          return { name: e.name, muscleGroup: e.muscle, targetSets, restSec: e.restSeconds || 90 };
         }),
       })));
        localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: executionPlan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
@@ -1085,8 +1136,13 @@ export const BbAutoConstructor: React.FC = () => {
         <PopupSelect label="Цель" value={bbGoal} onChange={setBbGoal} options={[['mass','Мышечная масса'],['cut','Сушка'],['recomp','Рекомпозиция'],['maintenance','Поддержание'],['strength_mass','Сила + Масса']].map(([id,label]) => ({ id, label }))} />
         <PopupNumber label="Дней/нед" value={bbDays} min={3} max={6} onChange={v => setBbDays(v)} />
         <PopupNumber label="Недель мезо" value={bbWeeks} min={4} max={24} suffix=" нед" onChange={v => setBbWeeks(v)} />
-        <PopupSelectSmart label="Цель объёма" value={bbVolGoal} onChange={onUserVolGoal} suggestedIds={bbSuggest.volumeGoal} suggestionReason="По цели и уровню" options={[['mev','Минимум (MEV)'],['mav','Оптимум (MAV)'],['mrv','Максимум (MRV)']].map(([id,label]) => ({ id, label }))} />
-        <PopupSelect label="Фокус-группа" value={bbFocus} onChange={setBbFocus} options={[{ id:'', label:'Нет' }, ...WEAK_GROUPS.map(([id,l]) => ({ id, label: l }))]} />
+         <PopupSelectSmart label="Цель объёма" value={bbVolGoal} onChange={onUserVolGoal} suggestedIds={bbSuggest.volumeGoal} suggestionReason="По цели и уровню" options={[['mev','Минимум (MEV)'],['mav','Оптимум (MAV)'],['mrv','Максимум (MRV)']].map(([id,label]) => ({ id, label }))} />
+         <PopupSelect label="🎯 Фокус тренировки" value={bbTrainingFocus} onChange={v => setBbTrainingFocus(v as 'strength' | 'hypertrophy' | 'endurance')} options={[
+           { id:'strength', label:'Сила: RIR 1-2' },
+           { id:'hypertrophy', label:'Гипертрофия: RIR 2-3' },
+           { id:'endurance', label:'Выносливость: RIR 3-4' },
+         ]} />
+         <PopupSelect label="Фокус-группа" value={bbFocus} onChange={setBbFocus} options={[{ id:'', label:'Нет' }, ...WEAK_GROUPS.map(([id,l]) => ({ id, label: l }))]} />
         <PopupSelect label="🧩 Методика порядка" value={bbMethodology} onChange={v => setBbMethodology(v as SessionMethodology)} hint="compound_first — базовые раньше изоляции; pre_exhaust — изоляция основной мышцы ПЕРВОЙ (предутомление)" options={[
           { id:'compound_first', label:'Базовые → изоляция (по умолчанию)' },
           { id:'pre_exhaust', label:'Pre-exhaust: изоляция первой' },

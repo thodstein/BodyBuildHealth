@@ -137,6 +137,34 @@ describe('applyPLTaper: already deloaded guard', () => {
   });
 });
 
+describe('BB taper: explicit deload phase', () => {
+  it('does not taper weeks before an explicit deload with normal volume', async () => {
+    const { applyTaperToFinalWeeks } = await import('../bb-autocoach.engine');
+    const makeWeek = (week: number, phase: any) => ({
+      week,
+      phase,
+      deload: phase === 'deload',
+      sessions: [{
+        day: 1,
+        character: 'тяж' as const,
+        exercises: [{
+          muscle: 'chest', name: 'Жим лёжа', role: 'primary' as const, character: 'тяж' as const,
+          sets: 4, repsRange: [8, 10] as [number, number], rir: 2,
+          workSets: Array.from({ length: 4 }, () => ({ reps: 8, rir: 2, weight: 80 })),
+        }],
+      }],
+    });
+    const plan: any = {
+      pattern: {},
+      weeks: [makeWeek(1, 'accumulation'), makeWeek(2, 'accumulation'), makeWeek(3, 'accumulation'), makeWeek(4, 'deload')],
+      rotationMuscleVolume: {}, rationale: [],
+    };
+    const result = applyTaperToFinalWeeks(plan, 4);
+    expect(result.weeks[2].sessions[0].exercises[0].sets).toBe(2);
+    expect(result.weeks[3].sessions[0].exercises[0].sets).toBe(4);
+  });
+});
+
 // ── 4. ACWR + Taper intersection ──
 describe('ACWR + Taper intersection', () => {
   function buildPlan(opts: any = {}) {

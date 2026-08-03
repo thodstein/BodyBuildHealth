@@ -42,8 +42,12 @@ export function syncBBPlanSetShape(plan: BBPlan): BBPlan {
         const current = Array.isArray(exercise.workSets) ? exercise.workSets : [];
         if (current.length > target) {
           exercise.workSets = current.slice(0, target);
-        } else if (current.length < target && current.length > 0) {
-          const template = current[current.length - 1];
+        } else if (current.length < target) {
+          const template = current[current.length - 1] || {
+            reps: exercise.repsRange?.[0] || 8,
+            rir: exercise.rir ?? 2,
+            weight: 0,
+          };
           exercise.workSets = [...current, ...Array.from({ length: target - current.length }, () => ({ ...template }))];
         }
       }

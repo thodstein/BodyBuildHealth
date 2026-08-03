@@ -37,4 +37,17 @@ describe('BB fatigue budget set distribution', () => {
     expect(session.exercises).toHaveLength(1);
     expect(session.exercises[0].sets).toBe(3);
   });
+
+  it('never reduces an accessory below the configured minimum', () => {
+    const session: any = {
+      day: 1, weekOffset: 1, character: 'тяж', sessionTag: 'Chest',
+      exercises: [
+        makeExercise('Жим лёжа', 'chest', 4, 'primary'),
+        makeExercise('Разводка', 'chest', 3),
+      ],
+    };
+    fitBBSessionToBudget(session, { maxWorkingSets: 5, minSetsPerExercise: 2, maxTimeSeconds: 99999, maxAxial: 99999 });
+    expect(session.exercises.every((exercise: any) => exercise.sets >= 2)).toBe(true);
+    expect(session.exercises.every((exercise: any) => exercise.workSets.length === exercise.sets)).toBe(true);
+  });
 });

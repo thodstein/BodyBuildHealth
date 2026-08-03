@@ -13,7 +13,7 @@ import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
 import { adaptForPEDs, type PED, type CourseIntensity } from './bb-ped-adaptation.engine';
 import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-plan-builder';
-import { applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
+import { applyPostPhaseProcessing, applyDeloadToWeek, DELOAD_PROTOCOLS, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { tidySessionExercises, SESSION_TIDY_RATIONALE, isIsolationByName } from './bb-session-order.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { trueMuscleOf } from '../movement-pattern';
@@ -1017,19 +1017,10 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     // Apply deload if this week is a deload week
     const isDeload = meta.deloadWeeks?.includes(w);
     if (isDeload) {
-      for (const sess of sessions) {
-        for (const ex of sess.exercises) {
-          ex.sets = Math.max(1, Math.round(ex.sets * 0.5));
-          ex.rir = Math.min(5, ex.rir + 1);
-          ex.repsRange = [ex.repsRange[0] + 2, ex.repsRange[1] + 2];
-          for (const ws of ex.workSets) {
-            ws.rir = Math.min(5, ws.rir + 1);
-            ws.weight = Math.round(ws.weight * 0.85 * 10) / 10;
-            ws.reps = ws.reps + 2;
-          }
-        }
-      }
-      rationale.push(`🔋 Разгрузка нед ${w}: объём -50%, RIR+1, вес -15%`);
+      const protocol = DELOAD_PROTOCOLS[deloadType || 'pump'];
+      const deloadWeek = applyDeloadToWeek({ week: w, sessions }, protocol);
+      sessions.splice(0, sessions.length, ...deloadWeek.sessions);
+      rationale.push(`🔋 Разгрузка нед ${w}: ${protocol.description} — ${protocol.instructions}`);
     }
 
     weeks.push({ week: w, sessions });

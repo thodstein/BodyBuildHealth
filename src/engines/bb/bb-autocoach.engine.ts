@@ -142,9 +142,17 @@ export function applyDeloadToWeek(week: BBWeek, protocol: DeloadProtocol): BBWee
           e.exerciseName = swapEx.name;
           e.muscle = swapEx.targetMuscle || e.muscle;
           if (!protocol.keepOriginalReps) e.repsRange = [protocol.repRange[0], protocol.repRange[1]];
+          e.sets = Math.max(1, Math.round(e.sets * protocol.volumeMultiplier));
+          e.rir = protocol.rirTarget;
+          const originalSets = e.workSets.slice();
+          e.workSets = originalSets.slice(0, e.sets);
+          while (e.workSets.length < e.sets) {
+            e.workSets.push({ ...(originalSets[originalSets.length - 1] || { reps: protocol.repRange[0], rir: protocol.rirTarget, weight: 0 }) });
+          }
           for (const ws of e.workSets) {
             if (!protocol.keepOriginalReps) ws.reps = Math.round((protocol.repRange[0] + protocol.repRange[1]) / 2);
-            ws.weight = Math.round((e.workSets?.[0]?.weight || ws.weight) * protocol.intensityMultiplier * 10) / 10;
+            ws.rir = protocol.rirTarget;
+            ws.weight = Math.round(ws.weight * protocol.intensityMultiplier * 10) / 10;
             ws.restSeconds = protocol.restSeconds;
           }
           continue;
@@ -153,6 +161,11 @@ export function applyDeloadToWeek(week: BBWeek, protocol: DeloadProtocol): BBWee
       e.sets = Math.max(1, Math.round(e.sets * protocol.volumeMultiplier));
       e.rir = protocol.rirTarget;
       if (!protocol.keepOriginalReps) e.repsRange = [protocol.repRange[0], protocol.repRange[1]];
+      const originalSets = e.workSets.slice();
+      e.workSets = originalSets.slice(0, e.sets);
+      while (e.workSets.length < e.sets) {
+        e.workSets.push({ ...(originalSets[originalSets.length - 1] || { reps: protocol.repRange[0], rir: protocol.rirTarget, weight: 0 }) });
+      }
       for (const ws of e.workSets) {
         if (!protocol.keepOriginalReps) ws.reps = Math.round((protocol.repRange[0] + protocol.repRange[1]) / 2);
         ws.rir = protocol.rirTarget;
@@ -576,6 +589,11 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
         for (const e of s.exercises) {
           const baseSets = Math.round(e.sets / Math.max(0.3, cfg.volumeMultiplier));
           e.sets = Math.max(1, Math.round(baseSets * deloadProtocol.volumeMultiplier));
+          const template = e.workSets[e.workSets.length - 1] || {
+            reps: e.repsRange[0], rir: e.rir, weight: 0,
+          };
+          e.workSets = e.workSets.slice(0, e.sets);
+          while (e.workSets.length < e.sets) e.workSets.push({ ...template });
           for (const ws of e.workSets) {
             // Дополнительное снижение веса (если протокол требует интенсивность < фаза)
             const protocolMult = deloadProtocol.intensityMultiplier / cfg.intensityMultiplier;
@@ -687,10 +705,15 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
     const phaseLabels: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
     for (const w of weeks) {
       const ph = phaseMap.get(w.week) || 'accumulation';
-      for (const s of w.sessions) {
-        for (const e of s.exercises) {
-          e.sets = Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier));
-          for (const ws of e.workSets) {
+        for (const s of w.sessions) {
+          for (const e of s.exercises) {
+            e.sets = Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier));
+            const template = e.workSets[e.workSets.length - 1] || {
+              reps: e.repsRange[0], rir: e.rir, weight: 0,
+            };
+            e.workSets = e.workSets.slice(0, e.sets);
+            while (e.workSets.length < e.sets) e.workSets.push({ ...template });
+            for (const ws of e.workSets) {
             ws.weight = Math.round(ws.weight * autoRegResult.topSetPctMultiplier * 10) / 10;
           }
           e.rir = Math.min(5, e.rir + autoRegResult.rirShift);
@@ -726,7 +749,13 @@ export function applyTaperToFinalWeeks(plan: BBPlan, totalWeeks: number): BBPlan
   const weeks = plan.weeks;
   let lastDeloadIdx = -1;
   for (let i = weeks.length - 1; i >= 0; i--) {
-    // определяем deload по объёму упражнений (deload-неделя = ~50% объёма)
+    // Явная фаза имеет приоритет над эвристикой объёма: пользовательский или
+    // импортированный deload может сохранять больше 60% сетов.
+    if (weeks[i].deload === true || weeks[i].phase === 'deload') {
+      lastDeloadIdx = i;
+      break;
+    }
+    // Fallback для старых планов без phase/deload-флага.
     const totalSets = weeks[i].sessions.flatMap(s => s.exercises).reduce((sum, e) => sum + e.sets, 0);
     const prevSets = i > 0 ? weeks[i - 1].sessions.flatMap(s => s.exercises).reduce((sum, e) => sum + e.sets, 0) : totalSets;
     if (totalSets < prevSets * 0.6) { lastDeloadIdx = i; break; }
@@ -743,7 +772,7 @@ export function applyTaperToFinalWeeks(plan: BBPlan, totalWeeks: number): BBPlan
     // Иначе taper×deload = двойное снижение (0.50×0.45 = 22.5% объёма = перетрен).
     const curSets = w.sessions.flatMap(s => s.exercises).reduce((sum, e) => sum + e.sets, 0);
     const prevSets = idx > 0 ? weeks[idx - 1].sessions.flatMap(s => s.exercises).reduce((sum, e) => sum + e.sets, 0) : curSets;
-    if (curSets < prevSets * 0.6) return w; // уже deload-неделя — не taper
+    if (w.deload === true || w.phase === 'deload' || curSets < prevSets * 0.6) return w; // уже deload-неделя — не taper
     // Taper-степень: неделя 1 (taperStart) = 100%, неделя 2 = 75%, неделя 3 = 50%.
     // Интенсивность (вес) сохраняется на 100% — снижается только объём (сеты).
     const taperWeek = idx - taperStart; // 0, 1, 2

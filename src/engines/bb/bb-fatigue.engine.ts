@@ -70,8 +70,9 @@ export function fitBBSessionToBudget(session: BBSession, budget: BBFatigueBudget
   const exerciseSetCount = (exercise: BBExercise): number => Math.max(0, exercise.sets || exercise.workSets?.length || 0);
   const totalWorkingSets = (): number => session.exercises.reduce((sum, exercise) => sum + exerciseSetCount(exercise), 0);
   const syncSets = (exercise: BBExercise, sets: number): void => {
-    exercise.sets = sets;
-    exercise.workSets = (exercise.workSets || []).slice(0, sets);
+    const target = Math.max(minSets, sets);
+    exercise.sets = target;
+    exercise.workSets = (exercise.workSets || []).slice(0, target);
   };
   const removable = (exercise: BBExercise): number => {
     const cost = estimateBBExerciseCost(exercise);

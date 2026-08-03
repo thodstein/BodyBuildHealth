@@ -24,6 +24,14 @@ export interface SavedBBPlan {
     loadStrategy: string;
     autoDeload: boolean;
     deloadType: string;
+    trainingFocus?: 'strength' | 'hypertrophy' | 'endurance';
+    methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
+    equipment?: string[];
+    specialization?: boolean;
+    daysPerWeek?: number;
+    source?: 'cycle' | 'program';
+    programPath?: 'library' | 'cycle';
+    programId?: string;
     planMode: string;
     cycleId?: string;
   };
@@ -51,29 +59,62 @@ export function loadSavedBBPlans(): SavedBBPlan[] {
     const raw = localStorage.getItem(KEY);
     if (!raw) return [];
     const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr.filter(item => item && typeof item === 'object').map(migrateSavedPlan) : [];
+    return Array.isArray(arr)
+      ? arr.filter(isSavedPlanShape).map(migrateSavedPlan)
+      : [];
   } catch { return []; }
 }
 
+function isSavedPlanShape(value: any): boolean {
+  return Boolean(
+    value && typeof value === 'object' &&
+    value.plan && typeof value.plan === 'object' &&
+    Array.isArray(value.plan.weeks) && value.plan.weeks.length > 0 &&
+    value.plan.weeks.every((week: any) => week && typeof week === 'object' && (!('sessions' in week) || Array.isArray(week.sessions))),
+  );
+}
+
 function migrateSavedPlan(value: any): SavedBBPlan {
+  const rawParams = value.params && typeof value.params === 'object' ? value.params : {};
+  const validFocus = ['strength', 'hypertrophy', 'endurance'].includes(rawParams.trainingFocus) ? rawParams.trainingFocus : undefined;
+  const validMethodology = ['compound_first', 'pre_exhaust', 'post_exhaust'].includes(rawParams.methodology) ? rawParams.methodology : undefined;
+  const validSource = rawParams.source === 'cycle' || rawParams.source === 'program' ? rawParams.source : undefined;
+  const validProgramPath = rawParams.programPath === 'library' || rawParams.programPath === 'cycle' ? rawParams.programPath : undefined;
+  const weeks = Number.isInteger(rawParams.weeks) && rawParams.weeks > 0 ? rawParams.weeks : value.plan.weeks.length;
   return {
-    ...value,
+    id: typeof value.id === 'string' && value.id ? value.id : `bbplan_legacy_${Date.now()}`,
+    name: typeof value.name === 'string' && value.name ? value.name : 'BB-план',
+    date: typeof value.date === 'string' ? value.date : '',
+    plan: value.plan,
     params: {
-      patternId: '', patternName: value.params?.patternName || value.plan?.pattern?.name || '',
-      level: value.params?.level || value.plan?.level || 'intermediate', goal: value.params?.goal || 'mass',
-      weeks: value.params?.weeks || value.plan?.weeks?.length || 1, volumeGoal: value.params?.volumeGoal || 'mav',
-      peds: Array.isArray(value.params?.peds) ? value.params.peds : [], weakPoints: Array.isArray(value.params?.weakPoints) ? value.params.weakPoints : [],
-      focusGroup: value.params?.focusGroup || '', intensityTechnique: value.params?.intensityTechnique || 'none',
-      loadStrategy: value.params?.loadStrategy || 'double_progression', autoDeload: Boolean(value.params?.autoDeload),
-      deloadType: value.params?.deloadType || 'pump', planMode: value.params?.planMode || 'generic_split', ...value.params,
+      patternId: typeof rawParams.patternId === 'string' ? rawParams.patternId : '',
+      patternName: rawParams.patternName || value.plan.pattern?.name || '',
+      level: rawParams.level || value.plan.level || 'intermediate', goal: rawParams.goal || 'mass',
+      weeks, volumeGoal: rawParams.volumeGoal || 'mav',
+      peds: Array.isArray(rawParams.peds) ? rawParams.peds.filter((item: any) => typeof item === 'string') : [],
+      pedDoses: rawParams.pedDoses && typeof rawParams.pedDoses === 'object' ? rawParams.pedDoses : undefined,
+      courseIntensity: rawParams.courseIntensity,
+      weakPoints: Array.isArray(rawParams.weakPoints) ? rawParams.weakPoints.filter((item: any) => typeof item === 'string') : [],
+      focusGroup: typeof rawParams.focusGroup === 'string' ? rawParams.focusGroup : '',
+      intensityTechnique: typeof rawParams.intensityTechnique === 'string' ? rawParams.intensityTechnique : 'none',
+      loadStrategy: typeof rawParams.loadStrategy === 'string' ? rawParams.loadStrategy : 'double_progression',
+      autoDeload: Boolean(rawParams.autoDeload), deloadType: typeof rawParams.deloadType === 'string' ? rawParams.deloadType : 'pump',
+      trainingFocus: validFocus, methodology: validMethodology,
+      equipment: Array.isArray(rawParams.equipment) ? rawParams.equipment.filter((item: any) => typeof item === 'string') : undefined,
+      specialization: rawParams.specialization == null ? undefined : Boolean(rawParams.specialization),
+      daysPerWeek: Number.isInteger(rawParams.daysPerWeek) && rawParams.daysPerWeek > 0 ? rawParams.daysPerWeek : undefined,
+      source: validSource, programPath: validProgramPath,
+      programId: typeof rawParams.programId === 'string' ? rawParams.programId : undefined,
+      planMode: rawParams.planMode === 'bb_cycle' ? 'bb_cycle' : 'generic_split',
+      cycleId: typeof rawParams.cycleId === 'string' ? rawParams.cycleId : undefined,
     },
     metrics: {
-      totalSets: value.metrics?.totalSets || 0, avgRir: value.metrics?.avgRir || 0,
-      sessionsPerWeek: value.metrics?.sessionsPerWeek || value.plan?.pattern?.sessionsPerRotation || 0,
-      phases: Array.isArray(value.metrics?.phases) ? value.metrics.phases : [], qualityScore: value.metrics?.qualityScore || 0,
-      muscleCount: value.metrics?.muscleCount || 0, mrvMult: value.metrics?.mrvMult || 1, ...value.metrics,
+      totalSets: Number(value.metrics?.totalSets) || 0, avgRir: Number(value.metrics?.avgRir) || 0,
+      sessionsPerWeek: Number(value.metrics?.sessionsPerWeek) || value.plan.pattern?.sessionsPerRotation || 0,
+      phases: Array.isArray(value.metrics?.phases) ? value.metrics.phases.filter((item: any) => typeof item === 'string') : [], qualityScore: Number(value.metrics?.qualityScore) || 0,
+      muscleCount: Number(value.metrics?.muscleCount) || 0, mrvMult: Number(value.metrics?.mrvMult) || 1,
     },
-  } as SavedBBPlan;
+  };
 }
 
 export function saveBBPlanVariant(name: string, plan: any, params: SavedBBPlan['params'], metrics: SavedBBPlan['metrics']): SavedBBPlan[] {
