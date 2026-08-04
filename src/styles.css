@@ -97,6 +97,55 @@
   --constructor-control: var(--input-bg);
   color: var(--constructor-text);
 }
+.constructor-surface {
+  background: var(--constructor-surface) !important;
+  border-color: var(--constructor-border) !important;
+  color: var(--constructor-text);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+.constructor-surface--accent { border-left-color: var(--accent) !important; }
+.constructor-surface--warning { border-left-color: var(--warning, #f59e0b) !important; }
+.constructor-surface--info { border-left-color: var(--info, #3b82f6) !important; }
+.constructor-surface--tinted { background: var(--constructor-surface) !important; }
+.bb-annual-planner-backdrop { scrollbar-gutter: stable; }
+.bb-annual-planner-dialog .macrocycle-panel {
+  background: var(--card-bg, #111318);
+  color: var(--text, #fff);
+  border-radius: 12px;
+  padding: 4px;
+}
+.bb-annual-planner-dialog .macrocycle-panel > div {
+  background: var(--card-bg, #181b22) !important;
+  border-color: var(--border-light, rgba(255,255,255,0.14)) !important;
+}
+.macrocycle-timeline-scroll { scrollbar-gutter: stable; }
+.macrocycle-timeline-track { width: 100%; }
+.macrocycle-timeline-track > [role="button"] {
+  min-width: 56px;
+  flex-shrink: 0 !important;
+  overflow: hidden;
+}
+.macrocycle-competition-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  white-space: nowrap;
+  writing-mode: horizontal-tb;
+  word-break: keep-all;
+}
+@media (max-width: 480px) {
+  .bb-annual-planner-backdrop { padding: 0 !important; }
+  .bb-annual-planner-dialog {
+    min-height: 100dvh !important;
+    border-radius: 0 !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+  }
+  .macrocycle-timeline-track { min-width: max-content !important; }
+  .macrocycle-timeline-track > [role="button"] { min-width: 56px; }
+  .macrocycle-timeline-track > [role="button"] > span { white-space: nowrap !important; word-break: keep-all !important; writing-mode: horizontal-tb !important; }
+}
 .manual-constructor__sticky-header {
   background: color-mix(in srgb, var(--bg) 88%, transparent) !important;
   border-color: var(--constructor-border) !important;
@@ -124,6 +173,65 @@
 }
 [data-theme="light"] .manual-constructor [style*="color: #fff"],
 [data-theme="light"] .manual-constructor [style*="color: '#fff'"] { color: var(--constructor-text) !important; }
+
+/* Manual training constructor controls: keep the same touch target and
+   responsive behavior in standard/pro modes and in the annual planner. */
+.manual-constructor button,
+.manual-constructor input,
+.manual-constructor select,
+.manual-constructor textarea,
+.periodization-designer button,
+.periodization-designer input,
+.periodization-designer select,
+.periodization-designer textarea,
+.macrocycle-panel button,
+.macrocycle-panel input,
+.macrocycle-panel select,
+.macrocycle-panel textarea {
+  min-height: 44px;
+}
+.manual-constructor button,
+.periodization-designer button,
+.macrocycle-panel button { touch-action: manipulation; }
+.periodization-designer [role="button"] { touch-action: manipulation; }
+.macrocycle-panel { min-width: 0; }
+.macrocycle-panel > div { min-width: 0; }
+
+@media (max-width: 480px) {
+  .manual-constructor { padding-bottom: calc(var(--bottom-nav-h, 64px) + 12px); }
+  .manual-constructor__sticky-header { position: sticky; top: 0; max-width: 100%; overflow-x: auto; }
+  .periodization-designer { padding: 8px !important; }
+  .periodization-designer > div { max-width: 100%; }
+  .periodization-designer [style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
+  .macrocycle-panel [style*="grid-template-columns: repeat(auto-fit"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .macrocycle-panel input[type="number"] { font-size: 16px !important; }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .manual-constructor button,
+  .manual-constructor input,
+  .manual-constructor select,
+  .manual-constructor textarea,
+  .periodization-designer button,
+  .periodization-designer input,
+  .periodization-designer select,
+  .periodization-designer textarea,
+  .macrocycle-panel button,
+  .macrocycle-panel input,
+  .macrocycle-panel select,
+  .macrocycle-panel textarea {
+    min-height: 44px !important;
+  }
+}
+
+/* Training modal — shared dialog shell for picker/library/method/macrocycle modals. */
+.training-modal-backdrop { animation: fadeInUp 0.15s ease-out; }
+.training-modal-backdrop [role="dialog"] { animation: fadeInUp 0.18s ease-out; }
+.training-modal-backdrop button { min-height: 44px; }
+@media (max-width: 480px) {
+  .training-modal-backdrop { padding: 0 !important; }
+  .training-modal-backdrop [role="dialog"] { maxWidth: 100% !important; maxHeight: 100dvh !important; borderRadius: 12 !important; border-radius: 0 !important; }
+}
 
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 

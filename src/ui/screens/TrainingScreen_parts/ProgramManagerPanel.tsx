@@ -14,7 +14,7 @@
  *
  * Сохранение → ProgramStore (localStorage, версионирование через revisions).
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { getAllPrograms } from '../../../engines/complete-program-library.engine';
 import { expandProgramWeeks } from '../../../engines/program-progression.engine';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
@@ -40,6 +40,8 @@ import { BbContextPanel } from './program-editor-context-panels';
 import { BBEditor, PLEditor, BBConstraintsPanel } from './ProgramEditorComponents';
 import { ProgramEditor } from './ProgramEditorView';
 import { ConfirmDialogProvider, useConfirmDialog } from './ConfirmDialog';
+import { TrainingModal } from './TrainingModal';
+import { useProgramUndo } from './hooks/useProgramUndo';
 import { PlanDiagnosticsPanel, InteractiveVolumePanel, ExerciseInfoPanel, ProgressionCoach, SplitConsultant, PlanSummaryTable, AutoPeriodizationPanel, SubstitutionPanel } from './editor-panels';
 import { LoadGuardPanel, RealMRVPanel, RIRCalibrationPanel, TonnageEstimatePanel, StickingPointPanel, PlateAutoPanel, WhatIfGuardPanel, ReadinessForecastPanel, CheckinGuardPanel, BiomechanicsPanel } from './ProGuardPanels';
 import { QuickTemplate, QuickTemplatesGrid } from './ProgramQuickTemplates';
@@ -60,7 +62,7 @@ import {
 import { tempoFor } from '../../../engines/bb/bb-tempo-rest';
 import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
-import { loadTrainingProfile, saveTrainingProfile, useTrainingProfile, type TrainingProfile } from './training-profile';
+import { loadTrainingProfile } from './training-profile';
 import { TrainingProfileCard } from './TrainingProfileCard';
 import { subscribePlannerApply, clearPlannerApply, type PlannerApply } from './planner-bridge';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
@@ -119,13 +121,15 @@ const MODE_META: Record<ManualMode, { label: string; icon: string; hint: string;
 };
 
 const ManualModeToggle: React.FC<{ mode: ManualMode; onMode: (m: ManualMode) => void }> = ({ mode, onMode }) => (
-  <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 12, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)' }}>
+  <div role="radiogroup" aria-label="Режим ручного конструктора" style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 12, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', flexWrap: 'wrap' }}>
     {(['standard', 'pro'] as ManualMode[]).map((m) => {
       const meta = MODE_META[m];
       const active = mode === m;
       return (
         <button
-          key={m}
+           key={m}
+           role="radio"
+           aria-checked={active}
           onClick={() => { hapticImpact('medium'); onMode(m); }}
           style={{
             flex: '0 0 auto',
@@ -171,57 +175,12 @@ export const ProgramManagerPanel: React.FC = () => {
   });
   useEffect(() => { try { localStorage.setItem('he_manual_mode', manualMode); } catch {} }, [manualMode]);
 
-  // F3.1: обёртка для отслеживания истории изменений (для Undo/Redo через Ctrl+Z)
-  const onEditChange = (next: UserProgram) => {
-    try {
-      // Сохраняем текущий snapshot ПЕРЕД изменением (для последующего Undo)
-      const cur = JSON.stringify(editing);
-      if (cur !== JSON.stringify(next)) {
-        const hist = JSON.parse(localStorage.getItem('he_editor_history') || '{"past":[],"future":[]}');
-        hist.past.push(cur);
-        if (hist.past.length > 50) hist.past.shift();
-        hist.future = [];
-        localStorage.setItem('he_editor_history', JSON.stringify(hist));
-      }
-    } catch {}
+  // F3.1: Undo/Redo history через useProgramUndo hook (извлечено из inline-кода)
+  const { pushSnapshot, undo, redo } = useProgramUndo(editing, setEditing);
+  const onEditChange = useCallback((next: UserProgram) => {
+    pushSnapshot(next);
     setEditing(next);
-  };
-  // F3.1: горячие клавиши Undo/Redo
-  useEffect(() => {
-    if (!editing) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return;
-      if (e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        try {
-          const hist = JSON.parse(localStorage.getItem('he_editor_history') || '{"past":[],"future":[],"current":""}');
-          if (Array.isArray(hist.past) && hist.past.length > 0) {
-            const prev = hist.past.pop();
-            hist.future = hist.future || [];
-            hist.future.push(JSON.stringify(editing));
-            localStorage.setItem('he_editor_history', JSON.stringify(hist));
-            if (prev) {
-              try { setEditing(JSON.parse(prev)); } catch {}
-            }
-          }
-        } catch {}
-      } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
-        e.preventDefault();
-        try {
-          const hist = JSON.parse(localStorage.getItem('he_editor_history') || '{"past":[],"future":[]}');
-          if (Array.isArray(hist.future) && hist.future.length > 0) {
-            const next = hist.future.pop();
-            hist.past = hist.past || [];
-            hist.past.push(JSON.stringify(editing));
-            localStorage.setItem('he_editor_history', JSON.stringify(hist));
-            if (next) { try { setEditing(JSON.parse(next)); } catch {} }
-          }
-        } catch {}
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [editing]);
+  }, [pushSnapshot]);
 
   // P2.6: поиск/сортировка/фильтр
   const [search, setSearch] = useState('');
@@ -242,84 +201,17 @@ export const ProgramManagerPanel: React.FC = () => {
   const [wizardDays, setWizardDays] = useState(4);
   const [wizardWeeks, setWizardWeeks] = useState(8);
   const startCreate = (dir: 'bb' | 'pl' | 'hybrid') => {
-    // Прямое создание — открываем скелет с автозаполнением через профиль.
-    const prof = loadTrainingProfile();
-    const days = 4, weeks = 8;
-    try {
-      if (dir === 'bb') {
-        const bbPlan = autodraftBBPlan({
-          level: 'intermediate', goal: 'hypertrophy', daysPerWeek: days, weeks,
-          equipment: (prof.equipment ?? []) as string[],
-          weakPoints: (prof.weakPoints ?? []) as string[],
-          avoidAxialLoad: prof.avoidAxialLoad ?? false,
-          favoriteExercises: (prof.favoriteExercises ?? []) as string[],
-          excludedExercises: (prof.excludedExercises ?? []) as string[],
-          workMax: prof.workMax ?? {},
-          onCourse: prof.onCourse ?? false,
-          courseIntensity: prof.courseIntensity ?? 'moderate',
-          injuries: prof.injuries ?? [],
-        });
-        const userProg = createFromBuild(bbPlan, {
-          title: 'Новая ББ-программа', goal: 'hypertrophy', level: 'intermediate',
-          weakPoints: (prof.weakPoints ?? []) as string[],
-          equipment: (prof.equipment ?? []) as string[],
-        });
-        if (userProg.bb && userProg.bb.weeks.length >= 4) {
-          userProg.bb.weeks = applyPhaseModulation(userProg.bb.weeks, { goal: 'hypertrophy', level: 'intermediate', weeksTotal: weeks });
-        }
-        setEditing(userProg);
-        const totalEx = userProg.bb?.weeks?.reduce((s, w) => s + w.sessions.reduce((ss, sess) => ss + sess.blocks.length, 0), 0) ?? 0;
-        flash('🆕 ББ создана автозаполнением: ' + weeks + ' нед, ' + totalEx + ' упр');
-        return;
-      }
-      if (dir === 'pl') {
-        const p = createBlank('pl');
-        const foundCycle = LMS_CYCLES.find(c => c.meta.level === 'intermediate' && Math.abs(c.meta.sessionsPerWeek - days) <= 1)
-          ?? LMS_CYCLES.find(c => Math.abs(c.meta.sessionsPerWeek - days) <= 1);
-        if (p.pl && foundCycle) {
-          p.pl.sourceCycleId = foundCycle.meta.id;
-          p.pl.schedule = Array.from({ length: days }, (_, i) => ({ sessionIdx: i, dayOfWeek: i }));
-          p.pl.workMax = { squat: prof.pmSquat, bench: prof.pmBench, dead: prof.pmDead };
-          p.pl.notes = 'Цикл: ' + foundCycle.meta.title + '. Процентки неизменны — ваш оверлей.';
-        }
-        setEditing(p);
-        flash('🆕 ПЛ: ' + (foundCycle ? 'цикл «' + foundCycle.meta.title + '»' : 'подберите цикл вручную'));
-        return;
-      }
-      if (dir === 'hybrid') {
-        const p = createBlank('hybrid');
-        const sessCount = 3;
-        const bbDays = Math.max(1, days - sessCount);
-        const foundCycle = LMS_CYCLES.find(c => c.meta.level === 'intermediate' && Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1)
-          ?? LMS_CYCLES.find(c => Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1);
-        try {
-          const bbPlan = autodraftBBPlan({
-            level: 'intermediate', goal: 'hypertrophy', daysPerWeek: bbDays, weeks,
-            equipment: (prof.equipment ?? []) as string[],
-            weakPoints: (prof.weakPoints ?? []) as string[],
-            avoidAxialLoad: prof.avoidAxialLoad ?? false,
-            workMax: prof.workMax ?? {},
-            onCourse: prof.onCourse ?? false,
-            courseIntensity: prof.courseIntensity ?? 'moderate',
-            injuries: prof.injuries ?? [],
-          });
-          const bbUserProg = createFromBuild(bbPlan, { title: 'hybrid-bb', goal: 'hypertrophy', level: 'intermediate' });
-          if (p.hybrid) {
-            p.hybrid.plRef = { sourceCycleId: foundCycle?.meta.id ?? '', sessionIndices: foundCycle ? Array.from({ length: foundCycle.meta.sessionsPerWeek }, (_, i) => i) : [] };
-            p.hybrid.bbWeeks = bbUserProg.bb?.weeks ?? [];
-            p.hybrid.workMax = { squat: prof.pmSquat ?? 120, bench: prof.pmBench ?? 100, deadlift: prof.pmDead ?? 140 };
-          }
-        } catch { /* ignore */ }
-        setEditing(p);
-        flash('🆕 Powerbuilder: ПЛ «' + (foundCycle?.meta.title ?? '—') + '» + ББ ' + bbDays + 'д/нед');
-        return;
-      }
-    } catch {
-      // Fallback: пустой скелет
-      const p = createBlank(dir);
-      setEditing(p);
-      flash('🆕 Создана пустая программа — заполните упражнениями');
-    }
+    // Быстрые CTA и визард используют один auto-fill путь. Это не даёт
+    // стандартному режиму терять trainingFocus и recovery-метрики профиля.
+    const p = createBlank(dir);
+    p.meta.title = dir === 'bb' ? 'Новая ББ-программа' : dir === 'pl' ? 'Новая ПЛ-программа' : 'Новый Powerbuilder-план';
+    p.meta.goal = dir === 'pl' ? 'powerlifting' : dir === 'hybrid' ? 'strength_mass' : 'hypertrophy';
+    p.meta.level = 'intermediate';
+    p.meta.daysPerWeek = 4;
+    p.meta.weeks = 8;
+    setPendingAutoFill(true);
+    setEditing(p);
+    flash('🆕 Создаём программу из профиля…');
   };
   const finishWizard = (autoFill = false) => {
     const p = createBlank(wizardDir);
@@ -653,11 +545,8 @@ export const ProgramManagerPanel: React.FC = () => {
 
         {/* P2.1: Визард создания программы (модал для пустого состояния) */}
         {wizardOpen && (
-          <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>🪄 Визард создания программы — шаг {wizardStep} из 4</span>
-              <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 38 }} onClick={() => setWizardOpen(false)}>Отмена</button>
-            </div>
+          <TrainingModal title={`🪄 Визард — шаг ${wizardStep} из 4`} onClose={() => setWizardOpen(false)}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {wizardStep === 1 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>1. Направление</div>
@@ -689,10 +578,10 @@ export const ProgramManagerPanel: React.FC = () => {
                 </select>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column' }}>Дней/нед
-                    <input type="number" style={IN} min={2} max={6} value={wizardDays} onChange={e => setWizardDays(parseInt(e.target.value) || 4)} />
+                    <input type="number" style={IN} min={2} max={6} value={wizardDays} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) setWizardDays(Math.max(2, Math.min(6, Math.round(v)))); }} aria-label="Дней в неделю" inputMode="numeric" />
                   </label>
                   <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column' }}>Недель
-                    <input type="number" style={IN} min={4} max={24} value={wizardWeeks} onChange={e => setWizardWeeks(parseInt(e.target.value) || 8)} />
+                    <input type="number" style={IN} min={4} max={24} value={wizardWeeks} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) setWizardWeeks(Math.max(4, Math.min(24, Math.round(v)))); }} aria-label="Недель в программе" inputMode="numeric" />
                   </label>
                 </div>
               </div>
@@ -700,7 +589,7 @@ export const ProgramManagerPanel: React.FC = () => {
             {wizardStep === 4 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>4. Превью</div>
-                <div style={{ ...CARD, padding: 10, background: 'rgba(167,139,250,0.06)' }}>
+                <div className="constructor-surface constructor-surface--tinted" style={{ ...CARD, padding: 10, background: 'rgba(167,139,250,0.06)' }}>
                   <div style={{ fontSize: 12, color: '#fff' }}>📋 <b>{wizardDir === 'bb' ? 'Бодибилдинг' : wizardDir === 'pl' ? 'Пауэрлифтинг' : 'Powerbuilder'}</b></div>
                   <div style={{ fontSize: 11, color: DIM }}>Цель: {wizardGoal} | Уровень: {wizardLevel}</div>
                   <div style={{ fontSize: 11, color: DIM }}>{wizardDays} дн/нед × {wizardWeeks} нед</div>
@@ -709,40 +598,33 @@ export const ProgramManagerPanel: React.FC = () => {
               </div>
             )}
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-              {wizardStep > 1 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => Math.max(1, s - 1) as any)}>← Назад</button>}
-              {wizardStep < 4 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => Math.min(4, s + 1) as any)}>Далее →</button>}
+              {wizardStep > 1 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => (Math.max(1, s - 1) as 1 | 2 | 3 | 4))}>← Назад</button>}
+              {wizardStep < 4 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => (Math.min(4, s + 1) as 1 | 2 | 3 | 4))}>Далее →</button>}
               {wizardStep === 4 && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)' }} onClick={() => finishWizard()}>✨ Создать программу</button>}
               {wizardStep === 4 && manualMode === 'pro' && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }} onClick={() => finishWizard(true)}>⚡ Создать и заполнить</button>}
             </div>
-          </div>
+            </div>
+          </TrainingModal>
         )}
 
         {/* Пикеры: Библиотека ББ / LMS-цикл (модалы для пустого состояния) */}
         {pickerOpen === 'bb' && (
-          <div style={{ ...CARD, padding: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: ACCENT }}>Библиотека программ</span>
-              <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 38 }} onClick={() => setPickerOpen(null)}>Закрыть</button>
-            </div>
+          <TrainingModal title="📚 Библиотека программ" onClose={() => setPickerOpen(null)}>
             <BbProgramLibraryPicker value={null} label="Выбрать программу" programs={allLibraryPrograms} onSelect={startCloneLibrary} />
-          </div>
+          </TrainingModal>
         )}
 
         {pickerOpen === 'pl' && (
-          <div style={{ ...CARD, padding: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>Проф. LMS-циклы (immutable)</span>
-              <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 38 }} onClick={() => setPickerOpen(null)}>Закрыть</button>
-            </div>
+          <TrainingModal title="🟣 Проф. LMS-циклы (immutable)" onClose={() => setPickerOpen(null)}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
               {plCycles.map(c => (
-                <button key={c.meta.id} onClick={() => startCloneCycle(c.meta.id)} style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.18)', color: DIM_STRONG, cursor: 'pointer' }}>
+                <button key={c.meta.id} onClick={() => startCloneCycle(c.meta.id)} style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.18)', color: DIM_STRONG, cursor: 'pointer', minHeight: 44 }}>
                   <div style={{ fontSize: 12, fontWeight: 700 }}>{c.meta.title}</div>
                   <div style={{ fontSize: 10, color: DIM }}>{c.meta.sessionsPerWeek}д/нед · {c.meta.weeks} нед · {c.meta.level} · {c.meta.period}</div>
                 </button>
               ))}
             </div>
-          </div>
+          </TrainingModal>
         )}
       </div>
     );
@@ -772,13 +654,13 @@ export const ProgramManagerPanel: React.FC = () => {
       </div>
 
       {/* Saved list */}
-      <div style={{ ...CARD, padding: 10 }}>
+      <div className="constructor-surface" style={{ ...CARD, padding: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.3, color: DIM_STRONG, textTransform: 'uppercase', flex: 1 }}>
             Сохранённые ({filteredPrograms().length}{filteredPrograms().length !== programs.length ? ` из ${programs.length}` : ''})
           </span>
           {/* P1-6: JSON экспорт/импорт */}
-          <button style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 38 }} onClick={() => {
+          <button style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 44 }} onClick={() => {
             const json = JSON.stringify(programs, null, 2);
             const blob = new Blob([json], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -786,7 +668,7 @@ export const ProgramManagerPanel: React.FC = () => {
             a.click(); URL.revokeObjectURL(url);
             flash('📥 Экспортировано ' + programs.length + ' программ');
           }} title="Экспорт всех программ в JSON">📥 JSON</button>
-          <label style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 38, cursor: 'pointer', position: 'relative' }}>
+          <label style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 44, cursor: 'pointer', position: 'relative' }}>
             📤 JSON
             <input type="file" accept=".json" style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} onChange={e => {
               const file = e.target.files?.[0];
@@ -820,19 +702,25 @@ export const ProgramManagerPanel: React.FC = () => {
             onChange={e => setSearch(e.target.value)}
             style={{ ...IN, flex: 2, minWidth: 100, fontSize: 11, padding: '6px 8px' }}
           />
-          <select value={filterDir} onChange={e => setFilterDir(e.target.value as any)} style={{ ...IN, flex: 1, minWidth: 70, fontSize: 11, padding: '6px 4px' }}>
+          <select value={filterDir} onChange={e => setFilterDir(e.target.value as 'all' | 'bb' | 'pl' | 'hybrid')} style={{ ...IN, flex: 1, minWidth: 70, fontSize: 11, padding: '6px 4px' }}>
             <option value="all">Все</option>
             <option value="bb">ББ</option>
             <option value="pl">ПЛ</option>
             <option value="hybrid">⚡</option>
           </select>
-          <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} style={{ ...IN, flex: 1, minWidth: 70, fontSize: 11, padding: '6px 4px' }}>
+          <select value={sortBy} onChange={e => setSortBy(e.target.value as 'updated' | 'title' | 'days')} style={{ ...IN, flex: 1, minWidth: 70, fontSize: 11, padding: '6px 4px' }}>
             <option value="updated">По дате</option>
             <option value="title">По имени</option>
             <option value="days">По дням</option>
           </select>
         </div>
-        {programs.length === 0 && <div style={{ fontSize: 11, color: DIM, padding: '12px 0' }}>Пока пусто. Создайте или клонируйте программу.</div>}
+        {programs.length === 0 && (
+          <div style={{ padding: '24px 12px', textAlign: 'center' }}>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>📋</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: DIM_STRONG, marginBottom: 4 }}>Пока нет сохранённых программ</div>
+            <div style={{ fontSize: 11, color: DIM }}>Создайте программу с нуля или клонируйте из библиотеки.</div>
+          </div>
+        )}
         {filteredPrograms().length === 0 && programs.length > 0 && <div style={{ fontSize: 11, color: DIM, padding: '12px 0' }}>Ничего не найдено по фильтру.</div>}
         {filteredPrograms().map(p => (
           <div key={p.meta.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
@@ -844,8 +732,8 @@ export const ProgramManagerPanel: React.FC = () => {
                 {p.meta.updatedAt && ' · ' + new Date(p.meta.updatedAt).toLocaleDateString()}
               </div>
             </div>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38 }} onClick={() => openExisting(p.meta.id)}>Открыть</button>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38 }} onClick={() => {
+            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44 }} onClick={() => openExisting(p.meta.id)}>Открыть</button>
+            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44 }} onClick={() => {
               const clone = JSON.parse(JSON.stringify(p));
               clone.meta.id = newId('prog');
               clone.meta.title = p.meta.title + ' (копия)';
@@ -857,9 +745,9 @@ export const ProgramManagerPanel: React.FC = () => {
               refresh();
               flash('📋 Клонировано: ' + clone.meta.title);
             }} title="Клонировать">⧉</button>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38 }} onClick={() => { setCompareIds(prev => prev.includes(p.meta.id) ? prev.filter(x => x !== p.meta.id) : prev.length < 2 ? [...prev, p.meta.id] : [prev[1], p.meta.id]); }} title="Сравнить">⚖</button>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38 }} onClick={() => copyProgramToClipboard(p)} title="Скопировать в буфер">📋</button>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeProgram(p.meta.id)}>✕</button>
+            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44 }} onClick={() => { setCompareIds(prev => prev.includes(p.meta.id) ? prev.filter(x => x !== p.meta.id) : prev.length < 2 ? [...prev, p.meta.id] : [prev[1], p.meta.id]); }} title="Сравнить">⚖</button>
+            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44 }} onClick={() => copyProgramToClipboard(p)} title="Скопировать в буфер">📋</button>
+            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeProgram(p.meta.id)}>✕</button>
           </div>
         ))}
       </div>
@@ -880,16 +768,26 @@ export const ProgramManagerPanel: React.FC = () => {
               }
             }
           }
+          if (p.pl?.customWeeks) {
+            for (const week of p.pl.customWeeks) {
+              for (const day of week.days ?? []) {
+                for (const exercise of day.exercises ?? []) {
+                  const muscle = (exercise.muscle || exercise.lift || '').toLowerCase();
+                  if (muscle) s[muscle] = (s[muscle] || 0) + (exercise.sets?.reduce((sum, set) => sum + (set.sets || 0), 0) ?? 0);
+                }
+              }
+            }
+          }
           return s;
         };
         const sa = stats(a);
         const sb = stats(b);
         const allMuscles = Array.from(new Set([...Object.keys(sa), ...Object.keys(sb)])).slice(0, 10);
         return (
-          <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b' }}>
+          <div className="constructor-surface constructor-surface--warning" style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b' }}>⚖ Сравнение</span>
-              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38 }} onClick={() => setCompareIds([])}>✕ Закрыть</button>
+              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => setCompareIds([])}>✕ Закрыть</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 4, fontSize: 11, marginBottom: 4 }}>
               <div style={{ fontWeight: 700, color: DIR_COLOR[a.meta.direction] }}>{a.meta.title}</div>
@@ -919,10 +817,10 @@ export const ProgramManagerPanel: React.FC = () => {
 
       {/* P2.1: Визард создания программы (5 шагов) */}
       {wizardOpen && (
-        <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa' }}>
+        <div className="constructor-surface constructor-surface--info" style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>🪄 Визард создания программы — шаг {wizardStep} из 4</span>
-            <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 38 }} onClick={() => setWizardOpen(false)}>Отмена</button>
+            <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 44 }} onClick={() => setWizardOpen(false)}>Отмена</button>
           </div>
           {wizardStep === 1 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -966,7 +864,7 @@ export const ProgramManagerPanel: React.FC = () => {
           {wizardStep === 4 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>4. Превью</div>
-              <div style={{ ...CARD, padding: 10, background: 'rgba(167,139,250,0.06)' }}>
+              <div className="constructor-surface constructor-surface--tinted" style={{ ...CARD, padding: 10, background: 'rgba(167,139,250,0.06)' }}>
                 <div style={{ fontSize: 12, color: '#fff' }}>📋 <b>{wizardDir === 'bb' ? 'Бодибилдинг' : wizardDir === 'pl' ? 'Пауэрлифтинг' : 'Powerbuilder'}</b></div>
                 <div style={{ fontSize: 11, color: DIM }}>Цель: {wizardGoal} | Уровень: {wizardLevel}</div>
                 <div style={{ fontSize: 11, color: DIM }}>{wizardDays} дн/нед × {wizardWeeks} нед</div>
@@ -975,8 +873,8 @@ export const ProgramManagerPanel: React.FC = () => {
             </div>
           )}
           <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-            {wizardStep > 1 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => Math.max(1, s - 1) as any)}>← Назад</button>}
-            {wizardStep < 4 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => Math.min(4, s + 1) as any)}>Далее →</button>}
+            {wizardStep > 1 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => (Math.max(1, s - 1) as 1 | 2 | 3 | 4))}>← Назад</button>}
+            {wizardStep < 4 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => (Math.min(4, s + 1) as 1 | 2 | 3 | 4))}>Далее →</button>}
             {wizardStep === 4 && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)' }} onClick={() => finishWizard()}>✨ Создать программу</button>}
             {wizardStep === 4 && manualMode === 'pro' && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }} onClick={() => finishWizard(true)}>⚡ Создать и заполнить</button>}
           </div>
@@ -984,30 +882,22 @@ export const ProgramManagerPanel: React.FC = () => {
       )}
 
       {pickerOpen === 'bb' && (
-        <div style={{ ...CARD, padding: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: ACCENT }}>Библиотека программ</span>
-            <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 38 }} onClick={() => setPickerOpen(null)}>Закрыть</button>
-          </div>
+        <TrainingModal title="📚 Библиотека программ" onClose={() => setPickerOpen(null)}>
           <BbProgramLibraryPicker value={null} label="Выбрать программу" programs={allLibraryPrograms} onSelect={startCloneLibrary} />
-        </div>
+        </TrainingModal>
       )}
 
       {pickerOpen === 'pl' && (
-        <div style={{ ...CARD, padding: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>Проф. ПЛ-циклы (immutable)</span>
-            <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 38 }} onClick={() => setPickerOpen(null)}>Закрыть</button>
-          </div>
+        <TrainingModal title="🟣 Проф. ПЛ-циклы (immutable)" onClose={() => setPickerOpen(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
             {plCycles.map(c => (
-              <button key={c.meta.id} onClick={() => startCloneCycle(c.meta.id)} style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.18)', color: DIM_STRONG, cursor: 'pointer' }}>
+              <button key={c.meta.id} onClick={() => startCloneCycle(c.meta.id)} style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.18)', color: DIM_STRONG, cursor: 'pointer', minHeight: 44 }}>
                 <div style={{ fontSize: 12, fontWeight: 700 }}>{c.meta.title}</div>
                 <div style={{ fontSize: 10, color: DIM }}>{c.meta.sessionsPerWeek}д/нед · {c.meta.weeks} нед · {c.meta.level} · {c.meta.period}</div>
               </button>
             ))}
           </div>
-        </div>
+        </TrainingModal>
       )}
 
       {toast && <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, padding: '4px 0' }}>{toast}</div>}

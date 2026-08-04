@@ -140,7 +140,7 @@ describe('makeEmptySessionsForWeek', () => {
   it('создаёт N сессий с корректными dayOfWeek', () => {
     const sessions = makeEmptySessionsForWeek(4);
     expect(sessions).toHaveLength(4);
-    expect(sessions.map(s => s.dayOfWeek)).toEqual([0, 1, 3, 4]); // Пн/Вт/Чт/Пт
+    expect(sessions.map(s => s.dayOfWeek)).toEqual([0, 1, 2, 3]); // Пн/Вт/Ср/Чт
     for (const s of sessions) {
       expect(s.blocks).toEqual([]);
       expect(s.focus).toBe('');

@@ -143,6 +143,13 @@ describe('buildMacrocycleMulti — несколько соревнований',
     ], { level: 'intermediate', goal: 'powerlifting', totalWeeks: 30 })).toThrow(/одной неделе/);
   });
 
+  it('отклоняет два главных соревнования A вместо молчаливого выбора первого', () => {
+    expect(() => buildMacrocycleMulti([
+      makeComp('a1', 12, 'A'),
+      makeComp('a2', 24, 'A'),
+    ], { level: 'intermediate', goal: 'powerlifting', totalWeeks: 30 })).toThrow(/только одно.*A/i);
+  });
+
   it('отклоняет дублирующиеся ID соревнований', () => {
     expect(() => buildMacrocycleMulti([
       makeComp('same', 10, 'B'),

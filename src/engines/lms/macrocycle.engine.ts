@@ -450,11 +450,7 @@ export function buildMacrocycleMulti(events: CompetitionEvent[], input: Omit<Mac
   }
 }
 
-/** Грубая оценка недели соревнований из даты (отсчёт от сегодня).
- *  P2-10: если дата в прошлом (daysDiff < 0), возвращаем последнюю неделю макроцикла
- *  (соревнование уже прошло — не имеет смысла планировать к нему). Раньше Math.max(1, ...)
- *  молча маппило прошедшую дату на неделю 1, что могло сбить peak/competition блоки.
- */
+/** Грубая оценка недели соревнований из даты (отсчёт от сегодня). */
 export function estimateCompetitionWeek(isoDate: string, totalWeeks: number = 52, referenceDate?: string | Date): number {
   try {
     const target = new Date(isoDate).getTime();
@@ -467,8 +463,6 @@ export function estimateCompetitionWeek(isoDate: string, totalWeeks: number = 52
     // Прошедшая дата не должна незаметно превращаться в первую неделю нового
     // макроцикла. Используем тот же безопасный fallback, что и для битой даты.
     if (daysDiff < 0) return Math.max(1, Math.min(totalWeeks, Math.round(totalWeeks * 0.85)));
-    // Past competition: return last week (no point planning for a past event).
-    if (daysDiff < 0) return totalWeeks;
     // Use Math.floor for consistent week boundaries: day 0 = week 1, day 7 = week 2.
     // Math.round caused off-by-one: day 4 would round to week 2 instead of week 1.
     const week = Math.floor(daysDiff / 7) + 1;

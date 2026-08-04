@@ -75,6 +75,16 @@ export interface MacrocycleDesign {
   updatedAt: string;
 }
 
+export interface DesignStats {
+  totalWeeks: number;
+  usedWeeks: number;
+  freeWeeks: number;
+  blockCount: number;
+  phaseCount: Record<string, number>;
+  overlapWeeks: number;
+  gapRanges: string[];
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Existing types (unchanged)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -155,7 +165,27 @@ export function createEmptyDesign(name?: string): MacrocycleDesign {
 }
 
 export function loadDesigns(): MacrocycleDesign[] {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((value): value is MacrocycleDesign => {
+      if (!value || typeof value !== 'object') return false;
+      const design = value as Partial<MacrocycleDesign>;
+      return typeof design.id === 'string'
+        && typeof design.name === 'string'
+        && Number.isInteger(design.totalWeeks)
+        && (design.totalWeeks ?? 0) >= 1
+        && Array.isArray(design.blocks)
+        && design.blocks.every(block => Boolean(block)
+          && typeof block.id === 'string'
+          && typeof block.phaseKey === 'string'
+          && Object.prototype.hasOwnProperty.call(PHASE_COLORS, block.phaseKey)
+          && Number.isInteger(block.startWeek)
+          && Number.isInteger(block.endWeek)
+          && block.startWeek >= 1
+          && block.endWeek >= block.startWeek);
+    });
+  } catch { return []; }
 }
 
 export function saveDesign(design: MacrocycleDesign): MacrocycleDesign[] {
@@ -197,10 +227,11 @@ function setOverlapNotes(block: DesignerPhaseBlock, overlaps: DesignerPhaseBlock
 export function addBlockToDesign(design: MacrocycleDesign, phaseKey: PhaseKey, startWeek: number): MacrocycleDesign {
   const block = getPhaseTemplate(phaseKey);
   if (!block) return design;
-  const endWeek = Math.min(startWeek + block.weeks - 1, design.totalWeeks);
+  const safeStart = Math.max(1, Math.min(design.totalWeeks, Math.round(startWeek)));
+  const endWeek = Math.min(safeStart + block.weeks - 1, design.totalWeeks);
   const newBlock: DesignerPhaseBlock = {
     id: 'blk_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-    phaseKey, startWeek, endWeek, notes: '',
+    phaseKey, startWeek: safeStart, endWeek, notes: '',
   };
   // P0-2: warn if overlapping existing blocks (UI should prevent this, but engine enforces)
   const overlaps = checkBlockOverlap(design.blocks, newBlock.startWeek, newBlock.endWeek);
@@ -217,8 +248,9 @@ export function moveBlockInDesign(design: MacrocycleDesign, blockId: string, new
   if (idx < 0) return design;
   const block = design.blocks[idx];
   const dur = block.endWeek - block.startWeek + 1;
-  const endWeek = Math.min(newStart + dur - 1, design.totalWeeks);
-  const updated: DesignerPhaseBlock = { ...block, startWeek: Math.max(1, newStart), endWeek };
+  const safeStart = Number.isFinite(newStart) ? Math.round(newStart) : block.startWeek;
+  const endWeek = Math.min(safeStart + dur - 1, design.totalWeeks);
+  const updated: DesignerPhaseBlock = { ...block, startWeek: Math.max(1, safeStart), endWeek };
   const blocks = [...design.blocks];
   const moveOverlaps = checkBlockOverlap(blocks.filter((b) => b.id !== blockId), updated.startWeek, updated.endWeek);
   blocks[idx] = setOverlapNotes(updated, moveOverlaps);
@@ -245,7 +277,8 @@ export function resizeBlockInDesign(design: MacrocycleDesign, blockId: string, n
   const idx = design.blocks.findIndex(b => b.id === blockId);
   if (idx < 0) return design;
   const block = design.blocks[idx];
-  const endWeek = Math.max(block.startWeek, Math.min(newEndWeek, design.totalWeeks));
+  const safeEnd = Number.isFinite(newEndWeek) ? Math.round(newEndWeek) : block.endWeek;
+  const endWeek = Math.max(block.startWeek, Math.min(safeEnd, design.totalWeeks));
   const updated: DesignerPhaseBlock = { ...block, endWeek };
   const blocks = [...design.blocks];
   blocks[idx] = setOverlapNotes(updated, checkBlockOverlap(blocks.filter((b) => b.id !== blockId), updated.startWeek, updated.endWeek));
@@ -260,10 +293,8 @@ export function updateBlockNotes(design: MacrocycleDesign, blockId: string, note
   return { ...design, blocks, updatedAt: new Date().toISOString() };
 }
 
-export function getDesignStats(design: MacrocycleDesign) {
+export function getDesignStats(design: MacrocycleDesign): DesignStats {
   const totalWeeks = design.totalWeeks;
-  const usedWeeks = design.blocks.reduce((s, b) => s + (b.endWeek - b.startWeek + 1), 0);
-  const freeWeeks = totalWeeks - usedWeeks;
   const phaseCount: Record<string, number> = {};
   for (const b of design.blocks) {
     phaseCount[b.phaseKey] = (phaseCount[b.phaseKey] || 0) + 1;
@@ -285,6 +316,8 @@ export function getDesignStats(design: MacrocycleDesign) {
   for (let w = 1; w <= totalWeeks; w++) {
     if (!covered.has(w)) gapWeeks.push(w);
   }
+  const usedWeeks = covered.size;
+  const freeWeeks = Math.max(0, totalWeeks - usedWeeks);
   // Consolidate consecutive gap weeks into ranges
   const gapRanges: string[] = [];
   if (gapWeeks.length > 0) {
@@ -295,7 +328,7 @@ export function getDesignStats(design: MacrocycleDesign) {
     }
     gapRanges.push(start === prev ? String(start) : start + '-' + prev);
   }
-  return { totalWeeks, usedWeeks, freeWeeks, blockCount: design.blocks.length, phaseCount, overlapWeeks: overlaps.length, gapRanges, warnings: [...gapRanges.map((g) => '  ' + g + '  '), ...overlaps.map((o) => ' ' + o.a + '  ' + o.b + '  ' + o.week + '-')] };
+  return { totalWeeks, usedWeeks, freeWeeks, blockCount: design.blocks.length, phaseCount, overlapWeeks: new Set(overlaps.map(o => o.week)).size, gapRanges };
 }
 
 export function getDefaultPresetDesigns(): MacrocycleDesign[] {
@@ -316,13 +349,25 @@ function createFromPhases(name: string, totalWeeks: number, phaseKeys: PhaseKey[
   for (const pk of phaseKeys) {
     const tmpl = getPhaseTemplate(pk);
     if (!tmpl) continue;
-    const end = cursor + tmpl.weeks - 1;
-    if (end > totalWeeks) break;
+    if (cursor > totalWeeks) break;
+    const end = Math.min(cursor + tmpl.weeks - 1, totalWeeks);
     design.blocks.push({
       id: 'blk_' + pk + '_' + cursor,
       phaseKey: pk, startWeek: cursor, endWeek: end, notes: '',
     });
     cursor = end + 1;
+  }
+  // Пресеты могут иметь округлённые длительности, не дающие ровно totalWeeks.
+  // Заполняем хвост переходом, чтобы таймлайн никогда не заканчивался раньше
+  // заявленного горизонта.
+  if (cursor <= totalWeeks) {
+    design.blocks.push({
+      id: 'blk_transition_' + cursor,
+      phaseKey: 'transition',
+      startWeek: cursor,
+      endWeek: totalWeeks,
+      notes: '',
+    });
   }
   return design;
 }
@@ -335,7 +380,7 @@ export function getPhaseTemplate(key: PhaseKey): PeriodizationBlock | undefined 
   return BLOCK_TEMPLATES[key];
 }
 
-const BLOCK_TEMPLATES: Record<string, PeriodizationBlock> = {
+const BLOCK_TEMPLATES: Record<PhaseKey, PeriodizationBlock> = {
   accumulation_hypertrophy: {
     name: 'Накопление (Гипертрофия)', weeks: 4,
     volumeLevel: 'high', intensityLevel: 'medium',
@@ -392,6 +437,18 @@ const BLOCK_TEMPLATES: Record<string, PeriodizationBlock> = {
     focus: 'power',
     description: 'Взрывная работа. 2-3 повторения с максимальной скоростью. VBT.',
   },
+  gpp: {
+    name: 'GPP (общая физическая подготовка)', weeks: 3,
+    volumeLevel: 'high', intensityLevel: 'low', frequencyDays: 4,
+    rpeTarget: 6, rirTarget: 3, focus: 'conditioning',
+    description: 'Общая физическая подготовка: аэробная база, рабочая ёмкость и техника без предельных весов.',
+  },
+  transition: {
+    name: 'Переходный период', weeks: 2,
+    volumeLevel: 'very_low', intensityLevel: 'low', frequencyDays: 3,
+    rpeTarget: 5, rirTarget: 4, focus: 'deload',
+    description: 'Активное восстановление после цикла: сниженный объём, лёгкая техника и подготовка к следующему этапу.',
+  },
 };
 
 const PROGRESSION_MODELS = [
@@ -407,7 +464,7 @@ export function getBlockTemplates(): PeriodizationBlock[] {
 }
 
 export function createMesocycle(name: string, blocks: string[], model: string): MesocycleDesign {
-  const selectedBlocks = blocks.map(b => BLOCK_TEMPLATES[b] || BLOCK_TEMPLATES.accumulation_hypertrophy);
+  const selectedBlocks = blocks.map(b => BLOCK_TEMPLATES[b as PhaseKey] || BLOCK_TEMPLATES.accumulation_hypertrophy);
   return {
     name,
     totalWeeks: selectedBlocks.reduce((s, b) => s + b.weeks, 0),

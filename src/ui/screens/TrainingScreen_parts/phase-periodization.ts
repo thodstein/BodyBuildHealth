@@ -115,7 +115,7 @@ export function distributePhases(mesoLength: number, deloadFreq: number, goal: s
     }
   }
 
-  const hasPeak = goal === 'strength' || goal === 'powerlifting';
+  const hasPeak = goal === 'strength' || goal === 'powerlifting' || goal === 'strength_mass';
   const peakWeeks = hasPeak ? Math.min(2, Math.floor(mesoLength * 0.15)) : 0;
 
   // Активные недели (без делода)
@@ -129,12 +129,14 @@ export function distributePhases(mesoLength: number, deloadFreq: number, goal: s
   const accumEnd = totalActive > 1 ? Math.ceil(totalActive / 2) : 1;
 
   for (let w = 1; w <= mesoLength; w++) {
-    if (deloadWeeks.has(w)) {
-      dist.push({ phase: 'deload', startWeek: w, endWeek: w, weeks: [w], config: PHASE_CONFIGS.deload });
-      continue;
-    }
+    // P1-2: peaking проверяется ПЕРЕД deload — финальные недели peaking
+    // не должны перекрываться регулярным deload (taper → peak, не deload → peak).
     if (w > mesoLength - peakWeeks) {
       dist.push({ phase: 'peaking', startWeek: w, endWeek: w, weeks: [w], config: PHASE_CONFIGS.peaking });
+      continue;
+    }
+    if (deloadWeeks.has(w)) {
+      dist.push({ phase: 'deload', startWeek: w, endWeek: w, weeks: [w], config: PHASE_CONFIGS.deload });
       continue;
     }
     // Определяем позицию среди активных недель

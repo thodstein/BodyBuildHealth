@@ -57,6 +57,24 @@ export const PED_EFFECTS: Record<PED, PEDEffect> = {
 };
 
 /**
+ * Метаданные PED: единицы измерения и testosterone-equivalent factor (tEq).
+ * tEq используется ТОЛЬКО для risk-threshold расчёта (не для MRV-интерполяции).
+ * Trenbolone (tEq=2.5) 500 мг = 1250 мг T-equiv → ближе к порогу 1500.
+ * Nandrolone (tEq=0.7) 500 мг = 350 мг T-equiv → ниже порога.
+ * Для не-андрогенных PED (insulin/GH/MGF/IGF1) tEq=0 (не применимо).
+ *
+ * Сейчас tEq для AAS=1.0 (чистый тестостерон). При расширении системы на
+ * отдельные вещества (Tren/Nandrolone/Equipoise) — добавить записи с tEq>1.
+ */
+export const PED_META: Record<PED, { unit: string; tEq: number }> = {
+  AAS: { unit: 'мг/нед', tEq: 1.0 },
+  insulin: { unit: 'МЕ/день', tEq: 0 },
+  MGF: { unit: 'мкг/нед', tEq: 0 },
+  IGF1: { unit: 'мкг/день', tEq: 0 },
+  GH: { unit: 'МЕ/день', tEq: 0 },
+};
+
+/**
  * Дозо-зависимые множители MRV для каждого PED.
  * Ключ — порог дозы, значение — множитель MRV (относительно натурала = 1.0).
  * Интерполяция линейна между порогами; выше последнего — cap.
@@ -142,6 +160,18 @@ function interpolateDose(ped: PED, dose: number): { mrv: number; rec: number } {
   return { mrv: last.mrv, rec: last.rec };
 }
 
+/** Унифицированный парсер дозы: число → как есть; строка "500mg"/"1,5г" → число.
+ *  P2-2: русская запятая "500,5" → "500.5" перед regex (иначе → 5005).
+ *  P0-2: используется и для perPED.dose, и для aasDose (risk-threshold) —
+ *  ранее aasDose использовал Number() который возвращал NaN для "500mg". */
+function parseDose(raw: unknown): number {
+  if (typeof raw === 'number') return raw;
+  if (raw != null) {
+    return parseFloat(String(raw).replace(',', '.').replace(/[^0-9.]/g, '')) || 0;
+  }
+  return 0;
+}
+
 /** Множитель courseIntensity — дополнительный boost сверх PED-доз.
  *  Отражает: оральные 17α, высокая частота, прочие факторы "тяжести" курса
  *  не учтённые напрямую дозами ААС/ГР/инсулина. */
@@ -193,15 +223,14 @@ export function adaptForPEDs(
     if (!base) continue;
     // P2-12: previously `Number(doses[ped]) || 0` silently returned 0 for string doses
     // like "500mg" (NaN → 0 → fallback to base multiplier, losing dose-aware precision).
-    // Now strips non-numeric suffixes before parsing.
-    const rawDose = doses[ped];
-    const dose = typeof rawDose === 'number' ? rawDose
-      : rawDose != null ? (parseFloat(String(rawDose).replace(/[^0-9.]/g, '')) || 0)
-      : 0;
-    // Dose-aware множитель (если доза передана и > 0 — интерполяция по кривой;
-    // иначе — fallback на базовый множитель PED_EFFECTS)
+    // P0-2: unified parser via parseDose() — handles "500mg", "1,5г", numbers.
+    const dose = parseDose(doses[ped]);
+    // Dose-aware множитель: если доза ЯВНО передана (даже 0) — интерполяция по кривой.
+    // interpolateDose(ped, 0) = {1, 1} (нет эффекта при нулевой дозе).
+    // Если pedDoses не передан (undefined) или ped отсутствует в doses — fallback на базу.
+    const doseProvided = ped in doses;
     let doseMrv: number, doseRec: number;
-    if (dose > 0 && PED_DOSE_CURVES[ped]) {
+    if (doseProvided && PED_DOSE_CURVES[ped]) {
       const interp = interpolateDose(ped, dose);
       doseMrv = interp.mrv;
       doseRec = interp.rec;
@@ -234,26 +263,38 @@ export function adaptForPEDs(
   }
 
   // Course intensity boost (поверх PED-множителя)
-  if (activePEDs.length > 0 && intensityMult > 1) {
+  // P0-fix: используем mrvMult > 1 вместо perPED.length > 0 —
+  // если все PED имеют dose=0 (явно отключены), mrvMult остаётся 1.0
+  // и intensity не применяется (корректно: нет PED → нет intensity boost).
+  if (mrvMult > 1 && intensityMult > 1) {
     mrvMult *= intensityMult;
     rationale.push(`Интенсивность курса (${intensity}): дополнительный MRV ×${intensityMult.toFixed(2)} (оральные/частота/прочее).`);
   }
 
-  // Суммарный множитель: натурал = 1.0, соло-ААС 500мг = ~1.28, полный стек heavy = до 1.85
-  // B8: recMult cap 1.85 — синхрон с mrvMult, чтобы не было рассинхрона
-  mrvMult = Math.min(mrvMult, 1.85);
-  recMult = Math.min(recMult, 1.85);
+  // Суммарный множитель: натурал = 1.0, соло-ААС 500мг = ~1.30, полный стек heavy = до 2.0
+  // P1-1: cap повышен с 1.85 → 2.0 — мега-стек (AAS 3000+insulin 40+GH 15+IGF1 100+MGF 400)
+  // оправдывает больший MRV, разница между AAS-only и полным стеком не должна стираться.
+  // B8: recMult cap синхрон с mrvMult, чтобы не было рассинхрона.
+  mrvMult = Math.min(mrvMult, 2.0);
+  recMult = Math.min(recMult, 2.0);
   const adjustedMrv: Record<string, number> = {};
   for (const m of Object.keys(baseMrv)) adjustedMrv[m] = Math.round(baseMrv[m] * mrvMult);
 
   // риски (BB15c — интеграция с risk-engine/pharma-interactions)
-  const aasDose = Number(doses['AAS']) || 0;
+  // P0-2: унифицированный парсер (ранее Number() возвращал NaN для "1500mg" → warning не срабатывал).
+  // P2-3: PED_META.tEq — testosterone-equivalent factor для risk-threshold.
+  // Tren (tEq=2.5) 500 мг = 750 T-equiv → ближе к порогу 1500. Пока AAS tEq=1.0.
+  const aasDose = parseDose(doses['AAS']);
+  const aasTEquiv = aasDose * (PED_META.AAS?.tEq ?? 1.0);
   if (activePEDs.includes('insulin')) risks.push('Инсулин: риск гипогликемии — контроль глюкозы, достаточные углеводы вокруг тренировки.');
   if (activePEDs.includes('GH')) risks.push('ГР: инсулинорезистентность при длительном использовании, возможны отёки.');
   if (activePEDs.includes('insulin') && activePEDs.includes('GH')) risks.push('Инсулин + ГР: синергия, но рост риска гипогликемии и инсулинорезистентности.');
+  // P1-4: risks для IGF1 и MGF — ранее отсутствовали.
+  if (activePEDs.includes('IGF1')) risks.push('IGF-1: риск гипогликемии (схож с инсулином), возможна артралгия.');
+  if (activePEDs.includes('MGF')) risks.push('MGF: непредсказуемая локальная гипертрофия, отёчность, болезненность в месте инъекции.');
   if (activePEDs.includes('AAS')) {
     risks.push('ААС: контроль гематокрита, эстрадиола, липидов, оси HPTA.');
-    if (aasDose >= 1500) risks.push(`⚠ Высокая доза ААС (${aasDose} мг/нед): риск эритроцитоза (HCT>54), гипертонии, дислипидемии. Сократить объём при росте АД/усталости.`);
+    if (aasTEquiv >= 1500) risks.push(`⚠ Высокая доза ААС (${aasDose} мг/нед, T-equiv ${aasTEquiv}): риск эритроцитоза (HCT>54), гипертонии, дислипидемии. Сократить объём при росте АД/усталости.`);
   }
 
   return {

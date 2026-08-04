@@ -13,21 +13,19 @@ import {
 } from '../../../engines/lms/macrocycle.engine';
 import type { BBTrainingFocus } from '../../../engines/bb/bb-goal-types';
 import { getCycleById, LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
+import { CARD, SMALL, H, IN, BTN, BTN_GHOST } from '../TrainingScreen_parts/training-ui';
+import { PL_PHASE_VISUAL, BB_PHASE_VISUAL, COMPETITION_PRIORITY_VISUAL } from '../TrainingScreen_parts/phase-visual-tokens';
 
-const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: 12, margin: '6px 0' };
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 11, lineHeight: 1.4 };
-const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 };
-const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const };
-const SEL: React.CSSProperties = { ...IN, minHeight: 40 };
-const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, margin: '4px 0 2px' };
-const BTN: React.CSSProperties = { background: 'var(--accent)', color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 12, minHeight: 40, cursor: 'pointer' };
-const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent-dim)' };
+const SEL: React.CSSProperties = { ...IN, minHeight: 44 };
+const LABEL: React.CSSProperties = { ...SMALL, fontSize: 11, margin: '4px 0 2px' };
 
 const PL_PHASES: MacroPhase[] = ['endurance', 'strength', 'peak', 'competition', 'transition'];
 const BB_PHASES: BBMacroPhase[] = ['hypertrophy', 'strength', 'contest_prep', 'transition'];
 const PHASE_ICON: Record<MacroPhase, string> = {
   endurance: '🏃', strength: '🏋️', peak: '⛰️', competition: '🏁', transition: '🧘',
 };
+const PL_VISUAL = PL_PHASE_VISUAL as Record<MacroPhase, { color: string; icon: string; label: string }>;
+const BB_VISUAL = BB_PHASE_VISUAL as Record<BBMacroPhase, { color: string; icon: string; label: string }>;
 
 const STORAGE_KEY = 'he_pl_macro';
 const BB_STORAGE_KEY = 'he_bb_macro';
@@ -148,13 +146,17 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   }, [bbMacro, isBB]);
   const competitionValidation = useMemo(() => {
     const seen = new Set<number>();
+    let mainCount = 0;
     for (const competition of competitions) {
+      if (!competition.name.trim()) return 'Укажите название каждого соревнования.';
       if (!Number.isFinite(competition.week) || competition.week < 1 || competition.week > totalWeeks) {
         return 'Неделя соревнования должна быть внутри макроцикла.';
       }
       if (seen.has(competition.week)) return 'Нельзя назначить два соревнования на одну неделю.';
       seen.add(competition.week);
+      if (competition.priority === 'A') mainCount += 1;
     }
+    if (mainCount > 1) return 'Можно назначить только одно главное соревнование (приоритет A).';
     return null;
   }, [competitions, totalWeeks]);
 
@@ -250,6 +252,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       setBuildError(null);
       setSelectedBlockIdx(-1);
       setEditWeeks({});
+      setCurrentWeekIdx(1);
     } catch (error) {
       setBuildError((error as Error).message || 'Не удалось построить макроцикл.');
     }
@@ -288,25 +291,25 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   }, [macro, bbMacro, selectedBlockIdx, isBB]);
 
   return (
-    <div style={{ '--macro-card-border': isHighContrast ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.04)' } as React.CSSProperties}>
+    <div className="macrocycle-panel" style={{ '--macro-card-border': isHighContrast ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.04)' } as React.CSSProperties}>
       {/* Параметры */}
-      <div style={{ ...cardStyle, borderColor: isHighContrast ? 'rgba(255,255,255,0.14)' : CARD.borderColor }}>
+      <div style={{ ...cardStyle, borderColor: isHighContrast ? 'rgba(255,255,255,0.14)' : 'var(--glass-border, rgba(255,255,255,0.09))' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
           <div style={H}>🗓 Годовое планирование {isBB ? 'ББ' : 'ПЛ'}</div>
-          <button type="button" onClick={() => setShowUiPrefs(value => !value)} style={{ ...BTN_GHOST, minHeight: 30, padding: '5px 8px', fontSize: 10 }} aria-expanded={showUiPrefs}>
+          <button type="button" onClick={() => setShowUiPrefs(value => !value)} style={{ ...BTN_GHOST, minHeight: 44, padding: '5px 8px', fontSize: 10 }} aria-expanded={showUiPrefs}>
             ⚙ Вид
           </button>
         </div>
         {showUiPrefs && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6, marginBottom: 8, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <label style={LABEL}>Плотность
-              <select style={{ ...SEL, minHeight: 34, marginTop: 2 }} value={uiPrefs.density} onChange={e => setUiPrefs(prev => ({ ...prev, density: e.target.value as MacrocycleUiPrefs['density'] }))}>
+              <select style={{ ...SEL, minHeight: 44, marginTop: 2 }} value={uiPrefs.density} onChange={e => setUiPrefs(prev => ({ ...prev, density: e.target.value as MacrocycleUiPrefs['density'] }))}>
                 <option value="comfortable">Комфортная</option>
                 <option value="compact">Компактная</option>
               </select>
             </label>
             <label style={LABEL}>Контраст
-              <select style={{ ...SEL, minHeight: 34, marginTop: 2 }} value={uiPrefs.contrast} onChange={e => setUiPrefs(prev => ({ ...prev, contrast: e.target.value as MacrocycleUiPrefs['contrast'] }))}>
+              <select style={{ ...SEL, minHeight: 44, marginTop: 2 }} value={uiPrefs.contrast} onChange={e => setUiPrefs(prev => ({ ...prev, contrast: e.target.value as MacrocycleUiPrefs['contrast'] }))}>
                 <option value="normal">Обычный</option>
                 <option value="high">Высокий</option>
               </select>
@@ -320,7 +323,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: isCompact ? 6 : 8 }}>
           <div>
             <div style={LABEL}>Уровень</div>
-            <select style={SEL} value={effLevel}
+            <select aria-label="Уровень спортсмена" style={SEL} value={effLevel}
               disabled={!onLevelChange}
               onChange={e => {
                 if (onLevelChange) onLevelChange(e.target.value);
@@ -337,7 +340,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           </div>
           <div>
             <div style={LABEL}>Цель</div>
-            <select style={SEL} value={effGoal}
+            <select aria-label="Цель годового планирования" style={SEL} value={effGoal}
               disabled={!onGoalChange}
               onChange={e => {
                 const v = e.target.value as 'powerlifting' | 'bodybuilding' | 'general';
@@ -370,9 +373,9 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
               <option value="general">Общее</option>
             </select>
           </div>
-          <div>
-            <div style={LABEL}>Длительность, нед</div>
-           <input style={IN} type="number" min={12} max={104} value={totalWeeks} onChange={e => {
+           <div>
+             <div style={LABEL}>Длительность, нед</div>
+            <input aria-label="Длительность макроцикла в неделях" style={IN} type="number" min={12} max={104} value={totalWeeks} onChange={e => {
              const value = Number(e.target.value);
              setTotalWeeks(Number.isFinite(value) ? Math.max(12, Math.min(104, Math.round(value))) : 12);
            }} />
@@ -380,7 +383,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           {isBB && (
             <div>
               <div style={LABEL}>Основной фокус</div>
-              <select style={SEL} value={trainingFocus} onChange={e => setTrainingFocus(e.target.value as BBTrainingFocus)}>
+               <select aria-label="Фокус ББ макроцикла" style={SEL} value={trainingFocus} onChange={e => setTrainingFocus(e.target.value as BBTrainingFocus)}>
                 <option value="hypertrophy">Гипертрофия</option>
                 <option value="strength">Сила</option>
                 <option value="endurance">Выносливость / детализация</option>
@@ -413,7 +416,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 };
                 setCompetitions([...competitions, newComp]);
               }}
-              style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 30 }}
+               style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 44 }}
             >+ Добавить</button>
           </div>
           <div style={{ fontSize: 10, color: SMALL.color, marginBottom: 6 }}>
@@ -424,7 +427,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           {competitions.length === 0 && (
             <div>
               <div style={LABEL}>Неделя соревнований</div>
-               <input style={IN} type="number" min={1} max={totalWeeks} value={compWeek} onChange={e => {
+                <input aria-label="Неделя главного соревнования" style={IN} type="number" min={1} max={totalWeeks} value={compWeek} onChange={e => {
                  const value = Number(e.target.value);
                  setCompWeek(Number.isFinite(value) ? Math.max(1, Math.min(totalWeeks, Math.round(value))) : 1);
                }} />
@@ -446,21 +449,21 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             return (
             <div key={c.id}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 60px 28px', gap: 4, marginBottom: 3, alignItems: 'center' }}>
-                <input style={{ ...IN, padding: '4px 8px', fontSize: 10, minHeight: 32 }}
+                <input aria-label="Название соревнования" style={{ ...IN, padding: '4px 8px', fontSize: 10, minHeight: 44 }}
                   value={c.name} placeholder="Название"
                   onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, name: e.target.value } : cc))} />
-                <input style={{ ...IN, padding: '4px', fontSize: 10, minHeight: 32, textAlign: 'center' }}
+                <input aria-label={`Неделя соревнования ${c.name}`} style={{ ...IN, padding: '4px', fontSize: 10, minHeight: 44, textAlign: 'center' }}
                   type="number" min={1} max={totalWeeks} value={c.week} title="Неделя"
                   onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, week: Math.max(1, Math.min(totalWeeks, +e.target.value || 1)) } : cc))} />
-                <select style={{ ...IN, padding: '4px', fontSize: 10, minHeight: 32 }}
+                <select aria-label={`Приоритет соревнования ${c.name}`} style={{ ...IN, padding: '4px', fontSize: 10, minHeight: 44 }}
                   value={c.priority} title="Приоритет"
                   onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, priority: e.target.value as CompetitionEvent['priority'] } : cc))}>
-                  <option value="A">A главн</option>
-                  <option value="B">B контр</option>
-                  <option value="C">C трен</option>
+                  <option value="A">A — главное</option>
+                  <option value="B">B — контрольное</option>
+                  <option value="C">C — тренировочное</option>
                 </select>
-                <button onClick={() => setCompetitions(competitions.filter((_, j) => j !== i))}
-                  style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: 4, minHeight: 32 }}
+                <button aria-label={`Удалить соревнование ${c.name}`} onClick={() => setCompetitions(competitions.filter((_, j) => j !== i))}
+                  style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: 4, minHeight: 44, minWidth: 44 }}
                   title="Удалить">✕</button>
               </div>
               {/* Мульти-цикл: список циклов для пика соревнования (только A и B).
@@ -571,7 +574,8 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
         <div style={CARD}>
           <div style={H}>📅 Таймлайн ({(isBB ? bbMacro!.totalWeeks : macro!.totalWeeks)} нед)</div>
           {/* Горизонтальная полоса с блоками + маркер текущей недели */}
-          <div style={{ display: 'flex', height: isCompact ? 48 : 64, borderRadius: 8, overflow: 'hidden', border: `1px solid ${isHighContrast ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)'}`, marginBottom: 8, position: 'relative' }}>
+          <div className="macrocycle-timeline-scroll" style={{ borderRadius: 8, overflowX: 'auto', overflowY: 'hidden', border: `1px solid ${isHighContrast ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)'}`, marginBottom: 8, minWidth: 0 }}>
+           <div className="macrocycle-timeline-track" style={{ display: 'flex', height: isCompact ? 48 : 64, position: 'relative', minWidth: Math.max(100, (isBB ? bbMacro!.totalWeeks : macro!.totalWeeks) * 56) }}>
             {(isBB ? bbMacro!.blocks : macro!.blocks).map((b: MacroBlock | BBMacroBlock, i: number) => {
               const src = isBB ? bbMacro! : macro!;
               const pct = (b.weeks / src.totalWeeks) * 100;
@@ -582,9 +586,10 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 : undefined;
               const isCompWeek = 'competitionWeek' in src && src.competitionWeek != null && src.competitionWeek >= b.weekOffset && src.competitionWeek < b.weekOffset + b.weeks;
               const isComp = isCompBlock || isCompWeek;
-              const phaseColor = isBB ? (BB_PHASE_COLOR[b.phase as BBMacroPhase] ?? '#888') : PHASE_COLOR[b.phase as MacroPhase];
-              const phaseLabel = isBB ? (BB_PHASE_LABEL_RU[b.phase as BBMacroPhase] ?? b.phase) : PHASE_LABEL_RU[b.phase as MacroPhase];
-              const phaseIcon = isBB ? (BB_PHASE_ICON[b.phase as BBMacroPhase] ?? '') : PHASE_ICON[b.phase as MacroPhase];
+               const phaseVisual = isBB ? BB_VISUAL[b.phase as BBMacroPhase] : PL_VISUAL[b.phase as MacroPhase];
+               const phaseColor = phaseVisual?.color ?? (isBB ? BB_PHASE_COLOR[b.phase as BBMacroPhase] : PHASE_COLOR[b.phase as MacroPhase]) ?? '#888';
+               const phaseLabel = phaseVisual?.label ?? (isBB ? BB_PHASE_LABEL_RU[b.phase as BBMacroPhase] : PHASE_LABEL_RU[b.phase as MacroPhase]) ?? b.phase;
+               const phaseIcon = phaseVisual?.icon ?? (isBB ? BB_PHASE_ICON[b.phase as BBMacroPhase] : PHASE_ICON[b.phase as MacroPhase]) ?? '';
               return (
                 <div
                   key={i}
@@ -599,7 +604,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     }
                   }}
                   style={{
-                    flex: `${pct} 1 0`,
+                    flex: `0 0 ${pct}%`,
                    background: phaseColor + (isSel ? 'cc' : (isHighContrast ? '70' : '44')),
                     borderRight: '1px solid rgba(0,0,0,0.2)',
                     cursor: 'pointer',
@@ -613,12 +618,12 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   title={`${phaseLabel}: нед ${b.weekOffset}-${b.weekOffset + b.weeks - 1}${compForThisBlock ? ' · 🏁 ' + compForThisBlock.name : ''}`}
                 >
                    {uiPrefs.showIcons && <span style={{ fontSize: isCompact ? 13 : 16 }}>{phaseIcon}</span>}
-                  <span style={{ fontSize: 9, fontWeight: 700, color: isSel ? '#000' : '#fff', textAlign: 'center', lineHeight: 1.1 }}>{phaseLabel}</span>
-                  <span style={{ fontSize: 8, color: isSel ? '#000' : 'rgba(255,255,255,0.7)' }}>{b.weeks}н</span>
-                  {isComp && <span style={{ position: 'absolute', top: 0, right: 2, fontSize: 10 }} title={compForThisBlock?.name}>🏁{compForThisBlock?.priority}</span>}
-                </div>
-              );
-            })}
+                    <span style={{ fontSize: 9, fontWeight: 700, color: isSel ? 'var(--accent-contrast, #06281c)' : 'var(--text, #fff)', textAlign: 'center', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{phaseLabel}</span>
+                   <span style={{ fontSize: 8, color: isSel ? 'var(--accent-contrast, #06281c)' : 'var(--text-dim, rgba(255,255,255,0.7))' }}>{b.weeks}н</span>
+                     {isComp && <span aria-label={compForThisBlock ? `Соревнование ${compForThisBlock.name}, приоритет ${compForThisBlock.priority}` : 'Соревновательный блок'} className="macrocycle-competition-badge" style={{ position: 'absolute', top: 2, right: 3, fontSize: 10, lineHeight: 1, color: compForThisBlock ? COMPETITION_PRIORITY_VISUAL[compForThisBlock.priority].color : '#ef4444' }} title={compForThisBlock?.name}>{compForThisBlock ? COMPETITION_PRIORITY_VISUAL[compForThisBlock.priority].icon : '🏁'}<b>{compForThisBlock?.priority ?? ''}</b></span>}
+                 </div>
+               );
+             })}
             {/* Маркер текущей недели (неделя 1 = "сегодня", начало макроцикла).
                 Показывает вертикальную линию на позиции currentWeekIdx. */}
             {currentWeekIdx >= 1 && currentWeekIdx <= (isBB ? bbMacro!.totalWeeks : macro!.totalWeeks) && (() => {
@@ -632,21 +637,23 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   <span style={{ position: 'absolute', top: -14, left: -8, fontSize: 8, color: '#fff', fontWeight: 700, background: 'rgba(0,0,0,0.6)', padding: '1px 3px', borderRadius: 3 }}>●{currentWeekIdx}</span>
                 </div>
               );
-            })()}
+           })()}
+           </div>
           </div>
 
-          {/* Линейка недель */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
-            <span>Нед 1</span>
-            <span>Нед {Math.round((isBB ? bbMacro!.totalWeeks : macro!.totalWeeks) / 4)}</span>
-            <span>Нед {Math.round((isBB ? bbMacro!.totalWeeks : macro!.totalWeeks) / 2)}</span>
-            <span>Нед {Math.round((isBB ? bbMacro!.totalWeeks : macro!.totalWeeks) * 3 / 4)}</span>
-            <span>Нед {(isBB ? bbMacro!.totalWeeks : macro!.totalWeeks)}</span>
+          {/* Линейка недель — выровнена по границам блоков */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim, rgba(255,255,255,0.4))', marginBottom: 8 }}>
+            {(() => {
+              const src = isBB ? bbMacro! : macro!;
+              const total = src.totalWeeks;
+              const ticks = [1, Math.ceil(total / 4), Math.ceil(total / 2), Math.ceil(total * 3 / 4), total];
+              return ticks.map((t, i) => <span key={i}>Нед {t}</span>);
+            })()}
           </div>
           {/* Маркер текущей недели — редактор */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
             <span>📍 Текущая неделя:</span>
-            <input style={{ ...IN, padding: '3px 6px', fontSize: 11, width: 50, minHeight: 30, textAlign: 'center' }}
+             <input aria-label="Текущая неделя макроцикла" style={{ ...IN, padding: '3px 6px', fontSize: 11, width: 60, minHeight: 44, textAlign: 'center' }}
               type="number" min={1} max={(isBB ? bbMacro!.totalWeeks : macro!.totalWeeks)}
               value={currentWeekIdx}
                onChange={e => setCurrentWeekIdx(Math.max(1, Math.min(isBB ? (bbMacro?.totalWeeks ?? 1) : (macro?.totalWeeks ?? 1), +e.target.value || 1)))} />
@@ -658,13 +665,13 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             <div style={{ marginBottom: 10, padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>🏁 Соревнования в макроцикле:</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {(isBB ? bbMacro!.competitions : macro!.competitions)!.map(c => {
+                {[...(isBB ? bbMacro!.competitions : macro!.competitions)!].sort((a, b) => a.week - b.week).map(c => {
                   const src = isBB ? bbMacro! : macro!;
                   const block = src.blocks.find(b => b.competitionId === c.id && b.phase === (isBB ? 'contest_prep' : 'competition'));
                   const priorityColor = c.priority === 'A' ? '#ef4444' : c.priority === 'B' ? '#f59e0b' : '#a78bfa';
                   return (
-                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>
-                      <span style={{ color: priorityColor, fontWeight: 700 }}>[{c.priority}]</span>
+                     <div key={c.id} aria-label={`${c.name}, неделя ${c.week}, приоритет ${c.priority}`} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--text-light, rgba(255,255,255,0.8))' }}>
+                       <span style={{ color: priorityColor, fontWeight: 700 }}>{c.priority === 'A' ? '🔴' : c.priority === 'B' ? '🟡' : '🟣'} [{c.priority}]</span>
                       <span style={{ fontWeight: 600 }}>{c.name}</span>
                       <span style={{ color: 'rgba(255,255,255,0.5)' }}>· нед {c.week}{block ? ` (блок ${block.weekOffset})` : ''}</span>
                     </div>
@@ -682,7 +689,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             return (
             <div style={{ padding: 10, borderRadius: 8, background: abColor + '15', border: `1px solid ${abColor}40`, marginBottom: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: abColor }}>{abIcon} {abLabel}</span>
+                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-light, #fff)', borderLeft: `3px solid ${abColor}`, paddingLeft: 6 }}>{abIcon} {abLabel}</span>
                 <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Нед {activeBlock.weekOffset}–{activeBlock.weekOffset + activeBlock.weeks - 1} ({activeBlock.weeks} нед)</span>
               </div>
               <div style={{ ...SMALL, marginBottom: 6 }}>{activeBlock.description}</div>
@@ -701,7 +708,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 );
               })()}
               {'cycleId' in activeBlock && activeBlock.cycleId && (
-                <button onClick={() => applyBlock(selectedBlockIdx)} style={{ ...BTN, fontSize: 11, padding: '8px 12px', minHeight: 34 }}>
+                <button onClick={() => applyBlock(selectedBlockIdx)} style={{ ...BTN, fontSize: 11, padding: '8px 12px', minHeight: 44 }}>
                   ✓ Применить как активный цикл
                 </button>
               )}
@@ -710,7 +717,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           })()}
 
           {onApplyMacrocycle && (isBB ? bbMacro : macro) && (
-            <button onClick={() => { const source = isBB ? bbMacro : macro; if (source) onApplyMacrocycle(source); }} style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 34, marginTop: 6, width: '100%' }}>
+            <button onClick={() => { const source = isBB ? bbMacro : macro; if (source) onApplyMacrocycle(source); }} style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 44, marginTop: 6, width: '100%' }}>
               🗓 Применить весь макроцикл
             </button>
           )}
@@ -730,17 +737,21 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 <div key={phase}>
                   <div style={{ fontSize: 9, color: pc, textAlign: 'center', fontWeight: 700 }}>{pi} {pl}</div>
                   <input
-                    style={{ ...IN, padding: '4px', fontSize: 11, textAlign: 'center', minHeight: 30, marginTop: 2 }}
-                    type="number" min={1} max={52}
+                     aria-label={`Длительность фазы ${pl}`}
+                     style={{ ...IN, padding: '4px', fontSize: 11, textAlign: 'center', minHeight: 44, marginTop: 2 }}
+                     type="number" min={1} max={Math.max(1, src.totalWeeks)} inputMode="numeric"
                     value={editWeeks[phase] ?? phaseWeeks}
-                    onChange={e => setEditWeeks(prev => ({ ...prev, [phase]: +e.target.value }))}
+                     onChange={e => {
+                       const value = Number(e.target.value);
+                       if (Number.isFinite(value) && value >= 1) setEditWeeks(prev => ({ ...prev, [phase]: Math.min(src.totalWeeks, Math.round(value)) }));
+                     }}
                   />
                   <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>сумма блоков</div>
                 </div>
                 );
               })}
             </div>
-            <button onClick={applyEdit} style={{ ...BTN_GHOST, fontSize: 11, padding: '6px 12px', minHeight: 32, marginTop: 6 }}>Пересчитать</button>
+            <button onClick={applyEdit} style={{ ...BTN_GHOST, fontSize: 11, padding: '6px 12px', minHeight: 44, marginTop: 6 }}>Пересчитать</button>
           </div>
 
           {/* Rationale */}

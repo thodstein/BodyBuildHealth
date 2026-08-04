@@ -515,6 +515,7 @@ export const BbAutoConstructor: React.FC = () => {
            mode: bbAdaptMode,
            methodology: bbMethodology,
            trainingFocus: bbTrainingFocus,
+           sex: linked.profile?.settings?.personal?.sex,
            bodyFat: linked.profile.settings.personal.bodyFat,
            leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
            hrvMs: linked.profile.settings.lifestyle.morningHRV,
@@ -552,13 +553,14 @@ export const BbAutoConstructor: React.FC = () => {
            mode: bbAdaptMode,
            methodology: bbMethodology,
            trainingFocus: bbTrainingFocus,
+           sex: linked.profile?.settings?.personal?.sex,
             bodyFat: linked.profile.settings.personal.bodyFat,
             leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
             hrvMs: linked.profile.settings.lifestyle.morningHRV,
             sleepHours: linked.profile.settings.lifestyle.sleepHours,
             stressLevel: linked.profile.settings.lifestyle.stressLevel,
            labMrvMultiplier: labAdjust.mrvMultiplier,
-        });
+       });
         const cycleWeeks = cycle.meta.sessionsPerWeek;
         if (bbDays !== cycleWeeks) setBbDays(cycleWeeks);
         if (bbWeeks !== cycle.meta.weeks) setBbWeeks(cycle.meta.weeks);
@@ -586,6 +588,7 @@ export const BbAutoConstructor: React.FC = () => {
         courseIntensity,
         equipment: bbEquipment,
         methodology: bbMethodology,
+        sex: linked.profile?.settings?.personal?.sex,
         // P0-5: лабораторная коррекция MRV
         labMrvMultiplier: labAdjust.mrvMultiplier,
          labWarnings: labAdjust.warnings,
@@ -2667,8 +2670,8 @@ export const BbAutoConstructor: React.FC = () => {
         </div>
       )}
       {showMacrocycle && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 61, background: 'rgba(0,0,0,0.72)', overflowY: 'auto', padding: 12 }} onClick={() => setShowMacrocycle(false)}>
-          <div role="dialog" aria-label="Годовой план ББ" onClick={e => e.stopPropagation()} style={{ maxWidth: 760, margin: '0 auto', background: '#09090b', borderRadius: 16, padding: 12, maxHeight: 'calc(100vh - 24px)', overflowY: 'auto' }}>
+        <div className="bb-annual-planner-backdrop" style={{ position: 'fixed', inset: 0, zIndex: 61, background: 'rgba(0,0,0,0.82)', overflowY: 'auto', overflowX: 'hidden', padding: 12, WebkitOverflowScrolling: 'touch' }} onClick={() => setShowMacrocycle(false)}>
+          <div className="bb-annual-planner-dialog" role="dialog" aria-modal="true" aria-label="Годовой план ББ" onClick={e => e.stopPropagation()} style={{ maxWidth: 760, width: '100%', minHeight: 'calc(100dvh - 24px)', margin: '0 auto', background: 'var(--card-bg, #111318)', border: '1px solid var(--border-light, rgba(255,255,255,0.14))', borderRadius: 16, padding: 12, overflow: 'visible', boxShadow: '0 20px 70px rgba(0,0,0,0.6)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <div style={{ fontWeight: 800, color: '#00e68a' }}>🗓 Годовое планирование ББ</div>
               <button onClick={() => setShowMacrocycle(false)} style={BTN_GHOST}>Закрыть</button>

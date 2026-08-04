@@ -10,10 +10,10 @@ import React, { useMemo, useState } from 'react';
 import { SET_TEMPLATES, GROUP_RU } from './program-types';
 import { ACCENT, ACCENT_LINE, BTN_GHOST, CARD, DIM, DIM_STRONG, IN, SMALL, panelStyle, UI_METRICS } from './training-ui';
 import { useConfirmDialog } from './ConfirmDialog';
-import { getReferencedCycle, userWeekToBBPlan } from '../../../engines/user-program/program-store';
+import { createBlank, getReferencedCycle, userWeekToBBPlan } from '../../../engines/user-program/program-store';
 import type {
   UserProgram, BBProgramBody, PLProgramBody, UserWeek, UserSession, UserBlock, UserSet,
-  ProgramConstraints, ProgramProgression,
+  ProgramConstraints, ProgramProgression, LoadStrategy, DeloadProtocol,
   PLWeek, PLDay, PLExercise, PLSet,
 } from '../../../engines/user-program/user-program.types';
 import { newId } from '../../../engines/user-program/user-program.types';
@@ -143,7 +143,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
                 <button
                   key={m}
                   onClick={() => addWeakToWeek(m)}
-                  style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700, minHeight: 38 }}
+                  style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700, minHeight: 44 }}
                 >
                   + {GROUP_RU[m] ?? m}
                 </button>
@@ -176,7 +176,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
                 </>
               );
             })()}
-            <select style={{ ...IN, padding: '4px 6px', fontSize: 11, flex: '0 0 auto', minHeight: 38 }} value={w.phase} onChange={e => updateWeek(wi, { phase: e.target.value as UserWeek['phase'] })}>
+            <select style={{ ...IN, padding: '4px 6px', fontSize: 11, flex: '0 0 auto', minHeight: 44 }} value={w.phase} onChange={e => updateWeek(wi, { phase: e.target.value as UserWeek['phase'] })}>
               <option value="accumulation">Накопление</option>
               <option value="intensification">Интенсификация</option>
               <option value="deload">Разгрузка</option>
@@ -201,17 +201,17 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
               <input type="checkbox" checked={w.deload} onChange={e => updateWeek(wi, { deload: e.target.checked })} /> deload
             </label>
             <button
-              style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38,
+              style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44,
                        color: volWeekIdx === wi ? ACCENT : DIM_STRONG,
                        borderColor: volWeekIdx === wi ? ACCENT_LINE : 'rgba(255,255,255,0.08)' }}
               onClick={() => setVolWeekIdx(volWeekIdx === wi ? null : wi)}
               title="Показать бюджет объёма по мышцам для этой недели"
             >📊 Объём</button>
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38 }} onClick={() => cloneWeek(wi)} title="Клонировать неделю">⧉</button>
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => cloneWeek(wi)} title="Клонировать неделю">⧉</button>
             {wi < body.weeks.length - 1 && (
-              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => swapWeek(wi, wi + 1)} title="Поменять местами с следующей неделей">⇅ swap</button>
+              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => swapWeek(wi, wi + 1)} title="Поменять местами с следующей неделей">⇅ swap</button>
             )}
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeWeek(wi)}>✕ нед</button>
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeWeek(wi)}>✕ нед</button>
           </div>
           {volWeekIdx === wi && (
             <div style={{ marginBottom: 8 }}>
@@ -261,7 +261,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
                         setWeeks(newWeeks);
                       }}
                       title={sub.reason + ' · confidence: ' + sub.confidence}
-                      style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontWeight: 700, minHeight: 30 }}
+                      style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontWeight: 700, minHeight: 44 }}
                     >→ {sub.exercise.name}</button>
                   )) : <span style={{ color: DIM, fontSize: 11 }}>нет замен</span>}
                 </div>
@@ -270,7 +270,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           </div>
         );
       })()}
-      <button style={{ ...BTN_GHOST, padding: '8px 14px', minHeight: 38 }} onClick={addWeek}>+ Добавить неделю</button>
+      <button style={{ ...BTN_GHOST, padding: '8px 14px', minHeight: 44 }} onClick={addWeek}>+ Добавить неделю</button>
     </div>
   );
 };
@@ -309,15 +309,15 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
       {sessions.map((s, si) => (
         <div key={s.id} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
           <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-            <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 38 }} value={s.name} onChange={e => updateSession(si, { name: e.target.value })} placeholder="День" />
-            <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 38 }} value={s.focus} onChange={e => updateSession(si, { focus: e.target.value })} placeholder="Фокус (грудь/трицепс)" />
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38 }} onClick={() => cloneSession(si)} title="Клонировать сессию">⧉</button>
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeSession(si)}>✕</button>
+            <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 44 }} value={s.name} onChange={e => updateSession(si, { name: e.target.value })} placeholder="День" />
+            <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 44 }} value={s.focus} onChange={e => updateSession(si, { focus: e.target.value })} placeholder="Фокус (грудь/трицепс)" />
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => cloneSession(si)} title="Клонировать сессию">⧉</button>
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeSession(si)}>✕</button>
           </div>
           <BlockList blocks={s.blocks} phase={phase} onChange={(blocks) => updateSession(si, { blocks })} />
         </div>
       ))}
-      <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38 }} onClick={addSession}>+ Сессия</button>
+      <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44 }} onClick={addSession}>+ Сессия</button>
     </div>
   );
 };
@@ -420,7 +420,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
     longPressTimer.current = window.setTimeout(() => {
       touchArmedRef.current = bi;
       setOverIdx(bi);
-      try { (navigator as any).vibrate?.(15); } catch { /* ignore */ }
+      try { navigator.vibrate?.(15); } catch { /* ignore */ }
     }, 350);
   };
   const onTouchMove = (e: React.TouchEvent) => {
@@ -519,17 +519,23 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
           <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
           <span
             title="Перетащите для изменения порядка"
-            style={{ cursor: 'grab', fontSize: 13, color: '#64748b', userSelect: 'none', padding: '4px 6px', touchAction: 'none', minWidth: 32, minHeight: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-            aria-label="drag handle"
+            style={{ cursor: 'grab', fontSize: 13, color: '#64748b', userSelect: 'none', padding: '4px 6px', touchAction: 'none', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            role="button" tabIndex={0} aria-label="Перетащить упражнение"
+            onKeyDown={event => {
+              if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                event.preventDefault();
+                moveBlock(bi, event.key === 'ArrowUp' ? -1 : 1);
+              }
+            }}
           >☰</span>
-          <select style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: '0 0 auto', minHeight: 38 }} value={b.type} onChange={e => updateBlock(bi, { type: e.target.value as UserBlock['type'], role: e.target.value === 'compound' ? 'primary' : 'accessory' })}>
+          <select style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: '0 0 auto', minHeight: 44 }} value={b.type} onChange={e => updateBlock(bi, { type: e.target.value as UserBlock['type'], role: e.target.value === 'compound' ? 'primary' : 'accessory' })}>
             <option value="compound">Базовое</option>
             <option value="accessory">Доп.</option>
             <option value="isolation">Изоляция</option>
             <option value="finisher">Финишь</option>
           </select>
           <ExerciseLabPicker value={b.exerciseName} muscle={b.muscle} onSelect={ex => updateBlock(bi, { exerciseName: ex.name, muscle: ex.group || b.muscle, type: (ex.type === 'compound' ? 'compound' : ex.type === 'isolation' ? 'isolation' : 'accessory') as UserBlock['type'], role: ex.type === 'compound' ? 'primary' : 'accessory' })} />
-          <input style={{ ...IN, padding: '6px 10px', fontSize: 11, width: 80, minHeight: 38 }} value={b.muscle} onChange={e => updateBlock(bi, { muscle: e.target.value })} placeholder="Мышца" list="muscle-list" />
+          <input style={{ ...IN, padding: '6px 10px', fontSize: 11, width: 80, minHeight: 44 }} value={b.muscle} onChange={e => updateBlock(bi, { muscle: e.target.value })} placeholder="Мышца" list="muscle-list" />
            <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} muscle={b.muscle} workMax={(loadTrainingProfile().workMax ?? {}) as Record<string, number>} />
            <button
              className="bb-block-expand"
@@ -591,7 +597,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
           {/* Ряд 2: комментарий + кнопки управления */}
           <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
           <input 
-            style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: '1 1 120px', minWidth: 90, minHeight: 38 }} 
+            style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: '1 1 120px', minWidth: 90, minHeight: 44 }}
             value={b.note || ''} 
             onChange={e => updateBlock(bi, { note: e.target.value })} 
             placeholder="💬 Комментарий" 
@@ -617,24 +623,24 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38, lineHeight: 1 }} onClick={() => moveBlock(bi, -1)} title="Вверх">▲</button>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38, lineHeight: 1 }} onClick={() => moveBlock(bi, 1)} title="Вниз">▼</button>
+            <button aria-label="Переместить упражнение вверх" style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44, minWidth: 44, lineHeight: 1 }} onClick={() => moveBlock(bi, -1)} title="Вверх">▲</button>
+            <button aria-label="Переместить упражнение вниз" style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44, minWidth: 44, lineHeight: 1 }} onClick={() => moveBlock(bi, 1)} title="Вниз">▼</button>
           </div>
           <button
-            style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38, color: b.supersetWith ? '#a78bfa' : DIM, borderColor: b.supersetWith ? 'rgba(167,139,250,0.3)' : 'rgba(255,255,255,0.08)' }}
+            style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44, color: b.supersetWith ? '#a78bfa' : DIM, borderColor: b.supersetWith ? 'rgba(167,139,250,0.3)' : 'rgba(255,255,255,0.08)' }}
             onClick={() => b.supersetWith ? unlinkSuperset(bi) : linkSuperset(bi)}
             title={b.supersetWith ? 'Снять superset-привязку' : 'Связать суперсетом с соседним блоком'}
           >⊕</button>
-          <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38 }} onClick={() => cloneBlock(bi)} title="Клонировать блок">⧉</button>
+          <button aria-label="Клонировать упражнение" style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44, minWidth: 44 }} onClick={() => cloneBlock(bi)} title="Клонировать блок">⧉</button>
           {b.exerciseName && (
             <button
-              style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38, color: substFor === bi ? '#f59e0b' : DIM, borderColor: substFor === bi ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)' }}
+              style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44, color: substFor === bi ? '#f59e0b' : DIM, borderColor: substFor === bi ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)' }}
               onClick={() => setSubstFor(substFor === bi ? null : bi)}
               title="Подобрать замену"
             >🔄</button>
           )}
-          <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38, color: '#06b6d4', borderColor: 'rgba(6,182,212,0.3)' }} onClick={() => copyBlock(bi)} title="Скопировать упражнение в буфер">📋</button>
-          <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 38, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeBlock(bi)}>✕</button>
+           <button aria-label="Скопировать упражнение" style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44, minWidth: 44, color: '#06b6d4', borderColor: 'rgba(6,182,212,0.3)' }} onClick={() => copyBlock(bi)} title="Скопировать упражнение в буфер">📋</button>
+           <button aria-label="Удалить упражнение" style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44, minWidth: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeBlock(bi)}>✕</button>
           {substFor === bi && substResults.length > 0 && (
             <div style={{ padding: '4px 8px', marginTop: 4, background: 'rgba(245,158,11,0.06)', borderRadius: 6, border: '1px solid rgba(245,158,11,0.18)' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>🔄 Замены для «{b.exerciseName}»:</div>
@@ -654,8 +660,8 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
         </div>
       ))}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38 }} onClick={addBlock}>+ Упражнение</button>
-        <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38, color: '#06b6d4', borderColor: 'rgba(6,182,212,0.3)' }} onClick={pasteBlock} title="Вставить скопированное упражнение из буфера">📥 Вставить</button>
+        <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44 }} onClick={addBlock}>+ Упражнение</button>
+        <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44, color: '#06b6d4', borderColor: 'rgba(6,182,212,0.3)' }} onClick={pasteBlock} title="Вставить скопированное упражнение из буфера">📥 Вставить</button>
       </div>
     </div>
   );
@@ -699,27 +705,27 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
       {sets.map((s, i) => (
         <div key={i} style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 6, padding: '6px 8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
-            <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 40, minHeight: 40 }} value={typeof s.reps === 'number' ? s.reps : 0} onChange={e => upd(i, { reps: parseInt(e.target.value) || 0 })} title="повторения" />
+            <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 40, minHeight: 44 }} value={typeof s.reps === 'number' ? s.reps : 0} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { reps: Math.max(0, Math.round(v)) }); }} title="повторения" aria-label="Повторения" inputMode="numeric" />
             <span style={{ fontSize: 11, color: DIM }}>×</span>
-            <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 36, minHeight: 40 }} value={s.rir} min={0} max={5} onChange={e => upd(i, { rir: parseInt(e.target.value) || 0 })} title="RIR" />
+            <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 36, minHeight: 44 }} value={s.rir} min={0} max={5} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { rir: Math.max(0, Math.min(5, Math.round(v))) }); }} title="RIR" aria-label="RIR" inputMode="numeric" />
             <span style={{ fontSize: 11, color: DIM }}>@</span>
             {weightMode === 'pct' ? (
               <>
-                <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 38, minHeight: 40 }} value={s.pctOf1RM != null ? Math.round(s.pctOf1RM * 100) : ''} onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd(i, { pctOf1RM: v / 100, weight: Math.round((wm * v / 100) / 2.5) * 2.5 }); }} title="% от 1ПМ" placeholder="%" />
+                <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 38, minHeight: 44 }} value={s.pctOf1RM != null ? Math.round(s.pctOf1RM * 100) : ''} onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd(i, { pctOf1RM: v / 100, weight: Math.round((wm * v / 100) / 2.5) * 2.5 }); }} title="% от 1ПМ" placeholder="%" />
                 <span style={{ fontSize: 11, color: DIM }}>%→</span>
               </>
             ) : null}
-            <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 44, minHeight: 40 }} value={s.weight ?? 0} onChange={e => upd(i, { weight: parseFloat(e.target.value) || 0 })} title="вес (кг)" placeholder="кг" />
+            <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 44, minHeight: 44 }} value={s.weight ?? 0} onChange={e => upd(i, { weight: parseFloat(e.target.value) || 0 })} title="вес (кг)" placeholder="кг" />
             {wm > 0 && typeof s.reps === 'number' && (
-              <button style={{ border: 'none', background: 'rgba(0,230,138,0.12)', color: ACCENT, cursor: 'pointer', fontSize: 11, padding: '4px 6px', borderRadius: 4, fontWeight: 700, minHeight: 40 }} onClick={() => autoCalcWeight(i, s.rir, s.reps as number)} title="Рассчитать вес из %1RM" aria-label="calc">🧮</button>
+              <button style={{ border: 'none', background: 'rgba(0,230,138,0.12)', color: ACCENT, cursor: 'pointer', fontSize: 11, padding: '4px 6px', borderRadius: 4, fontWeight: 700, minHeight: 44 }} onClick={() => autoCalcWeight(i, s.rir, s.reps as number)} title="Рассчитать вес из %1RM" aria-label="calc">🧮</button>
             )}
-            <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 36, minHeight: 40 }} value={Math.floor((s.restSec ?? 90) / 60)} min={0} max={20} onChange={e => upd(i, { restSec: (parseInt(e.target.value) || 0) * 60 })} title="отдых (мин)" placeholder="отд" />
+            <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 36, minHeight: 44 }} value={Math.floor((s.restSec ?? 90) / 60)} min={0} max={20} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { restSec: Math.max(0, Math.round(v)) * 60 }); }} title="отдых (мин)" placeholder="отд" aria-label="Отдых в минутах" inputMode="numeric" />
             <span style={{ fontSize: 11, color: DIM }}>м</span>
-            <input type="text" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 52, minHeight: 40 }} value={s.tempo || ''} onChange={e => upd(i, { tempo: e.target.value })} placeholder="темп" title="Темп (2-1-1-0)" />
-            <button style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: '4px 8px', minHeight: 38 }} onClick={() => confirmDelete(i)}>✕</button>
+            <input type="text" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 52, minHeight: 44 }} value={s.tempo || ''} onChange={e => upd(i, { tempo: e.target.value })} placeholder="темп" title="Темп (2-1-1-0)" />
+            <button style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: '4px 8px', minHeight: 44 }} onClick={() => confirmDelete(i)}>✕</button>
           </div>
           {wm > 0 && (
-            <button type="button" onClick={() => setWeightMode(m => m === 'kg' ? 'pct' : 'kg')} style={{ marginTop: 2, fontSize: 11, color: DIM, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', minHeight: 38 }}>
+            <button type="button" onClick={() => setWeightMode(m => m === 'kg' ? 'pct' : 'kg')} style={{ marginTop: 2, fontSize: 11, color: DIM, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', minHeight: 44 }}>
               {weightMode === 'kg' ? `+ %1PM (ПМ:${wm}кг)` : '→ только кг'}
             </button>
           )}
@@ -729,38 +735,38 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
               const active = hasTechnique(s, tech);
               const lbl: Record<string, string> = { drop_set: '↓DRP', myo_reps: 'MYO', pause_rep: 'PRS', rest_pause: 'RP', mechanical_drop: 'MD' };
               const clr: Record<string, string> = { drop_set: '#f59e0b', myo_reps: '#a78bfa', pause_rep: '#22c55e', rest_pause: '#3b82f6', mechanical_drop: '#ef4444' };
-              return <button key={tech} type="button" onClick={() => toggleTechnique(i, tech)} style={{ padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: active ? `1px solid ${clr[tech]}` : '1px solid rgba(255,255,255,0.08)', background: active ? `${clr[tech]}20` : 'transparent', color: active ? clr[tech] : DIM, minHeight: 38 }}>{lbl[tech]}</button>;
+              return <button key={tech} type="button" onClick={() => toggleTechnique(i, tech)} style={{ padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: active ? `1px solid ${clr[tech]}` : '1px solid rgba(255,255,255,0.08)', background: active ? `${clr[tech]}20` : 'transparent', color: active ? clr[tech] : DIM, minHeight: 44 }}>{lbl[tech]}</button>;
             })}
           </div>
           {hasTechnique(s, 'drop_set') && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4, paddingTop: 4, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
               <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 700 }}>↓ Дроп:</span>
-              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 40, minHeight: 34 }} value={s.dropWeight ?? 0} onChange={e => upd(i, { dropWeight: parseFloat(e.target.value) || 0 })} placeholder="вес" />
+              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 40, minHeight: 44 }} value={s.dropWeight ?? 0} onChange={e => upd(i, { dropWeight: parseFloat(e.target.value) || 0 })} placeholder="вес" />
               <span style={{ fontSize: 11, color: DIM }}>×</span>
-              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 34, minHeight: 34 }} value={s.dropReps ?? 0} onChange={e => upd(i, { dropReps: parseInt(e.target.value) || 0 })} placeholder="повт" />
+              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 34, minHeight: 44 }} value={s.dropReps ?? 0} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { dropReps: Math.max(0, Math.round(v)) }); }} placeholder="повт" aria-label="Drop повторения" inputMode="numeric" />
             </div>
           )}
           {hasTechnique(s, 'myo_reps') && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4, paddingTop: 4, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
               <span style={{ fontSize: 11, color: '#a78bfa', fontWeight: 700 }}>Мини:</span>
-              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 34, minHeight: 34 }} value={s.miniReps ?? 0} onChange={e => upd(i, { miniReps: parseInt(e.target.value) || 0 })} placeholder="повт" />
+              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 34, minHeight: 44 }} value={s.miniReps ?? 0} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { miniReps: Math.max(0, Math.round(v)) }); }} placeholder="повт" aria-label="Mini повторения" inputMode="numeric" />
               <span style={{ fontSize: 11, color: DIM }}>отд</span>
-              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 36, minHeight: 34 }} value={Math.floor((s.miniRestSec ?? 15) / 60)} onChange={e => upd(i, { miniRestSec: (parseInt(e.target.value) || 0) * 60 })} placeholder="м" />
+              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 36, minHeight: 44 }} value={Math.floor((s.miniRestSec ?? 15) / 60)} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { miniRestSec: Math.max(0, Math.round(v)) * 60 }); }} placeholder="м" aria-label="Mini отдых минуты" inputMode="numeric" />
             </div>
           )}
           {hasTechnique(s, 'pause_rep') && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4, paddingTop: 4, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
               <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 700 }}>Пауза:</span>
-              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 36, minHeight: 34 }} value={s.pauseSec ?? 2} onChange={e => upd(i, { pauseSec: parseInt(e.target.value) || 0 })} placeholder="сек" />
+              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 36, minHeight: 44 }} value={s.pauseSec ?? 2} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { pauseSec: Math.max(0, Math.round(v)) }); }} placeholder="сек" aria-label="Паза секунды" inputMode="numeric" />
             </div>
           )}
         </div>
       ))}
-      <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38, alignSelf: 'flex-start' }} onClick={add}>+ сет</button>
+      <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, alignSelf: 'flex-start' }} onClick={add}>+ сет</button>
       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 4, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         <span style={{ fontSize: 11, color: DIM, marginRight: 4 }}>📋 Шаблоны:</span>
         {Object.entries(SET_TEMPLATES).slice(0, 5).map(([key, tmpl]) => (
-          <button key={key} title={'Применить: ' + key} style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700, minHeight: 38 }}
+          <button key={key} title={'Применить: ' + key} style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700, minHeight: 44 }}
             onClick={() => onChange(Array.from({ length: tmpl.sets }, () => ({ reps: tmpl.reps, rir: tmpl.rir, restSec: tmpl.rest, weight: sets[0]?.weight ?? 0 })))}
           >{key}</button>
         ))}
@@ -798,33 +804,36 @@ const PLSetEditor: React.FC<{ sets: PLSet[]; lift: PLExercise['lift']; workMax: 
           <div key={i} style={{ background: 'rgba(167,139,250,0.10)', borderRadius: 6, padding: '5px 6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 10, color: DIM }}>%1RM</span>
-              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 44, minHeight: 34 }}
-                value={Math.round(s.pct * 100)} min={30} max={110} onChange={e => updSet(i, { pct: (parseInt(e.target.value) || 70) / 100 })} />
+              <input aria-label="Процент от 1ПМ" type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 54, minHeight: 44 }}
+                value={Math.round(s.pct * 100)} min={30} max={110} onChange={e => {
+                  const value = Number(e.target.value);
+                  if (Number.isFinite(value)) updSet(i, { pct: Math.max(0.3, Math.min(1.1, value / 100)) });
+                }} />
               {w != null && <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 700 }}>→ {w}кг</span>}
               <span style={{ fontSize: 10, color: DIM }}>×</span>
-              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 32, minHeight: 34 }}
-                value={s.reps} min={1} max={20} onChange={e => updSet(i, { reps: parseInt(e.target.value) || 1 })} title="повт" />
+              <input aria-label="Повторения" type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 42, minHeight: 44 }}
+                value={s.reps} min={1} max={20} onChange={e => updSet(i, { reps: Math.max(1, Number(e.target.value) || 1) })} title="повт" />
               <span style={{ fontSize: 10, color: DIM }}>повт</span>
-              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 34, minHeight: 34 }}
-                value={s.sets} min={1} max={12} onChange={e => updSet(i, { sets: parseInt(e.target.value) || 1 })} title="подходов" />
+              <input aria-label="Количество подходов" type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 44, minHeight: 44 }}
+                value={s.sets} min={1} max={12} onChange={e => updSet(i, { sets: Math.max(1, Number(e.target.value) || 1) })} title="подходов" />
               <span style={{ fontSize: 10, color: DIM }}>сетов</span>
               <label style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', gap: 2 }}>
-                RIR <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 28, minHeight: 34 }}
-                  value={s.rir ?? 2} min={0} max={5} onChange={e => updSet(i, { rir: parseInt(e.target.value) || 0 })} />
+                RIR <input aria-label="RIR" type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 38, minHeight: 44 }}
+                  value={s.rir ?? 2} min={0} max={5} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) updSet(i, { rir: Math.max(0, Math.min(5, Math.round(v))) }); }} inputMode="numeric" />
               </label>
-              <button style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: '4px 6px', minHeight: 38 }} onClick={() => removeSet(i)}>✕</button>
+              <button style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: '4px 6px', minHeight: 44 }} onClick={() => removeSet(i)}>✕</button>
             </div>
           </div>
         );
       })}
-      <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38, alignSelf: 'flex-start' }} onClick={addSet}>+ сет</button>
+      <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, alignSelf: 'flex-start' }} onClick={addSet}>+ сет</button>
     </div>
   );
 };
 
 const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => void }> = ({ body, onChange }) => {
   const { confirm } = useConfirmDialog();
-  const cycle = useMemo(() => getReferencedCycle({ meta: {} as any, pl: body } as UserProgram), [body.sourceCycleId]);
+  const cycle = useMemo(() => getReferencedCycle({ ...createBlank('pl'), pl: body }), [body.sourceCycleId]);
   const set = (patch: Partial<PLProgramBody>) => onChange({ ...body, ...patch });
   const isCustom = !body.sourceCycleId;
 
@@ -889,7 +898,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
               <div style={{ fontSize: 10, color: DIM }}>{cycle.meta.sessionsPerWeek}д/нед · {cycle.meta.weeks} нед · {cycle.meta.level} · {cycle.meta.period} · корректировка {((cycle.meta.correctionPct || 0) * 100).toFixed(1)}%/нед</div>
               <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Процентки/сеты/повторения цикла не редактируются — это профессиональная методика. Ниже — ваш оверлей.</div>
               <button
-                style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, marginTop: 6, minHeight: 38, color: '#f59e0b', borderColor: 'rgba(245,158,11,0.3)' }}
+                style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, marginTop: 6, minHeight: 44, color: '#f59e0b', borderColor: 'rgba(245,158,11,0.3)' }}
                 onClick={async () => {
                   const ok = await confirm({ title: 'Переключиться на свой ПЛ-цикл?', message: 'Процентки LMS-цикла будут отсоединены — вы сможете редактировать недели/дни/упражнения/процентки самостоятельно. Это нельзя отменить.', confirmLabel: 'Переключить', danger: true });
                   if (!ok) return;
@@ -903,7 +912,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>ПЛ-программа пустая. Выберите:</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <button
-                  style={{ ...BTN_GHOST, padding: '8px 12px', fontSize: 11, minHeight: 38, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }}
+                  style={{ ...BTN_GHOST, padding: '8px 12px', fontSize: 11, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }}
                   onClick={() => {
                     set({ sourceCycleId: null, customWeeks: [{ week: 1, phase: 'accumulation', deload: false, days: [{ name: 'День 1', exercises: [{ name: 'Присед', lift: 'squat', muscle: 'legs', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }] }] }] });
                   }}
@@ -977,7 +986,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
           {(['squat', 'bench', 'dead'] as const).map(k => (
             <label key={k} style={{ flex: 1, fontSize: 11, color: DIM, display: 'flex', flexDirection: 'column', gap: 3 }}>
               {k === 'squat' ? 'Присед' : k === 'bench' ? 'Жим' : 'Тяга'}
-              <input type="number" style={{ ...IN, minHeight: 38 }} value={body.workMax[k] ?? ''} onChange={e => set({ workMax: { ...body.workMax, [k]: parseFloat(e.target.value) || undefined } })} placeholder="кг" />
+              <input type="number" style={{ ...IN, minHeight: 44 }} value={body.workMax[k] ?? ''} onChange={e => set({ workMax: { ...body.workMax, [k]: parseFloat(e.target.value) || undefined } })} placeholder="кг" />
             </label>
           ))}
         </div>
@@ -1009,7 +1018,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                         updateDay(0, 0, { exercises: [...d0.exercises, ...newExercises] });
                       }}
                       title={diag.description + '\n' + diag.rationale + '\nУпр: ' + diag.assistance.join(', ')}
-                      style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)', color: '#ef4444', fontWeight: 700, minHeight: 38, textAlign: 'left', lineHeight: 1.3 }}
+                      style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)', color: '#ef4444', fontWeight: 700, minHeight: 44, textAlign: 'left', lineHeight: 1.3 }}
                     >
                       <div>{diag.label}</div>
                       <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>{diag.assistance.slice(0, 2).join(' · ')}</div>
@@ -1032,16 +1041,16 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <button
                 onClick={() => setExpandedWeek(isExp ? null : wi)}
-                style={{ padding: '6px 10px', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: `1px solid ${phaseColor}44`, color: DIM_STRONG, minHeight: 38 }}
+                style={{ padding: '6px 10px', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: `1px solid ${phaseColor}44`, color: DIM_STRONG, minHeight: 44 }}
               >{isExp ? '▼' : '▶'} Неделя {w.week}</button>
-              <select style={{ ...IN, padding: '4px 6px', fontSize: 11, minHeight: 38, flex: '0 0 auto' }} value={w.phase} onChange={e => updateWeek(wi, { phase: e.target.value as PLWeek['phase'] })}>
+              <select style={{ ...IN, padding: '4px 6px', fontSize: 11, minHeight: 44, flex: '0 0 auto' }} value={w.phase} onChange={e => updateWeek(wi, { phase: e.target.value as PLWeek['phase'] })}>
                 {PHASE_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
               </select>
               <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <input type="checkbox" checked={w.deload} onChange={e => updateWeek(wi, { deload: e.target.checked })} /> deload
               </label>
-              <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 38 }} onClick={() => cloneWeek(wi)} title="Клонировать">⧉</button>
-              <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 38, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeWeek(wi)}>✕ нед</button>
+              <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44 }} onClick={() => cloneWeek(wi)} title="Клонировать">⧉</button>
+              <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeWeek(wi)}>✕ нед</button>
             </div>
 
             {isExp && (
@@ -1049,9 +1058,9 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                 {w.days.map((d, di) => (
                   <div key={di} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                      <input style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: 1, minHeight: 38 }} value={d.name} onChange={e => updateDay(wi, di, { name: e.target.value })} placeholder="Название дня" />
+                      <input style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: 1, minHeight: 44 }} value={d.name} onChange={e => updateDay(wi, di, { name: e.target.value })} placeholder="Название дня" />
                       <span style={{ fontSize: 10, color: DIM }}>{d.exercises.length} упр</span>
-                      <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 38, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeDay(wi, di)}>✕ день</button>
+                      <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeDay(wi, di)}>✕ день</button>
                     </div>
                     {d.exercises.map((ex, ei) => (
                       <div key={ei} style={{ marginBottom: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.12)' }}>
@@ -1061,27 +1070,27 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                             muscle={ex.muscle ?? ''}
                             onSelect={selected => updateExercise(wi, di, ei, { name: selected.name, muscle: selected.group || ex.muscle, lift: ex.lift })}
                           />
-                          <select style={{ ...IN, padding: '4px 6px', fontSize: 11, minHeight: 38, flex: '0 0 100px' }} value={ex.lift} onChange={e => updateExercise(wi, di, ei, { lift: e.target.value as PLExercise['lift'] })}>
+                          <select style={{ ...IN, padding: '4px 6px', fontSize: 11, minHeight: 44, flex: '0 0 100px' }} value={ex.lift} onChange={e => updateExercise(wi, di, ei, { lift: e.target.value as PLExercise['lift'] })}>
                             {LIFT_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
                           </select>
-                          <input style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: '0 0 90px', minHeight: 38 }} value={ex.muscle ?? ''} onChange={e => updateExercise(wi, di, ei, { muscle: e.target.value })} placeholder="мышца" list="muscle-list" />
-                          <input style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: '1 1 100px', minHeight: 38 }} value={ex.note ?? ''} onChange={e => updateExercise(wi, di, ei, { note: e.target.value })} placeholder="заметка" />
-                          <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 38, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeExercise(wi, di, ei)}>✕</button>
+                          <input style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: '0 0 90px', minHeight: 44 }} value={ex.muscle ?? ''} onChange={e => updateExercise(wi, di, ei, { muscle: e.target.value })} placeholder="мышца" list="muscle-list" />
+                          <input style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: '1 1 100px', minHeight: 44 }} value={ex.note ?? ''} onChange={e => updateExercise(wi, di, ei, { note: e.target.value })} placeholder="заметка" />
+                          <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeExercise(wi, di, ei)}>✕</button>
                         </div>
                         <PLSetEditor sets={ex.sets} lift={ex.lift} workMax={body.workMax} onChange={(sets) => updateExercise(wi, di, ei, { sets })} />
                       </div>
                     ))}
-                    <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38 }} onClick={() => addExercise(wi, di)}>+ Упражнение</button>
+                    <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => addExercise(wi, di)}>+ Упражнение</button>
                   </div>
                 ))}
-                <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 38 }} onClick={() => addDay(wi)}>+ День</button>
+                <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => addDay(wi)}>+ День</button>
               </div>
             )}
           </div>
         );
       })}
       <div style={{ display: 'flex', gap: 6 }}>
-        <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38 }} onClick={addWeek}>+ Добавить неделю</button>
+        <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44 }} onClick={addWeek}>+ Добавить неделю</button>
       </div>
 
       {/* PL ротация — упражнения старше 4 недель (с кнопками замены через findSubstitutions) */}
@@ -1155,7 +1164,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
             {body.schedule.map((s, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
                 <span style={{ color: DIM, minWidth: 70 }}>Сессия {s.sessionIdx + 1}</span>
-                <select style={{ ...IN, padding: '4px 6px', fontSize: 10, minHeight: 38 }} value={s.dayOfWeek} onChange={e => { const sc = [...body.schedule]; sc[i] = { ...sc[i], dayOfWeek: parseInt(e.target.value) }; set({ schedule: sc }); }}>
+                <select style={{ ...IN, padding: '4px 6px', fontSize: 10, minHeight: 44 }} value={s.dayOfWeek} onChange={e => { const sc = [...body.schedule]; sc[i] = { ...sc[i], dayOfWeek: parseInt(e.target.value) }; set({ schedule: sc }); }}>
                   {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d, di) => <option key={di} value={di}>{d}</option>)}
                 </select>
               </div>
@@ -1174,7 +1183,7 @@ const WeakPointChips: React.FC<{ value: string[]; onChange: (v: string[]) => voi
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
       {WEAK_OPTS.map(m => {
         const on = value.includes(m);
-        return <button key={m} onClick={() => toggle(m)} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', border: on ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.02)', color: on ? '#fff' : DIM, minHeight: 38 }}>{GROUP_RU[m] ?? m}</button>;
+        return <button key={m} onClick={() => toggle(m)} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', border: on ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.02)', color: on ? '#fff' : DIM, minHeight: 44 }}>{GROUP_RU[m] ?? m}</button>;
       })}
     </div>
   );
@@ -1201,7 +1210,7 @@ const INTENSITY_TECHNIQUE_OPTS = [
 ];
 
 const Chip: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode; color?: string }> = ({ active, onClick, children, color }) => (
-  <button onClick={onClick} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', border: active ? '1px solid ' + (color || '#00e68a') : '1px solid rgba(255,255,255,0.08)', background: active ? (color || '#00e68a') + '20' : 'rgba(255,255,255,0.02)', color: active ? '#fff' : DIM, minHeight: 38 }}>{children}</button>
+  <button onClick={onClick} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', border: active ? '1px solid ' + (color || '#00e68a') : '1px solid rgba(255,255,255,0.08)', background: active ? (color || '#00e68a') + '20' : 'rgba(255,255,255,0.02)', color: active ? '#fff' : DIM, minHeight: 44 }}>{children}</button>
 );
 
 const BBConstraintsPanel: React.FC<{
@@ -1214,10 +1223,10 @@ const BBConstraintsPanel: React.FC<{
     const arr = constraints.equipment ?? [];
     onChangeConstraints({ ...constraints, equipment: arr.includes(eq) ? arr.filter(x => x !== eq) : [...arr, eq] });
   };
-  const toggleIntensity = (it: any) => {
-    const arr: any[] = (progression.intensityTechniques as any[]) ?? ['none'];
-    if (it === 'none') onChangeProgression({ ...progression, intensityTechniques: ['none'] as any });
-    else onChangeProgression({ ...progression, intensityTechniques: (arr.includes(it) ? arr.filter(x => x !== it && x !== 'none') : [...arr.filter(x => x !== 'none'), it]) as any });
+  const toggleIntensity = (it: IntensityTechnique) => {
+    const arr = progression.intensityTechniques ?? ['none'];
+    if (it === 'none') onChangeProgression({ ...progression, intensityTechniques: ['none'] });
+    else onChangeProgression({ ...progression, intensityTechniques: arr.includes(it) ? arr.filter(x => x !== it && x !== 'none') : [...arr.filter(x => x !== 'none'), it] });
   };
   return (
     <div style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1230,20 +1239,20 @@ const BBConstraintsPanel: React.FC<{
       </div>
       <div>
         <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Прогрессия весов</div>
-        <select style={IN} value={progression.loadStrategy || 'double_progression'} onChange={e => onChangeProgression({ ...progression, loadStrategy: e.target.value as any })}>
+        <select style={IN} value={progression.loadStrategy || 'double_progression'} onChange={e => onChangeProgression({ ...progression, loadStrategy: e.target.value as LoadStrategy })}>
           {LOAD_STRATEGY_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
         </select>
       </div>
       <div>
         <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Протокол делода</div>
-        <select style={IN} value={progression.deloadProtocol || 'pump'} onChange={e => onChangeProgression({ ...progression, deloadProtocol: e.target.value as any })}>
+        <select style={IN} value={progression.deloadProtocol || 'pump'} onChange={e => onChangeProgression({ ...progression, deloadProtocol: e.target.value as DeloadProtocol })}>
           {DELOAD_PROTOCOL_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
         </select>
       </div>
       <div>
         <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Интенсив-техники</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {INTENSITY_TECHNIQUE_OPTS.map(o => <Chip key={o.id} active={((progression.intensityTechniques as any[]) ?? ['none']).includes(o.id as any)} onClick={() => toggleIntensity(o.id)}>{o.label}</Chip>)}
+          {INTENSITY_TECHNIQUE_OPTS.map(o => <Chip key={o.id} active={(progression.intensityTechniques ?? ['none']).includes(o.id as IntensityTechnique)} onClick={() => toggleIntensity(o.id as IntensityTechnique)}>{o.label}</Chip>)}
         </div>
       </div>
       <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}>

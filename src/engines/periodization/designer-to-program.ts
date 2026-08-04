@@ -195,8 +195,8 @@ export function applyDesignPhasesToWeeks(
  */
 export function makeEmptySessionsForWeek(daysPerWeek: number): UserSession[] {
   const days = Math.max(1, Math.min(7, daysPerWeek));
-  // Типичное расписание 4д: Пн/Вт/Чт/Пт
-  const dowPattern = [0, 1, 3, 4, 2, 5, 6];
+  // Последовательные дни по умолчанию. Пользователь может изменить их в редакторе.
+  const dowPattern = [0, 1, 2, 3, 4, 5, 6];
   return Array.from({ length: days }, (_, i) => ({
     id: newId('ses'),
     name: `День ${i + 1}`,

@@ -1,11 +1,131 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
-## Current project state (Aug 3 2026)
+## Current project state (Aug 4 2026)
 
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK
-- `vitest` - 1140 passing (130 test files; BB-auto pro-quality Phase A/B/C/D, generation, safety, migration, round-trip, nutrition planner button audit, support calculator audit, and PL-auto critical audit coverage included)
+- `vitest` - 1318 passing (138 test files; BB-auto Phase E comprehensive audit, BB-auto pro-quality Phase A/B/C/D, generation, safety, migration, round-trip, nutrition planner button audit, support calculator audit, PL-auto critical audit coverage, and manual constructor audit included)
+
+---
+
+## BB-auto Phase E — Comprehensive PED + Exercise + Goals Audit (Aug 4 2026)
+
+Full critical analysis of BB-auto PED-dosing engine (`bb-ped-adaptation.engine.ts`), exercise selection, and all 5 BBGoal directions (mass/cut/recomp/maintenance/strength_mass). 3 P0 + 4 P1 + 4 P2 issues found and fixed. 7 new test files, +163 new tests.
+
+### P0 — Critical fixes
+1. **`BbAutoConstructor.buildBb()` did not pass `sex`** — `BbAutoConstructor.tsx:480-661`: `buildBBPlan`/`convertCycleToBBPlan`/`programToBBPlan` calls were missing `sex:` field. `bb-builder.engine.ts:2140` always received `input.sex === undefined`. Female users selecting `focusGroup: 'glutes'` or just female never got gluteBoost ×1.2 through the UI path (only through `autodraftBBPlan` in manual planner). Fixed: added `sex: linked.profile?.settings?.personal?.sex` to all 3 branches. Also added `sex?` field to `CycleToPlanInput` and `ProgramToBBPlanOpts` interfaces.
+2. **PED dose parser desync — `aasDose` warning ≥1500 didn't fire for strings** — `bb-ped-adaptation.engine.ts:199` vs `:250`: line 199 used regex parser (`"500mg"` → 500), line 250 used `Number()` (`"500mg"` → NaN → 0). Risk warning "⚠ High dose ≥1500 mg/week" silently failed for string doses. Fixed: unified `parseDose()` helper used in both places.
+3. **0 tests for `BBGoal='cut'/'recomp'/'maintenance'/'strength_mass'`** — Critical branches `bb-builder.engine.ts:1988-1989` (cut ×0.75, mass/strength_mass ×1.05) and `:2049` (strength_mass phase distribution) had ZERO test coverage. Fixed: 32 new tests in `bb-goal-coverage.test.ts` covering all 5 goals × 3 levels.
+
+### P1 — Important fixes
+4. **Cap 1.85 → 2.0 for full PED stack** — `bb-ped-adaptation.engine.ts:244-245`: 3+ PED with cap doses always hit 1.85 cap, erasing difference between AAS-only (1.30) and full stack (AAS 3000+insulin 40+GH 15+IGF1 100+MGF 400). Fixed: cap raised to 2.0 — mega-stack justifies +8% additional MRV.
+5. **`strength_mass` didn't get peaking phase** — `bb-builder.engine.ts:2049` passed `'mass'` to `distributePhases` for `strength_mass`, and `phase-periodization.ts:118` `hasPeak` only checked `'strength' | 'powerlifting'`. UI promised "linear strength progression" but plan had no peaking. Fixed: `hasPeak` now includes `'strength_mass'`; peaking checked BEFORE deload in phase loop (peaking weeks shouldn't be overridden by regular deload).
+6. **MGF/IGF1 didn't generate risks** — `bb-ped-adaptation.engine.ts:249-257`: `insulin`, `GH`, `AAS` had risk warnings, but `IGF1` (hypoglycemia, arthralgia) and `MGF` (unpredictable local hypertrophy) had none. Fixed: added risk blocks for both.
+7. **`labMrvMultiplier < 1.0` and recovery metrics had 0 bb-tests** — `bb-builder.engine.ts:1957-1965` (recoveryMult from bodyFat/leanMass/hrvMs/sleepHours/stressLevel) and `:2009,2022` (labMrvMultiplier composition) were untested. Fixed: 16 new tests in `bb-lab-recovery-coverage.test.ts`.
+
+### P2 — Quality fixes
+8. **Russian comma "500,5" parsed as 5005** — `bb-ped-adaptation.engine.ts:199`: regex `/[^0-9.]/g` removed comma before parsing, turning "500,5" into "5005" (+1000 mg error). Fixed: `.replace(',', '.')` before regex.
+9. **`PED_META.tEq` for T-equivalent risk threshold** — `bb-ped-adaptation.engine.ts`: new `PED_META` constant with `tEq` field (testosterone-equivalent factor). AAS tEq=1.0 (baseline), non-AAS tEq=0. Trenbolone (tEq=2.5) 500 mg = 750 T-equiv → closer to 1500 threshold. Risk warning now uses `aasTEquiv = aasDose × PED_META.AAS.tEq`.
+10. **`lengthenedBonus` not trainingFocus-specific** — `bb-builder.engine.ts:399-406`: +10 bonus for lengthened-position exercises (RDL, incline curl, sissy squat) was identical for strength/hypertrophy/endurance. Fixed: multiplier varies by `trainingFocus` (strength ×0.5, hypertrophy ×1.0, endurance ×1.5).
+11. **`courseIntensity` applied even when all PED doses=0** — `bb-ped-adaptation.engine.ts:237`: `activePEDs.length > 0` was true even if all PED had dose=0 (explicitly disabled). Fixed: condition changed to `mrvMult > 1` — if PEDs contribute no MRV boost, intensity shouldn't apply either.
+
+### New test files (7 files, +163 tests)
+- `src/engines/bb/__tests__/bb-ped-adaptation.test.ts` — **75 tests**: dose interpolation (AAS/insulin/GH/MGF/IGF1 all thresholds), multi-PED composition + diminishing 0.85, GH+insulin synergy, CourseIntensity (mild/moderate/heavy), string dose parsing ("500mg", "1,5г", "1e3"), risks auto-generation (AAS≥1500, insulin, GH, IGF1, MGF, T-eq), backward compat (undefined, negative, null), adjustedMrv per-muscle, PED_META + explainPEDAdaptation.
+- `src/engines/bb/__tests__/bb-goal-coverage.test.ts` — **32 tests**: volume target corrections (cut ×0.75, mass/strength_mass ×1.05), phase distribution per goal, plan generation matrix 5 goals × 3 levels, relative volume ordering, selector splitHints per goal.
+- `src/engines/bb/__tests__/bb-strength-mass.test.ts` — **6 tests**: peaking-phase activation (12/16 weeks), volume parity with mass, PED composition.
+- `src/engines/bb/__tests__/bb-lab-recovery-coverage.test.ts` — **16 tests**: labMrvMultiplier (0.7/1.0/undefined + PED composition), recovery metrics (bodyFat/leanMass/hrvMs/sleepHours/stressLevel + cap 0.6), nutrition metrics (calorieSurplus/proteinPerKg).
+- `src/engines/bb/__tests__/bb-female-default.test.ts` — **9 tests**: female without focusGroup (gluteBoost ×1.2), female vs male glute volume, female + enhanced + PED, lengthenedBonus × trainingFocus (strength/hypertrophy/endurance), UI integration sex forwarding.
+- `src/engines/bb/__tests__/bb-ped-combo.test.ts` — **12 tests**: mass + PED (baseline/heavy/full stack cap 2.0), cut + PED (dangerous scenario), strength_mass + PED (peaking + boost), recomp + PED, female + glutes + PED, enhanced exerciseCount, adaptForPEDs direct.
+- `src/engines/bb/__tests__/bb-exercise-tier-ped.test.ts` — **13 tests**: bbExerciseTier classification (canonical/acceptable/exotic/inappropriate), level-based filtering (beginner/intermediate no exotic), enhanced + PED exerciseCount.
+
+### Files modified
+- `src/engines/bb/bb-ped-adaptation.engine.ts` — PED_META with tEq, parseDose helper, cap 1.85→2.0, IGF1/MGF risks, T-equiv threshold, courseIntensity mrvMult>1 guard
+- `src/engines/bb/bb-builder.engine.ts` — strength_mass → distributePhases(goal) direct, lengthenedBonus × trainingFocus
+- `src/engines/bb/cycle-to-plan.ts` — `sex?` field added to `CycleToPlanInput` and `ProgramToBBPlanOpts`
+- `src/ui/screens/TrainingScreen_parts/phase-periodization.ts` — hasPeak += 'strength_mass', peaking checked before deload
+- `src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx` — `sex:` field added to all 3 buildBb() branches
+
+### Full suite: 1318 tests passing (138 test files), 0 TS errors, vite build OK.
+
+---
+
+## Manual Program Constructor Audit Fixes (Aug 4 2026)
+
+Full critical analysis of the manual program constructor (ручной конструктор) and annual planning (годовое планирование) across 6 directions: macrocycle engine, periodization designer, MacrocyclePanel UI, ProgramEditorView, ProgramManagerPanel, and planner-bridge-handlers. 6 P0 + 13 P1 + 8 P2 issues found and fixed. 16 new tests added.
+
+### P0 — Critical fixes
+1. **`BLOCK_TEMPLATES` missing `gpp`/`transition`** — `periodization-designer.engine.ts`: palette had GPP/Transition blocks (colors, icons, labels) but no templates. `addBlockToDesign()` returned `undefined` → silently nothing happened. Preset "52-нед годовой план" generated ~35 weeks instead of 52. Fixed: added `gpp` (3 weeks, high/low) and `transition` (2 weeks, very_low/low) to `BLOCK_TEMPLATES`.
+2. **`getDesignStats` overlapWeeks inflated** — `periodization-designer.engine.ts`: `overlaps.length` counted (block, week) entries, not unique weeks. 3 blocks on weeks 3-5 → `overlapWeeks = 6-9` instead of 3. Fixed: `overlapWeeks: new Set(overlaps.map(o => o.week)).size`. Added `DesignStats` interface.
+3. **`createFromPhases` dropped blocks instead of truncating** — `periodization-designer.engine.ts`: `if (end > totalWeeks) break;` dropped the entire block and all subsequent blocks. Preset "Классический 12-нед (сила)" created 4 blocks (10 weeks) instead of 8 (12 weeks). Fixed: `endWeek = Math.min(cursor + tmpl.weeks - 1, totalWeeks)`. Added tail-fill transition for unfilled weeks.
+4. **XSS in PDF print** — `ProgramEditorView.tsx`: `b.exerciseName`, `d.name`, `ex.name`, `s.name`, `s.focus`, `program.pl.notes`, `program.pl.sourceCycleId` inserted into HTML without escaping. A program named `<script>alert(1)</script>` would execute in the print window. Fixed: `escapeHtml()` helper applied to all user-provided strings in PDF output.
+5. **`editWeeks` NaN propagation** — `MacrocyclePanel.tsx`: `+e.target.value` without guards. Non-numeric input → NaN → `Math.max(1, NaN) = NaN` → corrupts all phase durations. Fixed: `Number.isFinite(value) && value >= 1` guard with clamping to `totalWeeks`.
+6. **`buildMacrocycle` competition minimum 2 weeks → 1** — `macrocycle.engine.ts`: `Math.max(2, ...)` for competition phase. Multi-mode path correctly used `compWeeks = 1`. Fixed: `Math.max(1, ...)` for competition.
+
+### P1 — Important fixes
+7. **`estimateCompetitionWeek` past date → week 1** — `macrocycle.engine.ts`: `daysDiff < 0` → `Math.floor(neg/7) + 1 ≤ 0` → clamped to 1. Old competition placed at start. Fixed: past dates return `Math.round(totalWeeks * 0.85)`.
+8. **`rebalanceBbMacrocycle` overwrites competition week** — `macrocycle.engine.ts`: `week: block.weekOffset + block.weeks - 1` overwrote original week. Fixed: `Math.max(block.weekOffset, Math.min(competition.week, block.weekOffset + block.weeks - 1))`.
+9. **Duplicate priority A competitions allowed** — `MacrocyclePanel.tsx`: no uniqueness check. Two A-priorities → engine used first silently. Fixed: `mainCount > 1` validation. Also `buildMacrocycleMulti` throws on duplicate A.
+10. **`startCreate` vs `autoFillDraftDispatch` divergence** — `ProgramManagerPanel.tsx`: `startCreate('bb')` did NOT pass `trainingFocus`, `bodyFat`, `leanMass`, `hrvMs`, `sleepHours`, `stressLevel`. Wizard path did. Fixed: unified — `startCreate` now creates blank + sets `pendingAutoFill=true`, `ProgramEditor` auto-fills via `autoFillDraftDispatch` with full recovery metrics.
+11. **Undo history not working from ProgramEditorView** — `ProgramManagerPanel.tsx`: undo snapshots only saved via `onEditChange`. `ProgramEditorView` used `onChange` directly → all editor changes bypassed undo. Fixed: extracted `useProgramUndo` hook, connected in both `ProgramManagerPanel` and `ProgramEditorView`.
+12. **Bridge macrocycle handler without recovery metrics** — `planner-bridge-handlers.ts`: `macrocycleToBBProgram` call missing `trainingFocus`, `bodyFat`, `leanMass`, `hrvMs`, `sleepHours`, `stressLevel`, `labMrvMultiplier`. Fixed: `BridgeCtx.recovery` field added, `ProgramEditorView` passes recovery metrics.
+13. **`sendToExecution` used `alert()` instead of `showToast()`** — `ProgramEditorView.tsx`: 5 `alert()` calls. Fixed: replaced with `showToast(msg, 'warning')`.
+14. **`PLSetEditor` parseInt("0") → 70%** — `ProgramEditorComponents.tsx`: `parseInt(e.target.value) || 70` — typing 0 gave 70% (impossible to set 0%). Fixed: `Number.isFinite` guard with clamping 0.3-1.1.
+15. **`makeEmptySessionsForWeek` non-sequential dowPattern** — `designer-to-program.ts`: `[0, 1, 3, 4, 2, 5, 6]` — 5th day = Wednesday instead of Friday. Fixed: `[0, 1, 2, 3, 4, 5, 6]`.
+16. **Days-per-week cascade removes wrong session** — `ProgramEditorView.tsx`: `sessions.pop()` removed last session. For PPL 3→2 days, "Legs" (most important) was removed. Fixed: prefer removing empty/deload sessions first via `findIndex`.
+17. **`sourceCycleId === null` instead of `== null`** — `ProgramEditorView.tsx`: `sourceCycleId` typed as `string | null | undefined`. `=== null` missed `undefined`. Fixed: `== null`.
+18. **`priHandler` volume multiplier changed weight not sets** — `planner-bridge-handlers.ts`: `weight: st.weight ? Math.round(st.weight * mult)` changed LOAD, not VOLUME. Fixed: adjusts set count via `Math.round(sourceSets.length * mult)`, preserves weight, shifts RIR.
+19. **`deloadHandler` only changed RIR+weight, not sets** — `planner-bridge-handlers.ts`: `rir: 4, weight: st.weight * 0.6` but no set reduction. Fixed: `Math.ceil(sourceSets.length * 0.6)` sets, each with RIR 4 and weight ×0.6.
+20. **`volumeHandler` added 1 block per set, capped at 5** — `planner-bridge-handlers.ts`: `Math.min(cnt, 5)` blocks each with 1 set. Fixed: 1 block with `count` sets, clamped 0-10.
+
+### P2 — Quality fixes
+21. **`loadDesigns` no validation** — `periodization-designer.engine.ts`: `JSON.parse` returned any shape. Fixed: validates `id`, `name`, `totalWeeks`, `blocks` array, `phaseKey` in `PHASE_COLORS`, integer `startWeek`/`endWeek`.
+22. **`moveBlockInDesign` no NaN guard** — `periodization-designer.engine.ts`: `newStart` could be NaN. Fixed: `Number.isFinite(newStart) ? Math.round(newStart) : block.startWeek`.
+23. **`resizeBlockInDesign` no NaN guard** — `periodization-designer.engine.ts`: `newEndWeek` could be NaN. Fixed: `Number.isFinite(newEndWeek) ? Math.round(newEndWeek) : block.endWeek`.
+24. **`isBodyweightExercise` skipped in `cloneWeekWithFreshIds`** — `macrocycle-to-bb.ts`: `weightFactor` applied to all numeric weights including bodyweight. Fixed: `!isBodyweightExercise(block.exerciseName)` guard.
+25. **`isBBMacrocycle` duck-typing** — `macrocycle-to-bb.ts`: `'trainingFocus' in macro` alone was fragile. Fixed: `isBBMacrocycle` type guard checks both `trainingFocus` field AND absence of `kind` in blocks.
+26. **All `minHeight: 30/32/34/36/38/40` → 44** — across all 5 files. CSS `@media (hover: none) and (pointer: coarse)` enforces `min-height: 44px !important` on touch devices.
+27. **All `parseInt() || default` → `Number.isFinite` guard** — across all numeric inputs: wizardDays, wizardWeeks, execWeek, reps, rir, restSec, dropReps, miniReps, miniRestSec, pauseSec, pctOf1RM, weight.
+28. **Empty states with icons** — ProgramManagerPanel: 📋 + title + description. PeriodizationDesignerTab: 🎨 + title + description.
+
+### UI/UX improvements
+- **TrainingModal.tsx** — shared dialog shell with `role="dialog"`, `aria-modal`, focus trap, Escape key, backdrop click. All 5 modal windows (BB library, PL cycles, wizard, methods, macrocycle) unified.
+- **Touch DnD in PeriodizationDesignerTab** — long-press 350ms on palette chips activates drag mode, `onTouchMove` cancels if >10px scroll, `onTouchEnd` on drop zones places block. Vibration feedback.
+- **Week ruler alignment** — MacrocyclePanel: `Math.ceil` instead of `Math.round` for integer tick labels aligned to block boundaries.
+- **CSS for mobile** — `@media (max-width: 480px)`: full-screen modals, grid collapse, 16px input font (iOS anti-zoom). `@media (hover: none)`: 44px tap targets.
+- **ARIA labels** — all inputs, selects, buttons, drag handles, delete buttons, phase blocks, competition markers have `aria-label`.
+- **`role="alert"` + `aria-live`** — validation banners in ProgramEditorView and PeriodizationDesignerTab.
+- **`role="radiogroup"`** — ManualModeToggle in ProgramManagerPanel.
+- **Keyboard navigation** — palette chips in PeriodizationDesignerTab: Tab → select, Enter/Space → toggle drag, Arrow Up/Down → move block.
+- **Phase visual tokens** — `phase-visual-tokens.ts` created as canonical source for PL/BB/Designer phase colors, icons, labels + competition priority visuals.
+- **`useProgramUndo` hook** — extracted from ProgramManagerPanel inline code. Undo/Redo via Ctrl+Z/Ctrl+Shift+Z/Ctrl+Y. localStorage history (cap=50). Connected in both ProgramManagerPanel and ProgramEditorView.
+
+### Files modified
+- `src/engines/periodization-designer.engine.ts` — P0-1/2/3, P2-21/22/23, DesignStats interface, loadDesigns validation
+- `src/engines/lms/macrocycle.engine.ts` — P0-6, P1-7/8/9
+- `src/engines/periodization/designer-to-program.ts` — P1-15
+- `src/engines/lms/macrocycle-to-bb.ts` — P2-24/25
+- `src/ui/screens/TrainingScreen_parts/ProgramEditorView.tsx` — P0-4, P1-10/11/12/13/16/17, escapeHtml, TrainingModal, useProgramUndo, aria
+- `src/ui/screens/TrainingScreen_parts/ProgramManagerPanel.tsx` — P1-10/11, TrainingModal, empty state, aria, unused imports removed
+- `src/ui/screens/TrainingScreen_parts/ProgramEditorComponents.tsx` — P1-14, P2-26/27, aria, tap-target 44px, keyboard nav
+- `src/ui/screens/TrainingScreen_parts/PeriodizationDesignerTab.tsx` — touch DnD, aria, empty state, tap-target 44px
+- `src/ui/screens/TrainingScreen_parts/planner-bridge-handlers.ts` — P1-12, P1-18/19/20, recovery metrics
+- `src/ui/screens/SRCBBScreen_parts/MacrocyclePanel.tsx` — P0-5, P1-9, week ruler, shared tokens, aria, tap-target 44px
+- `src/styles.css` — mobile CSS, modal CSS, tap-target enforcement
+
+### New files
+- `src/ui/screens/TrainingScreen_parts/TrainingModal.tsx` — shared modal component
+- `src/ui/screens/TrainingScreen_parts/hooks/useProgramUndo.ts` — undo/redo hook
+- `src/ui/screens/TrainingScreen_parts/phase-visual-tokens.ts` — shared phase visual tokens
+- `src/ui/screens/TrainingScreen_parts/__tests__/useProgramUndo.test.ts` — 10 tests
+
+### Tests
+- `src/engines/__tests__/periodization-designer-overlap.test.ts` — +3 tests (unique overlap weeks, GPP/transition presets)
+- `src/engines/lms/__tests__/macrocycle-multi.test.ts` — +1 test (duplicate A priority rejection)
+- `src/ui/screens/TrainingScreen_parts/__tests__/planner-bridge-handlers.test.ts` — +2 tests (pri volume multiplier, deload volume+intensity)
+- `src/ui/screens/TrainingScreen_parts/__tests__/useProgramUndo.test.ts` — 10 tests (pushSnapshot, skip identical, cap 50, clear future, undo/redo round-trip, corrupted storage)
+- `src/engines/periodization/__tests__/designer-to-program.test.ts` — updated for sequential dowPattern
+- Full suite: **1155 tests passing** (131 test files), 0 TS errors, vite build OK.
 
 ---
 

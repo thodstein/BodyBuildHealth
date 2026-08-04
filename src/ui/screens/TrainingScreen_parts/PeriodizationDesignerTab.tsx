@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type MacrocycleDesign,
+  type DesignStats,
   type DesignerPhaseBlock,
   type PhaseKey,
   PHASE_COLORS,
@@ -20,6 +21,7 @@ import {
   getDefaultPresetDesigns,
 } from '../../../engines/periodization-designer.engine';
 import { applyToPlanner } from './planner-bridge';
+import { DESIGNER_PHASE_VISUAL } from './phase-visual-tokens';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -36,6 +38,11 @@ export const PeriodizationDesignerTab: React.FC = () => {
   const pastRef = useRef<MacrocycleDesign[]>([]);
   const futureRef = useRef<MacrocycleDesign[]>([]);
   const [, setHistoryTick] = useState(0);
+  // Touch DnD: long-press on palette chip → drag to timeline week
+  const touchPhaseRef = useRef<PhaseKey | null>(null);
+  const touchTimerRef = useRef<number | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [touchActive, setTouchActive] = useState(false);
 
   useEffect(() => {
     const list = loadDesigns();
@@ -96,7 +103,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [redo, undo]);
 
-  const stats = useMemo(() => current ? getDesignStats(current) : null, [current]);
+  const stats: DesignStats | null = useMemo(() => current ? getDesignStats(current) : null, [current]);
 
   // Resize helpers
   const handleResize = useCallback((blockId: string, newEnd: number) => {
@@ -208,8 +215,10 @@ export const PeriodizationDesignerTab: React.FC = () => {
       </div>
 
       {!current && (
-        <div style={CARD}>
-          <div style={{ fontSize: 12, color: DIM, marginBottom: 10, textAlign: 'center' }}>Создайте новый дизайн или загрузите пресет</div>
+        <div className="constructor-surface" style={CARD}>
+          <div style={{ fontSize: 40, textAlign: 'center', marginBottom: 10 }}>🎨</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 6, textAlign: 'center' }}>Создайте первый дизайн периодизации</div>
+          <div style={{ fontSize: 11, color: DIM, marginBottom: 10, textAlign: 'center' }}>Перетащите фазовые блоки на таймлайн или начните с готового пресета.</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
             <button onClick={handleNewDesign} style={{ ...btn, background: 'rgba(0,230,138,0.1)', borderColor: ACCENT, color: ACCENT }}>➕ Создать пустой</button>
             {getDefaultPresetDesigns().map((p, i) => (
@@ -224,7 +233,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
       {current && (
         <>
           {/* Design info */}
-          <div style={CARD}>
+          <div className="constructor-surface" style={CARD}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <input value={current.name} onChange={e => handleSaveName(e.target.value)}
                 style={{ background: 'transparent', border: 'none', borderBottom: '1px dashed rgba(255,255,255,0.2)', color: '#fff', fontSize: 14, fontWeight: 700, width: '60%', outline: 'none' }} />
@@ -263,29 +272,74 @@ export const PeriodizationDesignerTab: React.FC = () => {
           </div>
 
           {/* Palette — draggable phase blocks */}
-          <div style={CARD}>
+          <div className="constructor-surface" style={CARD}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 6 }}>🎨 Палитра блоков (перетащите на таймлайн)</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {(Object.keys(PHASE_COLORS) as PhaseKey[]).map(pk => (
+              {(Object.keys(DESIGNER_PHASE_VISUAL) as PhaseKey[]).map(pk => (
                 <div key={pk}
                   draggable
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Добавить блок ${PHASE_LABELS_RU[pk]}`}
                   onDragStart={() => setDragPhase(pk)}
                   onDragEnd={() => setDragPhase(null)}
+                  onClick={() => setDragPhase(previous => previous === pk ? null : pk)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setDragPhase(previous => previous === pk ? null : pk);
+                    }
+                  }}
+                  onTouchStart={(e) => {
+                    const touch = e.touches[0];
+                    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+                    touchPhaseRef.current = pk;
+                    touchTimerRef.current = window.setTimeout(() => {
+                      setTouchActive(true);
+                      setDragPhase(pk);
+                      try { (navigator as any).vibrate?.(15); } catch { /* ignore */ }
+                    }, 350);
+                  }}
+                  onTouchMove={(e) => {
+                    if (!touchStartRef.current || !touchTimerRef.current) return;
+                    const touch = e.touches[0];
+                    const dx = Math.abs(touch.clientX - touchStartRef.current.x);
+                    const dy = Math.abs(touch.clientY - touchStartRef.current.y);
+                    if (dx > 10 || dy > 10) {
+                      window.clearTimeout(touchTimerRef.current);
+                      touchTimerRef.current = null;
+                      if (!touchActive) touchStartRef.current = null;
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    if (touchTimerRef.current) {
+                      window.clearTimeout(touchTimerRef.current);
+                      touchTimerRef.current = null;
+                    }
+                    if (touchActive) {
+                      setTouchActive(false);
+                      setDragPhase(null);
+                    }
+                    touchPhaseRef.current = null;
+                    touchStartRef.current = null;
+                  }}
                   style={{
                     padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 600, cursor: 'grab',
-                    background: PHASE_COLORS[pk] + '22', border: '1px solid ' + PHASE_COLORS[pk] + '55',
-                    color: PHASE_COLORS[pk], display: 'flex', alignItems: 'center', gap: 4,
-                    transition: 'transform 0.1s', userSelect: 'none',
+                    background: DESIGNER_PHASE_VISUAL[pk].color + (touchActive && dragPhase === pk ? '44' : '22'),
+                    border: '1px solid ' + DESIGNER_PHASE_VISUAL[pk].color + (touchActive && dragPhase === pk ? '88' : '55'),
+                    color: DESIGNER_PHASE_VISUAL[pk].color, display: 'flex', alignItems: 'center', gap: 4,
+                    transition: 'transform 0.1s', userSelect: 'none', touchAction: 'none',
+                    transform: touchActive && dragPhase === pk ? 'scale(1.08)' : 'none',
                   }}>
-                  <span>{PHASE_ICONS[pk]}</span>
-                  <span>{PHASE_LABELS_RU[pk]}</span>
+                  <span>{DESIGNER_PHASE_VISUAL[pk].icon}</span>
+                  <span>{DESIGNER_PHASE_VISUAL[pk].label}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Timeline canvas */}
-          <div style={{ ...CARD, padding: 0, overflowX: 'auto' }}>
+          <div className="constructor-surface" style={{ ...CARD, padding: 0, overflowX: 'auto' }}>
             <div style={{ minWidth: 380, padding: 12 }}>
               {/* Quarter nav */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -305,7 +359,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
                 <div style={{ width: 44, flexShrink: 0 }} />
                 {Array.from({ length: quarterEnd - quarterStart + 1 }, (_, i) => {
                   const wn = quarterStart + i;
-                  return <div key={wn} style={{ width: 32, flexShrink: 0, textAlign: 'center', fontSize: 10, color: DIM }}>{wn}</div>;
+                  return <div key={wn} style={{ width: 33, flexShrink: 0, textAlign: 'center', fontSize: 10, color: DIM }}>{wn}</div>;
                 })}
               </div>
 
@@ -323,11 +377,20 @@ export const PeriodizationDesignerTab: React.FC = () => {
                   return (
                     <div key={wn}
                       onDragOver={e => { e.preventDefault(); }}
+                      onClick={() => { if (dragPhase) handleDropOnCanvas(wn, dragPhase); }}
                       onDrop={e => { e.preventDefault(); if (dragPhase) { handleDropOnCanvas(wn, dragPhase); } }}
+                      onTouchEnd={() => {
+                        if (touchActive && dragPhase) {
+                          handleDropOnCanvas(wn, dragPhase);
+                          setTouchActive(false);
+                          setDragPhase(null);
+                        }
+                      }}
+                      aria-label={dragPhase ? `Разместить блок на неделе ${wn}` : `Неделя ${wn}`}
                       style={{
                         position: 'absolute', left: 44 + i * 33, top: 0, width: 33, height: '100%',
-                        background: dragPhase ? 'rgba(255,255,255,0.03)' : 'transparent',
-                        borderLeft: '1px dashed rgba(255,255,255,0.04)',
+                        background: dragPhase ? 'rgba(0,230,138,0.12)' : 'transparent',
+                        borderLeft: '1px dashed rgba(255,255,255,0.12)',
                         cursor: dragPhase ? 'copy' : 'default',
                         zIndex: 1,
                       }}
@@ -341,7 +404,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
                   const visEnd = Math.min(block.endWeek, quarterEnd);
                   const left = (visStart - quarterStart) * 33 + 44;
                   const width = (visEnd - visStart + 1) * 33 - 2;
-                  const color = PHASE_COLORS[block.phaseKey] || '#666';
+                  const color = DESIGNER_PHASE_VISUAL[block.phaseKey]?.color || PHASE_COLORS[block.phaseKey] || '#666';
                   return (
                     <div key={block.id}
                       onClick={() => setEditBlockId(block.id === editBlockId ? null : block.id)}
@@ -371,8 +434,8 @@ export const PeriodizationDesignerTab: React.FC = () => {
                         <div style={{ fontSize: 10, color: color + '99' }}>
                           {block.endWeek - block.startWeek + 1}н
                         </div>
-                        <button onClick={e => { e.stopPropagation(); handleDeleteBlock(block.id); }}
-                          style={{ fontSize: 10, padding: '0 4px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', lineHeight: 1 }}>
+                        <button aria-label={`Удалить блок ${PHASE_LABELS_RU[block.phaseKey]}`} onClick={e => { e.stopPropagation(); handleDeleteBlock(block.id); }}
+                          style={{ fontSize: 12, padding: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', lineHeight: 1, minWidth: 44, minHeight: 44 }}>
                           ✕
                         </button>
                       </div>
@@ -386,7 +449,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
                 <div style={{ width: 44, flexShrink: 0 }} />
                 {Array.from({ length: quarterEnd - quarterStart + 1 }, (_, i) => {
                   const wn = quarterStart + i;
-                  return <div key={wn} style={{ width: 32, flexShrink: 0, textAlign: 'center', fontSize: 10, color: DIM }}>{wn}</div>;
+                  return <div key={wn} style={{ width: 33, flexShrink: 0, textAlign: 'center', fontSize: 10, color: DIM }}>{wn}</div>;
                 })}
               </div>
             </div>
@@ -394,7 +457,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
 
           {/* Edit block panel */}
           {editBlock && (
-            <div style={{ ...CARD, border: '1px solid ' + ACCENT + '44' }}>
+            <div className="constructor-surface constructor-surface--accent" style={{ ...CARD, border: '1px solid ' + ACCENT + '44' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: PHASE_COLORS[editBlock.phaseKey] }}>
                   {PHASE_ICONS[editBlock.phaseKey]} {PHASE_LABELS_RU[editBlock.phaseKey]}
@@ -432,7 +495,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
                 const updated = updateBlockNotes(current!, editBlock.id, e.target.value);
                   commitDesign(updated);
                 }}
-                  style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: '#fff', fontSize: 10, padding: 6, resize: 'vertical', minHeight: 40 }} />
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: '#fff', fontSize: 10, padding: 6, resize: 'vertical', minHeight: 44 }} />
               </div>
             </div>
           )}
@@ -461,20 +524,20 @@ export const PeriodizationDesignerTab: React.FC = () => {
           )}
 
           {/* P0-2/P1-2: Overlap + gap warnings */}
-          {stats && ((stats as any).overlapWeeks > 0 || ((stats as any).gapRanges?.length ?? 0) > 0) && (
-            <div style={{ ...CARD, borderLeft: '3px solid #ef4444' }}>
+          {stats && (stats.overlapWeeks > 0 || stats.gapRanges.length > 0) && (
+            <div role="alert" aria-live="polite" style={{ ...CARD, borderLeft: '3px solid #ef4444' }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: '#ef4444', marginBottom: 6 }}>⚠ Проблемы структуры</div>
-              {(stats as any).overlapWeeks > 0 && (
+              {stats.overlapWeeks > 0 && (
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>
-                  🔴 Перекрытие блоков: {(stats as any).overlapWeeks} нед. Недели с перекрытием получат непредсказуемую фазу при применении.
+                  🔴 Перекрытие блоков: {stats.overlapWeeks} нед. Недели с перекрытием получат непредсказуемую фазу при применении.
                   <button onClick={handleResolveOverlaps} style={{ ...btn, marginLeft: 8, color: '#ef4444', borderColor: 'rgba(239,68,68,0.45)' }}>
                     Исправить автоматически
                   </button>
                 </div>
               )}
-              {(stats as any).gapRanges?.length > 0 && (
+              {stats.gapRanges.length > 0 && (
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
-                  🟡 Пропуски (недели без блока → accumulation по умолчанию): {(stats as any).gapRanges.join(', ')}
+                  🟡 Пропуски (недели без блока → accumulation по умолчанию): {stats.gapRanges.join(', ')}
                 </div>
               )}
             </div>
@@ -512,7 +575,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
                 label: 'Дизайн+упражнения: ' + current.name + ' (' + current.totalWeeks + ' нед)',
                 data: { design: current, fillExercises: true, daysPerWeek: 4 },
               })}
-              style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', color: '#fff', fontWeight: 700, fontSize: 12, minHeight: 40 }}
+              style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', color: '#fff', fontWeight: 700, fontSize: 12, minHeight: 44 }}
             >🏋️ Применить с упражнениями (autodraft)</button>
           </div>
         );

@@ -826,7 +826,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   }, [strengthLogs, selectedTrendEx]);
 
   return (
-    <div key={mainTab} style={{ padding: 12, color: '#fff', maxWidth: 720, margin: '0 auto', boxSizing: 'border-box', overflowX: 'hidden' }}>
+    <div key={mainTab} className="pl-auto-screen" style={{ padding: '12px 8px', color: '#fff', width: '100%', maxWidth: 720, margin: '0 auto', minWidth: 0, boxSizing: 'border-box', overflowX: 'hidden' }}>
       {/* Заголовок текущего режима планирования (выбор режима — в навигации блока) */}
       <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 12, background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)', textAlign: 'center' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)' }}>{mainTab === 'pl' ? '🏆 Силовой цикл (ПЛ)' : mainTab === 'bb' ? '💪 Бодибилдинг (ББ)' : '🛠 Ручной конструктор'}</span>
@@ -931,7 +931,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   const days = weakGroupDayMap[wg] || [];
                   return (
                     <div key={wg} style={{ marginBottom: 6 }}>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 3 }}>{WEAK_GROUP_LABELS_RU[wg] || wg}{days.length > 0 ? ` → день ${days.join(', ')}` : ' → авто (малые: 2 дня, крупные: 1 день)'}</div>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 3, minWidth: 0, overflowWrap: 'anywhere' }}>{WEAK_GROUP_LABELS_RU[wg] || wg}{days.length > 0 ? ` → день ${days.join(', ')}` : ' → авто (малые: 2 дня, крупные: 1 день)'}</div>
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
                         {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => {
                           const on = days.includes(d);
@@ -963,7 +963,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             }));
             return PL_WEAKPOINT_OPTIONS.map((opt) => (
             <div key={opt.lift} style={{ marginTop: 4 }}>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>{opt.lift === 'bench' ? 'Жим лёжа' : opt.lift === 'squat' ? 'Присед' : opt.lift === 'deadlift' ? 'Становая' : opt.lift === 'ohp' ? 'Жим стоя' : opt.lift === 'row' ? 'Тяга в наклоне' : opt.lift === 'pulldown' ? 'Тяга верхн. блока' : opt.lift === 'incline_press' ? 'Жим на наклонной' : opt.lift}</div>
+               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 2, minWidth: 0, overflowWrap: 'anywhere' }}>{opt.lift === 'bench' ? 'Жим лёжа' : opt.lift === 'squat' ? 'Присед' : opt.lift === 'deadlift' ? 'Становая' : opt.lift === 'ohp' ? 'Жим стоя' : opt.lift === 'row' ? 'Тяга в наклоне' : opt.lift === 'pulldown' ? 'Тяга верхн. блока' : opt.lift === 'incline_press' ? 'Жим на наклонной' : opt.lift}</div>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap", minWidth: 0, maxWidth: '100%' }}>
                 {opt.weakPoints.map((wp) => {
                   const on = plWeakPoints.some(x => x.lift === opt.lift && x.weakPoint === wp.id);

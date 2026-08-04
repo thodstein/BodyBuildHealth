@@ -24,7 +24,7 @@ import { ProgramRevisionsDiff } from './ProgramRevisions';
 import { StrengthDiaryPanel } from './StrengthDiaryPanel';
 import { tempoFor } from '../../../engines/bb/bb-tempo-rest';
 import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
-import { loadTrainingProfile, saveTrainingProfile, useTrainingProfile, type TrainingProfile } from './training-profile';
+import { loadTrainingProfile, useTrainingProfile, type TrainingProfile } from './training-profile';
 import { TrainingProfileCard } from './TrainingProfileCard';
 import { subscribePlannerApply, clearPlannerApply, type PlannerApply } from './planner-bridge';
 import { applyBridgePayloadDispatch, type BridgeCtx } from './planner-bridge-handlers';
@@ -34,7 +34,7 @@ import { designerToUserWeeks, applyDesignPhasesToWeeks } from '../../../engines/
 import { macrocycleToBBProgram } from '../../../engines/lms/macrocycle-to-bb';
 import { deserializeMacro } from '../../../engines/lms/macrocycle.engine';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
-import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
+import type { Macrocycle, BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, UI_METRICS } from './training-ui';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { suggestFeeders } from '../../../engines/bb/bb-autocoach.engine';
@@ -47,6 +47,8 @@ import { autodraftBBPlan, applyPhaseModulation, plLmsScheduleDays, computePlanQu
 import { GROUP_RU } from './program-types';
 import { BulkApplyCard } from './BulkApplyCard';
 import { useEditorToast } from './EditorToast';
+import { TrainingModal } from './TrainingModal';
+import { useProgramUndo } from './hooks/useProgramUndo';
 import { useConfirmDialog } from './ConfirmDialog';
 import { ProgramTimeline } from './ProgramTimeline';
 import { RirWaveChart, QualityScorePanel, PlanStatsPanel } from './ProgramEditorPanels2';
@@ -66,6 +68,15 @@ const SOURCE_LABEL: Record<string, string> = {
   custom: 'своя', cloned_library: 'из библиотеки', cloned_cycle: 'клон цикла', from_build: 'из сборки',
 };
 
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export interface ProgramEditorProps {
   program: UserProgram;
   onChange: (p: UserProgram) => void;
@@ -79,8 +90,14 @@ export interface ProgramEditorProps {
 export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange, onSave, onBack, mode, onMode, autoFillOnMount = false }) => {
   const dir = program.meta.direction;
   const isPro = mode === 'pro';
-  const update = (patch: Partial<UserProgram>) => onChange({ ...program, ...patch });
-  const updateMeta = (patch: Partial<UserProgram['meta']>) => onChange({ ...program, meta: { ...program.meta, ...patch } });
+  // P4: Undo/Redo — snapshot перед каждым onChange, чтобы Ctrl+Z работал из редактора
+  const { pushSnapshot } = useProgramUndo(program, (p) => { if (p) onChange(p); });
+  const onChangeWithUndo = useCallback((p: UserProgram) => {
+    pushSnapshot(p);
+    onChange(p);
+  }, [onChange, pushSnapshot]);
+  const update = (patch: Partial<UserProgram>) => onChangeWithUndo({ ...program, ...patch });
+  const updateMeta = (patch: Partial<UserProgram['meta']>) => onChangeWithUndo({ ...program, meta: { ...program.meta, ...patch } });
   const linked = useDataLink();
   const labAdjust = useMemo(() => labTrainingAdjust(linked.labAnalysis ?? null), [linked.labAnalysis]);
   const [tprofile, updateTProfile] = useTrainingProfile();
@@ -104,11 +121,22 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   }, [autoFillOnMount]);
   const applyBridgePayload = useCallback((payload: PlannerApply) => {
     // P0-3: dispatch table replaces 14-branch if/else chain
-    const ctx: BridgeCtx = { program, dir, update, onChange, showToast, tprofile };
+    const personal = linked.profile?.settings?.personal;
+    const lifestyle = linked.profile?.settings?.lifestyle;
+    const bodyFat = personal?.bodyFat;
+    const recovery = {
+      bodyFat,
+      leanMass: personal?.weight && bodyFat != null ? Math.round(personal.weight * (1 - bodyFat / 100)) : undefined,
+      hrvMs: lifestyle?.morningHRV,
+      sleepHours: lifestyle?.sleepHours,
+      stressLevel: lifestyle?.stressLevel,
+      labMrvMultiplier: labAdjust.mrvMultiplier,
+    };
+    const ctx: BridgeCtx = { program, dir, update, onChange, showToast, tprofile, recovery };
     applyBridgePayloadDispatch(payload, ctx);
     clearPlannerApply();
     setBridgeApply(null);
-  }, [program, dir, onChange, update, showToast, tprofile]);
+  }, [program, dir, onChange, update, showToast, tprofile, linked.profile, labAdjust.mrvMultiplier]);
 
 
   // Библиотека внутри редактора
@@ -142,6 +170,38 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     onChange(p);
     setEditorLibOpen(null);
     showToast('📥 Загружен ПЛ-цикл: ' + (p.meta?.title ?? cycleId));
+  };
+
+  const applyWholeMacrocycle = (source: Macrocycle | BBMacrocycle) => {
+    try {
+      const personal = linked.profile?.settings?.personal;
+      const lifestyle = linked.profile?.settings?.lifestyle;
+      const bodyFat = personal?.bodyFat;
+      const options = {
+        level: macroLevel,
+        goal: dir === 'hybrid' ? 'hypertrophy' : program.meta.goal,
+        daysPerWeek: dir === 'hybrid' ? Math.max(1, program.meta.daysPerWeek - 3) : program.meta.daysPerWeek,
+        weakPoints: (tprofile.weakPoints ?? []) as string[],
+        equipment: program.bb?.constraints?.equipment ?? [],
+        trainingFocus: program.meta.trainingFocus,
+        bodyFat,
+        leanMass: personal?.weight && bodyFat != null ? Math.round(personal.weight * (1 - bodyFat / 100)) : undefined,
+        hrvMs: lifestyle?.morningHRV,
+        sleepHours: lifestyle?.sleepHours,
+        stressLevel: lifestyle?.stressLevel,
+        labMrvMultiplier: labAdjust.mrvMultiplier,
+      };
+      const generated = macrocycleToBBProgram(source, options);
+      if (dir === 'hybrid' && program.hybrid && generated.bb) {
+        update({ hybrid: { ...program.hybrid, bbWeeks: generated.bb.weeks } });
+      } else {
+        onChange(generated);
+      }
+      setEditorLibOpen(null);
+      showToast(`🗓 Макроцикл применён: ${source.totalWeeks} нед.`);
+    } catch (error) {
+      showToast('⚠ Не удалось применить макроцикл: ' + (error as Error)?.message, 'error');
+    }
   };
 
   const revisions = program.meta.revisions ?? [];
@@ -226,7 +286,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     if (dir === 'bb' && program.bb) {
       const wi = Math.max(0, Math.min(execWeek - 1, program.bb.weeks.length - 1));
       const week = program.bb.weeks[wi];
-      if (!week) { alert('Сначала добавьте хотя бы одну сессию.'); return; }
+       if (!week) { showToast('Сначала добавьте хотя бы одну сессию.', 'warning'); return; }
       for (const s of week.sessions) {
         days.push({
           label: s.name || 'День',
@@ -244,12 +304,12 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         });
       }
       if (days.length === 0 || days.every((d) => d.exercises.length === 0)) {
-        alert('Добавьте хотя бы одно упражнение, прежде чем отправлять к выполнению.');
+         showToast('Добавьте хотя бы одно упражнение, прежде чем отправлять к выполнению.', 'warning');
         return;
       }
     } else if (dir === 'pl' && program.pl) {
       // P0-2: custom PL — конвертируем customWeeks в PlayerDay[]
-      if (program.pl.sourceCycleId === null && program.pl.customWeeks && program.pl.customWeeks.length > 0) {
+       if (program.pl.sourceCycleId == null && program.pl.customWeeks && program.pl.customWeeks.length > 0) {
         const wm = program.pl.workMax || {};
         const wmFor = (lift: string): number => {
           if (lift === 'bench') return wm.bench ?? 0;
@@ -262,7 +322,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         const wiPL = Math.max(0, Math.min(execWeek - 1, program.pl.customWeeks!.length - 1));
         const wk0 = program.pl.customWeeks[wiPL];
         if (!wk0 || wk0.days.length === 0) {
-          alert('Свой ПЛ-цикл пуст — добавьте дни и упражнения.');
+           showToast('Свой ПЛ-цикл пуст — добавьте дни и упражнения.', 'warning');
           return;
         }
         days = wk0.days.map((d, di) => ({
@@ -281,7 +341,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         // PL: использовать plLmsScheduleDays из manual-constructor.engine — превращает LMS-cycle в PlayerDay[].
         const plDays = plLmsScheduleDays(program);
         if (!plDays || plDays.length === 0) {
-          alert('ПЛ-цикл пустой. Укажите ПМ (приседа/жима/тяги) и проверьте подключение LMS-цикла.');
+           showToast('ПЛ-цикл пустой. Укажите ПМ (приседа/жима/тяги) и проверьте подключение LMS-цикла.', 'warning');
           return;
         }
         const wm = program.pl.workMax || {};
@@ -316,7 +376,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         }));
       }
     } else {
-      alert('Сначала выберите ББ или ПЛ программу.');
+      showToast('Сначала выберите ББ или ПЛ программу.', 'warning');
       return;
     }
     try {
@@ -329,7 +389,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   const printProgram = () => {
     const w = window.open('', '_blank', 'width=800,height=900');
     if (!w) { showToast('⚠ Разрешите всплывающие окна'); return; }
-    const safeTitle = (program.meta.title || '').replace(/</g, '&lt;');
+    const safeTitle = escapeHtml(program.meta.title);
     const html: string[] = [];
     html.push(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safeTitle}</title><style>`);
     html.push('body{font-family:Arial,sans-serif;margin:20px;color:#1a1a1a;background:#fff}');
@@ -343,34 +403,34 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     html.push(`<div class="meta">Цель: ${GOAL_OPTS.find(g=>g.id===program.meta.goal)?.label ?? program.meta.goal} · Уровень: ${LEVEL_OPTS.find(l=>l.id===program.meta.level)?.label ?? program.meta.level} · ${program.meta.daysPerWeek} дн/нед × ${program.meta.weeks} нед</div>`);
     // F2.5: тренерские заметки в PDF
     if (program.meta.notes) {
-      html.push(`<div style="white-space:pre-wrap;background:#f5f5f5;padding:10px;border-left:3px solid #60a5fa;margin:10px 0;font-size:11px;color:#333;">📝 <b>Заметки тренера:</b><br>${program.meta.notes.replace(/</g, '&lt;')}</div>`);
+       html.push(`<div style="white-space:pre-wrap;background:#f5f5f5;padding:10px;border-left:3px solid #60a5fa;margin:10px 0;font-size:11px;color:#333;">📝 <b>Заметки тренера:</b><br>${escapeHtml(program.meta.notes)}</div>`);
     }
     if (program.bb?.weeks) {
       for (const w of program.bb.weeks) {
         html.push(`<h2>Неделя ${w.week} <span class="phase" style="background:${w.deload?'#f59e0b20':'#00e68a20'};color:${w.deload?'#f59e0b':'#00e68a'}">${w.phase}${w.deload?' · делод':''}</span></h2>`);
         for (const s of w.sessions) {
-          html.push(`<table><thead><tr><th colspan="5">${s.name || 'День'} ${s.focus ? '· ' + s.focus : ''}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>Сеты</th><th>RIR</th><th>Вес</th></tr></thead><tbody>`);
+           html.push(`<table><thead><tr><th colspan="5">${escapeHtml(s.name || 'День')} ${s.focus ? '· ' + escapeHtml(s.focus) : ''}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>Сеты</th><th>RIR</th><th>Вес</th></tr></thead><tbody>`);
           for (const b of s.blocks) {
             if (!b.exerciseName) continue;
             const setsStr = b.sets.map(st => `${st.reps}×`).join(', ');
             const rir = b.sets[0]?.rir ?? '-';
             const wt = b.sets[0]?.weight ?? 0;
-            html.push(`<tr><td>${b.exerciseName}</td><td>${GROUP_RU[b.muscle] ?? b.muscle}</td><td>${setsStr}</td><td>${rir}</td><td>${wt} кг</td></tr>`);
+             html.push(`<tr><td>${escapeHtml(b.exerciseName)}</td><td>${escapeHtml(GROUP_RU[b.muscle] ?? b.muscle)}</td><td>${escapeHtml(setsStr)}</td><td>${escapeHtml(rir)}</td><td>${escapeHtml(wt)} кг</td></tr>`);
           }
           html.push('</tbody></table>');
         }
       }
     } else if (program.pl) {
       // P4-4: PL в PDF — customWeeks (таблицы) или LMS-расписание
-      if (program.pl.sourceCycleId === null && program.pl.customWeeks) {
+       if (program.pl.sourceCycleId == null && program.pl.customWeeks) {
         // Свой PL-цикл — таблицы как BB
         for (const w of program.pl.customWeeks) {
           html.push(`<h2>Неделя ${w.week} <span class="phase" style="background:${w.deload?'#f59e0b20':'#a78bfa20'};color:${w.deload?'#f59e0b':'#a78bfa'}">${w.phase}${w.deload?' · делод':''}</span></h2>`);
           for (const d of w.days) {
-            html.push(`<table><thead><tr><th colspan="5">${d.name}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>%1RM</th><th>Повт</th><th>Сетов</th></tr></thead><tbody>`);
+             html.push(`<table><thead><tr><th colspan="5">${escapeHtml(d.name)}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>%1RM</th><th>Повт</th><th>Сетов</th></tr></thead><tbody>`);
             for (const ex of d.exercises) {
               if (!ex.name) continue;
-              html.push(`<tr><td>${ex.name}</td><td>${ex.muscle || ex.lift || ''}</td><td>${Math.round((ex.sets[0]?.pct ?? 0) * 100)}%</td><td>${ex.sets[0]?.reps ?? '-'}</td><td>${ex.sets.length}</td></tr>`);
+               html.push(`<tr><td>${escapeHtml(ex.name)}</td><td>${escapeHtml(ex.muscle || ex.lift || '')}</td><td>${Math.round((ex.sets[0]?.pct ?? 0) * 100)}%</td><td>${escapeHtml(ex.sets[0]?.reps ?? '-')}</td><td>${ex.sets.length}</td></tr>`);
             }
             html.push('</tbody></table>');
           }
@@ -378,17 +438,17 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
       } else {
         // LMS-цикл — расписание через plLmsScheduleDays
         const plDays = plLmsScheduleDays(program);
-        html.push(`<h2>ПЛ-цикл: ${program.pl.sourceCycleId}</h2>`);
+         html.push(`<h2>ПЛ-цикл: ${escapeHtml(program.pl.sourceCycleId)}</h2>`);
         html.push(`<div class="meta">ПМ: присед ${program.pl.workMax?.squat ?? '-'} · жим ${program.pl.workMax?.bench ?? '-'} · тяга ${program.pl.workMax?.dead ?? '-'} кг</div>`);
         for (const pd of plDays) {
-          html.push(`<table><thead><tr><th colspan="4">${pd.label}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>Повт</th><th>Вес</th></tr></thead><tbody>`);
+           html.push(`<table><thead><tr><th colspan="4">${escapeHtml(pd.label)}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>Повт</th><th>Вес</th></tr></thead><tbody>`);
           for (const ex of (pd.exercises as any[])) {
-            html.push(`<tr><td>${ex.name}</td><td>${ex.muscleGroup || ''}</td><td>${(ex.sets ?? []).map((s:any) => s.reps).join(', ')}</td><td>${(ex.sets ?? []).map((s:any) => s.weight ?? 0).join(', ')} кг</td></tr>`);
+             html.push(`<tr><td>${escapeHtml(ex.name)}</td><td>${escapeHtml(ex.muscleGroup || '')}</td><td>${escapeHtml((ex.sets ?? []).map((s:any) => s.reps).join(', '))}</td><td>${escapeHtml((ex.sets ?? []).map((s:any) => s.weight ?? 0).join(', '))} кг</td></tr>`);
           }
           html.push('</tbody></table>');
         }
       }
-      if (program.pl.notes) html.push(`<p>${program.pl.notes}</p>`);
+       if (program.pl.notes) html.push(`<p>${escapeHtml(program.pl.notes)}</p>`);
     }
     html.push('</body></html>');
     w.document.write(html.join(''));
@@ -400,7 +460,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     <div className="manual-constructor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* V2: Sticky header — always visible during scroll */}
       <div className="manual-constructor__sticky-header" style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(15,17,22,0.92)', backdropFilter: 'blur(12px) saturate(140%)', WebkitBackdropFilter: 'blur(12px) saturate(140%)', borderRadius: 12, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-        <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 38 }} onClick={safeBack}>← К списку</button>
+        <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44 }} onClick={safeBack}>← К списку</button>
         <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
         {isPro && <RecoveryBadge onApplyAutoDeload={autoFillDraft} />}
         <ProgramMetricsCSV program={program} dir={dir} onToast={showToast} />
@@ -428,7 +488,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         const warns = issues.filter((i) => i.level === 'warning');
         if (errs.length === 0 && warns.length === 0) return null;
         return (
-          <div style={{ background: errs.length > 0 ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.10)', borderRadius: 8, padding: '8px 10px', borderLeft: '3px solid ' + (errs.length > 0 ? '#ef4444' : '#f59e0b') }}>
+           <div role="alert" aria-live="polite" style={{ background: errs.length > 0 ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.10)', borderRadius: 8, padding: '8px 10px', borderLeft: '3px solid ' + (errs.length > 0 ? '#ef4444' : '#f59e0b') }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: errs.length > 0 ? '#ef4444' : '#f59e0b', marginBottom: 4 }}>
               {errs.length > 0 ? `🚫 ${errs.length} ошибк${errs.length === 1 ? 'а' : 'и'} валидации` : `⚠ ${warns.length} предупреждений`}
             </div>
@@ -443,30 +503,30 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {/* P2-5: основной ряд (всегда виден) */}
-          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: showTableView ? 'rgba(0,230,138,0.6)' : 'rgba(255,255,255,0.15)', color: showTableView ? '#00e68a' : DIM }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Редактор' : 'Таблица плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
+          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: showTableView ? 'rgba(0,230,138,0.6)' : 'rgba(255,255,255,0.15)', color: showTableView ? '#00e68a' : DIM }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Редактор' : 'Таблица плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
           {(dir === 'bb' || dir === 'pl') && (
             <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4, marginRight: 4 }}>
               Нед
-              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 38, minHeight: 34, textAlign: 'center' }} value={execWeek} min={1} max={program.meta.weeks} onChange={e => setExecWeek(Math.max(1, Math.min(parseInt(e.target.value) || 1, program.meta.weeks)))} />
+              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 50, minHeight: 44, textAlign: 'center' }} value={execWeek} min={1} max={program.meta.weeks} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) setExecWeek(Math.max(1, Math.min(program.meta.weeks, Math.round(v)))); }} aria-label="Неделя выполнения" inputMode="numeric" />
             </label>
           )}
           {dir === 'bb' && (
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToExecution} title="Отправить к выполнению (he_pl_runtime)">🚚 К выполнению</button>
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToExecution} title="Отправить к выполнению (he_pl_runtime)">🚚 К выполнению</button>
           )}
           {dir === 'pl' && program.pl && (
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-цикл к выполнению (he_pl_runtime)">🚚 К выполнению</button>
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-цикл к выполнению (he_pl_runtime)">🚚 К выполнению</button>
           )}
-          <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 38 }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
-          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / сохранить в PDF">🖨 PDF</button>
+          <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
+          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / сохранить в PDF">🖨 PDF</button>
           {/* P2-5: secondary ряд (сворачиваемый «⋯ Ещё») */}
-          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38 }} onClick={() => setShowMore(v => !v)} title="Дополнительные инструменты">⋯ Ещё</button>
+          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44 }} onClick={() => setShowMore(v => !v)} title="Дополнительные инструменты">⋯ Ещё</button>
         </div>
         {showMore && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingTop: 4 }}>
             {isPro && (
-              <button disabled={isAutoFilling} style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a', opacity: isAutoFilling ? 0.65 : 1 }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней (требует профиль тренированности)">{isAutoFilling ? '⏳ Создание...' : '⚡ Авто-черновик'}</button>
+              <button disabled={isAutoFilling} style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a', opacity: isAutoFilling ? 0.65 : 1 }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней (требует профиль тренированности)">{isAutoFilling ? '⏳ Создание...' : '⚡ Авто-черновик'}</button>
             )}
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(245,158,11,0.4)', color: '#f59e0b' }}
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(245,158,11,0.4)', color: '#f59e0b' }}
               onClick={() => {
                 if (dir === 'bb') setEditorLibOpen('bb');
                 else if (dir === 'pl') setEditorLibOpen('pl');
@@ -474,7 +534,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
               title="Загрузить программу или цикл из библиотеки для редактирования"
             >📥 Загрузить</button>
             {isPro && dir === 'bb' && program.bb && (program.bb.weeks?.length ?? 0) >= 4 && (
-              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
+              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
                 onClick={() => {
                   const updated = { ...program.bb!, weeks: applyPhaseModulation(program.bb!.weeks!, { goal: program.meta.goal, level: program.meta.level, weeksTotal: program.meta.weeks || 4 }) };
                   update({ bb: updated });
@@ -485,7 +545,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
             )}
             {/* 🗓 Годовой план — MacrocyclePanel (для всех направлений: BB/PL/Hybrid) */}
             {isPro && (
-              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(245,158,11,0.5)', color: '#f59e0b' }}
+              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(245,158,11,0.5)', color: '#f59e0b' }}
                 onClick={() => {
                   setMacroLevel(program.meta.level);
                   setMacroGoal(mapGoalToMacro(program.meta.goal));
@@ -495,7 +555,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
               >🗓 Годовой план</button>
             )}
             {isPro && (
-              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}
+              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}
                 onClick={() => setEditorLibOpen('methods')}
                 title="Справочник тренировочных методик"
               >📚 Методики</button>
@@ -506,15 +566,15 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
 
       {/* P2-1/F5: подсказка при пустой программе в standard-режиме — прямая CTA авто-черновика */}
       {!isPro && program.bb && (program.bb.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0)) && (
-        <div style={{ ...CARD, padding: 14, borderLeft: '3px solid #00e68a' }}>
+        <div className="constructor-surface constructor-surface--accent" style={{ ...CARD, padding: 14, borderLeft: '3px solid #00e68a' }}>
           <div style={{ fontSize: 12, color: DIM_STRONG, lineHeight: 1.5, marginBottom: 8 }}>
             💡 Пустая программа. Заполните автоматически на основе вашего профиля или возьмите готовую из библиотеки.
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 40 }} onClick={() => autoFillDraft()} title="Автоматическая сборка на основе цели/уровня/дней">
+            <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44 }} onClick={() => autoFillDraft()} title="Автоматическая сборка на основе цели/уровня/дней">
               {isAutoFilling ? '⏳ Создание...' : '⚡ Создать автоматически'}
             </button>
-            <button style={{ ...BTN_GHOST, padding: '8px 16px', fontSize: 12, minHeight: 40, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => setEditorLibOpen('bb')}>
+            <button style={{ ...BTN_GHOST, padding: '8px 16px', fontSize: 12, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => setEditorLibOpen('bb')}>
               📥 Загрузить из библиотеки
             </button>
           </div>
@@ -523,10 +583,10 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
 
       {/* P1-1: planner-bridge баннер — рекомендация от калькулятора */}
       {bridgeApply && (
-        <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div className="constructor-surface constructor-surface--warning" style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', flex: 1, minWidth: 100 }}>🔗 Калькулятор рекомендует: {bridgeApply.label}</span>
-          <button style={{ ...BTN, padding: '6px 14px', fontSize: 11, minHeight: 38 }} onClick={() => applyBridgePayload(bridgeApply)}>Применить</button>
-          <button style={{ ...BTN_GHOST, padding: '6px 14px', fontSize: 11, minHeight: 38 }} onClick={() => { clearPlannerApply(); setBridgeApply(null); }}>✕</button>
+          <button style={{ ...BTN, padding: '6px 14px', fontSize: 11, minHeight: 44 }} onClick={() => applyBridgePayload(bridgeApply)}>Применить</button>
+          <button style={{ ...BTN_GHOST, padding: '6px 14px', fontSize: 11, minHeight: 44 }} onClick={() => { clearPlannerApply(); setBridgeApply(null); }}>✕</button>
         </div>
       )}
 
@@ -636,11 +696,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
 
       {/* 🗓 Годовой план — MacrocyclePanel (модал, только в про-режиме) */}
       {isPro && editorLibOpen === 'macro' && (
-        <div style={{ ...CARD, padding: 12, borderLeft: '3px solid #f59e0b' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontSize: 14, fontWeight: 800, color: '#f59e0b' }}>🗓 Годовое планирование</span>
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38 }} onClick={() => setEditorLibOpen(null)}>✕ Закрыть</button>
-          </div>
+        <TrainingModal title="🗓 Годовое планирование" onClose={() => setEditorLibOpen(null)} wide>
           <div style={{ fontSize: 11, color: DIM, marginBottom: 8 }}>
             Постройте макроцикл (5 фаз: выносливость → сила → пик → соревнования → переход).
             Клик по блоку → применить как активный цикл/программу. Текущее направление: <b style={{ color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]}</b>.
@@ -650,7 +706,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
             goal={macroGoal}
             onLevelChange={setMacroLevel}
             onGoalChange={setMacroGoal}
-            onApplyCycle={(cycleId, weeks) => {
+             onApplyCycle={(cycleId, weeks) => {
               if (dir === 'pl') {
                 // PL: загрузить LMS-цикл + установить weeks
                 loadCycleIntoEditor(cycleId);
@@ -723,24 +779,21 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
                 } catch (e) {
                   showToast('⚠ Hybrid: ' + (e as Error)?.message);
                 }
-              }
-            }}
-          />
-        </div>
+               }
+             }}
+             onApplyMacrocycle={dir === 'pl' ? undefined : applyWholeMacrocycle}
+           />
+        </TrainingModal>
       )}
 
       {/* 📚 Методики — справочник тренера (открывается из шапки, только в про-режиме) */}
       {isPro && editorLibOpen === 'methods' && (
-        <div style={{ ...CARD, padding: 12, borderLeft: '3px solid #a78bfa' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>📚 Справочник методик</span>
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38 }} onClick={() => setEditorLibOpen(null)}>✕ Закрыть</button>
-          </div>
+        <TrainingModal title="📚 Справочник методик" onClose={() => setEditorLibOpen(null)} wide>
           <div style={{ fontSize: 11, color: DIM, marginBottom: 8 }}>
             Энциклопедия тренировочных методик по категориям. Клик «Применить» → отправляет методику в planning-bridge (loadStrategy/intensityTechniques). Двойной клик по карточке разворачивает детали.
           </div>
           <MethodologyEncyclopedia />
-        </div>
+        </TrainingModal>
       )}
 
       {showTableView && dir === 'bb' && program.bb && (
@@ -773,7 +826,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         const dayByDow: Record<number, { idx: number; label: string; muscles: string[] }> = {};
         dayLabels.forEach((d) => { dayByDow[d.idx % 7] = d; });
         return (
-          <div style={{ ...CARD, padding: 10 }}>
+          <div className="constructor-surface" style={{ ...CARD, padding: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>
               🗓 Неделя — расписание
               <span style={{ fontSize: 11, color: DIM, marginLeft: 6, fontWeight: 500 }}>
@@ -841,21 +894,23 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
 
 
       {/* Meta */}
-      <div style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <input style={IN} value={program.meta.title} onChange={e => updateMeta({ title: e.target.value })} placeholder="Название программы" />
+      <div className="constructor-surface" style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+         <input aria-label="Название программы" style={IN} value={program.meta.title} onChange={e => updateMeta({ title: e.target.value })} placeholder="Название программы" />
         <div style={{ display: 'flex', gap: 6 }}>
-          <select style={IN} value={program.meta.goal} onChange={e => updateMeta({ goal: e.target.value })}>
+           <select aria-label="Цель программы" style={IN} value={program.meta.goal} onChange={e => updateMeta({ goal: e.target.value })}>
             {GOAL_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
-          <select style={IN} value={program.meta.level} onChange={e => updateMeta({ level: e.target.value })}>
+           <select aria-label="Уровень подготовки" style={IN} value={program.meta.level} onChange={e => updateMeta({ level: e.target.value })}>
             {LEVEL_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
           <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
             Дней/нед
             {/* U3: meta.daysPerWeek каскад — при изменении добавляет/удаляет сессии в bb.weeks */}
-            <input type="number" style={IN} value={program.meta.daysPerWeek} min={1} max={7}
+            <input aria-label="Дней тренировок в неделю" type="number" inputMode="numeric" style={IN} value={program.meta.daysPerWeek} min={1} max={7}
               onChange={e => {
-                const v = parseInt(e.target.value) || 1;
+                const parsed = Number(e.target.value);
+                if (!Number.isFinite(parsed)) return;
+                const v = Math.max(1, Math.min(7, Math.round(parsed)));
                 updateMeta({ daysPerWeek: v });
                 // Каскад на bb.weeks: выровнять кол-во сессий
                 if (program.bb) {
@@ -873,7 +928,10 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
                         sessions.push({ id: newId('ses'), name: 'День ' + (sessions.length + 1), focus: '', blocks: [] });
                       }
                     }
-                    while (sessions.length > target) sessions.pop();
+                    while (sessions.length > target) {
+                      const index = sessions.findIndex(session => session.blocks.length === 0 || session.focus === 'deload');
+                      sessions.splice(index >= 0 ? index : sessions.length - 1, 1);
+                    }
                     return { ...w, sessions };
                   });
                   onChange({ ...program, meta: { ...program.meta, daysPerWeek: v }, bb: { ...program.bb, weeks: updated } });
@@ -883,9 +941,11 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
           <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
             Недель
             {/* U3: meta.weeks каскад — при изменении добавляет/удаляет недели в bb.weeks */}
-            <input type="number" style={IN} value={program.meta.weeks} min={1} max={24}
+            <input aria-label="Количество недель программы" type="number" inputMode="numeric" style={IN} value={program.meta.weeks} min={1} max={24}
               onChange={e => {
-                const v = parseInt(e.target.value) || 1;
+                const parsed = Number(e.target.value);
+                if (!Number.isFinite(parsed)) return;
+                const v = Math.max(1, Math.min(24, Math.round(parsed)));
                 updateMeta({ weeks: v });
                 if (program.bb) {
                   const weeks = [...program.bb.weeks];
@@ -911,12 +971,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
 
       {/* Библиотека — модальное окно внутри редактора (только bb/pl; methods/macro имеют отдельные модалы) */}
       {editorLibOpen && editorLibOpen !== 'macro' && editorLibOpen !== 'methods' && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
-          <div style={{ background: '#18181b', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', maxWidth: 700, width: '100%', maxHeight: '85vh', overflow: 'auto', padding: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>📚 {editorLibOpen === 'bb' ? 'Библиотека программ' : editorLibOpen === 'pl' ? 'Проф. ПЛ-циклы' : 'Справочник методик'}</span>
-              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 38 }} onClick={() => setEditorLibOpen(null)}>✕ Закрыть</button>
-            </div>
+        <TrainingModal title={`📚 ${editorLibOpen === 'bb' ? 'Библиотека программ' : 'Проф. ПЛ-циклы'}`} onClose={() => setEditorLibOpen(null)}>
             {editorLibOpen === 'bb' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '60vh', overflow: 'auto' }}>
                 {libraryPrograms.map(pr => (
@@ -939,8 +994,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
                 ))}
               </div>
             )}
-          </div>
-        </div>
+        </TrainingModal>
       )}
 
       {/* P2.11: редактирование constraints (оборудование, травмы, avoidAxialLoad, любимые/исключённые) + progression — pro-only */}
@@ -957,7 +1011,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
       {!showTableView && dir === 'pl' && program.pl && <PLEditor body={program.pl} onChange={(pl) => update({ pl })} />}
       {!showTableView && dir === 'hybrid' && program.hybrid && (
         <>
-          <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #3b82f6', background: 'rgba(59,130,246,0.06)' }}>
+           <div className="constructor-surface constructor-surface--info" style={{ ...CARD, padding: 10, borderLeft: '3px solid #3b82f6', background: 'rgba(59,130,246,0.06)' }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#3b82f6' }}>⚡ Powerbuilder (Hybrid)</div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>Гибрид ПЛ+ББ в активной разработке. Редактируйте ПЛ и ББ части независимо.</div>
           </div>
@@ -975,7 +1029,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         const color = errCount > 0 ? '#ef4444' : warnCount > 0 ? '#f59e0b' : '#3b82f6';
         const icon = errCount > 0 ? '🚫' : warnCount > 0 ? '⚠️' : 'ℹ️';
         return (
-          <div style={{ ...CARD, padding: 10, marginTop: 4, borderLeft: `3px solid ${color}` }}>
+           <div className="constructor-surface" role="status" aria-live="polite" style={{ ...CARD, padding: 10, marginTop: 4, borderLeft: `3px solid ${color}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <span style={{ fontSize: 11, fontWeight: 800, color }}>{icon} Валидация</span>
               <span style={{ fontSize: 10, color: DIM }}>({errCount} ошибок, {warnCount} предупреждений, {infoCount} инфо)</span>
@@ -1007,7 +1061,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
                 <div key={r.ts} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
                   <span style={{ fontSize: 10, color: DIM_STRONG, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.note}</span>
                   <span style={{ fontSize: 10, color: DIM }}>{new Date(r.ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-                  <button style={{ ...BTN_GHOST, padding: '2px 6px', fontSize: 11, minHeight: 38, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeRev(realIdx)} title="Удалить запись">✕</button>
+                  <button style={{ ...BTN_GHOST, padding: '2px 6px', fontSize: 11, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeRev(realIdx)} title="Удалить запись">✕</button>
                 </div>
               );
             })}

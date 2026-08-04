@@ -396,11 +396,14 @@ const EXECUTION_NOTES: Record<string, string> = {
 // FIX-B4: lengthenedBonus — приоритет упражнениям в растянутой позиции.
 // Schoenfeld 2022, Maeo 2023: длина мышцы при натяжении — ключевой драйвер гипертрофии.
 // RDL > stiff-leg deadlift, incline curl > preacher curl, sissy squat > leg extension.
-function lengthenedBonus(name: string): number {
+// P2-4: trainingFocus модулирует бонус — strength меньше заботит растяжение
+// (механическое натяжение важнее), endurance больше (метаболический стресс + растяжение).
+function lengthenedBonus(name: string, focus?: BBTrainingFocus): number {
   const n = (name || '').toLowerCase();
-  // Растянутая позиция (lengthened) — +10
+  // Растянутая позиция (lengthened) — базовый +10
   if (/наклон.*скам|incline|наклонн|rdl|румынская|good.?morning|гудморнинг|сисси|sissy|overhead.*tricep|француз|french|за голов|behind.?neck|сгибан.*наклон|incline.*curl|пуловер|pullover|дефицит|deficit|атг|atg|глубок.*присед|ass.?to.?grass/i.test(n)) {
-    return 10;
+    const mult = focus === 'strength' ? 0.5 : focus === 'endurance' ? 1.5 : 1.0;
+    return Math.round(10 * mult);
   }
   return 0;
 }
@@ -1469,8 +1472,8 @@ function buildSession(
           candidates = candidates.sort((a, b) => {
             const sa = (a as any)._score ?? 0;
             const sb = (b as any)._score ?? 0;
-            const la = lengthenedBonus(a.name || '');
-            const lb = lengthenedBonus(b.name || '');
+            const la = lengthenedBonus(a.name || '', trainingFocus);
+            const lb = lengthenedBonus(b.name || '', trainingFocus);
             const saTotal = sa + la;
             const sbTotal = sb + lb;
             if (saTotal !== sbTotal) return sbTotal - saTotal;
@@ -2046,7 +2049,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   if (acwrDanger) {
     deloadFreq = Math.max(1, Math.min(deloadFreq || 3, 3));
   }
-  const phaseDist = distributePhases(input.weeks, deloadFreq, input.goal === 'strength_mass' ? 'mass' : (input.goal || 'mass'));
+  const phaseDist = distributePhases(input.weeks, deloadFreq, input.goal || 'mass');
   // P2: принудительный финальный делод для 4-5 нед планов (через замену последней недели)
   if (forceFinalDeload && input.weeks >= 4) {
     const lastIdx = phaseDist.findIndex(pd => pd.startWeek === input.weeks);

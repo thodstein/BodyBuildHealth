@@ -370,6 +370,8 @@ export interface CycleToPlanInput {
   methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
   /** Training focus для RIR-корректировки (Schoenfeld 2021, Roberts 2022). */
   trainingFocus?: BBTrainingFocus;
+  /** P0-1: Пол атлета — female активирует gluteBoost ×1.2, female_glute_5 split. */
+  sex?: 'male' | 'female';
   /** Recovery-метрики → MRV soft-cap (Helms 2022, Plews 2022, Watson 2022). */
   bodyFat?: number;
   leanMass?: number;
@@ -1165,6 +1167,8 @@ export interface ProgramToBBPlanOpts {
   /** Единая методика порядка упражнений для всех BB-источников. */
   methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
   trainingFocus?: BBTrainingFocus;
+  /** P0-1: Пол атлета — female активирует gluteBoost ×1.2, female_glute_5 split. */
+  sex?: 'male' | 'female';
   bodyFat?: number;
   leanMass?: number;
   hrvMs?: number;

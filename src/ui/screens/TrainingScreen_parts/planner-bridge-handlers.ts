@@ -24,6 +24,14 @@ export interface BridgeCtx {
   onChange: (p: UserProgram) => void;
   showToast: (m: string) => void;
   tprofile: TrainingProfile;
+  recovery?: {
+    bodyFat?: number;
+    leanMass?: number;
+    hrvMs?: number;
+    sleepHours?: number;
+    stressLevel?: number;
+    labMrvMultiplier?: number;
+  };
 }
 
 const clampRir = (r: number) => Math.max(0, Math.min(5, Math.round(r)));
@@ -46,10 +54,24 @@ const splitHandler: Handler = (payload, { program: p, dir, update, showToast }) 
 };
 
 const priHandler: Handler = (payload, { program: p, update, showToast }) => {
-  const mult: number = payload.data.volumeMult ?? 1;
+  const mult = Math.max(0.25, Math.min(2, Number(payload.data.volumeMult ?? 1) || 1));
   const rirShift: number = payload.data.rirShift ?? 0;
   if (p.bb) {
-    const weeks = p.bb.weeks.map((w) => ({ ...w, sessions: w.sessions.map((s) => ({ ...s, blocks: s.blocks.map((b) => ({ ...b, sets: (b.sets ?? []).map((st) => ({ ...st, weight: st.weight ? Math.round(st.weight * mult) : st.weight, rir: clampRir((st.rir ?? 2) + rirShift) })) })) })) }));
+    const weeks = p.bb.weeks.map(w => ({
+      ...w,
+      sessions: w.sessions.map(s => ({
+        ...s,
+        blocks: s.blocks.map(b => {
+          const sourceSets = b.sets ?? [];
+          const targetCount = Math.max(1, Math.round(sourceSets.length * mult));
+          const sets = Array.from({ length: targetCount }, (_, index) => {
+            const source = sourceSets[index % Math.max(1, sourceSets.length)] ?? { reps: 8, rir: 2, weight: 0, restSec: 90 };
+            return { ...source, rir: clampRir((source.rir ?? 2) + rirShift) };
+          });
+          return { ...b, sets };
+        }),
+      })),
+    }));
     update({ bb: { ...p.bb, weeks } });
   }
   showToast('🔗 Готовность применена: ' + payload.label);
@@ -105,7 +127,28 @@ const mrvHandler: Handler = (payload, { showToast }) => {
 const deloadHandler: Handler = (payload, { program: p, update, showToast }) => {
   if (!p.bb) return;
   const deloadWeeks: number[] = payload.data.weeks ?? [];
-  const weeks = p.bb.weeks.map((w) => deloadWeeks.includes(w.week) ? { ...w, phase: 'deload' as const, deload: true, sessions: w.sessions.map((s) => ({ ...s, blocks: s.blocks.map((b) => ({ ...b, sets: (b.sets ?? []).map((st) => ({ ...st, rir: 4, weight: st.weight ? Math.round(st.weight * 0.6) : st.weight })) })) })) } : w);
+  const weeks = p.bb.weeks.map(w => {
+    if (!deloadWeeks.includes(w.week)) return w;
+    return {
+      ...w,
+      phase: 'deload' as const,
+      deload: true,
+      sessions: w.sessions.map(s => ({
+        ...s,
+        blocks: s.blocks.map(b => {
+          const sourceSets = b.sets ?? [];
+          const count = Math.max(1, Math.ceil(sourceSets.length * 0.6));
+          return {
+            ...b,
+            sets: Array.from({ length: count }, (_, index) => {
+              const st = sourceSets[index] ?? sourceSets[sourceSets.length - 1] ?? { reps: 8, rir: 2, weight: 0, restSec: 90 };
+              return { ...st, rir: 4, weight: st.weight ? Math.round(st.weight * 0.6) : st.weight };
+            }),
+          };
+        }),
+      })),
+    };
+  });
   update({ bb: { ...p.bb, weeks } });
   showToast('🔗 Делод-недели: ' + payload.label);
 };
@@ -113,14 +156,15 @@ const deloadHandler: Handler = (payload, { program: p, update, showToast }) => {
 const volumeHandler: Handler = (payload, { program: p, update, showToast }) => {
   if (!p.bb) return;
   const setsByMuscle: Record<string, number> = payload.data.sets ?? {};
-  const weeks = p.bb.weeks.map((w, wi) => {
-    if (wi > 0) return w;
-    const sessions = w.sessions.map((s) => {
+  const weeks = p.bb.weeks.map((w) => {
+    if (w.deload) return w;
+    const sessions = w.sessions.map((s, sessionIndex) => {
       const blocks: UserBlock[] = [];
-      for (const [mu, cnt] of Object.entries(setsByMuscle)) {
-        for (let i = 0; i < Math.min(cnt, 5); i++) {
-          blocks.push({ id: newId('blk'), type: 'accessory' as const, exerciseName: '', muscle: mu, role: 'accessory' as const, sets: [{ reps: 10, rir: 2, weight: 0, restSec: 90 }] });
-        }
+      for (const [mu, rawCount] of Object.entries(setsByMuscle)) {
+        const count = Math.max(0, Math.min(10, Math.round(Number(rawCount) || 0)));
+        if (count === 0 || sessionIndex !== 0) continue;
+        blocks.push({ id: newId('blk'), type: 'accessory' as const, exerciseName: '', muscle: mu, role: 'accessory' as const,
+          sets: Array.from({ length: count }, () => ({ reps: 10, rir: 2, weight: 0, restSec: 90 })) });
       }
       return { ...s, blocks: [...s.blocks, ...blocks] };
     });
@@ -141,7 +185,7 @@ const peakHandler: Handler = (payload, { program: p, update, showToast }) => {
 
 const methodologyHandler: Handler = (payload, { program: p, update, showToast }) => {
   if (!p.bb) return;
-  const prog = { ...(p.bb.progression ?? { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] }), loadStrategy: payload.data.methodName as any };
+  const prog = { ...(p.bb.progression ?? { loadStrategy: 'double_progression' as const, deloadProtocol: 'pump', intensityTechniques: ['none'] }), loadStrategy: String(payload.data.methodName ?? 'double_progression') as import('../../../engines/user-program/user-program.types').LoadStrategy };
   update({ bb: { ...p.bb, progression: prog } });
   showToast('🔗 Методика: ' + payload.label);
 };
@@ -194,7 +238,7 @@ const designHandler: Handler = (payload, { program: p, dir, update, onChange, sh
   } catch (e) { showToast('⚠ Не удалось применить дизайн: ' + (e as Error)?.message); }
 };
 
-const macrocycleHandler: Handler = (payload, { program: p, onChange, showToast, tprofile }) => {
+const macrocycleHandler: Handler = (payload, { program: p, onChange, showToast, tprofile, recovery }) => {
   if (!payload.data?.macro) return;
   try {
     const macro = payload.data.macro as Macrocycle;
@@ -204,6 +248,13 @@ const macrocycleHandler: Handler = (payload, { program: p, onChange, showToast, 
       daysPerWeek: payload.data.daysPerWeek ?? p.meta.daysPerWeek,
       weakPoints: (tprofile.weakPoints ?? []) as string[],
       equipment: p.bb?.constraints?.equipment ?? [],
+      trainingFocus: p.meta.trainingFocus,
+      bodyFat: recovery?.bodyFat,
+      leanMass: recovery?.leanMass,
+      hrvMs: recovery?.hrvMs,
+      sleepHours: recovery?.sleepHours,
+      stressLevel: recovery?.stressLevel,
+      labMrvMultiplier: recovery?.labMrvMultiplier,
     });
     onChange(newProg);
     showToast('🔗 Макроцикл применён как ББ-программа: ' + payload.label);

@@ -11,6 +11,7 @@ import {
   resizeBlockInDesign,
   resolveDesignOverlaps,
   getDesignStats,
+  getDefaultPresetDesigns,
   type MacrocycleDesign,
 } from '../periodization-designer.engine';
 
@@ -94,6 +95,18 @@ describe('P1-2: getDesignStats gap + overlap reporting', () => {
     expect(stats.overlapWeeks).toBe(0);
   });
 
+  it('counts unique overlap weeks and does not inflate used weeks', () => {
+    const design = createEmptyDesign('test');
+    design.totalWeeks = 12;
+    const first = addBlockToDesign(design, 'accumulation_hypertrophy', 1);
+    const second = addBlockToDesign(first, 'intensification', 2);
+    const third = addBlockToDesign(second, 'power', 3);
+    const stats = getDesignStats(third);
+    expect(stats.overlapWeeks).toBe(3);
+    expect(stats.usedWeeks).toBe(4);
+    expect(stats.freeWeeks).toBe(8);
+  });
+
   it('consolidates consecutive gap weeks into ranges', () => {
     const design = createEmptyDesign('test');
     design.totalWeeks = 16;
@@ -103,6 +116,16 @@ describe('P1-2: getDesignStats gap + overlap reporting', () => {
     const stats = getDesignStats(d2);
     expect(stats.gapRanges).toContain('5-8');
     expect(stats.gapRanges).toContain('12-16');
+  });
+});
+
+describe('periodization presets', () => {
+  it('contains usable GPP/transition blocks and fills the requested horizon', () => {
+    const presets = getDefaultPresetDesigns();
+    const annual = presets.find(p => p.name === '52-нед годовой план')!;
+    expect(annual.blocks.some(block => block.phaseKey === 'gpp')).toBe(true);
+    expect(annual.blocks.some(block => block.phaseKey === 'transition')).toBe(true);
+    expect(annual.blocks.at(-1)!.endWeek).toBe(52);
   });
 });
 
