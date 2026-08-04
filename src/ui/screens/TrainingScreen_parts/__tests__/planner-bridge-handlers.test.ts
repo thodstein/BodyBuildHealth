@@ -95,4 +95,24 @@ describe('planner bridge handlers', () => {
     expect(week.sessions[0].blocks[0].sets[0].weight).toBe(60);
     expect(week.sessions[0].blocks[0].sets[0].rir).toBe(4);
   });
+
+  it('MRV recommendation reduces non-deload weekly muscle volume', () => {
+    const update = vi.fn();
+    const ctx = context('bb', update);
+    seedBlock(ctx);
+    ctx.program.bb!.weeks[0].sessions[0].blocks[0].sets = Array.from({ length: 8 }, () => ({ reps: 8, rir: 2, weight: 100, restSec: 120 }));
+    applyBridgePayloadDispatch(payload('mrv', { mrv: 4 }), ctx);
+    const patch = update.mock.calls[0][0];
+    expect(patch.bb.weeks[0].sessions[0].blocks[0].sets).toHaveLength(4);
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('MRV применён'));
+  });
+
+  it('MRV recommendation rejects invalid values without changing the plan', () => {
+    const update = vi.fn();
+    const ctx = context('bb', update);
+    seedBlock(ctx);
+    applyBridgePayloadDispatch(payload('mrv', { mrv: 0 }), ctx);
+    expect(update).not.toHaveBeenCalled();
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('положительным'));
+  });
 });

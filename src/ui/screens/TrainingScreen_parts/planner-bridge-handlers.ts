@@ -120,8 +120,33 @@ const rirHandler: Handler = (payload, { program: p, update, showToast }) => {
   showToast('🔗 RIR-сдвиг: ' + payload.label);
 };
 
-const mrvHandler: Handler = (payload, { showToast }) => {
-  showToast('🔗 MRV рекомендация: ' + payload.label + ' (примените вручную в PlanDiagnostics)');
+const mrvHandler: Handler = (payload, { program: p, update, showToast }) => {
+  if (!p.bb) {
+    showToast('🔗 MRV рекомендация: ' + payload.label + ' (доступно только для ББ)');
+    return;
+  }
+  const rawTarget = Math.round(Number(payload.data.mrv) || 0);
+  if (rawTarget <= 0) {
+    showToast('⚠ MRV должен быть положительным числом');
+    return;
+  }
+  const target = Math.min(60, rawTarget);
+  const weeks = p.bb.weeks.map(week => {
+    if (week.deload) return week;
+    const byMuscle: Record<string, number> = {};
+    for (const session of week.sessions) for (const block of session.blocks) {
+      byMuscle[block.muscle] = (byMuscle[block.muscle] ?? 0) + block.sets.length;
+    }
+    const factorByMuscle: Record<string, number> = {};
+    for (const [muscle, current] of Object.entries(byMuscle)) factorByMuscle[muscle] = current > 0 ? Math.min(1, target / current) : 1;
+    return { ...week, sessions: week.sessions.map(session => ({ ...session, blocks: session.blocks.map(block => {
+      const factor = factorByMuscle[block.muscle] ?? 1;
+      const count = Math.max(1, Math.min(block.sets.length, Math.round(block.sets.length * factor)));
+      return { ...block, sets: block.sets.slice(0, count) };
+    }) })) };
+  });
+  update({ bb: { ...p.bb, weeks } });
+  showToast('🔗 MRV применён: ' + target + ' сет/мышцу/нед');
 };
 
 const deloadHandler: Handler = (payload, { program: p, update, showToast }) => {

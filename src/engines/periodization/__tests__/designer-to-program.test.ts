@@ -86,6 +86,21 @@ describe('designerToUserWeeks', () => {
     expect(weeks[5].phase).toBe('accumulation');
   });
 
+  it('progresses repeated filled blocks across a long design', () => {
+    const d = makeDesign([makeBlock('b1', 'accumulation_hypertrophy', 1, 4)], 20);
+    const weeks = designerToUserWeeks(d, {
+      fillExercises: true,
+      daysPerWeek: 2,
+      level: 'intermediate',
+      goal: 'hypertrophy',
+    });
+    const weights = weeks
+      .map(week => week.sessions[0]?.blocks.find(block => (block.sets[0]?.weight ?? 0) > 0)?.sets[0]?.weight)
+      .filter((weight): weight is number => typeof weight === 'number');
+    expect(weights.length).toBeGreaterThan(1);
+    expect(Math.max(...weights)).toBeGreaterThan(Math.min(...weights));
+  });
+
   it('пересекающиеся блоки: first-match (сортировка по startWeek)', () => {
     const d = makeDesign([
       makeBlock('b2', 'peaking', 3, 6),

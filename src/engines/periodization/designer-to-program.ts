@@ -132,8 +132,9 @@ function buildFilledWeeks(total: number, opts: DesignerToUserWeeksOptions): User
     for (let w = 1; w <= total; w++) {
       const srcWeek = src[(w - 1) % Math.max(1, src.length)];
       if (srcWeek) {
-        const blockIndex = Math.floor((w - 1) / Math.max(1, src.length));
-        const progressionFactor = Math.pow(1.005, blockIndex * Math.max(1, src.length));
+        // Treat each repeated block as a mesocycle: progress by 0.5% weekly,
+        // not only once per repeated block.
+        const progressionFactor = Math.pow(1.005, w - 1);
         out.push({
           ...srcWeek,
           week: w,

@@ -184,12 +184,18 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
   }
 
   // 4. Проверка Hybrid
-  if (dir === 'hybrid' && program.hybrid) {
-    if (!program.hybrid.plRef?.sourceCycleId) {
+  if (dir === 'hybrid') {
+    if (!program.hybrid) {
+      issues.push({ level: 'error', code: 'NO_HYBRID_BODY', message: 'Hybrid-программа не содержит тела программы' });
+    } else {
+      if (!program.hybrid.plRef?.sourceCycleId) {
       issues.push({ level: 'warning', code: 'HYBRID_NO_CYCLE', message: 'Hybrid-программа без ПЛ-цикла — только ББ' });
-    }
-    if ((program.hybrid.bbWeeks ?? []).length === 0) {
+      }
+      if (!Array.isArray(program.hybrid.bbWeeks)) {
+        issues.push({ level: 'error', code: 'HYBRID_BAD_BB_WEEKS', message: 'Hybrid ББ-недели имеют неверный формат' });
+      } else if (program.hybrid.bbWeeks.length === 0) {
       issues.push({ level: 'info', code: 'HYBRID_NO_BB', message: 'Hybrid без ББ-недель — добавьте ББ-аксессуары' });
+      }
     }
   }
   return issues;

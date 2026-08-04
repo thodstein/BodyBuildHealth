@@ -25,38 +25,81 @@ export interface AutoFillCtx {
   showToast: (m: string) => void;
 }
 
+/** Shared BB builder for quick templates and profile-based editor filling. */
+export function buildBBUserProgramFromProfile(options: {
+  title: string;
+  goal: string;
+  level: string;
+  days: number;
+  weeks: number;
+  prof: TrainingProfile;
+  trainingFocus?: import('../../../engines/bb/bb-goal-types').BBTrainingFocus;
+  bodyFat?: number;
+  leanMass?: number;
+  hrvMs?: number;
+  sleepHours?: number;
+  stressLevel?: number;
+  labMrvMultiplier?: number;
+}): UserProgram {
+  const { title, goal, level, days, weeks, prof, trainingFocus, bodyFat, leanMass, hrvMs, sleepHours, stressLevel, labMrvMultiplier } = options;
+  const bbPlan = autodraftBBPlan({
+    level,
+    goal,
+    daysPerWeek: days,
+    weeks,
+    equipment: prof.equipment ?? [],
+    weakPoints: prof.weakPoints ?? [],
+    avoidAxialLoad: prof.avoidAxialLoad ?? false,
+    favoriteExercises: prof.favoriteExercises ?? [],
+    excludedExercises: prof.excludedExercises ?? [],
+    workMax: prof.workMax ?? {},
+    onCourse: prof.onCourse ?? false,
+    courseIntensity: prof.courseIntensity ?? 'moderate',
+    injuries: prof.injuries ?? [],
+    trainingFocus,
+    bodyFat,
+    leanMass,
+    hrvMs,
+    sleepHours,
+    stressLevel,
+    labMrvMultiplier,
+  });
+  const userProgram = createFromBuild(bbPlan, {
+    title,
+    goal,
+    level,
+    weakPoints: prof.weakPoints ?? [],
+    equipment: prof.equipment ?? [],
+  });
+  userProgram.meta.title = title;
+  userProgram.meta.weeks = weeks;
+  userProgram.meta.daysPerWeek = days;
+  if (trainingFocus) userProgram.meta.trainingFocus = trainingFocus;
+  if (userProgram.bb && userProgram.bb.weeks.length >= 4) {
+    userProgram.bb.weeks = applyPhaseModulation(userProgram.bb.weeks, {
+      goal,
+      level,
+      weeksTotal: weeks,
+    });
+  }
+  return userProgram;
+}
+
 /** BB direction: autodraftBBPlan + createFromBuild + applyPhaseModulation. */
-export function autoFillBBDraft(ctx: AutoFillCtx): void {
+export function autoFillBBDraft(ctx: AutoFillCtx): boolean {
   const { program, prof, days, bodyFat, leanMass, hrvMs, sleepHours, stressLevel, labMrvMultiplier, update, showToast } = ctx;
-  if (!program.bb) return;
+  if (!program.bb) return false;
   try {
-    const bbPlan = autodraftBBPlan({
-      level: program.meta.level,
+    const userProg = buildBBUserProgramFromProfile({
+      title: '[Черновик] ' + (program.meta.title || 'Моя программа'),
       goal: program.meta.goal,
-      daysPerWeek: days,
+      level: program.meta.level,
+      days,
       weeks: Math.max(1, program.meta.weeks || 4),
-      equipment: (prof.equipment ?? []) as string[],
-      weakPoints: (prof.weakPoints ?? []) as string[],
-      avoidAxialLoad: prof.avoidAxialLoad ?? false,
-      favoriteExercises: (prof.favoriteExercises ?? []) as string[],
-      excludedExercises: (prof.excludedExercises ?? []) as string[],
-      workMax: prof.workMax ?? {},
-      onCourse: prof.onCourse ?? false,
-      courseIntensity: prof.courseIntensity ?? 'moderate',
-      injuries: prof.injuries ?? [],
+      prof,
       trainingFocus: program.meta.trainingFocus,
       bodyFat, leanMass, hrvMs, sleepHours, stressLevel, labMrvMultiplier,
     });
-    const userProg = createFromBuild(bbPlan, {
-      title: program.meta.title || `${days}д/нед · ${program.meta.weeks}нед`,
-      goal: program.meta.goal,
-      level: program.meta.level,
-      weakPoints: (prof.weakPoints ?? []) as string[],
-      equipment: (prof.equipment ?? []) as string[],
-    });
-    userProg.meta.title = '[Черновик] ' + (program.meta.title || 'Моя программа');
-    userProg.meta.weeks = program.meta.weeks;
-    userProg.meta.daysPerWeek = days;
     if (userProg.bb) {
       userProg.bb.constraints = {
         equipment: (prof.equipment ?? []) as string[],
@@ -70,15 +113,9 @@ export function autoFillBBDraft(ctx: AutoFillCtx): void {
         deloadProtocol: 'pump',
         intensityTechniques: ['none'],
       };
-      if ((userProg.bb.weeks?.length ?? 0) >= 4) {
-        userProg.bb.weeks = applyPhaseModulation(userProg.bb.weeks!, {
-          goal: program.meta.goal,
-          level: program.meta.level,
-          weeksTotal: program.meta.weeks || 4,
-        });
-      }
     }
     update({ bb: userProg.bb });
+    return true;
   } catch (err) {
     console.error('autodraftBBPlan failed:', err);
     showToast('⚠ Авто-сборка не удалась: ' + (err as Error)?.message + ' — создана заготовка, заполните вручную');
@@ -96,13 +133,14 @@ export function autoFillBBDraft(ctx: AutoFillCtx): void {
       })),
     }));
     update({ bb: { ...program.bb, weeks } });
+    return false;
   }
 }
 
 /** PL direction: auto-select LMS cycle by level and days. */
-export function autoFillPLDraft(ctx: AutoFillCtx): void {
+export function autoFillPLDraft(ctx: AutoFillCtx): boolean {
   const { program, prof, days, update, showToast } = ctx;
-  if (!program.pl) return;
+  if (!program.pl) return false;
   const sessCount = Math.max(2, Math.min(6, days));
   let foundCycle = LMS_CYCLES.find(c =>
     c.meta.level === program.meta.level &&
@@ -126,31 +164,25 @@ export function autoFillPLDraft(ctx: AutoFillCtx): void {
     },
   });
   if (foundCycle) showToast('🏆 ПЛ-цикл подобран: ' + foundCycle.meta.title);
+  return Boolean(foundCycle);
 }
 
 /** Hybrid direction: PL from LMS + BB from bb-builder. */
-export function autoFillHybridDraft(ctx: AutoFillCtx): void {
+export function autoFillHybridDraft(ctx: AutoFillCtx): boolean {
   const { program, prof, days, bodyFat, leanMass, hrvMs, sleepHours, stressLevel, labMrvMultiplier, update, showToast } = ctx;
-  if (!program.hybrid) return;
+  if (!program.hybrid) return false;
   const sessCount = Math.max(2, Math.min(4, days));
   let foundCycle = LMS_CYCLES.find(c => c.meta.level === program.meta.level && Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1);
   if (!foundCycle) foundCycle = LMS_CYCLES.find(c => Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1);
   const bbDays = Math.max(1, days - sessCount);
   let bbWeeks: UserWeek[] = [];
   try {
-    const bbPlan = autodraftBBPlan({
-      level: program.meta.level, goal: 'hypertrophy', daysPerWeek: bbDays,
-      weeks: Math.max(1, program.meta.weeks || 4),
-      equipment: (prof.equipment ?? []) as string[], weakPoints: (prof.weakPoints ?? []) as string[],
-      avoidAxialLoad: prof.avoidAxialLoad ?? false, workMax: prof.workMax ?? {},
-      onCourse: prof.onCourse ?? false, courseIntensity: prof.courseIntensity ?? 'moderate', injuries: prof.injuries ?? [],
+    const bbUserProg = buildBBUserProgramFromProfile({
+      title: 'hybrid-bb', goal: 'hypertrophy', level: program.meta.level,
+      days: bbDays, weeks: Math.max(1, program.meta.weeks || 4), prof,
       trainingFocus: program.meta.trainingFocus,
       bodyFat, leanMass, hrvMs, sleepHours, stressLevel, labMrvMultiplier,
     });
-    const bbUserProg = createFromBuild(bbPlan, { title: 'hybrid-bb', goal: 'hypertrophy', level: program.meta.level });
-    if (bbUserProg.bb?.weeks && (bbUserProg.bb.weeks.length ?? 0) >= 4) {
-      bbUserProg.bb.weeks = applyPhaseModulation(bbUserProg.bb.weeks, { goal: 'hypertrophy', level: program.meta.level, weeksTotal: program.meta.weeks || 4 });
-    }
     bbWeeks = bbUserProg.bb?.weeks ?? [];
   } catch { bbWeeks = []; }
   update({
@@ -162,13 +194,15 @@ export function autoFillHybridDraft(ctx: AutoFillCtx): void {
     },
   });
   if (foundCycle) showToast('⚡ Hybrid: ПЛ=' + foundCycle.meta.title + ' + ББ=' + bbDays + 'д/нед');
+  return Boolean(foundCycle && bbWeeks.length > 0);
 }
 
 /** Dispatcher: calls the appropriate direction handler based on program.meta.direction. */
 export function autoFillDraftDispatch(ctx: AutoFillCtx): void {
   const dir = ctx.program.meta.direction;
-  if (dir === 'bb') autoFillBBDraft(ctx);
-  else if (dir === 'pl') autoFillPLDraft(ctx);
-  else if (dir === 'hybrid') autoFillHybridDraft(ctx);
-  ctx.showToast('⚡ Черновик создан из профиля — заполните упражнения и ПМ');
+  const success = dir === 'bb' ? autoFillBBDraft(ctx)
+    : dir === 'pl' ? autoFillPLDraft(ctx)
+    : dir === 'hybrid' ? autoFillHybridDraft(ctx)
+    : false;
+  if (success) ctx.showToast('⚡ Черновик создан из профиля — заполните упражнения и ПМ');
 }

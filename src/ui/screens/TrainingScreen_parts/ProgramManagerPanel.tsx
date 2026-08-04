@@ -24,7 +24,7 @@ import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { getReferencedCycle } from '../../../engines/user-program/program-store';
 import {
   loadUserPrograms, saveUserProgram, deleteUserProgram, deleteRevision,
-  cloneFromLibrary, cloneFromCycle, createBlank, createFromBuild, userWeekToBBPlan, validateProgram,
+  cloneFromLibrary, cloneFromCycle, createBlank, userWeekToBBPlan, validateProgram,
 } from '../../../engines/user-program/program-store';
 import type {
   UserProgram, BBProgramBody, PLProgramBody, UserWeek, UserSession, UserBlock, UserSet,
@@ -52,10 +52,6 @@ import { ProgramRevisionsDiff } from './ProgramRevisions';
 import { StrengthDiaryPanel } from './StrengthDiaryPanel';
 import { SET_TEMPLATES } from './program-types';
 import {
-  autodraftBBPlan,
-  buildUserProgramFromBB,
-  computePlanQualityFor,
-  applyPhaseModulation,
   plLmsScheduleDays,
   suggestExercisesForGroup,
 } from '../../../engines/manual-constructor';
@@ -82,6 +78,8 @@ import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import type { Exercise } from '../../../core/types';
 import { detectLift } from '../../../engines/lms/lms-to-pl';
+import { ManualProgramWizard, type WizardStep, type WizardDirection } from './ManualProgramWizard';
+import { buildBBUserProgramFromProfile } from './auto-fill-draft';
 
 const GOAL_OPTS = [
   { id: 'hypertrophy', label: 'Масса' }, { id: 'powerlifting', label: 'Сила (ПЛ)' },
@@ -182,6 +180,10 @@ export const ProgramManagerPanel: React.FC = () => {
     setEditing(next);
   }, [pushSnapshot]);
 
+  useEffect(() => {
+    if (!editing) setCompareIds([]);
+  }, [editing]);
+
   // P2.6: поиск/сортировка/фильтр
   const [search, setSearch] = useState('');
   const [filterDir, setFilterDir] = useState<'all' | 'bb' | 'pl' | 'hybrid'>('all');
@@ -194,8 +196,8 @@ export const ProgramManagerPanel: React.FC = () => {
 
   // P2.1: визард создания ББ-программы (5 шагов: направление → цель → уровень → дни/нед → preview → save)
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4>(1);
-  const [wizardDir, setWizardDir] = useState<'bb' | 'pl' | 'hybrid'>('bb');
+  const [wizardStep, setWizardStep] = useState<WizardStep>(1);
+  const [wizardDir, setWizardDir] = useState<WizardDirection>('bb');
   const [wizardGoal, setWizardGoal] = useState('hypertrophy');
   const [wizardLevel, setWizardLevel] = useState('intermediate');
   const [wizardDays, setWizardDays] = useState(4);
@@ -224,6 +226,7 @@ export const ProgramManagerPanel: React.FC = () => {
     setPendingAutoFill(autoFill);
     setEditing(p);
   };
+  const setWizardDirection = (direction: WizardDirection, defaultGoal: string) => { setWizardDir(direction); setWizardGoal(defaultGoal); };
 
   // P2.4: экспорт программы в текст (для копирования)
   const exportProgram = (p: UserProgram) => {
@@ -251,6 +254,17 @@ export const ProgramManagerPanel: React.FC = () => {
       lines.push(`ПЛ-цикл: ${p.pl.sourceCycleId}`);
       lines.push(`Сессии: ${p.pl.schedule.length}, рабочие ПМ: ${JSON.stringify(p.pl.workMax)}`);
       if (p.pl.notes) lines.push(`\nЗаметки: ${p.pl.notes}`);
+    } else if (p.hybrid) {
+      lines.push('Hybrid: ПЛ + ББ');
+      lines.push(`ПЛ-цикл: ${p.hybrid.plRef?.sourceCycleId || 'не выбран'}`);
+      lines.push(`ББ-недель: ${p.hybrid.bbWeeks?.length ?? 0}`);
+      for (const w of p.hybrid.bbWeeks ?? []) {
+        lines.push(`\n## Неделя ${w.week} (${w.phase}${w.deload ? ', делод' : ''})`);
+        for (const s of w.sessions ?? []) {
+          lines.push(`\n### ${s.name}`);
+          for (const b of s.blocks ?? []) lines.push(`  - ${b.exerciseName} (${GROUP_RU[b.muscle] || b.muscle}) — ${b.sets.map(set => `${set.reps}×${set.weight ? ` @${set.weight}кг` : ''}`).join(', ')}`);
+        }
+      }
     }
     return lines.join('\n');
   };
@@ -373,34 +387,7 @@ export const ProgramManagerPanel: React.FC = () => {
     const prof = loadTrainingProfile();
     try {
       if (tpl.dir === 'bb') {
-        const bbPlan = autodraftBBPlan({
-          level: tpl.level,
-          goal: tpl.goal,
-          daysPerWeek: tpl.days,
-          weeks: tpl.weeks,
-          equipment: (prof.equipment ?? []) as string[],
-          weakPoints: (prof.weakPoints ?? []) as string[],
-          avoidAxialLoad: prof.avoidAxialLoad ?? false,
-          favoriteExercises: (prof.favoriteExercises ?? []) as string[],
-          excludedExercises: (prof.excludedExercises ?? []) as string[],
-          workMax: prof.workMax ?? {},
-          onCourse: prof.onCourse ?? false,
-          courseIntensity: prof.courseIntensity ?? 'moderate',
-          injuries: prof.injuries ?? [],
-        });
-        const userProg = createFromBuild(bbPlan, {
-          title: tpl.title, goal: tpl.goal, level: tpl.level,
-          weakPoints: (prof.weakPoints ?? []) as string[],
-          equipment: (prof.equipment ?? []) as string[],
-        });
-        userProg.meta.title = tpl.title;
-        userProg.meta.weeks = tpl.weeks;
-        userProg.meta.daysPerWeek = tpl.days;
-        if (userProg.bb && userProg.bb.weeks.length >= 4) {
-          userProg.bb.weeks = applyPhaseModulation(userProg.bb.weeks, {
-            goal: tpl.goal, level: tpl.level, weeksTotal: tpl.weeks,
-          });
-        }
+        const userProg = buildBBUserProgramFromProfile({ title: tpl.title, goal: tpl.goal, level: tpl.level, days: tpl.days, weeks: tpl.weeks, prof });
         setEditing(userProg);
         const totalEx = userProg.bb?.weeks?.reduce((s, w) => s + w.sessions.reduce((ss, sess) => ss + sess.blocks.length, 0), 0) ?? 0;
         flash('🚀 ' + tpl.title + ' — готово: ' + userProg.bb?.weeks.length + ' нед, ' + totalEx + ' упр');
@@ -438,20 +425,7 @@ export const ProgramManagerPanel: React.FC = () => {
         const foundCycle = LMS_CYCLES.find(c => c.meta.level === tpl.level && Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1)
           ?? LMS_CYCLES.find(c => Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1);
         try {
-          const bbPlan = autodraftBBPlan({
-            level: tpl.level, goal: 'hypertrophy', daysPerWeek: bbDays, weeks: tpl.weeks,
-            equipment: (prof.equipment ?? []) as string[],
-            weakPoints: (prof.weakPoints ?? []) as string[],
-            avoidAxialLoad: prof.avoidAxialLoad ?? false,
-            workMax: prof.workMax ?? {},
-            onCourse: prof.onCourse ?? false,
-            courseIntensity: prof.courseIntensity ?? 'moderate',
-            injuries: prof.injuries ?? [],
-          });
-          const bbUserProg = createFromBuild(bbPlan, { title: 'hybrid-bb', goal: 'hypertrophy', level: tpl.level });
-          if (bbUserProg.bb?.weeks && bbUserProg.bb.weeks.length >= 4) {
-            bbUserProg.bb.weeks = applyPhaseModulation(bbUserProg.bb.weeks, { goal: 'hypertrophy', level: tpl.level, weeksTotal: tpl.weeks });
-          }
+          const bbUserProg = buildBBUserProgramFromProfile({ title: 'hybrid-bb', goal: 'hypertrophy', level: tpl.level, days: bbDays, weeks: tpl.weeks, prof });
           if (p.hybrid) {
             p.hybrid.plRef = { sourceCycleId: foundCycle?.meta.id ?? '', sessionIndices: foundCycle ? Array.from({ length: foundCycle.meta.sessionsPerWeek }, (_, i) => i) : [] };
             p.hybrid.bbWeeks = bbUserProg.bb?.weeks ?? [];
@@ -544,68 +518,7 @@ export const ProgramManagerPanel: React.FC = () => {
         {toast && <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, padding: '4px 0' }}>{toast}</div>}
 
         {/* P2.1: Визард создания программы (модал для пустого состояния) */}
-        {wizardOpen && (
-          <TrainingModal title={`🪄 Визард — шаг ${wizardStep} из 4`} onClose={() => setWizardOpen(false)}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {wizardStep === 1 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>1. Направление</div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {([['bb','💪 Бодибилдинг','hypertrophy'], ['pl','🏋 Пауэрлифтинг','powerlifting'], ['hybrid','⚡ Powerbuilder','powerbuilding']] as const).map(([d,lbl,defGoal]) => (
-                    <button key={d} onClick={() => { setWizardDir(d); setWizardGoal(defGoal); }} style={{ ...BTN, flex: 1, minHeight: 44, background: wizardDir === d ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : '#7c3aed20', color: wizardDir === d ? '#fff' : '#a78bfa' }}>{lbl}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {wizardStep === 2 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>2. Цель</div>
-                <select style={IN} value={wizardGoal} onChange={e => setWizardGoal(e.target.value)} disabled={wizardDir === 'pl'}>
-                  <option value="hypertrophy">💪 Мышечная масса</option>
-                  <option value="cut">✂️ Сушка</option>
-                  <option value="recomp">🔁 Рекомпозиция</option>
-                  <option value="maintenance">⚖ Поддержание</option>
-                  <option value="strength_mass">🎯 Сила + Масса</option>
-                  <option value="athletic">🏅 Атлетизм</option>
-                </select>
-              </div>
-            )}
-            {wizardStep === 3 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>3. Уровень и частота</div>
-                <select style={IN} value={wizardLevel} onChange={e => setWizardLevel(e.target.value)}>
-                  {LEVEL_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                </select>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column' }}>Дней/нед
-                    <input type="number" style={IN} min={2} max={6} value={wizardDays} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) setWizardDays(Math.max(2, Math.min(6, Math.round(v)))); }} aria-label="Дней в неделю" inputMode="numeric" />
-                  </label>
-                  <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column' }}>Недель
-                    <input type="number" style={IN} min={4} max={24} value={wizardWeeks} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) setWizardWeeks(Math.max(4, Math.min(24, Math.round(v)))); }} aria-label="Недель в программе" inputMode="numeric" />
-                  </label>
-                </div>
-              </div>
-            )}
-            {wizardStep === 4 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>4. Превью</div>
-                <div className="constructor-surface constructor-surface--tinted" style={{ ...CARD, padding: 10, background: 'rgba(167,139,250,0.06)' }}>
-                  <div style={{ fontSize: 12, color: '#fff' }}>📋 <b>{wizardDir === 'bb' ? 'Бодибилдинг' : wizardDir === 'pl' ? 'Пауэрлифтинг' : 'Powerbuilder'}</b></div>
-                  <div style={{ fontSize: 11, color: DIM }}>Цель: {wizardGoal} | Уровень: {wizardLevel}</div>
-                  <div style={{ fontSize: 11, color: DIM }}>{wizardDays} дн/нед × {wizardWeeks} нед</div>
-                  <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Программа будет пустой — добавьте упражнения после создания.</div>
-                </div>
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-              {wizardStep > 1 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => (Math.max(1, s - 1) as 1 | 2 | 3 | 4))}>← Назад</button>}
-              {wizardStep < 4 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => (Math.min(4, s + 1) as 1 | 2 | 3 | 4))}>Далее →</button>}
-              {wizardStep === 4 && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)' }} onClick={() => finishWizard()}>✨ Создать программу</button>}
-              {wizardStep === 4 && manualMode === 'pro' && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }} onClick={() => finishWizard(true)}>⚡ Создать и заполнить</button>}
-            </div>
-            </div>
-          </TrainingModal>
-        )}
+        <ManualProgramWizard open={wizardOpen} step={wizardStep} direction={wizardDir} goal={wizardGoal} level={wizardLevel} days={wizardDays} weeks={wizardWeeks} pro={manualMode === 'pro'} onClose={() => setWizardOpen(false)} onStep={setWizardStep} onDirection={setWizardDirection} onGoal={setWizardGoal} onLevel={setWizardLevel} onDays={setWizardDays} onWeeks={setWizardWeeks} onCreate={finishWizard} />
 
         {/* Пикеры: Библиотека ББ / LMS-цикл (модалы для пустого состояния) */}
         {pickerOpen === 'bb' && (
@@ -817,70 +730,8 @@ export const ProgramManagerPanel: React.FC = () => {
 
       {/* P2.1: Визард создания программы (5 шагов) */}
       {wizardOpen && (
-        <div className="constructor-surface constructor-surface--info" style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>🪄 Визард создания программы — шаг {wizardStep} из 4</span>
-            <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 11, minHeight: 44 }} onClick={() => setWizardOpen(false)}>Отмена</button>
-          </div>
-          {wizardStep === 1 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>1. Направление</div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {([['bb','💪 Бодибилдинг','hypertrophy'], ['pl','🏋 Пауэрлифтинг','powerlifting'], ['hybrid','⚡ Powerbuilder','powerbuilding']] as const).map(([d,lbl,defGoal]) => (
-                  <button key={d} onClick={() => { setWizardDir(d); setWizardGoal(defGoal); }} style={{ ...BTN, flex: 1, minHeight: 44, background: wizardDir === d ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : '#7c3aed20', color: wizardDir === d ? '#fff' : '#a78bfa' }}>{lbl}</button>
-                ))}
-              </div>
-            </div>
-          )}
-          {wizardStep === 2 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>2. Цель</div>
-              <select style={IN} value={wizardGoal} onChange={e => setWizardGoal(e.target.value)} disabled={wizardDir === 'pl'}>
-                <option value="hypertrophy">💪 Мышечная масса</option>
-                <option value="cut">✂️ Сушка</option>
-                <option value="recomp">🔁 Рекомпозиция</option>
-                <option value="maintenance">⚖ Поддержание</option>
-                <option value="strength_mass">🎯 Сила + Масса</option>
-                <option value="athletic">🏅 Атлетизм</option>
-              </select>
-            </div>
-          )}
-          {wizardStep === 3 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>3. Уровень и частота</div>
-              <select style={IN} value={wizardLevel} onChange={e => setWizardLevel(e.target.value)}>
-                {LEVEL_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-              </select>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column' }}>Дней/нед
-                  <input type="number" style={IN} min={2} max={6} value={wizardDays} onChange={e => setWizardDays(parseInt(e.target.value) || 4)} />
-                </label>
-                <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column' }}>Недель
-                  <input type="number" style={IN} min={4} max={24} value={wizardWeeks} onChange={e => setWizardWeeks(parseInt(e.target.value) || 8)} />
-                </label>
-              </div>
-            </div>
-          )}
-          {wizardStep === 4 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>4. Превью</div>
-              <div className="constructor-surface constructor-surface--tinted" style={{ ...CARD, padding: 10, background: 'rgba(167,139,250,0.06)' }}>
-                <div style={{ fontSize: 12, color: '#fff' }}>📋 <b>{wizardDir === 'bb' ? 'Бодибилдинг' : wizardDir === 'pl' ? 'Пауэрлифтинг' : 'Powerbuilder'}</b></div>
-                <div style={{ fontSize: 11, color: DIM }}>Цель: {wizardGoal} | Уровень: {wizardLevel}</div>
-                <div style={{ fontSize: 11, color: DIM }}>{wizardDays} дн/нед × {wizardWeeks} нед</div>
-                <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Программа будет пустой — добавьте упражнения после создания.</div>
-              </div>
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-            {wizardStep > 1 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => (Math.max(1, s - 1) as 1 | 2 | 3 | 4))}>← Назад</button>}
-            {wizardStep < 4 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => setWizardStep(s => (Math.min(4, s + 1) as 1 | 2 | 3 | 4))}>Далее →</button>}
-            {wizardStep === 4 && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)' }} onClick={() => finishWizard()}>✨ Создать программу</button>}
-            {wizardStep === 4 && manualMode === 'pro' && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }} onClick={() => finishWizard(true)}>⚡ Создать и заполнить</button>}
-          </div>
-        </div>
+        <ManualProgramWizard embedded open={wizardOpen} step={wizardStep} direction={wizardDir} goal={wizardGoal} level={wizardLevel} days={wizardDays} weeks={wizardWeeks} pro={manualMode === 'pro'} onClose={() => setWizardOpen(false)} onStep={setWizardStep} onDirection={setWizardDirection} onGoal={setWizardGoal} onLevel={setWizardLevel} onDays={setWizardDays} onWeeks={setWizardWeeks} onCreate={finishWizard} />
       )}
-
       {pickerOpen === 'bb' && (
         <TrainingModal title="📚 Библиотека программ" onClose={() => setPickerOpen(null)}>
           <BbProgramLibraryPicker value={null} label="Выбрать программу" programs={allLibraryPrograms} onSelect={startCloneLibrary} />
