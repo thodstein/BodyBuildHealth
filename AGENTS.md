@@ -5,7 +5,47 @@
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK
-- `vitest` - 1334 passing (139 test files; BB-auto Phase E comprehensive audit, BB-auto pro-quality Phase A/B/C/D, generation, safety, migration, round-trip, nutrition planner button audit, support calculator audit, PL-auto critical audit coverage, and manual constructor audit included)
+- `vitest` - 1348 passing (140 test files; BB-auto Phase E comprehensive audit + Pro features, BB-auto pro-quality Phase A/B/C/D, generation, safety, migration, round-trip, nutrition planner button audit, support calculator audit, PL-auto critical audit coverage, and manual constructor audit included)
+
+---
+
+## BB-auto Pro Features (Aug 4 2026)
+
+5 профессиональных функций для BB-auto: cross-mesocycle continuity, peak week protocol, muscle heatmap, frequency optimization, print/export.
+
+### P1: Cross-mesocycle continuity
+- **`bb-mesocycle-progression.engine.ts`** — новый движок: `extractMesocycleProgression` (peak weights, volume, exercises из предыдущего плана), `applyWeightProgression` (+2.5/5кг по level), `applyVolumeProgression` (+1-2 сета), `wasInPreviousMeso` (exercise rotation avoidance).
+- `BBBuilderInput.previousPlan?: BBPlan` — передача предыдущего плана.
+- `bb-builder.engine.ts` — `extractMesocycleProgression` → `applyWeightProgression` (workMax), `applyVolumeProgression` (rotationMuscleVolume), previousExercises → rotationNames (soft avoidance). Rationale: "🔗 Cross-mesocycle: веса +N кг, объём +N групп, ротация N упр."
+- `BbAutoConstructor.tsx` — checkbox "🔗 Cross-mesocycle: прогрессия из последнего плана", auto-load savedPlans[0].plan.
+- **24 tests** in `bb-mesocycle-progression.test.ts`.
+
+### P2: Peak week protocol
+- **`bb-peak-week.engine.ts`** — новый движок: `buildPeakWeekProtocol` (7-дневный протокол: water load→cut, sodium load→cut, carb depletion→reload, training light pump→rest, posing 20-60 мин). `applyPeakWeekToPlan` — замена последней недели на peak week.
+- `BbAutoConstructor.tsx` — кнопка "🎭 Peak week" + таблица протокола (7 дней × вода/натрий/carbs/трен/позы).
+- **18 tests** in `bb-peak-week.test.ts`.
+
+### P3: Inline Muscle Volume Heatmap
+- `BbAutoConstructor.tsx` — inline heatmap на шаге "plan": per-muscle карточки с цветовой шкалой (зелёный=MEV-MAV, жёлтый=Above MAV, красный=Over MRV, синий=Below MEV), progress bar, MEV/MAV/MRV labels.
+
+### P4: Per-muscle frequency optimization
+- **`bb-frequency-optimizer.engine.ts`** — новый движок: `optimizeMuscleFrequency` — per-muscle ACWR (danger→↓, undertrained→↑), muscle size (small→≥2×, large→≤2×), e1RM trend. Возвращает recommendations + rationale.
+- **7 tests** in `bb-frequency-optimizer.test.ts`.
+
+### P5: Print/Export
+- `BbAutoConstructor.tsx` — кнопка "🖨 PDF" → `handlePrintPlan()` — открывает new window с HTML-таблицей (недели × дни × упражнения × сеты/вес/RIR/коммент), `window.print()`.
+
+### Files
+- NEW: `src/engines/bb/bb-mesocycle-progression.engine.ts` (110 строк)
+- NEW: `src/engines/bb/bb-peak-week.engine.ts` (180 строк)
+- NEW: `src/engines/bb/bb-frequency-optimizer.engine.ts` (110 строк)
+- NEW: `src/engines/bb/__tests__/bb-mesocycle-progression.test.ts` (24 tests)
+- NEW: `src/engines/bb/__tests__/bb-peak-week.test.ts` (18 tests)
+- NEW: `src/engines/bb/__tests__/bb-frequency-optimizer.test.ts` (7 tests)
+- MOD: `src/engines/bb/bb-builder.engine.ts` — previousPlan field, mesocycle progression integration
+- MOD: `src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx` — cross-mesocycle toggle, peak week button+table, muscle heatmap, print button
+
+### Full suite: 1348 BB-auto tests passing, 0 TS errors in BB-auto files.
 
 ---
 

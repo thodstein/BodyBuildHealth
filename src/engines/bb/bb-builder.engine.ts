@@ -23,6 +23,7 @@ import type { PEDAdaptation, CourseIntensity } from './bb-ped-adaptation.engine'
 import type { Injury } from '../manual-plan-builder';
 import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, computePerMuscleACWR } from './bb-progression-feedback.engine';
+import { extractMesocycleProgression, applyWeightProgression, applyVolumeProgression, wasInPreviousMeso, type MesocycleProgression } from './bb-mesocycle-progression.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findSubstitutions } from '../exercise-substitution.engine';
@@ -125,6 +126,10 @@ export interface BBBuilderInput {
   calorieSurplus?: number;
   /** Белок г/кг. 1.6-2.2 = оптимально (Helms 2022). <1.0 → снижение MRV. */
   proteinPerKg?: number;
+  /** PRO: предыдущий мезоцикл — для auto-progress весов, ротации упражнений, объёмной прогрессии.
+   *  Если передан, buildBBPlan извлекает из него: peak-week веса → стартовые веса +2.5-5кг,
+   *  список упражнений → ротация (избегаем повторов), per-muscle volume → +1-2 сета. */
+  previousPlan?: BBPlan;
 }
 
 
@@ -1914,7 +1919,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   }
   const pattern = foundPattern || SPLIT_PATTERNS[0];
   const level = normLevel(input.level) as TrainingLevel;
-  const workMax = input.workMax || {};
+  const inputWorkMax = input.workMax || {};
+  // PRO: cross-mesocycle continuity — прогрессия весов и объёма из предыдущего плана.
+  const mesoProgression = input.previousPlan
+    ? extractMesocycleProgression(input.previousPlan, level, input.goal)
+    : null;
+  const workMax = mesoProgression
+    ? applyWeightProgression(inputWorkMax, mesoProgression)
+    : inputWorkMax;
   const weakPoints = input.weakPoints || [];
   const focusGroup = input.focusGroup;
   const sessions = sessionsOf(pattern);
@@ -1994,6 +2006,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       v = Math.round(v * (pedAdapt?.combinedMrvMultiplier ?? 1));
       // P0-5: лабораторная коррекция - снижение объёма при ALT/CRP/HCT/гормонах
       v = Math.round(v * (input.labMrvMultiplier ?? 1));
+      // PRO: cross-mesocycle volume progression — +1-2 сета per muscle из предыдущего мезо
+      if (mesoProgression) {
+        v = applyVolumeProgression(m, v, mesoProgression);
+      }
       v = muscleVolumeRotation[m] = v;
       volumeTargets[m] = buildBBVolumeTarget({
         muscle: m,
@@ -2126,6 +2142,13 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         for (const name of prevNames) {
           const cat = EXERCISE_CATALOG.find((e: any) => e.name === name);
           if (cat && cat.id) rotationIds.push(cat.id);
+        }
+      }
+      // PRO: cross-mesocycle rotation — добавляем упражнения из предыдущего мезо
+      // в rotationNames (мягкое понижение приоритета, не полный запрет).
+      if (mesoProgression) {
+        for (const name of mesoProgression.previousExercises) {
+          if (!rotationNames.includes(name)) rotationNames.push(name);
         }
       }
       // Solo-дни (1-2 группы мышц): увеличиваем бюджет на 50% — вся энергия дня идёт на эти мышцы
@@ -2431,6 +2454,17 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     }
     if (input.labIntensityNote) {
       rationale.push(`🧪 Интенсивность: ${input.labIntensityNote}`);
+    }
+  }
+  // PRO: cross-mesocycle continuity — отчёт о прогрессии
+  if (mesoProgression) {
+    const musclesProgressed = Object.keys(mesoProgression.weightProgression).length;
+    const avgDelta = musclesProgressed > 0
+      ? Math.round(Object.values(mesoProgression.weightProgression).reduce((s, v) => s + v, 0) / musclesProgressed * 10) / 10
+      : 0;
+    rationale.push(`🔗 Cross-mesocycle: веса +${avgDelta} кг (${musclesProgressed} мышц), объём +${Object.values(mesoProgression.volumeDelta).filter(v => v > 0).length} групп, ротация ${mesoProgression.previousExercises.length} упр.`);
+    if (mesoProgression.needsDeload) {
+      rationale.push(`⚠ Cross-mesocycle: предыдущий мезо был длинным/объёмным — рекомендуется deload-неделя в начале нового плана.`);
     }
   }
   // Cross-day weakPoints compensation: если слабая группа получает < MEV за неделю (потому что

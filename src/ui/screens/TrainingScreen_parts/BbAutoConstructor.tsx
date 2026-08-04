@@ -58,6 +58,7 @@ import { validatePlanQuality, bbPlanToQualityInput, type PlanQualityResult } fro
 import { PlanExportCard } from './PlanExportCard';
 import { DayCard, PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
+import { buildPeakWeekProtocol, applyPeakWeekToPlan, type PeakWeekProtocol } from '../../engines/bb/bb-peak-week.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
@@ -237,6 +238,11 @@ export const BbAutoConstructor: React.FC = () => {
   const [showCompare, setShowCompare] = useState(false);
   const [showTools, setShowTools] = useState(false);
   const [showMacrocycle, setShowMacrocycle] = useState(false);
+  // PRO: cross-mesocycle continuity — auto-load последнего сохранённого плана
+  const [usePreviousPlan, setUsePreviousPlan] = useState(true);
+  // PRO: peak week protocol для BB-соревнований
+  const [showPeakWeek, setShowPeakWeek] = useState(false);
+  const [peakWeekProtocol, setPeakWeekProtocol] = useState<PeakWeekProtocol | null>(null);
   const refreshSavedPlans = useCallback(() => setSavedPlans(loadSavedBBPlans()), []);
   useEffect(() => { refreshSavedPlans(); }, [refreshSavedPlans]);
 
@@ -616,6 +622,8 @@ export const BbAutoConstructor: React.FC = () => {
          proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
          calorieSurplus,
          eccentricMult,
+         // PRO: cross-mesocycle continuity — передаём последний сохранённый план
+         previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
        }, pedAdapt);
     }
 
@@ -921,6 +929,28 @@ export const BbAutoConstructor: React.FC = () => {
     } catch { alert('Ошибка при отправке плана на выполнение'); }
   };
 
+  /** PRO: печать плана в PDF через window.print() — HTML-таблица с упражнениями. */
+  const handlePrintPlan = () => {
+    if (!builtPlan) return;
+    const plan = applyEditsToPlan(builtPlan);
+    const w = window.open('', '_blank');
+    if (!w) { alert('Разрешите всплывающие окна для печати'); return; }
+    const esc = (s: string) => (s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const weeksHtml = plan.weeks.map(wk => {
+      const sessionsHtml = wk.sessions.map((s, si) => {
+        const exsHtml = s.exercises.map(e => {
+          const sets = (e.workSets || []).map(ws => `${ws.reps}×${ws.weight}кг @RIR${ws.rir ?? e.rir}`).join(', ');
+          return `<tr><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.exerciseName || e.name || '')}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.muscle)}</td><td style="padding:4px 8px;border:1px solid #ddd">${e.sets}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(sets)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.comment || '')}</td></tr>`;
+        }).join('');
+        return `<h3 style="margin:12px 0 4px">День ${si + 1}${s.sessionTag ? ' — ' + esc(s.sessionTag) : ''}</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#f0f0f0"><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Упражнение</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Мышца</th><th style="padding:4px 8px;border:1px solid #ddd">Сеты</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Вес/Reps</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Коммент</th></tr></thead><tbody>${exsHtml}</tbody></table>`;
+      }).join('');
+      return `<h2 style="margin:16px 0 6px">Неделя ${wk.week} (${esc(wk.phase || '')}${wk.deload ? ' — DELOAD' : ''})</h2>${sessionsHtml}`;
+    }).join('');
+    const rationaleHtml = (plan.rationale || []).map(r => `<div style="font-size:10px;color:#666;margin:2px 0">${esc(r)}</div>`).join('');
+    w.document.write(`<!DOCTYPE html><html><head><title>${esc(plan.pattern?.name || 'BB-план')}</title><style>@media print{body{font-size:10px}h2{page-break-before:auto}}</style></head><body style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:20px"><h1>${esc(plan.pattern?.name || 'BB-план')} — ${plan.weeks.length} нед</h1>${rationaleHtml}${weeksHtml}<script>window.print()</script></body></html>`);
+    w.document.close();
+  };
+
   const stepList: Step[] = planMode === 'bb_cycle' ? ['params','ped','plan','quality','adjust'] : ['params','ped','split','plan','quality','adjust'];
   const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'bb_cycle' ? '3 План' : '4 План', quality: planMode === 'bb_cycle' ? '4 Качество' : '5 Качество', adjust: planMode === 'bb_cycle' ? '5 Коррекция' : '6 Коррекция' };
   const renderStepNav = () => (
@@ -1223,6 +1253,14 @@ export const BbAutoConstructor: React.FC = () => {
           Авто-разгрузка при ACWR {`>`} 1.3
         </label>
       </div>
+      {savedPlans.length > 0 && (
+        <div style={{ marginTop:8, display:'flex', alignItems:'center', gap:8 }}>
+          <label style={{ fontSize:11, color:'rgba(255,255,255,0.6)', fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
+            <input type="checkbox" checked={usePreviousPlan} onChange={e => setUsePreviousPlan(e.target.checked)} style={{ accentColor: ACCENT }} />
+            🔗 Cross-mesocycle: прогрессия из последнего плана ({savedPlans[0]?.name || ''})
+          </label>
+        </div>
+      )}
       {autoDeload && (
         <div style={{ marginTop:6 }}>
           <PopupSelectSmart label="Тип разгрузки" value={deloadType} onChange={onUserDeloadType} suggestedIds={bbSuggest.deloadType} suggestionReason="По цели" options={[
@@ -1542,6 +1580,54 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={{ fontSize:12, fontWeight:800, color:'#00e68a', marginBottom:6 }}>💡 Советник плана</div>
               <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                 {tips.map((t,i) => <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.8)', lineHeight:1.4 }}>{t}</div>)}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* PRO: Inline Muscle Volume Heatmap */}
+        {(() => {
+          const vol = builtPlan.rotationMuscleVolume || {};
+          const lm = builtPlan.volumeLandmarks || [];
+          const MUSCLE_RU_H: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', quads: 'Квадр', hamstrings: 'Бицепс б', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предпл', abs: 'Пресс', traps: 'Трапец' };
+          const muscles = Object.keys(vol).filter(m => MUSCLE_RU_H[m]);
+          if (muscles.length === 0) return null;
+          // Color: green (MEV) → yellow (MAV) → red (MRV)
+          const colorFor = (sets: number, landmark?: any) => {
+            if (!landmark) return '#374151';
+            if (sets > landmark.mrv + 1) return '#ef4444'; // red — over MRV
+            if (sets > landmark.mav) return '#f59e0b';     // yellow — above MAV
+            if (sets >= landmark.mev) return '#22c55e';    // green — MEV-MAV range
+            return '#3b82f6';                               // blue — below MEV
+          };
+          const findLandmark = (m: string) => lm.find((l: any) => l.group === m || l.label === m);
+          return (
+            <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)' }}>
+              <div style={{ fontSize:12, fontWeight:800, color:'#60a5fa', marginBottom:8 }}>🔥 Muscle Volume Heatmap</div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(100px, 1fr))', gap:6 }}>
+                {muscles.sort((a,b) => (vol[b]||0) - (vol[a]||0)).map(m => {
+                  const sets = vol[m] || 0;
+                  const landmark = findLandmark(m);
+                  const color = colorFor(sets, landmark);
+                  const pct = landmark ? Math.min(100, Math.round((sets / (landmark.mrv || sets || 1)) * 100)) : 50;
+                  return (
+                    <div key={m} style={{ padding:'6px 8px', borderRadius:8, background:'rgba(0,0,0,0.2)', border:`2px solid ${color}` }}>
+                      <div style={{ fontSize:10, color:'rgba(255,255,255,0.7)', fontWeight:600 }}>{MUSCLE_RU_H[m]}</div>
+                      <div style={{ fontSize:16, fontWeight:800, color }}>{sets}</div>
+                      <div style={{ height:4, borderRadius:2, background:'rgba(255,255,255,0.1)', marginTop:4 }}>
+                        <div style={{ height:'100%', borderRadius:2, background:color, width:`${pct}%` }} />
+                      </div>
+                      {landmark && (
+                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:2 }}>
+                          MEV{landmark.mev} · MAV{landmark.mav} · MRV{landmark.mrv}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.4)', display:'flex', gap:12 }}>
+                <span>🟢 MEV-MAV</span><span>🟡 Above MAV</span><span>🔴 Over MRV</span><span>🔵 Below MEV</span>
               </div>
             </div>
           );
@@ -2503,9 +2589,63 @@ export const BbAutoConstructor: React.FC = () => {
              <button disabled={!!builtPlan.validation && !builtPlan.validation.valid} style={{ ...BTN_GHOST, borderColor:'#60a5fa', color:'#60a5fa' }} onClick={handleSaveToMyPlans}>💾 В Мои тренировки</button>
              <button disabled={!!builtPlan.validation && !builtPlan.validation.valid} style={{ ...BTN_GHOST, borderColor:'#a78bfa', color:'#a78bfa' }} onClick={handleSaveAsUserProgram}>📂 В Мои программы</button>
              <button disabled={!!builtPlan.validation && !builtPlan.validation.valid} style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e' }} onClick={handleSaveVariant}>💾 Вариант ({savedPlans.length})</button>
-            <button style={{ ...BTN_GHOST, borderColor:'#f59e0b', color:'#f59e0b' }} onClick={() => setShowCompare(s => !s)}>⚖ Сравнить</button>
-             <button disabled={!!builtPlan.validation && !builtPlan.validation.valid} style={{ ...BTN_GHOST, borderColor:'#a855f7', color:'#a855f7' }} onClick={handleSendToExecution}>▶ К выполнению</button>
-          </div>
+             <button style={{ ...BTN_GHOST, borderColor:'#f59e0b', color:'#f59e0b' }} onClick={() => setShowCompare(s => !s)}>⚖ Сравнить</button>
+              <button disabled={!!builtPlan.validation && !builtPlan.validation.valid} style={{ ...BTN_GHOST, borderColor:'#a855f7', color:'#a855f7' }} onClick={handleSendToExecution}>▶ К выполнению</button>
+             <button style={{ ...BTN_GHOST, borderColor:'#ec4899', color:'#ec4899' }} onClick={() => {
+               if (!builtPlan) return;
+               const weight = linked.profile?.settings?.personal?.weight || 80;
+               const sex = linked.profile?.settings?.personal?.sex || 'male';
+               const proto = buildPeakWeekProtocol(weight, 'mens_physique', sex);
+               setPeakWeekProtocol(proto);
+               const updated = applyPeakWeekToPlan(builtPlan, proto);
+               setBuiltPlan(updated);
+               setShowPeakWeek(true);
+             }}>🎭 Peak week</button>
+             <button style={BTN_GHOST} onClick={handlePrintPlan}>🖨 PDF</button>
+           </div>
+
+          {/* Peak week протокол */}
+          {showPeakWeek && peakWeekProtocol && (
+            <div style={{ marginTop:10, padding:12, borderRadius:12, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)' }}>
+              <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:8 }}>🎭 Peak Week протокол (7 дней)</div>
+              <div style={{ overflowX:'auto' }}>
+                <table style={{ width:'100%', fontSize:10, borderCollapse:'collapse' }}>
+                  <thead>
+                    <tr style={{ color:'rgba(255,255,255,0.5)', textAlign:'left' }}>
+                      <th style={{ padding:'4px 6px' }}>День</th>
+                      <th style={{ padding:'4px 6px' }}>Фаза</th>
+                      <th style={{ padding:'4px 6px' }}>💧 Вода</th>
+                      <th style={{ padding:'4px 6px' }}>🧂 Натрий</th>
+                      <th style={{ padding:'4px 6px' }}>🍚 Carbs</th>
+                      <th style={{ padding:'4px 6px' }}>🏋️ Трен.</th>
+                      <th style={{ padding:'4px 6px' }}>🎭 Позы</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {peakWeekProtocol.days.map(d => (
+                      <tr key={d.day} style={{ borderTop:'1px solid rgba(255,255,255,0.05)' }}>
+                        <td style={{ padding:'4px 6px', fontWeight:700 }}>{d.day === 7 ? '🎬 Show' : `Д${d.day}`}</td>
+                        <td style={{ padding:'4px 6px', color:'#ec4899' }}>{d.phase}</td>
+                        <td style={{ padding:'4px 6px' }}>{d.waterLiters}л</td>
+                        <td style={{ padding:'4px 6px' }}>{d.sodiumGrams}г</td>
+                        <td style={{ padding:'4px 6px' }}>{d.carbGrams}г</td>
+                        <td style={{ padding:'4px 6px' }}>{d.trainingMinutes > 0 ? `${d.trainingMinutes}'` : '—'}</td>
+                        <td style={{ padding:'4px 6px' }}>{d.poseMinutes}'</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ marginTop:8, fontSize:11, color:'rgba(255,255,255,0.6)' }}>
+                {peakWeekProtocol.rationale.map((r, i) => <div key={i}>{r}</div>)}
+              </div>
+              <div style={{ marginTop:6 }}>
+                {peakWeekProtocol.warnings.map((w, i) => (
+                  <div key={i} style={{ fontSize:10, color:'#f87171', marginTop:2 }}>{w}</div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Мульти-планы: сравнение вариантов */}
           {showCompare && savedPlans.length > 0 && (
