@@ -55,7 +55,7 @@ export function optimizeMuscleFrequency(
   // Compute per-muscle ACWR if workout sessions available
   let perMuscleACWR: Record<string, { ratio: number; zone: string }> = {};
   if (workoutSessions && workoutSessions.length > 0 && workMax) {
-    const acwrResult = computePerMuscleACWR(workoutSessions, workMax);
+    const acwrResult = computePerMuscleACWR(workoutSessions);
     perMuscleACWR = acwrResult || {};
   }
 

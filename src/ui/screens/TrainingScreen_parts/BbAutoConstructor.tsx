@@ -28,6 +28,7 @@ import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { adaptForPEDs, explainPEDAdaptation, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
+import { loadSessions } from '../../../engines/workout-logger.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
@@ -58,7 +59,8 @@ import { validatePlanQuality, bbPlanToQualityInput, type PlanQualityResult } fro
 import { PlanExportCard } from './PlanExportCard';
 import { DayCard, PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
-import { buildPeakWeekProtocol, applyPeakWeekToPlan, type PeakWeekProtocol } from '../../engines/bb/bb-peak-week.engine';
+import { buildPeakWeekProtocol, applyPeakWeekToPlan, type PeakWeekProtocol } from '../../../engines/bb/bb-peak-week.engine';
+import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../../../engines/bb/bb-frequency-optimizer.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
@@ -243,6 +245,8 @@ export const BbAutoConstructor: React.FC = () => {
   // PRO: peak week protocol для BB-соревнований
   const [showPeakWeek, setShowPeakWeek] = useState(false);
   const [peakWeekProtocol, setPeakWeekProtocol] = useState<PeakWeekProtocol | null>(null);
+  // PRO: per-muscle frequency optimization
+  const [freqOptResult, setFreqOptResult] = useState<FrequencyOptimizationResult | null>(null);
   const refreshSavedPlans = useCallback(() => setSavedPlans(loadSavedBBPlans()), []);
   useEffect(() => { refreshSavedPlans(); }, [refreshSavedPlans]);
 
@@ -668,6 +672,12 @@ export const BbAutoConstructor: React.FC = () => {
         `💪 Слабые группы: ${weakPoints.length > 0 ? weakPoints.join(', ') : 'нет'}`,
       ],
     });
+    // PRO: per-muscle frequency optimization
+    try {
+      const sessions = loadSessions();
+      const freqResult = optimizeMuscleFrequency(plan, sessions.length > 0 ? sessions : undefined, bbWorkMax);
+      setFreqOptResult(freqResult);
+    } catch { setFreqOptResult(null); }
     setBbWeekSel(1);
     setStep('plan');
     try {
@@ -1632,6 +1642,26 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           );
         })()}
+
+        {/* PRO: Per-muscle frequency optimization recommendations */}
+        {freqOptResult && freqOptResult.totalAdjustments > 0 && (
+          <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+            <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b', marginBottom:6 }}>🔧 Frequency Optimization ({freqOptResult.totalAdjustments} корректировок)</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              {freqOptResult.recommendations.map((rec: any, i: number) => {
+                const direction = rec.recommendedFrequency > rec.currentFrequency ? '↑' : '↓';
+                const color = rec.recommendedFrequency > rec.currentFrequency ? '#22c55e' : '#ef4444';
+                return (
+                  <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.8)', display:'flex', gap:8 }}>
+                    <span style={{ color, fontWeight:700 }}>{direction} {rec.muscle}:</span>
+                    <span>{rec.currentFrequency}→{rec.recommendedFrequency}×/нед</span>
+                    <span style={{ color:'rgba(255,255,255,0.4)' }}>({rec.reason})</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Overload targets for this week */}
         {(() => {
