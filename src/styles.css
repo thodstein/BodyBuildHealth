@@ -109,6 +109,22 @@
 .constructor-surface--info { border-left-color: var(--info, #3b82f6) !important; }
 .constructor-surface--tinted { background: var(--constructor-surface) !important; }
 .bb-annual-planner-backdrop { scrollbar-gutter: stable; }
+.bb-annual-planner-page {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 0 calc(var(--bottom-nav-h, 64px) + 24px);
+}
+.bb-annual-planner-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 12px;
+  background: var(--card-bg, #181b22);
+  border: 1px solid var(--border-light, rgba(255,255,255,0.14));
+  border-radius: 14px;
+}
 .bb-annual-planner-dialog .macrocycle-panel {
   background: var(--card-bg, #111318);
   color: var(--text, #fff);
@@ -135,6 +151,7 @@
   word-break: keep-all;
 }
 @media (max-width: 480px) {
+  .bb-annual-planner-page__header { align-items: stretch; flex-direction: column; }
   .bb-annual-planner-backdrop { padding: 0 !important; }
   .bb-annual-planner-dialog {
     min-height: 100dvh !important;
@@ -196,6 +213,19 @@
 .periodization-designer [role="button"] { touch-action: manipulation; }
 .macrocycle-panel { min-width: 0; }
 .macrocycle-panel > div { min-width: 0; }
+.macrocycle-control-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.macrocycle-control-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 82px !important; padding: 12px; border: 1px solid var(--border-light, rgba(255,255,255,0.12)); border-radius: 12px; background: var(--card-bg, #181b22); color: var(--text, #fff); text-align: left; cursor: pointer; }
+.macrocycle-control-card span { color: var(--text-dim); font-size: 10px; }
+.macrocycle-control-card strong { font-size: 13px; color: var(--accent); }
+.macrocycle-control-card small { color: var(--text-dim); font-size: 10px; }
+.macrocycle-control-popup { margin-top: 10px; padding: 12px; border: 1px solid var(--accent-line); border-radius: 14px; background: var(--card-bg, #181b22); box-shadow: 0 12px 32px rgba(0,0,0,0.25); }
+.macrocycle-control-popup__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: var(--text); }
+.macrocycle-control-popup__header button { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--text-dim); cursor: pointer; }
+.macrocycle-popup-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px; }
+.macrocycle-popup-options button, .macrocycle-popup-input button { min-height: 44px; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: 10px; background: var(--input-bg); color: var(--text); cursor: pointer; }
+.macrocycle-popup-options button.is-active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.macrocycle-popup-input { display: flex; flex-direction: column; gap: 8px; color: var(--text-dim); font-size: 11px; }
+.macrocycle-popup-input input { min-height: 44px; padding: 8px; border: 1px solid var(--input-border); border-radius: 10px; background: var(--input-bg); color: var(--text); font-size: 16px; }
 
 @media (max-width: 480px) {
   .manual-constructor { padding-bottom: calc(var(--bottom-nav-h, 64px) + 12px); }

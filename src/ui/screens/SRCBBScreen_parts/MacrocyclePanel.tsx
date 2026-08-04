@@ -131,9 +131,14 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   const [buildError, setBuildError] = useState<string | null>(null);
   const [uiPrefs, setUiPrefs] = useState<MacrocycleUiPrefs>(loadUiPrefs);
   const [showUiPrefs, setShowUiPrefs] = useState(false);
+  const [activePopup, setActivePopup] = useState<'level' | 'goal' | 'duration' | 'focus' | 'competition' | null>(null);
   const isCompact = uiPrefs.density === 'compact';
   const isHighContrast = uiPrefs.contrast === 'high';
   const cardStyle = { ...CARD, padding: isCompact ? 8 : 12 };
+  const levelOptions = ['beginner', 'novice', 'III-KMS', 'II-KMS', 'I-KMS', 'MS', 'intermediate', 'advanced', 'enhanced'];
+  const levelLabel = effLevel || 'Не выбран';
+  const goalLabel = effGoal === 'powerlifting' ? 'Пауэрлифтинг' : effGoal === 'bodybuilding' ? 'Бодибилдинг' : 'Общее';
+  const focusLabel = trainingFocus === 'strength' ? 'Сила' : trainingFocus === 'endurance' ? 'Выносливость' : 'Гипертрофия';
   useEffect(() => {
     try { localStorage.setItem(UI_PREFS_KEY, JSON.stringify(uiPrefs)); } catch { /* ignore */ }
   }, [uiPrefs]);
@@ -320,30 +325,32 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           </div>
         )}
         <div style={{ ...SMALL, marginBottom: 8 }}>Последовательность фаз: выносливость → силовой → выход на пик → соревнования → переход. Клик по блоку → применить цикл.</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: isCompact ? 6 : 8 }}>
-          <div>
-            <div style={LABEL}>Уровень</div>
-            <select aria-label="Уровень спортсмена" style={SEL} value={effLevel}
-              disabled={!onLevelChange}
-              onChange={e => {
-                if (onLevelChange) onLevelChange(e.target.value);
-                else setLocalLevel(e.target.value);
-              }}>
-              {onLevelChange ? (
-                <option value={effLevel}>{effLevel}</option>
-              ) : (
-                ['beginner', 'novice', 'III-KMS', 'II-KMS', 'I-KMS', 'MS', 'intermediate', 'advanced', 'enhanced'].map(lvl => (
-                  <option key={lvl} value={lvl}>{lvl}</option>
-                ))
-              )}
-            </select>
-          </div>
-          <div>
-            <div style={LABEL}>Цель</div>
-            <select aria-label="Цель годового планирования" style={SEL} value={effGoal}
-              disabled={!onGoalChange}
-              onChange={e => {
-                const v = e.target.value as 'powerlifting' | 'bodybuilding' | 'general';
+        <div className="macrocycle-control-cards">
+          <button type="button" className="macrocycle-control-card" onClick={() => setActivePopup('level')}>
+            <span>🎓 Уровень спортсмена</span><strong>{levelLabel}</strong><small>Изменить</small>
+          </button>
+          <button type="button" className="macrocycle-control-card" onClick={() => setActivePopup('goal')}>
+            <span>🎯 Направление</span><strong>{goalLabel}</strong><small>Изменить</small>
+          </button>
+          <button type="button" className="macrocycle-control-card" onClick={() => setActivePopup('duration')}>
+            <span>🗓 Горизонт</span><strong>{totalWeeks} недель</strong><small>Ввести значение</small>
+          </button>
+          {isBB && <button type="button" className="macrocycle-control-card" onClick={() => setActivePopup('focus')}>
+            <span>💪 Фокус ББ</span><strong>{focusLabel}</strong><small>Изменить</small>
+          </button>}
+        </div>
+        {activePopup && (
+          <div className="macrocycle-control-popup" role="dialog" aria-label="Настройка параметра">
+            <div className="macrocycle-control-popup__header">
+              <strong>{activePopup === 'level' ? '🎓 Уровень спортсмена' : activePopup === 'goal' ? '🎯 Направление' : activePopup === 'duration' ? '🗓 Горизонт планирования' : '💪 Фокус ББ'}</strong>
+              <button type="button" aria-label="Закрыть" onClick={() => setActivePopup(null)}>✕</button>
+            </div>
+            {activePopup === 'level' && <div className="macrocycle-popup-options">
+              {levelOptions.map(option => <button type="button" key={option} className={option === effLevel ? 'is-active' : ''} onClick={() => { onLevelChange?.(option); setLocalLevel(option); setActivePopup(null); }}>{option}</button>)}
+            </div>}
+            {activePopup === 'goal' && <div className="macrocycle-popup-options">
+              {(['powerlifting', 'bodybuilding', 'general'] as const).map(option => <button type="button" key={option} className={option === effGoal ? 'is-active' : ''} onClick={() => {
+                const v = option;
                 if (onGoalChange) onGoalChange(v);
                 else setLocalGoal(v);
                 // Сбросить cycleId/cycleIds в соревнованиях, не подходящих под новое направление.
@@ -367,30 +374,18 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     : dropBad(comp.cycleId);
                   return { ...comp, cycleId: cleanCycleId, cycleIds: cleanCycleIds && cleanCycleIds.length > 0 ? cleanCycleIds : undefined };
                 }));
-              }}>
-              <option value="powerlifting">Пауэрлифтинг</option>
-              <option value="bodybuilding">Бодибилдинг</option>
-              <option value="general">Общее</option>
-            </select>
+                setActivePopup(null);
+              }}>{option === 'powerlifting' ? 'Пауэрлифтинг' : option === 'bodybuilding' ? 'Бодибилдинг' : 'Общее'}</button>)}
+            </div>}
+            {activePopup === 'duration' && <label className="macrocycle-popup-input">Недель (12–104)
+              <input autoFocus type="number" min={12} max={104} value={totalWeeks} onChange={e => { const value = Number(e.target.value); if (Number.isFinite(value)) setTotalWeeks(Math.max(12, Math.min(104, Math.round(value)))); }} />
+              <button type="button" onClick={() => setActivePopup(null)}>Готово</button>
+            </label>}
+            {activePopup === 'focus' && <div className="macrocycle-popup-options">
+              {(['hypertrophy', 'strength', 'endurance'] as BBTrainingFocus[]).map(option => <button type="button" key={option} className={option === trainingFocus ? 'is-active' : ''} onClick={() => { setTrainingFocus(option); setActivePopup(null); }}>{option === 'hypertrophy' ? 'Гипертрофия' : option === 'strength' ? 'Сила' : 'Выносливость / детализация'}</button>)}
+            </div>}
           </div>
-           <div>
-             <div style={LABEL}>Длительность, нед</div>
-            <input aria-label="Длительность макроцикла в неделях" style={IN} type="number" min={12} max={104} value={totalWeeks} onChange={e => {
-             const value = Number(e.target.value);
-             setTotalWeeks(Number.isFinite(value) ? Math.max(12, Math.min(104, Math.round(value))) : 12);
-           }} />
-          </div>
-          {isBB && (
-            <div>
-              <div style={LABEL}>Основной фокус</div>
-               <select aria-label="Фокус ББ макроцикла" style={SEL} value={trainingFocus} onChange={e => setTrainingFocus(e.target.value as BBTrainingFocus)}>
-                <option value="hypertrophy">Гипертрофия</option>
-                <option value="strength">Сила</option>
-                <option value="endurance">Выносливость / детализация</option>
-              </select>
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Менеджер соревнований (несколько) */}
         <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
