@@ -262,6 +262,66 @@ export function applyFeedbackToBuild(
 }
 
 /**
+ * PRO: извлечь сводный отчёт о auto-regulation корректировках из плана.
+ * Сканирует комментарии упражнений на наличие "↻ из факта:" маркеров.
+ */
+export function summarizeAutoRegulation(plan: BBPlan): {
+  adjustedExercises: number;
+  totalExercises: number;
+  weightIncreases: number;
+  weightDecreases: number;
+  rirAdjustments: number;
+  plateauDetected: number;
+  details: { exercise: string; from: string; to: string }[];
+} {
+  const details: { exercise: string; from: string; to: string }[] = [];
+  let weightIncreases = 0;
+  let weightDecreases = 0;
+  let rirAdjustments = 0;
+  let plateauDetected = 0;
+  let adjustedExercises = 0;
+  let totalExercises = 0;
+
+  for (const wk of plan.weeks) {
+    for (const s of wk.sessions) {
+      for (const ex of s.exercises) {
+        totalExercises++;
+        const comment = ex.comment || '';
+        if (!comment.includes('↻')) continue;
+        adjustedExercises++;
+        // Parse: "↻ из факта: 80×5 RIR2 → 82.5×5 RIR3"
+        const match = comment.match(/↻ из факта:\s*([\d.]+)×(\d+)\s*RIR(\d+)\s*→\s*([\d.]+)×(\d+)\s*RIR(\d+)/);
+        if (match) {
+          const fromWeight = parseFloat(match[1]);
+          const toWeight = parseFloat(match[4]);
+          const fromRir = parseInt(match[3]);
+          const toRir = parseInt(match[6]);
+          if (toWeight > fromWeight) weightIncreases++;
+          else if (toWeight < fromWeight) weightDecreases++;
+          if (toRir !== fromRir) rirAdjustments++;
+          details.push({
+            exercise: ex.exerciseName || ex.name || '',
+            from: `${match[1]}×${match[2]} RIR${match[3]}`,
+            to: `${match[4]}×${match[5]} RIR${match[6]}`,
+          });
+        }
+        if (comment.toLowerCase().includes('plateau')) plateauDetected++;
+      }
+    }
+  }
+
+  return {
+    adjustedExercises,
+    totalExercises,
+    weightIncreases,
+    weightDecreases,
+    rirAdjustments,
+    plateauDetected,
+    details,
+  };
+}
+
+/**
  * P0-6b: Авто-обновление weakPoints на основе e1RM-тренда из дневника.
  *
  * Для каждой слабой группы: считаем e1RM 4+ нед назад и текущий e1RM.

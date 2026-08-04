@@ -126,6 +126,13 @@ export interface BBBuilderInput {
   calorieSurplus?: number;
   /** Белок г/кг. 1.6-2.2 = оптимально (Helms 2022). <1.0 → снижение MRV. */
   proteinPerKg?: number;
+  /** PRO: ограничения мобильности — фильтр упражнений по биомеханике.
+   *  'shoulder' — ограниченная плечевая мобильность → исключить overhead press, behind neck.
+   *  'hip' — ограниченная тазобедренная мобильность → исключить deep squats, prefer hack squat.
+   *  'ankle' — ограниченная голеностопная мобильность → prefer leg press over squat.
+   *  'lower_back' — проблемы с поясницей → исключить conventional deadlift, barbell row.
+   *  'wrist' — проблемы с запястьями → исключить straight-bar curl, prefer cable. */
+  mobilityRestrictions?: string[];
   /** PRO: предыдущий мезоцикл — для auto-progress весов, ротации упражнений, объёмной прогрессии.
    *  Если передан, buildBBPlan извлекает из него: peak-week веса → стартовые веса +2.5-5кг,
    *  список упражнений → ротация (избегаем повторов), per-muscle volume → +1-2 сета. */
@@ -455,6 +462,26 @@ function isBBJunk(ex: any): boolean {
   }
   // Изометрические планки/уголки — не для гипертрофии (но подъём ног в висе — OK для abs)
   if (/планк|plank|уголок|l[\s_-]?sit|hollow.?hold|лодочк|boat/.test(n) && !/подъём ног|leg.?raise|скручиван|crunch|пресс.*маши|паук/.test(n)) return true;
+  return false;
+}
+
+/** PRO: Biomechanics-based filtering — исключить упражнения по ограничениям мобильности.
+ *  Экспортируется для использования в cycle-to-plan.ts. */
+export const MOBILITY_PATTERNS: Record<string, RegExp> = {
+  shoulder: /overhead|жим.*стоя|ohp|за.*голов|behind.?neck|upright.?row|тяга.*подбород|арнольд|arnold/i,
+  hip: /atg|ass.?to.?grass|глубок.*присед|гоблет.*присед|goblet.*squat|sissy|сисси/i,
+  ankle: /присед.*штанг|back.?squat|front.?squat|выпад|lunge|болгар|bulgarian/i,
+  lower_back: /станов.*классич|conventional.*deadlift|тяга.*наклон|barbell.?row|good.?morning|гудморнинг|румынск.*штанг|rdl.*barbell/i,
+  wrist: /бицепс.*штанг|barbell.?curl|ez.?bar| француз.*штанг|french.?press.*barbell|skullcrusher.*barbell/i,
+};
+
+export function isMobilityRestricted(ex: any, restrictions?: string[]): boolean {
+  if (!restrictions || restrictions.length === 0) return false;
+  const n = (ex.name || '').toLowerCase();
+  for (const r of restrictions) {
+    const pattern = MOBILITY_PATTERNS[r];
+    if (pattern && pattern.test(n)) return true;
+  }
   return false;
 }
 /** Маппинг PRO-мышц в group каталога для getExercisesByGroup(). */
@@ -876,6 +903,7 @@ function buildSession(
   primaryBySlot: Map<string, string> = new Map(),
   trainingFocus?: BBTrainingFocus,
   eccentricMult?: number,
+  mobilityRestrictions?: string[],
 ): BBSession {
   const character = sched.character as DayCharacter;
   const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles, focusGroup);
@@ -1126,6 +1154,7 @@ function buildSession(
       { const _t = bbExerciseTier(ex); if (_t === 4 || (!allowExotic && _t === 3)) return false; }
       if (!isPurePull && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
       if (avoidAxialLoad && ex.name && isAxialLoadExercise(ex as any)) return false;
+      if (mobilityRestrictions && isMobilityRestricted(ex, mobilityRestrictions)) return false;
       if (equipmentList.length > 0) {
         const rawEq = ex.equipment;
         const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
@@ -2163,7 +2192,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const weekExcluded = getExcludedMuscles(injuries, weekDate);
       const weekGraded = getGradedInjuries(injuries, weekDate);
       const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
-       const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, new Map(), primaryBySlot, input.trainingFocus, input.eccentricMult);
+       const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, new Map(), primaryBySlot, input.trainingFocus, input.eccentricMult, input.mobilityRestrictions);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {

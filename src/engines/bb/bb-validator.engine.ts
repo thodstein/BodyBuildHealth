@@ -181,3 +181,104 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
   }
   return { valid: issues.every(issue => issue.level !== 'error'), issues };
 }
+
+/**
+ * PRO: конвертировать validation issues в actionable рекомендации.
+ * Вместо "chest: volume 5 ниже MEV 8" → "Добавьте 3 сета на chest: жим гантелей лёжа в день 2".
+ */
+export function generateActionableRecommendations(
+  plan: BBPlan,
+  issues: BBPlanValidationIssue[],
+): { priority: 'high' | 'medium' | 'low'; action: string; code: string }[] {
+  const recs: { priority: 'high' | 'medium' | 'low'; action: string; code: string }[] = [];
+
+  for (const issue of issues) {
+    switch (issue.code) {
+      case 'target_volume_deficit': {
+        // "muscle: effective volume X ниже MEV Y" → "Добавьте N сетов на muscle"
+        const match = issue.message.match(/(\w+):.*volume\s+([\d.]+).*MEV\s+(\d+)/);
+        if (match) {
+          const muscle = match[1];
+          const current = parseFloat(match[2]);
+          const mev = parseInt(match[3]);
+          const deficit = Math.ceil(mev - current);
+          recs.push({
+            priority: 'high',
+            action: `Добавьте ${deficit} сет(а) на ${muscle}: включите feeder-сеты или добавьте изоляцию в ближайший день.`,
+            code: issue.code,
+          });
+        }
+        break;
+      }
+      case 'effective_mrv_overflow': {
+        const match = issue.message.match(/(\w+):.*effective\s+([\d.]+).*MRV\s+(\d+)/);
+        if (match) {
+          const muscle = match[1];
+          const current = parseFloat(match[2]);
+          const mrv = parseInt(match[3]);
+          const excess = Math.ceil(current - mrv);
+          recs.push({
+            priority: 'high',
+            action: `Снизьте ${excess} сет(а) на ${muscle}: уберите accessory или уменьшите сеты primary в неделе ${issue.week || ''}.`,
+            code: issue.code,
+          });
+        }
+        break;
+      }
+      case 'deload_volume_not_reduced': {
+        recs.push({
+          priority: 'medium',
+          action: `Deload-неделя: снизьте объём на 25-40% (уберите 1-2 сета на упражнение, оставьте вес).`,
+          code: issue.code,
+        });
+        break;
+      }
+      case 'deload_rir_too_low': {
+        recs.push({
+          priority: 'medium',
+          action: `Deload-неделя: повысьте RIR до 3-4 (снижение интенсивности для восстановления).`,
+          code: issue.code,
+        });
+        break;
+      }
+      case 'taper_volume_increased': {
+        recs.push({
+          priority: 'high',
+          action: `Taper/peak: объём не должен расти. Уберите accessory, оставьте только primary compounds с низким объёмом.`,
+          code: issue.code,
+        });
+        break;
+      }
+      case 'session_working_set_cap': {
+        recs.push({
+          priority: 'medium',
+          action: `Сессия превышает 24 сета: уберите 1-2 accessory упражнения или уменьшите сеты на изоляции.`,
+          code: issue.code,
+        });
+        break;
+      }
+      case 'session_muscle_leak': {
+        recs.push({
+          priority: 'low',
+          action: `${issue.exercise || 'Упражнение'} не соответствует дню — замените на упражнение целевой группы.`,
+          code: issue.code,
+        });
+        break;
+      }
+    }
+  }
+
+  // Если проблем нет — позитивная рекомендация
+  if (recs.length === 0) {
+    recs.push({
+      priority: 'low',
+      action: '✅ План сбалансирован: объём в пределах MEV-MRV, делод и taper корректны.',
+      code: 'all_clear',
+    });
+  }
+
+  return recs.sort((a, b) => {
+    const order = { high: 0, medium: 1, low: 2 };
+    return order[a.priority] - order[b.priority];
+  });
+}

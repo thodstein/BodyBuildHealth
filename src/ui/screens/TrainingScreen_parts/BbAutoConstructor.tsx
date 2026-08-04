@@ -61,6 +61,8 @@ import { DayCard, PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
 import { buildPeakWeekProtocol, applyPeakWeekToPlan, type PeakWeekProtocol } from '../../../engines/bb/bb-peak-week.engine';
 import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../../../engines/bb/bb-frequency-optimizer.engine';
+import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feedback.engine';
+import { generateActionableRecommendations } from '../../../engines/bb/bb-validator.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
@@ -68,7 +70,7 @@ import { WhatIfCard } from './WhatIfCard';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { bbMacroToActiveBlock, type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 
-type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust';
+type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust' | 'annual';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
 type PlanMode = 'generic_split' | 'bb_cycle';
 
@@ -214,6 +216,8 @@ export const BbAutoConstructor: React.FC = () => {
   }));
   const [weakPoints, setWeakPoints] = useState<string[]>(prof.weakPoints || []);
   const [injuries, setInjuries] = useState<InjurySelectEntry[]>(prof.injuries || []);
+  // PRO: mobility restrictions — biomechanics-based exercise filtering
+  const [mobilityRestrictions, setMobilityRestrictions] = useState<string[]>([]);
 
   const [selectedSplitId, setSelectedSplitId] = useState<string>('');
   const [builtPlan, setBuiltPlan] = useState<BBPlan | null>(null);
@@ -239,7 +243,6 @@ export const BbAutoConstructor: React.FC = () => {
   const [savedPlans, setSavedPlans] = useState<SavedBBPlan[]>([]);
   const [showCompare, setShowCompare] = useState(false);
   const [showTools, setShowTools] = useState(false);
-  const [showMacrocycle, setShowMacrocycle] = useState(false);
   // PRO: cross-mesocycle continuity — auto-load последнего сохранённого плана
   const [usePreviousPlan, setUsePreviousPlan] = useState(true);
   // PRO: peak week protocol для BB-соревнований
@@ -542,6 +545,7 @@ export const BbAutoConstructor: React.FC = () => {
            proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
            calorieSurplus,
            eccentricMult,
+           mobilityRestrictions,
            labMrvMultiplier: labAdjust.mrvMultiplier,
           });
         if (bbDays !== customProgram.daysPerWeek) setBbDays(customProgram.daysPerWeek);
@@ -583,6 +587,7 @@ export const BbAutoConstructor: React.FC = () => {
             proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
             calorieSurplus,
             eccentricMult,
+            mobilityRestrictions,
             labMrvMultiplier: labAdjust.mrvMultiplier,
         });
         const cycleWeeks = cycle.meta.sessionsPerWeek;
@@ -626,6 +631,7 @@ export const BbAutoConstructor: React.FC = () => {
          proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
          calorieSurplus,
          eccentricMult,
+         mobilityRestrictions,
          // PRO: cross-mesocycle continuity — передаём последний сохранённый план
          previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
        }, pedAdapt);
@@ -961,8 +967,40 @@ export const BbAutoConstructor: React.FC = () => {
     w.document.close();
   };
 
-  const stepList: Step[] = planMode === 'bb_cycle' ? ['params','ped','plan','quality','adjust'] : ['params','ped','split','plan','quality','adjust'];
-  const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'bb_cycle' ? '3 План' : '4 План', quality: planMode === 'bb_cycle' ? '4 Качество' : '5 Качество', adjust: planMode === 'bb_cycle' ? '5 Коррекция' : '6 Коррекция' };
+  /** PRO: CSV export — все сеты плана в CSV для Excel/Google Sheets. */
+  const handleExportCSV = () => {
+    if (!builtPlan) return;
+    const plan = applyEditsToPlan(builtPlan);
+    const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Комментарий'].join(',')];
+    for (const wk of plan.weeks) {
+      for (let si = 0; si < wk.sessions.length; si++) {
+        const s = wk.sessions[si];
+        for (const ex of s.exercises) {
+          const ws = ex.workSets || [];
+          for (let i = 0; i < (ws.length || ex.sets); i++) {
+            const set = ws[i] || { reps: ex.repsRange?.[0] || 10, weight: 0, rir: ex.rir };
+            const esc = (v: any) => `"${String(v || '').replace(/"/g, '""')}"`;
+            rows.push([
+              wk.week, si + 1, esc(ex.exerciseName || ex.name), esc(ex.muscle),
+              ex.role, i + 1, set.reps, set.weight, set.rir,
+              esc(ex.tempoSpec || ''), ex.restSeconds || '',
+              esc(ex.comment || ''),
+            ].join(','));
+          }
+        }
+      }
+    }
+    const blob = new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bb-plan-${plan.pattern?.id || 'export'}-${plan.weeks.length}wk.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const stepList: Step[] = planMode === 'bb_cycle' ? ['params','ped','plan','quality','adjust','annual'] : ['params','ped','split','plan','quality','adjust','annual'];
+  const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'bb_cycle' ? '3 План' : '4 План', quality: planMode === 'bb_cycle' ? '4 Качество' : '5 Качество', adjust: planMode === 'bb_cycle' ? '5 Коррекция' : '6 Коррекция', annual:'🗓 Годовой план' };
   const renderStepNav = () => (
     <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
       {stepList.map(s => {
@@ -1317,6 +1355,28 @@ export const BbAutoConstructor: React.FC = () => {
           onChange={setInjuries}
         />
       </div>
+      {/* PRO: Mobility restrictions — biomechanics-based exercise filtering */}
+      <div style={{ marginTop:8 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.6)', marginBottom:6 }}>🦴 Ограничения мобильности (биомеханика)</div>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+          {([
+            { id: 'shoulder', label: ' плечи (OHP/behind neck)' },
+            { id: 'hip', label: '🦵 таз (deep squats/sissy)' },
+            { id: 'ankle', label: '🦶 голеностоп (squats/lunges)' },
+            { id: 'lower_back', label: '🔙 поясница (deadlift/row)' },
+            { id: 'wrist', label: '✋ запястья (barbell curl)' },
+          ] as const).map(r => {
+            const active = mobilityRestrictions.includes(r.id);
+            return (
+              <button key={r.id} onClick={() => setMobilityRestrictions(prev => active ? prev.filter(x => x !== r.id) : [...prev, r.id])}
+                style={{ padding:'6px 12px', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', border: active ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: active ? 'rgba(245,158,11,0.15)' : 'transparent', color: active ? '#f59e0b' : 'rgba(255,255,255,0.5)' }}>
+                {r.label}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ marginTop:4, fontSize:10, color:'rgba(255,255,255,0.4)' }}>Исключает упражнения, требующие мобильности, которую вы ограничиваете. Заменяет на биомеханически безопасные альтернативы.</div>
+      </div>
 
       <button style={{ ...BTN, width:'100%', marginTop:12 }} onClick={() => setStep('ped')}>Далее: PED и рабочие веса →</button>
     </div>
@@ -1663,6 +1723,33 @@ export const BbAutoConstructor: React.FC = () => {
           </div>
         )}
 
+        {/* PRO: Auto-regulation status panel — что сделал diary feedback loop */}
+        {(() => {
+          const summary = summarizeAutoRegulation(builtPlan);
+          if (summary.adjustedExercises === 0) return null;
+          return (
+            <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
+              <div style={{ fontSize:12, fontWeight:800, color:'#a855f7', marginBottom:6 }}>
+                ↻ Auto-regulation: {summary.adjustedExercises}/{summary.totalExercises} упражнений скорректировано из дневника
+              </div>
+              <div style={{ display:'flex', gap:12, fontSize:11, color:'rgba(255,255,255,0.7)', marginBottom:6 }}>
+                {summary.weightIncreases > 0 && <span style={{ color:'#22c55e' }}>↑ Вес +{summary.weightIncreases}</span>}
+                {summary.weightDecreases > 0 && <span style={{ color:'#ef4444' }}>↓ Вес −{summary.weightDecreases}</span>}
+                {summary.rirAdjustments > 0 && <span style={{ color:'#f59e0b' }}>RIR ±{summary.rirAdjustments}</span>}
+                {summary.plateauDetected > 0 && <span style={{ color:'#ef4444' }}>⚠ Plateau: {summary.plateauDetected}</span>}
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                {summary.details.slice(0, 5).map((d, i) => (
+                  <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>
+                    {d.exercise}: {d.from} → {d.to}
+                  </div>
+                ))}
+                {summary.details.length > 5 && <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)' }}>+{summary.details.length - 5} ещё...</div>}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Overload targets for this week */}
         {(() => {
            // Per-muscle частота и объём
@@ -1811,6 +1898,26 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b', marginBottom:5 }}>⚠️ Объём и бюджет требуют внимания</div>
               {warnings.slice(0, 8).map((issue, i) => <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.8)', lineHeight:1.4 }}>{issue.message}</div>)}
               <div style={{ marginTop:5, fontSize:10, color:'rgba(255,255,255,0.5)' }}>Это предупреждения, а не блокировка. Ограничения оборудования, времени и восстановления могут объяснять недобор.</div>
+            </div>
+          );
+        })()}
+
+        {/* PRO: Actionable recommendations — конкретные шаги по улучшению плана */}
+        {builtPlan.validation && (() => {
+          const recs = generateActionableRecommendations(builtPlan, builtPlan.validation.issues);
+          if (recs.length === 0 || (recs.length === 1 && recs[0].code === 'all_clear')) return null;
+          const colorFor = (p: string) => p === 'high' ? '#ef4444' : p === 'medium' ? '#f59e0b' : '#22c55e';
+          return (
+            <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
+              <div style={{ fontSize:12, fontWeight:800, color:'#22c55e', marginBottom:6 }}>💡 Рекомендации по улучшению</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                {recs.slice(0, 8).map((rec, i) => (
+                  <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.8)', lineHeight:1.4, display:'flex', gap:6 }}>
+                    <span style={{ color: colorFor(rec.priority), fontWeight:700 }}>{rec.priority === 'high' ? '🔴' : rec.priority === 'medium' ? '🟡' : '🟢'}</span>
+                    <span>{rec.action}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           );
         })()}
@@ -2632,6 +2739,7 @@ export const BbAutoConstructor: React.FC = () => {
                setShowPeakWeek(true);
              }}>🎭 Peak week</button>
              <button style={BTN_GHOST} onClick={handlePrintPlan}>🖨 PDF</button>
+             <button style={BTN_GHOST} onClick={handleExportCSV}>📥 CSV</button>
            </div>
 
           {/* Peak week протокол */}
@@ -2813,7 +2921,7 @@ export const BbAutoConstructor: React.FC = () => {
           title="Библиотека инструментов"
           style={{ padding:'9px 12px', borderRadius:12, fontSize:16, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.8)', minWidth:38, minHeight:38, flexShrink:0 }}
         >⚙️</button>
-        <button onClick={() => setShowMacrocycle(true)} title="Годовое планирование" style={{ padding:'9px 12px', borderRadius:12, fontSize:16, cursor:'pointer', border:'1px solid rgba(0,230,138,0.35)', background:'rgba(0,230,138,0.08)', color:'#00e68a', minWidth:38, minHeight:38, flexShrink:0 }}>🗓</button>
+        <button onClick={() => setStep('annual')} title="Годовое планирование" aria-label="Открыть годовой план" style={{ padding:'9px 12px', borderRadius:12, fontSize:16, cursor:'pointer', border:'1px solid rgba(0,230,138,0.35)', background:'rgba(0,230,138,0.08)', color:'#00e68a', minWidth:44, minHeight:44, flexShrink:0 }}>🗓</button>
       </div>
       {showTools && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding: 8 }} onClick={() => setShowTools(false)}>
@@ -2863,31 +2971,30 @@ export const BbAutoConstructor: React.FC = () => {
           </div>
         </div>
       )}
-      {showMacrocycle && (
-        <div className="bb-annual-planner-backdrop" style={{ position: 'fixed', inset: 0, zIndex: 61, background: 'rgba(0,0,0,0.82)', overflowY: 'auto', overflowX: 'hidden', padding: 12, WebkitOverflowScrolling: 'touch' }} onClick={() => setShowMacrocycle(false)}>
-          <div className="bb-annual-planner-dialog" role="dialog" aria-modal="true" aria-label="Годовой план ББ" onClick={e => e.stopPropagation()} style={{ maxWidth: 760, width: '100%', minHeight: 'calc(100dvh - 24px)', margin: '0 auto', background: 'var(--card-bg, #111318)', border: '1px solid var(--border-light, rgba(255,255,255,0.14))', borderRadius: 16, padding: 12, overflow: 'visible', boxShadow: '0 20px 70px rgba(0,0,0,0.6)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <div style={{ fontWeight: 800, color: '#00e68a' }}>🗓 Годовое планирование ББ</div>
-              <button onClick={() => setShowMacrocycle(false)} style={BTN_GHOST}>Закрыть</button>
+      {step === 'annual' && (
+        <div className="bb-annual-planner-page">
+          <div className="bb-annual-planner-page__header">
+            <div>
+              <div style={H}>🗓 Годовое планирование ББ</div>
+              <div style={SMALL}>Отдельная вкладка годового планировщика. Постройте макроцикл и примените его к BB-auto.</div>
             </div>
-            <MacrocyclePanel level={bbLevel} goal="bodybuilding" onLevelChange={setBbLevel} onGoalChange={() => undefined} onApplyMacrocycle={source => {
-              if (!('trainingFocus' in source)) return;
-              setBbAnnualMacrocycle(source as BBMacrocycle);
-              setPlanMode('generic_split');
-              setBbWeeks(source.totalWeeks);
-              setBbTrainingFocus(source.trainingFocus);
-              setShowMacrocycle(false);
-              setStep('params');
-            }} onApplyCycle={(cycleId, weeks) => {
-              setBbAnnualMacrocycle(null);
-              setPlanMode('bb_cycle');
-              setBbProgramPath('cycle');
-              setSelectedCycleId(cycleId);
-              setBbWeeks(weeks);
-              setShowMacrocycle(false);
-              setStep('params');
-            }} />
+            <button style={BTN_GHOST} onClick={() => setStep('params')}>← К параметрам</button>
           </div>
+          <MacrocyclePanel level={bbLevel} goal="bodybuilding" onLevelChange={setBbLevel} onGoalChange={() => undefined} onApplyMacrocycle={source => {
+            if (!('trainingFocus' in source)) return;
+            setBbAnnualMacrocycle(source as BBMacrocycle);
+            setPlanMode('generic_split');
+            setBbWeeks(source.totalWeeks);
+            setBbTrainingFocus(source.trainingFocus);
+            setStep('params');
+          }} onApplyCycle={(cycleId, weeks) => {
+            setBbAnnualMacrocycle(null);
+            setPlanMode('bb_cycle');
+            setBbProgramPath('cycle');
+            setSelectedCycleId(cycleId);
+            setBbWeeks(weeks);
+            setStep('params');
+          }} />
         </div>
       )}
       {step === 'params' && renderParams()}

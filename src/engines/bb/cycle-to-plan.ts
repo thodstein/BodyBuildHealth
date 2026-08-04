@@ -7,7 +7,7 @@
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec, SRDirection, SRLevel, SRPeriod } from '../../data/lms-cycles/lms-types';
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
 import { getBBVolumeLandmarks } from './bb-builder.engine';
-import { isRearDeltExercise } from './bb-builder.engine';
+import { isRearDeltExercise, isMobilityRestricted } from './bb-builder.engine';
 import { PCT_FOR_RIR } from '../rir-table';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
@@ -383,6 +383,8 @@ export interface CycleToPlanInput {
   proteinPerKg?: number;
   /** Eccentric overload multiplier (1.0=норма, 1.1-1.2=overload). Schoenfeld 2021. */
   eccentricMult?: number;
+  /** PRO: ограничения мобильности — фильтр упражнений по биомеханике. */
+  mobilityRestrictions?: string[];
   /** Lab-based MRV multiplier. */
   labMrvMultiplier?: number;
 }
@@ -886,6 +888,11 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
           const rep = findReplacementForCycle(bbExName, muscleGroupFromExName(bbExName, EXERCISE_CATALOG), favNames, favIdSet, seenNames);
           if (rep) { finalExName = rep.name; }
         }
+        // PRO: mobility restrictions — замена упражнений по биомеханике
+        if (input.mobilityRestrictions && catEntry && isMobilityRestricted(catEntry, input.mobilityRestrictions)) {
+          const rep = findReplacementForCycle(bbExName, muscleGroupFromExName(bbExName, EXERCISE_CATALOG), favNames, favIdSet, seenNames);
+          if (rep) { finalExName = rep.name; }
+        }
         // Проверка: оборудование (если указано) → замена если упражнение требует недоступного оборудования
         if (equipment.length > 0 && catEntry) {
           const rawEq = (catEntry as any).equipment;
@@ -1187,6 +1194,8 @@ export interface ProgramToBBPlanOpts {
   proteinPerKg?: number;
   /** Eccentric overload multiplier (1.0=норма, 1.1-1.2=overload). Schoenfeld 2021. */
   eccentricMult?: number;
+  /** PRO: ограничения мобильности — фильтр упражнений по биомеханике. */
+  mobilityRestrictions?: string[];
   labMrvMultiplier?: number;
 }
 
@@ -1487,6 +1496,11 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
         }
         // avoidAxialLoad filter
         if (avAxial && catEntry && isAxialLoadExercise(catEntry)) {
+          const rep = findReplacementForCycle(ex.name, muscleGroupFromExName(ex.name, EXERCISE_CATALOG), favNames, favIds, new Set(exercises.map(e => e.name)));
+          if (rep) finalExName = rep.name;
+        }
+        // PRO: mobility restrictions filter
+        if (opts.mobilityRestrictions && catEntry && isMobilityRestricted(catEntry, opts.mobilityRestrictions)) {
           const rep = findReplacementForCycle(ex.name, muscleGroupFromExName(ex.name, EXERCISE_CATALOG), favNames, favIds, new Set(exercises.map(e => e.name)));
           if (rep) finalExName = rep.name;
         }
