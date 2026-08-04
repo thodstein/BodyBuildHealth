@@ -2206,10 +2206,15 @@ export const BbAutoConstructor: React.FC = () => {
                           <Chip label="Группа" value={e.muscle} color="rgba(255,255,255,0.55)" />
                         </div>
 
-                        {/* Комментарий */}
-                        <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.5)', lineHeight:1.4, padding:'4px 8px', borderRadius:8, background:'rgba(255,255,255,0.02)' }}>
-                          {comment}
-                        </div>
+                        {/* Комментарий и полная тренерская инструкция */}
+                        <details style={{ marginTop:6 }} open={false}>
+                          <summary style={{ fontSize:11, fontWeight:700, color:'rgba(0,230,138,0.8)', cursor:'pointer', padding:'5px 8px', borderRadius:8, background:'rgba(0,230,138,0.04)' }}>
+                            📖 Полная инструкция: паттерн · техника · прогрессия
+                          </summary>
+                          <div style={{ marginTop:4, fontSize:11, color:'rgba(255,255,255,0.68)', lineHeight:1.5, padding:'7px 9px', borderRadius:8, background:'rgba(255,255,255,0.025)', whiteSpace:'normal' }}>
+                            {comment}
+                          </div>
+                        </details>
                         {technique && (
                           <details style={{ marginTop:4 }}>
                             <summary style={{ fontSize:11, fontWeight:600, color:'rgba(0,230,138,0.75)', cursor:'pointer' }}>💡 Техника выполнения</summary>
