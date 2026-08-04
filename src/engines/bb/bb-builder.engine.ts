@@ -1836,6 +1836,16 @@ function buildSession(
     priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
   });
   exercises.length = 0; exercises.push(..._ordered);
+  // После финальной сортировки обновляем порядок в тренерской инструкции.
+  // Это точнее, чем порядок до orderSessionExercises: методика может переставить
+  // primary/accessory, stretch-biased и priority-muscle упражнения.
+  exercises.forEach((exercise, index) => {
+    if (!exercise.comment) return;
+    const orderText = exercise.role === 'primary'
+      ? (index === 0 ? 'первое основное упражнение дня' : `основное упражнение №${index + 1} в дне`)
+      : `упражнение №${index + 1} в дне, после базовых движений`;
+    exercise.comment = exercise.comment.replace(/Порядок: [^.]+/, `Порядок: ${orderText}`);
+  });
 
   // Кап упражнений в сессии: просто берём первые exCap из уже отсортированного массива.
   // Сортировка выше уже гарантирует: primary → accessory, мышца дня → остальные.
