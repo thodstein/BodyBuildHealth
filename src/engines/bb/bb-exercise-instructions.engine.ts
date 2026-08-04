@@ -69,6 +69,18 @@ function findBio(input: ExerciseInstructionInput): { bio?: ExerciseBio; target?:
   return { bio, target, id: resolvedId };
 }
 
+function catalogInstruction(input: ExerciseInstructionInput, id?: string) {
+  const entry = EXERCISE_CATALOG.find(e => e.id === id || e.name.toLowerCase() === input.exerciseName.toLowerCase());
+  if (!entry) return undefined;
+  return {
+    pattern: PATTERN_RU[entry.movementPattern || ''] || entry.movementPattern || entry.group,
+    cues: entry.technique ? [entry.technique] : [],
+    stretch: entry.stretchPhase ? 'Контролируйте растяжение в нижней точке без потери положения суставов.' : undefined,
+    peak: entry.peakContraction ? 'В конечной точке удерживайте максимальное сокращение 1 сек.' : undefined,
+    mistakes: entry.comments ? [entry.comments] : [],
+  };
+}
+
 function defaultTempo(focus?: ExerciseInstructionInput['trainingFocus']): string {
   return focus === 'strength' ? '2-0-1-0' : focus === 'endurance' ? '2-0-2-0' : '3-1-1-1';
 }
@@ -83,8 +95,9 @@ function orderLabel(input: ExerciseInstructionInput): string {
 /** Returns detailed instructions suitable for BBPlan.comment and exports. */
 export function buildExerciseInstructions(input: ExerciseInstructionInput): ExerciseInstructionProfile {
   const { bio, target, id } = findBio(input);
-  const pattern = PATTERN_RU[bio?.pattern || ''] || bio?.pattern || input.muscle || 'силовой паттерн';
-  const cues = [...(bio?.techniqueCues || []), ...(target?.techniqueCues || [])].filter((cue, i, all) => all.indexOf(cue) === i).slice(0, 5);
+  const catalog = catalogInstruction(input, id);
+  const pattern = PATTERN_RU[bio?.pattern || ''] || PATTERN_RU[catalog?.pattern || ''] || bio?.pattern || catalog?.pattern || input.muscle || 'силовой паттерн';
+  const cues = [...(bio?.techniqueCues || []), ...(target?.techniqueCues || []), ...(catalog?.cues || [])].filter((cue, i, all) => all.indexOf(cue) === i).slice(0, 5);
   const tempo = input.tempo || target?.tempoRecommendation || defaultTempo(input.trainingFocus);
   const order = orderLabel(input);
   const progression = input.trainingFocus === 'strength'
@@ -94,16 +107,16 @@ export function buildExerciseInstructions(input: ExerciseInstructionInput): Exer
   return {
     pattern,
     cues,
-    stretch: target?.stretchKey,
-    peak: target?.peakKey,
+    stretch: target?.stretchKey || catalog?.stretch,
+    peak: target?.peakKey || catalog?.peak,
     mmc: target?.mmc,
     tempo,
     restSeconds: input.restSeconds,
     order,
     progression,
-    mistakes: target?.commonMistakes || [],
+    mistakes: [...(target?.commonMistakes || []), ...(catalog?.mistakes || [])].slice(0, 4),
     intensityTechnique: input.intensityTechnique,
-    source,
+    source: bio || target ? 'exercise-lab' : catalog ? 'catalog' : source,
   };
 }
 
