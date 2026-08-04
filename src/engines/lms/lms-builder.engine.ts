@@ -20,6 +20,7 @@ import { computeVolumeLandmarks, getVolumeLandmarks, getAllVolumeLandmarks } fro
 import { adaptForPEDs, type PED } from '../bb/bb-ped-adaptation.engine';
 import { trueMuscleOf } from '../movement-pattern';
 import { norm } from '../norm';
+import { resolveCatalogId } from '../../data/lms-cycles/exercise-alias-map';
 
 export interface LMSBuildInput {
   template: SRCycleTemplate;
@@ -230,8 +231,16 @@ function rirLevelKey(level: string): keyof typeof RIR_MATRIX['strength'] {
   }
 }
 
-/** Найти упражнение в каталоге по метке коррекции (метка может быть более специфичной, чем имя в каталоге). */
+/** Найти упражнение в каталоге по метке коррекции (метка может быть более специфичной, чем имя в каталоге).
+ *  P0-fix: сначала проверяем EXERCISE_ALIAS_MAP для точного маппинга шаблонных имён → catalog ID.
+ */
 function findCatalogExerciseByLabel(label: string): Exercise | null {
+  // P0-1: точный маппинг из alias map (шаблонные имена → catalog ID)
+  const aliasId = resolveCatalogId(label);
+  if (aliasId) {
+    const byId = EXERCISE_CATALOG.find(e => e.id === aliasId);
+    if (byId) return byId;
+  }
   const n = norm(label);
   let ex = EXERCISE_CATALOG.find(e => norm(e.name) === n);
   if (ex) return ex;
@@ -264,6 +273,12 @@ function findCatalogExerciseByLabel(label: string): Exercise | null {
  *  P0-fix: trueMuscleOf как канон — catalog .group содержит ошибки (close-grip=chest,
  *  face_pull=back, deadlift=back). Без trueMuscleOf MRV-подсчёт уходит не туда. */
 function groupOfExercise(name: string, fallback: string): string {
+  // P0-1: сначала проверяем alias map для catalog lookup
+  const aliasId = resolveCatalogId(name);
+  if (aliasId) {
+    const byId = EXERCISE_CATALOG.find(e => e.id === aliasId);
+    if (byId) return trueMuscleOf(byId) ?? (byId.group as string) ?? fallback;
+  }
   const ex = EXERCISE_CATALOG.find(e => norm(e.name) === norm(name));
   if (ex) return trueMuscleOf(ex) ?? (ex.group as string) ?? fallback;
   // fuzzy match
@@ -290,10 +305,14 @@ function fatigueBudget(readiness?: number): number {
 
 /** Apply the same session fatigue budget to exercises injected after base generation. */
 function enforceInjectedFatigueBudget(days: LMSPlanDay[], baseExerciseCounts: number[], readiness?: number): void {
-  const budget = fatigueBudget(readiness);
-  for (const [dayIndex, day] of days.entries()) {
-    const fatigueCost = (exercise: LMSPlanExercise): number =>
-      EXERCISE_CATALOG.find(candidate => candidate.name === exercise.name)?.fatigueCost ?? 5;
+    const budget = fatigueBudget(readiness);
+    for (const [dayIndex, day] of days.entries()) {
+    const fatigueCost = (exercise: LMSPlanExercise): number => {
+      const aliasId = resolveCatalogId(exercise.name);
+      return (aliasId
+        ? EXERCISE_CATALOG.find(candidate => candidate.id === aliasId)
+        : EXERCISE_CATALOG.find(candidate => candidate.name === exercise.name))?.fatigueCost ?? 5;
+    };
     const sessionCost = () => day.exercises.reduce((total, exercise) =>
       total + fatigueCost(exercise) * exercise.workSets.reduce((sets, workSet) => sets + workSet.sets, 0), 0);
 
@@ -623,9 +642,11 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           sets = Math.max(isMain ? 1 : 2, sets);
 
           // ACWR-авто-делод: корректируем объём (все упражнения) и RIR
-          sets = Math.max(1, Math.round(sets * acwrVolMod));
+          // P1-1: floor=2 для аксессуаров (иначе dangerous ACWR может сократить до 1 сета - < MEV)
+          sets = Math.max(isMain ? 1 : 2, Math.round(sets * acwrVolMod));
           // Авторегуляция: объём (все) — применяется поверх ACWR
-          sets = Math.max(1, Math.round(sets * arVolMult));
+          // Keep the accessory MEV floor after every volume multiplier, not only after ACWR.
+          sets = Math.max(isMain ? 1 : 2, Math.round(sets * arVolMult));
 
           // Расчётный вес с авторегуляцией (topSetPctMultiplier)
           const baseWeight = workWeight(pm, s.pct);
@@ -643,7 +664,10 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
         // Проверка S-MRV: срезаем аксессуары, чтобы влезть в бюджет утомления
         let totalWorkSets = workSets.reduce((sum, ws) => sum + ws.sets, 0);
-        const fatigueCost = EXERCISE_CATALOG.find(e => e.name === spec.name)?.fatigueCost || 5;
+        const aliasId = resolveCatalogId(spec.name);
+        const fatigueCost = (aliasId
+          ? EXERCISE_CATALOG.find(e => e.id === aliasId)
+          : EXERCISE_CATALOG.find(e => e.name === spec.name))?.fatigueCost ?? 5;
         const exCost = fatigueCost * totalWorkSets;
         if (dayFatigueBudget < exCost && !isMain) {
           const fit = Math.max(2, Math.floor(Math.max(0, dayFatigueBudget) / fatigueCost));
@@ -727,8 +751,12 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           const dayIdx = targetDays[ti] - 1;
           if (dayIdx < 0 || dayIdx >= days.length) continue;
           const targetDay = days[dayIdx];
+          // P1-2: large weak groups (chest, back, quads, hamstrings) also get heavy protocol
+          const isWeakLarge = ['chest', 'back', 'quads', 'hamstrings', 'shoulders'].includes(wg);
           // Протокол дня: 1-й = тяжёлый добив (3×8 RIR 2), 2-й = памп-добив (3×12 RIR 3)
-          const isHeavyDay = ti === 0 && isSmall && targetDays.length > 1;
+          // P1-2: расширено для large weak groups (chest, back, quads, hamstrings)
+          // чтобы слабые крупные группы не получали только pump-протокол
+          const isHeavyDay = ti === 0 && (isSmall || isWeakLarge) && targetDays.length > 1;
           // Выбрать упражнение: тяж-день → compound/isolation если есть; памп-день → изоляция
           const poolFiltered = candidates.filter(ex => !targetDay.exercises.some(e => norm(e.name) === norm(ex.name)));
           if (poolFiltered.length === 0) continue;

@@ -482,7 +482,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                           : (c.cycleId ? [c.cycleId] : []);
                         setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, cycleIds: [...current, ''] } : cc));
                       }}
-                      style={{ ...BTN_GHOST, padding: '2px 6px', fontSize: 9, minHeight: 22, lineHeight: 1 }}
+                       style={{ ...BTN_GHOST, padding: '2px 6px', fontSize: 9, minHeight: 44, lineHeight: 1 }}
                       title="Добавить ещё один цикл на пик"
                     >+ Цикл</button>
                   </div>
@@ -500,7 +500,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                         <div key={k} style={{ display: 'flex', gap: 4, marginBottom: 3, alignItems: 'center' }}>
                           <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', minWidth: 14, textAlign: 'center' }}>{k + 1}.</span>
                           <select
-                            style={{ ...IN, padding: '3px 6px', fontSize: 9, minHeight: 26, flex: 1 }}
+                             style={{ ...IN, padding: '3px 6px', fontSize: 9, minHeight: 44, flex: 1 }}
                             value={cid}
                             onChange={e => {
                               const val = e.target.value;
@@ -538,7 +538,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                                   return { ...cc, cycleIds: cleaned.length > 0 ? cleaned : undefined, cycleId: cleaned[0] };
                                 }));
                               }}
-                              style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: 2, minHeight: 22, lineHeight: 1 }}
+                               style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: 2, minHeight: 44, minWidth: 44, lineHeight: 1 }}
                               title="Удалить цикл"
                             >✕</button>
                           )}

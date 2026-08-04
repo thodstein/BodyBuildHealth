@@ -124,10 +124,9 @@ function planPhase(week: LMSBuildOutput['weeks'][number], totalWeeks: number) {
 
 /**
  * Рассчитать обратную связь ПЛ-плана с дневником.
- * @param plan — собранный LMS-план (берём последнюю неделю).
- * @param sessions — выполненные сессии (localStorage/дневник).
- * @param fallbackPm — fallback PM для оценки (если нет в дневнике).
- * @param strategy — стратегия прогрессии (по умолчанию double_progression).
+ * P0-2-fix: previously only the LAST week was evaluated. If the user completed week 4 of 8,
+ * planned values from week 8 were matched against diary data from weeks 1-7, producing
+ * incorrect feedback. Now: iterate the last 4 weeks (or all if <4) and match facts per-week.
  */
 export function computePLPlanFeedback(
   plan: LMSBuildOutput,
@@ -138,14 +137,15 @@ export function computePLPlanFeedback(
   if (!Number.isFinite(fallbackPm) || fallbackPm <= 0) {
     throw new Error('computePLPlanFeedback: fallbackPm must be > 0');
   }
-  const lastWeek = plan.weeks[plan.weeks.length - 1];
-  if (!lastWeek) return [];
   const idx = buildLastResultIndex(sessions);
-  const out: PLExerciseFeedback[] = [];
-  const weekNum = lastWeek.week;
+  const feedbackByExercise = new Map<string, PLExerciseFeedback>();
   const totalWeeks = plan.weeks.length;
 
-  for (const day of lastWeek.days) {
+  // P0-2: evaluate last 4 weeks instead of only the final week
+  const evalWeeks = plan.weeks.slice(-Math.min(4, totalWeeks));
+  for (const week of evalWeeks) {
+    const weekNum = week.week;
+    for (const day of week.days) {
     for (const ex of day.exercises) {
       const key = normName(ex.name);
       // fuzzy match: ищем по точному ключу, иначе по токенам + includes
@@ -175,9 +175,11 @@ export function computePLPlanFeedback(
         if (candidates.length === 1) last = candidates[0][1];
       }
 
-      const plannedWeight = ex.workSets[0]?.weight ?? 0;
-      const plannedReps = ex.workSets[0]?.reps ?? 5;
-      const plannedRir = ex.workSets[0]?.rir ?? 2;
+      // P1-7: select the workSet with highest pct/weight (not [0] which may be warmup)
+      const mainWorkSet = ex.workSets.reduce((best, ws) => (ws.weight ?? 0) > (best.weight ?? 0) ? ws : best, ex.workSets[0] ?? {} as LMSPlanExercise['workSets'][number]);
+      const plannedWeight = mainWorkSet?.weight ?? 0;
+      const plannedReps = mainWorkSet?.reps ?? 5;
+      const plannedRir = mainWorkSet?.rir ?? 2;
       const maxWeight = Number.isFinite(ex.pm) && ex.pm > 0 ? ex.pm : fallbackPm;
 
       let rirDelta: number | null = null;
@@ -185,8 +187,8 @@ export function computePLPlanFeedback(
 
       if (last) {
         rirDelta = last.actualRir - plannedRir;
-        // prescribeLoad с plannedRir — success-aware коррекция
-        const phase = planPhase(lastWeek, totalWeeks);
+        // prescribeLoad с plannedRir - success-aware коррекция
+        const phase = planPhase(week, totalWeeks);
         const presc = prescribeLoad(
           strategy,
           last.topWeight,
@@ -202,13 +204,13 @@ export function computePLPlanFeedback(
         );
         recommendation = { nextWeight: presc.nextWeight, nextReps: presc.nextReps, nextRir: presc.nextRIR, label: presc.label, source: 'fact' };
       } else {
-        // нет данных — рекомендация по плану
-        const phase = planPhase(lastWeek, totalWeeks);
+        // нет данных - рекомендация по плану
+        const phase = planPhase(week, totalWeeks);
         const presc = prescribeLoad(strategy, plannedWeight, plannedReps, plannedRir, maxWeight, weekNum, totalWeeks, phase, 'compound', 'primary');
         recommendation = { nextWeight: presc.nextWeight, nextReps: presc.nextReps, nextRir: presc.nextRIR, label: presc.label, source: 'plan' };
       }
 
-      out.push({
+      const feedback: PLExerciseFeedback = {
         planKey: `${ex.name}|${ex.group}`,
         planExerciseName: ex.name,
         group: ex.group,
@@ -219,10 +221,14 @@ export function computePLPlanFeedback(
         last,
         recommendation,
         rirDelta,
-      });
+      };
+      // Keep one current record per exercise for API/UI compatibility. Since weeks
+      // are processed chronologically, the latest evaluated week wins.
+      feedbackByExercise.set(feedback.planKey, feedback);
+    }
     }
   }
-  return out;
+  return [...feedbackByExercise.values()];
 }
 
 /** Сводка: сколько упражнений с фактом vs без данных. */

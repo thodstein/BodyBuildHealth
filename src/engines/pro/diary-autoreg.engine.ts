@@ -169,15 +169,16 @@ export function buildDiaryAutoreg(input: DiaryAutoregInput): DiaryAutoregResult 
       : (fact.e1RM > 0 && fact.lastSet.weight > 0
         ? rpeFromLoad(fact.e1RM, fact.lastSet.weight, fact.lastSet.reps)
         : null);
-    // P1-fix: when e1RM=0 (bodyweight-only or zero-data entry), rpeFromLoad returns 5 (fallback),
-    // which creates delta=-3 and triggers a weight INCREASE. Instead, treat as no-data → fallback.
-    if (factRPE == null) {
+    // P0-3-fix: when e1RM=0 (bodyweight-only or zero-data entry) OR rpeFromLoad returns 5 (fallback
+    // because e1RM=0), treat as no-data to avoid weight being set to 0 or weight increase from
+    // an artificial delta of -3. Also guard fact.e1RM <= 0 directly.
+    if (factRPE == null || fact.e1RM <= 0 || fact.lastSet.weight <= 0) {
       noData++;
       perExercise.set(planned.name, {
         adjustedWeight: planned.plannedWeight,
         adjustedSets: planned.plannedSets,
         adjustedRir: planned.plannedRir,
-        note: 'нет валидных данных (e1RM=0 или вес=0)',
+        note: 'нет валидных данных (e1RM=0, вес=0 или RPE не указано)',
         source: 'fallback',
       });
       continue;

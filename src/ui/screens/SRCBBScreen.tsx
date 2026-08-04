@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, selectBestCycle, explainSelection, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
-import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, type LMSBuildOutput } from '../../engines/lms/lms-builder.engine';
+import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
 import { mesocyclePhaseForWeek } from '../../engines/rir-matrix.engine';
 import { autoRegulate, shouldTrainToday, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
@@ -23,7 +23,6 @@ import { RecoveryPanel } from './SRCBBScreen_parts/RecoveryPanel';
 import { ExerciseSafetyPanel } from './SRCBBScreen_parts/ExerciseSafetyPanel';
 import { TrainingMetricsChart, type LMSWeekMetric, type BBMuscleMetric } from './SRCBBScreen_parts/TrainingMetricsChart';
 import { ExerciseDemoPanel } from './SRCBBScreen_parts/ExerciseDemoPanel';
-import { ProgramsTab } from './TrainingScreen_parts/ProgramsTab';
 import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { useDataLink } from '../../core/data-link';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
@@ -76,6 +75,19 @@ const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border:
 const IN: React.CSSProperties = { ...SEL, padding: '10px' };
 const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, margin: '6px 0 3px' };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 };
+
+function getRecoveryMetrics(linked: any): Pick<LMSBuildInput, 'bodyFat' | 'leanMass' | 'hrvMs' | 'sleepHours' | 'stressLevel'> {
+  const settings = linked.profile?.settings as Record<string, any> | undefined;
+  const weight = settings?.personal?.weight;
+  const bodyFat = settings?.personal?.bodyFat;
+  return {
+    bodyFat,
+    leanMass: weight && bodyFat != null ? Math.round(weight * (1 - bodyFat / 100)) : undefined,
+    hrvMs: settings?.lifestyle?.morningHRV,
+    sleepHours: settings?.lifestyle?.sleepHours,
+    stressLevel: settings?.lifestyle?.stressLevel,
+  };
+}
 
 export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
@@ -248,6 +260,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!pmMap['Присед']) pmMap['Присед'] = pmSquat;
     if (!pmMap['Жим лежа']) pmMap['Жим лежа'] = pmBench;
     if (!pmMap['Становая тяга']) pmMap['Становая тяга'] = pmDead;
+    const rec = getRecoveryMetrics(linked);
     const plan = buildLMSPlan({
       template: tpl, pmMap, fallbackPm: 80, mode: peds.length ? 'on_course' : 'natural', courseIntensity, weeksOverride: weeks,
       volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
@@ -262,20 +275,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       pedDoses,
       acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
       autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
-      // P0-fix: recovery metrics wired from canonical profile paths (matching BbAutoConstructor).
-      // Previously: bodyFatPct (non-existent root field) → undefined; hrvMs (wrong settings path);
-      // sleepHours (lossy /10 of composite score); stressLevel (0-100 scale, wrong source).
-      // Now: same 5 canonical paths as BbAutoConstructor.tsx:518-522.
-      bodyFat: (linked.profile?.settings as Record<string, any> | undefined)?.personal?.bodyFat,
-      leanMass: (() => {
-        const prof = (linked.profile?.settings as Record<string, any> | undefined);
-        const w = prof?.personal?.weight;
-        const bf = prof?.personal?.bodyFat;
-        return (w && bf != null) ? Math.round(w * (1 - bf / 100)) : undefined;
-      })(),
-      hrvMs: (linked.profile?.settings as Record<string, any> | undefined)?.lifestyle?.morningHRV,
-      sleepHours: (linked.profile?.settings as Record<string, any> | undefined)?.lifestyle?.sleepHours,
-      stressLevel: (linked.profile?.settings as Record<string, any> | undefined)?.lifestyle?.stressLevel,
+      ...rec,
     });
     setBuiltSrc(plan); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setSrcAdditions({}); setPickerDay(null);
     // TRAINING INTEGRATION: конвертировать PL план в сессии
@@ -287,6 +287,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (unsupported) {
       throw new Error(`Фаза «${unsupported.phase}» не содержит доступного СРЦ-цикла для PL-плана`);
     }
+    const rec = getRecoveryMetrics(linked);
     const outputs = macro.blocks
       .map(block => {
         const cycle = getCycleById(block.cycleId!);
@@ -310,18 +311,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           pedDoses,
           acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
           autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
-          // P0-fix: macrocycle path previously passed ZERO recovery metrics,
-          // disabling the entire recovery multiplier (Helms/Plews/Watson) for year-round plans.
-          bodyFat: (linked.profile?.settings as Record<string, any> | undefined)?.personal?.bodyFat,
-          leanMass: (() => {
-            const prof = (linked.profile?.settings as Record<string, any> | undefined);
-            const w = prof?.personal?.weight;
-            const bf = prof?.personal?.bodyFat;
-            return (w && bf != null) ? Math.round(w * (1 - bf / 100)) : undefined;
-          })(),
-          hrvMs: (linked.profile?.settings as Record<string, any> | undefined)?.lifestyle?.morningHRV,
-          sleepHours: (linked.profile?.settings as Record<string, any> | undefined)?.lifestyle?.sleepHours,
-          stressLevel: (linked.profile?.settings as Record<string, any> | undefined)?.lifestyle?.stressLevel,
+          ...rec,
         });
         const blockWeeks = Array.from({ length: block.weeks }, (_, index) => {
           const source = output.weeks[index % output.weeks.length];
@@ -443,7 +433,6 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   useEffect(() => { try { localStorage.setItem('he_bb_session', JSON.stringify({ bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel, bbWorkMax, bbTrainingFocus })); } catch { /* ignore */ } }, [bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel, bbTrainingFocus]);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax }); } catch { /* ignore */ } }, [bbWorkMax]);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), onCourse: peds.length > 0 }); } catch {} }, [peds]);
-  const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
   const [appliedMethods, setAppliedMethods] = useState<Record<string, string>>({});
   const [methodNote, setMethodNote] = useState<string | null>(null);
   const linked = useDataLink();
@@ -837,6 +826,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           <button onClick={() => { clearPlannerApply(); setApplyPayload(null); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: 10, cursor: 'pointer' }}>✕</button>
         </div>
       )}
+      {methodNote && (
+        <div role="alert" aria-live="polite" style={{ ...CARD, borderColor: 'rgba(0,230,138,0.3)', background: 'var(--accent-dim)', color: 'var(--accent)', fontSize: 11 }}>
+          {methodNote}
+        </div>
+      )}
       {/* sub-view pill nav for PL/BB */}
       {mainTab !== 'manual' && subViewList[mainTab].length > 0 && (
         <div style={{ display: 'flex', gap: 4, marginBottom: 10, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4, scrollbarWidth: 'none' }}>
@@ -856,7 +850,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             <PopupNumber label="Дней в неделю" value={days} min={2} max={7} suffix="" onChange={v => setDays(v)} />
             <PopupNumber label="Вес тела" value={bw} min={40} max={200} suffix=" кг" onChange={v => setBw(v)} />
           </div>
-          {best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { setSelectedCycleId(best.cycle.meta.id); buildSrc(best.cycle.meta.id); }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,var(--accent),#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
+           {best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { try { setSelectedCycleId(best.cycle.meta.id); buildSrc(best.cycle.meta.id); } catch (error) { setMethodNote(`⚠ План не собран: ${(error as Error).message}`); } }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,var(--accent),#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
           <div style={H}>📂 Каталог силовых циклов ({plCycles.length})</div>
           <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={plCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${({ powerlifting: 'Троеборье', bench: 'Жим лёжа', deadlift_bench: 'Тяга+Жим', armwrestling: 'Армрестлинг' } as Record<string,string>)[c.meta.direction] || c.meta.direction} · ${c.meta.period} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
           {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
@@ -1917,7 +1911,10 @@ legs: [
             const macro = deserializeMacro(rawPl);
             if (!macro) { setSubView('plan'); return; }
             applyBBMacrocycle(macro);
-          } catch { /* ignore */ }
+           } catch (error) {
+             setMethodNote(`⚠ Макроцикл ББ не применён: ${(error as Error).message}`);
+             setSubView('plan');
+           }
         } else {
           // ПЛ-авто: загрузить выбранный СРЦ-цикл
            setSelectedCycleId(cycleId);
@@ -1933,9 +1930,7 @@ legs: [
       {subView === 'recovery' && (<><RecoveryPanel /><div style={{ marginTop: 10 }}><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', margin: '10px 0 6px' }}>🧮 Training Score Engine</div><TrainingScoreCard workoutsPerWeek={mainTab === 'pl' ? days : bbDays} avgMinutes={75} intensity={autoRegResult.deload ? 'low' : 'moderate'} goal={mainTab === 'pl' ? 'strength' : 'hypertrophy'} experience={(mainTab === 'pl' ? (level === 'novice' ? 'beginner' : level === 'intermediate' ? 'intermediate' : 'advanced') : (bbLevel === 'beginner' ? 'beginner' : bbLevel === 'intermediate' ? 'intermediate' : 'advanced')) as 'beginner' | 'intermediate' | 'advanced'} sleepHours={(linked.readiness?.sleep ?? 7) as number} stressLevel={Math.round((linked.readiness?.stress ?? 3) as number)} jointPain={[]} deloadWeeksAgo={autoRegResult.deload ? 0 : 99} weight={mainTab === 'pl' ? bw : 80} age={30} sex={'male'} /></div><ReadinessForecastCard /></>)}
       {subView === 'safety' && <ExerciseSafetyPanel />}
       {subView === 'demo' && <ExerciseDemoPanel />}
-      {subView === 'programs' && <ProgramsTab selectedProgram={selectedProgram} setSelectedProgram={setSelectedProgram} onAddToMyTraining={() => {}} />}
       {subView === 'methods' && (<>
-        {methodNote && <div style={{ ...CARD, borderColor:'rgba(0,230,138,0.3)', background:'var(--accent-dim)', color:'var(--accent)', fontSize:11 }}>{methodNote}</div>}
         <MethodsTab linked={linked} trainingOutput={null} diaryStats={[] as any} historyWorkouts={[] as any} goal={mainTab === 'pl' ? goal : bbGoal} level={mainTab === 'pl' ? level : bbLevel} daysPerWeek={mainTab === 'pl' ? days : bbDays} recovery={linked.readiness?.recovery ?? 80} fatigue={linked.readiness?.fatigue ?? 30} appliedMethods={appliedMethods} onToggleMethod={(name, cat) => setAppliedMethods(prev => { const n = { ...prev }; if (n[cat] === name) delete n[cat]; else n[cat] = name; return n; })} onApplyComposition={() => { const keys = Object.keys(appliedMethods); if (keys.length > 0) { const h = deriveHints(appliedMethods); setMethodHints(h); setMethodNote(`✓ Применена методология: ${h.label}${h.volumeMult !== 1 ? ' · объём×' + h.volumeMult : ''}${h.technique ? ' · техн: ' + h.technique : ''}`); } else { setMethodHints({ volumeMult: 1, technique: null, label: '' }); setMethodNote('Выберите методики (по одной из категории)'); } }} />
       </>)}
       {subView === 'analytics' && (<><AnalyticsTab sessions={historyWorkouts} /><VisualTab sessions={historyWorkouts} /></>)}
