@@ -691,7 +691,7 @@ export const BbAutoConstructor: React.FC = () => {
         label: 'Нед' + w.week + ' Д' + (si+1),
         exercises: s.exercises.map(e => {
            const targetSets = (e.workSets || []).map(ws => ({ weight: ws.weight || 0, reps: ws.reps || 0, rir: ws.rir ?? e.rir ?? 2 }));
-           return { name: e.name, muscleGroup: e.muscle, targetSets, restSec: e.restSeconds || 90 };
+           return { name: e.name, muscleGroup: e.muscle, notes: e.comment || e.rationale || '', targetSets, restSec: e.restSeconds || 90 };
         }),
       })));
       localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: plan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
@@ -935,7 +935,7 @@ export const BbAutoConstructor: React.FC = () => {
             reps: ws.reps || 0,
             rir: ws.rir ?? e.rir ?? 2,
           }));
-          return { name: e.name, muscleGroup: e.muscle, targetSets, restSec: e.restSeconds || 90 };
+          return { name: e.name, muscleGroup: e.muscle, notes: e.comment || e.rationale || '', targetSets, restSec: e.restSeconds || 90 };
         }),
       })));
        localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: executionPlan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));

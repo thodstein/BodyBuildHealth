@@ -34,6 +34,20 @@ function hasPEDRationale(plan: BBPlan): boolean {
  * convertCycleToBBPlan — PED integration
  * ═══════════════════════════════════════════════════════════════════ */
 describe('convertCycleToBBPlan: PED integration', () => {
+  it('adapt cycle path injects Exercise Lab instructions into comments', () => {
+    const plan = convertCycleToBBPlan({
+      cycle: CYCLE_01,
+      workMax: WM,
+      level: 'intermediate',
+      equipment: EQ,
+      mode: 'adapt',
+      trainingFocus: 'hypertrophy',
+    } as any);
+    const comments = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises)
+      .map(e => e.comment || '');
+    expect(comments.some(c => c.includes('Паттерн:'))).toBe(true);
+    expect(comments.some(c => c.includes('Техника:'))).toBe(true);
+  });
   it('adapt + AAS 500 → PED rationale присутствует', () => {
     const plan = convertCycleToBBPlan({
       cycle: CYCLE_01,
@@ -158,6 +172,17 @@ describe('programToBBPlan: PED integration', () => {
         courseIntensity: 'moderate', mode: 'adapt',
       } as any);
       expect(hasPEDRationale(plan)).toBe(true);
+    });
+
+    it('adapt program path injects Exercise Lab instructions into comments', () => {
+      const plan = programToBBPlan(prog, {
+        workMax: WM, weakPoints: [], injuries: [], level: 'intermediate',
+        equipment: EQ, mode: 'adapt', trainingFocus: 'hypertrophy',
+      } as any);
+      const comments = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises)
+        .map(e => e.comment || '');
+      expect(comments.some(c => c.includes('Паттерн:'))).toBe(true);
+      expect(comments.some(c => c.includes('Порядок:'))).toBe(true);
     });
 
     it('adapt + AAS 1000 → больше объём чем без PED', () => {
