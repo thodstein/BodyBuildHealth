@@ -31,28 +31,28 @@ export const PED_EFFECTS: Record<PED, PEDEffect> = {
     ped: 'AAS',
     mrvMultiplier: 1.35, recoveryMultiplier: 1.35,
     periWorkoutCarbs: 'moderate',
-    notes: 'ААС (500 мг тест/нед): синтез белка ×2-3, восстановление ↑↑, MRV +35% (Israetel enhanced). Каждые +250 мг ≈ +5% к MRV.',
+    notes: 'ААС (500 мг тест/нед): синтез белка ×2-3, восстановление ↑↑. Базовый MRV ×1.35 (Israetel enhanced). С diminishing 0.85 → эффективный ×1.30 в соло. Каждые +250 мг ≈ +5% к MRV.',
   },
   insulin: {
     ped: 'insulin',
     mrvMultiplier: 1.28, recoveryMultiplier: 1.25,
     periWorkoutCarbs: 'high',
-    notes: 'Инсулин: суперкомпенсация гликогена, шунт нутриентов в клетку, +28% работоспособности. Требует высоких углеводов вокруг тренировки.',
+    notes: 'Инсулин: суперкомпенсация гликогена, шунт нутриентов в клетку. Базовый MRV ×1.28 (с diminishing → эффективный ×1.24 в соло). Требует высоких углеводов вокруг тренировки.',
   },
   MGF: {
     ped: 'MGF',
     mrvMultiplier: 1.10, recoveryMultiplier: 1.12,
-    notes: 'MGF (PEG-MGF): локальная активация сателлитных клеток, +10% локального объёма. Эффект ограничен тренируемыми мышцами.',
+    notes: 'MGF (PEG-MGF): локальная активация сателлитных клеток. Базовый MRV ×1.10 (с diminishing → ×1.085 в соло). Эффект ограничен тренируемыми мышцами.',
   },
   IGF1: {
     ped: 'IGF1',
     mrvMultiplier: 1.18, recoveryMultiplier: 1.18,
-    notes: 'IGF-1 LR3: системный анаболизм, гиперплазия, +18% MRV.',
+    notes: 'IGF-1 LR3: системный анаболизм, гиперплазия. Базовый MRV ×1.18 (с diminishing → ×1.153 в соло).',
   },
   GH: {
     ped: 'GH',
     mrvMultiplier: 1.22, recoveryMultiplier: 1.25,
-    notes: 'ГР (4 МЕ/день): ремонт соединительной ткани, липолиз, +22% MRV. Синергия с инсулином (IGF-1↑).',
+    notes: 'ГР (4 МЕ/день): ремонт соединительной ткани, липолиз. Базовый MRV ×1.22 (с diminishing → ×1.187 в соло). Синергия с инсулином (IGF-1↑).',
   },
 };
 

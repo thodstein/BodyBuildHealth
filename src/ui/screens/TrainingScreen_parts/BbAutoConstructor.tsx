@@ -194,6 +194,14 @@ export const BbAutoConstructor: React.FC = () => {
   const [intensityTech, setIntensityTech] = useState<IntensityTechnique>('none');
   const [bbMethodology, setBbMethodology] = useState<SessionMethodology>('compound_first');
 
+  // P-ext: calorieSurplus (ккал/день) и eccentricMult (1.0=норма, 1.1-1.2=eccentric overload).
+  // calorieSurplus: из профиля nutrition (если есть) или manual input. Нет в профиле → 0 (нейтрально).
+  // eccentricMult: тренировочный параметр, не профильный → default 1.0.
+  const [calorieSurplus, setCalorieSurplus] = useState<number>(
+    (linked?.profile?.settings?.nutrition as any)?.calorieSurplus ?? 0,
+  );
+  const [eccentricMult, setEccentricMult] = useState<number>(1.0);
+
   const [peds, setPeds] = useState<PED[]>((prof.bbPeds?.length ? prof.bbPeds : (prof.onCourse ? ['AAS'] : [])) as PED[]);
   const [pedDoses, setPedDoses] = useState<Record<string, number>>({ AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
   const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(prof.courseIntensity || 'moderate');
@@ -515,14 +523,17 @@ export const BbAutoConstructor: React.FC = () => {
            mode: bbAdaptMode,
            methodology: bbMethodology,
            trainingFocus: bbTrainingFocus,
-           sex: linked.profile?.settings?.personal?.sex,
-           bodyFat: linked.profile.settings.personal.bodyFat,
-           leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
-           hrvMs: linked.profile.settings.lifestyle.morningHRV,
-           sleepHours: linked.profile.settings.lifestyle.sleepHours,
-           stressLevel: linked.profile.settings.lifestyle.stressLevel,
-          labMrvMultiplier: labAdjust.mrvMultiplier,
-         });
+            sex: linked.profile?.settings?.personal?.sex,
+            bodyFat: linked.profile.settings.personal.bodyFat,
+            leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
+            hrvMs: linked.profile.settings.lifestyle.morningHRV,
+            sleepHours: linked.profile.settings.lifestyle.sleepHours,
+            stressLevel: linked.profile.settings.lifestyle.stressLevel,
+           proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
+           calorieSurplus,
+           eccentricMult,
+           labMrvMultiplier: labAdjust.mrvMultiplier,
+          });
         if (bbDays !== customProgram.daysPerWeek) setBbDays(customProgram.daysPerWeek);
         if (bbWeeks !== customProgram.durationWeeks) setBbWeeks(customProgram.durationWeeks);
       } else if (selectedCycleId || customCycle) {
@@ -553,14 +564,17 @@ export const BbAutoConstructor: React.FC = () => {
            mode: bbAdaptMode,
            methodology: bbMethodology,
            trainingFocus: bbTrainingFocus,
-           sex: linked.profile?.settings?.personal?.sex,
-            bodyFat: linked.profile.settings.personal.bodyFat,
-            leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
-            hrvMs: linked.profile.settings.lifestyle.morningHRV,
-            sleepHours: linked.profile.settings.lifestyle.sleepHours,
-            stressLevel: linked.profile.settings.lifestyle.stressLevel,
-           labMrvMultiplier: labAdjust.mrvMultiplier,
-       });
+            sex: linked.profile?.settings?.personal?.sex,
+             bodyFat: linked.profile.settings.personal.bodyFat,
+             leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
+             hrvMs: linked.profile.settings.lifestyle.morningHRV,
+             sleepHours: linked.profile.settings.lifestyle.sleepHours,
+             stressLevel: linked.profile.settings.lifestyle.stressLevel,
+            proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
+            calorieSurplus,
+            eccentricMult,
+            labMrvMultiplier: labAdjust.mrvMultiplier,
+        });
         const cycleWeeks = cycle.meta.sessionsPerWeek;
         if (bbDays !== cycleWeeks) setBbDays(cycleWeeks);
         if (bbWeeks !== cycle.meta.weeks) setBbWeeks(cycle.meta.weeks);
@@ -599,6 +613,9 @@ export const BbAutoConstructor: React.FC = () => {
          hrvMs: linked.profile.settings.lifestyle.morningHRV,
          sleepHours: linked.profile.settings.lifestyle.sleepHours,
          stressLevel: linked.profile.settings.lifestyle.stressLevel,
+         proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
+         calorieSurplus,
+         eccentricMult,
        }, pedAdapt);
     }
 
@@ -1171,11 +1188,18 @@ export const BbAutoConstructor: React.FC = () => {
            { id:'endurance', label:'Выносливость: RIR 3-4' },
          ]} />
          <PopupSelect label="Фокус-группа" value={bbFocus} onChange={setBbFocus} options={[{ id:'', label:'Нет' }, ...WEAK_GROUPS.map(([id,l]) => ({ id, label: l }))]} />
-        <PopupSelect label="🧩 Методика порядка" value={bbMethodology} onChange={v => setBbMethodology(v as SessionMethodology)} hint="compound_first — базовые раньше изоляции; pre_exhaust — изоляция основной мышцы ПЕРВОЙ (предутомление)" options={[
-          { id:'compound_first', label:'Базовые → изоляция (по умолчанию)' },
-          { id:'pre_exhaust', label:'Pre-exhaust: изоляция первой' },
-          { id:'post_exhaust', label:'Post-exhaust: базовые → изоляция' },
-        ]} />        </div>
+         <PopupSelect label="🧩 Методика порядка" value={bbMethodology} onChange={v => setBbMethodology(v as SessionMethodology)} hint="compound_first — базовые раньше изоляции; pre_exhaust — изоляция основной мышцы ПЕРВОЙ (предутомление)" options={[
+           { id:'compound_first', label:'Базовые → изоляция (по умолчанию)' },
+           { id:'pre_exhaust', label:'Pre-exhaust: изоляция первой' },
+           { id:'post_exhaust', label:'Post-exhaust: базовые → изоляция' },
+         ]} />
+         <PopupSelect label="⬇️ Eccentric overload" value={String(eccentricMult)} onChange={v => setEccentricMult(parseFloat(v))} hint="Множитель эксцентрической фазы. 1.0 = норма, 1.1-1.2 = eccentric overload (Schoenfeld 2021). Повышает вес primary-упражнений." options={[
+           { id:'1.0', label:'1.0 — Норма (концентрическая = эксцентрическая)' },
+           { id:'1.1', label:'1.1 — Лёгкий eccentric overload (+10%)' },
+           { id:'1.2', label:'1.2 — Выраженный eccentric overload (+20%)' },
+         ]} />
+         <PopupNumber label="🍽️ Профицит калорий (ккал/день)" value={calorieSurplus} onChange={v => setCalorieSurplus(Math.round(v))} step={50} min={-500} max={1000} hint="Профицит >100 → +5% MRV, >300 → +10% MRV. Дефицит <-200 → -20% MRV. 0 = нейтрально (Helms 2022)." />
+        </div>
       </div>
       )}
       <div style={{ marginTop:12, padding:10, borderRadius:10, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>

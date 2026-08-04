@@ -5,7 +5,7 @@
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK
-- `vitest` - 1318 passing (138 test files; BB-auto Phase E comprehensive audit, BB-auto pro-quality Phase A/B/C/D, generation, safety, migration, round-trip, nutrition planner button audit, support calculator audit, PL-auto critical audit coverage, and manual constructor audit included)
+- `vitest` - 1334 passing (139 test files; BB-auto Phase E comprehensive audit, BB-auto pro-quality Phase A/B/C/D, generation, safety, migration, round-trip, nutrition planner button audit, support calculator audit, PL-auto critical audit coverage, and manual constructor audit included)
 
 ---
 
@@ -30,7 +30,7 @@ Full critical analysis of BB-auto PED-dosing engine (`bb-ped-adaptation.engine.t
 10. **`lengthenedBonus` not trainingFocus-specific** — `bb-builder.engine.ts:399-406`: +10 bonus for lengthened-position exercises (RDL, incline curl, sissy squat) was identical for strength/hypertrophy/endurance. Fixed: multiplier varies by `trainingFocus` (strength ×0.5, hypertrophy ×1.0, endurance ×1.5).
 11. **`courseIntensity` applied even when all PED doses=0** — `bb-ped-adaptation.engine.ts:237`: `activePEDs.length > 0` was true even if all PED had dose=0 (explicitly disabled). Fixed: condition changed to `mrvMult > 1` — if PEDs contribute no MRV boost, intensity shouldn't apply either.
 
-### New test files (7 files, +163 tests)
+### New test files (8 files, +172 tests)
 - `src/engines/bb/__tests__/bb-ped-adaptation.test.ts` — **75 tests**: dose interpolation (AAS/insulin/GH/MGF/IGF1 all thresholds), multi-PED composition + diminishing 0.85, GH+insulin synergy, CourseIntensity (mild/moderate/heavy), string dose parsing ("500mg", "1,5г", "1e3"), risks auto-generation (AAS≥1500, insulin, GH, IGF1, MGF, T-eq), backward compat (undefined, negative, null), adjustedMrv per-muscle, PED_META + explainPEDAdaptation.
 - `src/engines/bb/__tests__/bb-goal-coverage.test.ts` — **32 tests**: volume target corrections (cut ×0.75, mass/strength_mass ×1.05), phase distribution per goal, plan generation matrix 5 goals × 3 levels, relative volume ordering, selector splitHints per goal.
 - `src/engines/bb/__tests__/bb-strength-mass.test.ts` — **6 tests**: peaking-phase activation (12/16 weeks), volume parity with mass, PED composition.
@@ -42,11 +42,15 @@ Full critical analysis of BB-auto PED-dosing engine (`bb-ped-adaptation.engine.t
 ### Files modified
 - `src/engines/bb/bb-ped-adaptation.engine.ts` — PED_META with tEq, parseDose helper, cap 1.85→2.0, IGF1/MGF risks, T-equiv threshold, courseIntensity mrvMult>1 guard
 - `src/engines/bb/bb-builder.engine.ts` — strength_mass → distributePhases(goal) direct, lengthenedBonus × trainingFocus
-- `src/engines/bb/cycle-to-plan.ts` — `sex?` field added to `CycleToPlanInput` and `ProgramToBBPlanOpts`
+- `src/engines/bb/cycle-to-plan.ts` — `sex?` field added to `CycleToPlanInput` and `ProgramToBBPlanOpts`; female glute boost ×1.2 in both `convertCycleToBBPlan` and `programToBBPlan`; `calorieSurplus?`/`proteinPerKg?` fields added; `nutritionMult` applied to `mrvMult` in both paths (parity with `bb-builder.engine.ts`)
+- `src/engines/bb/bb-volume.engine.ts` — new `computeBBNutritionMultiplier()` helper (calorieSurplus/proteinPerKg → MRV soft-cap, parity with bb-builder inline logic)
 - `src/ui/screens/TrainingScreen_parts/phase-periodization.ts` — hasPeak += 'strength_mass', peaking checked before deload
-- `src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx` — `sex:` field added to all 3 buildBb() branches
+- `src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx` — `sex:` field added to all 3 buildBb() branches; `proteinPerKg:` from `linked.profile.settings.nutrition` added to all 3 branches
 
-### Full suite: 1318 tests passing (138 test files), 0 TS errors, vite build OK.
+### Additional test files (Phase E extension)
+- `src/engines/bb/__tests__/bb-cycle-program-ped.test.ts` — **15 tests**: convertCycleToBBPlan PED integration (adapt/faithful/full stack), programToBBPlan PED integration (adapt/faithful), female glute boost ×1.2 in both paths, nutrition metrics (calorieSurplus/proteinPerKg) in both paths, eccentricMult in bb-builder path.
+
+### Full suite: 1334 tests passing (139 test files), 0 TS errors, vite build OK.
 
 ---
 

@@ -41,6 +41,17 @@ export function computeBBRecoveryMultiplier(input: {
   return Math.max(0.6, Math.min(1.5, value));
 }
 
+/** Shared nutrition soft-cap used by every BB source (Helms 2022). */
+export function computeBBNutritionMultiplier(input: {
+  calorieSurplus?: number;
+  proteinPerKg?: number;
+}): number {
+  let value = 1;
+  if (input.calorieSurplus != null) value *= input.calorieSurplus > 300 ? 1.1 : input.calorieSurplus > 100 ? 1.05 : input.calorieSurplus < -200 ? 0.8 : 1.0;
+  if (input.proteinPerKg != null) value *= input.proteinPerKg >= 2.0 ? 1.1 : input.proteinPerKg >= 1.6 ? 1.05 : input.proteinPerKg < 1.0 ? 0.85 : 1.0;
+  return Math.max(0.6, Math.min(1.5, value));
+}
+
 export interface BBVolumeContribution {
   muscle: string;
   directSets: number;

@@ -23,7 +23,7 @@ import type { FullProgram, ProgramWeek, ProgramDay } from '../../engines/complet
 import type { BBTrainingFocus } from './bb-goal-types';
 import { FOCUS_RIR_TABLE } from './bb-goal-types';
 import { finalizeBBPlan } from './bb-finalize.engine';
-import { computeBBRecoveryMultiplier } from './bb-volume.engine';
+import { computeBBRecoveryMultiplier, computeBBNutritionMultiplier } from './bb-volume.engine';
 import { applyFeedbackToBuild, autoReplaceOnPlateau } from './bb-progression-feedback.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 
@@ -378,6 +378,11 @@ export interface CycleToPlanInput {
   hrvMs?: number;
   sleepHours?: number;
   stressLevel?: number;
+  /** Nutrition-метрики → MRV soft-cap (Helms 2022). */
+  calorieSurplus?: number;
+  proteinPerKg?: number;
+  /** Eccentric overload multiplier (1.0=норма, 1.1-1.2=overload). Schoenfeld 2021. */
+  eccentricMult?: number;
   /** Lab-based MRV multiplier. */
   labMrvMultiplier?: number;
 }
@@ -776,8 +781,9 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const pedAdapt = adaptForPEDs(peds, landmarks, pedDoses, courseIntensity);
   // Recovery multiplier from body composition + recovery metrics (Helms 2022, Plews 2022, Watson 2022).
   const recoveryMult = computeBBRecoveryMultiplier(input);
+  const nutritionMult = computeBBNutritionMultiplier(input);
   const labMult = input.labMrvMultiplier ?? 1.0;
-  const mrvMult = (pedAdapt.combinedMrvMultiplier || 1.0) * recoveryMult * labMult;
+  const mrvMult = (pedAdapt.combinedMrvMultiplier || 1.0) * recoveryMult * nutritionMult * labMult;
 
   // volumeGoal scaling: MEV=0.7, MAV=1.0, MRV=1.15 (поверх шаблона).
   // Faithful: всегда 1.0 — не меняем объём программы.
@@ -917,8 +923,10 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         const specFactor = specialization ? (specWeak.includes(muscle) ? 1.10 : 0.70) : 1.0;
         // focusGroup: +30%
         const focusFactor = isFocus ? 1.30 : 1.0;
+        // P0-1: female glute boost ×1.2 (как в buildBBPlan:590) —女性 glutes требуют большего объёма
+        const femaleGluteBoost = (input.sex === 'female' && muscle === 'glutes') ? 1.2 : 1.0;
         // volumeGoal: MEV×0.7 / MAV×1.0 / MRV×1.15
-        const setMult = (isWeak ? 1.2 : 1.0) * pedFactor * volGoalMult * specFactor * focusFactor;
+        const setMult = (isWeak ? 1.2 : 1.0) * pedFactor * volGoalMult * specFactor * focusFactor * femaleGluteBoost;
         const baseSets = exSpec.sets[0]?.sets || 3;
         let targetSets = Math.max(1, Math.round(baseSets * setMult));
         // Минимум 2 сета для любого упражнения (ББ-практика)
@@ -1174,6 +1182,11 @@ export interface ProgramToBBPlanOpts {
   hrvMs?: number;
   sleepHours?: number;
   stressLevel?: number;
+  /** Nutrition-метрики → MRV soft-cap (Helms 2022). */
+  calorieSurplus?: number;
+  proteinPerKg?: number;
+  /** Eccentric overload multiplier (1.0=норма, 1.1-1.2=overload). Schoenfeld 2021. */
+  eccentricMult?: number;
   labMrvMultiplier?: number;
 }
 
@@ -1366,7 +1379,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const pedAdapt = adaptForPEDs(opts.peds || [], landmarks, opts.pedDoses, opts.courseIntensity);
   const mrvMult = pedAdapt.combinedMrvMultiplier || 1.0;
   const recoveryMult = computeBBRecoveryMultiplier(opts);
-  const effectiveMrvMult = mrvMult * recoveryMult * (opts.labMrvMultiplier ?? 1);
+  const nutritionMult = computeBBNutritionMultiplier(opts);
+  const effectiveMrvMult = mrvMult * recoveryMult * nutritionMult * (opts.labMrvMultiplier ?? 1);
   const pedMrvMult = effectiveMrvMult;
 
   const rationale: string[] = [];
@@ -1538,6 +1552,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           if (isWeak) adjSets = Math.round(adjSets * 1.15);
           if (isFocus) adjSets = Math.round(adjSets * 1.30);
           if (isWeak) adjRir = Math.max(0, rir - 1);
+          // P0-1: female glute boost ×1.2 (как в buildBBPlan:590)
+          if (opts.sex === 'female' && muscle === 'glutes') adjSets = Math.round(adjSets * 1.2);
           // PED volume boost (как в buildBBPlan): primary × mrvMult, accessory × max(1, mrvMult×0.8)
           if (opts.peds && opts.peds.length > 0) {
             const pedFactor = role === 'primary' ? mrvMult : Math.max(1.0, mrvMult * 0.8);

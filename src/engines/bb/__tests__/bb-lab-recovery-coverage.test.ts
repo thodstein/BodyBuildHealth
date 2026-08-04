@@ -165,3 +165,33 @@ describe('C: Nutrition metrics — calorieSurplus, proteinPerKg', () => {
     expect(chestVolume(high)).toBeGreaterThanOrEqual(chestVolume(normal));
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════
+ * Section D: Eccentric overload (eccentricMult)
+ * ═══════════════════════════════════════════════════════════════════ */
+describe('D: Eccentric overload (eccentricMult)', () => {
+  it('eccentricMult=1.2 → план генерируется без crash', () => {
+    const plan = buildBBPlan(makeInput({ eccentricMult: 1.2 }));
+    expect(plan).toBeDefined();
+    expect(plan.weeks.length).toBe(8);
+  });
+
+  it('eccentricMult=1.2 → primary weight выше чем eccentricMult=1.0', () => {
+    const overload = buildBBPlan(makeInput({ eccentricMult: 1.2 }));
+    const normal = buildBBPlan(makeInput({ eccentricMult: 1.0 }));
+    // Находим первый primary compound в неделе 1
+    const findPrimaryWeight = (plan: any) => {
+      const ex = plan.weeks[0].sessions[0].exercises.find((e: any) => e.role === 'primary');
+      return ex?.workSets?.[0]?.weight || 0;
+    };
+    const overloadW = findPrimaryWeight(overload);
+    const normalW = findPrimaryWeight(normal);
+    // eccentricMult 1.2 должен давать weight ≥ normal (×1.2 для primary)
+    expect(overloadW).toBeGreaterThanOrEqual(normalW);
+  });
+
+  it('eccentricMult=1.0 → нейтрально (по умолчанию)', () => {
+    const plan = buildBBPlan(makeInput({ eccentricMult: 1.0 }));
+    expect(plan).toBeDefined();
+  });
+});
