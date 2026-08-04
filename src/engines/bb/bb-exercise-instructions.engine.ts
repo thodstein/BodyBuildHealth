@@ -1,0 +1,122 @@
+/** Builds coach-facing execution notes from the Exercise Lab databases. */
+import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+import { getExerciseBio, type ExerciseBio } from '../../data/exercise-biomechanics-db';
+import { getMappedBioId, getMappedIds } from '../../data/exercise-id-mapping';
+import { getTargetMuscleForExercise, TARGET_MUSCLE_DB, type TargetMuscleEntry } from '../../data/target-muscle-db';
+
+export interface ExerciseInstructionInput {
+  exerciseId?: string;
+  exerciseName: string;
+  muscle?: string;
+  role?: 'primary' | 'accessory';
+  phase?: string;
+  trainingFocus?: 'strength' | 'hypertrophy' | 'endurance';
+  tempo?: string;
+  restSeconds?: number;
+  orderIndex?: number;
+  totalExercises?: number;
+  intensityTechnique?: string;
+}
+
+export interface ExerciseInstructionProfile {
+  pattern: string;
+  cues: string[];
+  stretch?: string;
+  peak?: string;
+  mmc?: string;
+  tempo: string;
+  restSeconds?: number;
+  order: string;
+  progression: string;
+  mistakes: string[];
+  intensityTechnique?: string;
+  source: 'exercise-lab' | 'catalog' | 'generic';
+}
+
+const EXERCISE_ID_ALIASES: Record<string, string> = {
+  pull_down_wide: 'pulldown_wide',
+  lat_pulldown_wide: 'pulldown_wide',
+  incline_bench: 'incline_bar',
+};
+
+const PATTERN_RU: Record<string, string> = {
+  vertical_pull: 'вертикальная тяга',
+  horizontal_pull: 'горизонтальная тяга',
+  horizontal_push: 'горизонтальный жим',
+  vertical_push: 'вертикальный жим',
+  squat: 'приседательный паттерн',
+  hinge: 'тазобедренный шарнир',
+  knee_flexion: 'сгибание колена',
+  hip_extension: 'разгибание бедра',
+  shoulder_abduction: 'отведение плеча',
+  elbow_flexion: 'сгибание локтя',
+  elbow_extension: 'разгибание локтя',
+};
+
+function findBio(input: ExerciseInstructionInput): { bio?: ExerciseBio; target?: TargetMuscleEntry; id?: string } {
+  const catalog = input.exerciseId
+    ? EXERCISE_CATALOG.find(e => e.id === input.exerciseId)
+    : EXERCISE_CATALOG.find(e => e.name.toLowerCase() === input.exerciseName.toLowerCase());
+  const id = input.exerciseId || catalog?.id;
+  const resolvedId = id ? (EXERCISE_ID_ALIASES[id] || id) : undefined;
+  const mapped = resolvedId ? getMappedBioId(resolvedId) : undefined;
+  const bio = (mapped ? getExerciseBio(mapped) : undefined) || (resolvedId ? getExerciseBio(resolvedId) : undefined);
+  const targetId = id && getTargetMuscleForExercise(id) ? id : resolvedId;
+  let target = targetId ? getTargetMuscleForExercise(targetId) : undefined;
+  if (!target && targetId) {
+    target = Object.values(TARGET_MUSCLE_DB).find(entry => entry.exerciseMask.includes(targetId));
+  }
+  return { bio, target, id: resolvedId };
+}
+
+function defaultTempo(focus?: ExerciseInstructionInput['trainingFocus']): string {
+  return focus === 'strength' ? '2-0-1-0' : focus === 'endurance' ? '2-0-2-0' : '3-1-1-1';
+}
+
+function orderLabel(input: ExerciseInstructionInput): string {
+  if (input.role === 'primary' && (input.orderIndex == null || input.orderIndex === 0)) return 'первое основное упражнение дня';
+  if (input.role === 'primary') return 'основное упражнение после первого движения';
+  if (input.intensityTechnique) return 'добивочное упражнение после базовых движений';
+  return 'добивочное упражнение в конце блока мышцы';
+}
+
+/** Returns detailed instructions suitable for BBPlan.comment and exports. */
+export function buildExerciseInstructions(input: ExerciseInstructionInput): ExerciseInstructionProfile {
+  const { bio, target, id } = findBio(input);
+  const pattern = PATTERN_RU[bio?.pattern || ''] || bio?.pattern || input.muscle || 'силовой паттерн';
+  const cues = [...(bio?.techniqueCues || []), ...(target?.techniqueCues || [])].filter((cue, i, all) => all.indexOf(cue) === i).slice(0, 5);
+  const tempo = input.tempo || target?.tempoRecommendation || defaultTempo(input.trainingFocus);
+  const order = orderLabel(input);
+  const progression = input.trainingFocus === 'strength'
+    ? 'Повышайте вес после выполнения всех сетов в верхней границе повторов при заданном RIR.'
+    : 'Сначала добавляйте повторы до верхней границы, затем повышайте вес минимальным шагом.';
+  const source = bio || target ? 'exercise-lab' : id || EXERCISE_CATALOG.some(e => e.name === input.exerciseName) ? 'catalog' : 'generic';
+  return {
+    pattern,
+    cues,
+    stretch: target?.stretchKey,
+    peak: target?.peakKey,
+    mmc: target?.mmc,
+    tempo,
+    restSeconds: input.restSeconds,
+    order,
+    progression,
+    mistakes: target?.commonMistakes || [],
+    intensityTechnique: input.intensityTechnique,
+    source,
+  };
+}
+
+export function formatExerciseInstructions(input: ExerciseInstructionInput): string {
+  const p = buildExerciseInstructions(input);
+  const parts = [`Паттерн: ${p.pattern}`, `Порядок: ${p.order}`];
+  if (p.cues.length) parts.push(`Техника: ${p.cues.join('; ')}`);
+  if (p.stretch) parts.push(`Растяжение: ${p.stretch}`);
+  if (p.peak) parts.push(`Пиковое напряжение: ${p.peak}`);
+  if (p.mmc) parts.push(`Связь мышца-мозг: ${p.mmc}`);
+  parts.push(`Темп: ${p.tempo}${p.restSeconds ? `, отдых ${p.restSeconds} сек` : ''}`);
+  if (p.intensityTechnique) parts.push(`Техника интенсивности: ${p.intensityTechnique}`);
+  parts.push(`Прогрессия: ${p.progression}`);
+  if (p.mistakes.length) parts.push(`Ошибки: ${p.mistakes.slice(0, 3).join('; ')}`);
+  return parts.join('. ') + '.';
+}

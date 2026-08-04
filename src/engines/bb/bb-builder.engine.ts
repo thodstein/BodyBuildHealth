@@ -24,6 +24,7 @@ import type { Injury } from '../manual-plan-builder';
 import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, computePerMuscleACWR } from './bb-progression-feedback.engine';
 import { extractMesocycleProgression, applyWeightProgression, applyVolumeProgression, wasInPreviousMeso, type MesocycleProgression } from './bb-mesocycle-progression.engine';
+import { formatExerciseInstructions } from './bb-exercise-instructions.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findSubstitutions } from '../exercise-substitution.engine';
@@ -795,6 +796,7 @@ function buildExComment(
   phase: BBPhase, tempo: string, restSec: number,
   isSubstituted: boolean,
   exerciseId?: string,
+  trainingFocus?: BBTrainingFocus,
 ): string {
   const parts: string[] = [];
   const label = role === 'primary' ? '🎯 Основное' : '📌 Добивочное';
@@ -820,6 +822,16 @@ function buildExComment(
   
   const warn = exerciseRiskWarning(name);
   if (warn) parts.push(warn);
+  parts.push(formatExerciseInstructions({
+    exerciseId,
+    exerciseName: name,
+    muscle,
+    role,
+    phase,
+    trainingFocus,
+    tempo,
+    restSeconds: restSec,
+  }));
   return parts.join('. ');
 }
 
@@ -1774,7 +1786,7 @@ function buildSession(
           rir: finalRir,
           workSets, exerciseName: (exData as any).name || (exData as any).id,
           tempoSpec: tempoStr, restSeconds: exRest,
-          comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id),
+          comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus),
           warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary' || (exData as any).type === 'compound'),
           rationale: pl.rationaleMap.get((exData as any).name) || '',
         });
@@ -1807,7 +1819,7 @@ function buildSession(
         rir: finalRir,
         workSets, exerciseName: (exData as any).name || (exData as any).id,
         tempoSpec: tempoStr, restSeconds: exRest,
-        comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, exSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id),
+        comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, exSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus),
         warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary'),
         rationale: pl.rationaleMap.get((exData as any).name) || '',
       });
