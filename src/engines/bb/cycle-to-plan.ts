@@ -8,7 +8,7 @@ import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec, SRDirection
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
 import { getBBVolumeLandmarks } from './bb-builder.engine';
 import { isRearDeltExercise, isMobilityRestricted } from './bb-builder.engine';
-import { formatExerciseInstructions } from './bb-exercise-instructions.engine';
+import { buildExerciseInstructions, formatExerciseInstructions } from './bb-exercise-instructions.engine';
 import { PCT_FOR_RIR } from '../rir-table';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
@@ -982,6 +982,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
           workSets,
           restSeconds,
           comment: `${isPrimary ? '🎯 Основное' : '📌 Добивочное'}: ${muscle}. ${targetSets}×${targetReps} @${Math.round(workMaxVal * pct)}кг, RIR ${effectiveRir}.${isSubstituted ? ' ⚠ Замена (было: ' + exSpec.name + ').' : ''}${isFocus ? ' ⭐ Фокус.' : ''} ${formatExerciseInstructions({ exerciseName: finalExName, muscle, role: isPrimary ? 'primary' : 'accessory', trainingFocus: input.trainingFocus, restSeconds })}`,
+          executionProfile: buildExerciseInstructions({ exerciseName: finalExName, muscle, role: isPrimary ? 'primary' : 'accessory', trainingFocus: input.trainingFocus, restSeconds }),
           warmupSets: isPrimary ? (() => {
             const w = Math.round(workMaxVal * pct);
             if (w <= 0) return [];
@@ -1621,6 +1622,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           restSeconds: restSec,
           exerciseName: finalExName,
           comment: `${role === 'primary' ? '🎯 Основное' : '📌 Добивочное'}: ${muscle}. ${usedSets.length}×${reps} @${Math.round(workWeight)} кг, RIR ${adjRir}.${ex.notes ? ' ' + ex.notes : ''}${ex.progression ? ' ' + ex.progression : ''}${mode === 'adapt' && weakPoints.includes(muscle) ? ' 🔥 Слабая группа.' : ''}${mode === 'adapt' && focusGroup === muscle ? ' ⭐ Фокус.' : ''} ${formatExerciseInstructions({ exerciseName: finalExName, muscle, role, trainingFocus: opts.trainingFocus, restSeconds: restSec })}`,
+          executionProfile: buildExerciseInstructions({ exerciseName: finalExName, muscle, role, trainingFocus: opts.trainingFocus, restSeconds: restSec }),
           warmupSets: role === 'primary' ? parseWarmup(workWeight, pd.warmup) : [],
           rationale: `${finalExName} (${muscle}) из программы «${program.name}» недели ${weekNum}`,
         });
