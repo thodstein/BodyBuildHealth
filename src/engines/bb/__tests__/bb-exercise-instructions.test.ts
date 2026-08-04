@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildExerciseInstructions, formatExerciseInstructions } from '../bb-exercise-instructions.engine';
 import { buildBBPlan } from '../bb-builder.engine';
+import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 
 describe('BB exercise instructions from Exercise Lab', () => {
   it('builds a professional profile for a catalog exercise', () => {
@@ -83,5 +84,24 @@ describe('BB exercise instructions from Exercise Lab', () => {
     expect(comments.some(c => c.includes('Техника:'))).toBe(true);
     expect(comments.some(c => c.includes('Порядок:'))).toBe(true);
     expect(comments.some(c => c.includes('Прогрессия:'))).toBe(true);
+  });
+
+  it('provides non-empty execution guidance for every catalog exercise', () => {
+    const failures = EXERCISE_CATALOG
+      .map(ex => ({ ex, profile: buildExerciseInstructions({ exerciseId: ex.id, exerciseName: ex.name, muscle: ex.group }) }))
+      .filter(({ profile }) => !profile.pattern || !profile.order || !profile.tempo || !profile.progression);
+
+    expect(failures.map(({ ex }) => ex.id)).toEqual([]);
+  });
+
+  it('catalog fallback includes the exercise-specific technique field', () => {
+    const catalogExercise = EXERCISE_CATALOG.find(ex => ex.id === 'bench_closegrip');
+    expect(catalogExercise).toBeDefined();
+    const text = formatExerciseInstructions({
+      exerciseId: catalogExercise!.id,
+      exerciseName: catalogExercise!.name,
+      muscle: catalogExercise!.group,
+    });
+    expect(text).toContain(catalogExercise!.technique);
   });
 });

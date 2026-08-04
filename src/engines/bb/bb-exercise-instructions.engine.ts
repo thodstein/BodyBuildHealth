@@ -97,7 +97,11 @@ export function buildExerciseInstructions(input: ExerciseInstructionInput): Exer
   const { bio, target, id } = findBio(input);
   const catalog = catalogInstruction(input, id);
   const pattern = PATTERN_RU[bio?.pattern || ''] || PATTERN_RU[catalog?.pattern || ''] || bio?.pattern || catalog?.pattern || input.muscle || 'силовой паттерн';
-  const cues = [...(bio?.techniqueCues || []), ...(target?.techniqueCues || []), ...(catalog?.cues || [])].filter((cue, i, all) => all.indexOf(cue) === i).slice(0, 5);
+  const labCues = [...(bio?.techniqueCues || []), ...(target?.techniqueCues || [])].filter((cue, i, all) => all.indexOf(cue) === i);
+  const catalogCue = catalog?.cues?.[0];
+  const cues = catalogCue
+    ? [...labCues.filter(cue => cue !== catalogCue).slice(0, 4), catalogCue]
+    : labCues.slice(0, 5);
   const tempo = input.tempo || target?.tempoRecommendation || defaultTempo(input.trainingFocus);
   const order = orderLabel(input);
   const progression = input.trainingFocus === 'strength'
