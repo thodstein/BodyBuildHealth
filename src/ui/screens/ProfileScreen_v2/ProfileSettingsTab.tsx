@@ -1,15 +1,26 @@
 /**
  * ProfileSettingsTab — вкладка "Настройки" + контакты + экспорт/импорт + сброс.
+ * Использует PopupValueEditor для ввода значений через попап.
  */
 import React, { useState } from 'react';
 import { useProfileRefresh, updateProfile, clearSnapshots } from '../../../core/profile-manager';
 import type { UnifiedSettings } from '../../../core/types';
-import { AccordionSection, Field, FieldRow, TextInput, SelectInput, BoolChip, colors } from './ui';
+import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, colors } from './ui';
 
 const PRIVACY = [
   { id: 'private', label: 'Только я' },
   { id: 'friends', label: 'Друзья' },
   { id: 'public', label: 'Публичные' },
+];
+const UNITS = [
+  { id: 'metric', label: 'Метрические (кг, см)' },
+  { id: 'imperial', label: 'Имперские (фунты, дюймы)' },
+];
+const MC_RUNS = [
+  { id: '500', label: '500' },
+  { id: '1000', label: '1000' },
+  { id: '5000', label: '5000' },
+  { id: '10000', label: '10000' },
 ];
 
 export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => void }> = ({ onNavigate }) => {
@@ -117,43 +128,37 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
         color={colors.blue}
       >
         <FieldRow cols={2}>
-          <Field label="Единицы измерения">
-            <SelectInput
-              value={system.preferredUnits}
-              onChange={v => update({ preferredUnits: v as any })}
-              options={[
-                { id: 'metric', label: 'Метрические (кг, см)' },
-                { id: 'imperial', label: 'Имперские (фунты, дюймы)' },
-              ]}
-            />
-          </Field>
-          <Field label="Приватность">
-            <SelectInput
-              value={system.privacyLevel}
-              onChange={v => update({ privacyLevel: v as any })}
-              options={PRIVACY}
-            />
-          </Field>
-          <Field label="Monte Carlo прогонов">
-            <SelectInput
-              value={String(system.mcRuns || 1000)}
-              onChange={v => update({ mcRuns: Number(v) })}
-              options={[
-                { id: '500', label: '500' },
-                { id: '1000', label: '1000' },
-                { id: '5000', label: '5000' },
-                { id: '10000', label: '10000' },
-              ]}
-            />
-          </Field>
-          <Field label="Имя пользователя">
-            <TextInput
-              value={profile.name}
-              onChange={v => updateProfile({ name: v })}
-              placeholder="Имя"
-              maxLength={60}
-            />
-          </Field>
+          <PopupValueEditor
+            label="Единицы измерения"
+            value={system.preferredUnits}
+            type="select"
+            options={UNITS}
+            onChange={v => update({ preferredUnits: v as any })}
+            placeholder="—"
+          />
+          <PopupValueEditor
+            label="Приватность"
+            value={system.privacyLevel}
+            type="select"
+            options={PRIVACY}
+            onChange={v => update({ privacyLevel: v as any })}
+            placeholder="—"
+          />
+          <PopupValueEditor
+            label="Monte Carlo прогонов"
+            value={String(system.mcRuns || 1000)}
+            type="select"
+            options={MC_RUNS}
+            onChange={v => update({ mcRuns: Number(v) })}
+            placeholder="—"
+          />
+          <PopupValueEditor
+            label="Имя пользователя"
+            value={profile.name}
+            type="text"
+            onChange={v => updateProfile({ name: v })}
+            placeholder="Имя"
+          />
         </FieldRow>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
           <BoolChip

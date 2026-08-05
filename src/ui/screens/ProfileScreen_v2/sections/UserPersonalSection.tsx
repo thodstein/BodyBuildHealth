@@ -1,17 +1,22 @@
 /**
  * UserPersonalSection — секция "Основное" вкладки Пользователь.
  * Личные данные + антропометрия + контакты.
+ * Использует PopupValueEditor для ввода значений через попап.
  */
 import React from 'react';
 import { useProfileSection } from '../../../../core/profile-manager';
 import { useSectionState } from '../hooks/useSectionState';
-import { AccordionSection, Field, FieldRow, NumberInput, TextInput, SelectInput, colors } from '../ui';
+import { AccordionSection, FieldRow, PopupValueEditor, colors } from '../ui';
 
 const BLOOD_TYPES: { id: string; label: string }[] = [
   { id: 'I+', label: 'I (Rh+)' }, { id: 'I-', label: 'I (Rh−)' },
   { id: 'II+', label: 'II (Rh+)' }, { id: 'II-', label: 'II (Rh−)' },
   { id: 'III+', label: 'III (Rh+)' }, { id: 'III-', label: 'III (Rh−)' },
   { id: 'IV+', label: 'IV (Rh+)' }, { id: 'IV-', label: 'IV (Rh−)' },
+];
+const SEX_OPTIONS = [
+  { id: 'male', label: '♂ Мужской' },
+  { id: 'female', label: '♀ Женский' },
 ];
 
 export const UserPersonalSection: React.FC = () => {
@@ -33,81 +38,84 @@ export const UserPersonalSection: React.FC = () => {
       badge={`${filled}/5 заполнено`}
     >
       <FieldRow cols={3}>
-        <Field label="Возраст">
-          <NumberInput
-            value={personal.age}
-            onChange={v => updatePersonal({ age: v ?? 0 })}
-            min={10} max={120} unit="лет"
-          />
-        </Field>
-        <Field label="Пол">
-          <SelectInput
-            value={personal.sex}
-            onChange={v => updatePersonal({ sex: v as 'male' | 'female' })}
-            options={[
-              { id: 'male', label: '♂ Мужской' },
-              { id: 'female', label: '♀ Женский' },
-            ]}
-          />
-        </Field>
-        <Field label="Группа крови">
-          <SelectInput
-            value={personal.bloodType}
-            onChange={v => updatePersonal({ bloodType: v })}
-            options={BLOOD_TYPES}
-            placeholder="—"
-          />
-        </Field>
-        <Field label="Рост" hint="см">
-          <NumberInput
-            value={personal.height}
-            onChange={v => updatePersonal({ height: v ?? 0 })}
-            min={100} max={250}
-          />
-        </Field>
-        <Field label="Вес" hint="кг">
-          <NumberInput
-            value={personal.weight}
-            onChange={v => updatePersonal({ weight: v ?? 0 })}
-            min={30} max={250} step={0.1}
-          />
-        </Field>
-        <Field label="% жира" hint="процент">
-          <NumberInput
-            value={personal.bodyFat}
-            onChange={v => updatePersonal({ bodyFat: v ?? 0 })}
-            min={3} max={60} step={0.1} unit="%"
-          />
-        </Field>
+        <PopupValueEditor
+          label="Возраст"
+          value={personal.age}
+          unit="лет"
+          type="number"
+          min={10} max={120}
+          onChange={v => updatePersonal({ age: v ?? 0 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Пол"
+          value={personal.sex}
+          type="select"
+          options={SEX_OPTIONS}
+          onChange={v => updatePersonal({ sex: v as 'male' | 'female' })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Группа крови"
+          value={personal.bloodType}
+          type="select"
+          options={BLOOD_TYPES}
+          onChange={v => updatePersonal({ bloodType: v })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Рост"
+          value={personal.height}
+          unit="см"
+          type="number"
+          min={100} max={250}
+          onChange={v => updatePersonal({ height: v ?? 0 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Вес"
+          value={personal.weight}
+          unit="кг"
+          type="number"
+          min={30} max={250} step={0.1}
+          onChange={v => updatePersonal({ weight: v ?? 0 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="% жира"
+          value={personal.bodyFat}
+          unit="%"
+          type="number"
+          min={3} max={60} step={0.1}
+          onChange={v => updatePersonal({ bodyFat: v ?? 0 })}
+          placeholder="—"
+        />
       </FieldRow>
 
       <div style={{ height: 1, background: colors.border, margin: '12px 0' }} />
 
       <FieldRow cols={3}>
-        <Field label="Email">
-          <TextInput
-            value={system.email}
-            onChange={v => setSystem({ email: v })}
-            placeholder="example@mail.com"
-            maxLength={100}
-          />
-        </Field>
-        <Field label="Экстренный контакт (имя)">
-          <TextInput
-            value={personal.emergencyName}
-            onChange={v => updatePersonal({ emergencyName: v })}
-            placeholder="Имя"
-            maxLength={100}
-          />
-        </Field>
-        <Field label="Экстренный контакт (телефон)">
-          <TextInput
-            value={personal.emergencyPhone}
-            onChange={v => updatePersonal({ emergencyPhone: v })}
-            placeholder="+7..."
-            maxLength={30}
-          />
-        </Field>
+        <PopupValueEditor
+          label="Email"
+          value={system.email}
+          type="text"
+          onChange={v => setSystem({ email: v })}
+          placeholder="example@mail.com"
+        />
+        <PopupValueEditor
+          label="Экстренный контакт (имя)"
+          value={personal.emergencyName}
+          type="text"
+          onChange={v => updatePersonal({ emergencyName: v })}
+          placeholder="Имя"
+        />
+        <PopupValueEditor
+          label="Экстренный контакт (телефон)"
+          value={personal.emergencyPhone}
+          type="text"
+          onChange={v => updatePersonal({ emergencyPhone: v })}
+          placeholder="+7..."
+        />
       </FieldRow>
 
       {personal.weight && personal.height && personal.weight > 0 && personal.height > 0 && (

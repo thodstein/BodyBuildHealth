@@ -1,9 +1,10 @@
 /**
  * TrainingPMSection — секция "Личные рекорды (ПМ)" вкладки Тренировки.
+ * Использует PopupValueEditor для ввода значений через попап.
  */
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
-import { AccordionSection, Field, FieldRow, NumberInput, colors } from '../ui';
+import { AccordionSection, FieldRow, PopupValueEditor, colors } from '../ui';
 
 const WORK_MAX_GROUPS = [
   { id: 'chest', label: 'Грудь' },
@@ -43,27 +44,33 @@ export const TrainingPMSection: React.FC = () => {
         Главные лифты (1RM)
       </div>
       <FieldRow cols={3}>
-        <Field label="Присед" hint="кг">
-          <NumberInput
-            value={training.pmSquat}
-            onChange={v => updateTraining({ pmSquat: v ?? 0 })}
-            min={0} max={500} step={2.5}
-          />
-        </Field>
-        <Field label="Жим лёжа" hint="кг">
-          <NumberInput
-            value={training.pmBench}
-            onChange={v => updateTraining({ pmBench: v ?? 0 })}
-            min={0} max={300} step={2.5}
-          />
-        </Field>
-        <Field label="Становая тяга" hint="кг">
-          <NumberInput
-            value={training.pmDeadlift}
-            onChange={v => updateTraining({ pmDeadlift: v ?? 0 })}
-            min={0} max={400} step={2.5}
-          />
-        </Field>
+        <PopupValueEditor
+          label="Присед"
+          value={training.pmSquat}
+          unit="кг"
+          type="number"
+          min={0} max={500} step={2.5}
+          onChange={v => updateTraining({ pmSquat: v ?? 0 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Жим лёжа"
+          value={training.pmBench}
+          unit="кг"
+          type="number"
+          min={0} max={300} step={2.5}
+          onChange={v => updateTraining({ pmBench: v ?? 0 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Становая тяга"
+          value={training.pmDeadlift}
+          unit="кг"
+          type="number"
+          min={0} max={400} step={2.5}
+          onChange={v => updateTraining({ pmDeadlift: v ?? 0 })}
+          placeholder="—"
+        />
       </FieldRow>
 
       <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, margin: '12px 0 8px' }}>
@@ -71,13 +78,16 @@ export const TrainingPMSection: React.FC = () => {
       </div>
       <FieldRow cols={3}>
         {WORK_MAX_GROUPS.map(g => (
-          <Field key={g.id} label={g.label} hint="кг">
-            <NumberInput
-              value={workMax[g.id]}
-              onChange={v => updateWorkMax(g.id, v)}
-              min={0} max={300} step={2.5}
-            />
-          </Field>
+          <PopupValueEditor
+            key={g.id}
+            label={g.label}
+            value={workMax[g.id]}
+            unit="кг"
+            type="number"
+            min={0} max={300} step={2.5}
+            onChange={v => updateWorkMax(g.id, v)}
+            placeholder="—"
+          />
         ))}
       </FieldRow>
     </AccordionSection>

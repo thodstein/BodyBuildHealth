@@ -1,11 +1,11 @@
 /**
  * UserHealthSection — секция "Здоровье" вкладки Пользователь.
  * Хронические заболевания, генетика, травмы + 8 системных подкарточек.
+ * Использует PopupValueEditor для ввода значений через попап.
  */
-import React, { useState } from 'react';
+import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
-import { useProfileSection } from '../../../../core/profile-manager';
-import { AccordionSection, Field, FieldRow, NumberInput, TextInput, SelectInput, BoolChip, SliderInput, colors } from '../ui';
+import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, SliderInput, colors } from '../ui';
 import {
   CHRONIC_CONDITIONS_LIST, ALLERGEN_LIST, ORGAN_WEAKNESSES, GENETIC_POLYMORPHISMS,
 } from '../../../../core/contraindications';
@@ -39,6 +39,17 @@ const SNP_GENOTYPES = [
   { id: '--', label: '−− (гомозигота)' },
 ];
 
+const LDL_OPTIONS = [
+  { id: 'low', label: 'Низкий' },
+  { id: 'normal', label: 'Норма' },
+  { id: 'high', label: 'Высокий' },
+  { id: 'very_high', label: 'Очень высокий' },
+];
+const HDL_OPTIONS = [
+  { id: 'normal', label: 'Норма' },
+  { id: 'low', label: 'Низкий' },
+];
+
 const COMMON_INJURIES = [
   'Поясница', 'Колено', 'Плечо', 'Локоть', 'Запястье',
   'Шея', 'Бедро', 'Голеностоп', 'Бицепс', 'Трицепс',
@@ -47,16 +58,6 @@ const COMMON_INJURIES = [
 export const UserHealthSection: React.FC = () => {
   const [health, updateHealth] = useSectionState('health');
   const [nutrition, updateNutrition] = useSectionState('nutrition');
-
-  const toggle = (key: 'chronicConditions' | 'foodAllergies' | 'foodIntolerances' | 'excludedFoods', id: string) => {
-    const arr = (nutrition as any)[key] || (health as any)[key] || [];
-    const next = arr.includes(id) ? arr.filter((x: string) => x !== id) : [...arr, id];
-    if (key === 'foodAllergies' || key === 'foodIntolerances' || key === 'excludedFoods') {
-      updateNutrition({ [key]: next } as any);
-    } else {
-      updateHealth({ [key]: next } as any);
-    }
-  };
 
   return (
     <AccordionSection
@@ -96,14 +97,15 @@ export const UserHealthSection: React.FC = () => {
         </div>
         <FieldRow cols={2}>
           {SNP_LIST.map(snp => (
-            <Field key={snp.id} label={snp.label}>
-              <SelectInput
-                value={health.genetics?.[snp.id] || ''}
-                onChange={v => updateHealth({ genetics: { ...(health.genetics || {}), [snp.id]: v } })}
-                options={SNP_GENOTYPES}
-                placeholder="—"
-              />
-            </Field>
+            <PopupValueEditor
+              key={snp.id}
+              label={snp.label}
+              value={health.genetics?.[snp.id]}
+              type="select"
+              options={SNP_GENOTYPES}
+              onChange={v => updateHealth({ genetics: { ...(health.genetics || {}), [snp.id]: v } })}
+              placeholder="—"
+            />
           ))}
         </FieldRow>
       </div>
@@ -112,57 +114,55 @@ export const UserHealthSection: React.FC = () => {
       <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: 'rgba(239,68,68,0.05)', border: `1px solid ${colors.dangerDim}` }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: colors.danger, marginBottom: 10 }}>❤️ Кардио</div>
         <FieldRow cols={3}>
-          <Field label="Стадия АД">
-            <SelectInput
-              value={health.bpStage}
-              onChange={v => updateHealth({ bpStage: v as any })}
-              options={BP_STAGES}
-            />
-          </Field>
-          <Field label="Гематокрит">
-            <SelectInput
-              value={health.hctElevation}
-              onChange={v => updateHealth({ hctElevation: v as any })}
-              options={HCT_LEVELS}
-            />
-          </Field>
-          <Field label="ЧСС покоя" hint="уд/мин">
-            <NumberInput
-              value={health.heartRate}
-              onChange={v => updateHealth({ heartRate: v ?? 0 })}
-              min={30} max={150}
-            />
-          </Field>
-          <Field label="LDL">
-            <SelectInput
-              value={health.ldlElevation || ''}
-              onChange={v => updateHealth({ ldlElevation: v })}
-              options={[
-                { id: 'low', label: 'Низкий' },
-                { id: 'normal', label: 'Норма' },
-                { id: 'high', label: 'Высокий' },
-                { id: 'very_high', label: 'Очень высокий' },
-              ]}
-              placeholder="—"
-            />
-          </Field>
-          <Field label="HDL">
-            <SelectInput
-              value={health.hdlLow ? 'low' : 'normal'}
-              onChange={v => updateHealth({ hdlLow: v === 'low' })}
-              options={[
-                { id: 'normal', label: 'Норма' },
-                { id: 'low', label: 'Низкий' },
-              ]}
-            />
-          </Field>
-          <Field label="Триглицериды">
-            <SelectInput
-              value={health.triglycerides}
-              onChange={v => updateHealth({ triglycerides: v as any })}
-              options={TRIGL}
-            />
-          </Field>
+          <PopupValueEditor
+            label="Стадия АД"
+            value={health.bpStage}
+            type="select"
+            options={BP_STAGES}
+            onChange={v => updateHealth({ bpStage: v as any })}
+            placeholder="—"
+          />
+          <PopupValueEditor
+            label="Гематокрит"
+            value={health.hctElevation}
+            type="select"
+            options={HCT_LEVELS}
+            onChange={v => updateHealth({ hctElevation: v as any })}
+            placeholder="—"
+          />
+          <PopupValueEditor
+            label="ЧСС покоя"
+            value={health.heartRate}
+            unit="уд/мин"
+            type="number"
+            min={30} max={150}
+            onChange={v => updateHealth({ heartRate: v ?? 0 })}
+            placeholder="—"
+          />
+          <PopupValueEditor
+            label="LDL"
+            value={health.ldlElevation}
+            type="select"
+            options={LDL_OPTIONS}
+            onChange={v => updateHealth({ ldlElevation: v })}
+            placeholder="—"
+          />
+          <PopupValueEditor
+            label="HDL"
+            value={health.hdlLow ? 'low' : 'normal'}
+            type="select"
+            options={HDL_OPTIONS}
+            onChange={v => updateHealth({ hdlLow: v === 'low' })}
+            placeholder="—"
+          />
+          <PopupValueEditor
+            label="Триглицериды"
+            value={health.triglycerides}
+            type="select"
+            options={TRIGL}
+            onChange={v => updateHealth({ triglycerides: v as any })}
+            placeholder="—"
+          />
         </FieldRow>
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
           <BoolChip
@@ -184,15 +184,18 @@ export const UserHealthSection: React.FC = () => {
       <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: 'rgba(139,92,246,0.05)', border: `1px solid ${colors.purpleDim}` }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: colors.purple, marginBottom: 10 }}>🧠 Неврология</div>
         <FieldRow cols={3}>
-          <Field label="Дофамин" hint="1-5">
+          <div>
+            <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Дофамин (1-5)</div>
             <SliderInput value={health.dopamineScore} onChange={v => updateHealth({ dopamineScore: v })} min={1} max={5} color={colors.purple} />
-          </Field>
-          <Field label="Серотонин" hint="1-5">
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Серотонин (1-5)</div>
             <SliderInput value={health.serotoninScore} onChange={v => updateHealth({ serotoninScore: v })} min={1} max={5} color={colors.purple} />
-          </Field>
-          <Field label="Агрессия" hint="1-5">
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Агрессия (1-5)</div>
             <SliderInput value={health.aggressionScore} onChange={v => updateHealth({ aggressionScore: v })} min={1} max={5} color={colors.purple} />
-          </Field>
+          </div>
         </FieldRow>
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
           {[
@@ -241,15 +244,18 @@ export const UserHealthSection: React.FC = () => {
       <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: 'rgba(236,72,153,0.05)', border: `1px solid ${colors.pinkDim}` }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: colors.pink, marginBottom: 10 }}>💭 Психология</div>
         <FieldRow cols={3}>
-          <Field label="Страх потери" hint="1-5">
+          <div>
+            <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Страх потери (1-5)</div>
             <SliderInput value={health.fearOfLoss} onChange={v => updateHealth({ fearOfLoss: v })} min={1} max={5} color={colors.pink} />
-          </Field>
-          <Field label="Одержимость зеркалом" hint="1-5">
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Одержимость зеркалом (1-5)</div>
             <SliderInput value={health.mirrorObsession} onChange={v => updateHealth({ mirrorObsession: v })} min={1} max={5} color={colors.pink} />
-          </Field>
-          <Field label="Апатия off-cycle" hint="1-5">
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Апатия off-cycle (1-5)</div>
             <SliderInput value={health.apathyOffCycle} onChange={v => updateHealth({ apathyOffCycle: v })} min={1} max={5} color={colors.pink} />
-          </Field>
+          </div>
         </FieldRow>
       </div>
 
@@ -360,28 +366,31 @@ export const UserHealthSection: React.FC = () => {
       {/* Аллергии и исключения */}
       <div>
         <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8 }}>💊 Аллергии на лекарства и исключения</div>
-        <Field label="Аллергия на лекарства">
-          <TextInput
+        <FieldRow cols={2}>
+          <PopupValueEditor
+            label="Аллергия на лекарства"
             value={health.drugAllergies}
+            type="text"
             onChange={v => updateHealth({ drugAllergies: v })}
-            placeholder="Например: пенициллин, аспирин..."
-            maxLength={200}
+            placeholder="пенициллин, аспирин..."
           />
-        </Field>
-        <Field label="Исключить БАДы (id)">
-          <TextInput
+          <PopupValueEditor
+            label="Исключить БАДы (id)"
             value={(health.excludedSupplements || []).join(', ')}
-            onChange={v => updateHealth({ excludedSupplements: v.split(',').map(x => x.trim()).filter(Boolean) })}
+            type="text"
+            onChange={v => updateHealth({ excludedSupplements: String(v).split(',').map(x => x.trim()).filter(Boolean) })}
             placeholder="через запятую"
           />
-        </Field>
-        <Field label="Исключить лекарства (id)">
-          <TextInput
+        </FieldRow>
+        <div style={{ marginTop: 12 }}>
+          <PopupValueEditor
+            label="Исключить лекарства (id)"
             value={(health.excludedMeds || []).join(', ')}
-            onChange={v => updateHealth({ excludedMeds: v.split(',').map(x => x.trim()).filter(Boolean) })}
+            type="text"
+            onChange={v => updateHealth({ excludedMeds: String(v).split(',').map(x => x.trim()).filter(Boolean) })}
             placeholder="через запятую"
           />
-        </Field>
+        </div>
       </div>
     </AccordionSection>
   );

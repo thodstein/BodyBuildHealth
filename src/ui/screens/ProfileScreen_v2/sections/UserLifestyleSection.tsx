@@ -1,9 +1,10 @@
 /**
  * UserLifestyleSection — секция "Образ жизни" вкладки Пользователь.
+ * Использует PopupValueEditor для ввода значений через попап.
  */
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
-import { AccordionSection, Field, FieldRow, NumberInput, TextInput, SelectInput, BoolChip, SliderInput, colors } from '../ui';
+import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, SliderInput, colors } from '../ui';
 
 const CHRONOTYPES = [
   { id: 'lark', label: 'Жаворонок' },
@@ -28,95 +29,108 @@ export const UserLifestyleSection: React.FC = () => {
       color={colors.purple}
     >
       <FieldRow cols={3}>
-        <Field label="Сон" hint="часов">
-          <NumberInput
-            value={lifestyle.sleepHours}
-            onChange={v => updateLifestyle({ sleepHours: v ?? 7 })}
-            min={3} max={12} step={0.5}
-          />
-        </Field>
-        <Field label="Качество сна">
-          <SelectInput
-            value={lifestyle.sleepQuality}
-            onChange={v => updateLifestyle({ sleepQuality: v as any })}
-            options={SLEEP_QUALITY}
-          />
-        </Field>
-        <Field label="Пробуждений за ночь">
-          <NumberInput
-            value={lifestyle.nightAwakenings}
-            onChange={v => updateLifestyle({ nightAwakenings: v ?? 0 })}
-            min={0} max={10}
-          />
-        </Field>
-        <Field label="Хронотип">
-          <SelectInput
-            value={lifestyle.chronotype}
-            onChange={v => updateLifestyle({ chronotype: v as any })}
-            options={CHRONOTYPES}
-          />
-        </Field>
-        <Field label="Ложусь" hint="HH:MM">
-          <TextInput
-            value={lifestyle.bedtime}
-            onChange={v => updateLifestyle({ bedtime: v })}
-            placeholder="23:00"
-            maxLength={5}
-          />
-        </Field>
-        <Field label="Встаю" hint="HH:MM">
-          <TextInput
-            value={lifestyle.wakeTime}
-            onChange={v => updateLifestyle({ wakeTime: v })}
-            placeholder="07:00"
-            maxLength={5}
-          />
-        </Field>
+        <PopupValueEditor
+          label="Сон"
+          value={lifestyle.sleepHours}
+          unit="часов"
+          type="number"
+          min={3} max={12} step={0.5}
+          onChange={v => updateLifestyle({ sleepHours: v ?? 7 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Качество сна"
+          value={lifestyle.sleepQuality}
+          type="select"
+          options={SLEEP_QUALITY}
+          onChange={v => updateLifestyle({ sleepQuality: v as any })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Пробуждений за ночь"
+          value={lifestyle.nightAwakenings}
+          type="number"
+          min={0} max={10}
+          onChange={v => updateLifestyle({ nightAwakenings: v ?? 0 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Хронотип"
+          value={lifestyle.chronotype}
+          type="select"
+          options={CHRONOTYPES}
+          onChange={v => updateLifestyle({ chronotype: v as any })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Ложусь"
+          value={lifestyle.bedtime}
+          type="text"
+          onChange={v => updateLifestyle({ bedtime: v })}
+          placeholder="23:00"
+        />
+        <PopupValueEditor
+          label="Встаю"
+          value={lifestyle.wakeTime}
+          type="text"
+          onChange={v => updateLifestyle({ wakeTime: v })}
+          placeholder="07:00"
+        />
       </FieldRow>
 
       <div style={{ height: 1, background: colors.border, margin: '12px 0' }} />
 
       <FieldRow cols={2}>
-        <Field label="Стресс" hint="1-10 (10 = максимум)">
+        <div>
+          <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Стресс (1-10, 10 = максимум)</div>
           <SliderInput value={lifestyle.stressLevel} onChange={v => updateLifestyle({ stressLevel: v })} min={1} max={10} color={colors.danger} />
-        </Field>
-        <Field label="Усталость" hint="1-10 (10 = полное истощение)">
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Усталость (1-10, 10 = полное истощение)</div>
           <SliderInput value={lifestyle.fatigueLevel} onChange={v => updateLifestyle({ fatigueLevel: v })} min={1} max={10} color={colors.warning} />
-        </Field>
-        <Field label="Активность" hint="1-10 (10 = очень активный)">
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Активность (1-10, 10 = очень активный)</div>
           <SliderInput value={lifestyle.activityLevel} onChange={v => updateLifestyle({ activityLevel: v })} min={1} max={10} color={colors.primary} />
-        </Field>
-        <Field label="HRV baseline" hint="коэффициент (0.5-1.5)">
-          <NumberInput
-            value={lifestyle.baselineHrvRatio}
-            onChange={v => updateLifestyle({ baselineHrvRatio: v ?? 1 })}
-            min={0.5} max={1.5} step={0.05}
-          />
-        </Field>
+        </div>
+        <PopupValueEditor
+          label="HRV baseline"
+          value={lifestyle.baselineHrvRatio}
+          unit="коэф. 0.5-1.5"
+          type="number"
+          min={0.5} max={1.5} step={0.05}
+          onChange={v => updateLifestyle({ baselineHrvRatio: v ?? 1 })}
+          placeholder="—"
+        />
       </FieldRow>
 
       <FieldRow cols={3}>
-        <Field label="Шаги/день">
-          <NumberInput
-            value={lifestyle.dailySteps}
-            onChange={v => updateLifestyle({ dailySteps: v ?? 0 })}
-            min={0} max={50000} step={500}
-          />
-        </Field>
-        <Field label="Вода/день" hint="литров">
-          <NumberInput
-            value={lifestyle.dailyWaterLiters}
-            onChange={v => updateLifestyle({ dailyWaterLiters: v ?? 2 })}
-            min={0} max={10} step={0.1}
-          />
-        </Field>
-        <Field label="HRV" hint="мс (утренний)">
-          <NumberInput
-            value={lifestyle.morningHRV}
-            onChange={v => updateLifestyle({ morningHRV: v ?? 0 })}
-            min={0} max={200}
-          />
-        </Field>
+        <PopupValueEditor
+          label="Шаги/день"
+          value={lifestyle.dailySteps}
+          type="number"
+          min={0} max={50000} step={500}
+          onChange={v => updateLifestyle({ dailySteps: v ?? 0 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Вода/день"
+          value={lifestyle.dailyWaterLiters}
+          unit="литров"
+          type="number"
+          min={0} max={10} step={0.1}
+          onChange={v => updateLifestyle({ dailyWaterLiters: v ?? 2 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="HRV"
+          value={lifestyle.morningHRV}
+          unit="мс"
+          type="number"
+          min={0} max={200}
+          onChange={v => updateLifestyle({ morningHRV: v ?? 0 })}
+          placeholder="—"
+        />
       </FieldRow>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

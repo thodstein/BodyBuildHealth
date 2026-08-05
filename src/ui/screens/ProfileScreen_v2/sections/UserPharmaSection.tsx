@@ -1,9 +1,10 @@
 /**
  * UserPharmaSection — секция "Курс / Фарма" вкладки Пользователь.
+ * Использует PopupValueEditor для ввода значений через попап.
  */
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
-import { AccordionSection, Field, FieldRow, NumberInput, TextInput, SelectInput, BoolChip, colors } from '../ui';
+import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, colors } from '../ui';
 
 const PHASES = [
   { id: 'baseline', label: 'База (без курса)' },
@@ -46,70 +47,78 @@ export const UserPharmaSection: React.FC = () => {
       badge={pharma.phase === 'course' ? 'КУРС' : ''}
     >
       <FieldRow cols={3}>
-        <Field label="Фаза">
-          <SelectInput
-            value={pharma.phase}
-            onChange={v => updatePharma({ phase: v as any })}
-            options={PHASES}
-          />
-        </Field>
-        <Field label="Дата старта курса">
-          <TextInput
-            value={pharma.courseStartDate}
-            onChange={v => updatePharma({ courseStartDate: v })}
-            placeholder="YYYY-MM-DD"
-            maxLength={10}
-          />
-        </Field>
-        <Field label="Опыт">
-          <SelectInput
-            value={pharma.experience}
-            onChange={v => updatePharma({ experience: v as any })}
-            options={EXPERIENCE}
-          />
-        </Field>
-        <Field label="Всего курсов">
-          <NumberInput
-            value={pharma.totalCycles}
-            onChange={v => updatePharma({ totalCycles: v ?? 0 })}
-            min={0} max={50}
-          />
-        </Field>
-        <Field label="Лет на фарме">
-          <NumberInput
-            value={pharma.yearsOnGear}
-            onChange={v => updatePharma({ yearsOnGear: v ?? 0 })}
-            min={0} max={30} step={0.5}
-          />
-        </Field>
-        <Field label="Месяцев с последнего">
-          <NumberInput
-            value={pharma.monthsSinceLastCourse}
-            onChange={v => updatePharma({ monthsSinceLastCourse: v ?? 0 })}
-            min={0} max={120}
-          />
-        </Field>
-        <Field label="Время с последнего">
-          <SelectInput
-            value={pharma.timeSinceLastCycle}
-            onChange={v => updatePharma({ timeSinceLastCycle: v as any })}
-            options={TIME_SINCE}
-          />
-        </Field>
-        <Field label="Тип цикла">
-          <SelectInput
-            value={pharma.trainingCycleType}
-            onChange={v => updatePharma({ trainingCycleType: v as any })}
-            options={CYCLE_TYPES}
-          />
-        </Field>
-        <Field label="Длительность цикла" hint="недель">
-          <NumberInput
-            value={pharma.trainingCycleWeeks}
-            onChange={v => updatePharma({ trainingCycleWeeks: v ?? 12 })}
-            min={1} max={52}
-          />
-        </Field>
+        <PopupValueEditor
+          label="Фаза"
+          value={pharma.phase}
+          type="select"
+          options={PHASES}
+          onChange={v => updatePharma({ phase: v as any })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Дата старта курса"
+          value={pharma.courseStartDate}
+          type="text"
+          onChange={v => updatePharma({ courseStartDate: v })}
+          placeholder="YYYY-MM-DD"
+        />
+        <PopupValueEditor
+          label="Опыт"
+          value={pharma.experience}
+          type="select"
+          options={EXPERIENCE}
+          onChange={v => updatePharma({ experience: v as any })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Всего курсов"
+          value={pharma.totalCycles}
+          type="number"
+          min={0} max={50}
+          onChange={v => updatePharma({ totalCycles: v ?? 0 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Лет на фарме"
+          value={pharma.yearsOnGear}
+          type="number"
+          min={0} max={30} step={0.5}
+          onChange={v => updatePharma({ yearsOnGear: v ?? 0 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Месяцев с последнего"
+          value={pharma.monthsSinceLastCourse}
+          type="number"
+          min={0} max={120}
+          onChange={v => updatePharma({ monthsSinceLastCourse: v ?? 0 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Время с последнего"
+          value={pharma.timeSinceLastCycle}
+          type="select"
+          options={TIME_SINCE}
+          onChange={v => updatePharma({ timeSinceLastCycle: v as any })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Тип цикла"
+          value={pharma.trainingCycleType}
+          type="select"
+          options={CYCLE_TYPES}
+          onChange={v => updatePharma({ trainingCycleType: v as any })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Длительность цикла"
+          value={pharma.trainingCycleWeeks}
+          unit="недель"
+          type="number"
+          min={1} max={52}
+          onChange={v => updatePharma({ trainingCycleWeeks: v ?? 12 })}
+          placeholder="—"
+        />
       </FieldRow>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -127,13 +136,16 @@ export const UserPharmaSection: React.FC = () => {
         />
       </div>
 
-      <Field label="Прошлых курсов">
-        <NumberInput
+      <div style={{ marginBottom: 12 }}>
+        <PopupValueEditor
+          label="Прошлых курсов"
           value={pharma.previousCycles}
-          onChange={v => updatePharma({ previousCycles: v ?? 0 })}
+          type="number"
           min={0} max={50}
+          onChange={v => updatePharma({ previousCycles: v ?? 0 })}
+          placeholder="—"
         />
-      </Field>
+      </div>
 
       <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
         💡 Конкретные препараты с дозами управляются на экране <b>💊 Мой курс</b> (PharmaScreen).

@@ -363,3 +363,164 @@ export const FieldRow: React.FC<{ children: React.ReactNode; cols?: number; gap?
     {children}
   </div>
 );
+
+/* ── Popup value editor ── */
+
+export const PopupValueEditor: React.FC<{
+  label: string;
+  value: string | number | undefined | null;
+  unit?: string;
+  placeholder?: string;
+  type?: 'number' | 'text' | 'select';
+  options?: { id: string; label: string }[];
+  min?: number;
+  max?: number;
+  step?: number;
+  onChange: (v: any) => void;
+  children?: React.ReactNode;
+  color?: string;
+}> = ({ label, value, unit, placeholder, type = 'text', options, min, max, step = 1, onChange, children, color }) => {
+  const [open, setOpen] = useState(false);
+  const [local, setLocal] = useState<string>('');
+  const c = color || colors.primary;
+
+  const displayValue = () => {
+    if (value === undefined || value === null || value === '') return placeholder || '—';
+    if (unit) return `${value} ${unit}`;
+    return String(value);
+  };
+
+  const openPopup = () => {
+    setLocal(value !== undefined && value !== null ? String(value) : '');
+    setOpen(true);
+  };
+
+  const commit = () => {
+    if (type === 'number') {
+      const n = Number(local);
+      if (!Number.isFinite(n)) { setOpen(false); return; }
+      let v = n;
+      if (min !== undefined) v = Math.max(min, v);
+      if (max !== undefined) v = Math.min(max, v);
+      onChange(v);
+    } else {
+      onChange(local);
+    }
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={openPopup}
+        style={{
+          ...glassCard,
+          background: 'rgba(255,255,255,0.04)',
+          padding: '10px 12px',
+          cursor: 'pointer',
+          border: `1px solid ${colors.border}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          textAlign: 'left',
+          color: colors.text,
+          minHeight: 44,
+          transition: 'border-color 0.15s',
+        }}
+      >
+        <span style={{ fontSize: 12, color: colors.textMuted }}>{label}</span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: value ? colors.text : colors.textSubtle }}>
+          {displayValue()}
+        </span>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => setOpen(false)}
+        >
+          <div
+            style={{
+              ...glassCard,
+              width: 'min(360px, 90vw)',
+              padding: 20,
+              border: `1px solid ${c}44`,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 14, fontWeight: 700, color: c, marginBottom: 16 }}>{label}</div>
+
+            {type === 'select' && options ? (
+              <select
+                value={local}
+                onChange={e => setLocal(e.target.value)}
+                style={{ ...selectStyle, marginBottom: 16 }}
+                autoFocus
+              >
+                {placeholder && <option value="">{placeholder}</option>}
+                {options.map(o => (
+                  <option key={o.id} value={o.id}>{o.label}</option>
+                ))}
+              </select>
+            ) : type === 'number' ? (
+              <input
+                type="number"
+                value={local}
+                onChange={e => setLocal(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setOpen(false); }}
+                min={min}
+                max={max}
+                step={step}
+                placeholder={placeholder}
+                autoFocus
+                style={{ ...inputStyle, marginBottom: 16, fontSize: 18, padding: '12px 14px' }}
+                inputMode="decimal"
+              />
+            ) : (
+              <input
+                type="text"
+                value={local}
+                onChange={e => setLocal(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setOpen(false); }}
+                placeholder={placeholder}
+                autoFocus
+                style={{ ...inputStyle, marginBottom: 16, fontSize: 18, padding: '12px 14px' }}
+              />
+            )}
+
+            {unit && type === 'number' && (
+              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>
+                Единица измерения: {unit}
+                {min !== undefined && max !== undefined && ` · Диапазон: ${min}–${max}`}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setOpen(false)}
+                style={{
+                  ...inputBase, background: 'transparent', border: `1px solid ${colors.border}`,
+                  cursor: 'pointer', minHeight: 36, padding: '8px 16px',
+                }}
+              >Отмена</button>
+              <button
+                onClick={commit}
+                style={{
+                  ...inputBase, background: c, border: `1px solid ${c}`,
+                  color: '#000', cursor: 'pointer', fontWeight: 700,
+                  minHeight: 36, padding: '8px 16px',
+                }}
+              >Сохранить</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};

@@ -80,7 +80,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
   const phaseBadge = ph.phase === 'course' ? { label: 'КУРС', color: colors.warning } : null;
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '60vh' }}>
       {/* Шапка с краткой сводкой */}
       <div style={{
         ...glassCard,
@@ -157,11 +157,22 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
         </div>
       </div>
 
-      {/* 4 карточки вкладок */}
+      {/* Растягиваемый спейсер чтобы прижать карточки вниз */}
+      <div style={{ flex: 1 }} />
+
+      {/* 4 карточки вкладок — горизонтально внизу */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-        gap: 12,
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: 10,
+        padding: '12px 0 0 0',
+        position: 'sticky',
+        bottom: 0,
+        background: 'rgba(28,28,32,0.95)',
+        backdropFilter: 'blur(8px)',
+        paddingTop: 12,
+        paddingBottom: 8,
+        zIndex: 10,
       }}>
         {TABS.map(t => (
           <button
@@ -173,12 +184,14 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
               border: `1px solid ${t.color}33`,
               display: 'flex',
               flexDirection: 'column',
-              alignItems: 'flex-start',
-              gap: 8,
-              minHeight: 140,
-              textAlign: 'left',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              minHeight: 100,
+              textAlign: 'center',
               color: colors.text,
               transition: 'all 0.2s',
+              padding: 12,
             }}
             onMouseEnter={e => {
               (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
@@ -189,9 +202,8 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
               (e.currentTarget as HTMLElement).style.borderColor = `${t.color}33`;
             }}
           >
-            <span style={{ fontSize: 32, lineHeight: 1 }}>{t.icon}</span>
-            <div style={{ fontSize: 16, fontWeight: 700, color: t.color }}>{t.title}</div>
-            <div style={{ fontSize: 11, color: colors.textMuted, lineHeight: 1.4 }}>{t.short}</div>
+            <span style={{ fontSize: 28, lineHeight: 1 }}>{t.icon}</span>
+            <div style={{ fontSize: 13, fontWeight: 700, color: t.color }}>{t.title}</div>
           </button>
         ))}
       </div>

@@ -58,7 +58,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void 
   const meta = TAB_META[tab];
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
       {/* Хедер вкладки */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
@@ -66,6 +66,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void 
         background: `${meta.color}11`,
         border: `1px solid ${meta.color}33`,
         borderRadius: 12,
+        flexShrink: 0,
       }}>
         <button
           onClick={() => setTab(null)}
@@ -100,11 +101,20 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void 
         )}
       </div>
 
-      {/* Содержимое вкладки */}
-      {tab === 'user' && <ProfileUserTab />}
-      {tab === 'training' && <ProfileTrainingTab />}
-      {tab === 'diaries' && <ProfileDiariesTab onNavigate={onNavigate} />}
-      {tab === 'settings' && <ProfileSettingsTab onNavigate={onNavigate} />}
+      {/* Содержимое вкладки с прокруткой */}
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        paddingRight: 4,
+        scrollbarWidth: 'thin',
+        scrollbarColor: `${colors.border} transparent`,
+      }}>
+        {tab === 'user' && <ProfileUserTab />}
+        {tab === 'training' && <ProfileTrainingTab />}
+        {tab === 'diaries' && <ProfileDiariesTab onNavigate={onNavigate} />}
+        {tab === 'settings' && <ProfileSettingsTab onNavigate={onNavigate} />}
+      </div>
     </div>
   );
 };

@@ -1,10 +1,11 @@
 /**
  * UserGoalsSection — секция "Цели" вкладки Пользователь.
+ * Использует PopupValueEditor для ввода значений через попап.
  */
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
 import { useProfileSection } from '../../../../core/profile-manager';
-import { AccordionSection, Field, FieldRow, NumberInput, TextInput, SelectInput, colors } from '../ui';
+import { AccordionSection, FieldRow, PopupValueEditor, colors } from '../ui';
 
 const PRIMARY_GOALS = [
   { id: 'bulk', label: 'Набор массы' },
@@ -54,76 +55,84 @@ export const UserGoalsSection: React.FC = () => {
       color={colors.orange}
     >
       <FieldRow cols={2}>
-        <Field label="Основная цель">
-          <SelectInput
-            value={goals.primaryGoal || training.primaryGoal}
-            onChange={v => {
-              updateGoals({ primaryGoal: v as any });
-              updateTraining({ primaryGoal: v as any });
-            }}
-            options={PRIMARY_GOALS}
-          />
-        </Field>
-        <Field label="Цель курса">
-          <SelectInput
-            value={goals.cycleGoal}
-            onChange={v => updateGoals({ cycleGoal: v })}
-            options={CYCLE_GOALS}
-            placeholder="—"
-          />
-        </Field>
-        <Field label="Длительность курса" hint="нед">
-          <NumberInput
-            value={goals.cycleWeeks}
-            onChange={v => updateGoals({ cycleWeeks: v })}
-            min={1} max={52}
-          />
-        </Field>
-        <Field label="Срок достижения" hint="нед">
-          <NumberInput
-            value={goals.goalTimelineWeeks}
-            onChange={v => updateGoals({ goalTimelineWeeks: v })}
-            min={1} max={104}
-          />
-        </Field>
-        <Field label="Целевой вес" hint="кг">
-          <NumberInput
-            value={goals.targetWeight}
-            onChange={v => updateGoals({ targetWeight: v })}
-            min={30} max={250} step={0.5}
-          />
-        </Field>
-        <Field label="Целевой % жира" hint="%">
-          <NumberInput
-            value={goals.targetBodyFat}
-            onChange={v => updateGoals({ targetBodyFat: v })}
-            min={3} max={50} step={0.5}
-          />
-        </Field>
-        <Field label="BB-категория">
-          <SelectInput
-            value={goals.bbCategory}
-            onChange={v => updateGoals({ bbCategory: v })}
-            options={BB_CATEGORIES}
-            placeholder="—"
-          />
-        </Field>
-        <Field label="Этап жизни">
-          <SelectInput
-            value={goals.lifeStage}
-            onChange={v => updateGoals({ lifeStage: v })}
-            options={LIFE_STAGES}
-            placeholder="—"
-          />
-        </Field>
-        <Field label="Дата шоу" hint="YYYY-MM-DD (для peak week)">
-          <TextInput
-            value={goals.peakShowDay}
-            onChange={v => updateGoals({ peakShowDay: v })}
-            placeholder="—"
-            maxLength={10}
-          />
-        </Field>
+        <PopupValueEditor
+          label="Основная цель"
+          value={goals.primaryGoal || training.primaryGoal}
+          type="select"
+          options={PRIMARY_GOALS}
+          onChange={v => {
+            updateGoals({ primaryGoal: v as any });
+            updateTraining({ primaryGoal: v as any });
+          }}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Цель курса"
+          value={goals.cycleGoal}
+          type="select"
+          options={CYCLE_GOALS}
+          onChange={v => updateGoals({ cycleGoal: v })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Длительность курса"
+          value={goals.cycleWeeks}
+          unit="нед"
+          type="number"
+          min={1} max={52}
+          onChange={v => updateGoals({ cycleWeeks: v })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Срок достижения"
+          value={goals.goalTimelineWeeks}
+          unit="нед"
+          type="number"
+          min={1} max={104}
+          onChange={v => updateGoals({ goalTimelineWeeks: v })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Целевой вес"
+          value={goals.targetWeight}
+          unit="кг"
+          type="number"
+          min={30} max={250} step={0.5}
+          onChange={v => updateGoals({ targetWeight: v })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Целевой % жира"
+          value={goals.targetBodyFat}
+          unit="%"
+          type="number"
+          min={3} max={50} step={0.5}
+          onChange={v => updateGoals({ targetBodyFat: v })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="BB-категория"
+          value={goals.bbCategory}
+          type="select"
+          options={BB_CATEGORIES}
+          onChange={v => updateGoals({ bbCategory: v })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Этап жизни"
+          value={goals.lifeStage}
+          type="select"
+          options={LIFE_STAGES}
+          onChange={v => updateGoals({ lifeStage: v })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Дата шоу"
+          value={goals.peakShowDay}
+          type="text"
+          onChange={v => updateGoals({ peakShowDay: v })}
+          placeholder="YYYY-MM-DD (peak week)"
+        />
       </FieldRow>
     </AccordionSection>
   );

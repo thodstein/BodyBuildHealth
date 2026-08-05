@@ -1,9 +1,10 @@
 /**
  * UserDietSection — секция "Питание" вкладки Пользователь.
+ * Использует PopupValueEditor для ввода значений через попап.
  */
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
-import { AccordionSection, Field, FieldRow, NumberInput, SelectInput, BoolChip, colors } from '../ui';
+import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, colors } from '../ui';
 import { ALLERGEN_LIST } from '../../../../core/contraindications';
 
 const DIET_TYPES = [
@@ -40,27 +41,30 @@ export const UserDietSection: React.FC = () => {
       color={colors.green}
     >
       <FieldRow cols={3}>
-        <Field label="Тип питания">
-          <SelectInput
-            value={nutrition.dietType}
-            onChange={v => updateNutrition({ dietType: v as any })}
-            options={DIET_TYPES}
-          />
-        </Field>
-        <Field label="Приёмов пищи в день">
-          <NumberInput
-            value={nutrition.mealsPerDay}
-            onChange={v => updateNutrition({ mealsPerDay: v ?? 3 })}
-            min={2} max={8}
-          />
-        </Field>
-        <Field label="Навык готовки">
-          <SelectInput
-            value={nutrition.cookingSkill}
-            onChange={v => updateNutrition({ cookingSkill: v as any })}
-            options={COOKING_SKILLS}
-          />
-        </Field>
+        <PopupValueEditor
+          label="Тип питания"
+          value={nutrition.dietType}
+          type="select"
+          options={DIET_TYPES}
+          onChange={v => updateNutrition({ dietType: v as any })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Приёмов пищи в день"
+          value={nutrition.mealsPerDay}
+          type="number"
+          min={2} max={8}
+          onChange={v => updateNutrition({ mealsPerDay: v ?? 3 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Навык готовки"
+          value={nutrition.cookingSkill}
+          type="select"
+          options={COOKING_SKILLS}
+          onChange={v => updateNutrition({ cookingSkill: v as any })}
+          placeholder="—"
+        />
       </FieldRow>
 
       <div style={{ marginBottom: 16 }}>
@@ -94,48 +98,60 @@ export const UserDietSection: React.FC = () => {
       </div>
 
       <FieldRow cols={3}>
-        <Field label="Белок/кг" hint="г на кг массы">
-          <NumberInput
-            value={nutrition.proteinPerKg}
-            onChange={v => updateNutrition({ proteinPerKg: v ?? 1.8 })}
-            min={0.8} max={4} step={0.1}
-          />
-        </Field>
-        <Field label="Клетчатка" hint="г/день">
-          <NumberInput
-            value={nutrition.fiberG}
-            onChange={v => updateNutrition({ fiberG: v ?? 25 })}
-            min={10} max={80}
-          />
-        </Field>
-        <Field label="Омега-3" hint="г/день">
-          <NumberInput
-            value={nutrition.omega3G}
-            onChange={v => updateNutrition({ omega3G: v ?? 1.5 })}
-            min={0} max={10} step={0.1}
-          />
-        </Field>
-        <Field label="Натрий" hint="г/день">
-          <NumberInput
-            value={nutrition.sodiumG}
-            onChange={v => updateNutrition({ sodiumG: v ?? 3 })}
-            min={0.5} max={10} step={0.1}
-          />
-        </Field>
-        <Field label="Калий" hint="г/день">
-          <NumberInput
-            value={nutrition.potassiumG}
-            onChange={v => updateNutrition({ potassiumG: v ?? 3 })}
-            min={0.5} max={10} step={0.1}
-          />
-        </Field>
-        <Field label="Алкоголь/нед" hint="дринков">
-          <NumberInput
-            value={nutrition.alcoholPerWeek}
-            onChange={v => updateNutrition({ alcoholPerWeek: v ?? 0 })}
-            min={0} max={30}
-          />
-        </Field>
+        <PopupValueEditor
+          label="Белок/кг"
+          value={nutrition.proteinPerKg}
+          unit="г/кг"
+          type="number"
+          min={0.8} max={4} step={0.1}
+          onChange={v => updateNutrition({ proteinPerKg: v ?? 1.8 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Клетчатка"
+          value={nutrition.fiberG}
+          unit="г/день"
+          type="number"
+          min={10} max={80}
+          onChange={v => updateNutrition({ fiberG: v ?? 25 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Омега-3"
+          value={nutrition.omega3G}
+          unit="г/день"
+          type="number"
+          min={0} max={10} step={0.1}
+          onChange={v => updateNutrition({ omega3G: v ?? 1.5 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Натрий"
+          value={nutrition.sodiumG}
+          unit="г/день"
+          type="number"
+          min={0.5} max={10} step={0.1}
+          onChange={v => updateNutrition({ sodiumG: v ?? 3 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Калий"
+          value={nutrition.potassiumG}
+          unit="г/день"
+          type="number"
+          min={0.5} max={10} step={0.1}
+          onChange={v => updateNutrition({ potassiumG: v ?? 3 })}
+          placeholder="—"
+        />
+        <PopupValueEditor
+          label="Алкоголь/нед"
+          value={nutrition.alcoholPerWeek}
+          unit="дринков"
+          type="number"
+          min={0} max={30}
+          onChange={v => updateNutrition({ alcoholPerWeek: v ?? 0 })}
+          placeholder="—"
+        />
       </FieldRow>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
