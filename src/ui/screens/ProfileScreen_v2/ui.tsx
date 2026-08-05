@@ -410,7 +410,7 @@ export const PopupValueEditor: React.FC<{
   };
 
   return (
-    <>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
       <button
         type="button"
         onClick={openPopup}
@@ -430,8 +430,11 @@ export const PopupValueEditor: React.FC<{
           transition: 'border-color 0.15s',
         }}
       >
-        <span style={{ fontSize: 12, color: colors.textMuted }}>{label}</span>
-        <span style={{ fontSize: 14, fontWeight: 600, color: value ? colors.text : colors.textSubtle }}>
+        <span style={{ fontSize: 12, color: colors.textMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+        <span style={{
+          fontSize: 14, fontWeight: 600, color: value ? colors.text : colors.textSubtle,
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '60%',
+        }}>
           {displayValue()}
         </span>
       </button>
@@ -521,6 +524,6 @@ export const PopupValueEditor: React.FC<{
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };

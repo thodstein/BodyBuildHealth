@@ -4,7 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { db } from '../../../core/db';
-import { getWeightLog, getMeasurementsLog } from '../../../engines/profile-store';
+import { getWeightLog, saveWeightLog, getMeasurementsLog, saveMeasurementsLog } from '../../../engines/profile-store';
 import { AccordionSection, colors } from './ui';
 
 interface QuickLink {
