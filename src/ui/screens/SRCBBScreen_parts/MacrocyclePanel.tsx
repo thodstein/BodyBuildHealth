@@ -95,25 +95,30 @@ interface Props {
   onLevelChange?: (level: string) => void;
   /** Опционально: callback при изменении goal (для редактируемого селектора). */
   onGoalChange?: (goal: 'powerlifting' | 'bodybuilding' | 'general') => void;
+  /** MC-4: Storage key для изоляции storage контекстов (по умолчанию he_pl_macro / he_bb_macro). */
+  storageKey?: string;
 }
 
-export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, onApplyMacrocycle, onLevelChange, onGoalChange }) => {
+export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, onApplyMacrocycle, onLevelChange, onGoalChange, storageKey }) => {
   // Локальные редактируемые значения (если onLevelChange/onGoalChange не переданы — селекторы disabled)
   const [localLevel, setLocalLevel] = useState<string>(level);
   const [localGoal, setLocalGoal] = useState<'powerlifting' | 'bodybuilding' | 'general'>(goal);
   const effLevel = onLevelChange ? level : localLevel;
   const effGoal = onGoalChange ? goal : localGoal;
   const isBB = effGoal === 'bodybuilding';
+  // MC-4: use storageKey prop for isolation (default to STORAGE_KEY/BB_STORAGE_KEY)
+  const plKey = storageKey ?? STORAGE_KEY;
+  const bbKey = isBB ? (storageKey ?? BB_STORAGE_KEY) : BB_STORAGE_KEY;
   const [macro, setMacro] = useState<Macrocycle | null>(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(plKey);
       const migrated = migrateStorage(raw);
       return migrated ? deserializeMacro(migrated) : null;
     } catch { return null; }
   });
   const [bbMacro, setBbMacro] = useState<BBMacrocycle | null>(() => {
     try {
-      const raw = localStorage.getItem(BB_STORAGE_KEY);
+      const raw = localStorage.getItem(bbKey);
       return raw ? deserializeBbMacro(raw) : null;
     } catch { return null; }
   });
@@ -170,25 +175,25 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       try {
         const serialized = serializeMacro(macro);
         macroSerializedRef.current = serialized;
-        localStorage.setItem(STORAGE_KEY, serialized);
+        localStorage.setItem(plKey, serialized);
         window.dispatchEvent(new CustomEvent('he-pl-macrocycle-updated', { detail: serialized }));
       } catch { /* ignore */ }
     }
-  }, [macro, isBB]);
+  }, [macro, isBB, plKey]);
   useEffect(() => {
     if (bbMacro && isBB) {
       try {
         const serialized = serializeBbMacro(bbMacro);
         bbSerializedRef.current = serialized;
-        localStorage.setItem(BB_STORAGE_KEY, serialized);
+        localStorage.setItem(bbKey, serialized);
         window.dispatchEvent(new CustomEvent('he-bb-macrocycle-updated', { detail: serialized }));
       } catch { /* ignore */ }
     }
-  }, [bbMacro, isBB]);
+  }, [bbMacro, isBB, bbKey]);
 
   useEffect(() => {
     const sync = (raw?: string | null) => {
-      const serialized = raw ?? localStorage.getItem(STORAGE_KEY);
+      const serialized = raw ?? localStorage.getItem(plKey);
       if (!serialized) return;
       if (serialized === macroSerializedRef.current) return;
       const restored = deserializeMacro(serialized);
@@ -202,7 +207,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       setEditWeeks({});
     };
     const syncBb = (raw?: string | null) => {
-      const serialized = raw ?? localStorage.getItem(BB_STORAGE_KEY);
+      const serialized = raw ?? localStorage.getItem(bbKey);
       if (!serialized || serialized === bbSerializedRef.current) return;
       const restored = deserializeBbMacro(serialized);
       if (!restored || !isBB) return;
@@ -324,7 +329,9 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             </label>
           </div>
         )}
-        <div style={{ ...SMALL, marginBottom: 8 }}>Последовательность фаз: выносливость → силовой → выход на пик → соревнования → переход. Клик по блоку → применить цикл.</div>
+        <div style={{ ...SMALL, marginBottom: 8 }}>{isBB
+          ? 'Последовательность фаз ББ: гипертрофия → сила → contest prep → переход. Клик по блоку → применить макроцикл.'
+          : 'Последовательность фаз ПЛ: выносливость → силовой → выход на пик → соревнования → переход. Клик по блоку → применить цикл.'}</div>
         <div className="macrocycle-control-cards">
           <button type="button" className="macrocycle-control-card" onClick={() => setActivePopup('level')}>
             <span>🎓 Уровень спортсмена</span><strong>{levelLabel}</strong><small>Изменить</small>
@@ -443,7 +450,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             const levelMismatch = selectedCycle && selectedCycle.meta.level !== effLevel;
             return (
             <div key={c.id}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 60px 28px', gap: 4, marginBottom: 3, alignItems: 'center' }}>
+              <div className="macrocycle-competition-row" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 50px 60px 28px', gap: 4, marginBottom: 3, alignItems: 'center' }}>
                 <input aria-label="Название соревнования" style={{ ...IN, padding: '4px 8px', fontSize: 10, minHeight: 44 }}
                   value={c.name} placeholder="Название"
                   onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, name: e.target.value } : cc))} />
@@ -548,9 +555,9 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           })}
         </div>
 
-        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+        <div className="macrocycle-actions" style={{ display: 'flex', gap: 8, marginTop: 10 }}>
           <button onClick={build} style={BTN}>Построить макроцикл</button>
-          {(isBB ? bbMacro : macro) && <button onClick={() => { if (isBB) { setBbMacro(null); try { localStorage.removeItem(BB_STORAGE_KEY); } catch {} } else { setMacro(null); try { localStorage.removeItem(STORAGE_KEY); } catch {} } }} style={BTN_GHOST}>Сбросить</button>}
+          {(isBB ? bbMacro : macro) && <button onClick={() => { if (isBB) { setBbMacro(null); try { localStorage.removeItem(bbKey); } catch {} } else { setMacro(null); try { localStorage.removeItem(plKey); } catch {} } }} style={BTN_GHOST}>Сбросить</button>}
         </div>
         {competitionValidation && (
           <div role="alert" style={{ marginTop: 8, color: '#fca5a5', fontSize: 11 }}>
@@ -646,7 +653,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             })()}
           </div>
           {/* Маркер текущей недели — редактор */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+          <div className="macrocycle-current-week" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
             <span>📍 Текущая неделя:</span>
              <input aria-label="Текущая неделя макроцикла" style={{ ...IN, padding: '3px 6px', fontSize: 11, width: 60, minHeight: 44, textAlign: 'center' }}
               type="number" min={1} max={(isBB ? bbMacro!.totalWeeks : macro!.totalWeeks)}
@@ -665,7 +672,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   const block = src.blocks.find(b => b.competitionId === c.id && b.phase === (isBB ? 'contest_prep' : 'competition'));
                   const priorityColor = c.priority === 'A' ? '#ef4444' : c.priority === 'B' ? '#f59e0b' : '#a78bfa';
                   return (
-                     <div key={c.id} aria-label={`${c.name}, неделя ${c.week}, приоритет ${c.priority}`} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--text-light, rgba(255,255,255,0.8))' }}>
+                      <div key={c.id} aria-label={`${c.name}, неделя ${c.week}, приоритет ${c.priority}`} className="macrocycle-competition-summary-row" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--text-light, rgba(255,255,255,0.8))' }}>
                        <span style={{ color: priorityColor, fontWeight: 700 }}>{c.priority === 'A' ? '🔴' : c.priority === 'B' ? '🟡' : '🟣'} [{c.priority}]</span>
                       <span style={{ fontWeight: 600 }}>{c.name}</span>
                       <span style={{ color: 'rgba(255,255,255,0.5)' }}>· нед {c.week}{block ? ` (блок ${block.weekOffset})` : ''}</span>
@@ -682,12 +689,12 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             const abIcon = isBB ? (BB_PHASE_ICON[activeBlock.phase as BBMacroPhase] ?? '') : PHASE_ICON[activeBlock.phase as MacroPhase];
             const abLabel = isBB ? (BB_PHASE_LABEL_RU[activeBlock.phase as BBMacroPhase] ?? '') : PHASE_LABEL_RU[activeBlock.phase as MacroPhase];
             return (
-            <div style={{ padding: 10, borderRadius: 8, background: abColor + '15', border: `1px solid ${abColor}40`, marginBottom: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+             <div className="macrocycle-active-block" style={{ padding: 10, borderRadius: 8, background: abColor + '15', border: `1px solid ${abColor}40`, marginBottom: 8 }}>
+               <div className="macrocycle-active-block__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-light, #fff)', borderLeft: `3px solid ${abColor}`, paddingLeft: 6 }}>{abIcon} {abLabel}</span>
                 <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Нед {activeBlock.weekOffset}–{activeBlock.weekOffset + activeBlock.weeks - 1} ({activeBlock.weeks} нед)</span>
               </div>
-              <div style={{ ...SMALL, marginBottom: 6 }}>{activeBlock.description}</div>
+              <div className="macrocycle-active-block__description" style={{ ...SMALL, marginBottom: 6 }}>{activeBlock.description}</div>
               {'cycleId' in activeBlock && activeBlock.cycleId && (() => {
                 const cyc = getCycleById(activeBlock.cycleId);
                 return (
@@ -718,7 +725,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           )}
 
           {/* Правка длительности фаз */}
-          <div style={{ marginTop: 10 }}>
+           <div className="macrocycle-phase-editor" style={{ marginTop: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>⚙️ Правка длительности фаз</div>
              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(82px, 1fr))', gap: isCompact ? 4 : 6 }}>
               {(isBB ? BB_PHASES : PL_PHASES).map((phase: BBMacroPhase | MacroPhase) => {
@@ -750,7 +757,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           </div>
 
           {/* Rationale */}
-          <div style={{ marginTop: 12, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+           <div className="macrocycle-rationale" style={{ marginTop: 12, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>Обоснование:</div>
             {(isBB ? bbMacro!.rationale : macro!.rationale).map((r, i) => <div key={i} style={{ ...SMALL, fontSize: 10 }}>• {r}</div>)}
           </div>

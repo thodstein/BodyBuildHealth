@@ -80,7 +80,7 @@ export function escapeHtml(value: unknown): string {
 export interface ProgramEditorProps {
   program: UserProgram;
   onChange: (p: UserProgram) => void;
-  onSave: (note?: string) => void;
+  onSave: (note?: string) => boolean | void;
   onBack: () => void;
   mode: ManualMode;
   onMode: (m: ManualMode) => void;
@@ -221,9 +221,11 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     const timer = setInterval(() => {
       const current = JSON.stringify(program);
       if (current !== lastSavedRef.current) {
-        onSave('Автосохранение');
-        lastSavedRef.current = current;
-        setIsDirty(false);
+        const saved = onSave('Автосохранение');
+        if (saved !== false) {
+          lastSavedRef.current = current;
+          setIsDirty(false);
+        }
       }
     }, UI_METRICS.autosaveMs);
     return () => clearInterval(timer);
@@ -237,15 +239,15 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     if (ok) {
       onBack();
     } else {
-      onSave('Ручная правка');
-      onBack();
+      if (onSave('Ручная правка') !== false) onBack();
     }
   };
   // U5: при ручном сохранении — обновляем baseline
   const handleSave = (note?: string) => {
-    onSave(note);
-    lastSavedRef.current = JSON.stringify(program);
-    setIsDirty(false);
+    if (onSave(note) !== false) {
+      lastSavedRef.current = JSON.stringify(program);
+      setIsDirty(false);
+    }
   };
 
   // P5: «⚡ Заполнить автоматически» — реальная интеллектуальная сборка через
@@ -714,7 +716,9 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
       {isPro && editorLibOpen === 'macro' && (
         <TrainingModal title="🗓 Годовое планирование" onClose={() => setEditorLibOpen(null)} wide>
           <div style={{ fontSize: 11, color: DIM, marginBottom: 8 }}>
-            Постройте макроцикл (5 фаз: выносливость → сила → пик → соревнования → переход).
+            {dir === 'bb'
+              ? 'Постройте макроцикл ББ (4 фазы: гипертрофия → сила → contest prep → переход).'
+              : 'Постройте макроцикл ПЛ (5 фаз: выносливость → сила → пик → соревнования → переход).'}
             Клик по блоку → применить как активный цикл/программу. Текущее направление: <b style={{ color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]}</b>.
           </div>
           <MacrocyclePanel
@@ -722,6 +726,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
             goal={macroGoal}
             onLevelChange={setMacroLevel}
             onGoalChange={setMacroGoal}
+            storageKey={dir === 'bb' ? 'he_bb_macro' : 'he_pl_macro'}
              onApplyCycle={(cycleId, weeks) => {
               if (dir === 'pl') {
                 // PL: загрузить LMS-цикл + установить weeks
@@ -731,8 +736,11 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
                 showToast('🗓 ПЛ-цикл применён: ' + cycleId + ' (' + weeks + ' нед)');
               } else if (dir === 'bb') {
                 // BB: применить макроцикл как ББ-программу (macrocycleToBBProgram)
+                // MC-1 FIX: read both he_bb_macro and he_pl_macro
                 try {
-                  const raw = localStorage.getItem('he_pl_macro');
+                  const rawBB = localStorage.getItem('he_bb_macro');
+                  const rawPL = localStorage.getItem('he_pl_macro');
+                  const raw = rawBB || rawPL;
                   if (!raw) {
                     showToast('⚠ Годовой план не найден — постройте макроцикл сначала');
                   } else {
@@ -755,7 +763,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
                       });
                       onChange(newProg);
                       setEditorLibOpen(null);
-                      showToast('🗓 Годовой план ББ создан: ' + macro.totalWeeks + ' нед, 5 фаз');
+                      showToast('🗓 Годовой план ББ создан: ' + macro.totalWeeks + ' нед, 4 фазы');
                     }
                   }
                 } catch (e) {
@@ -763,8 +771,11 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
                 }
               } else if (dir === 'hybrid') {
                 // Hybrid: применить макроцикл для bb-части, pl-часть не трогается
+                // MC-2 FIX: read both he_bb_macro and he_pl_macro
                 try {
-                  const raw = localStorage.getItem('he_pl_macro');
+                  const rawBB = localStorage.getItem('he_bb_macro');
+                  const rawPL = localStorage.getItem('he_pl_macro');
+                  const raw = rawBB || rawPL;
                   if (!raw) {
                     showToast('⚠ Годовой план не найден — постройте макроцикл сначала');
                   } else {

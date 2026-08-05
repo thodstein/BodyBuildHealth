@@ -993,7 +993,8 @@ export function buildTzInput(state: CalculatorState, supportSubs: string[]): TzS
     const form = dbEntry?.form === 'oral' ? 'oral' as const : 'inject' as const;
     const dbClass = dbEntry?.class || 'aas';
     const drugClass: 'aas' | 'gh' | 'insulin' = dbClass === 'gh' ? 'gh' : dbClass === 'insulin' ? 'insulin' : 'aas';
-    drugs.push({ drugClass, drugName: a.id, dose: a.doseMgWeek || 0, form, startWeek: a.startWeek, endWeek: a.endWeek });
+    const safeDose = Number.isFinite(a.doseMgWeek) ? a.doseMgWeek : 0;
+    drugs.push({ drugClass, drugName: a.id, dose: safeDose, form, startWeek: a.startWeek, endWeek: a.endWeek });
   }
 
   if (state.pharma.hasGH && !drugs.some(d => d.drugName === 'mk677' || d.drugName === 'cjc1295')) {

@@ -16,6 +16,7 @@ import { designerToUserWeeks, applyDesignPhasesToWeeks } from '../../../engines/
 import { macrocycleToBBProgram } from '../../../engines/lms/macrocycle-to-bb';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
+import { DESIGNER_PHASE_VISUAL } from './phase-visual-tokens';
 
 export interface BridgeCtx {
   program: UserProgram;
@@ -201,9 +202,28 @@ const volumeHandler: Handler = (payload, { program: p, update, showToast }) => {
 
 const peakHandler: Handler = (payload, { program: p, update, showToast }) => {
   if (!p.bb) return;
-  const mult: number = payload.data.volumeMult ?? 0.5;
-  const rirTarget: number = payload.data.rirTarget ?? 0;
-  const weeks = p.bb.weeks.map((w, wi) => wi === p.bb!.weeks.length - 1 ? { ...w, phase: 'peaking' as const, sessions: w.sessions.map((s) => ({ ...s, blocks: s.blocks.map((b) => ({ ...b, sets: (b.sets ?? []).map((st) => ({ ...st, weight: st.weight ? Math.round(st.weight * mult) : st.weight, rir: rirTarget })) })) })) } : w);
+  // volumeMult — множитель объёма (сокращение сетов), rirTarget — целевой RIR для пиковой недели
+  const volumeMult: number = Math.max(0.25, Math.min(1, Number(payload.data.volumeMult ?? 0.5)));
+  const rirTarget: number = Math.max(0, Math.min(5, Number(payload.data.rirTarget ?? 2)));
+  const weeks = p.bb.weeks.map((w, wi) => wi === p.bb!.weeks.length - 1
+    ? {
+        ...w,
+        phase: 'peaking' as const,
+        sessions: w.sessions.map((s) => ({
+          ...s,
+          blocks: s.blocks.map((b) => {
+            const count = Math.max(1, Math.round((b.sets ?? []).length * volumeMult));
+            return {
+              ...b,
+              sets: Array.from({ length: count }, (_, i) => {
+                const src = (b.sets ?? [])[i] ?? { reps: 5, rir: 2, weight: 0, restSec: 90 };
+                return { ...src, rir: rirTarget };
+              }),
+            };
+          }),
+        })),
+      }
+    : w);
   update({ bb: { ...p.bb, weeks } });
   showToast('🔗 Пиковая неделя: ' + payload.label);
 };
@@ -241,7 +261,10 @@ const designHandler: Handler = (payload, { program: p, dir, update, onChange, sh
       const existingWeeks = p.bb.weeks;
       const remapped = applyDesignPhasesToWeeks(existingWeeks, design);
       update({ bb: { ...p.bb, weeks: remapped } });
-      showToast('🔗 Фазы дизайнера применены к текущей программе: ' + payload.label);
+      // MC-10 FIX: detailed toast with stats
+      const phaseCounts = design.blocks.reduce((acc, b) => { acc[b.phaseKey] = (acc[b.phaseKey] || 0) + 1; return acc; }, {} as Record<string, number>);
+      const phaseSummary = Object.entries(phaseCounts).map(([phase, count]) => `${DESIGNER_PHASE_VISUAL[phase as keyof typeof DESIGNER_PHASE_VISUAL]?.label || phase}: ${count}`).join(', ');
+      showToast(`🔗 Фазы дизайнера применены: ${design.totalWeeks} нед, ${design.blocks.length} блоков (${phaseSummary})`);
     } else {
       const weeks = designerToUserWeeks(design, {
         fillExercises,
@@ -251,6 +274,11 @@ const designHandler: Handler = (payload, { program: p, dir, update, onChange, sh
         equipment: p.bb?.constraints?.equipment ?? [],
         weakPoints: (tprofile.weakPoints ?? []) as string[],
       });
+      // MC-7 FIX: Handle empty weeks or null fallback
+      if (!weeks || weeks.length === 0) {
+        showToast('⚠ Ошибка: не удалось создать недели из дизайна. Проверьте параметры дизайна.');
+        return;
+      }
       const blank = createBlank('bb');
       const newProg: UserProgram = {
         ...blank,
@@ -258,7 +286,10 @@ const designHandler: Handler = (payload, { program: p, dir, update, onChange, sh
         bb: { ...blank.bb!, weeks },
       };
       onChange(newProg);
-      showToast('🔗 Дизайн применён как новая программа: ' + payload.label);
+      // MC-10 FIX: detailed toast with stats
+      const phaseCounts = design.blocks.reduce((acc, b) => { acc[b.phaseKey] = (acc[b.phaseKey] || 0) + 1; return acc; }, {} as Record<string, number>);
+      const phaseSummary = Object.entries(phaseCounts).map(([phase, count]) => `${DESIGNER_PHASE_VISUAL[phase as keyof typeof DESIGNER_PHASE_VISUAL]?.label || phase}: ${count}`).join(', ');
+      showToast(`🔗 Дизайн применён как новая программа: ${design.totalWeeks} нед, ${design.blocks.length} блоков (${phaseSummary})${fillExercises ? ' + упражнения' : ''}`);
     }
   } catch (e) { showToast('⚠ Не удалось применить дизайн: ' + (e as Error)?.message); }
 };

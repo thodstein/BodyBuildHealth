@@ -152,13 +152,17 @@ describe('macrocycleToBBProgram', () => {
     expect(repeatedWeight!).toBeGreaterThan(firstWeight!);
   });
 
-  it('inserts a mini-deload at the fourth week of long preparation blocks', () => {
+  it('inserts a mini-deload at the fourth week of preparation blocks (adaptive frequency)', () => {
     const macro = buildMacrocycle({ level: 'intermediate', goal: 'bodybuilding', totalWeeks: 52 });
     const program = macrocycleToBBProgram(macro, baseOpts);
     const preparation = macro.blocks.find(block => block.phase === 'endurance' && block.weeks >= 4);
     expect(preparation).toBeTruthy();
-    const fourth = program.bb!.weeks.find(week => week.week === preparation!.weekOffset + 3);
-    expect(fourth?.deload).toBe(true);
+    // PL-4 FIX: deload frequency is now adaptive based on block duration
+    // For blocks > 12 weeks, deload every 5-6 weeks; for shorter blocks, every 4 weeks
+    const deloadFrequency = preparation!.weeks > 12 ? 6 : preparation!.weeks > 8 ? 5 : 4;
+    const deloadWeek = preparation!.weekOffset + deloadFrequency - 1;
+    const deloadWeekData = program.bb!.weeks.find(week => week.week === deloadWeek);
+    expect(deloadWeekData?.deload).toBe(true);
   });
 
   it('uses trainingFocus stored in a BB macrocycle over fallback options', () => {

@@ -25,7 +25,7 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
     db.put('course_log', {
       id: crypto.randomUUID(), substanceId: sub.id,
       doseValue: val, doseUnit: unit,
-      frequency: dr?.frequency || '2x/wk',
+      frequency: typeof dr?.frequency === 'number' ? dr.frequency : 2,
       startWeek: 1, endWeek: 12,
     }).catch(() => {});
   }, [sub.id, sub.dosageRange, detail?.dosageRange]);

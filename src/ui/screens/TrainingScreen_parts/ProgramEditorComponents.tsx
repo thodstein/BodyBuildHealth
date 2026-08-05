@@ -23,6 +23,7 @@ import {
   suggestExercisesForGroup,
 } from '../../../engines/manual-constructor';
 import { loadTrainingProfile } from './training-profile';
+import { addWeakToWeekLogic, calcW as calcWLogic } from './program-editor-logic';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { findSubstitutions } from '../../../engines/exercise-substitution.engine';
 import { ExerciseLabPicker } from './ExerciseLabPicker';
@@ -135,27 +136,15 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
         const wp = (prof.weakPoints ?? []) as string[];
         if (wp.length === 0) return null;
         const addWeakToWeek = (muscle: string) => {
-          if (!body.weeks[0]?.sessions[0]) return;
-          const recs = suggestExercisesForGroup(muscle, level, 2, (prof.equipment ?? []) as string[], wp, [], prof.avoidAxialLoad ?? false, (prof.favoriteExercises ?? []) as string[], (prof.excludedExercises ?? []) as string[]);
-          if (recs.length === 0) return;
-          const w0 = body.weeks[0];
-          const s0 = w0.sessions[0];
-          // Генерируем блоки один раз (с одинаковыми id нельзя переиспользовать в разных сессиях,
-          // поэтому генерируем свежие id для каждой недели через factory).
-          const makeBlocks = (): UserBlock[] => recs.slice(0, 2).map((r) => ({
-            id: newId('blk'),
-            type: 'accessory' as const,
-            exerciseName: r.name,
+          const updated = addWeakToWeekLogic({
+            weeks: body.weeks,
             muscle,
-            role: 'accessory' as const,
-            sets: makeSetsFromTemplate(muscleAwareSets(muscle, level), (prof.workMax ?? {})[muscle] ?? 40),
-          }));
-          // Добавлять во все недели, кроме deload (в deload объём снижен, слабые группы не добавляем).
-          const updatedWeeks = body.weeks.map((w) => w.deload ? w : {
-            ...w,
-            sessions: w.sessions.map((s, si) => si === 0 ? { ...s, blocks: [...s.blocks, ...makeBlocks()] } : s),
+            level,
+            profile: prof,
+            maxExercisesPerWeek: 2,
+            sessionIndex: 0,
           });
-          setWeeks(updatedWeeks);
+          setWeeks(updated);
         };
         return (
           <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa' }}>
@@ -816,13 +805,7 @@ const PLSetEditor: React.FC<{ sets: PLSet[]; lift: PLExercise['lift']; workMax: 
   const addSet = () => onChange([...sets, { pct: 0.7, reps: 5, sets: 3, rir: 2 }]);
   const updSet = (i: number, patch: Partial<PLSet>) => onChange(sets.map((s, j) => j === i ? { ...s, ...patch } : s));
   const removeSet = (i: number) => onChange(sets.filter((_, j) => j !== i));
-  const calcW = (pct: number) => {
-    // Для accessory упражнений процентка не применима (нет 1RM подсобки) → вес вводится вручную.
-    if (lift === 'accessory') return null;
-    const pm = workMax[lift];
-    if (!pm || pm <= 0) return null;
-    return Math.round((pm * pct) / 2.5) * 2.5;
-  };
+  const calcW = (pct: number) => calcWLogic(pct, lift, workMax);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       {sets.map((s, i) => {

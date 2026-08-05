@@ -61,6 +61,8 @@ import { DayCard, PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
 import { buildPeakWeekProtocol, applyPeakWeekToPlan, type PeakWeekProtocol } from '../../../engines/bb/bb-peak-week.engine';
 import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../../../engines/bb/bb-frequency-optimizer.engine';
+import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
+import { assessReadiness, calculateACWR, getAutoRegulationOverride } from '../../../engines/bb/bb-auto-regulation.engine';
 import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feedback.engine';
 import { generateActionableRecommendations } from '../../../engines/bb/bb-validator.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
@@ -361,7 +363,26 @@ export const BbAutoConstructor: React.FC = () => {
     const hrv = linked.profile?.settings?.baselineHrvRatio ?? 1.0;
     const srpe = loadSRPESessions();
     const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : { ratio: 1.0, zone: 'optimal' as const };
-    return autoRegulate({ readiness: rec, acwr: { ratio: acwr.ratio, zone: acwr.zone }, fatigue: fat, hrvRatio: hrv, sleepScore: sleep, plannedTopSetPct: 0.8, plannedRIR: 2 });
+    const legacy = autoRegulate({ readiness: rec, acwr: { ratio: acwr.ratio, zone: acwr.zone }, fatigue: fat, hrvRatio: hrv, sleepScore: sleep, plannedTopSetPct: 0.8, plannedRIR: 2 });
+    const lifestyle = linked.profile?.settings?.lifestyle;
+    const readiness = assessReadiness({
+      hrvMs: lifestyle?.morningHRV,
+      hrvBaseline: lifestyle?.morningHRV && lifestyle?.baselineHrvRatio ? lifestyle.morningHRV / lifestyle.baselineHrvRatio : undefined,
+      sleepHours: lifestyle?.sleepHours,
+      stressLevel: lifestyle?.stressLevel,
+      subjectiveReadiness: linked.readiness?.recovery ? linked.readiness.recovery / 10 : undefined,
+    });
+    const override = getAutoRegulationOverride(readiness);
+    return {
+      ...legacy,
+      volumeMultiplier: Math.min(legacy.volumeMultiplier, override.volumeMultiplier),
+      topSetPctMultiplier: legacy.topSetPctMultiplier * override.intensityMultiplier,
+      rirShift: Math.max(legacy.rirShift, override.rirShift),
+      deload: legacy.deload || readiness.action === 'rest',
+      decisions: [...legacy.decisions, ...readiness.recommendations.slice(0, 2)],
+      readinessLevel: readiness.level,
+      readinessScore: readiness.score,
+    };
   }, [linked.readiness, linked.profile?.settings]);
 
   const ranked = useMemo(() => rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays, weakPoints: weakPoints.length > 0 ? weakPoints : undefined }), [bbLevel, bbGoal, bbDays, weakPoints]);
@@ -372,6 +393,19 @@ export const BbAutoConstructor: React.FC = () => {
   const pedAdapt = useMemo(() => adaptForPEDs(peds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv])), pedDoses, courseIntensity), [peds, allLandmarks, pedDoses, courseIntensity]);
 
   const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan, pedAdapt.combinedMrvMultiplier) : null, [builtPlan, pedAdapt]);
+  const safetyScore = useMemo<PlanSafetyScore | null>(() => {
+    if (!builtPlan) return null;
+    const personal = linked.profile?.settings?.personal;
+    const lifestyle = linked.profile?.settings?.lifestyle;
+    return calculatePlanSafetyScore(builtPlan, {
+      acwrRatio: calculateACWR(),
+      bodyFat: personal?.bodyFat,
+      hrvMs: lifestyle?.morningHRV,
+      sleepHours: lifestyle?.sleepHours,
+      stressLevel: lifestyle?.stressLevel,
+      injuryCount: injuries.length,
+    });
+  }, [builtPlan, linked.profile, injuries.length]);
   // FIX-6: Единый источник качества — validatePlanQuality (канонический движок)
   const quality = useMemo(() => {
     if (!builtPlan) return null;
@@ -723,6 +757,11 @@ export const BbAutoConstructor: React.FC = () => {
   const handleSavePlan = () => {
     try {
       const planToSave = applyEditsToPlan(builtPlan!);
+      const saveSafety = calculatePlanSafetyScore(planToSave, {
+        acwrRatio: calculateACWR(),
+        injuryCount: injuries.length,
+      });
+      if (saveSafety.riskLevel === 'dangerous') { alert(`План небезопасен: SafetyScore ${saveSafety.score}/100. Исправьте риски перед сохранением.`); return; }
       if (!planToSave.validation?.valid) { alert('План нельзя сохранить: исправьте ошибки валидации.'); return; }
       setBuiltPlan(planToSave); localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: planToSave, date: new Date().toISOString() })); alert('План сохранён');
     } catch { alert('Ошибка сохранения'); }
@@ -732,6 +771,8 @@ export const BbAutoConstructor: React.FC = () => {
   const handleSaveToMyPlans = () => {
     if (!builtPlan) return;
     const exportPlan = applyEditsToPlan(builtPlan);
+    const saveSafety = calculatePlanSafetyScore(exportPlan, { acwrRatio: calculateACWR(), injuryCount: injuries.length });
+    if (saveSafety.riskLevel === 'dangerous') { alert(`План небезопасен: SafetyScore ${saveSafety.score}/100.`); return; }
     if (!exportPlan.validation?.valid) { alert('План нельзя сохранить: исправьте ошибки валидации.'); return; }
     const name = prompt('Название плана:', `${exportPlan.pattern.name} ${bbWeeks}нед`);
     if (!name) return;
@@ -787,7 +828,10 @@ export const BbAutoConstructor: React.FC = () => {
       mrvMult: pedAdapt.combinedMrvMultiplier,
        peakWeek: exportPlan.report?.peakWeek,
        peakDirectSets: exportPlan.report?.peakDirectSets,
-       peakEffectiveSets: exportPlan.report ? Object.values(exportPlan.report.peakVolume).reduce((sum, item) => sum + item.effectiveSets, 0) : undefined,
+        peakEffectiveSets: exportPlan.report
+          ? Object.values(exportPlan.report.peakVolume as Record<string, { effectiveSets: number }>)
+            .reduce((sum: number, item: { effectiveSets: number }) => sum + item.effectiveSets, 0)
+          : undefined,
        maxSessionMinutes: exportPlan.report?.maxSessionMinutes,
        maxAxialCost: exportPlan.report?.maxAxialCost,
     };
@@ -1811,7 +1855,7 @@ export const BbAutoConstructor: React.FC = () => {
                   </div>
                   {report.issues.length === 0
                     ? <div style={{ fontSize:11, color:'#22c55e' }}>✅ Конфликтов ротации не обнаружено.</div>
-                    : report.issues.slice(0, 8).map((issue, i) => (
+                    : report.issues.slice(0, 8).map((issue: { code?: string; phase?: string; message: string }, i: number) => (
                       <div key={i} style={{ fontSize:11, color: issue.code === 'primary_changed' ? '#f59e0b' : 'rgba(255,255,255,0.75)' }}>
                          {issue.phase ? `[${PHASE_LABELS[issue.phase as BBPhase] || issue.phase}] ` : ''}{issue.message}
                       </div>
@@ -1856,7 +1900,7 @@ export const BbAutoConstructor: React.FC = () => {
                     Максимум за сессию: {report.maxSessionMinutes} мин · axial cost: {report.maxAxialCost.toFixed(1)} · muscle leakage: {report.sessionLeakWarnings}
                   </div>
                   <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                    {Object.entries(report.peakVolume).map(([muscle, volume]) => (
+                    {Object.entries(report.peakVolume as Record<string, { directSets: number; effectiveSets: number; fatigueWeightedSets: number }>).map(([muscle, volume]) => (
                       <div key={muscle} style={{ color:'rgba(255,255,255,0.7)' }}>
                          {REPORT_MUSCLE_RU[muscle] || muscle}: direct {volume.directSets}, effective {Math.round(volume.effectiveSets * 10) / 10}, fatigue {Math.round(volume.fatigueWeightedSets * 10) / 10}
                       </div>
@@ -1884,19 +1928,19 @@ export const BbAutoConstructor: React.FC = () => {
         {builtPlan.validation && !builtPlan.validation.valid && (
           <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.3)' }}>
             <div style={{ fontSize:12, fontWeight:800, color:'#ef4444', marginBottom:5 }}>🚫 План требует исправления</div>
-            {builtPlan.validation.issues.filter(i => i.level === 'error').slice(0, 5).map((issue, i) => (
+            {builtPlan.validation.issues.filter((i: { level?: string }) => i.level === 'error').slice(0, 5).map((issue: { message: string }, i: number) => (
               <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.8)', lineHeight:1.4 }}>{issue.message}</div>
             ))}
           </div>
         )}
 
         {builtPlan.validation && (() => {
-          const warnings = builtPlan.validation.issues.filter(issue => issue.level === 'warning' && ['target_volume_deficit', 'session_working_set_cap', 'effective_mrv_overflow'].includes(issue.code));
+          const warnings = builtPlan.validation.issues.filter((issue: { level?: string; code: string }) => issue.level === 'warning' && ['target_volume_deficit', 'session_working_set_cap', 'effective_mrv_overflow'].includes(issue.code));
           if (warnings.length === 0) return null;
           return (
             <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.25)' }}>
               <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b', marginBottom:5 }}>⚠️ Объём и бюджет требуют внимания</div>
-              {warnings.slice(0, 8).map((issue, i) => <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.8)', lineHeight:1.4 }}>{issue.message}</div>)}
+              {warnings.slice(0, 8).map((issue: { message: string }, i: number) => <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.8)', lineHeight:1.4 }}>{issue.message}</div>)}
               <div style={{ marginTop:5, fontSize:10, color:'rgba(255,255,255,0.5)' }}>Это предупреждения, а не блокировка. Ограничения оборудования, времени и восстановления могут объяснять недобор.</div>
             </div>
           );
@@ -2294,6 +2338,12 @@ export const BbAutoConstructor: React.FC = () => {
     const ratio = loads ? acuteChronicRatio(loads) : null;
     return (
       <div>
+        {safetyScore && (
+          <div role="status" aria-label={`SafetyScore ${safetyScore.score} из 100`} style={{ marginBottom: 10, padding: 10, borderRadius: 10, border: `1px solid ${safetyScore.riskLevel === 'safe' ? '#22c55e' : safetyScore.riskLevel === 'caution' ? '#f59e0b' : '#ef4444'}`, background: 'rgba(255,255,255,0.03)' }}>
+            <b>🛡 SafetyScore: {safetyScore.score}/100</b> · {safetyScore.riskLevel === 'safe' ? 'Безопасный план' : safetyScore.riskLevel === 'caution' ? 'Требует внимания' : 'Опасный план'}
+            {safetyScore.issues.slice(0, 3).map((issue, index) => <div key={index} style={{ marginTop: 3, fontSize: 11, color: '#f59e0b' }}>⚠ {issue}</div>)}
+          </div>
+        )}
         <div style={H}>📊 Шаг 5: Качество и нагрузка плана</div>
         {/* Validation banners */}
         {(() => {
@@ -3005,14 +3055,10 @@ export const BbAutoConstructor: React.FC = () => {
             setBbWeeks(source.totalWeeks);
             setBbTrainingFocus(source.trainingFocus);
             setStep('params');
-          }} onApplyCycle={(cycleId, weeks) => {
-            setBbAnnualMacrocycle(null);
-            setPlanMode('bb_cycle');
-            setBbProgramPath('cycle');
-            setSelectedCycleId(cycleId);
-            setBbWeeks(weeks);
-            setStep('params');
-          }} />
+           }} onApplyCycle={() => {
+             // BB macro blocks have no LMS cycleId. Keep the annual macrocycle
+             // intact instead of switching to an unrelated BB cycle path.
+           }} />
         </div>
       )}
       {step === 'params' && renderParams()}

@@ -21,6 +21,7 @@ import { macroPhaseToUserPhase, isDeloadLikeMacroPhase, bbMacroPhaseToUserPhase,
 import { autodraftBBPlan } from '../manual-constructor/manual-draft.engine';
 import { createFromBuild } from '../user-program/program-store';
 import type { BBTrainingFocus } from '../bb/bb-goal-types';
+import { adaptForPEDs, type PEDAdaptation } from '../bb/bb-ped-adaptation.engine';
 
 export interface MacrocycleToBBOptions {
   level: string;
@@ -40,13 +41,22 @@ export interface MacrocycleToBBOptions {
   avoidAxialLoad?: boolean;
   excludedExercises?: string[];
   favoriteExercises?: string[];
+  /** MC-5: PED parameters for MRV adaptation */
+  peds?: string[];
+  pedDoses?: Record<string, number>;
+  courseIntensity?: 'mild' | 'moderate' | 'heavy';
 }
 
-/** Структурированная разгрузка каждые 4 недели внутри базовых фаз.
+/** Структурированная разгрузка каждые N недели внутри базовых фаз.
+ *  N адаптируется к длительности блока: короткие блоки (≤12 нед) → каждые 4 нед,
+ *  длинные блоки (>12 нед) → каждые 5-6 нед (стандарт: каждые 4-6 недель).
  *  P2-fix: contest_prep добавлен — NSCA 2021 рекомендует делод каждые 3-4 нед даже при пике. */
-export function shouldPeriodicDeload(phase: string, weekNumber: number, weekOffset: number): boolean {
+export function shouldPeriodicDeload(phase: string, weekNumber: number, weekOffset: number, blockWeeks?: number): boolean {
   if (phase !== 'hypertrophy' && phase !== 'strength' && phase !== 'endurance' && phase !== 'contest_prep') return false;
-  return (weekNumber - weekOffset + 1) % 4 === 0;
+  const weekInBlock = weekNumber - weekOffset + 1;
+  // PL-4 FIX: adaptive deload frequency based on block duration
+  const deloadFrequency = blockWeeks && blockWeeks > 12 ? 6 : blockWeeks && blockWeeks > 8 ? 5 : 4;
+  return weekInBlock % deloadFrequency === 0;
 }
 
 // ─── BB-макроцикл: volume multipliers и RIR ─────────────────────────────────
@@ -122,10 +132,16 @@ export function macrocycleToBBProgram(
   const effectiveOpts = isBbMacro
     ? { ...opts, trainingFocus: (macro as BBMacrocycle).trainingFocus }
     : opts;
+  // MC-5: PED adaptation (if PED parameters provided)
+  let pedAdapt: PEDAdaptation | undefined;
+  if (opts.peds && opts.peds.length > 0) {
+    const baseMrv: Record<string, number> = {}; // default MRV (will be overridden by plan)
+    pedAdapt = adaptForPEDs(opts.peds as any, baseMrv, opts.pedDoses, opts.courseIntensity);
+  }
   // 1. Попытаться собрать ББ-план с упражнениями.
   let baseProgram: UserProgram | null = null;
   try {
-    baseProgram = buildBaseBBProgram(total, effectiveOpts);
+    baseProgram = buildBaseBBProgram(total, effectiveOpts, pedAdapt);
   } catch (error) {
     // P2-11: previously silently swallowed build errors — user saw empty program with no
     // diagnostic info. Now logs a warning so the fallback path is traceable.
@@ -179,7 +195,7 @@ export function macrocycleToBBProgram(
  * Собрать базовый ББ-план через autodraftBBPlan → createFromBuild.
  * Возвращает UserProgram или бросает при ошибке сборки.
  */
-function buildBaseBBProgram(total: number, opts: MacrocycleToBBOptions): UserProgram {
+function buildBaseBBProgram(total: number, opts: MacrocycleToBBOptions, pedAdapt?: PEDAdaptation): UserProgram {
   const bbPlan = autodraftBBPlan({
     level: opts.level,
     goal: opts.goal,
@@ -188,6 +204,9 @@ function buildBaseBBProgram(total: number, opts: MacrocycleToBBOptions): UserPro
     equipment: opts.equipment ?? [],
     weakPoints: opts.weakPoints ?? [],
     trainingFocus: opts.trainingFocus,
+    // MC-5: Pass PED parameters (simplified - uses onCourse flag)
+    onCourse: opts.peds && opts.peds.length > 0,
+    courseIntensity: opts.courseIntensity,
     bodyFat: opts.bodyFat,
     leanMass: opts.leanMass,
     hrvMs: opts.hrvMs,
@@ -233,7 +252,7 @@ function remapWeeksFromBbMacrocycle(weeks: UserWeek[], macro: BBMacrocycle): Use
     if (!active) return w;
     const phase = bbMacroPhaseToUserPhase(active.phase);
     const deload = isDeloadLikeBbMacroPhase(active.phase);
-    const periodicDeload = !deload && shouldPeriodicDeload(active.phase, w.week, active.weekOffset);
+    const periodicDeload = !deload && shouldPeriodicDeload(active.phase, w.week, active.weekOffset, active.weeks);
     const adjustedSessions = w.sessions
       .map(s => adjustBbSessionForPhase(s, active.phase, phase, deload || periodicDeload))
       .filter((s): s is UserWeek['sessions'][number] => s !== null);
@@ -253,7 +272,7 @@ function remapWeeksFromMacrocycle(weeks: UserWeek[], macro: Macrocycle): UserWee
     const bbPhase = macroPhaseToBbPhase(block.phase);
     const phase = bbMacroPhaseToUserPhase(bbPhase);
     const deload = isDeloadLikeMacroPhase(block.phase);
-    const periodicDeload = !deload && shouldPeriodicDeload(block.phase, w.week, block.weekOffset);
+    const periodicDeload = !deload && shouldPeriodicDeload(block.phase, w.week, block.weekOffset, block.weeks);
     const adjustedSessions = w.sessions
       .map(s => adjustBbSessionForPhase(s, bbPhase, phase, deload || periodicDeload, block.phase))
       .filter((s): s is UserWeek['sessions'][number] => s !== null);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { autoFillDraftDispatch, buildBBUserProgramFromProfile } from '../auto-fill-draft';
 import { DEFAULT_PROFILE } from '../training-profile';
-import { isUserProgramShape, validateProgram } from '../../../../engines/user-program/program-store';
+import { getProgramBlockingIssue, isUserProgramShape, validateProgram } from '../../../../engines/user-program/program-store';
 import { createBlank } from '../../../../engines/user-program/program-store';
 
 describe('manual constructor shared BB draft builder', () => {
@@ -62,6 +62,11 @@ describe('manual constructor Hybrid validation', () => {
     const issues = validateProgram(program);
     expect(issues.some(issue => issue.code === 'NO_HYBRID_BODY')).toBe(false);
     expect(issues.some(issue => issue.code === 'HYBRID_NO_BB')).toBe(true);
+  });
+
+  it('returns the first blocking issue for save flows', () => {
+    const program = { meta: { direction: 'hybrid', title: '', daysPerWeek: 0, weeks: 0 } } as any;
+    expect(getProgramBlockingIssue(program)?.level).toBe('error');
   });
 });
 

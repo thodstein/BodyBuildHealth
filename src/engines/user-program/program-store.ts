@@ -211,6 +211,10 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
   return issues;
 }
 
+export function getProgramBlockingIssue(program: UserProgram): ValidationIssue | undefined {
+  return validateProgram(program).find(issue => issue.level === 'error');
+}
+
 /** Проверить минимальную форму программы перед импортом из внешнего JSON. */
 export function isUserProgramShape(value: unknown): value is UserProgram {
   if (!value || typeof value !== 'object') return false;

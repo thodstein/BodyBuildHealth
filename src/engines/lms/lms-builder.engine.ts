@@ -866,11 +866,13 @@ function applyPLTaper(weeks: LMSPlanWeek[], totalWeeks: number): LMSPlanWeek[] {
   };
   const refVolume = prevIdx > 0 ? weekVolume(weeks[prevIdx - 1]) : 0;
 
-  return weeks.map((wk, idx) => {
-    if (idx !== prevIdx && idx !== lastIdx) return wk;
-    // Guard: если неделя уже low-volume (< 60% от предыдущей) — не применять taper.
-     if (mesocyclePhaseForWeek(wk.week, totalWeeks) === 'deload') return wk;
-     if (refVolume > 0 && weekVolume(wk) < refVolume * 0.6) return wk;
+   return weeks.map((wk, idx) => {
+     if (idx !== prevIdx && idx !== lastIdx) return wk;
+      // Guard: если неделя уже low-volume (< 60% от предыдущей) — не применять taper.
+      // PL-3 FIX: also skip deload weeks
+       const phase = mesocyclePhaseForWeek(wk.week, totalWeeks);
+       if (phase === 'deload') return wk;
+      if (refVolume > 0 && weekVolume(wk) < refVolume * 0.6) return wk;
     const volumeMult = idx === prevIdx ? 0.65 : 0.45;
     const rirAdd = idx === prevIdx ? 1 : 2;
     const newDays = wk.days.map(d => ({

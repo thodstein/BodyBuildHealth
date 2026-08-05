@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
-import { rankCycles, selectBestCycle, explainSelection, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
+import { rankCycles, selectBestCycle, explainSelection, modeMismatchWarning, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
 import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
 import { mesocyclePhaseForWeek } from '../../engines/rir-matrix.engine';
@@ -110,6 +110,14 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [macroGoal, setMacroGoal] = useState<'powerlifting' | 'bodybuilding' | 'general'>(
     dir === 'bodybuilding' ? 'bodybuilding' : 'powerlifting'
   );
+  // Keep the annual planner aligned with the active PL level when it changes
+  // outside the annual-planning view (profile/session restore).
+  useEffect(() => {
+    setMacroLevel(level);
+  }, [level]);
+  useEffect(() => {
+    setMacroGoal(dir === 'bodybuilding' ? 'bodybuilding' : 'powerlifting');
+  }, [dir]);
   const [bw, setBw] = useState<number>(_plSaved?.plBw ?? _profPL.bodyWeight ?? 85);
   const [days, setDays] = useState<number>(_plSaved?.plDays ?? 3);
   const [pmSquat, setPmSquat] = useState<number>(_plSaved?.pmSquat ?? _profPL.pmSquat ?? 120);
@@ -555,13 +563,21 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!bbBest) return;
     const profData = linked.profile?.settings?.personal;
     const lifeData = linked.profile?.settings?.lifestyle;
+    const nutrData = linked.profile?.settings?.nutrition as (Record<string, any> | undefined);
     const bodyFat = profData?.bodyFat;
     const leanMass = (profData?.weight && bodyFat != null) ? Math.round(profData.weight * (1 - bodyFat / 100)) : undefined;
-    const plan = buildBBPlan({ 
-      patternId: bbBest.pattern.id, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks, 
+    // BB-2+BB-5 FIX: pass all available parameters to buildBBPlan
+    const plan = buildBBPlan({
+      patternId: bbBest.pattern.id, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks,
       workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any,
       trainingFocus: bbTrainingFocus,
       bodyFat, leanMass, hrvMs: lifeData?.morningHRV, sleepHours: lifeData?.sleepHours, stressLevel: lifeData?.stressLevel,
+      // BB-4 FIX: pass PED parameters
+      pedDoses, courseIntensity,
+      // Profile parameters
+      sex: profData?.sex,
+      proteinPerKg: nutrData?.proteinPerKg,
+      calorieSurplus: nutrData?.calorieSurplus ?? 0,
     }, pedAdapt);
     setBuiltBb(plan); setBbWeekSel(1);
     // TRAINING INTEGRATION: конвертировать BB план в сессии
@@ -572,10 +588,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!bbBest) throw new Error('Не найден подходящий ББ-сплит');
     const profData = linked.profile?.settings?.personal;
     const lifeData = linked.profile?.settings?.lifestyle;
+    const nutrData = linked.profile?.settings?.nutrition as (Record<string, any> | undefined);
     const bodyFat = profData?.bodyFat;
     const leanMass = (profData?.weight && bodyFat != null)
       ? Math.round(profData.weight * (1 - bodyFat / 100))
       : undefined;
+    // BB-2+BB-5 FIX: pass all available parameters to buildBBPlan
     const plan = buildBBPlan({
       patternId: bbBest.pattern.id,
       level: bbLevel,
@@ -591,6 +609,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       hrvMs: lifeData?.morningHRV,
       sleepHours: lifeData?.sleepHours,
       stressLevel: lifeData?.stressLevel,
+      // BB-4 FIX: pass PED parameters
+      pedDoses, courseIntensity,
+      // Profile parameters
+      sex: profData?.sex,
+      proteinPerKg: nutrData?.proteinPerKg,
+      calorieSurplus: nutrData?.calorieSurplus ?? 0,
     }, pedAdapt);
     const phased = applyMacrocycleToBBPlan(plan, macro);
     setBbWeeks(macro.totalWeeks);
@@ -1103,9 +1127,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 <span style={{ fontSize:11, fontWeight:700, color: PH_COLOR[phase], background: PH_COLOR[phase]+'22', padding:'3px 8px', borderRadius:10, flexShrink:0 }}>{PH_RU[phase]}</span>
               </div>
                <div style={{ ...SMALL, marginTop:4, wordBreak:'break-word' }}>{builtSrc.progressionRationale}</div>
-               {autoRegMode === 'off' && best && ['KMS-MSMK', 'MS-MSMK'].includes(best.cycle.meta.level) && (
+               {autoRegMode === 'off' && best && modeMismatchWarning({ goal: goal as any, level: level as any, mode: peds.length > 0 ? 'on_course' : 'natural' }, best.cycle) && (
                  <div role="alert" style={{ marginTop:6, padding:'6px 8px', borderRadius:7, color:'#f59e0b', background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)', fontSize:11 }}>
-                   ⚠ Рекомендованный цикл рассчитан на продвинутого/enhanced-атлета. Для натурала проверьте объём и восстановление.
+                   ⚠ {modeMismatchWarning({ goal: goal as any, level: level as any, mode: peds.length > 0 ? 'on_course' : 'natural' }, best.cycle)}
                  </div>
                )}
               <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: PH_COLOR[phase]+'14', border:'1px solid '+PH_COLOR[phase]+'30' }}>

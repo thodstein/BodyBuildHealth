@@ -115,4 +115,59 @@ describe('planner bridge handlers', () => {
     expect(update).not.toHaveBeenCalled();
     expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('положительным'));
   });
+
+  it('volume adds one accessory block with the requested set count', () => {
+    const update = vi.fn();
+    const ctx = context('bb', update);
+    seedBlock(ctx);
+    applyBridgePayloadDispatch(payload('volume', { sets: { shoulders: 4 } }), ctx);
+    const patch = update.mock.calls[0][0];
+    const blocks = patch.bb.weeks[0].sessions[0].blocks;
+    const added = blocks.find((block: any) => block.muscle === 'shoulders');
+    expect(added).toBeDefined();
+    expect(added.sets).toHaveLength(4);
+    expect(blocks.filter((block: any) => block.muscle === 'shoulders')).toHaveLength(1);
+  });
+
+  it('peak reduces sets and preserves load while setting peaking RIR', () => {
+    const update = vi.fn();
+    const ctx = context('bb', update);
+    seedBlock(ctx);
+    ctx.program.bb!.weeks.push({ ...ctx.program.bb!.weeks[0], week: 2 });
+    ctx.program.bb!.weeks[1].sessions[0].blocks[0].sets = Array.from({ length: 4 }, () => ({
+      reps: 3, rir: 2, weight: 140, restSec: 180,
+    }));
+    applyBridgePayloadDispatch(payload('peak', { volumeMult: 0.5, rirTarget: 1 }), ctx);
+    const patch = update.mock.calls[0][0];
+    const finalWeek = patch.bb.weeks[1];
+    const sets = finalWeek.sessions[0].blocks[0].sets;
+    expect(finalWeek.phase).toBe('peaking');
+    expect(sets).toHaveLength(2);
+    expect(sets.every((set: any) => set.weight === 140 && set.rir === 1)).toBe(true);
+    expect(patch.bb.weeks[0].phase).toBe('accumulation');
+  });
+
+  it('rir and tempo handlers update all sets without changing unrelated fields', () => {
+    const update = vi.fn();
+    const ctx = context('bb', update);
+    seedBlock(ctx);
+    ctx.program.bb!.weeks[0].sessions[0].blocks[0].sets = [{ reps: 8, rir: 2, weight: 80, restSec: 90 }];
+    applyBridgePayloadDispatch(payload('rir', { rirShift: 2 }), ctx);
+    let patch = update.mock.calls[0][0];
+    expect(patch.bb.weeks[0].sessions[0].blocks[0].sets[0]).toMatchObject({ reps: 8, weight: 80, rir: 4 });
+
+    ctx.program = patch;
+    applyBridgePayloadDispatch(payload('tempo', { label: '3-1-1-0' }), ctx);
+    patch = update.mock.calls[1][0];
+    expect(patch.bb.weeks[0].sessions[0].blocks[0].sets[0]).toMatchObject({ tempo: '3-1-1-0', weight: 80 });
+  });
+
+  it('methodology updates progression and malformed payload does not throw', () => {
+    const update = vi.fn();
+    const ctx = context('bb', update);
+    seedBlock(ctx);
+    expect(() => applyBridgePayloadDispatch(payload('methodology', { methodName: 'double_progression' }), ctx)).not.toThrow();
+    expect(update.mock.calls[0][0].bb.progression.loadStrategy).toBe('double_progression');
+    expect(() => applyBridgePayloadDispatch(payload('volume', { sets: null as any }), ctx)).not.toThrow();
+  });
 });

@@ -22,6 +22,7 @@ import {
 } from '../../../engines/periodization-designer.engine';
 import { applyToPlanner } from './planner-bridge';
 import { DESIGNER_PHASE_VISUAL } from './phase-visual-tokens';
+import { useConfirmDialog } from './ConfirmDialog';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -43,6 +44,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
   const touchTimerRef = useRef<number | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const [touchActive, setTouchActive] = useState(false);
+  const { confirm } = useConfirmDialog();
 
   useEffect(() => {
     const list = loadDesigns();
@@ -562,19 +564,39 @@ export const PeriodizationDesignerTab: React.FC = () => {
             {/* Новая кнопка: применить весь дизайн как новую программу (через bridge kind='design') */}
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 6, marginTop: 4 }}>📥 Применить ВЕСЬ дизайн ({current.blocks.length} блоков, {current.totalWeeks} нед) к ручному планировщику как новую программу с правильными фазами по всем неделям.</div>
             <button
-              onClick={() => applyToPlanner({
-                kind: 'design',
-                label: 'Дизайн: ' + current.name + ' (' + current.totalWeeks + ' нед, ' + current.blocks.length + ' блоков)',
-                data: { design: current, fillExercises: false, daysPerWeek: 4 },
-              })}
+              onClick={async () => {
+                const ok = await confirm({
+                  title: 'Применить весь дизайн?',
+                  message: `Будет создана новая программа (${current.totalWeeks} нед, ${current.blocks.length} блоков). Текущая программа будет заменена.`,
+                  confirmLabel: 'Применить',
+                  cancelLabel: 'Отмена',
+                  danger: false,
+                });
+                if (!ok) return;
+                applyToPlanner({
+                  kind: 'design',
+                  label: 'Дизайн: ' + current.name + ' (' + current.totalWeeks + ' нед, ' + current.blocks.length + ' блоков)',
+                  data: { design: current, fillExercises: false, daysPerWeek: 4 },
+                });
+              }}
               style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff', fontWeight: 800, fontSize: 13, minHeight: 44, marginBottom: 8 }}
             >📥 Применить к новой программе (скелет)</button>
             <button
-              onClick={() => applyToPlanner({
-                kind: 'design',
-                label: 'Дизайн+упражнения: ' + current.name + ' (' + current.totalWeeks + ' нед)',
-                data: { design: current, fillExercises: true, daysPerWeek: 4 },
-              })}
+              onClick={async () => {
+                const ok = await confirm({
+                  title: 'Применить дизайн с упражнениями?',
+                  message: `Будет создана новая программа с упражнениями (${current.totalWeeks} нед, ${current.blocks.length} блоков). Текущая программа будет заменена. Это может занять несколько секунд.`,
+                  confirmLabel: 'Применить',
+                  cancelLabel: 'Отмена',
+                  danger: false,
+                });
+                if (!ok) return;
+                applyToPlanner({
+                  kind: 'design',
+                  label: 'Дизайн+упражнения: ' + current.name + ' (' + current.totalWeeks + ' нед)',
+                  data: { design: current, fillExercises: true, daysPerWeek: 4 },
+                });
+              }}
               style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', color: '#fff', fontWeight: 700, fontSize: 12, minHeight: 44 }}
             >🏋️ Применить с упражнениями (autodraft)</button>
           </div>

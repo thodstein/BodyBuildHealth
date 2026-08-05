@@ -27,6 +27,24 @@ export interface LMSRankedCycle {
   warnings: string[];
 }
 
+/** Mode-specific safety warning shared by ranking and consumers. */
+export function modeMismatchWarning(input: LMSSelectorInput, cycle: SRCycleTemplate): string | null {
+  const m = cycle.meta;
+  if (input.mode === 'natural' && (m.level === 'KMS-MSMK' || m.level === 'MS-MSMK')) {
+    return 'цикл рассчитан на продвинутого/enhanced-атлета и требует проверки объёма для натурала';
+  }
+  if (input.mode === 'natural' && m.period === 'peak') {
+    return 'пиковый цикл не рекомендуется натуралу (восстановление ограничено)';
+  }
+  if (input.mode === 'pct' && m.period === 'peak') {
+    return 'пиковый цикл противопоказан на ПКТ (риск перетренированности)';
+  }
+  if (input.mode === 'on_course' && m.period === 'endurance') {
+    return 'выносливостный цикл не использует потенциал курса (низкая прогрессия)';
+  }
+  return null;
+}
+
 const GOAL_TO_PERIOD: Record<UserGoal, string[]> = {
   strength: ['strength', 'mixed'],
   mass: ['mass'],
@@ -105,12 +123,11 @@ export function rankCycles(input: LMSSelectorInput): LMSRankedCycle[] {
     // P2-9: mode mismatch penalty — natural user shouldn't get on_course cycle (too aggressive),
     // on_course user shouldn't get natural cycle (too conservative), PCT user shouldn't get
     // peak cycles (too intense for recovery). Previously no penalty → wrong cycles recommended.
-    if (input.mode === 'natural' && m.period === 'peak') {
-      score -= 15; warnings.push('пиковый цикл не рекомендуется натуралу (восстановление ограничено)');
-    } else if (input.mode === 'pct' && m.period === 'peak') {
-      score -= 20; warnings.push('пиковый цикл противопоказан на ПКТ (риск перетренированности)');
-    } else if (input.mode === 'on_course' && m.period === 'endurance') {
-      score -= 10; warnings.push('выносливостный цикл не использует потенциал курса (низкая прогрессия)');
+    const modeWarning = modeMismatchWarning(input, cycle);
+    if (modeWarning) {
+      const penalty = input.mode === 'pct' ? 20 : input.mode === 'natural' && (m.level === 'KMS-MSMK' || m.level === 'MS-MSMK') ? 10 : input.mode === 'natural' ? 15 : 10;
+      score -= penalty;
+      warnings.push(modeWarning);
     }
 
     out.push({ cycle, score, rationale, warnings });

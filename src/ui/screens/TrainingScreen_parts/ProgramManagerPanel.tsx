@@ -24,7 +24,7 @@ import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { getReferencedCycle } from '../../../engines/user-program/program-store';
 import {
   loadUserPrograms, saveUserProgram, deleteUserProgram, deleteRevision,
-  cloneFromLibrary, cloneFromCycle, createBlank, userWeekToBBPlan, validateProgram, isUserProgramShape,
+  cloneFromLibrary, cloneFromCycle, createBlank, userWeekToBBPlan, validateProgram, getProgramBlockingIssue, isUserProgramShape,
 } from '../../../engines/user-program/program-store';
 import type {
   UserProgram, BBProgramBody, PLProgramBody, UserWeek, UserSession, UserBlock, UserSet,
@@ -320,16 +320,17 @@ export const ProgramManagerPanel: React.FC = () => {
     flash('🗑 Удалено');
   };
 
-  const commit = (note?: string) => {
-    if (!editing) return;
-    const blockingIssues = validateProgram(editing).filter(issue => issue.level === 'error');
-    if (blockingIssues.length > 0) {
-      flash('⚠ Не сохранено: ' + blockingIssues[0].message);
-      return;
+  const commit = (note?: string): boolean => {
+    if (!editing) return false;
+    const blockingIssue = getProgramBlockingIssue(editing);
+    if (blockingIssue) {
+      flash('⚠ Не сохранено: ' + blockingIssue.message);
+      return false;
     }
     saveUserProgram(editing, note);
     refresh();
     flash('✅ Сохранено');
+    return true;
   };
 
   // Полный каталог программ: библиотека + женские + авторские. Используется в обоих ветках UI.

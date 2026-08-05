@@ -464,7 +464,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
     const aasList = (linked.course || []).filter((c: any) => {
       const ph = PHARMA_DB[c.substanceId];
       return ph?.class && ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm'].includes(ph.class);
-    }).map((c: any) => ({ id: c.substanceId || '', doseMgWeek: (c.doseValue || 0) * (c.frequency || 1), weeks: (c.endWeek || 12) - (c.startWeek || 0), startWeek: c.startWeek || 1, endWeek: c.endWeek || 12 }));
+    }).map((c: any) => {
+      const freq = typeof c.frequency === 'number' ? c.frequency : (parseFloat(String(c.frequency)) || 1);
+      return { id: c.substanceId || '', doseMgWeek: (c.doseValue || 0) * Math.max(1, freq), weeks: (c.endWeek || 12) - (c.startWeek || 0), startWeek: c.startWeek || 1, endWeek: c.endWeek || 12 };
+    });
     const h = hydrateState();
     const state: CalculatorState = {
       profile: h.profile || { weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male' | 'female', workoutsPerWeek: s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
@@ -555,7 +558,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
     const aasList = (linked.course || []).filter(c => {
       const ph = PHARMA_DB[c.substanceId] as any;
       return ph?.class && ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm'].includes(ph.class);
-    }).map(c => ({ id: c.substanceId, doseMgWeek: (c.doseValue || 0) * ((typeof c.frequency === 'number' ? c.frequency : parseFloat(String(c.frequency)) || 0) > 0 ? (typeof c.frequency === 'number' ? c.frequency : parseFloat(String(c.frequency)) || 0) : 1), weeks: (c.endWeek || 12) - (c.startWeek || 0), startWeek: c.startWeek || 1, endWeek: c.endWeek || 12 }));
+    }).map(c => {
+      const freq = typeof c.frequency === 'number' ? c.frequency : (parseFloat(String(c.frequency)) || 1);
+      return { id: c.substanceId, doseMgWeek: (c.doseValue || 0) * Math.max(1, freq), weeks: (c.endWeek || 12) - (c.startWeek || 0), startWeek: c.startWeek || 1, endWeek: c.endWeek || 12 };
+    });
     const defaults: Partial<CalculatorState> = {
       profile: { weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male' | 'female', workoutsPerWeek: s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
       pharma: { phase: 'course', aas: aasList, hasGH: false, hasIGF: false, hasInsulin: false, hasHCG: !!linked.course?.find((c: any) => c.substanceId === 'hcg'), hasAI: false, hasCaber: false, hasSERM: false, hasSARMs: aasList.some(a => a.id.includes('ostarine') || a.id.includes('lgd')), hasMGF: false, hasGLP1: false },
