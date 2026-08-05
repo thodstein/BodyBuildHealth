@@ -88,6 +88,7 @@ describe('BB exercise instructions from Exercise Lab', () => {
     expect(exercise.executionProfile?.pattern).toBeTruthy();
     expect(exercise.executionProfile?.order).toBeTruthy();
     expect(exercise.executionProfile?.progression).toBeTruthy();
+    expect(exercise.executionProfile?.order).toContain('упражнение');
   });
 
   it('provides non-empty execution guidance for every catalog exercise', () => {

@@ -1844,11 +1844,11 @@ function buildSession(
   // Это точнее, чем порядок до orderSessionExercises: методика может переставить
   // primary/accessory, stretch-biased и priority-muscle упражнения.
   exercises.forEach((exercise, index) => {
-    if (!exercise.comment) return;
     const orderText = exercise.role === 'primary'
       ? (index === 0 ? 'первое основное упражнение дня' : `основное упражнение №${index + 1} в дне`)
       : `упражнение №${index + 1} в дне, после базовых движений`;
-    exercise.comment = exercise.comment.replace(/Порядок: [^.]+/, `Порядок: ${orderText}`);
+    if (exercise.comment) exercise.comment = exercise.comment.replace(/Порядок: [^.]+/, `Порядок: ${orderText}`);
+    if (exercise.executionProfile) exercise.executionProfile.order = orderText;
   });
 
   // Кап упражнений в сессии: просто берём первые exCap из уже отсортированного массива.
