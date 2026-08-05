@@ -46,6 +46,7 @@ import { buildBBVolumeTarget, type BBVolumeTarget } from './bb-volume.engine';
 import type { BBRotationReport } from './bb-rotation.engine';
 import type { BBSessionCost } from './bb-fatigue.engine';
 import type { BBPlanReport } from './bb-report.engine';
+import { applyDUPOverlay, type DUPConfig } from './bb-dup.engine';
 import type { BBPlanValidationResult } from './bb-validator.engine';
 
 // P7: приоритет equipment по фазе (формирует пропорцию compound/isolation/cable/machine из PHASE_CONFIGS)
@@ -2726,6 +2727,19 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     mrvMultiplier: effectiveMrvMult,
     checkOrder: true,
   });
+}
+
+/**
+ * Явный DUP-вариант генерации. Обычный buildBBPlan сохраняет прежнее
+ * поведение, а undulating periodization включается только через этот API.
+ */
+export function buildBBPlanWithDUP(
+  input: BBBuilderInput,
+  dup: DUPConfig,
+  pedAdapt?: PEDAdaptation,
+): BBPlan {
+  const plan = buildBBPlan(input, pedAdapt);
+  return applyDUPOverlay(plan, dup);
 }
 
 /* ───────────────────────── Cross-Day WeakPoints Compensation ───────────────────────── */
