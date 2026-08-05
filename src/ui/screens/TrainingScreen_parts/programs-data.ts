@@ -13,6 +13,17 @@ export const GOAL_FILTER_OPTIONS: { value: string; label: string; goal?: string 
   { value: 'custom', label: 'Авторские' },
 ];
 
+/** Files supplied by the user. These are intentionally raw files, not parsed programs. */
+export const ORIGINAL_PROGRAM_FILES = [
+  { id: 'original-01', name: '8-дневный сплит (без дня плеч и рук)', file: 'original-01.md', format: 'MD' },
+  { id: 'original-02', name: 'Базовый переработанный сплит', file: 'original-02.docx', format: 'DOCX' },
+  { id: 'original-03', name: 'Тренировочный план Апрель', file: 'original-03.docx', format: 'DOCX' },
+  { id: 'original-04', name: 'Тренировочный план: ягодицы', file: 'original-04.md', format: 'MD' },
+  { id: 'original-05', name: 'Тренировочный план Июль: масса', file: 'original-05.docx', format: 'DOCX' },
+] as const;
+
+export const ORIGINAL_PROGRAMS_URL = '/original-programs/';
+
 export const WOMENS_PROGRAMS: FullProgram[] = [
   {
     id: 'women_glutes_hips', name: 'Ягодицы и бёдра (Женский)', author: 'Health Engine',

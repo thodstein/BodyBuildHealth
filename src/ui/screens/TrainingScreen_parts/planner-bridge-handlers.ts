@@ -10,7 +10,6 @@ import { newId } from '../../../engines/user-program/user-program.types';
 import type { TrainingProfile } from './training-profile';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
 import { cloneFromCycle, cloneFromLibrary, createBlank } from '../../../engines/user-program/program-store';
-import { expandProgramWeeks } from '../../../engines/program-progression.engine';
 import { cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
 import { designerToUserWeeks, applyDesignPhasesToWeeks } from '../../../engines/periodization/designer-to-program';
 import { macrocycleToBBProgram } from '../../../engines/lms/macrocycle-to-bb';
@@ -253,7 +252,7 @@ const programHandler: Handler = (payload, { onChange, showToast }) => {
     }
     if (!cloned && payload.data.meta) {
       const fullProg = cycleTemplateToFullProgram(payload.data);
-      if (fullProg) cloned = cloneFromLibrary(expandProgramWeeks(fullProg));
+      if (fullProg) cloned = cloneFromLibrary(fullProg);
     }
     if (cloned) { onChange(cloned); showToast('🔗 Программа загружена: ' + payload.label); }
     else { showToast('⚠ Программа не найдена: ' + payload.label); }

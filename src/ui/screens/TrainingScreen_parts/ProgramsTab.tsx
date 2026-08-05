@@ -23,7 +23,6 @@ import { generateWeeklyReport, analyzeMeasurements, loadMeasurements, saveMeasur
 import { getExerciseBio } from '../../../data/exercise-biomechanics-db';
 import { getStrengthLevel, getNextLevelTarget } from '../../../engines/performance-analytics.engine';
 import { computeStructuredAnalytics } from '../../../engines/structured-analytics.engine';
-import { expandProgramWeeks } from '../../../engines/program-progression.engine';
 import {
   WARMUP_LABELS, GOALS, LEVELS, MUSCLE_GROUPS, GROUP_LABELS, EQUIP_LABELS, JOINT_LABELS,
   PHASE_LABELS, PHASE_HINTS, TAB_LABELS,
@@ -31,7 +30,7 @@ import {
 } from './shared';
 
 import {
-  GOAL_FILTER_OPTIONS, WOMENS_PROGRAMS, CUSTOM_PROGRAMS,
+  GOAL_FILTER_OPTIONS, WOMENS_PROGRAMS, CUSTOM_PROGRAMS, ORIGINAL_PROGRAM_FILES, ORIGINAL_PROGRAMS_URL,
   PROGRAM_LEVEL_MAP, PROGRAM_GOAL_MAP, PROGRAM_EQUIP_MAP,
 } from './programs-data';
 import { applyToPlanner } from './planner-bridge';
@@ -58,7 +57,7 @@ export const ProgramsTab: React.FC<{
     return filtered;
   }, [goalFilter, levelFilter, allPrograms]);
   const selected = selectedId ? allPrograms.find(p => p.id === selectedId) || null : null;
-  const expandedSelected = React.useMemo(() => selected ? expandProgramWeeks(selected) : null, [selected]);
+  const expandedSelected = selected;
 
   const handleLoadToConstructor = () => {
     if (!expandedSelected || !onLoadToConstructor) return;
@@ -129,6 +128,30 @@ export const ProgramsTab: React.FC<{
   };
 
   return (<div>
+    <div style={{ padding: 12, marginBottom: 10, borderRadius: 14, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.25)' }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>📁 Мои оригиналы</div>
+      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>
+        Исходные файлы из «Новая папка (6)». Открываются напрямую, без конвертации и изменений.
+      </div>
+      <div style={{ display: 'grid', gap: 5 }}>
+        {ORIGINAL_PROGRAM_FILES.map(file => (
+          <div key={file.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ flex: 1, fontSize: 11, color: 'var(--text)' }}>{file.name} <span style={{ color: 'var(--text-dim)' }}>({file.format})</span></span>
+            <a
+              href={ORIGINAL_PROGRAMS_URL + file.file}
+              target="_blank"
+              rel="noreferrer"
+              style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(96,165,250,0.14)', border: '1px solid rgba(96,165,250,0.35)', color: '#60a5fa', fontSize: 11, textDecoration: 'none', whiteSpace: 'nowrap' }}
+            >Открыть оригинал</a>
+            <a
+              href={ORIGINAL_PROGRAMS_URL + file.file}
+              download
+              style={{ padding: '7px 10px', borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-dim)', fontSize: 11, textDecoration: 'none', whiteSpace: 'nowrap' }}
+            >Скачать</a>
+          </div>
+        ))}
+      </div>
+    </div>
     <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
       {GOAL_FILTER_OPTIONS.map(g => (
         <button key={g.value} onClick={() => { setGoalFilter(g.value); setSelectedId(null); }}
@@ -286,11 +309,6 @@ export const ProgramsTab: React.FC<{
           <h4 style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--text)' }}>
             Программа по неделям ({expandedSelected.weeks.length} из {expandedSelected.durationWeeks} нед{expandedSelected.weeks.length >= expandedSelected.durationWeeks ? ' ✅' : ' ⚠️'})
           </h4>
-          {expandedSelected.weeks.length < expandedSelected.durationWeeks && (
-            <div style={{ fontSize: 11, color: '#f59e0b', marginBottom: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)' }}>
-              ⚠ Недели {expandedSelected.weeks.length + 1}-{expandedSelected.durationWeeks} — авто-генерация по модели прогрессии (детали в описании программы)
-            </div>
-          )}
           <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
             {expandedSelected.weeks.map((w, i) => (
               <button key={i} onClick={() => setDetailWeek(i + 1)}

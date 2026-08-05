@@ -16,7 +16,6 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { getAllPrograms } from '../../../engines/complete-program-library.engine';
-import { expandProgramWeeks } from '../../../engines/program-progression.engine';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
 import { cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
@@ -296,11 +295,10 @@ export const ProgramManagerPanel: React.FC = () => {
   };
 
   const startCloneLibrary = (program: FullProgram) => {
-    const expanded = expandProgramWeeks(program);
-    const p = cloneFromLibrary(expanded);
+    const p = cloneFromLibrary(program);
     setEditing(p);
     setPickerOpen(null);
-    flash('🔗 Программа клонирована (' + expanded.weeks.length + ' нед)');
+    flash('🔗 Программа клонирована (' + program.weeks.length + ' нед)');
   };
 
   const startCloneCycle = (cycleId: string) => {

@@ -47,7 +47,6 @@ import { getCyclesByDirection, getCycleById } from '../../../data/lms-cycles/lms
 import { convertCycleToBBPlan, programToCycleTemplate, cycleTemplateToFullProgram, programToBBPlan } from '../../../engines/bb/cycle-to-plan';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { getAllPrograms, FULL_PROGRAM_LIBRARY } from '../../../engines/complete-program-library.engine';
-import { expandProgramWeeks } from '../../../engines/program-progression.engine';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
@@ -333,7 +332,7 @@ export const BbAutoConstructor: React.FC = () => {
     } else {
       // Library путь: прямой FullProgram → programToBBPlan. По умолчанию faithful — программа без изменений.
       setBbAdaptMode('faithful');
-      setCustomProgram(expandProgramWeeks(program));
+      setCustomProgram(program);
       setCustomCycle(null);
       setBbProgramPath('library');
       setPlanMode('bb_cycle');
@@ -899,7 +898,7 @@ export const BbAutoConstructor: React.FC = () => {
       setSelectedProgramId(v.params.programId);
       const sourceProgram = bbLibraryPrograms.find(program => program.id === v.params.programId);
       if (sourceProgram && v.params.programPath === 'library') {
-        setCustomProgram(expandProgramWeeks(sourceProgram));
+        setCustomProgram(sourceProgram);
         setCustomCycle(null);
       }
     }
