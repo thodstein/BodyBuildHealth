@@ -10,6 +10,7 @@
  * Pedrosa 2022: incline curl > preacher curl для длинной головки бицепса.
  */
 import type { Exercise } from '../../core/types';
+import type { BBTrainingFocus } from './bb-goal-types';
 
 export interface AngleClass {
   name: string;
@@ -89,11 +90,14 @@ export const ANGLE_CLASSES: Record<string, AngleClass[]> = {
  * FIX-B4: lengthenedBonus — приоритет упражнениям в растянутой позиции.
  * Schoenfeld 2022, Maeo 2023: длина мышцы при натяжении — ключевой драйвер гипертрофии.
  * RDL > stiff-leg deadlift, incline curl > preacher curl, sissy squat > leg extension.
+ * P2-4: trainingFocus модулирует бонус — strength меньше заботит растяжение
+ * (механическое натяжение важнее), endurance больше (метаболический стресс + растяжение).
  */
-export function lengthenedBonus(name: string): number {
+export function lengthenedBonus(name: string, focus?: BBTrainingFocus): number {
   const n = (name || '').toLowerCase();
   if (/наклон.*скам|incline|наклонн|rdl|румынская|good.?morning|гудморнинг|сисси|sissy|overhead.*tricep|француз|french|за голов|behind.?neck|сгибан.*наклон|incline.*curl|пуловер|pullover|дефицит|deficit|атг|atg|глубок.*присед|ass.?to.?grass/i.test(n)) {
-    return 10;
+    const mult = focus === 'strength' ? 0.5 : focus === 'endurance' ? 1.5 : 1.0;
+    return Math.round(10 * mult);
   }
   return 0;
 }

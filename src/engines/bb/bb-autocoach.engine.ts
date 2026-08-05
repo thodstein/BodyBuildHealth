@@ -59,7 +59,7 @@ export function prescribeLoad(
       if (currentReps < repCap) {
         return { nextWeight: currentWeight, nextReps: currentReps + 1, nextRIR: Math.max(0, currentRIR - 1), label: `Добейте ${currentReps + 1} повторов (цель ${repCap})` };
       }
-      return { nextWeight: Math.round(currentWeight * 1.05), nextReps: Math.max(6, repCap - 4), nextRIR: Math.min(3, currentRIR + 1), label: `Повысьте вес до ${Math.round(currentWeight * 1.05)} кг` };
+      return { nextWeight: Math.round(currentWeight * 1.05), nextReps: Math.max(6, repCap - 4), nextRIR: Math.max(0, currentRIR - 1), label: `Повысьте вес до ${Math.round(currentWeight * 1.05)} кг` };
     }
     case 'linear': {
       const phaseMult = week < totalWeeks * 0.75 ? 1.0 : 0.5;
@@ -608,11 +608,13 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
           rebuildComment(e, cfg.label);
         }
       }
-    } else if (loadStrategy) {
+    } else if (loadStrategy && ph !== 'deload') {
       // P1: стратегия прогрессии нагрузки (если выбрана) — модифицирует ВЕС относительно
       // базового из buildSession. reps/rir/tempo НЕ трогаем (они уже фазо-корректные).
       // P3: RPE-based стратегия теперь реально работает (targetRPE-корректировка).
       // P4: передаём exType + role в prescribeLoad для разделения linear-increment.
+      // BUG-FIX: loadStrategy НЕ применяется к deload-неделям — иначе prescribeLoad
+      // прогрессирует веса, отменяя протокол разгрузки (×0.55).
       for (const s of w.sessions) {
         for (const e of s.exercises) {
           for (const ws of e.workSets) {

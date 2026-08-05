@@ -64,19 +64,29 @@ describe('A: extractMesocycleProgression', () => {
     expect(prog.previousExercises.length).toBeGreaterThan(0);
   });
 
-  it('intermediate + mass → weightDelta = 2.5 кг', () => {
+  it('intermediate + mass → weightDelta = 2.5 кг (большие мышцы), 1.25 (малые)', () => {
     const prev = makeMockPreviousPlan();
     const prog = extractMesocycleProgression(prev, 'intermediate', 'mass');
+    const SMALL = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'traps', 'delt_front', 'delt_mid', 'delt_rear']);
     for (const muscle of Object.keys(prog.peakWeights)) {
-      expect(prog.weightProgression[muscle]).toBe(2.5);
+      if (SMALL.has(muscle)) {
+        expect(prog.weightProgression[muscle]).toBe(1.3);
+      } else {
+        expect(prog.weightProgression[muscle]).toBe(2.5);
+      }
     }
   });
 
-  it('enhanced + mass → weightDelta = 5 кг', () => {
+  it('enhanced + mass → weightDelta = 5 кг (большие мышцы), 2.5 (малые)', () => {
     const prev = makeMockPreviousPlan();
     const prog = extractMesocycleProgression(prev, 'enhanced', 'mass');
+    const SMALL = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'traps', 'delt_front', 'delt_mid', 'delt_rear']);
     for (const muscle of Object.keys(prog.peakWeights)) {
-      expect(prog.weightProgression[muscle]).toBe(5);
+      if (SMALL.has(muscle)) {
+        expect(prog.weightProgression[muscle]).toBe(2.5);
+      } else {
+        expect(prog.weightProgression[muscle]).toBe(5);
+      }
     }
   });
 

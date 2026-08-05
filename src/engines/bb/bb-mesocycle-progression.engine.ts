@@ -81,16 +81,19 @@ export function extractMesocycleProgression(
     volumeDelta[muscle] = baseDelta;
   }
 
-  // Weight progression: +2.5кг (beginner/intermediate), +5кг (advanced/enhanced)
-  // cut → 0 (сохранение), maintenance → +1.25
-  const weightDelta = goal === 'cut' ? 0
+  // Weight progression: muscle-specific deltas.
+  // BUG-FIX: раньше плоский +2.5/+5кг для ВСЕХ мышц — малые мышцы (бицепс, икры, предплечья)
+  // не могут прогрессировать +5кг за мезоцикл. Теперь: малые мышцы +1.25кг, большие +2.5-5кг.
+  const SMALL_MUSCLES = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'traps', 'delt_front', 'delt_mid', 'delt_rear']);
+  const baseWeightDelta = goal === 'cut' ? 0
     : goal === 'maintenance' ? 1.25
     : level === 'beginner' ? 2.5
     : level === 'enhanced' ? 5
     : level === 'advanced' ? 5
     : 2.5;
   for (const muscle of Object.keys(peakWeights)) {
-    weightProgression[muscle] = weightDelta;
+    // Малые мышцы прогрессируют в 2 раза медленнее (Schoenfeld 2017: малые мышцы меньше силы генерируют)
+    weightProgression[muscle] = SMALL_MUSCLES.has(muscle) ? Math.round(baseWeightDelta / 2 * 10) / 10 : baseWeightDelta;
   }
 
   // Needs deload: если предыдущий план был длинным (≥12 нед) или volume был высоким

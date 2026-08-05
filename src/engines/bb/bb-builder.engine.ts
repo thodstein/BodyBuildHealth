@@ -36,6 +36,7 @@ import { distributePhases, PHASE_CONFIGS, getPhaseVolumeMult, type BBPhase } fro
 import { orderSessionExercises, type SessionMethodology } from './bb-session-order.engine';
 import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
+import { ANGLE_CLASSES, lengthenedBonus } from './bb-exercise-selection.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import type { Macrocycle, MacroPhase, BBMacrocycle, BBMacroPhase } from '../lms/macrocycle.engine';
@@ -160,6 +161,7 @@ export interface BBExercise {
   rir: number;
   workSets: BBSet[];
   exerciseName?: string;
+  exerciseType?: string;    // 'compound' | 'isolation' | 'cable' | 'machine' etc. — для prescribeLoad
   tempoSpec?: string;       // PRO: нотация темпа из bb-tempo-rest
   restSeconds?: number;     // PRO: отдых между подходами
   comment?: string;         // PRO: тренерский комментарий (роль/слабые/фаза/нагрузка)
@@ -408,20 +410,11 @@ const EXECUTION_NOTES: Record<string, string> = {
   'шраги с гантелями': "Плечи: вверх к ушам. Без вращения. Задержка 1 сек вверху.",
 };
 
-// FIX-B4: lengthenedBonus — приоритет упражнениям в растянутой позиции.
+// FIX-B4: lengthenedBonus — импортирован из bb-exercise-selection.engine.ts (единственный источник).
 // Schoenfeld 2022, Maeo 2023: длина мышцы при натяжении — ключевой драйвер гипертрофии.
 // RDL > stiff-leg deadlift, incline curl > preacher curl, sissy squat > leg extension.
 // P2-4: trainingFocus модулирует бонус — strength меньше заботит растяжение
 // (механическое натяжение важнее), endurance больше (метаболический стресс + растяжение).
-function lengthenedBonus(name: string, focus?: BBTrainingFocus): number {
-  const n = (name || '').toLowerCase();
-  // Растянутая позиция (lengthened) — базовый +10
-  if (/наклон.*скам|incline|наклонн|rdl|румынская|good.?morning|гудморнинг|сисси|sissy|overhead.*tricep|француз|french|за голов|behind.?neck|сгибан.*наклон|incline.*curl|пуловер|pullover|дефицит|deficit|атг|atg|глубок.*присед|ass.?to.?grass/i.test(n)) {
-    const mult = focus === 'strength' ? 0.5 : focus === 'endurance' ? 1.5 : 1.0;
-    return Math.round(10 * mult);
-  }
-  return 0;
-}
 
 /** Ранг упражнения по "тяжести" — определяет порядок внутри угла.
  *  compound barbell (1) > compound dumbbell (2) > compound machine (3) >
@@ -547,7 +540,7 @@ function dedupeMuscles(tag: string | undefined, excluded: Set<string>, focusGrou
     muscles.push(focusGroup);
   }
   for (const m of muscles) {
-    if (excluded.has(m)) continue;
+    if (excluded.has(m) || excluded.has(collapseKey(m))) continue;
     const ck = collapseKey(m);
     if (seen.has(ck)) continue;
     seen.add(ck);
@@ -699,14 +692,19 @@ function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string,
       const minTotal = info.exs.length * 2; // минимум 2 сета на упражнение
       if (minTotal > cap) {
         // Удалить последние упражнения пока sum(2 × remaining) <= cap
-        // Сортируем: primary первыми (accessory удаляем раньше)
+        // Сортируем: primary первыми (accessory удаляем раньше).
+        // BUG-FIX: добавлена вторичная сортировка по strengthRank — compound
+        // упражнения сохраняются раньше isolation (compound даёт больше гипертрофии).
         const sortedExs = [...info.exs].sort((a, b) => {
           if (a.role === 'primary' && b.role !== 'primary') return -1;
           if (a.role !== 'primary' && b.role === 'primary') return 1;
-          return 0;
+          // Одинаковая роль → compound раньше isolation (меньший rank = тяжелее = сохраняем)
+          return strengthRank(a) - strengthRank(b);
         });
         const toRemove: BBExercise[] = [];
         let keptCount = info.exs.length;
+        // BUG-FIX: гарантировать минимум 1 упражнение (2 сета) даже если cap < 2.
+        // Раньше при cap=0 или cap=1 удалялись ВСЕ упражнения → мышца без объёма.
         while (keptCount * 2 > cap && keptCount > 1) {
           const removed = sortedExs.pop()!;
           toRemove.push(removed);
@@ -1276,7 +1274,7 @@ function buildSession(
       preferEquipment: PHASE_EQUIPMENT_PREF[phase],
     });
     for (const s of selected) { if (s && s.id) sessionSelectedIds.push(s.id); if (s && s.name) sessionSelectedNames.push(s.name); }
-    let exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5 }];
+    let exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5, _score: 0 }];
     // Keep the first compound stable for the same session slot across weeks;
     // accessory movements remain eligible for phase rotation.
     const primarySlot = `${phase}|${sched.sessionTag || dayInRotation}|${muscle}`;
@@ -1402,107 +1400,8 @@ function buildSession(
     // P9: MULTI-ANGLE diversity — гарантированное покрытие разных углов/паттернов.
     // Для каждой мышцы — 3-4 разных угла/паттерна, не просто "compound + isolation".
     // Это устраняет "3 жима лёжа подряд" и обеспечивает полноценное развитие.
+    // ANGLE_CLASSES импортирован из bb-exercise-selection.engine.ts (единственный источник истины).
     if (exerciseCount >= 2 && pool.length >= 2 && muscle !== 'shoulders') {
-      // Классификаторы углов/паттернов по мышцам
-      type AngleClass = { name: string; match: (e: any) => boolean };
-      const ANGLE_CLASSES: Record<string, AngleClass[]> = {
-        chest: [
-          // ПРОФ-порядок: 1. тяжёлый горизонтальный жим (механическое натяжение)
-          //               2. наклонный жим (верх груди — отстающая у большинства)
-          //               3. разводка/fly (растяжение мышцы — критично для гипертрофии)
-          //               4. отжимания на брусьях (нижняя часть + трицепс)
-          // Ранее порядок был horizontal_press → fly_cable → incline_press → dips_press,
-          // из-за чего при exerciseCount=3 алгоритм брал 2 жима + 1 РАЗВОДКУ (всегда растяжка).
-          // Переставили incline_press перед fly_cable — теперь 3-я позиция = жим на наклонной
-          // (compound, механическое натяжение), а разводка идёт 4-й — добивка-изоляция.
-          { name: 'horizontal_press', match: (e) => /жим.*(лёжа|лежа|гориз)|bench.*(press|жим)|жим штанги|жим в смите лёжа/i.test(e.name) && !/наклон|incline|decline|сниз|отриц|узк/i.test(e.name) },
-          { name: 'incline_press', match: (e) => (/жим.*(наклон|incline|верх)/i.test(e.name) || /incline.*(press|жим)/i.test(e.name)) && !/отриц|decline|сниз|нижн/i.test(e.name) },
-          { name: 'fly_cable', match: (e) => /развод|fly|crossover|кроссов|сведен|пек.?дек|бабоч|сведение/i.test(e.name) },
-          { name: 'decline_press', match: (e) => /жим.*(отриц|decline|сниз|нижн)/i.test(e.name) || /decline.*(press|жим)/i.test(e.name) },
-          { name: 'dips_press', match: (e) => /отжим.*(брус|dip|параллел)|брусь/i.test(e.name) && !/трицепс/i.test(e.name) },
-        ],
-        back: [
-          // ПРОФ-порядок для спины: 1. вертикальная тяга (подтяг/пуллдаун — ширина)
-          //                          2. тяжёлая горизонтальная тяга двумя руками (толщина — row_bar/T-bar/seal/Yates/Pendlay)
-          //                          3. горизонтальная тяга одной рукой / в тренажёре (db row / chest-supported / machine — точность)
-          //                          4. пуловер (изоляция широчайших — растяжение)
-          //                          5. rear delt / face pull (задняя дельта — отдельный угол)
-          //                          6. шраги (трапеции)
-          // Ранее все 12 тяг (включая one-arm изоляции) были в одном классе horizontal_row,
-          // и offset-формула (week*31+day*17+ci*7) % candidates.length выбирала лёгкие
-          // изоляции (Тяга верхнего блока одной рукой = 24% всех back-слотов) чаще тяжёлых.
-          // Разделение на тяжёлые/одноручные даёт приоритет тяжёлым compound-тягам.
-          { name: 'vertical_pull', match: (e) => /подтяг|pull.?up|тяга.*верх|lat.?pull|пуллдаун|верхн.*блок/i.test(e.name) && !/одной рук/i.test(e.name) },
-          { name: 'heavy_row', match: (e) => (/тяга.*наклон.*штанг|тяга.*штанг.*наклон|тяга.*т-?гриф|тяга.*гриф|тяга.*пендл|тяга.*йейт|тяга.*мэдоус|тяга.*леж.*скам|seal.?row|pendlay|yates|meadows/i.test(e.name) || (/row/i.test(e.id) && !/one.?arm|single|cable|machine/i.test(e.name))) && !/верх|вертик|подтяг|одной рук|за голов/i.test(e.name) },
-          { name: 'single_arm_row', match: (e) => (/тяга.*гантел.*наклон|тяга.*одной рук|тяга.*блок.*одной|тяга.*лэндмайн|тяга.*грудь.*упор|chest.?supported|тяга.*тренаж/i.test(e.name) || (/row/i.test(e.id) && /one.?arm|single|cable|machine/i.test(e.name))) && !/подтяг|за голов/i.test(e.name) },
-          { name: 'pullover_lat_iso', match: (e) => /пуловер|pullover|пулов|прям.*рук|прямые руки|straight.?pull|жиз.*широчайш/i.test(e.name) },
-          { name: 'rear_delt_facepull', match: (e) => /лиц.*тяга|face.?pull|тяга к лиц|задн.*дельт|rear.?delt|обратн.*бабоч/i.test(e.name) },
-          { name: 'shrugs', match: (e) => /шраг/i.test(e.name) },
-        ],
-        quads: [
-          // ПРОФ-порядок для квадрицепсов (Schoenfeld 2022, Maeo 2023 — lengthened-position bias):
-          // 1. compound_squat — bilateral compound (механическое натяжение, тяжёлый день)
-          // 2. lunge_bulgarian — unilateral (баланс, активация стабилизаторов)
-          // 3. sissy_lengthened — lengthened-position (максимальное растяжение квадрицепса, m. rectus femoris)
-          // 4. extension — изоляция (shortened-position, peak contraction)
-          // 5. belt_front — вариант для разгрузки осевой (belt squat / front squat)
-          { name: 'compound_squat', match: (e) => /присед|squat|жим.*ног|leg.?press|хак|hack/i.test(e.name) && !/над голов|overhead|пистол|pistol|split|выпад|lunge|болгар|bulgarian|гоблет|goblet|гантел|сисси|sissy|поясн|belt/i.test(e.name) },
-          { name: 'lunge_bulgarian', match: (e) => /выпад|lunge|болгар|bulgarian|гоблет|goblet|фронт.*присед|front.*squat|split.*squat|присед.*ножниц/i.test(e.name) && !/сисси|sissy/i.test(e.name) },
-          // FIX-A10: sissy squat — lengthened-position для quads (Maeo 2023: m. rectus femoris растягивается в сисси)
-          { name: 'sissy_lengthened', match: (e) => /сисси|sissy|наклон.*назад|reverse.*nordic|обратн.*скандинав/i.test(e.name) },
-          { name: 'extension', match: (e) => /разгибан.*ног|leg.?extension/i.test(e.name) },
-          // FIX-A10: belt squat / step-up — варианты для разнообразия и разгрузки
-          { name: 'belt_stepup', match: (e) => /поясн.*присед|belt.?squat|step.?up|вставан.*скам|зашагиван/i.test(e.name) },
-        ],
-        hamstrings: [
-          { name: 'curl', match: (e) => /сгибан.*ног|leg.?curl|сгибания ног/i.test(e.name) },
-          { name: 'seated_curl', match: (e) => /сгибан.*сидя|seated.*curl/i.test(e.name) },
-          { name: 'rdl_bridge', match: (e) => /румын|rdl|ягодичн.*мост|hip.?thrust|glute.?bridge/i.test(e.name) },
-          { name: 'good_morning', match: (e) => /гудморнинг|good.?morning|гиперэкстенз|back.?extension/i.test(e.name) },
-          { name: 'nordic_ghr', match: (e) => /норд|nordic|glute.?ham|ghr/i.test(e.name) },
-          { name: 'lunge', match: (e) => /выпад|lunge/i.test(e.name) },
-        ],
-        glutes: [
-          { name: 'hip_thrust', match: (e) => /ягодичн.*мост|hip.?thrust|glute.?bridge/i.test(e.name) },
-          { name: 'squat_variant', match: (e) => /присед|squat|выпад|lunge|болгар/i.test(e.name) },
-          { name: 'kickback', match: (e) => /отведен.*ног|kick.?back|мах.*ног|glute.?kick/i.test(e.name) },
-          { name: 'abduction', match: (e) => /отведен.*бедр|abduction|разведен.*ног/i.test(e.name) },
-          { name: 'extension', match: (e) => /гиперэкстенз|back.?extension|45.?degree/i.test(e.name) },
-        ],
-        calves: [
-          { name: 'standing_calf', match: (e) => /подъём.*носки.*стоя|подъем.*носки.*стоя|standing.*calf|calf.*stand/i.test(e.name) },
-          { name: 'seated_calf', match: (e) => /подъём.*носки.*сидя|подъем.*носки.*сидя|seated.*calf|calf.*seat/i.test(e.name) },
-          { name: 'donkey_calf', match: (e) => /ослин|donkey.*calf|наклон.*носки/i.test(e.name) },
-        ],
-        biceps: [
-          // ПРОФ-порядок для бицепса (Schoenfeld 2022, Pedrosa 2022 — lengthened-position bias):
-          // 1. barbell_curl — тяжёлая основа (механическое натяжение, both heads)
-          // 2. incline_lengthened — наклонный сгибание (m. long head растягивается — ключ для гипертрофии)
-          // 3. hammer_brachialis — молоток (m. brachialis + brachioradialis — ширина руки)
-          // 4. preacher_shortened — концентрированный/проповедника (shortened-position, peak contraction)
-          // 5. cable_constant — кабель (постоянное натяжение throughout ROM)
-          { name: 'barbell_curl', match: (e) => /сгибан.*штанг|barbell.*curl|подъём.*штанг.*бицепс|подъем.*штанг.*бицепс/i.test(e.name) && !/молот|наклон|проповед|концентр/i.test(e.name) },
-          // FIX-A9: incline curl — lengthened-position для biceps long head
-          { name: 'incline_lengthened', match: (e) => /сгибан.*наклон|incline.*curl|сгибан.*скам.*наклон/i.test(e.name) },
-          { name: 'hammer_brachialis', match: (e) => /молот|hammer.*curl/i.test(e.name) },
-          // FIX-A9: preacher curl — shortened-position для peak contraction
-          { name: 'preacher_shortened', match: (e) => /проповед|preacher|концентр|concentration|спайдер|spider/i.test(e.name) },
-          { name: 'cable_constant', match: (e) => /сгибан.*блок|cable.*curl|бицепс.*блок/i.test(e.name) },
-          // dumbbell_curl — fallback если ничего из выше не нашлось
-          { name: 'dumbbell_curl', match: (e) => /сгибан.*гантел|dumbbell.*curl|бицепс.*гантел/i.test(e.name) && !/молот|наклон|проповед|концентр/i.test(e.name) },
-        ],
-        triceps: [
-          { name: 'press_closegrip', match: (e) => /жим.*узк|close.?grip|француз.*жим/i.test(e.name) },
-          { name: 'extension_overhead', match: (e) => /разгибан.*из.?за|overhead.*triceps|француз|french/i.test(e.name) },
-          { name: 'pushdown', match: (e) => /разгибан.*блок|pushdown|трицепс.*блок|канат.*рукоят/i.test(e.name) },
-          { name: 'dips_triceps', match: (e) => /отжим.*брус|dip|брусь/i.test(e.name) },
-        ],
-        abs: [
-          { name: 'crunch', match: (e) => /скручиван|crunch|пресс.*скручив/i.test(e.name) },
-          { name: 'leg_raise', match: (e) => /подъём.*ног|подъем.*ног|leg.?raise|подниман.*ног/i.test(e.name) },
-          { name: 'cable_crunch', match: (e) => /пресс.*блок|cable.*crunch|скручиван.*блок/i.test(e.name) },
-        ],
-      };
       const classes = ANGLE_CLASSES[muscle];
       if (classes && classes.length > 0) {
         const diverse: any[] = [];
@@ -1787,6 +1686,7 @@ function buildSession(
           sets: adjustedSets, repsRange: effReps,
           rir: finalRir,
           workSets, exerciseName: (exData as any).name || (exData as any).id,
+          exerciseType: (exData as any).exerciseType || (exData as any).type || 'compound',
           tempoSpec: tempoStr, restSeconds: exRest,
           comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus),
           executionProfile: buildExerciseInstructions({ exerciseId: (exData as any).id, exerciseName: (exData as any).name || (exData as any).id, muscle: pl.muscle, role: pl.role, phase, trainingFocus, tempo: tempoStr, restSeconds: exRest, orderIndex: exercises.length, totalExercises: pl.exDatas.length }),
@@ -1821,6 +1721,7 @@ function buildSession(
         sets: exSets, repsRange: [Math.min(Math.max(repMin, adjReps - 2), repsCap), Math.min(repMax, repsCap)] as [number,number],
         rir: finalRir,
         workSets, exerciseName: (exData as any).name || (exData as any).id,
+        exerciseType: (exData as any).exerciseType || (exData as any).type || 'compound',
         tempoSpec: tempoStr, restSeconds: exRest,
         comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, exSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus),
         executionProfile: buildExerciseInstructions({ exerciseId: (exData as any).id, exerciseName: (exData as any).name || (exData as any).id, muscle: pl.muscle, role: pl.role, phase, trainingFocus, tempo: tempoStr, restSeconds: exRest, orderIndex: exercises.length, totalExercises: pl.exDatas.length }),
@@ -2074,7 +1975,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         volumeGoal: input.volumeGoal || 'mav',
         weakPoint: isWeak(m, weakPoints),
         focus: focusGroup === m || (focusGroup ? isWeak(m, [focusGroup]) : false),
-        recoveryMultiplier: recoveryMult * nutritionMult,
+        // BUG-FIX: recoveryMultiplier уже применён к rotationSets (v) на строках выше
+        // (v *= recoveryMult * nutritionMult * pedAdapt * labMrvMultiplier * goal).
+        // Передаём 1.0 чтобы избежать двойного применения.
+        // MRV cap (mrvByMuscle[m]) вычисляется отдельно на строке 1977 с учётом recovery.
+        recoveryMultiplier: 1,
       });
       // fix D: истинный MRV — потолок для капа.
       // fix C: для отстающих/фокус-групп поднимаем потолок в такт объёмному
@@ -2091,6 +1996,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const PRO_KEYS = ['delt_front', 'delt_mid', 'delt_rear', 'forearms', 'traps', 'lower_back', 'abs'];
   for (const m of PRO_KEYS) {
     if (mrvByMuscle[m]) continue;
+    // BUG-FIX: проверяем excludedMuscles для PRO-ключей (и их collapseKey).
+    // Раньше травмированные PRO-мышцы (например forearms) получали MRV cap,
+    // и normalizeWeekMrv пытался капать упражнения для них.
+    if (excludedMuscles.has(m) || excludedMuscles.has(collapseKey(m))) continue;
     const lm = landmarksForRotation(level, m, pattern.rotationDays);
     if (lm) {
       let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult);
@@ -2438,7 +2347,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           'double_progression',
           prevWs.weight, prevWs.reps, prevEx.rir,
           maxW, curWeek.week, input.weeks, curPhase,
-          (curEx as any).exerciseType,
+          curEx.exerciseType || (curEx as any).type || 'compound',
           curEx.role,
         );
         // Применяем weight + reps (progression). RIR НЕ трогаем — он управляется

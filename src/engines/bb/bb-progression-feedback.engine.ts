@@ -436,9 +436,12 @@ export function autoReplaceOnPlateau(
     const first = series[0];
     const last = series[series.length - 1];
     if (first <= 0) continue;
-    const growthPct = Math.abs(((last - first) / first) * 100);
-    if (growthPct < 2) {
-      // e1RM стабильна ±2% за 4+ нед → плато
+    // BUG-FIX: порог 2% (±) даёт ложные плато — e1RM колеблется ±3-5% от сна/стресса.
+    // Schoenfeld 2017: плато = 0% роста за 4+ недели. Используем <= 0 (строгий критерий).
+    // Регресс (last < first) — НЕ плато, а перетрен/усталость → нужна другая обработка.
+    const growthPct = ((last - first) / first) * 100;
+    if (growthPct <= 0) {
+      // e1RM не выросла за 4+ сессий → плато
       plateauExercises.add(name);
     }
   }
