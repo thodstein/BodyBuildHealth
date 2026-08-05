@@ -1925,19 +1925,20 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const volumeTargets: Record<string, BBVolumeTarget> = {};
   const specWeak = input.specialization ? expandWeakForSpecialization(input.weakPoints || []).slice(0, 2) : [];
   // Recovery multiplier from body composition + recovery metrics (Helms 2022, Plews 2022, Watson 2022)
+  // BUG-FIX: используем Number.isFinite() вместо != null для защиты от строк/NaN/undefined.
   const recoveryMult = Math.max(0.6, Math.min(1.5, (() => {
     let r = 1.0;
-    if (input.bodyFat != null) r *= input.bodyFat > 25 ? 0.9 : input.bodyFat > 20 ? 0.95 : 1.0;
-    if (input.leanMass != null) r *= input.leanMass >= 90 ? 1.15 : input.leanMass >= 75 ? 1.05 : input.leanMass >= 60 ? 1.0 : 0.9;
-    if (input.hrvMs != null) r *= input.hrvMs > 70 ? 1.1 : input.hrvMs >= 50 ? 1.0 : 0.85;
-    if (input.sleepHours != null) r *= input.sleepHours >= 7 ? 1.05 : input.sleepHours >= 6 ? 1.0 : 0.85;
-    if (input.stressLevel != null) r *= input.stressLevel < 3 ? 1.05 : input.stressLevel < 6 ? 1.0 : 0.85;
+    if (Number.isFinite(input.bodyFat)) r *= (input.bodyFat as number) > 25 ? 0.9 : (input.bodyFat as number) > 20 ? 0.95 : 1.0;
+    if (Number.isFinite(input.leanMass)) r *= (input.leanMass as number) >= 90 ? 1.15 : (input.leanMass as number) >= 75 ? 1.05 : (input.leanMass as number) >= 60 ? 1.0 : 0.9;
+    if (Number.isFinite(input.hrvMs)) r *= (input.hrvMs as number) > 70 ? 1.1 : (input.hrvMs as number) >= 50 ? 1.0 : 0.85;
+    if (Number.isFinite(input.sleepHours)) r *= (input.sleepHours as number) >= 7 ? 1.05 : (input.sleepHours as number) >= 6 ? 1.0 : 0.85;
+    if (Number.isFinite(input.stressLevel)) r *= (input.stressLevel as number) < 3 ? 1.05 : (input.stressLevel as number) < 6 ? 1.0 : 0.85;
     return r;
   })()));
   const nutritionMult = Math.max(0.6, Math.min(1.5, (() => {
     let n = 1.0;
-    if (input.calorieSurplus != null) n *= input.calorieSurplus > 300 ? 1.1 : input.calorieSurplus > 100 ? 1.05 : input.calorieSurplus < -200 ? 0.8 : 1.0;
-    if (input.proteinPerKg != null) n *= input.proteinPerKg >= 2.0 ? 1.1 : input.proteinPerKg >= 1.6 ? 1.05 : input.proteinPerKg < 1.0 ? 0.85 : 1.0;
+    if (Number.isFinite(input.calorieSurplus)) n *= (input.calorieSurplus as number) > 300 ? 1.1 : (input.calorieSurplus as number) > 100 ? 1.05 : (input.calorieSurplus as number) < -200 ? 0.8 : 1.0;
+    if (Number.isFinite(input.proteinPerKg)) n *= (input.proteinPerKg as number) >= 2.0 ? 1.1 : (input.proteinPerKg as number) >= 1.6 ? 1.05 : (input.proteinPerKg as number) < 1.0 ? 0.85 : 1.0;
     return n;
   })()));
   for (const m of Object.keys(muscleSessionCount)) {
