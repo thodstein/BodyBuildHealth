@@ -123,11 +123,20 @@ export function useDataLink(): LinkedData {
         await db.init();
         const allLabs = await db.getAll<LabPoint>('labs_log');
         const pid = profile.id || 'current-user';
-        const userLabs = allLabs.filter(l => l.patientId === pid || !l.patientId);
-        setLabs(userLabs);
+         const userLabs = (Array.isArray(allLabs) ? allLabs : []).filter(l => l && typeof l.code === 'string' && l.patientId === pid || l && typeof l.code === 'string' && !l.patientId);
+         setLabs(userLabs);
 
-        const allCourse = await db.getAll<CourseEntry>('course_log');
-        setCourse(allCourse);
+         const allCourse = await db.getAll<CourseEntry>('course_log');
+         const validCourse = (Array.isArray(allCourse) ? allCourse : []).filter(c =>
+           c && typeof c.substanceId === 'string' && c.substanceId.length > 0
+         ).map(c => ({
+           ...c,
+           doseValue: Number.isFinite(Number(c.doseValue)) ? Number(c.doseValue) : 0,
+           frequency: typeof c.frequency === 'number' ? c.frequency : (Number.isFinite(Number(c.frequency)) ? Number(c.frequency) : 1),
+           startWeek: Number.isFinite(Number(c.startWeek)) ? Number(c.startWeek) : 1,
+           endWeek: Number.isFinite(Number(c.endWeek)) ? Number(c.endWeek) : 12,
+         }));
+         setCourse(validCourse);
       } catch {}
     };
     load();

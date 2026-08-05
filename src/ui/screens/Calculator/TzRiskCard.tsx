@@ -36,6 +36,7 @@ interface Props {
 
 export const TzRiskCard: React.FC<Props> = ({ tz, before, after }) => {
   const [expandedOrgan, setExpandedOrgan] = useState<string | null>(null);
+  const organs = Array.isArray(tz?.organs) ? tz.organs : [];
 
   return (
     <div style={{ ...GLASS, padding: '10px 12px', marginTop: 6, marginBottom: 6 }}>
@@ -101,12 +102,13 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after }) => {
         Риск по системам
       </div>
 
-      {tz.organs.map((organ: TzSpecOrganResult) => {
-        const sc = SYSTEM_COLORS[organ.id] || { accent: ACCENT, bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.08)' };
-        const isExpanded = expandedOrgan === organ.id;
-        const delta = organ.rawPercent - organ.afterPercent;
-        const protectedMechs = organ.mechanisms.filter(m => m.k_used > 0).length;
-        const totalMechs = organ.mechanisms.length;
+       {organs.map((organ: TzSpecOrganResult) => {
+         const sc = SYSTEM_COLORS[organ.id] || { accent: ACCENT, bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.08)' };
+         const isExpanded = expandedOrgan === organ.id;
+         const delta = organ.rawPercent - organ.afterPercent;
+         const mechanisms = Array.isArray(organ.mechanisms) ? organ.mechanisms : [];
+         const protectedMechs = mechanisms.filter(m => m.k_used > 0).length;
+         const totalMechs = mechanisms.length;
 
         return (
           <div key={organ.id} style={{
@@ -150,9 +152,9 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after }) => {
             </div>
 
             {/* Expanded mechanisms */}
-            {isExpanded && (
-              <div style={{ padding: '5px 10px 8px', borderTop: '1px solid rgba(255,255,255,0.04)', marginTop: 3 }}>
-                 {organ.mechanisms.map((m: TzSpecMechanismResult) => {
+                 {isExpanded && (
+               <div style={{ padding: '5px 10px 8px', borderTop: '1px solid rgba(255,255,255,0.04)', marginTop: 3 }}>
+                  {mechanisms.map((m: TzSpecMechanismResult) => {
                    const hasProtection = m.k_used > 0;
                    const beforePct = organ.maxRaw ? Math.min(100, Math.round((m.raw / organ.maxRaw) * 100)) : Math.round(m.raw);
                    const afterPct = organ.maxRaw ? Math.min(100, Math.round((m.afterSupport / organ.maxRaw) * 100)) : Math.round(m.afterSupport);

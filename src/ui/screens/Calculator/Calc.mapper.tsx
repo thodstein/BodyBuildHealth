@@ -440,12 +440,12 @@ export function buildMapperCtx(
     crpLevel: labs['CRP'] || labs['HSCRP'],
     triggeredStackIds: stackTriggers || [],
   };
-  const pedDoses = (state.pharma.aas || [])
+  const pedDoses = (Array.isArray(state.pharma?.aas) ? state.pharma.aas : [])
     .filter((a: any) => a && a.id)
     .map((a: any) => ({
       id: (a.id as string).toLowerCase(),
       pClass: classifyPed(a.id),
-      mgPerWeek: a.mgPerWeek ?? a.dosePerWeek ?? (a.dose ? Number(String(a.dose).replace(/\D/g,''))*7 : 500),
+       mgPerWeek: Number(a.mgPerWeek ?? a.dosePerWeek ?? (a.dose ? Number(String(a.dose).replace(/\D/g,''))*7 : 500)) || 0,
       form: (a.form === 'oral' ? 'oral' : 'inject') as 'oral' | 'inject',
     }));
   const ghIU = state.pharma.ghIU || 0;
@@ -460,11 +460,11 @@ export function buildMapperCtx(
   if (t3Mcg > 0) pedDoses.push({ id: 't3', pClass: 't3', mcgPerDay: t3Mcg, form: 'oral' } as any);
   return {
     labs, phaseCtx, boosterCtx, level, manualChoices,
-    onCourse: state.pharma.aas.length > 0 || pedDoses.length > 0,
+     onCourse: (Array.isArray(state.pharma?.aas) ? state.pharma.aas.length : 0) > 0 || pedDoses.length > 0,
     e2Level: labs['ESTRADIOL'], hemoglobin: labs['HEMOGLOBIN'], hematocrit: labs['HEMATOCRIT'],
     hasHCG: state.pharma.hasHCG, hasAI: state.pharma.hasAI,
     hasCabergoline: state.pharma.hasCaber || false,
-    aasIds: (state.pharma.aas || []).map((a: any) => a.id || '').filter(Boolean),
+     aasIds: (Array.isArray(state.pharma?.aas) ? state.pharma.aas : []).map((a: any) => a.id || '').filter(Boolean),
     pedDoses, libidoLow: (state.symptoms || []).includes('low_libido'),
     bpSystolic: state.cardio.bpStage === 'high' ? 150 : state.cardio.bpStage === 'normal' ? 120 : 135,
     lipidLdl: labs['LDL'],

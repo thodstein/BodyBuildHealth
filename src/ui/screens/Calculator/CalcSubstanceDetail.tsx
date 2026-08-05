@@ -34,6 +34,15 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
   const titr = getTitrationProtocol(id);
   const catalogEntry = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toLowerCase()] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
   const tier = subTier(id);
+  const mechsCovered = Array.isArray(sub.mechsCovered) ? sub.mechsCovered : [];
+  const pharmacyBrands = Array.isArray(form?.pharmacyBrands) ? form.pharmacyBrands : [];
+  const titrSteps = Array.isArray(titr?.steps) ? titr.steps : [];
+  const monitorLabs = Array.isArray(titr?.monitorLabs) ? titr.monitorLabs : [];
+  const stopConditions = Array.isArray(titr?.stopConditions) ? titr.stopConditions : [];
+  const monitoring = Array.isArray(catalogEntry?.monitoring) ? catalogEntry.monitoring : [];
+  const contraindications = Array.isArray(catalogEntry?.contraindications) ? catalogEntry.contraindications : [];
+  const sideEffects = Array.isArray(catalogEntry?.sideEffects) ? catalogEntry.sideEffects : [];
+  const conflicts = Array.isArray(catalogEntry?.conflicts) ? catalogEntry.conflicts : [];
 
   const doseMg = dose ? (titrFactor && titrFactor > 1 ? Math.round(dose.mg * titrFactor) : dose.mg) : null;
 
@@ -87,10 +96,10 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
           )}
 
           {/* Механизмы покрытия (если есть) */}
-          {sub.mechsCovered.length > 0 && (
+          {mechsCovered.length > 0 && (
             <div style={{ marginBottom: 5, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
               <span style={{ fontSize: 7, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.3px', width: '100%' }}>ТЗ-механизмы:</span>
-              {sub.mechsCovered.map(m => (
+              {mechsCovered.map(m => (
                 <span key={m} style={{ fontSize: 7, padding: '1px 6px', borderRadius: 6, background: 'rgba(168,85,247,0.08)', color: '#c4b5fd', fontWeight: 500 }}>{m}</span>
               ))}
             </div>
@@ -105,10 +114,10 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
                   <span style={{ color: 'var(--text-light)', fontSize: 8 }}>{form.optimalForm}</span>
                 </div>
               )}
-              {form.pharmacyBrands && form.pharmacyBrands.length > 0 && (
+              {pharmacyBrands.length > 0 && (
                 <div style={{ marginBottom: 2 }}>
                   <span style={{ fontWeight: 700, color: '#00e68a', fontSize: 7 }}>Аптечные: </span>
-                  <span style={{ color: 'var(--text-light)', fontSize: 8 }}>{form.pharmacyBrands.join(', ')}</span>
+                  <span style={{ color: 'var(--text-light)', fontSize: 8 }}>{pharmacyBrands.join(', ')}</span>
                 </div>
               )}
               {form.altForm && (
@@ -147,7 +156,7 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
           {titr && (
             <div style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.12)', marginBottom: 5 }}>
               <div style={{ fontWeight: 700, color: '#f59e0b', marginBottom: 3, fontSize: 7 }}>📈 Титрация: {titr.startDose} → {titr.maxDose}</div>
-              {titr.steps.map((step, si) => (
+              {titrSteps.map((step, si) => (
                 <div key={si} style={{ fontSize: 7, color: 'var(--text-light)', marginBottom: 2 }}>
                   <b style={{ color: '#fbbf24' }}>{step.dose}</b> ({step.duration})
                   {step.trigger ? ' — ' + step.trigger : ''}
@@ -157,24 +166,24 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
               {titr.flushWarning && (
                 <div style={{ fontSize: 7, color: '#fbbf24', marginTop: 3, fontWeight: 600 }}>⚠ {titr.flushWarning}</div>
               )}
-              {titr.monitorLabs && titr.monitorLabs.length > 0 && (
+              {monitorLabs.length > 0 && (
                 <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 3 }}>
-                  🧪 Контроль: {titr.monitorLabs.join(', ')} — {titr.frequency}
+                  🧪 Контроль: {monitorLabs.join(', ')} — {titr.frequency}
                 </div>
               )}
-              {titr.stopConditions && titr.stopConditions.length > 0 && (
+              {stopConditions.length > 0 && (
                 <div style={{ fontSize: 7, color: '#ef4444', marginTop: 2 }}>
-                  ⛔ Стоп: {titr.stopConditions.join('; ')}
+                  ⛔ Стоп: {stopConditions.join('; ')}
                 </div>
               )}
             </div>
           )}
 
           {/* Мониторинг из каталога */}
-          {catalogEntry?.monitoring && catalogEntry.monitoring.length > 0 && (
+          {monitoring.length > 0 && (
             <div style={{ padding: '5px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.12)', marginBottom: 5 }}>
               <div style={{ fontWeight: 700, color: '#60a5fa', marginBottom: 3, fontSize: 7 }}>🧪 Мониторинг анализов:</div>
-              {catalogEntry.monitoring.map((m, mi) => {
+              {monitoring.map((m, mi) => {
                 const mw = typeof m === 'string' ? m : m.what || '';
                 const wn = typeof m === 'string' ? '' : m.when || '';
                 const tr = typeof m === 'string' ? '' : m.targetRange || '';
@@ -188,30 +197,30 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
           )}
 
           {/* Противопоказания из каталога */}
-          {catalogEntry?.contraindications && catalogEntry.contraindications.length > 0 && (
+          {contraindications.length > 0 && (
             <div style={{ padding: '5px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)', marginBottom: 5 }}>
               <div style={{ fontWeight: 700, color: '#ef4444', marginBottom: 3, fontSize: 7 }}>⛔ Противопоказания:</div>
-              {catalogEntry.contraindications.map((c, ci) => (
+              {contraindications.map((c, ci) => (
                 <div key={ci} style={{ fontSize: 7, color: '#fca5a5', marginBottom: 1 }}>• {c}</div>
               ))}
             </div>
           )}
 
           {/* Побочные эффекты */}
-          {catalogEntry?.sideEffects && catalogEntry.sideEffects.length > 0 && (
+          {sideEffects.length > 0 && (
             <div style={{ padding: '5px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.1)', marginBottom: 5 }}>
               <div style={{ fontWeight: 700, color: '#fbbf24', marginBottom: 3, fontSize: 7 }}>⚠ Побочные эффекты:</div>
-              {catalogEntry.sideEffects.map((se, si) => (
+              {sideEffects.map((se, si) => (
                 <div key={si} style={{ fontSize: 7, color: 'var(--text-light)', marginBottom: 1 }}>• {se}</div>
               ))}
             </div>
           )}
 
           {/* Взаимодействия из каталога */}
-          {catalogEntry?.conflicts && catalogEntry.conflicts.length > 0 && (
+          {conflicts.length > 0 && (
             <div style={{ padding: '5px 8px', borderRadius: 6, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.1)' }}>
               <div style={{ fontWeight: 700, color: '#a855f7', marginBottom: 3, fontSize: 7 }}>❌ Конфликты:</div>
-              {catalogEntry.conflicts.map((c, ci) => (
+              {conflicts.map((c, ci) => (
                 <div key={ci} style={{ fontSize: 7, color: 'var(--text-light)', marginBottom: 1 }}>• <b>{c.with}</b> — {c.effect}</div>
               ))}
             </div>

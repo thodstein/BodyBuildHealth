@@ -83,6 +83,7 @@ import { UnifiedSynergyCalculator } from './SupportScreen_parts/UnifiedSynergyCa
 import { SupportTimingPlanner } from './SupportScreen_parts/SupportTimingPlanner';
 import { SupportAnalogCalculator } from './SupportScreen_parts/SupportAnalogCalculator';
 import { AutoCalculator } from './Calculator';
+import { normalizeCalculatorState } from './Calculator/Calc.types';
 export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (screen: string) => void }> = ({ initialTab, onNavigate }) => {
   const linked = useDataLink();
   const [tab, setTab] = useState<SupportTab>(initialTab || 'main');
@@ -332,9 +333,12 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
   const [supportReportCurrent, setSupportReportCurrent] = useState<any>(null);
 
   // Neurotoxicity calculator state
-  const courseCompounds = useMemo(() => (linked.course || []).map(c => {
+  const courseCompounds = useMemo(() => (Array.isArray(linked.course) ? linked.course : []).filter(c => c && typeof c.substanceId === 'string').map(c => {
     const ph = PHARMA_DB[c.substanceId];
-    return { substanceId: c.substanceId, name: ph?.name || c.substanceId, cls: ph?.class || 'other', doseWeekly: (c.doseValue * (typeof c.frequency === 'number' ? c.frequency : 1)), startWeek: c.startWeek, endWeek: c.endWeek };
+    const freq = typeof c.frequency === 'number' && Number.isFinite(c.frequency)
+      ? c.frequency
+      : Number(String(c.frequency ?? '').match(/\d+(?:[.,]\d+)?/)?.[0]?.replace(',', '.')) || 1;
+    return { substanceId: c.substanceId, name: ph?.name || c.substanceId, cls: ph?.class || 'other', doseWeekly: (Number(c.doseValue) || 0) * Math.max(1, freq), startWeek: c.startWeek, endWeek: c.endWeek };
   }), [linked.course]);
   const uniqueCompounds = useMemo(() => {
     const map = new Map<string, { substanceId: string; name: string; cls: string; doseWeekly: number; startWeek: number; endWeek: number }>();
@@ -461,7 +465,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
   const [planResult, setPlanResult] = useState<PlanResult | null>(null);
   const effectiveLevel = useMemo(() => {
     const s = linked.profile?.settings;
-    const aasList = (linked.course || []).filter((c: any) => {
+    const aasList = (Array.isArray(linked.course) ? linked.course : []).filter((c: any) => {
       const ph = PHARMA_DB[c.substanceId];
       return ph?.class && ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm'].includes(ph.class);
     }).map((c: any) => {
@@ -472,16 +476,25 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
     const state: CalculatorState = {
       profile: h.profile || { weight: s?.weight ?? 80, age: s?.age ?? 30, sex: (s?.sex ?? 'male') as 'male' | 'female', workoutsPerWeek: s?.workoutsPerWeek ?? 3, avgWorkoutMinutes: s?.avgWorkoutMinutes ?? 60, sleepHours: 7, stressLevel: 4, smoker: false, alcohol: 'rare', caffeineMg: 100 },
       neuro: h.neuro || { dopamineScore: 0, serotoninScore: 0, gabaBalance: 'balance', memoryIssues: false, focusIssues: false, slowThinking: false, coordinationIssues: false, aggressionScore: 0, headaches: false, weatherDependent: false, sleepQuality: 'good' },
-      pharma: h.pharma || { phase: (supportPhase === 'fertility' ? 'pct' : supportPhase) as any, aas: aasList, hasGH: false, hasIGF: false, hasInsulin: false, hasHCG: false, hasAI: false, hasCaber: false, hasSERM: false, hasSARMs: false, hasMGF: false, hasGLP1: false },
+       pharma: {
+         phase: (supportPhase === 'fertility' ? 'pct' : supportPhase) as any,
+         aas: Array.isArray(h.pharma?.aas) ? h.pharma.aas.filter((a: any) => a && typeof a.id === 'string') : aasList,
+         hasGH: !!h.pharma?.hasGH, hasIGF: !!h.pharma?.hasIGF, hasInsulin: !!h.pharma?.hasInsulin,
+         hasHCG: !!h.pharma?.hasHCG, hasAI: !!h.pharma?.hasAI, hasCaber: !!h.pharma?.hasCaber,
+         hasSERM: !!h.pharma?.hasSERM, hasSARMs: !!h.pharma?.hasSARMs, hasMGF: !!h.pharma?.hasMGF, hasGLP1: !!h.pharma?.hasGLP1,
+       },
       goals: h.goals || { healthMaintenance: false, competitionPrep: false, sleepRecovery: false, lipidCorrection: false, bloodThinning: false, liverDetox: false, bpControl: false, trainingCycle: 'maintenance', cycleWeeks: 12, previousCycles: 0, timeSinceLastCycle: 'none' },
       hepatobiliary: h.hepatobiliary || { altAstElevation: 'none', ggtElevation: 'none', bilirubinElevation: 'none', fattyLiver: false, cholecystitis: false, alcoholHistory: 'none' },
       urinary: h.urinary || { creatinineElevation: 'none', ureaElevation: 'none', proteinuria: false, nephrotoxicDrugs: false, hypertension: false, diabetes: false, urinationPattern: 'normal' },
       cardio: h.cardio || { bpStage: 'normal', heartRate: 70, ldlElevation: 'none', hdlLow: false, triglycerides: 'normal', hctElevation: 'none', previousCVD: false, familyCVD: false },
-      oda: h.oda || { jointPain: 'none', ligamentIssues: false, backPain: false, injuries: [] },
+       oda: { ...(h.oda || {}), injuries: Array.isArray(h.oda?.injuries) ? h.oda.injuries : [] } as any,
       nutrition: h.nutrition || { calories: 2500, proteinG: 160, fatG: 70, carbsG: 300, waterL: 2, saltIntake: 'normal', omega3: false, fiberG: 25, proteinGPerKg: 2, sodiumMg: 3000, potassiumMg: 3000 },
       contraindications: h.contraindications || { allergies: '', hasCVD: false, hasThrombophilia: false, hasGI: false, hasProstateIssues: false, hasDiabetes: false, hasEpilepsy: false, hasMentalIllness: false, hasLiverDisease: false, hasKidneyDisease: false },
-      labs: h.labs || { preCourse: null, midCourse: null, postPCT: null, fullPanel: null },
-      journal: h.journal || { positive: [], negative: [] },
+       labs: {
+         preCourse: h.labs?.preCourse || null, midCourse: h.labs?.midCourse || null,
+         postPCT: h.labs?.postPCT || null, fullPanel: h.labs?.fullPanel || null,
+       },
+       journal: { positive: Array.isArray(h.journal?.positive) ? h.journal.positive : [], negative: Array.isArray(h.journal?.negative) ? h.journal.negative : [] },
       epicrisis: h.epicrisis || { pastGyno: false, pastLibidoDrop: false, pastHctSpike: false, pastLiverIssues: false, pastKidneyIssues: false },
       toxicLoad: h.toxicLoad || { hazardousWork: false, regularNSAIDs: false, otherHeavyDrugs: false, bowelFrequency: 'regular' },
       dental: h.dental || { bleedingGums: false, looseTeeth: false, nightGrinding: false, boneFractures: false, cramps: false },
@@ -497,7 +510,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
       neuroMode: neuroMode,
     };
     // ── ОДИН ВЫЗОВ ──
-    const planRes = runSupportUnified(state);
+    const planRes = runSupportUnified(normalizeCalculatorState(state));
     setPlanResult(planRes);
     // C23: уведомления о режимах усиления / суставной поддержке
     try {
@@ -595,7 +608,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (sc
     // ── Всегда вызываем calculateSupportTZ для полного CalculatorResult ──
     // (раньше здесь была lossy-реконструкция из planResult, которая теряла8+ полей)
     let tzResult: CalculatorResult;
-    tzResult = calculateSupportTZ(state);
+     tzResult = calculateSupportTZ(normalizeCalculatorState(state));
     // ── ЕДИНЫЙ ДВИЖОК РИСКА: calculateTzSpecRisk (механизм-ориентированная модель) ──
     const systemBreakdown: Record<string, { raw: number; net: number }> = {};
     for (const cmp of (tzResult.comparisonBeforeAfter || [])) {

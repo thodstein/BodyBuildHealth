@@ -24,7 +24,25 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
 
   const effectiveWeek = propWeek || Math.min(state.goals.cycleWeeks || 12, Math.max(1, ...state.pharma.aas.map(a => a.weeks || 12), 6));
 
-  const result = useMemo<CalculatorResult>(() => calculateSupportTZ({ ...state, courseWeek: effectiveWeek }), [state, effectiveWeek]);
+  const courseFrequency = (value: unknown): number => {
+    if (typeof value === 'number' && Number.isFinite(value)) return Math.max(1, value);
+    const match = String(value ?? '').match(/\d+(?:[.,]\d+)?/);
+    return match ? Math.max(1, Number(match[0].replace(',', '.'))) : 1;
+  };
+
+  const result = useMemo<CalculatorResult>(() => {
+    try {
+      return calculateSupportTZ({ ...state, courseWeek: effectiveWeek });
+    } catch (error) {
+      console.error('AutoCalculator calculation failed', error);
+      return {
+        risk: { systems: [], overallRaw: 0, overallAfterSupport: 0, timestamp: new Date().toISOString() },
+        schedule: [], selectedSubstances: [], synergyIdsUsed: [], titrationApplied: {}, labDeltas: [],
+        overallRiskBefore: 0, overallRiskAfter: 0, contraindicationAlerts: ['Не удалось рассчитать риск. Проверьте данные курса и анализов.'],
+        negativeBlocks: [], comparisonBeforeAfter: [], timestamp: new Date().toISOString(),
+      } as CalculatorResult;
+    }
+  }, [state, effectiveWeek]);
 
   React.useEffect(() => {
     try {
@@ -43,7 +61,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       })
       .map(c => ({
         id: c.substanceId,
-        doseMgWeek: (c.doseValue || 0) * (c.frequency || 1),
+        doseMgWeek: (Number(c.doseValue) || 0) * courseFrequency(c.frequency),
         weeks: (c.endWeek || 12) - (c.startWeek || 0),
         startWeek: c.startWeek || 1,
         endWeek: c.endWeek || 12,
@@ -111,7 +129,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
     try {
       if (!courseLinked || courseLinked.length === 0) { setFillStatus('❌ Нет активного курса'); setTimeout(() => setFillStatus(''), 2000); return; }
       const aasClasses = ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm'];
-       const linkedAas = courseLinked.filter(c => c && typeof c.substanceId === 'string').filter(c => { const ph = PHARMA_DB[c.substanceId]; return ph?.class && aasClasses.includes(ph.class); }).map(c => ({ id: c.substanceId, doseMgWeek: (Number(c.doseValue) || 0) * (Number(c.frequency) || 1), weeks: (Number(c.endWeek) || 12) - (Number(c.startWeek) || 0), startWeek: Number(c.startWeek) || 1, endWeek: Number(c.endWeek) || 12 }));
+       const linkedAas = courseLinked.filter(c => c && typeof c.substanceId === 'string').filter(c => { const ph = PHARMA_DB[c.substanceId]; return ph?.class && aasClasses.includes(ph.class); }).map(c => ({ id: c.substanceId, doseMgWeek: (Number(c.doseValue) || 0) * courseFrequency(c.frequency), weeks: Math.max(1, (Number(c.endWeek) || 12) - (Number(c.startWeek) || 0)), startWeek: Number(c.startWeek) || 1, endWeek: Number(c.endWeek) || 12 }));
       const hasHCG = !!courseLinked.find(c => c.substanceId === 'hcg');
       const hasAI = !!courseLinked.find(c => ['anastrozole','letrozole','exemestane'].includes(c.substanceId));
       const hasSERM = !!courseLinked.find(c => ['tamoxifen','clomiphene','enclomiphene'].includes(c.substanceId));
@@ -507,7 +525,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       )}
 
       {/* ── РИСК: механизм-ориентированная модель (TZ) ── */}
-      {result.tzSpecResult && result.tzSpecResult.organs ? (
+      {result.tzSpecResult && Array.isArray(result.tzSpecResult.organs) ? (
         <TzRiskCard
           tz={result.tzSpecResult}
           before={result.overallRiskBefore}
