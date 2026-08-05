@@ -117,4 +117,9 @@ describe('shouldTrainToday', () => {
   it('allows when readiness >= 45', () => {
     expect(shouldTrainToday(baseInput({ readiness: 50 })).train).toBe(true);
   });
+  it('blocks when combined RIR shift is at least 3', () => {
+    const result = shouldTrainToday(baseInput({ readiness: 80, combinedRirShift: 3 }));
+    expect(result.train).toBe(false);
+    expect(result.reason).toContain('RIR');
+  });
 });

@@ -24,6 +24,8 @@ export interface AutoRegInput {
   plannedTopSetPct?: number;    // напр. 0.85
   plannedVolumeMult?: number;    // 1
   plannedRIR?: number;           // 0-4
+  /** Суммарный сдвиг RIR из нескольких авторегуляционных источников. */
+  combinedRirShift?: number;
 }
 
 export interface AutoRegOutput {
@@ -200,6 +202,9 @@ export function sessionAutoRegulate(
 
 /** Быстрая оценка: стоит ли тренироваться сегодня (по readiness + HRV). */
 export function shouldTrainToday(input: AutoRegInput): { train: boolean; reason: string } {
+  if ((input.combinedRirShift ?? 0) >= 3) {
+    return { train: false, reason: `Суммарный RIR-сдвиг ${input.combinedRirShift}≥3 — восстановление приоритетно` };
+  }
   if (input.readiness < 25) return { train: false, reason: `Готовность ${input.readiness}<25 — полный отдых` };
   if (input.readiness < 35 && (input.hrvRatio ?? 1) < 0.7) return { train: false, reason: `Готовность ${input.readiness}<35 + HRV<0.7 — восстановление приоритетно` };
   if (input.acwr.zone === 'dangerous') return { train: false, reason: 'ACWR в опасной зоне — пропуск тренировки рекомендован' };
