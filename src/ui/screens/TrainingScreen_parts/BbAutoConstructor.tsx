@@ -19,7 +19,7 @@ import { EXERCISE_CATALOG, getExercisesByGroup, getExerciseById } from '../../..
 import { SubstitutionPopup } from './SubstitutionPopup';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { rankBBSplits, getMuscleFrequencies, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
-import { buildBBPlan, buildWarmup, type BBPlan, type BBExercise } from '../../../engines/bb/bb-builder.engine';
+import { buildBBPlan, buildWarmup, applyMacrocycleToBBPlan, type BBPlan, type BBExercise } from '../../../engines/bb/bb-builder.engine';
 import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
 import { finalizeBBPlan } from '../../../engines/bb/bb-finalize.engine';
 import { calcBBPlanMetrics, explainBBMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
@@ -68,7 +68,7 @@ import { getBBSuggestions } from './bb-compat';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { WhatIfCard } from './WhatIfCard';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
-import { bbMacroToActiveBlock, type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
+import { type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 
 type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust' | 'annual';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -638,24 +638,9 @@ export const BbAutoConstructor: React.FC = () => {
     }
 
     if (bbAnnualMacrocycle) {
-      const phaseMap = {
-        hypertrophy: 'accumulation',
-        strength: 'intensification',
-        contest_prep: 'peaking',
-        transition: 'deload',
-      } as const;
-      plan = {
-        ...plan,
-        weeks: plan.weeks.map(week => {
-          const active = bbMacroToActiveBlock(bbAnnualMacrocycle, week.week);
-          if (!active) return week;
-          return {
-            ...week,
-            phase: phaseMap[active.phase],
-            deload: active.phase === 'transition',
-          };
-        }),
-      };
+      // BB-1 FIX: use applyMacrocycleToBBPlan for proper volume/RIR adjustments
+      // (compound×accessory multipliers, RIR ranges, accessory removal in contest_prep)
+      plan = applyMacrocycleToBBPlan(plan, bbAnnualMacrocycle);
     }
 
     const modeLabel = bbAnnualMacrocycle
@@ -1569,7 +1554,17 @@ export const BbAutoConstructor: React.FC = () => {
 
     return (
       <div>
-        <div style={H}>📋 Шаг 4: План — {builtPlan.pattern.name}</div>
+        <div style={{ ...H, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <span>📋 Шаг 4: План — {builtPlan.pattern.name}</span>
+          <button
+            disabled={!!builtPlan.validation && !builtPlan.validation.valid}
+            style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e', fontSize:11, padding:'4px 10px' }}
+            onClick={handleSendToExecution}
+            aria-label="Начать тренировку с этим планом"
+          >
+            ▶ Начать тренировку
+          </button>
+        </div>
 
         {/* Phase banner */}
         <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:PHASE_COLORS[currentPhase] + '18', border:'1px solid ' + PHASE_COLORS[currentPhase] + '30' }}>
@@ -3003,7 +2998,7 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
             <button style={BTN_GHOST} onClick={() => setStep('params')}>← К параметрам</button>
           </div>
-          <MacrocyclePanel level={bbLevel} goal="bodybuilding" onLevelChange={setBbLevel} onGoalChange={() => undefined} onApplyMacrocycle={source => {
+          <MacrocyclePanel level={bbLevel} goal="bodybuilding" onLevelChange={setBbLevel} onGoalChange={() => undefined} storageKey="he_bb_macro" onApplyMacrocycle={source => {
             if (!('trainingFocus' in source)) return;
             setBbAnnualMacrocycle(source as BBMacrocycle);
             setPlanMode('generic_split');
