@@ -598,6 +598,7 @@ export interface UnifiedSettings {
     foodIntolerances: string[];
     excludedFoods: string[];
     preferredFoods: string[];
+    preferredByMeal?: Record<string, string[]>;
     histamineSensitive: boolean;
     proteinPerKg: number;         // г/кг
     fiberG: number;               // г/день
@@ -605,6 +606,28 @@ export interface UnifiedSettings {
     sodiumG: number;              // г/день
     potassiumG: number;           // г/день
     alcoholPerWeek: number;       // стандартных дринков
+    /** КБЖУ: режим выбора целей (auto = по профилю, manual = ручные цифры) */
+    kbjuMode?: 'auto' | 'manual';
+    /** Ручные цели КБЖУ (если kbjuMode='manual') */
+    manualTargets?: { kcal: number; protein: number; fat: number; carbs: number };
+    /** Ручной г/кг белка (override proteinPerKg) */
+    manualGPerKg?: number;
+    /** Низкоуглеводный вечерний приём */
+    eveningLowCarb?: boolean;
+    /** Процент суперкомпенсации (5-15%) */
+    surplusPct?: number;
+    /** Жёсткость разнообразия плана */
+    varietyStrictness?: 'low' | 'medium' | 'high';
+    /** Специфичность (общая/индивидуальная) */
+    specificity?: 'generic' | 'specific';
+    /** Вкусовой профиль */
+    tasteProfile?: string[];
+    /** Исключённые категории */
+    excludedCategories?: string[];
+    /** Заблокированные продукты (для планировщика) */
+    lockedFoods?: string[];
+    /** Заметки по питанию */
+    dietNotes?: string;
     currentSupplements: SupplementEntry[];
     currentMedications: MedicationEntry[];
     /** Зеркало текущего плана поддержки (he_support_plan_result) — единая БД «что пьёт пользователь» */
@@ -626,6 +649,14 @@ export interface UnifiedSettings {
     targetWeight?: number;         // кг
     targetBodyFat?: number;        // %
     goalTimelineWeeks?: number;    // срок достижения
+    /** Категория ББ (например, Men's Physique) */
+    bbCategory?: string;
+    /** Peak week (да/нет) */
+    peakWeek?: boolean;
+    /** Дата шоу (для peak week) */
+    peakShowDay?: string;
+    /** Этап жизни (детокс/набор/поддержание/сушка) */
+    lifeStage?: string;
   };
 
   // ─────────── 9. АНАЛИЗЫ (зеркало сводки из IndexedDB labs_log) ───────────
@@ -675,10 +706,6 @@ export interface UnifiedSettings {
     hasHIIT: boolean;
     volumeTonnes: number;
     lissMinutesPerWeek: number;
-    goalTimelineWeeks?: number;
-    targetWeight?: number;
-    targetBodyFat?: number;
-    secondaryGoals?: string[];
     email?: string;
   };
 }
@@ -742,9 +769,13 @@ export function getDefaultSettings(): UnifiedSettings {
     nutrition: {
       dietType: 'omnivore', mealsPerDay: 3, cookingSkill: 'basic',
       foodAllergies: [], foodIntolerances: [], excludedFoods: [], preferredFoods: [],
-      histamineSensitive: false,
+      preferredByMeal: undefined, histamineSensitive: false,
       proteinPerKg: 1.8, fiberG: 25, omega3G: 1.5, sodiumG: 3.5, potassiumG: 3.0,
       alcoholPerWeek: 0,
+      kbjuMode: 'auto', manualTargets: undefined, manualGPerKg: undefined,
+      eveningLowCarb: false, surplusPct: 10,
+      varietyStrictness: 'medium', specificity: 'specific',
+      tasteProfile: [], excludedCategories: [], lockedFoods: [], dietNotes: undefined,
       currentSupplements: [], currentMedications: [], supplementStack: undefined,
     },
     lifestyle: {
@@ -759,8 +790,7 @@ export function getDefaultSettings(): UnifiedSettings {
       preferredUnits: 'metric', notificationsEnabled: false,
       privacyLevel: 'private', nutritionFactor: 1, trainingFactor: 1,
       hasHIIT: false, volumeTonnes: 0, lissMinutesPerWeek: 0,
-      goalTimelineWeeks: undefined, targetWeight: undefined,
-      targetBodyFat: undefined, secondaryGoals: undefined, email: undefined,
+      email: undefined,
     },
     goals: {
       primaryGoal: 'hypertrophy', cycleGoal: undefined, cycleWeeks: undefined,

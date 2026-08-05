@@ -131,9 +131,13 @@ export function migrateToUnified(): UnifiedSettings {
   s.system.hasHIIT = o.hasHIIT ?? s.system.hasHIIT;
   s.system.volumeTonnes = o.volumeTonnes ?? s.system.volumeTonnes;
   s.system.lissMinutesPerWeek = o.lissMinutesPerWeek ?? s.system.lissMinutesPerWeek;
-  s.system.targetWeight = o.targetWeight ?? s.system.targetWeight;
-  s.system.targetBodyFat = o.targetBodyFat ?? s.system.targetBodyFat;
   s.system.email = o.email ?? s.system.email;
+
+  // goals (из плоских)
+  s.goals.targetWeight = o.targetWeight ?? s.goals.targetWeight;
+  s.goals.targetBodyFat = o.targetBodyFat ?? s.goals.targetBodyFat;
+  s.goals.goalTimelineWeeks = o.goalTimelineWeeks ?? s.goals.goalTimelineWeeks;
+  s.goals.secondaryGoals = o.secondaryGoals ?? s.goals.secondaryGoals;
 
   // 2. Training profile (he_training_profile)
   const tp = parseLocal(LEGACY_KEYS.training, {} as any);
@@ -261,6 +265,76 @@ export function migrateToUnified(): UnifiedSettings {
     }
   }
 
+  // 5. Nutrition Planner localStorage keys (he_food_allergens, he_health_issues, he_preferred_foods, he_excluded_foods, he_diet_preferences, he_manual_*, he_kbju_mode, he_bb_category, he_peak_week, he_life_stage, he_surplus_pct, he_evening_low_carb, he_variety_strictness, he_specificity, he_intolerances, he_taste_profile, he_excluded_categories, he_preferred_by_meal, he_nutrition_notes, he_locked_foods, he_planner_histamine)
+  const safeArray = (k: string): any[] => {
+    try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []; } catch { return []; }
+  };
+  const safeObj = (k: string): any => { try { return JSON.parse(localStorage.getItem(k) || 'null') || {}; } catch { return {}; } };
+  const safeNum = (k: string): number | undefined => { try { const v = localStorage.getItem(k); if (v === null) return undefined; const n = Number(v); return Number.isFinite(n) ? n : undefined; } catch { return undefined; } };
+  const safeStr = (k: string): string | undefined => { try { return localStorage.getItem(k) || undefined; } catch { return undefined; } };
+
+  const foodAllergens = safeArray('he_food_allergens');
+  if (foodAllergens.length) s.nutrition.foodAllergies = Array.from(new Set([...s.nutrition.foodAllergies, ...foodAllergens]));
+  const healthIssues = safeArray('he_health_issues');
+  if (healthIssues.length) s.health.chronicConditions = Array.from(new Set([...s.health.chronicConditions, ...healthIssues]));
+  const excludedFoods = safeArray('he_excluded_foods');
+  if (excludedFoods.length) s.nutrition.excludedFoods = Array.from(new Set([...s.nutrition.excludedFoods, ...excludedFoods]));
+  const preferredFoods = safeArray('he_preferred_foods');
+  if (preferredFoods.length) s.nutrition.preferredFoods = Array.from(new Set([...s.nutrition.preferredFoods, ...preferredFoods]));
+  const dietPrefs = safeArray('he_diet_preferences');
+  if (dietPrefs.length) s.nutrition.tasteProfile = Array.from(new Set([...(s.nutrition.tasteProfile || []), ...dietPrefs]));
+
+  const manualKcal = safeNum('he_manual_kcal');
+  const manualP = safeNum('he_manual_p');
+  const manualF = safeNum('he_manual_f');
+  const manualC = safeNum('he_manual_c');
+  if (manualKcal !== undefined || manualP !== undefined || manualF !== undefined || manualC !== undefined) {
+    s.nutrition.manualTargets = {
+      kcal: manualKcal ?? 0,
+      protein: manualP ?? 0,
+      fat: manualF ?? 0,
+      carbs: manualC ?? 0,
+    };
+  }
+  const manualG = safeNum('he_manual_g_per_kg');
+  if (manualG !== undefined) s.nutrition.manualGPerKg = manualG;
+  const kbjuMode = safeStr('he_kbju_mode');
+  if (kbjuMode === 'auto' || kbjuMode === 'manual') s.nutrition.kbjuMode = kbjuMode;
+
+  const eveningLowCarb = safeStr('he_evening_low_carb');
+  if (eveningLowCarb === 'true' || eveningLowCarb === '1') s.nutrition.eveningLowCarb = true;
+  const surplusPct = safeNum('he_surplus_pct');
+  if (surplusPct !== undefined) s.nutrition.surplusPct = surplusPct;
+  const variety = safeStr('he_variety_strictness');
+  if (variety === 'low' || variety === 'medium' || variety === 'high') s.nutrition.varietyStrictness = variety;
+  const specificity = safeStr('he_specificity');
+  if (specificity === 'generic' || specificity === 'specific') s.nutrition.specificity = specificity;
+  const intolerances = safeArray('he_intolerances');
+  if (intolerances.length) s.nutrition.foodIntolerances = Array.from(new Set([...s.nutrition.foodIntolerances, ...intolerances]));
+  const tasteProfile = safeArray('he_taste_profile');
+  if (tasteProfile.length) s.nutrition.tasteProfile = Array.from(new Set([...(s.nutrition.tasteProfile || []), ...tasteProfile]));
+  const excludedCategories = safeArray('he_excluded_categories');
+  if (excludedCategories.length) s.nutrition.excludedCategories = Array.from(new Set([...(s.nutrition.excludedCategories || []), ...excludedCategories]));
+  const preferredByMeal = safeObj('he_preferred_by_meal');
+  if (Object.keys(preferredByMeal).length) s.nutrition.preferredByMeal = preferredByMeal;
+  const dietNotes = safeStr('he_nutrition_notes');
+  if (dietNotes) s.nutrition.dietNotes = dietNotes;
+  const lockedFoods = safeArray('he_locked_foods');
+  if (lockedFoods.length) s.nutrition.lockedFoods = Array.from(new Set([...(s.nutrition.lockedFoods || []), ...lockedFoods]));
+
+  const histamine = safeStr('he_planner_histamine');
+  if (histamine === 'true' || histamine === '1') s.nutrition.histamineSensitive = true;
+
+  // Goals (BB-категория, peak week, life stage)
+  const bbCategory = safeStr('he_bb_category');
+  if (bbCategory) s.goals.bbCategory = bbCategory;
+  const peakWeek = safeStr('he_peak_week');
+  if (peakWeek === 'true' || peakWeek === '1') s.goals.peakWeek = true;
+  const peakShowDay = safeStr('he_peak_show_day');
+  if (peakShowDay) s.goals.peakShowDay = peakShowDay;
+  const lifeStage = safeStr('he_life_stage');
+  if (lifeStage) s.goals.lifeStage = lifeStage;
+
   return s;
 }
 
@@ -280,14 +354,32 @@ function mapTimeSinceOld(v: string): UnifiedSettings['pharma']['timeSinceLastCyc
 export function getSettings(): UnifiedSettings {
   if (!localStorage.getItem(MIGRATED_FLAG)) {
     const unified = migrateToUnified();
-    // Сохраняем мигрированные данные
+    // Сохраняем мигрированные данные напрямую через saveProfile,
+    // чтобы не вызывать getSettings рекурсивно.
     const old = getOldProfile();
-    updateSettings(unified, old.name, old.role, old.id);
+    const prof: Partial<UserProfile> = { settings: unified };
+    if (old.name) prof.name = old.name;
+    if (old.role) prof.role = old.role;
+    if (old.id) prof.id = old.id;
+    saveProfile(prof as UserProfile);
     localStorage.setItem(MIGRATED_FLAG, '1');
     // Удаляем старые хранилища
     try { localStorage.removeItem(LEGACY_KEYS.training); } catch {}
     try { localStorage.removeItem(LEGACY_KEYS.autocalc); } catch {}
     try { localStorage.removeItem(LEGACY_KEYS.biostack); } catch {}
+    // Удаляем мигрированные Nutrition Planner keys
+    const NUTRITION_KEYS_TO_DELETE = [
+      'he_food_allergens', 'he_health_issues', 'he_preferred_foods', 'he_excluded_foods',
+      'he_diet_preferences', 'he_manual_kcal', 'he_manual_p', 'he_manual_f', 'he_manual_c',
+      'he_manual_g_per_kg', 'he_kbju_mode', 'he_evening_low_carb', 'he_surplus_pct',
+      'he_variety_strictness', 'he_specificity', 'he_intolerances', 'he_taste_profile',
+      'he_excluded_categories', 'he_preferred_by_meal', 'he_nutrition_notes', 'he_locked_foods',
+      'he_planner_histamine', 'he_bb_category', 'he_peak_week', 'he_peak_show_day', 'he_life_stage',
+      'he_contraindications',
+    ];
+    for (const k of NUTRITION_KEYS_TO_DELETE) {
+      try { localStorage.removeItem(k); } catch {}
+    }
     return unified;
   }
   const old = getOldProfile();

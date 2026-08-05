@@ -3,13 +3,14 @@
 // ════════════════════════════════════════════════════════════════════
 import React, { useState, useCallback } from 'react';
 import { GLASS } from './Calc.types';
+import { getProfile, updateSection } from '../../../core/profile-manager';
 
 interface Props {
   state: any;
   onStateChange: (next: any) => void;
 }
 
-const FIELD_DEFS: Array<{ key: string; label: string; icon: string; popupType: 'number' | 'select' | 'toggle'; options?: string[]; sublabel?: string }> = [
+const FIELD_DEFS: Array<{ key: string; label: string; icon: string; popupType: 'number' | 'select'; options?: string[]; sublabel?: string }> = [
   { key: 'age', label: 'Возраст', icon: '👤', popupType: 'number', sublabel: 'лет' },
   { key: 'weight', label: 'Вес', icon: '⚖️', popupType: 'number', sublabel: 'кг' },
   { key: 'height', label: 'Рост', icon: '📏', popupType: 'number', sublabel: 'см' },
@@ -22,6 +23,7 @@ export const CalcProfileCard: React.FC<Props> = ({ state, onStateChange }) => {
   const [open, setOpen] = useState(false);
   const [popup, setPopup] = useState<string | null>(null);
   const [tempVal, setTempVal] = useState('');
+  const [lastSaved, setLastSaved] = useState<number | null>(null);
 
   const profile = state.profile || {};
 
@@ -29,20 +31,56 @@ export const CalcProfileCard: React.FC<Props> = ({ state, onStateChange }) => {
     onStateChange({ ...state, profile: { ...profile, [key]: val } });
   };
 
+  // Загрузка из Профиля (UnifiedSettings) в локальный state калькулятора.
   const autofillFromProfile = useCallback(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem('he_profile_v2') || localStorage.getItem('he_profile') || '{}');
-      const settings = stored.settings || {};
+      const stored = getProfile();
+      const settings = (stored.settings || {}) as any;
       const next = { ...profile };
-      if (settings.age || stored.age) next.age = Number(settings.age || stored.age);
-      if (settings.weight || stored.weight) next.weight = Number(settings.weight || stored.weight);
-      if (settings.height || stored.height) next.height = Number(settings.height || stored.height);
-      if (settings.sex || stored.sex) next.sex = settings.sex || stored.sex;
-      if (settings.sleepHours || stored.sleepHours) next.sleepHours = Number(settings.sleepHours || stored.sleepHours);
-      if (settings.stressLevel || stored.stressLevel) next.stressLevel = Number(settings.stressLevel || stored.stressLevel);
+      // Читаем из вложенной структуры UnifiedSettings
+      if (settings.personal?.age) next.age = Number(settings.personal.age);
+      if (settings.personal?.weight) next.weight = Number(settings.personal.weight);
+      if (settings.personal?.height) next.height = Number(settings.personal.height);
+      if (settings.personal?.sex) next.sex = settings.personal.sex === 'female' ? 'Ж' : 'М';
+      if (settings.lifestyle?.sleepHours) next.sleepHours = Number(settings.lifestyle.sleepHours);
+      if (settings.lifestyle?.stressLevel) next.stressLevel = Number(settings.lifestyle.stressLevel);
       onStateChange({ ...state, profile: next });
-    } catch { /* онсайд*/ }
+    } catch (e) {
+      console.error('[autofillFromProfile]', e);
+    }
   }, [state, profile, onStateChange]);
+
+  // Сохранение локальных значений калькулятора обратно в Профиль (UnifiedSettings).
+  const saveToProfile = useCallback(() => {
+    try {
+      const p = profile;
+      // personal
+      if (p.age || p.weight || p.height || p.sex) {
+        updateSection('personal', {
+          ...(p.age ? { age: Number(p.age) } : {}),
+          ...(p.weight ? { weight: Number(p.weight) } : {}),
+          ...(p.height ? { height: Number(p.height) } : {}),
+          ...(p.sex ? { sex: p.sex === 'Ж' ? 'female' : 'male' } : {}),
+        });
+      }
+      // lifestyle
+      if (p.sleepHours || p.stressLevel) {
+        updateSection('lifestyle', {
+          ...(p.sleepHours ? { sleepHours: Number(p.sleepHours) } : {}),
+          ...(p.stressLevel ? { stressLevel: Number(p.stressLevel) } : {}),
+        });
+      }
+      setLastSaved(Date.now());
+      if (typeof (window as any).showToast === 'function') {
+        (window as any).showToast('✓ Сохранено в профиль', 'success');
+      } else {
+        alert('✓ Сохранено в профиль');
+      }
+    } catch (e) {
+      console.error('[saveToProfile]', e);
+      alert('Ошибка сохранения: ' + (e as Error).message);
+    }
+  }, [profile]);
 
   const renderPopup = (def: typeof FIELD_DEFS[0]) => {
     const val = profile[def.key] ?? '';
@@ -101,10 +139,21 @@ export const CalcProfileCard: React.FC<Props> = ({ state, onStateChange }) => {
               );
             })}
           </div>
-          <button onClick={autofillFromProfile} style={{ width: '100%', padding: '6px', borderRadius: 8, fontSize: 8, fontWeight: 600, cursor: 'pointer', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-            <span style={{fontSize:10}}>🔄</span>
-            <span>Автозаполнение из профиля</span>
-          </button>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button onClick={autofillFromProfile} aria-label="Загрузить значения из Профиля" style={{ flex: 1, padding: '6px', borderRadius: 8, fontSize: 8, fontWeight: 600, cursor: 'pointer', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 32 }}>
+              <span style={{fontSize:10}}>🔄</span>
+              <span>Автозаполнение</span>
+            </button>
+            <button onClick={saveToProfile} aria-label="Сохранить в Профиль" title="Сохранить в Профиль" style={{ flex: 1, padding: '6px', borderRadius: 8, fontSize: 8, fontWeight: 600, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 32 }}>
+              <span style={{fontSize:10}}>💾</span>
+              <span>Сохранить в профиль</span>
+            </button>
+          </div>
+          {lastSaved && (
+            <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>
+              ✓ Сохранено: {new Date(lastSaved).toLocaleTimeString('ru')}
+            </div>
+          )}
           {popup && renderPopup(FIELD_DEFS.find(f => f.key === popup)!)}
         </div>
       )}

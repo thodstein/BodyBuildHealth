@@ -6,6 +6,7 @@ import React, { useMemo, useState } from 'react';
 import { analyzeRecovery, shouldTrain, type RecoveryOutput } from '../../../engines/recovery-optimization.engine';
 import { getMobilityFlows, getAllCorrectives } from '../../../engines/federation-grip-mobility.engine';
 import { DeloadProtocolCard } from '../TrainingScreen_parts/DeloadProtocolCard';
+import { getProfile, updateSection } from '../../../core/profile-manager';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -19,6 +20,7 @@ const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-betwe
 const labelColor = (l: string) => l === 'Отлично' ? ACCENT : l === 'Хорошо' ? '#84cc16' : l === 'Средне' ? '#f59e0b' : l === 'Низко' ? '#f97316' : '#ef4444';
 
 export const RecoveryPanel: React.FC = () => {
+  // ── Локальный state (поля остаются локальными) ──
   const [sleepHours, setSleepHours] = useState(7.5);
   const [sleepQuality, setSleepQuality] = useState(4);
   const [rmssd, setRmssd] = useState(55);
@@ -29,6 +31,57 @@ export const RecoveryPanel: React.FC = () => {
   const [phase, setPhase] = useState<'accumulation' | 'intensification' | 'peaking' | 'deload'>('accumulation');
   const [recentPR, setRecentPR] = useState(false);
   const [injuries, setInjuries] = useState('');
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+
+  // ── Кнопка «📋 Из профиля» — однократная загрузка из UnifiedSettings в локальный state ──
+  const autofillFromProfile = () => {
+    try {
+      const p = getProfile();
+      const s = (p.settings || {}) as any;
+      if (s.lifestyle?.sleepHours !== undefined) setSleepHours(s.lifestyle.sleepHours);
+      if (s.lifestyle?.sleepQuality) {
+        const map: Record<string, number> = { good: 5, fair: 3, poor: 1 };
+        setSleepQuality(map[s.lifestyle.sleepQuality] ?? 3);
+      }
+      if (s.lifestyle?.restingHR) setRestingHR(s.lifestyle.restingHR);
+      if (s.lifestyle?.morningHRV) setRmssd(s.lifestyle.morningHRV);
+      if (s.lifestyle?.fatigueLevel !== undefined) setFatigue(s.lifestyle.fatigueLevel * 10); // шкала 1-10 → 0-100
+      if (s.training?.daysPerWeek) setTrainDays(s.training.daysPerWeek);
+    } catch (e) { console.error('[RecoveryPanel.autofillFromProfile]', e); }
+  };
+
+  // ── Кнопка «💾 Сохранить в профиль» — явная запись обратно ──
+  const saveToProfile = () => {
+    try {
+      updateSection('lifestyle', {
+        sleepHours,
+        sleepQuality: sleepQuality >= 4 ? 'good' : sleepQuality >= 2 ? 'fair' : 'poor',
+        restingHR,
+        morningHRV: rmssd,
+        baselineHrvRatio: 1.0, // можно уточнить, если нужно
+        fatigueLevel: Math.min(10, Math.max(1, Math.round(fatigue / 10))),
+      });
+      updateSection('training', { daysPerWeek: trainDays });
+      if (injuries.trim()) {
+        // Травмы из строки → массив {location, type, ...} (минимум для записей)
+        const list = injuries.split(',').map(s => s.trim()).filter(Boolean);
+        const existing = getProfile().settings?.health?.injuries || [];
+        const merged = [
+          ...existing,
+          ...list.filter(loc => !existing.some((e: any) => e.location === loc))
+            .map(loc => ({ id: 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), location: loc, type: 'muscle' as const, painLevel: 3, movementLimit: 'mild' as const, side: 'both' as const, chronic: false, date: new Date().toISOString().slice(0, 10) })),
+        ];
+        updateSection('health', { injuries: merged });
+      }
+      setLastSavedAt(Date.now());
+      const toast = (window as any).showToast;
+      if (typeof toast === 'function') toast('✓ Сохранено в профиль', 'success');
+      else alert('✓ Сохранено в профиль');
+    } catch (e) {
+      console.error('[RecoveryPanel.saveToProfile]', e);
+      alert('Ошибка сохранения: ' + (e as Error).message);
+    }
+  };
 
   const flows = useMemo(() => getMobilityFlows(), []);
   const correctives = useMemo(() => getAllCorrectives().slice(0, 12), []);
@@ -66,6 +119,32 @@ export const RecoveryPanel: React.FC = () => {
         <div><div style={LABEL}>Недавний PR</div><select style={SEL} value={recentPR ? '1' : '0'} onChange={e => setRecentPR(e.target.value === '1')}><option value="0">Нет</option><option value="1">Да</option></select></div>
         <div style={{ gridColumn: 'span 3' }}><div style={LABEL}>Травмы (через запятую: knee, spine, shoulder…)</div><input style={IN} value={injuries} onChange={e => setInjuries(e.target.value)} placeholder="например: knee, lower_back" /></div>
       </div>
+
+      <div style={{ display: 'flex', gap: 8, margin: '10px 0', flexWrap: 'wrap' }}>
+        <button
+          onClick={autofillFromProfile}
+          aria-label="Загрузить из Профиля"
+          style={{
+            flex: 1, minHeight: 40, padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+            background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontWeight: 700, fontSize: 12,
+            border: '1px solid rgba(99,102,241,0.3)',
+          }}
+        >📋 Из профиля</button>
+        <button
+          onClick={saveToProfile}
+          aria-label="Сохранить в Профиль"
+          style={{
+            flex: 1, minHeight: 40, padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+            background: 'rgba(0,230,138,0.15)', color: '#00e68a', fontWeight: 700, fontSize: 12,
+            border: '1px solid rgba(0,230,138,0.3)',
+          }}
+        >💾 Сохранить в профиль</button>
+      </div>
+      {lastSavedAt && (
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 6, textAlign: 'center' }}>
+          ✓ Сохранено: {new Date(lastSavedAt).toLocaleTimeString('ru')}
+        </div>
+      )}
 
       {out && verdict && (
         <div>

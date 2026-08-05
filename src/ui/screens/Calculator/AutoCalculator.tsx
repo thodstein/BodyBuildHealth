@@ -3,7 +3,7 @@ import type { CalculatorState, CalculatorResult, LabSlice } from '../../../engin
 import { calculateSupportTZ, hydrateState } from '../../../engines/support-plan';
 import { PHARMA_DB, PHARMA_CLASSES } from '../../../core/pharma-database';
 import { getProfile } from '../../../core/profile-manager';
-import { GLASS, BADGE, DEFAULT_STATE } from './Calc.types';
+import { GLASS, BADGE, DEFAULT_STATE, normalizeCalculatorState } from './Calc.types';
 import type { AutoCalculatorProps } from './Calc.types';
 import { Card, PopupPEDInput, PopupNumber } from './Calc.parts';
 import { TzRiskCard } from './TzRiskCard';
@@ -15,7 +15,7 @@ import { CalcMapperCard } from './Calc.mapper';
 export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked, labsLinked, onOpenManualPicker, onOpenLabs, planResult }) => {
   const [state, setState] = useState<CalculatorState>(() => {
     const h = hydrateState();
-    return { ...DEFAULT_STATE, ...h, profile: { ...DEFAULT_STATE.profile, ...(h.profile || {}) }, pharma: { ...DEFAULT_STATE.pharma, ...(h.pharma || {}) }, labs: { ...DEFAULT_STATE.labs, ...(h.labs || {}), fullPanel: h.labs?.fullPanel || DEFAULT_STATE.labs.fullPanel } };
+    return normalizeCalculatorState({ ...DEFAULT_STATE, ...h });
   });
   const [fillStatus, setFillStatus] = useState('');
   const [labDerivedFields, setLabDerivedFields] = useState<string[]>([]);
@@ -36,6 +36,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
     if (!courseLinked || courseLinked.length === 0) return;
     const aasClasses = ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm'];
     const linkedAas = courseLinked
+      .filter(c => c && typeof c.substanceId === 'string')
       .filter(c => {
         const ph = PHARMA_DB[c.substanceId];
         return ph?.class && aasClasses.includes(ph.class);
@@ -110,7 +111,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
     try {
       if (!courseLinked || courseLinked.length === 0) { setFillStatus('❌ Нет активного курса'); setTimeout(() => setFillStatus(''), 2000); return; }
       const aasClasses = ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm'];
-      const linkedAas = courseLinked.filter(c => { const ph = PHARMA_DB[c.substanceId]; return ph?.class && aasClasses.includes(ph.class); }).map(c => ({ id: c.substanceId, doseMgWeek: (c.doseValue || 0) * (c.frequency || 1), weeks: (c.endWeek || 12) - (c.startWeek || 0), startWeek: c.startWeek || 1, endWeek: c.endWeek || 12 }));
+       const linkedAas = courseLinked.filter(c => c && typeof c.substanceId === 'string').filter(c => { const ph = PHARMA_DB[c.substanceId]; return ph?.class && aasClasses.includes(ph.class); }).map(c => ({ id: c.substanceId, doseMgWeek: (Number(c.doseValue) || 0) * (Number(c.frequency) || 1), weeks: (Number(c.endWeek) || 12) - (Number(c.startWeek) || 0), startWeek: Number(c.startWeek) || 1, endWeek: Number(c.endWeek) || 12 }));
       const hasHCG = !!courseLinked.find(c => c.substanceId === 'hcg');
       const hasAI = !!courseLinked.find(c => ['anastrozole','letrozole','exemestane'].includes(c.substanceId));
       const hasSERM = !!courseLinked.find(c => ['tamoxifen','clomiphene','enclomiphene'].includes(c.substanceId));

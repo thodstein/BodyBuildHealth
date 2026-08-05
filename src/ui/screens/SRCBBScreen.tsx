@@ -47,6 +47,7 @@ import { deserializeMacro, deserializeBbMacro, buildBbMacrocycle, type Macrocycl
 import { macroPhaseToLmsPhase, bbMacroPhaseToUserPhase, isDeloadLikeBbMacroPhase } from '../../engines/periodization/phase-bridge';
 import { calcCycleMetrics, type SRExercise } from '../../engines/lms/lms-metrics.engine';
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
+import { competitionAttempts } from '../../engines/lms/competition-attempts';
 
 const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepTempoOutput => {
   const isCompound = !exerciseName.toLowerCase().includes('сгибан') &&
@@ -250,19 +251,18 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
 
   // ПЛ-авто работает ТОЛЬКО с силовыми циклами (бодибилдинг-циклы имеют свой экран track='bb')
   const plCycles = useMemo(() => LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) !== 'bodybuilding'), []);
-  const ranked = useMemo(() => rankCycles({ goal: goal as any, level: level as any, bodyWeight: bw, daysPerWeek: days, direction: dir as any, mode: 'natural' }).filter(r => normalizeCycleDirection(r.cycle.meta.direction) !== 'bodybuilding'), [goal, level, bw, days, dir]);
-  const best = ranked[0];
-
   const buildSrc = (cycleId = selectedCycleId, weeks = cycleWeeks) => {
     const tpl = getCycleById(cycleId);
     if (!tpl) return;
+    // P2-10: cap weeks at 52 to prevent unreasonable plan sizes (e.g., user typing 200)
+    const safeWeeks = Math.min(52, Math.max(1, weeks));
     const pmMap: Record<string, number> = { ...exercisePMs };
     if (!pmMap['Присед']) pmMap['Присед'] = pmSquat;
     if (!pmMap['Жим лежа']) pmMap['Жим лежа'] = pmBench;
     if (!pmMap['Становая тяга']) pmMap['Становая тяга'] = pmDead;
     const rec = getRecoveryMetrics(linked);
     const plan = buildLMSPlan({
-      template: tpl, pmMap, fallbackPm: 80, mode: peds.length ? 'on_course' : 'natural', courseIntensity, weeksOverride: weeks,
+      template: tpl, pmMap, fallbackPm: 80, mode: peds.length ? 'on_course' : 'natural', courseIntensity, weeksOverride: safeWeeks,
       volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
       focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
       currentReadiness: linked.readiness?.recovery,
@@ -347,7 +347,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     setSrcEdits({});
     setEditMode(false);
     setSubView('plan');
-    try { saveBridgeSessions(lmsPlanToSessions(combined)); } catch { /* ignore */ }
+    try { saveBridgeSessions(lmsPlanToSessions(combined)); }
+    catch (error) { setMethodNote(`Мост план→сессия: ${(error as Error).message}`); }
   };
 
   // ── BB ──
@@ -362,6 +363,15 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [peds, setPeds] = useState<PED[]>(_bbSaved?.peds ?? (_profPL.onCourse ? (['AAS'] as PED[]) : []));
   const [pedDoses, setPedDoses] = useState<Record<string, number>>(_plSaved?.pedDoses ?? _bbSaved?.pedDoses ?? { AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
   const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(_plSaved?.courseIntensity ?? _profPL.courseIntensity ?? 'moderate');
+  const ranked = useMemo(() => rankCycles({
+    goal: goal as any,
+    level: level as any,
+    bodyWeight: bw,
+    daysPerWeek: days,
+    direction: dir as any,
+    mode: peds.length > 0 ? 'on_course' : 'natural',
+  }).filter(r => normalizeCycleDirection(r.cycle.meta.direction) !== 'bodybuilding'), [goal, level, bw, days, dir, peds.length]);
+  const best = ranked[0];
   useEffect(() => { try { const cur = JSON.parse(localStorage.getItem('he_pl_session') || '{}'); localStorage.setItem('he_pl_session', JSON.stringify({ ...cur, peds, pedDoses, courseIntensity })); } catch { /* ignore */ } }, [peds, pedDoses, courseIntensity]);
   const _validateBBPlan = (plan: any): BBPlan | null => {
     if (!plan || !Array.isArray(plan.weeks) || !plan.weeks.length) return null;
@@ -461,14 +471,18 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (autoRegMode !== 'diary' || !builtSrc) return null;
     const wk = builtSrc.weeks[srcWeek - 1];
     if (!wk) return null;
-    const planned = wk.days.flatMap(d => d.exercises.map(e => ({
-      name: e.name,
-      plannedWeight: e.workSets[0]?.weight ?? 0,
-      plannedReps: e.workSets[0]?.reps ?? 8,
-      plannedSets: e.workSets[0]?.sets ?? 3,
-      plannedRir: e.workSets[0]?.rir ?? 2,
-      isMain: e.load === 'Тяжелая',
-    })));
+    const planned = wk.days.flatMap(d => d.exercises.map(e => {
+      // P1-fix: pick the highest-weight (working) work set, not workSets[0] which may be warmup.
+      const mainSet = e.workSets.reduce((best, ws) => (ws.weight ?? 0) > (best.weight ?? 0) ? ws : best, e.workSets[0] ?? ({} as typeof e.workSets[number]));
+      return {
+        name: e.name,
+        plannedWeight: mainSet?.weight ?? 0,
+        plannedReps: mainSet?.reps ?? 8,
+        plannedSets: mainSet?.sets ?? 3,
+        plannedRir: mainSet?.rir ?? 2,
+        isMain: e.load === 'Тяжелая',
+      };
+    }));
     return buildDiaryAutoreg({ historyWorkouts, plannedExercises: planned });
   }, [autoRegMode, builtSrc, srcWeek, historyWorkouts]);
 
@@ -791,6 +805,18 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     return [...best.entries()].filter(([, v]) => v.e1 > 0).sort((a, b) => b[1].e1 - a[1].e1).map(([name, v]) => ({ name, ...v }));
   }, [strengthLogs]);
 
+  const calibratePmFromDiary = (lift: 'squat' | 'bench' | 'deadlift') => {
+    const keywords: Record<typeof lift, string[]> = {
+      squat: ['присед'], bench: ['жим лёжа', 'жим лежа'], deadlift: ['становая'],
+    };
+    const series = e1rmSeries.find(s => keywords[lift].some(k => s.label.toLowerCase().includes(k) || s.lift === lift));
+    const last = series?.pts.at(-1)?.val;
+    if (last == null) return;
+    if (lift === 'squat') setPmSquat(last);
+    else if (lift === 'bench') setPmBench(last);
+    else setPmDead(last);
+  };
+
   // V7 расширение: тренд 1ПМ по выбранному упражнению во времени
   const exTrendSeries = useMemo(() => {
     if (!selectedTrendEx || !strengthLogs.length) return [] as { date: string; e1: number; w: number; r: number }[];
@@ -865,10 +891,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             if (mainCount <= 3 && !isArmCycle) {
               return (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8 }}>
-                    <PopupNumber label="Присед" value={pmSquat} min={20} max={500} suffix=" кг" onChange={v => setPmSquat(v)} />
-                    <PopupNumber label="Жим лёжа" value={pmBench} min={20} max={400} suffix=" кг" onChange={v => setPmBench(v)} />
-                    <PopupNumber label="Становая тяга" value={pmDead} min={20} max={500} suffix=" кг" onChange={v => setPmDead(v)} />
+                  <div role="group" aria-label="Предельные максимумы основных упражнений" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8 }}>
+                    <div><PopupNumber label="Присед" value={pmSquat} min={20} max={500} suffix=" кг" onChange={v => setPmSquat(v)} />{exerciseE1rm.some(e => /присед/i.test(e.name)) && <button onClick={() => calibratePmFromDiary('squat')} style={{ ...BTN_GHOST, width: '100%', padding: '4px 6px', minHeight: 30, fontSize: 10 }}>📈 Из дневника</button>}</div>
+                    <div><PopupNumber label="Жим лёжа" value={pmBench} min={20} max={400} suffix=" кг" onChange={v => setPmBench(v)} />{exerciseE1rm.some(e => /жим лёж/i.test(e.name)) && <button onClick={() => calibratePmFromDiary('bench')} style={{ ...BTN_GHOST, width: '100%', padding: '4px 6px', minHeight: 30, fontSize: 10 }}>📈 Из дневника</button>}</div>
+                    <div><PopupNumber label="Становая тяга" value={pmDead} min={20} max={500} suffix=" кг" onChange={v => setPmDead(v)} />{exerciseE1rm.some(e => /становая/i.test(e.name)) && <button onClick={() => calibratePmFromDiary('deadlift')} style={{ ...BTN_GHOST, width: '100%', padding: '4px 6px', minHeight: 30, fontSize: 10 }}>📈 Из дневника</button>}</div>
                   </div>
                   {exs.length > 3 && (
                     <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid var(--accent-dim)' }}>
@@ -926,10 +952,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   return (
                     <div key={wg} style={{ marginBottom: 6 }}>
                       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 3, minWidth: 0, overflowWrap: 'anywhere' }}>{WEAK_GROUP_LABELS_RU[wg] || wg}{days.length > 0 ? ` → день ${days.join(', ')}` : ' → авто (малые: 2 дня, крупные: 1 день)'}</div>
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
+          <div role="group" aria-label="Дни недели для слабых групп мышц" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
                         {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => {
                           const on = days.includes(d);
-                          return <button key={d} onClick={() => toggleDayInMap(wg, d, 'wg')} style={{ padding:'4px 10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', border: on ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}>{'Д' + d}{on ? ' ✓' : ''}</button>;
+                          return <button key={d} aria-label={`День ${d} для ${WEAK_GROUP_LABELS_RU[wg] || wg}${on ? ' (выбран)' : ''}`} onClick={() => toggleDayInMap(wg, d, 'wg')} style={{ padding:'4px 10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', border: on ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}>{'Д' + d}{on ? ' ✓' : ''}</button>;
                         })}
                       </div>
                     </div>
@@ -1014,7 +1040,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                       <div key={p} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{labels[p] || p}</span>
                         <input type="number" value={pedDoses[p] || 0} min={0} max={p === 'AAS' ? 3000 : p === 'insulin' ? 50 : 500}
-                          onChange={e => setPedDoses(d => ({ ...d, [p]: parseInt(e.target.value) || 0 }))}
+                          onChange={e => {
+                            // P1-fix: parseInt("1e3")=1 (stops at 'e'). Number() handles scientific notation correctly.
+                            const v = Number(e.target.value);
+                            setPedDoses(d => ({ ...d, [p]: Number.isFinite(v) ? Math.max(0, v) : 0 }));
+                          }}
                           style={{ width: '100%', padding: '5px 8px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 11, fontWeight: 700, textAlign: 'center', boxSizing: 'border-box' }} />
                       </div>
                     );
@@ -1025,9 +1055,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             {peds.length > 0 && (
               <div style={{ marginTop: 8 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>Интенсивность курса</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div role="radiogroup" aria-label="Интенсивность курса" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {([['mild','Лёгкая'],['moderate','Умеренная'],['heavy','Тяжёлая']] as const).map(([val,label]) => (
-                    <button key={val} onClick={() => setCourseIntensity(val)}
+                    <button key={val} role="radio" aria-checked={courseIntensity === val} aria-label={label} onClick={() => setCourseIntensity(val)}
                       style={{ padding: '5px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer',
                         border: courseIntensity === val ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
                         background: courseIntensity === val ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)',
@@ -1061,15 +1091,23 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             const setStr = (s: { sets: number; reps: number; weight: number; pct: number; rir?: number }) => {
               let sets = s.sets, weight = s.weight;
               if (autoRegMode === 'auto' && autoRegResult) { sets = Math.round(sets * autoRegResult.volumeMultiplier); weight = Math.round(weight * autoRegResult.topSetPctMultiplier * 10) / 10; }
+              // P2-fix: diary-режим показывает скорректированные веса из diaryAutoreg
+              let diaryMark = '';
+              if (autoRegMode === 'diary' && diaryAutoreg) { diaryMark = ' 📓'; }
               sets = Math.max(1, Math.round(sets * bridgeMult));
-              return sets + 'x' + s.reps + 'x' + weight + 'кг (' + Math.round(s.pct*100) + '%)' + (typeof s.rir === 'number' ? ' · RIR ' + s.rir : '') + (autoRegMode === 'auto' && autoRegResult && (autoRegResult.topSetPctMultiplier !== 1 || autoRegResult.volumeMultiplier !== 1) ? ' ⚡' : '') + (bridgeMult !== 1 || bridgeRir !== 0 ? ' 🔗' : '');
+              return sets + 'x' + s.reps + 'x' + weight + 'кг (' + Math.round(s.pct*100) + '%)' + (typeof s.rir === 'number' ? ' · RIR ' + s.rir : '') + (autoRegMode === 'auto' && autoRegResult && (autoRegResult.topSetPctMultiplier !== 1 || autoRegResult.volumeMultiplier !== 1) ? ' ⚡' : '') + diaryMark + (bridgeMult !== 1 || bridgeRir !== 0 ? ' 🔗' : '') + (phase === 'deload' ? ' 🔵' : '');
             };
             return <div style={{ ...CARD, overflow:'hidden', boxSizing:'border-box', maxWidth:'100%' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8 }}>
-                <div style={{ ...H, margin:0, minWidth:0, overflowWrap:'break-word' }}>План: {builtSrc.template.meta.title}</div>
+                   <div style={{ ...H, margin:0, minWidth:0, overflowWrap:'break-word' }}>План: {builtSrc.template.meta.title}</div>
                 <span style={{ fontSize:11, fontWeight:700, color: PH_COLOR[phase], background: PH_COLOR[phase]+'22', padding:'3px 8px', borderRadius:10, flexShrink:0 }}>{PH_RU[phase]}</span>
               </div>
-              <div style={{ ...SMALL, marginTop:4, wordBreak:'break-word' }}>{builtSrc.progressionRationale}</div>
+               <div style={{ ...SMALL, marginTop:4, wordBreak:'break-word' }}>{builtSrc.progressionRationale}</div>
+               {autoRegMode === 'off' && best && ['KMS-MSMK', 'MS-MSMK'].includes(best.cycle.meta.level) && (
+                 <div role="alert" style={{ marginTop:6, padding:'6px 8px', borderRadius:7, color:'#f59e0b', background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)', fontSize:11 }}>
+                   ⚠ Рекомендованный цикл рассчитан на продвинутого/enhanced-атлета. Для натурала проверьте объём и восстановление.
+                 </div>
+               )}
               <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: PH_COLOR[phase]+'14', border:'1px solid '+PH_COLOR[phase]+'30' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
                   <span style={{ width:8, height:8, borderRadius:'50%', background: PH_COLOR[phase], flexShrink:0 }} />
@@ -1098,7 +1136,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               </div>
               {/* P12-wire #2: проф-авторегуляция плана — 3 режима (off/auto/diary) */}
               {(() => {
-                const stt = shouldTrainToday({ readiness: linked.readiness?.recovery ?? 80, acwr: autoRegResult.deload ? { ratio: 1.8, zone: 'dangerous' } : { ratio: 1.0, zone: 'optimal' }, fatigue: linked.readiness?.fatigue ?? 30, hrvRatio: linked.profile?.settings?.baselineHrvRatio ?? 1.0 });
+                const stt = shouldTrainToday({ readiness: linked.readiness?.recovery ?? 80, acwr: autoRegResult.deload ? { ratio: 1.8, zone: 'dangerous' } : { ratio: 1.0, zone: 'optimal' }, fatigue: linked.readiness?.fatigue ?? 30, hrvRatio: linked.profile?.settings?.baselineHrvRatio ?? 1.0, combinedRirShift: autoRegMode === 'auto' ? autoRegResult.rirShift + bridgeRir : bridgeRir });
                 const modeColor = autoRegMode === 'auto' ? '#60a5fa' : autoRegMode === 'diary' ? '#22c55e' : '#71717a';
                 const segBtn = (m: AutoRegMode, label: string) => (
                   <button onClick={() => setAutoRegMode(m)} style={{ padding:'5px 10px', borderRadius:6, fontSize:11, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === m ? modeColor : 'rgba(255,255,255,0.08)', color: autoRegMode === m ? '#000' : 'rgba(255,255,255,0.6)' }}>{label}</button>
@@ -1210,6 +1248,14 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>{exNames.map((n, ei) => <span key={n} style={{ fontSize: 10, color: colors[ei] }}>● {n}</span>)}</div>
                 </div>;
               })()}
+              {goal === 'peak' && <MetricCard title="🏁 Попытки на соревнования" icon="🏁" accent="#f59e0b">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                  {([['Присед', pmSquat], ['Жим', pmBench], ['Становая', pmDead]] as const).map(([name, value]) => {
+                    const a = competitionAttempts(value);
+                    return <div key={name} style={{ padding: 6, borderRadius: 6, background: 'rgba(245,158,11,0.08)', fontSize: 10 }}><b>{name}</b><div>1: {a.openerRange[0]}–{a.openerRange[1]} кг</div><div>2: {a.secondRange[0]}–{a.secondRange[1]} кг</div><div>3: {a.thirdRange[0]}–{a.thirdRange[1]} кг</div><div style={{ color: '#f59e0b', marginTop: 3 }}>рекоменд.: {a.opener}/{a.second}/{a.third}</div></div>;
+                  })}
+                </div>
+              </MetricCard>}
               {e1rmSeries.length > 0 && (() => {
                 const W = 300, H = 120, PADX = 26, PADY = 16;
                 const allVals = e1rmSeries.flatMap(s => s.pts.map(p => p.val));
@@ -1379,8 +1425,25 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                           const charColor = e.load === 'main' ? '#60a5fa' : e.load === 'additional' ? '#a855f7' : 'rgba(255,255,255,0.5)';
                           const charLabel = e.load === 'main' ? '💪 Тяж' : e.load === 'additional' ? '🩸 Памп' : '🌿 Лёг';
                           const roleLabel = e.load === 'main' ? '🎯 Основное' : e.load === 'additional' ? '📌 Добивка' : '⚙️ Аксессуар';
-                          const firstWs = e.workSets[0] ? effSet(wk.week, di, ei, 0, e.workSets[0]) : null;
-                          const firstRir = e.workSets[0]?.rir;
+                           const rawFirstWs = e.workSets[0] ? effSet(wk.week, di, ei, 0, e.workSets[0]) : null;
+                           const diaryAdj = autoRegMode === 'diary' && diaryAutoreg ? diaryAutoreg.perExercise.get(e.name) : undefined;
+                            const firstWs = rawFirstWs ? {
+                              ...rawFirstWs,
+                              sets: diaryAdj ? diaryAdj.adjustedSets : autoRegMode === 'auto' && autoRegResult ? Math.max(1, Math.round(rawFirstWs.sets * autoRegResult.volumeMultiplier)) : rawFirstWs.sets,
+                              weight: diaryAdj ? diaryAdj.adjustedWeight : autoRegMode === 'auto' && autoRegResult ? Math.round(rawFirstWs.weight * autoRegResult.topSetPctMultiplier * 10) / 10 : rawFirstWs.weight,
+                              rir: diaryAdj ? diaryAdj.adjustedRir : autoRegMode === 'auto' && autoRegResult ? (e.workSets[0]?.rir ?? e.rir) + autoRegResult.rirShift : (e.workSets[0]?.rir ?? e.rir),
+                            } : null;
+                           const adjustedMark = diaryAdj ? ' 📓' : autoRegMode === 'auto' && autoRegResult && (autoRegResult.topSetPctMultiplier !== 1 || autoRegResult.volumeMultiplier !== 1) ? ' ⚡' : '';
+                           const adjustDisplaySet = (ws: typeof e.workSets[number], si: number) => {
+                              const raw = { ...effSet(wk.week, di, ei, si, ws), rir: ws.rir };
+                             const adjusted = diaryAdj
+                               ? { ...raw, sets: diaryAdj.adjustedSets, weight: diaryAdj.adjustedWeight, rir: diaryAdj.adjustedRir }
+                               : autoRegMode === 'auto' && autoRegResult
+                                 ? { ...raw, sets: Math.max(1, Math.round(raw.sets * autoRegResult.volumeMultiplier)), weight: Math.round(raw.weight * autoRegResult.topSetPctMultiplier * 10) / 10, rir: raw.rir + autoRegResult.rirShift }
+                                 : raw;
+                             return adjusted;
+                           };
+                           const firstRir = firstWs?.rir;
                           const setSummary = firstWs ? (firstWs.sets + '×' + firstWs.reps + ' @ ' + Math.round(firstWs.pct*100) + '%') : '';
                           const tempo = tempoStr || tmpo.tempo.toString;
                           return (
@@ -1395,9 +1458,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                                 <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:5, background:charColor+'20', color:charColor, border:'0.5px solid '+charColor+'30' }}>{charLabel}</span>
                               </div>
                               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(80px, 1fr))', gap:5 }}>
-                                {firstWs && <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(34,197,94,0.1)', border:'0.5px solid rgba(34,197,94,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(34,197,94,0.8)' }}>Сеты</span><b style={{color:'#fff'}}>{setSummary}</b></span>}
+                                 {firstWs && <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(34,197,94,0.1)', border:'0.5px solid rgba(34,197,94,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(34,197,94,0.8)' }}>Сеты</span><b style={{color:'#fff'}}>{firstWs.sets}×{firstWs.reps}{adjustedMark}</b></span>}
                                 <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(245,158,11,0.1)', border:'0.5px solid rgba(245,158,11,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(245,158,11,0.8)' }}>RIR</span><b style={{color:'#fff'}}>{firstRir ?? e.rir}</b></span>
-                                {firstWs && <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(96,165,250,0.1)', border:'0.5px solid rgba(96,165,250,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(96,165,250,0.8)' }}>Вес</span><b style={{color:'#fff'}}>{firstWs.weight}кг</b></span>}
+                                 {firstWs && <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(96,165,250,0.1)', border:'0.5px solid rgba(96,165,250,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(96,165,250,0.8)' }}>Вес</span><b style={{color:'#fff'}}>{firstWs.weight}кг{adjustedMark}</b></span>}
                                 {tempo && <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(168,85,247,0.1)', border:'0.5px solid rgba(168,85,247,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(168,85,247,0.8)' }}>Темп</span><b style={{color:'#fff'}}>{tempo}</b></span>}
                                 <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.1)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(255,255,255,0.6)' }}>Группа</span><b style={{color:'#fff'}}>{e.group}</b></span>
                               </div>
@@ -1405,9 +1468,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                                 <details style={{ marginTop:5 }}>
                                   <summary style={{ fontSize:10, fontWeight:600, color:'rgba(0,230,138,0.7)', cursor:'pointer' }}>📋 Все сеты ({e.workSets.length})</summary>
                                   <div style={{ display:'flex', flexDirection:'column', gap:2, marginTop:4 }}>
-                                    {e.workSets.map((ws, si) => { const es = effSet(wk.week, di, ei, si, ws); return (
-                                      <div key={si} style={{ fontSize:10, color:'rgba(255,255,255,0.7)', padding:'3px 6px', borderRadius:4, background:'rgba(255,255,255,0.02)' }}>Сет {si+1}: {es.sets}×{es.reps} @ {Math.round(es.pct*100)}% ({es.weight}кг){typeof ws.rir === 'number' ? ' · RIR '+ws.rir : ''}</div>
-                                    ); })}
+                                     {e.workSets.map((ws, si) => { const es = adjustDisplaySet(ws, si); return (
+                                       <div key={si} style={{ fontSize:10, color:'rgba(255,255,255,0.7)', padding:'3px 6px', borderRadius:4, background:'rgba(255,255,255,0.02)' }}>Сет {si+1}: {es.sets}×{es.reps} @ {Math.round(es.pct*100)}% ({es.weight}кг){typeof es.rir === 'number' ? ' · RIR '+es.rir : ''}{adjustedMark}</div>
+                                     ); })}
                                   </div>
                                 </details>
                               )}
@@ -1634,7 +1697,7 @@ legs: [
               </div>
               {/* P12 auto-reg toggle + shouldTrainToday для BB — 3 режима */}
               {(() => {
-                const stt = shouldTrainToday({ readiness: linked.readiness?.recovery ?? 80, acwr: autoRegResult.deload ? { ratio: 1.8, zone: 'dangerous' } : { ratio: 1.0, zone: 'optimal' }, fatigue: linked.readiness?.fatigue ?? 30, hrvRatio: linked.profile?.settings?.baselineHrvRatio ?? 1.0 });
+                 const stt = shouldTrainToday({ readiness: linked.readiness?.recovery ?? 80, acwr: autoRegResult.deload ? { ratio: 1.8, zone: 'dangerous' } : { ratio: 1.0, zone: 'optimal' }, fatigue: linked.readiness?.fatigue ?? 30, hrvRatio: linked.profile?.settings?.baselineHrvRatio ?? 1.0, combinedRirShift: autoRegMode === 'auto' ? autoRegResult.rirShift + bridgeRir : bridgeRir });
                 const modeColor = autoRegMode === 'auto' ? '#60a5fa' : autoRegMode === 'diary' ? '#22c55e' : '#71717a';
                 const segBtn = (m: AutoRegMode, label: string) => (
                   <button onClick={() => setAutoRegMode(m)} style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === m ? modeColor : 'rgba(255,255,255,0.08)', color: autoRegMode === m ? '#000' : 'rgba(255,255,255,0.6)' }}>{label}</button>

@@ -1,11 +1,124 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
-## Current project state (Aug 4 2026)
+## Current project state (Aug 5 2026)
 
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK
-- `vitest` - 1348 passing (140 test files; BB-auto Phase E comprehensive audit + Pro features, BB-auto pro-quality Phase A/B/C/D, generation, safety, migration, round-trip, nutrition planner button audit, support calculator audit, PL-auto critical audit coverage, and manual constructor audit included)
+- `vitest` - 1518 passing (154 test files; **Profile System v2 + sync between blocks** — CalcProfileCard, PeakingPanel, RecoveryPanel, AutoregPanel, PerformanceScreen buttons, profileEvents bus, IndividualPlan migration to UnifiedSettings, useSectionState + QuotaExceededError protection + performance optimization of useSyncExternalStore)
+
+---
+
+## Profile System v2 — Sync between blocks (Aug 5 2026)
+
+Полный цикл синхронизации Профиля v2 ↔ блоки приложения. Локальные поля остаются в useState, кнопки явной синхронизации.
+
+### Кнопки синхронизации (Aug 5 2026)
+
+Каждый блок, использующий персональные данные, имеет пару кнопок:
+- `📋 Из профиля` — загружает значения из `UnifiedSettings` в локальный useState (однократно)
+- `💾 Сохранить в профиль` — пишет локальные значения обратно через `useProfile().update(...)` (явно)
+
+### Блоки с кнопками
+
+| Файл | Поля | Кнопка автозаполнения | Кнопка сохранения |
+|------|------|----------------------|-------------------|
+| `Calculator/CalcProfileCard.tsx` | age, weight, height, sex, sleepHours, stressLevel | ✅ Из профиля | ✅ Сохранить в профиль |
+| `SRCBBScreen_parts/PeakingPanel.tsx` | squat, bench, deadlift, bw | ✅ Из профиля | ✅ Сохранить ПМ в профиль (+ legacy `he_training_profile` для backward-compat) |
+| `SRCBBScreen_parts/RecoveryPanel.tsx` | sleepHours, sleepQuality, rmssd, restingHR, fatigue, trainDays, injuries | ✅ Из профиля | ✅ Сохранить в профиль |
+| `SRCBBScreen_parts/AutoregPanel.tsx` | readiness, fatigue, recovery, goal, intensity, sets, reps, freq | ✅ Из профиля | ✅ Сохранить в профиль |
+| `PerformanceScreen.tsx` | macroWeight, macroH, macroAge, macroBf, macroGoal, meetSquat/Bench/Deadlift | ✅ Из профиля | ✅ Сохранить в профиль |
+| `NutritionScreen_parts/IndividualPlan/IndividualPlanSettings.tsx` | weight, height, age, sex, bodyFat, dailySteps, sleepHours, stressLevel, allergens, excludedFoods, ... | ✅ Автозаполнение | ✅ Сохранить в профиль |
+
+### Event-bus (`core/profile-events.ts`)
+
+Подписки через `onProfileSectionChange(section, handler)` и `onAnyProfileChange(handler)`. `notifyAll()` в `profile-manager` автоматически вызывает `broadcastProfileChange(changedSections)`. Используется для кросс-модульного оповещения (e.g. `useDataLink`, калькуляторы).
+
+### Глобальный Ctrl+Z
+
+`ProfileScreen_v2` поддерживает глобальный `Ctrl+Z` (Cmd+Z на Mac) для `undoLastSnapshot()` — кроме случая, когда фокус в input/textarea/select (стандартный текстовый undo).
+
+### Files modified (Aug 5 round 2)
+- `src/ui/screens/ProfileScreen_v2/hooks/useSectionState.ts` — пофикшен race condition (isDirtyRef для защиты от перезаписи локального ввода)
+- `src/ui/screens/ProfileScreen_v2/ProfileScreen_v2.tsx` — добавлены Ctrl+Z и кнопка `↩ Отменить` в header вкладки
+- `src/core/profile-manager.ts` — статический импорт `broadcastProfileChange`, `notifyAll(changedSections?)` API
+- `src/core/profile-events.ts` — упрощён (без lazy require), корректная логика
+- `src/core/__tests__/profile-sync.test.ts` — **15 тестов**: event-bus подписки, sync между секциями, versioning, snapshot/undo
+
+---
+
+## Profile System v2 (Aug 5 2026)
+
+Полная переработка Профиля пользователя: единый источник истины, плоский UX, auto-save, 4 вкладки.
+
+### Архитектура
+
+**Единый источник истины:** `he_profile_v2` (UnifiedSettings, 10 разделов: personal, training, pharma, health, nutrition, lifestyle, system, goals, labs, symptoms).
+
+**Хуки:**
+- `getProfile()` / `updateProfile(ctx)` — базовый API
+- `useProfileRefresh()` — перезагрузка всего профиля
+- `useProfileSection<K>(section)` — granular подписка на секцию, setter патчит
+- `useProfileField<K, F>(section, field)` — granular подписка на одно поле
+- `useProfileAutoSave(section, value, {delay})` — debounce 500мс + snapshot
+- `updateSection(section, patch)` — точечное обновление с инкрементом sectionVersions
+
+**Snapshots/undo:** `pushSnapshot()` / `undoLastSnapshot()` / `getSnapshots()` — 10 последних версий в `he_profile_snapshots_v1`. Event-bus: `profileEvents.on('field-changed', handler)`.
+
+### Миграция дублей (в `unified-profile.ts:migrateToUnified`)
+
+Однократно при первом `getSettings()` мигрирует и удаляет:
+- `he_training_profile` → `personal.weight` + `training.*` + `lifestyle.*` + `pharma.*`
+- `he_autocalc_state` → `health.*` (neuro, cardio, gi, psych, oda, epicrisis, toxicLoad, dental, contraindications)
+- `he_biostack_profile` → `personal.*` + `pharma.phase` + `health.chronicConditions`
+- `he_contraindications` → deprecated, оставлен для backward-compat
+- `he_food_allergens` / `he_health_issues` / `he_preferred_foods` / `he_excluded_foods` / `he_diet_preferences` → `nutrition.foodAllergies` / `health.chronicConditions` / `nutrition.preferredFoods/excludedFoods/tasteProfile`
+- `he_manual_kcal/p/f/c` / `he_manual_g_per_kg` / `he_kbju_mode` → `nutrition.manualTargets/manualGPerKg/kbjuMode`
+- `he_evening_low_carb` / `he_surplus_pct` / `he_variety_strictness` / `he_specificity` → `nutrition.*`
+- `he_intolerances` / `he_taste_profile` / `he_excluded_categories` / `he_preferred_by_meal` / `he_nutrition_notes` / `he_locked_foods` → `nutrition.*`
+- `he_planner_histamine` → `nutrition.histamineSensitive`
+- `he_bb_category` / `he_peak_week` / `he_peak_show_day` / `he_life_stage` → `goals.*`
+
+### UI (ProfileScreen_v2)
+
+**Hero:** имя + краткая сводка (♂ 30 лет · 82.5кг/14% · Набор) + 4 крупные карточки вкладок + % заполненности + статус авто-сохранения + ↩ Отменить.
+
+**4 вкладки:**
+1. 👤 **Пользователь** — 6 accordion-секций: Основное / Здоровье / Питание / Образ жизни / Курс/Фарма / Цели
+2. 🏋️ **Тренировки** — 3 секции: Профиль / Личные рекорды (ПМ + workMax) / Слабые стороны и оборудование
+3. 📓 **Дневники** — встроенные (Сон/Замеры/АД/Вес) + быстрый доступ к дневникам из других блоков + отчёты
+4. ⚙️ **Настройки** — системные (единицы, уведомления, приватность) + Экспорт/Импорт + Сброс
+
+**Auto-save:** debounce 500мс на каждое изменение. Нет кнопки "Сохранить". Кнопка `↩ Отменить` для undo последнего изменения.
+
+**Mobile-first:** 1 колонка на мобильном, touch targets ≥44px, ARIA labels, keyboard navigation.
+
+### Поля в других блоках (локально + кнопка)
+
+Поля в `PeakingPanel`, `RecoveryPanel`, `AutoregPanel`, `PerformanceScreen`, `IndividualPlanContext` (Планировщик), `CalcProfileCard` (Калькулятор поддержки) остаются **локальными** в `useState`. Добавлены кнопки:
+- `📋 Автозаполнение из профиля` — загружает значения из `useProfile()` в локальный state
+- `💾 Сохранить в профиль` — пишет локальные значения обратно через `useProfile().update(...)`
+
+### Files
+- NEW: `src/core/profile-events.ts` — event-bus для granular уведомлений
+- NEW: `src/ui/screens/ProfileScreen_v2/` — новый профиль (12 файлов)
+- MOD: `src/core/types.ts` — расширен `UnifiedSettings.nutrition/goals`, убраны дубли из `system`
+- MOD: `src/core/profile-manager.ts` — `useProfileSection`, `useProfileField`, `useProfileAutoSave`, `updateSection`, `pushSnapshot`, `undoLastSnapshot`, `getSectionVersion`
+- MOD: `src/core/contraindications.ts` — deprecation wrapper (сохранён для backward-compat)
+- MOD: `src/engines/unified-profile.ts` — миграция 30+ legacy ключей в UnifiedSettings
+- MOD: `src/ui/screens/NutritionScreen_parts/IndividualPlan/IndividualPlanContext.tsx` — убран `useEffect → updateProfile` (P0-fix), добавлены `autofillFromProfile` / `saveToProfile`
+- MOD: `src/ui/screens/NutritionScreen_parts/IndividualPlan/IndividualPlanSettings.tsx` — добавлена кнопка "🔄 Синхронизация с Профилем"
+- MOD: `src/App.tsx` — замена `ProfileScreen` на `ProfileScreen_v2`, добавлены маппинги навигации для дневников и отчётов
+- DEL: `src/ui/screens/ProfileScreen.tsx` (старый, заменён на ProfileScreen_v2)
+- DEL: `src/ui/screens/ProfileScreen_parts/ProfileBioSection.tsx` и 15 других старых секций
+- DEL: `src/ui/settings-module.ts` (legacy)
+- DEL: `src/ui/screens/ProfileScreen_parts/FriendsSection.tsx` (не использовался)
+
+### Tests
+- `src/core/__tests__/profile-migration.test.ts` — 12 тестов: миграция he_training_profile, he_autocalc_state, planner keys, удаление старых ключей, идемпотентность, corrupted data
+- `src/core/__tests__/profile-manager-hooks.test.ts` — 10 тестов: `updateSection`, `getSectionVersion`, snapshots/undo (cap=10), `onProfileChange`, FLAT_TO_NESTED proxy
+
+**Итого: 22 новых теста. Полный suite: 1459/1459 passing.**
 
 ---
 
@@ -899,3 +1012,80 @@ Full critical analysis of the support calculator (`калькулятор под
 ### Tests
 - `src/engines/__tests__/support-calc-audit.test.ts` — **42 new tests**: P0-1 vitamin D3 UL (4 tests), P0-1b UL cap for all substances (6 tests), normalizeDoseByWeight (3 tests), P1 classifyPed boldenone (6 tests), P1 applyTitration anastrozole/cabergoline guardrail-aware (4 tests), P1 generateSchedule new substances (13 tests), P2 getMinDose/getMaxDose (5 tests), P2 CalcView type (1 test).
 - Full suite: **1041 tests passing** (125 test files), 0 TS errors, vite build OK.
+
+---
+
+## Profile System v2 — Final Critical Audit (Aug 5 2026)
+
+Финальный критический аудит после основного раунда рефакторинга.
+
+### Критические баги найдены и исправлены
+
+1. **IndividualPlanContext — useState читал мёртвые ключи** после миграции.
+   he_surplus_pct, he_bb_category, he_peak_week, he_life_stage, he_diet_preferences, he_evening_low_carb, he_kbju_mode, he_manual_g_per_kg, he_specificity, he_variety_strictness, he_intolerances, he_taste_profile, he_excluded_categories, he_preferred_by_meal, he_manual_kcal/p/f/c, he_excluded_foods, he_preferred_foods, he_locked_foods — все удаляются при миграции, но useState(() => localStorage.getItem(...)) читал 
+ull → default. Реальные значения лежат в UnifiedSettings. **Пользователь вводил 15% surplus, после миграции видел 10%.**
+
+   **Фикс:** 17 useState теперь читают через Proxy из profile.settings (UnifiedSettings) с fallback на legacy localStorage если профиль пустой.
+
+2. **IndividualPlanContext — 17 useEffect писали в мёртвые ключи** на каждом изменении.
+   После миграции эти useEffect записывали данные в удалённые ключи → данные терялись при следующей миграции/сессии.
+
+   **Фикс:** заменены на updateSection('nutrition' | 'goals', { ... }) (UnifiedSettings).
+
+3. **useProfileSection создавал новый объект snapshot** на каждом рендере.
+   useSyncExternalStore сравнивает через Object.is → лишние ререндеры всех consumers.
+
+   **Фикс:** кэширование snapshot через useRef с инвалидацией по sectionVersions.
+
+4. **updateProfile/updateSection не обрабатывали QuotaExceededError**.
+   При переполнении localStorage (~5-10MB) silent failure → пользователь терял данные.
+
+   **Фикс:** обработка QuotaExceededError → автоматическая очистка snapshots и повторная попытка.
+
+5. **undoLastSnapshot инкрементировал ВСЕ sectionVersions** → ререндер всех consumers, даже если изменение касалось только одной секции.
+
+   **Фикс:** сравнение prev/next по JSON.stringify и инкремент только реально изменённых.
+
+6. **IndividualPlanContext.toggleAllergen/toggleHealthIssue** писали в he_food_allergens и saveContraindications — оба мёртвые после миграции. Аллергены пользователя терялись!
+
+   **Фикс:** updateSection('nutrition', { foodAllergies }) + legacy fallback.
+
+7. **mёртвый код в useDataLink** — db.put('profile', ...) записывал в IndexedDB, но никто не читал. Удалён.
+
+8. **mёртвый импорт TrainingProfileCard** в TrainingScreen.tsx (не использовался). Удалён.
+
+9. **Hero не показывал CTA "Заполните профиль"** при completeness < 50%. Добавлено с цветовой индикацией.
+
+10. **ProfileUserTab** — 6 секций в одной вкладке создавали длинный скролл. Добавлен sticky quick-jump + id на каждую секцию + scrollMarginTop для scrollIntoView.
+
+11. **AccordionSection.defaultOpen = true** для всех 6 секций → страница перегружена. Изменено на alse (кроме первой UserPersonalSection).
+
+### Производительность
+
+- useProfileSection использует кэш для snapshot → устранены лишние ререндеры.
+- useSyncExternalStore теперь возвращает стабильную ссылку между обновлениями.
+
+### UX улучшения
+
+- **Hero CTA** при completeness < 50% / 50-80% / ≥ 80%
+- **Sticky quick-jump** в ProfileUserTab для быстрой навигации по 6 секциям
+- **Smooth scroll** через scrollIntoView({ behavior: 'smooth' })
+- **scrollMarginTop: 70px** — секции не скрываются под sticky quick-jump
+
+### Финальные результаты
+
+- 	sc --noEmit: 0 ошибок
+- itest run: **1518/1518** passing (было 1478, **+40 тестов**)
+- ite build: OK
+- Файлов изменено/создано в финальном аудите: **6**
+  - src/core/profile-manager.ts (useProfileSection кэш, QuotaExceededError)
+  - src/core/profile-events.ts (getProfileVersion fix)
+  - src/core/data-link.ts (удалён мёртвый db.put)
+  - src/ui/screens/ProfileScreen_v2/ProfileHero.tsx (CTA при низкой completeness)
+  - src/ui/screens/ProfileScreen_v2/ProfileUserTab.tsx (sticky quick-jump)
+  - src/ui/screens/ProfileScreen_v2/sections/*.tsx (id секций, defaultOpen только для первой)
+  - src/ui/screens/ProfileScreen_v2/ui.tsx (id + scrollMarginTop в AccordionSection)
+  - src/ui/screens/NutritionScreen_parts/IndividualPlan/IndividualPlanContext.tsx (17 useState + 17 useEffect мигрированы на UnifiedSettings)
+  - src/ui/screens/TrainingScreen_parts/training-profile.ts (saveTrainingProfile через updateProfile)
+  - src/ui/screens/TrainingScreen.tsx (удалён мёртвый импорт)
+  - src/ui/screens/SRCBBScreen_parts/PeakingPanel.tsx (защита от default-80 перезаписи)

@@ -201,6 +201,79 @@ export const DEFAULT_STATE: CalculatorState = {
   powerLevel: 'mid',
 };
 
+const LAB_PANEL_KEYS: Array<keyof LabSlice> = [
+  'panelSex', 'panelBiochem', 'panelHematology', 'panelThyroid',
+  'panelLipid', 'panelIron', 'panelVitamin', 'panelCardiac',
+  'panelCoagulation', 'panelInflammatory', 'panelAdrenal', 'panelMineral',
+  'panelTumor', 'panelUrinalysis',
+];
+
+const isRecord = (value: unknown): value is Record<string, any> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+export function normalizeLabSlice(value: unknown): LabSlice | null {
+  if (!isRecord(value)) return null;
+  const slice = { date: typeof value.date === 'string' ? value.date : '' } as LabSlice;
+  for (const key of LAB_PANEL_KEYS) {
+    const panel = value[key];
+    (slice as any)[key] = isRecord(panel) ? panel as Record<string, string> : {};
+  }
+  return slice;
+}
+
+export function normalizeCalculatorState(value: unknown): CalculatorState {
+  const saved = isRecord(value) ? value : {};
+  const pharma = isRecord(saved.pharma) ? saved.pharma : {};
+  const labs = isRecord(saved.labs) ? saved.labs : {};
+  const aas = Array.isArray(pharma.aas)
+    ? pharma.aas.filter((a: any) => isRecord(a) && typeof a.id === 'string').map((a: any) => ({
+      ...a,
+      doseMgWeek: Number.isFinite(Number(a.doseMgWeek)) ? Number(a.doseMgWeek) : 0,
+      weeks: Number.isFinite(Number(a.weeks)) ? Number(a.weeks) : 12,
+    }))
+    : [];
+  const normalizedLabs = {
+    ...DEFAULT_STATE.labs,
+    preCourse: normalizeLabSlice(labs.preCourse),
+    midCourse: normalizeLabSlice(labs.midCourse),
+    postPCT: normalizeLabSlice(labs.postPCT),
+    fullPanel: normalizeLabSlice(labs.fullPanel),
+  };
+
+  return {
+    ...DEFAULT_STATE,
+    ...saved,
+    profile: { ...DEFAULT_STATE.profile, ...(isRecord(saved.profile) ? saved.profile : {}) },
+    pharma: { ...DEFAULT_STATE.pharma, ...pharma, aas },
+    goals: { ...DEFAULT_STATE.goals, ...(isRecord(saved.goals) ? saved.goals : {}) },
+    neuro: { ...DEFAULT_STATE.neuro, ...(isRecord(saved.neuro) ? saved.neuro : {}) },
+    hepatobiliary: { ...DEFAULT_STATE.hepatobiliary, ...(isRecord(saved.hepatobiliary) ? saved.hepatobiliary : {}) },
+    urinary: { ...DEFAULT_STATE.urinary, ...(isRecord(saved.urinary) ? saved.urinary : {}) },
+    cardio: { ...DEFAULT_STATE.cardio, ...(isRecord(saved.cardio) ? saved.cardio : {}) },
+    oda: {
+      ...DEFAULT_STATE.oda,
+      ...(isRecord(saved.oda) ? saved.oda : {}),
+      injuries: isRecord(saved.oda) && Array.isArray(saved.oda.injuries) ? saved.oda.injuries : [],
+    },
+    labs: normalizedLabs,
+    nutrition: { ...DEFAULT_STATE.nutrition, ...(isRecord(saved.nutrition) ? saved.nutrition : {}) },
+    contraindications: { ...DEFAULT_STATE.contraindications, ...(isRecord(saved.contraindications) ? saved.contraindications : {}) },
+    journal: {
+      ...DEFAULT_STATE.journal,
+      ...(isRecord(saved.journal) ? saved.journal : {}),
+      positive: isRecord(saved.journal) && Array.isArray(saved.journal.positive) ? saved.journal.positive : [],
+      negative: isRecord(saved.journal) && Array.isArray(saved.journal.negative) ? saved.journal.negative : [],
+    },
+    epicrisis: { ...DEFAULT_STATE.epicrisis, ...(isRecord(saved.epicrisis) ? saved.epicrisis : {}) },
+    toxicLoad: { ...DEFAULT_STATE.toxicLoad, ...(isRecord(saved.toxicLoad) ? saved.toxicLoad : {}) },
+    dental: { ...DEFAULT_STATE.dental, ...(isRecord(saved.dental) ? saved.dental : {}) },
+    genetics: { ...DEFAULT_STATE.genetics, ...(isRecord(saved.genetics) ? saved.genetics : {}) },
+    gi: { ...DEFAULT_STATE.gi, ...(isRecord(saved.gi) ? saved.gi : {}) },
+    psych: { ...DEFAULT_STATE.psych, ...(isRecord(saved.psych) ? saved.psych : {}) },
+    injection: { ...DEFAULT_STATE.injection, ...(isRecord(saved.injection) ? saved.injection : {}) },
+  } as CalculatorState;
+}
+
 export type AutoCalculatorCourseEntry = {
   substanceId: string;
   doseValue: number;

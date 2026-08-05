@@ -2,13 +2,14 @@ import React, { useState, useMemo, useEffect, useRef, createContext, useContext 
 import { addToCart } from "../../../../core/nutrition-utils";
 import { FOOD_DB, FOOD_ALLERGEN_DIET, compositeQualityScore } from "../../../../core/nutrition-database";
 import { PHARMA_DB } from "../../../../core/pharma-database";
-import { updateProfile } from "../../../../core/profile-manager";
+import { updateProfile, getProfile } from "../../../../core/profile-manager";
 import { getRecipes, getRecipesByMeal, type Recipe } from "../../../../engines/nutrition-periodization.engine";
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type DailyDietReport, type MealScoreV2 } from "../../../../engines/product-usefulness-v2.engine";
 import { scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU, parseServingSizeGrams } from "../../../../engines/kbju-food-match.engine";
 import { generateNutritionReport, type NutritionReport } from "../../../../engines/nutrition-report.engine";
 import type { UserProfile, LabPoint } from "../../../../core/types";
 import { getContraindications, saveContraindications } from "../../../../core/contraindications";
+import { updateSection } from "../../../../core/profile-manager";
 import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrition-v2-data";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { computePlannerTargets } from "./planner-targets";
@@ -174,6 +175,10 @@ export interface PlanCtx {
   toggleAllergen: (id: string) => void;
   toggleHealthIssue: (id: string) => void;
   loadSavedPlan: (plan: SavedPlan) => void;
+  /** Загрузить значения из Профиля (UnifiedSettings) в локальные useState. */
+  autofillFromProfile: () => void;
+  /** Сохранить текущие локальные значения в Профиль (UnifiedSettings). */
+  saveToProfile: () => void;
   generateCheatMeal: () => void;
   generateCarbload: () => void;
   generateBUTCH: () => void;
@@ -259,23 +264,105 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [lazyDayMode, setLazyDayMode] = useState(false);
   const [lazyDayDays, setLazyDayDays] = useState(1);
   const [periodizationEnabled, setPeriodizationEnabled] = useState(false);
-  const [surplusPct, setSurplusPct] = useState(() => { try { const v = localStorage.getItem('he_surplus_pct'); return v ? parseInt(v) : 10; } catch { return 10; } });
+  // P1-fix (Aug 5 2026): читаем из UnifiedSettings через proxy, а НЕ из мёртвого localStorage
+  // (после миграции he_surplus_pct удалён → default). Реальное значение в profile.nutrition.surplusPct.
+  const [surplusPct, setSurplusPct] = useState<number>(() => {
+    try {
+      const v = (s as any)?.nutrition?.surplusPct;
+      if (typeof v === 'number' && v > 0) return v;
+      // Legacy fallback
+      const legacy = localStorage.getItem('he_surplus_pct');
+      if (legacy) {
+        const n = parseInt(legacy);
+        if (Number.isFinite(n) && n > 0) return n;
+      }
+    } catch {}
+    return 10;
+  });
   const [trainType, setTrainType] = useState<'strength' | 'cardio' | 'mixed' | 'hiit'>('strength');
   const [trainIntensity, setTrainIntensity] = useState<'low' | 'medium' | 'high'>('medium');
   const [householdActivity, setHouseholdActivity] = useState<'sedentary' | 'light' | 'moderate' | 'active'>('light');
-  const [bodyFatPct, setBodyFatPct] = useState(profile?.settings?.bodyFat || 15);
-  const [sleepHours, setSleepHours] = useState(7);
-  const [sleepQuality, setSleepQuality] = useState(7);
-  const [stressLevel, setStressLevel] = useState(5);
+  const [bodyFatPct, setBodyFatPct] = useState<number>(() => {
+    // P1-fix: читаем из Profile (UnifiedSettings) через proxy
+    try {
+      const v = s?.bodyFat;
+      if (typeof v === 'number' && v > 0) return v;
+    } catch {}
+    return 15;
+  });
+  const [sleepHours, setSleepHours] = useState<number>(() => {
+    try {
+      const v = s?.sleepHours;
+      if (typeof v === 'number' && v > 0) return v;
+    } catch {}
+    return 7;
+  });
+  const [sleepQuality, setSleepQuality] = useState<number>(() => {
+    try {
+      const v = (s as any)?.lifestyle?.sleepQuality;
+      if (v === 'good') return 9;
+      if (v === 'fair') return 6;
+      if (v === 'poor') return 3;
+    } catch {}
+    return 7;
+  });
+  const [stressLevel, setStressLevel] = useState<number>(() => {
+    try {
+      const v = s?.stressLevel;
+      if (typeof v === 'number' && v > 0) return v;
+    } catch {}
+    return 5;
+  });
   const [cyclePhase, setCyclePhase] = useState<'none' | 'follicular' | 'ovulation' | 'luteal' | 'menstrual'>('none');
-  const [bbCategory, setBBCategory] = useState<BBCategory>(() => { try { return (localStorage.getItem('he_bb_category') as BBCategory) || 'none'; } catch { return 'none'; } });
-  useEffect(() => { try { localStorage.setItem('he_bb_category', bbCategory); } catch {} }, [bbCategory]);
-  const [peakWeekEnabled, setPeakWeekEnabled] = useState<boolean>(() => { try { return localStorage.getItem('he_peak_week') === 'true'; } catch { return false; } });
-  useEffect(() => { try { localStorage.setItem('he_peak_week', peakWeekEnabled ? 'true' : 'false'); } catch {} }, [peakWeekEnabled]);
-  const [peakWeekShowDay, setPeakWeekShowDay] = useState<number>(() => { try { const n = parseInt(localStorage.getItem('he_peak_show_day') || '6'); return isNaN(n) ? 6 : Math.max(0, Math.min(6, n)); } catch { return 6; } });
-  useEffect(() => { try { localStorage.setItem('he_peak_show_day', String(peakWeekShowDay)); } catch {} }, [peakWeekShowDay]);
-  const [lifeStage, setLifeStage] = useState<LifeStage>(() => { try { return (localStorage.getItem('he_life_stage') as LifeStage) || 'none'; } catch { return 'none'; } });
-  useEffect(() => { try { localStorage.setItem('he_life_stage', lifeStage); } catch {} }, [lifeStage]);
+  // P1-fix: читаем из UnifiedSettings (goals.bbCategory), а не из мёртвого he_bb_category
+  const [bbCategory, setBBCategory] = useState<BBCategory>(() => {
+    try {
+      const v = (s as any)?.goals?.bbCategory as BBCategory;
+      if (v) return v;
+    } catch {}
+    try {
+      const legacy = localStorage.getItem('he_bb_category') as BBCategory;
+      if (legacy) return legacy;
+    } catch {}
+    return 'none';
+  });
+  useEffect(() => { try { updateSection('goals', { bbCategory }); } catch {} }, [bbCategory]);
+  const [peakWeekEnabled, setPeakWeekEnabled] = useState<boolean>(() => {
+    try {
+      const v = (s as any)?.goals?.peakWeek;
+      if (typeof v === 'boolean') return v;
+    } catch {}
+    try { return localStorage.getItem('he_peak_week') === 'true'; } catch {}
+    return false;
+  });
+  useEffect(() => { try { updateSection('goals', { peakWeek: peakWeekEnabled }); } catch {} }, [peakWeekEnabled]);
+  const [peakWeekShowDay, setPeakWeekShowDay] = useState<number>(() => {
+    try {
+      const v = (s as any)?.goals?.peakShowDay;
+      if (typeof v === 'string') {
+        const d = new Date(v);
+        if (!isNaN(d.getTime())) return d.getDay();
+      }
+    } catch {}
+    try {
+      const n = parseInt(localStorage.getItem('he_peak_show_day') || '6');
+      return isNaN(n) ? 6 : Math.max(0, Math.min(6, n));
+    } catch {}
+    return 6;
+  });
+  useEffect(() => { try { updateSection('goals', { peakShowDay: new Date(Date.now() + peakWeekShowDay * 86400000).toISOString().slice(0, 10) }); } catch {} }, [peakWeekShowDay]);
+  const [lifeStage, setLifeStage] = useState<LifeStage>(() => {
+    try {
+      const v = (s as any)?.goals?.lifeStage as LifeStage;
+      if (v) return v;
+    } catch {}
+    try {
+      const legacy = localStorage.getItem('he_life_stage') as LifeStage;
+      if (legacy) return legacy;
+    } catch {}
+    return 'none';
+  });
+  useEffect(() => { try { updateSection('goals', { lifeStage }); } catch {} }, [lifeStage]);
   const [hungerLevel, setHungerLevel] = useState(5);
   const [weightAdaptMode, setWeightAdaptMode] = useState(false);
   const [weightLogWeek, setWeightLogWeek] = useState<number[]>([80, 80, 80]);
@@ -295,9 +382,18 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [metabolicAdaptEnabled, setMetabolicAdaptEnabled] = useState(false);
   const [metabolicAdaptPct, setMetabolicAdaptPct] = useState(10);
   const [dietPauseMode, setDietPauseMode] = useState<'none' | 'refeed' | 'flex_80_20' | 'periodization_2_1' | 'diet_5_2'>('none');
-  // FIX: manualGPerKg теперь инициализируется из localStorage и персистится при изменениях.
-  // Раньше всегда сбрасывался на {protein:0,fat:0,carbs:0} при перезагрузке страницы.
+  // P1-fix: manualGPerKg инициализируется из Profile (UnifiedSettings.nutrition.manualGPerKg) + legacy
   const [manualGPerKg, setManualGPerKg] = useState<Record<string, number>>(() => {
+    try {
+      const v = (s as any)?.nutrition?.manualGPerKg;
+      if (v && typeof v === 'object') {
+        return {
+          protein: typeof v.protein === 'number' && !isNaN(v.protein) ? v.protein : 0,
+          fat: typeof v.fat === 'number' && !isNaN(v.fat) ? v.fat : 0,
+          carbs: typeof v.carbs === 'number' && !isNaN(v.carbs) ? v.carbs : 0,
+        };
+      }
+    } catch {}
     try {
       const v = JSON.parse(localStorage.getItem('he_manual_g_per_kg') || 'null');
       if (v && typeof v === 'object' && !Array.isArray(v)) {
@@ -366,11 +462,47 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
 
   // FIX: manual KBJU + kbjuMode теперь инициализируются из localStorage и персистятся.
   // Раньше при перезагрузке страницы все ручные цели КБЖУ сбрасывались на null, а режим — на 'auto'.
-  const [manualKcal, setManualKcal] = useState<number | null>(() => { try { const v = localStorage.getItem('he_manual_kcal'); return v !== null ? Number(v) : null; } catch { return null; } });
-  const [manualP, setManualP] = useState<number | null>(() => { try { const v = localStorage.getItem('he_manual_p'); return v !== null ? Number(v) : null; } catch { return null; } });
-  const [manualF, setManualF] = useState<number | null>(() => { try { const v = localStorage.getItem('he_manual_f'); return v !== null ? Number(v) : null; } catch { return null; } });
-  const [manualC, setManualC] = useState<number | null>(() => { try { const v = localStorage.getItem('he_manual_c'); return v !== null ? Number(v) : null; } catch { return null; } });
-  const [kbjuMode, setKbjuMode] = useState<'auto' | 'manual' | 'profile'>(() => { try { const v = localStorage.getItem('he_kbju_mode'); return v === 'manual' || v === 'profile' ? v : 'auto'; } catch { return 'auto'; } });
+  // P1-fix: manualKcal/P/F/C из Profile (UnifiedSettings.nutrition.manualTargets) + legacy
+  const [manualKcal, setManualKcal] = useState<number | null>(() => {
+    try {
+      const v = (s as any)?.nutrition?.manualTargets?.kcal;
+      if (typeof v === 'number' && v > 0) return v;
+    } catch {}
+    try { const v = localStorage.getItem('he_manual_kcal'); return v !== null ? Number(v) : null; } catch { return null; }
+  });
+  const [manualP, setManualP] = useState<number | null>(() => {
+    try {
+      const v = (s as any)?.nutrition?.manualTargets?.protein;
+      if (typeof v === 'number' && v > 0) return v;
+    } catch {}
+    try { const v = localStorage.getItem('he_manual_p'); return v !== null ? Number(v) : null; } catch { return null; }
+  });
+  const [manualF, setManualF] = useState<number | null>(() => {
+    try {
+      const v = (s as any)?.nutrition?.manualTargets?.fat;
+      if (typeof v === 'number' && v > 0) return v;
+    } catch {}
+    try { const v = localStorage.getItem('he_manual_f'); return v !== null ? Number(v) : null; } catch { return null; }
+  });
+  const [manualC, setManualC] = useState<number | null>(() => {
+    try {
+      const v = (s as any)?.nutrition?.manualTargets?.carbs;
+      if (typeof v === 'number' && v > 0) return v;
+    } catch {}
+    try { const v = localStorage.getItem('he_manual_c'); return v !== null ? Number(v) : null; } catch { return null; }
+  });
+  const [kbjuMode, setKbjuMode] = useState<'auto' | 'manual' | 'profile'>(() => {
+    // P1-fix: читаем из Profile (UnifiedSettings.nutrition.kbjuMode)
+    try {
+      const v = (s as any)?.nutrition?.kbjuMode;
+      if (v === 'manual' || v === 'profile' || v === 'auto') return v;
+    } catch {}
+    try {
+      const v = localStorage.getItem('he_kbju_mode');
+      if (v === 'manual' || v === 'profile' || v === 'auto') return v;
+    } catch {}
+    return 'auto';
+  });
 
   const profileTargets = useMemo(() => {
     // P1-fix: replaced legacy calcNutrition (which ignored phase/course/weight-adapt)
@@ -411,44 +543,188 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const resultsRef = useRef<HTMLDivElement>(null);
   const [budget, setBudget] = useState<BudgetLevel>('medium');
   const [variety, setVariety] = useState<'minimal' | 'medium' | 'max'>('max');
-  const [wakeTime, setWakeTime] = useState('07:00');
-  const [bedTime, setBedTime] = useState('23:00');
+  // P1-fix: wakeTime/bedTime из Profile (UnifiedSettings.lifestyle.wakeTime/bedtime) + legacy
+  const [wakeTime, setWakeTime] = useState<string>(() => {
+    try {
+      const v = (s as any)?.lifestyle?.wakeTime;
+      if (v) return v;
+    } catch {}
+    return '07:00';
+  });
+  const [bedTime, setBedTime] = useState<string>(() => {
+    try {
+      const v = (s as any)?.lifestyle?.bedtime;
+      if (v) return v;
+    } catch {}
+    return '23:00';
+  });
   const [lunchTime, setLunchTime] = useState('13:00');
   const [dinnerTime, setDinnerTime] = useState('19:00');
   const [workFood, setWorkFood] = useState<'any' | 'portable'>('any');
-  const [mealsCount, setMealsCount] = useState(4);
+  // P1-fix: mealsCount из Profile (UnifiedSettings.nutrition.mealsPerDay) + legacy
+  const [mealsCount, setMealsCount] = useState<number>(() => {
+    try {
+      const v = (s as any)?.nutrition?.mealsPerDay;
+      if (typeof v === 'number' && v >= 2 && v <= 8) return v;
+    } catch {}
+    return 4;
+  });
   useEffect(() => { if (!wakeTime?.includes(':') || !bedTime?.includes(':')) return; const wMin = parseInt(wakeTime.split(':')[0]) * 60 + parseInt(wakeTime.split(':')[1]); const bMin = parseInt(bedTime.split(':')[0]) * 60 + parseInt(bedTime.split(':')[1]); const awakeHours = (bMin - wMin) / 60; if (awakeHours >= 16) setMealsCount(5); else if (awakeHours >= 14) setMealsCount(4); else setMealsCount(3); }, [wakeTime, bedTime]);
 
-  const [allergens, setAllergens] = useState<string[]>(() => { try { const local = JSON.parse(localStorage.getItem('he_food_allergens') || 'null'); if (local && Array.isArray(local) && local.length > 0) return local.filter((x: any) => typeof x === 'string'); } catch {} try { return getContraindications().foodAllergies || []; } catch { return []; } });
-  const [healthIssues, setHealthIssues] = useState<string[]>(() => { try { const local = JSON.parse(localStorage.getItem('he_health_issues') || 'null'); if (local && Array.isArray(local) && local.length > 0) return local.filter((x: any) => typeof x === 'string'); } catch {} try { return getContraindications().chronicConditions || []; } catch { return []; } });
-  const [eveningLowCarb, setEveningLowCarb] = useState(() => { try { return localStorage.getItem('he_evening_low_carb') === 'true'; } catch { return false; } });
-  React.useEffect(() => { const relevantActive = healthIssues.some(h => h === 'oedema' || h === 'diabetes'); if (relevantActive && !eveningLowCarb) { setEveningLowCarb(true); localStorage.setItem('he_evening_low_carb', 'true'); } }, [healthIssues]);
+  const [allergens, setAllergens] = useState<string[]>(() => {
+    // P1-fix: читаем из Profile (UnifiedSettings), а не из мёртвых ключей he_food_allergens/he_contraindications
+    try {
+      const p = getProfile();
+      const s = (p.settings || {}) as any;
+      if (s.nutrition?.foodAllergies?.length) return s.nutrition.foodAllergies;
+    } catch {}
+    try { return getContraindications().foodAllergies || []; } catch { return []; }
+  });
+  const [healthIssues, setHealthIssues] = useState<string[]>(() => {
+    try {
+      const p = getProfile();
+      const s = (p.settings || {}) as any;
+      if (s.health?.chronicConditions?.length) return s.health.chronicConditions;
+    } catch {}
+    try { return getContraindications().chronicConditions || []; } catch { return []; }
+  });
+  // P1-fix: eveningLowCarb из Profile (UnifiedSettings.nutrition.eveningLowCarb) + legacy
+  const [eveningLowCarb, setEveningLowCarb] = useState<boolean>(() => {
+    try {
+      const v = (s as any)?.nutrition?.eveningLowCarb;
+      if (typeof v === 'boolean') return v;
+    } catch {}
+    try { return localStorage.getItem('he_evening_low_carb') === 'true'; } catch {}
+    return false;
+  });
+  React.useEffect(() => {
+    const relevantActive = healthIssues.some(h => h === 'oedema' || h === 'diabetes');
+    if (relevantActive && !eveningLowCarb) {
+      setEveningLowCarb(true);
+      try { updateSection('nutrition', { eveningLowCarb: true }); } catch {}
+    }
+  }, [healthIssues]);
 
   const [planType, setPlanType] = useState<PlanType>('classic');
-  const [preferredFoods, setPreferredFoods] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_preferred_foods') || '["chicken_breast","rice_white","broccoli","egg_whole","avocado"]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : ['chicken_breast','rice_white','broccoli','egg_whole','avocado']; } catch { return ['chicken_breast','rice_white','broccoli','egg_whole','avocado']; } });
+  // P1-fix: preferredFoods из Profile (UnifiedSettings.nutrition.preferredFoods) + legacy
+  const [preferredFoods, setPreferredFoods] = useState<string[]>(() => {
+    try {
+      const v = (s as any)?.nutrition?.preferredFoods;
+      if (Array.isArray(v) && v.length) return v.filter((x: any) => typeof x === 'string');
+    } catch {}
+    try {
+      const v = JSON.parse(localStorage.getItem('he_preferred_foods') || '["chicken_breast","rice_white","broccoli","egg_whole","avocado"]');
+      return Array.isArray(v) ? v.filter(x => typeof x === 'string') : ['chicken_breast','rice_white','broccoli','egg_whole','avocado'];
+    } catch { return ['chicken_breast','rice_white','broccoli','egg_whole','avocado']; }
+  });
   const [quickAddMealIdx, setQuickAddMealIdx] = useState<number | null>(null);
   const [quickAddSearch, setQuickAddSearch] = useState('');
   const [customNotes, setCustomNotes] = useState(() => { try { return localStorage.getItem('he_nutrition_notes') || ''; } catch { return ''; } });
   // D-28: meal-bound preferred foods (e.g. rice_cream → breakfast only)
   const [preferredByMeal, setPreferredByMeal] = useState<Record<string, string[]>>(() => { try { const v = JSON.parse(localStorage.getItem('he_preferred_by_meal') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } });
-  useEffect(() => { try { localStorage.setItem('he_preferred_by_meal', JSON.stringify(preferredByMeal)); } catch {} }, [preferredByMeal]);
+  useEffect(() => { try { updateSection('nutrition', { preferredByMeal }); } catch {} }, [preferredByMeal]);
   // D-28+: advanced preference states
-  const [specificity, setSpecificity] = useState<Specificity>(() => { try { return (localStorage.getItem('he_specificity') as Specificity) || 'varied'; } catch { return 'varied'; } });
-  useEffect(() => { try { localStorage.setItem('he_specificity', specificity); } catch {} }, [specificity]);
-  const [intolerances, setIntolerances] = useState<Intolerances>(() => { try { const v = JSON.parse(localStorage.getItem('he_intolerances') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } });
-  useEffect(() => { try { localStorage.setItem('he_intolerances', JSON.stringify(intolerances)); } catch {} }, [intolerances]);
-  const [tasteProfile, setTasteProfile] = useState<TasteProfile>(() => { try { const p = JSON.parse(localStorage.getItem('he_taste_profile') || '{"spicy":0,"sweet":0,"salty":0,"sour":0,"umami":0}'); return { spicy: 0, sweet: 0, salty: 0, sour: 0, umami: 0, ...p }; } catch { return { spicy: 0, sweet: 0, salty: 0, sour: 0, umami: 0 }; } });
-  useEffect(() => { try { localStorage.setItem('he_taste_profile', JSON.stringify(tasteProfile)); } catch {} }, [tasteProfile]);
-   const [excludedCategories, setExcludedCategories] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_excluded_categories') || '[]'); return Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []; } catch { return []; } });
-  useEffect(() => { try { localStorage.setItem('he_excluded_categories', JSON.stringify(excludedCategories)); } catch {} }, [excludedCategories]);
+  const [specificity, setSpecificity] = useState<Specificity>(() => {
+    try {
+      const v = (s as any)?.nutrition?.specificity;
+      if (v === 'generic' || v === 'specific') return v;
+    } catch {}
+    try {
+      const v = localStorage.getItem('he_specificity');
+      if (v === 'generic' || v === 'specific') return v;
+    } catch {}
+    return 'varied';
+  });
+  useEffect(() => {
+    try {
+      // Маппинг Specificity → UnifiedSettings.specificity: 'everyday' → 'generic', остальное → 'specific'
+      const mapped = specificity === 'everyday' ? 'generic' : 'specific';
+      updateSection('nutrition', { specificity: mapped as any });
+    } catch {}
+  }, [specificity]);
+  const [intolerances, setIntolerances] = useState<Intolerances>(() => {
+    try {
+      const v = (s as any)?.nutrition?.foodIntolerances;
+      if (v && typeof v === 'object' && !Array.isArray(v)) return v as Intolerances;
+    } catch {}
+    try {
+      const v = JSON.parse(localStorage.getItem('he_intolerances') || '{}');
+      if (v && typeof v === 'object' && !Array.isArray(v)) return v;
+    } catch {}
+    return {};
+  });
+  useEffect(() => { try { updateSection('nutrition', { foodIntolerances: intolerances as any }); } catch {} }, [intolerances]);
+  const [tasteProfile, setTasteProfile] = useState<TasteProfile>(() => {
+    try {
+      const v = (s as any)?.nutrition?.tasteProfile;
+      if (v && typeof v === 'object' && !Array.isArray(v)) return v as TasteProfile;
+    } catch {}
+    try {
+      const p = JSON.parse(localStorage.getItem('he_taste_profile') || '{"spicy":0,"sweet":0,"salty":0,"sour":0,"umami":0}');
+      return { spicy: 0, sweet: 0, salty: 0, sour: 0, umami: 0, ...p };
+    } catch { return { spicy: 0, sweet: 0, salty: 0, sour: 0, umami: 0 }; }
+  });
+  useEffect(() => {
+    try {
+      // TasteProfile — объект {spicy, sweet, ...}, не мигрируется в UnifiedSettings.nutrition.tasteProfile (там string[]).
+      // Сохраняем в nutrition как userPreference через extras? Или оставляем в localStorage legacy.
+      // Используем localStorage для обратной совместимости.
+      localStorage.setItem('he_taste_profile', JSON.stringify(tasteProfile));
+    } catch {}
+  }, [tasteProfile]);
+   const [excludedCategories, setExcludedCategories] = useState<string[]>(() => {
+    try {
+      const v = (s as any)?.nutrition?.excludedCategories;
+      if (Array.isArray(v)) return v.filter((x: any) => typeof x === 'string');
+    } catch {}
+    try {
+      const v = JSON.parse(localStorage.getItem('he_excluded_categories') || '[]');
+      return Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : [];
+    } catch { return []; }
+   });
+  useEffect(() => { try { updateSection('nutrition', { excludedCategories }); } catch {} }, [excludedCategories]);
   // Адаптация по фактическому дневнику (вчера → сегодня компенсация).
   const [diaryAdaptation, setDiaryAdaptation] = useState<boolean>(() => { try { return localStorage.getItem('he_diary_adaptation') !== 'false'; } catch { return true; } });
   useEffect(() => { try { localStorage.setItem('he_diary_adaptation', diaryAdaptation ? 'true' : 'false'); } catch {} }, [diaryAdaptation]);
   // Smart 7-day variety: 'soft' = только deprioritize recent, 'strict' = hard-exclude последние 1-2 дня.
-  const [varietyStrictness, setVarietyStrictness] = useState<'soft' | 'strict'>(() => { try { return (localStorage.getItem('he_variety_strictness') as 'soft' | 'strict') || 'strict'; } catch { return 'strict'; } });
-  useEffect(() => { try { localStorage.setItem('he_variety_strictness', varietyStrictness); } catch {} }, [varietyStrictness]);
-  const [excludedFoods, setExcludedFoods] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_excluded_foods') || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; } catch { return []; } });
-  const [dietPrefs, setDietPrefs] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_diet_preferences') || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; } catch { return []; } });
+  const [varietyStrictness, setVarietyStrictness] = useState<'soft' | 'strict'>(() => {
+    try {
+      const v = (s as any)?.nutrition?.varietyStrictness;
+      if (v === 'low' || v === 'medium' || v === 'high') {
+        return v === 'low' ? 'soft' : 'strict';
+      }
+    } catch {}
+    try {
+      const v = localStorage.getItem('he_variety_strictness') as 'soft' | 'strict';
+      if (v === 'soft' || v === 'strict') return v;
+    } catch {}
+    return 'strict';
+  });
+  useEffect(() => { try { updateSection('nutrition', { varietyStrictness: varietyStrictness === 'soft' ? 'low' : 'high' }); } catch {} }, [varietyStrictness]);
+  // P1-fix: excludedFoods из Profile (UnifiedSettings.nutrition.excludedFoods) + legacy
+  const [excludedFoods, setExcludedFoods] = useState<string[]>(() => {
+    try {
+      const v = (s as any)?.nutrition?.excludedFoods;
+      if (Array.isArray(v)) return v.filter(x => typeof x === 'string');
+    } catch {}
+    try {
+      const v = JSON.parse(localStorage.getItem('he_excluded_foods') || '[]');
+      return Array.isArray(v) ? v.filter(x => typeof x === 'string') : [];
+    } catch { return []; }
+  });
+  // P1-fix: dietPrefs из Profile (UnifiedSettings.nutrition.tasteProfile) + legacy
+  // dietPrefs — это список типов (vegetarian, vegan, pescatarian и т.д.) из UI.
+  // В UnifiedSettings он хранится в nutrition.tasteProfile как массив (через миграцию diet_preferences).
+  const [dietPrefs, setDietPrefs] = useState<string[]>(() => {
+    try {
+      const v = (s as any)?.nutrition?.tasteProfile;
+      if (Array.isArray(v)) return v.filter(x => typeof x === 'string');
+    } catch {}
+    try {
+      const v = JSON.parse(localStorage.getItem('he_diet_preferences') || '[]');
+      return Array.isArray(v) ? v.filter(x => typeof x === 'string') : [];
+    } catch { return []; }
+  });
   const [allergenExcludedCount, setAllergenExcludedCount] = useState(0);
   const [planTargets, setPlanTargets] = useState<{ kcal: number; protein: number; fats: number; carbs: number }>({ kcal: 2500, protein: 160, fats: 70, carbs: 300 });
   // Bug-1 fix: planTargets must mirror effective* so the full nutrition report
@@ -719,8 +995,127 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     setRecipePickerMeal(null);
   };
 
-  const toggleAllergen = (id: string) => { setAllergens(prev => { const updated = prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]; localStorage.setItem('he_food_allergens', JSON.stringify(updated)); try { saveContraindications({ foodAllergies: updated }); } catch {} return updated; }); };
-  const toggleHealthIssue = (id: string) => { setHealthIssues(prev => { const updated = prev.includes(id) ? prev.filter(h => h !== id) : [...prev, id]; localStorage.setItem('he_health_issues', JSON.stringify(updated)); try { saveContraindications({ chronicConditions: updated }); } catch {} return updated; }); };
+  const toggleAllergen = (id: string) => {
+    setAllergens(prev => {
+      const updated = prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id];
+      // P1-fix: пишем в Profile (UnifiedSettings.nutrition.foodAllergies) + legacy he_food_allergens для backward-compat
+      try { updateSection('nutrition', { foodAllergies: updated }); } catch {}
+      try { localStorage.setItem('he_food_allergens', JSON.stringify(updated)); } catch {}
+      try { saveContraindications({ foodAllergies: updated }); } catch {}
+      return updated;
+    });
+  };
+  const toggleHealthIssue = (id: string) => {
+    setHealthIssues(prev => {
+      const updated = prev.includes(id) ? prev.filter(h => h !== id) : [...prev, id];
+      try { updateSection('health', { chronicConditions: updated }); } catch {}
+      try { localStorage.setItem('he_health_issues', JSON.stringify(updated)); } catch {}
+      try { saveContraindications({ chronicConditions: updated }); } catch {}
+      return updated;
+    });
+  };
+
+  /**
+   * Кнопка "📋 Автозаполнение из профиля" — загружает значения из UnifiedSettings
+   * в локальные useState планировщика. НЕ пишет обратно. Пользователь может
+   * отредактировать поля, и только явное "Сохранить в профиль" переносит их в профиль.
+   */
+  const autofillFromProfile = () => {
+    try {
+      const prof = profile;
+      if (!prof) return;
+      const s = (prof.settings || {}) as any;
+      if (s.personal) {
+        if (s.personal.weight) setWeight(s.personal.weight);
+        if (s.personal.height) setHeight(s.personal.height);
+        if (s.personal.age) setAge(s.personal.age);
+        if (s.personal.sex) setSex(s.personal.sex);
+        if (s.personal.bodyFat !== undefined) setBodyFatPct(s.personal.bodyFat);
+      }
+      if (s.training) {
+        if (s.training.daysPerWeek) setTrainType(s.training.daysPerWeek >= 5 ? 'strength' : s.training.daysPerWeek >= 3 ? 'mixed' : 'cardio');
+        if (s.training.minutesPerSession) {
+          // не подменяем minutesPerSession напрямую, маппим в workout duration
+        }
+        if (s.training.primaryGoal) { setGoal(s.training.primaryGoal as GoalId); setGoalUserSet(true); }
+      }
+      if (s.lifestyle) {
+        if (s.lifestyle.dailySteps !== undefined) setDailySteps(s.lifestyle.dailySteps);
+        if (s.lifestyle.sleepHours !== undefined) setSleepHours(s.lifestyle.sleepHours);
+        if (s.lifestyle.stressLevel !== undefined) setStressLevel(s.lifestyle.stressLevel);
+        if (s.lifestyle.bedtime) setBedTime(s.lifestyle.bedtime);
+        if (s.lifestyle.wakeTime) setWakeTime(s.lifestyle.wakeTime);
+      }
+      if (s.nutrition) {
+        if (s.nutrition.dietType && s.nutrition.dietType !== 'omnivore') {
+          setDietPrefs([s.nutrition.dietType as 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'paleo' | 'mediterranean']);
+        }
+        if (s.nutrition.mealsPerDay) setMealsCount(s.nutrition.mealsPerDay);
+        if (s.nutrition.foodAllergies) setAllergens(s.nutrition.foodAllergies);
+        if (s.nutrition.foodIntolerances) setIntolerances({ ...intolerances, ...Object.fromEntries(s.nutrition.foodIntolerances.map((a: string) => [a, true])) });
+        if (s.nutrition.excludedFoods) setExcludedFoods(s.nutrition.excludedFoods);
+        if (s.nutrition.preferredFoods) setPreferredFoods(s.nutrition.preferredFoods);
+        if (s.nutrition.preferredByMeal) setPreferredByMeal(s.nutrition.preferredByMeal);
+        if (s.nutrition.proteinPerKg) setManualGPerKg(s.nutrition.proteinPerKg);
+        if (s.nutrition.sodiumG) {/* stored */}
+        if (s.nutrition.eveningLowCarb) setEveningLowCarb(s.nutrition.eveningLowCarb);
+        if (s.nutrition.surplusPct) setSurplusPct(s.nutrition.surplusPct);
+        if (s.nutrition.histamineSensitive !== undefined) setHistamineSensitive(s.nutrition.histamineSensitive);
+      }
+      if (s.health?.chronicConditions) setHealthIssues(s.health.chronicConditions);
+      if (s.pharma?.phase) setPhase(s.pharma.phase === 'baseline' ? 'maintenance' : s.pharma.phase === 'post_pct' ? 'recovery' : s.pharma.phase === 'fertility' ? 'recovery' : s.pharma.phase as PhaseId);
+      if (s.goals?.bbCategory) setBBCategory(s.goals.bbCategory as BBCategory);
+      if (s.goals?.lifeStage) setLifeStage(s.goals.lifeStage as LifeStage);
+    } catch (e) {
+      console.error('[autofillFromProfile]', e);
+    }
+  };
+
+  /**
+   * Кнопка "💾 Сохранить в профиль" — пишет ТЕКУЩИЕ локальные значения в UnifiedSettings.
+   * Вызывается по явному действию пользователя.
+   */
+  const saveToProfile = () => {
+    try {
+      const cur = getProfile();
+      const next = JSON.parse(JSON.stringify(cur.settings || {})) as any;
+      if (!next.personal) next.personal = {};
+      if (weight) next.personal.weight = weight;
+      if (height) next.personal.height = height;
+      if (age) next.personal.age = age;
+      if (sex) next.personal.sex = sex;
+      if (bodyFatPct !== undefined && bodyFatPct !== null) next.personal.bodyFat = bodyFatPct;
+      if (!next.training) next.training = {};
+      if (goal) next.training.primaryGoal = goal;
+      if (!next.lifestyle) next.lifestyle = {};
+      if (dailySteps !== undefined) next.lifestyle.dailySteps = dailySteps;
+      if (sleepHours !== undefined) next.lifestyle.sleepHours = sleepHours;
+      if (stressLevel !== undefined) next.lifestyle.stressLevel = stressLevel;
+      if (bedTime) next.lifestyle.bedtime = bedTime;
+      if (wakeTime) next.lifestyle.wakeTime = wakeTime;
+      if (!next.nutrition) next.nutrition = {};
+      if (dietPrefs.length) next.nutrition.dietType = (dietPrefs[0] as any) || 'omnivore';
+      if (mealsCount) next.nutrition.mealsPerDay = mealsCount;
+      if (allergens.length) next.nutrition.foodAllergies = allergens;
+      if (excludedFoods.length) next.nutrition.excludedFoods = excludedFoods;
+      if (preferredFoods.length) next.nutrition.preferredFoods = preferredFoods;
+      if (preferredByMeal && Object.keys(preferredByMeal).length) next.nutrition.preferredByMeal = preferredByMeal;
+      if (manualGPerKg) next.nutrition.proteinPerKg = manualGPerKg;
+      next.nutrition.eveningLowCarb = eveningLowCarb;
+      if (surplusPct) next.nutrition.surplusPct = surplusPct;
+      next.nutrition.histamineSensitive = histamineSensitive;
+      if (!next.health) next.health = {};
+      if (healthIssues.length) next.health.chronicConditions = healthIssues;
+      if (!next.pharma) next.pharma = {};
+      next.pharma.phase = phase;
+      if (!next.goals) next.goals = {};
+      if (bbCategory) next.goals.bbCategory = bbCategory;
+      if (lifeStage) next.goals.lifeStage = lifeStage;
+      updateProfile({ settings: next });
+    } catch (e) {
+      console.error('[saveToProfile]', e);
+    }
+  };
 
   const loadSavedPlan = (plan: SavedPlan) => {
     if (plan.dayPlan) { setDayPlan(plan.dayPlan); setGenerated(true); setPlanDays(1); }
@@ -731,9 +1126,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  useEffect(() => { if (profile) { try { updateProfile({ settings: { ...profile.settings, primaryGoal: goal as any } } as any); } catch {} } }, [goal]);
-  // B4: Sync weight/height/age/sex/bodyFat back to profile so other screens see updated values
-  useEffect(() => { if (profile) { try { const ps = profile.settings; if (ps?.weight !== weight || ps?.height !== height || ps?.age !== age || ps?.sex !== sex || ps?.bodyFat !== bodyFatPct) { updateProfile({ settings: { ...profile.settings, weight, height, age, sex, bodyFat: bodyFatPct } } as any); } } catch {} } }, [weight, height, age, sex, bodyFatPct]);
+  // P0-fix (Aug 5 2026): убрана автоматическая синхронизация useState → updateProfile.
+  // Теперь поля в планировщике ЛОКАЛЬНЫЕ. Кнопка "💾 Сохранить в профиль" пишет
+  // выборочно в useProfile() по явному действию пользователя. Это предотвращает
+  // перезапись данных Профиля при промежуточных изменениях в Планировщике.
+  // B4-fix: Sync weight/height/age/sex/bodyFat back to profile — ОТКЛЮЧЕНО.
+  // (Пользователь должен явно нажать "Сохранить в профиль" — см. `saveToProfile` ниже)
 
   // Auto-recalc macros when course changes
   // P1-fix: dependency was `injections.length` which missed dose/type changes on
@@ -760,53 +1158,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [injectionsSignature, goal]);
 
-  // Sync from Profile Planner data (he_nutrition_profile)
-  useEffect(() => {
-    try {
-      const pd = JSON.parse(localStorage.getItem('he_nutrition_profile') || '{}');
-      if (!pd || Object.keys(pd).length === 0) return;
-      if (pd.primaryGoal && !goalUserSet) { setGoal(pd.primaryGoal as GoalId); setGoalUserSet(true); }
-      if (pd.budget) setBudget(pd.budget as BudgetLevel);
-      if (pd.mealsCount) setMealsCount(pd.mealsCount);
-      if (pd.dietType && pd.dietType !== 'omnivore') { setDietPrefs([pd.dietType === 'vegetarian' ? 'vegetarian' : pd.dietType]); }
-      if (pd.allergens) {
-        const newAl = Object.entries(pd.allergens).filter(([_,v]) => v).map(([k]) => k);
-        if (newAl.length > 0) setAllergens(newAl);
-      }
-      if (pd.healthIssues) {
-        const newHi = Object.entries(pd.healthIssues).filter(([_,v]) => v).map(([k]) => k);
-        if (newHi.length > 0) setHealthIssues(newHi);
-      }
-      if (pd.targetKcal) { setManualKcal(pd.targetKcal); setKbjuMode('manual'); }
-      if (pd.targetProtein) setManualP(pd.targetProtein);
-      if (pd.targetFat) setManualF(pd.targetFat);
-      if (pd.targetCarbs) setManualC(pd.targetCarbs);
-      if (pd.lazyDayMode) setLazyDayMode(true);
-      if (pd.carbCycling) setCyclingMode('macro');
-      if (pd.trainingDays) {
-        if (Array.isArray(pd.trainingDays)) {
-          setTrainingDays(pd.trainingDays.map((v: any) => Boolean(v)));
-        } else {
-          const n = Number(pd.trainingDays) || 0;
-          setTrainingDays(Array.from({ length: 7 }, (_, i) => i < n));
-        }
-      }
-      if (pd.sodiumMg) { /* stored for future use in meal generation */ }
-      if (pd.potassiumMg) { /* stored for future use */ }
-      if (pd.magnesiumMg) { /* stored for future use */ }
-      if (pd.pharma) {
-        const ph = typeof pd.pharma === 'object' ? pd.pharma : {};
-        setV2Pharma((prev:any) => ({ ...prev,
-          AAS_ORAL: !!ph.aas_oral || prev.AAS_ORAL,
-          AAS_INJECTABLE: !!ph.aas_inj || prev.AAS_INJECTABLE,
-          HGH: !!ph.hgh || prev.HGH,
-          INSULIN_USE: !!ph.insulin || prev.INSULIN_USE,
-          DIURETICS: !!ph.diuretics || prev.DIURETICS,
-          STIMULATORS: !!ph.stimulants || prev.STIMULATORS,
-        }));
-      }
-    } catch {}
-  }, []); // only on mount
+  // P0-fix (Aug 5 2026): мёртвый useEffect чтения `he_nutrition_profile` удалён —
+  // этот ключ никем не пишется, код был мёртв. Миграция из этого ключа не нужна:
+  // unified-profile.ts мигрирует все настройки в UnifiedSettings, и планировщик
+  // читает их через `getProfile()` + `useProfileSection()`.
 
   // ── Supplement / Water timeline builders (подняты ВЫШЕ generatePlan во избежание TDZ) ──
   const buildSupplementTimeline = (mealTimes: { time: string; label: string; pct: number }[], isTrainingDay: boolean) => {
@@ -2209,6 +2564,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     quickAddMealIdx, setQuickAddMealIdx, quickAddSearch, setQuickAddSearch,
     updateItemAmount, removeFoodItem, replaceMealWithRecipe, generatePlan,
     toggleAllergen, toggleHealthIssue, loadSavedPlan,
+    autofillFromProfile, saveToProfile,
     generateCheatMeal, generateCarbload, generateBUTCH,
     generateCravingPlan, generateLazyDayPlan,
     generateRecommendations, autoCorrectPlan, saveCurrentPlan,

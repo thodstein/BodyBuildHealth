@@ -128,19 +128,6 @@ export function useDataLink(): LinkedData {
 
         const allCourse = await db.getAll<CourseEntry>('course_log');
         setCourse(allCourse);
-
-        try {
-          const idbProfile = await db.get<UserProfile>('profile', 'current-user');
-          if (idbProfile && idbProfile.settings) {
-            const lsProfile = getProfile();
-            const lsUpdated = lsProfile.settings;
-            const idbUpdated = idbProfile.settings;
-            const merged = { ...idbProfile, ...lsProfile, settings: { ...idbUpdated, ...lsUpdated } };
-            await db.put('profile', merged);
-          } else {
-            await db.put('profile', profile);
-          }
-        } catch {}
       } catch {}
     };
     load();

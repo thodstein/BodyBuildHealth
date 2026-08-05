@@ -116,6 +116,7 @@ export const IndividualPlanSettings: React.FC = () => {
     userRecipes, labAnalysis, labs,
     errorMsg, setErrorMsg,
     generatePlan,
+    autofillFromProfile, saveToProfile,
   } = usePlanCtx();
 
   // P1-11: валидация ввода перед генерацией (TMA-роль: не позволить абсурдные комбинации).
@@ -208,6 +209,33 @@ export const IndividualPlanSettings: React.FC = () => {
 
   return (
     <>
+
+      {/* Кнопки синхронизации с Профилем (Aug 5 2026) */}
+      <GlassCard title="🔄 Синхронизация с Профилем" icon="🔄" color="#3b82f6">
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginBottom: 8, lineHeight: 1.5 }}>
+          Поля ниже ЛОКАЛЬНЫЕ — не пишут в Профиль автоматически.
+          <br/>📋 <b>Автозаполнение</b> — загрузить значения из Профиля.
+          <br/>💾 <b>Сохранить в Профиль</b> — записать текущие значения обратно.
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            onClick={() => { autofillFromProfile(); }}
+            style={{
+              flex: 1, padding: '10px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+              background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)',
+              color: '#3b82f6', cursor: 'pointer', minHeight: 40,
+            }}
+          >📋 Автозаполнение из профиля</button>
+          <button
+            onClick={() => { saveToProfile(); if (typeof (window as any).showToast === 'function') (window as any).showToast('✓ Сохранено в профиль', 'success'); else alert('✓ Сохранено в профиль'); }}
+            style={{
+              flex: 1, padding: '10px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+              background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.3)',
+              color: '#00e68a', cursor: 'pointer', minHeight: 40,
+            }}
+          >💾 Сохранить в профиль</button>
+        </div>
+      </GlassCard>
 
       {/* Кнопка генерации (Pro Engine — единый движок) */}
       {true && (

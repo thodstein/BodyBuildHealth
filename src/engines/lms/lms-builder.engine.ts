@@ -431,8 +431,10 @@ function injectPLWeakPoints(
           const cur = weeklyMuscleSets(days, exGroup);
           if (cur + sets > Math.round(ref.mrv * mrvMult)) continue;
         }
+        // P2: coef not in Exercise catalog — use heuristic by movementType (compound vs isolation).
+        const injCoef = ex?.type === 'compound' ? 1.0 : ex?.type === 'isolation' ? 0.3 : 0.7;
         heavyDay.exercises.push({
-          name: resolvedName, group: exGroup, coef: 0.7, mnosz: 1,
+          name: resolvedName, group: exGroup, coef: injCoef, mnosz: 1,
           load: 'Тяжелая', pm, rir: rirBase,
           workSets: [{ pct: c.pct, reps: 8, sets: Math.max(1, sets), weight: workWeight(pm, c.pct), rir: rirBase }],
         });
@@ -459,8 +461,10 @@ function injectPLWeakPoints(
           }
           // Памп-протокол: 3×12 @ 60% 1PM, RIR 3
           const pumpPct = 0.60;
+          // P2: coef by catalog type — compound ~1.0, isolation ~0.3, fallback 0.65
+          const pumpCoef = ex?.type === 'compound' ? 0.8 : ex?.type === 'isolation' ? 0.3 : 0.65;
           lightDay.exercises.push({
-            name: resolvedName, group: exGroup, coef: 0.65, mnosz: 1,
+            name: resolvedName, group: exGroup, coef: pumpCoef, mnosz: 1,
             load: 'Средняя', pm, rir: Math.max(3, rirBase + 1),
             workSets: [{ pct: pumpPct, reps: 12, sets: Math.max(1, sets), weight: workWeight(pm, pumpPct), rir: Math.max(3, rirBase + 1) }],
           });
@@ -589,7 +593,9 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   // Авторегуляция: если передана — применяется к весам (topSetPctMultiplier) и объёму/RIR.
   const ar = input.autoReg;
   const arTopMult = ar?.topSetPctMultiplier ?? 1;
-  const arVolMult = ar?.volumeMultiplier ?? 1;
+  // The deload flag is authoritative even when a caller did not precompute a
+  // reduced volume multiplier. Do not double-cut an already smaller value.
+  const arVolMult = Math.min(ar?.volumeMultiplier ?? 1, ar?.deload ? 0.6 : 1);
   const arRirShift = ar?.rirShift ?? 0;
 
   const weeks: LMSPlanWeek[] = [];
@@ -780,10 +786,12 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           if (targetDay.exercises.length >= 8) continue;
 
            const wPm = pmRow[pick.name] ?? fallbackPm;
+          // P2: coef by catalog type — compound ~0.7, isolation ~0.3, fallback 0.5
+          const accCoef = pick?.type === 'compound' ? 0.7 : pick?.type === 'isolation' ? 0.3 : 0.5;
           targetDay.exercises.push({
             name: pick.name,
             group: wg,
-            coef: 0.5,
+            coef: accCoef,
             mnosz: 1,
             load: isHeavyDay ? 'Тяжелая' : 'Средняя',
             pm: wPm,

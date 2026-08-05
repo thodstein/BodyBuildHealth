@@ -42,9 +42,10 @@ export interface MacrocycleToBBOptions {
   favoriteExercises?: string[];
 }
 
-/** Структурированная разгрузка каждые 4 недели внутри базовых фаз. */
+/** Структурированная разгрузка каждые 4 недели внутри базовых фаз.
+ *  P2-fix: contest_prep добавлен — NSCA 2021 рекомендует делод каждые 3-4 нед даже при пике. */
 export function shouldPeriodicDeload(phase: string, weekNumber: number, weekOffset: number): boolean {
-  if (phase !== 'hypertrophy' && phase !== 'strength' && phase !== 'endurance') return false;
+  if (phase !== 'hypertrophy' && phase !== 'strength' && phase !== 'endurance' && phase !== 'contest_prep') return false;
   return (weekNumber - weekOffset + 1) % 4 === 0;
 }
 
@@ -142,8 +143,10 @@ export function macrocycleToBBProgram(
     meta = baseProgram.meta;
   } else {
     // Fallback: скелет с пустыми sessions + переразмеченные фазы.
+    // P2-fix: помечаем meta warning чтобы UI показал пользователю что план пустой
     weeks = skeletonWeeksFromBbMacrocycle(macro as any, opts.daysPerWeek);
     meta = makeMeta(opts, total);
+    meta.notes = `⚠ План собран в режиме skeleton (без упражнений): ошибка сборки базового плана. Проверьте параметры.`;
   }
 
   // 3. Заголовок

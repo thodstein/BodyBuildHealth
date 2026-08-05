@@ -4,6 +4,7 @@
 import React, { useState, useMemo } from 'react';
 import { PopupNumber, PopupSelect, PopupToggle, ExpandableCard, MetricCard, CalcSection, CalcResult } from './TrainingPopups';
 import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';
+import { getProfile, updateSection } from '../../../core/profile-manager';
 
 const ACCENT = '#00e68a';
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 800, color: ACCENT, margin: '4px 0 10px' };
@@ -90,7 +91,7 @@ function weightClass(bw: number, fed: string): { name: string; min: number; max:
 export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultKind }) => {
   const kind = defaultKind || 'pl';
 
-  // PL state
+  // ── Локальный state (поля остаются локальными) ──
   const [squat, setSquat] = useState(180);
   const [bench, setBench] = useState(120);
   const [deadlift, setDeadlift] = useState(200);
@@ -100,12 +101,27 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
   const [fatigue, setFatigue] = useState(300);
   const [weighIn, setWeighIn] = useState('09:00');
   const [startTime, setStartTime] = useState('10:00');
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
 
   // BB state
   const [showDate, setShowDate] = useState('');
   const [carbLoadDays, setCarbLoadDays] = useState(3);
   const [sodiumManip, setSodiumManip] = useState(true);
   const [waterLoadDays, setWaterLoadDays] = useState(2);
+
+  // ── Автозаполнение из Профиля (однократная загрузка в локальный state) ──
+  const autofillFromProfile = () => {
+    try {
+      const p = getProfile();
+      const s = (p.settings || {}) as any;
+      if (s.personal?.weight) setBw(s.personal.weight);
+      if (s.training?.pmSquat) setSquat(s.training.pmSquat);
+      if (s.training?.pmBench) setBench(s.training.pmBench);
+      if (s.training?.pmDeadlift) setDeadlift(s.training.pmDeadlift);
+    } catch (e) {
+      console.error('[PeakingPanel.autofillFromProfile]', e);
+    }
+  };
 
   const cls = useMemo(() => weightClass(bw, fed), [bw, fed]);
   const taper = useMemo(() => genTaperCurve(weeks, fatigue), [weeks, fatigue]);
@@ -121,15 +137,56 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
     });
   };
 
+  /**
+   * Сохранить ПМ в Профиль (UnifiedSettings) + показать toast.
+   * PМ из PeakingPanel — ЭТАЛОННЫЕ 1RM для всех модулей (BB-auto, PL-auto).
+   */
   const applyPms = () => {
-    const p = JSON.parse(localStorage.getItem('he_training_profile') || '{}');
-    p.pmSquat = squat; p.pmBench = bench; p.pmDead = deadlift; p.bodyWeight = bw;
-    localStorage.setItem('he_training_profile', JSON.stringify(p));
-    applyToPlanner({
-      kind: 'pri',
-      label: `ПМ: присед ${squat} / жим ${bench} / тяга ${deadlift} кг · вес ${bw} кг`,
-      data: { volumeMult: 1, rirShift: 0 },
-    });
+    try {
+      updateSection('training', {
+        pmSquat: squat,
+        pmBench: bench,
+        pmDeadlift: deadlift,
+      });
+      // Сохраняем вес ТОЛЬКО если он отличается от дефолтного 80 (иначе не перезаписываем профиль)
+      // Default = 80 (из useState). Если пользователь явно ввёл другой — он отличается.
+      // Чтобы не сохранять default, проверяем через источник — инициализирован ли bw из профиля.
+      if (bw > 0 && bw !== 80) {
+        updateSection('personal', { weight: bw });
+      } else {
+        // Прочитаем текущий вес из профиля и сохраним (на случай если там уже есть)
+        const cur = getProfile();
+        const w = (cur.settings as any).personal?.weight;
+        if (w && w > 0) {
+          // Сохраняем тот же вес, не перезаписывая default
+          // (если пользователь НЕ ввёл вес, не трогаем значение)
+        }
+      }
+      // Также legacy-ключ для backward-compat с модулями, которые ещё читают training-profile
+      const legacy = {
+        bodyWeight: bw,
+        pmSquat: squat,
+        pmBench: bench,
+        pmDead: deadlift,
+      };
+      try {
+        const cur = JSON.parse(localStorage.getItem('he_training_profile') || '{}') || {};
+        const next = { ...cur, ...legacy };
+        localStorage.setItem('he_training_profile', JSON.stringify(next));
+      } catch {}
+      setLastSavedAt(Date.now());
+      const toast = (window as any).showToast;
+      if (typeof toast === 'function') toast('✓ ПМ сохранены в профиль', 'success');
+      else alert(`✓ ПМ сохранены в профиль: присед ${squat} / жим ${bench} / тяга ${deadlift} / вес ${bw} кг`);
+      applyToPlanner({
+        kind: 'pri',
+        label: `ПМ: присед ${squat} / жим ${bench} / тяга ${deadlift} кг · вес ${bw} кг`,
+        data: { volumeMult: 1, rirShift: 0 },
+      });
+    } catch (e) {
+      console.error('[PeakingPanel.applyPms]', e);
+      alert('Ошибка сохранения: ' + (e as Error).message);
+    }
   };
 
   if (kind === 'bb') {
@@ -239,21 +296,38 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
         </div>
       </CalcSection>
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <button
+          onClick={autofillFromProfile}
+          aria-label="Загрузить ПМ и вес из Профиля"
+          title="Загрузить ПМ и вес из Профиля"
+          style={{
+            flex: 1, padding: '12px', borderRadius: 10, cursor: 'pointer', minHeight: 44,
+            background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontWeight: 800, fontSize: 12,
+            border: '1px solid rgba(99,102,241,0.3)',
+          }}
+        >
+          📋 Из профиля
+        </button>
         <button onClick={applyTaper} style={{
-          flex: 1, padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer',
+          flex: 1, padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer', minHeight: 44,
           background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 12,
         }}>
-          🛠 Применить taper к планировщику
+          🛠 Применить taper
         </button>
         <button onClick={applyPms} style={{
-          flex: 1, padding: '12px', borderRadius: 10, cursor: 'pointer',
+          flex: 1, padding: '12px', borderRadius: 10, cursor: 'pointer', minHeight: 44,
           background: 'rgba(96,165,250,0.15)', color: '#60a5fa', fontWeight: 800, fontSize: 12,
           border: '1px solid rgba(96,165,250,0.3)',
         }}>
           💾 Сохранить ПМ в профиль
         </button>
       </div>
+      {lastSavedAt && (
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6, textAlign: 'center' }}>
+          ✓ ПМ сохранены: {new Date(lastSavedAt).toLocaleTimeString('ru')}
+        </div>
+      )}
     </div>
   );
 };

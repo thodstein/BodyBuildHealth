@@ -24,6 +24,11 @@ const DEFAULTS: ContraindicationsData = {
   lastUpdated: '',
 };
 
+/**
+ * @deprecated Считывание из устаревшего localStorage ключа. Сохранено для backward-compat
+ * с модулями, которые ещё не мигрировали на чтение из useProfile().
+ * ВСЕ новые модули должны читать из UnifiedSettings напрямую.
+ */
 export function getContraindications(): ContraindicationsData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -32,12 +37,20 @@ export function getContraindications(): ContraindicationsData {
   return { ...DEFAULTS };
 }
 
+/**
+ * @deprecated Сохранение в устаревший localStorage ключ. ВСЕ новые модули должны
+ * использовать useProfile().update('health', {...}) или useProfile().update('nutrition', {...}).
+ * После миграции ключ удаляется из localStorage автоматически.
+ */
 export function saveContraindications(data: Partial<ContraindicationsData>) {
   const current = getContraindications();
   const updated = { ...current, ...data, lastUpdated: new Date().toISOString() };
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
 }
 
+/**
+ * @deprecated Использовать useProfile() напрямую.
+ */
 export function mergeProfileToContraindications(profileSettings: any): ContraindicationsData {
   const current = getContraindications();
   const merged: ContraindicationsData = {

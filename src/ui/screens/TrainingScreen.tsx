@@ -704,7 +704,6 @@ import { MethodologyEncyclopedia } from './TrainingScreen_parts/MethodologyEncyc
 import { labTrainingAdjust } from './TrainingScreen_parts/lab-training-adjust';
 import { appendReadinessToday, loadReadinessHistory } from './TrainingScreen_parts/readiness-history';
 import { useTrainingProfile } from './TrainingScreen_parts/training-profile';
-import { TrainingProfileCard } from './TrainingScreen_parts/TrainingProfileCard';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../engines/pro/training-load.engine';
 import { PopupSelect, PopupNumber, ExpandableCard } from './SRCBBScreen_parts/TrainingPopups';

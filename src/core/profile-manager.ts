@@ -1,5 +1,6 @@
 import { UserRole, UserProfile, UnifiedSettings, getDefaultSettings } from "./types";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useSyncExternalStore, useRef } from "react";
+import { broadcastProfileChange } from './profile-events';
 
 const STORAGE_KEY = "he_profile_v2";
 const MIGRATED_FLAG = 'he_profile_migrated_v2';
@@ -23,13 +24,39 @@ function cleanupRemovedBioStackStorage(): void {
 type ProfileListener = () => void;
 const listeners: Set<ProfileListener> = new Set();
 
+/* ── Версионирование для granular подписок ── */
+let profileVersion = 0;
+const sectionVersions: Record<string, number> = {
+  personal: 0, training: 0, pharma: 0, health: 0,
+  nutrition: 0, lifestyle: 0, system: 0, goals: 0, labs: 0, symptoms: 0,
+};
+
 export function onProfileChange(fn: ProfileListener): () => void {
   listeners.add(fn);
   return () => { listeners.delete(fn); };
 }
 
-export function notifyAll() {
+export function notifyAll(changedSections?: string[]) {
+  profileVersion++;
   listeners.forEach(fn => { try { fn(); } catch {} });
+  // Триггерим event-bus — модули с onProfileSectionChange/onAnyProfileChange получают сигнал
+  // Если передан changedSections — используем его (точные данные).
+  // Иначе собираем все секции, у которых version > 0 (накопительно с последнего сброса).
+  const changed = changedSections && changedSections.length > 0
+    ? changedSections
+    : (() => {
+        const list: string[] = [];
+        for (const sec of Object.keys(sectionVersions)) {
+          if (sectionVersions[sec] > 0) list.push(sec);
+        }
+        return list;
+      })();
+  try { broadcastProfileChange(changed); } catch {}
+}
+
+export function getProfileVersion(): number { return profileVersion; }
+export function getSectionVersion(section: keyof UnifiedSettings): number {
+  return sectionVersions[section] || 0;
 }
 
 /* ── Backward-compat: old flat paths → nested ── */
@@ -129,7 +156,35 @@ export function getProfile(): UserProfile {
 export function updateProfile(ctx: Partial<UserProfile>): UserProfile {
   const current = getProfile();
   const updated = { ...current, ...ctx };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  // Если обновляются только настройки — инкрементим только их версию
+  if (ctx.settings) {
+    const prev = (current.settings || {}) as any;
+    const next = ctx.settings as any;
+    for (const sec of Object.keys(sectionVersions)) {
+      if (next[sec] !== undefined && next[sec] !== prev[sec]) {
+        sectionVersions[sec]++;
+      }
+    }
+  } else {
+    // Без settings — инкрементим все (любое изменение профиля)
+    for (const sec of Object.keys(sectionVersions)) sectionVersions[sec]++;
+  }
+  // Защита от QuotaExceededError: если localStorage переполнен — очищаем snapshots и пробуем снова.
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  } catch (e: any) {
+    if (e?.name === 'QuotaExceededError' || e?.code === 22) {
+      try { clearSnapshots(); } catch {}
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch (e2: any) {
+        console.error('[updateProfile] QuotaExceeded after clearing snapshots:', e2);
+        throw e2;
+      }
+    } else {
+      throw e;
+    }
+  }
   // При первом сохранении после миграции — зачистка старых хранилищ
   if (localStorage.getItem(MIGRATED_FLAG) && !localStorage.getItem('he_profile_cleanup_done')) {
     try { localStorage.removeItem('he_training_profile'); } catch {}
@@ -137,8 +192,122 @@ export function updateProfile(ctx: Partial<UserProfile>): UserProfile {
     try { localStorage.removeItem('he_biostack_profile'); } catch {}
     localStorage.setItem('he_profile_cleanup_done', '1');
   }
-  notifyAll();
+  // Собираем список изменённых секций для broadcast
+  const changedSections: string[] = [];
+  if (ctx.settings) {
+    const prev = (current.settings || {}) as any;
+    const next = ctx.settings as any;
+    for (const sec of Object.keys(sectionVersions)) {
+      if (next[sec] !== undefined && next[sec] !== prev[sec]) {
+        changedSections.push(sec);
+      }
+    }
+  } else {
+    // Без settings — все секции считаются изменёнными
+    for (const sec of Object.keys(sectionVersions)) changedSections.push(sec);
+  }
+  notifyAll(changedSections);
   return updated;
+}
+
+/**
+ * Точечное обновление одной секции настроек.
+ * Не вызывает полный notifyAll — подписчики granular хуков получают обновления
+ * через sectionVersions.
+ */
+export function updateSection<K extends keyof UnifiedSettings>(
+  section: K,
+  patch: Partial<UnifiedSettings[K]>
+): UserProfile {
+  const current = getProfile();
+  const currentSection = (current.settings as any)[section] || {};
+  const updated = {
+    ...current,
+    settings: {
+      ...current.settings,
+      [section]: { ...currentSection, ...patch },
+    },
+  };
+  sectionVersions[section]++;
+  // Защита от QuotaExceededError
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  } catch (e: any) {
+    if (e?.name === 'QuotaExceededError' || e?.code === 22) {
+      try { clearSnapshots(); } catch {}
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); }
+      catch (e2) { console.error('[updateSection] QuotaExceeded after clear:', e2); throw e2; }
+    } else { throw e; }
+  }
+  notifyAll([section as string]);
+  return updated;
+}
+
+/**
+ * Snapshot профиля для undo.
+ */
+export interface ProfileSnapshot {
+  version: number;
+  timestamp: number;
+  settings: UnifiedSettings;
+  name?: string;
+  role?: UserRole;
+}
+
+const SNAPSHOTS_KEY = 'he_profile_snapshots_v1';
+const SNAPSHOTS_MAX = 10;
+
+export function pushSnapshot(): void {
+  try {
+    const p = getProfile();
+    const snap: ProfileSnapshot = {
+      version: profileVersion,
+      timestamp: Date.now(),
+      settings: JSON.parse(JSON.stringify(p.settings)) as UnifiedSettings,
+      name: p.name,
+      role: p.role,
+    };
+    const existing = getSnapshots();
+    existing.push(snap);
+    if (existing.length > SNAPSHOTS_MAX) existing.shift();
+    localStorage.setItem(SNAPSHOTS_KEY, JSON.stringify(existing));
+  } catch {}
+}
+
+export function getSnapshots(): ProfileSnapshot[] {
+  try {
+    return JSON.parse(localStorage.getItem(SNAPSHOTS_KEY) || '[]');
+  } catch { return []; }
+}
+
+export function undoLastSnapshot(): boolean {
+  const snaps = getSnapshots();
+  if (snaps.length === 0) return false;
+  const last = snaps[snaps.length - 1];
+  try {
+    const cur = getProfile();
+    const restored: UserProfile = {
+      ...cur,
+      settings: last.settings,
+      name: last.name ?? cur.name,
+      role: last.role ?? cur.role,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(restored));
+    // Сравниваем со старым состоянием — инкрементим только реально изменённые секции
+    const prevSettings = (cur.settings || {}) as any;
+    const nextSettings = (last.settings || {}) as any;
+    for (const sec of Object.keys(sectionVersions)) {
+      if (JSON.stringify(prevSettings[sec]) !== JSON.stringify(nextSettings[sec])) {
+        sectionVersions[sec]++;
+      }
+    }
+    notifyAll();
+    return true;
+  } catch { return false; }
+}
+
+export function clearSnapshots(): void {
+  try { localStorage.removeItem(SNAPSHOTS_KEY); } catch {}
 }
 
 export function setRole(role: UserRole): void {
@@ -162,4 +331,121 @@ export function useProfileRefresh(): UserProfile {
     return onProfileChange(() => setProfile(getProfile()));
   }, []);
   return profile;
+}
+
+/**
+ * Granularный хук: подписка на одну секцию настроек.
+ * Перерендеривается ТОЛЬКО при изменении этой секции.
+ */
+export function useProfileSection<K extends keyof UnifiedSettings>(
+  section: K
+): [UnifiedSettings[K], (patch: Partial<UnifiedSettings[K]>) => void] {
+  const subscribe = useCallback((cb: () => void) => {
+    let lastVer = sectionVersions[section] || 0;
+    return onProfileChange(() => {
+      const cur = sectionVersions[section] || 0;
+      if (cur !== lastVer) {
+        lastVer = cur;
+        cb();
+      }
+    });
+  }, [section]);
+
+  // Кэшируем snapshot — useSyncExternalStore сравнивает через Object.is.
+  // Без кэша каждый рендер возвращал бы новый объект → лишние ререндеры.
+  const snapshotRef = useRef<UnifiedSettings[K] | null>(null);
+  const snapshotVerRef = useRef<number>(-1);
+  const getSnapshot = useCallback(() => {
+    const curVer = sectionVersions[section] || 0;
+    if (snapshotRef.current && snapshotVerRef.current === curVer) {
+      return snapshotRef.current;
+    }
+    const p = getProfile();
+    const sec = ((p.settings as any)[section] || {}) as UnifiedSettings[K];
+    snapshotRef.current = sec;
+    snapshotVerRef.current = curVer;
+    return sec;
+  }, [section]);
+
+  const getServerSnapshot = useCallback(() => {
+    return ((getDefaultSettings() as any)[section] || {}) as UnifiedSettings[K];
+  }, [section]);
+
+  const value = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+
+  const setter = useCallback((patch: Partial<UnifiedSettings[K]>) => {
+    updateSection(section, patch);
+  }, [section]);
+
+  return [value, setter];
+}
+
+/**
+ * Granularный хук: подписка на одно поле внутри секции.
+ * Перерендеривается ТОЛЬКО при изменении этого поля.
+ */
+export function useProfileField<K extends keyof UnifiedSettings, F extends keyof UnifiedSettings[K]>(
+  section: K,
+  field: F
+): [UnifiedSettings[K][F], (v: UnifiedSettings[K][F]) => void] {
+  const [sectionValue] = useProfileSection(section);
+  const value = (sectionValue as any)[field];
+  const setter = useCallback((v: UnifiedSettings[K][F]) => {
+    updateSection(section, { [field]: v } as any);
+  }, [section, field]);
+  return [value, setter];
+}
+
+/**
+ * Хук для auto-save с debounce (НЕ рекомендуется — используйте useSectionState).
+ * @param delay мс (по умолчанию 500)
+ */
+export function useProfileAutoSave(delay = 500): {
+  scheduleSave: (settings: UnifiedSettings) => void;
+  flush: () => void;
+  pending: React.MutableRefObject<UnifiedSettings | null>;
+} {
+  const pending = useRef<UnifiedSettings | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstRef = useRef(true);
+
+  const scheduleSave = useCallback((next: UnifiedSettings) => {
+    // Skip первый save (initial state)
+    if (isFirstRef.current) {
+      isFirstRef.current = false;
+      return;
+    }
+    pending.current = next;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      if (pending.current) {
+        try { pushSnapshot(); } catch {}
+        try { updateProfile({ settings: pending.current }); } catch {}
+        pending.current = null;
+      }
+    }, delay);
+  }, [delay]);
+
+  const flush = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    if (pending.current) {
+      try { pushSnapshot(); } catch {}
+      try { updateProfile({ settings: pending.current }); } catch {}
+      pending.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      // flush на unmount
+      if (timer.current) {
+        clearTimeout(timer.current);
+        if (pending.current) {
+          try { updateProfile({ settings: pending.current }); } catch {}
+        }
+      }
+    };
+  }, []);
+
+  return { scheduleSave, flush, pending };
 }

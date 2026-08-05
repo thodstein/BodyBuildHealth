@@ -8,7 +8,7 @@ import { TrainingScreen } from './ui/screens/TrainingScreen';
 import { LabsScreen } from './ui/screens/LabsScreen';
 import { RiskScreen } from './ui/screens/RiskScreen';
 import { NutritionScreen } from './ui/screens/NutritionScreen';
-import { ProfileScreen } from './ui/screens/ProfileScreen';
+import { ProfileScreen_v2 } from './ui/screens/ProfileScreen_v2/ProfileScreen_v2';
 import { ArticlesScreen } from './ui/screens/ArticlesScreen';
 
 import { ToastContainer } from './ui/ToastContainer';
@@ -121,6 +121,19 @@ export default function App() {
       'bloodwork': 'labs',
       'toolkit': 'training',
       'training-tools': 'training',
+      // Дневники и отчёты из других блоков (для ProfileDiariesTab)
+      'nutrition-diary': 'nutrition',
+      'workout-log': 'training',
+      'pharma-course': 'pharma',
+      'support-diary': 'support',
+      'symptoms': 'support',
+      'labs-diary': 'labs',
+      'training-analytics': 'training',
+      'pharma-reports': 'pharma',
+      'labs-reports': 'labs',
+      'nutrition-reports': 'nutrition',
+      'support-reports': 'support',
+      'custom-report': 'profile',
     };
     const target = tabMap[screen] || 'home';
     go(target);
@@ -148,7 +161,7 @@ export default function App() {
       case 'risks': return <RiskScreen key={key} />;
       case 'nutrition': return <NutritionScreen key={key} />;
       case 'marketplace': return <MarketplaceScreen key={key} />;
-      case 'profile': return <ProfileScreen key={key} onNavigate={handleNavigate} />;
+      case 'profile': return <ProfileScreen_v2 key={key} onNavigate={handleNavigate} />;
       case 'articles': return <ArticlesScreen key={key} />;
       default: return <DashboardScreen key={key} onNavigate={handleNavigate} />;
     }

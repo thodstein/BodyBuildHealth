@@ -5,6 +5,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { autoregulate, type AutoregOutput } from '../../../engines/autoregulation-engine';
+import { getProfile, updateSection } from '../../../core/profile-manager';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -18,6 +19,7 @@ const dirColor = (d: string) => d === 'increase' ? ACCENT : d === 'decrease' ? '
 const dirLabel = (d: string) => d === 'increase' ? '↑ увеличить' : d === 'decrease' ? '↓ уменьшить' : '→ держать';
 
 export const AutoregPanel: React.FC = () => {
+  // ── Локальный state ──
   const [readiness, setReadiness] = useState(70);   // 0-100
   const [fatigue, setFatigue] = useState(30);
   const [recovery, setRecovery] = useState(70);
@@ -26,6 +28,42 @@ export const AutoregPanel: React.FC = () => {
   const [sets, setSets] = useState(5);
   const [reps, setReps] = useState(5);
   const [freq, setFreq] = useState(4);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+
+  // ── Кнопка «📋 Из профиля» ──
+  const autofillFromProfile = () => {
+    try {
+      const p = getProfile();
+      const s = (p.settings || {}) as any;
+      if (s.training?.recovery !== undefined) setRecovery(Math.min(100, s.training.recovery * 10));
+      if (s.lifestyle?.fatigueLevel !== undefined) setFatigue(Math.min(100, s.lifestyle.fatigueLevel * 10));
+      if (s.training?.primaryGoal) {
+        if (s.training.primaryGoal === 'strength') setGoal('strength');
+        else setGoal('hypertrophy');
+      }
+      if (s.training?.daysPerWeek) setFreq(s.training.daysPerWeek);
+    } catch (e) { console.error('[AutoregPanel.autofillFromProfile]', e); }
+  };
+
+  // ── Кнопка «💾 Сохранить в профиль» — пишет readiness/fatigue в lifestyle ──
+  const saveToProfile = () => {
+    try {
+      updateSection('lifestyle', {
+        fatigueLevel: Math.min(10, Math.max(1, Math.round(fatigue / 10))),
+        // readiness в profile не хранится явно — но recovery (lifestyle) можно проксировать
+      });
+      updateSection('training', {
+        recovery: Math.min(10, Math.max(1, Math.round(recovery / 10))),
+      });
+      setLastSavedAt(Date.now());
+      const toast = (window as any).showToast;
+      if (typeof toast === 'function') toast('✓ Сохранено в профиль', 'success');
+      else alert('✓ Сохранено в профиль');
+    } catch (e) {
+      console.error('[AutoregPanel.saveToProfile]', e);
+      alert('Ошибка сохранения: ' + (e as Error).message);
+    }
+  };
 
   const out: AutoregOutput | null = useMemo(() => {
     try {
@@ -56,13 +94,40 @@ export const AutoregPanel: React.FC = () => {
         <div><div style={LABEL}>Усталость, %</div><input style={IN} type="number" min={0} max={100} value={fatigue} onChange={e => setFatigue(+e.target.value)} /></div>
         <div><div style={LABEL}>Восстановление, %</div><input style={IN} type="number" min={0} max={100} value={recovery} onChange={e => setRecovery(+e.target.value)} /></div>
         <div><div style={LABEL}>Цель</div><select style={SEL} value={goal} onChange={e => setGoal(e.target.value as any)}>
-          <option value="strength">Сила</option><option value="hypertrophy">Гипертрофия</option>
+          <option value="strength">Сила</option>
+          <option value="hypertrophy">Гипертрофия</option>
         </select></div>
         <div><div style={LABEL}>План. интенсивность %1RM</div><input style={IN} type="number" min={50} max={100} value={intensity} onChange={e => setIntensity(+e.target.value)} /></div>
         <div><div style={LABEL}>План. сеты/упр</div><input style={IN} type="number" min={1} max={10} value={sets} onChange={e => setSets(+e.target.value)} /></div>
         <div><div style={LABEL}>План. повт</div><input style={IN} type="number" min={1} max={20} value={reps} onChange={e => setReps(+e.target.value)} /></div>
         <div><div style={LABEL}>План. частота дн/нед</div><input style={IN} type="number" min={1} max={7} value={freq} onChange={e => setFreq(+e.target.value)} /></div>
       </div>
+
+      <div style={{ display: 'flex', gap: 8, margin: '10px 0', flexWrap: 'wrap' }}>
+        <button
+          onClick={autofillFromProfile}
+          aria-label="Загрузить из Профиля"
+          style={{
+            flex: 1, minHeight: 40, padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+            background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontWeight: 700, fontSize: 12,
+            border: '1px solid rgba(99,102,241,0.3)',
+          }}
+        >📋 Из профиля</button>
+        <button
+          onClick={saveToProfile}
+          aria-label="Сохранить в Профиль"
+          style={{
+            flex: 1, minHeight: 40, padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+            background: 'rgba(0,230,138,0.15)', color: '#00e68a', fontWeight: 700, fontSize: 12,
+            border: '1px solid rgba(0,230,138,0.3)',
+          }}
+        >💾 Сохранить в профиль</button>
+      </div>
+      {lastSavedAt && (
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 6, textAlign: 'center' }}>
+          ✓ Сохранено: {new Date(lastSavedAt).toLocaleTimeString('ru')}
+        </div>
+      )}
 
       {out && (
         <div>

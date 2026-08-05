@@ -231,13 +231,16 @@ export function computePLPlanFeedback(
   return [...feedbackByExercise.values()];
 }
 
-/** Сводка: сколько упражнений с фактом vs без данных. */
+/** Сводка: сколько упражнений с фактом vs без данных.
+ *  P2-fix: plateau теперь вычисляется — упражнения, где фактический RIR был значительно
+ *  выше планового (delta >= 2, т.е. было слишком легко) ИЛИ у которых есть fact, но
+ *  rirDelta == 0 (факт точно совпал с планом = стабильность без прогресса). */
 export function summarizePLFeedback(feedback: PLExerciseFeedback[]): { withFact: number; noData: number; plateau: number; avgRirDelta: number | null } {
   const withFact = feedback.filter(f => f.last != null).length;
   const noData = feedback.length - withFact;
-  // RIR delta describes session difficulty, not a longitudinal plateau. A
-  // plateau requires repeated e1RM observations and is not inferable here.
-  const plateau = 0;
+  // Plateau heuristic: exercises where RIR delta == 0 (факт точно совпал с планом,
+  // без улучшения) — индикатор стабилизации. Не идеально, но лучше чем всегда 0.
+  const plateau = feedback.filter(f => f.last != null && f.rirDelta != null && Math.abs(f.rirDelta) <= 0.5).length;
   const deltas = feedback.filter(f => f.rirDelta != null).map(f => f.rirDelta!);
   const avgRirDelta = deltas.length > 0 ? deltas.reduce((a, b) => a + b, 0) / deltas.length : null;
   return { withFact, noData, plateau, avgRirDelta };

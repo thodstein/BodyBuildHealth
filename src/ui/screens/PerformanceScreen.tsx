@@ -3,6 +3,7 @@ import { useDataLink } from '../../core/data-link';
 import { getBloodMarkersDeep, getCriticalMarkers, getSupplementStacks, calculateFullMacros, calculateMealSplit } from '../../engines/blood-stack-macro.engine';
 import { getPeriodizationModels, getBBContestPrep, getPCTProtocols, generateMeetStrategy, type MeetStrategy } from '../../engines/periodization-meet-pct.engine';
 import { predictStrength, computePRI, type PredictionInput } from '../../engines/prediction-models-engine';
+import { getProfile, updateSection } from '../../core/profile-manager';
 
 export const PerformanceScreen: React.FC = () => {
   const linked = useDataLink();
@@ -17,6 +18,8 @@ export const PerformanceScreen: React.FC = () => {
   const [macroAge, setMacroAge] = useState(s?.age ?? 30);
   const [macroBf, setMacroBf] = useState(s?.bodyFat ?? 15);
   const [macroGoal, setMacroGoal] = useState<'bulk'|'cut'|'maintenance'>('bulk');
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+
   const macroResult = useMemo(() => calculateFullMacros(macroWeight, macroH, macroAge, 'male', macroBf, 'moderate', macroGoal), [macroWeight, macroH, macroAge, macroBf, macroGoal]);
   const mealSplit = useMemo(() => calculateMealSplit(macroResult.goals[macroGoal].kcal, macroResult.goals[macroGoal].protein, 5), [macroResult, macroGoal]);
 
@@ -26,6 +29,49 @@ export const PerformanceScreen: React.FC = () => {
   const [meetBodyW, setMeetBodyW] = useState(83);
   const [meetFed, setMeetFed] = useState('IPF');
   const [meetResult, setMeetResult] = useState<ReturnType<typeof generateMeetStrategy> | null>(null);
+
+  // ── Кнопка «📋 Из профиля» (однократно) ──
+  const autofillFromProfile = () => {
+    try {
+      const p = getProfile();
+      const ps = (p.settings || {}) as any;
+      if (ps.personal?.weight) setMacroWeight(ps.personal.weight);
+      if (ps.personal?.height) setMacroH(ps.personal.height);
+      if (ps.personal?.age) setMacroAge(ps.personal.age);
+      if (ps.personal?.bodyFat !== undefined) setMacroBf(ps.personal.bodyFat);
+      if (ps.training?.primaryGoal && ['bulk', 'cut', 'maintenance'].includes(ps.training.primaryGoal)) {
+        setMacroGoal(ps.training.primaryGoal as any);
+      }
+      if (ps.training?.pmSquat) setMeetSquat(ps.training.pmSquat);
+      if (ps.training?.pmBench) setMeetBench(ps.training.pmBench);
+      if (ps.training?.pmDeadlift) setMeetDeadlift(ps.training.pmDeadlift);
+    } catch (e) { console.error('[PerformanceScreen.autofillFromProfile]', e); }
+  };
+
+  // ── Кнопка «💾 Сохранить в профиль» (явно) ──
+  const saveToProfile = () => {
+    try {
+      updateSection('personal', {
+        weight: macroWeight,
+        height: macroH,
+        age: macroAge,
+        bodyFat: macroBf,
+      });
+      updateSection('training', {
+        pmSquat: meetSquat,
+        pmBench: meetBench,
+        pmDeadlift: meetDeadlift,
+        primaryGoal: macroGoal as any,
+      });
+      setLastSavedAt(Date.now());
+      const toast = (window as any).showToast;
+      if (typeof toast === 'function') toast('✓ Сохранено в профиль', 'success');
+      else alert('✓ Сохранено в профиль');
+    } catch (e) {
+      console.error('[PerformanceScreen.saveToProfile]', e);
+      alert('Ошибка сохранения: ' + (e as Error).message);
+    }
+  };
 
   const periodizationModels = useMemo(() => getPeriodizationModels(), []);
   const bbPrep = useMemo(() => getBBContestPrep(), []);
@@ -68,6 +114,29 @@ export const PerformanceScreen: React.FC = () => {
         <div><label style={{ fontSize:10 }}>BF%</label><input type="number" value={macroBf} onChange={e=>setMacroBf(parseFloat(e.target.value) || 0)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,boxSizing:'border-box' }} /></div>
         <div><label style={{ fontSize:10 }}>Цель</label><select value={macroGoal || ''} onChange={e=>setMacroGoal(e.target.value as any)} style={{ width:'100%',padding:'6px',borderRadius:6,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12 }}><option value="bulk">Набор</option><option value="cut">Сушка</option><option value="maintenance">Поддержание</option></select></div>
       </div>
+
+      <div style={{ display:'flex', gap:6, marginTop:8 }}>
+        <button
+          onClick={autofillFromProfile}
+          aria-label="Загрузить из Профиля"
+          style={{
+            flex: 1, minHeight: 36, padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+            background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontWeight: 700, fontSize: 11,
+            border: '1px solid rgba(99,102,241,0.3)',
+          }}
+        >📋 Из профиля</button>
+        <button
+          onClick={saveToProfile}
+          aria-label="Сохранить в Профиль"
+          style={{
+            flex: 1, minHeight: 36, padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+            background: 'rgba(0,230,138,0.15)', color: '#00e68a', fontWeight: 700, fontSize: 11,
+            border: '1px solid rgba(0,230,138,0.3)',
+          }}
+        >💾 Сохранить в профиль</button>
+      </div>
+      {lastSavedAt && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>✓ Сохранено: {new Date(lastSavedAt).toLocaleTimeString('ru')}</div>}
+
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'2px 12px', fontSize:10, marginTop:8 }}>
         <span>BMR:</span><span style={{ fontWeight:600 }}>{macroResult.bmr.mifflin} ккал</span>
         <span>Katch:</span><span style={{ fontWeight:600 }}>{macroResult.bmr.katch} ккал</span>

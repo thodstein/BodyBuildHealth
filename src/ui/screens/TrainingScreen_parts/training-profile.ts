@@ -5,6 +5,7 @@
  * Хранится в localStorage('he_training_profile').
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { getProfile, updateProfile } from '../../../core/profile-manager';
 
 const KEY = 'he_training_profile';
 
@@ -72,6 +73,40 @@ export const DEFAULT_PROFILE: TrainingProfile = {
 };
 
 export function loadTrainingProfile(): TrainingProfile {
+  // Сначала пытаемся прочитать из UnifiedSettings (новый путь)
+  try {
+    const prof = getProfile();
+    const s = (prof.settings || {}) as any;
+    if (s.training) {
+      // Маппинг из UnifiedSettings → TrainingProfile (для backward-compat legacy consumer'ов)
+      return {
+        ...DEFAULT_PROFILE,
+        bodyWeight: s.personal?.weight ?? DEFAULT_PROFILE.bodyWeight,
+        goal: s.training?.primaryGoal ?? DEFAULT_PROFILE.goal,
+        level: s.training?.level ?? DEFAULT_PROFILE.level,
+        trainingYears: s.training?.experience ?? DEFAULT_PROFILE.trainingYears,
+        daysPerWeek: s.training?.daysPerWeek ?? DEFAULT_PROFILE.daysPerWeek,
+        recovery: s.training?.recovery ?? DEFAULT_PROFILE.recovery,
+        fatigue: s.lifestyle?.fatigueLevel ?? DEFAULT_PROFILE.fatigue,
+        sleepHours: s.lifestyle?.sleepHours ?? DEFAULT_PROFILE.sleepHours,
+        stressLevel: s.lifestyle?.stressLevel ?? DEFAULT_PROFILE.stressLevel,
+        weakPoints: s.training?.weakPoints ?? DEFAULT_PROFILE.weakPoints,
+        favoriteExercises: (s.training as any).favoriteExercises ?? DEFAULT_PROFILE.favoriteExercises,
+        excludedExercises: (s.training as any).excludedExercises ?? DEFAULT_PROFILE.excludedExercises,
+        avoidAxialLoad: (s.training as any).avoidAxialLoad ?? DEFAULT_PROFILE.avoidAxialLoad,
+        equipment: s.training?.equipment ?? DEFAULT_PROFILE.equipment,
+        loadStrategy: (s.training as any).loadStrategy ?? DEFAULT_PROFILE.loadStrategy,
+        pmSquat: s.training?.pmSquat ?? DEFAULT_PROFILE.pmSquat,
+        pmBench: s.training?.pmBench ?? DEFAULT_PROFILE.pmBench,
+        pmDead: s.training?.pmDeadlift ?? DEFAULT_PROFILE.pmDead,
+        workMax: s.training?.workMax ?? DEFAULT_PROFILE.workMax,
+        pharmaCoursesCount: s.pharma?.totalCycles ?? DEFAULT_PROFILE.pharmaCoursesCount,
+        monthsSinceLastCourse: s.pharma?.monthsSinceLastCourse ?? DEFAULT_PROFILE.monthsSinceLastCourse,
+        totalYearsOnPharma: s.pharma?.yearsOnGear ?? DEFAULT_PROFILE.totalYearsOnPharma,
+      };
+    }
+  } catch { /* fallback к legacy */ }
+  // Fallback — старый путь через localStorage
   try {
     const v = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (v) return { ...DEFAULT_PROFILE, ...v, workMax: { ...DEFAULT_PROFILE.workMax, ...(v.workMax || {}) } };
@@ -81,42 +116,37 @@ export function loadTrainingProfile(): TrainingProfile {
 
 export function saveTrainingProfile(p: TrainingProfile): void {
   try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* ignore */ }
-  // Also sync to UnifiedSettings for cross-module consistency
+  // P1-fix (Aug 5): Sync в UnifiedSettings через updateProfile (а не напрямую через localStorage)
+  // — чтобы сработали sectionVersions, notifyAll, useDataLink, useProfileSection.
   try {
-    const raw = localStorage.getItem('he_profile_v2');
-    if (raw) {
-      const prof = JSON.parse(raw);
-      const us = prof.settings || {};
-      const tr = us.training || {};
-      const pr = us.personal || {};
-      const ls = us.lifestyle || {};
-      if (p.bodyWeight) pr.weight = p.bodyWeight;
-      if (p.goal) tr.primaryGoal = p.goal;
-      if (p.level) tr.level = p.level;
-      if (p.daysPerWeek) tr.daysPerWeek = p.daysPerWeek;
-      if (p.recovery) tr.recovery = p.recovery;
-      if (p.fatigue !== undefined) ls.fatigueLevel = p.fatigue;
-      if (p.sleepHours) ls.sleepHours = p.sleepHours;
-      if (p.stressLevel) ls.stressLevel = p.stressLevel;
-      if (p.weakPoints?.length) tr.weakPoints = p.weakPoints;
-      if (p.favoriteExercises?.length) tr.favoriteExercises = p.favoriteExercises;
-      if (p.excludedExercises?.length) tr.excludedExercises = p.excludedExercises;
-      if (p.avoidAxialLoad !== undefined) tr.avoidAxialLoad = p.avoidAxialLoad;
-      if (p.equipment?.length) tr.equipment = p.equipment;
-      if (p.loadStrategy) tr.loadStrategy = p.loadStrategy;
-      if (p.pmSquat) tr.pmSquat = p.pmSquat;
-      if (p.pmBench) tr.pmBench = p.pmBench;
-      if (p.pmDead) tr.pmDeadlift = p.pmDead;
-      if (p.workMax) tr.workMax = { ...tr.workMax, ...p.workMax };
-      if (p.pharmaCoursesCount) us.pharma = us.pharma || {}; us.pharma.totalCycles = p.pharmaCoursesCount;
-      if (p.monthsSinceLastCourse) us.pharma = us.pharma || {}; us.pharma.monthsSinceLastCourse = p.monthsSinceLastCourse;
-      if (p.totalYearsOnPharma) us.pharma = us.pharma || {}; us.pharma.yearsOnGear = p.totalYearsOnPharma;
-      us.training = tr;
-      us.personal = pr;
-      us.lifestyle = ls;
-      prof.settings = us;
-      localStorage.setItem('he_profile_v2', JSON.stringify(prof));
-    }
+    const cur = getProfile();
+    const next: any = JSON.parse(JSON.stringify(cur.settings || {}));
+    if (!next.personal) next.personal = {};
+    if (!next.training) next.training = {};
+    if (!next.lifestyle) next.lifestyle = {};
+    if (!next.pharma) next.pharma = {};
+    if (p.bodyWeight) next.personal.weight = p.bodyWeight;
+    if (p.goal) next.training.primaryGoal = p.goal as any;
+    if (p.level) next.training.level = p.level as any;
+    if (p.daysPerWeek) next.training.daysPerWeek = p.daysPerWeek;
+    if (p.recovery) next.training.recovery = p.recovery;
+    if (p.fatigue !== undefined) next.lifestyle.fatigueLevel = p.fatigue;
+    if (p.sleepHours) next.lifestyle.sleepHours = p.sleepHours;
+    if (p.stressLevel) next.lifestyle.stressLevel = p.stressLevel;
+    if (p.weakPoints?.length) next.training.weakPoints = p.weakPoints;
+    if (p.favoriteExercises?.length) (next.training as any).favoriteExercises = p.favoriteExercises;
+    if (p.excludedExercises?.length) (next.training as any).excludedExercises = p.excludedExercises;
+    if (p.avoidAxialLoad !== undefined) (next.training as any).avoidAxialLoad = p.avoidAxialLoad;
+    if (p.equipment?.length) next.training.equipment = p.equipment;
+    if (p.loadStrategy) (next.training as any).loadStrategy = p.loadStrategy;
+    if (p.pmSquat) next.training.pmSquat = p.pmSquat;
+    if (p.pmBench) next.training.pmBench = p.pmBench;
+    if (p.pmDead) next.training.pmDeadlift = p.pmDead;
+    if (p.workMax) next.training.workMax = { ...(next.training.workMax || {}), ...p.workMax };
+    if (p.pharmaCoursesCount) next.pharma.totalCycles = p.pharmaCoursesCount;
+    if (p.monthsSinceLastCourse) next.pharma.monthsSinceLastCourse = p.monthsSinceLastCourse;
+    if (p.totalYearsOnPharma) next.pharma.yearsOnGear = p.totalYearsOnPharma;
+    updateProfile({ settings: next });
   } catch { /* silent */ }
 }
 
