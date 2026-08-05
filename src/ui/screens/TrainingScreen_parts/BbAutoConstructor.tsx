@@ -971,7 +971,7 @@ export const BbAutoConstructor: React.FC = () => {
   const handleExportCSV = () => {
     if (!builtPlan) return;
     const plan = applyEditsToPlan(builtPlan);
-    const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Комментарий'].join(',')];
+    const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Паттерн', 'Ключи техники', 'Растяжение', 'Пиковое сокращение', 'Ошибки', 'Комментарий'].join(',')];
     for (const wk of plan.weeks) {
       for (let si = 0; si < wk.sessions.length; si++) {
         const s = wk.sessions[si];
@@ -984,6 +984,11 @@ export const BbAutoConstructor: React.FC = () => {
               wk.week, si + 1, esc(ex.exerciseName || ex.name), esc(ex.muscle),
               ex.role, i + 1, set.reps, set.weight, set.rir,
               esc(ex.tempoSpec || ''), ex.restSeconds || '',
+              esc(ex.executionProfile?.pattern || ''),
+              esc(ex.executionProfile?.cues.join('; ') || ''),
+              esc(ex.executionProfile?.stretch || ''),
+              esc(ex.executionProfile?.peak || ''),
+              esc(ex.executionProfile?.mistakes.join('; ') || ''),
               esc(ex.comment || ''),
             ].join(','));
           }
@@ -2215,6 +2220,19 @@ export const BbAutoConstructor: React.FC = () => {
                             {comment}
                           </div>
                         </details>
+                        {e.executionProfile && (
+                          <details style={{ marginTop:4 }}>
+                            <summary style={{ fontSize:11, fontWeight:600, color:'#60a5fa', cursor:'pointer' }}>🧬 Биомеханика и мышечный акцент</summary>
+                            <div style={{ marginTop:4, padding:'6px 8px', borderRadius:8, background:'rgba(96,165,250,0.05)', color:'rgba(255,255,255,0.65)', fontSize:10, lineHeight:1.5 }}>
+                              <div><b>Паттерн:</b> {e.executionProfile.pattern}</div>
+                              {e.executionProfile.mmc && <div><b>Связь мышца-мозг:</b> {e.executionProfile.mmc}</div>}
+                              {e.executionProfile.stretch && <div><b>Растяжение:</b> {e.executionProfile.stretch}</div>}
+                              {e.executionProfile.peak && <div><b>Пиковое сокращение:</b> {e.executionProfile.peak}</div>}
+                              {e.executionProfile.cues.length > 0 && <div><b>Ключи:</b> {e.executionProfile.cues.join('; ')}</div>}
+                              {e.executionProfile.mistakes.length > 0 && <div><b>Ошибки:</b> {e.executionProfile.mistakes.join('; ')}</div>}
+                            </div>
+                          </details>
+                        )}
                         {technique && (
                           <details style={{ marginTop:4 }}>
                             <summary style={{ fontSize:11, fontWeight:600, color:'rgba(0,230,138,0.75)', cursor:'pointer' }}>💡 Техника выполнения</summary>
