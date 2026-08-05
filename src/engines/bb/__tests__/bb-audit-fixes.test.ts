@@ -80,10 +80,10 @@ describe('ФАЗА 1.1: Каталог group исправления', () => {
     expect(trueMuscleOf(ex!)).toBe('shoulders');
   });
 
-  it('deadlift_romanian group = legs (не back)', () => {
+  it('deadlift_romanian group = back (задняя цепь, не legs)', () => {
     const ex = findCatalogById('deadlift_romanian');
     expect(ex).toBeDefined();
-    expect(ex!.group).toBe('legs');
+    expect(ex!.group).toBe('back');
   });
 
   it('deadlift_romanian: trueMuscleOf возвращает hamstrings', () => {

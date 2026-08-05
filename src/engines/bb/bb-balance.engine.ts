@@ -11,11 +11,12 @@ export interface BBBalanceReport {
   pullPressRatio: number;
   compound: number;
   isolation: number;
+  compoundIsolationRatio: number;
   lengthened: number;
   midRange: number;
   shortened: number;
   patterns: Record<string, number>;
-  byMuscle: Record<string, { patterns: Record<string, number>; lengthened: number; midRange: number; shortened: number }>;
+  byMuscle: Record<string, { patterns: Record<string, number>; lengthened: number; midRange: number; shortened: number; compound: number; isolation: number }>;
   issues: string[];
   peakWork?: { press: number; pull: number; pullPressRatio: number };
 }
@@ -30,7 +31,7 @@ function position(name: string, catalog?: typeof EXERCISE_CATALOG[number]): 'len
 }
 
 export function analyzeBBBalance(plan: BBPlan): BBBalanceReport {
-  const report: BBBalanceReport = { press: 0, pull: 0, raise: 0, upperPress: 0, upperPull: 0, pullPressRatio: 0, compound: 0, isolation: 0, lengthened: 0, midRange: 0, shortened: 0, patterns: {}, byMuscle: {}, issues: [] };
+  const report: BBBalanceReport = { press: 0, pull: 0, raise: 0, upperPress: 0, upperPull: 0, pullPressRatio: 0, compound: 0, isolation: 0, compoundIsolationRatio: 0, lengthened: 0, midRange: 0, shortened: 0, patterns: {}, byMuscle: {}, issues: [] };
   const workWeeks = plan.weeks.filter(week => String((week as any).phase || '').toLowerCase() !== 'deload' && !(week as any).taper);
   const sessions = (workWeeks.length > 0 ? workWeeks : plan.weeks).flatMap(week => week.sessions);
   for (const session of sessions) for (const exercise of session.exercises) {
@@ -39,7 +40,7 @@ export function analyzeBBBalance(plan: BBPlan): BBBalanceReport {
     const catalog = EXERCISE_CATALOG.find(item => item.name === exercise.name || item.id === exercise.exerciseName);
     const movement = String(catalog?.movementPattern || '').toLowerCase();
     const pattern = derivePattern(exercise);
-    const muscle = report.byMuscle[exercise.muscle] || (report.byMuscle[exercise.muscle] = { patterns: {}, lengthened: 0, midRange: 0, shortened: 0 });
+    const muscle = report.byMuscle[exercise.muscle] || (report.byMuscle[exercise.muscle] = { patterns: {}, lengthened: 0, midRange: 0, shortened: 0, compound: 0, isolation: 0 });
     muscle.patterns[pattern] = (muscle.patterns[pattern] || 0) + sets;
     report.patterns[pattern] = (report.patterns[pattern] || 0) + sets;
     const isPress = movement.includes('push') || /жим|press|bench|push|отжим/i.test(name);
@@ -48,8 +49,9 @@ export function analyzeBBBalance(plan: BBPlan): BBBalanceReport {
     if (isPress) report.press += sets;
     if (isPull) report.pull += sets;
     if (isRaise) report.raise += sets;
-    if (exercise.role === 'primary' || /присед|squat|жим|press|row|тяга|pull|lunge|hip.?thrust|rdl/i.test(name)) report.compound += sets;
-    else report.isolation += sets;
+    const isCompound = exercise.role === 'primary' || /присед|squat|жим|press|row|тяга|pull|lunge|hip.?thrust|rdl/i.test(name);
+    if (isCompound) { report.compound += sets; muscle.compound += sets; }
+    else { report.isolation += sets; muscle.isolation += sets; }
     const positionName = position(name, catalog);
     report[positionName] += sets;
     muscle[positionName] += sets;
@@ -58,6 +60,7 @@ export function analyzeBBBalance(plan: BBPlan): BBBalanceReport {
     if (upper && isPull) report.upperPull += sets;
   }
   report.pullPressRatio = report.upperPress > 0 ? Math.round((report.upperPull / report.upperPress) * 100) / 100 : 0;
+  report.compoundIsolationRatio = report.isolation > 0 ? Math.round((report.compound / report.isolation) * 100) / 100 : 0;
   report.peakWork = { press: report.upperPress, pull: report.upperPull, pullPressRatio: report.pullPressRatio };
   if (report.upperPress > 0 && report.upperPull < report.upperPress * 0.75) report.issues.push(`Перекос верхней части: тяги ${report.upperPull} против жимов ${report.upperPress} сетов (ratio ${report.pullPressRatio}).`);
   if (report.upperPull > 0 && report.upperPress < report.upperPull * 0.4) report.issues.push(`Перекос верхней части: жимы ${report.upperPress} против тяг ${report.upperPull} сетов.`);
@@ -69,6 +72,10 @@ export function analyzeBBBalance(plan: BBPlan): BBBalanceReport {
     if (coverage.lengthened === 0 && coverage.midRange > 0) report.issues.push(`${muscle}: нет растянутой позиции.`);
     if (coverage.shortened === 0 && coverage.midRange > 0) report.issues.push(`${muscle}: нет сокращённой позиции.`);
     if (Object.keys(coverage.patterns).length === 1 && Object.values(coverage.patterns)[0] >= 4) report.issues.push(`${muscle}: один movement pattern доминирует в объёме.`);
+    const totalMuscleSets = coverage.compound + coverage.isolation;
+    if (totalMuscleSets >= 6 && coverage.compound < totalMuscleSets * 0.4) {
+      report.issues.push(`${muscle}: только ${coverage.compound}/${totalMuscleSets} сетов compound (менее 40%) — слишком много изоляции ("мусорный объём").`);
+    }
   }
   return report;
 }

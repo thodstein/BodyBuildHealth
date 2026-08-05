@@ -24,7 +24,7 @@ export interface AngleClass {
  */
 export const ANGLE_CLASSES: Record<string, AngleClass[]> = {
   chest: [
-    { name: 'horizontal_press', match: (e) => /жим.*(лёжа|лежа|гориз)|bench.*(press|жим)|жим штанги|жим в смите лёжа/i.test(e.name) && !/наклон|incline|decline|сниз|отриц|узк/i.test(e.name) },
+    { name: 'horizontal_press', match: (e) => /жим.*(лёжа|лежа|гориз)|bench.*(press|жим)|жим штанги|жим в смите лёжа|жим в тренажёре|machine.*chest|chest.*press|грудн.*тренаж/i.test(e.name) && !/наклон|incline|decline|сниз|отриц|узк/i.test(e.name) },
     { name: 'incline_press', match: (e) => (/жим.*(наклон|incline|верх)/i.test(e.name) || /incline.*(press|жим)/i.test(e.name)) && !/отриц|decline|сниз|нижн/i.test(e.name) },
     { name: 'fly_cable', match: (e) => /развод|fly|crossover|кроссов|сведен|пек.?дек|бабоч|сведение/i.test(e.name) },
     { name: 'decline_press', match: (e) => /жим.*(отриц|decline|сниз|нижн)/i.test(e.name) || /decline.*(press|жим)/i.test(e.name) },
