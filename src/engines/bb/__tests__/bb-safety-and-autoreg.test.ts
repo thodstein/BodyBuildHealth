@@ -12,6 +12,30 @@ import {
 } from '../bb-auto-regulation.engine';
 
 describe('bb-safety-score.engine', () => {
+  it('SafetyScore: опасный план нельзя считать безопасным', () => {
+    const plan = buildBBPlan(makeInput({ weeks: 8, weakPoints: ['chest', 'shoulders'] }));
+    const result = calculatePlanSafetyScore(plan, {
+      acwrRatio: 1.8,
+      bodyFat: 35,
+      hrvMs: 35,
+      sleepHours: 4,
+      stressLevel: 9,
+      injuryCount: 3,
+    });
+    expect(result.riskLevel).not.toBe('safe');
+    expect(result.recommendations[0]).toContain('КРИТИЧНО');
+  });
+
+  it('SafetyScore: score factors stay within their configured budgets', () => {
+    const plan = buildBBPlan(makeInput({ weeks: 8 }));
+    const result = calculatePlanSafetyScore(plan);
+    expect(result.factors.jointStress).toBeGreaterThanOrEqual(0);
+    expect(result.factors.jointStress).toBeLessThanOrEqual(20);
+    expect(result.factors.acwrCompliance).toBeGreaterThanOrEqual(0);
+    expect(result.factors.acwrCompliance).toBeLessThanOrEqual(20);
+    expect(result.factors.recovery).toBeGreaterThanOrEqual(0);
+    expect(result.factors.recovery).toBeLessThanOrEqual(15);
+  });
   it('calculatePlanSafetyScore — возвращает score 0-100', () => {
     const plan = buildBBPlan(makeInput({ weeks: 8 }));
     const result = calculatePlanSafetyScore(plan);
@@ -70,6 +94,16 @@ describe('bb-safety-score.engine', () => {
 });
 
 describe('bb-auto-regulation.engine', () => {
+  it('assessReadiness: invalid metrics are ignored rather than treated as zero', () => {
+    const result = assessReadiness({
+      hrvMs: Number.NaN,
+      hrvBaseline: Number.POSITIVE_INFINITY,
+      sleepHours: Number.NaN,
+      stressLevel: Number.NaN,
+    });
+    expect(result.score).toBe(100);
+    expect(result.level).toBe('optimal');
+  });
   it('assessReadiness — хорошие метрики → optimal', () => {
     const result = assessReadiness({
       hrvMs: 80,
