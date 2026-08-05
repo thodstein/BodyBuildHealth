@@ -10,6 +10,7 @@ import type { UserProgram } from '../../../../engines/user-program/user-program.
 
 const STORAGE_KEY = 'he_editor_history';
 const MAX_HISTORY = 50;
+const MAX_STORAGE_BYTES = 2_000_000;
 
 interface HistoryState {
   past: string[];
@@ -29,9 +30,23 @@ function loadHistory(): HistoryState {
 }
 
 function saveHistory(hist: HistoryState): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(hist));
-  } catch { /* ignore */ }
+  while (hist.past.length + hist.future.length > 0) {
+    const serialized = JSON.stringify(hist);
+    if (serialized.length <= MAX_STORAGE_BYTES) {
+      try { localStorage.setItem(STORAGE_KEY, serialized); } catch {
+        // QuotaExceededError: discard the oldest snapshots before retrying.
+        if (hist.past.length > 0) hist.past.shift();
+        else if (hist.future.length > 0) hist.future.shift();
+        else break;
+        continue;
+      }
+      return;
+    }
+    if (hist.past.length > 0) hist.past.shift();
+    else if (hist.future.length > 0) hist.future.shift();
+    else break;
+  }
+  try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
 }
 
 /**

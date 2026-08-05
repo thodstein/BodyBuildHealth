@@ -35,6 +35,7 @@ import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landma
 import { distributePhases, PHASE_CONFIGS, getPhaseVolumeMult, type BBPhase } from '../periodization';
 import { orderSessionExercises, type SessionMethodology } from './bb-session-order.engine';
 import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
+import { clampRir } from './bb-utils';
 import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
 import { ANGLE_CLASSES, lengthenedBonus } from './bb-exercise-selection.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
@@ -596,7 +597,7 @@ export function bbRir(resolved: DayCharacter, phase: BBPhase, phaseWeek: number,
   let rir = resolved === 'тяж' ? driftable : driftable + 1;
   if (phase === 'deload') rir = Math.max(3, Math.min(4, rir));
   if (resolved === 'памп') rir = Math.max(cfg.pumpRir, rir);
-  return Math.max(0, Math.min(5, rir));
+  return clampRir(rir);
 }
 
 /** Группы, получающие 2 изолирующих упражнения (акцент детализации) — fix B.

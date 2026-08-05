@@ -29,6 +29,12 @@ export interface DesignerToUserWeeksOptions {
   goal?: string;
   /** Дней в неделю (для autodraftBBPlan и для скелета при пустых sessions). */
   daysPerWeek?: number;
+  /**
+   * Шаблон дней недели для скелета sessions (0=Пн … 6=Вс).
+   * По умолчанию берётся из design (если есть) или [0,1,2,3,4,5,6].
+   * Позволяет задать реальное расписание тренировок (например [1,3,5] — Вт,Чт,Сб).
+   */
+  dowPattern?: number[];
   /** Оборудование (для autodraftBBPlan). */
   equipment?: string[];
   /** Слабые группы (для autodraftBBPlan). */
@@ -134,7 +140,8 @@ function buildFilledWeeks(total: number, opts: DesignerToUserWeeksOptions): User
       if (srcWeek) {
         // Treat each repeated block as a mesocycle: progress by 0.5% weekly,
         // not only once per repeated block.
-        const progressionFactor = Math.pow(1.005, w - 1);
+        // Не прогрессируем вес в deload-неделю: исходный deload уже снижает нагрузку.
+        const progressionFactor = srcWeek.deload ? 1 : Math.pow(1.005, w - 1);
         out.push({
           ...srcWeek,
           week: w,
@@ -193,16 +200,21 @@ export function applyDesignPhasesToWeeks(
 /**
  * Создать пустой скелет sessions для недели (N дней с пустыми блоками).
  * Используется когда sessions: [] не подходит (например для гибрид-интеграции).
+ *
+ * @param daysPerWeek — количество тренировочных дней в неделю (1-7)
+ * @param dowPattern — шаблон дней недели (0=Пн … 6=Вс). По умолчанию [0,1,2,3,4,5,6].
+ *                     Позволяет задать реальное расписание (например [1,3,5] — Вт,Чт,Сб).
  */
-export function makeEmptySessionsForWeek(daysPerWeek: number): UserSession[] {
+export function makeEmptySessionsForWeek(daysPerWeek: number, dowPattern?: number[]): UserSession[] {
   const days = Math.max(1, Math.min(7, daysPerWeek));
-  // Последовательные дни по умолчанию. Пользователь может изменить их в редакторе.
-  const dowPattern = [0, 1, 2, 3, 4, 5, 6];
+  const pattern = (dowPattern && dowPattern.length >= days)
+    ? dowPattern
+    : [0, 1, 2, 3, 4, 5, 6];
   return Array.from({ length: days }, (_, i) => ({
     id: newId('ses'),
     name: `День ${i + 1}`,
     focus: '',
-    dayOfWeek: dowPattern[i] ?? i,
+    dayOfWeek: pattern[i] ?? i,
     blocks: [],
   }));
 }

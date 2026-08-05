@@ -546,7 +546,7 @@ export function rebalanceMacrocycle(macro: Macrocycle, edits: MacroRebalanceEdit
     }
   }
   for (const block of macro.blocks) {
-    const weeks = allocations.get(block) ?? block.weeks;
+    const weeks = Math.max(1, allocations.get(block) ?? block.weeks);
     newBlocks.push({ ...block, weeks, weekOffset: offset });
     offset += weeks;
   }
@@ -570,6 +570,14 @@ export function rebalanceMacrocycle(macro: Macrocycle, edits: MacroRebalanceEdit
     // пересчитать offsets
     let off = 1;
     for (const b of newBlocks) { b.weekOffset = off; off += b.weeks; }
+  }
+  // P0: offsets всегда строятся заново из валидных длительностей.
+  // Не зажимаем отдельные offset независимо: это могло создать перекрытия.
+  let normalizedOffset = 1;
+  for (const block of newBlocks) {
+    block.weeks = Math.max(1, Math.round(Number(block.weeks) || 1));
+    block.weekOffset = Math.max(1, Math.min(macro.totalWeeks, normalizedOffset));
+    normalizedOffset += block.weeks;
   }
   const newTotal = newBlocks.reduce((s, b) => s + b.weeks, 0);
   const rationale = newBlocks.map(b => `${b.phase}: ${b.weeks} нед (с ${b.weekOffset}), ${b.kind}${b.cycleId ? ' (' + b.cycleId + ')' : ''}`);

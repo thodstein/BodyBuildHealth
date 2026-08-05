@@ -17,6 +17,7 @@ import { macrocycleToBBProgram } from '../../../engines/lms/macrocycle-to-bb';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
 import { DESIGNER_PHASE_VISUAL } from './phase-visual-tokens';
+import { clampRir } from '../../../engines/bb/bb-utils';
 
 export interface BridgeCtx {
   program: UserProgram;
@@ -34,8 +35,6 @@ export interface BridgeCtx {
     labMrvMultiplier?: number;
   };
 }
-
-const clampRir = (r: number) => Math.max(0, Math.min(5, Math.round(r)));
 
 type Handler = (payload: PlannerApply, ctx: BridgeCtx) => void;
 
@@ -143,7 +142,9 @@ const mrvHandler: Handler = (payload, { program: p, update, showToast }) => {
     return { ...week, sessions: week.sessions.map(session => ({ ...session, blocks: session.blocks.map(block => {
       const factor = factorByMuscle[block.muscle] ?? 1;
       const count = Math.max(1, Math.min(block.sets.length, Math.round(block.sets.length * factor)));
-      return { ...block, sets: block.sets.slice(0, count) };
+      // P0: защита от factor < 1/block.sets.length → count = 0
+      const safeCount = Math.max(1, count);
+      return { ...block, sets: block.sets.slice(0, safeCount) };
     }) })) };
   });
   update({ bb: { ...p.bb, weeks } });
@@ -182,15 +183,23 @@ const deloadHandler: Handler = (payload, { program: p, update, showToast }) => {
 const volumeHandler: Handler = (payload, { program: p, update, showToast }) => {
   if (!p.bb) return;
   const setsByMuscle: Record<string, number> = payload.data.sets ?? {};
+  // P0: распределяем объём по всем сессиям дня, а не только по sessionIndex === 0
   const weeks = p.bb.weeks.map((w) => {
     if (w.deload) return w;
+    const sessionCount = w.sessions.length;
     const sessions = w.sessions.map((s, sessionIndex) => {
       const blocks: UserBlock[] = [];
       for (const [mu, rawCount] of Object.entries(setsByMuscle)) {
         const count = Math.max(0, Math.min(10, Math.round(Number(rawCount) || 0)));
-        if (count === 0 || sessionIndex !== 0) continue;
-        blocks.push({ id: newId('blk'), type: 'accessory' as const, exerciseName: '', muscle: mu, role: 'accessory' as const,
-          sets: Array.from({ length: count }, () => ({ reps: 10, rir: 2, weight: 0, restSec: 90 })) });
+        if (count === 0) continue;
+        // Распределяем ровно count сетов между сессиями.
+        const perSession = Math.floor(count / sessionCount);
+        const remainder = count % sessionCount;
+        const sessionSets = perSession + (sessionIndex < remainder ? 1 : 0);
+        if (sessionSets > 0) {
+          blocks.push({ id: newId('blk'), type: 'accessory' as const, exerciseName: '', muscle: mu, role: 'accessory' as const,
+            sets: Array.from({ length: sessionSets }, () => ({ reps: 10, rir: 2, weight: 0, restSec: 90 })) });
+        }
       }
       return { ...s, blocks: [...s.blocks, ...blocks] };
     });

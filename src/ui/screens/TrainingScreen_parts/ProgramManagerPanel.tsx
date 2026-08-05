@@ -211,6 +211,12 @@ export const ProgramManagerPanel: React.FC = () => {
     p.meta.level = 'intermediate';
     p.meta.daysPerWeek = 4;
     p.meta.weeks = 8;
+    // P0: forward trainingFocus из профиля (если есть) или из goal
+    const prof = loadTrainingProfile();
+    if (dir === 'bb' || dir === 'hybrid') {
+      const focusFromProfile = prof.trainingFocus;
+      p.meta.trainingFocus = focusFromProfile || (p.meta.goal === 'strength_mass' ? 'strength' : 'hypertrophy');
+    }
     setPendingAutoFill(true);
     setEditing(p);
     flash('🆕 Создаём программу из профиля…');

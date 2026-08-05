@@ -211,25 +211,34 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   };
 
   // U5: автосохранение каждые 30 секунд + индикатор «● изменено»
+  // P0: programRef гарантирует что interval читает актуальное значение program,
+  // исключая race condition между onSave и обновлением lastSavedRef.
   const [isDirty, setIsDirty] = useState(false);
   const lastSavedRef = useRef<string>(JSON.stringify(program));
+  const programRef = useRef(program);
+  programRef.current = program;
   useEffect(() => {
     const current = JSON.stringify(program);
     setIsDirty(current !== lastSavedRef.current);
   }, [program]);
   useEffect(() => {
     const timer = setInterval(() => {
-      const current = JSON.stringify(program);
+      const current = JSON.stringify(programRef.current);
       if (current !== lastSavedRef.current) {
         const saved = onSave('Автосохранение');
         if (saved !== false) {
-          lastSavedRef.current = current;
-          setIsDirty(false);
+          // onSave может синхронно вызвать обновление родительского состояния.
+          // Не помечаем более новую правку сохранённой.
+          const latest = JSON.stringify(programRef.current);
+          if (latest === current) {
+            lastSavedRef.current = current;
+            setIsDirty(false);
+          }
         }
       }
     }, UI_METRICS.autosaveMs);
     return () => clearInterval(timer);
-  }, [program, onSave]);
+  }, [onSave]);
   // F4: ConfirmDialog replaces window.confirm
   const { confirm } = useConfirmDialog();
   // U4: подтверждение выхода без сохранения
@@ -383,7 +392,21 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     }
     try {
       localStorage.setItem('he_pl_runtime', JSON.stringify({ days, focus: program.meta.title || 'Моя программа', week: execWeek, track: dir }));
-    } catch {}
+    } catch (err) {
+      // P0: QuotaExceededError — очищаем старые данные и пробуем снова
+      if (err instanceof DOMException && err.name === 'QuotaExceededError') {
+        try {
+          localStorage.removeItem('he_pl_runtime');
+          localStorage.setItem('he_pl_runtime', JSON.stringify({ days, focus: program.meta.title || 'Моя программа', week: execWeek, track: dir }));
+        } catch {
+          showToast('⚠ Недостаточно места в localStorage для сохранения данных тренировки', 'warning');
+          return;
+        }
+      } else {
+        showToast('⚠ Ошибка сохранения данных тренировки', 'warning');
+        return;
+      }
+    }
     showToast('🚚 Отправлено к выполнению — откройте зону «▶ Тренировка»');
   };
 
@@ -393,8 +416,8 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     if (!w) { showToast('⚠ Разрешите всплывающие окна'); return; }
     const safeTitle = escapeHtml(program.meta.title);
     const html: string[] = [];
-    html.push(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safeTitle}</title><style>`);
-    html.push('body{font-family:Arial,sans-serif;margin:20px;color:#1a1a1a;background:#fff}');
+    html.push(`<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>${safeTitle}</title><style>`);
+    html.push('body{font-family:"Segoe UI",Arial,"Noto Sans",sans-serif;margin:20px;color:#1a1a1a;background:#fff}');
     html.push('h1{font-size:20px;margin:0 0 6px}h2{font-size:14px;margin:16px 0 6px;color:#333}');
     html.push('table{border-collapse:collapse;width:100%;margin:6px 0;font-size:12px}');
     html.push('th,td{border:1px solid #ccc;padding:4px 8px;text-align:left}th{background:#f0f0f0}');
@@ -583,7 +606,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
       </div>
 
       {/* P2-1/F5: подсказка при пустой программе в standard-режиме — прямая CTA авто-черновика */}
-      {!isPro && program.bb && (program.bb.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0)) && (
+      {program.bb && (program.bb.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0)) && (
         <div className="constructor-surface constructor-surface--accent" style={{ ...CARD, padding: 14, borderLeft: '3px solid #00e68a' }}>
           <div style={{ fontSize: 12, color: DIM_STRONG, lineHeight: 1.5, marginBottom: 8 }}>
             💡 Пустая программа. Заполните автоматически на основе вашего профиля или возьмите готовую из библиотеки.

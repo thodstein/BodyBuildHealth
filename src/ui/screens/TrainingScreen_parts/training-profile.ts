@@ -33,6 +33,7 @@ export interface TrainingProfile {
   bbCycleId: string;
   onCourse: boolean;
   courseIntensity: 'mild' | 'moderate' | 'heavy';
+  trainingFocus?: 'strength' | 'hypertrophy' | 'endurance';
   bbPeds: string[];
   pharmaCoursesCount: number;
   monthsSinceLastCourse: number;
@@ -82,7 +83,10 @@ export function loadTrainingProfile(): TrainingProfile {
       return {
         ...DEFAULT_PROFILE,
         bodyWeight: s.personal?.weight ?? DEFAULT_PROFILE.bodyWeight,
-        goal: s.training?.primaryGoal ?? DEFAULT_PROFILE.goal,
+         goal: s.training?.primaryGoal ?? DEFAULT_PROFILE.goal,
+         trainingFocus: ['strength', 'hypertrophy', 'endurance'].includes(s.training?.trainingFocus)
+           ? s.training.trainingFocus
+           : undefined,
         level: s.training?.level ?? DEFAULT_PROFILE.level,
         trainingYears: s.training?.experience ?? DEFAULT_PROFILE.trainingYears,
         daysPerWeek: s.training?.daysPerWeek ?? DEFAULT_PROFILE.daysPerWeek,
@@ -127,6 +131,7 @@ export function saveTrainingProfile(p: TrainingProfile): void {
     if (!next.pharma) next.pharma = {};
     if (p.bodyWeight) next.personal.weight = p.bodyWeight;
     if (p.goal) next.training.primaryGoal = p.goal as any;
+    if (p.trainingFocus) next.training.trainingFocus = p.trainingFocus;
     if (p.level) next.training.level = p.level as any;
     if (p.daysPerWeek) next.training.daysPerWeek = p.daysPerWeek;
     if (p.recovery) next.training.recovery = p.recovery;

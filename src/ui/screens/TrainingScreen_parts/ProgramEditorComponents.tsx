@@ -805,6 +805,8 @@ const PLSetEditor: React.FC<{ sets: PLSet[]; lift: PLExercise['lift']; workMax: 
   const addSet = () => onChange([...sets, { pct: 0.7, reps: 5, sets: 3, rir: 2 }]);
   const updSet = (i: number, patch: Partial<PLSet>) => onChange(sets.map((s, j) => j === i ? { ...s, ...patch } : s));
   const removeSet = (i: number) => onChange(sets.filter((_, j) => j !== i));
+  // Accessory exercises have no competition-lift 1RM; calcWLogic returns null
+  // for them and the editor keeps their manually entered weight.
   const calcW = (pct: number) => calcWLogic(pct, lift, workMax);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

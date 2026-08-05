@@ -299,18 +299,22 @@ export function getDesignStats(design: MacrocycleDesign): DesignStats {
   for (const b of design.blocks) {
     phaseCount[b.phaseKey] = (phaseCount[b.phaseKey] || 0) + 1;
   }
-  // P1-2: detect gaps (uncovered weeks) and overlaps
-  const covered = new Set<number>();
-  const overlaps: Array<{ a: string; b: string; week: number }> = [];
+  // P1-2: интервальный difference-array вместо поиска блока для каждой недели.
+  const diff = new Int32Array(Math.max(0, totalWeeks) + 2);
   for (const b of design.blocks) {
-    for (let w = b.startWeek; w <= b.endWeek; w++) {
-      if (covered.has(w)) {
-        // find the other block covering this week
-        const other = design.blocks.find((ob) => ob.id !== b.id && w >= ob.startWeek && w <= ob.endWeek);
-        if (other) overlaps.push({ a: b.phaseKey, b: other.phaseKey, week: w });
-      }
-      covered.add(w);
-    }
+    const start = Math.max(1, Math.min(totalWeeks, Math.round(b.startWeek)));
+    const end = Math.max(0, Math.min(totalWeeks, Math.round(b.endWeek)));
+    if (totalWeeks < 1 || start > end) continue;
+    diff[start]++;
+    diff[end + 1]--;
+  }
+  const covered = new Set<number>();
+  let active = 0;
+  let overlapWeeks = 0;
+  for (let w = 1; w <= totalWeeks; w++) {
+    active += diff[w];
+    if (active > 0) covered.add(w);
+    if (active > 1) overlapWeeks++;
   }
   const gapWeeks: number[] = [];
   for (let w = 1; w <= totalWeeks; w++) {
@@ -328,7 +332,7 @@ export function getDesignStats(design: MacrocycleDesign): DesignStats {
     }
     gapRanges.push(start === prev ? String(start) : start + '-' + prev);
   }
-  return { totalWeeks, usedWeeks, freeWeeks, blockCount: design.blocks.length, phaseCount, overlapWeeks: new Set(overlaps.map(o => o.week)).size, gapRanges };
+  return { totalWeeks, usedWeeks, freeWeeks, blockCount: design.blocks.length, phaseCount, overlapWeeks, gapRanges };
 }
 
 export function getDefaultPresetDesigns(): MacrocycleDesign[] {
@@ -350,7 +354,9 @@ function createFromPhases(name: string, totalWeeks: number, phaseKeys: PhaseKey[
     const tmpl = getPhaseTemplate(pk);
     if (!tmpl) continue;
     if (cursor > totalWeeks) break;
-    const end = Math.min(cursor + tmpl.weeks - 1, totalWeeks);
+    const end = Math.min(cursor + Math.max(1, tmpl.weeks) - 1, totalWeeks);
+    // P0: защита от end < cursor при повреждённых данных (tmpl.weeks ≤ 0)
+    if (end < cursor) continue;
     design.blocks.push({
       id: 'blk_' + pk + '_' + cursor,
       phaseKey: pk, startWeek: cursor, endWeek: end, notes: '',

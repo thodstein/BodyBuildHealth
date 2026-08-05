@@ -32,13 +32,32 @@ export interface RirPayload { rirShift: number; label?: string }
 export interface MrvPayload { mrv: number; label?: string }
 export interface DeloadPayload { volumeMult: number; rirShift: number; weeks: number[]; label?: string }
 export interface VolumePayload { sets: Record<string, number>; label?: string }
-export interface PeakPayload { volumeMult: number; rirTarget: number; label?: string }
+export interface PeakPayload { volumeMult?: number; rirTarget?: number; label?: string; weeks?: unknown; protocol?: unknown }
 export interface MethodologyPayload { methodName: string; category?: string }
-export interface ProgramPayload { cycleId: string }
+export interface ProgramPayload { cycleId?: string; [key: string]: unknown }
 export interface DesignPayload { design: unknown; fillExercises?: boolean; daysPerWeek?: number; level?: string; goal?: string }
 export interface MacrocyclePayload { macro: unknown; level?: string; goal?: string; daysPerWeek?: number }
 
 export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload;
+
+/** Типобезопасная карта данных для публичного канала. */
+export interface PlannerApplyDataByKind {
+  split: SplitPayload;
+  pm: PmPayload;
+  weakpoints: WeakpointsPayload;
+  pri: PriPayload;
+  tempo: TempoPayload;
+  rir: RirPayload;
+  mrv: MrvPayload;
+  deload: DeloadPayload;
+  volume: VolumePayload & Record<string, unknown>;
+  peak: PeakPayload;
+  methodology: MethodologyPayload;
+  // Program bridge accepts both a cycle id and a full legacy cycle template.
+  program: unknown;
+  design: DesignPayload;
+  macrocycle: MacrocyclePayload;
+}
 
 export interface PlannerApply {
   kind: PlannerApplyKind;
@@ -53,7 +72,11 @@ export function getPlannerApply(): PlannerApply | null {
   try { const v = JSON.parse(localStorage.getItem(KEY) || 'null'); return v; } catch { return null; }
 }
 
-export function applyToPlanner(p: Omit<PlannerApply, 'ts'>): void {
+export function applyToPlanner<K extends PlannerApplyKind>(p: {
+  kind: K;
+  label: string;
+  data: PlannerApplyDataByKind[K];
+}): void {
   const payload: PlannerApply = { ...p, ts: Date.now() };
   try { localStorage.setItem(KEY, JSON.stringify(payload)); } catch { /* ignore */ }
   window.dispatchEvent(new CustomEvent('planner-apply', { detail: payload }));

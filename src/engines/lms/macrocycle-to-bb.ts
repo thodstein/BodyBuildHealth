@@ -127,6 +127,34 @@ export function macrocycleToBBProgram(
   macro: Macrocycle | BBMacrocycle,
   opts: MacrocycleToBBOptions,
 ): UserProgram {
+  try {
+    return macrocycleToBBProgramInner(macro, opts);
+  } catch (error) {
+    // P0: graceful degradation — любая ошибка в конвертации макроцикла → skeleton-план
+    // вместо краша всего вызова
+    console.warn('macrocycleToBBProgram: unexpected error, falling back to skeleton:', (error as Error).message);
+    const total = Math.max(1, macro.totalWeeks || 1);
+    const weeks = skeletonWeeksFromBbMacrocycle(macro as any, opts.daysPerWeek);
+    const meta = makeMeta(opts, total);
+    meta.notes = `⚠ План собран в режиме skeleton (без упражнений): ${((error as Error).message || 'неизвестная ошибка').slice(0, 120)}. Проверьте параметры макроцикла.`;
+    return {
+      meta,
+      bb: {
+        direction: 'bb',
+        microcycleTemplate: { daySlots: [] },
+        weeks,
+        volumeBudget: {},
+        progression: { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] },
+        constraints: { equipment: opts.equipment ?? [] },
+      },
+    };
+  }
+}
+
+function macrocycleToBBProgramInner(
+  macro: Macrocycle | BBMacrocycle,
+  opts: MacrocycleToBBOptions,
+): UserProgram {
   const total = Math.max(1, macro.totalWeeks || 1);
   const isBbMacro = isBBMacrocycle(macro);
   const effectiveOpts = isBbMacro
