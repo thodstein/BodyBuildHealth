@@ -13,4 +13,15 @@ describe('BB UserProgram legacy migration', () => {
     expect(programs[0].bb?.weeks[0].sessions).toEqual([]);
     expect(programs[0].bb?.progression.loadStrategy).toBe('double_progression');
   });
+
+  it('drops malformed records instead of exposing them to the editor', () => {
+    localStorage.setItem('he_user_programs', JSON.stringify([
+      null,
+      { meta: { id: 'broken', direction: 'bb' }, bb: { weeks: null } },
+      { meta: { id: 'valid', title: 'Valid', direction: 'bb', daysPerWeek: 4, weeks: 4 }, bb: { weeks: [] } },
+    ]));
+    const programs = loadUserPrograms();
+    expect(programs).toHaveLength(1);
+    expect(programs[0].meta.id).toBe('valid');
+  });
 });

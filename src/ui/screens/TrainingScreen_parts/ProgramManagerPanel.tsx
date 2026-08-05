@@ -24,7 +24,7 @@ import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { getReferencedCycle } from '../../../engines/user-program/program-store';
 import {
   loadUserPrograms, saveUserProgram, deleteUserProgram, deleteRevision,
-  cloneFromLibrary, cloneFromCycle, createBlank, userWeekToBBPlan, validateProgram,
+  cloneFromLibrary, cloneFromCycle, createBlank, userWeekToBBPlan, validateProgram, isUserProgramShape,
 } from '../../../engines/user-program/program-store';
 import type {
   UserProgram, BBProgramBody, PLProgramBody, UserWeek, UserSession, UserBlock, UserSet,
@@ -322,6 +322,11 @@ export const ProgramManagerPanel: React.FC = () => {
 
   const commit = (note?: string) => {
     if (!editing) return;
+    const blockingIssues = validateProgram(editing).filter(issue => issue.level === 'error');
+    if (blockingIssues.length > 0) {
+      flash('⚠ Не сохранено: ' + blockingIssues[0].message);
+      return;
+    }
     saveUserProgram(editing, note);
     refresh();
     flash('✅ Сохранено');
@@ -591,12 +596,13 @@ export const ProgramManagerPanel: React.FC = () => {
                 try {
                   const imported = JSON.parse(reader.result as string);
                   if (!Array.isArray(imported)) throw new Error('Not an array');
-                  let added = 0;
-                  for (const p of imported) {
-                    if (!p.meta?.id || !p.meta?.direction) continue;
-                    const exists = programs.find(x => x.meta.id === p.meta.id);
-                    if (exists) continue;
-                    saveUserProgram(p as UserProgram, 'Импорт JSON');
+                   let added = 0;
+                   const importedIds = new Set(programs.map(program => program.meta.id));
+                   for (const p of imported) {
+                    if (!isUserProgramShape(p)) continue;
+                    if (importedIds.has(p.meta.id)) continue;
+                    saveUserProgram(p, 'Импорт JSON');
+                    importedIds.add(p.meta.id);
                     added++;
                   }
                   refresh();

@@ -420,7 +420,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
           html.push('</tbody></table>');
         }
       }
-    } else if (program.pl) {
+     } else if (program.pl) {
       // P4-4: PL в PDF — customWeeks (таблицы) или LMS-расписание
        if (program.pl.sourceCycleId == null && program.pl.customWeeks) {
         // Свой PL-цикл — таблицы как BB
@@ -449,7 +449,23 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         }
       }
        if (program.pl.notes) html.push(`<p>${escapeHtml(program.pl.notes)}</p>`);
-    }
+     } else if (program.hybrid) {
+       html.push(`<h2>Hybrid: ПЛ + ББ</h2>`);
+       html.push(`<div class="meta">ПЛ-цикл: ${escapeHtml(program.hybrid.plRef?.sourceCycleId || 'не выбран')} · ББ-недель: ${program.hybrid.bbWeeks?.length ?? 0}</div>`);
+       for (const w of program.hybrid.bbWeeks ?? []) {
+         html.push(`<h2>Неделя ${w.week} <span class="phase" style="background:${w.deload ? '#f59e0b20' : '#3b82f620'};color:${w.deload ? '#f59e0b' : '#3b82f6'}">${escapeHtml(w.phase)}${w.deload ? ' · делод' : ''}</span></h2>`);
+         for (const s of w.sessions ?? []) {
+           html.push(`<table><thead><tr><th colspan="5">${escapeHtml(s.name || 'День')} ${s.focus ? '· ' + escapeHtml(s.focus) : ''}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>Сеты</th><th>RIR</th><th>Вес</th></tr></thead><tbody>`);
+           for (const b of s.blocks ?? []) {
+             if (!b.exerciseName) continue;
+             const sets = b.sets ?? [];
+             html.push(`<tr><td>${escapeHtml(b.exerciseName)}</td><td>${escapeHtml(GROUP_RU[b.muscle] ?? b.muscle)}</td><td>${escapeHtml(sets.map(st => `${st.reps}×`).join(', '))}</td><td>${escapeHtml(sets[0]?.rir ?? '-')}</td><td>${escapeHtml(sets[0]?.weight ?? 0)} кг</td></tr>`);
+           }
+           html.push('</tbody></table>');
+         }
+       }
+       if (program.hybrid.notes) html.push(`<p>${escapeHtml(program.hybrid.notes)}</p>`);
+     }
     html.push('</body></html>');
     w.document.write(html.join(''));
     w.document.close();

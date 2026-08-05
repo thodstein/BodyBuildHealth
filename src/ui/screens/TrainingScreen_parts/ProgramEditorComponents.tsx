@@ -32,6 +32,28 @@ import { diagnoseWeakPoint, WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } fro
 import { tempoFor, TEMPO_BY_CHARACTER, REST_BY_CHARACTER, tutForSet } from '../../../engines/bb/bb-tempo-rest';
 import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
 
+export function isUserBlockClipboardShape(value: unknown): value is UserBlock {
+  if (!value || typeof value !== 'object') return false;
+  const block = value as Partial<UserBlock>;
+  const sets = block.sets;
+  return typeof block.id === 'string'
+    && typeof block.type === 'string'
+    && typeof block.exerciseName === 'string'
+    && typeof block.muscle === 'string'
+    && (block.role === 'primary' || block.role === 'accessory')
+    && Array.isArray(sets)
+    && sets.every(set => !!set
+      && (typeof set.reps === 'number' || typeof set.reps === 'string')
+      && Number.isFinite(set.rir)
+      && set.rir >= 0
+      && set.rir <= 5
+      && (set.weight == null || (Number.isFinite(set.weight) && set.weight >= 0)));
+}
+
+export function normalizeProgramDayOfWeek(value: number, fallback = 0): number {
+  return Number.isFinite(value) ? Math.max(0, Math.min(6, Math.round(value))) : fallback;
+}
+
 /* ─── ББ-редактор: недели → сессии → блоки ─── */
 
 const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => void; level: string }> = ({ body, onChange, level }) => {
@@ -336,8 +358,13 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
     try {
       const raw = sessionStorage.getItem(COPY_KEY);
       if (!raw) return;
-      const src = JSON.parse(raw) as UserBlock;
-      const newBlock: UserBlock = { ...src, id: newId('blk') };
+       const src: unknown = JSON.parse(raw);
+       if (!isUserBlockClipboardShape(src)) return;
+       const newBlock: UserBlock = {
+         ...src,
+         id: newId('blk'),
+         sets: src.sets.map(set => ({ ...set })),
+       };
       onChange([...blocks, newBlock]);
     } catch {}
   };
@@ -954,7 +981,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
               {body.schedule.map((s, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
                   <span style={{ color: DIM, minWidth: 70 }}>Сессия {s.sessionIdx + 1}</span>
-                  <select style={{ ...IN, padding: '4px 6px', fontSize: 10 }} value={s.dayOfWeek} onChange={e => { const sc = [...body.schedule]; sc[i] = { ...sc[i], dayOfWeek: parseInt(e.target.value) }; set({ schedule: sc }); }}>
+                  <select style={{ ...IN, padding: '4px 6px', fontSize: 10 }} value={s.dayOfWeek} onChange={e => { const sc = [...body.schedule]; sc[i] = { ...sc[i], dayOfWeek: normalizeProgramDayOfWeek(Number(e.target.value), s.dayOfWeek) }; set({ schedule: sc }); }}>
                     {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d, di) => <option key={di} value={di}>{d}</option>)}
                   </select>
                 </div>
@@ -1164,7 +1191,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
             {body.schedule.map((s, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
                 <span style={{ color: DIM, minWidth: 70 }}>Сессия {s.sessionIdx + 1}</span>
-                <select style={{ ...IN, padding: '4px 6px', fontSize: 10, minHeight: 44 }} value={s.dayOfWeek} onChange={e => { const sc = [...body.schedule]; sc[i] = { ...sc[i], dayOfWeek: parseInt(e.target.value) }; set({ schedule: sc }); }}>
+                        <select style={{ ...IN, padding: '4px 6px', fontSize: 10, minHeight: 44 }} value={s.dayOfWeek} onChange={e => { const sc = [...body.schedule]; sc[i] = { ...sc[i], dayOfWeek: normalizeProgramDayOfWeek(Number(e.target.value), s.dayOfWeek) }; set({ schedule: sc }); }}>
                   {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d, di) => <option key={di} value={di}>{d}</option>)}
                 </select>
               </div>

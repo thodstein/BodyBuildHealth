@@ -33,16 +33,25 @@ export function loadUserPrograms(): UserProgram[] {
     const raw = localStorage.getItem(KEY);
     if (!raw) return [];
     const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr.filter(Boolean).map(migrateUserProgram) : [];
+    return Array.isArray(arr)
+      ? arr.map(migrateUserProgram).filter((program): program is UserProgram => !!program && isUserProgramShape(program))
+      : [];
   } catch(_e) { return []; }
 }
 
 /** Normalize programs saved before BB derived metadata was introduced. */
-function migrateUserProgram(value: any): UserProgram {
-  if (!value || typeof value !== 'object') return value;
+function migrateUserProgram(value: any): UserProgram | null {
+  if (!value || typeof value !== 'object' || !value.meta || typeof value.meta !== 'object') return null;
   const program = { ...value } as UserProgram;
+  program.meta = {
+    ...program.meta,
+    title: typeof program.meta.title === 'string' ? program.meta.title : 'Моя программа',
+    daysPerWeek: Number.isFinite(program.meta.daysPerWeek) ? program.meta.daysPerWeek : 4,
+    weeks: Number.isFinite(program.meta.weeks) ? program.meta.weeks : 4,
+  };
   if (program.bb) {
-    const weeks = (program.bb.weeks || []).map((week: any, index: number) => ({
+    if (!Array.isArray(program.bb.weeks)) return null;
+    const weeks = program.bb.weeks.map((week: any, index: number) => ({
       ...week,
       week: week.week || index + 1,
       phase: week.phase || 'accumulation',
@@ -66,6 +75,7 @@ export function getUserProgram(id: string): UserProgram | null {
 
 export function saveUserProgram(program: UserProgram, note?: string): UserProgram[] {
   const all = loadUserPrograms();
+  if (!isUserProgramShape(program)) return all;
   const now = new Date().toISOString();
   const rev = note ? { ts: now, note } : undefined;
   const updated: UserProgram = {
@@ -199,6 +209,70 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
     }
   }
   return issues;
+}
+
+/** Проверить минимальную форму программы перед импортом из внешнего JSON. */
+export function isUserProgramShape(value: unknown): value is UserProgram {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<UserProgram>;
+  const meta = candidate.meta;
+  if (!meta || typeof meta !== 'object') return false;
+  if (typeof meta.id !== 'string' || typeof meta.title !== 'string') return false;
+  if (!['bb', 'pl', 'hybrid'].includes(meta.direction)) return false;
+  if (!Number.isInteger(meta.daysPerWeek) || meta.daysPerWeek < 1 || meta.daysPerWeek > 7) return false;
+  if (!Number.isInteger(meta.weeks) || meta.weeks < 1 || meta.weeks > 52) return false;
+  if (meta.direction === 'bb') {
+    return !!candidate.bb
+      && Array.isArray(candidate.bb.weeks)
+      && candidate.bb.weeks.every(week => !!week
+        && Array.isArray(week.sessions)
+        && new Set(week.sessions.map(session => session?.id)).size === week.sessions.length
+        && week.sessions.every(session => !!session
+          && typeof session.id === 'string'
+          && Array.isArray(session.blocks)
+          && new Set(session.blocks.map(block => block?.id)).size === session.blocks.length
+          && session.blocks.every(block => !!block
+            && typeof block.id === 'string'
+            && typeof block.exerciseName === 'string'
+            && Array.isArray(block.sets))));
+  }
+  if (meta.direction === 'pl') {
+    return !!candidate.pl
+      && Array.isArray(candidate.pl.schedule)
+      && candidate.pl.schedule.every(item => item
+        && Number.isInteger(item.sessionIdx)
+        && Number.isInteger(item.dayOfWeek)
+        && item.dayOfWeek >= 0
+        && item.dayOfWeek <= 6)
+      && new Set(candidate.pl.schedule.map(item => item.sessionIdx)).size === candidate.pl.schedule.length
+      && (!candidate.pl.customWeeks || candidate.pl.customWeeks.every(week =>
+        !!week
+        && Number.isInteger(week.week)
+        && Array.isArray(week.days)
+        && week.days.every(day => !!day
+          && typeof day.name === 'string'
+          && Array.isArray(day.exercises)
+          && day.exercises.every(exercise => !!exercise
+            && typeof exercise.name === 'string'
+            && Array.isArray(exercise.sets)))));
+  }
+  return !!candidate.hybrid
+    && Array.isArray(candidate.hybrid.bbWeeks)
+    && candidate.hybrid.bbWeeks.every(week => !!week
+      && Array.isArray(week.sessions)
+      && new Set(week.sessions.map(session => session?.id)).size === week.sessions.length
+      && week.sessions.every(session => !!session
+        && typeof session.id === 'string'
+        && Array.isArray(session.blocks)
+        && new Set(session.blocks.map(block => block?.id)).size === session.blocks.length
+        && session.blocks.every(block => !!block
+          && typeof block.id === 'string'
+          && typeof block.exerciseName === 'string'
+          && Array.isArray(block.sets))))
+    && !!candidate.hybrid.plRef
+    && Array.isArray(candidate.hybrid.plRef.sessionIndices)
+    && candidate.hybrid.plRef.sessionIndices.every(index => Number.isInteger(index) && index >= 0)
+    && new Set(candidate.hybrid.plRef.sessionIndices).size === candidate.hybrid.plRef.sessionIndices.length;
 }
 
 function wHasDeload(bb: BBProgramBody): boolean {
