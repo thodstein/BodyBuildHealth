@@ -619,9 +619,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   });
   const [quickAddMealIdx, setQuickAddMealIdx] = useState<number | null>(null);
   const [quickAddSearch, setQuickAddSearch] = useState('');
-  const [customNotes, setCustomNotes] = useState(() => { try { return localStorage.getItem('he_nutrition_notes') || ''; } catch { return ''; } });
+  const [customNotes, setCustomNotes] = useState(() => {
+    try { const v = (s as any)?.nutrition?.dietNotes; if (typeof v === 'string') return v; } catch {}
+    try { return localStorage.getItem('he_nutrition_notes') || ''; } catch { return ''; }
+  });
   // D-28: meal-bound preferred foods (e.g. rice_cream → breakfast only)
-  const [preferredByMeal, setPreferredByMeal] = useState<Record<string, string[]>>(() => { try { const v = JSON.parse(localStorage.getItem('he_preferred_by_meal') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } });
+  const [preferredByMeal, setPreferredByMeal] = useState<Record<string, string[]>>(() => {
+    try { const v = (s as any)?.nutrition?.preferredByMeal; if (v && typeof v === 'object' && !Array.isArray(v)) return v; } catch {}
+    try { const v = JSON.parse(localStorage.getItem('he_preferred_by_meal') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; }
+  });
   useEffect(() => { try { updateSection('nutrition', { preferredByMeal }); } catch {} }, [preferredByMeal]);
   // D-28+: advanced preference states
   const [specificity, setSpecificity] = useState<Specificity>(() => {
@@ -750,7 +756,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [shoppingList, setShoppingList] = useState<any>(null); // Bug-3: не персистим — без плана это осиротевшие данные
   const [waterCalc, setWaterCalc] = useState<any>(null); // Bug-3: не персистим — без плана это осиротевшие данные
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_saved_nutrition_plans') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } });
-  const [lockedFoodIds, setLockedFoodIds] = useState<Set<string>>(() => { try { const v = JSON.parse(localStorage.getItem('he_locked_foods') || '[]'); return new Set(Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []); } catch { return new Set<string>(); } });
+  const [lockedFoodIds, setLockedFoodIds] = useState<Set<string>>(() => {
+    try { const v = (s as any)?.nutrition?.lockedFoods; if (Array.isArray(v)) return new Set(v.filter((x: any) => typeof x === 'string')); } catch {}
+    try { const v = JSON.parse(localStorage.getItem('he_locked_foods') || '[]'); return new Set(Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []); } catch { return new Set<string>(); }
+  });
   const toggleLockFood = (foodId: string) => { setLockedFoodIds(prev => { const next = new Set(prev); if (next.has(foodId)) next.delete(foodId); else next.add(foodId); localStorage.setItem('he_locked_foods', JSON.stringify([...next])); return next; }); };
   const [expandedSavedId, setExpandedSavedId] = useState<number | null>(null);
   const [editItem, setEditItem] = useState<{ dayIdx: number; mealIdx: number; itemIdx: number } | null>(null);
@@ -773,7 +782,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [v2Phase, setV2Phase] = useState('LEAN_MASS');
   const [v2Labs, setV2Labs] = useState<Record<string, string>>(() => { try { const v = JSON.parse(localStorage.getItem('he_planner_labs') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } });
   const [v2Pharma, setV2Pharma] = useState<Record<string, boolean>>(() => { try { const v = JSON.parse(localStorage.getItem('he_planner_pharma') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } });
-  const [histamineSensitive, setHistamineSensitive] = useState(() => { try { return localStorage.getItem('he_planner_histamine') === 'true'; } catch { return false; } });
+  const [histamineSensitive, setHistamineSensitive] = useState(() => {
+    try { const v = (s as any)?.nutrition?.histamineSensitive; if (typeof v === 'boolean') return v; } catch {}
+    try { return localStorage.getItem('he_planner_histamine') === 'true'; } catch { return false; }
+  });
   useEffect(() => { try { localStorage.setItem('he_planner_labs', JSON.stringify(v2Labs)); } catch {} }, [v2Labs]);
   useEffect(() => { try { localStorage.setItem('he_planner_pharma', JSON.stringify(v2Pharma)); } catch {} }, [v2Pharma]);
   useEffect(() => { try { localStorage.setItem('he_planner_histamine', histamineSensitive ? 'true' : 'false'); } catch {} }, [histamineSensitive]);
