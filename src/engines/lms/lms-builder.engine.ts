@@ -505,7 +505,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       if (!ex || typeof ex.name !== 'string' || !ex.name.trim()) throw new Error('buildLMSPlan: exercise name must be non-empty');
       if (!ex.sets || !Array.isArray(ex.sets)) throw new Error(`buildLMSPlan: exercise "${ex.name}" has missing or invalid sets`);
       for (const s of ex.sets) {
-        if (typeof s.pct !== 'number' || s.pct <= 0 || s.pct > 1) throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid pct (${s.pct}), expected 0..1`);
+        if (typeof s.pct !== 'number' || s.pct <= 0 || s.pct > 1.3) throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid pct (${s.pct}), expected 0..1.3`);
         if (typeof s.sets !== 'number' || s.sets <= 0) throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid sets count (${s.sets})`);
         if (typeof s.reps !== 'number' || s.reps <= 0) throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid reps (${s.reps})`);
       }
@@ -522,7 +522,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           if (!ex || typeof ex.name !== 'string' || !ex.name.trim()) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise name must be non-empty`);
           if (!ex.sets || !Array.isArray(ex.sets)) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid sets`);
           for (const s of ex.sets) {
-            if (typeof s.pct !== 'number' || !Number.isFinite(s.pct) || s.pct <= 0 || s.pct > 1) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid pct (${s.pct})`);
+            if (typeof s.pct !== 'number' || !Number.isFinite(s.pct) || s.pct <= 0 || s.pct > 1.3) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid pct (${s.pct})`);
             if (typeof s.sets !== 'number' || !Number.isFinite(s.sets) || s.sets <= 0) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid sets count (${s.sets})`);
             if (typeof s.reps !== 'number' || !Number.isFinite(s.reps) || s.reps <= 0) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid reps (${s.reps})`);
           }
