@@ -5,7 +5,111 @@
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK
-- `vitest` - 1752 passing (168 test files; **BB-auto training generation audit** — bb-builder RIR/progression/MRV fixes, bb-progression-feedback e1RM selection, bb-frequency-optimizer e1rmTrend, suggestFeeders PRO-KEYS, BbAutoConstructor alert→toast, restProgression phaseWeek, prescribeLoad repCap exercise-type-aware, 34 new tests)
+- `vitest` - 1951 passing (174 test files; **Support Calculator PED-risk audit** — PED-risk matrix, tiered LV1-LV3 boosters, profile autopull, 15 new substances, 199 new tests)
+
+---
+
+## Support Calculator PED-Risk Audit (Aug 6 2026)
+
+Полная переработка калькулятора поддержки: PED-risk-based triggering нейро/суставы, tiered LV1-LV3 бустеры по статье «Нейротоксичность ААС» + Суставы.txt, автоподтягивание из профиля v2, 15 новых веществ в БД и каталоге. 3 этапа, 199 новых тестов.
+
+### ЭТАП 1 — PED-risk matrix + tiered boosters
+
+**NEW `src/engines/ped-risk-matrix.ts`** — полная матрица рисков:
+- 20+ AAS с дозовыми порогами (трен 200/500/800, стан 20/30 мг/день, нандролон 300/500, тест 250/750, superdrol, trestolone, mibolerone, methyltrienolone, и т.д.)
+- 7 SARMs (RAD-140=moderate neuro, S-23=moderate, ostarine=protective joints, LGD, andarine, sr9009, cardarine)
+- 7 пептидов/GH (GH 3/6/10 IU дозозависимый, IGF-1, MGF, GHRP, GHRH, MK-677)
+- Компенсация: нандролон + станозолол → high→moderate (COLLAGEN_SYNTHESIS)
+- Эскалации: 2+ moderate neuro → high; 2+ 19-нор → high; 3+ PED → +1 уровень
+- ID-маппинг: substring-паттерны для trestolone/superdrol/proviron (classifyPed=other fallback)
+- `assessPedRisk(pedDoses, level)` → `{ neuroBoosterTier, jointsBoosterTier, triggeredBy }`
+
+**`src/engines/tz-bridge-boosters.ts`** — LV1-LV3 tier selection:
+- NEURO_BOOST: LV1 (16 веществ: agmatine★, NAC★, таурин★ + Mg/ashwagandha/theanine/glycine/gaba/rhodiola/ALCAR/B6/apigenin/magnolia/Mg-L-threonate/tryptophan/alpha-lipoic) → LV2 (8: прегненолон, инозитол, цитиколин, lions_mane, PS, бакопа, астаксантин, **grandaxine**) → LV3 (6: fasoracetam, bromantane, noopept, **dihexa**, **tropoflavin**, **phenylpiracetam** + 3 alternate groups: NMDA [memantine/lamotrigine/amantadine], противотревожная [fluvoxamine/naltrexone], α2 [guanfacine/tizanidine])
+- JOINTS_BOOST: LV1 (9: коллаген, глюкозамин, хондроитин, босвеллия, MSM, куркумин, гиалурон, вит.C, омега-3) → LV2 (10: UC-II, кремний, марганец, D3, K2, Ca, бор, **havinson_a4**, **ligamentide**, **voltaren_gel**) → LV3 (3: **BPC-157+TB-500+GHK-Cu** — протокол из Суставы.txt)
+- `BoosterTriggerCtx` += `symptomNeuro`, `symptomJoints`, `forceNeuro`, `forceJoints`, `pedNeuroTier`, `pedJointsTier`, `pedRiskReasons`
+- `shouldActivateNeuro/Joints` — приоритет: PED-risk > force > symptom > state-estimate
+- `applyBoosters` выбирает tier = `max(pedTier, symptomTier, stateTier, forceTier)`, берёт `LV1..LV{tier}`
+- LV3 нейро — селективные пары (memantine ИЛИ lamotrigine ИЛИ amantadine — не стекать NMDA-антагонисты)
+- Helper: `getNeuroBoosterSubstanceIds(tier)`, `getJointsBoosterSubstanceIds(tier)` для UI авто-выбора
+
+**`src/engines/tz-mapper-engine.ts`** — интеграция:
+- Priority=2 для tier≥2 бустеров (выживают TOTAL_LIMIT trim)
+- Post-trim safety net на `max`: обязательная нейрозащита (Mg+ashwagandha+theanine) + суставы (collagen+glucosamine+msm), даже если trim срезил всё
+- PED-risk reasons в summary для UI
+- `pedRisk: PedRiskAssessment` в `SupportRecommendation` и `MapperCtx`
+
+**`src/ui/screens/Calculator/Calc.mapper.tsx`** — UI:
+- `assessPedRisk(pedDoses, level)` в `buildMapperCtx`
+- PED-risk баннер: «⚡ Авто-защита по стеку PED» с Neuro/Joints LV/tier/причинами
+- Кнопки «Суставы»/«Нейро» — **AUTO LV{tier}** badge когда PED триггерит бустер
+- Попапы «Суставы»/«Нейро» — **⚡ PED AUTO** preset: авто-выбор веществ по tier
+- Попапы — PED-risk в score и контекст-баннере
+
+### ЭТАП 2 — Профиль и автоподтягивание
+
+**`src/core/types.ts`** — новые поля UnifiedSettings:
+- `health.gabaBalance`, `health.coordinationIssues`, `health.sleepQuality`, `health.jointPainSeverity`
+- `pharma.hasCaber/hasGH/hasIGF/hasInsulin/hasSERM/hasSARMs/hasMGF/hasGLP1/ghIU/insulinIU/igfMcg/clenMcg/t3Mcg`
+
+**`src/engines/support-plan/engine.ts:hydrateState()`** — полностью переписан:
+- Nested чтение из `he_profile_v2` (personal/lifestyle/health/pharma/symptoms/labs)
+- Нормализация `aggressionScore` 1-5 → 0-10 (×2)
+- Конвертация `jointPain` boolean → enum / `jointPainSeverity` → enum
+- Adapter `symptoms.recent` → `string[]` активных симптомов
+- Adapter `labs.summary` → flatPanel для калькулятора
+- Маппинг pharma: `currentSubstances` → `aas`, `hcgEnabled` → `hasHCG`, дозы PED напрямую
+
+**`src/ui/screens/Calculator/Calc.mapper.tsx`** — кнопки автоподтягивания:
+- «📋 Из профиля» рядом с pill-кнопками симптомов (загрузка из `symptoms.recent`)
+- «📋 Из профиля (neuro/oda/pharma)» — глобальная синхронизация neuro/oda/pharma/healthConditions из профиля
+
+### ЭТАП 3 — Вещества в БД и каталоге
+
+**15 новых веществ** (источник: ТЗ «Нейротоксичность ААС» + «Суставы.txt»):
+
+Нейро (9): grandaxine (тофизопам), dihexa, phenylpiracetam, tropoflavin (7,8-DHF), fluvoxamine, amantadine, naltrexone (LDN), guanfacine, tizanidine
+Суставы (6): havinson_a4, havinson_a19, ligamentide, neovitin, voltaren_gel, artra
+
+Добавлены в:
+- `src/data/support-db/supplements.ts` — мехи ТЗ (cns1-4, cv1, hem2)
+- `src/data/support-dosing.ts` — дозировки, warnings, evidenceLevel, protocolRefs
+- `src/data/support-catalog-data.ts` — **полные каталог-записи** (id, name, nameRu, tier, category, forms, organs, systems, mechanisms, description, synergies, conflicts, monitoring, contraindications, sideEffects, dosage, bestForCourse, specialInstructions, targetOrgan, organMechanism, mechanismOfAction, clinicalEffect, bestForm, analog)
+- lamotrigine — новая полная каталог-запись (memantine/fasoracetam/noopept/bromantane уже были в каталоге)
+
+### Тесты (199 новых)
+
+- `src/engines/__tests__/ped-risk-matrix.test.ts` — **37 тестов**: AAS дозозависимость (13), SARMs (4), пептиды (6), компенсации (2), эскалации (3), tier mapping (5), ID-маппинг edge cases (4)
+- `src/engines/__tests__/tz-bridge-boosters-tiered.test.ts` — **35 тестов**: shouldActivate (10), tier selection NEURO (7), tier selection JOINTS (3), дедупликация (1), max tier (2), оба бустера (1), структура бустеров (6), LV3 alternates (5)
+- `src/engines/__tests__/support-profile-autopull.test.ts` — **15 тестов**: nested чтение, нормализация шкал, adapter symptoms/labs, phase маппинг
+- `src/engines/__tests__/support-new-substances.test.ts` — **38 тестов**: SUPPLEMENTS_DB (15), SUPPORT_DOSING (15), SUPPORT_CATALOG_DATA полные записи (8)
+
+### Files modified (9)
+- NEW: `src/engines/ped-risk-matrix.ts` (330 строк)
+- MOD: `src/engines/tz-bridge-boosters.ts` — LV1-LV3, tier selection, helper functions
+- MOD: `src/engines/tz-mapper-engine.ts` — priority fix, post-trim safety net, pedRisk field
+- MOD: `src/ui/screens/Calculator/Calc.mapper.tsx` — boosterCtx wiring, PED-risk баннеры, AUTO badges, PED-AUTO presets, кнопки «Из профиля»
+- MOD: `src/engines/support-plan/engine.ts` — hydrateState nested чтение
+- MOD: `src/core/types.ts` — новые поля UnifiedSettings
+- MOD: `src/data/support-db/supplements.ts` — +15 веществ
+- MOD: `src/data/support-dosing.ts` — +15 дозировок
+- MOD: `src/data/support-catalog-data.ts` — +16 полных каталог-записей (15 новых + lamotrigine)
+- NEW: 4 test files (125 тестов)
+
+### Ключевые сценарии
+
+| Сценарий | Результат |
+|----------|-----------|
+| Тренболон 500мг на «База» | 🧠 NEURO LV3 авто (memantine+fasoracetam+bromantane+noopept+dihexa+tropoflavin+fluvoxamine+guanfacine) |
+| Станозолол 50мг/день на «База» | 🦴 JOINTS LV3 авто (BPC-157+TB-500+GHK-Cu) |
+| Стан + Нандролон | JOINTS moderate (частичная компенсация COLLAGEN_SYNTHESIS) |
+| Тестостерон 250мг | Без forced бустеров (только по симптом-кнопке/«Усиление»/max) |
+| «Максимум» без PED | Принудительная нейро+суставы база (post-trim safety net) |
+| Нажатие «Бессонница» (pill) | NEURO LV2 (agmatine+NAC+таурин+прегненолон+...) |
+| Кнопка «📋 Из профиля» | Загрузка neuro/oda/pharma/symptoms из UnifiedSettings |
+| Попап «Суставы» + PED tier | ⚡ PED AUTO preset — авто-выбор веществ по tier |
+| Попап «Нейро» + PED tier | ⚡ PED AUTO preset — авто-выбор веществ по tier |
+| Фаза фертильности | Forced бустеры пропускаются (areBoostersAllowed=false) |
 
 ---
 

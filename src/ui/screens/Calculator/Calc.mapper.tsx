@@ -8,7 +8,8 @@ import type { SupportLevel } from '../../../engines/tz-bridge-mechanism';
 import type { PhaseContext, PhaseKey } from '../../../engines/tz-bridge-phase';
 import type { BoosterTriggerCtx } from '../../../engines/tz-bridge-boosters';
 import { PHASE_PROTOCOL } from '../../../engines/tz-bridge-phase';
-import { STACK_BOOSTER_TRIGGERS, buildGapFillSuggestions, megaEnhance, type MegaEnhanceSuggestion } from '../../../engines/tz-bridge-boosters';
+import { STACK_BOOSTER_TRIGGERS, buildGapFillSuggestions, megaEnhance, type MegaEnhanceSuggestion, getNeuroBoosterSubstanceIds, getJointsBoosterSubstanceIds } from '../../../engines/tz-bridge-boosters';
+import { assessPedRisk, type PedRiskAssessment } from '../../../engines/ped-risk-matrix';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import { CalcSafetyLayer } from './CalcSafetyLayer';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
@@ -430,16 +431,6 @@ export function buildMapperCtx(
     inFertilityProgram: false,
   };
   const labs = labSliceToValues(state.labs.fullPanel);
-  const boosterCtx: BoosterTriggerCtx = {
-    anxietyScore: state.neuro.aggressionScore,
-    sleepHours: state.profile.sleepHours,
-    stressScore: state.profile.stressLevel,
-    cortisolHigh: false,
-    irritability: state.neuro.aggressionScore > 6,
-    jointPainScore: state.oda.jointPain === 'severe' ? 8 : state.oda.jointPain === 'moderate' ? 5 : state.oda.jointPain === 'mild' ? 3 : 0,
-    crpLevel: labs['CRP'] || labs['HSCRP'],
-    triggeredStackIds: stackTriggers || [],
-  };
   const pedDoses = (Array.isArray(state.pharma?.aas) ? state.pharma.aas : [])
     .filter((a: any) => a && a.id)
     .map((a: any) => ({
@@ -458,6 +449,29 @@ export function buildMapperCtx(
   if (clenMcg > 0) pedDoses.push({ id: 'clenbuterol', pClass: 'clenbut', mcgPerDay: clenMcg, form: 'oral' } as any);
   const t3Mcg = state.pharma.t3Mcg || 0;
   if (t3Mcg > 0) pedDoses.push({ id: 't3', pClass: 't3', mcgPerDay: t3Mcg, form: 'oral' } as any);
+
+  // ── PED-risk assessment (Фаза 1: нейро/суставы по стеку PED) ──
+  const pedRisk = assessPedRisk(pedDoses, level);
+  const symptomsList = state.symptoms || [];
+
+  const boosterCtx: BoosterTriggerCtx = {
+    anxietyScore: state.neuro.aggressionScore,
+    sleepHours: state.profile.sleepHours,
+    stressScore: state.profile.stressLevel,
+    cortisolHigh: false,
+    irritability: state.neuro.aggressionScore > 6,
+    jointPainScore: state.oda.jointPain === 'severe' ? 8 : state.oda.jointPain === 'moderate' ? 5 : state.oda.jointPain === 'mild' ? 3 : 0,
+    crpLevel: labs['CRP'] || labs['HSCRP'],
+    triggeredStackIds: stackTriggers || [],
+    // Фаза 1: symptom-кнопки + force на max + PED-risk tiers
+    symptomJoints: symptomsList.includes('joint_pain'),
+    symptomNeuro: symptomsList.some(s => ['insomnia','anxiety','mood_swings'].includes(s)),
+    forceNeuro: level === 'max',
+    forceJoints: level === 'max',
+    pedNeuroTier: pedRisk.neuroBoosterTier,
+    pedJointsTier: pedRisk.jointsBoosterTier,
+    pedRiskReasons: pedRisk.triggeredBy,
+  };
   return {
     labs, phaseCtx, boosterCtx, level, manualChoices,
      onCourse: (Array.isArray(state.pharma?.aas) ? state.pharma.aas.length : 0) > 0 || pedDoses.length > 0,
@@ -465,11 +479,12 @@ export function buildMapperCtx(
     hasHCG: state.pharma.hasHCG, hasAI: state.pharma.hasAI,
     hasCabergoline: state.pharma.hasCaber || false,
      aasIds: (Array.isArray(state.pharma?.aas) ? state.pharma.aas : []).map((a: any) => a.id || '').filter(Boolean),
-    pedDoses, libidoLow: (state.symptoms || []).includes('low_libido'),
+    pedDoses, libidoLow: symptomsList.includes('low_libido'),
     bpSystolic: state.cardio.bpStage === 'high' ? 150 : state.cardio.bpStage === 'normal' ? 120 : 135,
     lipidLdl: labs['LDL'],
-    symptoms: state.symptoms || [],
+    symptoms: symptomsList,
     healthConditions: state.healthConditions || [],
+    pedRisk,
   };
 }
 
@@ -1020,6 +1035,67 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         </div>
       , document.body)}
       
+      {/* ===== PED-RISK БАННЕР: авто-активация нейро/суставы по стеку PED ===== */}
+      {rec?.pedRisk && (rec.pedRisk.neuroBoosterTier > 0 || rec.pedRisk.jointsBoosterTier > 0) && (
+        <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:12, background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.15)' }}>
+          <div style={{ fontSize:9, fontWeight:800, color:'#a5b4fc', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.3px' }}>
+            ⚡ Авто-защита по стеку PED
+          </div>
+          {rec.pedRisk.neuroBoosterTier > 0 && (
+            <div style={{ fontSize:8, color:'#818cf8', lineHeight:1.4, marginBottom:3, display:'flex', alignItems:'flex-start', gap:4 }}>
+              <span style={{ fontSize:10 }}>🧠</span>
+              <div>
+                <b>Нейрозащита LV{rec.pedRisk.neuroBoosterTier}</b> (авто)
+                <span style={{ color:'rgba(255,255,255,0.5)', marginLeft:4 }}>— риск: {rec.pedRisk.neuroRisk}</span>
+                {rec.pedRisk.triggeredBy.filter(r => r.includes('нейро') || r.includes('Нейро') || r.includes('19-нор') || r.includes('трен') || r.includes('Трен') || r.includes('Эскалация')).slice(0,2).map((r,i) => (
+                  <div key={i} style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:1 }}>{r}</div>
+                ))}
+              </div>
+            </div>
+          )}
+          {rec.pedRisk.jointsBoosterTier > 0 && (
+            <div style={{ fontSize:8, color:'#4ade80', lineHeight:1.4, marginBottom:3, display:'flex', alignItems:'flex-start', gap:4 }}>
+              <span style={{ fontSize:10 }}>🦴</span>
+              <div>
+                <b>Суставы LV{rec.pedRisk.jointsBoosterTier}</b> (авто)
+                <span style={{ color:'rgba(255,255,255,0.5)', marginLeft:4 }}>— риск: {rec.pedRisk.jointsRisk}</span>
+                {rec.pedRisk.triggeredBy.filter(r => r.includes('сустав') || r.includes('Сустав') || r.includes('стан') || r.includes('Стан') || r.includes('tendin') || r.includes('компенс') || r.includes('Эскалация')).slice(0,2).map((r,i) => (
+                  <div key={i} style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:1 }}>{r}</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===== СИНХРОНИЗАЦИЯ С ПРОФИЛЕМ (neuro/oda/pharma/symptoms) ===== */}
+      {onStateChange && (
+        <div style={{ marginBottom:6, display:'flex', gap:4 }}>
+          <button onClick={() => {
+            try {
+              const raw = localStorage.getItem('he_profile_v2');
+              if (!raw) return;
+              const p = JSON.parse(raw);
+              const s = p?.settings || {};
+              const personal = s.personal || {};
+              const lifestyle = s.lifestyle || {};
+              const health = s.health || {};
+              const pharma = s.pharma || {};
+              const phaseMap: Record<string, string> = { baseline: 'base', course: 'course', bridge: 'bridge', pct: 'pct', post_pct: 'pct', fertility: 'base' };
+              const aas = Array.isArray(pharma.currentSubstances) ? pharma.currentSubstances.map((sub: any) => ({ id: sub.id || sub.substanceId || '', mgPerWeek: sub.doseMgWeek || sub.weeklyDose || 0, weeks: sub.weeks || 12, form: sub.form || 'inject' })) : [];
+              onStateChange({
+                ...state,
+                profile: { ...state.profile, weight: personal.weight || state.profile.weight, age: personal.age || state.profile.age, sleepHours: lifestyle.sleepHours ?? state.profile.sleepHours, stressLevel: lifestyle.stressLevel ?? state.profile.stressLevel, height: personal.height ?? state.profile.height },
+                neuro: { ...state.neuro, aggressionScore: (health.aggressionScore ?? 3) * 2, dopamineScore: health.dopamineScore ?? state.neuro.dopamineScore, serotoninScore: health.serotoninScore ?? state.neuro.serotoninScore, memoryIssues: health.memoryIssues ?? state.neuro.memoryIssues, focusIssues: health.focusIssues ?? state.neuro.focusIssues, slowThinking: health.slowThinking ?? state.neuro.slowThinking, headaches: health.headaches ?? state.neuro.headaches, gabaBalance: health.gabaBalance || state.neuro.gabaBalance, coordinationIssues: health.coordinationIssues ?? state.neuro.coordinationIssues },
+                oda: { ...state.oda, jointPain: health.jointPainSeverity ?? (health.jointPain ? 'moderate' : state.oda.jointPain), ligamentIssues: health.ligamentIssues ?? state.oda.ligamentIssues, backPain: health.backPain ?? state.oda.backPain },
+                pharma: { ...state.pharma, phase: (phaseMap[pharma.phase] || state.pharma.phase) as any, aas: aas.length > 0 ? aas : state.pharma.aas, hasHCG: pharma.hcgEnabled ?? state.pharma.hasHCG, hasAI: pharma.aiEnabled ?? state.pharma.hasAI, hasCaber: pharma.hasCaber ?? state.pharma.hasCaber, hasGH: pharma.hasGH ?? state.pharma.hasGH, ghIU: pharma.ghIU ?? state.pharma.ghIU, insulinIU: pharma.insulinIU ?? state.pharma.insulinIU, igfMcg: pharma.igfMcg ?? state.pharma.igfMcg },
+                healthConditions: Array.isArray(health.chronicConditions) ? health.chronicConditions : state.healthConditions,
+              });
+            } catch {}
+          }} style={{ flex:1, fontSize:8, fontWeight:700, cursor:'pointer', padding:'5px 8px', borderRadius:6, background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.15)', color:'#a5b4fc' }}>📋 Из профиля (neuro/oda/pharma)</button>
+        </div>
+      )}
+
       {/* ===== УСИЛЕНИЕ: все стеки каталога (видно во ВСЕХ режимах, включая ручной) ===== */}
       {(
         <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:12, background:'rgba(24,24,27,0.3)', border:'1px solid rgba(255,255,255,0.04)' }}>
@@ -1034,6 +1110,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               ['mega_total_support_35', '🚀', 'Мега', '#f87171'],
             ] as const).map(([id, icon, label, col]) => {
               const active = selectedStacks.includes(id) || (id === 'mega_total_support_35' && megaSelected.size > 0);
+              // PED-risk AUTO badge
+              const pedAuto = id === 'articular_stack' ? (rec?.pedRisk?.jointsBoosterTier ?? 0) : id === 'neuroprotection_stack' ? (rec?.pedRisk?.neuroBoosterTier ?? 0) : 0;
               return (
                 <button key={id} onClick={() => {
                   if (id === 'mega_total_support_35') {
@@ -1045,13 +1123,18 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     if (id === 'neuroprotection_stack') { setNeuroPreset(null); setNeuroSelected(new Set()); setNeuroConfirm(false); setNeuroSymptoms(buildNeuroSymptomsFromState(state)); }
                   }
                 }}
-                  style={{ flex:1, padding:'8px 4px', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:1,
-                    background: active ? `linear-gradient(135deg,rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : '239,68,68'},0.2),rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : '239,68,68'},0.1))` : 'rgba(255,255,255,0.03)',
-                    border: active ? `1.5px solid ${col}55` : '1px solid rgba(255,255,255,0.06)',
-                    color: active ? col : 'rgba(255,255,255,0.5)' }}>
+                  style={{ flex:1, padding:'8px 4px', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:1, position:'relative',
+                    background: active ? `linear-gradient(135deg,rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : '239,68,68'},0.2),rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : '239,68,68'},0.1))` : pedAuto > 0 ? `${col}10` : 'rgba(255,255,255,0.03)',
+                    border: active ? `1.5px solid ${col}55` : pedAuto > 0 ? `1.5px solid ${col}40` : '1px solid rgba(255,255,255,0.06)',
+                    color: active ? col : pedAuto > 0 ? col : 'rgba(255,255,255,0.5)' }}>
                   <span style={{fontSize:13}}>{icon}</span>
                   <span>{label}</span>
                   {active && <span style={{fontSize:6,fontWeight:700,color:col,marginTop:1}}>✓</span>}
+                  {pedAuto > 0 && !active && (
+                    <span style={{ position:'absolute', top:-4, right:-4, fontSize:6, fontWeight:800, padding:'1px 4px', borderRadius:4, background: col, color:'#000', lineHeight:1.2 }}>
+                      AUTO LV{pedAuto}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -1322,7 +1405,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           const jointPain = state.oda.jointPain;
           const hasJointSymptom = symptoms.includes('joint_pain');
           const crp = labs['CRP'] || labs['HSCRP'];
-          const jointScore = (hasJointSymptom ? 20 : 0) + (jointPain === 'severe' ? 30 : jointPain === 'moderate' ? 15 : jointPain === 'mild' ? 5 : 0) + (crp && crp > 3 ? 15 : 0);
+          const pedJointsTier = rec?.pedRisk?.jointsBoosterTier ?? 0;
+          const pedJointsRisk = rec?.pedRisk?.jointsRisk ?? 'none';
+          const jointScore = (hasJointSymptom ? 20 : 0) + (jointPain === 'severe' ? 30 : jointPain === 'moderate' ? 15 : jointPain === 'mild' ? 5 : 0) + (crp && crp > 3 ? 15 : 0) + (pedJointsTier >= 2 ? 30 : pedJointsTier === 1 ? 10 : 0);
           const presetColor = jointScore < 20 ? '#22c55e' : jointScore < 40 ? '#f59e0b' : jointScore < 60 ? '#f97316' : '#ef4444';
 
           const toggleSub = (id: string) => {
@@ -1355,6 +1440,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', lineHeight:1.4, marginBottom:8, padding:'5px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
                     {jointScore < 20 ? '🟢 Низкий риск — профилактика' : jointScore < 40 ? '🟡 Умеренный риск — базовая поддержка' : jointScore < 60 ? '🟠 Высокий риск — усиленная защита' : '🔴 Критический — максимальная защита'}
                     {hasJointSymptom ? ' · боль в суставах' : ''}{crp && crp > 3 ? ` · CRP ${crp}` : ''}
+                    {pedJointsTier > 0 && <span style={{ color:'#4ade80', fontWeight:700 }}> · ⚡ PED AUTO LV{pedJointsTier} ({pedJointsRisk})</span>}
                   </div>
 
                   <DomainSymptomMap domains={JOINT_DOMAINS} checked={jointSymptoms} onToggle={toggleJointSymptom} />
@@ -1392,6 +1478,46 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                       );
                     })}
                   </div>
+
+                  {/* ⚡ PED-AUTO preset: авто-выбор по PED-risk tier */}
+                  {pedJointsTier > 0 && (() => {
+                    const pedAutoIds = getJointsBoosterSubstanceIds(pedJointsTier)
+                      .filter(id => JOINT_CATALOG.some(c => c.id === id || canonIdLocal(c.id) === canonIdLocal(id)));
+                    const pedAutoActive = pedAutoIds.length > 0 && pedAutoIds.every(id => articularSelected.has(id));
+                    return (
+                      <div onClick={() => {
+                        if (pedAutoActive) {
+                          setArticularPreset(null);
+                          setArticularSelected(new Set());
+                        } else {
+                          setArticularPreset('ped_auto');
+                          setArticularSelected(new Set(pedAutoIds));
+                        }
+                      }} style={{
+                        padding:'7px 8px', borderRadius:8, cursor:'pointer', marginBottom:6,
+                        background: pedAutoActive ? 'rgba(74,222,128,0.15)' : 'rgba(74,222,128,0.06)',
+                        border: pedAutoActive ? '1.5px solid #4ade8055' : '1.5px solid #4ade8030',
+                      }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                          <span style={{ fontSize:14 }}>⚡</span>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:9, fontWeight:700, color: pedAutoActive ? '#4ade80' : '#4ade80' }}>
+                              PED AUTO — LV{pedJointsTier} ({pedJointsRisk}) {pedAutoActive && '✓'}
+                            </div>
+                            <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>
+                              Авто-выбор по стеку PED: {pedAutoIds.length} веществ
+                            </div>
+                          </div>
+                        </div>
+                        {pedAutoIds.length > 0 && (
+                          <div style={{ fontSize:6, color:'rgba(255,255,255,0.3)', marginTop:3, display:'flex', flexWrap:'wrap', gap:2 }}>
+                            {pedAutoIds.slice(0,6).map(sid => <span key={sid} style={{ background:'rgba(74,222,128,0.08)', padding:'1px 4px', borderRadius:3 }}>{subNameRu(sid).slice(0,12)}</span>)}
+                            {pedAutoIds.length > 6 && <span style={{color:'rgba(255,255,255,0.2)'}}>+{pedAutoIds.length-6}</span>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Рекомендация по пресету */}
                   <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:6, padding:'4px 8px', borderRadius:6, background:presetColor+'10', border:`1px solid ${presetColor}22` }}>
@@ -1470,7 +1596,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           const sleepHours = state.profile.sleepHours || 7;
           const stressLevel = state.profile.stressLevel || 5;
           const aggressionScore = state.neuro.aggressionScore || 0;
-          const neuroScore = (hasInsomnia ? 20 : 0) + (hasAnxiety ? 15 : 0) + (sleepHours < 7 ? 15 : 0) + (stressLevel > 7 ? 20 : 0) + (aggressionScore > 6 ? 15 : 0);
+          const pedNeuroTier = rec?.pedRisk?.neuroBoosterTier ?? 0;
+          const pedNeuroRisk = rec?.pedRisk?.neuroRisk ?? 'none';
+          const neuroScore = (hasInsomnia ? 20 : 0) + (hasAnxiety ? 15 : 0) + (sleepHours < 7 ? 15 : 0) + (stressLevel > 7 ? 20 : 0) + (aggressionScore > 6 ? 15 : 0) + (pedNeuroTier >= 2 ? 30 : pedNeuroTier === 1 ? 10 : 0);
           const presetColor = neuroScore < 20 ? '#22c55e' : neuroScore < 40 ? '#f59e0b' : neuroScore < 60 ? '#f97316' : '#ef4444';
 
           const toggleSub = (id: string) => { setNeuroSelected(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }); };
@@ -1496,6 +1624,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', lineHeight:1.4, marginBottom:8, padding:'5px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
                     {neuroScore < 20 ? '🟢 Низкий риск — профилактика' : neuroScore < 40 ? '🟡 Умеренный риск — базовая поддержка' : neuroScore < 60 ? '🟠 Высокий риск — усиленная защита' : '🔴 Критический — максимальная защита'}
                     {hasInsomnia ? ' · бессонница' : ''}{hasAnxiety ? ' · тревога' : ''}{sleepHours < 7 ? ` · сон ${sleepHours}ч` : ''}{stressLevel > 7 ? ` · стресс ${stressLevel}/10` : ''}
+                    {pedNeuroTier > 0 && <span style={{ color:'#818cf8', fontWeight:700 }}> · ⚡ PED AUTO LV{pedNeuroTier} ({pedNeuroRisk})</span>}
                   </div>
 
                   <DomainSymptomMap domains={NEURO_DOMAINS} checked={neuroSymptoms} onToggle={toggleNeuroSymptom} />
@@ -1529,6 +1658,46 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                       );
                     })}
                   </div>
+
+                  {/* ⚡ PED-AUTO preset: авто-выбор по PED-risk tier */}
+                  {pedNeuroTier > 0 && (() => {
+                    const pedAutoIds = getNeuroBoosterSubstanceIds(pedNeuroTier)
+                      .filter(id => NEURO_CATALOG.some(c => c.id === id || canonIdLocal(c.id) === canonIdLocal(id)));
+                    const pedAutoActive = pedAutoIds.length > 0 && pedAutoIds.every(id => neuroSelected.has(id));
+                    return (
+                      <div onClick={() => {
+                        if (pedAutoActive) {
+                          setNeuroPreset(null);
+                          setNeuroSelected(new Set());
+                        } else {
+                          setNeuroPreset('ped_auto');
+                          setNeuroSelected(new Set(pedAutoIds));
+                        }
+                      }} style={{
+                        padding:'7px 8px', borderRadius:8, cursor:'pointer', marginBottom:6,
+                        background: pedAutoActive ? 'rgba(129,140,248,0.15)' : 'rgba(129,140,248,0.06)',
+                        border: pedAutoActive ? '1.5px solid #818cf855' : '1.5px solid #818cf830',
+                      }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                          <span style={{ fontSize:14 }}>⚡</span>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:9, fontWeight:700, color: pedAutoActive ? '#818cf8' : '#818cf8' }}>
+                              PED AUTO — LV{pedNeuroTier} ({pedNeuroRisk}) {pedAutoActive && '✓'}
+                            </div>
+                            <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>
+                              Авто-выбор по стеку PED: {pedAutoIds.length} веществ
+                            </div>
+                          </div>
+                        </div>
+                        {pedAutoIds.length > 0 && (
+                          <div style={{ fontSize:6, color:'rgba(255,255,255,0.3)', marginTop:3, display:'flex', flexWrap:'wrap', gap:2 }}>
+                            {pedAutoIds.slice(0,6).map(sid => <span key={sid} style={{ background:'rgba(129,140,248,0.08)', padding:'1px 4px', borderRadius:3 }}>{subNameRu(sid).slice(0,12)}</span>)}
+                            {pedAutoIds.length > 6 && <span style={{color:'rgba(255,255,255,0.2)'}}>+{pedAutoIds.length-6}</span>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginBottom:6, padding:'4px 8px', borderRadius:6, background:presetColor+'10', border:`1px solid ${presetColor}22` }}>
                     🔍 Рекомендованный: <b style={{color:presetColor}}>
@@ -1737,7 +1906,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           <span style={{ fontSize:9, fontWeight:700, color:'#818cf8' }}>
             🩺 Симптомы (отметьте актуальные) {symptoms.length > 0 ? `(${symptoms.length})` : ''}
           </span>
-          <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showSymptoms ? '▲ скрыть' : '▼ показать'}</span>
+          <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+            <button onClick={(e) => { e.stopPropagation(); try { const raw = localStorage.getItem('he_profile_v2'); if (raw) { const p = JSON.parse(raw); const sym = p?.settings?.symptoms?.recent || {}; const active = Object.entries(sym).filter(([_,v]: [string,any]) => v && typeof v === 'object' && v.score > 0).map(([k]) => { const map: Record<string,string> = { insomnia:'insomnia', anxiety:'anxiety', mood_swings:'mood_swings', joint_pain:'joint_pain', headache:'headache', palpitations:'palpitations', acne:'acne', hair_loss:'hair_loss', gynecomastia:'gynecomastia', edema:'edema_severe', low_libido:'low_libido', prostate:'prostate_symptoms' }; return map[k] || k; }); setSymptoms(active); } } catch {} }} style={{ fontSize:7, fontWeight:700, cursor:'pointer', padding:'2px 6px', borderRadius:4, background:'rgba(99,102,241,0.1)', border:'1px solid rgba(99,102,241,0.2)', color:'#a5b4fc' }}>📋 Из профиля</button>
+            <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showSymptoms ? '▲ скрыть' : '▼ показать'}</span>
+          </div>
         </div>
         {showSymptoms && (
           <div style={{ padding:'7px 9px', background:'rgba(99,102,241,0.03)', border:'1px solid rgba(99,102,241,0.1)', borderTop:'none', borderRadius:'0 0 10px 10px', display:'flex', flexWrap:'wrap', gap:3 }}>

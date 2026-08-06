@@ -344,4 +344,25 @@ export const SUPPLEMENTS_DB: Record<string, TzSupportEntry[]> = {
   goldenrod: [{organId:'renal',mechId:'ren4',k:0.10,q:'C',source:'Европейский почечный акваретик, ↑ СКФ'},{organId:'renal',mechId:'ren1',k:0.05,q:'C',source:'↓ почечного воспаления, урологический антисептик'}],
   horsetail: [{organId:'renal',mechId:'ren4',k:0.10,q:'C',source:'Кремний-содержащий почечный диуретик, мягкая нефропротекция'}],
   uva_ursi: [{organId:'renal',mechId:'ren1',k:0.10,q:'C',source:'Уринарный антисептик (арбутин → гидрохинон), лечение ИМП'}],
+
+  // ════════════════════════════════════════════════════════════════════════════
+  //  ЭТАП 3: Вещества из ТЗ «Нейротоксичность ААС» + «Суставы.txt»
+  // ════════════════════════════════════════════════════════════════════════════
+  // ── Нейропротекция (статья LV3-LV4): фармакология ──
+  grandaxine: [{organId:'cns',mechId:'cns1',k:0.30,q:'B',source:'Тофизопам — ФДЭ-4 ингибитор, ↑ГAМК в тормозных нейронах (статья: LV2)'}],
+  dihexa: [{organId:'cns',mechId:'cns3',k:0.35,q:'C',source:'Дигекса — c-met/HGF агонист, ↑синаптогенез в 10× сильнее BDNF (статья: LV3)'}],
+  phenylpiracetam: [{organId:'cns',mechId:'cns1',k:0.20,q:'C',source:'Фенилпирацетам — ↑дофамин/норадреналин (обратный захват), ↑мотивация (статья: LV3)'}],
+  tropoflavin: [{organId:'cns',mechId:'cns3',k:0.25,q:'C',source:'Тропофлавин (7,8-DHF) — TrkB агонист, ↑выживаемость нейронов (статья: LV3)'}],
+  fluvoxamine: [{organId:'cns',mechId:'cns1',k:0.30,q:'A',source:'Флувоксамин — СИОЗС + сигма-1 агонист, нейропротекция (статья: LV3)'}],
+  amantadine: [{organId:'cns',mechId:'cns2',k:0.20,q:'B',source:'Амантадин — NMDA-антагонист (слабее мемантина), ↑дофамин, ↑BDNF (статья: LV4)'}],
+  naltrexone: [{organId:'cns',mechId:'cns4',k:0.20,q:'C',source:'LDN (низкодозовый налтрексон) — ↑эндорфины, ↓TLR4-нейровоспаление (статья: LV4)'}],
+  guanfacine: [{organId:'cns',mechId:'cns1',k:0.25,q:'A',source:'Гуанфацин — α2-адренорецептор (постсинаптический), ↓импульсивности (статья: LV4)'}],
+  tizanidine: [{organId:'cns',mechId:'cns1',k:0.20,q:'A',source:'Тизанидин (сирдалуд) — α2-адренорецептор (пресинаптический), ↓норадреналин (статья: LV4)'}],
+  // ── Суставы (Суставы.txt): пептиды и специфические ──
+  havinson_a4: [{organId:'cns',mechId:'cns2',k:0.10,q:'C',source:'Хавинсон A4 (хрящ) — пептидный биорегулятор, ↑хондроцитов (Суставы.txt)'}],
+  havinson_a19: [{organId:'cardio',mechId:'cv1',k:0.10,q:'C',source:'Хавинсон A19 (сосуды) — пептидный биорегулятор, ↑эндотелия (Суставы.txt)'}],
+  ligamentide: [{organId:'cns',mechId:'cns2',k:0.10,q:'C',source:'LigamenTIDE PLUS — пептид для связок/сухожилий (Суставы.txt)'}],
+  neovitin: [{organId:'cns',mechId:'cns2',k:0.10,q:'C',source:'Неовитин — антиоксидант, ↓воспаления (Суставы.txt)'}],
+  voltaren_gel: [{organId:'cns',mechId:'cns2',k:0.15,q:'B',source:'Вольтарен гель (диклофенак местно) — ↓COX-2 локально (Суставы.txt)'}],
+  artra: [{organId:'cns',mechId:'cns2',k:0.10,q:'C',source:'Артра (глюкозамин+хондроитин) — комбинированный хондропротектор (Суставы.txt)'}],
 };

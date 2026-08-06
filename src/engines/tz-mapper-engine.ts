@@ -62,9 +62,12 @@ import {
   applyBoosters,
   getBoosterSubs,
   getBoosterMechs,
+  NEURO_BOOST,
+  JOINTS_BOOST,
   type BoosterTriggerCtx,
   type AppliedBooster,
 } from './tz-bridge-boosters';
+import { assessPedRisk, type PedRiskAssessment } from './ped-risk-matrix';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../data/support-db';
 import { canonId, sameClassIds } from './support-plan/shared-constants';
 import { getPrioritySubstances, deriveSeverity, type SeverityLevel } from '../data/lab-priority-map';
@@ -141,6 +144,7 @@ export interface SupportRecommendation {
   contraindications?: import('../data/substance-contraindications').ContraAlert[];
   protocolWarnings?: string[];   // H3/H4: клинические предупреждения (гипотония, кровотечение)
   monitoringPlan?: string;       // H5: структурированный график лаб-мониторинга
+  pedRisk?: PedRiskAssessment;   // v6: оценка PED-риска нейро/суставы (для UI-баннеров)
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -171,6 +175,7 @@ export interface MapperCtx {
   pedDoses?: PEDDose[]; // v5 — PED с дозами + классами
   healthConditions?: string[];  // заболевания пользователя для проверки противопоказаний
   symptoms?: string[];         // симптомы: gynecomastia, edema_severe, joint_pain, insomnia, anxiety, low_libido, hair_loss, prostate_symptoms
+  pedRisk?: PedRiskAssessment;  // v6: оценка PED-риска нейро/суставы
 }
 
 // Импорт PED-типов и helpers
@@ -1271,9 +1276,11 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
           category: 'other' as TzCategory,
           k: 0.5,
           q: 'B',
-          reason: `[БУСТЕР ${ab.label}] ${bs.reason}`,
+          reason: `[БУСТЕР ${ab.label}${ab.tier ? ` LV${ab.tier}` : ''}] ${bs.reason}`,
           mechsCovered: [],
-          priority: ab.key === 'stack' ? 1 : 3,
+          // tier≥2 (PED-risk/symptom) → priority 2 (выживает при TOTAL_LIMIT trim)
+          // tier<2 или stack → priority 3 (отсекается первым) / 1 (stack)
+          priority: ab.key === 'stack' ? 1 : ((ab.tier ?? 0) >= 2 ? 2 : 3),
         });
       }
     }
@@ -1298,7 +1305,11 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
   // ── 7. coverage (передаём activated для фильтрации gaps) ─
   const { coverage, gaps } = buildCoverageMatrix(subs, activated);
   // ── 8. summary ─
-  const summary = buildSummary(subs, activated, phase, phaseProto, ctx.level, coverage, gaps, guardrails, boosters, suppression);
+  let summary = buildSummary(subs, activated, phase, phaseProto, ctx.level, coverage, gaps, guardrails, boosters, suppression);
+  // Добавить PED-risk reasons в summary (для UI-баннера)
+  if (ctx.boosterCtx?.pedRiskReasons?.length) {
+    summary += ` ⚠ PED-риск: ${ctx.boosterCtx.pedRiskReasons.join('; ')}.`;
+  }
   const rationale = phaseProto.algorithm;
 
   // ── Отсеивание block-конфликтов ПЕРЕД возвратом ──
@@ -1326,6 +1337,39 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     }
   }
 
+  // ── POST-TRIM SAFETY NET: на «Максимум» — обязательная нейро/суставная защита ──
+  // Даже если trim срезал все priority-2/3 нейро/суставные вещества,
+  // добавляем базовые 3+3 с priority=1 (не отсекаются).
+  // Фаза фертильности (allowBoosters=false) пропускается.
+  if (ctx.level === 'max' && areBoostersAllowed(phase)) {
+    const neuroIds = new Set(NEURO_BOOST.subs.map(s => s.substanceId.toLowerCase()));
+    const jointIds = new Set(JOINTS_BOOST.subs.map(s => s.substanceId.toLowerCase()));
+    // Нейрозащита
+    if (!subs.some(s => neuroIds.has(s.substanceId.toLowerCase()))) {
+      for (const id of ['magnesium','ashwagandha','l_theanine']) {
+        if (subs.some(s => canonId(s.substanceId) === canonId(id))) continue;
+        subs.push({
+          substanceId: id, category: 'neuroprotector' as TzCategory,
+          k: 0.5, q: 'B' as const,
+          reason: '[МАКС: обязательная нейрозащита]', mechsCovered: [],
+          priority: 1,
+        });
+      }
+    }
+    // Суставы
+    if (!subs.some(s => jointIds.has(s.substanceId.toLowerCase()))) {
+      for (const id of ['collagen','glucosamine','msm']) {
+        if (subs.some(s => canonId(s.substanceId) === canonId(id))) continue;
+        subs.push({
+          substanceId: id, category: 'amino' as TzCategory,
+          k: 0.5, q: 'B' as const,
+          reason: '[МАКС: обязательная защита суставов]', mechsCovered: [],
+          priority: 1,
+        });
+      }
+    }
+  }
+
   return {
     level: ctx.level,
     phase,
@@ -1344,6 +1388,7 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     contraindications: checkContraindications(subs.map(s => s.substanceId), ctx.healthConditions),
     protocolWarnings,
     monitoringPlan,
+    pedRisk: ctx.pedRisk,
   };
 }
 

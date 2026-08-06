@@ -524,6 +524,20 @@ export interface UnifiedSettings {
     previousCycles: number;
     timeSinceLastCycle: 'none' | '1-3mo' | '3-6mo' | '6-12mo' | '1y+';
     currentSubstances: PharmaSubstanceEntry[];
+    // v6: дозы PED и флаги для калькулятора поддержки (ЭТАП 2)
+    hasCaber?: boolean;
+    hasGH?: boolean;
+    hasIGF?: boolean;
+    hasInsulin?: boolean;
+    hasSERM?: boolean;
+    hasSARMs?: boolean;
+    hasMGF?: boolean;
+    hasGLP1?: boolean;
+    ghIU?: number;            // МЕ/день
+    insulinIU?: number;       // МЕ/день
+    igfMcg?: number;          // мкг/день
+    clenMcg?: number;         // мкг/день
+    t3Mcg?: number;           // мкг/день
   };
 
   // ─────────── 4. ЗДОРОВЬЕ ───────────
@@ -561,6 +575,10 @@ export interface UnifiedSettings {
     slowThinking: boolean;
     headaches: boolean;
     weatherDependent: boolean;
+    // v6: дополнительные нейро-поля для калькулятора поддержки (ЭТАП 2)
+    gabaBalance?: 'balance' | 'overexcited' | 'inhibited';
+    coordinationIssues?: boolean;
+    sleepQuality?: 'good' | 'fair' | 'poor';
     // Психология
     fearOfLoss: number;           // 1-5
     mirrorObsession: number;      // 1-5
@@ -569,6 +587,8 @@ export interface UnifiedSettings {
     jointPain: boolean;
     ligamentIssues: boolean;
     backPain: boolean;
+    // v6: детализация боли в суставах для калькулятора поддержки (ЭТАП 2)
+    jointPainSeverity?: 'none' | 'mild' | 'moderate' | 'severe';
     // Стоматология
     bleedingGums: boolean;
     looseTeeth: boolean;

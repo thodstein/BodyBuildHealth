@@ -91,10 +91,17 @@ export interface BoosterDef {
   label: string;
   description: string;
   trigger: string;             // описание триггера для UI
-  subs: BoosterSubstance[];
+  subs: BoosterSubstance[];    // LV1 (база — всегда при активации)
   mechs: TzMechId[];            // покрываемые ТЗ-механизмы
   organs: TzOrganId[];
   rationale: string;
+  // ── Tier-based selection (Фаза 1) ──
+  subsLv2?: BoosterSubstance[];                    // LV2 (средний — при tier≥2)
+  subsLv3?: BoosterSubstance[];                    // LV3 (тяжёлый — при tier≥3, всегда)
+  subsLv3Alternates?: {                            // LV3 (тяжёлый — при tier≥3, выбрать ОДИН из группы)
+    group: string;
+    options: BoosterSubstance[];
+  }[];
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -106,7 +113,8 @@ export const NEURO_BOOST: BoosterDef = {
   key: 'neuro',
   label: '🧠 Нейро-бустер',
   description: 'Когнитивная поддержка, сон, тревога, адаптация к стрессу.',
-  trigger: 'Тревога >6/10, сон <6ч, ↑кортизол, стресс >7/10, раздражительность.',
+  trigger: 'Тревога >6/10, сон <6ч, ↑кортизол, стресс >7/10, раздражительность. PED: тренболон/19-нор → авто.',
+  // ── LV1 (база) — статья: agmatine ★, NAC ★, таурин ★ + существующие 9 ──
   subs: [
     { substanceId: 'magnesium',         reason: 'Mg-зависимая нейротрансмиссия, блок NMDA, ↑ГAМК', category: 'mineral' },
     { substanceId: 'ashwagandha',       reason: '↓кортизола 20-30% (мета), адаптоген, ↑ГAМК-ергический тонус', category: 'adaptogen' },
@@ -116,11 +124,65 @@ export const NEURO_BOOST: BoosterDef = {
     { substanceId: 'acetyl_l_carnitine',reason: 'Митохондриальная защита нейронов, ↑ацетилхолина', category: 'amino' },
     { substanceId: 'vitamin_b6',        reason: 'Кофактор синтеза серотонина/дофамина/ГAМК', category: 'vitamin' },
     { substanceId: 'apigenin',          reason: 'ГAМК-модулятор, ↓тревоги (микродозинг)', category: 'other' },
-    { substanceId: 'magnolia',           reason: 'Анксиолитик (ханиол/магнолол), ГAМК-ергический', category: 'other' },
+    { substanceId: 'magnolia',          reason: 'Анксиолитик (ханиол/магнолол), ГAМК-ергический', category: 'other' },
+    // ── Добавлено по статье «Нейротоксичность ААС» ──
+    { substanceId: 'agmatine',          reason: '★ must have на курсе: неконкурентный антагонист NMDA, ↓глутаматергической активности', category: 'amino' },
+    { substanceId: 'magnesium_l_threonate', reason: 'Mg через ГЭБ, ↑синаптическая пластичность, блок NMDA', category: 'mineral' },
+    { substanceId: 'gaba',              reason: 'Тормозной нейромедиатор, ↓возбудимость ЦНС (статья: влияет на флору кишечника → ЦНС)', category: 'amino' },
+    { substanceId: 'tryptophan',        reason: 'Предшественник серотонина → мелатонин (статья: ААС ↓серотонин)', category: 'amino' },
+    { substanceId: 'nac',               reason: '★ Снижает глутаматергическую активность через mGluR2/3 (статья: АЦЦ при ОКР)', category: 'antioxidant' },
+    { substanceId: 'taurine',           reason: '★ Стабилизирует митохондрии, ↓кальциевая токсичность (статья)', category: 'amino' },
+    { substanceId: 'alpha_lipoic',      reason: '★ Проникает в ЦНС, ↓оксидативный стресс нейронов (статья)', category: 'antioxidant' },
+  ],
+  // ── LV2 (средний) — нейростероиды, BDNF, серотонин ──
+  subsLv2: [
+    { substanceId: 'pregnenolone',      reason: 'Тормозный нейростероид (статья: закрывает прегненолоновую дырку на ААС)', category: 'hormonal' },
+    { substanceId: 'inositol',          reason: '↑чувствительность серотониновых рецепторов (статья: ОКР/БДР)', category: 'other' },
+    { substanceId: 'citicoline',        reason: 'Донатор холина для ACh, ↑фосфатидилхолин мембран', category: 'other' },
+    { substanceId: 'lions_mane',        reason: '↑NGF через ERK1/2 (статья: нейротрофины, BDNF)', category: 'other' },
+    { substanceId: 'phosphatidylserine',reason: 'Связывает кортизол, ↓GR-активацию в гиппокампе', category: 'other' },
+    { substanceId: 'bacopa',            reason: '↑ацетилхолин, ↑дендритное ветвление, антиоксидант', category: 'adaptogen' },
+    { substanceId: 'astaxanthin',       reason: 'Встраивается в мембрану, блокирует окисление жиров (статья: митохондрии/ДНК)', category: 'antioxidant' },
+    { substanceId: 'grandaxine',        reason: 'ФДЭ-4 ингибитор, ↑ГАМК без толерантности (статья: LV2)', category: 'pharma' },
+  ],
+  // ── LV3 (тяжёлый) — NMDA-антагонизм, нормотимики, TrkB-агонисты ──
+  // Статья: «самая мощная нейропротекция — адекватная доза и длительность»
+  // LV3 — селективные пары (не стекать 2 NMDA-антагониста)
+  subsLv3: [
+    { substanceId: 'fasoracetam',       reason: '↑ГAМК-Б рецепторы (статья: контроль импульсов в префронтальной коре)', category: 'other' },
+    { substanceId: 'bromantane',        reason: '↑тирозин-гидроксилаза → дофамин, ↓ГAМК-транспортёр (статья: 19-нор)', category: 'other' },
+    { substanceId: 'noopept',           reason: '↑NGF, ↑BDNF, ↑AMPA (статья: нейрогенез)', category: 'other' },
+    { substanceId: 'dihexa',            reason: 'c-met/HGF агонист, синаптогенез 10× сильнее BDNF (статья: LV3)', category: 'pharma' },
+    { substanceId: 'tropoflavin',       reason: 'TrkB-агонист, ↑выживаемости нейронов (статья: LV3)', category: 'other' },
+    { substanceId: 'phenylpiracetam',   reason: '↑дофамин/норадреналин, ↑мотивация (статья: LV3)', category: 'other' },
+  ],
+  subsLv3Alternates: [
+    {
+      group: 'NMDA-антагонизм / нормотимик (выбрать ОДИН — не стекать)',
+      options: [
+        { substanceId: 'memantine',    reason: 'Неконкурентный антагонист NMDA, ↓эксайтотоксичность (статья: LV4)', category: 'pharma' },
+        { substanceId: 'lamotrigine',  reason: 'Негативный модулятор Na-каналов, нормотимик (статья: LV4)', category: 'pharma' },
+        { substanceId: 'amantadine',   reason: 'NMDA-антагонист (слабее мемантина), ↑дофамин, ↑BDNF (статья: LV4)', category: 'pharma' },
+      ],
+    },
+    {
+      group: 'Противотревожный / иммуномодулятор (опционально, выбрать ОДИН)',
+      options: [
+        { substanceId: 'fluvoxamine',  reason: 'СИОЗС + сигма-1 агонист, нейропротекция (статья: LV3)', category: 'pharma' },
+        { substanceId: 'naltrexone',   reason: 'LDN — ↑эндорфины, ↓TLR4-нейровоспаление (статья: LV4)', category: 'pharma' },
+      ],
+    },
+    {
+      group: 'α2-адренорецептор (опционально, для импульсивности/сна)',
+      options: [
+        { substanceId: 'guanfacine',   reason: 'α2 (постсинаптический), ↓импульсивности (статья: LV4)', category: 'pharma' },
+        { substanceId: 'tizanidine',   reason: 'α2 (пресинаптический), ↓норадреналин, индукция сна (статья: LV4)', category: 'pharma' },
+      ],
+    },
   ],
   mechs: ['cns1', 'cns2', 'cns3', 'cns4'],
   organs: ['cns'],
-  rationale: 'Комплексная нейропротекция: Mg+ГAМК-ергические аминокислоты+адаптогены+когнитивные аминокислоты+витамины. 4 механизма ТЗ: нейромедиаторная, оксидативный стресс, апоптоз, нейроэндокринная. Дозы титруются от мягких (Mg, теанин) до средних (ашваганда 300-600 мг).',
+  rationale: 'Комплексная нейропротекция по статье «Нейротоксичность ААС»: LV1 (agmatine★+NAC★+таурин★+Mg+ГAМК-аминокислоты) → LV2 (нейростероиды+BDNF) → LV3 (NMDA-антагонизм, селективные пары: memantine ИЛИ lamotrigine). 4 механизма ТЗ: нейромедиаторная, оксидативный стресс, апоптоз, нейроэндокринная.',
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -132,7 +194,8 @@ export const JOINTS_BOOST: BoosterDef = {
   key: 'joints',
   label: '🦴 Суставной бустер',
   description: 'Регенерация хряща, противовоспаление, коллагеновый синтез.',
-  trigger: 'Боли в суставах >4/10, острая травма <4 нед, ↑CRP>3, осевые нагрузки.',
+  trigger: 'Боли в суставах >4/10, острая травма <4 нед, ↑CRP>3, осевые нагрузки. PED: станозолол → авто.',
+  // ── LV1 (база) — хондропротекция, анти-воспаление ──
   subs: [
     { substanceId: 'collagen',     reason: 'Коллаген II типа — основной белок гиалинового хряща', category: 'amino' },
     { substanceId: 'glucosamine', reason: 'Субстрат GAG, ↑протеогликанов хряща', category: 'amino' },
@@ -142,11 +205,31 @@ export const JOINTS_BOOST: BoosterDef = {
     { substanceId: 'curcumin',    reason: '↓COX-2, ↓NF-κB, ↓MMP — тройной противовоспалительный эффект', category: 'antiinflam' },
     { substanceId: 'hyaluronic', reason: 'Компонент синовиальной жидкости, ↓трения', category: 'other' },
     { substanceId: 'vitamin_c',   reason: 'Кофактор гидроксилирования пролина → синтез коллагена', category: 'vitamin' },
-    { substanceId: 'bpc157',      reason: 'Пептид регенерации (ангio+fibroblast), ↓воспаления', category: 'pharma' },
+    { substanceId: 'omega3',      reason: 'Резолвины/протектины, ↓воспаления в синовии', category: 'other' },
+  ],
+  // ── LV2 (средний) — усиление синтеза коллагена, минерализация ──
+  subsLv2: [
+    { substanceId: 'collagen_uc2', reason: 'Коллаген UC-II — оральная толерантность, ↓атаку на коллаген сустава', category: 'amino' },
+    { substanceId: 'silicon',      reason: 'Сшивка коллагена и эластина, стабилизация ГАГ', category: 'mineral' },
+    { substanceId: 'manganese',    reason: 'Кофактор гликозилтрансфераз → синтез ГАГ', category: 'mineral' },
+    { substanceId: 'vitamin_d3',   reason: 'VDR-активация, Ca²⁺ гомеостаз, минерализация кости', category: 'vitamin' },
+    { substanceId: 'vitamin_k2',   reason: 'Активация остеокальцина → Ca²⁺ в кости', category: 'vitamin' },
+    { substanceId: 'calcium',      reason: 'Минерализация костной ткани', category: 'mineral' },
+    { substanceId: 'boron',        reason: '↑ t½ вит. D и E₂, ↓боль в суставах', category: 'mineral' },
+    { substanceId: 'havinson_a4',  reason: 'Пептидный биорегулятор хряща, ↑хондроцитов (Суставы.txt)', category: 'pharma' },
+    { substanceId: 'ligamentide',  reason: 'Пептид для связок/сухожилий, ↑регенерации (Суставы.txt: 6-нед курс)', category: 'pharma' },
+    { substanceId: 'voltaren_gel', reason: 'Диклофенак местно, ↓COX-2 локально (Суставы.txt: 2-3р/день)', category: 'pharma' },
+  ],
+  // ── LV3 (пептиды) — 6-недельный протокол восстановления (Суставы.txt) ──
+  // Протокол щелчка локтя: BPC-157 + TB-500 + GHK-Cu
+  subsLv3: [
+    { substanceId: 'bpc157',  reason: 'Пептид регенерации (ангио+фибробласт), ↓воспаления (Суставы.txt: 250-400 мкг/день)', category: 'pharma' },
+    { substanceId: 'tb500',   reason: 'Thymosin β4 — полимеризация G-актина, ↑миграцию клеток (Суставы.txt: 2.5-10 мг/нед)', category: 'pharma' },
+    { substanceId: 'ghk_cu',  reason: 'GHK-Cu — медь-пептид, ↑коллаген/эластин, анти-воспаление (Суставы.txt: 1-2 мг)', category: 'pharma' },
   ],
   mechs: ['cns2','cv1','hem2'],   // ─ Mesenchymal mech не входит в ТЗ-28 → бустер работает через антиокиданты/витамины; формально соответствует ТЗ через перекрёстные мехи
   organs: ['cns','cardio','hematologic'], // снимает опосредованно: анти-воспалительный,vascular (эндотелий), метаболический синдром (chondroprotection: mTOR)
-  rationale: 'Регенерация хряща и противовоспаление: субстрат синтеза GAG + анти-LOX + ↑коллаген. ↑CRP/острая травма — безусловное добавление. mfmode: коллаген 10-15 г/день с витамином C 500 мг.',
+  rationale: 'Регенерация хряща и противовоспаление по Суставы.txt: LV1 (хондропротекторы+анти-воспаление) → LV2 (синтез коллагена+минерализация) → LV3 (пептиды: BPC-157+TB-500+GHK-Cu — 6-недельный протокол). ↑CRP/острая травма/станозолол — безусловное добавление.',
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -268,6 +351,14 @@ export interface BoosterTriggerCtx {
   crpLevel?: number;               // мг/л
   // stack — активированные стеки (id из STACK_DB)
   triggeredStackIds?: string[];
+  // ── Tier-based triggering (Фаза 1: PED-risk + symptom + force) ──
+  symptomNeuro?: boolean;          // insomnia/anxiety/mood_swings из pill-кнопок
+  symptomJoints?: boolean;         // joint_pain из pill-кнопки
+  forceNeuro?: boolean;            // принудительно на level='max'
+  forceJoints?: boolean;           // принудительно на level='max'
+  pedNeuroTier?: 0 | 1 | 2 | 3;   // tier из assessPedRisk (приоритет над level)
+  pedJointsTier?: 0 | 1 | 2 | 3;  // tier из assessPedRisk
+  pedRiskReasons?: string[];       // причины для UI-баннера
 }
 
 export interface AppliedBooster {
@@ -278,12 +369,21 @@ export interface AppliedBooster {
   organs: TzOrganId[];
   rationale: string;
   triggered: boolean;
+  tier?: 0 | 1 | 2 | 3;   // активированный tier
+  reasons?: string[];      // причины активации (для UI)
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 //  Оценка триггеров
 // ════════════════════════════════════════════════════════════════════════════
 export function shouldActivateNeuro(ctx: BoosterTriggerCtx): boolean {
+  // PED-risk tier (приоритет — даже на «База» активирует бустер)
+  if ((ctx.pedNeuroTier ?? 0) > 0) return true;
+  // Принудительно на «Максимум»
+  if (ctx.forceNeuro) return true;
+  // Симптом-кнопки (insomnia/anxiety/mood_swings)
+  if (ctx.symptomNeuro) return true;
+  // Детальные state-оценки (существующая логика)
   if (ctx.anxietyScore != null && ctx.anxietyScore > 6) return true;
   if (ctx.sleepHours != null && ctx.sleepHours < 6) return true;
   if (ctx.cortisolHigh) return true;
@@ -293,6 +393,13 @@ export function shouldActivateNeuro(ctx: BoosterTriggerCtx): boolean {
 }
 
 export function shouldActivateJoints(ctx: BoosterTriggerCtx): boolean {
+  // PED-risk tier (приоритет)
+  if ((ctx.pedJointsTier ?? 0) > 0) return true;
+  // Принудительно на «Максимум»
+  if (ctx.forceJoints) return true;
+  // Симптом-кнопка (joint_pain)
+  if (ctx.symptomJoints) return true;
+  // Детальные state-оценки (существующая логика)
   if (ctx.jointPainScore != null && ctx.jointPainScore > 4) return true;
   if (ctx.acuteInjuryWeeks != null && ctx.acuteInjuryWeeks < 4) return true;
   if (ctx.crpLevel != null && ctx.crpLevel > 3) return true;
@@ -301,6 +408,66 @@ export function shouldActivateJoints(ctx: BoosterTriggerCtx): boolean {
 
 export function getTriggeredStacks(ctx: BoosterTriggerCtx): string[] {
   return ctx.triggeredStackIds || [];
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//  Tier computation (Фаза 1: PED-risk + symptom + force + state-estimate)
+// ────────────────────────────────────────────────────────────────────────────
+
+function computeNeuroTier(ctx: BoosterTriggerCtx): 0 | 1 | 2 | 3 {
+  const pedTier = ctx.pedNeuroTier ?? 0;
+  const symptomTier = ctx.symptomNeuro ? 2 : 0;
+  // state-estimate trigger → tier 2 (тревога/сон/стресс/кортизол/раздражительность)
+  const stateTier = (
+    (ctx.anxietyScore != null && ctx.anxietyScore > 6) ||
+    (ctx.sleepHours != null && ctx.sleepHours < 6) ||
+    ctx.cortisolHigh ||
+    (ctx.stressScore != null && ctx.stressScore > 7) ||
+    ctx.irritability
+  ) ? 2 : 0;
+  const forceTier = ctx.forceNeuro ? 1 : 0;
+  return Math.max(pedTier, symptomTier, stateTier, forceTier) as 0 | 1 | 2 | 3;
+}
+
+function computeJointsTier(ctx: BoosterTriggerCtx): 0 | 1 | 2 | 3 {
+  const pedTier = ctx.pedJointsTier ?? 0;
+  const symptomTier = ctx.symptomJoints ? 2 : 0;
+  // state-estimate trigger → tier 2 (боль/травма/CRP)
+  const stateTier = (
+    (ctx.jointPainScore != null && ctx.jointPainScore > 4) ||
+    (ctx.acuteInjuryWeeks != null && ctx.acuteInjuryWeeks < 4) ||
+    (ctx.crpLevel != null && ctx.crpLevel > 3)
+  ) ? 2 : 0;
+  const forceTier = ctx.forceJoints ? 1 : 0;
+  return Math.max(pedTier, symptomTier, stateTier, forceTier) as 0 | 1 | 2 | 3;
+}
+
+/**
+ * Select booster substances by tier.
+ * tier 1 → LV1 only
+ * tier 2 → LV1 + LV2
+ * tier 3 → LV1 + LV2 + LV3 (incl. one from each alternate group)
+ */
+function selectBoosterSubsByTier(
+  booster: BoosterDef,
+  tier: 0 | 1 | 2 | 3,
+  existing: Set<string>
+): BoosterSubstance[] {
+  if (tier === 0) return [];
+  let selected: BoosterSubstance[] = [...booster.subs]; // LV1
+  if (tier >= 2 && booster.subsLv2) selected = [...selected, ...booster.subsLv2];
+  if (tier >= 3) {
+    if (booster.subsLv3) selected = [...selected, ...booster.subsLv3];
+    // Alternates: pick ONE from each group (memantine ИЛИ lamotrigine — не стекать)
+    if (booster.subsLv3Alternates) {
+      for (const group of booster.subsLv3Alternates) {
+        const pick = group.options[0]; // первый вариант (по умолчанию)
+        if (pick) selected.push(pick);
+      }
+    }
+  }
+  // Dedup against existing plan
+  return selected.filter(s => !existing.has(s.substanceId.toLowerCase()));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -317,12 +484,15 @@ export function applyBoosters(
 
   // NEURO
   if (shouldActivateNeuro(ctx)) {
-    const subs = NEURO_BOOST.subs.filter(s => !existing.has(s.substanceId.toLowerCase()));
+    const tier = computeNeuroTier(ctx);
+    const subs = selectBoosterSubsByTier(NEURO_BOOST, tier, existing);
     if (subs.length) {
       result.push({
         key: 'neuro', label: NEURO_BOOST.label, subs,
         mechs: NEURO_BOOST.mechs, organs: NEURO_BOOST.organs,
         rationale: NEURO_BOOST.rationale, triggered: true,
+        tier,
+        reasons: ctx.pedRiskReasons,
       });
       subs.forEach(s => existing.add(s.substanceId.toLowerCase()));
     }
@@ -330,12 +500,15 @@ export function applyBoosters(
 
   // JOINTS
   if (shouldActivateJoints(ctx)) {
-    const subs = JOINTS_BOOST.subs.filter(s => !existing.has(s.substanceId.toLowerCase()));
+    const tier = computeJointsTier(ctx);
+    const subs = selectBoosterSubsByTier(JOINTS_BOOST, tier, existing);
     if (subs.length) {
       result.push({
         key: 'joints', label: JOINTS_BOOST.label, subs,
         mechs: JOINTS_BOOST.mechs, organs: JOINTS_BOOST.organs,
         rationale: JOINTS_BOOST.rationale, triggered: true,
+        tier,
+        reasons: ctx.pedRiskReasons,
       });
       subs.forEach(s => existing.add(s.substanceId.toLowerCase()));
     }
@@ -351,6 +524,7 @@ export function applyBoosters(
         key: 'stack', label: booster.label, subs,
         mechs: booster.mechs, organs: booster.organs,
         rationale: booster.rationale, triggered: true,
+        tier: 0,
       });
       subs.forEach(s => existing.add(s.substanceId.toLowerCase()));
     }
@@ -495,4 +669,44 @@ export function megaEnhance(
 
   // 4. Отобрать топ-20 (не больше — это усиление, а не замена плана)
   return scored.slice(0, 20);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  Helper для UI: получить список веществ по tier (для авто-выбора в попапах)
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Возвращает список ID веществ NEURO_BOOST для данного tier.
+ * tier 1 → LV1, tier 2 → LV1+LV2, tier 3 → LV1+LV2+LV3+alternates
+ */
+export function getNeuroBoosterSubstanceIds(tier: 0 | 1 | 2 | 3): string[] {
+  if (tier === 0) return [];
+  const ids: string[] = NEURO_BOOST.subs.map(s => s.substanceId);
+  if (tier >= 2 && NEURO_BOOST.subsLv2) {
+    ids.push(...NEURO_BOOST.subsLv2.map(s => s.substanceId));
+  }
+  if (tier >= 3) {
+    if (NEURO_BOOST.subsLv3) ids.push(...NEURO_BOOST.subsLv3.map(s => s.substanceId));
+    if (NEURO_BOOST.subsLv3Alternates) {
+      for (const group of NEURO_BOOST.subsLv3Alternates) {
+        if (group.options[0]) ids.push(group.options[0].substanceId);
+      }
+    }
+  }
+  return Array.from(new Set(ids));
+}
+
+/**
+ * Возвращает список ID веществ JOINTS_BOOST для данного tier.
+ */
+export function getJointsBoosterSubstanceIds(tier: 0 | 1 | 2 | 3): string[] {
+  if (tier === 0) return [];
+  const ids: string[] = JOINTS_BOOST.subs.map(s => s.substanceId);
+  if (tier >= 2 && JOINTS_BOOST.subsLv2) {
+    ids.push(...JOINTS_BOOST.subsLv2.map(s => s.substanceId));
+  }
+  if (tier >= 3 && JOINTS_BOOST.subsLv3) {
+    ids.push(...JOINTS_BOOST.subsLv3.map(s => s.substanceId));
+  }
+  return Array.from(new Set(ids));
 }

@@ -679,13 +679,92 @@ export function hydrateState(): Partial<CalculatorState> {
     if (raw) {
       const p = JSON.parse(raw);
       const s = p.settings || {};
+      // ── ЭТАП 2: nested чтение из UnifiedSettings (исправление flat-ключей) ──
+      // Profile: personal + lifestyle
+      const personal = s.personal || {};
+      const lifestyle = s.lifestyle || {};
+      const health = s.health || {};
+      const pharma = s.pharma || {};
       result.profile = {
-        weight: s.weight || 80, age: s.age || 30, sex: (s.sex || 'male') as 'male' | 'female',
-        height: s.height, bodyfat: s.bodyFat,
-        workoutsPerWeek: s.workoutsPerWeek || 3, avgWorkoutMinutes: s.avgWorkoutMinutes || 60,
-        sleepHours: s.sleepHours || 7, stressLevel: s.stressLevel || 4,
-        smoker: s.smoker || false, alcohol: s.alcohol || 'rare', caffeineMg: s.caffeineMg || 100,
+        weight: personal.weight || s.weight || 80,
+        age: personal.age || s.age || 30,
+        sex: (personal.sex || s.sex || 'male') as 'male' | 'female',
+        height: personal.height ?? s.height,
+        bodyfat: personal.bodyFat ?? s.bodyFat ?? personal.bodyfat,
+        workoutsPerWeek: personal.workoutsPerWeek || s.workoutsPerWeek || 3,
+        avgWorkoutMinutes: personal.avgWorkoutMinutes || s.avgWorkoutMinutes || 60,
+        sleepHours: lifestyle.sleepHours ?? s.sleepHours ?? 7,
+        stressLevel: lifestyle.stressLevel ?? s.stressLevel ?? 4,
+        smoker: lifestyle.smoke ?? s.smoker ?? false,
+        alcohol: lifestyle.alcohol || s.alcohol || 'rare',
+        caffeineMg: lifestyle.caffeineMg ?? s.caffeineMg ?? 100,
       };
+      // ── Neuro: из health.* с нормализацией шкалы 1-5 → 0-10 ──
+      if (!result.neuro) {
+        result.neuro = {
+          dopamineScore: health.dopamineScore ?? 3,
+          serotoninScore: health.serotoninScore ?? 3,
+          gabaBalance: health.gabaBalance || 'balance',
+          memoryIssues: health.memoryIssues ?? false,
+          focusIssues: health.focusIssues ?? false,
+          slowThinking: health.slowThinking ?? false,
+          coordinationIssues: health.coordinationIssues ?? false,
+          // aggressionScore в профиле 1-5, в калькуляторе 0-10 → ×2
+          aggressionScore: (health.aggressionScore ?? 3) * 2,
+          headaches: health.headaches ?? false,
+          weatherDependent: health.weatherDependent ?? false,
+          sleepQuality: health.sleepQuality || lifestyle.sleepQuality || 'good',
+        } as any;
+      }
+      // ── ODA: из health.* с конвертацией jointPainSeverity ──
+      if (!result.oda) {
+        const jps = health.jointPainSeverity;
+        result.oda = {
+          jointPain: jps ?? (health.jointPain ? 'moderate' : 'none'),
+          ligamentIssues: health.ligamentIssues ?? false,
+          backPain: health.backPain ?? false,
+          injuries: Array.isArray(health.injuries) ? health.injuries.map((i: any) => typeof i === 'string' ? i : (i?.description || i?.name || '')).filter(Boolean) : [],
+        } as any;
+      }
+      // ── Pharma: из pharma.* с маппингом ──
+      if (!result.pharma) {
+        const phaseMap: Record<string, string> = { baseline: 'base', course: 'course', bridge: 'bridge', pct: 'pct', post_pct: 'pct', fertility: 'base' };
+        result.pharma = {
+          phase: (phaseMap[pharma.phase] || pharma.phase || 'course') as any,
+          aas: Array.isArray(pharma.currentSubstances) ? pharma.currentSubstances.map((s: any) => ({ id: s.id || s.substanceId || '', doseMgWeek: s.doseMgWeek || s.weeklyDose || 0, weeks: s.weeks || 0 })) : [],
+          hasGH: pharma.hasGH ?? false,
+          hasIGF: pharma.hasIGF ?? false,
+          hasInsulin: pharma.hasInsulin ?? false,
+          hasHCG: pharma.hcgEnabled ?? false,
+          hasAI: pharma.aiEnabled ?? false,
+          hasCaber: pharma.hasCaber ?? false,
+          hasSERM: pharma.hasSERM ?? false,
+          hasSARMs: pharma.hasSARMs ?? false,
+          hasMGF: pharma.hasMGF ?? false,
+          hasGLP1: pharma.hasGLP1 ?? false,
+          ghIU: pharma.ghIU ?? 0,
+          insulinIU: pharma.insulinIU ?? 0,
+          igfMcg: pharma.igfMcg ?? 0,
+          clenMcg: pharma.clenMcg ?? 0,
+          t3Mcg: pharma.t3Mcg ?? 0,
+        } as any;
+      }
+      // ── Symptoms: из symptoms.recent → string[] ──
+      if (!result.symptoms) {
+        const sym = s.symptoms || {};
+        const recent = sym.recent || {};
+        const activeSymptoms = Object.entries(recent)
+          .filter(([_, v]: [string, any]) => v && typeof v === 'object' && v.score > 0)
+          .map(([k]) => k);
+        if (activeSymptoms.length > 0) {
+          (result as any).symptomsList = activeSymptoms;
+        }
+      }
+      // ── Health conditions: из health.chronicConditions ──
+      if (!(result as any).healthConditions) {
+        (result as any).healthConditions = Array.isArray(health.chronicConditions) ? health.chronicConditions : [];
+      }
+      // ── Genetics ──
       if (s.genetics && !result.genetics) {
         result.genetics = {
           cyp19a1: s.genetics.CYP19A1 || s.genetics.cyp19a1 || 'unknown',
@@ -694,20 +773,37 @@ export function hydrateState(): Partial<CalculatorState> {
           mthfr: s.genetics.MTHFR || s.genetics.mthfr || 'unknown',
         };
       }
+      // ── Contraindications ──
       if (!result.contraindications) {
-        const ci = s.chronicConditions || [];
+        const ci = health.chronicConditions || s.chronicConditions || [];
         result.contraindications = {
-          allergies: (s.foodAllergies || []).join(', '),
-          hasCVD: ci.includes('heart') || ci.includes('hypertension'),
-          hasThrombophilia: false,
-          hasGI: false,
-          hasProstateIssues: false,
+          allergies: (s.foodAllergies || (s.nutrition && s.nutrition.foodAllergies) || []).join(', '),
+          hasCVD: ci.includes('heart') || ci.includes('hypertension') || ci.includes('cvd'),
+          hasThrombophilia: ci.includes('thrombophilia'),
+          hasGI: ci.includes('gi') || ci.includes('giDisease'),
+          hasProstateIssues: ci.includes('prostate'),
           hasDiabetes: ci.includes('diabetes'),
-          hasEpilepsy: false,
-          hasMentalIllness: false,
+          hasEpilepsy: ci.includes('epilepsy'),
+          hasMentalIllness: ci.includes('mental') || ci.includes('mentalIllness'),
           hasLiverDisease: ci.includes('liver'),
           hasKidneyDisease: ci.includes('kidney'),
         };
+      }
+      // ── Labs: из labs.summary → плоский record (адаптер) ──
+      if (!result.labs && s.labs && s.labs.summary) {
+        const summary = s.labs.summary || {};
+        const flatPanel: Record<string, string> = {};
+        for (const [k, v] of Object.entries(summary)) {
+          if (v && typeof v === 'object' && (v as any).value != null) {
+            flatPanel[k] = String((v as any).value);
+          }
+        }
+        if (Object.keys(flatPanel).length > 0) {
+          result.labs = {
+            preCourse: null, midCourse: null, postPCT: null,
+            fullPanel: { panelBiochem: flatPanel } as any,
+          };
+        }
       }
     }
   } catch {}
