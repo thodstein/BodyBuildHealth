@@ -4,6 +4,10 @@ import {
   calcW,
   allBlockIdsUnique,
   cloneWeekProgression,
+  firstFreeTrainingDay,
+  resizeTrainingSessions,
+  sessionDayOfWeek,
+  trainingDayForIndex,
 } from '../program-editor-logic';
 import type { UserWeek, TrainingProfile } from '../../../../engines/user-program/user-program.types';
 import { newId } from '../../../../engines/user-program/user-program.types';
@@ -54,6 +58,39 @@ function makeProfile(): TrainingProfile {
     injuries: [],
   } as TrainingProfile;
 }
+
+describe('training day assignment', () => {
+  it('assigns practical default days and skips occupied days', () => {
+    expect(trainingDayForIndex(0)).toBe(0);
+    expect(trainingDayForIndex(1)).toBe(2);
+    expect(firstFreeTrainingDay([{ dayOfWeek: 0 }, { dayOfWeek: 2 }])).toBe(4);
+    expect(firstFreeTrainingDay([{ dayOfWeek: 0 }, { dayOfWeek: 2 }, { dayOfWeek: 4 }])).toBe(1);
+  });
+
+  it('normalizes missing or invalid session days for display', () => {
+    expect(sessionDayOfWeek({}, 1)).toBe(2);
+    expect(sessionDayOfWeek({ dayOfWeek: 8 }, 1)).toBe(2);
+    expect(sessionDayOfWeek({ dayOfWeek: 5 }, 1)).toBe(5);
+  });
+
+  it('resizes a week while preserving populated sessions', () => {
+    const populated: UserWeek['sessions'][number] = {
+      id: 'keep', name: 'Push', dayOfWeek: 2, focus: 'chest', blocks: [{ id: 'b', type: 'accessory', exerciseName: 'Bench', muscle: 'chest', role: 'accessory', sets: [{ reps: 8, rir: 2 }] }],
+    };
+    const result = resizeTrainingSessions([populated], 3);
+    expect(result).toHaveLength(3);
+    expect(result[0]).toBe(populated);
+    expect(result[1].dayOfWeek).not.toBe(2);
+    expect(resizeTrainingSessions(result, 1)[0]).toBe(populated);
+  });
+
+  it('creates explicit deload sessions for a deload week', () => {
+    const result = resizeTrainingSessions([], 2, true);
+    expect(result).toHaveLength(2);
+    expect(result.every(session => session.focus === 'deload')).toBe(true);
+    expect(result.every(session => session.blocks.length === 1)).toBe(true);
+  });
+});
 
 describe('program-editor-logic', () => {
   describe('addWeakToWeekLogic', () => {

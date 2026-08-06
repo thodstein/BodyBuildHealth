@@ -6,7 +6,6 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getAllPrograms } from '../../../engines/complete-program-library.engine';
-import { expandProgramWeeks } from '../../../engines/program-progression.engine';
 import { cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
 import { newId } from '../../../engines/user-program/user-program.types';
 import type { UserProgram, UserWeek, UserBlock, ProgramProgression } from '../../../engines/user-program/user-program.types';
@@ -40,11 +39,13 @@ import { labTrainingAdjust } from './lab-training-adjust';
 import { suggestFeeders } from '../../../engines/bb/bb-autocoach.engine';
 import { useDataLink } from '../../../core/data-link';
 import { detectLift } from '../../../engines/lms/lms-to-pl';
-import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
+import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS, ORIGINAL_PROGRAMS, ORIGINAL_PROGRAMS_URL, type OriginalProgram } from './programs-data';
+import { useOriginalPrograms } from './useOriginalPrograms';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { getReferencedCycle, userWeekToBBPlan, validateProgram, cloneFromCycle, cloneFromLibrary, createBlank, createFromBuild, deleteRevision } from '../../../engines/user-program/program-store';
 import { autodraftBBPlan, applyPhaseModulation, plLmsScheduleDays, computePlanQualityFor } from '../../../engines/manual-constructor';
 import { GROUP_RU } from './program-types';
+import { resizeTrainingSessions, sessionDayOfWeek } from './program-editor-logic';
 import { BulkApplyCard } from './BulkApplyCard';
 import { useEditorToast } from './EditorToast';
 import { TrainingModal } from './TrainingModal';
@@ -96,8 +97,8 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     pushSnapshot(p);
     onChange(p);
   }, [onChange, pushSnapshot]);
-  const update = (patch: Partial<UserProgram>) => onChangeWithUndo({ ...program, ...patch });
-  const updateMeta = (patch: Partial<UserProgram['meta']>) => onChangeWithUndo({ ...program, meta: { ...program.meta, ...patch } });
+  const update = useCallback((patch: Partial<UserProgram>) => onChangeWithUndo({ ...program, ...patch }), [program, onChangeWithUndo]);
+  const updateMeta = useCallback((patch: Partial<UserProgram['meta']>) => onChangeWithUndo({ ...program, meta: { ...program.meta, ...patch } }), [program, onChangeWithUndo]);
   const linked = useDataLink();
   const labAdjust = useMemo(() => labTrainingAdjust(linked.labAnalysis ?? null), [linked.labAnalysis]);
   const [tprofile, updateTProfile] = useTrainingProfile();
@@ -157,7 +158,8 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   };
   const [showMore, setShowMore] = useState(false);
   const [showTableView, setShowTableView] = useState(false);
-  const libraryPrograms = useMemo(() => [...getAllPrograms(), ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS], []);
+  const originalPrograms = useOriginalPrograms();
+  const libraryPrograms = useMemo(() => [...getAllPrograms(), ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS, ...originalPrograms], [originalPrograms]);
   const plCycleList = useMemo(() => LMS_CYCLES, []);
   const loadIntoEditor = (p: UserProgram) => {
     onChange(p);
@@ -252,46 +254,46 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     }
   };
   // U5: при ручном сохранении — обновляем baseline
-  const handleSave = (note?: string) => {
+  const handleSave = useCallback((note?: string) => {
     if (onSave(note) !== false) {
       lastSavedRef.current = JSON.stringify(program);
       setIsDirty(false);
     }
-  };
+  }, [program, onSave]);
 
   // P5: «⚡ Заполнить автоматически» — реальная интеллектуальная сборка через
   // buildBBPlan (BB) + LMS-cycles (PL). Пользователь получает рабочую программу
   // с реальными упражнениями и весами, а не пустую заготовку.
-  // Читает единый профиль тренированности (equipment, weakPoints, avoidAxialLoad,
-  // workMax, onCourse, favoriteExercises, excludedExercises) + лаб. коррекцию.
-  const autoFillDraft = () => {
-    // P0-4: extracted to auto-fill-draft.ts for per-direction testability
-    const prof = tprofile;
-    const days = Math.max(2, Math.min(7, program.meta.daysPerWeek || 4));
-    updateMeta({ title: '[Черновик] ' + (program.meta.title || 'Моя программа') });
-    const profData = linked.profile?.settings?.personal;
-    const lifeData = linked.profile?.settings?.lifestyle;
-    const ctx: AutoFillCtx = {
-      program, prof, days,
-      bodyFat: profData?.bodyFat,
-      leanMass: (profData?.weight && profData?.bodyFat != null) ? Math.round(profData.weight * (1 - profData.bodyFat / 100)) : undefined,
-      hrvMs: lifeData?.morningHRV,
-      sleepHours: lifeData?.sleepHours,
-      stressLevel: lifeData?.stressLevel,
-      labMrvMultiplier: labAdjust.mrvMultiplier,
-      update, showToast,
-    };
-    setIsAutoFilling(true);
-    window.setTimeout(() => {
-      try { autoFillDraftDispatch(ctx); }
-      finally { setIsAutoFilling(false); }
-    }, 0);
-  };
+   // Читает единый профиль тренированности (equipment, weakPoints, avoidAxialLoad,
+   // workMax, onCourse, favoriteExercises, excludedExercises) + лаб. коррекцию.
+   const autoFillDraft = useCallback(() => {
+     // P0-4: extracted to auto-fill-draft.ts for per-direction testability
+     const prof = tprofile;
+     const days = Math.max(2, Math.min(7, program.meta.daysPerWeek || 4));
+     updateMeta({ title: '[Черновик] ' + (program.meta.title || 'Моя программа') });
+     const profData = linked.profile?.settings?.personal;
+     const lifeData = linked.profile?.settings?.lifestyle;
+     const ctx: AutoFillCtx = {
+       program, prof, days,
+       bodyFat: profData?.bodyFat,
+       leanMass: (profData?.weight && profData?.bodyFat != null) ? Math.round(profData.weight * (1 - profData.bodyFat / 100)) : undefined,
+       hrvMs: lifeData?.morningHRV,
+       sleepHours: lifeData?.sleepHours,
+       stressLevel: lifeData?.stressLevel,
+       labMrvMultiplier: labAdjust.mrvMultiplier,
+       update, showToast,
+     };
+     setIsAutoFilling(true);
+     window.setTimeout(() => {
+       try { autoFillDraftDispatch(ctx); }
+       finally { setIsAutoFilling(false); }
+     }, 0);
+   }, [program, tprofile, linked.profile, labAdjust.mrvMultiplier, update, showToast]);
 
 
- // «🚚 К выполнению» — поддерживает BB и PL.
-  const [execWeek, setExecWeek] = useState(1);
-  const sendToExecution = () => {
+  // «🚚 К выполнению» — поддерживает BB и PL.
+   const [execWeek, setExecWeek] = useState(1);
+   const sendToExecution = useCallback(() => {
     let days: { label: string; exercises: { name: string; muscleGroup: string; targetSets: { weight: number; reps: number; rir: number }[] }[] }[] = [];
 
     if (dir === 'bb' && program.bb) {
@@ -408,10 +410,10 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
       }
     }
     showToast('🚚 Отправлено к выполнению — откройте зону «▶ Тренировка»');
-  };
+   }, [program, dir, showToast, execWeek]);
 
   /** 🖨 PDF-печать программы — print-friendly окно с таблицами */
-  const printProgram = () => {
+  const printProgram = useCallback(() => {
     const w = window.open('', '_blank', 'width=800,height=900');
     if (!w) { showToast('⚠ Разрешите всплывающие окна'); return; }
     const safeTitle = escapeHtml(program.meta.title);
@@ -495,12 +497,12 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     w.document.write(html.join(''));
     w.document.close();
     setTimeout(() => { w.print(); }, 300);
-  };
+    }, [program, dir, showToast]);
 
-  return (
-    <div className="manual-constructor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+   return (
+     <div className="manual-constructor manual-constructor--editor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* V2: Sticky header — always visible during scroll */}
-      <div className="manual-constructor__sticky-header" style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(15,17,22,0.92)', backdropFilter: 'blur(12px) saturate(140%)', WebkitBackdropFilter: 'blur(12px) saturate(140%)', borderRadius: 12, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+        <div className="manual-constructor__sticky-header editor-topbar" style={{ position: 'sticky', top: 0, zIndex: 10, background: 'rgba(15,17,22,0.95)', borderRadius: 12, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
         <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44 }} onClick={safeBack}>← К списку</button>
         <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
         {isPro && <RecoveryBadge onApplyAutoDeload={autoFillDraft} />}
@@ -862,13 +864,13 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         let dayLabels: Array<{ idx: number; label: string; muscles: string[] }> = [];
         if (dir === 'bb' && program.bb) {
           dayLabels = (program.bb.weeks[0]?.sessions ?? []).map((s, i) => ({
-            idx: i,
+            idx: sessionDayOfWeek(s, i),
             label: s.name || `День ${i + 1}`,
             muscles: Array.from(new Set((s.blocks ?? []).map((b) => b.muscle).filter(Boolean))),
           }));
         } else if (dir === 'pl' && program.pl) {
           dayLabels = (program.pl.schedule ?? []).map((s, i) => ({
-            idx: i,
+            idx: s.dayOfWeek,
             label: (s.sessionIdx != null ? `Сессия ${s.sessionIdx + 1}` : `День ${i + 1}`),
             muscles: ['—'],
           }));
@@ -944,7 +946,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
 
 
       {/* Meta */}
-      <div className="constructor-surface" style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="constructor-surface editor-meta-card" style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
          <input aria-label="Название программы" style={IN} value={program.meta.title} onChange={e => updateMeta({ title: e.target.value })} placeholder="Название программы" />
         <div style={{ display: 'flex', gap: 6 }}>
            <select aria-label="Цель программы" style={IN} value={program.meta.goal} onChange={e => updateMeta({ goal: e.target.value })}>
@@ -956,59 +958,48 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
           <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
             Дней/нед
             {/* U3: meta.daysPerWeek каскад — при изменении добавляет/удаляет сессии в bb.weeks */}
-            <input aria-label="Дней тренировок в неделю" type="number" inputMode="numeric" style={IN} value={program.meta.daysPerWeek} min={1} max={7}
-              onChange={e => {
-                const parsed = Number(e.target.value);
-                if (!Number.isFinite(parsed)) return;
-                const v = Math.max(1, Math.min(7, Math.round(parsed)));
-                updateMeta({ daysPerWeek: v });
-                // Каскад на bb.weeks: выровнять кол-во сессий
-                if (program.bb) {
-                  const weeks = program.bb.weeks;
-                  const updated = weeks.map(w => {
-                    const target = v;
-                    const sessions = [...w.sessions];
-                    while (sessions.length < target) {
-                      // P1-3: в deload-неделю добавляем разгрузочную сессию, не копию базовой
-                      if (w.deload) {
-                        sessions.push({ id: newId('ses'), name: 'Разгрузка ' + (sessions.length + 1), focus: 'deload', blocks: [
-                          { id: newId('blk'), type: 'accessory' as const, exerciseName: '', muscle: '', role: 'accessory' as const, sets: [{ reps: 15, rir: 4, weight: 0, restSec: 60 }] }
-                        ] });
-                      } else {
-                        sessions.push({ id: newId('ses'), name: 'День ' + (sessions.length + 1), focus: '', blocks: [] });
-                      }
-                    }
-                    while (sessions.length > target) {
-                      const index = sessions.findIndex(session => session.blocks.length === 0 || session.focus === 'deload');
-                      sessions.splice(index >= 0 ? index : sessions.length - 1, 1);
-                    }
-                    return { ...w, sessions };
-                  });
-                  onChange({ ...program, meta: { ...program.meta, daysPerWeek: v }, bb: { ...program.bb, weeks: updated } });
-                }
-              }} />
+             <input aria-label="Дней тренировок в неделю" type="number" inputMode="numeric" style={IN} value={program.meta.daysPerWeek} min={1} max={7}
+               onChange={e => {
+                 const parsed = Number(e.target.value);
+                 if (!Number.isFinite(parsed)) return;
+                 const v = Math.max(1, Math.min(7, Math.round(parsed)));
+                 const newMeta = { ...program.meta, daysPerWeek: v };
+                 let newProgram = { ...program, meta: newMeta };
+                 // Каскад на bb.weeks: выровнять кол-во сессий
+                  if (program.bb) {
+                    const weeks = program.bb.weeks;
+                    const updated = weeks.map(w => {
+                      const target = v;
+                      return { ...w, sessions: resizeTrainingSessions(w.sessions, target, w.deload) };
+                   });
+                   newProgram = { ...newProgram, bb: { ...program.bb, weeks: updated } };
+                 }
+                 onChangeWithUndo(newProgram);
+               }} />
           </label>
           <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
             Недель
             {/* U3: meta.weeks каскад — при изменении добавляет/удаляет недели в bb.weeks */}
-            <input aria-label="Количество недель программы" type="number" inputMode="numeric" style={IN} value={program.meta.weeks} min={1} max={24}
-              onChange={e => {
-                const parsed = Number(e.target.value);
-                if (!Number.isFinite(parsed)) return;
-                const v = Math.max(1, Math.min(24, Math.round(parsed)));
-                updateMeta({ weeks: v });
-                if (program.bb) {
-                  const weeks = [...program.bb.weeks];
-                  while (weeks.length < v) {
-                    const n = weeks.length + 1;
-                    const template = weeks[0]?.sessions ?? [];
-                    const progression = 1 + (n - 1) * 0.025; // +2.5% за каждую неделю
-                    weeks.push({ week: n, phase: 'accumulation', deload: n % 4 === 0, sessions: template.map(s => ({ ...s, id: newId('ses'), blocks: s.blocks.map(b => ({ ...b, id: newId('blk'), sets: b.sets.map(st => ({ ...st, weight: st.weight ? Math.round(st.weight * progression / 2.5) * 2.5 : st.weight })) })) })) });
-                  }
-                  while (weeks.length > v) weeks.pop();
-                  onChange({ ...program, meta: { ...program.meta, weeks: v }, bb: { ...program.bb, weeks } });
-                }
-              }} />
+             <input aria-label="Количество недель программы" type="number" inputMode="numeric" style={IN} value={program.meta.weeks} min={1} max={24}
+               onChange={e => {
+                 const parsed = Number(e.target.value);
+                 if (!Number.isFinite(parsed)) return;
+                 const v = Math.max(1, Math.min(24, Math.round(parsed)));
+                 const newMeta = { ...program.meta, weeks: v };
+                 let newProgram = { ...program, meta: newMeta };
+                 if (program.bb) {
+                   const weeks = [...program.bb.weeks];
+                   while (weeks.length < v) {
+                     const n = weeks.length + 1;
+                     const template = weeks[0]?.sessions ?? [];
+                     const progression = 1 + (n - 1) * 0.025;
+                     weeks.push({ week: n, phase: 'accumulation', deload: n % 4 === 0, sessions: template.map(s => ({ ...s, id: newId('ses'), blocks: s.blocks.map(b => ({ ...b, id: newId('blk'), sets: b.sets.map(st => ({ ...st, weight: st.weight ? Math.round(st.weight * progression / 2.5) * 2.5 : st.weight })) })) })) });
+                   }
+                   while (weeks.length > v) weeks.pop();
+                   newProgram = { ...newProgram, bb: { ...program.bb, weeks } };
+                 }
+                 onChangeWithUndo(newProgram);
+               }} />
           </label>
         </div>
       </div>
@@ -1025,7 +1016,9 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
             {editorLibOpen === 'bb' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '60vh', overflow: 'auto' }}>
                 {libraryPrograms.map(pr => (
-                  <button key={pr.id ?? pr.name} onClick={() => loadIntoEditor(cloneFromLibrary(expandProgramWeeks(pr)))}
+                  <button key={pr.id ?? pr.name} onClick={() => {
+                    loadIntoEditor(cloneFromLibrary(pr));
+                  }}
                     style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)', color: DIM_STRONG, cursor: 'pointer', fontSize: 11 }}>
                     <div style={{ fontWeight: 700 }}>{pr.name}</div>
                     <div style={{ fontSize: 11, color: DIM }}>{pr.author} · {pr.goal} · {pr.daysPerWeek}д/нед · {pr.durationWeeks}нед</div>

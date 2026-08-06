@@ -23,7 +23,7 @@ import {
   suggestExercisesForGroup,
 } from '../../../engines/manual-constructor';
 import { loadTrainingProfile } from './training-profile';
-import { addWeakToWeekLogic, calcW as calcWLogic } from './program-editor-logic';
+import { addWeakToWeekLogic, calcW as calcWLogic, firstFreeTrainingDay, resizeTrainingSessions, sessionDayOfWeek, trainingDayForIndex } from './program-editor-logic';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { findSubstitutions } from '../../../engines/exercise-substitution.engine';
 import { ExerciseLabPicker } from './ExerciseLabPicker';
@@ -32,6 +32,8 @@ import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/
 import { diagnoseWeakPoint, WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import { tempoFor, TEMPO_BY_CHARACTER, REST_BY_CHARACTER, tutForSet } from '../../../engines/bb/bb-tempo-rest';
 import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
+
+export const TRAINING_DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const;
 
 export function isUserBlockClipboardShape(value: unknown): value is UserBlock {
   if (!value || typeof value !== 'object') return false;
@@ -59,31 +61,51 @@ export function normalizeProgramDayOfWeek(value: number, fallback = 0): number {
 
 const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => void; level: string }> = ({ body, onChange, level }) => {
   const [volWeekIdx, setVolWeekIdx] = useState<number | null>(null);
+  const [expandedWeekIdx, setExpandedWeekIdx] = useState(0);
   const { confirm } = useConfirmDialog();
-  const setWeeks = (weeks: UserWeek[]) => onChange({ ...body, weeks });
+  React.useEffect(() => {
+    setExpandedWeekIdx(current => body.weeks.length === 0 ? -1 : Math.min(Math.max(current, 0), body.weeks.length - 1));
+    setVolWeekIdx(current => current != null && current < body.weeks.length ? current : null);
+  }, [body.weeks.length]);
+  const bodyRef = React.useRef(body);
+  bodyRef.current = body;
+  const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const setWeeks = (weeks: UserWeek[]) => onChange({ ...bodyRef.current, weeks });
   const addWeek = () => {
-    const n = body.weeks.length + 1;
-    setWeeks([...body.weeks, { week: n, phase: 'accumulation', deload: false, sessions: [] }]);
+    const current = bodyRef.current;
+    const n = current.weeks.length + 1;
+    setWeeks([...current.weeks, { week: n, phase: 'accumulation', deload: false, sessions: [] }]);
+    setExpandedWeekIdx(n - 1);
   };
   const updateWeek = (wi: number, patch: Partial<UserWeek>) => {
-    const w2 = body.weeks.map((w, i) => i === wi ? { ...w, ...patch } : w);
+    const w2 = bodyRef.current.weeks.map((w, i) => i === wi ? { ...w, ...patch } : w);
     setWeeks(w2);
+  };
+  const resizeWeek = (wi: number, count: number) => {
+    const current = bodyRef.current;
+    const week = current.weeks[wi];
+    if (!week) return;
+    const sessions = resizeTrainingSessions(week.sessions, count, week.deload);
+    setWeeks(current.weeks.map((w, index) => index === wi ? { ...w, sessions } : w));
   };
   // U4/F4: confirm-диалог при удалении недели — ConfirmDialog вместо window.confirm
   const removeWeek = async (wi: number) => {
-    const wk = body.weeks[wi];
+    const wk = bodyRef.current.weeks[wi];
     const sessCount = wk?.sessions?.length ?? 0;
     const ok = await confirm({ title: `Удалить неделю ${wk?.week}?`, message: `Будет потеряно ${sessCount} сессий. Это нельзя отменить.`, confirmLabel: 'Удалить', danger: true });
     if (!ok) return;
-    setWeeks(body.weeks.filter((_, i) => i !== wi).map((w, i) => ({ ...w, week: i + 1 })));
+    const remaining = bodyRef.current.weeks.filter((_, i) => i !== wi).map((w, i) => ({ ...w, week: i + 1 }));
+    setWeeks(remaining);
+    setExpandedWeekIdx(remaining.length === 0 ? -1 : Math.min(wi, remaining.length - 1));
   };
   // U12: клонировать неделю с прогрессией весов +2.5%
   const cloneWeek = (wi: number) => {
-    const src = body.weeks[wi];
+    const current = bodyRef.current;
+    const src = current.weeks[wi];
     if (!src) return;
     const progression = 1.025; // +2.5% к весу
     const cloned: UserWeek = {
-      week: body.weeks.length + 1,
+      week: current.weeks.length + 1,
       phase: src.phase,
       deload: src.deload,
       sessions: src.sessions.map(s => ({
@@ -96,23 +118,26 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
         cooldown: s.cooldown,
       })),
     };
-    setWeeks([...body.weeks, cloned]);
+    setWeeks([...current.weeks, cloned]);
+    setExpandedWeekIdx(current.weeks.length);
   };
   // F2.3: swap two weeks (drag-and-drop lite — кнопка переставляет соседние недели)
   const swapWeek = (a: number, b: number) => {
-    if (a < 0 || b < 0 || a >= body.weeks.length || b >= body.weeks.length || a === b) return;
-    const arr = [...body.weeks];
+    const current = bodyRef.current;
+    if (a < 0 || b < 0 || a >= current.weeks.length || b >= current.weeks.length || a === b) return;
+    const arr = [...current.weeks];
     [arr[a], arr[b]] = [arr[b], arr[a]];
     // Сохраняем week-номера (переставляем только содержимое)
-    arr[a] = { ...arr[a], week: body.weeks[a].week };
-    arr[b] = { ...arr[b], week: body.weeks[b].week };
+    arr[a] = { ...arr[a], week: current.weeks[a].week };
+    arr[b] = { ...arr[b], week: current.weeks[b].week };
     setWeeks(arr);
   };
   // F3: reorder full weeks with desktop drag-and-drop; preserves week numbers.
   const weekDragRef = React.useRef<number | null>(null);
   const moveWeek = (from: number, to: number) => {
-    if (from === to || from < 0 || to < 0 || from >= body.weeks.length || to >= body.weeks.length) return;
-    const arr = [...body.weeks];
+    const current = bodyRef.current;
+    if (from === to || from < 0 || to < 0 || from >= current.weeks.length || to >= current.weeks.length) return;
+    const arr = [...current.weeks];
     const [moved] = arr.splice(from, 1);
     arr.splice(to, 0, moved);
     setWeeks(arr.map((w, i) => ({ ...w, week: i + 1 })));
@@ -129,7 +154,29 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>Структура ({body.weeks.length} нед)</div>
+      <div className="constructor-surface constructor-surface--info" style={{ ...CARD, padding: 10, borderLeft: '3px solid #60a5fa' }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa' }}>Как собрать программу</div>
+        <div style={{ fontSize: 11, color: DIM_STRONG, lineHeight: 1.5, marginTop: 4 }}>
+          1. В каждой неделе добавьте тренировочные дни. 2. Назначьте каждому дню Пн–Вс и задайте фокус. 3. Внутри дня добавьте упражнения, затем настройте подходы, повторы, RIR и вес.
+        </div>
+        <div style={{ fontSize: 10, color: DIM, marginTop: 5 }}>Неделя = период прогрессии · день = отдельная тренировка · упражнение = движение · сет = один подход.</div>
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>Структура: {body.weeks.length} нед. · тренировочные дни внутри каждой недели</div>
+      {body.weeks.length > 1 && (
+        <div className="editor-week-bulk-actions">
+          <span>Навигация по неделям:</span>
+          <label className="editor-week-jump">Перейти к
+            <select value={expandedWeekIdx < 0 ? '' : expandedWeekIdx} onChange={event => setExpandedWeekIdx(Number(event.target.value))} aria-label="Перейти к неделе">
+              <option value="">Выбрать</option>
+              {body.weeks.map((week, index) => <option key={week.week} value={index}>Неделя {week.week}</option>)}
+            </select>
+          </label>
+          <button type="button" onClick={() => setExpandedWeekIdx(current => Math.max(0, current - 1))} disabled={expandedWeekIdx <= 0}>← Предыдущая</button>
+          <button type="button" onClick={() => setExpandedWeekIdx(current => Math.min(body.weeks.length - 1, Math.max(0, current + 1)))} disabled={expandedWeekIdx < 0 || expandedWeekIdx >= body.weeks.length - 1}>Следующая →</button>
+          <button type="button" onClick={() => setExpandedWeekIdx(0)}>Открыть первую</button>
+          <button type="button" onClick={() => setExpandedWeekIdx(-1)}>Свернуть все</button>
+        </div>
+      )}
       {/* 🎯 Быстрое добавление упражнений для слабых групп из профиля */}
       {(() => {
         const prof = loadTrainingProfile();
@@ -164,7 +211,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
         );
       })()}
       {body.weeks.map((w, wi) => (
-        <div
+        <div className={`editor-week-card${expandedWeekIdx === wi ? ' is-open' : ''}`}
           key={wi}
           draggable
           onDragStart={e => { weekDragRef.current = wi; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(wi)); }}
@@ -174,16 +221,26 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           style={{ ...CARD, padding: 10 }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+            <button
+              className="editor-week-toggle"
+              type="button"
+              aria-expanded={expandedWeekIdx === wi}
+              aria-label={`${expandedWeekIdx === wi ? 'Свернуть' : 'Открыть'} неделю ${w.week}`}
+              onClick={() => setExpandedWeekIdx(expandedWeekIdx === wi ? -1 : wi)}
+            >
+              {expandedWeekIdx === wi ? '▼' : '▶'}
+            </button>
             {(() => {
               const pc = { accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' }[w.phase];
               const prog = wi > 0 ? Math.round(((1.025 ** wi) - 1) * 100) : 0;
+              const totalExercises = w.sessions.reduce((s, ses) => s + ses.blocks.filter(block => block.exerciseName).length, 0);
               const totalSets = w.sessions.reduce((s, ses) => s + ses.blocks.reduce((b, blk) => b + blk.sets.length, 0), 0);
               return (
                 <>
                   <div style={{ width: 4, height: 24, borderRadius: 2, background: pc, flexShrink: 0 }} />
                   <span style={{ fontSize: 12, fontWeight: 800, color: DIM_STRONG }}>Неделя {w.week}</span>
                   {prog > 0 && <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 700 }}>+{prog}%</span>}
-                  <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto' }}>{totalSets} сетов</span>
+                  <span className="editor-week-summary">{w.sessions.length} дн. · {totalExercises} упр. · {totalSets} подх.</span>
                 </>
               );
             })()}
@@ -211,20 +268,29 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
             <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}>
               <input type="checkbox" checked={w.deload} onChange={e => updateWeek(wi, { deload: e.target.checked })} /> deload
             </label>
+            <label style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }} title="Быстро создать нужное количество тренировок в этой неделе">
+              Тренировок
+              <select style={{ ...IN, padding: '3px 5px', fontSize: 10, minHeight: 44 }} value={w.sessions.length} onChange={e => resizeWeek(wi, Number(e.target.value))} aria-label={`Количество тренировок в неделе ${w.week}`}>
+                {[1, 2, 3, 4, 5, 6, 7].map(count => <option key={count} value={count}>{count}</option>)}
+              </select>
+            </label>
             <button
               style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44,
                        color: volWeekIdx === wi ? ACCENT : DIM_STRONG,
                        borderColor: volWeekIdx === wi ? ACCENT_LINE : 'rgba(255,255,255,0.08)' }}
-              onClick={() => setVolWeekIdx(volWeekIdx === wi ? null : wi)}
+               onClick={() => {
+                 setExpandedWeekIdx(wi);
+                 setVolWeekIdx(volWeekIdx === wi ? null : wi);
+               }}
               title="Показать бюджет объёма по мышцам для этой недели"
-            >📊 Объём</button>
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => cloneWeek(wi)} title="Клонировать неделю">⧉</button>
-            {wi < body.weeks.length - 1 && (
-              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => swapWeek(wi, wi + 1)} title="Поменять местами с следующей неделей">⇅ swap</button>
-            )}
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeWeek(wi)}>✕ нед</button>
+             >{volWeekIdx === wi ? 'Скрыть объём' : 'Объём'}</button>
+             <button aria-label={`Копировать неделю ${w.week}`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => cloneWeek(wi)} title="Создать копию недели">Копировать</button>
+             {wi < body.weeks.length - 1 && (
+               <button aria-label={`Переместить неделю ${w.week} ниже`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => swapWeek(wi, wi + 1)} title="Поменять местами со следующей неделей">Ниже</button>
+             )}
+             <button aria-label={`Удалить неделю ${w.week}`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeWeek(wi)}>Удалить</button>
           </div>
-          {volWeekIdx === wi && (
+          {expandedWeekIdx === wi && volWeekIdx === wi && (
             <div style={{ marginBottom: 8 }}>
               {volMetrics
                 ? <VolumeBudgetCard metrics={volMetrics} />
@@ -234,7 +300,12 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
               }
             </div>
           )}
-          <SessionList sessions={w.sessions} phase={w.phase} onChange={(sessions) => updateWeek(wi, { sessions })} />
+          {expandedWeekIdx === wi && (
+            <div style={{ marginTop: 4 }}>
+              <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Шаг 2: тренировочные дни этой недели</div>
+              <SessionList sessions={w.sessions} phase={w.phase} onChange={(sessions) => updateWeek(wi, { sessions })} />
+            </div>
+          )}
         </div>
       ))}
       {/* P0-1: Ротация — упражнения старше 4 недель */}
@@ -281,14 +352,14 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           </div>
         );
       })()}
-      <button style={{ ...BTN_GHOST, padding: '8px 14px', minHeight: 44 }} onClick={addWeek}>+ Добавить неделю</button>
+       <button className="editor-add-week" style={{ ...BTN_GHOST, padding: '10px 14px', minHeight: 44 }} onClick={addWeek}>+ Добавить следующую неделю</button>
     </div>
   );
 };
 
 const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']; onChange: (s: UserSession[]) => void }> = ({ sessions, phase, onChange }) => {
   const { confirm } = useConfirmDialog();
-  const addSession = () => onChange([...sessions, { id: newId('ses'), name: 'День ' + (sessions.length + 1), focus: '', blocks: [] }]);
+  const addSession = () => onChange([...sessions, { id: newId('ses'), name: 'День ' + (sessions.length + 1), dayOfWeek: firstFreeTrainingDay(sessions), focus: '', blocks: [] }]);
   const updateSession = (si: number, patch: Partial<UserSession>) => onChange(sessions.map((s, i) => i === si ? { ...s, ...patch } : s));
   // U4/F4: confirm-диалог при удалении сессии — ConfirmDialog
   const removeSession = async (si: number) => {
@@ -306,7 +377,7 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
       {
         id: newId('ses'),
         name: src.name + ' (копия)',
-        dayOfWeek: src.dayOfWeek,
+        dayOfWeek: firstFreeTrainingDay(sessions),
         focus: src.focus,
         blocks: src.blocks.map(b => ({ ...b, id: newId('blk'), sets: b.sets.map(st => ({ ...st })) })),
         warmup: src.warmup,
@@ -317,18 +388,34 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {sessions.length === 0 && (
+        <div style={{ padding: 10, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px dashed rgba(0,230,138,0.35)' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>В этой неделе пока нет тренировок</div>
+          <div style={{ fontSize: 10, color: DIM, marginTop: 3 }}>Нажмите кнопку ниже, чтобы создать первый день, например «Пн · Грудь / Трицепс».</div>
+        </div>
+      )}
       {sessions.map((s, si) => (
-        <div key={s.id} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <div key={s.id} className="editor-session-card" style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="editor-session-heading">
+            <div>
+              <div className="editor-kicker">ТРЕНИРОВОЧНЫЙ ДЕНЬ {si + 1}</div>
+              <div className="editor-session-day">{TRAINING_DAY_NAMES[sessionDayOfWeek(s, si)]} · {s.blocks.length} упражн.</div>
+            </div>
+            <div className="editor-session-hint">Сначала выберите день и фокус, затем добавьте упражнения</div>
+          </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-            <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 44 }} value={s.name} onChange={e => updateSession(si, { name: e.target.value })} placeholder="День" />
-            <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 44 }} value={s.focus} onChange={e => updateSession(si, { focus: e.target.value })} placeholder="Фокус (грудь/трицепс)" />
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => cloneSession(si)} title="Клонировать сессию">⧉</button>
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeSession(si)}>✕</button>
+            <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 44 }} value={s.name} onChange={e => updateSession(si, { name: e.target.value })} placeholder="Название дня" aria-label={`Название тренировки ${si + 1}`} />
+            <select style={{ ...IN, padding: '6px 8px', fontSize: 11, flex: '0 0 74px', minHeight: 44 }} value={sessionDayOfWeek(s, si)} onChange={e => updateSession(si, { dayOfWeek: normalizeProgramDayOfWeek(Number(e.target.value), trainingDayForIndex(si)) })} aria-label={`День недели тренировки ${si + 1}`}>
+              {TRAINING_DAY_NAMES.map((day, di) => <option key={di} value={di} disabled={sessions.some((other, oi) => oi !== si && sessionDayOfWeek(other, oi) === di)}>{day}{sessions.some((other, oi) => oi !== si && sessionDayOfWeek(other, oi) === di) ? ' · занято' : ''}</option>)}
+            </select>
+            <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 44 }} value={s.focus} onChange={e => updateSession(si, { focus: e.target.value })} placeholder="Фокус: грудь / трицепс" aria-label={`Фокус тренировки ${si + 1}`} />
+            <button aria-label={`Клонировать тренировку ${si + 1}`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => cloneSession(si)} title="Клонировать тренировку">⧉</button>
+            <button aria-label={`Удалить тренировку ${si + 1}`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeSession(si)}>✕</button>
           </div>
           <BlockList blocks={s.blocks} phase={phase} onChange={(blocks) => updateSession(si, { blocks })} />
         </div>
       ))}
-      <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44 }} onClick={addSession}>+ Сессия</button>
+       <button className="editor-add-session" style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44 }} onClick={addSession}>+ Добавить тренировочный день</button>
     </div>
   );
 };
@@ -504,6 +591,13 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
         background: transparent; color: var(--accent, #00e68a);
         font-size: 10px; cursor: pointer; min-height: 30px;
       }`}</style>
+      {blocks.length === 0 && (
+        <div className="editor-empty-exercises">
+          <div className="editor-empty-exercises__title">Шаг 3: добавьте первое упражнение</div>
+          <div className="editor-empty-exercises__text">Выберите упражнение через каталог ниже, затем настройте подходы и RIR.</div>
+        </div>
+      )}
+      {blocks.length > 0 && <div className="editor-exercise-list-heading"><span>УПРАЖНЕНИЯ</span><span>{blocks.length} шт.</span></div>}
       {blocks.map((b, bi) => (
         <div
           key={b.id}
@@ -522,7 +616,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
           onDragEnd={() => { dragSrcRef.current = null; setOverIdx(null); }}
           onTouchStart={onTouchStart(bi)}
           onTouchMove={onTouchMove}
-          className={`bb-block-row${expandedBlock === bi ? ' is-expanded' : ''}`}
+          className={`bb-block-row editor-exercise-card${expandedBlock === bi ? ' is-expanded' : ''}`}
           style={{
             display: 'flex', flexDirection: 'column', gap: 4, padding: '6px 0',
             borderTop: overIdx === bi ? '2px solid #00e68a' : '2px solid transparent',
@@ -531,6 +625,15 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
             borderRadius: 8,
           }}
         >
+          <div className="editor-exercise-heading">
+            <div>
+              <div className="editor-kicker">УПРАЖНЕНИЕ {bi + 1}</div>
+              <div className="editor-exercise-title">{b.exerciseName || 'Упражнение не выбрано'}</div>
+            </div>
+            <div className={`editor-exercise-status${b.exerciseName && b.sets.length > 0 ? ' is-ready' : ''}`}>
+              {b.exerciseName && b.sets.length > 0 ? `${b.sets.length} подход${b.sets.length === 1 ? '' : 'а'}` : 'Нужно заполнить'}
+            </div>
+          </div>
           {/* Ряд 1: drag + тип + упражнение + мышца + сеты */}
           <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
           <span
@@ -552,7 +655,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
           </select>
           <ExerciseLabPicker value={b.exerciseName} muscle={b.muscle} onSelect={ex => updateBlock(bi, { exerciseName: ex.name, muscle: ex.group || b.muscle, type: (ex.type === 'compound' ? 'compound' : ex.type === 'isolation' ? 'isolation' : 'accessory') as UserBlock['type'], role: ex.type === 'compound' ? 'primary' : 'accessory' })} />
           <input style={{ ...IN, padding: '6px 10px', fontSize: 11, width: 80, minHeight: 44 }} value={b.muscle} onChange={e => updateBlock(bi, { muscle: e.target.value })} placeholder="Мышца" list="muscle-list" />
-           <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} muscle={b.muscle} workMax={(loadTrainingProfile().workMax ?? {}) as Record<string, number>} />
+            <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} muscle={b.muscle} workMax={(loadTrainingProfile().workMax ?? {}) as Record<string, number>} />
            <button
              className="bb-block-expand"
              type="button"
@@ -718,12 +821,20 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
   const hasTechnique = (s: UserSet, tech: IntensityTechnique) => (s.techniques || []).includes(tech);
   return (
     <div className="bb-set-editor" style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 auto' }}>
+      <div className="editor-sets-heading">
+        <div>
+          <div className="editor-kicker">СХЕМА ПОДХОДОВ</div>
+          <div className="editor-sets-help">Повторы × RIR @ вес · отдых в минутах</div>
+        </div>
+        <span>{sets.length} шт.</span>
+      </div>
       {sets.map((s, i) => (
         <div key={i} style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 6, padding: '6px 8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
-            <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 40, minHeight: 44 }} value={typeof s.reps === 'number' ? s.reps : 0} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { reps: Math.max(0, Math.round(v)) }); }} title="повторения" aria-label="Повторения" inputMode="numeric" />
+             <span className="editor-set-index">{i + 1}</span>
+             <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 40, minHeight: 44 }} value={typeof s.reps === 'number' ? s.reps : 0} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { reps: Math.max(0, Math.round(v)) }); }} title="повторения" aria-label={`Повторения подхода ${i + 1}`} inputMode="numeric" />
             <span style={{ fontSize: 11, color: DIM }}>×</span>
-            <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 36, minHeight: 44 }} value={s.rir} min={0} max={5} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { rir: Math.max(0, Math.min(5, Math.round(v))) }); }} title="RIR" aria-label="RIR" inputMode="numeric" />
+             <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 36, minHeight: 44 }} value={s.rir} min={0} max={5} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { rir: Math.max(0, Math.min(5, Math.round(v))) }); }} title="RIR: повторения в запасе" aria-label={`RIR подхода ${i + 1}`} inputMode="numeric" />
             <span style={{ fontSize: 11, color: DIM }}>@</span>
             {weightMode === 'pct' ? (
               <>
@@ -731,7 +842,7 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
                 <span style={{ fontSize: 11, color: DIM }}>%→</span>
               </>
             ) : null}
-            <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 44, minHeight: 44 }} value={s.weight ?? 0} onChange={e => upd(i, { weight: parseFloat(e.target.value) || 0 })} title="вес (кг)" placeholder="кг" />
+             <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 44, minHeight: 44 }} value={s.weight ?? 0} onChange={e => upd(i, { weight: parseFloat(e.target.value) || 0 })} title="вес (кг)" aria-label={`Вес подхода ${i + 1} в килограммах`} placeholder="кг" />
             {wm > 0 && typeof s.reps === 'number' && (
               <button style={{ border: 'none', background: 'rgba(0,230,138,0.12)', color: ACCENT, cursor: 'pointer', fontSize: 11, padding: '4px 6px', borderRadius: 4, fontWeight: 700, minHeight: 44 }} onClick={() => autoCalcWeight(i, s.rir, s.reps as number)} title="Рассчитать вес из %1RM" aria-label="calc">🧮</button>
             )}
@@ -745,8 +856,8 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
               {weightMode === 'kg' ? `+ %1PM (ПМ:${wm}кг)` : '→ только кг'}
             </button>
           )}
-          <div style={{ display: 'flex', gap: 3, marginTop: 4, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 11, color: DIM, marginRight: 2 }}>Тех:</span>
+       <div className="editor-techniques" style={{ display: 'flex', gap: 3, marginTop: 4, flexWrap: 'wrap' }}>
+             <span className="editor-techniques-label">Доп. техники:</span>
             {(['drop_set', 'myo_reps', 'pause_rep', 'rest_pause', 'mechanical_drop'] as IntensityTechnique[]).map(tech => {
               const active = hasTechnique(s, tech);
               const lbl: Record<string, string> = { drop_set: '↓DRP', myo_reps: 'MYO', pause_rep: 'PRS', rest_pause: 'RP', mechanical_drop: 'MD' };
@@ -778,13 +889,13 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
           )}
         </div>
       ))}
-      <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, alignSelf: 'flex-start' }} onClick={add}>+ сет</button>
+      <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, alignSelf: 'flex-start' }} onClick={add}>+ Добавить подход</button>
       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 4, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         <span style={{ fontSize: 11, color: DIM, marginRight: 4 }}>📋 Шаблоны:</span>
         {Object.entries(SET_TEMPLATES).slice(0, 5).map(([key, tmpl]) => (
           <button key={key} title={'Применить: ' + key} style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700, minHeight: 44 }}
             onClick={() => onChange(Array.from({ length: tmpl.sets }, () => ({ reps: tmpl.reps, rir: tmpl.rir, restSec: tmpl.rest, weight: sets[0]?.weight ?? 0 })))}
-          >{key}</button>
+           >Шаблон: {key}</button>
         ))}
       </div>
     </div>
@@ -845,56 +956,63 @@ const PLSetEditor: React.FC<{ sets: PLSet[]; lift: PLExercise['lift']; workMax: 
 
 const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => void }> = ({ body, onChange }) => {
   const { confirm } = useConfirmDialog();
+  const bodyRef = React.useRef(body);
+  bodyRef.current = body;
+  const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   const cycle = useMemo(() => getReferencedCycle({ ...createBlank('pl'), pl: body }), [body.sourceCycleId]);
-  const set = (patch: Partial<PLProgramBody>) => onChange({ ...body, ...patch });
+  const set = (patch: Partial<PLProgramBody>) => onChange({ ...bodyRef.current, ...patch });
   const isCustom = !body.sourceCycleId;
 
   // ── Custom PL: fully editable weeks/days/exercises ──
   const [expandedWeek, setExpandedWeek] = useState<number | null>(null);
 
   const addWeek = () => {
-    const weeks = [...(body.customWeeks ?? [])];
+    const weeks = [...(bodyRef.current.customWeeks ?? [])];
     const n = weeks.length + 1;
-    weeks.push({ week: n, phase: 'accumulation', deload: false, days: [{ name: 'День 1', exercises: [] }] });
-    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wi) => w.days.map((_, di) => ({ sessionIdx: weeks.slice(0, wi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: di }))) });
+    weeks.push({ week: n, phase: 'accumulation', deload: false, days: [{ name: 'День 1', dayOfWeek: 0, exercises: [] }] });
+    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: d.dayOfWeek ?? di }))) });
+    setExpandedWeek(n - 1);
   };
   const removeWeek = (wi: number) => {
-    const weeks = body.customWeeks?.filter((_, i) => i !== wi).map((w, i) => ({ ...w, week: i + 1 })) ?? [];
-    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((_, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: di }))) });
+    const weeks = bodyRef.current.customWeeks?.filter((_, i) => i !== wi).map((w, i) => ({ ...w, week: i + 1 })) ?? [];
+    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: d.dayOfWeek ?? di }))) });
+    setExpandedWeek(weeks.length === 0 ? null : Math.min(wi, weeks.length - 1));
   };
   const cloneWeek = (wi: number) => {
-    const src = body.customWeeks?.[wi];
+    const current = bodyRef.current;
+    const src = current.customWeeks?.[wi];
     if (!src) return;
-    const weeks = [...(body.customWeeks ?? [])];
-    const cloned: PLWeek = { week: weeks.length + 1, phase: src.phase, deload: src.deload, days: src.days.map(d => ({ name: d.name, exercises: d.exercises.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) })) })) };
-    set({ customWeeks: [...weeks, cloned], schedule: [...weeks, cloned].flatMap((w, wwi) => w.days.map((_, di) => ({ sessionIdx: [...weeks, cloned].slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: di }))) });
+    const weeks = [...(current.customWeeks ?? [])];
+    const cloned: PLWeek = { week: weeks.length + 1, phase: src.phase, deload: src.deload, days: src.days.map(d => ({ name: d.name, dayOfWeek: d.dayOfWeek, exercises: d.exercises.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) })) })) };
+    set({ customWeeks: [...weeks, cloned], schedule: [...weeks, cloned].flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: [...weeks, cloned].slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: d.dayOfWeek ?? di }))) });
+    setExpandedWeek(weeks.length);
   };
   const updateWeek = (wi: number, patch: Partial<PLWeek>) => {
-    const weeks = (body.customWeeks ?? []).map((w, i) => i === wi ? { ...w, ...patch } : w);
+    const weeks = (bodyRef.current.customWeeks ?? []).map((w, i) => i === wi ? { ...w, ...patch } : w);
     set({ customWeeks: weeks });
   };
   const updateDay = (wi: number, di: number, patch: Partial<PLDay>) => {
-    const weeks = (body.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: w.days.map((d, j) => j === di ? { ...d, ...patch } : d) } : w);
-    set({ customWeeks: weeks });
+    const weeks = (bodyRef.current.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: w.days.map((d, j) => j === di ? { ...d, ...patch } : d) } : w);
+    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, dayIndex) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + dayIndex, dayOfWeek: d.dayOfWeek ?? dayIndex }))) });
   };
   const addDay = (wi: number) => {
-    const weeks = (body.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: [...w.days, { name: 'День ' + (w.days.length + 1), exercises: [] }] } : w);
-    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((_, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: di }))) });
+    const weeks = (bodyRef.current.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: [...w.days, { name: 'День ' + (w.days.length + 1), dayOfWeek: firstFreeTrainingDay(w.days), exercises: [] }] } : w);
+    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: d.dayOfWeek ?? di }))) });
   };
   const removeDay = (wi: number, di: number) => {
-    const weeks = (body.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: w.days.filter((_, j) => j !== di) } : w);
-    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((_, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: di }))) });
+    const weeks = (bodyRef.current.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: w.days.filter((_, j) => j !== di) } : w);
+    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: d.dayOfWeek ?? di }))) });
   };
   const updateExercise = (wi: number, di: number, ei: number, patch: Partial<PLExercise>) => {
-    const weeks = (body.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: w.days.map((d, j) => j === di ? { ...d, exercises: d.exercises.map((e, k) => k === ei ? { ...e, ...patch } : e) } : d) } : w);
+    const weeks = (bodyRef.current.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: w.days.map((d, j) => j === di ? { ...d, exercises: d.exercises.map((e, k) => k === ei ? { ...e, ...patch } : e) } : d) } : w);
     set({ customWeeks: weeks });
   };
   const addExercise = (wi: number, di: number) => {
-    const weeks = (body.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: w.days.map((d, j) => j === di ? { ...d, exercises: [...d.exercises, { name: '', lift: 'accessory' as const, muscle: '', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }] } : d) } : w);
+    const weeks = (bodyRef.current.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: w.days.map((d, j) => j === di ? { ...d, exercises: [...d.exercises, { name: '', lift: 'accessory' as const, muscle: '', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }] } : d) } : w);
     set({ customWeeks: weeks });
   };
   const removeExercise = (wi: number, di: number, ei: number) => {
-    const weeks = (body.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: w.days.map((d, j) => j === di ? { ...d, exercises: d.exercises.filter((_, k) => k !== ei) } : d) } : w);
+    const weeks = (bodyRef.current.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: w.days.map((d, j) => j === di ? { ...d, exercises: d.exercises.filter((_, k) => k !== ei) } : d) } : w);
     set({ customWeeks: weeks });
   };
 
@@ -914,7 +1032,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                 onClick={async () => {
                   const ok = await confirm({ title: 'Переключиться на свой ПЛ-цикл?', message: 'Процентки LMS-цикла будут отсоединены — вы сможете редактировать недели/дни/упражнения/процентки самостоятельно. Это нельзя отменить.', confirmLabel: 'Переключить', danger: true });
                   if (!ok) return;
-                  set({ sourceCycleId: null, customWeeks: [{ week: 1, phase: 'accumulation', deload: false, days: [{ name: 'День 1', exercises: [{ name: 'Присед', lift: 'squat', muscle: 'legs', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }] }] }] });
+                  set({ sourceCycleId: null, customWeeks: [{ week: 1, phase: 'accumulation', deload: false, days: [{ name: 'День 1', dayOfWeek: 0, exercises: [{ name: 'Присед', lift: 'squat', muscle: 'legs', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }] }] }] });
                 }}
               >✏ Переключить на свой цикл</button>
             </div>
@@ -926,7 +1044,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                 <button
                   style={{ ...BTN_GHOST, padding: '8px 12px', fontSize: 11, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }}
                   onClick={() => {
-                    set({ sourceCycleId: null, customWeeks: [{ week: 1, phase: 'accumulation', deload: false, days: [{ name: 'День 1', exercises: [{ name: 'Присед', lift: 'squat', muscle: 'legs', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }] }] }] });
+                    set({ sourceCycleId: null, customWeeks: [{ week: 1, phase: 'accumulation', deload: false, days: [{ name: 'День 1', dayOfWeek: 0, exercises: [{ name: 'Присед', lift: 'squat', muscle: 'legs', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }] }] }] });
                   }}
                 >✏ Создать свой цикл с нуля</button>
               </div>
@@ -983,13 +1101,31 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ ...panelStyle('#a78bfa'), padding: 10 }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', marginBottom: 4 }}>
+      <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', marginBottom: 4 }}>
           ✏ Свой ПЛ-цикл — полное редактирование ({weeks.length} нед)
         </div>
         <div style={{ fontSize: 10, color: DIM }}>
           Все процентки, сеты, повторения и структура цикла полностью редактируемы.
         </div>
+        <div style={{ fontSize: 10, color: DIM_STRONG, lineHeight: 1.45, marginTop: 5 }}>
+          Начните с недели, раскройте её стрелкой, добавьте дни и выберите день недели. Затем добавьте упражнения и настройте подходы.
+        </div>
       </div>
+      {weeks.length > 1 && (
+        <div className="editor-week-bulk-actions">
+          <span>Навигация по неделям:</span>
+          <label className="editor-week-jump">Перейти к
+            <select value={expandedWeek == null ? '' : expandedWeek} onChange={event => setExpandedWeek(event.target.value === '' ? null : Number(event.target.value))} aria-label="Перейти к неделе PL">
+              <option value="">Выбрать</option>
+              {weeks.map((week, index) => <option key={week.week} value={index}>Неделя {week.week}</option>)}
+            </select>
+          </label>
+          <button type="button" onClick={() => setExpandedWeek(current => current == null ? 0 : Math.max(0, current - 1))} disabled={expandedWeek == null || expandedWeek <= 0}>← Предыдущая</button>
+          <button type="button" onClick={() => setExpandedWeek(current => current == null ? 0 : Math.min(weeks.length - 1, current + 1))} disabled={expandedWeek == null || expandedWeek >= weeks.length - 1}>Следующая →</button>
+          <button type="button" onClick={() => setExpandedWeek(0)}>Открыть первую</button>
+          <button type="button" onClick={() => setExpandedWeek(null)}>Свернуть все</button>
+        </div>
+      )}
 
       {/* WorkMax */}
       <div style={{ ...CARD, padding: 10 }}>
@@ -1044,12 +1180,14 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
       </div>
 
       {/* Weeks */}
-      <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>🗓 Недели ({weeks.length})</div>
+      <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>🗓 Шаг 1: недели ({weeks.length})</div>
       {weeks.map((w, wi) => {
         const isExp = expandedWeek === wi;
         const phaseColor = { accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' }[w.phase];
+        const exerciseCount = w.days.reduce((total, day) => total + day.exercises.length, 0);
+        const setCount = w.days.reduce((total, day) => total + day.exercises.reduce((sets, exercise) => sets + exercise.sets.length, 0), 0);
         return (
-          <div key={wi} style={{ ...CARD, padding: 10, borderLeft: `3px solid ${phaseColor}` }}>
+          <div key={wi} className={`editor-week-card${isExp ? ' is-open' : ''}`} style={{ ...CARD, padding: 10, borderLeft: `3px solid ${phaseColor}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <button
                 onClick={() => setExpandedWeek(isExp ? null : wi)}
@@ -1061,17 +1199,21 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
               <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <input type="checkbox" checked={w.deload} onChange={e => updateWeek(wi, { deload: e.target.checked })} /> deload
               </label>
-              <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44 }} onClick={() => cloneWeek(wi)} title="Клонировать">⧉</button>
-              <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeWeek(wi)}>✕ нед</button>
+              <span className="editor-week-summary">{w.days.length} дн. · {exerciseCount} упр. · {setCount} подх.</span>
+              <button aria-label={`Копировать неделю ${w.week}`} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44 }} onClick={() => cloneWeek(wi)} title="Создать копию недели">Копировать</button>
+              <button aria-label={`Удалить неделю ${w.week}`} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeWeek(wi)}>Удалить</button>
             </div>
 
             {isExp && (
               <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {w.days.map((d, di) => (
-                  <div key={di} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div key={di} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                       <input style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: 1, minHeight: 44 }} value={d.name} onChange={e => updateDay(wi, di, { name: e.target.value })} placeholder="Название дня" />
-                      <span style={{ fontSize: 10, color: DIM }}>{d.exercises.length} упр</span>
+                      <select style={{ ...IN, padding: '5px 6px', fontSize: 11, minHeight: 44, flex: '0 0 74px' }} value={d.dayOfWeek ?? trainingDayForIndex(di)} onChange={e => updateDay(wi, di, { dayOfWeek: normalizeProgramDayOfWeek(Number(e.target.value), trainingDayForIndex(di)) })} aria-label={`День недели ${d.name}`}>
+                         {TRAINING_DAY_NAMES.map((day, dayIdx) => <option key={dayIdx} value={dayIdx} disabled={w.days.some((other, otherIndex) => otherIndex !== di && (other.dayOfWeek ?? trainingDayForIndex(otherIndex)) === dayIdx)}>{day}{w.days.some((other, otherIndex) => otherIndex !== di && (other.dayOfWeek ?? trainingDayForIndex(otherIndex)) === dayIdx) ? ' · занято' : ''}</option>)}
+                      </select>
+                      <span style={{ fontSize: 10, color: DIM }}>{d.exercises.length} упр. · {TRAINING_DAY_NAMES[d.dayOfWeek ?? di % 7]}</span>
                       <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeDay(wi, di)}>✕ день</button>
                     </div>
                     {d.exercises.map((ex, ei) => (
@@ -1092,7 +1234,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                         <PLSetEditor sets={ex.sets} lift={ex.lift} workMax={body.workMax} onChange={(sets) => updateExercise(wi, di, ei, { sets })} />
                       </div>
                     ))}
-                    <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => addExercise(wi, di)}>+ Упражнение</button>
+                    <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => addExercise(wi, di)}>+ Добавить упражнение</button>
                   </div>
                 ))}
                 <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => addDay(wi)}>+ День</button>
@@ -1136,14 +1278,14 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
                       {subs.map((s, si) => (
                         <button key={si} onClick={() => {
-                          const updatedCustomWeeks = (body.customWeeks ?? []).map((w: any) => ({
+                          const updatedCustomWeeks = (bodyRef.current.customWeeks ?? []).map((w: any) => ({
                             ...w,
                             days: w.days.map((d: any) => ({
                               ...d,
                               exercises: d.exercises.map((e: any) => (e.name === name ? { ...e, name: s.name } : e)),
                             })),
                           }));
-                          onChange({ ...body, customWeeks: updatedCustomWeeks });
+                          onChange({ ...bodyRef.current, customWeeks: updatedCustomWeeks });
                         }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontWeight: 600, minHeight: 32 }}>
                           {s.name}
                         </button>
@@ -1171,17 +1313,16 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
           <WeakPointChips value={body.weakPoints} onChange={(weakPoints) => set({ weakPoints })} />
         </div>
         <div>
-          <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Расписание: сессия → день недели</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {body.schedule.map((s, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-                <span style={{ color: DIM, minWidth: 70 }}>Сессия {s.sessionIdx + 1}</span>
-                        <select style={{ ...IN, padding: '4px 6px', fontSize: 10, minHeight: 44 }} value={s.dayOfWeek} onChange={e => { const sc = [...body.schedule]; sc[i] = { ...sc[i], dayOfWeek: normalizeProgramDayOfWeek(Number(e.target.value), s.dayOfWeek) }; set({ schedule: sc }); }}>
-                  {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d, di) => <option key={di} value={di}>{d}</option>)}
-                </select>
-              </div>
+          <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Расписание цикла</div>
+          <div className="editor-schedule-summary">
+            {body.customWeeks?.[0]?.days.map((day, index) => (
+              <span key={index} className="editor-schedule-chip">
+                {TRAINING_DAY_NAMES[day.dayOfWeek ?? trainingDayForIndex(index)]} · {day.name || `День ${index + 1}`}
+              </span>
             ))}
+            {(body.customWeeks?.[0]?.days.length ?? 0) === 0 && <span style={{ color: DIM, fontSize: 10 }}>Добавьте тренировочный день выше.</span>}
           </div>
+          <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>День недели редактируется в карточке каждого тренировочного дня выше.</div>
         </div>
       </div>
     </div>

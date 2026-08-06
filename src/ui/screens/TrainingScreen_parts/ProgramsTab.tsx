@@ -30,11 +30,12 @@ import {
 } from './shared';
 
 import {
-  GOAL_FILTER_OPTIONS, WOMENS_PROGRAMS, CUSTOM_PROGRAMS, ORIGINAL_PROGRAMS, ORIGINAL_PROGRAMS_URL,
+  GOAL_FILTER_OPTIONS, WOMENS_PROGRAMS, CUSTOM_PROGRAMS, ORIGINAL_PROGRAMS,
   PROGRAM_LEVEL_MAP, PROGRAM_GOAL_MAP, PROGRAM_EQUIP_MAP,
 } from './programs-data';
 import { applyToPlanner } from './planner-bridge';
 import { programToCycleTemplate } from '../../../engines/bb/cycle-to-plan';
+import { useOriginalPrograms } from './useOriginalPrograms';
 
 export const ProgramsTab: React.FC<{
   selectedProgram: string | null; setSelectedProgram: (id: string | null) => void;
@@ -42,36 +43,23 @@ export const ProgramsTab: React.FC<{
   onLoadToConstructor?: (program: { name: string; exercises: { name: string; sets: number; reps: number; rir: number }[] }) => void;
   goPlannerManual?: () => void;
 }> = ({ selectedProgram: selectedId, setSelectedProgram: setSelectedId, onAddToMyTraining, onLoadToConstructor, goPlannerManual }) => {
-  type OriginalProgramLike = FullProgram & { kind: 'original'; format: string; file: string; textFile: string };
-  const isOriginalProgram = (program: FullProgram | OriginalProgramLike): program is OriginalProgramLike => 'kind' in program && program.kind === 'original';
   const [goalFilter, setGoalFilter] = React.useState('all');
   const [levelFilter, setLevelFilter] = React.useState('all');
   const [detailWeek, setDetailWeek] = React.useState(1);
   const [expandedDay, setExpandedDay] = React.useState<number | null>(null);
 
-  const allPrograms = React.useMemo<Array<FullProgram | OriginalProgramLike>>(() => [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS, ...ORIGINAL_PROGRAMS], []);
+  const originalPrograms = useOriginalPrograms();
+  const allPrograms = React.useMemo<FullProgram[]>(() => [...FULL_PROGRAM_LIBRARY, ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS, ...originalPrograms], [originalPrograms]);
   const programs = React.useMemo(() => {
     let filtered = allPrograms;
     if (goalFilter === 'women') filtered = WOMENS_PROGRAMS;
-    else if (goalFilter === 'custom') filtered = [...CUSTOM_PROGRAMS, ...ORIGINAL_PROGRAMS];
+    else if (goalFilter === 'custom') filtered = [...CUSTOM_PROGRAMS, ...originalPrograms];
     else if (goalFilter !== 'all') filtered = allPrograms.filter(p => p.goal === goalFilter);
     if (levelFilter !== 'all') filtered = filtered.filter(p => p.level === levelFilter);
     return filtered;
-  }, [goalFilter, levelFilter, allPrograms]);
+  }, [goalFilter, levelFilter, allPrograms, originalPrograms]);
   const selected = selectedId ? allPrograms.find(p => p.id === selectedId) || null : null;
-  const selectedOriginal = selected && isOriginalProgram(selected) ? selected : null;
-  const expandedSelected = selected && !isOriginalProgram(selected) ? selected : null;
-  const [originalText, setOriginalText] = useState('');
-  useEffect(() => {
-    let cancelled = false;
-    setOriginalText('');
-    if (!selectedOriginal) return;
-    fetch(ORIGINAL_PROGRAMS_URL + selectedOriginal.file)
-      .then(response => response.ok ? response.text() : '')
-      .then(text => { if (!cancelled) setOriginalText(text); })
-      .catch(() => { if (!cancelled) setOriginalText('Не удалось загрузить текстовый просмотр. Используйте кнопку «Открыть исходник».'); });
-    return () => { cancelled = true; };
-  }, [selectedOriginal]);
+  const expandedSelected = selected;
 
   const handleLoadToConstructor = () => {
     if (!expandedSelected || !onLoadToConstructor) return;
@@ -184,7 +172,7 @@ export const ProgramsTab: React.FC<{
             <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--text-light)', flexWrap: 'wrap' }}>
               <span>Автор: <b>{p.author}</b></span>
               <span>Уровень: <b style={{ color: 'var(--accent)' }}>{PROGRAM_LEVEL_MAP[p.level] || p.level}</b></span>
-                <span>{isOriginalProgram(p) ? `${p.daysPerWeek} дней в цикле` : `${p.daysPerWeek} дн/нед`}</span>
+                <span>{p.daysPerWeek} дн/нед</span>
               <span>{p.durationWeeks} нед</span>
             </div>
           </div>
@@ -192,28 +180,7 @@ export const ProgramsTab: React.FC<{
       </div>
     )}
 
-    {selectedOriginal && (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <button onClick={() => setSelectedId(null)} style={{ alignSelf: 'flex-start', padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontSize: 12, minHeight: 38 }}>← К списку</button>
-        <div style={{ padding: 16, borderRadius: 14, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.3)' }}>
-          <h3 style={{ margin: '0 0 6px', color: '#60a5fa' }}>📁 {selectedOriginal.name}</h3>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>
-            Оригинал пользователя · {selectedOriginal.format} · {selectedOriginal.daysPerWeek} дней в цикле
-          </div>
-          <div style={{ fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>
-            Эта программа хранится и открывается в исходном формате. Упражнения, порядок, комментарии и структура не переводятся в другой шаблон.
-          </div>
-          <pre style={{ maxHeight: '65vh', overflow: 'auto', margin: '0 0 12px', padding: 12, borderRadius: 9, background: 'rgba(0,0,0,0.25)', color: 'var(--text)', whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 11, lineHeight: 1.45 }}>
-            {originalText || 'Загрузка полного оригинала...'}
-          </pre>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <a href={ORIGINAL_PROGRAMS_URL + selectedOriginal.file} target="_blank" rel="noreferrer" style={{ padding: '10px 14px', borderRadius: 9, background: '#60a5fa', color: '#07111f', fontWeight: 800, fontSize: 12, textDecoration: 'none' }}>Открыть исходник</a>
-            <a href={ORIGINAL_PROGRAMS_URL + selectedOriginal.file} download style={{ padding: '10px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.2)', color: 'var(--text)', fontWeight: 700, fontSize: 12, textDecoration: 'none' }}>Скачать</a>
-          </div>
-        </div>
-      </div>
-    )}
-    {expandedSelected && !selectedOriginal && (
+    {expandedSelected && (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <button onClick={() => setSelectedId(null)}
           style={{

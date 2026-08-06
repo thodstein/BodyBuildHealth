@@ -13,6 +13,51 @@ import {
   suggestExercisesForGroup,
 } from '../../../engines/manual-constructor';
 
+export const TRAINING_DAY_ORDER = [0, 2, 4, 1, 3, 5, 6] as const;
+
+export function trainingDayForIndex(index: number): number {
+  return TRAINING_DAY_ORDER[((index % TRAINING_DAY_ORDER.length) + TRAINING_DAY_ORDER.length) % TRAINING_DAY_ORDER.length];
+}
+
+export function sessionDayOfWeek(session: Pick<UserSession, 'dayOfWeek'>, index: number): number {
+  return Number.isInteger(session.dayOfWeek) && session.dayOfWeek! >= 0 && session.dayOfWeek! <= 6
+    ? session.dayOfWeek!
+    : trainingDayForIndex(index);
+}
+
+export function firstFreeTrainingDay(sessions: Array<Pick<UserSession, 'dayOfWeek'>>): number {
+  const used = new Set(sessions.map((session, index) => sessionDayOfWeek(session, index)));
+  return TRAINING_DAY_ORDER.find(day => !used.has(day)) ?? trainingDayForIndex(sessions.length);
+}
+
+/** Resize a week's session list without replacing existing user content. */
+export function resizeTrainingSessions(sessions: UserSession[], target: number, deload = false): UserSession[] {
+  const count = Math.max(1, Math.min(7, Math.round(target)));
+  const result = [...sessions];
+  while (result.length < count) {
+    const dayNumber = result.length + 1;
+    result.push({
+      id: newId('ses'),
+      name: deload ? `Разгрузка ${dayNumber}` : `День ${dayNumber}`,
+      dayOfWeek: firstFreeTrainingDay(result),
+      focus: deload ? 'deload' : '',
+      blocks: deload ? [{
+        id: newId('blk'),
+        type: 'accessory',
+        exerciseName: '',
+        muscle: '',
+        role: 'accessory',
+        sets: [{ reps: 15, rir: 4, weight: 0, restSec: 60 }],
+      }] : [],
+    });
+  }
+  while (result.length > count) {
+    const removable = result.findIndex(session => session.blocks.length === 0 || session.focus === 'deload');
+    result.splice(removable >= 0 ? removable : result.length - 1, 1);
+  }
+  return result;
+}
+
 export interface AddWeakToWeekOptions {
   weeks: UserWeek[];
   muscle: string;
