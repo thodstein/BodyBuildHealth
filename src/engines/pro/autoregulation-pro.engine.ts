@@ -11,7 +11,8 @@ function r2(v: number) { return Math.round(v * 100) / 100; }
 function r3(v: number) { return Math.round(v * 1000) / 1000; }
 function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
 
-export type ACWRZone = "undertrained" | "optimal" | "caution" | "dangerous";
+import type { ACWRZone } from './training-load.engine';
+export type { ACWRZone };
 
 export interface AutoRegInput {
   readiness: number;            // 0-100

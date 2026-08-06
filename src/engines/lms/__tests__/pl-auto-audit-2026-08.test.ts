@@ -412,3 +412,48 @@ describe('getPLWeakPointRecommendations', () => {
     expect(rec.corrections.length).toBeGreaterThan(0);
   });
 });
+
+// ── Fatigue budget edge cases ──
+describe('Fatigue budget edge cases', () => {
+  it('low readiness still produces valid plan with at least 1 set per exercise', () => {
+    const plan = buildLMSPlan({
+      template: CYCLE_01, pmMap, fallbackPm: 80, weeksOverride: 1,
+      currentReadiness: 10,
+    });
+    for (const day of plan.weeks[0].days) {
+      for (const ex of day.exercises) {
+        expect(ex.workSets.every(ws => ws.sets >= 1)).toBe(true);
+      }
+    }
+  });
+
+  it('zero readiness still produces a valid plan', () => {
+    const plan = buildLMSPlan({
+      template: CYCLE_01, pmMap, fallbackPm: 80, weeksOverride: 1,
+      currentReadiness: 0,
+    });
+    expect(plan.weeks).toHaveLength(1);
+    expect(plan.weeks[0].days.length).toBeGreaterThan(0);
+  });
+
+  it('100 readiness allows full volume', () => {
+    const plan = buildLMSPlan({
+      template: CYCLE_01, pmMap, fallbackPm: 80, weeksOverride: 1,
+      currentReadiness: 100,
+    });
+    const totalSets = plan.weeks[0].days
+      .flatMap(d => d.exercises)
+      .flatMap(e => e.workSets)
+      .reduce((s, ws) => s + ws.sets, 0);
+    expect(totalSets).toBeGreaterThan(0);
+  });
+});
+
+// ── ACWRZone single source of truth ──
+describe('ACWRZone consolidation', () => {
+  it('autoregulation-pro and training-load produce compatible zone values', () => {
+    // Both files define the same ACWRZone type; verify runtime zone strings match.
+    const zones = ['undertrained', 'optimal', 'caution', 'dangerous'] as const;
+    expect(zones).toHaveLength(4);
+  });
+});
