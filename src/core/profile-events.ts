@@ -7,8 +7,9 @@
  *
  * broadcast вызывается из `notifyAll()` в profile-manager — централизованно,
  * нет необходимости вызывать его из updateProfile/updateSection вручную.
+ *
+ * Этот модуль НЕ импортирует из profile-manager (избегаем circular deps).
  */
-import { getProfileVersion } from './profile-manager';
 
 type ProfileEventHandler = (payload: { section: string; version: number }) => void;
 
@@ -41,7 +42,8 @@ export function onAnyProfileChange(handler: () => void): () => void {
  * @param changedSections список изменённых секций (если известен).
  */
 export function broadcastProfileChange(changedSections?: string[]): void {
-  const version = getProfileVersion();
+  // version — текущее время; используется только для идентификации события.
+  const version = Date.now();
   // Уведомляем слушателей конкретных секций
   if (changedSections && changedSections.length > 0) {
     for (const sec of changedSections) {

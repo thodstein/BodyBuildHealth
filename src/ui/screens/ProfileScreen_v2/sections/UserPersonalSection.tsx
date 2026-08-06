@@ -125,12 +125,19 @@ export const UserPersonalSection: React.FC = () => {
         }}>
           <div style={{ display: 'flex', gap: 16, fontSize: 12, color: colors.textMuted, flexWrap: 'wrap' }}>
             <span>BMI: <b style={{ color: colors.primary }}>{((personal.weight / Math.pow(personal.height / 100, 2))).toFixed(1)}</b></span>
-            {personal.bodyFat > 0 && (
-              <>
-                <span>LBM: <b style={{ color: colors.primary }}>{(personal.weight * (1 - personal.bodyFat / 100)).toFixed(1)} кг</b></span>
-                <span>FFMI: <b style={{ color: colors.primary }}>(((LBM)/(h²)))</b> = <b style={{ color: colors.primary }}>{(((personal.weight * (1 - personal.bodyFat / 100)) / Math.pow(personal.height / 100, 2))).toFixed(1)}</b></span>
-              </>
-            )}
+            {(() => {
+              // FFMI = LBM / height² — формула Mattila et al. 2001
+              const bodyFat = personal.bodyFat ?? 0;
+              if (bodyFat <= 0) return null;
+              const lbm = personal.weight * (1 - bodyFat / 100);
+              const ffmi = lbm / Math.pow(personal.height / 100, 2);
+              return (
+                <>
+                  <span>LBM: <b style={{ color: colors.primary }}>{lbm.toFixed(1)} кг</b></span>
+                  <span>FFMI: <b style={{ color: colors.primary }}>{ffmi.toFixed(1)}</b></span>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

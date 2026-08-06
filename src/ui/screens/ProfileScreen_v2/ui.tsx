@@ -385,20 +385,27 @@ export const PopupValueEditor: React.FC<{
   const c = color || colors.primary;
 
   const displayValue = () => {
-    if (value === undefined || value === null || value === '') return placeholder || '—';
+    // Не показывать "0" как валидное значение (это default для нового профиля)
+    if (value === undefined || value === null || value === '' || value === 0) return placeholder || '—';
     if (unit) return `${value} ${unit}`;
     return String(value);
   };
 
   const openPopup = () => {
-    setLocal(value !== undefined && value !== null ? String(value) : '');
+    setLocal(value !== undefined && value !== null && value !== 0 ? String(value) : '');
     setOpen(true);
   };
 
   const commit = () => {
     if (type === 'number') {
+      if (local === '' || local === '-') { onChange(undefined); setOpen(false); return; }
       const n = Number(local);
-      if (!Number.isFinite(n)) { setOpen(false); return; }
+      if (!Number.isFinite(n)) {
+        // Невалидный ввод — сбрасываем local чтобы не залип
+        setLocal('');
+        setOpen(false);
+        return;
+      }
       let v = n;
       if (min !== undefined) v = Math.max(min, v);
       if (max !== undefined) v = Math.min(max, v);

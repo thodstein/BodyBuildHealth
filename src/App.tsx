@@ -16,6 +16,10 @@ import { setLocale, getLocale } from './data/interactions-labels';
 
 type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'articles' | 'marketplace';
 
+// NavTarget — куда переходить внутри блока.
+// subTab — конкретный раздел/дневник внутри блока (например, 'diary' в NutritionScreen).
+interface NavTarget { tab: Tab; subTab?: string; }
+
 // Bottom nav: 7 primary tabs
 const PRIMARY_NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'home', label: 'Главная', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
@@ -37,6 +41,7 @@ function DarkBg() {
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('home');
+  const [subTab, setSubTab] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [screenKey, setScreenKey] = useState(0);
   // touchRef removed
@@ -83,60 +88,71 @@ export default function App() {
     }
   }, [tab]);
 
-  const go = (t: Tab) => {
+  const go = (t: Tab, st: string | null = null) => {
     if (tab === t) {
       setScreenKey(k => k + 1);
     } else {
       setTab(t);
     }
+    setSubTab(st);
     if (mainRef.current) mainRef.current.scrollTop = 0;
     window.scrollTo(0, 0);
   };
 
-  // Expose go function for DashboardScreen navigation
+  // handleNavigate: каждая цель указывает tab + subTab (конкретный дневник/отчёт).
+  // subTab пробрасывается в конкретный экран через props.
   const handleNavigate = useCallback((screen: string) => {
-    const tabMap: Record<string, Tab> = {
-      'dashboard': 'home',
-      'pharma': 'pharma',
-      'support': 'support',
-      'training': 'training',
-      'labs': 'labs',
-      'risks': 'risks',
-      'nutrition': 'nutrition',
-      'profile': 'profile',
-      'course': 'training',
-      'plan': 'training',
-      'substances': 'support',
-      'peptides': 'support',
-      'predictive': 'home',
-      'marketplace': 'marketplace',
-      'articles': 'articles',
-      'assistant': 'home',
-      'gamification': 'home',
-      'fertility-pct': 'support',
-      'role-management': 'profile',
-      'recovery': 'training',
-      'wellness': 'training',
-      'performance': 'pharma',
-      'bloodwork': 'labs',
-      'toolkit': 'training',
-      'training-tools': 'training',
-      // Дневники и отчёты из других блоков (для ProfileDiariesTab)
-      'nutrition-diary': 'nutrition',
-      'workout-log': 'training',
-      'pharma-course': 'pharma',
-      'support-diary': 'support',
-      'symptoms': 'support',
-      'labs-diary': 'labs',
-      'training-analytics': 'training',
-      'pharma-reports': 'pharma',
-      'labs-reports': 'labs',
-      'nutrition-reports': 'nutrition',
-      'support-reports': 'support',
-      'custom-report': 'profile',
+    const tabMap: Record<string, NavTarget> = {
+      'dashboard': { tab: 'home' },
+      'pharma': { tab: 'pharma' },
+      'support': { tab: 'support' },
+      'training': { tab: 'training' },
+      'labs': { tab: 'labs' },
+      'risks': { tab: 'risks' },
+      'nutrition': { tab: 'nutrition' },
+      'profile': { tab: 'profile' },
+      'course': { tab: 'training' },
+      'plan': { tab: 'training' },
+      'substances': { tab: 'support' },
+      'peptides': { tab: 'support' },
+      'predictive': { tab: 'home' },
+      'marketplace': { tab: 'marketplace' },
+      'articles': { tab: 'articles' },
+      'assistant': { tab: 'home' },
+      'gamification': { tab: 'home' },
+      'fertility-pct': { tab: 'support' },
+      'role-management': { tab: 'profile' },
+      'recovery': { tab: 'training' },
+      'wellness': { tab: 'training' },
+      'performance': { tab: 'pharma' },
+      'bloodwork': { tab: 'labs' },
+      'toolkit': { tab: 'training' },
+      'training-tools': { tab: 'training' },
+
+      // Дневники в других блоках — открываем конкретный sub-раздел
+      'nutrition-diary': { tab: 'nutrition', subTab: 'diary' },
+      'workout-log': { tab: 'training', subTab: 'diary' },
+      'pharma-course': { tab: 'pharma', subTab: 'course' },
+      'support-diary': { tab: 'support', subTab: 'diary' },
+      'symptoms': { tab: 'support', subTab: 'symptoms' },
+      'labs-diary': { tab: 'labs', subTab: 'diary' },
+
+      // Отчёты
+      'training-analytics': { tab: 'training', subTab: 'analytics' },
+      'pharma-reports': { tab: 'pharma', subTab: 'reports' },
+      'labs-reports': { tab: 'labs', subTab: 'reports' },
+      'nutrition-reports': { tab: 'nutrition', subTab: 'reports' },
+      'support-reports': { tab: 'support', subTab: 'reports' },
+      'custom-report': { tab: 'profile', subTab: 'custom-report' },
+
+      // Встроенные дневники — открываем профильный дневник
+      'profile-diary-sleep': { tab: 'profile', subTab: 'sleep' },
+      'profile-diary-bp': { tab: 'profile', subTab: 'bp' },
+      'profile-diary-weight': { tab: 'profile', subTab: 'weight' },
+      'profile-diary-measurements': { tab: 'profile', subTab: 'measurements' },
     };
-    const target = tabMap[screen] || 'home';
-    go(target);
+    const target = tabMap[screen] || { tab: 'home' as Tab };
+    go(target.tab, target.subTab ?? null);
   }, []);
 
   // Swipe removed — only within-tab swiping allowed
@@ -151,17 +167,17 @@ export default function App() {
       </div>
     );
 
-    const key = `screen-${tab}-${screenKey}`;
+    const key = `screen-${tab}-${subTab || 'main'}-${screenKey}`;
     switch (tab) {
       case 'home': return <DashboardScreen key={key} onNavigate={handleNavigate} />;
-      case 'pharma': return <PharmaScreen key={key} />;
-      case 'support': return <SupportScreen key={key} onNavigate={handleNavigate} />;
-      case 'training': return <TrainingScreen key={key} />;
-      case 'labs': return <LabsScreen key={key} />;
+      case 'pharma': return <PharmaScreen key={key} initialSubTab={subTab || undefined} />;
+      case 'support': return <SupportScreen key={key} onNavigate={handleNavigate} initialSubTab={subTab || undefined} />;
+      case 'training': return <TrainingScreen key={key} initialSubTab={subTab || undefined} />;
+      case 'labs': return <LabsScreen key={key} initialSubTab={subTab || undefined} />;
       case 'risks': return <RiskScreen key={key} />;
-      case 'nutrition': return <NutritionScreen key={key} />;
+      case 'nutrition': return <NutritionScreen key={key} initialSubTab={subTab || undefined} />;
       case 'marketplace': return <MarketplaceScreen key={key} />;
-      case 'profile': return <ProfileScreen_v2 key={key} onNavigate={handleNavigate} />;
+      case 'profile': return <ProfileScreen_v2 key={key} onNavigate={handleNavigate} initialSubTab={subTab || undefined} />;
       case 'articles': return <ArticlesScreen key={key} />;
       default: return <DashboardScreen key={key} onNavigate={handleNavigate} />;
     }

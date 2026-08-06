@@ -140,17 +140,17 @@ export const CalcProfileCard: React.FC<Props> = ({ state, onStateChange }) => {
             })}
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
-            <button onClick={autofillFromProfile} aria-label="Загрузить значения из Профиля" style={{ flex: 1, padding: '6px', borderRadius: 8, fontSize: 8, fontWeight: 600, cursor: 'pointer', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 32 }}>
-              <span style={{fontSize:10}}>🔄</span>
+            <button onClick={autofillFromProfile} aria-label="Загрузить значения из Профиля" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 36 }}>
+              <span aria-hidden="true" style={{fontSize: 14}}>🔄</span>
               <span>Автозаполнение</span>
             </button>
-            <button onClick={saveToProfile} aria-label="Сохранить в Профиль" title="Сохранить в Профиль" style={{ flex: 1, padding: '6px', borderRadius: 8, fontSize: 8, fontWeight: 600, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 32 }}>
-              <span style={{fontSize:10}}>💾</span>
+            <button onClick={saveToProfile} aria-label="Сохранить в Профиль" title="Сохранить в Профиль" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 36 }}>
+              <span aria-hidden="true" style={{fontSize: 14}}>💾</span>
               <span>Сохранить в профиль</span>
             </button>
           </div>
           {lastSaved && (
-            <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>
               ✓ Сохранено: {new Date(lastSaved).toLocaleTimeString('ru')}
             </div>
           )}

@@ -84,9 +84,15 @@ import { SupportTimingPlanner } from './SupportScreen_parts/SupportTimingPlanner
 import { SupportAnalogCalculator } from './SupportScreen_parts/SupportAnalogCalculator';
 import { AutoCalculator } from './Calculator';
 import { normalizeCalculatorState } from './Calculator/Calc.types';
-export const SupportScreen: React.FC<{ initialTab?: SupportTab; onNavigate?: (screen: string) => void }> = ({ initialTab, onNavigate }) => {
+export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: string; onNavigate?: (screen: string) => void }> = ({ initialTab, initialSubTab, onNavigate }) => {
   const linked = useDataLink();
-  const [tab, setTab] = useState<SupportTab>(initialTab || 'main');
+  // initialSubTab маппится в initialTab для обратной совместимости
+  const resolveTab = (): SupportTab => {
+    if (initialTab) return initialTab;
+    // initialSubTab значения ('diary'/'reports'/'symptoms') открываются через main tab
+    return 'main';
+  };
+  const [tab, setTab] = useState<SupportTab>(resolveTab());
   const [supportView, setSupportView] = useState<SupportView>('main');
   const [calcView, setCalcView] = useState<CalcView>('main');
   const [infoView, setInfoView] = useState<InfoView>('main');

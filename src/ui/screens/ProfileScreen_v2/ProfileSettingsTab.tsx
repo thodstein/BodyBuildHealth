@@ -37,9 +37,11 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
   }, [settings.system]);
 
   const update = (patch: Partial<UnifiedSettings['system']>) => {
-    const next = { ...system, ...patch };
+    // Берём свежие настройки из useProfileRefresh, чтобы избежать stale closure
+    const cur = (profile.settings || {}) as any;
+    const next = { ...(cur.system || {}), ...patch };
     setSystem(next);
-    updateProfile({ settings: { ...settings, system: next } });
+    updateProfile({ settings: { ...cur, system: next } });
   };
 
   const handleExport = () => {

@@ -10,6 +10,7 @@ import { ProfileTrainingTab } from './ProfileTrainingTab';
 import { ProfileDiariesTab } from './ProfileDiariesTab';
 import { ProfileSettingsTab } from './ProfileSettingsTab';
 import { useProfileRefresh, getSnapshots, undoLastSnapshot } from '../../../core/profile-manager';
+import { onAnyProfileChange } from '../../../core/profile-events';
 import { colors } from './ui';
 
 type Tab = 'user' | 'training' | 'diaries' | 'settings';
@@ -21,30 +22,38 @@ const TAB_META: Record<Tab, { icon: string; title: string; color: string }> = {
   settings: { icon: '⚙️', title: 'Настройки', color: colors.purple },
 };
 
-export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void }> = ({ onNavigate }) => {
-  useProfileRefresh(); // ensure subscription
+export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void; initialSubTab?: string }> = ({ onNavigate, initialSubTab }) => {
+  useProfileRefresh();
   const [tab, setTab] = useState<Tab | null>(null);
   const [undoAvailable, setUndoAvailable] = useState(false);
 
+  // P1-fix (Aug 5 2026): при переходе из App — открываем конкретную вкладку дневника
   useEffect(() => {
-    const refresh = () => setUndoAvailable(getSnapshots().length > 0);
-    refresh();
-    const interval = setInterval(refresh, 1500);
-    return () => clearInterval(interval);
+    if (initialSubTab && ['sleep', 'bp', 'weight', 'measurements'].includes(initialSubTab)) {
+      setTab('diaries');
+    }
+  }, [initialSubTab]);
+
+  // Подписка на event-bus вместо polling
+  useEffect(() => {
+    setUndoAvailable(getSnapshots().length > 0);
+    const unsub = onAnyProfileChange(() => {
+      setUndoAvailable(getSnapshots().length > 0);
+    });
+    return unsub;
   }, []);
 
-  // Глобальный Ctrl+Z для undo
+  // Глобальный Ctrl+Z для undo (только вне input/textarea/select)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
-          // Не перехватываем undo в текстовых полях
-          return;
+          return; // Не перехватываем undo в текстовых полях
         }
         e.preventDefault();
         undoLastSnapshot();
-        setUndoAvailable(getSnapshots().length > 0);
+        // Snapshots обновятся через onAnyProfileChange listener выше
       }
     };
     window.addEventListener('keydown', handler);
@@ -76,29 +85,15 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void 
             fontSize: 20, cursor: 'pointer', padding: 4, minWidth: 36, minHeight: 36,
           }}
         >←</button>
-        <span style={{ fontSize: 24 }}>{meta.icon}</span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: meta.color }}>{meta.title}</div>
+        <span aria-hidden="true" style={{ fontSize: 24 }}>{meta.icon}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 16, fontWeight: 700, color: meta.color,
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>{meta.title}</div>
           <div style={{ fontSize: 11, color: colors.textMuted }}>Изменения сохраняются автоматически</div>
         </div>
-        {undoAvailable && (
-          <button
-            onClick={() => { undoLastSnapshot(); setUndoAvailable(getSnapshots().length > 0); }}
-            aria-label="Отменить последнее изменение (Ctrl+Z)"
-            title="Отменить (Ctrl+Z)"
-            style={{
-              background: 'rgba(59,130,246,0.12)',
-              border: '1px solid rgba(59,130,246,0.3)',
-              color: colors.blue,
-              padding: '6px 12px',
-              borderRadius: 8,
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-              minHeight: 36,
-            }}
-          >↩ Отменить</button>
-        )}
+        <UndoButton undoAvailable={undoAvailable} setUndoAvailable={setUndoAvailable} />
       </div>
 
       {/* Содержимое вкладки с прокруткой */}
@@ -116,5 +111,28 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void 
         {tab === 'settings' && <ProfileSettingsTab onNavigate={onNavigate} />}
       </div>
     </div>
+  );
+};
+
+const UndoButton: React.FC<{ undoAvailable: boolean; setUndoAvailable: (v: boolean) => void }> = ({ undoAvailable, setUndoAvailable }) => {
+  if (!undoAvailable) return null;
+  return (
+    <button
+      onClick={() => { undoLastSnapshot(); setUndoAvailable(false); }}
+      aria-label="Отменить последнее изменение (Ctrl+Z)"
+      title="Отменить (Ctrl+Z)"
+      style={{
+        background: 'rgba(59,130,246,0.12)',
+        border: '1px solid rgba(59,130,246,0.3)',
+        color: colors.blue,
+        padding: '6px 12px',
+        borderRadius: 8,
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: 'pointer',
+        minHeight: 36,
+        flexShrink: 0,
+      }}
+    >↩ Отменить</button>
   );
 };

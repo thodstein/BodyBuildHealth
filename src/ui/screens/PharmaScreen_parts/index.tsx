@@ -15,7 +15,7 @@ import { PharmaPeptideCalc } from './PharmaPeptideCalc';
 type PharmaPage = 'main' | 'course' | 'calculators' | 'info';
 type SubTab = 'catalog' | 'pkpd' | 'dosage' | 'peptides' | 'mapper' | 'diagnostics' | 'interactions';
 
-export const PharmaScreen: React.FC = () => {
+export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
   const [page, setPage] = useState<PharmaPage>('main');
   const [subTab, setSubTab] = useState<SubTab>('catalog');
   const linked = useDataLink();

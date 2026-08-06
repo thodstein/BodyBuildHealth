@@ -1393,7 +1393,7 @@ const FavoritesTab: React.FC = () => {
   </div>);
 };
 
-export const NutritionScreen: React.FC = () => {
+export const NutritionScreen: React.FC<{ initialSubTab?: string }> = () => {
   const linked = useDataLink();
   const [tab, setTab] = useState<ActiveTab>('mealplan');
   const [page, setPage] = useState<NutritionPage>('hero');

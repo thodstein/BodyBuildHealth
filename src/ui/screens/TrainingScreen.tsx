@@ -55,7 +55,7 @@ import { ZONES, ZONE_ORDER, zoneForTab, PLANNER_MODES, type TrainingZone } from 
 import { hapticImpact } from '../../core/telegram';
 import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 
-export const TrainingScreen: React.FC = () => {
+export const TrainingScreen: React.FC<{ initialSubTab?: string }> = () => {
   const linked = useDataLink();
   const readiness = linked.readiness;
   const labAnalysis = linked.labAnalysis;

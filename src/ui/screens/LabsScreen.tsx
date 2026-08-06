@@ -143,7 +143,7 @@ const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
 
 type LabSubTab = 'hero' | 'overview' | 'current' | 'catalog' | 'journal';
 
-export const LabsScreen: React.FC = () => {
+export const LabsScreen: React.FC<{ initialSubTab?: string }> = () => {
   const linked = useDataLink();
   const profilePhase = (linked.profile?.settings as any)?.pharma?.phase || '';
   const initialLabsPhase = PROFILE_PHASE_TO_LABS_PHASE[profilePhase] || 'baseline';

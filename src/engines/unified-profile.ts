@@ -306,7 +306,10 @@ export function migrateToUnified(): UnifiedSettings {
   const surplusPct = safeNum('he_surplus_pct');
   if (surplusPct !== undefined) s.nutrition.surplusPct = surplusPct;
   const variety = safeStr('he_variety_strictness');
+  // Старый формат был 'soft' | 'strict' (маппим в low/high), новый — 'low' | 'medium' | 'high'
   if (variety === 'low' || variety === 'medium' || variety === 'high') s.nutrition.varietyStrictness = variety;
+  else if (variety === 'soft') s.nutrition.varietyStrictness = 'low';
+  else if (variety === 'strict') s.nutrition.varietyStrictness = 'high';
   const specificity = safeStr('he_specificity');
   if (specificity === 'generic' || specificity === 'specific') s.nutrition.specificity = specificity;
   const intolerances = safeArray('he_intolerances');
