@@ -68,31 +68,26 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
-      {/* Хедер вкладки */}
+      {/* Sticky-хедер вкладки — в стиле NutritionScreen */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
-        padding: '12px 16px',
-        background: `${meta.color}11`,
-        border: `1px solid ${meta.color}33`,
-        borderRadius: 12,
-        flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', flexShrink: 0,
+        background: '#18181b',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        position: 'sticky', top: 0, zIndex: 20,
       }}>
         <button
           onClick={() => setTab(null)}
           aria-label="Назад к hero"
           style={{
-            background: 'transparent', border: 'none', color: colors.text,
-            fontSize: 20, cursor: 'pointer', padding: 4, minWidth: 36, minHeight: 36,
+            padding: '4px 8px', cursor: 'pointer', fontSize: 20, color: 'rgba(255,255,255,0.85)',
+            border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', minHeight: 36,
           }}
         >←</button>
-        <span aria-hidden="true" style={{ fontSize: 24 }}>{meta.icon}</span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: 16, fontWeight: 700, color: meta.color,
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>{meta.title}</div>
-          <div style={{ fontSize: 11, color: colors.textMuted }}>Изменения сохраняются автоматически</div>
+        <span aria-hidden="true" style={{ fontSize: 18 }}>{meta.icon}</span>
+        <div style={{ flex: 1, fontSize: 15, fontWeight: 700, color: '#fff', letterSpacing: -0.3 }}>
+          {meta.title}
         </div>
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>авто-сохранение</span>
         <UndoButton undoAvailable={undoAvailable} setUndoAvailable={setUndoAvailable} />
       </div>
 
@@ -101,7 +96,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
         flex: 1,
         overflowY: 'auto',
         overflowX: 'hidden',
-        paddingRight: 4,
+        padding: '0 8px 80px',
         scrollbarWidth: 'thin',
         scrollbarColor: `${colors.border} transparent`,
       }}>
