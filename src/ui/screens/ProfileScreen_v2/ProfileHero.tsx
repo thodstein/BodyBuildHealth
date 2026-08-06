@@ -11,13 +11,14 @@ interface TabDef {
   id: 'user' | 'diaries' | 'settings';
   icon: string;
   label: string;
+  desc: string;
   color: string;
 }
 
 const TABS: TabDef[] = [
-  { id: 'user', icon: '👤', label: 'Пользователь', color: colors.primary },
-  { id: 'diaries', icon: '📓', label: 'Дневники', color: colors.orange },
-  { id: 'settings', icon: '⚙️', label: 'Настройки', color: colors.purple },
+  { id: 'user', icon: '👤', label: 'Пользователь', desc: 'Имя, параметры, образ жизни, курс, цели', color: colors.primary },
+  { id: 'diaries', icon: '📓', label: 'Дневники', desc: 'Сон, давление, вес, замеры, отчёты, архив', color: colors.orange },
+  { id: 'settings', icon: '⚙️', label: 'Настройки', desc: 'Единицы, уведомления, экспорт данных', color: colors.purple },
 ];
 
 function calcCompleteness(s: any): number {
@@ -179,13 +180,13 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
           </div>
         )}
 
-        {/* Pill-вкладки — как в NutritionScreen */}
+        {/* Карточки-баннеры — как в NutritionScreen */}
         <div
           role="navigation"
           aria-label="Разделы профиля"
           style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 8,
-            width: 'min(100%, 360px)', padding: '4px',
+            display: 'flex', flexDirection: 'column', gap: 8,
+            width: '100%', padding: '4px 0',
           }}
         >
         {TABS.map(t => (
@@ -194,26 +195,38 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
             onClick={() => onSelectTab(t.id)}
             aria-label={`Открыть раздел: ${t.label}`}
             style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 16px', borderRadius: 12, cursor: 'pointer',
-              fontSize: 12, fontWeight: 700, letterSpacing: 0.2,
-              border: `1px solid ${t.color}33`,
-              background: `linear-gradient(135deg, ${t.color}11, rgba(0,0,0,0.2))`,
-              color: t.color,
-              transition: 'all 0.2s cubic-bezier(0.22,1,0.36,1)',
-              minHeight: 44, textAlign: 'left',
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '12px 14px', borderRadius: 14, cursor: 'pointer',
+              textAlign: 'left', width: '100%',
+              background: `${t.color}1A`, border: `1px solid ${t.color}55`,
+              color: colors.text,
+              boxShadow: '0 2px 12px rgba(0,0,0,0.35)',
+              backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+              transition: 'transform 0.2s, box-shadow 0.2s',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = `linear-gradient(135deg, ${t.color}33, ${t.color}11)`;
               e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.45)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = `linear-gradient(135deg, ${t.color}11, rgba(0,0,0,0.2))`;
               e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.35)';
             }}
           >
-            <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1 }}>{t.icon}</span>
-            <span>{t.label}</span>
+            <div
+              aria-hidden="true"
+              style={{
+                width: 44, height: 44, borderRadius: 12,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, background: `${t.color}33`,
+                fontSize: 22, lineHeight: 1,
+              }}
+            >{t.icon}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: t.color, letterSpacing: -0.2, marginBottom: 1 }}>{t.label}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.3 }}>{t.desc}</div>
+            </div>
+            <span aria-hidden="true" style={{ color: t.color, fontSize: 18, opacity: 0.7 }}>→</span>
           </button>
         ))}
         </div>
