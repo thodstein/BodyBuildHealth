@@ -43,6 +43,7 @@ const style: Record<string, React.CSSProperties> = {
 };
 
 interface TrainingDiaryHubProps {
+  initialMode?: 'diary' | 'reports';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -64,10 +65,10 @@ interface TrainingDiaryHubProps {
 type HubMode = 'diary' | 'history' | 'analytics' | 'progress' | 'visual' | 'reports';
 
 export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
-  diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh,
+  initialMode, diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh,
   trainingOutput, goal, daysPerWeek, splitType, periodizationType, mesoLength, tprofile, linked,
 }) => {
-  const [mode, setMode] = useState<HubMode>('diary');
+  const [mode, setMode] = useState<HubMode>(initialMode || 'diary');
   const [search, setSearch] = useState('');
   const isMobile = useIsMobile();
   const [historyExpanded, setHistoryExpanded] = useState<string | null>(null);

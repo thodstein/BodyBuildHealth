@@ -17,6 +17,7 @@ import type { TrainingTab } from './shared';
 
 interface Props {
   tab: TrainingTab;
+  initialDiaryMode?: 'diary' | 'reports';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -41,6 +42,7 @@ export const DiaryAnalyticsZone: React.FC<Props> = (p) => {
       {p.tab === 'diary' && (
         <InfoErrorBoundary label="Дневник">
           <TrainingDiaryHub
+            initialMode={p.initialDiaryMode}
             diary={p.diary}
             diaryStats={p.diaryStats}
             diaryProgress={p.diaryProgress}

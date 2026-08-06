@@ -92,6 +92,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     // initialSubTab значения ('diary'/'reports'/'symptoms') открываются через main tab
     return 'main';
   };
+  useEffect(() => {
+    if (initialSubTab === 'reports') {
+      setTab('main'); setSupportView('calc'); setCalcView('reports');
+    }
+  }, [initialSubTab]);
   const [tab, setTab] = useState<SupportTab>(resolveTab());
   const [supportView, setSupportView] = useState<SupportView>('main');
   const [calcView, setCalcView] = useState<CalcView>('main');

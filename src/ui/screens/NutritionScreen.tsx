@@ -1393,7 +1393,7 @@ const FavoritesTab: React.FC = () => {
   </div>);
 };
 
-export const NutritionScreen: React.FC<{ initialSubTab?: string }> = () => {
+export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
   const linked = useDataLink();
   const [tab, setTab] = useState<ActiveTab>('mealplan');
   const [page, setPage] = useState<NutritionPage>('hero');
@@ -1422,6 +1422,14 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = () => {
       }
     } catch {}
   }, []);
+
+  useEffect(() => {
+    if (initialSubTab === 'diary') {
+      setTab('diary'); setPage('tabs'); setNutritionSection('diary');
+    } else if (initialSubTab === 'reports') {
+      setTab('reports'); setPage('tabs'); setNutritionSection('analytics');
+    }
+  }, [initialSubTab]);
 
   // B3: Reload diary data from localStorage when NutritionDiary reports changes
   const reloadDiary = () => {
@@ -1692,4 +1700,3 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = () => {
     </div>
   );
 };
-

@@ -55,7 +55,7 @@ import { ZONES, ZONE_ORDER, zoneForTab, PLANNER_MODES, type TrainingZone } from 
 import { hapticImpact } from '../../core/telegram';
 import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 
-export const TrainingScreen: React.FC<{ initialSubTab?: string }> = () => {
+export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
   const linked = useDataLink();
   const readiness = linked.readiness;
   const labAnalysis = linked.labAnalysis;
@@ -196,6 +196,11 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = () => {
       }
     } catch {}
   }, []);
+  useEffect(() => {
+    if (initialSubTab === 'diary' || initialSubTab === 'reports') {
+      setZone('diary'); setPage('tabs'); setTab('diary');
+    }
+  }, [initialSubTab]);
   const [showWarmup, setShowWarmup] = useState(false);
   const [showCooldown, setShowCooldown] = useState(false);
   const [runtimeSetW, setRuntimeSetW] = useState(80);
@@ -624,6 +629,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = () => {
       {(tab === 'diary' || tab === 'insights' || tab === 'strength' || tab === 'goals' || tab === 'calendar' || tab === 'checkin' || tab === 'mmc_tracking' || tab === 'import_data') && (
         <DiaryAnalyticsZone
           tab={tab}
+          initialDiaryMode={initialSubTab === 'reports' ? 'reports' : initialSubTab === 'diary' ? 'diary' : undefined}
           diary={diary} diaryStats={diaryStats} diaryProgress={diaryProgress}
           historyWorkouts={historyWorkouts} macrocycle={macrocycle} selectedWeek={selectedWeek}
           level={level} onRefresh={loadDiaryStats} trainingOutput={trainingOutput}
@@ -721,4 +727,3 @@ import { RIRCalibrationCard } from './TrainingScreen_parts/RIRCalibrationCard';
 import MesoCorrectionCard from './TrainingScreen_parts/MesoCorrectionCard';
 import MMCTrackingCard from './TrainingScreen_parts/MMCTrackingCard';
 import { loadRirCalibrationStats } from '../../engines/meso-correction.engine';
-

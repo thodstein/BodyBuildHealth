@@ -379,7 +379,9 @@ const QUICK_REPORT_LINKS: QuickLink[] = [
 
 /* ── Главный компонент ── */
 
-export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void }> = ({ onNavigate }) => {
+export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void; initialView?: 'diary' | 'reports' | 'archive' }> = ({ onNavigate, initialView }) => {
+  const [view, setView] = useState<'diary' | 'reports' | 'archive'>(initialView || 'diary');
+  useEffect(() => { if (initialView) setView(initialView); }, [initialView]);
   const [sleepEntries, setSleepEntries] = useState<SleepEntry[]>([]);
   const [bpEntries, setBpEntries] = useState<BPEntry[]>([]);
   const [injectionEntries, setInjectionEntries] = useState<InjectionEntry[]>([]);
@@ -415,6 +417,25 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
     { key: 'injection', icon: '💉', title: 'Инъекции', color: colors.warning, count: injectionEntries.length, last: lastDate(injectionEntries) },
   ];
 
+  const reportSources = [
+    ['he_training_report_current', 'Тренировки', ['he_training_reports']],
+    ['he_nutrition_report_current', 'Питание', ['he_nutrition_report_archive']],
+    ['he_labs_report_current', 'Анализы', ['he_lab_reports']],
+    ['he_support_reports', 'Поддержка', ['he_support_reports_archive', 'he_support_reports']],
+  ] as const;
+  const readReports = (archive: boolean) => reportSources.flatMap(([current, label, archiveKeys]) => {
+    try {
+      const raw = archive
+        ? archiveKeys.map(key => localStorage.getItem(key)).find(Boolean)
+        : localStorage.getItem(current);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const list = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+      return list.map((report: any) => ({ report, label }));
+    } catch { return []; }
+  });
+  const reports = readReports(false);
+  const archivedReports = readReports(true);
+
   const QuickLinkRow: React.FC<{ links: QuickLink[]; ariaLabel: string }> = ({ links, ariaLabel }) => (
     <div
       role="navigation"
@@ -444,6 +465,43 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="tablist" aria-label="Разделы дневников">
+        {([
+          ['diary', '📓 Дневники'], ['reports', '📊 Отчёты'], ['archive', '🗄 Архив отчётов'],
+        ] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setView(key)} role="tab" aria-selected={view === key}
+            style={{ padding: '7px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+              border: `1px solid ${view === key ? colors.primary : colors.border}`,
+              background: view === key ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.03)',
+              color: view === key ? colors.primary : colors.textMuted }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'reports' && (
+        <AccordionSection title="📊 Отчёты блоков" subtitle="Последние отчёты из модулей приложения" icon="📊" color={colors.teal} defaultOpen>
+          {reports.length === 0 ? <div style={{ color: colors.textMuted, fontSize: 12, padding: 12 }}>Отчётов пока нет.</div> : reports.map(({ report, label }, i) => (
+            <div key={`${label}-${i}`} style={{ padding: 10, marginBottom: 6, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}` }}>
+              <div style={{ color: colors.teal, fontWeight: 700, fontSize: 12 }}>{label}</div>
+              <div style={{ color: colors.textMuted, fontSize: 10, marginTop: 3 }}>{report.date ? new Date(report.date).toLocaleString('ru-RU') : 'Последний отчёт'}</div>
+            </div>
+          ))}
+        </AccordionSection>
+      )}
+
+      {view === 'archive' && (
+        <AccordionSection title="🗄 Архив отчётов" subtitle="Сохранённые отчёты всех блоков" icon="🗄" color={colors.orange} defaultOpen>
+          {archivedReports.length === 0 ? <div style={{ color: colors.textMuted, fontSize: 12, padding: 12 }}>Архив отчётов пуст.</div> : archivedReports.map(({ report, label }, i) => (
+            <div key={`${label}-${i}`} style={{ padding: 10, marginBottom: 6, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}` }}>
+              <div style={{ color: colors.orange, fontWeight: 700, fontSize: 12 }}>{label}</div>
+              <div style={{ color: colors.textMuted, fontSize: 10, marginTop: 3 }}>{report.date ? new Date(report.date).toLocaleString('ru-RU') : 'Архивный отчёт'}</div>
+            </div>
+          ))}
+        </AccordionSection>
+      )}
+
+      {view !== 'diary' ? null : <>
       <AccordionSection
         title="📓 Встроенные дневники"
         subtitle="Сон, давление, вес, замеры, инъекции — добавляйте прямо здесь"
@@ -542,6 +600,7 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
           setInjectionEntries(updated);
         }}
       />
+      </>}
     </div>
   );
 };

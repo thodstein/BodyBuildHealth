@@ -143,7 +143,7 @@ const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
 
 type LabSubTab = 'hero' | 'overview' | 'current' | 'catalog' | 'journal';
 
-export const LabsScreen: React.FC<{ initialSubTab?: string }> = () => {
+export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
   const linked = useDataLink();
   const profilePhase = (linked.profile?.settings as any)?.pharma?.phase || '';
   const initialLabsPhase = PROFILE_PHASE_TO_LABS_PHASE[profilePhase] || 'baseline';
@@ -187,6 +187,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = () => {
       }
     } catch {}
   }, []);
+  useEffect(() => {
+    if (initialSubTab === 'diary') {
+      setMainTab('lab'); setSubTab('journal'); setJournalSubView('diary');
+    } else if (initialSubTab === 'reports') {
+      setMainTab('lab'); setSubTab('journal'); setJournalSubView('reports');
+    }
+  }, [initialSubTab]);
   const [selectedArchivedLabReport, setSelectedArchivedLabReport] = useState<any>(null);
   const [labArchive, setLabArchive] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_lab_reports') || '[]'); } catch { return []; }

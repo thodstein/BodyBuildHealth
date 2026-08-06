@@ -28,7 +28,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
   // P1-fix (Aug 5 2026): при переходе из App — открываем конкретную вкладку дневника
   useEffect(() => {
     if (initialSubTab && (
-      ['diaries', 'sleep', 'bp', 'weight', 'measurements', 'injection'].includes(initialSubTab)
+      ['diaries', 'reports', 'archive', 'custom-report', 'sleep', 'bp', 'weight', 'measurements', 'injection'].includes(initialSubTab)
       || initialSubTab.endsWith('-diary')
       || initialSubTab.endsWith('-reports')
     )) {
@@ -103,7 +103,10 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
         scrollbarColor: `${colors.border} transparent`,
       }}>
         {tab === 'user' && <ProfileUserTab />}
-        {tab === 'diaries' && <ProfileDiariesTab onNavigate={onNavigate} />}
+        {tab === 'diaries' && <ProfileDiariesTab
+          onNavigate={onNavigate}
+          initialView={initialSubTab === 'reports' || initialSubTab === 'custom-report' ? 'reports' : initialSubTab === 'archive' ? 'archive' : 'diary'}
+        />}
         {tab === 'settings' && <ProfileSettingsTab onNavigate={onNavigate} />}
       </div>
     </div>
