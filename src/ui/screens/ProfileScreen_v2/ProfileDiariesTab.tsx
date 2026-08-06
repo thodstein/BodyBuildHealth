@@ -20,6 +20,10 @@ interface BPEntry { date: string; systolic: number; diastolic: number; pulse: nu
 const INJECTION_DIARY_KEY = 'he_injection_diary';
 interface InjectionEntry { date: string; substance: string; dose: string; site: string; notes?: string; }
 
+type DiaryKey = 'sleep' | 'bp' | 'weight' | 'measurements' | 'injection';
+
+interface BuiltInDiaryRow { key: DiaryKey; count: number; last: string; }
+
 /* ── Хелперы localStorage ── */
 
 function loadDiary<T>(key: string): T[] {
@@ -298,62 +302,99 @@ const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
 
 /* ── Карточка дневника ── */
 
-interface BuiltInDiary {
-  key: 'sleep' | 'bp' | 'weight' | 'measurements' | 'injection';
-  icon: string;
-  title: string;
-  color: string;
-  count: number;
-  last: string;
-  unit?: string;
-}
+const DIARY_META: Record<DiaryKey, { title: string; unit: string; icon: string; color: string; storageKey?: string }> = {
+  sleep: { title: 'Сон', unit: 'ч', icon: '💤', color: '#a78bfa', storageKey: SLEEP_DIARY_KEY },
+  bp: { title: 'Давление', unit: 'мм рт.ст.', icon: '❤️', color: '#ef4444', storageKey: BP_DIARY_KEY },
+  weight: { title: 'Вес', unit: 'кг', icon: '⚖️', color: '#22c55e' },
+  measurements: { title: 'Замеры тела', unit: 'см', icon: '📏', color: '#3b82f6' },
+  injection: { title: 'Инъекции', unit: '', icon: '💉', color: '#f59e0b', storageKey: INJECTION_DIARY_KEY },
+};
+
+const DIARY_FIELDS: Record<DiaryKey, { label: string; unit: string }[]> = {
+  sleep: [
+    { label: 'Часы', unit: 'ч' },
+    { label: 'Качество', unit: '1–5' },
+    { label: 'Пробуждений', unit: 'раз' },
+    { label: 'Легли', unit: 'время' },
+    { label: 'Подъём', unit: 'время' },
+  ],
+  bp: [
+    { label: 'Систола', unit: 'мм рт.ст.' },
+    { label: 'Диастола', unit: 'мм рт.ст.' },
+    { label: 'Пульс', unit: 'уд/мин' },
+  ],
+  weight: [
+    { label: 'Вес', unit: 'кг' },
+    { label: 'Изменение', unit: 'кг' },
+  ],
+  measurements: [
+    { label: 'Талия', unit: 'см' },
+    { label: 'Грудь', unit: 'см' },
+    { label: 'Бёдра', unit: 'см' },
+    { label: 'Бицепс', unit: 'см' },
+    { label: 'Бедро', unit: 'см' },
+    { label: 'Шея', unit: 'см' },
+    { label: 'Предплечье', unit: 'см' },
+    { label: '% жира', unit: '%' },
+  ],
+  injection: [
+    { label: 'Препарат', unit: '' },
+    { label: 'Доза', unit: '' },
+    { label: 'Место', unit: '' },
+  ],
+};
 
 const DiaryCard: React.FC<{
-  diary: BuiltInDiary;
+  diaryKey: DiaryKey;
+  count: number;
+  last: string;
   onAdd: () => void;
   onOpen: () => void;
-}> = ({ diary, onAdd, onOpen }) => (
-  <div
-    style={{
-      background: 'rgba(28,28,32,0.65)',
-      border: `1px solid ${diary.color}33`,
-      borderRadius: 12, padding: 12,
-      display: 'flex', flexDirection: 'column', gap: 6,
-    }}
-  >
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1 }}>{diary.icon}</span>
-      <span style={{ fontSize: 13, fontWeight: 700, color: colors.text }}>{diary.title}</span>
-      <span style={{
-        fontSize: 10, fontWeight: 700, color: diary.color, marginLeft: 'auto',
-        background: `${diary.color}22`, padding: '1px 6px', borderRadius: 4,
-      }}>{diary.count}</span>
+}> = ({ diaryKey, count, last, onAdd, onOpen }) => {
+  const meta = DIARY_META[diaryKey];
+  return (
+    <div
+      style={{
+        background: 'rgba(28,28,32,0.65)',
+        border: `1px solid ${meta.color}33`,
+        borderRadius: 12, padding: 12,
+        display: 'flex', flexDirection: 'column', gap: 6,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1 }}>{meta.icon}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: colors.text }}>{meta.title}</span>
+        <span style={{
+          fontSize: 10, fontWeight: 700, color: meta.color, marginLeft: 'auto',
+          background: `${meta.color}22`, padding: '1px 6px', borderRadius: 4,
+        }}>{count}</span>
+      </div>
+      <div style={{ fontSize: 10, color: colors.textMuted, minHeight: 14 }}>
+        {last ? `Последняя: ${last}${meta.unit ? ' ' + meta.unit : ''}` : 'Нет записей'}
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+        <button
+          onClick={onAdd}
+          aria-label={`Добавить запись в дневник ${meta.title}`}
+          style={{
+            flex: 1, minHeight: 32, padding: '6px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+            background: `${meta.color}22`, color: meta.color, border: `1px solid ${meta.color}44`,
+            cursor: 'pointer',
+          }}
+        >+ Добавить</button>
+        <button
+          onClick={onOpen}
+          aria-label={`Открыть дневник ${meta.title}`}
+          style={{
+            flex: 1, minHeight: 32, padding: '6px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+            background: 'transparent', color: colors.text, border: `1px solid ${colors.border}`,
+            cursor: 'pointer',
+          }}
+        >📋 Открыть</button>
+      </div>
     </div>
-    <div style={{ fontSize: 10, color: colors.textMuted, minHeight: 14 }}>
-      {diary.last ? `Последняя: ${diary.last}${diary.unit ? ' ' + diary.unit : ''}` : 'Нет записей'}
-    </div>
-    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-      <button
-        onClick={onAdd}
-        aria-label={`Добавить запись в дневник ${diary.title}`}
-        style={{
-          flex: 1, minHeight: 32, padding: '6px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-          background: `${diary.color}22`, color: diary.color, border: `1px solid ${diary.color}44`,
-          cursor: 'pointer',
-        }}
-      >+ Добавить</button>
-      <button
-        onClick={onOpen}
-        aria-label={`Открыть дневник ${diary.title}`}
-        style={{
-          flex: 1, minHeight: 32, padding: '6px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-          background: 'transparent', color: colors.text, border: `1px solid ${colors.border}`,
-          cursor: 'pointer',
-        }}
-      >📋 Открыть</button>
-    </div>
-  </div>
-);
+  );
+};
 
 /* ── Быстрые ссылки на дневники в других блоках ── */
 
@@ -379,9 +420,12 @@ const QUICK_REPORT_LINKS: QuickLink[] = [
 
 /* ── Главный компонент ── */
 
-export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void; initialView?: 'diary' | 'reports' | 'archive' }> = ({ onNavigate, initialView }) => {
+export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void; initialView?: 'diary' | 'reports' | 'archive'; initialActiveDiary?: DiaryKey }> = ({ onNavigate, initialView, initialActiveDiary }) => {
   const [view, setView] = useState<'diary' | 'reports' | 'archive'>(initialView || 'diary');
+  const [activeDiary, setActiveDiary] = useState<DiaryKey | null>(initialActiveDiary || null);
   useEffect(() => { if (initialView) setView(initialView); }, [initialView]);
+  useEffect(() => { if (initialActiveDiary) { setActiveDiary(initialActiveDiary); setView('diary'); } }, [initialActiveDiary]);
+  useEffect(() => { if (view !== 'diary') setActiveDiary(null); }, [view]);
   const [sleepEntries, setSleepEntries] = useState<SleepEntry[]>([]);
   const [bpEntries, setBpEntries] = useState<BPEntry[]>([]);
   const [injectionEntries, setInjectionEntries] = useState<InjectionEntry[]>([]);
@@ -409,32 +453,102 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
     return arr[arr.length - 1].date;
   };
 
-  const builtInDiaries: BuiltInDiary[] = [
-    { key: 'sleep', icon: '💤', title: 'Сон', color: colors.purple, count: sleepEntries.length, last: lastDate(sleepEntries), unit: 'ч' },
-    { key: 'bp', icon: '❤️', title: 'Давление', color: colors.danger, count: bpEntries.length, last: bpEntries.length ? `${bpEntries[bpEntries.length - 1].systolic}/${bpEntries[bpEntries.length - 1].diastolic}` : '' },
-    { key: 'weight', icon: '⚖️', title: 'Вес', color: colors.green, count: weights.length, last: lastDate(weights), unit: 'кг' },
-    { key: 'measurements', icon: '📏', title: 'Замеры тела', color: colors.blue, count: measurements.length, last: lastDate(measurements) },
-    { key: 'injection', icon: '💉', title: 'Инъекции', color: colors.warning, count: injectionEntries.length, last: lastDate(injectionEntries) },
+  const builtInDiaries: BuiltInDiaryRow[] = [
+    { key: 'sleep', count: sleepEntries.length, last: lastDate(sleepEntries) },
+    { key: 'bp', count: bpEntries.length, last: bpEntries.length ? `${bpEntries[bpEntries.length - 1].systolic}/${bpEntries[bpEntries.length - 1].diastolic}` : '' },
+    { key: 'weight', count: weights.length, last: lastDate(weights) },
+    { key: 'measurements', count: measurements.length, last: lastDate(measurements) },
+    { key: 'injection', count: injectionEntries.length, last: lastDate(injectionEntries) },
   ];
 
+  const getEntries = (key: DiaryKey): { date: string; fields: { label: string; value: string; unit: string }[] }[] => {
+    if (key === 'sleep') return [...sleepEntries].reverse().map(e => ({
+      date: e.date, fields: [
+        { label: 'Часы', value: String(e.hours), unit: 'ч' },
+        { label: 'Качество', value: String(e.quality), unit: '1–5' },
+        { label: 'Пробуждений', value: String(e.awakenings ?? 0), unit: 'раз' },
+        { label: 'Легли', value: e.bedtime || '—', unit: '' },
+        { label: 'Подъём', value: e.wakeTime || '—', unit: '' },
+        ...(e.notes ? [{ label: 'Заметка', value: e.notes, unit: '' }] : []),
+      ],
+    }));
+    if (key === 'bp') return [...bpEntries].reverse().map(e => ({
+      date: e.date, fields: [
+        { label: 'Систола', value: String(e.systolic), unit: 'мм рт.ст.' },
+        { label: 'Диастола', value: String(e.diastolic), unit: 'мм рт.ст.' },
+        { label: 'Пульс', value: String(e.pulse), unit: 'уд/мин' },
+        ...(e.notes ? [{ label: 'Заметка', value: e.notes, unit: '' }] : []),
+      ],
+    }));
+    if (key === 'weight') return [...weights].reverse().map((w, idx, arr) => {
+      const prev = arr[idx + 1];
+      const delta = prev ? (w.weight - prev.weight) : 0;
+      return {
+        date: w.date, fields: [
+          { label: 'Вес', value: String(w.weight), unit: 'кг' },
+          { label: 'Изменение', value: (delta > 0 ? '+' : '') + delta.toFixed(1), unit: 'кг' },
+        ],
+      };
+    });
+    if (key === 'measurements') return [...measurements].reverse().map(m => ({
+      date: m.date, fields: DIARY_FIELDS.measurements
+        .filter(f => f.label !== '% жира' || (m as any).bodyFat)
+        .map(f => ({
+          label: f.label,
+          value: (() => {
+            switch (f.label) {
+              case 'Талия': return String((m as any).waistCm || 0);
+              case 'Грудь': return String((m as any).chestCm || 0);
+              case 'Бёдра': return String((m as any).hipCm || 0);
+              case 'Бицепс': return String((m as any).bicepCm || 0);
+              case 'Бедро': return String((m as any).thighCm || 0);
+              case 'Шея': return String((m as any).neckCm || 0);
+              case 'Предплечье': return String((m as any).forearmCm || 0);
+              case '% жира': return String((m as any).bodyFat || 0);
+              default: return '0';
+            }
+          })(),
+          unit: f.unit,
+        })),
+    }));
+    if (key === 'injection') return [...injectionEntries].reverse().map(e => ({
+      date: e.date, fields: [
+        { label: 'Препарат', value: e.substance || '—', unit: '' },
+        { label: 'Доза', value: e.dose || '—', unit: '' },
+        { label: 'Место', value: e.site || '—', unit: '' },
+        ...(e.notes ? [{ label: 'Заметка', value: e.notes, unit: '' }] : []),
+      ],
+    }));
+    return [];
+  };
+
+  const activeEntries = activeDiary ? getEntries(activeDiary) : [];
+
   const reportSources = [
-    ['he_training_report_current', 'Тренировки', ['he_training_reports']],
-    ['he_nutrition_report_current', 'Питание', ['he_nutrition_report_archive']],
-    ['he_labs_report_current', 'Анализы', ['he_lab_reports']],
-    ['he_support_reports', 'Поддержка', ['he_support_reports_archive', 'he_support_reports']],
-  ] as const;
-  const readReports = (archive: boolean) => reportSources.flatMap(([current, label, archiveKeys]) => {
+    { current: 'he_training_report_current', label: '🏋️ Тренер-отчёт', target: 'training-analytics', archiveKeys: ['he_training_reports'], color: colors.blue },
+    { current: 'he_nutrition_report_current', label: '🍽 Отчёт по питанию', target: 'nutrition-reports', archiveKeys: ['he_nutrition_report_archive'], color: colors.green },
+    { current: 'he_labs_report_current', label: '🩺 Врач-отчёт', target: 'labs-reports', archiveKeys: ['he_lab_reports'], color: colors.danger },
+    { current: 'he_support_reports', label: '🛡 Отчёт поддержки', target: 'support-reports', archiveKeys: ['he_support_reports_archive', 'he_support_reports'], color: colors.purple },
+    { current: 'he_profile_reports', label: '📊 Кастомный отчёт', target: 'custom-report', archiveKeys: ['he_profile_reports'], color: colors.orange },
+  ];
+  const readReportEntries = (src: typeof reportSources[number]) => {
+    const list: any[] = [];
     try {
-      const raw = archive
-        ? archiveKeys.map(key => localStorage.getItem(key)).find(Boolean)
-        : localStorage.getItem(current);
-      const parsed = raw ? JSON.parse(raw) : [];
-      const list = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
-      return list.map((report: any) => ({ report, label }));
-    } catch { return []; }
-  });
-  const reports = readReports(false);
-  const archivedReports = readReports(true);
+      const current = localStorage.getItem(src.current);
+      const parsed = current ? JSON.parse(current) : null;
+      if (Array.isArray(parsed)) list.push(...parsed);
+      else if (parsed) list.push(parsed);
+    } catch {}
+    for (const key of src.archiveKeys) {
+      try {
+        const arch = localStorage.getItem(key);
+        const parsed = arch ? JSON.parse(arch) : null;
+        if (Array.isArray(parsed)) list.push(...parsed);
+        else if (parsed) list.push(parsed);
+      } catch {}
+    }
+    return list;
+  };
 
   const QuickLinkRow: React.FC<{ links: QuickLink[]; ariaLabel: string }> = ({ links, ariaLabel }) => (
     <div
@@ -481,23 +595,53 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
 
       {view === 'reports' && (
         <AccordionSection title="📊 Отчёты блоков" subtitle="Последние отчёты из модулей приложения" icon="📊" color={colors.teal} defaultOpen>
-          {reports.length === 0 ? <div style={{ color: colors.textMuted, fontSize: 12, padding: 12 }}>Отчётов пока нет.</div> : reports.map(({ report, label }, i) => (
-            <div key={`${label}-${i}`} style={{ padding: 10, marginBottom: 6, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}` }}>
-              <div style={{ color: colors.teal, fontWeight: 700, fontSize: 12 }}>{label}</div>
-              <div style={{ color: colors.textMuted, fontSize: 10, marginTop: 3 }}>{report.date ? new Date(report.date).toLocaleString('ru-RU') : 'Последний отчёт'}</div>
-            </div>
-          ))}
+          <div role="list" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {reportSources.map(src => {
+              const list = readReportEntries(src);
+              const last = list[0];
+              return (
+                <button
+                  key={src.target}
+                  onClick={() => onNavigate?.(src.target)}
+                  role="listitem"
+                  aria-label={`Открыть ${src.label}`}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                    borderRadius: 10, cursor: 'pointer', textAlign: 'left', minHeight: 56,
+                    background: `${src.color}10`, border: `1px solid ${src.color}44`,
+                    color: colors.text,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: src.color }}>{src.label}</div>
+                    <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>
+                      {list.length === 0
+                        ? 'Нет отчётов'
+                        : `${list.length} отчёт${list.length === 1 ? '' : 'ов'}${last?.date ? ` · последний ${new Date(last.date).toLocaleDateString('ru-RU')}` : ''}`}
+                    </div>
+                  </div>
+                  <span style={{ color: src.color, fontSize: 18, opacity: 0.7 }}>→</span>
+                </button>
+              );
+            })}
+          </div>
         </AccordionSection>
       )}
 
       {view === 'archive' && (
         <AccordionSection title="🗄 Архив отчётов" subtitle="Сохранённые отчёты всех блоков" icon="🗄" color={colors.orange} defaultOpen>
-          {archivedReports.length === 0 ? <div style={{ color: colors.textMuted, fontSize: 12, padding: 12 }}>Архив отчётов пуст.</div> : archivedReports.map(({ report, label }, i) => (
-            <div key={`${label}-${i}`} style={{ padding: 10, marginBottom: 6, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}` }}>
-              <div style={{ color: colors.orange, fontWeight: 700, fontSize: 12 }}>{label}</div>
-              <div style={{ color: colors.textMuted, fontSize: 10, marginTop: 3 }}>{report.date ? new Date(report.date).toLocaleString('ru-RU') : 'Архивный отчёт'}</div>
+          {reportSources.every(src => readReportEntries(src).length === 0) ? (
+            <div style={{ color: colors.textMuted, fontSize: 12, padding: 12 }}>Архив отчётов пуст.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {reportSources.flatMap(src => readReportEntries(src).map((rep: any, i: number) => ({ src, rep, key: `${src.target}-${i}` }))).map(({ src, rep, key }) => (
+                <div key={key} style={{ padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}` }}>
+                  <div style={{ color: src.color, fontWeight: 700, fontSize: 12 }}>{src.label}</div>
+                  <div style={{ color: colors.textMuted, fontSize: 10, marginTop: 3 }}>{rep.date ? new Date(rep.date).toLocaleString('ru-RU') : 'Архивный отчёт'}</div>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </AccordionSection>
       )}
 
@@ -517,7 +661,9 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
           {builtInDiaries.map(d => (
             <DiaryCard
               key={d.key}
-              diary={d}
+              diaryKey={d.key}
+              count={d.count}
+              last={d.last}
               onAdd={() => {
                 if (d.key === 'sleep') setAddSleepOpen(true);
                 else if (d.key === 'bp') setAddBPOpen(true);
@@ -525,17 +671,63 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
                 else if (d.key === 'measurements') setAddMeasurementsOpen(true);
                 else if (d.key === 'injection') setAddInjectionOpen(true);
               }}
-              onOpen={() => {
-                if (d.key === 'sleep' || d.key === 'bp' || d.key === 'weight' || d.key === 'measurements') {
-                  onNavigate?.(`profile-diary-${d.key}`);
-                } else if (d.key === 'injection') {
-                  onNavigate?.('pharma-course');
-                }
-              }}
+              onOpen={() => setActiveDiary(d.key)}
             />
           ))}
         </div>
       </AccordionSection>
+
+      {activeDiary && (
+        <AccordionSection
+          title={`${DIARY_META[activeDiary].icon} Дневник: ${DIARY_META[activeDiary].title}`}
+          subtitle={`Записи из ${DIARY_META[activeDiary].title.toLowerCase()} (${activeEntries.length})`}
+          icon={DIARY_META[activeDiary].icon}
+          color={DIARY_META[activeDiary].color}
+          defaultOpen
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <button
+              onClick={() => setActiveDiary(null)}
+              aria-label="Закрыть дневник"
+              style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${colors.border}`, color: colors.text }}
+            >← Назад к дневникам</button>
+            <button
+              onClick={() => {
+                if (activeDiary === 'sleep') setAddSleepOpen(true);
+                else if (activeDiary === 'bp') setAddBPOpen(true);
+                else if (activeDiary === 'weight') setAddWeightOpen(true);
+                else if (activeDiary === 'measurements') setAddMeasurementsOpen(true);
+                else if (activeDiary === 'injection') setAddInjectionOpen(true);
+              }}
+              style={{ padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: DIARY_META[activeDiary].color, color: '#0a0a0a', border: 'none' }}
+            >+ Добавить запись</button>
+          </div>
+          {activeEntries.length === 0 ? (
+            <div style={{ color: colors.textMuted, fontSize: 12, padding: 12, textAlign: 'center' }}>
+              Записей пока нет. Нажмите «+ Добавить запись», чтобы внести первую.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {activeEntries.map((entry, i) => (
+                <div key={`${entry.date}-${i}`} style={{ padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${DIARY_META[activeDiary].color}22` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: DIARY_META[activeDiary].color }}>{new Date(entry.date).toLocaleDateString('ru-RU')}</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 4 }}>
+                    {entry.fields.map((f, fi) => (
+                      <div key={fi} style={{ fontSize: 10, color: colors.textMuted }}>
+                        <span style={{ color: colors.text }}>{f.value}</span>
+                        {f.unit ? ` ${f.unit}` : ''}
+                        <span style={{ marginLeft: 4, opacity: 0.7 }}>· {f.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </AccordionSection>
+      )}
 
       <AccordionSection
         title="🔗 Дневники в других блоках"

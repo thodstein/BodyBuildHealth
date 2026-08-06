@@ -106,6 +106,12 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
         {tab === 'diaries' && <ProfileDiariesTab
           onNavigate={onNavigate}
           initialView={initialSubTab === 'reports' || initialSubTab === 'custom-report' ? 'reports' : initialSubTab === 'archive' ? 'archive' : 'diary'}
+          initialActiveDiary={
+            initialSubTab === 'sleep' || initialSubTab === 'bp' || initialSubTab === 'weight'
+            || initialSubTab === 'measurements' || initialSubTab === 'injection'
+              ? initialSubTab as 'sleep' | 'bp' | 'weight' | 'measurements' | 'injection'
+              : undefined
+          }
         />}
         {tab === 'settings' && <ProfileSettingsTab onNavigate={onNavigate} />}
       </div>
