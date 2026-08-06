@@ -72,18 +72,29 @@ function emit(id,title,dir,lvl,period,minW,wk,data,desc){
   const corr=data.corrPct||0.005;
   const weeks=wk||data.weeks||12;
   const w1=data.week1||[];
+  const explicitWeeks=data.explicitWeeks && data.explicitWeeks.length > 1 ? data.explicitWeeks : null;
   const how=desc.howItWorks||(`${title}. ${dir}, уровень ${lvl}, период ${period}. Саморасчитывающийся цикл: раскладка недели 1, недели 2..N генерируются прогрессией PM (коэффициент корректировки ${corr}).`);
   const cond=desc.conditions&&desc.conditions.length?desc.conditions:[];
   let body=`import type { SRCycleTemplate } from './lms-types';\n\n/**\n * ${id}.ts — ${title}. Импортировано из xlsm (Этап A1/B3). Обезличено.\n * Раскладка недели 1; недели 2..${weeks} генерируются прогрессией PM (correctionPct=${corr}).\n */\nexport const ${id.toUpperCase().replace(/-/g,'_')}: SRCycleTemplate = {\n  meta: {\n    id: '${id}',\n    title: '${esc(title)}',\n    direction: '${dir}',\n    level: '${lvl}',\n    period: '${period}',\n    ${minW!=null?`minBodyWeight: ${minW},\n    `:''}sessionsPerWeek: ${sessions},\n    weeks: ${weeks},\n    correctionPct: ${corr},\n    description: '${esc(title)}.',\n    howItWorks: '${esc(how)}',\n    conditions: [${cond.map(c=>`'${esc(c)}'`).join(', ')}],\n  },\n  week1: [\n`;
-  for(const day of w1){
+  body=body.replace(/  week1: \[\n/,'');
+  if(explicitWeeks) body=body.replace(`    correctionPct: ${corr},`, `    correctionPct: ${corr},\n    sourceWeeks: true,`);
+  const emitWeek=(week)=>{ for(const day of week){
     body+=`    { exercises: [\n`;
     for(const e of day.exercises){
       const sets=e.sets.map(s=>`{pct:${s.pct},reps:${s.reps},sets:${s.sets}}`).join(',');
       body+=`      { name: '${esc(e.name)}', group: '${esc(e.group)}', coef: ${e.coef}, mnosz: ${e.mnosz}, ${e.load?`load: '${esc(e.load)}', `:''}sets: [${sets}] },\n`;
     }
     body+=`    ] },\n`;
+  } };
+  body+=`  week1: [\n`;
+  emitWeek(w1);
+  body+=`  ],\n`;
+  if(explicitWeeks){
+    body+=`  weeks: [\n`;
+    for(const week of explicitWeeks){ body+=`    [\n`; emitWeek(week); body+=`    ],\n`; }
+    body+=`  ],\n`;
   }
-  body+=`  ],\n};\n`;
+  body+=`};\n`;
   return body;
 }
 
@@ -101,5 +112,5 @@ for(const id of ids){ idx+=`import { ${id.toUpperCase().replace(/-/g,'_')} } fro
 idx+=`\nexport const LMS_CYCLES: SRCycleTemplate[] = [\n`;
 for(const id of ids){ idx+=`  ${id.toUpperCase().replace(/-/g,'_')},\n`; }
 idx+=`];\n\nexport function getCycleById(id: string): SRCycleTemplate | undefined {\n  return LMS_CYCLES.find(c => c.meta.id === id);\n}\nexport function getCyclesByDirection(dir: string): SRCycleTemplate[] {\n  return LMS_CYCLES.filter(c => c.meta.direction === dir);\n}\nexport function getCyclesByLevel(level: string): SRCycleTemplate[] {\n  return LMS_CYCLES.filter(c => c.meta.level === level);\n}\n`;
-fs.writeFileSync(`${OUTDIR}/lms-cycle-index.ts`,idx,'utf8');
+// The index also contains non-XLSM SRC2/BB cycles and is maintained separately.
 console.log('generated '+ids.length+' templates with howItWorks');

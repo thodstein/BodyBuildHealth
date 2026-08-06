@@ -2,34 +2,108 @@ import type { SRCycleTemplate } from './lms-types';
 
 /**
  * embed-bic-beg.ts — Встраиваемый: бицепс, новичок. Импортировано из xlsm (Этап A1/B3). Обезличено.
- * Раскладка недели 1; недели 2..12 генерируются прогрессией PM (correctionPct=0.005).
+ * Раскладка недели 1; недели 2..4 генерируются прогрессией PM (correctionPct=0.005).
  */
 export const EMBED_BIC_BEG: SRCycleTemplate = {
- meta: {
- id: 'embed-bic-beg',
- title: 'Встраиваемый: бицепс, новичок',
- direction: 'bodybuilding',
- level: 'novice',
- period: 'strength',
- sessionsPerWeek: 1,
- weeks: 12,
- correctionPct: 0.005,
- description: '12-недельный встраиваемый микроцикл для строгого подъёма на бицепс (новичок). Целевая проработка сгибателей рук для укрепления и роста. Может быть встроен в любой тренировочный план.',
- howItWorks: 'Цикл «Встраиваемый: бицепс, новичок». Встройка для бицепса: специализация в основном цикле. Добавочный объём на бицепс без перетрена. Параметры: bodybuilding, novice, strength, 12 нед × 1 дн/нед, корректировка ПМ 0.5%/нед. Прогрессия весов: ПМ_нед_N = ПМ_0 × (1 + k)^N (k = 0.5%/нед для natural, ×3-4 для on_course). Фаза делода (при weeks ≥ 6): встроена в distributePhases.',
- conditions: [],
- tags: ['lms'],
- },
- week1: [
- { exercises: [
- { name: 'Пресс в тренажере (скручивания)', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:4,sets:3},{pct:0.6,reps:3,sets:3}] },
- { name: 'Бицепс стоя со штангой', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:5,sets:5}] },
- { name: 'Кисть стоя', group: '', coef: 1, mnosz: 2, sets: [{pct:0.4,reps:6,sets:4}] },
- { name: 'Молотковые сгибания', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:3,sets:3},{pct:0.62,reps:1,sets:3},{pct:0.72,reps:1,sets:3}] },
- { name: 'Молотковые сгибания', group: '', coef: 1, mnosz: 1, sets: [{pct:0.58,reps:2,sets:5}] },
- { name: 'Упражнение комплекса', group: '', coef: 1, mnosz: 2, sets: [{pct:0.5,reps:4,sets:1},{pct:0.6,reps:4,sets:4}] },
- { name: 'Бицепс с гантелями', group: '', coef: 1, mnosz: 2, sets: [{pct:0.5,reps:5,sets:1},{pct:0.6,reps:4,sets:4},{pct:0.7,reps:3,sets:4}] },
- { name: 'Бицепс стоя со штангой', group: '', coef: 1, mnosz: 1, sets: [{pct:0.6,reps:5,sets:5}] },
- { name: 'Концентрированный подъем', group: '', coef: 1, mnosz: 1, sets: [{pct:0.4,reps:5,sets:5}] },
- ] },
- ],
+  meta: {
+    id: 'embed-bic-beg',
+    title: 'Встраиваемый: бицепс, новичок',
+    direction: 'bodybuilding',
+    level: 'novice',
+    period: 'strength',
+    sessionsPerWeek: 3,
+    weeks: 4,
+    correctionPct: 0.005,
+    sourceWeeks: true,
+    description: 'Встраиваемый: бицепс, новичок.',
+    howItWorks: '*Данная инструкция включает в себя встраиваемые циклы для тренировки строгого подъема на бицепс. Не смотря на то, что такое движение, как строгий подъем, в последнее время набирает популярность, тем не менее, сложно представить атлета, который будет готовиться только в данной дисциплине. Исходя из этого, были разработаны встраиваемые циклы, а именно циклы, которые можно встроить в любой план и добавить достаточные тренировки строгого подъема. Это даст возможность полноценно готовиться в строгом подъеме на бицепс и при этом не мешать основной специализации атлета. А таковая может быть как троеборье или жим лежа, так и любая другая.* Первое на что нужно обратить внимание, если атлет хочет взят',
+    conditions: [],
+  },
+  week1: [
+    { exercises: [
+      { name: 'Бицепс стоя со штангой', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:4,sets:3},{pct:0.6,reps:3,sets:3}] },
+      { name: 'Кисть стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:5,sets:5}] },
+      { name: 'Молотковые сгибания', group: '', coef: 1, mnosz: 2, sets: [{pct:0.4,reps:6,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Строгий подъем на бицепс', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:3,sets:3},{pct:0.62,reps:1,sets:3},{pct:0.72,reps:1,sets:3}] },
+      { name: 'Строгий подъем на бицепс', group: '', coef: 1, mnosz: 1, sets: [{pct:0.58,reps:2,sets:5}] },
+      { name: 'Концентрированный подъем', group: '', coef: 1, mnosz: 2, sets: [{pct:0.5,reps:4,sets:1},{pct:0.6,reps:4,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Бицепс с гантелями', group: '', coef: 1, mnosz: 2, sets: [{pct:0.5,reps:5,sets:1},{pct:0.6,reps:4,sets:4},{pct:0.7,reps:3,sets:4}] },
+      { name: 'Кисть стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.6,reps:5,sets:5}] },
+      { name: 'Подъем обратным хватом стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.4,reps:5,sets:5}] },
+    ] },
+  ],
+  weeks: [
+    [
+    { exercises: [
+      { name: 'Бицепс стоя со штангой', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:4,sets:3},{pct:0.6,reps:3,sets:3}] },
+      { name: 'Кисть стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:5,sets:5}] },
+      { name: 'Молотковые сгибания', group: '', coef: 1, mnosz: 2, sets: [{pct:0.4,reps:6,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Строгий подъем на бицепс', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:3,sets:3},{pct:0.62,reps:1,sets:3},{pct:0.72,reps:1,sets:3}] },
+      { name: 'Строгий подъем на бицепс', group: '', coef: 1, mnosz: 1, sets: [{pct:0.58,reps:2,sets:5}] },
+      { name: 'Концентрированный подъем', group: '', coef: 1, mnosz: 2, sets: [{pct:0.5,reps:4,sets:1},{pct:0.6,reps:4,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Бицепс с гантелями', group: '', coef: 1, mnosz: 2, sets: [{pct:0.5,reps:5,sets:1},{pct:0.6,reps:4,sets:4},{pct:0.7,reps:3,sets:4}] },
+      { name: 'Кисть стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.6,reps:5,sets:5}] },
+      { name: 'Подъем обратным хватом стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.4,reps:5,sets:5}] },
+    ] },
+    ],
+    [
+    { exercises: [
+      { name: 'Бицепс стоя со штангой', group: '', coef: 1, mnosz: 1, sets: [{pct:0.56,reps:4,sets:3},{pct:0.65,reps:1,sets:3}] },
+      { name: 'Кисть стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.48,reps:6,sets:5}] },
+      { name: 'Молотковые сгибания', group: '', coef: 1, mnosz: 2, sets: [{pct:0.47,reps:5,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Строгий подъем на бицепс', group: '', coef: 1, mnosz: 1, sets: [{pct:0.58,reps:3,sets:3},{pct:0.65,reps:2,sets:3},{pct:0.7,reps:1,sets:3}] },
+      { name: 'Строгий подъем на бицепс', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:5,sets:5}] },
+      { name: 'Концентрированный подъем', group: '', coef: 1, mnosz: 2, sets: [{pct:0.58,reps:4,sets:1},{pct:0.68,reps:4,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Бицепс с гантелями', group: '', coef: 1, mnosz: 2, sets: [{pct:0.58,reps:6,sets:5}] },
+      { name: 'Кисть стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:6,sets:1},{pct:0.6,reps:5,sets:4}] },
+      { name: 'Подъем обратным хватом стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.45,reps:5,sets:5},{pct:0.5,reps:4,sets:5}] },
+    ] },
+    ],
+    [
+    { exercises: [
+      { name: 'Бицепс стоя со штангой', group: '', coef: 1, mnosz: 1, sets: [{pct:0.64,reps:3,sets:3},{pct:0.7,reps:1,sets:3}] },
+      { name: 'Кисть стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:6,sets:1},{pct:0.6,reps:5,sets:5}] },
+      { name: 'Молотковые сгибания', group: '', coef: 1, mnosz: 2, sets: [{pct:0.4,reps:6,sets:4},{pct:0.48,reps:5,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Строгий подъем на бицепс', group: '', coef: 1, mnosz: 1, sets: [{pct:0.6,reps:3,sets:3},{pct:0.7,reps:1,sets:2},{pct:0.8,reps:1,sets:2},{pct:0.88,reps:1,sets:2}] },
+      { name: 'Строгий подъем на бицепс', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:4,sets:1},{pct:0.65,reps:3,sets:5}] },
+      { name: 'Концентрированный подъем', group: '', coef: 1, mnosz: 2, sets: [{pct:0.5,reps:5,sets:5}] },
+    ] },
+    { exercises: [
+      { name: 'Бицепс с гантелями', group: '', coef: 1, mnosz: 2, sets: [{pct:0.4,reps:6,sets:5},{pct:0.48,reps:5,sets:5}] },
+      { name: 'Кисть стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:6,sets:1},{pct:0.65,reps:5,sets:4}] },
+      { name: 'Подъем обратным хватом стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:5,sets:4},{pct:0.6,reps:4,sets:4}] },
+    ] },
+    ],
+    [
+    { exercises: [
+      { name: 'Бицепс стоя со штангой', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:4,sets:4},{pct:0.65,reps:1,sets:4}] },
+      { name: 'Кисть стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:6,sets:1},{pct:0.65,reps:5,sets:5}] },
+      { name: 'Молотковые сгибания', group: '', coef: 1, mnosz: 2, sets: [{pct:0.47,reps:5,sets:3},{pct:0.55,reps:4,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Строгий подъем на бицепс', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:5}] },
+      { name: 'Строгий подъем на бицепс', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:4,sets:1},{pct:0.6,reps:3,sets:3},{pct:0.7,reps:1,sets:3}] },
+      { name: 'Концентрированный подъем', group: '', coef: 1, mnosz: 2, sets: [{pct:0.47,reps:5,sets:4},{pct:0.6,reps:4,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Бицепс с гантелями', group: '', coef: 1, mnosz: 2, sets: [{pct:0.5,reps:5,sets:4},{pct:0.6,reps:4,sets:4}] },
+      { name: 'Кисть стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.5,reps:5,sets:4}] },
+      { name: 'Подъем обратным хватом стоя', group: '', coef: 1, mnosz: 1, sets: [{pct:0.55,reps:5,sets:4}] },
+    ] },
+    ],
+  ],
 };

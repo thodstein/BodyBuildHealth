@@ -26,7 +26,7 @@ export function expandCycleWeeks(cycle: SRCycleTemplate): SRDaySpec[][] {
   if (!cycle.week1) return out;
   if (cycle.weeks && cycle.weeks.length > 0) {
     // Prefer explicit weeks[0] if present; it's the authoritative week 1 in multi-week cycles.
-    out.push(cycle.weeks[0]);
+    out.push(cycle.meta.sourceWeeks ? cycle.week1 : cycle.weeks[0]);
     for (let i = 1; i < cycle.weeks.length; i++) out.push(cycle.weeks[i]);
   } else {
     out.push(cycle.week1);
@@ -59,13 +59,14 @@ export function lmsCycleToSchedule(
   cycleId: string,
   workMax: { squat?: number; bench?: number; dead?: number } = {},
   dayOfWeekBySession: Record<number, number> = {},
+  weekNumber = 1,
 ): PLScheduledDay[] {
   const cycle = getCycleById(cycleId);
   if (!cycle) return [];
   const wm = workMax;
   const weeks = expandCycleWeeks(cycle);
   // Берём week1 как основной шаблон (anchor)
-  const week1Days = weeks[0] ?? [];
+  const week1Days = weeks[Math.max(0, Math.min(weeks.length - 1, Math.round(weekNumber) - 1))] ?? [];
   return week1Days.map((day, idx) => {
     const dow = dayOfWeekBySession[idx] ?? idx;
     const dowLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];

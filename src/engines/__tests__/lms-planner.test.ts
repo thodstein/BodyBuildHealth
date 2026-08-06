@@ -74,6 +74,43 @@ describe('buildLMSPlan', () => {
     expect(plan.weeks[0].pmRow['Становая тяга']).toBe(180);
   });
 
+  it('faithful сохраняет исходные проценты и количество подходов каждой строки', () => {
+    const plan = buildCycle01Plan({
+      faithful: true,
+      volumeGoal: 'mrv',
+      currentReadiness: 0,
+      acwr: { ratio: 1.8, zone: 'dangerous' },
+      autoReg: { topSetPctMultiplier: 0.8, volumeMultiplier: 0.5, rirShift: 3, deload: true },
+    });
+    CYCLE_01.week1.forEach((sourceDay, dayIndex) => {
+      expect(plan.weeks[0].days[dayIndex].exercises).toHaveLength(sourceDay.exercises.length);
+      sourceDay.exercises.forEach((sourceExercise, exerciseIndex) => {
+        const actual = plan.weeks[0].days[dayIndex].exercises[exerciseIndex];
+        expect(actual.name).toBe(sourceExercise.name);
+        expect(actual.workSets.map(({ pct, reps, sets }) => ({ pct, reps, sets })))
+          .toEqual(sourceExercise.sets);
+      });
+    });
+  });
+
+  it('faithful сохраняет source и добавляет слабые группы и точки отдельным слоем', () => {
+    const plan = buildCycle01Plan({
+      faithful: true,
+      weakPoints: ['shoulders'],
+      weakGroupDayMap: { shoulders: [2] },
+      plWeakPoints: [{ lift: 'bench', weakPoint: 'lockout' }],
+      plWeakPointDayMap: { 'bench|lockout': [1] },
+    });
+    const sourceExerciseNames = new Set(CYCLE_01.week1[1].exercises.map(ex => ex.name));
+    const dayTwo = plan.weeks[0].days[1].exercises;
+    expect(dayTwo.filter(ex => sourceExerciseNames.has(ex.name))).toHaveLength(sourceExerciseNames.size);
+    expect(dayTwo.some(ex => ex.group === 'shoulders')).toBe(true);
+    expect(plan.weeks[0].days[0].exercises.some(ex => /дожим|трицепс|разгиб/i.test(ex.name))).toBe(true);
+    const sourceBench = CYCLE_01.week1[1].exercises.find(ex => ex.name === 'Жим лежа')!;
+    const actualBench = dayTwo.find(ex => ex.name === 'Жим лежа')!;
+    expect(actualBench.workSets.map(({ pct, reps, sets }) => ({ pct, reps, sets }))).toEqual(sourceBench.sets);
+  });
+
   it('каждое упражнение имеет workSets с weight > 0', () => {
     const plan = buildCycle01Plan();
     for (const wk of plan.weeks) {
@@ -165,6 +202,8 @@ describe('buildLMSPlan', () => {
     };
     const template = {
       ...CYCLE_01,
+      meta: { ...CYCLE_01.meta, sourceWeeks: false },
+      weeks: undefined,
       week1: CYCLE_01.week1.map((day, index) => index === 0
         ? { ...day, exercises: [...day.exercises, legPress] }
         : day),
@@ -246,6 +285,7 @@ describe('buildLMSPlan', () => {
     }));
     const faithfulTpl: SRCycleTemplate = {
       ...CYCLE_01,
+      meta: { ...CYCLE_01.meta, sourceWeeks: false },
       weeks: [CYCLE_01.week1, week2Layout],
     };
     const plan = buildLMSPlan({ template: faithfulTpl, pmMap, fallbackPm: 80 });
@@ -353,7 +393,7 @@ describe('buildLMSPlan', () => {
     const week2Layout = CYCLE_01.week1.map(day => ({
       exercises: day.exercises.map(ex => ({ ...ex, sets: ex.sets.map(s => ({ ...s, pct: s.pct * 1.02 })) })),
     }));
-    const faithfulTpl: SRCycleTemplate = { ...CYCLE_01, weeks: [CYCLE_01.week1, week2Layout] };
+    const faithfulTpl: SRCycleTemplate = { ...CYCLE_01, meta: { ...CYCLE_01.meta, sourceWeeks: false }, weeks: [CYCLE_01.week1, week2Layout] };
     const plan = buildLMSPlan({ template: faithfulTpl, pmMap, fallbackPm: 80 });
     // 2-недельный план < 4 нед → taper не применяется
     expect(plan.progressionRationale).not.toContain('Taper');
@@ -454,6 +494,8 @@ describe('pmProgression', () => {
   it('prefers the most specific PM fuzzy match', () => {
     const template = {
       ...CYCLE_01,
+      meta: { ...CYCLE_01.meta, sourceWeeks: false },
+      weeks: undefined,
       week1: CYCLE_01.week1.map(day => ({
         ...day,
         exercises: day.exercises.map(ex => ex.name === 'Жим лежа'

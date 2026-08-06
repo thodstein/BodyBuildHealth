@@ -57,6 +57,8 @@ export interface LMSBuildInput {
   hrvMs?: number;         // RMSSD в мс
   sleepHours?: number;    // часов сна/ночь
   stressLevel?: number;   // 1-10
+  /** Exact source mode: preserve source sets, reps, order and frequency. */
+  faithful?: boolean;
 }
 
 
@@ -516,6 +518,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   }
 
   const mode = input.mode ?? 'natural';
+  const faithful = input.faithful === true;
   if (input.weeksOverride != null && (!Number.isFinite(input.weeksOverride) || input.weeksOverride < 1)) {
     throw new Error('buildLMSPlan: weeksOverride must be a finite number >= 1');
   }
@@ -530,7 +533,8 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
   // Faithful multi-week: если задана явная раскладка ВСЕХ недель — используем её
   // дословно, БЕЗ авто-прогрессии (pct каждой недели уже отражает реальную нагрузку).
-  const hasExplicitWeeks = !!(template.weeks && template.weeks.length);
+  const hasExplicitWeeks = !!(template.weeks && template.weeks.length)
+    && (faithful || template.meta.sourceWeeks !== true);
   const totalWeeks = hasExplicitWeeks
     ? template.weeks!.length
     : Math.max(1, Math.round(input.weeksOverride ?? template.meta.weeks));
@@ -605,7 +609,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     const rirBase = RIR_MATRIX[goalKey]?.[levelKey]?.[phase] ?? MesoPhaseConfigs[phase].rirBase;
     // Для auto-прогрессирующих циклов применяем объёмную модуляцию фазы (реальный пик/разгрузка).
     // Для faithful (явная раскладка всех недель) уважаем источник — модуляции нет.
-    const phaseVolMod = hasExplicitWeeks ? 1.0 : MesoPhaseConfigs[phase].volumeMod;
+    const phaseVolMod = faithful || hasExplicitWeeks ? 1.0 : MesoPhaseConfigs[phase].volumeMod;
 
     const pmRow: Record<string, number> = {};
     for (const name of exercises) {
@@ -635,7 +639,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           let sets = s.sets;
 
           // Коррекция объёма по VolumeGoal + фазе мезоцикла (только для аксессуаров)
-          if (!isMain) {
+          if (!faithful && !isMain) {
             const vMult = input.volumeGoal === 'mev' ? 0.8 : input.volumeGoal === 'mrv' ? 1.2 : 1.0;
             const focusMult = matchesFocusLift(spec.name, input.focusLift) ? 1.2 : 1.0;
             const weakEn = exEnGroup(spec.group);
@@ -645,21 +649,21 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           }
 
           // S-MRV floor: аксессуары не ниже 2 подходов (иначе < MEV — бесполезный объём)
-          sets = Math.max(isMain ? 1 : 2, sets);
+          if (!faithful) sets = Math.max(isMain ? 1 : 2, sets);
 
           // ACWR-авто-делод: корректируем объём (все упражнения) и RIR
           // P1-1: floor=2 для аксессуаров (иначе dangerous ACWR может сократить до 1 сета - < MEV)
-          sets = Math.max(isMain ? 1 : 2, Math.round(sets * acwrVolMod));
+          if (!faithful) sets = Math.max(isMain ? 1 : 2, Math.round(sets * acwrVolMod));
           // Авторегуляция: объём (все) — применяется поверх ACWR
           // Keep the accessory MEV floor after every volume multiplier, not only after ACWR.
-          sets = Math.max(isMain ? 1 : 2, Math.round(sets * arVolMult));
+          if (!faithful) sets = Math.max(isMain ? 1 : 2, Math.round(sets * arVolMult));
 
           // Расчётный вес с авторегуляцией (topSetPctMultiplier)
           const baseWeight = workWeight(pm, s.pct);
-          const adjWeight = Math.round(baseWeight * arTopMult * 10) / 10;
+          const adjWeight = Math.round(baseWeight * (faithful ? 1 : arTopMult) * 10) / 10;
 
           // RIR с ACWR + авторегуляцией
-          const adjRir = Math.max(0, rirBase + acwrRirShift + arRirShift);
+          const adjRir = faithful ? (s.rir ?? 0) : Math.max(0, rirBase + acwrRirShift + arRirShift);
 
           return {
             pct: s.pct, reps: s.reps, sets: Math.max(1, sets),
@@ -675,7 +679,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           ? EXERCISE_CATALOG.find(e => e.id === aliasId)
           : EXERCISE_CATALOG.find(e => e.name === spec.name))?.fatigueCost ?? 5;
         const exCost = fatigueCost * totalWorkSets;
-        if (dayFatigueBudget < exCost && !isMain) {
+        if (!faithful && dayFatigueBudget < exCost && !isMain) {
           const fit = Math.max(2, Math.floor(Math.max(0, dayFatigueBudget) / fatigueCost));
           workSets.forEach(ws => { ws.sets = Math.min(ws.sets, fit); });
           totalWorkSets = workSets.reduce((sum, ws) => sum + ws.sets, 0);
@@ -693,7 +697,8 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     });
     const baseExerciseCounts = days.map(day => day.exercises.length);
 
-    // Инъекция ассистентов по слабым точкам СРЦ-движений (все циклы, включая faithful с полными weeks[])
+    // Слабые точки добавляются отдельным слоем. Faithful защищает source-сеты,
+    // но не должен отключать выбранные пользователем ассистенты.
     if (input.plWeakPoints && input.plWeakPoints.length) {
       injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, combinedMrvMult, input.plWeakPointDayMap, input.fallbackPm ?? 80);
     }
@@ -804,7 +809,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       }
     }
 
-    enforceInjectedFatigueBudget(days, baseExerciseCounts, input.currentReadiness);
+    if (!faithful) enforceInjectedFatigueBudget(days, baseExerciseCounts, input.currentReadiness);
 
     // Пересчёт метрик сессий (после возможной инъекции слабых точек)
     for (const d of days) {
@@ -839,7 +844,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
   // P1: Авто-taper к финальным 2 неделям (peaking phase) — снижение объёма, интенсивность сохранена.
   // Применяется только для auto-прогрессирующих циклов (не faithful) и при отсутствии ACWR-deload.
-  const taperedWeeks = (!hasExplicitWeeks && totalWeeks >= 4 && !acwrDeload)
+  const taperedWeeks = (!faithful && !hasExplicitWeeks && totalWeeks >= 4 && !acwrDeload)
     ? applyPLTaper(weeks, totalWeeks)
     : weeks;
 
@@ -873,15 +878,18 @@ function applyPLTaper(weeks: LMSPlanWeek[], totalWeeks: number): LMSPlanWeek[] {
        const phase = mesocyclePhaseForWeek(wk.week, totalWeeks);
        if (phase === 'deload') return wk;
       if (refVolume > 0 && weekVolume(wk) < refVolume * 0.6) return wk;
-    const volumeMult = idx === prevIdx ? 0.65 : 0.45;
-    const rirAdd = idx === prevIdx ? 1 : 2;
-    const newDays = wk.days.map(d => ({
+     const volumeMult = idx === prevIdx ? 0.65 : 0.45;
+     const rirAdd = idx === prevIdx ? 1 : 2;
+     const targetSets = Math.max(1, Math.round(refVolume * volumeMult));
+     const currentSets = Math.max(1, weekVolume(wk));
+     const setScale = targetSets / currentSets;
+     const newDays = wk.days.map(d => ({
       ...d,
       exercises: d.exercises.map(e => ({
         ...e,
         workSets: e.workSets.map(ws => ({
           ...ws,
-          sets: Math.max(1, Math.round(ws.sets * volumeMult)),
+           sets: Math.max(1, Math.round(ws.sets * setScale)),
           rir: ws.rir + rirAdd,
         })),
       })),

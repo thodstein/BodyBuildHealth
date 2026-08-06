@@ -27,4 +27,13 @@ describe('LMS to PL conversion', () => {
     expect(sets.length).toBeGreaterThan(0);
     expect(sets.every(set => set.weight % 2.5 === 0)).toBe(true);
   });
+
+  it('returns the selected original week, including every source percentage row', () => {
+    const cycle = getCycleById('cycle-01')!;
+    const schedule = lmsCycleToSchedule('cycle-01', { squat: 200, bench: 140, dead: 220 }, {}, 2);
+    const source = cycle.weeks![1];
+    expect(schedule).toHaveLength(source.length);
+    expect(schedule[0].exercises[0].sets.map(({ pct, reps, sets }) => ({ pct, reps, sets })))
+      .toEqual(source[0].exercises[0].sets);
+  });
 });

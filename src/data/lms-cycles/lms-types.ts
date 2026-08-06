@@ -20,6 +20,7 @@ export interface SRCycleMeta {
  sessionsPerWeek: number;
  weeks: number;
  correctionPct: number; // недельный % корректировки PM (0.005 = +0.5%)
+ sourceWeeks?: boolean; // исходник содержит отдельные раскладки микроциклов
  weightRatio?: 'normal' | 'any';
  description: string;
  howItWorks: string;

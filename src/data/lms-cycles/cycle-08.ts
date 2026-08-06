@@ -5,50 +5,437 @@ import type { SRCycleTemplate } from './lms-types';
  * Раскладка недели 1; недели 2..12 генерируются прогрессией PM (correctionPct=0.005).
  */
 export const CYCLE_08: SRCycleTemplate = {
- meta: {
- id: 'cycle-08',
- title: 'Массонабор (бодибилдинг, средний)',
- direction: 'bodybuilding',
- level: 'intermediate',
- period: 'mass',
- minBodyWeight: 80,
- sessionsPerWeek: 4,
- weeks: 12,
- correctionPct: 0.005,
- description: '12-недельный цикл массонабора для бодибилдинга среднего уровня. Направлен на гипертрофию через увеличение тренировочного объёма и многоповторную работу. Сочетает базовые и изолирующие упражнения в сплит-формате 4 раза в неделю.',
- howItWorks: 'Цикл «Массонабор (бодибилдинг, средний)». Цикл с акцентом на становую тягу. Приседания и жим фоном, тяга — основной прогресс. Параметры: bodybuilding, intermediate, mass, 12 нед × 4 дн/нед, корректировка ПМ 0.5%/нед. Прогрессия весов: ПМ_нед_N = ПМ_0 × (1 + k)^N (k = 0.5%/нед для natural, ×3-4 для on_course). Фаза делода (при weeks ≥ 6): встроена в distributePhases.',
- conditions: ['Условия соответствия цикла Средний уровень атлетов.', 'Цикл не подойдет абсолютным новичкам, равно как и не будет эффективен для атлетов высокого уровня.', 'Брать в работу данный СРЦ следует, если атлет уже занимается некоторое время, имеет поставленную технику и некоторую тренированность; Предполагается, что атлет не имеет выраженной худобы или явного перебора собственного веса.', 'В рамках цикла нагрузка имеет условно равное распределение по мышечным группам.', 'Предполагается, что те мышцы, которые не охвачены программой, однако должны тренироваться (голень, пресс, задняя дельта), добавляются атлетом в рамках заминки и выполняются по мере надобности.', 'Заминка оставляется полностью на усмотрение пользователя цикла.', 'СРЦ8 предполагает использование повторного метода в режиме силовой выносливости.'],
-  tags: ['lms'],
-
- },
- week1: [
- { exercises: [
- { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.4,reps:10,sets:1},{pct:0.5,reps:8,sets:1},{pct:0.58,reps:8,sets:3}] },
- { name: 'Подъем гантели перед собой', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.35,reps:12,sets:1},{pct:0.48,reps:10,sets:2},{pct:0.55,reps:8,sets:2}] },
- { name: 'Махи гантелями в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.25,reps:15,sets:4}] },
- { name: 'Махи в наклоне на заднюю дельту', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.22,reps:15,sets:4}] },
- ] },
- { exercises: [
- { name: 'Подъем гантелей в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Тяжелая', sets: [{pct:0.4,reps:12,sets:3}] },
- { name: 'Присед', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.44,reps:12,sets:1},{pct:0.5,reps:10,sets:3}] },
- { name: 'Присед на груди', group: '', coef: 1.2, mnosz: 1, load: 'Требования к атлету (см. инструкцию):', sets: [{pct:0.4,reps:12,sets:1},{pct:0.6,reps:10,sets:4}] },
- { name: 'Разгибания ног', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.42,reps:10,sets:4}] },
- { name: 'Жим лежа', group: '', coef: 0.4, mnosz: 5, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.55,reps:12,sets:3}] },
- ] },
- { exercises: [
- { name: 'Жим на наклонной', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.6,reps:10,sets:4}] },
- { name: 'Кроссовер', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.62,reps:10,sets:3}] },
- { name: 'Французский жим', group: '', coef: 0.3, mnosz: 4, load: 'Тяжелая', sets: [{pct:0.35,reps:12,sets:4}] },
- { name: 'Трицепс на блоке', group: '', coef: 0.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.55,reps:10,sets:3}] },
- { name: 'Разгибания из-за головы', group: '', coef: 0.3, mnosz: 2, load: 'Требования к атлету (см. инструкцию):', sets: [{pct:0.45,reps:12,sets:1},{pct:0.6,reps:10,sets:1},{pct:0.68,reps:10,sets:2}] },
- { name: 'Тяга на прямых ногах', group: '', coef: 0.3, mnosz: 2, load: 'Тяжелая', sets: [{pct:0.32,reps:12,sets:4}] },
- ] },
- { exercises: [
- { name: 'Тяга гантели в наклоне', group: '', coef: 1.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.56,reps:10,sets:3}] },
- { name: 'Бицепс стоя', group: '', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.4,reps:12,sets:4}] },
- { name: 'Тяга верхнего блока', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.35,reps:12,sets:1},{pct:0.52,reps:10,sets:3}] },
- { name: 'Наклоны', group: '', coef: 0.4, mnosz: 5, load: 'Тяжелая', sets: [{pct:0.3,reps:12,sets:4}] },
- { name: 'Молотковые сгибания', group: '', coef: 0.4, mnosz: 1, load: 'Требования к атлету (см. инструкцию):', sets: [{pct:0.45,reps:10,sets:1},{pct:0.55,reps:10,sets:1},{pct:0.65,reps:10,sets:3}] },
- ] },
- ],
+  meta: {
+    id: 'cycle-08',
+    title: 'Массонабор (бодибилдинг, средний)',
+    direction: 'bodybuilding',
+    level: 'intermediate',
+    period: 'mass',
+    minBodyWeight: 80,
+    sessionsPerWeek: 6,
+    weeks: 12,
+    correctionPct: 0.005,
+    sourceWeeks: true,
+    description: 'Массонабор (бодибилдинг, средний).',
+    howItWorks: 'Инструкция №8. СРЦ для атлета-культуриста среднего уровня 15.11.2019 8 Прочие циклы Культурист В статье приводится саморасчитывающийся цикл, который подойдет для атлетов, которые стремятся увеличить мышечную массу и атлетизм. Программа ориентирована на спортсменов среднего уровня, то есть таких, которые уже систематически тренируются 1-2 года, соблюдая спортивный режим и стремясь увеличивать мышечную массу и силу. Цикл построен в многоповторном ключе и представляет из себя сплит с разделением на мышечные группы. Предпочтение отдается базовым упражнениям, однако присутствуют и изолирующие, рассчитанные на то, чтобы добрать нагрузки отдельными мышечными группами. Описываемый цикл был составлен',
+    conditions: ['Условия соответствия цикла Средний уровень атлетов.', 'Цикл не подойдет абсолютным новичкам, равно как и не будет эффективен для атлетов высокого уровня.', 'Брать в работу данный СРЦ следует, если атлет уже занимается некоторое время, имеет поставленную технику и некоторую тренированность; Предполагается, что атлет не имеет выраженной худобы или явного перебора собственного веса.', 'В рамках цикла нагрузка имеет условно равное распределение по мышечным группам.', 'Предполагается, что те мышцы, которые не охвачены программой, однако должны тренироваться (голень, пресс, задняя дельта), добавляются атлетом в рамках заминки и выполняются по мере надобности.', 'Заминка оставляется полностью на усмотрение пользователя цикла.', 'СРЦ8 предполагает использование повторного метода в режиме силовой выносливости.'],
+  },
+  week1: [
+    { exercises: [
+      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.35,reps:12,sets:1},{pct:0.48,reps:10,sets:2},{pct:0.55,reps:8,sets:2}] },
+    ] },
+    { exercises: [
+      { name: 'Подъем гантели перед собой', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.4,reps:12,sets:3}] },
+      { name: 'Подъем гантелей в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.44,reps:12,sets:1},{pct:0.5,reps:10,sets:3}] },
+      { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.4,reps:12,sets:1},{pct:0.6,reps:10,sets:4}] },
+      { name: 'Присед на груди', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.42,reps:10,sets:4}] },
+      { name: 'Разгибания ног', group: '', coef: 0.4, mnosz: 5, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.55,reps:12,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Жим лежа', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.6,reps:10,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим на наклонной', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.62,reps:10,sets:3}] },
+      { name: 'Кроссовер', group: '', coef: 0.3, mnosz: 4, load: 'Легкая', sets: [{pct:0.35,reps:12,sets:4}] },
+      { name: 'Французский жим', group: '', coef: 0.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.55,reps:10,sets:3}] },
+      { name: 'Трицепс на блоке', group: '', coef: 0.3, mnosz: 2, load: 'Тяжелая', sets: [{pct:0.45,reps:12,sets:1},{pct:0.6,reps:10,sets:1},{pct:0.68,reps:10,sets:2}] },
+      { name: 'Разгибания из-за головы', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.32,reps:12,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Тяга на прямых ногах', group: '', coef: 1.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.56,reps:10,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Наклоны', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.4,reps:12,sets:4}] },
+      { name: 'Тяга гантели в наклоне', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.35,reps:12,sets:1},{pct:0.52,reps:10,sets:3}] },
+      { name: 'Тяга верхнего блока', group: '', coef: 0.4, mnosz: 5, load: 'Легкая', sets: [{pct:0.3,reps:12,sets:4}] },
+      { name: 'Бицепс стоя', group: '', coef: 0.4, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.45,reps:10,sets:1},{pct:0.55,reps:10,sets:1},{pct:0.65,reps:10,sets:3}] },
+      { name: 'Молотковые сгибания', group: '', coef: 0.4, mnosz: 2, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.5,reps:12,sets:3}] },
+    ] },
+  ],
+  weeks: [
+    [
+    { exercises: [
+      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.35,reps:12,sets:1},{pct:0.48,reps:10,sets:2},{pct:0.55,reps:8,sets:2}] },
+    ] },
+    { exercises: [
+      { name: 'Подъем гантели перед собой', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.4,reps:12,sets:3}] },
+      { name: 'Подъем гантелей в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.44,reps:12,sets:1},{pct:0.5,reps:10,sets:3}] },
+      { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.4,reps:12,sets:1},{pct:0.6,reps:10,sets:4}] },
+      { name: 'Присед на груди', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.42,reps:10,sets:4}] },
+      { name: 'Разгибания ног', group: '', coef: 0.4, mnosz: 5, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.55,reps:12,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Жим лежа', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.6,reps:10,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим на наклонной', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.62,reps:10,sets:3}] },
+      { name: 'Кроссовер', group: '', coef: 0.3, mnosz: 4, load: 'Легкая', sets: [{pct:0.35,reps:12,sets:4}] },
+      { name: 'Французский жим', group: '', coef: 0.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.55,reps:10,sets:3}] },
+      { name: 'Трицепс на блоке', group: '', coef: 0.3, mnosz: 2, load: 'Тяжелая', sets: [{pct:0.45,reps:12,sets:1},{pct:0.6,reps:10,sets:1},{pct:0.68,reps:10,sets:2}] },
+      { name: 'Разгибания из-за головы', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.32,reps:12,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Тяга на прямых ногах', group: '', coef: 1.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.56,reps:10,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Наклоны', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.4,reps:12,sets:4}] },
+      { name: 'Тяга гантели в наклоне', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.35,reps:12,sets:1},{pct:0.52,reps:10,sets:3}] },
+      { name: 'Тяга верхнего блока', group: '', coef: 0.4, mnosz: 5, load: 'Легкая', sets: [{pct:0.3,reps:12,sets:4}] },
+      { name: 'Бицепс стоя', group: '', coef: 0.4, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.45,reps:10,sets:1},{pct:0.55,reps:10,sets:1},{pct:0.65,reps:10,sets:3}] },
+      { name: 'Молотковые сгибания', group: '', coef: 0.4, mnosz: 2, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.5,reps:12,sets:3}] },
+    ] },
+    ],
+    [
+    { exercises: [
+      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.42,reps:10,sets:1},{pct:0.65,reps:8,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Подъем гантели перед собой', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.5,reps:12,sets:1},{pct:0.58,reps:10,sets:3}] },
+      { name: 'Подъем гантелей в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.38,reps:10,sets:5}] },
+      { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.5,reps:10,sets:1},{pct:0.63,reps:10,sets:1},{pct:0.73,reps:8,sets:1}] },
+      { name: 'Присед на груди', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.38,reps:10,sets:5}] },
+      { name: 'Разгибания ног', group: '', coef: 0.4, mnosz: 5, load: 'Средняя', sets: [{pct:0.5,reps:10,sets:1},{pct:0.6,reps:12,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим лежа', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:10,sets:1},{pct:0.65,reps:8,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим на наклонной', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:10,sets:1},{pct:0.67,reps:8,sets:3}] },
+      { name: 'Кроссовер', group: '', coef: 0.3, mnosz: 4, load: 'Легкая', sets: [{pct:0.4,reps:12,sets:4}] },
+      { name: 'Французский жим', group: '', coef: 0.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.5,reps:12,sets:3}] },
+      { name: 'Трицепс на блоке', group: '', coef: 0.3, mnosz: 2, load: 'Тяжелая', sets: [{pct:0.5,reps:10,sets:1},{pct:0.65,reps:10,sets:3}] },
+      { name: 'Разгибания из-за головы', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.38,reps:12,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Тяга на прямых ногах', group: '', coef: 1.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:12,sets:5}] },
+    ] },
+    { exercises: [
+      { name: 'Наклоны', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.35,reps:12,sets:2},{pct:0.4,reps:15,sets:1}] },
+      { name: 'Тяга гантели в наклоне', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.55,reps:10,sets:3}] },
+      { name: 'Тяга верхнего блока', group: '', coef: 0.4, mnosz: 5, load: 'Легкая', sets: [{pct:0.41,reps:10,sets:2},{pct:0.55,reps:10,sets:2}] },
+      { name: 'Бицепс стоя', group: '', coef: 0.4, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.48,reps:10,sets:1},{pct:0.6,reps:8,sets:1},{pct:0.7,reps:8,sets:2}] },
+      { name: 'Молотковые сгибания', group: '', coef: 0.4, mnosz: 2, load: 'Средняя', sets: [{pct:0.5,reps:12,sets:1},{pct:0.55,reps:10,sets:3}] },
+    ] },
+    ],
+    [
+    { exercises: [
+      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.35,reps:15,sets:1},{pct:0.4,reps:20,sets:1}] },
+    ] },
+    { exercises: [
+      { name: 'Подъем гантели перед собой', group: '', coef: 0.3, mnosz: 2, load: 'Тяжелая', sets: [{pct:0.45,reps:12,sets:1},{pct:0.6,reps:12,sets:3}] },
+      { name: 'Подъем гантелей в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.53,reps:10,sets:4}] },
+      { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.55,reps:10,sets:1},{pct:0.65,reps:8,sets:4}] },
+      { name: 'Присед на груди', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.5,reps:8,sets:4}] },
+      { name: 'Разгибания ног', group: '', coef: 0.4, mnosz: 5, load: 'Средняя', sets: [{pct:0.45,reps:10,sets:1},{pct:0.57,reps:8,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим лежа', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.55,reps:10,sets:1},{pct:0.7,reps:8,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим на наклонной', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.55,reps:10,sets:1},{pct:0.62,reps:10,sets:1},{pct:0.72,reps:8,sets:1}] },
+      { name: 'Кроссовер', group: '', coef: 0.3, mnosz: 4, load: 'Легкая', sets: [{pct:0.45,reps:10,sets:4}] },
+      { name: 'Французский жим', group: '', coef: 0.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:10,sets:1},{pct:0.55,reps:10,sets:3}] },
+      { name: 'Трицепс на блоке', group: '', coef: 0.3, mnosz: 2, load: 'Тяжелая', sets: [{pct:0.55,reps:10,sets:1},{pct:0.68,reps:10,sets:3}] },
+      { name: 'Разгибания из-за головы', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.41,reps:12,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Тяга на прямых ногах', group: '', coef: 1.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.55,reps:12,sets:4},{pct:0.63,reps:10,sets:1}] },
+    ] },
+    { exercises: [
+      { name: 'Наклоны', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.4,reps:10,sets:4}] },
+      { name: 'Тяга гантели в наклоне', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.45,reps:10,sets:1},{pct:0.6,reps:8,sets:4}] },
+      { name: 'Тяга верхнего блока', group: '', coef: 0.4, mnosz: 5, load: 'Легкая', sets: [{pct:0.45,reps:12,sets:3}] },
+      { name: 'Бицепс стоя', group: '', coef: 0.4, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.5,reps:10,sets:1},{pct:0.63,reps:8,sets:4}] },
+      { name: 'Молотковые сгибания', group: '', coef: 0.4, mnosz: 2, load: 'Средняя', sets: [{pct:0.55,reps:12,sets:1},{pct:0.6,reps:10,sets:3}] },
+    ] },
+    ],
+    [
+    { exercises: [
+      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:2},{pct:0.45,reps:15,sets:1}] },
+    ] },
+    { exercises: [
+      { name: 'Подъем гантели перед собой', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.37,reps:12,sets:3}] },
+      { name: 'Подъем гантелей в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.37,reps:12,sets:3}] },
+      { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.58,reps:10,sets:3}] },
+      { name: 'Присед на груди', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.55,reps:12,sets:1},{pct:0.62,reps:10,sets:1},{pct:0.7,reps:10,sets:2}] },
+      { name: 'Разгибания ног', group: '', coef: 0.4, mnosz: 5, load: 'Легкая', sets: [{pct:0.35,reps:12,sets:2},{pct:0.41,reps:15,sets:1}] },
+    ] },
+    { exercises: [
+      { name: 'Жим лежа', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.41,reps:12,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим на наклонной', group: '', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.5,reps:12,sets:1},{pct:0.62,reps:10,sets:1},{pct:0.74,reps:8,sets:2}] },
+      { name: 'Кроссовер', group: '', coef: 0.3, mnosz: 4, load: 'Средняя', sets: [{pct:0.5,reps:12,sets:4}] },
+      { name: 'Французский жим', group: '', coef: 0.3, mnosz: 1, load: 'Легкая', sets: [{pct:0.37,reps:12,sets:3}] },
+      { name: 'Трицепс на блоке', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.4,reps:10,sets:3}] },
+      { name: 'Разгибания из-за головы', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.4,reps:12,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Тяга на прямых ногах', group: '', coef: 1.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.58,reps:10,sets:1},{pct:0.7,reps:8,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Наклоны', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.45,reps:8,sets:4}] },
+      { name: 'Тяга гантели в наклоне', group: '', coef: 0.5, mnosz: 2, load: 'Легкая', sets: [{pct:0.4,reps:12,sets:4}] },
+      { name: 'Тяга верхнего блока', group: '', coef: 0.4, mnosz: 5, load: 'Тяжелая', sets: [{pct:0.5,reps:12,sets:1},{pct:0.6,reps:10,sets:1},{pct:0.72,reps:8,sets:2}] },
+      { name: 'Бицепс стоя', group: '', coef: 0.4, mnosz: 1, load: 'Легкая', sets: [{pct:0.4,reps:12,sets:4}] },
+      { name: 'Молотковые сгибания', group: '', coef: 0.4, mnosz: 2, load: 'Средняя', sets: [{pct:0.5,reps:12,sets:1},{pct:0.57,reps:10,sets:2}] },
+    ] },
+    ],
+    [
+    { exercises: [
+      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.44,reps:12,sets:1},{pct:0.52,reps:15,sets:1},{pct:0.58,reps:20,sets:1}] },
+    ] },
+    { exercises: [
+      { name: 'Подъем гантели перед собой', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.41,reps:10,sets:4}] },
+      { name: 'Подъем гантелей в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.37,reps:12,sets:4}] },
+      { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:12,sets:1},{pct:0.6,reps:10,sets:2}] },
+      { name: 'Присед на груди', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:2},{pct:0.6,reps:12,sets:2}] },
+      { name: 'Разгибания ног', group: '', coef: 0.4, mnosz: 5, load: 'Легкая', sets: [{pct:0.4,reps:10,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим лежа', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:12,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим на наклонной', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.4,reps:12,sets:4}] },
+      { name: 'Кроссовер', group: '', coef: 0.3, mnosz: 4, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.5,reps:10,sets:4}] },
+      { name: 'Французский жим', group: '', coef: 0.3, mnosz: 1, load: 'Легкая', sets: [{pct:0.4,reps:10,sets:3}] },
+      { name: 'Трицепс на блоке', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.5,reps:12,sets:4}] },
+      { name: 'Разгибания из-за головы', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.55,reps:10,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Тяга на прямых ногах', group: '', coef: 1.3, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.55,reps:10,sets:1},{pct:0.63,reps:10,sets:1},{pct:0.72,reps:8,sets:1}] },
+    ] },
+    { exercises: [
+      { name: 'Наклоны', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.52,reps:12,sets:1},{pct:0.63,reps:10,sets:2}] },
+      { name: 'Тяга гантели в наклоне', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.5,reps:15,sets:1}] },
+      { name: 'Тяга верхнего блока', group: '', coef: 0.4, mnosz: 5, load: 'Тяжелая', sets: [{pct:0.55,reps:12,sets:1},{pct:0.63,reps:10,sets:1},{pct:0.71,reps:8,sets:1}] },
+      { name: 'Бицепс стоя', group: '', coef: 0.4, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:10,sets:5}] },
+      { name: 'Молотковые сгибания', group: '', coef: 0.4, mnosz: 2, load: 'Средняя', sets: [{pct:0.55,reps:8,sets:4}] },
+    ] },
+    ],
+    [
+    { exercises: [
+      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.4,reps:12,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Подъем гантели перед собой', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.5,reps:15,sets:1},{pct:0.63,reps:20,sets:1}] },
+      { name: 'Подъем гантелей в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.4,reps:10,sets:4}] },
+      { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.55,reps:10,sets:1},{pct:0.64,reps:8,sets:4}] },
+      { name: 'Присед на груди', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:12,sets:1},{pct:0.58,reps:10,sets:1},{pct:0.66,reps:8,sets:2}] },
+      { name: 'Разгибания ног', group: '', coef: 0.4, mnosz: 5, load: 'Легкая', sets: [{pct:0.33,reps:12,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим лежа', group: '', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.55,reps:12,sets:1},{pct:0.62,reps:15,sets:1},{pct:0.7,reps:20,sets:1}] },
+    ] },
+    { exercises: [
+      { name: 'Жим на наклонной', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.32,reps:12,sets:5}] },
+      { name: 'Кроссовер', group: '', coef: 0.3, mnosz: 4, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.57,reps:10,sets:4}] },
+      { name: 'Французский жим', group: '', coef: 0.3, mnosz: 1, load: 'Легкая', sets: [{pct:0.45,reps:8,sets:3}] },
+      { name: 'Трицепс на блоке', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.55,reps:10,sets:4}] },
+      { name: 'Разгибания из-за головы', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.53,reps:12,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Тяга на прямых ногах', group: '', coef: 1.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.59,reps:10,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Наклоны', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.35,reps:12,sets:3}] },
+      { name: 'Тяга гантели в наклоне', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:4},{pct:0.57,reps:10,sets:1}] },
+      { name: 'Тяга верхнего блока', group: '', coef: 0.4, mnosz: 5, load: 'Тяжелая', sets: [{pct:0.5,reps:12,sets:1},{pct:0.6,reps:10,sets:3}] },
+      { name: 'Бицепс стоя', group: '', coef: 0.4, mnosz: 1, load: 'Средняя', sets: [{pct:0.48,reps:10,sets:1},{pct:0.54,reps:8,sets:3}] },
+      { name: 'Молотковые сгибания', group: '', coef: 0.4, mnosz: 2, load: 'Средняя', sets: [{pct:0.5,reps:10,sets:1},{pct:0.6,reps:8,sets:3}] },
+    ] },
+    ],
+    [
+    { exercises: [
+      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.45,reps:10,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Подъем гантели перед собой', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.55,reps:10,sets:4}] },
+      { name: 'Подъем гантелей в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.45,reps:10,sets:4}] },
+      { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.45,reps:12,sets:1},{pct:0.54,reps:10,sets:1},{pct:0.67,reps:8,sets:4}] },
+      { name: 'Присед на груди', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.45,reps:12,sets:1},{pct:0.55,reps:10,sets:4}] },
+      { name: 'Разгибания ног', group: '', coef: 0.4, mnosz: 5, load: 'Легкая', sets: [{pct:0.4,reps:10,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим лежа', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:10,sets:2},{pct:0.56,reps:8,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим на наклонной', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:10,sets:2},{pct:0.54,reps:8,sets:3}] },
+      { name: 'Кроссовер', group: '', coef: 0.3, mnosz: 4, load: 'Легкая', sets: [{pct:0.37,reps:12,sets:3}] },
+      { name: 'Французский жим', group: '', coef: 0.3, mnosz: 1, load: 'Легкая', sets: [{pct:0.35,reps:12,sets:3}] },
+      { name: 'Трицепс на блоке', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.45,reps:10,sets:3},{pct:0.55,reps:8,sets:1}] },
+      { name: 'Разгибания из-за головы', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.45,reps:10,sets:2},{pct:0.6,reps:8,sets:1}] },
+    ] },
+    { exercises: [
+      { name: 'Тяга на прямых ногах', group: '', coef: 1.3, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.55,reps:12,sets:1},{pct:0.65,reps:10,sets:1},{pct:0.77,reps:8,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Наклоны', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.4,reps:10,sets:4}] },
+      { name: 'Тяга гантели в наклоне', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.5,reps:10,sets:2},{pct:0.6,reps:8,sets:2}] },
+      { name: 'Тяга верхнего блока', group: '', coef: 0.4, mnosz: 5, load: 'Легкая', sets: [{pct:0.46,reps:12,sets:5}] },
+      { name: 'Бицепс стоя', group: '', coef: 0.4, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.45,reps:12,sets:1},{pct:0.59,reps:10,sets:3}] },
+      { name: 'Молотковые сгибания', group: '', coef: 0.4, mnosz: 2, load: 'Легкая', sets: [{pct:0.4,reps:10,sets:4}] },
+    ] },
+    ],
+    [
+    { exercises: [
+      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.44,reps:12,sets:1},{pct:0.52,reps:10,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Подъем гантели перед собой', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.43,reps:12,sets:1},{pct:0.55,reps:10,sets:3}] },
+      { name: 'Подъем гантелей в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.52,reps:12,sets:4}] },
+      { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:10,sets:1},{pct:0.58,reps:10,sets:4}] },
+      { name: 'Присед на груди', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.35,reps:12,sets:4}] },
+      { name: 'Разгибания ног', group: '', coef: 0.4, mnosz: 5, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.58,reps:10,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим лежа', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.5,reps:10,sets:5}] },
+    ] },
+    { exercises: [
+      { name: 'Жим на наклонной', group: '', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.5,reps:12,sets:1},{pct:0.62,reps:10,sets:1},{pct:0.73,reps:8,sets:4}] },
+      { name: 'Кроссовер', group: '', coef: 0.3, mnosz: 4, load: 'Легкая', sets: [{pct:0.42,reps:10,sets:3}] },
+      { name: 'Французский жим', group: '', coef: 0.3, mnosz: 1, load: 'Легкая', sets: [{pct:0.4,reps:10,sets:4}] },
+      { name: 'Трицепс на блоке', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.49,reps:12,sets:1},{pct:0.57,reps:10,sets:3}] },
+      { name: 'Разгибания из-за головы', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.49,reps:10,sets:1},{pct:0.62,reps:8,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Тяга на прямых ногах', group: '', coef: 1.3, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.45,reps:12,sets:1},{pct:0.55,reps:15,sets:1}] },
+    ] },
+    { exercises: [
+      { name: 'Наклоны', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.3,reps:12,sets:4}] },
+      { name: 'Тяга гантели в наклоне', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.45,reps:10,sets:1},{pct:0.58,reps:8,sets:4}] },
+      { name: 'Тяга верхнего блока', group: '', coef: 0.4, mnosz: 5, load: 'Средняя', sets: [{pct:0.47,reps:12,sets:1},{pct:0.6,reps:8,sets:3}] },
+      { name: 'Бицепс стоя', group: '', coef: 0.4, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:10,sets:2},{pct:0.6,reps:8,sets:4}] },
+      { name: 'Молотковые сгибания', group: '', coef: 0.4, mnosz: 2, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:2},{pct:0.52,reps:10,sets:2}] },
+    ] },
+    ],
+    [
+    { exercises: [
+      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.5,reps:12,sets:1},{pct:0.58,reps:10,sets:1},{pct:0.64,reps:8,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Подъем гантели перед собой', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.39,reps:12,sets:4}] },
+      { name: 'Подъем гантелей в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.55,reps:12,sets:3}] },
+      { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.55,reps:10,sets:1},{pct:0.65,reps:8,sets:4}] },
+      { name: 'Присед на груди', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.49,reps:10,sets:5}] },
+      { name: 'Разгибания ног', group: '', coef: 0.4, mnosz: 5, load: 'Средняя', sets: [{pct:0.52,reps:12,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим лежа', group: '', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.45,reps:12,sets:1},{pct:0.55,reps:10,sets:1},{pct:0.62,reps:10,sets:1},{pct:0.7,reps:8,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Жим на наклонной', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.54,reps:12,sets:4}] },
+      { name: 'Кроссовер', group: '', coef: 0.3, mnosz: 4, load: 'Легкая', sets: [{pct:0.39,reps:12,sets:3}] },
+      { name: 'Французский жим', group: '', coef: 0.3, mnosz: 1, load: 'Легкая', sets: [{pct:0.37,reps:12,sets:3}] },
+      { name: 'Трицепс на блоке', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.53,reps:12,sets:4}] },
+      { name: 'Разгибания из-за головы', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.43,reps:12,sets:1},{pct:0.55,reps:10,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Тяга на прямых ногах', group: '', coef: 1.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.52,reps:10,sets:5}] },
+    ] },
+    { exercises: [
+      { name: 'Наклоны', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.4,reps:12,sets:5}] },
+      { name: 'Тяга гантели в наклоне', group: '', coef: 0.5, mnosz: 2, load: 'Легкая', sets: [{pct:0.4,reps:10,sets:4}] },
+      { name: 'Тяга верхнего блока', group: '', coef: 0.4, mnosz: 5, load: 'Тяжелая', sets: [{pct:0.5,reps:12,sets:2},{pct:0.6,reps:15,sets:1},{pct:0.7,reps:20,sets:1}] },
+      { name: 'Бицепс стоя', group: '', coef: 0.4, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.55,reps:12,sets:1},{pct:0.65,reps:8,sets:5}] },
+      { name: 'Молотковые сгибания', group: '', coef: 0.4, mnosz: 2, load: 'Легкая', sets: [{pct:0.39,reps:12,sets:3}] },
+    ] },
+    ],
+    [
+    { exercises: [
+      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.55,reps:10,sets:1},{pct:0.62,reps:10,sets:1},{pct:0.7,reps:8,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Подъем гантели перед собой', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:4}] },
+      { name: 'Подъем гантелей в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.52,reps:12,sets:4}] },
+      { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.57,reps:10,sets:1},{pct:0.68,reps:8,sets:4}] },
+      { name: 'Присед на груди', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.4,reps:12,sets:1},{pct:0.55,reps:10,sets:1},{pct:0.67,reps:8,sets:3}] },
+      { name: 'Разгибания ног', group: '', coef: 0.4, mnosz: 5, load: 'Средняя', sets: [{pct:0.58,reps:12,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим лежа', group: '', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.5,reps:12,sets:3},{pct:0.58,reps:15,sets:1},{pct:0.63,reps:20,sets:1}] },
+    ] },
+    { exercises: [
+      { name: 'Жим на наклонной', group: '', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.5,reps:12,sets:1},{pct:0.62,reps:10,sets:1},{pct:0.71,reps:8,sets:3}] },
+      { name: 'Кроссовер', group: '', coef: 0.3, mnosz: 4, load: 'Легкая', sets: [{pct:0.42,reps:12,sets:2}] },
+      { name: 'Французский жим', group: '', coef: 0.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.52,reps:10,sets:4}] },
+      { name: 'Трицепс на блоке', group: '', coef: 0.3, mnosz: 2, load: 'Тяжелая', sets: [{pct:0.5,reps:12,sets:1},{pct:0.6,reps:10,sets:1},{pct:0.66,reps:8,sets:4}] },
+      { name: 'Разгибания из-за головы', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.58,reps:10,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Тяга на прямых ногах', group: '', coef: 1.3, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.45,reps:12,sets:1},{pct:0.55,reps:10,sets:1},{pct:0.63,reps:8,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Наклоны', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.3,reps:12,sets:5}] },
+      { name: 'Тяга гантели в наклоне', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.56,reps:10,sets:3}] },
+      { name: 'Тяга верхнего блока', group: '', coef: 0.4, mnosz: 5, load: 'Тяжелая', sets: [{pct:0.52,reps:10,sets:1},{pct:0.63,reps:8,sets:4}] },
+      { name: 'Бицепс стоя', group: '', coef: 0.4, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.52,reps:12,sets:1},{pct:0.62,reps:12,sets:3}] },
+      { name: 'Молотковые сгибания', group: '', coef: 0.4, mnosz: 2, load: 'Средняя', sets: [{pct:0.45,reps:20,sets:1}] },
+    ] },
+    ],
+    [
+    { exercises: [
+      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:2},{pct:0.56,reps:10,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Подъем гантели перед собой', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.5,reps:12,sets:3}] },
+      { name: 'Подъем гантелей в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.35,reps:10,sets:5}] },
+      { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.52,reps:12,sets:1},{pct:0.58,reps:10,sets:1},{pct:0.64,reps:8,sets:3}] },
+      { name: 'Присед на груди', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:10,sets:2},{pct:0.58,reps:8,sets:3}] },
+      { name: 'Разгибания ног', group: '', coef: 0.4, mnosz: 5, load: 'Средняя', sets: [{pct:0.5,reps:10,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Жим лежа', group: '', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.45,reps:12,sets:1},{pct:0.55,reps:10,sets:1},{pct:0.62,reps:10,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Жим на наклонной', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.57,reps:10,sets:3}] },
+      { name: 'Кроссовер', group: '', coef: 0.3, mnosz: 4, load: 'Легкая', sets: [{pct:0.35,reps:12,sets:4}] },
+      { name: 'Французский жим', group: '', coef: 0.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:2},{pct:0.55,reps:10,sets:2}] },
+      { name: 'Трицепс на блоке', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.55,reps:12,sets:4}] },
+      { name: 'Разгибания из-за головы', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.6,reps:8,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Тяга на прямых ногах', group: '', coef: 1.3, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.48,reps:12,sets:1},{pct:0.57,reps:10,sets:1},{pct:0.67,reps:8,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Наклоны', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.35,reps:12,sets:4}] },
+      { name: 'Тяга гантели в наклоне', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.5,reps:10,sets:3}] },
+      { name: 'Тяга верхнего блока', group: '', coef: 0.4, mnosz: 5, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.49,reps:15,sets:1},{pct:0.53,reps:20,sets:1}] },
+      { name: 'Бицепс стоя', group: '', coef: 0.4, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.5,reps:12,sets:2},{pct:0.57,reps:15,sets:1},{pct:0.63,reps:20,sets:1}] },
+      { name: 'Молотковые сгибания', group: '', coef: 0.4, mnosz: 2, load: 'Средняя', sets: [{pct:0.55,reps:8,sets:4}] },
+    ] },
+    ],
+    [
+    { exercises: [
+      { name: 'Жим стоя', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.4,reps:12,sets:1},{pct:0.47,reps:10,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Подъем гантели перед собой', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.35,reps:12,sets:3}] },
+      { name: 'Подъем гантелей в стороны', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.39,reps:10,sets:6}] },
+      { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.55,reps:10,sets:4}] },
+      { name: 'Присед на груди', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.53,reps:20,sets:1}] },
+      { name: 'Разгибания ног', group: '', coef: 0.4, mnosz: 5, load: 'Легкая', sets: [{pct:0.34,reps:12,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим лежа', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.47,reps:12,sets:1},{pct:0.58,reps:10,sets:4}] },
+    ] },
+    { exercises: [
+      { name: 'Жим на наклонной', group: '', coef: 1, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:10,sets:1},{pct:0.59,reps:10,sets:3}] },
+      { name: 'Кроссовер', group: '', coef: 0.3, mnosz: 4, load: 'Легкая', sets: [{pct:0.39,reps:10,sets:6}] },
+      { name: 'Французский жим', group: '', coef: 0.3, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:12,sets:1},{pct:0.58,reps:10,sets:2}] },
+      { name: 'Трицепс на блоке', group: '', coef: 0.3, mnosz: 2, load: 'Средняя', sets: [{pct:0.47,reps:12,sets:3}] },
+      { name: 'Разгибания из-за головы', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.5,reps:8,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Тяга на прямых ногах', group: '', coef: 1.3, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.5,reps:12,sets:1},{pct:0.6,reps:10,sets:1},{pct:0.7,reps:8,sets:3}] },
+    ] },
+    { exercises: [
+      { name: 'Наклоны', group: '', coef: 1, mnosz: 1, load: 'Легкая', sets: [{pct:0.4,reps:12,sets:3}] },
+      { name: 'Тяга гантели в наклоне', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.45,reps:12,sets:1},{pct:0.55,reps:10,sets:3}] },
+      { name: 'Тяга верхнего блока', group: '', coef: 0.4, mnosz: 5, load: 'Легкая', sets: [{pct:0.48,reps:10,sets:3}] },
+      { name: 'Бицепс стоя', group: '', coef: 0.4, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.55,reps:10,sets:1},{pct:0.63,reps:8,sets:3}] },
+      { name: 'Молотковые сгибания', group: '', coef: 0.4, mnosz: 2, load: 'Легкая', sets: [{pct:0.3,reps:12,sets:4}] },
+    ] },
+    ],
+  ],
 };

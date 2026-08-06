@@ -193,12 +193,16 @@ export interface PLProgramBody {
   notes: string;
   /** Рабочие максимумы для расчёта весов из % цикла. */
   workMax: { squat?: number; bench?: number; dead?: number };
+  /** Текущая неделя исходного цикла для просмотра/выполнения. */
+  activeWeek?: number;
   /** Custom PL: когда sourceCycleId===null, weeks содержит редактируемую структуру. */
   customWeeks?: PLWeek[];
 }
 
 export interface PLDay {
   name: string;
+  /** Calendar day for custom PL sessions (0 = Monday). */
+  dayOfWeek?: number;
   exercises: PLExercise[];
 }
 export interface PLExercise {

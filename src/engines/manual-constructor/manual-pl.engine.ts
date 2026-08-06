@@ -19,6 +19,7 @@ export function plLmsScheduleDays(program: UserProgram): Array<{ label: string; 
     cycle.meta.id,
     program.pl.workMax,
     dayOfWeekBySession,
+    program.pl.activeWeek ?? 1,
   );
 
   return days.map((d: PLScheduledDay) => ({

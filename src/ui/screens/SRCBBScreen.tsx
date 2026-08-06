@@ -203,11 +203,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   };
   const [builtSrc, setBuiltSrc] = useState<LMSBuildOutput | null>(() => validateSavedSrc(_plSaved?.builtSrc));
   const [srcWeek, setSrcWeek] = useState<number>(_plSaved?.srcWeek ?? 1);
+  const [srcAdditions, setSrcAdditions] = useState<Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]>>(_plSaved?.srcAdditions ?? {});
   useEffect(() => {
     if (!builtSrc) return;
     setSrcWeek(current => Math.max(1, Math.min(builtSrc.weeks.length, current)));
   }, [builtSrc]);
-  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs]);
+  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs]);
   useEffect(() => { initExercisePMs(selectedCycleId); }, [selectedCycleId]);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), pmSquat, pmBench, pmDead, bodyWeight: bw }); } catch { /* ignore */ } }, [pmSquat, pmBench, pmDead, bw]);
   // U4: ручная правка поверх сгенерированного плана (оверлей правок по позиции сета)
@@ -224,7 +225,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [pickerGroup, setPickerGroup] = useState<string>('chest');
   const [pickerExName, setPickerExName] = useState<string>('');
   const [pickerScheme, setPickerScheme] = useState<{ sets: number; reps: number; weight: number }>({ sets: 3, reps: 8, weight: 40 });
-  const [srcAdditions, setSrcAdditions] = useState<Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]>>({});
+  // Additions are an overlay and never modify source cycle exercises.
   const CAT_GROUPS = ['chest','back','legs','shoulders','arms','core'];
   const GRP_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' };
   const dayKey = (w: number, di: number) => `${w}_${di}`;
@@ -283,9 +284,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       pedDoses,
       acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
       autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
+      faithful: true,
       ...rec,
     });
-    setBuiltSrc(plan); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setSrcAdditions({}); setPickerDay(null);
+    setBuiltSrc(plan); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setPickerDay(null);
     // TRAINING INTEGRATION: конвертировать PL план в сессии
     try { const sessions = lmsPlanToSessions(plan); saveBridgeSessions(sessions); } catch { /* ignore */ }
   };
@@ -318,8 +320,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           peds: peds.length ? peds : undefined,
           pedDoses,
           acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
-          autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
-          ...rec,
+           autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
+           faithful: true,
+           ...rec,
         });
         const blockWeeks = Array.from({ length: block.weeks }, (_, index) => {
           const source = output.weeks[index % output.weeks.length];
