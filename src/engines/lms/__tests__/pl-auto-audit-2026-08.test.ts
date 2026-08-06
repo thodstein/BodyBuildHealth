@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildLMSPlan, extractExercises } from '../lms-builder.engine';
+import { buildLMSPlan, extractExercises, getPLVolumeLandmarks, getPLWeakPointRecommendations } from '../lms-builder.engine';
 import { buildDiaryAutoreg } from '../../pro/diary-autoreg.engine';
 import { normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
+import { fitnessFatigue } from '../../pro/training-load.engine';
+import { relativeStrengthReport, relativeStrengthFullReport } from '../../pro/relative-strength.engine';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 import { CYCLE_04 } from '../../../data/lms-cycles/cycle-04';
 import { CYCLE_09K } from '../../../data/lms-cycles/cycle-09k';
@@ -327,5 +329,86 @@ describe('Additional coverage', () => {
     });
     const ws = plan.weeks[0].days[0].exercises[0].workSets[0];
     expect(ws.rir).toBe(0);
+  });
+});
+
+// ── P1-7: fitnessFatigue O(n) recurrence ──
+describe('P1-7: fitnessFatigue O(n) recurrence', () => {
+  it('produces same results as nested loop for small series', () => {
+    const loads = [
+      { date: '2026-07-01', load: 500 },
+      { date: '2026-07-02', load: 600 },
+      { date: '2026-07-03', load: 0 },
+      { date: '2026-07-04', load: 700 },
+      { date: '2026-07-05', load: 550 },
+    ];
+    const result = fitnessFatigue(loads);
+    expect(result.series).toHaveLength(5);
+    expect(result.current).toBeDefined();
+    expect(result.current!.fitness).toBeGreaterThan(result.current!.fatigue);
+  });
+
+  it('handles large series without hanging (1826 days)', () => {
+    const loads = Array.from({ length: 1826 }, (_, i) => ({
+      date: `2021-01-${String((i % 28) + 1).padStart(2, '0')}`,
+      load: 300 + (i % 7) * 100,
+    }));
+    const start = Date.now();
+    const result = fitnessFatigue(loads);
+    const elapsed = Date.now() - start;
+    expect(result.series.length).toBeGreaterThan(0);
+    expect(elapsed).toBeLessThan(1000);
+  });
+
+  it('returns empty series for empty input', () => {
+    expect(fitnessFatigue([]).series).toHaveLength(0);
+  });
+});
+
+// ── P1-8: relativeStrengthReport per-lift ──
+describe('P1-8: relativeStrengthReport vs FullReport', () => {
+  it('relativeStrengthReport has zero per-lift values (no individual lifts provided)', () => {
+    const report = relativeStrengthReport(500, 80, 'male');
+    expect(report.lifts.squat.value).toBe(0);
+    expect(report.lifts.bench.rs).toBe(0);
+    expect(report.wilks).toBeGreaterThan(0);
+    expect(report.dots).toBeGreaterThan(0);
+  });
+
+  it('relativeStrengthFullReport has real per-lift values', () => {
+    const report = relativeStrengthFullReport(200, 140, 220, 80, 'male');
+    expect(report.lifts.squat.value).toBe(200);
+    expect(report.lifts.squat.rs).toBeGreaterThan(0);
+    expect(report.lifts.bench.value).toBe(140);
+    expect(report.lifts.deadlift.value).toBe(220);
+    expect(report.total).toBe(560);
+  });
+});
+
+// ── getPLVolumeLandmarks edge cases ──
+describe('getPLVolumeLandmarks edge cases', () => {
+  it('handles undefined groups gracefully', () => {
+    const plan = buildLMSPlan({ template: CYCLE_01, pmMap, fallbackPm: 80, weeksOverride: 1 });
+    const landmarks = getPLVolumeLandmarks(plan.weeks, 'intermediate');
+    for (const row of landmarks) {
+      expect(row.mev).toBeGreaterThan(0);
+      expect(row.mav).toBeGreaterThanOrEqual(row.mev);
+      expect(row.mrv).toBeGreaterThanOrEqual(row.mav);
+    }
+  });
+});
+
+// ── getPLWeakPointRecommendations ──
+describe('getPLWeakPointRecommendations', () => {
+  it('returns corrections and rationale for bench lockout', () => {
+    const rec = getPLWeakPointRecommendations('bench', 'lockout');
+    expect(rec.corrections.length).toBeGreaterThan(0);
+    expect(rec.rationale.length).toBeGreaterThan(0);
+    expect(rec.group).toBe('chest');
+  });
+
+  it('returns corrections for squat bottom', () => {
+    const rec = getPLWeakPointRecommendations('squat', 'bottom');
+    expect(rec.corrections.length).toBeGreaterThan(0);
   });
 });

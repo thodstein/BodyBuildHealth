@@ -308,8 +308,10 @@ function weeklyMuscleSets(days: LMSPlanDay[], group: string): number {
     .reduce((dayTotal, ex) => dayTotal + ex.workSets.reduce((sets, workSet) => sets + workSet.sets, 0), 0), 0);
 }
 
-/** P2-8: Shared fatigue budget formula — previously duplicated in enforceInjectedFatigueBudget
- *  and the main week loop (line ~584). Now a single source of truth. */
+/** Fatigue budget per session, scaled by readiness (0-100%).
+ *  Base 60 = typical intermediate session capacity (S-MRV heuristic:
+ *  ~60 fatigue-cost units = 4-5 compound exercises at ~12 fatigue each).
+ *  At readiness=100 → 60, at readiness=50 → 30, at readiness=0 → 0. */
 function fatigueBudget(readiness?: number): number {
   return 60 * (Math.max(0, Math.min(100, readiness ?? 80)) / 100);
 }

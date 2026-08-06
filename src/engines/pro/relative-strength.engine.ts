@@ -171,7 +171,11 @@ export interface RelativeStrengthReport {
   };
 }
 
-/** Сводка всех формул + классификация + per-lift относительная сила. */
+/**
+ * Сводка всех формул + классификация + per-lift относительная сила.
+ * NOTE: per-lift values are zero because only `total` is known.
+ * Use `relativeStrengthFullReport(squat, bench, deadlift, bw, sex)` for real per-lift data.
+ */
 export function relativeStrengthReport(total: number, bw: number, sex: Sex): RelativeStrengthReport {
   const dots = dotsScore(total, bw, sex);
   return {

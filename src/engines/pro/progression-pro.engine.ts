@@ -20,7 +20,7 @@ export interface ProgressionScheme {
   template: ProgressionWeek[];
 }
 
-const SQUAT = (sets: ProgressionSet[], focus = "Heavy") => ({ label: "День 1", focus, sets });
+const SQUAT = (sets: ProgressionSet[], focus = "Heavy", label = "День 1") => ({ label, focus, sets });
 const r = (pct: number, reps: number, sets = 1): ProgressionSet => ({ pct, reps, sets });
 
 export const PROGRESSION_SCHEMES: Record<ProgressionSchemeId, ProgressionScheme> = {

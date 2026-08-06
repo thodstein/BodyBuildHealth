@@ -118,13 +118,15 @@ export function fitnessFatigue(
   for (let cur = minD; cur <= maxD; cur = addDays(cur, 1)) full.push({ date: cur, load: byDate[cur] || 0 });
 
   const series: BanisterPoint[] = [];
+  // P1-7: O(n) recurrence instead of O(n²) nested loop.
+  // fitness[t] = fitness[t-1] * exp(-1/tau1) + load[t]
+  // fatigue[t] = fatigue[t-1] * exp(-1/tau2) + load[t]
+  const decay1 = Math.exp(-1 / tau1);
+  const decay2 = Math.exp(-1 / tau2);
+  let fitness = 0, fatigue = 0;
   for (let t = 0; t < full.length; t++) {
-    let fitness = 0, fatigue = 0;
-    for (let d = 0; d <= t; d++) {
-      const dt = t - d;
-      fitness += full[d].load * Math.exp(-dt / tau1);
-      fatigue += full[d].load * Math.exp(-dt / tau2);
-    }
+    fitness = fitness * decay1 + full[t].load;
+    fatigue = fatigue * decay2 + full[t].load;
     series.push({ date: full[t].date, fitness: Math.round(fitness), fatigue: Math.round(fatigue), performance: Math.round(k1 * fitness - k2 * fatigue) });
   }
   let peakIdx = 0;
