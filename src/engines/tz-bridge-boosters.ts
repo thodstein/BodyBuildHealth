@@ -118,7 +118,7 @@ export const NEURO_BOOST: BoosterDef = {
   subs: [
     { substanceId: 'magnesium',         reason: 'Mg-зависимая нейротрансмиссия, блок NMDA, ↑ГAМК', category: 'mineral' },
     { substanceId: 'ashwagandha',       reason: '↓кортизола 20-30% (мета), адаптоген, ↑ГAМК-ергический тонус', category: 'adaptogen' },
-    { substanceId: 'l_theanine',        reason: 'α-волны, релаксация без седации, ↑ГAМК/дофамина', category: 'amino' },
+    { substanceId: 'theanine',          reason: 'α-волны, релаксация без седации, ↑ГAМК/дофамина', category: 'amino' },
     { substanceId: 'glycine',           reason: 'Тормозной нейротрансмиттер, ↓core body temp → сон', category: 'amino' },
     { substanceId: 'rhodiola',          reason: 'Адаптоген, ↓утомления, ↑серотонина/дофамина', category: 'adaptogen' },
     { substanceId: 'acetyl_l_carnitine',reason: 'Митохондриальная защита нейронов, ↑ацетилхолина', category: 'amino' },
@@ -203,7 +203,7 @@ export const JOINTS_BOOST: BoosterDef = {
     { substanceId: 'boswellia',   reason: 'Босвеллиевая кислота, ↓5-LOX → ↓лейкотриенов, ↓MMP', category: 'antiinflam' },
     { substanceId: 'msm',         reason: 'Органическая сера, ↓воспаления, ↓боли (мета)', category: 'other' },
     { substanceId: 'curcumin',    reason: '↓COX-2, ↓NF-κB, ↓MMP — тройной противовоспалительный эффект', category: 'antiinflam' },
-    { substanceId: 'hyaluronic', reason: 'Компонент синовиальной жидкости, ↓трения', category: 'other' },
+    { substanceId: 'hyaluronic_acid', reason: 'Компонент синовиальной жидкости, ↓трения', category: 'other' },
     { substanceId: 'vitamin_c',   reason: 'Кофактор гидроксилирования пролина → синтез коллагена', category: 'vitamin' },
     { substanceId: 'omega3',      reason: 'Резолвины/протектины, ↓воспаления в синовии', category: 'other' },
   ],

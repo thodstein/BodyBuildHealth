@@ -99,9 +99,9 @@ export const CalcSubstanceManager: React.FC<Props> = ({ finalRec, onApplyChanges
     for (const id of extra) {
       if (!all.some(a => a.id === id)) all.push({ id, name: subNameRu(id) });
     }
-    if (!addSearch) return all.slice(0, 80);
+    if (!addSearch) return all.slice(0, 30);
     const q = addSearch.toLowerCase();
-    return all.filter(a => a.id.toLowerCase().includes(q) || a.name.toLowerCase().includes(q)).slice(0, 80);
+    return all.filter(a => a.id.toLowerCase().includes(q) || a.name.toLowerCase().includes(q)).slice(0, 50);
   }, [addSearch]);
 
   const filteredStacks = useMemo(() => {
@@ -216,7 +216,11 @@ export const CalcSubstanceManager: React.FC<Props> = ({ finalRec, onApplyChanges
     height: 3, background: `linear-gradient(90deg,${col},${col}88)`,
   });
   const popupBody: React.CSSProperties = {
-    padding: '16px 16px 12px', overflowY: 'auto', flex: 1,
+    padding: '12px 14px 10px', overflowY: 'auto', flex: 1,
+  };
+  const stickyHeader: React.CSSProperties = {
+    position: 'sticky', top: -12, zIndex: 10, background: '#1a1a1d',
+    padding: '12px 14px 8px', marginBottom: 4, borderBottom: '1px solid rgba(255,255,255,0.06)',
   };
 
   const tabBtn = (a: boolean, col: string): React.CSSProperties => ({
@@ -275,24 +279,29 @@ export const CalcSubstanceManager: React.FC<Props> = ({ finalRec, onApplyChanges
           <div onClick={e => e.stopPropagation()} style={popupBox}>
             <div style={popupHeader('#00e68a')} />
             <div style={popupBody}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#00e68a', marginBottom: 8 }}>
-                ➕ Добавить препараты
+              <div style={stickyHeader}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#00e68a', marginBottom: 8 }}>
+                  ➕ Добавить препараты
+                </div>
+                {/* табы */}
+                <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                  {(['catalog','stacks','favorites'] as const).map(t => (
+                    <button key={t} onClick={() => { setAddTab(t); setAddSearch(''); }} style={tabBtn(addTab === t, '#00e68a')}>
+                      {t === 'catalog' ? '📋 Каталог' : t === 'stacks' ? '📦 Стек' : '⭐ Избранное'}
+                    </button>
+                  ))}
+                </div>
+                <input value={addSearch} onChange={e => setAddSearch(e.target.value)}
+                  placeholder={addTab === 'catalog' ? 'Поиск препарата...' : addTab === 'stacks' ? 'Поиск стека...' : 'Поиск в избранном...'}
+                  style={searchInput} autoFocus />
+                {addTab === 'catalog' && !addSearch && (
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', marginTop:3 }}>Показано 30. Введите поиск для остальных.</div>
+                )}
               </div>
-              {/* табы */}
-              <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-                {(['catalog','stacks','favorites'] as const).map(t => (
-                  <button key={t} onClick={() => { setAddTab(t); setAddSearch(''); }} style={tabBtn(addTab === t, '#00e68a')}>
-                    {t === 'catalog' ? '📋 Каталог' : t === 'stacks' ? '📦 Стек' : '⭐ Избранное'}
-                  </button>
-                ))}
-              </div>
-              <input value={addSearch} onChange={e => setAddSearch(e.target.value)}
-                placeholder={addTab === 'catalog' ? 'Поиск препарата...' : addTab === 'stacks' ? 'Поиск стека...' : 'Поиск в избранном...'}
-                style={searchInput} autoFocus />
 
               {/* Каталог */}
               {addTab === 'catalog' && (
-                <div style={{ maxHeight: 260, overflowY: 'auto', marginBottom: 8 }}>
+                <div style={{ maxHeight: '40vh', overflowY: 'auto', marginBottom: 8 }}>
                   {catalogEntries.map(entry => (
                     <button key={entry.id} onClick={() => toggleAddSelect(entry.id)}
                       style={itemBtn(addSelection.includes(entry.id), '#00e68a')}>

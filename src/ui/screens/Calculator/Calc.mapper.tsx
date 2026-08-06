@@ -47,7 +47,7 @@ const JOINT_PRESETS: JointPreset[] = [
   { id:'enhanced', name:'Усиление', desc:'Высокий риск', color:'#f97316', icon:'🟠',
     subs:['hyaluronic_acid','curcumin','boswellia','silicon'] },
   { id:'max', name:'Максимум', desc:'Критический риск', color:'#ef4444', icon:'🔴',
-    subs:['bpc','tb500','calcium','boron'] },
+    subs:['bpc157','tb500','calcium','boron'] },
 ];
 const JOINT_CATALOG: { id: string; nameRu: string; dose: string; desc: string }[] = [
   { id: 'glucosamine', nameRu: 'Глюкозамин сульфат', dose: '1500 мг', desc: 'Субстрат ГАГ, ↑ синтез протеогликанов хряща' },
@@ -64,10 +64,15 @@ const JOINT_CATALOG: { id: string; nameRu: string; dose: string; desc: string }[
   { id: 'curcumin', nameRu: 'Куркумин + пиперин', dose: '500 мг', desc: '↓ COX-2, ↓ NF-κB, ↓ IL-1β' },
   { id: 'boswellia', nameRu: 'Босвеллия (AKBA ≥30%)', dose: '300 мг', desc: '↓ 5-LOX, ↓ лейкотриены, ↓ боль при ОА' },
   { id: 'silicon', nameRu: 'Кремний (монометанол-силанол)', dose: '10-20 мг', desc: 'Сшивка коллагена и эластина, стабилизация ГАГ' },
-  { id: 'bpc', nameRu: 'BPC-157 (пентадекапептид)', dose: '250-500 мкг', desc: '↑ VEGF → ангиогенез, заживление связок/сухожилий' },
+  { id: 'bpc157', nameRu: 'BPC-157 (пентадекапептид)', dose: '250-500 мкг', desc: '↑ VEGF → ангиогенез, заживление связок/сухожилий' },
   { id: 'tb500', nameRu: 'TB-500 (Thymosin β4)', dose: '2.5-5 мг', desc: 'Полимеризация G-актина, ↑ миграцию клеток' },
   { id: 'calcium', nameRu: 'Кальций', dose: '500 мг', desc: 'Минерализация костной ткани' },
   { id: 'boron', nameRu: 'Бор', dose: '3 мг', desc: '↑ t½ вит. D и E₂, ↓ боль в суставах' },
+  // ── ЭТАП 3: новые вещества из Суставы.txt ──
+  { id: 'ghk_cu', nameRu: 'GHK-Cu (медь-пептид)', dose: '1-2 мг', desc: '↑коллаген/эластин, анти-воспаление (Суставы.txt: 6-нед протокол)' },
+  { id: 'havinson_a4', nameRu: 'Хавинсон A4 (хрящ)', dose: '1-2 капс', desc: 'Пептидный биорегулятор, ↑хондроцитов (Суставы.txt)' },
+  { id: 'ligamentide', nameRu: 'LigamenTIDE PLUS', dose: '1-2 капс', desc: 'Пептид для связок/сухожилий (Суставы.txt: 6-нед курс)' },
+  { id: 'voltaren_gel', nameRu: 'Вольтарен гель (диклофенак местно)', dose: '2-3р/день', desc: '↓COX-2 локально (Суставы.txt)' },
 ];
 const JOINT_RECOMMENDED_HIGH: Set<string> = new Set(['glucosamine','chondroitin','collagen','vitamin_c','msm']);
 const JOINT_RECOMMENDED_MEDIUM: Set<string> = new Set(['omega3','hyaluronic_acid','curcumin','boswellia']);
@@ -113,6 +118,26 @@ const NEURO_CATALOG: { id: string; nameRu: string; dose: string; desc: string }[
   { id: 'folate', nameRu: 'Фолат (5-MTHF)', dose: '400 мкг', desc: 'Метилирование, синтез SAME, обмен гомоцистеина' },
   { id: 'taurine', nameRu: 'Таурин', dose: '2 г', desc: '↑ ГАМК-А, ↓ глутаматную эксайтотоксичность' },
   { id: 'magnesium', nameRu: 'Магний (глицинат/цитрат)', dose: '400 мг', desc: '↓ NMDA-рецептор, ↑ ГАМК, ↓ кортизол, расслабление' },
+  // ── ЭТАП 3: новые вещества из статьи «Нейротоксичность ААС» ──
+  { id: 'agmatine', nameRu: 'Агматин', dose: '1-2 г', desc: '★ must have: неконкурентный антагонист NMDA, ↓глутамат' },
+  { id: 'nac', nameRu: 'NAC (АЦЦ)', dose: '1200-2400 мг', desc: '★ Снижает глутамат через mGluR2/3, антиоксидант' },
+  { id: 'apigenin', nameRu: 'Апигенин', dose: '50-100 мг', desc: 'ГАМК-модулятор, ↓тревоги (микродозинг)' },
+  { id: 'magnolia', nameRu: 'Магнолия (ханиол/магнолол)', dose: '200-400 мг', desc: 'Анксиолитик, ГАМК-ергический' },
+  { id: 'pregnenolone', nameRu: 'Прегненолон', dose: '10-30 мг', desc: 'Тормозный нейростероид, закрывает дырку на ААС' },
+  { id: 'inositol', nameRu: 'Инозитол', dose: '500-2000 мг', desc: '↑чувствительность серотониновых рецепторов (ОКР/БДР)' },
+  { id: 'astaxanthin', nameRu: 'Астаксантин', dose: '4-12 мг', desc: 'Встраивается в мембрану, блок окисления жиров' },
+  // ── LV2-LV3 (статья: тяжёлая артиллерия) ──
+  { id: 'grandaxine', nameRu: 'Грандаксин (тофизопам)', dose: '25-100 мг', desc: 'ФДЭ-4 ингибитор, ↑ГАМК без толерантности (LV2)' },
+  { id: 'fasoracetam', nameRu: 'Фасорацетам', dose: '100-200 мг', desc: '↑ГАМК-Б рецепторы, контроль импульсов (LV3)' },
+  { id: 'bromantane', nameRu: 'Бромантан', dose: '50-100 мг', desc: '↑тирозин-гидроксилаза → дофамин, для 19-нор (LV3)' },
+  { id: 'noopept', nameRu: 'Ноопепт (омберацетам)', dose: '10-30 мг', desc: '↑NGF, ↑BDNF, ↑AMPA — нейрогенез (LV3)' },
+  { id: 'dihexa', nameRu: 'Дигекса', dose: '5-20 мг', desc: 'c-met/HGF агонист, синаптогенез 10× BDNF (LV3)' },
+  { id: 'tropoflavin', nameRu: 'Тропофлавин (7,8-DHF)', dose: '5-30 мг', desc: 'TrkB-агонист, ↑выживаемости нейронов (LV3)' },
+  { id: 'phenylpiracetam', nameRu: 'Фенилпирацетам (Фенотропил)', dose: '100-300 мг', desc: '↑дофамин/норадреналин, ↑мотивация (LV3)' },
+  { id: 'memantine', nameRu: 'Мемантин', dose: '5-20 мг', desc: 'NMDA-антагонист, ↓эксайтотоксичность (LV4)' },
+  { id: 'lamotrigine', nameRu: 'Ламотриджин', dose: '25-200 мг', desc: 'Na-каналы, нормотимик (LV4, медленная титрация)' },
+  { id: 'fluvoxamine', nameRu: 'Флувоксамин', dose: '50-300 мг', desc: 'СИОЗС + сигма-1, нейропротекция (LV3)' },
+  { id: 'guanfacine', nameRu: 'Гуанфацин', dose: '0.5-4 мг', desc: 'α2 (постсинаптический), ↓импульсивности (LV4)' },
 ];
 const NEURO_RECOMMENDED_HIGH: Set<string> = new Set(['citicoline','lions_mane','magnesium_l_threonate','phosphatidylserine']);
 const NEURO_RECOMMENDED_MEDIUM: Set<string> = new Set(['ashwagandha','theanine','gaba','melatonin','acetyl_l_carnitine','bacopa','rhodiola']);
@@ -343,7 +368,7 @@ const FALLBACK_NAMES: Record<string, string> = {
   collagen: 'Коллаген гидролизат', collagen_uc2: 'Коллаген UC-II',
   msm: 'MSM', hyaluronic_acid: 'Гиалуроновая кислота',
   manganese: 'Марганец', silicon: 'Кремний', boron: 'Бор',
-  bpc: 'BPC-157', tb500: 'TB-500', boswellia: 'Босвеллия',
+  bpc: 'BPC-157', bpc157: 'BPC-157', tb500: 'TB-500', boswellia: 'Босвеллия',
   // нейропротекция
   citicoline: 'Цитиколин', alpha_gpc: 'Альфа-GPC', uridine_monophosphate: 'Уридин UMP',
   magnesium_l_threonate: 'Магний L-треонат', acetyl_l_carnitine: 'Ацетил-L-Карнитин',
@@ -687,7 +712,42 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const megaSuggestions = useMemo(() => {
     if (!finalRec) return [];
     const currentSubs = finalRec.subs.map(s => s.substanceId);
-    return megaEnhance(finalRec.gaps as any, currentSubs);
+    const gapBased = megaEnhance(finalRec.gaps as any, currentSubs);
+    if (gapBased.length > 0) return gapBased;
+    // ── Fallback: если gaps пуст (нет лаб-данных), предлагаем по PED-risk ──
+    const pedRisk = finalRec.pedRisk;
+    if (pedRisk && (pedRisk.neuroBoosterTier > 0 || pedRisk.jointsBoosterTier > 0)) {
+      const neuroIds = getNeuroBoosterSubstanceIds(pedRisk.neuroBoosterTier);
+      const jointIds = getJointsBoosterSubstanceIds(pedRisk.jointsBoosterTier);
+      const allBoosterIds = [...neuroIds, ...jointIds];
+      const existingSet = new Set(currentSubs.map(s => s.toLowerCase().replace(/[^a-z0-9]/g, '')));
+      return allBoosterIds
+        .filter(id => !existingSet.has(id.toLowerCase().replace(/[^a-z0-9]/g, '')))
+        .map(id => ({
+          substanceId: id,
+          reason: pedRisk.triggeredBy.filter(r => r.includes('нейро') || r.includes('Нейро') || r.includes('сустав') || r.includes('Сустав') || r.includes('19-нор') || r.includes('стан') || r.includes('трен') || r.includes('Эскалация')).slice(0,1).join('; ') || 'PED-risk',
+          mechsCovered: [] as any,
+          synergyWith: [] as string[],
+          breadth: 1,
+          totalK: 0,
+        }));
+    }
+    // ── Fallback 2: если есть PED, но без PED-risk tier — предлагаем ядро поддержки ──
+    if (state.pharma.aas.length > 0) {
+      const coreIds = ['nac','omega3','vitamin_d3','vitamin_k2','magnesium','vitamin_c','tudca','milk_thistle'];
+      const existingSet = new Set(currentSubs.map(s => s.toLowerCase().replace(/[^a-z0-9]/g, '')));
+      return coreIds
+        .filter(id => !existingSet.has(id.toLowerCase().replace(/[^a-z0-9]/g, '')))
+        .map(id => ({
+          substanceId: id,
+          reason: 'Ядро поддержки при курсе ААС',
+          mechsCovered: [] as any,
+          synergyWith: [] as string[],
+          breadth: 1,
+          totalK: 0,
+        }));
+    }
+    return [];
   }, [finalRec]);
 
   // Токсикологический контроль дозировок (UL + титрация выше оптимума)
@@ -1321,7 +1381,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             <div style={{ flex:1, overflowY:'auto', padding:'10px 14px 14px' }}>
               {megaSuggestions.length === 0 ? (
                 <div style={{ padding:'20px 10px', textAlign:'center', color:'rgba(255,255,255,0.4)', fontSize:10, lineHeight:1.5 }}>
-                  ✅ Все активированные механизмы ТЗ покрыты текущим планом.<br />Усиление не требуется.
+                  {state.pharma.aas.length === 0
+                    ? '💡 Добавьте препараты курса (PED) или введите лаб-данные — Мега подберёт усиление по непокрытым механизмам.'
+                    : '✅ Все доступные вещества уже в плане. Проверьте лаб-данные для активации дополнительных механизмов.'}
                 </div>
               ) : (
                 <>
@@ -1907,7 +1969,58 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             🩺 Симптомы (отметьте актуальные) {symptoms.length > 0 ? `(${symptoms.length})` : ''}
           </span>
           <div style={{ display:'flex', gap:4, alignItems:'center' }}>
-            <button onClick={(e) => { e.stopPropagation(); try { const raw = localStorage.getItem('he_profile_v2'); if (raw) { const p = JSON.parse(raw); const sym = p?.settings?.symptoms?.recent || {}; const active = Object.entries(sym).filter(([_,v]: [string,any]) => v && typeof v === 'object' && v.score > 0).map(([k]) => { const map: Record<string,string> = { insomnia:'insomnia', anxiety:'anxiety', mood_swings:'mood_swings', joint_pain:'joint_pain', headache:'headache', palpitations:'palpitations', acne:'acne', hair_loss:'hair_loss', gynecomastia:'gynecomastia', edema:'edema_severe', low_libido:'low_libido', prostate:'prostate_symptoms' }; return map[k] || k; }); setSymptoms(active); } } catch {} }} style={{ fontSize:7, fontWeight:700, cursor:'pointer', padding:'2px 6px', borderRadius:4, background:'rgba(99,102,241,0.1)', border:'1px solid rgba(99,102,241,0.2)', color:'#a5b4fc' }}>📋 Из профиля</button>
+            <button onClick={(e) => { e.stopPropagation(); try {
+              // Маппинг ID симптомов → коды pill-кнопок калькулятора
+              const symMap: Record<string,string> = {
+                insomnia:'insomnia', anxiety:'anxiety', mood_swings:'mood_swings', mood_swings_mood:'mood_swings',
+                joint_pain:'joint_pain', joint:'joint_pain', arthralgia:'joint_pain',
+                headache:'headache', head:'headache', migraines:'headache',
+                palpitations:'palpitations', tachycardia:'palpitations', heart_palpitations:'palpitations',
+                acne:'acne', skin_acne:'acne',
+                hair_loss:'hair_loss', alopecia:'hair_loss', hair_thinning:'hair_loss',
+                gynecomastia:'gynecomastia', gyno:'gynecomastia',
+                edema:'edema_severe', edema_severe:'edema_severe', swelling:'edema_severe', water_retention:'edema_severe',
+                low_libido:'low_libido', libido_low:'low_libido', decreased_libido:'low_libido',
+                prostate:'prostate_symptoms', prostate_symptoms:'prostate_symptoms', prostate_issues:'prostate_symptoms',
+                irritability:'mood_swings', aggression:'mood_swings', anger:'mood_swings',
+                sleep_problems:'insomnia', sleep_disturbance:'insomnia',
+                fatigue:'mood_swings', depression:'mood_swings', low_mood:'mood_swings',
+                brain_fog:'mood_swings', cognitive_issues:'mood_swings',
+              };
+              const active = new Set<string>();
+              // Источник 1: he_profile_v2 → symptoms.recent
+              try {
+                const raw = localStorage.getItem('he_profile_v2');
+                if (raw) { const p = JSON.parse(raw); const sym = p?.settings?.symptoms?.recent || {};
+                  for (const [k, v] of Object.entries(sym)) {
+                    if (v && typeof v === 'object' && (v as any).score > 0) {
+                      const code = symMap[k] || symMap[k.toLowerCase()] || k;
+                      active.add(code);
+                    }
+                  }
+                }
+              } catch {}
+              // Источник 2: he_symptom_diary (последние 7 дней, severity > 0)
+              try {
+                const raw2 = localStorage.getItem('he_symptom_diary');
+                if (raw2) {
+                  const diary = JSON.parse(raw2); const arr = Array.isArray(diary) ? diary : [];
+                  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+                  for (const day of arr) {
+                    if (!day?.date) continue;
+                    const d = new Date(day.date);
+                    if (d < weekAgo) continue;
+                    for (const e of (day.entries || [])) {
+                      if (e.severity > 0 && e.symptomId) {
+                        const code = symMap[e.symptomId] || symMap[e.symptomId.toLowerCase()] || e.symptomId;
+                        active.add(code);
+                      }
+                    }
+                  }
+                }
+              } catch {}
+              setSymptoms(Array.from(active));
+            } catch {} }} style={{ fontSize:7, fontWeight:700, cursor:'pointer', padding:'2px 6px', borderRadius:4, background:'rgba(99,102,241,0.1)', border:'1px solid rgba(99,102,241,0.2)', color:'#a5b4fc' }}>📋 Из профиля</button>
             <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showSymptoms ? '▲ скрыть' : '▼ показать'}</span>
           </div>
         </div>
@@ -1949,6 +2062,30 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {rec && (
         <div style={{ fontSize:8, fontWeight:500, color:'rgba(255,255,255,0.55)', marginBottom:6, lineHeight:1.4 }}>
           {rec.summary}
+        </div>
+      )}
+
+      {/* PED-risk детали (если есть) */}
+      {rec?.pedRisk && (rec.pedRisk.neuroBoosterTier > 0 || rec.pedRisk.jointsBoosterTier > 0) && (
+        <div style={{ marginBottom:6, padding:'6px 8px', borderRadius:8, background:'rgba(99,102,241,0.04)', border:'1px solid rgba(99,102,241,0.1)' }}>
+          <div style={{ fontSize:8, fontWeight:700, color:'#a5b4fc', marginBottom:3 }}>⚡ О подборе (PED-risk)</div>
+          {rec.pedRisk.neuroBoosterTier > 0 && (
+            <div style={{ fontSize:7, color:'#818cf8', lineHeight:1.4, marginBottom:2 }}>
+              🧠 <b>Нейрозащита LV{rec.pedRisk.neuroBoosterTier}</b> — {rec.pedRisk.neuroRisk} риск
+              {rec.pedRisk.perSubstance.filter(ps => ps.neuro === 'high' || ps.neuro === 'moderate').slice(0,3).map(ps => ` · ${ps.substanceId}`).join('')}
+            </div>
+          )}
+          {rec.pedRisk.jointsBoosterTier > 0 && (
+            <div style={{ fontSize:7, color:'#4ade80', lineHeight:1.4, marginBottom:2 }}>
+              🦴 <b>Суставы LV{rec.pedRisk.jointsBoosterTier}</b> — {rec.pedRisk.jointsRisk} риск
+              {rec.pedRisk.perSubstance.filter(ps => ps.joints === 'high' || ps.joints === 'moderate').slice(0,3).map(ps => ` · ${ps.substanceId}`).join('')}
+            </div>
+          )}
+          {rec.pedRisk.triggeredBy.length > 0 && (
+            <div style={{ fontSize:6, color:'rgba(255,255,255,0.35)', lineHeight:1.3, marginTop:2 }}>
+              {rec.pedRisk.triggeredBy.slice(0,3).map((r,i) => <div key={i}>• {r}</div>)}
+            </div>
+          )}
         </div>
       )}
 
@@ -2775,6 +2912,52 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
                 {/* ===== ДИНАМИЧЕСКИЙ СЛОЙ БЕЗОПАСНОСТИ (з движка) ===== */}
                 <CalcSafetyLayer rec={finalRec} planResult={planResult} />
+
+                {/* ===== ОСОБЫЕ УКАЗАНИЯ БУСТЕРОВ (PED-risk + LV3) ===== */}
+                {finalRec.boosters && finalRec.boosters.length > 0 && (() => {
+                  const boosterInstructions: { booster: string; tier: number; instructions: string[] }[] = [];
+                  for (const b of finalRec.boosters) {
+                    if (b.key === 'neuro' && (b.tier ?? 0) >= 2) {
+                      const instr: string[] = [];
+                      if ((b.tier ?? 0) >= 3) {
+                        instr.push('⚡ LV3: селективные NMDA-антагонисты (memantine ИЛИ lamotrigine ИЛИ amantadine — не комбинировать)');
+                        instr.push('⚡ LV3: рецептурные препараты — только через врача (психиатр/невролог)');
+                        instr.push('⚡ LV3: титрация — мемантин 5 мг/нед → 20 мг, ламотриджин 25 мг → +25 мг каждые 2 нед');
+                      }
+                      if ((b.tier ?? 0) >= 2) {
+                        instr.push('LV2: прегненолон 10-30 мг — осторожно с прогестогенными ААС (нандролон)');
+                      }
+                      if (instr.length > 0) boosterInstructions.push({ booster: '🧠 Нейропротекция', tier: b.tier ?? 0, instructions: instr });
+                    }
+                    if (b.key === 'joints' && (b.tier ?? 0) >= 2) {
+                      const instr: string[] = [];
+                      if ((b.tier ?? 0) >= 3) {
+                        instr.push('⚡ LV3: BPC-157+TB-500+GHK-Cu — 6-недельный протокол (Суставы.txt)');
+                        instr.push('⚡ LV3: пептиды — исследовательские, только под ортопедом');
+                        instr.push('⚡ LV3: стерильные шприцы/инсулинки, бактериостатическая вода');
+                        instr.push('⚡ LV3: контроль УЗИ на 14-й и 28-й день');
+                      }
+                      if ((b.tier ?? 0) >= 2) {
+                        instr.push('LV2: voltaren_gel — только местно, 2-3р/день, не на открытые раны');
+                      }
+                      if (instr.length > 0) boosterInstructions.push({ booster: '🦴 Суставы', tier: b.tier ?? 0, instructions: instr });
+                    }
+                  }
+                  if (boosterInstructions.length === 0) return null;
+                  return (
+                    <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
+                      <div style={{ fontSize:8, fontWeight:700, color:'#c084fc', marginBottom:4 }}>📋 Особые указания бустеров</div>
+                      {boosterInstructions.map((bi, i) => (
+                        <div key={i} style={{ marginBottom:4 }}>
+                          <div style={{ fontSize:7, fontWeight:700, color:'#a5b4fc' }}>{bi.booster} (LV{bi.tier})</div>
+                          {bi.instructions.map((inst, j) => (
+                            <div key={j} style={{ fontSize:6, color:'rgba(255,255,255,0.55)', lineHeight:1.4, marginLeft:8, marginBottom:1 }}>• {inst}</div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
 
               </div>
             )}
