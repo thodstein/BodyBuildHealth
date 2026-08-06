@@ -50,6 +50,22 @@ import { recommendStacksLight } from './stacks';
  *  2. Display-данные генерируются здесь из каталога + ALL_INTERACTIONS + evaluateRecommendations.
  */
 export function runSupportUnified(state: CalculatorState): PlanResult {
+  try {
+    return runSupportUnifiedInner(state);
+  } catch (err: any) {
+    console.error('runSupportUnified error:', err);
+    return {
+      substances: [], dosages: {}, schedule: [], systems: {}, mechanisms: [],
+      coveragePercent: 0, synergyComment: '', monitoring: [], specialInstructions: [],
+      riskDynamics: [], overallRiskBefore: 50, overallRiskAfter: 50,
+      labFindings: [], uncoveredMechanisms: [], coverageGaps: [], weekScale: 1,
+      stackRecommendations: [], conflicts: [], riskBreakdown: {},
+      pillBurden: { totalSubstances: 0, estimatedPillsPerDay: 0, morningPills: 0, afternoonPills: 0, eveningPills: 0, feasibility: 'unknown', message: 'Ошибка расчёта' },
+    };
+  }
+}
+
+function runSupportUnifiedInner(state: CalculatorState): PlanResult {
   // ── ОДИН вызов движка ──
   const tzRes = calculateSupportTZ(state);
 

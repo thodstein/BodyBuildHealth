@@ -516,7 +516,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
       neuroMode: neuroMode,
     };
     // ── ОДИН ВЫЗОВ (чистый расчёт, без побочных эффектов) ──
-    const planRes = runSupportUnified(normalizeCalculatorState(state));
+    let planRes: PlanResult;
+    try {
+      planRes = runSupportUnified(normalizeCalculatorState(state));
+    } catch (e) {
+      console.error('runSupportUnified in useMemo threw:', e);
+      planRes = { substances: [], dosages: {}, schedule: [], systems: {}, mechanisms: [], coveragePercent: 0, synergyComment: '', monitoring: [], specialInstructions: [], riskDynamics: [], overallRiskBefore: 50, overallRiskAfter: 50, labFindings: [], uncoveredMechanisms: [], coverageGaps: [], weekScale: 1, stackRecommendations: [], conflicts: [], riskBreakdown: {}, pillBurden: { totalSubstances: 0, estimatedPillsPerDay: 0, morningPills: 0, afternoonPills: 0, eveningPills: 0, feasibility: 'unknown', message: 'Ошибка расчёта' } } as PlanResult;
+    }
     // subs + dosages из единого результата (с dedup)
     const subs: string[] = [...new Set(planRes.substances.map(p => p.id))];
     const dosages: Record<string, { mg: number; timing: string }> = {};
@@ -616,8 +622,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
 
     // ── Всегда вызываем calculateSupportTZ для полного CalculatorResult ──
     // (раньше здесь была lossy-реконструкция из planResult, которая теряла8+ полей)
-    let tzResult: CalculatorResult;
-     tzResult = calculateSupportTZ(normalizeCalculatorState(state));
+     let tzResult: CalculatorResult;
+     try {
+       tzResult = calculateSupportTZ(normalizeCalculatorState(state));
+     } catch (e) {
+       console.error('calculateSupportTZ in calcSupport threw:', e);
+       tzResult = { risk: { systems: [], overallRaw: 50, overallAfterSupport: 50, timestamp: new Date().toISOString() }, schedule: [], selectedSubstances: [], synergyIdsUsed: [], titrationApplied: {}, labDeltas: [], overallRiskBefore: 50, overallRiskAfter: 50, contraindicationAlerts: [], negativeBlocks: [], comparisonBeforeAfter: [], timestamp: new Date().toISOString() } as CalculatorResult;
+     }
     // ── ЕДИНЫЙ ДВИЖОК РИСКА: calculateTzSpecRisk (механизм-ориентированная модель) ──
     const systemBreakdown: Record<string, { raw: number; net: number }> = {};
     for (const cmp of (tzResult.comparisonBeforeAfter || [])) {
