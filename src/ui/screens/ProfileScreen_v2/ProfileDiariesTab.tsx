@@ -19,8 +19,16 @@ const BP_DIARY_KEY = 'he_bp_diary';
 interface BPEntry { date: string; systolic: number; diastolic: number; pulse: number; notes?: string; }
 const INJECTION_DIARY_KEY = 'he_injection_diary';
 interface InjectionEntry { date: string; substance: string; dose: string; site: string; notes?: string; }
+const SYMPTOMS_DIARY_KEY = 'he_symptoms_diary';
+export interface SymptomEntry {
+  date: string;
+  name: string;
+  severity: 1 | 2 | 3 | 4 | 5;
+  duration?: string;
+  notes?: string;
+}
 
-type DiaryKey = 'sleep' | 'bp' | 'weight' | 'measurements' | 'injection';
+type DiaryKey = 'sleep' | 'bp' | 'weight' | 'measurements' | 'injection' | 'symptoms';
 
 interface BuiltInDiaryRow { key: DiaryKey; count: number; last: string; }
 
@@ -300,6 +308,55 @@ const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
   );
 };
 
+const SYMPTOM_PRESETS = [
+  'Головная боль', 'Тошнота', 'Бессонница', 'Боль в суставах', 'Отёки',
+  'Сыпь', 'Акне', 'Потливость', 'Раздражительность', 'Снижение либидо',
+  'Сердцебиение', 'Головокружение', 'Слабость', 'Боль в пояснице', 'Судороги',
+];
+
+const AddSymptomModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: SymptomEntry) => void }> = ({ open, onClose, onSave }) => {
+  const [date, setDate] = useState(todayIso());
+  const [name, setName] = useState('');
+  const [severity, setSeverity] = useState<1 | 2 | 3 | 4 | 5>(2);
+  const [duration, setDuration] = useState('');
+  const [notes, setNotes] = useState('');
+  const submit = () => {
+    if (!date || !name.trim()) return;
+    onSave({ date, name: name.trim(), severity, duration: duration.trim() || undefined, notes: notes.trim() || undefined });
+    setName(''); setSeverity(2); setDuration(''); setNotes('');
+    onClose();
+  };
+  return (
+    <Modal open={open} onClose={onClose} title="🩺 Добавить симптом">
+      <label style={fieldLabel}>Дата</label>
+      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+      <label style={{ ...fieldLabel, marginTop: 10 }}>Симптом</label>
+      <input type="text" value={name} onChange={e => setName(e.target.value)} style={fieldInput} placeholder="Например: головная боль" list="he-symptom-presets" />
+      <datalist id="he-symptom-presets">{SYMPTOM_PRESETS.map(s => <option key={s} value={s} />)}</datalist>
+      <label style={{ ...fieldLabel, marginTop: 10 }}>Сила (1-5)</label>
+      <div style={{ display: 'flex', gap: 4 }}>
+        {[1, 2, 3, 4, 5].map(n => (
+          <button key={n} type="button" onClick={() => setSeverity(n as 1 | 2 | 3 | 4 | 5)} style={{
+            flex: 1, minHeight: 36, borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+            border: `1px solid ${severity === n ? colors.danger : colors.border}`,
+            background: severity === n ? `${colors.danger}26` : 'rgba(255,255,255,0.03)',
+            color: severity === n ? colors.danger : colors.text,
+          }}>{n}</button>
+        ))}
+      </div>
+      <label style={{ ...fieldLabel, marginTop: 10 }}>Длительность (необязательно)</label>
+      <input type="text" value={duration} onChange={e => setDuration(e.target.value)} style={fieldInput} placeholder="Например: 2 часа, всю ночь" />
+      <label style={{ ...fieldLabel, marginTop: 10 }}>Заметка (необязательно)</label>
+      <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} maxLength={200}
+        style={{ ...fieldInput, resize: 'vertical' }} placeholder="Сопутствующие факторы, триггеры..." />
+      <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+        <button onClick={onClose} style={btnGhost}>Отмена</button>
+        <button onClick={submit} style={btnPrimary(colors.danger)}>Сохранить</button>
+      </div>
+    </Modal>
+  );
+};
+
 /* ── Карточка дневника ── */
 
 const DIARY_META: Record<DiaryKey, { title: string; unit: string; icon: string; color: string; storageKey?: string }> = {
@@ -308,6 +365,7 @@ const DIARY_META: Record<DiaryKey, { title: string; unit: string; icon: string; 
   weight: { title: 'Вес', unit: 'кг', icon: '⚖️', color: '#22c55e' },
   measurements: { title: 'Замеры тела', unit: 'см', icon: '📏', color: '#3b82f6' },
   injection: { title: 'Инъекции', unit: '', icon: '💉', color: '#f59e0b', storageKey: INJECTION_DIARY_KEY },
+  symptoms: { title: 'Симптомы', unit: '', icon: '🩺', color: '#ec4899', storageKey: SYMPTOMS_DIARY_KEY },
 };
 
 const DIARY_FIELDS: Record<DiaryKey, { label: string; unit: string }[]> = {
@@ -341,6 +399,11 @@ const DIARY_FIELDS: Record<DiaryKey, { label: string; unit: string }[]> = {
     { label: 'Препарат', unit: '' },
     { label: 'Доза', unit: '' },
     { label: 'Место', unit: '' },
+  ],
+  symptoms: [
+    { label: 'Симптом', unit: '' },
+    { label: 'Сила', unit: '1–5' },
+    { label: 'Длительность', unit: '' },
   ],
 };
 
@@ -405,7 +468,6 @@ const QUICK_DIARY_LINKS: QuickLink[] = [
   { icon: '🏋️', label: 'Журнал тренировок', target: 'workout-log', color: colors.blue },
   { icon: '💊', label: 'Мой курс', target: 'pharma-course', color: colors.warning },
   { icon: '🛡', label: 'Дневник поддержки', target: 'support-diary', color: colors.purple },
-  { icon: '🩺', label: 'Симптомы', target: 'symptoms', color: colors.pink },
   { icon: '🧪', label: 'Анализы', target: 'labs-diary', color: colors.teal },
 ];
 
@@ -429,6 +491,7 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
   const [sleepEntries, setSleepEntries] = useState<SleepEntry[]>([]);
   const [bpEntries, setBpEntries] = useState<BPEntry[]>([]);
   const [injectionEntries, setInjectionEntries] = useState<InjectionEntry[]>([]);
+  const [symptomEntries, setSymptomEntries] = useState<SymptomEntry[]>([]);
   const [measurements, setMeasurements] = useState<ReturnType<typeof getMeasurementsLog>>([]);
   const [weights, setWeights] = useState<ReturnType<typeof getWeightLog>>([]);
 
@@ -437,11 +500,13 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
   const [addWeightOpen, setAddWeightOpen] = useState(false);
   const [addMeasurementsOpen, setAddMeasurementsOpen] = useState(false);
   const [addInjectionOpen, setAddInjectionOpen] = useState(false);
+  const [addSymptomOpen, setAddSymptomOpen] = useState(false);
 
   const refresh = () => {
     try { setSleepEntries(loadDiary<SleepEntry>(SLEEP_DIARY_KEY)); } catch {}
     try { setBpEntries(loadDiary<BPEntry>(BP_DIARY_KEY)); } catch {}
     try { setInjectionEntries(loadDiary<InjectionEntry>(INJECTION_DIARY_KEY)); } catch {}
+    try { setSymptomEntries(loadDiary<SymptomEntry>(SYMPTOMS_DIARY_KEY)); } catch {}
     try { setMeasurements(getMeasurementsLog()); } catch {}
     try { setWeights(getWeightLog()); } catch {}
   };
@@ -459,6 +524,7 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
     { key: 'weight', count: weights.length, last: lastDate(weights) },
     { key: 'measurements', count: measurements.length, last: lastDate(measurements) },
     { key: 'injection', count: injectionEntries.length, last: lastDate(injectionEntries) },
+    { key: 'symptoms', count: symptomEntries.length, last: symptomEntries.length ? symptomEntries[symptomEntries.length - 1].name : '' },
   ];
 
   const getEntries = (key: DiaryKey): { date: string; fields: { label: string; value: string; unit: string }[] }[] => {
@@ -516,6 +582,14 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
         { label: 'Препарат', value: e.substance || '—', unit: '' },
         { label: 'Доза', value: e.dose || '—', unit: '' },
         { label: 'Место', value: e.site || '—', unit: '' },
+        ...(e.notes ? [{ label: 'Заметка', value: e.notes, unit: '' }] : []),
+      ],
+    }));
+    if (key === 'symptoms') return [...symptomEntries].reverse().map(e => ({
+      date: e.date, fields: [
+        { label: 'Симптом', value: e.name, unit: '' },
+        { label: 'Сила', value: '★'.repeat(e.severity) + '☆'.repeat(5 - e.severity), unit: `${e.severity}/5` },
+        ...(e.duration ? [{ label: 'Длительность', value: e.duration, unit: '' }] : []),
         ...(e.notes ? [{ label: 'Заметка', value: e.notes, unit: '' }] : []),
       ],
     }));
@@ -670,6 +744,7 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
                 else if (d.key === 'weight') setAddWeightOpen(true);
                 else if (d.key === 'measurements') setAddMeasurementsOpen(true);
                 else if (d.key === 'injection') setAddInjectionOpen(true);
+                else if (d.key === 'symptoms') setAddSymptomOpen(true);
               }}
               onOpen={() => setActiveDiary(d.key)}
             />
@@ -698,6 +773,7 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
                 else if (activeDiary === 'weight') setAddWeightOpen(true);
                 else if (activeDiary === 'measurements') setAddMeasurementsOpen(true);
                 else if (activeDiary === 'injection') setAddInjectionOpen(true);
+                else if (activeDiary === 'symptoms') setAddSymptomOpen(true);
               }}
               style={{ padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: DIARY_META[activeDiary].color, color: '#0a0a0a', border: 'none' }}
             >+ Добавить запись</button>
@@ -790,6 +866,15 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
           const updated = [...injectionEntries.filter(x => !(x.date === e.date && x.substance === e.substance)), e].sort((a, b) => a.date.localeCompare(b.date));
           saveDiary(INJECTION_DIARY_KEY, updated);
           setInjectionEntries(updated);
+        }}
+      />
+      <AddSymptomModal
+        open={addSymptomOpen}
+        onClose={() => setAddSymptomOpen(false)}
+        onSave={(e) => {
+          const updated = [...symptomEntries.filter(x => !(x.date === e.date && x.name === e.name)), e].sort((a, b) => a.date.localeCompare(b.date));
+          saveDiary(SYMPTOMS_DIARY_KEY, updated);
+          setSymptomEntries(updated);
         }}
       />
       </>}

@@ -109,7 +109,8 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
           initialActiveDiary={
             initialSubTab === 'sleep' || initialSubTab === 'bp' || initialSubTab === 'weight'
             || initialSubTab === 'measurements' || initialSubTab === 'injection'
-              ? initialSubTab as 'sleep' | 'bp' | 'weight' | 'measurements' | 'injection'
+            || initialSubTab === 'symptoms'
+              ? initialSubTab as 'sleep' | 'bp' | 'weight' | 'measurements' | 'injection' | 'symptoms'
               : undefined
           }
         />}
