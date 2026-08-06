@@ -10,7 +10,6 @@ import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { computePlanQualityFor } from '../../../engines/manual-constructor';
 import { userWeekToBBPlan } from '../../../engines/user-program/program-store';
 import { getAllPrograms } from '../../../engines/complete-program-library.engine';
-import { expandProgramWeeks } from '../../../engines/program-progression.engine';
 import { cloneFromLibrary } from '../../../engines/user-program/program-store';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { cloneFromCycle } from '../../../engines/user-program/program-store';

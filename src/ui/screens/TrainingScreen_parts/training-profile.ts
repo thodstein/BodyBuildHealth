@@ -83,10 +83,7 @@ export function loadTrainingProfile(): TrainingProfile {
       return {
         ...DEFAULT_PROFILE,
         bodyWeight: s.personal?.weight ?? DEFAULT_PROFILE.bodyWeight,
-         goal: s.training?.primaryGoal ?? DEFAULT_PROFILE.goal,
-         trainingFocus: ['strength', 'hypertrophy', 'endurance'].includes(s.training?.trainingFocus)
-           ? s.training.trainingFocus
-           : undefined,
+        goal: s.training?.primaryGoal ?? DEFAULT_PROFILE.goal,
         level: s.training?.level ?? DEFAULT_PROFILE.level,
         trainingYears: s.training?.experience ?? DEFAULT_PROFILE.trainingYears,
         daysPerWeek: s.training?.daysPerWeek ?? DEFAULT_PROFILE.daysPerWeek,

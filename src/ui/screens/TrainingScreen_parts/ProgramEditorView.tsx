@@ -158,6 +158,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   };
   const [showMore, setShowMore] = useState(false);
   const [showTableView, setShowTableView] = useState(false);
+  const [showProTools, setShowProTools] = useState(false);
   const originalPrograms = useOriginalPrograms();
   const libraryPrograms = useMemo(() => [...getAllPrograms(), ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS, ...originalPrograms], [originalPrograms]);
   const plCycleList = useMemo(() => LMS_CYCLES, []);
@@ -636,6 +637,13 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
       {/* ═════════ ПРОФЕССИОНАЛЬНЫЙ РЕЖИМ: контекстные панели, профиль, лаб-коррекция, диагностика, объём, периодизация, рекомендации, тренер ═════════ */}
       {isPro && (
       <>
+      <div className="manual-constructor__pro-tools-toggle">
+        <button type="button" onClick={() => setShowProTools(value => !value)} aria-expanded={showProTools}>
+          {showProTools ? '▲ Скрыть PRO-анализ' : '▼ Открыть PRO-анализ и инструменты'}
+        </button>
+        <span>Основной редактор программы находится ниже</span>
+      </div>
+      {showProTools && <>
       {/* P4 — контекстная панель ББ (ПЛ дубль PLEditor удалён — F4.5) */}
       {dir === 'bb' && program.bb && <BbContextPanel program={program} level={program.meta.level} />}
       {dir === 'bb' && program.bb && <MesoHeatmap program={program} dir={dir} onToast={showToast} />}
@@ -734,6 +742,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
           </>,
         },
       ]} />
+      </>}
       </>
       )}
 
