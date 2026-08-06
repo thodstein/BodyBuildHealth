@@ -762,6 +762,154 @@ const DiaryCard: React.FC<{
 
 interface QuickLink { icon: string; label: string; target: string; color: string; }
 
+const Sparkline: React.FC<{ points: { date: string; value: number }[]; color: string; width?: number; height?: number }> = ({ points, color, width = 320, height = 48 }) => {
+  if (points.length < 2) return null;
+  const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
+  const values = sorted.map(p => p.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const stepX = (width - 4) / (sorted.length - 1);
+  const pathD = sorted.map((p, i) => {
+    const x = 2 + i * stepX;
+    const y = height - 2 - ((p.value - min) / range) * (height - 4);
+    return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+  }).join(' ');
+  const last = sorted[sorted.length - 1];
+  return (
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ display: 'block' }} aria-label="График тренда">
+      <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={2 + (sorted.length - 1) * stepX} cy={height - 2 - ((last.value - min) / range) * (height - 4)} r="3" fill={color} />
+      <text x={width - 4} y={12} fontSize="10" fill={color} textAnchor="end" fontWeight="700">{last.value.toFixed(1)}</text>
+    </svg>
+  );
+};
+
+const buildSparkline = (
+  key: DiaryKey,
+  entries: { date: string; fields: { label: string; value: string; unit: string }[] }[]
+): { date: string; value: number }[] => {
+  const out: { date: string; value: number }[] = [];
+  for (const e of entries) {
+    let v: number | null = null;
+    if (key === 'sleep') {
+      const f = e.fields.find(x => x.label === 'Часы');
+      if (f) v = parseFloat(f.value);
+    } else if (key === 'bp') {
+      const sys = e.fields.find(x => x.label === 'Систола');
+      const dia = e.fields.find(x => x.label === 'Диастола');
+      if (sys && dia) v = (parseFloat(sys.value) + parseFloat(dia.value)) / 2;
+    } else if (key === 'weight') {
+      const f = e.fields.find(x => x.label === 'Вес');
+      if (f) v = parseFloat(f.value);
+    } else if (key === 'measurements') {
+      const f = e.fields.find(x => x.label === 'Талия');
+      if (f) v = parseFloat(f.value);
+    } else if (key === 'pain') {
+      const f = e.fields.find(x => x.label === 'Суммарно');
+      if (f) v = parseFloat(f.value);
+    } else if (key === 'neuro') {
+      const f = e.fields.find(x => x.label === 'Симптомов');
+      if (f) v = parseFloat(f.value);
+    } else if (key === 'acne') {
+      const f = e.fields.find(x => x.label === 'Суммарно');
+      if (f) v = parseFloat(f.value);
+    } else if (key === 'hemato') {
+      const f = e.fields.find(x => x.label === 'Симптомов');
+      if (f) v = parseFloat(f.value);
+    } else if (key === 'injection' || key === 'symptoms') {
+      continue;
+    }
+    if (v !== null && Number.isFinite(v)) out.push({ date: e.date, value: v });
+  }
+  return out;
+};
+
+const computeSummary = (
+  key: DiaryKey,
+  entries: { date: string; fields: { label: string; value: string; unit: string }[] }[]
+): { label: string; value: string; color: string }[] | null => {
+  if (entries.length === 0) return null;
+  const color = DIARY_META[key].color;
+  const out: { label: string; value: string; color: string }[] = [];
+  if (key === 'sleep') {
+    const hours = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Часы')?.value || 'NaN')).filter(Number.isFinite);
+    if (hours.length) {
+      const avg = hours.reduce((s, v) => s + v, 0) / hours.length;
+      out.push({ label: 'Записей', value: String(hours.length), color });
+      out.push({ label: 'Среднее', value: `${avg.toFixed(1)} ч`, color });
+      out.push({ label: 'Мин/Макс', value: `${Math.min(...hours).toFixed(1)} / ${Math.max(...hours).toFixed(1)}`, color: color });
+    }
+  } else if (key === 'bp') {
+    const sys = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Систола')?.value || 'NaN')).filter(Number.isFinite);
+    const dia = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Диастола')?.value || 'NaN')).filter(Number.isFinite);
+    if (sys.length) {
+      out.push({ label: 'Записей', value: String(sys.length), color });
+      out.push({ label: 'Ср. сист.', value: `${(sys.reduce((s, v) => s + v, 0) / sys.length).toFixed(0)}`, color });
+    }
+    if (dia.length) {
+      out.push({ label: 'Ср. диаст.', value: `${(dia.reduce((s, v) => s + v, 0) / dia.length).toFixed(0)}`, color });
+    }
+  } else if (key === 'weight') {
+    const w = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Вес')?.value || 'NaN')).filter(Number.isFinite);
+    if (w.length) {
+      const first = w[w.length - 1];
+      const last = w[0];
+      const delta = last - first;
+      out.push({ label: 'Записей', value: String(w.length), color });
+      out.push({ label: 'Текущий', value: `${last.toFixed(1)} кг`, color });
+      out.push({ label: 'Δ за период', value: `${delta > 0 ? '+' : ''}${delta.toFixed(1)} кг`, color: delta > 0 ? '#22c55e' : delta < 0 ? colors.danger : color });
+    }
+  } else if (key === 'measurements') {
+    out.push({ label: 'Записей', value: String(entries.length), color });
+    const last = entries[0];
+    const waist = last.fields.find(x => x.label === 'Талия')?.value;
+    const bf = last.fields.find(x => x.label === '% жира')?.value;
+    if (waist) out.push({ label: 'Талия', value: `${waist} см`, color });
+    if (bf && Number(bf) > 0) out.push({ label: '% жира', value: `${bf}%`, color });
+  } else if (key === 'injection' || key === 'symptoms') {
+    out.push({ label: 'Записей', value: String(entries.length), color });
+    if (entries[0]) out.push({ label: 'Последняя', value: new Date(entries[0].date).toLocaleDateString('ru-RU'), color });
+  } else if (key === 'pain') {
+    const totals = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Суммарно')?.value || 'NaN')).filter(Number.isFinite);
+    if (totals.length) {
+      const avg = totals.reduce((s, v) => s + v, 0) / totals.length;
+      const colorByLevel = avg < 20 ? '#22c55e' : avg < 40 ? '#f59e0b' : avg < 60 ? '#f97316' : '#ef4444';
+      out.push({ label: 'Записей', value: String(totals.length), color });
+      out.push({ label: 'Ср. Σ', value: `${avg.toFixed(1)}/70`, color: colorByLevel });
+      out.push({ label: 'Макс Σ', value: `${Math.max(...totals).toFixed(0)}/70`, color: colorByLevel });
+    }
+  } else if (key === 'neuro') {
+    const scores = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Симптомов')?.value || 'NaN')).filter(Number.isFinite);
+    if (scores.length) {
+      const avg = scores.reduce((s, v) => s + v, 0) / scores.length;
+      const colorByLevel = avg >= 4 ? '#ef4444' : avg >= 2 ? '#f59e0b' : '#22c55e';
+      out.push({ label: 'Записей', value: String(scores.length), color });
+      out.push({ label: 'Ср. симптомов', value: `${avg.toFixed(1)}/10`, color: colorByLevel });
+      out.push({ label: 'Макс', value: `${Math.max(...scores)}/10`, color: colorByLevel });
+    }
+  } else if (key === 'acne') {
+    const totals = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Суммарно')?.value || 'NaN')).filter(Number.isFinite);
+    if (totals.length) {
+      const avg = totals.reduce((s, v) => s + v, 0) / totals.length;
+      const colorByLevel = avg >= 7 ? '#ef4444' : avg >= 4 ? '#f59e0b' : '#22c55e';
+      out.push({ label: 'Записей', value: String(totals.length), color });
+      out.push({ label: 'Ср. Σ', value: `${avg.toFixed(1)}/12`, color: colorByLevel });
+      out.push({ label: 'Макс Σ', value: `${Math.max(...totals).toFixed(0)}/12`, color: colorByLevel });
+    }
+  } else if (key === 'hemato') {
+    const scores = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Симптомов')?.value || 'NaN')).filter(Number.isFinite);
+    if (scores.length) {
+      const avg = scores.reduce((s, v) => s + v, 0) / scores.length;
+      const colorByLevel = avg >= 2 ? '#ef4444' : '#22c55e';
+      out.push({ label: 'Записей', value: String(scores.length), color });
+      out.push({ label: 'Ср. симптомов', value: `${avg.toFixed(1)}/8`, color: colorByLevel });
+      out.push({ label: 'Макс', value: `${Math.max(...scores)}/8`, color: colorByLevel });
+    }
+  }
+  return out;
+};
+
 const QUICK_DIARY_LINKS: QuickLink[] = [
   { icon: '🍽', label: 'Дневник питания', target: 'nutrition-diary', color: colors.green },
   { icon: '🏋️', label: 'Журнал тренировок', target: 'workout-log', color: colors.blue },
@@ -808,6 +956,7 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
   const [addNeuroOpen, setAddNeuroOpen] = useState(false);
   const [addAcneOpen, setAddAcneOpen] = useState(false);
   const [addHematoOpen, setAddHematoOpen] = useState(false);
+  const [diaryRange, setDiaryRange] = useState<'all' | '7' | '30' | '90'>('all');
 
   const refresh = () => {
     try { setSleepEntries(loadDiary<SleepEntry>(SLEEP_DIARY_KEY)); } catch {}
@@ -951,14 +1100,70 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
     return [];
   };
 
-  const activeEntries = activeDiary ? getEntries(activeDiary) : [];
+  const activeEntriesRaw = activeDiary ? getEntries(activeDiary) : [];
+  const activeEntries = diaryRange === 'all' ? activeEntriesRaw : activeEntriesRaw.filter(e => {
+    const d = Date.parse(e.date);
+    if (Number.isNaN(d)) return true;
+    return d >= Date.now() - Number(diaryRange) * 86400000;
+  });
+
+  const deleteDiaryEntry = (key: DiaryKey, date: string) => {
+    if (!confirm(`Удалить запись от ${new Date(date).toLocaleDateString('ru-RU')}?`)) return;
+    const handler = (arr: any[], list: any[], setter: (v: any[]) => void, save: (v: any[]) => void) => {
+      const updated = list.filter(x => x.date !== date);
+      setter(updated);
+      save(updated);
+    };
+    if (key === 'sleep') handler([], sleepEntries, setSleepEntries, v => saveDiary(SLEEP_DIARY_KEY, v));
+    else if (key === 'bp') handler([], bpEntries, setBpEntries, v => saveDiary(BP_DIARY_KEY, v));
+    else if (key === 'injection') handler([], injectionEntries, setInjectionEntries, v => saveDiary(INJECTION_DIARY_KEY, v));
+    else if (key === 'symptoms') handler([], symptomEntries, setSymptomEntries, v => saveDiary(SYMPTOMS_DIARY_KEY, v));
+    else if (key === 'pain') handler([], painEntries, setPainEntries, v => saveDiary(PAIN_DIARY_KEY, v));
+    else if (key === 'neuro') handler([], neuroEntries, setNeuroEntries, v => saveDiary(NEURO_DIARY_KEY, v));
+    else if (key === 'acne') handler([], acneEntries, setAcneEntries, v => saveDiary(ACNE_DIARY_KEY, v));
+    else if (key === 'hemato') handler([], hematoEntries, setHematoEntries, v => saveDiary(HEMATO_DIARY_KEY, v));
+  };
+
+  const exportDiaryCSV = (key: DiaryKey, entries: typeof activeEntries) => {
+    if (entries.length === 0) return;
+    const meta = DIARY_META[key];
+    const rows: string[] = [];
+    const allLabels = new Set<string>();
+    entries.forEach(e => e.fields.forEach(f => allLabels.add(f.label)));
+    const labels = Array.from(allLabels);
+    rows.push(['Дата', ...labels].join(','));
+    entries.forEach(e => {
+      const cells: string[] = [e.date];
+      labels.forEach(l => {
+        const f = e.fields.find(x => x.label === l);
+        const v = f ? `${f.value}${f.unit ? ' ' + f.unit : ''}`.replace(/"/g, '""') : '';
+        cells.push(`"${v}"`);
+      });
+      rows.push(cells.join(','));
+    });
+    const csv = '\uFEFF' + rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${key}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+    if (typeof window !== 'undefined' && (window as any).showToast) {
+      (window as any).showToast(`📤 Экспортировано ${entries.length} записей: ${meta.title}`);
+    }
+  };
 
   const reportSources = [
-    { current: 'he_training_report_current', label: '🏋️ Тренер-отчёт', target: 'training-analytics', archiveKeys: ['he_training_reports'], color: colors.blue },
-    { current: 'he_nutrition_report_current', label: '🍽 Отчёт по питанию', target: 'nutrition-reports', archiveKeys: ['he_nutrition_report_archive'], color: colors.green },
-    { current: 'he_labs_report_current', label: '🩺 Врач-отчёт', target: 'labs-reports', archiveKeys: ['he_lab_reports'], color: colors.danger },
-    { current: 'he_support_reports', label: '🛡 Отчёт поддержки', target: 'support-reports', archiveKeys: ['he_support_reports_archive', 'he_support_reports'], color: colors.purple },
-    { current: 'he_profile_reports', label: '📊 Кастомный отчёт', target: 'custom-report', archiveKeys: ['he_profile_reports'], color: colors.orange },
+    { current: 'he_training_report_current', label: '🏋️ Тренер-отчёт', target: 'training-analytics', archiveKeys: ['he_training_reports'], color: colors.blue, desc: 'Анализ силы, прогрессии, объёма, восстановления' },
+    { current: 'he_nutrition_report_current', label: '🍽 Отчёт по питанию', target: 'nutrition-reports', archiveKeys: ['he_nutrition_report_archive'], color: colors.green, desc: 'КБЖУ за день/неделю/месяц, микронутриенты' },
+    { current: 'he_labs_report_current', label: '🩺 Врач-отчёт', target: 'labs-reports', archiveKeys: ['he_lab_reports'], color: colors.danger, desc: 'Анализы: отклонения, динамика по фазам' },
+    { current: 'he_support_reports', label: '🛡 Отчёт поддержки', target: 'support-reports', archiveKeys: ['he_support_reports_archive', 'he_support_reports'], color: colors.purple, desc: 'Стек, фазы, перекрёстные риски, совместимость' },
+    { current: 'he_pharma_report_current', label: '💊 Фарма-отчёт', target: 'pharma-reports', archiveKeys: ['he_pharma_reports'], color: colors.warning, desc: 'Оценка курса: баланс, безопасность, длительность' },
+    { current: 'he_risk_report_current', label: '⚠️ Отчёт по рискам', target: 'risk-reports', archiveKeys: ['he_risk_reports'], color: '#f97316', desc: 'Риск по системам органов, динамика' },
+    { current: 'he_profile_reports', label: '📊 Кастомный отчёт', target: 'custom-report', archiveKeys: ['he_profile_reports'], color: colors.orange, desc: 'Сводный отчёт по разделам профиля' },
   ];
   const readReportEntries = (src: typeof reportSources[number]) => {
     const list: any[] = [];
@@ -1036,17 +1241,33 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
                   aria-label={`Открыть ${src.label}`}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-                    borderRadius: 10, cursor: 'pointer', textAlign: 'left', minHeight: 56,
+                    borderRadius: 10, cursor: 'pointer', textAlign: 'left', minHeight: 60,
                     background: `${src.color}10`, border: `1px solid ${src.color}44`,
-                    color: colors.text,
+                    color: colors.text, transition: 'transform 0.15s, box-shadow 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
                   }}
                 >
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0, background: `${src.color}26`, fontSize: 20,
+                    }}
+                  >{src.label.split(' ')[0]}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: src.color }}>{src.label}</div>
-                    <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: src.color }}>{src.label.replace(/^[^\s]+\s/, '')}</div>
+                    <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{src.desc}</div>
+                    <div style={{ fontSize: 9, color: colors.textMuted, marginTop: 3, opacity: 0.8 }}>
                       {list.length === 0
                         ? 'Нет отчётов'
-                        : `${list.length} отчёт${list.length === 1 ? '' : 'ов'}${last?.date ? ` · последний ${new Date(last.date).toLocaleDateString('ru-RU')}` : ''}`}
+                        : `${list.length} ${list.length === 1 ? 'отчёт' : list.length < 5 ? 'отчёта' : 'отчётов'}${last?.date ? ` · последний ${new Date(last.date).toLocaleDateString('ru-RU')}` : ''}`}
                     </div>
                   </div>
                   <span style={{ color: src.color, fontSize: 18, opacity: 0.7 }}>→</span>
@@ -1119,28 +1340,81 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
           color={DIARY_META[activeDiary].color}
           defaultOpen
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6, flexWrap: 'wrap' }}>
             <button
               onClick={() => setActiveDiary(null)}
               aria-label="Закрыть дневник"
               style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${colors.border}`, color: colors.text }}
             >← Назад к дневникам</button>
-            <button
-              onClick={() => {
-                if (activeDiary === 'sleep') setAddSleepOpen(true);
-                else if (activeDiary === 'bp') setAddBPOpen(true);
-                else if (activeDiary === 'weight') setAddWeightOpen(true);
-                else if (activeDiary === 'measurements') setAddMeasurementsOpen(true);
-                else if (activeDiary === 'injection') setAddInjectionOpen(true);
-                else if (activeDiary === 'symptoms') setAddSymptomOpen(true);
-                else if (activeDiary === 'pain') setAddPainOpen(true);
-                else if (activeDiary === 'neuro') setAddNeuroOpen(true);
-                else if (activeDiary === 'acne') setAddAcneOpen(true);
-                else if (activeDiary === 'hemato') setAddHematoOpen(true);
-              }}
-              style={{ padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: DIARY_META[activeDiary].color, color: '#0a0a0a', border: 'none' }}
-            >+ Добавить запись</button>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              {activeEntries.length > 0 && (
+                <button
+                  onClick={() => exportDiaryCSV(activeDiary, activeEntries)}
+                  aria-label="Экспорт в CSV"
+                  style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }}
+                >📤 CSV</button>
+              )}
+              <button
+                onClick={() => {
+                  if (activeDiary === 'sleep') setAddSleepOpen(true);
+                  else if (activeDiary === 'bp') setAddBPOpen(true);
+                  else if (activeDiary === 'weight') setAddWeightOpen(true);
+                  else if (activeDiary === 'measurements') setAddMeasurementsOpen(true);
+                  else if (activeDiary === 'injection') setAddInjectionOpen(true);
+                  else if (activeDiary === 'symptoms') setAddSymptomOpen(true);
+                  else if (activeDiary === 'pain') setAddPainOpen(true);
+                  else if (activeDiary === 'neuro') setAddNeuroOpen(true);
+                  else if (activeDiary === 'acne') setAddAcneOpen(true);
+                  else if (activeDiary === 'hemato') setAddHematoOpen(true);
+                }}
+                style={{ padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: DIARY_META[activeDiary].color, color: '#0a0a0a', border: 'none' }}
+              >+ Добавить запись</button>
+            </div>
           </div>
+
+          {/* Фильтр по дате */}
+          {activeEntries.length > 1 && (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10, color: colors.textMuted, fontWeight: 600 }}>Период:</span>
+              {(['all', '7', '30', '90'] as const).map(r => (
+                <button key={r} onClick={() => setDiaryRange(r)} style={{
+                  padding: '4px 10px', borderRadius: 12, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                  border: `1px solid ${diaryRange === r ? DIARY_META[activeDiary].color : colors.border}`,
+                  background: diaryRange === r ? `${DIARY_META[activeDiary].color}26` : 'rgba(255,255,255,0.03)',
+                  color: diaryRange === r ? DIARY_META[activeDiary].color : colors.textMuted,
+                }}>{r === 'all' ? 'Всё время' : `${r} дней`}</button>
+              ))}
+            </div>
+          )}
+
+          {/* Summary */}
+          {(() => {
+            const summary = computeSummary(activeDiary, activeEntries);
+            if (!summary) return null;
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 6, marginBottom: 10 }}>
+                {summary.map((s, i) => (
+                  <div key={i} style={{ padding: 8, borderRadius: 8, background: `${s.color}1A`, border: `1px solid ${s.color}44` }}>
+                    <div style={{ fontSize: 9, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: s.color, marginTop: 2 }}>{s.value}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Sparkline */}
+          {activeEntries.length >= 2 && (() => {
+            const points = buildSparkline(activeDiary, activeEntries);
+            if (points.length < 2) return null;
+            return (
+              <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${DIARY_META[activeDiary].color}22`, marginBottom: 10 }}>
+                <div style={{ fontSize: 9, color: colors.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Тренд (по дате)</div>
+                <Sparkline points={points} color={DIARY_META[activeDiary].color} width={300} height={48} />
+              </div>
+            );
+          })()}
+
           {activeEntries.length === 0 ? (
             <div style={{ color: colors.textMuted, fontSize: 12, padding: 12, textAlign: 'center' }}>
               Записей пока нет. Нажмите «+ Добавить запись», чтобы внести первую.
@@ -1151,6 +1425,11 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
                 <div key={`${entry.date}-${i}`} style={{ padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${DIARY_META[activeDiary].color}22` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: DIARY_META[activeDiary].color }}>{new Date(entry.date).toLocaleDateString('ru-RU')}</span>
+                    <button
+                      onClick={() => deleteDiaryEntry(activeDiary, entry.date)}
+                      aria-label={`Удалить запись ${new Date(entry.date).toLocaleDateString('ru-RU')}`}
+                      style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}
+                    >🗑 Удалить</button>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 4 }}>
                     {entry.fields.map((f, fi) => (

@@ -140,6 +140,7 @@ export default function App() {
       // Отчёты
       'training-analytics': { tab: 'training', subTab: 'analytics' },
       'pharma-reports': { tab: 'pharma', subTab: 'reports' },
+      'risk-reports': { tab: 'risks', subTab: 'reports' },
       'labs-reports': { tab: 'labs', subTab: 'reports' },
       'nutrition-reports': { tab: 'nutrition', subTab: 'reports' },
       'support-reports': { tab: 'support', subTab: 'reports' },
