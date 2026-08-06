@@ -39,7 +39,7 @@ import { labTrainingAdjust } from './lab-training-adjust';
 import { suggestFeeders } from '../../../engines/bb/bb-autocoach.engine';
 import { useDataLink } from '../../../core/data-link';
 import { detectLift } from '../../../engines/lms/lms-to-pl';
-import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS, ORIGINAL_PROGRAMS, ORIGINAL_PROGRAMS_URL, type OriginalProgram } from './programs-data';
+import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
 import { useOriginalPrograms } from './useOriginalPrograms';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { getReferencedCycle, userWeekToBBPlan, validateProgram, cloneFromCycle, cloneFromLibrary, createBlank, createFromBuild, deleteRevision } from '../../../engines/user-program/program-store';

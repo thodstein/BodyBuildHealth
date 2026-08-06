@@ -49,6 +49,7 @@ import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { getAllPrograms, FULL_PROGRAM_LIBRARY } from '../../../engines/complete-program-library.engine';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
+import { useOriginalPrograms } from './useOriginalPrograms';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { getPlanFeedback } from '../../../engines/plan-execution-feedback.engine';
 import { validatePlan, weeklySetsFromBBPlan } from '../../../engines/plan-validator';
@@ -494,11 +495,13 @@ export const BbAutoConstructor: React.FC = () => {
   // Все доступные программы для ББ-контекста:
   // FULL_PROGRAM_LIBRARY + WOMENS_PROGRAMS + CUSTOM_PROGRAMS + bb-циклы (дедуп по id).
   // Фильтр направления: только bodybuilding или both (силовые PL-only исключаем из ББ-выбора).
+  const originalPrograms = useOriginalPrograms();
   const bbLibraryPrograms = useMemo<FullProgram[]>(() => {
     const all = [
       ...FULL_PROGRAM_LIBRARY,
       ...WOMENS_PROGRAMS,
       ...CUSTOM_PROGRAMS,
+      ...originalPrograms,
       ...bbCyclePrograms,
     ];
     const seen = new Set<string>();
@@ -511,7 +514,7 @@ export const BbAutoConstructor: React.FC = () => {
       out.push(p);
     }
     return out;
-  }, [bbCyclePrograms]);
+  }, [bbCyclePrograms, originalPrograms]);
 
   const applyBbSubstitution = useCallback((newId: string) => {
     if (!subTarget || !builtPlan) return;

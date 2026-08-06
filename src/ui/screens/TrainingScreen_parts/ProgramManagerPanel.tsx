@@ -19,6 +19,7 @@ import { getAllPrograms } from '../../../engines/complete-program-library.engine
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
 import { cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
+import { useOriginalPrograms } from './useOriginalPrograms';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { getReferencedCycle } from '../../../engines/user-program/program-store';
 import {
@@ -338,11 +339,13 @@ export const ProgramManagerPanel: React.FC = () => {
   };
 
   // Полный каталог программ: библиотека + женские + авторские. Используется в обоих ветках UI.
+  const originalPrograms = useOriginalPrograms();
   const allLibraryPrograms = useMemo(() => [
     ...getAllPrograms(),
     ...WOMENS_PROGRAMS,
     ...CUSTOM_PROGRAMS,
-  ], []);
+    ...originalPrograms,
+  ], [originalPrograms]);
   const plCycles = useMemo(() => LMS_CYCLES, []);
 
   // P2.6: фильтрация + сортировка

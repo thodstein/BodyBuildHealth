@@ -76,19 +76,14 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
   const filled = Math.round((completeness / 100) * 12);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 0 16px 0' }}>
-      {/* Hero-картинка */}
-      <div
-        style={{
-          position: 'relative',
-          width: '100%',
-          height: 180,
-          borderRadius: 16,
-          overflow: 'hidden',
-          background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-          border: `1px solid ${colors.border}`,
-        }}
-      >
+    <div style={{
+      position: 'relative', minHeight: 'calc(100vh - 120px)', overflow: 'hidden',
+      display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+      padding: '24px 16px 28px', boxSizing: 'border-box',
+      background: '#0f172a',
+    }}>
+      {/* Полноэкранный Hero */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
         <img
           src="/profile-hero.png"
           alt="Profile"
@@ -101,11 +96,13 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
         {/* Градиент для читаемости текста */}
         <div style={{
           position: 'absolute', inset: 0,
-          background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.7) 100%)',
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.28) 42%, rgba(0,0,0,0.86) 100%)',
         }} />
-        {/* Имя + метрики поверх картинки */}
+      </div>
+
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Имя + метрики поверх полноэкранного изображения */}
         <div style={{
-          position: 'absolute', left: 16, right: 16, bottom: 12,
           display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12,
         }}>
           <div style={{ minWidth: 0, flex: 1 }}>
@@ -149,10 +146,9 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
             >↩</button>
           )}
         </div>
-      </div>
 
-      {/* Прогресс-бар заполненности */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px' }}>
+        {/* Прогресс-бар заполненности */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px' }}>
         <div
           role="progressbar"
           aria-valuenow={completeness}
@@ -173,28 +169,27 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
         <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, minWidth: 32, textAlign: 'right' }}>
           {completeness}%
         </span>
-      </div>
-
-      {/* Подсказка для заполнения */}
-      {filled < 8 && (
-        <div style={{ fontSize: 11, color: colors.textMuted, textAlign: 'center', padding: '0 8px' }}>
-          {filled === 0
-            ? '👇 Заполните основное в карточке "Пользователь"'
-            : `Заполнено ${filled}/12 ключевых полей. Можно дополнить ниже.`}
         </div>
-      )}
 
-      {/* Pill-вкладки — как в NutritionScreen */}
-      <div
-        role="navigation"
-        aria-label="Разделы профиля"
-        style={{
-          display: 'flex', gap: 6, flexWrap: 'nowrap', overflowX: 'auto',
-          padding: '4px 4px 4px 4px',
-          scrollbarWidth: 'none', msOverflowStyle: 'none',
-          WebkitOverflowScrolling: 'touch', whiteSpace: 'nowrap',
-        }}
-      >
+        {/* Подсказка для заполнения */}
+        {filled < 8 && (
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', textAlign: 'center', padding: '0 8px' }}>
+            {filled === 0
+              ? '👇 Заполните основное в карточке "Пользователь"'
+              : `Заполнено ${filled}/12 ключевых полей. Можно дополнить ниже.`}
+          </div>
+        )}
+
+        {/* Pill-вкладки — как в NutritionScreen */}
+        <div
+          role="navigation"
+          aria-label="Разделы профиля"
+          style={{
+            display: 'flex', gap: 6, flexWrap: 'nowrap', overflowX: 'auto',
+            padding: '4px', scrollbarWidth: 'none', msOverflowStyle: 'none',
+            WebkitOverflowScrolling: 'touch', whiteSpace: 'nowrap',
+          }}
+        >
         {TABS.map(t => (
           <button
             key={t.id}
@@ -224,6 +219,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
             <span>{t.label}</span>
           </button>
         ))}
+        </div>
       </div>
     </div>
   );
