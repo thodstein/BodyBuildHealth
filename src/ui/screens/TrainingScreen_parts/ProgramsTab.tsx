@@ -389,25 +389,25 @@ export const ProgramsTab: React.FC<{
                       <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>
                         {day.focus} · Разминка: {day.warmup} · Заминка: {day.cooldown}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px', borderRadius: 4, marginBottom: 2, fontSize: 11, color: 'var(--text-dim)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <span style={{ flex: 1 }}>Упражнение</span>
-                        <span style={{ minWidth: 55, textAlign: 'center' }}>Подходы</span>
-                        <span style={{ minWidth: 40, textAlign: 'center' }}>RPE</span>
-                        <span style={{ minWidth: 35, textAlign: 'center' }}>RIR</span>
-                        <span style={{ minWidth: 45, textAlign: 'center' }}>Отдых</span>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 70px 52px 52px 58px', gap: 6, padding: '2px 8px', borderRadius: 4, marginBottom: 2, fontSize: 11, color: 'var(--text-dim)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <span>Упражнение</span>
+                        <span style={{ textAlign: 'center' }}>Подходы</span>
+                        <span style={{ textAlign: 'center' }}>RPE</span>
+                        <span style={{ textAlign: 'center' }}>RIR</span>
+                        <span style={{ textAlign: 'center' }}>Отдых</span>
                       </div>
                       {day.exercises.map((ex, ei) => (
                         <div key={ei} style={{
-                          display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px',
+                          display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 70px 52px 52px 58px', gap: 6, alignItems: 'start', padding: '6px 8px',
                           borderRadius: 6, marginBottom: 2, background: 'rgba(255,255,255,0.03)',
                           fontSize: 11,
                         }}>
-                          <span style={{ flex: 1, fontWeight: 600 }}>{ex.name}</span>
-                          <span style={{ color: 'var(--accent)', fontSize: 11 }}>{ex.sets}×{ex.reps}</span>
-                          <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>RPE {ex.rpe}</span>
-                          <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>RIR {ex.rir}</span>
-                          <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>{ex.restSec}с</span>
-                          {ex.notes ? <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{ex.notes}</span> : null}
+                          <span style={{ minWidth: 0, overflowWrap: 'anywhere', whiteSpace: 'normal', fontWeight: 600 }}>{ex.name}</span>
+                          <span style={{ color: 'var(--accent)', fontSize: 11, textAlign: 'center', whiteSpace: 'normal' }}>{ex.sets}×{ex.reps}</span>
+                          <span style={{ color: 'var(--text-dim)', fontSize: 11, textAlign: 'center' }}>RPE {ex.rpe}</span>
+                          <span style={{ color: 'var(--text-dim)', fontSize: 11, textAlign: 'center' }}>RIR {ex.rir}</span>
+                          <span style={{ color: 'var(--text-dim)', fontSize: 11, textAlign: 'center' }}>{ex.restSec}с</span>
+                          {ex.notes ? <span style={{ gridColumn: '1 / -1', minWidth: 0, color: 'var(--text-dim)', lineHeight: 1.35, overflowWrap: 'anywhere' }}>{ex.notes}</span> : null}
                         </div>
                       ))}
                     </div>
