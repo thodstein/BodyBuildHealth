@@ -5,7 +5,7 @@
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK
-- `vitest` - 1722 passing (165 test files; **BB-auto training generation audit** — bb-builder RIR/progression/MRV fixes, bb-progression-feedback e1RM selection, bb-frequency-optimizer e1rmTrend, suggestFeeders PRO-KEYS, BbAutoConstructor alert→toast, 29 new tests)
+- `vitest` - 1752 passing (168 test files; **BB-auto training generation audit** — bb-builder RIR/progression/MRV fixes, bb-progression-feedback e1RM selection, bb-frequency-optimizer e1rmTrend, suggestFeeders PRO-KEYS, BbAutoConstructor alert→toast, restProgression phaseWeek, prescribeLoad repCap exercise-type-aware, 34 new tests)
 
 ---
 
@@ -41,6 +41,10 @@
 19. **D3: summarizeAutoRegulation float RIR** — `bb-progression-feedback.engine.ts:310`. Regex `RIR(\d+)` не парсит `RIR2.5` (от bbRir drift). Fixed: `RIR([\d.]+)` + `parseFloat`.
 20. **D4: e1rmTrend dead field** — `bb-frequency-optimizer.engine.ts:67`. `e1rmTrend` declared but never assigned. Fixed: `computePerMuscleE1RMTrend()` — recent (7д) vs old (4нед ±7д) best e1RM per muscle. Trend ≥+10% → повысить частоту, ≤-5% → снизить.
 
+### Phase E — Minor quality fixes (2)
+21. **E1: restProgression absolute week** — `bb-builder.engine.ts:1685`. Использовал absolute `week` вместо `phaseWeek` → на W9 12-нед плана restProgression=120с > baseRest=120 → clamped to floor=60 на всей фазе intensification. Fixed: `phaseWeek` (как RIR drift) — прогрессия рестартует с каждой фазой. Паритет с `bb-loading-layer.engine.ts`.
+22. **E3: prescribeLoad repCap hardcoded** — `bb-autocoach.engine.ts:58`. `repCap = phase === 'intensification' ? 8 : 12` для ВСЕХ упражнений. Изоляция/cable/accessory теперь получают 12/15 (accumulation/intensification) — малые мышцы прогрессируют повторы дольше до weight jump. Compound: 8/12 (без изменений).
+
 ### False positives removed (4)
 - ~~MRV cap overflow (L731-758)~~ — математически опровергнуто (после `minTotal > cap` path, `minTotal <= cap` гарантирует `numExercises * 2 <= cap`).
 - ~~Re-cap MRV after compensateCrossDayWeakPoints~~ — feeders добавляют 2 сета только когда `weekSets < MEV`, MEV << MRV.
@@ -48,18 +52,19 @@
 - ~~Weight progression for isolation~~ — double progression стандартна для всех типов; `linear` strategy уже различает (isolation +1.0 кг/нед, compound +2.5).
 
 ### Files modified (8)
-- `src/engines/bb/bb-builder.engine.ts` — 11 fixes (A1, A5, B1, B4, B5, C1, C3, C5, C6, C7, C10)
+- `src/engines/bb/bb-builder.engine.ts` — 12 fixes (A1, A5, B1, B4, B5, C1, C3, C5, C6, C7, C10, E1)
+- `src/engines/bb/bb-autocoach.engine.ts` — 2 fixes (D2, E3)
 - `src/engines/bb/bb-progression-feedback.engine.ts` — 2 fixes (B6, D1) + D3
 - `src/engines/bb/bb-peak-week.engine.ts` — 1 fix (C2)
 - `src/engines/bb/bb-exercise-tier.engine.ts` — 1 fix (C8)
-- `src/engines/bb/bb-autocoach.engine.ts` — 1 fix (D2)
 - `src/engines/bb/bb-frequency-optimizer.engine.ts` — 1 fix (D4)
+- `src/engines/bb/bb-loading-layer.engine.ts` — 1 fix (E1 parity)
 - `src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx` — 1 fix (C4, 15 alert→flash)
-- `src/engines/bb/__tests__/bb-audit-2026-08.test.ts` — NEW (29 tests)
+- `src/engines/bb/__tests__/bb-audit-2026-08.test.ts` — NEW (34 tests)
 
 ### Tests
-- `src/engines/bb/__tests__/bb-audit-2026-08.test.ts` — **29 tests**: A1 LegsBiceps biceps primary, A5 dead code removal, B1 peaking RIR drift (3 tests), B4 reps shiftedMin, B5 fuzzy match, B6 epley1RM e1RM comparison (2 tests), C1 deload cascade, C2 peak week floor=2, C6 deload floor=1, D2 suggestFeeders PRO-KEYS (8 tests), D3 float RIR (2 tests), D4 e1rmTrend (2 tests), C7 defaultWorkMax (5 tests).
-- Full suite: **1722/1722 passing** (165 test files), 0 TS errors, vite build OK.
+- `src/engines/bb/__tests__/bb-audit-2026-08.test.ts` — **34 tests**: A1 LegsBiceps biceps primary, A5 dead code removal, B1 peaking RIR drift (3 tests), B4 reps shiftedMin, B5 fuzzy match, B6 epley1RM e1RM comparison (2 tests), C1 deload cascade, C2 peak week floor=2, C6 deload floor=1, C7 defaultWorkMax (5 tests), D2 suggestFeeders PRO-KEYS (8 tests), D3 float RIR (2 tests), D4 e1rmTrend (2 tests), E1 restProgression phaseWeek, E3 repCap isolation/compound (4 tests).
+- Full suite: **1752/1752 passing** (168 test files), 0 TS errors, vite build OK.
 
 ---
 
