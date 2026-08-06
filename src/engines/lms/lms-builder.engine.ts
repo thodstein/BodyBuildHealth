@@ -123,7 +123,7 @@ function vrLevelKey(level: string): 'beginner' | 'intermediate' | 'advanced' {
 }
 
 const RU_TO_EN: Record<string, string> = { 'Грудь': 'chest', 'Спина': 'back', 'Ноги': 'legs', 'Плечи': 'shoulders', 'Руки': 'arms', 'Кор': 'core' };
-const SENT_TO_RU: Record<string, string> = { 'ПР': 'Грудь', 'ЖМ': 'Ноги', 'ТГ': 'Спина', 'ЖИМ': 'Грудь', 'ТЯГА': 'Спина', 'ОФП': 'Кор', 'СФП': 'Кор' };
+const SENT_TO_RU: Record<string, string> = { 'ПР': 'Ноги', 'ЖМ': 'Грудь', 'ТГ': 'Спина', 'ЖИМ': 'Грудь', 'ТЯГА': 'Спина', 'ОФП': 'Кор', 'СФП': 'Кор' };
 const EN_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
 /**
  * Проверяет, является ли упражнение вариантом приоритетного лифта.
@@ -391,12 +391,15 @@ function injectPLWeakPoints(
         .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
       if (mainSets > 0) dayRankByMain.push({ idx: i, mainSets });
     }
-    // Авто-распределение: heavy = max объём лифта, light = следующий по объёму (минимум)
+    // Авто-распределение: heavy = max объём лифта, light = min объём среди остальных
     let heavyDayIdx = -1, lightDayIdx = -1;
     if (dayRankByMain.length > 0) {
-      const sorted = [...dayRankByMain].sort((a, b) => b.mainSets - a.mainSets);
-      heavyDayIdx = sorted[0].idx;
-      if (sorted.length > 1) lightDayIdx = sorted[1].idx;
+      const sortedDesc = [...dayRankByMain].sort((a, b) => b.mainSets - a.mainSets);
+      heavyDayIdx = sortedDesc[0].idx;
+      if (sortedDesc.length > 1) {
+        const rest = sortedDesc.slice(1).sort((a, b) => a.mainSets - b.mainSets);
+        lightDayIdx = rest[0].idx;
+      }
     } else {
       heavyDayIdx = 0;
     }
@@ -644,7 +647,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
             const focusMult = matchesFocusLift(spec.name, input.focusLift) ? 1.2 : 1.0;
             const weakEn = exEnGroup(spec.group);
             const weakMult = (input.weakPoints && weakEn && input.weakPoints.includes(weakEn)) ? 1.2 : 1.0;
-            const totalMult = vMult * phaseVolMod * focusMult * weakMult;
+            const totalMult = Math.min(1.5, vMult * phaseVolMod * focusMult * weakMult);
             sets = Math.round(sets * totalMult);
           }
 
@@ -869,7 +872,15 @@ function applyPLTaper(weeks: LMSPlanWeek[], totalWeeks: number): LMSPlanWeek[] {
     for (const d of wk.days) for (const e of d.exercises) for (const ws of e.workSets) v += ws.sets;
     return v;
   };
-  const refVolume = prevIdx > 0 ? weekVolume(weeks[prevIdx - 1]) : 0;
+  const refVolume = (() => {
+    for (let i = prevIdx - 1; i >= 0; i--) {
+      const phase = mesocyclePhaseForWeek(weeks[i].week, totalWeeks);
+      if (phase === 'deload') continue;
+      const vol = weekVolume(weeks[i]);
+      if (vol > 0) return vol;
+    }
+    return 0;
+  })();
 
    return weeks.map((wk, idx) => {
      if (idx !== prevIdx && idx !== lastIdx) return wk;

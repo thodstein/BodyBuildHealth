@@ -137,9 +137,9 @@ export type TrainingDirection = 'strength' | 'bodybuilding' | 'both';
 export function normalizeCycleDirection(dir: SRDirection | string): TrainingDirection {
   const strengthDirs = new Set([
     'powerlifting', 'bench', 'deadlift_bench', 'squat_bench',
-    'squat', 'deadlift_squat', 'deadlift',
+    'deadlift_squat', 'armwrestling', 'weightlifting',
     'peaking_pl', 'peaking_bench', 'peaking_deadlift',
-    'competition', 'strength',
+    'competition',
   ]);
   const bodybuildingDirs = new Set([
     'bodybuilding', 'hypertrophy', 'peaking_bb', 'cutting', 'contest_prep',

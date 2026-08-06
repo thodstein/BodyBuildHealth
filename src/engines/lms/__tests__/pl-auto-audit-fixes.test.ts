@@ -117,6 +117,7 @@ describe('P1-4: expandCycleWeeks preserves weeks[0]', () => {
     const customWeek0 = [{ exercises: [{ name: 'Custom W0', group: 'Грудь', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{ pct: 0.8, reps: 5, sets: 3, rir: 2 }] }] }];
     const cycle = {
       ...CYCLE_01,
+      meta: { ...CYCLE_01.meta, sourceWeeks: false },
       weeks: [customWeek0 as any, ...CYCLE_01.week1.map(d => ({ ...d }))],
     };
     const expanded = expandCycleWeeks(cycle);

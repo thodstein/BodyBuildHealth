@@ -57,10 +57,20 @@ export interface DiaryAutoregResult {
   decisions: string[];
 }
 
-/** Fuzzy match имён упражнений (как в lms-builder.engine + извлечение ядра). */
+/** Fuzzy match имён упражнений (как в lms-builder.engine + извлечение ядра).
+ *  P1-3: exclude OHP/leg-press from bench matches, row/pulldown from deadlift matches. */
 function nameMatch(a: string, b: string): boolean {
   const na = norm(a), nb = norm(b);
   if (na === nb) return true;
+  // Lift-aware exclusions: "Жим лежа" must NOT match "Жим стоя", "Жим ногами", etc.
+  const isBenchVariant = (s: string) => /жим/.test(s) && !/стоя|сидя|армейск|над голов|ногами|гантел|швунг|push.?press|армолд|арнолд/i.test(s);
+  const isOverheadOrLegPress = (s: string) => /стоя|сидя|армейск|над голов|ногами|швунг|push.?press|армолд|арнолд/i.test(s);
+  const isDeadliftVariant = (s: string) => /станов|румын|сумо|прямых ног|плинт|из ямы/i.test(s);
+  const isRowOrPulldown = (s: string) => /верхнего|нижнего|горизонтального|блока|в наклон|к поясу|гантел|штанг|к груди/i.test(s);
+  if (isBenchVariant(na) && isOverheadOrLegPress(nb)) return false;
+  if (isBenchVariant(nb) && isOverheadOrLegPress(na)) return false;
+  if (isDeadliftVariant(na) && isRowOrPulldown(nb)) return false;
+  if (isDeadliftVariant(nb) && isRowOrPulldown(na)) return false;
   if (na.length > 2 && nb.length > 2 && (na.includes(nb) || nb.includes(na))) return true;
   // Извлечение ядра: убираем «штанги», «гантелей», «в тренажёре» и т.п.
   const core = (s: string) => s.replace(/штанг[иеы]?|гантел[иеы]?|в тренажере|в тренажёре/g, '').replace(/\s+/g, ' ').trim();
