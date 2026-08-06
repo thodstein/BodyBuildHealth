@@ -1,10 +1,10 @@
 /**
  * bb-audit-2026-08.test.ts — тесты для аудита BB-auto (Aug 6 2026).
- * Покрывает: A1, A5, B1, B4, B5, B6, C1, C2, C6, D1, D2, D3, D4.
+ * Покрывает: A1, A5, B1, B4, B5, B6, C1, C2, C6, C7, D1, D2, D3, D4, E1, E3.
  */
 import { describe, it, expect } from 'vitest';
 import { buildBBPlan, bbRir, defaultWorkMax, type BBBuilderInput } from '../bb-builder.engine';
-import { suggestFeeders } from '../bb-autocoach.engine';
+import { prescribeLoad, suggestFeeders } from '../bb-autocoach.engine';
 import { summarizeAutoRegulation } from '../bb-progression-feedback.engine';
 import { optimizeMuscleFrequency } from '../bb-frequency-optimizer.engine';
 import { buildPeakWeekProtocol, applyPeakWeekToPlan } from '../bb-peak-week.engine';
@@ -431,5 +431,103 @@ describe('C7: defaultWorkMax returns correct values', () => {
   });
   it('collapses delt_front → shoulders', () => {
     expect(defaultWorkMax('delt_front')).toBe(70);
+  });
+});
+
+// ─── E1: restProgression uses phaseWeek (not absolute week) ───
+describe('E1: restProgression uses phaseWeek, not absolute week', () => {
+  it('long plan does not collapse rest to floor in later phases', () => {
+    // 12-week plan: accumulation W1-5, intensification W6-9, deload W10, peaking W11-12
+    const plan = buildBBPlan(makeInput({ weeks: 12, autoDeload: true }));
+    expect(plan.weeks.length).toBe(12);
+    // Check that intensification weeks have reasonable rest for primary exercises
+    // phaseWeek resets per phase, so intensification W1 (absolute W6) should have restProgression=0
+    const intensificationWeek = plan.weeks.find(w => w.phase === 'intensification');
+    if (intensificationWeek) {
+      for (const s of intensificationWeek.sessions) {
+        for (const ex of s.exercises) {
+          // Only check primary exercises (accessory/pump may have low rest by design)
+          if (ex.role === 'primary' && ex.restSeconds && ex.restSeconds > 0) {
+            // baseRest for intensification ~120, phaseWeek=1 → restProgression=0 → rest~120
+            // Should NOT be at floor (60) in the first week of intensification
+            expect(ex.restSeconds).toBeGreaterThanOrEqual(90);
+          }
+        }
+      }
+    }
+  });
+});
+
+// ─── E3: prescribeLoad repCap exercise-type-aware ───
+describe('E3: prescribeLoad repCap depends on exercise type', () => {
+  it('isolation exercise gets higher repCap (15) in accumulation', () => {
+    // Isolation: accumulation → repCap=15 (not 12)
+    const result = prescribeLoad(
+      'double_progression',  // strategy
+      20,                     // currentWeight
+      12,                     // currentReps
+      2,                      // currentRIR
+      40,                     // maxWeight
+      1,                      // week
+      8,                      // totalWeeks
+      'accumulation',         // phase
+      'isolation',            // exType
+      'accessory',            // role
+    );
+    // currentReps=12 < repCap=15 → should increase reps, not weight
+    expect(result.nextReps).toBe(13);
+    expect(result.nextWeight).toBe(20); // no weight jump yet
+  });
+  it('compound exercise keeps repCap=12 in accumulation', () => {
+    // Compound: accumulation → repCap=12 (unchanged)
+    const result = prescribeLoad(
+      'double_progression',
+      80,
+      11,
+      2,
+      100,
+      1,
+      8,
+      'accumulation',
+      'compound',
+      'primary',
+    );
+    // currentReps=11 < repCap=12 → +1 rep
+    expect(result.nextReps).toBe(12);
+    expect(result.nextWeight).toBe(80);
+  });
+  it('isolation at repCap=15 → weight jump in accumulation', () => {
+    const result = prescribeLoad(
+      'double_progression',
+      20,
+      15, // at repCap
+      2,
+      40,
+      3,
+      8,
+      'accumulation',
+      'isolation',
+      'accessory',
+    );
+    // At repCap → weight jump +5%, reps drop to Math.max(6, repCap-4) = 11
+    expect(result.nextWeight).toBe(21); // 20*1.05=21
+    expect(result.nextReps).toBe(11);   // Math.max(6, 15-4)=11
+  });
+  it('compound at repCap=12 → weight jump in accumulation', () => {
+    const result = prescribeLoad(
+      'double_progression',
+      80,
+      12, // at repCap
+      2,
+      100,
+      3,
+      8,
+      'accumulation',
+      'compound',
+      'primary',
+    );
+    // At repCap → weight jump +5%, reps drop to repCap-4=8
+    expect(result.nextWeight).toBe(84); // 80*1.05=84
+    expect(result.nextReps).toBe(8);    // 12-4=8
   });
 });

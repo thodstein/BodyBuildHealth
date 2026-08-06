@@ -94,8 +94,9 @@ export function computeLoading(input: LoadingInput): LoadingOutput {
   const tempoStr = tempoSpec.notation;
 
   // Rest: phase base + progression (B1)
+  // FIX: используем phaseWeek (не absolute week) — parity с bb-builder.
   const baseRest = phaseCfg.restBase;
-  const restProgression = input.phase === 'deload' ? -30 : Math.max(0, (input.week - 1) * 15);
+  const restProgression = input.phase === 'deload' ? -30 : Math.max(0, (input.phaseWeek - 1) * 15);
   const restSeconds = input.phase === 'deload'
     ? Math.min(180, (isAccessory ? baseRest : baseRest + 30) - restProgression)
     : Math.max(60, (isAccessory ? Math.max(45, baseRest - 30) : baseRest) - restProgression);

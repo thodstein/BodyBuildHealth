@@ -55,7 +55,14 @@ export function prescribeLoad(
   }
   switch (strategy) {
     case 'double_progression': {
-      const repCap = phase === 'intensification' ? 8 : 12;
+      // repCap зависит от типа упражнения: изоляция/кабель → выше repCap
+      // (малые мышцы прогрессируют через повторы дольше до weight jump).
+      // Compound: accumulation=12, intensification=8 (стандарт).
+      // Isolation/cable: accumulation=15, intensification=12.
+      const isIsol = exType === 'isolation' || exType === 'cable' || exType === 'machine' || role === 'accessory';
+      const repCap = isIsol
+        ? (phase === 'intensification' ? 12 : 15)
+        : (phase === 'intensification' ? 8 : 12);
       if (currentReps < repCap) {
         return { nextWeight: currentWeight, nextReps: currentReps + 1, nextRIR: Math.max(0, currentRIR - 1), label: `Добейте ${currentReps + 1} повторов (цель ${repCap})` };
       }

@@ -1682,7 +1682,10 @@ function buildSession(
       const baseRest = phaseCfg.restBase;
       // P5: Rest progression. Накопление/интенсификация/пик → -15s/нед (плотность растёт).
       // Делод → +30с (восстановление: больше отдыха = меньше утомления, Schoenfeld 2016).
-      const restProgression = phase === 'deload' ? -30 : Math.max(0, (week - 1) * 15);
+      // FIX: используем phaseWeek (не absolute week) — прогрессия рестартует с каждой фазой,
+      // как RIR drift. Ранее week=9 → restProgression=120с → baseRest-120=0 → clamped to 60
+      // на всей фазе intensification. Теперь phaseWeek=1-4 → max 45s сокращения.
+      const restProgression = phase === 'deload' ? -30 : Math.max(0, (phaseWeek - 1) * 15);
       const exRest = phase === 'deload'
         ? Math.min(180, (pl.role === 'accessory' ? baseRest : baseRest + 30) - restProgression)
         : Math.max(60, (pl.role === 'accessory' ? Math.max(45, baseRest - 30) : baseRest) - restProgression);
