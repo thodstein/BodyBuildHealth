@@ -1396,30 +1396,26 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                                  </span>
                                </div>
                               <div style={{ display:'flex', flexDirection:'column', gap:4, marginTop:6 }}>
-                                 {e.workSets.map((ws, si) => { const k = setKey(wk.week, di, ei, si); const es = effSet(wk.week, di, ei, si, ws); const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'5px 4px', fontSize:12, textAlign:'center', minWidth:0 }; const IN_LBL: React.CSSProperties = { fontSize:9, color:'rgba(255,255,255,0.4)', textTransform:'uppercase' as const, letterSpacing:0.5, textAlign:'center' as const }; return (
-                                    <div key={si} style={{ background:'rgba(255,255,255,0.025)', borderRadius:6, padding:'4px 6px' }}>
-                                      <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginBottom:2, fontWeight:600, display:'flex', justifyContent:'space-between' }}><span>Сет {si+1}</span><span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(ws.pct*100)}%</span></div>
-                                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-                                       <div>
-                                         <div style={IN_LBL}>Вес, кг</div>
-                                         <input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], weight: +ev.target.value } }))} style={{ ...INM, width:'100%' }} />
-                                       </div>
-                                       <div>
-                                         <div style={IN_LBL}>Повторы</div>
-                                         <input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:'100%' }} />
-                                       </div>
-                                       <div>
-                                         <div style={IN_LBL}>Подходы</div>
-                                         <input type='number' value={es.sets} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], sets: +ev.target.value } }))} style={{ ...INM, width:'100%' }} />
-                                       </div>
-                                       <div>
-                                         <div style={IN_LBL}>Темп</div>
-                                         <input type='text' value={srcEdits[k]?.tempo || ''} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], tempo: ev.target.value } }))} style={{ ...INM, width:'100%', color:'#a855f7', fontWeight:700 }} placeholder='3-1-1-0' />
-                                       </div>
-                                     </div>
-                                   </div>
-                                 ); })}
-                               </div>
+                                {(() => {
+                                  const allSets: { ws: typeof e.workSets[number]; blockIdx: number; setIdx: number }[] = [];
+                                  e.workSets.forEach((ws, bi) => { for (let r=0; r<ws.sets; r++) allSets.push({ ws, blockIdx: bi, setIdx: allSets.length }); });
+                                  const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'5px 4px', fontSize:12, textAlign:'center', minWidth:0 };
+                                  const IN_LBL: React.CSSProperties = { fontSize:9, color:'rgba(255,255,255,0.4)', textTransform:'uppercase' as const, letterSpacing:0.5, textAlign:'center' as const };
+                                  return allSets.map(({ ws, blockIdx, setIdx }) => {
+                                    const k = setKey(wk.week, di, ei, setIdx);
+                                    const es = effSet(wk.week, di, ei, setIdx, ws);
+                                    return (
+                                      <div key={setIdx} style={{ background:'rgba(255,255,255,0.025)', borderRadius:6, padding:'4px 6px' }}>
+                                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginBottom:2, fontWeight:600, display:'flex', justifyContent:'space-between' }}><span>Сет {setIdx+1}</span><span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(ws.pct*100)}%</span></div>
+                                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                                          <div><div style={IN_LBL}>Вес, кг</div><input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], weight: +ev.target.value } }))} style={{ ...INM, width:'100%' }} /></div>
+                                          <div><div style={IN_LBL}>Повторы</div><input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:'100%' }} /></div>
+                                        </div>
+                                      </div>
+                                    );
+                                  });
+                                })()}
+                              </div>
                             </div>
                           ))}
                           {(srcAdditions[dk] || []).map(a => (
@@ -1490,23 +1486,34 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                                 <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:5, background:charColor+'20', color:charColor, border:'0.5px solid '+charColor+'30' }}>{charLabel}</span>
                               </div>
                               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(80px, 1fr))', gap:5 }}>
-                                 {firstWs && <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(34,197,94,0.1)', border:'0.5px solid rgba(34,197,94,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(34,197,94,0.8)' }}>Сеты</span><b style={{color:'#fff'}}>{firstWs.sets}×{firstWs.reps}{adjustedMark}</b></span>}
+                                 {firstWs && <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(34,197,94,0.1)', border:'0.5px solid rgba(34,197,94,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(34,197,94,0.8)' }}>Сеты</span><b style={{color:'#fff'}}>{e.workSets.reduce((n,ws)=>n+ws.sets,0)}×{firstWs.reps}{adjustedMark}</b></span>}
                                 <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(245,158,11,0.1)', border:'0.5px solid rgba(245,158,11,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(245,158,11,0.8)' }}>RIR</span><b style={{color:'#fff'}}>{firstRir ?? e.rir}</b></span>
                                  {firstWs && <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(96,165,250,0.1)', border:'0.5px solid rgba(96,165,250,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(96,165,250,0.8)' }}>Вес</span><b style={{color:'#fff'}}>{firstWs.weight}кг{adjustedMark}</b></span>}
                                  {tempo && <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(168,85,247,0.1)', border:'0.5px solid rgba(168,85,247,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(168,85,247,0.8)' }}>Темп</span><b style={{color:'#fff'}}>{tempo}</b></span>}
                                 <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.1)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(255,255,255,0.6)' }}>Группа</span><b style={{color:'#fff'}}>{e.group}</b></span>
                               </div>
                               <div style={{ marginTop:5, display:'flex', flexDirection:'column', gap:3 }}>
-                                {e.workSets.map((ws, si) => { const es = adjustDisplaySet(ws, si); return (
-                                  <div key={si} style={{ fontSize:11, color:'rgba(255,255,255,0.8)', padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                                    <span style={{ fontSize:9, fontWeight:700, color:'rgba(0,230,138,0.7)', minWidth:32 }}>Сет {si+1}</span>
-                                    <span style={{ fontWeight:700, color:'#fff' }}>{es.sets}×{es.reps}</span>
-                                    <span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(es.pct*100)}%</span>
-                                    <span style={{ color:'rgba(255,255,255,0.6)' }}>{es.weight}кг</span>
-                                    {typeof es.rir === 'number' && <span style={{ color:'#f59e0b' }}>RIR {es.rir}</span>}
-                                    {adjustedMark && <span style={{ fontSize:9 }}>{adjustedMark}</span>}
-                                  </div>
-                                ); })}
+                                {(() => {
+                                  const allSets: { ws: typeof e.workSets[number]; si: number; blockIdx: number; repIdx: number }[] = [];
+                                  e.workSets.forEach((ws, blockIdx) => {
+                                    for (let r = 0; r < ws.sets; r++) {
+                                      allSets.push({ ws, si: allSets.length, blockIdx, repIdx: r });
+                                    }
+                                  });
+                                  return allSets.map(({ ws, si, blockIdx }) => {
+                                    const es = adjustDisplaySet(ws, blockIdx);
+                                    return (
+                                      <div key={si} style={{ fontSize:11, color:'rgba(255,255,255,0.8)', padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                                        <span style={{ fontSize:9, fontWeight:700, color:'rgba(0,230,138,0.7)', minWidth:40 }}>Сет {si+1}</span>
+                                        <span style={{ fontWeight:700, color:'#fff' }}>{es.reps} повт</span>
+                                        <span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(es.pct*100)}%</span>
+                                        <span style={{ color:'rgba(255,255,255,0.6)' }}>{es.weight}кг</span>
+                                        {typeof es.rir === 'number' && <span style={{ color:'#f59e0b' }}>RIR {es.rir}</span>}
+                                        {adjustedMark && <span style={{ fontSize:9 }}>{adjustedMark}</span>}
+                                      </div>
+                                    );
+                                  });
+                                })()}
                               </div>
                             </div>
                           );
