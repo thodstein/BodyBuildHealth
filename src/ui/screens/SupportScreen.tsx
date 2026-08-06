@@ -515,16 +515,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
       reproMode: reproMode,
       neuroMode: neuroMode,
     };
-    // ── ОДИН ВЫЗОВ ──
+    // ── ОДИН ВЫЗОВ (чистый расчёт, без побочных эффектов) ──
     const planRes = runSupportUnified(normalizeCalculatorState(state));
-    setPlanResult(planRes);
-    // C23: уведомления о режимах усиления / суставной поддержке
-    try {
-      const boostSubs = planRes.substances.filter((p: any) => p.fromBoost);
-      const jointSubs = planRes.substances.filter((p: any) => p.fromJoint);
-      if (boostSubs.length > 0) showToast(`🚀 Режим «Усиление»: добавлено ${boostSubs.length} веществ (гонадотропины, пептиды, ноотропы)`, 'warning');
-      if (jointSubs.length > 0) showToast(`🦴 Суставная поддержка: добавлено ${jointSubs.length} веществ (глюкозамин, коллаген, куркумин)`, 'warning');
-    } catch {}
     // subs + dosages из единого результата (с dedup)
     const subs: string[] = [...new Set(planRes.substances.map(p => p.id))];
     const dosages: Record<string, { mg: number; timing: string }> = {};
@@ -550,10 +542,21 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
         dosages[enhId] = d ? { mg: d.mg, timing: d.timing } : { mg: 500, timing: 'с едой' };
       }
     }
-    // ПЛАН 1 (калькулятор): risk-driven вещества + ручные правки поддержки. БЕЗ миксов/питания.
-    try { localStorage.setItem('he_support_plan_result', JSON.stringify(subs)); } catch {}
-    return { subs, dosages };
+    return { subs, dosages, planRes };
   }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, linked.course, linked.profile, courseWeekState, boostEnabled, jointMode, reproMode, neuroMode]);
+
+  // Побочные эффекты (setPlanResult, showToast, localStorage) — в useEffect, НЕ в useMemo
+  useEffect(() => {
+    if (!effectiveLevel?.planRes) return;
+    setPlanResult(effectiveLevel.planRes);
+    try {
+      const boostSubs = effectiveLevel.planRes.substances.filter((p: any) => p.fromBoost);
+      const jointSubs = effectiveLevel.planRes.substances.filter((p: any) => p.fromJoint);
+      if (boostSubs.length > 0) showToast(`🚀 Режим «Усиление»: добавлено ${boostSubs.length} веществ (гонадотропины, пептиды, ноотропы)`, 'warning');
+      if (jointSubs.length > 0) showToast(`🦴 Суставная поддержка: добавлено ${jointSubs.length} веществ (глюкозамин, коллаген, куркумин)`, 'warning');
+    } catch {}
+    try { localStorage.setItem('he_support_plan_result', JSON.stringify(effectiveLevel.subs || [])); } catch {}
+  }, [effectiveLevel]);
 
     // ПЛАН 2 (общий): калькулятор ∪ внешние добавки (миксы/питание). Для удобства, без привязки к рискам.
   useEffect(() => {
@@ -3392,6 +3395,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
 
       {/* ===== AUTO CALCULATOR (единый калькулятор — ввод + TZ-mapper результат) ===== */}
       {section === 'generator' && genTab === 'calculator' && ((tab === 'main' && supportView === 'calc' && calcView === 'calculator') || tab === 'calculator') && (
+        <InfoErrorBoundary label="Калькулятор поддержки">
         <AutoCalculator
           embedded
           courseWeek={courseWeekState}
@@ -3410,6 +3414,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
           onOpenLabs={() => onNavigate?.('labs')}
           planResult={planResult ?? undefined}
         />
+        </InfoErrorBoundary>
       )}
 
       {/* ===== WEEK CHANGE TOAST (C22) ===== */}
