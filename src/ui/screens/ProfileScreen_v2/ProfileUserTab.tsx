@@ -9,6 +9,9 @@ import { UserDietSection } from './sections/UserDietSection';
 import { UserLifestyleSection } from './sections/UserLifestyleSection';
 import { UserPharmaSection } from './sections/UserPharmaSection';
 import { UserGoalsSection } from './sections/UserGoalsSection';
+import { TrainingProfileSection } from './sections/TrainingProfileSection';
+import { TrainingPMSection } from './sections/TrainingPMSection';
+import { TrainingWeakPointsSection } from './sections/TrainingWeakPointsSection';
 import { colors } from './ui';
 
 const JUMP_LINKS = [
@@ -82,6 +85,9 @@ export const ProfileUserTab: React.FC = () => {
         <UserLifestyleSection />
         <UserPharmaSection />
         <UserGoalsSection />
+        <TrainingProfileSection />
+        <TrainingPMSection />
+        <TrainingWeakPointsSection />
       </div>
     </div>
   );

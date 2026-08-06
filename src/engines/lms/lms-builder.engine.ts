@@ -419,8 +419,11 @@ function injectPLWeakPoints(
     const userDays = plWeakPointDayMap?.[mapKey] || plWeakPointDayMap?.[wp.lift as string];
     if (userDays && userDays.length > 0) {
       heavyDayIdx = (userDays[0] - 1);
-      if (userDays.length > 1) lightDayIdx = (userDays[1] - 1);
-      else lightDayIdx = -1;
+      if (heavyDayIdx < 0 || heavyDayIdx >= days.length) heavyDayIdx = 0;
+      if (userDays.length > 1) {
+        lightDayIdx = (userDays[1] - 1);
+        if (lightDayIdx < 0 || lightDayIdx >= days.length) lightDayIdx = -1;
+      } else lightDayIdx = -1;
     }
 
     const liftGroup = liftToEnGroup(wp.lift);
@@ -442,11 +445,7 @@ function injectPLWeakPoints(
         const exGroup = ex ? (trueMuscleOf(ex) ?? (ex.group as string)) : liftGroup;
         const sets = Math.max(2, Math.round(3 * phaseVolMod));
         const pm = pmForInjected(resolvedName, mainName, pmRow, fallbackPm);
-        const ref = getVolumeLandmarks(vrLevel, exGroup);
-        if (ref) {
-          const cur = weeklyMuscleSets(days, exGroup);
-          if (cur + sets > Math.round(ref.mrv * mrvMult)) continue;
-        }
+        // User explicitly selected these weak points — always add, no MRV cap.
         // P2: coef not in Exercise catalog — use heuristic by movementType (compound vs isolation).
         const injCoef = ex?.type === 'compound' ? 1.0 : ex?.type === 'isolation' ? 0.3 : 0.7;
         heavyDay.exercises.push({
@@ -470,11 +469,7 @@ function injectPLWeakPoints(
           const exGroup = ex ? (trueMuscleOf(ex) ?? (ex.group as string)) : liftGroup;
           const sets = Math.max(2, Math.round(3 * phaseVolMod));
           const pm = pmForInjected(resolvedName, mainName, pmRow, fallbackPm);
-          const ref = getVolumeLandmarks(vrLevel, exGroup);
-          if (ref) {
-            const cur = weeklyMuscleSets(days, exGroup);
-            if (cur + sets > Math.round(ref.mrv * mrvMult)) continue;
-          }
+          // User explicitly selected these weak points — always add, no MRV cap.
           // Памп-протокол: 3×12 @ 60% 1PM, RIR 3
           const pumpPct = 0.60;
           // P2: coef by catalog type — compound ~1.0, isolation ~0.3, fallback 0.65
@@ -765,13 +760,11 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           } else if (isWpUpper) {
             dayStats.sort((a, b) => (a.isUpperDay === b.isUpperDay ? a.cnt - b.cnt : a.isUpperDay ? -1 : 1));
           }
-          // Взять top targetDayCount дней (разные дни — dequeueReusableCell)
+          // Взять top targetDayCount дней — обновляем после каждой группы чтобы spread
           targetDays = dayStats.slice(0, targetDayCount).map(s => s.idx + 1);
         }
 
         // Для каждого выбранного дня — добавить accessory упражнения с разным протоколом
-        const listedMuscleRef = getVolumeLandmarks(vrLevel, wg);
-        const fakeMrvCap = listedMuscleRef ? Math.round(listedMuscleRef.mrv * combinedMrvMult) : 99;
         for (let ti = 0; ti < targetDays.length; ti++) {
           const dayIdx = targetDays[ti] - 1;
           if (dayIdx < 0 || dayIdx >= days.length) continue;
@@ -789,20 +782,14 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
             ? (poolFiltered.find(e => e.type === 'compound' || e.movementType === 'compound') || poolFiltered[0])
             : (poolFiltered.find(e => e.type === 'isolation' || e.movementType === 'isolation') || poolFiltered[0])) as Exercise;
 
-          // Выбор exercises сделан; tfПротокол
+          // Выбор exercises сделан; протокол
           const pct = isHeavyDay ? 0.68 : 0.55;
           const reps = isHeavyDay ? 8 : 12;
           let sets = 3;
           const rir = isHeavyDay ? 2 : 3;
-          // MRV soft-cap: урезаем sets так, чтобы вписаться в fakeMrvCap
-           const currentMuscleSets = weeklyMuscleSets(days, wg);
-           if (currentMuscleSets + sets > fakeMrvCap) {
-             const margin = Math.max(0, fakeMrvCap - currentMuscleSets);
-            if (margin < 2) continue; // бюджета не хватает даже на минимум
-            sets = margin; // урезаем подходы, чтобы вписаться в cap
-          }
-          // Day cap: упражнений ≤ 8
-          if (targetDay.exercises.length >= 8) continue;
+          // User explicitly selected these weak groups — always add, no MRV cap.
+          // Day cap: упражнений ≤ 10 (raised from 8 to allow user-selected additions)
+          if (targetDay.exercises.length >= 10) continue;
 
            const wPm = pmRow[pick.name] ?? fallbackPm;
           // P2: coef by catalog type — compound ~0.7, isolation ~0.3, fallback 0.5

@@ -404,6 +404,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   // 📅 Ручной выбор дней недели для слабых групп и слабых точек (1-based)
   const [weakGroupDayMap, setWeakGroupDayMap] = useState<Record<string, number[]>>({});
   const [plWeakPointDayMap, setPlWeakPointDayMap] = useState<Record<string, number[]>>({});
+  // Clear stale day selections when cycle changes (old cycle may have had different day count)
+  useEffect(() => {
+    setWeakGroupDayMap({});
+    setPlWeakPointDayMap({});
+  }, [selectedCycleId]);
   const toggleDayInMap = (mapKey: string, day: number, which: 'wg' | 'pw') => {
     const upd = (prev: Record<string, number[]>) => {
       const s = new Set(prev[mapKey] || []);

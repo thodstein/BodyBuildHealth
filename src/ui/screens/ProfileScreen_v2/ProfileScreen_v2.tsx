@@ -6,18 +6,16 @@
 import React, { useState, useEffect } from 'react';
 import { ProfileHero } from './ProfileHero';
 import { ProfileUserTab } from './ProfileUserTab';
-import { ProfileTrainingTab } from './ProfileTrainingTab';
 import { ProfileDiariesTab } from './ProfileDiariesTab';
 import { ProfileSettingsTab } from './ProfileSettingsTab';
 import { useProfileRefresh, getSnapshots, undoLastSnapshot } from '../../../core/profile-manager';
 import { onAnyProfileChange } from '../../../core/profile-events';
 import { colors } from './ui';
 
-type Tab = 'user' | 'training' | 'diaries' | 'settings';
+type Tab = 'user' | 'diaries' | 'settings';
 
 const TAB_META: Record<Tab, { icon: string; title: string; color: string }> = {
   user: { icon: '👤', title: 'Пользователь', color: colors.primary },
-  training: { icon: '🏋️', title: 'Тренировки', color: colors.blue },
   diaries: { icon: '📓', title: 'Дневники', color: colors.orange },
   settings: { icon: '⚙️', title: 'Настройки', color: colors.purple },
 };
@@ -29,7 +27,11 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
 
   // P1-fix (Aug 5 2026): при переходе из App — открываем конкретную вкладку дневника
   useEffect(() => {
-    if (initialSubTab && ['sleep', 'bp', 'weight', 'measurements'].includes(initialSubTab)) {
+    if (initialSubTab && (
+      ['diaries', 'sleep', 'bp', 'weight', 'measurements', 'injection'].includes(initialSubTab)
+      || initialSubTab.endsWith('-diary')
+      || initialSubTab.endsWith('-reports')
+    )) {
       setTab('diaries');
     }
   }, [initialSubTab]);
@@ -101,7 +103,6 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
         scrollbarColor: `${colors.border} transparent`,
       }}>
         {tab === 'user' && <ProfileUserTab />}
-        {tab === 'training' && <ProfileTrainingTab />}
         {tab === 'diaries' && <ProfileDiariesTab onNavigate={onNavigate} />}
         {tab === 'settings' && <ProfileSettingsTab onNavigate={onNavigate} />}
       </div>

@@ -8,7 +8,7 @@ import { onAnyProfileChange } from '../../../core/profile-events';
 import { colors } from './ui';
 
 interface TabDef {
-  id: 'user' | 'training' | 'diaries' | 'settings';
+  id: 'user' | 'diaries' | 'settings';
   icon: string;
   label: string;
   color: string;
@@ -16,7 +16,6 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { id: 'user', icon: '👤', label: 'Пользователь', color: colors.primary },
-  { id: 'training', icon: '🏋️', label: 'Тренировки', color: colors.blue },
   { id: 'diaries', icon: '📓', label: 'Дневники', color: colors.orange },
   { id: 'settings', icon: '⚙️', label: 'Настройки', color: colors.purple },
 ];
@@ -185,9 +184,8 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
           role="navigation"
           aria-label="Разделы профиля"
           style={{
-            display: 'flex', gap: 6, flexWrap: 'nowrap', overflowX: 'auto',
-            padding: '4px', scrollbarWidth: 'none', msOverflowStyle: 'none',
-            WebkitOverflowScrolling: 'touch', whiteSpace: 'nowrap',
+            display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 8,
+            width: 'min(100%, 360px)', padding: '4px',
           }}
         >
         {TABS.map(t => (
@@ -196,15 +194,14 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
             onClick={() => onSelectTab(t.id)}
             aria-label={`Открыть раздел: ${t.label}`}
             style={{
-              flexShrink: 0,
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', borderRadius: 20, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 16px', borderRadius: 12, cursor: 'pointer',
               fontSize: 12, fontWeight: 700, letterSpacing: 0.2,
               border: `1px solid ${t.color}33`,
               background: `linear-gradient(135deg, ${t.color}11, rgba(0,0,0,0.2))`,
               color: t.color,
               transition: 'all 0.2s cubic-bezier(0.22,1,0.36,1)',
-              minHeight: 40,
+              minHeight: 44, textAlign: 'left',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = `linear-gradient(135deg, ${t.color}33, ${t.color}11)`;
