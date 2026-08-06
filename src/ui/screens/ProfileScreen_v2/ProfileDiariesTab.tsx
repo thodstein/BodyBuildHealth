@@ -27,8 +27,36 @@ export interface SymptomEntry {
   duration?: string;
   notes?: string;
 }
+const PAIN_DIARY_KEY = 'he_pain_diary';
+export interface PainEntry {
+  date: string;
+  zones: Record<string, number>;
+  totalScore: number;
+  notes?: string;
+}
+const NEURO_DIARY_KEY = 'he_neuro_diary';
+export interface NeuroEntry {
+  date: string;
+  symptoms: Record<string, boolean>;
+  totalScore: number;
+  notes?: string;
+}
+const ACNE_DIARY_KEY = 'he_acne_diary';
+export interface AcneEntry {
+  date: string;
+  areas: Record<string, number>;
+  totalScore: number;
+  notes?: string;
+}
+const HEMATO_DIARY_KEY = 'he_hemato_diary';
+export interface HematoEntry {
+  date: string;
+  symptoms: Record<string, boolean>;
+  totalScore: number;
+  notes?: string;
+}
 
-type DiaryKey = 'sleep' | 'bp' | 'weight' | 'measurements' | 'injection' | 'symptoms';
+type DiaryKey = 'sleep' | 'bp' | 'weight' | 'measurements' | 'injection' | 'symptoms' | 'pain' | 'neuro' | 'acne' | 'hemato';
 
 interface BuiltInDiaryRow { key: DiaryKey; count: number; last: string; }
 
@@ -357,6 +385,216 @@ const AddSymptomModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e
   );
 };
 
+const painZoneColor = (v: number) => v <= 2 ? '#22c55e' : v <= 4 ? '#f59e0b' : v <= 7 ? '#f97316' : '#ef4444';
+
+const AddPainModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: PainEntry) => void }> = ({ open, onClose, onSave }) => {
+  const [date, setDate] = useState(todayIso());
+  const [zones, setZones] = useState<Record<string, number>>({});
+  const [notes, setNotes] = useState('');
+  const total = Object.values(zones).reduce((s, v) => s + (v || 0), 0);
+  const submit = () => {
+    if (!date) return;
+    onSave({ date, zones, totalScore: total, notes: notes.trim() || undefined });
+    setZones({}); setNotes('');
+    onClose();
+  };
+  return (
+    <Modal open={open} onClose={onClose} title="🦴 Оценить боль в суставах">
+      <label style={fieldLabel}>Дата</label>
+      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+      <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 8 }}>
+        Визуально-аналоговая шкала (0–10). При боли ≥6/10 не тренируйте эту зону.
+      </div>
+      {PAIN_ZONES.map(z => {
+        const v = zones[z.id] || 0;
+        const c = painZoneColor(v);
+        return (
+          <div key={z.id} style={{ marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ fontSize: 11, color: colors.text, fontWeight: 600 }}>{z.label}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: c }}>{v}/10</span>
+            </div>
+            <div style={{ display: 'flex', gap: 3 }}>
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                <button key={n} type="button" onClick={() => setZones(p => ({ ...p, [z.id]: n }))} style={{
+                  flex: 1, minHeight: 28, padding: 0, borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 700,
+                  border: `1px solid ${n === v ? c : colors.border}`,
+                  background: n === v ? `${c}33` : 'rgba(255,255,255,0.03)',
+                  color: n === v ? c : colors.textMuted,
+                }}>{n}</button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+      <div style={{ padding: 8, borderRadius: 6, background: 'rgba(255,255,255,0.04)', marginTop: 8, fontSize: 11, color: colors.text, fontWeight: 700 }}>
+        Суммарно по всем зонам: <span style={{ color: painZoneColor(Math.round(total / PAIN_ZONES.length)) }}>{total}/70</span>
+      </div>
+      <label style={{ ...fieldLabel, marginTop: 10 }}>Заметка (необязательно)</label>
+      <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} maxLength={200}
+        style={{ ...fieldInput, resize: 'vertical' }} placeholder="Триггер, длительность, облегчение..." />
+      <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+        <button onClick={onClose} style={btnGhost}>Отмена</button>
+        <button onClick={submit} style={btnPrimary('#22c55e')}>Сохранить</button>
+      </div>
+    </Modal>
+  );
+};
+
+const AddNeuroModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: NeuroEntry) => void }> = ({ open, onClose, onSave }) => {
+  const [date, setDate] = useState(todayIso());
+  const [symptoms, setSymptoms] = useState<Record<string, boolean>>({});
+  const [notes, setNotes] = useState('');
+  const total = Object.values(symptoms).filter(Boolean).length;
+  const submit = () => {
+    if (!date) return;
+    onSave({ date, symptoms, totalScore: total, notes: notes.trim() || undefined });
+    setSymptoms({}); setNotes('');
+    onClose();
+  };
+  return (
+    <Modal open={open} onClose={onClose} title="🧠 Нейросимптомы (еженедельный чек-лист)">
+      <label style={fieldLabel}>Дата</label>
+      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+      <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 8 }}>
+        Отметьте симптомы, которые наблюдались за неделю. При ≥4/10 — обратиться к неврологу.
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        {NEURO_SYMPTOMS.map(s => {
+          const on = !!symptoms[s.id];
+          return (
+            <button key={s.id} type="button" onClick={() => setSymptoms(p => ({ ...p, [s.id]: !on }))} style={{
+              padding: '8px 10px', borderRadius: 6, cursor: 'pointer', textAlign: 'left',
+              border: `1px solid ${on ? colors.danger : colors.border}`,
+              background: on ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
+              color: on ? colors.danger : colors.text, fontSize: 11, fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <span style={{ width: 16, height: 16, borderRadius: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: on ? colors.danger : 'rgba(255,255,255,0.08)', color: on ? '#fff' : colors.textMuted, fontSize: 10, fontWeight: 800 }}>{on ? '✓' : ''}</span>
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ padding: 8, borderRadius: 6, background: 'rgba(255,255,255,0.04)', marginTop: 8, fontSize: 11, color: colors.text, fontWeight: 700 }}>
+        Симптомов отмечено: <span style={{ color: total >= 4 ? colors.danger : total >= 2 ? colors.warning : colors.primary }}>{total}/10</span>
+      </div>
+      <label style={{ ...fieldLabel, marginTop: 10 }}>Заметка (необязательно)</label>
+      <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} maxLength={200}
+        style={{ ...fieldInput, resize: 'vertical' }} placeholder="Связь с курсом, триггеры, длительность..." />
+      <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+        <button onClick={onClose} style={btnGhost}>Отмена</button>
+        <button onClick={submit} style={btnPrimary(colors.danger)}>Сохранить</button>
+      </div>
+    </Modal>
+  );
+};
+
+const acneAreaColor = (v: number) => v === 0 ? '#22c55e' : v === 1 ? '#f59e0b' : v === 2 ? '#f97316' : '#ef4444';
+
+const AddAcneModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: AcneEntry) => void }> = ({ open, onClose, onSave }) => {
+  const [date, setDate] = useState(todayIso());
+  const [areas, setAreas] = useState<Record<string, number>>({});
+  const [notes, setNotes] = useState('');
+  const total = Object.values(areas).reduce((s, v) => s + (v || 0), 0);
+  const submit = () => {
+    if (!date) return;
+    onSave({ date, areas, totalScore: total, notes: notes.trim() || undefined });
+    setAreas({}); setNotes('');
+    onClose();
+  };
+  return (
+    <Modal open={open} onClose={onClose} title="🔴 Обострения акне (еженедельный трекинг)">
+      <label style={fieldLabel}>Дата</label>
+      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+      <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 8 }}>
+        Оцените каждую зону: 0 — чисто, 1 — единичные, 2 — умеренно, 3 — тяжёлое обострение.
+      </div>
+      {ACNE_AREAS.map(a => {
+        const v = areas[a.id] || 0;
+        const c = acneAreaColor(v);
+        return (
+          <div key={a.id} style={{ marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ fontSize: 11, color: colors.text, fontWeight: 600 }}>{a.label}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: c }}>{v}/3</span>
+            </div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {[0, 1, 2, 3].map(n => (
+                <button key={n} type="button" onClick={() => setAreas(p => ({ ...p, [a.id]: n }))} style={{
+                  flex: 1, minHeight: 32, borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                  border: `1px solid ${n === v ? c : colors.border}`,
+                  background: n === v ? `${c}33` : 'rgba(255,255,255,0.03)',
+                  color: n === v ? c : colors.textMuted,
+                }}>{n === 0 ? 'Чисто' : n === 1 ? 'Единичные' : n === 2 ? 'Умеренно' : 'Тяжёлое'}</button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+      <div style={{ padding: 8, borderRadius: 6, background: 'rgba(255,255,255,0.04)', marginTop: 8, fontSize: 11, color: colors.text, fontWeight: 700 }}>
+        Суммарно: <span style={{ color: total >= 7 ? colors.danger : total >= 4 ? colors.warning : colors.primary }}>{total}/12</span>
+      </div>
+      <label style={{ ...fieldLabel, marginTop: 10 }}>Заметка (необязательно)</label>
+      <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} maxLength={200}
+        style={{ ...fieldInput, resize: 'vertical' }} placeholder="Связь с препаратом, диета, гигиена..." />
+      <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+        <button onClick={onClose} style={btnGhost}>Отмена</button>
+        <button onClick={submit} style={btnPrimary('#f97316')}>Сохранить</button>
+      </div>
+    </Modal>
+  );
+};
+
+const AddHematoModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: HematoEntry) => void }> = ({ open, onClose, onSave }) => {
+  const [date, setDate] = useState(todayIso());
+  const [symptoms, setSymptoms] = useState<Record<string, boolean>>({});
+  const [notes, setNotes] = useState('');
+  const total = Object.values(symptoms).filter(Boolean).length;
+  const submit = () => {
+    if (!date) return;
+    onSave({ date, symptoms, totalScore: total, notes: notes.trim() || undefined });
+    setSymptoms({}); setNotes('');
+    onClose();
+  };
+  return (
+    <Modal open={open} onClose={onClose} title="🩸 Гематологические симптомы">
+      <label style={fieldLabel}>Дата</label>
+      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+      <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 8 }}>
+        Отметьте симптомы. При ≥2/8 — срочно сдать ОАК + гематокрит.
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        {HEMATO_SYMPTOMS.map(s => {
+          const on = !!symptoms[s.id];
+          return (
+            <button key={s.id} type="button" onClick={() => setSymptoms(p => ({ ...p, [s.id]: !on }))} style={{
+              padding: '8px 10px', borderRadius: 6, cursor: 'pointer', textAlign: 'left',
+              border: `1px solid ${on ? colors.danger : colors.border}`,
+              background: on ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
+              color: on ? colors.danger : colors.text, fontSize: 11, fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <span style={{ width: 16, height: 16, borderRadius: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: on ? colors.danger : 'rgba(255,255,255,0.08)', color: on ? '#fff' : colors.textMuted, fontSize: 10, fontWeight: 800 }}>{on ? '✓' : ''}</span>
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ padding: 8, borderRadius: 6, background: 'rgba(255,255,255,0.04)', marginTop: 8, fontSize: 11, color: colors.text, fontWeight: 700 }}>
+        Симптомов отмечено: <span style={{ color: total >= 2 ? colors.danger : colors.primary }}>{total}/8</span>
+      </div>
+      <label style={{ ...fieldLabel, marginTop: 10 }}>Заметка (необязательно)</label>
+      <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} maxLength={200}
+        style={{ ...fieldInput, resize: 'vertical' }} placeholder="Связь с курсом, давление, принимаемые препараты..." />
+      <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+        <button onClick={onClose} style={btnGhost}>Отмена</button>
+        <button onClick={submit} style={btnPrimary(colors.blue)}>Сохранить</button>
+      </div>
+    </Modal>
+  );
+};
+
 /* ── Карточка дневника ── */
 
 const DIARY_META: Record<DiaryKey, { title: string; unit: string; icon: string; color: string; storageKey?: string }> = {
@@ -366,7 +604,52 @@ const DIARY_META: Record<DiaryKey, { title: string; unit: string; icon: string; 
   measurements: { title: 'Замеры тела', unit: 'см', icon: '📏', color: '#3b82f6' },
   injection: { title: 'Инъекции', unit: '', icon: '💉', color: '#f59e0b', storageKey: INJECTION_DIARY_KEY },
   symptoms: { title: 'Симптомы', unit: '', icon: '🩺', color: '#ec4899', storageKey: SYMPTOMS_DIARY_KEY },
+  pain: { title: 'Боль в суставах (VAS)', unit: 'балл', icon: '🦴', color: '#22c55e', storageKey: PAIN_DIARY_KEY },
+  neuro: { title: 'Нейросимптомы', unit: 'балл', icon: '🧠', color: '#ef4444', storageKey: NEURO_DIARY_KEY },
+  acne: { title: 'Обострения акне', unit: 'балл', icon: '🔴', color: '#f97316', storageKey: ACNE_DIARY_KEY },
+  hemato: { title: 'Гематологические симптомы', unit: 'балл', icon: '🩸', color: '#3b82f6', storageKey: HEMATO_DIARY_KEY },
 };
+
+const PAIN_ZONES = [
+  { id: 'shoulders', label: '🦵 Плечи' },
+  { id: 'elbows', label: '💪 Локти' },
+  { id: 'wrists', label: '✋ Запястья' },
+  { id: 'lower_back', label: '🔙 Поясница' },
+  { id: 'hips', label: '🦵 ТБС' },
+  { id: 'knees', label: '🦵 Колени' },
+  { id: 'ankles', label: '🦶 Голеностоп' },
+];
+
+const NEURO_SYMPTOMS = [
+  { id: 'anxiety', label: 'Тревожность' },
+  { id: 'insomnia', label: 'Бессонница' },
+  { id: 'mood_swings', label: 'Перепады настроения' },
+  { id: 'irritability', label: 'Раздражительность' },
+  { id: 'headache', label: 'Головная боль' },
+  { id: 'low_libido', label: 'Снижение либидо' },
+  { id: 'fatigue', label: 'Усталость' },
+  { id: 'concentration', label: 'Трудности с концентрацией' },
+  { id: 'depression', label: 'Подавленное настроение' },
+  { id: 'sweating', label: 'Потливость' },
+];
+
+const ACNE_AREAS = [
+  { id: 'face', label: '🧑 Лицо' },
+  { id: 'chest', label: '🫁 Грудь' },
+  { id: 'back', label: '🔙 Спина' },
+  { id: 'shoulders_acne', label: '💪 Плечи' },
+];
+
+const HEMATO_SYMPTOMS = [
+  { id: 'nosebleeds', label: 'Носовые кровотечения' },
+  { id: 'gum_bleeding', label: 'Кровоточивость дёсен' },
+  { id: 'bruising', label: 'Синяки без причины' },
+  { id: 'headache_h', label: 'Головная боль' },
+  { id: 'flushing', label: 'Покраснение лица' },
+  { id: 'vision', label: 'Нарушения зрения' },
+  { id: 'itching', label: 'Кожный зуд' },
+  { id: 'numbness', label: 'Онемение конечностей' },
+];
 
 const DIARY_FIELDS: Record<DiaryKey, { label: string; unit: string }[]> = {
   sleep: [
@@ -404,6 +687,22 @@ const DIARY_FIELDS: Record<DiaryKey, { label: string; unit: string }[]> = {
     { label: 'Симптом', unit: '' },
     { label: 'Сила', unit: '1–5' },
     { label: 'Длительность', unit: '' },
+  ],
+  pain: [
+    { label: 'Зоны', unit: '0–10' },
+    { label: 'Суммарно', unit: '/70' },
+  ],
+  neuro: [
+    { label: 'Симптомы', unit: '' },
+    { label: 'Итого', unit: '/10' },
+  ],
+  acne: [
+    { label: 'Зоны', unit: '0–3' },
+    { label: 'Суммарно', unit: '/12' },
+  ],
+  hemato: [
+    { label: 'Симптомы', unit: '' },
+    { label: 'Итого', unit: '/8' },
   ],
 };
 
@@ -492,6 +791,10 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
   const [bpEntries, setBpEntries] = useState<BPEntry[]>([]);
   const [injectionEntries, setInjectionEntries] = useState<InjectionEntry[]>([]);
   const [symptomEntries, setSymptomEntries] = useState<SymptomEntry[]>([]);
+  const [painEntries, setPainEntries] = useState<PainEntry[]>([]);
+  const [neuroEntries, setNeuroEntries] = useState<NeuroEntry[]>([]);
+  const [acneEntries, setAcneEntries] = useState<AcneEntry[]>([]);
+  const [hematoEntries, setHematoEntries] = useState<HematoEntry[]>([]);
   const [measurements, setMeasurements] = useState<ReturnType<typeof getMeasurementsLog>>([]);
   const [weights, setWeights] = useState<ReturnType<typeof getWeightLog>>([]);
 
@@ -501,12 +804,20 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
   const [addMeasurementsOpen, setAddMeasurementsOpen] = useState(false);
   const [addInjectionOpen, setAddInjectionOpen] = useState(false);
   const [addSymptomOpen, setAddSymptomOpen] = useState(false);
+  const [addPainOpen, setAddPainOpen] = useState(false);
+  const [addNeuroOpen, setAddNeuroOpen] = useState(false);
+  const [addAcneOpen, setAddAcneOpen] = useState(false);
+  const [addHematoOpen, setAddHematoOpen] = useState(false);
 
   const refresh = () => {
     try { setSleepEntries(loadDiary<SleepEntry>(SLEEP_DIARY_KEY)); } catch {}
     try { setBpEntries(loadDiary<BPEntry>(BP_DIARY_KEY)); } catch {}
     try { setInjectionEntries(loadDiary<InjectionEntry>(INJECTION_DIARY_KEY)); } catch {}
     try { setSymptomEntries(loadDiary<SymptomEntry>(SYMPTOMS_DIARY_KEY)); } catch {}
+    try { setPainEntries(loadDiary<PainEntry>(PAIN_DIARY_KEY)); } catch {}
+    try { setNeuroEntries(loadDiary<NeuroEntry>(NEURO_DIARY_KEY)); } catch {}
+    try { setAcneEntries(loadDiary<AcneEntry>(ACNE_DIARY_KEY)); } catch {}
+    try { setHematoEntries(loadDiary<HematoEntry>(HEMATO_DIARY_KEY)); } catch {}
     try { setMeasurements(getMeasurementsLog()); } catch {}
     try { setWeights(getWeightLog()); } catch {}
   };
@@ -525,6 +836,10 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
     { key: 'measurements', count: measurements.length, last: lastDate(measurements) },
     { key: 'injection', count: injectionEntries.length, last: lastDate(injectionEntries) },
     { key: 'symptoms', count: symptomEntries.length, last: symptomEntries.length ? symptomEntries[symptomEntries.length - 1].name : '' },
+    { key: 'pain', count: painEntries.length, last: painEntries.length ? `Σ ${painEntries[painEntries.length - 1].totalScore}/70` : '' },
+    { key: 'neuro', count: neuroEntries.length, last: neuroEntries.length ? `${neuroEntries[neuroEntries.length - 1].totalScore}/10` : '' },
+    { key: 'acne', count: acneEntries.length, last: acneEntries.length ? `Σ ${acneEntries[acneEntries.length - 1].totalScore}/12` : '' },
+    { key: 'hemato', count: hematoEntries.length, last: hematoEntries.length ? `${hematoEntries[hematoEntries.length - 1].totalScore}/8` : '' },
   ];
 
   const getEntries = (key: DiaryKey): { date: string; fields: { label: string; value: string; unit: string }[] }[] => {
@@ -593,6 +908,46 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
         ...(e.notes ? [{ label: 'Заметка', value: e.notes, unit: '' }] : []),
       ],
     }));
+    if (key === 'pain') return [...painEntries].reverse().map(e => {
+      const fields: { label: string; value: string; unit: string }[] = [];
+      Object.entries(e.zones).forEach(([zoneId, val]) => {
+        const z = PAIN_ZONES.find(p => p.id === zoneId);
+        if (z && val > 0) fields.push({ label: z.label.replace(/^[^\s]+\s/, ''), value: String(val), unit: '/10' });
+      });
+      fields.push({ label: 'Суммарно', value: String(e.totalScore), unit: '/70' });
+      if (e.notes) fields.push({ label: 'Заметка', value: e.notes, unit: '' });
+      return { date: e.date, fields };
+    });
+    if (key === 'neuro') return [...neuroEntries].reverse().map(e => {
+      const fields: { label: string; value: string; unit: string }[] = [];
+      Object.entries(e.symptoms).filter(([, v]) => v).forEach(([symId]) => {
+        const s = NEURO_SYMPTOMS.find(n => n.id === symId);
+        if (s) fields.push({ label: s.label, value: 'есть', unit: '' });
+      });
+      fields.push({ label: 'Симптомов', value: String(e.totalScore), unit: '/10' });
+      if (e.notes) fields.push({ label: 'Заметка', value: e.notes, unit: '' });
+      return { date: e.date, fields };
+    });
+    if (key === 'acne') return [...acneEntries].reverse().map(e => {
+      const fields: { label: string; value: string; unit: string }[] = [];
+      Object.entries(e.areas).forEach(([areaId, val]) => {
+        const a = ACNE_AREAS.find(x => x.id === areaId);
+        if (a && val > 0) fields.push({ label: a.label.replace(/^[^\s]+\s/, ''), value: String(val), unit: '/3' });
+      });
+      fields.push({ label: 'Суммарно', value: String(e.totalScore), unit: '/12' });
+      if (e.notes) fields.push({ label: 'Заметка', value: e.notes, unit: '' });
+      return { date: e.date, fields };
+    });
+    if (key === 'hemato') return [...hematoEntries].reverse().map(e => {
+      const fields: { label: string; value: string; unit: string }[] = [];
+      Object.entries(e.symptoms).filter(([, v]) => v).forEach(([symId]) => {
+        const s = HEMATO_SYMPTOMS.find(h => h.id === symId);
+        if (s) fields.push({ label: s.label, value: 'есть', unit: '' });
+      });
+      fields.push({ label: 'Симптомов', value: String(e.totalScore), unit: '/8' });
+      if (e.notes) fields.push({ label: 'Заметка', value: e.notes, unit: '' });
+      return { date: e.date, fields };
+    });
     return [];
   };
 
@@ -745,6 +1100,10 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
                 else if (d.key === 'measurements') setAddMeasurementsOpen(true);
                 else if (d.key === 'injection') setAddInjectionOpen(true);
                 else if (d.key === 'symptoms') setAddSymptomOpen(true);
+                else if (d.key === 'pain') setAddPainOpen(true);
+                else if (d.key === 'neuro') setAddNeuroOpen(true);
+                else if (d.key === 'acne') setAddAcneOpen(true);
+                else if (d.key === 'hemato') setAddHematoOpen(true);
               }}
               onOpen={() => setActiveDiary(d.key)}
             />
@@ -774,6 +1133,10 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
                 else if (activeDiary === 'measurements') setAddMeasurementsOpen(true);
                 else if (activeDiary === 'injection') setAddInjectionOpen(true);
                 else if (activeDiary === 'symptoms') setAddSymptomOpen(true);
+                else if (activeDiary === 'pain') setAddPainOpen(true);
+                else if (activeDiary === 'neuro') setAddNeuroOpen(true);
+                else if (activeDiary === 'acne') setAddAcneOpen(true);
+                else if (activeDiary === 'hemato') setAddHematoOpen(true);
               }}
               style={{ padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: DIARY_META[activeDiary].color, color: '#0a0a0a', border: 'none' }}
             >+ Добавить запись</button>
@@ -875,6 +1238,42 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
           const updated = [...symptomEntries.filter(x => !(x.date === e.date && x.name === e.name)), e].sort((a, b) => a.date.localeCompare(b.date));
           saveDiary(SYMPTOMS_DIARY_KEY, updated);
           setSymptomEntries(updated);
+        }}
+      />
+      <AddPainModal
+        open={addPainOpen}
+        onClose={() => setAddPainOpen(false)}
+        onSave={(e) => {
+          const updated = [...painEntries.filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
+          saveDiary(PAIN_DIARY_KEY, updated);
+          setPainEntries(updated);
+        }}
+      />
+      <AddNeuroModal
+        open={addNeuroOpen}
+        onClose={() => setAddNeuroOpen(false)}
+        onSave={(e) => {
+          const updated = [...neuroEntries.filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
+          saveDiary(NEURO_DIARY_KEY, updated);
+          setNeuroEntries(updated);
+        }}
+      />
+      <AddAcneModal
+        open={addAcneOpen}
+        onClose={() => setAddAcneOpen(false)}
+        onSave={(e) => {
+          const updated = [...acneEntries.filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
+          saveDiary(ACNE_DIARY_KEY, updated);
+          setAcneEntries(updated);
+        }}
+      />
+      <AddHematoModal
+        open={addHematoOpen}
+        onClose={() => setAddHematoOpen(false)}
+        onSave={(e) => {
+          const updated = [...hematoEntries.filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
+          saveDiary(HEMATO_DIARY_KEY, updated);
+          setHematoEntries(updated);
         }}
       />
       </>}
