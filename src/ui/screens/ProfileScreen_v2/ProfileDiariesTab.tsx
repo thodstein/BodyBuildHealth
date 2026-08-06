@@ -125,6 +125,33 @@ const btnGhost: React.CSSProperties = {
   background: 'transparent', color: colors.text, border: `1px solid ${colors.border}`, cursor: 'pointer',
 };
 
+const DateInput: React.FC<{ value: string; onChange: (v: string) => void; style?: React.CSSProperties }> = ({ value, onChange, style }) => {
+  const today = todayIso();
+  const isFuture = value > today;
+  return (
+    <div>
+      <input
+        type="date"
+        value={value}
+        max={today}
+        onChange={e => onChange(e.target.value)}
+        style={{
+          ...fieldInput,
+          ...(isFuture ? { borderColor: '#f59e0b', background: 'rgba(245,158,11,0.08)' } : {}),
+          ...style,
+        }}
+        aria-invalid={isFuture}
+        aria-label="Дата (не позже сегодняшней)"
+      />
+      {isFuture && (
+        <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>
+          ⚠ Будущая дата — обычно записывают прошедшие дни. Это не запрещено, но проверьте.
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ── Модалки добавления записей ── */
 
 const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: SleepEntry) => void }> = ({ open, onClose, onSave }) => {
@@ -149,7 +176,7 @@ const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: 
   return (
     <Modal open={open} onClose={onClose} title="💤 Добавить запись сна">
       <label style={fieldLabel}>Дата</label>
-      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+      <DateInput value={date} onChange={setDate} style={fieldInput} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
         <div>
           <label style={fieldLabel}>Часы сна</label>
@@ -204,7 +231,7 @@ const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: BPE
   return (
     <Modal open={open} onClose={onClose} title="❤️ Добавить запись АД">
       <label style={fieldLabel}>Дата</label>
-      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+      <DateInput value={date} onChange={setDate} style={fieldInput} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginTop: 10 }}>
         <div>
           <label style={fieldLabel}>Систола</label>
@@ -242,7 +269,7 @@ const AddWeightModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e:
   return (
     <Modal open={open} onClose={onClose} title="⚖️ Добавить запись веса">
       <label style={fieldLabel}>Дата</label>
-      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+      <DateInput value={date} onChange={setDate} style={fieldInput} />
       <label style={{ ...fieldLabel, marginTop: 10 }}>Вес (кг)</label>
       <input type="number" step="0.1" min="30" max="250" value={weight} onChange={e => setWeight(e.target.value)} style={fieldInput} />
       <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
@@ -278,7 +305,7 @@ const AddMeasurementsModal: React.FC<{ open: boolean; onClose: () => void; onSav
   return (
     <Modal open={open} onClose={onClose} title="📏 Добавить замеры тела">
       <label style={fieldLabel}>Дата</label>
-      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+      <DateInput value={date} onChange={setDate} style={fieldInput} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
         {[
           { label: 'Талия (см)', val: waistCm, set: setWaistCm },
@@ -318,7 +345,7 @@ const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
   return (
     <Modal open={open} onClose={onClose} title="💉 Добавить запись инъекции">
       <label style={fieldLabel}>Дата</label>
-      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+      <DateInput value={date} onChange={setDate} style={fieldInput} />
       <label style={{ ...fieldLabel, marginTop: 10 }}>Препарат</label>
       <input type="text" value={substance} onChange={e => setSubstance(e.target.value)} style={fieldInput} placeholder="Тест энантат 250 мг" />
       <label style={{ ...fieldLabel, marginTop: 10 }}>Доза</label>
@@ -357,7 +384,7 @@ const AddSymptomModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e
   return (
     <Modal open={open} onClose={onClose} title="🩺 Добавить симптом">
       <label style={fieldLabel}>Дата</label>
-      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+      <DateInput value={date} onChange={setDate} style={fieldInput} />
       <label style={{ ...fieldLabel, marginTop: 10 }}>Симптом</label>
       <input type="text" value={name} onChange={e => setName(e.target.value)} style={fieldInput} placeholder="Например: головная боль" list="he-symptom-presets" />
       <datalist id="he-symptom-presets">{SYMPTOM_PRESETS.map(s => <option key={s} value={s} />)}</datalist>
@@ -401,7 +428,7 @@ const AddPainModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: P
   return (
     <Modal open={open} onClose={onClose} title="🦴 Оценить боль в суставах">
       <label style={fieldLabel}>Дата</label>
-      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+      <DateInput value={date} onChange={setDate} style={fieldInput} />
       <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 8 }}>
         Визуально-аналоговая шкала (0–10). При боли ≥6/10 не тренируйте эту зону.
       </div>
@@ -455,7 +482,7 @@ const AddNeuroModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: 
   return (
     <Modal open={open} onClose={onClose} title="🧠 Нейросимптомы (еженедельный чек-лист)">
       <label style={fieldLabel}>Дата</label>
-      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+      <DateInput value={date} onChange={setDate} style={fieldInput} />
       <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 8 }}>
         Отметьте симптомы, которые наблюдались за неделю. При ≥4/10 — обратиться к неврологу.
       </div>
@@ -506,7 +533,7 @@ const AddAcneModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: A
   return (
     <Modal open={open} onClose={onClose} title="🔴 Обострения акне (еженедельный трекинг)">
       <label style={fieldLabel}>Дата</label>
-      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+      <DateInput value={date} onChange={setDate} style={fieldInput} />
       <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 8 }}>
         Оцените каждую зону: 0 — чисто, 1 — единичные, 2 — умеренно, 3 — тяжёлое обострение.
       </div>
@@ -560,7 +587,7 @@ const AddHematoModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e:
   return (
     <Modal open={open} onClose={onClose} title="🩸 Гематологические симптомы">
       <label style={fieldLabel}>Дата</label>
-      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+      <DateInput value={date} onChange={setDate} style={fieldInput} />
       <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 8 }}>
         Отметьте симптомы. При ≥2/8 — срочно сдать ОАК + гематокрит.
       </div>
@@ -910,6 +937,144 @@ const computeSummary = (
   return out;
 };
 
+const computePeriodDelta = (
+  key: DiaryKey,
+  entries: { date: string; fields: { label: string; value: string; unit: string }[] }[]
+): { label: string; value: string; delta: number; color: string } | null => {
+  if (entries.length < 4) return null;
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+  const half = Math.floor(sorted.length / 2);
+  const earlier = sorted.slice(0, half);
+  const recent = sorted.slice(half);
+  const extractValue = (e: typeof sorted[0]): number | null => {
+    if (key === 'sleep') return parseFloat(e.fields.find(x => x.label === 'Часы')?.value || 'NaN');
+    if (key === 'weight') return parseFloat(e.fields.find(x => x.label === 'Вес')?.value || 'NaN');
+    if (key === 'pain') return parseFloat(e.fields.find(x => x.label === 'Суммарно')?.value || 'NaN');
+    if (key === 'acne') return parseFloat(e.fields.find(x => x.label === 'Суммарно')?.value || 'NaN');
+    if (key === 'neuro') return parseFloat(e.fields.find(x => x.label === 'Симптомов')?.value || 'NaN');
+    if (key === 'hemato') return parseFloat(e.fields.find(x => x.label === 'Симптомов')?.value || 'NaN');
+    if (key === 'bp') {
+      const sys = parseFloat(e.fields.find(x => x.label === 'Систола')?.value || 'NaN');
+      const dia = parseFloat(e.fields.find(x => x.label === 'Диастола')?.value || 'NaN');
+      return (Number.isFinite(sys) && Number.isFinite(dia)) ? (sys + dia) / 2 : NaN;
+    }
+    return null;
+  };
+  const avg = (arr: typeof sorted) => {
+    const vals = arr.map(extractValue).filter((v): v is number => v !== null && Number.isFinite(v));
+    return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
+  };
+  const avgEarlier = avg(earlier);
+  const avgRecent = avg(recent);
+  if (avgEarlier === null || avgRecent === null) return null;
+  const delta = avgRecent - avgEarlier;
+  const direction = delta > 0.05 ? '↑' : delta < -0.05 ? '↓' : '=';
+  const isNegativeTrend = (key === 'weight' && key !== 'weight') || ['pain', 'acne', 'neuro', 'hemato', 'bp'].includes(key);
+  const isPositiveWhenRising = key === 'sleep' || key === 'weight';
+  const isImprovement = isPositiveWhenRising ? delta > 0 : delta < 0;
+  const trendColor = Math.abs(delta) < 0.05 ? colors.textMuted : (isImprovement ? '#22c55e' : (isNegativeTrend ? '#ef4444' : '#ef4444'));
+  return {
+    label: `Тренд ${half} vs ${sorted.length - half}`,
+    value: `${direction} ${Math.abs(delta).toFixed(1)}`,
+    delta,
+    color: trendColor,
+  };
+};
+
+const computeStreak = (
+  entries: { date: string }[]
+): { current: number; best: number; totalDays: number } => {
+  if (entries.length === 0) return { current: 0, best: 0, totalDays: 0 };
+  const sorted = [...entries].map(e => e.date).sort();
+  const unique = Array.from(new Set(sorted));
+  const todayMs = Date.now();
+  const dayMs = 86400000;
+  let current = 0;
+  let cursor = new Date(todayMs);
+  cursor.setHours(0, 0, 0, 0);
+  while (unique.includes(cursor.toISOString().slice(0, 10))) {
+    current += 1;
+    cursor = new Date(cursor.getTime() - dayMs);
+  }
+  if (current === 0) {
+    const last = unique[unique.length - 1];
+    const lastMs = Date.parse(last);
+    if (Number.isFinite(lastMs)) {
+      const diffDays = Math.floor((todayMs - lastMs) / dayMs);
+      if (diffDays <= 2) {
+        cursor = new Date(lastMs);
+        cursor.setHours(0, 0, 0, 0);
+        current = 0;
+        while (unique.includes(cursor.toISOString().slice(0, 10))) {
+          current += 1;
+          cursor = new Date(cursor.getTime() - dayMs);
+        }
+      }
+    }
+  }
+  let best = 0;
+  let run = 1;
+  for (let i = 1; i < unique.length; i++) {
+    const prev = Date.parse(unique[i - 1]);
+    const cur = Date.parse(unique[i]);
+    if (Number.isFinite(prev) && Number.isFinite(cur) && cur - prev === dayMs) {
+      run += 1;
+    } else {
+      if (run > best) best = run;
+      run = 1;
+    }
+  }
+  if (run > best) best = run;
+  return { current, best, totalDays: unique.length };
+};
+
+const computeExtremes = (
+  key: DiaryKey,
+  entries: { date: string; fields: { label: string; value: string; unit: string }[] }[]
+): { min: { date: string; value: number } | null; max: { date: string; value: number } | null } => {
+  const result: { min: { date: string; value: number } | null; max: { date: string; value: number } | null } = { min: null, max: null };
+  if (entries.length === 0) return result;
+  for (const e of entries) {
+    let v: number | null = null;
+    if (key === 'sleep') v = parseFloat(e.fields.find(x => x.label === 'Часы')?.value || 'NaN');
+    else if (key === 'weight') v = parseFloat(e.fields.find(x => x.label === 'Вес')?.value || 'NaN');
+    else if (key === 'pain' || key === 'acne') v = parseFloat(e.fields.find(x => x.label === 'Суммарно')?.value || 'NaN');
+    else if (key === 'neuro' || key === 'hemato') v = parseFloat(e.fields.find(x => x.label === 'Симптомов')?.value || 'NaN');
+    if (v === null || !Number.isFinite(v)) continue;
+    if (!result.min || v < result.min.value) result.min = { date: e.date, value: v };
+    if (!result.max || v > result.max.value) result.max = { date: e.date, value: v };
+  }
+  return result;
+};
+
+const groupEntriesByPeriod = (
+  entries: { date: string; fields: { label: string; value: string; unit: string }[] }[]
+): { label: string; entries: { date: string; fields: { label: string; value: string; unit: string }[] }[] }[] => {
+  if (entries.length === 0) return [];
+  const groups: Record<string, { date: string; fields: { label: string; value: string; unit: string }[] }[]> = {};
+  const order: string[] = [];
+  for (const e of entries) {
+    const d = new Date(e.date);
+    if (isNaN(d.getTime())) continue;
+    const startOfWeek = new Date(d);
+    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1));
+    const key = startOfWeek.toISOString().slice(0, 10);
+    if (!groups[key]) { groups[key] = []; order.push(key); }
+    groups[key].push(e);
+  }
+  return order.reverse().map(k => {
+    const start = new Date(k);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const fmt = (d: Date) => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+    return {
+      label: `Неделя ${fmt(start)} – ${fmt(end)}`,
+      entries: groups[k],
+    };
+  });
+};
+
 const QUICK_DIARY_LINKS: QuickLink[] = [
   { icon: '🍽', label: 'Дневник питания', target: 'nutrition-diary', color: colors.green },
   { icon: '🏋️', label: 'Журнал тренировок', target: 'workout-log', color: colors.blue },
@@ -1156,6 +1321,22 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
     }
   };
 
+  const clearActiveDiary = () => {
+    if (!activeDiary) return;
+    if (!confirm(`Удалить ВСЕ записи дневника «${DIARY_META[activeDiary].title}»? Это действие необратимо.`)) return;
+    if (activeDiary === 'sleep') { saveDiary(SLEEP_DIARY_KEY, []); setSleepEntries([]); }
+    else if (activeDiary === 'bp') { saveDiary(BP_DIARY_KEY, []); setBpEntries([]); }
+    else if (activeDiary === 'injection') { saveDiary(INJECTION_DIARY_KEY, []); setInjectionEntries([]); }
+    else if (activeDiary === 'symptoms') { saveDiary(SYMPTOMS_DIARY_KEY, []); setSymptomEntries([]); }
+    else if (activeDiary === 'pain') { saveDiary(PAIN_DIARY_KEY, []); setPainEntries([]); }
+    else if (activeDiary === 'neuro') { saveDiary(NEURO_DIARY_KEY, []); setNeuroEntries([]); }
+    else if (activeDiary === 'acne') { saveDiary(ACNE_DIARY_KEY, []); setAcneEntries([]); }
+    else if (activeDiary === 'hemato') { saveDiary(HEMATO_DIARY_KEY, []); setHematoEntries([]); }
+    if (typeof window !== 'undefined' && (window as any).showToast) {
+      (window as any).showToast(`🧹 Дневник «${DIARY_META[activeDiary].title}» очищен`);
+    }
+  };
+
   const reportSources = [
     { current: 'he_training_report_current', label: '🏋️ Тренер-отчёт', target: 'training-analytics', archiveKeys: ['he_training_reports'], color: colors.blue, desc: 'Анализ силы, прогрессии, объёма, восстановления' },
     { current: 'he_nutrition_report_current', label: '🍽 Отчёт по питанию', target: 'nutrition-reports', archiveKeys: ['he_nutrition_report_archive'], color: colors.green, desc: 'КБЖУ за день/неделю/месяц, микронутриенты' },
@@ -1347,6 +1528,13 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
               style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${colors.border}`, color: colors.text }}
             >← Назад к дневникам</button>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              {activeEntriesRaw.length > 0 && (
+                <button
+                  onClick={() => clearActiveDiary()}
+                  aria-label="Очистить весь дневник"
+                  style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}
+                >🧹 Очистить</button>
+              )}
               {activeEntries.length > 0 && (
                 <button
                   onClick={() => exportDiaryCSV(activeDiary, activeEntries)}
@@ -1373,7 +1561,7 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
           </div>
 
           {/* Фильтр по дате */}
-          {activeEntries.length > 1 && (
+          {activeEntriesRaw.length > 1 && (
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 10, color: colors.textMuted, fontWeight: 600 }}>Период:</span>
               {(['all', '7', '30', '90'] as const).map(r => (
@@ -1387,16 +1575,31 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
             </div>
           )}
 
-          {/* Summary */}
+          {/* Summary + Streak + Extremes + Trend */}
           {(() => {
             const summary = computeSummary(activeDiary, activeEntries);
-            if (!summary) return null;
+            const period = computePeriodDelta(activeDiary, activeEntries);
+            const streak = computeStreak(activeEntriesRaw);
+            const extremes = computeExtremes(activeDiary, activeEntries);
+            const blocks: { label: string; value: string; color: string }[] = [];
+            if (streak.totalDays > 0) {
+              blocks.push({ label: 'Дней с записями', value: String(streak.totalDays), color: DIARY_META[activeDiary].color });
+              blocks.push({ label: 'Серия (текущая)', value: `${streak.current} дн.`, color: streak.current >= 3 ? '#22c55e' : streak.current >= 1 ? colors.warning : colors.textMuted });
+              blocks.push({ label: 'Серия (лучшая)', value: `${streak.best} дн.`, color: streak.best >= 7 ? '#22c55e' : streak.best >= 3 ? colors.warning : colors.textMuted });
+            }
+            if (period) blocks.push(period);
+            if (extremes.min && (activeDiary === 'sleep' || activeDiary === 'weight' || activeDiary === 'pain' || activeDiary === 'acne' || activeDiary === 'neuro' || activeDiary === 'hemato')) {
+              blocks.push({ label: 'Минимум', value: `${extremes.min.value.toFixed(1)} · ${new Date(extremes.min.date).toLocaleDateString('ru-RU')}`, color: '#22c55e' });
+              blocks.push({ label: 'Максимум', value: `${extremes.max!.value.toFixed(1)} · ${new Date(extremes.max!.date).toLocaleDateString('ru-RU')}`, color: '#ef4444' });
+            }
+            if (summary) blocks.push(...summary);
+            if (blocks.length === 0) return null;
             return (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 6, marginBottom: 10 }}>
-                {summary.map((s, i) => (
+                {blocks.map((s, i) => (
                   <div key={i} style={{ padding: 8, borderRadius: 8, background: `${s.color}1A`, border: `1px solid ${s.color}44` }}>
                     <div style={{ fontSize: 9, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: s.color, marginTop: 2 }}>{s.value}</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: s.color, marginTop: 2 }}>{s.value}</div>
                   </div>
                 ))}
               </div>
@@ -1417,29 +1620,41 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
 
           {activeEntries.length === 0 ? (
             <div style={{ color: colors.textMuted, fontSize: 12, padding: 12, textAlign: 'center' }}>
-              Записей пока нет. Нажмите «+ Добавить запись», чтобы внести первую.
+              {activeEntriesRaw.length === 0
+                ? 'Записей пока нет. Нажмите «+ Добавить запись», чтобы внести первую.'
+                : `Нет записей за выбранный период (${diaryRange === 'all' ? 'всё время' : diaryRange + ' дней'}).`}
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {activeEntries.map((entry, i) => (
-                <div key={`${entry.date}-${i}`} style={{ padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${DIARY_META[activeDiary].color}22` }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: DIARY_META[activeDiary].color }}>{new Date(entry.date).toLocaleDateString('ru-RU')}</span>
-                    <button
-                      onClick={() => deleteDiaryEntry(activeDiary, entry.date)}
-                      aria-label={`Удалить запись ${new Date(entry.date).toLocaleDateString('ru-RU')}`}
-                      style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}
-                    >🗑 Удалить</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {groupEntriesByPeriod(activeEntries).map(group => (
+                <div key={group.label} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: `${DIARY_META[activeDiary].color}14`, borderRadius: 6, borderLeft: `3px solid ${DIARY_META[activeDiary].color}` }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: DIARY_META[activeDiary].color }}>📅 {group.label}</span>
+                    <span style={{ fontSize: 9, color: colors.textMuted }}>· {group.entries.length} {group.entries.length === 1 ? 'запись' : group.entries.length < 5 ? 'записи' : 'записей'}</span>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 4 }}>
-                    {entry.fields.map((f, fi) => (
-                      <div key={fi} style={{ fontSize: 10, color: colors.textMuted }}>
-                        <span style={{ color: colors.text }}>{f.value}</span>
-                        {f.unit ? ` ${f.unit}` : ''}
-                        <span style={{ marginLeft: 4, opacity: 0.7 }}>· {f.label}</span>
+                  {group.entries.map((entry, i) => (
+                    <div key={`${group.label}-${entry.date}-${i}`} style={{ padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${DIARY_META[activeDiary].color}22`, transition: 'background 0.15s' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: DIARY_META[activeDiary].color }}>{new Date(entry.date).toLocaleDateString('ru-RU')}</span>
+                        <button
+                          onClick={() => deleteDiaryEntry(activeDiary, entry.date)}
+                          aria-label={`Удалить запись ${new Date(entry.date).toLocaleDateString('ru-RU')}`}
+                          style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}
+                        >🗑 Удалить</button>
                       </div>
-                    ))}
-                  </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 4 }}>
+                        {entry.fields.map((f, fi) => (
+                          <div key={fi} style={{ fontSize: 10, color: colors.textMuted }}>
+                            <span style={{ color: colors.text }}>{f.value}</span>
+                            {f.unit ? ` ${f.unit}` : ''}
+                            <span style={{ marginLeft: 4, opacity: 0.7 }}>· {f.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
