@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../../core/db';
 import { getWeightLog, saveWeightLog, getMeasurementsLog, saveMeasurementsLog } from '../../../engines/profile-store';
+import { useProfileRefresh } from '../../../core/profile-manager';
 import { AccordionSection, colors } from './ui';
 
 /* ── Типы для встроенных дневников ── */
@@ -1095,6 +1096,26 @@ const QUICK_REPORT_LINKS: QuickLink[] = [
 /* ── Главный компонент ── */
 
 export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void; initialView?: 'diary' | 'reports' | 'archive'; initialActiveDiary?: DiaryKey }> = ({ onNavigate, initialView, initialActiveDiary }) => {
+  const profile = useProfileRefresh();
+  const pharmaPhase = (profile.settings as any)?.pharma?.phase as 'baseline' | 'course' | 'bridge' | 'pct' | 'post_pct' | 'fertility' | undefined;
+  const courseStartDate = (profile.settings as any)?.pharma?.courseStartDate as string | undefined;
+  const PHASE_LABELS: Record<string, { label: string; color: string }> = {
+    baseline: { label: 'Базовая линия', color: '#6b7280' },
+    course: { label: 'Курс', color: '#f59e0b' },
+    bridge: { label: 'Мост', color: '#a78bfa' },
+    pct: { label: 'ПКТ', color: '#8b5cf6' },
+    post_pct: { label: 'После ПКТ', color: '#3b82f6' },
+    fertility: { label: 'Фертильность', color: '#ec4899' },
+  };
+  const currentPhase = pharmaPhase ? PHASE_LABELS[pharmaPhase] : null;
+  const courseWeek = (() => {
+    if (pharmaPhase !== 'course' || !courseStartDate) return null;
+    const start = new Date(courseStartDate);
+    if (isNaN(start.getTime())) return null;
+    const now = new Date();
+    const diffMs = now.getTime() - start.getTime();
+    return Math.max(1, Math.floor(diffMs / (7 * 86400000)) + 1);
+  })();
   const [view, setView] = useState<'diary' | 'reports' | 'archive'>(initialView || 'diary');
   const [activeDiary, setActiveDiary] = useState<DiaryKey | null>(initialActiveDiary || null);
   useEffect(() => { if (initialView) setView(initialView); }, [initialView]);
@@ -1122,6 +1143,26 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
   const [addAcneOpen, setAddAcneOpen] = useState(false);
   const [addHematoOpen, setAddHematoOpen] = useState(false);
   const [diaryRange, setDiaryRange] = useState<'all' | '7' | '30' | '90'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  interface DiaryGoals { sleepHours: number; weightKg: number; systolicTarget: number; }
+  const GOALS_KEY = 'he_diary_goals';
+  const [goals, setGoals] = useState<DiaryGoals>(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(GOALS_KEY) || '{}');
+      return {
+        sleepHours: Number(raw.sleepHours) || 0,
+        weightKg: Number(raw.weightKg) || 0,
+        systolicTarget: Number(raw.systolicTarget) || 0,
+      };
+    } catch { return { sleepHours: 0, weightKg: 0, systolicTarget: 0 }; }
+  });
+  const importInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const saveGoals = (next: DiaryGoals) => {
+    setGoals(next);
+    try { localStorage.setItem(GOALS_KEY, JSON.stringify(next)); } catch {}
+  };
 
   const refresh = () => {
     try { setSleepEntries(loadDiary<SleepEntry>(SLEEP_DIARY_KEY)); } catch {}
@@ -1337,6 +1378,119 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
     }
   };
 
+  const exportAllDiaries = () => {
+    const payload: Record<string, any> = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      goals,
+      diaries: {
+        [SLEEP_DIARY_KEY]: sleepEntries,
+        [BP_DIARY_KEY]: bpEntries,
+        [INJECTION_DIARY_KEY]: injectionEntries,
+        [SYMPTOMS_DIARY_KEY]: symptomEntries,
+        [PAIN_DIARY_KEY]: painEntries,
+        [NEURO_DIARY_KEY]: neuroEntries,
+        [ACNE_DIARY_KEY]: acneEntries,
+        [HEMATO_DIARY_KEY]: hematoEntries,
+      },
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `diaries-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+    if ((window as any).showToast) (window as any).showToast('📦 Все дневники экспортированы в JSON');
+  };
+
+  const importAllDiaries = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result || ''));
+        const diaries = data.diaries || {};
+        if (diaries[SLEEP_DIARY_KEY] && Array.isArray(diaries[SLEEP_DIARY_KEY])) { saveDiary(SLEEP_DIARY_KEY, diaries[SLEEP_DIARY_KEY]); setSleepEntries(diaries[SLEEP_DIARY_KEY]); }
+        if (diaries[BP_DIARY_KEY] && Array.isArray(diaries[BP_DIARY_KEY])) { saveDiary(BP_DIARY_KEY, diaries[BP_DIARY_KEY]); setBpEntries(diaries[BP_DIARY_KEY]); }
+        if (diaries[INJECTION_DIARY_KEY] && Array.isArray(diaries[INJECTION_DIARY_KEY])) { saveDiary(INJECTION_DIARY_KEY, diaries[INJECTION_DIARY_KEY]); setInjectionEntries(diaries[INJECTION_DIARY_KEY]); }
+        if (diaries[SYMPTOMS_DIARY_KEY] && Array.isArray(diaries[SYMPTOMS_DIARY_KEY])) { saveDiary(SYMPTOMS_DIARY_KEY, diaries[SYMPTOMS_DIARY_KEY]); setSymptomEntries(diaries[SYMPTOMS_DIARY_KEY]); }
+        if (diaries[PAIN_DIARY_KEY] && Array.isArray(diaries[PAIN_DIARY_KEY])) { saveDiary(PAIN_DIARY_KEY, diaries[PAIN_DIARY_KEY]); setPainEntries(diaries[PAIN_DIARY_KEY]); }
+        if (diaries[NEURO_DIARY_KEY] && Array.isArray(diaries[NEURO_DIARY_KEY])) { saveDiary(NEURO_DIARY_KEY, diaries[NEURO_DIARY_KEY]); setNeuroEntries(diaries[NEURO_DIARY_KEY]); }
+        if (diaries[ACNE_DIARY_KEY] && Array.isArray(diaries[ACNE_DIARY_KEY])) { saveDiary(ACNE_DIARY_KEY, diaries[ACNE_DIARY_KEY]); setAcneEntries(diaries[ACNE_DIARY_KEY]); }
+        if (diaries[HEMATO_DIARY_KEY] && Array.isArray(diaries[HEMATO_DIARY_KEY])) { saveDiary(HEMATO_DIARY_KEY, diaries[HEMATO_DIARY_KEY]); setHematoEntries(diaries[HEMATO_DIARY_KEY]); }
+        if (data.goals && typeof data.goals === 'object') { setGoals({ ...goals, ...data.goals }); localStorage.setItem(GOALS_KEY, JSON.stringify({ ...goals, ...data.goals })); }
+        if ((window as any).showToast) (window as any).showToast('📥 Дневники импортированы');
+      } catch (e) {
+        if ((window as any).showToast) (window as any).showToast('❌ Ошибка импорта: ' + (e instanceof Error ? e.message : 'неверный формат'));
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const printActiveDiary = () => {
+    if (!activeDiary) return;
+    const meta = DIARY_META[activeDiary];
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${meta.title} — отчёт</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0a;color:#fafafa;padding:24px;max-width:780px;margin:0 auto;}
+h1{color:${meta.color};border-bottom:2px solid ${meta.color};padding-bottom:8px;}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px;}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #222;}
+th{color:${meta.color};}
+.muted{color:#777;font-size:12px;}
+</style></head><body>
+<h1>${meta.icon} ${meta.title}</h1>
+<p class="muted">Отчёт сформирован: ${new Date().toLocaleString('ru-RU')}</p>
+<p class="muted">Записей: ${activeEntriesRaw.length}${diaryRange !== 'all' ? ` (показано ${activeEntries.length} за период ${diaryRange} дней)` : ''}</p>
+<table><thead><tr><th>Дата</th>${Array.from(new Set(activeEntriesRaw.flatMap(e => e.fields.map(f => f.label)))).map(l => `<th>${l}</th>`).join('')}<th>Заметка</th></tr></thead><tbody>
+${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-RU')}</td>${Array.from(new Set(activeEntriesRaw.flatMap(e2 => e2.fields.map(f => f.label)))).map(l => {
+      const f = e.fields.find(x => x.label === l);
+      return `<td>${f ? f.value + (f.unit ? ' ' + f.unit : '') : ''}</td>`;
+    }).join('')}<td>${(e.fields.find(f => f.label === 'Заметка')?.value) || ''}</td></tr>`).join('')}
+</tbody></table>
+<p class="muted">BodyBuildHealth · профильные дневники</p>
+</body></html>`;
+    const w = window.open('', '_blank');
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      setTimeout(() => w.print(), 250);
+    } else {
+      if ((window as any).showToast) (window as any).showToast('⚠ Не удалось открыть окно печати — разрешите всплывающие окна');
+    }
+  };
+
+  const targetHit = (
+    key: DiaryKey,
+    entries: { date: string; fields: { label: string; value: string; unit: string }[] }[]
+  ): { onTarget: boolean; details: string } | null => {
+    const last = entries[0];
+    if (!last) return null;
+    if (key === 'sleep' && goals.sleepHours > 0) {
+      const hours = parseFloat(last.fields.find(x => x.label === 'Часы')?.value || 'NaN');
+      if (!Number.isFinite(hours)) return null;
+      const onTarget = hours >= goals.sleepHours;
+      return { onTarget, details: `${hours.toFixed(1)} ч / цель ${goals.sleepHours} ч` };
+    }
+    if (key === 'weight' && goals.weightKg > 0) {
+      const w = parseFloat(last.fields.find(x => x.label === 'Вес')?.value || 'NaN');
+      if (!Number.isFinite(w)) return null;
+      const diff = w - goals.weightKg;
+      const onTarget = Math.abs(diff) <= 0.5;
+      return { onTarget, details: `${w.toFixed(1)} кг / цель ${goals.weightKg} кг (Δ ${diff > 0 ? '+' : ''}${diff.toFixed(1)})` };
+    }
+    if (key === 'bp' && goals.systolicTarget > 0) {
+      const sys = parseFloat(last.fields.find(x => x.label === 'Систола')?.value || 'NaN');
+      if (!Number.isFinite(sys)) return null;
+      return { onTarget: sys <= goals.systolicTarget, details: `${sys.toFixed(0)} / цель ≤ ${goals.systolicTarget}` };
+    }
+    return null;
+  };
+
   const reportSources = [
     { current: 'he_training_report_current', label: '🏋️ Тренер-отчёт', target: 'training-analytics', archiveKeys: ['he_training_reports'], color: colors.blue, desc: 'Анализ силы, прогрессии, объёма, восстановления' },
     { current: 'he_nutrition_report_current', label: '🍽 Отчёт по питанию', target: 'nutrition-reports', archiveKeys: ['he_nutrition_report_archive'], color: colors.green, desc: 'КБЖУ за день/неделю/месяц, микронутриенты' },
@@ -1478,18 +1632,107 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
 
       {view !== 'diary' ? null : <>
       <AccordionSection
+        title="🎯 Цели"
+        subtitle="Целевые значения для отслеживания прогресса"
+        icon="🎯"
+        color={colors.primary}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+          {([
+            { key: 'sleepHours', label: 'Сон (ч/день)', min: 4, max: 12, step: 0.5, color: '#a78bfa' },
+            { key: 'weightKg', label: 'Вес (кг)', min: 30, max: 250, step: 0.1, color: '#22c55e' },
+            { key: 'systolicTarget', label: 'АД сист. (≤ мм рт.ст.)', min: 80, max: 180, step: 1, color: '#ef4444' },
+          ] as const).map(g => (
+            <div key={g.key} style={{ padding: 8, borderRadius: 8, background: `${g.color}12`, border: `1px solid ${g.color}44` }}>
+              <label style={{ fontSize: 9, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700, display: 'block', marginBottom: 4 }}>{g.label}</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="number"
+                  min={g.min}
+                  max={g.max}
+                  step={g.step}
+                  value={goals[g.key] || ''}
+                  onChange={e => {
+                    const v = parseFloat(e.target.value);
+                    saveGoals({ ...goals, [g.key]: Number.isFinite(v) ? v : 0 });
+                  }}
+                  style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '8px 10px', color: g.color, fontSize: 16, fontWeight: 700, outline: 'none' }}
+                />
+                {goals[g.key] > 0 && (
+                  <button
+                    onClick={() => saveGoals({ ...goals, [g.key]: 0 })}
+                    aria-label="Сбросить цель"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: 'none', color: colors.textMuted, padding: '4px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+                  >✕</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 8, lineHeight: 1.4 }}>
+          Укажите целевые значения, и в активном дневнике появится индикатор «в цели/вне цели» для последней записи.
+        </div>
+      </AccordionSection>
+
+      <AccordionSection
+        title="💾 Данные"
+        subtitle="Импорт, экспорт и сброс всех дневников"
+        icon="💾"
+        color={colors.blue}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <button
+            onClick={exportAllDiaries}
+            style={{ padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, background: 'rgba(96,165,250,0.14)', border: '1px solid rgba(96,165,250,0.4)', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: 6 }}
+          >📤 Экспорт всех дневников (JSON)</button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) importAllDiaries(f); e.target.value = ''; }}
+            style={{ display: 'none' }}
+            aria-label="Импорт файла"
+          />
+          <button
+            onClick={() => importInputRef.current?.click()}
+            style={{ padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.4)', color: '#22c55e', display: 'flex', alignItems: 'center', gap: 6 }}
+          >📥 Импорт</button>
+          <button
+            onClick={() => {
+              if (!confirm('Удалить ВСЕ записи ВСЕХ встроенных дневников? Это действие необратимо.')) return;
+              [SLEEP_DIARY_KEY, BP_DIARY_KEY, INJECTION_DIARY_KEY, SYMPTOMS_DIARY_KEY, PAIN_DIARY_KEY, NEURO_DIARY_KEY, ACNE_DIARY_KEY, HEMATO_DIARY_KEY].forEach(k => saveDiary(k, []));
+              setSleepEntries([]); setBpEntries([]); setInjectionEntries([]); setSymptomEntries([]);
+              setPainEntries([]); setNeuroEntries([]); setAcneEntries([]); setHematoEntries([]);
+              if ((window as any).showToast) (window as any).showToast('🧹 Все встроенные дневники очищены');
+            }}
+            style={{ padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 6 }}
+          >🗑 Сбросить всё</button>
+        </div>
+      </AccordionSection>
+
+      <AccordionSection
         title="📓 Встроенные дневники"
-        subtitle="Сон, давление, вес, замеры, инъекции — добавляйте прямо здесь"
+        subtitle="Сон, давление, вес, замеры, инъекции, симптомы, боль, нейро, акне, гематология"
         icon="📓"
         color={colors.orange}
         defaultOpen
       >
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="🔍 Поиск дневника…"
+          style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '8px 10px', color: colors.text, fontSize: 12, outline: 'none', marginBottom: 8, boxSizing: 'border-box' }}
+          aria-label="Поиск дневника"
+        />
         <div
           role="list"
           aria-label="Встроенные дневники"
           style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}
         >
-          {builtInDiaries.map(d => (
+          {builtInDiaries
+            .filter(d => !searchQuery.trim() || DIARY_META[d.key].title.toLowerCase().includes(searchQuery.toLowerCase()) || d.last.toLowerCase().includes(searchQuery.toLowerCase()))
+            .map(d => (
             <DiaryCard
               key={d.key}
               diaryKey={d.key}
@@ -1511,12 +1754,17 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
             />
           ))}
         </div>
+        {searchQuery.trim() && builtInDiaries.filter(d => DIARY_META[d.key].title.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+          <div style={{ color: colors.textMuted, fontSize: 12, padding: 12, textAlign: 'center' }}>
+            Дневников по запросу «{searchQuery}» не найдено.
+          </div>
+        )}
       </AccordionSection>
 
       {activeDiary && (
         <AccordionSection
           title={`${DIARY_META[activeDiary].icon} Дневник: ${DIARY_META[activeDiary].title}`}
-          subtitle={`Записи из ${DIARY_META[activeDiary].title.toLowerCase()} (${activeEntries.length})`}
+          subtitle={`Записи из ${DIARY_META[activeDiary].title.toLowerCase()} (${activeEntries.length})${currentPhase ? ` · ${currentPhase.label}${courseWeek ? ` · неделя ${courseWeek}` : ''}` : ''}`}
           icon={DIARY_META[activeDiary].icon}
           color={DIARY_META[activeDiary].color}
           defaultOpen
@@ -1529,11 +1777,18 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
             >← Назад к дневникам</button>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               {activeEntriesRaw.length > 0 && (
-                <button
-                  onClick={() => clearActiveDiary()}
-                  aria-label="Очистить весь дневник"
-                  style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}
-                >🧹 Очистить</button>
+                <>
+                  <button
+                    onClick={() => printActiveDiary()}
+                    aria-label="Печать отчёта"
+                    style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa' }}
+                  >🖨 Печать</button>
+                  <button
+                    onClick={() => clearActiveDiary()}
+                    aria-label="Очистить весь дневник"
+                    style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}
+                  >🧹 Очистить</button>
+                </>
               )}
               {activeEntries.length > 0 && (
                 <button
@@ -1581,6 +1836,7 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
             const period = computePeriodDelta(activeDiary, activeEntries);
             const streak = computeStreak(activeEntriesRaw);
             const extremes = computeExtremes(activeDiary, activeEntries);
+            const target = targetHit(activeDiary, activeEntriesRaw);
             const blocks: { label: string; value: string; color: string }[] = [];
             if (streak.totalDays > 0) {
               blocks.push({ label: 'Дней с записями', value: String(streak.totalDays), color: DIARY_META[activeDiary].color });
@@ -1592,6 +1848,7 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
               blocks.push({ label: 'Минимум', value: `${extremes.min.value.toFixed(1)} · ${new Date(extremes.min.date).toLocaleDateString('ru-RU')}`, color: '#22c55e' });
               blocks.push({ label: 'Максимум', value: `${extremes.max!.value.toFixed(1)} · ${new Date(extremes.max!.date).toLocaleDateString('ru-RU')}`, color: '#ef4444' });
             }
+            if (target) blocks.unshift({ label: '🎯 Цель', value: `${target.onTarget ? '✅' : '⚠️'} ${target.details}`, color: target.onTarget ? '#22c55e' : '#f59e0b' });
             if (summary) blocks.push(...summary);
             if (blocks.length === 0) return null;
             return (
