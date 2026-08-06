@@ -15,14 +15,39 @@ export const GOAL_FILTER_OPTIONS: { value: string; label: string; goal?: string 
 
 /** Files supplied by the user. These are intentionally raw files, not parsed programs. */
 export const ORIGINAL_PROGRAM_FILES = [
-  { id: 'original-01', name: '8-дневный сплит (без дня плеч и рук)', file: 'original-01.md', format: 'MD' },
-  { id: 'original-02', name: 'Базовый переработанный сплит', file: 'original-02.docx', format: 'DOCX' },
-  { id: 'original-03', name: 'Тренировочный план Апрель', file: 'original-03.docx', format: 'DOCX' },
-  { id: 'original-04', name: 'Тренировочный план: ягодицы', file: 'original-04.md', format: 'MD' },
-  { id: 'original-05', name: 'Тренировочный план Июль: масса', file: 'original-05.docx', format: 'DOCX' },
+  { id: 'original-01', name: '8-дневный сплит (без дня плеч и рук)', file: 'original-01.md', textFile: 'original-01.txt', format: 'MD', daysPerWeek: 8 },
+  { id: 'original-02', name: 'Базовый переработанный сплит', file: 'original-02.docx', textFile: 'original-02.txt', format: 'DOCX', daysPerWeek: 5 },
+  { id: 'original-03', name: 'Тренировочный план Апрель', file: 'original-03.docx', textFile: 'original-03.txt', format: 'DOCX', daysPerWeek: 5 },
+  { id: 'original-04', name: 'Тренировочный план: ягодицы', file: 'original-04.md', textFile: 'original-04.txt', format: 'MD', daysPerWeek: 8 },
+  { id: 'original-05', name: 'Тренировочный план Июль: масса', file: 'original-05.docx', textFile: 'original-05.txt', format: 'DOCX', daysPerWeek: 9 },
 ] as const;
 
 export const ORIGINAL_PROGRAMS_URL = '/original-programs/';
+
+export type OriginalProgram = FullProgram & typeof ORIGINAL_PROGRAM_FILES[number] & {
+  kind: 'original';
+};
+
+export const ORIGINAL_PROGRAMS: OriginalProgram[] = ORIGINAL_PROGRAM_FILES.map(file => ({
+  ...file,
+  kind: 'original' as const,
+  author: 'Мои оригиналы',
+  type: `Оригинальный файл ${file.format}`,
+  goal: 'hypertrophy' as const,
+  direction: 'bodybuilding' as const,
+  level: 'advanced' as const,
+  durationWeeks: 1,
+  sessionTimeMin: 'Исходник',
+  description: `Исходная пользовательская программа из файла ${file.format}. Структура не преобразуется.`,
+  targetAudience: 'Пользовательская оригинальная программа',
+  equipmentNeeded: [],
+  weeks: [],
+  progressionModel: 'Сохранено в исходном файле',
+  deloadProtocol: 'Сохранено в исходном файле',
+  customization: [],
+  warnings: [],
+  expectedResults: 'Сохранено в исходном файле',
+}));
 
 export const WOMENS_PROGRAMS: FullProgram[] = [
   {
