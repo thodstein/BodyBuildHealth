@@ -2041,9 +2041,6 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         const peds = (ctx.pedDoses || ctx.aasIds?.map((id: string) => ({ id, pClass: 'aas_unknown' })) || []);
         if (!peds.length) return null;
         
-        // Lazy import to avoid circular deps
-        const { calculateReboundTrajectory, getReboundSummary } = require('../../../engines/rebound-modeling.engine');
-        
         const cycleWeeks = state.goals?.cycleWeeks || 12;
         const pctProtocol = rec?.pedFlags?.hasTest ? 'hcg+clomid' : 'clomid+nolva';
 
@@ -2066,8 +2063,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         };
         
         try {
-          const rebound = calculateReboundTrajectory(reboundInput);
-          const summary = getReboundSummary(rebound);
+          const rebound = calculateReboundTrajectory(reboundInput) as any;
+          const summary = getReboundSummary(rebound) as any;
           
           return (
             <div style={{ marginTop:6 }}>
