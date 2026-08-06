@@ -406,7 +406,7 @@ const EXECUTION_NOTES: Record<string, string> = {
   'сведение в тренажёре': "Сводите руки до касания. Контроль негативной фазы. Растяжение в стартовой позиции.",
   'сведение рук в кроссовере': "Сводите руки до касания. Контроль негативной фазы. Растяжение в стартовой позиции.",
   'отжимания на брусьях': "Корпус: наклон вперёд (грудь) или вертикально (трицепс). Опускайтесь до параллели плеч полу.",
-  'гиперэкстензия': "Спина: прямая. Не переразгибайтесь в верхней точке. Движение可控ное.",
+  'гиперэкстензия': "Спина: прямая. Не переразгибайтесь в верхней точке. Движение контролируемое.",
   'ягодичный мост': "Стопы: на ширине плеч. Таз: вверх до полного разгибания. Пиковое сокращение 1 сек.",
   'шраги со штангой': "Плечи: вверх к ушам. Без вращения. Задержка 1 сек вверху.",
   'шраги с гантелями': "Плечи: вверх к ушам. Без вращения. Задержка 1 сек вверху.",
@@ -445,7 +445,7 @@ function strengthRank(ex: any): number {
  * Эти упражнения не дают механического натяжения/метаболического стресса для роста мышц.
  * Разрешены: скручивания (crunch), подъём ног, гиперэкстензия (ягодицы/разгибатели спины).
  */
-const BB_JUNK_PATTERNS: RegExp = /паллоф|pallof|bird.?dog|птиц.*собак|monster.?walk|резин|banded|band.?walk|планк|plank|copenhagen|копенгаген|spiderman|человек.?паук|plank.?jack|планк.*прыжк|walkout|шагающ.*планк|супермен|superman|gator.?walk|аллигатор|inchworm|гусениц|dead.?bug|мёртв.*жук|мертв.*жук|медбол|med.?ball|medicine.?ball|бросок.*мяч|рубк.*дров|рубк.*дерев|wood.?chop|ротацион|rotational|bradford|брэдфорд|наклон.*сидя.*штанг|seated.*good.?morning|отжиман|push.?up|русск.*твист|russian.?twist|тяга.*за голов|pulldown.*behind|pike.*отжим|pike.*push|индийск|hindu.*push|скольжен.*стен|wall.?slide|кубан|cuban|мельниц.*гир|windmill|пугало|scarecrow|жим.*гир|kb.?press|bent.?press|наклонн.*жим.*гир|лэндмайн|landmine|вис.*полотен|вис.*гриф|вис.*турник|l.?сит|l.?sit|растяжк|stretch|мобильн|mobility|кошк.*корова|cat.?cow|колесо|ab.?wheel|горн.*ключ|mountain.*climb|90\/90|world.?greatest| йога|yoga/i;
+const BB_JUNK_PATTERNS: RegExp = /паллоф|pallof|bird.?dog|птиц.*собак|monster.?walk|резин|banded|band.?walk|планк|plank|copenhagen|копенгаген|spiderman|человек.?паук|plank.?jack|планк.*прыжк|walkout|шагающ.*планк|супермен|superman|gator.?walk|аллигатор|inchworm|гусениц|dead.?bug|мёртв.*жук|мертв.*жук|медбол|med.?ball|medicine.?ball|бросок.*мяч|рубк.*дров|рубк.*дерев|wood.?chop|ротацион|rotational|bradford|брэдфорд|наклон.*сидя.*штанг|seated.*good.?morning|отжимания.*(?:от пол|от скам|на колен|от колен)|push.?up|русск.*твист|russian.?twist|тяга.*за голов|pulldown.*behind|pike.*отжим|pike.*push|индийск|hindu.*push|скольжен.*стен|wall.?slide|кубан|cuban|мельниц.*гир|windmill|пугало|scarecrow|жим.*гир|kb.?press|bent.?press|наклонн.*жим.*гир|лэндмайн|landmine|вис.*полотен|вис.*гриф|вис.*турник|l.?сит|l.?sit|растяжк|stretch|мобильн|mobility|кошк.*корова|cat.?cow|колесо|ab.?wheel|горн.*ключ|mountain.*climb|90\/90|world.?greatest| йога|yoga/i;
 
 /** Проверить, является ли упражнение BB-мусором (не для гипертрофии). */
 function isBBJunk(ex: any): boolean {
@@ -588,7 +588,11 @@ export function bbRir(resolved: DayCharacter, phase: BBPhase, phaseWeek: number,
   let base = cfg.base;
   if (phase === 'deload') base = 4;
   else if (phase === 'intensification') base = Math.max(0, base - 1);
-  else if (phase === 'peaking') base = Math.max(0, base - 1);
+  // B1: peaking НЕ снижает base на 1 — пусть drift естественным образом доводит RIR
+  // до 0 к концу пика. Ранее base-1 давало RIR=0 для ВСЕХ недель peaking (3 недели
+  // на failure — нарушает supercompensation, Zatsiorsky 2006). Теперь:
+  // strength base=1: W1=1, W2=0, W3=0 (1 субмакс. неделя перед пиком).
+  // hypertrophy base=2: W1=2, W2=1, W3=1 (мягкий пик).
   // Per-week RIR drift: driftPer2Weeks applies every 2 weeks of the SAME phase.
   // strength/hypertrophy: drift=-1 → RIR drops 1 every 2 weeks (W1=base, W2=base-1, W3=base-1, W4=base-2).
   // endurance: drift=0 → RIR stays constant (metabolic focus, no neural peaking).
@@ -651,8 +655,10 @@ function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary
 }
 
 /** fix D: недельный кап объёма каждой мышцы по её истинному MRV (после всех множителей).
- *  + per-exercise кап: максимум 8 сетов на упражнение (ББ-практика). */
-function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string, number>): void {
+ *  + per-exercise кап: максимум 8 сетов на упражнение (ББ-практика).
+ *  C6: isDeload — во время deload floor=2 НЕ применяется (4 упр × 2 = 8 сетов
+ *  нарушает intended deload ~4-6 сетов). floor=1 для deload, floor=2 для рабочих недель. */
+function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string, number>, isDeload: boolean = false): void {
   const syncWorkSets = (ex: BBExercise): void => {
     const target = Math.max(0, ex.sets || 0);
     const current = Array.isArray(ex.workSets) ? ex.workSets : [];
@@ -677,9 +683,10 @@ function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string,
     // большого объёма за одно упражнение (Schoenfeld: small muscles 4-6 сетов/упр).
     // P1-4: per-exercise FLOOR — минимум 2 сета (1 сет = разминка, не рабочий объём).
     const perExCap = (m === 'forearms' || m === 'calves' || m === 'abs') ? 6 : 8;
+    const floor = isDeload ? 1 : 2; // C6: deload floor=1, рабочая неделя floor=2
     for (const ex of info.exs) {
       if (ex.sets > perExCap) ex.sets = perExCap;
-      if (ex.sets < 2) ex.sets = 2;
+      if (ex.sets < floor) ex.sets = floor;
       syncWorkSets(ex);
     }
     // Пересчитать total после per-exercise капа
@@ -691,9 +698,9 @@ function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string,
       // Если даже при floor=2 для всех упражнений сумма > cap, удалить последние
       // (accessory/памп) упражнения целиком, а не резать до 1 сета.
       // Это даёт чистый план без 1-set "разминочных" упражнений.
-      const minTotal = info.exs.length * 2; // минимум 2 сета на упражнение
+      const minTotal = info.exs.length * floor; // C6: deload floor=1, иначе 2
       if (minTotal > cap) {
-        // Удалить последние упражнения пока sum(2 × remaining) <= cap
+        // Удалить последние упражнения пока sum(floor × remaining) <= cap
         // Сортируем: primary первыми (accessory удаляем раньше).
         // BUG-FIX: добавлена вторичная сортировка по strengthRank — compound
         // упражнения сохраняются раньше isolation (compound даёт больше гипертрофии).
@@ -705,9 +712,9 @@ function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string,
         });
         const toRemove: BBExercise[] = [];
         let keptCount = info.exs.length;
-        // BUG-FIX: гарантировать минимум 1 упражнение (2 сета) даже если cap < 2.
+        // BUG-FIX: гарантировать минимум 1 упражнение (floor сетов) даже если cap < floor.
         // Раньше при cap=0 или cap=1 удалялись ВСЕ упражнения → мышца без объёма.
-        while (keptCount * 2 > cap && keptCount > 1) {
+        while (keptCount * floor > cap && keptCount > 1) {
           const removed = sortedExs.pop()!;
           toRemove.push(removed);
           keptCount--;
@@ -737,12 +744,13 @@ function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string,
       let allocated = 0;
       const rawSets = info.exs.map(ex => ex.sets * factor);
       // FIX-A7: floor=2 (не 1) — 1 сет = разминка, не рабочий объём (Schoenfeld 2016: минимум 2-3 рабочих сета).
-      const floored = rawSets.map(v => Math.max(2, Math.floor(v)));
+      // C6: deload → floor=1 (разгрузка допускает 1 сет на упражнение).
+      const floored = rawSets.map(v => Math.max(floor, Math.floor(v)));
       allocated = floored.reduce((s, v) => s + v, 0);
-      // Если allocated > target (мало упражнений, все ≥2), урезаем последние до 2.
+      // Если allocated > target (мало упражнений, все ≥floor), урезаем последние до floor.
       let overflow = allocated - target;
       for (let i = info.exs.length - 1; i >= 0 && overflow > 0; i--) {
-        const cut = Math.min(overflow, Math.max(0, floored[i] - 2));
+        const cut = Math.min(overflow, Math.max(0, floored[i] - floor));
         floored[i] -= cut;
         overflow -= cut;
       }
@@ -753,7 +761,7 @@ function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string,
         remainder--;
       }
       for (let i = 0; i < info.exs.length; i++) {
-        info.exs[i].sets = Math.max(2, floored[i]);
+        info.exs[i].sets = Math.max(floor, floored[i]);
         syncWorkSets(info.exs[i]);
       }
     }
@@ -875,8 +883,53 @@ export const DEFAULT_WORKMAX: Record<string, number> = {
   chest: 100, back: 120, shoulders: 70, arms: 50,
   quads: 140, hamstrings: 100, glutes: 150, calves: 90, abs: 80, traps: 90,
   delt_front: 70, delt_mid: 70, delt_rear: 70, forearms: 45,
+  biceps: 45, triceps: 50,
 };
-export const defaultWorkMax = (key: string): number => DEFAULT_WORKMAX[collapseKey(key)] ?? DEFAULT_WORKMAX[key] ?? 80;
+export const defaultWorkMax = (key: string): number => {
+  const collapsed = collapseKey(key);
+  const val = DEFAULT_WORKMAX[collapsed] ?? DEFAULT_WORKMAX[key];
+  if (val === undefined) {
+    // C7: warn на неизвестный ключ — помогает отловить опечатки в muscle names.
+    console.warn(`[BB] defaultWorkMax: unknown muscle key "${key}" (collapsed: "${collapsed}"), using fallback 80kg`);
+    return 80;
+  }
+  return val;
+};
+
+/**
+ * C10: TAG_PRIMARY_MUSCLES — вынесено из buildSession на уровень модуля.
+ * Зависит только от dayInRotation (для чередования quads/hamstrings на Legs-днях).
+ * Ранее реконструировалось при каждом вызове buildSession (~100+ раз на план).
+ */
+function getTagPrimaryMuscles(dayInRotation: number): Record<string, Set<string>> {
+  const legPrimary = dayInRotation % 2 === 0 ? new Set(['hamstrings', 'glutes']) : new Set(['quads', 'glutes']);
+  const lowerPrimary = dayInRotation % 2 === 0 ? new Set(['hamstrings', 'glutes', 'calves']) : new Set(['quads', 'glutes', 'calves']);
+  return {
+    Chest: new Set(['chest']),
+    Back: new Set(['back']),
+    Shoulders: new Set(['shoulders']),
+    Arms: new Set(['biceps', 'triceps', 'forearms']),
+    Legs: legPrimary,
+    Push: new Set(['chest', 'shoulders', 'triceps']),
+    Pull: new Set(['back', 'biceps', 'traps']),
+    ChestBack: new Set(['chest', 'back']),
+    ShouldersArms: new Set(['shoulders', 'biceps', 'triceps', 'forearms']),
+    Upper: new Set(['chest', 'back', 'shoulders', 'biceps', 'triceps']),
+    Lower: lowerPrimary,
+    FullBody: new Set(['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'arms']),
+    Torso: new Set(['chest', 'back', 'shoulders']),
+    Limbs: new Set(['quads', 'hamstrings', 'glutes', 'biceps', 'triceps', 'calves']),
+    UpperPower: new Set(['chest', 'back', 'shoulders', 'biceps', 'triceps']),
+    LowerPower: new Set(['quads', 'hamstrings', 'glutes', 'calves']),
+    UpperHyp: new Set(['chest', 'back', 'shoulders', 'biceps', 'triceps']),
+    LowerHyp: new Set(['quads', 'hamstrings', 'glutes', 'calves']),
+    // A1: LegsBiceps — primary = quads (legs) + biceps (arms). Hamstrings/calves = accessory.
+    // Ранее biceps отсутствовал в TAG_PRIMARY → всегда accessory на своём «дедицинном» дне.
+    LegsBiceps: new Set(['quads', 'biceps']),
+    Glutes: new Set(['glutes', 'hamstrings']),
+    GlutesHams: new Set(['glutes', 'hamstrings']),
+  };
+}
 
 function buildSession(
   sched: ScheduleDay, dayInRotation: number, week: number,
@@ -978,34 +1031,8 @@ function buildSession(
     // Какие мышцы являются "главными" для каждого тега сессии.
     // Остальные мышцы тега — добивочные (accessory), даже если тяж-день.
     // Это предотвращает: delt_front=primary в Chest-дне → блокирует Shoulders-день.
-    const TAG_PRIMARY_MUSCLES: Record<string, Set<string>> = {
-      Chest: new Set(['chest']),
-      Back: new Set(['back']),
-      Shoulders: new Set(['shoulders']),
-      Arms: new Set(['biceps', 'triceps', 'forearms']),
-      // Legs: чередование quads/hamstrings как primary по номеру дня в ротации.
-      // 1-й Legs-день: quads primary (тяж), hams accessory (памп).
-      // 2-й Legs-день: hamstrings primary (тяж), quads accessory (памп).
-      // Это устраняет "всегда квадры тяж" — даёт баланс развития.
-      Legs: dayInRotation % 2 === 0 ? new Set(['hamstrings', 'glutes']) : new Set(['quads', 'glutes']),
-      Push: new Set(['chest', 'shoulders', 'triceps']),
-      Pull: new Set(['back', 'biceps', 'traps']),
-      ChestBack: new Set(['chest', 'back']),
-      ShouldersArms: new Set(['shoulders', 'biceps', 'triceps', 'forearms']),
-      Upper: new Set(['chest', 'back', 'shoulders', 'biceps', 'triceps']),
-      Lower: dayInRotation % 2 === 0 ? new Set(['hamstrings', 'glutes', 'calves']) : new Set(['quads', 'glutes', 'calves']),
-      FullBody: new Set(['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'arms']),
-      Torso: new Set(['chest', 'back', 'shoulders']),
-      Limbs: new Set(['quads', 'hamstrings', 'glutes', 'biceps', 'triceps', 'calves']),
-      UpperPower: new Set(['chest', 'back', 'shoulders', 'biceps', 'triceps']),
-      LowerPower: new Set(['quads', 'hamstrings', 'glutes', 'calves']),
-      UpperHyp: new Set(['chest', 'back', 'shoulders', 'biceps', 'triceps']),
-      LowerHyp: new Set(['quads', 'hamstrings', 'glutes', 'calves']),
-      LegsBiceps: new Set(['quads', 'hamstrings', 'calves']),
-      // Женский glute-фокус: glutes + hams primary
-      Glutes: new Set(['glutes', 'hamstrings']),
-      GlutesHams: new Set(['glutes', 'hamstrings']),
-    };
+    // C10: вынесено в getTagPrimaryMuscles (модульный уровень) — без реконструкции на каждый вызов.
+    const TAG_PRIMARY_MUSCLES = getTagPrimaryMuscles(dayInRotation);
     const tagPrimaries = sched.sessionTag ? TAG_PRIMARY_MUSCLES[sched.sessionTag] : undefined;
     // Glute priority для женщин ИЛИ при focusGroup='glutes': glutes всегда primary в любом ножном дне.
     // Также для FullBody — glutes добавляется в fbPrimaryToday при focus.
@@ -1027,7 +1054,7 @@ function buildSession(
     // lead-мышца дня. WeakPoints обходят через отдельное условие ниже.
     // ИСКЛЮЧЕНИЕ: dual-primary теги (ChestBack, ShouldersArms, Upper, Torso) — 2 primary
     // (chest+back, shoulders+arms), иначе back=1ex в ChestBack — недопустимо.
-    const DUAL_PRIMARY_TAGS = new Set(['ChestBack', 'ShouldersArms', 'Upper', 'UpperPower', 'UpperHyp', 'Torso']);
+    const DUAL_PRIMARY_TAGS = new Set(['ChestBack', 'ShouldersArms', 'Upper', 'UpperPower', 'UpperHyp', 'Torso', 'LegsBiceps']);
     const maxPrimaries = DUAL_PRIMARY_TAGS.has(sched.sessionTag || '') ? 2 : 1;
     // focusGroup: мышца специализации получает primary-слот даже если maxPrimaries достигнут.
     const isFocusMuscle = focusGroup && (muscle === focusGroup || isWeak(muscle, [focusGroup]));
@@ -1077,7 +1104,13 @@ function buildSession(
     const repShift = phase === 'deload' ? 0 : Math.floor(phaseWeek / 2);
     const shiftedMin = Math.max(3, repMin - repShift);
     const shiftedMax = Math.max(shiftedMin + 2, repMax - repShift);
-    const reps = Math.round((shiftedMin + shiftedMax) / 2);
+    // B4: для non-deload фаз используем shiftedMin (нижняя граница) вместо midpoint.
+    // Ранее midpoint accumulation [10,15] = 12 = repCap в prescribeLoad → неделя 2
+    // сразу получала +5% вес и reps=8 (нет окна для rep progression).
+    // Теперь: W1=10, W2=11, W3=12 (prescribeLoad), W4=8+weight jump — корректный
+    // double progression с 3 неделями rep buildup. Deload сохраняет midpoint
+    // (больше reps = легче вес для разгрузки).
+    const reps = phase === 'deload' ? Math.round((shiftedMin + shiftedMax) / 2) : shiftedMin;
     // RIR: bbRir (учитывает phase + phaseWeek + характер). Делод → RIR 3-4.
     const rir = bbRir(resolved, phase, phaseWeek, trainingFocus);
     const wm = workMax[repKey] || PRO_WORKMAX_RATIO[repKey]?.(workMax) || defaultWorkMax(repKey);
@@ -1109,14 +1142,6 @@ function buildSession(
     const isArm = ['triceps','biceps','shoulders','forearms','arms'].includes(muscle);
     const isLeg = ['quads','hamstrings','glutes','calves'].includes(muscle);
     const onPED = pedAdapt ? pedAdapt.combinedMrvMultiplier >= 1.3 : false;
-    // PED dose-aware: чем выше MRV-множитель, тем больше упражнений (как у профи на курсе).
-    // AAS 500мг = ~1.3 → +1 упражнение; AAS 1000+insulin+GH = ~1.6 → +3 упражнения.
-    const pedExerciseBoost = pedAdapt ? Math.round((pedAdapt.combinedMrvMultiplier - 1.0) * 5) : 0;
-    const primaryBase = ['back','quads','chest','shoulders'].includes(muscle)
-      ? (isMultiDay ? (onPED ? 5 : 3) : (isSingleFreq ? 4 : (onPED ? 7 : 5)))
-      : (isArm && onPED ? 4 : 2);
-    const accessoryBase = isArm && onPED ? 3 : (isArm ? 2 : 1);
-    const accessoryBoost = isSingleFreq ? 0 : (isArm ? 1 : 0);
     // ★ E: Снижен exerciseCount — качество > количество.
     // Primary: 2-4 упр на мышцу (3 для multi-day, 4 single-freq natural, 5 PED single-freq)
     // Accessory: 1-2 упр (2 для arms на PED)
@@ -2306,7 +2331,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       weekSessions.push(sess);
     }
     // fix D: капаем недельный объём каждой мышцы по её истинному MRV
-    normalizeWeekMrv(weekSessions, mrvByMuscle);
+    normalizeWeekMrv(weekSessions, mrvByMuscle, phase === 'deload');
     weeks.push({ week: w, phase, deload: phase === 'deload', sessions: weekSessions });
     // Запоминаем упражнения этой недели для мягкого freshness блокировки следующей.
     prevWeekUsedByMuscle.clear();
@@ -2332,16 +2357,34 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const curPhase = phaseByWeek.get(curWeek.week) || 'accumulation';
     // Пропускаем делод-неделю: вес не растёт, объём уже срезан normalizeWeekMrv.
     if (curPhase === 'deload') continue;
-    // Если ПРЕДЫДУЩАЯ неделя была deload — не берём её вес как базу (он занижен).
-    // Берём вес последней недели с phase !== 'deload'.
-    const prevPhase = phaseByWeek.get(prevWeek.week) || 'accumulation';
-    const useWeek = prevPhase === 'deload' ? (wi >= 2 ? weeks[wi - 2] : null) : prevWeek;
+    // C1: Если предыдущая неделя была deload — ищем ОЦЕПКУ назад до первой
+    // non-deload недели (а не просто wi-2, которая тоже может быть deload).
+    // Ранее: двойной deload (W2+W3) → W4 брала базу из W3 (deload) → заниженный старт.
+    let useWeek: typeof prevWeek | null = null;
+    for (let back = wi - 1; back >= 0; back--) {
+      const bk = weeks[back];
+      const bkPhase = phaseByWeek.get(bk.week) || 'accumulation';
+      if (bkPhase !== 'deload') { useWeek = bk; break; }
+    }
     if (!useWeek) continue;
     for (const curSess of curWeek.sessions) {
       for (const curEx of curSess.exercises) {
-        const prevEx = useWeek.sessions
-          .flatMap(s => s.exercises)
-          .find(pe => pe.name === curEx.name && pe.muscle === curEx.muscle);
+        // B5: exact name match + fuzzy fallback для rotated/substituted exercises.
+        // Ранее: pe.name === curEx.name → сбой при ротации (жим лёжа ↔ жим штанги лёжа).
+        const prevExercises = useWeek.sessions.flatMap(s => s.exercises);
+        let prevEx = prevExercises.find(pe => pe.name === curEx.name && pe.muscle === curEx.muscle);
+        if (!prevEx) {
+          // Fuzzy: та же мышца + нормализованный token overlap ≥ 2 OR substring
+          const curNorm = (curEx.name || '').toLowerCase().replace(/ё/g, 'е').trim();
+          const curTokens = curNorm.split(/\s+/).filter(t => t.length > 2);
+          prevEx = prevExercises.find(pe => {
+            if (pe.muscle !== curEx.muscle) return false;
+            const peNorm = (pe.name || '').toLowerCase().replace(/ё/g, 'е').trim();
+            if (curNorm === peNorm) return true;
+            const overlap = curTokens.filter(t => peNorm.includes(t)).length;
+            return overlap >= 2 || (curTokens.length >= 2 && overlap >= 1 && peNorm.includes(curNorm));
+          });
+        }
         if (!prevEx) continue;
         const maxW = workMax[curEx.muscle] || defaultWorkMax(curEx.muscle);
         const prevWs = prevEx.workSets[0];
@@ -2569,7 +2612,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // P0-2: финальный MRV-кап ПОСЛЕ всех модификаций (dedup, feeders, re-sort).
     // Раньше normalizeWeekMrv вызывался до compensateCrossDayWeakPoints/dedup,
     // и feeders/dedup могли добавить объём выше MRV.
-    normalizeWeekMrv(w.sessions, mrvByMuscle);
+    normalizeWeekMrv(w.sessions, mrvByMuscle, w.phase === 'deload' || !!w.deload);
   }
   // P1-5: auto-MEV-feeder — мышцы с объёмом < MEV получают feeder в ближайший релевантный день.
   // Актуально для bro_5 (calves=2, glutes=4 при MEV=8) и других 1×/нед сплитов.
@@ -2653,7 +2696,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       }
     }
     // Финальный MRV-кап после auto-feeders
-    for (const w of finalPlan.weeks) normalizeWeekMrv(w.sessions, mrvByMuscle);
+    for (const w of finalPlan.weeks) normalizeWeekMrv(w.sessions, mrvByMuscle, w.phase === 'deload' || !!w.deload);
   }
   // P0-6 (audit 2026-07): feedback-driven rebuild из дневника.
   // 1) autoUpdateWeakPoints: e1RM-тренд → exit/add слабых групп

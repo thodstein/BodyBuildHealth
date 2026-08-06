@@ -355,8 +355,15 @@ export function suggestFeeders(weakPoints: string[], equipment: string[]): Feede
         feeders.push({ muscle: 'triceps', exercise: 'Разгибания рук на блоке (лёгкий)', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3, смена рукояти.' });
         break;
       case 'side_delts':
+      case 'delt_mid':
       case 'shoulders':
         feeders.push({ muscle: 'shoulders', exercise: 'Махи гантелями в стороны', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Не заваливать корпус.' });
+        break;
+      case 'delt_front':
+        feeders.push({ muscle: 'shoulders', exercise: 'Подъём гантелей перед собой', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Поочерёдно или одновременно.' });
+        break;
+      case 'delt_rear':
+        feeders.push({ muscle: 'shoulders', exercise: 'Махи гантелями в наклоне', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Акцент на заднюю дельту, не широчайшие.' });
         break;
       case 'upper_chest':
       case 'chest':
@@ -364,6 +371,21 @@ export function suggestFeeders(weakPoints: string[], equipment: string[]): Feede
         break;
       case 'back':
         feeders.push({ muscle: 'back', exercise: 'Тяга резины/блока к лицу', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Для задней дельты и вращательной манжеты.' });
+        break;
+      case 'forearms':
+        feeders.push({ muscle: 'forearms', exercise: 'Сгибания кистей со штангой', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Хват снизу.' });
+        break;
+      case 'traps':
+        feeders.push({ muscle: 'traps', exercise: 'Шраги с гантелями (лёгкий)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Задержка 1 сек вверху.' });
+        break;
+      case 'glutes':
+        feeders.push({ muscle: 'glutes', exercise: 'Ягодичный мостик (свой вес)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, пиковое сокращение 2 сек вверху.' });
+        break;
+      case 'quads':
+        feeders.push({ muscle: 'quads', exercise: 'Разгибания ног на тренажёре (лёгкий)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Медленная негативная фаза.' });
+        break;
+      case 'hamstrings':
+        feeders.push({ muscle: 'hamstrings', exercise: 'Сгибания ног на тренажёре (лёгкий)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Контроль негатива.' });
         break;
     }
   }

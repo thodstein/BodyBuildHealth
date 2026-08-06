@@ -15,6 +15,7 @@
  * Helms MAAS (recovery-based auto-regulation), Damas 2018 (muscle damage recovery).
  */
 import { computePerMuscleACWR } from './bb-progression-feedback.engine';
+import { epley1RM } from '../e1rm';
 import type { BBPlan } from './bb-builder.engine';
 
 export interface MuscleFrequencyRecommendation {
@@ -37,6 +38,45 @@ const SMALL_MUSCLES = new Set(['biceps', 'triceps', 'calves', 'forearms', 'abs',
 /** Большие мышцы — медленнее восстанавливаются. */
 const LARGE_MUSCLES = new Set(['quads', 'back', 'chest', 'hamstrings', 'glutes', 'shoulders']);
 
+/** D4: Вычислить per-muscle e1RM trend (% изменения за 4 нед).
+ *  Возвращает Record<muscle, pct> где pct > 0 = рост, pct < 0 = падение. */
+function computePerMuscleE1RMTrend(sessions: any[]): Record<string, number> {
+  if (!sessions || sessions.length < 4) return {};
+  const sorted = [...sessions].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const recentDate = new Date(sorted[sorted.length - 1].date);
+  const fourWeeksAgo = new Date(recentDate.getTime() - 28 * 24 * 60 * 60 * 1000);
+
+  // Group by muscle: find best e1RM in recent (last 7 days) vs old (4 weeks ago ±7 days)
+  const muscleRecent: Record<string, number> = {};
+  const muscleOld: Record<string, number> = {};
+
+  for (const s of sorted) {
+    const sDate = new Date(s.date);
+    const isRecent = (recentDate.getTime() - sDate.getTime()) <= 7 * 24 * 60 * 60 * 1000;
+    const isOld = Math.abs(sDate.getTime() - fourWeeksAgo.getTime()) <= 7 * 24 * 60 * 60 * 1000;
+    if (!isRecent && !isOld) continue;
+    for (const ex of s.exercises || []) {
+      const muscle = ex.muscleGroup || '';
+      if (!muscle) continue;
+      for (const set of (ex.sets || [])) {
+        if (!set.weightKg || !set.reps || set.weightKg <= 0) continue;
+        const e1 = epley1RM(set.weightKg, set.reps);
+        if (e1 <= 0) continue;
+        if (isRecent) muscleRecent[muscle] = Math.max(muscleRecent[muscle] || 0, e1);
+        if (isOld) muscleOld[muscle] = Math.max(muscleOld[muscle] || 0, e1);
+      }
+    }
+  }
+
+  const result: Record<string, number> = {};
+  for (const muscle of Object.keys(muscleRecent)) {
+    const oldVal = muscleOld[muscle];
+    if (!oldVal || oldVal <= 0) continue;
+    result[muscle] = Math.round(((muscleRecent[muscle] - oldVal) / oldVal) * 1000) / 10;
+  }
+  return result;
+}
+
 /**
  * Оптимизировать частоту per-muscle на основе данных восстановления.
  * @param plan — текущий BB-план (для извлечения currentFrequency)
@@ -54,9 +94,11 @@ export function optimizeMuscleFrequency(
 
   // Compute per-muscle ACWR if workout sessions available
   let perMuscleACWR: Record<string, { ratio: number; zone: string }> = {};
+  let perMuscleE1RMTrend: Record<string, number> = {};
   if (workoutSessions && workoutSessions.length > 0 && workMax) {
     const acwrResult = computePerMuscleACWR(workoutSessions);
     perMuscleACWR = acwrResult || {};
+    perMuscleE1RMTrend = computePerMuscleE1RMTrend(workoutSessions);
   }
 
   for (const muscle of Object.keys(currentFreq)) {
@@ -83,8 +125,23 @@ export function optimizeMuscleFrequency(
       }
     }
 
+    // D4: e1RM trend-based adjustment
+    const trend = perMuscleE1RMTrend[muscle];
+    if (trend !== undefined) {
+      e1rmTrend = trend;
+      if (trend >= 10 && current < 3) {
+        // e1RM растёт ≥10% → мышца адаптируется, можно повысить частоту
+        recommended = Math.max(recommended, current + 1);
+        reasons.push(`e1RM +${trend}% за 4 нед → мышца адаптируется, можно повысить частоту`);
+      } else if (trend <= -5) {
+        // e1RM падает ≥5% → перетренированность, снизить частоту
+        recommended = Math.min(recommended, Math.max(1, current - 1));
+        reasons.push(`e1RM ${trend}% за 4 нед → перетренированность, снизить частоту`);
+      }
+    }
+
     // Muscle size-based defaults (если нет ACWR данных)
-    if (!acwrData) {
+    if (!acwrData && e1rmTrend === undefined) {
       if (SMALL_MUSCLES.has(muscle) && current < 2) {
         recommended = Math.max(recommended, 2);
         reasons.push('малая мышца → рекомендована 2×/нед (быстрое восстановление)');

@@ -240,6 +240,8 @@ export const BbAutoConstructor: React.FC = () => {
   const [bbSource, setBbSource] = useState<'cycle' | 'program'>(customCycle ? 'program' : 'cycle');
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(customCycle ? customCycle.meta.id.replace('prog_', '') : null);
   const [bridgeMsg, setBridgeMsg] = useState('');
+  // C4: flash helper — заменяет alert() для некритичных уведомлений.
+  const flash = useCallback((m: string) => { setBridgeMsg(m); setTimeout(() => setBridgeMsg(''), 4000); }, []);
   // Мульти-планы: сохранённые варианты для сравнения
   const [savedPlans, setSavedPlans] = useState<SavedBBPlan[]>([]);
   const [showCompare, setShowCompare] = useState(false);
@@ -586,7 +588,7 @@ export const BbAutoConstructor: React.FC = () => {
       } else if (selectedCycleId || customCycle) {
         // BB-цикл путь (SRCycleTemplate → convertCycleToBBPlan)
         const cycle = customCycle || (getCycleById(selectedCycleId) as SRCycleTemplate | undefined);
-        if (!cycle) { alert('Цикл не найден'); return; }
+        if (!cycle) { flash('Цикл не найден'); return; }
         plan = convertCycleToBBPlan({
           cycle,
           workMax: bbWorkMax,
@@ -717,7 +719,7 @@ export const BbAutoConstructor: React.FC = () => {
 
     } catch (e: any) {
       console.error('[BB-auto] Ошибка генерации плана:', e);
-      alert('Ошибка при генерации плана: ' + (e?.message || String(e)) + '. Проверьте параметры и попробуйте снова.');
+      flash('Ошибка при генерации плана: ' + (e?.message || String(e)) + '. Проверьте параметры и попробуйте снова.');
       return;
     }
   };
@@ -760,10 +762,10 @@ export const BbAutoConstructor: React.FC = () => {
         acwrRatio: calculateACWR(),
         injuryCount: injuries.length,
       });
-      if (saveSafety.riskLevel === 'dangerous') { alert(`План небезопасен: SafetyScore ${saveSafety.score}/100. Исправьте риски перед сохранением.`); return; }
-      if (!planToSave.validation?.valid) { alert('План нельзя сохранить: исправьте ошибки валидации.'); return; }
-      setBuiltPlan(planToSave); localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: planToSave, date: new Date().toISOString() })); alert('План сохранён');
-    } catch { alert('Ошибка сохранения'); }
+      if (saveSafety.riskLevel === 'dangerous') { flash(`План небезопасен: SafetyScore ${saveSafety.score}/100. Исправьте риски перед сохранением.`); return; }
+      if (!planToSave.validation?.valid) { flash('План нельзя сохранить: исправьте ошибки валидации.'); return; }
+      setBuiltPlan(planToSave); localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: planToSave, date: new Date().toISOString() })); flash('План сохранён');
+    } catch { flash('Ошибка сохранения'); }
   };
 
   /** Сохранить BB-план в "Мои тренировки" (myTrainingPlans) — унификация с ручным конструктором. */
@@ -771,8 +773,8 @@ export const BbAutoConstructor: React.FC = () => {
     if (!builtPlan) return;
     const exportPlan = applyEditsToPlan(builtPlan);
     const saveSafety = calculatePlanSafetyScore(exportPlan, { acwrRatio: calculateACWR(), injuryCount: injuries.length });
-    if (saveSafety.riskLevel === 'dangerous') { alert(`План небезопасен: SafetyScore ${saveSafety.score}/100.`); return; }
-    if (!exportPlan.validation?.valid) { alert('План нельзя сохранить: исправьте ошибки валидации.'); return; }
+    if (saveSafety.riskLevel === 'dangerous') { flash(`План небезопасен: SafetyScore ${saveSafety.score}/100.`); return; }
+    if (!exportPlan.validation?.valid) { flash('План нельзя сохранить: исправьте ошибки валидации.'); return; }
     const name = prompt('Название плана:', `${exportPlan.pattern.name} ${bbWeeks}нед`);
     if (!name) return;
     // Конвертация BB-плана в flat-формат Моих тренировок: все упражнения недели 1
@@ -788,14 +790,14 @@ export const BbAutoConstructor: React.FC = () => {
       const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
       const updated = [...existing, plan].slice(-20);
       localStorage.setItem('myTrainingPlans', JSON.stringify(updated));
-      alert(`План «${name}» сохранён в Мои тренировки (${exs.length} упр.)`);
-    } catch { alert('Ошибка сохранения'); }
+      flash(`План «${name}» сохранён в Мои тренировки (${exs.length} упр.)`);
+    } catch { flash('Ошибка сохранения'); }
   };
 
   const handleSaveVariant = () => {
     if (!builtPlan || !metrics) return;
     const exportPlan = applyEditsToPlan(builtPlan);
-    if (!exportPlan.validation?.valid) { alert('Вариант нельзя сохранить: исправьте ошибки валидации.'); return; }
+    if (!exportPlan.validation?.valid) { flash('Вариант нельзя сохранить: исправьте ошибки валидации.'); return; }
     const exportMetrics = calcBBPlanMetrics(exportPlan, pedAdapt.combinedMrvMultiplier);
     const exportQuality = validatePlanQuality(bbPlanToQualityInput(exportPlan, { level: bbLevel, weakPoints, hasDeload: autoDeload, onCourse: peds.length > 0 }));
     const name = prompt('Название варианта:', `${exportPlan.pattern.name} ${bbWeeks}нед ${peds.length > 0 ? peds.join('+') : 'натурал'}`);
@@ -848,7 +850,7 @@ export const BbAutoConstructor: React.FC = () => {
   const handleSaveAsUserProgram = () => {
     if (!builtPlan) return;
     const exportPlan = applyEditsToPlan(builtPlan);
-    if (!exportPlan.validation?.valid) { alert('Программу нельзя сохранить: исправьте ошибки валидации.'); return; }
+    if (!exportPlan.validation?.valid) { flash('Программу нельзя сохранить: исправьте ошибки валидации.'); return; }
     const fallbackName = `${exportPlan.pattern.name} ${bbWeeks}нед`;
     const name = window.prompt('📂 Название программы (Мои программы):', fallbackName);
     if (!name) return;
@@ -861,10 +863,10 @@ export const BbAutoConstructor: React.FC = () => {
         equipment: bbEquipment.slice(),
       });
       saveUserProgramStore(userProg, 'Импорт из ББ-визарда');
-      alert(`✅ Сохранено в «Мои программы»: ${name}`);
+      flash(`✅ Сохранено в «Мои программы»: ${name}`);
     } catch (e: any) {
       console.error('[BB-auto] Ошибка сохранения в Мои программы:', e);
-      alert('⚠ Не удалось сохранить: ' + (e?.message || String(e)));
+      flash('⚠ Не удалось сохранить: ' + (e?.message || String(e)));
     }
   };
 
@@ -950,7 +952,7 @@ export const BbAutoConstructor: React.FC = () => {
     const executionPlan = applyEditsToPlan(builtPlan);
     const validation = executionPlan.validation || validateBBPlan(executionPlan, executionPlan.safetyConstraints);
     if (!validation.valid) {
-      alert('План нельзя отправить на выполнение: сначала исправьте ошибки валидации.');
+      flash('План нельзя отправить на выполнение: сначала исправьте ошибки валидации.');
       return;
     }
     setBuiltPlan(executionPlan);
@@ -970,7 +972,7 @@ export const BbAutoConstructor: React.FC = () => {
       // FIX-12: Авто-переход на вкладку «Тренировка» (как ручной конструктор)
       localStorage.setItem('he_training_tab', 'runtime');
       window.dispatchEvent(new StorageEvent('storage', { key: 'he_training_tab' }));
-    } catch { alert('Ошибка при отправке плана на выполнение'); }
+    } catch { flash('Ошибка при отправке плана на выполнение'); }
   };
 
   /** PRO: печать плана в PDF через window.print() — HTML-таблица с упражнениями. */
@@ -978,7 +980,7 @@ export const BbAutoConstructor: React.FC = () => {
     if (!builtPlan) return;
     const plan = applyEditsToPlan(builtPlan);
     const w = window.open('', '_blank');
-    if (!w) { alert('Разрешите всплывающие окна для печати'); return; }
+    if (!w) { flash('Разрешите всплывающие окна для печати'); return; }
     const esc = (s: string) => (s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const weeksHtml = plan.weeks.map(wk => {
       const sessionsHtml = wk.sessions.map((s, si) => {

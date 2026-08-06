@@ -74,28 +74,40 @@ function collapseKeyLocal(muscle: string): string {
 /** e1RM (Epley) — для оценки прогрессии. */
 const e1rm = epley1RM;
 
-/** Топ-сет сессии упражнения: максимальный рабочий вес. */
+/** Топ-сет сессии упражнения: сет с НАИВЫСШИМ e1RM (Epley), а не просто максимальным весом.
+ *  B6: ранее выбирался максимальный weightKg → 80кг×5 (e1RM=88) проигрывал 82кг×1 (e1RM=82).
+ *  Теперь: 80кг×5 (e1RM=88) выигрывает, т.к. e1RM — истинная метрика интенсивности. */
 function topSetOf(ex: WorkoutExercise): { weight: number; reps: number; rir: number } | null {
   if (!ex.sets || ex.sets.length === 0) return null;
   let best = ex.sets[0];
+  let bestE1rm = e1rm(best.weightKg, best.reps);
   for (const s of ex.sets) {
-    if (s.weightKg > best.weightKg) best = s;
+    const sE1rm = e1rm(s.weightKg, s.reps);
+    if (sE1rm > bestE1rm) { best = s; bestE1rm = sE1rm; }
   }
   return { weight: best.weightKg, reps: best.reps, rir: best.rir };
 }
 
-/** Индекс последних результатов по нормализованному имени упражнения. */
+/** Индекс последних результатов по нормализованному имени упражнения.
+ *  D1: parity с PL-auto (lms-progression-feedback P1-10) — выбирает ЗАПИСЬ С НАИВЫСШИМ e1RM
+ *  среди недавних сессий (≤90 дней), а не просто последнюю по дате.
+ *  Ранее: тяж-день 100кг×5 (e1RM=112) + памп-день 60кг×15 (e1RM=84) → брался памп (последний),
+ *  занижая базу для прогрессии. Теперь: берётся тяж-день (наивысший e1RM). */
 function buildLastResultIndex(sessions: WorkoutSession[]): Map<string, ExerciseLastResult> {
-  // sessions отсортированы по дате убыванию (loadSessions не гарантирует — сортируем)
   const sorted = [...sessions].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const idx = new Map<string, ExerciseLastResult>();
+  const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+  const now = sorted[0]?.date ? new Date(sorted[0].date).getTime() : Date.now();
   for (const s of sorted) {
+    // Only consider sessions within the last 90 days
+    const sessionTime = s.date ? new Date(s.date).getTime() : 0;
+    if (now - sessionTime > NINETY_DAYS_MS) break;
     for (const ex of s.exercises || []) {
       const key = normName(ex.exerciseName || '');
-      if (!key || idx.has(key)) continue; // первое (=последнее по дате) вхождение
+      if (!key) continue;
       const top = topSetOf(ex);
       if (!top) continue;
-      idx.set(key, {
+      const entry: ExerciseLastResult = {
         exerciseName: ex.exerciseName || '',
         date: s.date,
         topWeight: top.weight,
@@ -104,7 +116,12 @@ function buildLastResultIndex(sessions: WorkoutSession[]): Map<string, ExerciseL
         e1rm: e1rm(top.weight, top.reps),
         totalVolume: ex.totalVolume || 0,
         setsDone: (ex.sets || []).length,
-      });
+      };
+      // Pick highest e1RM across sessions (preserves heavy-day performance)
+      const existing = idx.get(key);
+      if (!existing || entry.e1rm > existing.e1rm) {
+        idx.set(key, entry);
+      }
     }
   }
   return idx;
@@ -290,12 +307,13 @@ export function summarizeAutoRegulation(plan: BBPlan): {
         if (!comment.includes('↻')) continue;
         adjustedExercises++;
         // Parse: "↻ из факта: 80×5 RIR2 → 82.5×5 RIR3"
-        const match = comment.match(/↻ из факта:\s*([\d.]+)×(\d+)\s*RIR(\d+)\s*→\s*([\d.]+)×(\d+)\s*RIR(\d+)/);
+        // D3: RIR может быть дробным (RIR2.5 от bbRir drift) — RIR([\d.]+) вместо RIR(\d+)
+        const match = comment.match(/↻ из факта:\s*([\d.]+)×(\d+)\s*RIR([\d.]+)\s*→\s*([\d.]+)×(\d+)\s*RIR([\d.]+)/);
         if (match) {
           const fromWeight = parseFloat(match[1]);
           const toWeight = parseFloat(match[4]);
-          const fromRir = parseInt(match[3]);
-          const toRir = parseInt(match[6]);
+          const fromRir = parseFloat(match[3]);
+          const toRir = parseFloat(match[6]);
           if (toWeight > fromWeight) weightIncreases++;
           else if (toWeight < fromWeight) weightDecreases++;
           if (toRir !== fromRir) rirAdjustments++;

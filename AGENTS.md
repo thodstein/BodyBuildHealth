@@ -1,11 +1,65 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
-## Current project state (Aug 5 2026)
+## Current project state (Aug 6 2026)
 
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK
-- `vitest` - 1518 passing (154 test files; **Profile System v2 + sync between blocks** — CalcProfileCard, PeakingPanel, RecoveryPanel, AutoregPanel, PerformanceScreen buttons, profileEvents bus, IndividualPlan migration to UnifiedSettings, useSectionState + QuotaExceededError protection + performance optimization of useSyncExternalStore)
+- `vitest` - 1722 passing (165 test files; **BB-auto training generation audit** — bb-builder RIR/progression/MRV fixes, bb-progression-feedback e1RM selection, bb-frequency-optimizer e1rmTrend, suggestFeeders PRO-KEYS, BbAutoConstructor alert→toast, 29 new tests)
+
+---
+
+## BB-auto Training Generation Critical Audit (Aug 6 2026)
+
+Полный критический анализ генерации тренировок ББ-авто: построение сессий, периодизация, прогрессия весов, MRV-кап, feedback loop. 20 исправлений (2 P0 + 4 P1 + 9 P2 + 4 доп) + 29 новых тестов. 4 false positive удалены после проверки.
+
+### P0 — Critical fixes (2)
+1. **A1: LegsBiceps TAG_PRIMARY missing biceps** — `bb-builder.engine.ts:1004`. `TAG_MUSCLES.LegsBiceps` включает `biceps`, но `TAG_PRIMARY_MUSCLES.LegsBiceps` — нет. Biceps всегда accessory на своём «дедицинном» дне. Сплит `pro_8_day` (единственный с LegsBiceps) был бесполезен для рук. Fixed: добавлен `'biceps'` в Set + `LegsBiceps` в `DUAL_PRIMARY_TAGS` (maxPrimaries=2 для quads+biceps).
+2. **A5: Dead code** — `bb-builder.engine.ts:1114-1119`. `pedExerciseBoost`, `primaryBase`, `accessoryBase`, `accessoryBoost` — объявлены, но никогда не используются (exerciseCount использует inline ternaries). Fixed: удалены 4 строки + 3 комментария.
+
+### P1 — Important fixes (4)
+3. **B1: Peaking RIR flat 0** — `bb-builder.engine.ts:591`. `peaking` subtracted 1 from base → strength base=1-1=0 → RIR=0 for ALL 3 peaking weeks. 3 недели на failure нарушает supercompensation (Zatsiorsky 2006). Fixed: убран `-1` для peaking; drift естественным образом доводит RIR с 1 до 0 (strength W1=1, W3=0; hypertrophy W1=2, W3=1).
+4. **B4: Reps midpoint = repCap** — `bb-builder.engine.ts:1080`. `reps = round((shiftedMin + shiftedMax) / 2)` = 13 для accumulation [10,15]. Но `prescribeLoad` repCap=12. 13 > 12 → W2 сразу +5% вес и reps=8 (нет окна для rep progression). Fixed: `shiftedMin` для non-deload (W1=10, W2=11, W3=12, W4=8+weight jump — корректный double progression).
+5. **B5: prevEx exact name match** — `bb-builder.engine.ts:2342-2344`. `find(pe => pe.name === curEx.name)` fails при ротации/замене упражнений → вес не прогрессирует. Fixed: fuzzy fallback — нормализованный token overlap ≥2 OR substring для имён с 2+ tokens.
+6. **B6: topSetOf by weight not e1RM** — `bb-progression-feedback.engine.ts:80-84`. 80кг×5 (e1RM=93) проигрывал 82кг×1 (e1RM=85). Fixed: выбор по `epley1RM(weight, reps)`.
+
+### P2 — Quality fixes (9 из 10, 1 отменено)
+7. **C1: Deload cascade** — `bb-builder.engine.ts:2338`. `weeks[wi-2]` может тоже быть deload → заниженная база. Fixed: цикл назад до первой non-deload недели.
+8. **C2: Peak week floor=1** — `bb-peak-week.engine.ts:205,207`. `Math.max(1,...)` и `slice(0,1)` — 1 сет недостаточен. Fixed: floor=2, slice(0,2) (parity с taper fix A7).
+9. **C3: Chinese chars** — `bb-builder.engine.ts:409`. `可控` (Chinese "controllable") в EXECUTION_NOTES. Fixed: `контролируемое`.
+10. **C4: alert() → toast** — `BbAutoConstructor.tsx` (15 instances). Fixed: `flash()` helper (setBridgeMsg + 4s timeout).
+11. **C5: BB_JUNK_PATTERNS отжиман** — `bb-builder.engine.ts:447`. `отжиман` ловит weighted push-ups (валидное упражнение). Fixed: `отжимания.*(?:от пол|от скам|на колен|от колен)` — только bodyweight variants.
+12. **C6: Deload floor=2** — `bb-builder.engine.ts:682`. 4 accessory × floor=2 = 8 sets minimum на deload (intended ~4-6). Fixed: `isDeload` parameter, floor=1 для deload, floor=2 для рабочих недель.
+13. **C7: defaultWorkMax silent fallback** — `bb-builder.engine.ts:879`. Unknown keys silently return 80. Fixed: `console.warn` + добавлены `biceps:45, triceps:50` в DEFAULT_WORKMAX.
+14. **C8: upright_row tier** — `bb-exercise-tier.engine.ts:60`. High impingement risk (Reinold 2009) но был в exception list. Fixed: убран из исключений → tier 3 (exotic, только intermediate+ с allowExotic).
+15. **C9: orderSessionExercises 3 passes — ОТМЕНЕНО**. После проверки: 3 вызова не избыточны (truncation, post-finisher, post-dedup — каждый служит разной цели).
+16. **C10: TAG_PRIMARY_MUSCLES reconstructed per call** — `bb-builder.engine.ts:980-1007`. Fixed: вынесено в `getTagPrimaryMuscles(dayInRotation)` на уровень модуля.
+
+### Phase D — Additional fixes (4)
+17. **D1: buildLastResultIndex recency not e1RM** — `bb-progression-feedback.engine.ts:92-115`. Берёт последнюю сессию, не лучшую по e1RM. Heavy-day 100кг×5 (e1RM=112) + pump-day 60кг×15 (e1RM=84) → брался pump. Fixed: parity с PL-auto (P1-10) — выбор записи с наивысшим e1RM среди сессий ≤90 дней.
+18. **D2: suggestFeeders missing PRO-KEYS** — `bb-autocoach.engine.ts:340-371`. `delt_front/delt_mid/delt_rear/glutes/quads/hamstrings/forearms/traps` не имели feeders. Fixed: добавлены 8 case-блоков с exercises.
+19. **D3: summarizeAutoRegulation float RIR** — `bb-progression-feedback.engine.ts:310`. Regex `RIR(\d+)` не парсит `RIR2.5` (от bbRir drift). Fixed: `RIR([\d.]+)` + `parseFloat`.
+20. **D4: e1rmTrend dead field** — `bb-frequency-optimizer.engine.ts:67`. `e1rmTrend` declared but never assigned. Fixed: `computePerMuscleE1RMTrend()` — recent (7д) vs old (4нед ±7д) best e1RM per muscle. Trend ≥+10% → повысить частоту, ≤-5% → снизить.
+
+### False positives removed (4)
+- ~~MRV cap overflow (L731-758)~~ — математически опровергнуто (после `minTotal > cap` path, `minTotal <= cap` гарантирует `numExercises * 2 <= cap`).
+- ~~Re-cap MRV after compensateCrossDayWeakPoints~~ — feeders добавляют 2 сета только когда `weekSets < MEV`, MEV << MRV.
+- ~~Re-cap MRV after addAdaptiveMEVFeeders~~ — MEV feeders поднимают объём ВВЕРХ до MEV, не выше MRV.
+- ~~Weight progression for isolation~~ — double progression стандартна для всех типов; `linear` strategy уже различает (isolation +1.0 кг/нед, compound +2.5).
+
+### Files modified (8)
+- `src/engines/bb/bb-builder.engine.ts` — 11 fixes (A1, A5, B1, B4, B5, C1, C3, C5, C6, C7, C10)
+- `src/engines/bb/bb-progression-feedback.engine.ts` — 2 fixes (B6, D1) + D3
+- `src/engines/bb/bb-peak-week.engine.ts` — 1 fix (C2)
+- `src/engines/bb/bb-exercise-tier.engine.ts` — 1 fix (C8)
+- `src/engines/bb/bb-autocoach.engine.ts` — 1 fix (D2)
+- `src/engines/bb/bb-frequency-optimizer.engine.ts` — 1 fix (D4)
+- `src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx` — 1 fix (C4, 15 alert→flash)
+- `src/engines/bb/__tests__/bb-audit-2026-08.test.ts` — NEW (29 tests)
+
+### Tests
+- `src/engines/bb/__tests__/bb-audit-2026-08.test.ts` — **29 tests**: A1 LegsBiceps biceps primary, A5 dead code removal, B1 peaking RIR drift (3 tests), B4 reps shiftedMin, B5 fuzzy match, B6 epley1RM e1RM comparison (2 tests), C1 deload cascade, C2 peak week floor=2, C6 deload floor=1, D2 suggestFeeders PRO-KEYS (8 tests), D3 float RIR (2 tests), D4 e1rmTrend (2 tests), C7 defaultWorkMax (5 tests).
+- Full suite: **1722/1722 passing** (165 test files), 0 TS errors, vite build OK.
 
 ---
 

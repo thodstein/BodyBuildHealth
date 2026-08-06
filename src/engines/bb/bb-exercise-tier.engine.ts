@@ -55,9 +55,10 @@ export function bbExerciseTier(ex: Exercise | any): BBExerciseTier {
   if (EXOTIC_PATTERNS.test(n) || EXOTIC_PATTERNS.test(id)) return 3;
   if (/trx|suspension|кольц/i.test(n)) return 3;
   // Травмоопасные/нестандартные для гипертрофии.
-  // P2-7: добавлены тяга к подбородку (upright row) и жим стоя (OHP) в исключения —
-  // это валидные плечевые compound, не должны быть tier 3 из-за jointStress:'high'.
-  if (joint === 'high' && !/присед.*штанг|станов|жим.*лёж|squat|deadlift|bench|жим.*ног|overhead|тяга.*подбород|upright.?row|жим.*стоя|ohp/i.test(n)) return 3;
+  // P2-7: OHP (жим стоя) — валидное плечевое compound, не должен быть tier 3 из-за jointStress:'high'.
+  // C8: upright row (тяга к подбородку) УБРАН из исключений — высокий риск импинджмента
+  // при абдукции >90° (Reinold 2009). Теперь tier 3 (exotic) — только для intermediate+ с allowExotic.
+  if (joint === 'high' && !/присед.*штанг|станов|жим.*лёж|squat|deadlift|bench|жим.*ног|overhead|жим.*стоя|ohp/i.test(n)) return 3;
 
   // 1) Канонический инструментарий
   if (CANONICAL_PATTERNS.test(n) || CANONICAL_PATTERNS.test(id)) return 1;

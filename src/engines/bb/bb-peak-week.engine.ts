@@ -197,14 +197,15 @@ export function applyPeakWeekToPlan(
     taper: true,
     sessions: lastWeek.sessions.map((s: any, si: number) => {
       const day = protocol.days[Math.min(si, protocol.days.length - 1)];
-      // Снижаем объём: 1 сет на упражнение, RIR 3-4, вес 50%
+      // Снижаем объём: 2 сета на упражнение (floor=2, не 1), RIR 3-4, вес 50%
+      // C2: ранее floor=1 — 1 сет недостаточен для стимула (fix A7 в taper использует floor=2).
       return {
         ...s,
         exercises: s.exercises.map((e: any) => ({
           ...e,
-          sets: Math.max(1, Math.round(e.sets * 0.3)),
+          sets: Math.max(2, Math.round(e.sets * 0.3)),
           rir: 4,
-          workSets: (e.workSets || []).slice(0, 1).map((ws: any) => ({
+          workSets: (e.workSets || []).slice(0, 2).map((ws: any) => ({
             ...ws,
             weight: Math.round((ws.weight || 0) * 0.5),
             rir: 4,
