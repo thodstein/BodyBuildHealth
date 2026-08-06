@@ -37,9 +37,9 @@ export const CYCLE_04: SRCycleTemplate = {
     { exercises: [
       { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.45,reps:6,sets:3}] },
       { name: 'Приведение к плечу', group: '', coef: 1, mnosz: 2, load: 'Средняя', sets: [{pct:0.5,reps:4,sets:4}] },
-      { name: 'Подтягивание ', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.68,reps:5,sets:3}] },
-      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Лекая', sets: [{pct:0.48,reps:4,sets:4}] },
-      { name: 'Кисть РР ', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.43,reps:6,sets:3}] },
+      { name: 'Подтягивание', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.68,reps:5,sets:3}] },
+      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Легкая', sets: [{pct:0.48,reps:4,sets:4}] },
+      { name: 'Кисть РР', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.43,reps:6,sets:3}] },
     ] },
     { exercises: [
       { name: 'Пронация СБ', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.55,reps:5,sets:5}] },
@@ -78,9 +78,9 @@ export const CYCLE_04: SRCycleTemplate = {
     { exercises: [
       { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.45,reps:6,sets:3}] },
       { name: 'Приведение к плечу', group: '', coef: 1, mnosz: 2, load: 'Средняя', sets: [{pct:0.5,reps:4,sets:4}] },
-      { name: 'Подтягивание ', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.68,reps:5,sets:3}] },
-      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Лекая', sets: [{pct:0.48,reps:4,sets:4}] },
-      { name: 'Кисть РР ', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.43,reps:6,sets:3}] },
+      { name: 'Подтягивание', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.68,reps:5,sets:3}] },
+      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Легкая', sets: [{pct:0.48,reps:4,sets:4}] },
+      { name: 'Кисть РР', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.43,reps:6,sets:3}] },
     ] },
     { exercises: [
       { name: 'Пронация СБ', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.55,reps:5,sets:5}] },
@@ -118,9 +118,9 @@ export const CYCLE_04: SRCycleTemplate = {
     { exercises: [
       { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.4,reps:6,sets:3}] },
       { name: 'Приведение к плечу', group: '', coef: 1, mnosz: 2, load: 'Средняя', sets: [{pct:0.6,reps:6,sets:4}] },
-      { name: 'Подтягивание ', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.7,reps:4,sets:4}] },
-      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Лекая', sets: [{pct:0.6,reps:4,sets:4}] },
-      { name: 'Кисть РР ', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.4,reps:6,sets:3}] },
+      { name: 'Подтягивание', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.7,reps:4,sets:4}] },
+      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Легкая', sets: [{pct:0.6,reps:4,sets:4}] },
+      { name: 'Кисть РР', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.4,reps:6,sets:3}] },
     ] },
     { exercises: [
       { name: 'Пронация СБ', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.58,reps:6,sets:4}] },
@@ -158,9 +158,9 @@ export const CYCLE_04: SRCycleTemplate = {
     { exercises: [
       { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.35,reps:6,sets:5}] },
       { name: 'Приведение к плечу', group: '', coef: 1, mnosz: 2, load: 'Средняя', sets: [{pct:0.5,reps:5,sets:5}] },
-      { name: 'Подтягивание ', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.64,reps:5,sets:4}] },
-      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Лекая', sets: [{pct:0.5,reps:5,sets:5}] },
-      { name: 'Кисть РР ', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.35,reps:6,sets:5}] },
+      { name: 'Подтягивание', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.64,reps:5,sets:4}] },
+      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Легкая', sets: [{pct:0.5,reps:5,sets:5}] },
+      { name: 'Кисть РР', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.35,reps:6,sets:5}] },
     ] },
     { exercises: [
       { name: 'Пронация СБ', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.52,reps:4,sets:1},{pct:0.58,reps:4,sets:1},{pct:0.65,reps:4,sets:4}] },
@@ -198,9 +198,9 @@ export const CYCLE_04: SRCycleTemplate = {
     { exercises: [
       { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.42,reps:6,sets:5}] },
       { name: 'Приведение к плечу', group: '', coef: 1, mnosz: 2, load: 'Средняя', sets: [{pct:0.45,reps:4,sets:5}] },
-      { name: 'Подтягивание ', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.72,reps:4,sets:4}] },
-      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Лекая', sets: [{pct:0.45,reps:4,sets:5}] },
-      { name: 'Кисть РР ', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.41,reps:6,sets:5}] },
+      { name: 'Подтягивание', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.72,reps:4,sets:4}] },
+      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Легкая', sets: [{pct:0.45,reps:4,sets:5}] },
+      { name: 'Кисть РР', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.41,reps:6,sets:5}] },
     ] },
     { exercises: [
       { name: 'Пронация СБ', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.56,reps:5,sets:1},{pct:0.62,reps:5,sets:1},{pct:0.69,reps:4,sets:4}] },
@@ -238,9 +238,9 @@ export const CYCLE_04: SRCycleTemplate = {
     { exercises: [
       { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.58,reps:6,sets:3}] },
       { name: 'Приведение к плечу', group: '', coef: 1, mnosz: 2, load: 'Легкая', sets: [{pct:0.52,reps:4,sets:5}] },
-      { name: 'Подтягивание ', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.77,reps:4,sets:3}] },
-      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Лекая', sets: [{pct:0.53,reps:4,sets:5}] },
-      { name: 'Кисть РР ', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.51,reps:6,sets:3}] },
+      { name: 'Подтягивание', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.77,reps:4,sets:3}] },
+      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Легкая', sets: [{pct:0.53,reps:4,sets:5}] },
+      { name: 'Кисть РР', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.51,reps:6,sets:3}] },
     ] },
     { exercises: [
       { name: 'Пронация СБ', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.54,reps:6,sets:1},{pct:0.62,reps:5,sets:1},{pct:0.72,reps:4,sets:4}] },
@@ -278,9 +278,9 @@ export const CYCLE_04: SRCycleTemplate = {
     { exercises: [
       { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.4,reps:6,sets:4}] },
       { name: 'Приведение к плечу', group: '', coef: 1, mnosz: 2, load: 'Легкая', sets: [{pct:0.6,reps:4,sets:5}] },
-      { name: 'Подтягивание ', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.7,reps:4,sets:3}] },
-      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Лекая', sets: [{pct:0.58,reps:4,sets:5}] },
-      { name: 'Кисть РР ', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.3,reps:6,sets:4}] },
+      { name: 'Подтягивание', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.7,reps:4,sets:3}] },
+      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Легкая', sets: [{pct:0.58,reps:4,sets:5}] },
+      { name: 'Кисть РР', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.3,reps:6,sets:4}] },
     ] },
     { exercises: [
       { name: 'Пронация СБ', group: '', coef: 0.5, mnosz: 2, load: 'Тяжелая', sets: [{pct:0.58,reps:5,sets:1},{pct:0.76,reps:4,sets:4}] },
@@ -318,9 +318,9 @@ export const CYCLE_04: SRCycleTemplate = {
     { exercises: [
       { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.41,reps:6,sets:5}] },
       { name: 'Приведение к плечу', group: '', coef: 1, mnosz: 2, load: 'Легкая', sets: [{pct:0.5,reps:5,sets:5}] },
-      { name: 'Подтягивание ', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.71,reps:4,sets:4}] },
-      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Лекая', sets: [{pct:0.5,reps:5,sets:5}] },
-      { name: 'Кисть РР ', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.37,reps:6,sets:5}] },
+      { name: 'Подтягивание', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.71,reps:4,sets:4}] },
+      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Легкая', sets: [{pct:0.5,reps:5,sets:5}] },
+      { name: 'Кисть РР', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.37,reps:6,sets:5}] },
     ] },
     { exercises: [
       { name: 'Пронация СБ', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.51,reps:5,sets:1},{pct:0.65,reps:4,sets:4}] },
@@ -358,9 +358,9 @@ export const CYCLE_04: SRCycleTemplate = {
     { exercises: [
       { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.52,reps:6,sets:4}] },
       { name: 'Приведение к плечу', group: '', coef: 1, mnosz: 2, load: 'Легкая', sets: [{pct:0.55,reps:4,sets:5}] },
-      { name: 'Подтягивание ', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.77,reps:4,sets:3}] },
-      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Лекая', sets: [{pct:0.55,reps:4,sets:5}] },
-      { name: 'Кисть РР ', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.43,reps:6,sets:4}] },
+      { name: 'Подтягивание', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.77,reps:4,sets:3}] },
+      { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Легкая', sets: [{pct:0.55,reps:4,sets:5}] },
+      { name: 'Кисть РР', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.43,reps:6,sets:4}] },
     ] },
     { exercises: [
       { name: 'Пронация СБ', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.55,reps:6,sets:1},{pct:0.63,reps:5,sets:1},{pct:0.71,reps:4,sets:4}] },
@@ -398,9 +398,9 @@ export const CYCLE_04: SRCycleTemplate = {
     { exercises: [
       { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.46,reps:6,sets:4}] },
       { name: 'Приведение к плечу', group: '', coef: 1, mnosz: 2, load: 'Средняя', sets: [{pct:0.52,reps:4,sets:1},{pct:0.64,reps:4,sets:4}] },
-      { name: 'Подтягивание ', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.72,reps:5,sets:5}] },
+      { name: 'Подтягивание', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.72,reps:5,sets:5}] },
       { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Средняя', sets: [{pct:0.56,reps:5,sets:1},{pct:0.66,reps:4,sets:4}] },
-      { name: 'Кисть РР ', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.5,reps:6,sets:3}] },
+      { name: 'Кисть РР', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.5,reps:6,sets:3}] },
     ] },
     { exercises: [
       { name: 'Пронация СБ', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.56,reps:6,sets:1},{pct:0.63,reps:5,sets:5}] },
@@ -438,9 +438,9 @@ export const CYCLE_04: SRCycleTemplate = {
     { exercises: [
       { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.5,reps:5,sets:4}] },
       { name: 'Приведение к плечу', group: '', coef: 1, mnosz: 2, load: 'Средняя', sets: [{pct:0.6,reps:5,sets:1},{pct:0.67,reps:4,sets:3}] },
-      { name: 'Подтягивание ', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.68,reps:6,sets:4}] },
+      { name: 'Подтягивание', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.68,reps:6,sets:4}] },
       { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:6,sets:1},{pct:0.6,reps:5,sets:5}] },
-      { name: 'Кисть РР ', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.35,reps:5,sets:4}] },
+      { name: 'Кисть РР', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.35,reps:5,sets:4}] },
     ] },
     { exercises: [
       { name: 'Пронация СБ', group: '', coef: 0.5, mnosz: 2, load: 'Средняя', sets: [{pct:0.58,reps:6,sets:1},{pct:0.62,reps:5,sets:1},{pct:0.67,reps:5,sets:4}] },
@@ -478,9 +478,9 @@ export const CYCLE_04: SRCycleTemplate = {
     { exercises: [
       { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.43,reps:6,sets:4}] },
       { name: 'Приведение к плечу', group: '', coef: 1, mnosz: 2, load: 'Средняя', sets: [{pct:0.51,reps:6,sets:5}] },
-      { name: 'Подтягивание ', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.64,reps:5,sets:2},{pct:0.68,reps:4,sets:3}] },
+      { name: 'Подтягивание', group: '', coef: 1.2, mnosz: 1, load: 'Тяжелая', sets: [{pct:0.64,reps:5,sets:2},{pct:0.68,reps:4,sets:3}] },
       { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Средняя', sets: [{pct:0.51,reps:6,sets:5}] },
-      { name: 'Кисть РР ', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.43,reps:6,sets:4}] },
+      { name: 'Кисть РР', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.43,reps:6,sets:4}] },
     ] },
     { exercises: [
       { name: 'Пронация СБ', group: '', coef: 0.5, mnosz: 2, load: 'Тяжелая', sets: [{pct:0.5,reps:6,sets:2},{pct:0.6,reps:5,sets:2},{pct:0.7,reps:4,sets:4}] },
@@ -518,9 +518,9 @@ export const CYCLE_04: SRCycleTemplate = {
     { exercises: [
       { name: 'Присед', group: '', coef: 1.2, mnosz: 1, load: 'Легкая', sets: [{pct:0.5,reps:6,sets:4}] },
       { name: 'Приведение к плечу', group: '', coef: 1, mnosz: 2, load: 'Средняя', sets: [{pct:0.6,reps:6,sets:4}] },
-      { name: 'Подтягивание ', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.72,reps:4,sets:4}] },
+      { name: 'Подтягивание', group: '', coef: 1.2, mnosz: 1, load: 'Средняя', sets: [{pct:0.72,reps:4,sets:4}] },
       { name: 'Жим стоя', group: '', coef: 0.6, mnosz: 1, load: 'Средняя', sets: [{pct:0.5,reps:6,sets:1},{pct:0.6,reps:5,sets:4}] },
-      { name: 'Кисть РР ', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.5,reps:6,sets:4}] },
+      { name: 'Кисть РР', group: '', coef: 0.3, mnosz: 2, load: 'Легкая', sets: [{pct:0.5,reps:6,sets:4}] },
     ] },
     { exercises: [
       { name: 'Пронация СБ', group: '', coef: 0.5, mnosz: 2, load: 'Тяжелая', sets: [{pct:0.6,reps:6,sets:1},{pct:0.74,reps:5,sets:2},{pct:0.8,reps:4,sets:2}] },

@@ -61,6 +61,7 @@ export const EXERCISE_ALIAS_MAP: Record<string, string> = {
   'тяга сумо': 'sumo_dl',
   'гиперэкстензия': 'back_extension',
   'подтягивания': 'pullup',
+  'подтягивание': 'pullup',
 
   // ─── Ноги ───
   'разгибания ног': 'leg_ext',

@@ -235,8 +235,17 @@ function rirLevelKey(level: string): keyof typeof RIR_MATRIX['strength'] {
 
 /** Найти упражнение в каталоге по метке коррекции (метка может быть более специфичной, чем имя в каталоге).
  *  P0-fix: сначала проверяем EXERCISE_ALIAS_MAP для точного маппинга шаблонных имён → catalog ID.
+ *  P2: memoized — same label returns same result without repeated linear scans.
  */
+const _catalogLabelCache = new Map<string, Exercise | null>();
 function findCatalogExerciseByLabel(label: string): Exercise | null {
+  const cached = _catalogLabelCache.get(label);
+  if (cached !== undefined) return cached;
+  const result = _findCatalogExerciseByLabelUncached(label);
+  _catalogLabelCache.set(label, result);
+  return result;
+}
+function _findCatalogExerciseByLabelUncached(label: string): Exercise | null {
   // P0-1: точный маппинг из alias map (шаблонные имена → catalog ID)
   const aliasId = resolveCatalogId(label);
   if (aliasId) {

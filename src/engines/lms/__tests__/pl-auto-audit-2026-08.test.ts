@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildLMSPlan } from '../lms-builder.engine';
+import { buildLMSPlan, extractExercises } from '../lms-builder.engine';
 import { buildDiaryAutoreg } from '../../pro/diary-autoreg.engine';
 import { normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
@@ -271,5 +271,61 @@ describe('LMS cycle integrity: source percentages preserved', () => {
 
   it('CYCLE_04 (armwrestling) is classified as strength direction', () => {
     expect(normalizeCycleDirection(CYCLE_04.meta.direction)).toBe('strength');
+  });
+});
+
+// ── Additional coverage: extractExercises, pmFor, catalog memoization ──
+describe('Additional coverage', () => {
+  it('extractExercises returns unique names from weeks[] when present', () => {
+    const names = extractExercises(CYCLE_01);
+    expect(names).toContain('Присед');
+    expect(names).toContain('Жим лежа');
+    expect(names).toContain('Становая тяга');
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('extractExercises from week1 when no weeks[]', () => {
+    const tpl: SRCycleTemplate = {
+      meta: { ...CYCLE_01.meta, sourceWeeks: false },
+      week1: [{ exercises: [{ name: 'Test Ex', group: 'ПР', coef: 1, mnosz: 1, sets: [{ pct: 0.5, reps: 5, sets: 3 }] }] }],
+    };
+    expect(extractExercises(tpl)).toEqual(['Test Ex']);
+  });
+
+  it('pmFor fuzzy match does not match unrelated exercises', () => {
+    const plan = buildLMSPlan({
+      template: CYCLE_01,
+      pmMap: { 'Присед': 150 },
+      fallbackPm: 80,
+      weeksOverride: 1,
+    });
+    const squat = plan.weeks[0].days[0].exercises.find(e => e.name === 'Присед');
+    expect(squat?.pm).toBe(150);
+    const bench = plan.weeks[0].days[0].exercises.find(e => e.name === 'Жим лежа');
+    expect(bench?.pm).toBe(80);
+  });
+
+  it('cycle-04 exercise names have no trailing spaces', () => {
+    for (const day of CYCLE_04.week1) {
+      for (const ex of day.exercises) {
+        expect(ex.name).toBe(ex.name.trim());
+      }
+    }
+  });
+
+  it('all cycle-01 weeks have same day count as week1', () => {
+    expect(CYCLE_01.weeks).toBeDefined();
+    for (let i = 0; i < CYCLE_01.weeks!.length; i++) {
+      expect(CYCLE_01.weeks![i].length).toBe(CYCLE_01.week1.length);
+    }
+  });
+
+  it('faithful mode preserves source RIR as-is (no phase override)', () => {
+    const plan = buildLMSPlan({
+      template: CYCLE_01, pmMap, fallbackPm: 80,
+      faithful: true, weeksOverride: 1,
+    });
+    const ws = plan.weeks[0].days[0].exercises[0].workSets[0];
+    expect(ws.rir).toBe(0);
   });
 });
