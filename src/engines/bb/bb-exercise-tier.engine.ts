@@ -63,9 +63,12 @@ export function bbExerciseTier(ex: Exercise | any): BBExerciseTier {
   // 1) Канонический инструментарий
   if (CANONICAL_PATTERNS.test(n) || CANONICAL_PATTERNS.test(id)) return 1;
 
-  // 2) Допустимая вариативность (Смит-варианты без явного канон, тренажёры, Арнольд-жим, нейтральные)
+  // 2) Допустимая вариативность: известное оборудование остаётся безопасным
+  // tier-2, а неизвестные/неописанные варианты получают мягкий exotic штраф.
+  if (['barbell', 'dumbbell', 'machine', 'cable', 'smith', 'bodyweight'].includes(equip)
+    || /смит|smith|тренаж|машин|кроссовер|блок|кабел|гантел|штанг|подтяг|отжиман/i.test(n)) return 2;
   if (diff === 'beginner' || diff === 'intermediate') return 2;
-  return 2;
+  return 3;
 }
 
 export function isCanonicalBB(ex: Exercise | any): boolean { return bbExerciseTier(ex) === 1; }

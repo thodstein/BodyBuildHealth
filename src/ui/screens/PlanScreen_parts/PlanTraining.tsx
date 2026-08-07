@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { TrainingOutput, Exercise } from '../../../core/types';
 import type { MacrocyclePlan } from '../../../engines/training-periodization.engine';
+import { generateMacrocycle } from '../../../engines/training-periodization.engine';
 import type { SplitCandidate } from '../../../engines/split-selector.engine';
 import type { ProgressionRule } from '../../../engines/progression.engine';
 import { calcSuggestedWeight } from '../../../engines/progression.engine';
@@ -315,7 +316,20 @@ export const PlanTraining: React.FC<{
       {!macrocycle && (
         <div className="card" style={{ marginTop: 16 }}>
           <h3>Генерация макроцикла (опционально)</h3>
-          <button onClick={() => setMacrocycle(null as any)} style={{ width: '100%', padding: 8 }}>
+           <button onClick={() => {
+             const macro = generateMacrocycle({
+               goal: goalState as any,
+               level: level as any,
+               daysPerWeek,
+               readinessScore: recovery,
+               isOnCourse: level === 'enhanced',
+               weakPoints,
+               injuries: [],
+               experience: level as any,
+             });
+             setMacrocycle(macro);
+             setSelectedWeek(1);
+           }} style={{ width: '100%', padding: 8 }}>
             Создать макроцикл
           </button>
         </div>

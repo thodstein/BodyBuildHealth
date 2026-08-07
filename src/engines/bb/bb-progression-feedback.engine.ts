@@ -20,6 +20,7 @@ import type { WorkoutSession, WorkoutExercise, WorkoutSet } from '../workout-log
 import { prescribeLoad, type LoadStrategy } from './bb-autocoach.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { trueMuscleOf } from '../movement-pattern';
+import { bbExerciseTier } from './bb-exercise-tier.engine';
 
 export interface ExerciseLastResult {
   exerciseName: string;
@@ -485,6 +486,11 @@ export function autoReplaceOnPlateau(
           if (mg !== ex.muscle && mg !== collapseKeyLocal(ex.muscle)) return false;
           if (e.type !== 'compound' && e.exerciseType !== 'compound') return false;
           return true;
+        }).sort((a: any, b: any) => {
+          const tierDiff = bbExerciseTier(a) - bbExerciseTier(b);
+          if (tierDiff !== 0) return tierDiff;
+          const difficulty = ({ beginner: 0, intermediate: 1, advanced: 2 } as Record<string, number>);
+          return (difficulty[String(a.difficulty || '')] ?? 1) - (difficulty[String(b.difficulty || '')] ?? 1);
         });
         if (alternatives.length === 0) return ex;
         const sub = alternatives[0];

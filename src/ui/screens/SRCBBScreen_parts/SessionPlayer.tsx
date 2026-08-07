@@ -6,7 +6,8 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
   startSession, addExerciseToSession, logSet, finishSession,
-  getLastSession, getRecentPRs, type WorkoutSession,
+  getLastSession, getRecentPRs, type WorkoutSession, type CachedProgress,
+  getExerciseProgress, cacheExerciseProgress, cacheSessionStats, getWorkoutStats,
 } from '../../../engines/workout-logger.engine';
 import { generateWarmup, type WarmupInput } from '../../../engines/warmup.engine';
 import { generateCooldown, type CooldownInput } from '../../../engines/cooldown.engine';
@@ -22,8 +23,20 @@ import { recordSessionRIR, getSessionRIRFeedback } from '../../../engines/rir-ca
 import { recordMMC } from '../../../engines/mmc-tracking.engine';
 import { StrengthDiary, sessionToWorkoutLog } from '../../../engines/strength-diary.engine';
 
-const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
-const ACCENT = '#00e68a';
+  const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
+  const ACCENT = '#00e68a';
+  
+  // CSS анимация для таймера
+  const timerAnimationStyle = `
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    @keyframes slideIn {
+      from { transform: translateY(-10px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  `;
 
 const WARMUP_LABELS: Record<string, string> = {
   light_cardio: 'Лёгкое кардио (ходьба/вело)', jumping_jack: 'Прыжки ноги вместе-врозь',
@@ -95,8 +108,29 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   const [cooldownDone, setCooldownDone] = useState<Record<string, boolean>>({});
   // фактический ввод текущего подхода: [exerciseIndex][setIndex] -> {weight,reps}
   const [actual, setActual] = useState<Record<string, { weight: number; reps: number; rpe: number }>>({});
-  const [exDone, setExDone] = useState<Record<string, boolean>>({});
-  // P11: VBT-ввод скорости штанги (м/с) на сет + авторегуляция по потере скорости
+   const [exDone, setExDone] = useState<Record<string, boolean>>({});
+   const [interExTimerSec, setInterExTimerSec] = useState<number>(0);
+   const [interExTimerRunning, setInterExTimerRunning] = useState<boolean>(false);
+   const interExTimerRef = useRef<number | null>(null);
+   const [supersetMode, setSupersetMode] = useState<boolean>(false);
+   const [circuitMode, setCircuitMode] = useState<boolean>(false);
+    const [supersetExercises, setSupersetExercises] = useState<number[]>([]);
+    const [autoStartRest, setAutoStartRest] = useState<boolean>(true);
+    const [exerciseProgress, setExerciseProgress] = useState<Record<string, { completed: number; total: number }>>({});
+    const [restHistory, setRestHistory] = useState<{ exercise: string; duration: number; timestamp: string }[]>([]);
+   const [timerSettings, setTimerSettings] = useState<{
+     preset: 'compound' | 'isolation' | 'pump' | 'custom';
+     customRest: number;
+     autoStart: boolean;
+   }>(() => {
+     try {
+       const saved = localStorage.getItem('he_timer_settings');
+       if (saved) return JSON.parse(saved);
+     } catch {}
+     return { preset: 'compound' as const, customRest: 90, autoStart: true };
+   });
+
+    // P11: VBT-ввод скорости штанги (м/с) на сет + авторегуляция по потере скорости
   const [vel, setVel] = useState<Record<string, number>>({});
   const [mmco, setMMCOpen] = useState<string>('');
   const [mmcVals, setMMCVals] = useState<Record<string, number>>({});
@@ -104,50 +138,209 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   const [sessionRPE, setSessionRPE] = useState<number>(7);
   const [sessionDur, setSessionDur] = useState<number>(60);
   // авто-таймер отдыха
-  const [timerSec, setTimerSec] = useState<number>(0);
-  const [timerRunning, setTimerRunning] = useState<boolean>(false);
-  const [timerExIdx, setTimerExIdx] = useState<number>(-1);
-  const timerRef = useRef<number | null>(null);
+   const [timerSec, setTimerSec] = useState<number>(0);
+   const [timerRunning, setTimerRunning] = useState<boolean>(false);
+   const [timerExIdx, setTimerExIdx] = useState<number>(-1);
+   const [timerPreset, setTimerPreset] = useState<'compound' | 'isolation' | 'pump' | 'custom'>('compound');
+   const [customRestSec, setCustomRestSec] = useState<number>(90);
+   const timerRef = useRef<number | null>(null);
+   const [sessionTimerSec, setSessionTimerSec] = useState<number>(0);
+   const [sessionTimerRunning, setSessionTimerRunning] = useState<boolean>(false);
+    const sessionTimerRef = useRef<number | null>(null);
 
-  const day = days[dayIdx] || days[0];
+   // Сохранение настроек таймера при изменении
+   useEffect(() => {
+     try {
+       localStorage.setItem('he_timer_settings', JSON.stringify({
+         preset: timerPreset,
+         customRest: customRestSec,
+         autoStart: autoStartRest
+       }));
+     } catch {}
+   }, [timerPreset, customRestSec, autoStartRest]);
+ 
+   const day = days[dayIdx] || days[0];
   const last = useMemo(() => getLastSession(), [done]);
   const prs = useMemo(() => getRecentPRs(3), [done]);
 
-  // авто-таймер: обратный отсчёт
-  useEffect(() => {
-    if (!timerRunning || timerSec <= 0) return;
-    timerRef.current = window.setTimeout(() => {
-      setTimerSec(prev => {
-        if (prev <= 1) { 
-          setTimerRunning(false); 
-          hapticNotify('success');
-          try {
-            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-            audio.play().catch(() => {});
-          } catch { /* browser block */ }
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => { if (timerRef.current !== null) { window.clearTimeout(timerRef.current); timerRef.current = null; } };
-  }, [timerRunning, timerSec]);
+  const speakRestComplete = (exIdx: number) => {
+     if (!('speechSynthesis' in window)) return;
+     const exName = day?.exercises[exIdx]?.name || 'упражнение';
+     const utterance = new SpeechSynthesisUtterance(`Отдых завершён. Можно приступать к следующему подходу: ${exName}`);
+     utterance.lang = 'ru-RU';
+     utterance.rate = 1.0;
+     utterance.pitch = 1.0;
+     utterance.volume = 0.8;
+     window.speechSynthesis.speak(utterance);
+   };
 
-  const startRestTimer = useCallback((ei: number) => {
-    const rest = day?.exercises[ei]?.restSec || 90;
-    setTimerExIdx(ei);
-    setTimerSec(rest);
-    setTimerRunning(true);
-  }, [day]);
+    const speakWarning = (secondsLeft: number) => {
+      if (!('speechSynthesis' in window)) return;
+      const utterance = new SpeechSynthesisUtterance(`${secondsLeft} секунд до конца отдыха`);
+      utterance.lang = 'ru-RU';
+      utterance.rate = 1.2;
+      utterance.pitch = 1.0;
+      utterance.volume = 0.6;
+      window.speechSynthesis.speak(utterance);
+    };
+
+    const currentRestSec = useMemo(() => {
+      if (timerExIdx >= 0 && day?.exercises[timerExIdx]?.restSec) return day.exercises[timerExIdx].restSec;
+      if (timerPreset === 'custom') return customRestSec;
+      return 90; // default
+    }, [timerExIdx, day, timerPreset, customRestSec]);
+
+   // авто-таймер: обратный отсчёт
+   useEffect(() => {
+     if (!timerRunning || timerSec <= 0) return;
+     timerRef.current = window.setTimeout(() => {
+       setTimerSec(prev => {
+         if (prev <= 1) { 
+           setTimerRunning(false); 
+           // Уведомление при завершении таймера
+           hapticNotify('success');
+           // Вибрация: паттерн зависит от типа таймера
+           if (navigator.vibrate) {
+             if (timerExIdx >= 0) {
+               navigator.vibrate([200, 100, 200]); // двойная вибрация для отдыха между подходами
+             } else {
+               navigator.vibrate([500, 200, 500]); // длинная вибрация для отдыха между упражнениями
+             }
+           }
+           // Звук
+           try {
+             const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+             audio.play().catch(() => {});
+           } catch { /* browser block */ }
+           // Голосовое уведомление
+           speakRestComplete(timerExIdx);
+           // Запись в историю отдыха
+           if (timerExIdx >= 0 && day?.exercises[timerExIdx]) {
+             const ex = day.exercises[timerExIdx];
+             const restDuration = day.exercises[timerExIdx]?.restSec || currentRestSec;
+             setRestHistory(prev => [...prev, {
+               exercise: ex.name,
+               duration: restDuration,
+               timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+             }]);
+           }
+         } else if (prev <= 5) {
+           // Предупреждение за 5 секунд
+           hapticImpact('light');
+           // Голосовое предупреждение
+           speakWarning(prev);
+         }
+         return prev - 1;
+       });
+     }, 1000);
+     return () => { if (timerRef.current !== null) { window.clearTimeout(timerRef.current); timerRef.current = null; } };
+   }, [timerRunning, timerSec, timerExIdx, day, currentRestSec]);
+
+   // таймер сессии
+   useEffect(() => {
+     if (!sessionTimerRunning) return;
+     sessionTimerRef.current = window.setTimeout(() => {
+       setSessionTimerSec(prev => prev + 1);
+     }, 1000);
+     return () => { if (sessionTimerRef.current !== null) { window.clearTimeout(sessionTimerRef.current); sessionTimerRef.current = null; } };
+   }, [sessionTimerRunning, sessionTimerSec]);
+
+   // таймер между упражнениями
+   useEffect(() => {
+     if (!interExTimerRunning || interExTimerSec <= 0) return;
+     interExTimerRef.current = window.setTimeout(() => {
+       setInterExTimerSec(prev => {
+         if (prev <= 1) { 
+           setInterExTimerRunning(false); 
+           hapticNotify('success');
+         }
+         return prev - 1;
+       });
+     }, 1000);
+     return () => { if (interExTimerRef.current !== null) { window.clearTimeout(interExTimerRef.current); interExTimerRef.current = null; } };
+   }, [interExTimerRunning, interExTimerSec]);
+
+  const getRestTime = useCallback((ei: number): number => {
+     if (timerPreset === 'custom') return customRestSec;
+     const ex = day?.exercises[ei];
+     if (!ex) return 90;
+     const isCompound = ['chest','back','quads','hamstrings','shoulders','legs'].includes(ex.muscleGroup?.toLowerCase() || '');
+     if (timerPreset === 'compound') return isCompound ? 180 : 90;
+     if (timerPreset === 'isolation') return isCompound ? 120 : 60;
+     if (timerPreset === 'pump') return 45;
+      return ex.restSec || 90;
+    }, [day, timerPreset, customRestSec]);
+
+    const getSupersetRestTime = useCallback((): number => {
+      if (circuitMode) return 0; // no rest between exercises in circuit
+      return 30; // short rest for supersets
+    }, [circuitMode]);
+ 
+    const startRestTimer = useCallback((ei: number) => {
+     // В режиме суперсета или круга проверяем, нужно ли запускать таймер
+     if (supersetMode || circuitMode) {
+       const isInSuperset = supersetExercises.includes(ei);
+       if (isInSuperset && supersetExercises.length > 1) {
+         const currentIdx = supersetExercises.indexOf(ei);
+         const isLastInSuperset = currentIdx === supersetExercises.length - 1;
+         if (!isLastInSuperset) {
+           // Ещё не все упражнения суперсета выполнены - короткий отдых или без отдыха
+           const rest = circuitMode ? 0 : getSupersetRestTime();
+           if (rest > 0) {
+             setTimerExIdx(ei);
+             setTimerSec(rest);
+             setTimerRunning(true);
+           }
+           return;
+         }
+       }
+     }
+     const rest = getRestTime(ei);
+     setTimerExIdx(ei);
+     setTimerSec(rest);
+     setTimerRunning(true);
+   }, [day, getRestTime, supersetMode, circuitMode, supersetExercises, getSupersetRestTime]);
 
   const skipRestTimer = useCallback(() => {
-    setTimerRunning(false);
-    setTimerSec(0);
-    setTimerExIdx(-1);
-    if (timerRef.current !== null) { window.clearTimeout(timerRef.current); timerRef.current = null; }
+     setTimerRunning(false);
+     setTimerSec(0);
+     setTimerExIdx(-1);
+     if (timerRef.current !== null) { window.clearTimeout(timerRef.current); timerRef.current = null; }
+   }, []);
+
+  const startInterExTimer = useCallback((restSec: number = 120) => {
+    setInterExTimerSec(restSec);
+    setInterExTimerRunning(true);
   }, []);
 
-  const timerPct = timerRunning && timerSec > 0
-    ? ((day?.exercises[timerExIdx]?.restSec || 90) - timerSec) / (day?.exercises[timerExIdx]?.restSec || 90) * 100
+  const skipInterExTimer = useCallback(() => {
+    setInterExTimerRunning(false);
+    setInterExTimerSec(0);
+    if (interExTimerRef.current !== null) { window.clearTimeout(interExTimerRef.current); interExTimerRef.current = null; }
+  }, []);
+
+  // Superset/circuit mode handlers
+  const toggleSupersetMode = useCallback(() => {
+    setSupersetMode(prev => !prev);
+    if (circuitMode) setCircuitMode(false);
+    if (!supersetMode) setSupersetExercises([]);
+  }, [supersetMode, circuitMode]);
+
+  const toggleCircuitMode = useCallback(() => {
+    setCircuitMode(prev => !prev);
+    if (supersetMode) setSupersetMode(false);
+    if (!circuitMode) setSupersetExercises([]);
+  }, [circuitMode, supersetMode]);
+
+  const toggleExerciseInSuperset = useCallback((ei: number) => {
+    setSupersetExercises(prev => {
+      if (prev.includes(ei)) return prev.filter(x => x !== ei);
+      return [...prev, ei].sort((a, b) => a - b);
+     });
+    }, []);
+
+   const timerPct = timerRunning && timerSec > 0 && currentRestSec > 0
+    ? ((currentRestSec - timerSec) / currentRestSec) * 100
     : 0;
 
   const begin = () => {
@@ -180,16 +373,20 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   };
 
   const startMain = () => {
-    if (!day || !Array.isArray(day.exercises)) return;
-    let s = startSession(focus || day.label, weekNumber);
-    day.exercises.forEach(ex => {
-      s = addExerciseToSession(s, { id: ex.name, name: ex.name, pattern: ex.muscleGroup, muscleGroup: ex.muscleGroup });
-    });
-    setSession(s);
-    setPhase('main');
-    setActual({});
-    setExDone({});
-  };
+     if (!day || !Array.isArray(day.exercises)) return;
+     let s = startSession(focus || day.label, weekNumber);
+     day.exercises.forEach(ex => {
+       s = addExerciseToSession(s, { id: ex.name, name: ex.name, pattern: ex.muscleGroup, muscleGroup: ex.muscleGroup });
+     });
+     setSession(s);
+     setPhase('main');
+     setActual({});
+     setExDone({});
+     setRestHistory([]);
+     // старт таймера сессии
+     setSessionTimerSec(0);
+     setSessionTimerRunning(true);
+   };
 
   const finish = () => {
     if (!session || !day || !Array.isArray(day.exercises)) return;
@@ -245,11 +442,51 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     } catch { /* ignore */ }
     setDone(finished);
     setSession(null);
+
+    // Автообновление кэша прогресса после завершённой сессии
+    try {
+      const stats = getWorkoutStats();
+      cacheSessionStats({ totalSessions: stats.totalSessions, totalVolume: stats.totalVolume, totalSets: stats.totalSets, totalReps: stats.totalReps, prCount: stats.prCount, streak: stats.streak });
+      const progressItems = finished.exercises.map(ex => {
+        const prog = getExerciseProgress(ex.exerciseName, 20);
+        if (!prog) return null;
+        return { exerciseName: prog.exerciseName, bestWeight: prog.bestWeight, bestReps: prog.bestReps, bestE1RM: prog.bestE1RM, totalVolume: prog.totalVolume, totalSets: prog.totalSets, sessions: prog.sessions, lastDate: prog.lastDate, trend: prog.trend, weightDelta: prog.weightDelta, e1RMDelta: prog.e1RMDelta, cachedAt: Date.now() };
+      }).filter(Boolean) as CachedProgress[];
+      cacheExerciseProgress(progressItems);
+    } catch {}
   };
 
   const exitSession = () => {
-    setPhase('done');
-  };
+     setPhase('done');
+   };
+
+   // горячие клавиши для быстрого логирования
+   useEffect(() => {
+     if (phase !== 'main') return;
+     const handler = (e: KeyboardEvent) => {
+       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+       if (e.key === ' ' || e.key === 'Enter') {
+         e.preventDefault();
+         // найти первый незалогированный сет и залогировать
+         if (!day || !Array.isArray(day.exercises)) return;
+         for (let ei = 0; ei < day.exercises.length; ei++) {
+           for (let si = 0; si < day.exercises[ei].targetSets.length; si++) {
+             if (!actual[keyFor(ei, si)]) {
+               logOne(ei, si);
+               return;
+             }
+           }
+         }
+       }
+       if (e.key === 'r' || e.key === 'R') {
+         e.preventDefault();
+         if (timerRunning) skipRestTimer();
+         else if (timerExIdx >= 0) startRestTimer(timerExIdx);
+       }
+     };
+     window.addEventListener('keydown', handler);
+     return () => window.removeEventListener('keydown', handler);
+   }, [phase, day, actual, timerRunning, timerExIdx]);
 
 
   const toggleWarmup = (blockIdx: number, exIdx: number) => {
@@ -265,19 +502,27 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   const keyFor = (ei: number, si: number) => `${ei}_${si}`;
 
   const logOne = (ei: number, si: number) => {
-    if (!session || !day || !Array.isArray(day.exercises)) return;
-    hapticImpact('light');
-    const ex = day.exercises[ei];
-    if (!ex) return;
-    const ts = Array.isArray(ex.targetSets) ? ex.targetSets[si] : null;
-    const t = ts || { weight: weightFor(ex) || 60, reps: repsFor(ex) || 10, rir: rirFor(ex) ?? 2 };
-    const a = actual[keyFor(ei, si)] || { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir) };
-    let s = logSet(session, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe || Math.max(1, 10 - t.rir), rir: t.rir, notes: '', plannedWeight: t.weight, plannedReps: t.reps, plannedRir: t.rir });
-    setSession(s);
-    setActual(prev => ({ ...prev, [keyFor(ei, si)]: a }));
-    // авто-старт таймера отдыха после подхода
-    startRestTimer(ei);
-  };
+     if (!session || !day || !Array.isArray(day.exercises)) return;
+     hapticImpact('light');
+     const ex = day.exercises[ei];
+     if (!ex) return;
+     const ts = Array.isArray(ex.targetSets) ? ex.targetSets[si] : null;
+     const t = ts || { weight: weightFor(ex) || 60, reps: repsFor(ex) || 10, rir: rirFor(ex) ?? 2 };
+     const a = actual[keyFor(ei, si)] || { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir) };
+     let s = logSet(session, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe || Math.max(1, 10 - t.rir), rir: t.rir, notes: '', plannedWeight: t.weight, plannedReps: t.reps, plannedRir: t.rir });
+     setSession(s);
+     setActual(prev => ({ ...prev, [keyFor(ei, si)]: a }));
+     // обновляем прогресс упражнения
+      setExerciseProgress(prev => {
+        const total = ex.targetSets.length;
+        const completed = Object.keys(prev).filter(k => k.startsWith(`${ei}_`) && prev[k]).length;
+        return { ...prev, [String(ei)]: { completed: Math.min(completed + 1, total), total } };
+      });
+     // авто-старт таймера отдыха после подхода
+     if (autoStartRest) {
+       startRestTimer(ei);
+     }
+   };
 
   // Fallback helpers when targetSets is missing (legacy cache)
   const weightFor = (ex: any) => ex?.targetSets?.[0]?.weight ?? ex?.weight ?? 60;
@@ -347,6 +592,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
 
   return (
     <div>
+      <style>{timerAnimationStyle}</style>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
         {days.map((d, i) => (
           <button key={i} style={i === dayIdx ? BTN : BTN_GHOST} onClick={() => setDayIdx(i)}>{d.label}</button>
@@ -393,12 +639,39 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
         </div>
       )}
 
-      {phase === 'main' && session && (
-        <div style={CARD}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={H}>🏃 {day.label}</div>
-            <button style={BTN} onClick={finish}>⏹ Завершить</button>
-          </div>
+       {phase === 'main' && session && (
+         <div style={CARD}>
+           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+             <div style={H}>🏃 {day.label}</div>
+             <button style={BTN} onClick={finish}>⏹ Завершить</button>
+           </div>
+           
+           {/* таймер сессии */}
+           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Время сессии:</span>
+             <span style={{ fontSize: 14, fontWeight: 600, color: ACCENT, fontVariantNumeric: 'tabular-nums' }}>
+               {String(Math.floor(sessionTimerSec / 60)).padStart(2, '0')}:{String(sessionTimerSec % 60).padStart(2, '0')}
+             </span>
+             <button onClick={() => { setSessionTimerRunning(!sessionTimerRunning); if (!sessionTimerRunning) setSessionTimerSec(0); }} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 10, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', background: sessionTimerRunning ? 'rgba(239,68,68,0.12)' : 'rgba(0,230,138,0.12)', color: sessionTimerRunning ? '#ef4444' : '#00e68a' }}>
+               {sessionTimerRunning ? '⏸ Пауза' : '▶ Старт'}
+             </button>
+           </div>
+
+           {/* режимы суперсета и круга */}
+           <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+             <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', alignSelf: 'center' }}>Режим:</span>
+             <button onClick={toggleSupersetMode} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: supersetMode?'1px solid #f59e0b':'1px solid rgba(255,255,255,0.08)', background: supersetMode?'rgba(245,158,11,0.12)':'rgba(255,255,255,0.02)', color: supersetMode?'#f59e0b':'var(--text-dim)' }}>
+               🔄 Суперсет
+             </button>
+             <button onClick={toggleCircuitMode} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: circuitMode?'1px solid #8b5cf6':'1px solid rgba(255,255,255,0.08)', background: circuitMode?'rgba(139,92,246,0.12)':'rgba(255,255,255,0.02)', color: circuitMode?'#8b5cf6':'var(--text-dim)' }}>
+               ⭕ Круг
+             </button>
+             {(supersetMode || circuitMode) && (
+               <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', alignSelf: 'center' }}>
+                 {supersetMode ? 'Выберите 2+ упражнения' : 'Минимальный отдых между упражнениями'}
+               </span>
+             )}
+           </div>
           <div style={{ ...SMALL, marginBottom: 6 }}>План: {planned.sets} сетов / {planned.volume} кг·пов · Факт: {factVol.sets} сетов / {factVol.volume} кг·пов</div>
           {/* P12: sRPE для мониторинга нагрузки (сохранится при завершении) */}
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
@@ -408,66 +681,105 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
             <input style={{ ...IN, width: 64 }} type="number" value={sessionDur} onChange={e => setSessionDur(+e.target.value)} aria-label="длительность мин" />
           </div>
           {day.exercises.map((ex, ei) => (
-            <div key={ei} style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{ex.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>({ex.muscleGroup})</span>{(() => { const isCompound = ['chest','back','quads','hamstrings','shoulders','legs'].includes(ex.muscleGroup?.toLowerCase() || ''); const t = TEMPO_PRESETS[recommendTempo('hypertrophy', isCompound ? 'compound' : 'isolation')]; return <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginLeft:6 }} title={t?.nameRu}>⏱ {formatTempo(t?.tempo)}</span>; })()}</div>
-              {ex.targetSets.map((t, si) => {
-                const k = keyFor(ei, si);
-                const a = actual[k] || { weight: t.weight, reps: t.reps, rpe: 0 };
-                const logged = !!actual[k];
-                const targetRPE = 10 - t.rir;
-                const dW = a.weight - t.weight;
-                const dR = a.reps - t.reps;
-                const rpeDelta = a.rpe > 0 ? a.rpe - targetRPE : 0;
-                const nextW = a.rpe > 0 ? (rpeDelta > 0 ? Math.max(0, a.weight - 2.5) : rpeDelta < -1 ? a.weight + 2.5 : a.weight) : a.weight;
-                const nextR = a.rpe > 0 ? (rpeDelta > 1 ? Math.max(1, a.reps - 1) : a.reps) : a.reps;
-                return (
-                  <div key={si} style={{ ...ROW, flexWrap: 'wrap', gap: 6 }}>
-                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, width: 52 }}>Сет {si + 1}</span>
-                    <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, width: 90 }}>цель {t.weight}кг×{t.reps}@RIR{t.rir}</span>
-                    {t.weight > 0 && (
-                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', width: '100%', paddingLeft: 52 }}>
-                        🏋️ {formatPlates(t.weight)}
-                      </span>
-                    )}
-                     <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                       <input style={{ ...IN, width: 60 }} type="number" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { weight: +e.target.value, reps: a.reps, rpe: a.rpe } }))} aria-label="вес" />
-                       <input style={{ ...IN, width: 48 }} type="number" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: +e.target.value, rpe: a.rpe } }))} aria-label="повт" />
-                        <input style={{ ...IN, width: 44 }} type="number" min={0} max={10} placeholder="RPE" value={a.rpe || ""} onChange={e => { const v = +e.target.value; setActual(p => ({ ...p, [k]: { weight: a.weight, reps: a.reps, rpe: Number.isFinite(v) ? Math.max(0, Math.min(10, v)) : 0 } })) }} aria-label="RPE" />
-                       <input style={{ ...IN, width: 48 }} type="number" step="0.01" placeholder="v" value={vel[k] ?? ""} onChange={e => setVel(p => ({ ...p, [k]: +e.target.value }))} aria-label="скорость м/с" />
-                       <button style={logged ? BTN_GHOST : BTN} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>
-                     </div>
-                      {logged && (
-                        <div style={{ width: '100%', fontSize: 10, color: 'rgba(255,255,255,0.55)', paddingLeft: 56, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                          <span style={{ color: 'rgba(255,255,255,0.8)' }}>🏋️ {formatPlates(a.weight)}</span>
-                          <span>факт <b style={{ color: '#fff' }}>{a.weight}кг×{a.reps}</b>{a.rpe > 0 ? `@RPE${a.rpe}` : ''}</span>
-                          <span style={{ color: dW === 0 ? 'var(--text-dim)' : dW > 0 ? '#22c55e' : '#f59e0b' }}>Δвес {dW > 0 ? '+' : ''}{dW}</span>
-                          <span style={{ color: dR === 0 ? 'var(--text-dim)' : dR > 0 ? '#22c55e' : '#f59e0b' }}>Δповт {dR > 0 ? '+' : ''}{dR}</span>
-                          {a.rpe > 0 && <span style={{ color: rpeDelta > 0 ? '#ef4444' : rpeDelta < -1 ? '#22c55e' : 'var(--text-dim)' }}>RPE vs цели({targetRPE}): {rpeDelta > 0 ? '+' : ''}{rpeDelta}</span>}
-                          {a.rpe > 0 && (rpeDelta > 0 || rpeDelta < -1) && (
-                            <span style={{ color: ACCENT, fontWeight: 700 }}>→ след. сет: {nextW}кг×{nextR}{rpeDelta > 0 ? ' (легче)' : ' (тяжелее)'}</span>
-                          )}
-                          {/* MMC-трекинг */}
-                          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', cursor: 'pointer', userSelect:'none', borderBottom:'1px dashed rgba(255,255,255,0.15)' }} onClick={() => setMMCOpen(mmco === k ? '' : k)}>
-                            {mmco === k ? '🔼 скрыть MMC' : '🔽 MMC/Пампинг/Суставы'}
-                          </span>
-                          {mmco === k && <div style={{ width: '100%', display: 'flex', gap: 8, padding: '4px 0' }}>
-                            {([['mmc','🧠 MMC',7],['pump','💪 Пампинг',6],['joint','🦵 Суставы',0],['energy','⚡ Энергия',7]] as any[]).map((item: any[]) => {
-                              const f = item[0]; const label = item[1]; const def = item[2];
-                              const valKey = k + '_' + f;
-                              return <label key={f} style={{ display:'flex', alignItems:'center', gap:4, fontSize:9, color:'rgba(255,255,255,0.4)' }}>
-                                <span style={{minWidth:42}}>{label}</span>
-                                <input style={{width:32,padding:'2px 4px',borderRadius:4,border:'1px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.04)',color:'#fff',fontSize:9,textAlign:'center'}}
-                                  type="number" min={0} max={10} value={mmcVals[valKey] ?? def}
-                                  onChange={e => setMMCVals(p => ({...p, [valKey]: +e.target.value}))} />
-                              </label>
-                            })}
-                          </div>}
-                        </div>
-                      )}
-
-                  </div>
-                );
-              })}
+               <div key={ei} style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)', 
+                 background: supersetExercises.includes(ei) ? (supersetMode ? 'rgba(245,158,11,0.05)' : 'rgba(139,92,246,0.05)') : 'transparent',
+                 borderRadius: supersetExercises.includes(ei) ? 8 : 0,
+                 paddingLeft: supersetExercises.includes(ei) ? 8 : 0,
+                 paddingRight: supersetExercises.includes(ei) ? 8 : 0,
+               }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                   {(supersetMode || circuitMode) && (
+                     <input type="checkbox" checked={supersetExercises.includes(ei)} onChange={() => toggleExerciseInSuperset(ei)} 
+                       style={{ cursor: 'pointer', width: 16, height: 16 }} />
+                   )}
+                   <div style={{ color: '#fff', fontSize: 13, fontWeight: 600, flex: 1 }}>
+                     {ex.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>({ex.muscleGroup})</span>
+                     {supersetExercises.includes(ei) && (
+                       <span style={{ fontSize: 9, marginLeft: 6, color: supersetMode ? '#f59e0b' : '#8b5cf6' }}>
+                         {supersetMode ? '🔄 Суперсет' : '⭕ Круг'}
+                       </span>
+                     )}
+                     {(() => { const isCompound = ['chest','back','quads','hamstrings','shoulders','legs'].includes(ex.muscleGroup?.toLowerCase() || ''); const t = TEMPO_PRESETS[recommendTempo('hypertrophy', isCompound ? 'compound' : 'isolation')]; return <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginLeft:6 }} title={t?.nameRu}>⏱ {formatTempo(t?.tempo)}</span>; })()}
+                   </div>
+                 </div>
+                 
+                  {/* индикатор прогресса упражнения */}
+                  <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
+                    {ex.targetSets.map((_, si) => (
+                      <div key={si} style={{ 
+                        width: 24, height: 8, borderRadius: 4,
+                        background: actual[keyFor(ei, si)] ? '#00e68a' : 'rgba(255,255,255,0.1)',
+                        transition: 'background 0.3s ease'
+                      }} />
+                    ))}
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginLeft: 4 }}>
+                      {Object.keys(actual).filter(k => k.startsWith(`${ei}_`)).length}/{ex.targetSets.length}
+                    </span>
+                   </div>
+                {ex.targetSets.map((t, si) => {
+                 const k = keyFor(ei, si);
+                 const a = actual[k] || { weight: t.weight, reps: t.reps, rpe: 0 };
+                 const logged = !!actual[k];
+                 const targetRPE = 10 - t.rir;
+                 const dW = a.weight - t.weight;
+                 const dR = a.reps - t.reps;
+                 const rpeDelta = a.rpe > 0 ? a.rpe - targetRPE : 0;
+                 const nextW = a.rpe > 0 ? (rpeDelta > 0 ? Math.max(0, a.weight - 2.5) : rpeDelta < -1 ? a.weight + 2.5 : a.weight) : a.weight;
+                 const nextR = a.rpe > 0 ? (rpeDelta > 1 ? Math.max(1, a.reps - 1) : a.reps) : a.reps;
+                 return (
+                   <div key={si} style={{ ...ROW, flexWrap: 'wrap', gap: 6 }}>
+                     <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, width: 52 }}>Сет {si + 1}</span>
+                     <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, width: 90 }}>цель {t.weight}кг×{t.reps}@RIR{t.rir}</span>
+                     {t.weight > 0 && (
+                       <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', width: '100%', paddingLeft: 52 }}>
+                         🏋️ {formatPlates(t.weight)}
+                       </span>
+                     )}
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <input style={{ ...IN, width: 60 }} type="number" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { weight: +e.target.value, reps: a.reps, rpe: a.rpe } }))} aria-label="вес" />
+                        <input style={{ ...IN, width: 48 }} type="number" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: +e.target.value, rpe: a.rpe } }))} aria-label="повт" />
+                         <input style={{ ...IN, width: 44 }} type="number" min={0} max={10} placeholder="RPE" value={a.rpe || ""} onChange={e => { const v = +e.target.value; setActual(p => ({ ...p, [k]: { weight: a.weight, reps: a.reps, rpe: Number.isFinite(v) ? Math.max(0, Math.min(10, v)) : 0 } })) }} aria-label="RPE" />
+                        <input style={{ ...IN, width: 48 }} type="number" step="0.01" placeholder="v" value={vel[k] ?? ""} onChange={e => setVel(p => ({ ...p, [k]: +e.target.value }))} aria-label="скорость м/с" />
+                        <button style={logged ? BTN_GHOST : BTN} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>
+                        {!logged && (
+                          <button style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 8px' }} onClick={() => {
+                            setActual(p => ({ ...p, [k]: { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir) } }));
+                            logOne(ei, si);
+                          }}>Быстро</button>
+                        )}
+                      </div>
+                       {logged && (
+                         <div style={{ width: '100%', fontSize: 10, color: 'rgba(255,255,255,0.55)', paddingLeft: 56, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                           <span style={{ color: 'rgba(255,255,255,0.8)' }}>🏋️ {formatPlates(a.weight)}</span>
+                           <span>факт <b style={{ color: '#fff' }}>{a.weight}кг×{a.reps}</b>{a.rpe > 0 ? `@RPE${a.rpe}` : ''}</span>
+                           <span style={{ color: dW === 0 ? 'var(--text-dim)' : dW > 0 ? '#22c55e' : '#f59e0b' }}>Δвес {dW > 0 ? '+' : ''}{dW}</span>
+                           <span style={{ color: dR === 0 ? 'var(--text-dim)' : dR > 0 ? '#22c55e' : '#f59e0b' }}>Δповт {dR > 0 ? '+' : ''}{dR}</span>
+                           {a.rpe > 0 && <span style={{ color: rpeDelta > 0 ? '#ef4444' : rpeDelta < -1 ? '#22c55e' : 'var(--text-dim)' }}>RPE vs цели({targetRPE}): {rpeDelta > 0 ? '+' : ''}{rpeDelta}</span>}
+                           {a.rpe > 0 && (rpeDelta > 0 || rpeDelta < -1) && (
+                             <span style={{ color: ACCENT, fontWeight: 700 }}>→ след. сет: {nextW}кг×{nextR}{rpeDelta > 0 ? ' (легче)' : ' (тяжелее)'}</span>
+                           )}
+                           {/* MMC-трекинг */}
+                           <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', cursor: 'pointer', userSelect:'none', borderBottom:'1px dashed rgba(255,255,255,0.15)' }} onClick={() => setMMCOpen(mmco === k ? '' : k)}>
+                             {mmco === k ? '🔼 скрыть MMC' : '🔽 MMC/Пампинг/Суставы'}
+                           </span>
+                           {mmco === k && <div style={{ width: '100%', display: 'flex', gap: 8, padding: '4px 0' }}>
+                             {([['mmc','🧠 MMC',7],['pump','💪 Пампинг',6],['joint','🦵 Суставы',0],['energy','⚡ Энергия',7]] as any[]).map((item: any[]) => {
+                               const f = item[0]; const label = item[1]; const def = item[2];
+                               const valKey = k + '_' + f;
+                               return <label key={f} style={{ display:'flex', alignItems:'center', gap:4, fontSize:9, color:'rgba(255,255,255,0.4)' }}>
+                                 <span style={{minWidth:42}}>{label}</span>
+                                 <input style={{width:32,padding:'2px 4px',borderRadius:4,border:'1px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.04)',color:'#fff',fontSize:9,textAlign:'center'}}
+                                   type="number" min={0} max={10} value={mmcVals[valKey] ?? def}
+                                   onChange={e => setMMCVals(p => ({...p, [valKey]: +e.target.value}))} />
+                               </label>
+                             })}
+                           </div>}
+                         </div>
+                       )}
+ 
+                   </div>
+                 );
+               })}
               {/* P11: VBT-авторегуляция по потере скорости (если введены скорости) */}
               {(() => {
                 const vels = ex.targetSets.map((t, si) => vel[keyFor(ei, si)]).filter(v => v && v > 0);
@@ -487,22 +799,102 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
                   <button key={it} onClick={() => setVbtIntent(it)} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: vbtIntent===it?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: vbtIntent===it?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.02)', color: vbtIntent===it?'#00e68a':'var(--text-dim)' }}>{it}</button>
                 ))}
               </div>
-              {/* таймер отдыха для этого упражнения */}
-              {timerRunning && timerExIdx === ei && (
-                <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>⏱ Отдых</span>
-                    <span style={{ fontSize: 20, fontWeight: 700, color: timerSec <= 10 ? '#f59e0b' : ACCENT }}>
-                      {String(Math.floor(timerSec / 60)).padStart(2, '0')}:{String(timerSec % 60).padStart(2, '0')}
-                    </span>
-                    <button onClick={skipRestTimer} style={{ fontSize: 10, padding: '2px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', minHeight: 28 }}>Пропустить</button>
+               {/* таймер отдыха для этого упражнения */}
+               {timerRunning && timerExIdx === ei && (
+                 <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)' }}>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                     <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>⏱ Отдых</span>
+                     <span style={{ 
+                       fontSize: 20, 
+                       fontWeight: 700, 
+                       color: timerSec <= 10 ? '#f59e0b' : ACCENT,
+                       animation: timerSec <= 10 && timerSec > 0 ? 'pulse 1s ease-in-out infinite' : 'none',
+                       transition: 'color 0.3s ease'
+                     }}>
+                       {String(Math.floor(timerSec / 60)).padStart(2, '0')}:{String(timerSec % 60).padStart(2, '0')}
+                     </span>
+                     <button onClick={skipRestTimer} style={{ fontSize: 10, padding: '2px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', minHeight: 28 }}>Пропустить</button>
+                   </div>
+                   <div style={{ marginTop: 4, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                     <div style={{ height: '100%', width: `${Math.min(100, timerPct)}%`, borderRadius: 2, background: timerSec <= 10 ? '#f59e0b' : ACCENT, transition: 'width 1s linear' }} />
+                   </div>
+                   {timerSec === 0 && <div style={{ marginTop: 4, fontSize: 10, color: ACCENT, fontWeight: 600 }}>✅ Отдых завершён — можно приступать к следующему подходу</div>}
                   </div>
-                  <div style={{ marginTop: 4, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${Math.min(100, timerPct)}%`, borderRadius: 2, background: timerSec <= 10 ? '#f59e0b' : ACCENT, transition: 'width 1s linear' }} />
-                  </div>
-                  {timerSec === 0 && <div style={{ marginTop: 4, fontSize: 10, color: ACCENT, fontWeight: 600 }}>✅ Отдых завершён — можно приступать к следующему подходу</div>}
+                 )}
+                
+                {/* пресеты таймера отдыха */}
+               <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', alignSelf: 'center' }}>Таймер:</span>
+                 {(['compound','isolation','pump'] as const).map(p => (
+                   <button key={p} onClick={() => setTimerPreset(p)} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: timerPreset===p?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: timerPreset===p?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.02)', color: timerPreset===p?'#00e68a':'var(--text-dim)' }}>
+                     {p === 'compound' ? 'Силовой' : p === 'isolation' ? 'Изоляция' : 'Пампинг'}
+                   </button>
+                 ))}
+                 <button onClick={() => { setTimerPreset('custom'); }} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: timerPreset==='custom'?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: timerPreset==='custom'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.02)', color: timerPreset==='custom'?'#00e68a':'var(--text-dim)' }}>
+                   {customRestSec}с
+                 </button>
+                 {timerPreset === 'custom' && (
+                   <input style={{ ...IN, width: 48, fontSize: 10, padding: '2px 4px' }} type="number" min={30} max={300} value={customRestSec} onChange={e => setCustomRestSec(Math.max(30, Math.min(300, +e.target.value)))} aria-label="свой таймер" />
+                 )}
+                 <button onClick={() => setAutoStartRest(!autoStartRest)} style={{ 
+                   padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', 
+                   border: autoStartRest ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', 
+                   background: autoStartRest ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)', 
+                   color: autoStartRest ? '#00e68a' : 'var(--text-dim)' 
+                 }}>
+                   {autoStartRest ? '▶ Авто-старт' : '⏸ Ручной'}
+                 </button>
                 </div>
-              )}
+               
+               {/* кнопка отдыха между упражнениями */}
+               <div style={{ marginTop: 6 }}>
+                 <button onClick={() => startInterExTimer(120)} style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px' }}>
+                   ⏱ Отдых между упражнениями (2 мин)
+                 </button>
+               </div>
+
+               {/* индикация суперсета/круга */}
+               {(supersetMode || circuitMode) && supersetExercises.length > 0 && (
+                 <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 8, 
+                   background: supersetMode ? 'rgba(245,158,11,0.08)' : 'rgba(139,92,246,0.08)',
+                   border: `1px solid ${supersetMode ? 'rgba(245,158,11,0.3)' : 'rgba(139,92,246,0.3)'}` }}>
+                   <div style={{ fontSize: 11, fontWeight: 600, color: supersetMode ? '#f59e0b' : '#8b5cf6', marginBottom: 6 }}>
+                     {supersetMode ? '🔄 Суперсет:' : '⭕ Круг:'} {supersetExercises.length} упражнений
+                   </div>
+                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                     {supersetExercises.map((exIdx, order) => (
+                       <span key={exIdx} style={{ 
+                         fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                         background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.8)',
+                       }}>
+                         {order + 1}. {day?.exercises[exIdx]?.name || `Упр ${exIdx + 1}`}
+                       </span>
+                     ))}
+                   </div>
+                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>
+                     {supersetMode 
+                       ? `Короткий отдых (${getSupersetRestTime()}с) между упражнениями, полный отдых после всех`
+                       : 'Минимальный отдых между упражнениями, отдых после завершения круга'
+                     }
+                   </div>
+                 </div>
+               )}
+               
+               {/* таймер между упражнениями */}
+               {interExTimerRunning && (
+                 <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)' }}>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                     <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>⏱ Переход к следующему</span>
+                     <span style={{ fontSize: 20, fontWeight: 700, color: interExTimerSec <= 10 ? '#f59e0b' : '#60a5fa' }}>
+                       {String(Math.floor(interExTimerSec / 60)).padStart(2, '0')}:{String(interExTimerSec % 60).padStart(2, '0')}
+                     </span>
+                     <button onClick={skipInterExTimer} style={{ fontSize: 10, padding: '2px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', minHeight: 28 }}>Пропустить</button>
+                   </div>
+                   <div style={{ marginTop: 4, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                     <div style={{ height: '100%', width: `${Math.min(100, (120 - interExTimerSec) / 120 * 100)}%`, borderRadius: 2, background: interExTimerSec <= 10 ? '#f59e0b' : '#60a5fa', transition: 'width 1s linear' }} />
+                   </div>
+                 </div>
+               )}
             </div>
           ))}
         </div>
@@ -592,10 +984,35 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
               </div>
             </div>
           )}
-          {prs.length > 0 && <div style={{ marginTop: 8 }}><div style={LABEL}>🏆 Последние PR:</div>{prs.map((p, i) => <div key={i} style={SMALL}>• {p.exercise}: {p.weight}кг×{p.reps} ({p.date})</div>)}</div>}
-          <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setPhase('ready'); }}>← Новая тренировка</button>
-        </div>
-      )}
+           {prs.length > 0 && <div style={{ marginTop: 8 }}><div style={LABEL}>🏆 Последние PR:</div>{prs.map((p, i) => <div key={i} style={SMALL}>• {p.exercise}: {p.weight}кг×{p.reps} ({p.date})</div>)}</div>}
+           
+           {/* история отдыха */}
+           {restHistory.length > 0 && (
+             <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)' }}>
+               <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                 <span>⏱ История отдыха</span>
+                 <button onClick={() => setRestHistory([])} style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>Очистить</button>
+               </div>
+               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6 }}>
+                 <div style={SMALL}>Всего отдыха: <b style={{ color: '#fff' }}>{Math.floor(restHistory.reduce((s, r) => s + r.duration, 0) / 60)}</b> мин</div>
+                 <div style={SMALL}>Периодов: <b style={{ color: '#fff' }}>{restHistory.length}</b></div>
+                 <div style={SMALL}>Средний: <b style={{ color: '#fff' }}>{Math.round(restHistory.reduce((s, r) => s + r.duration, 0) / restHistory.length)}</b> сек</div>
+               </div>
+               <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 120, overflowY: 'auto' }}>
+                 {restHistory.map((r, i) => (
+                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.7)', padding: '2px 4px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                     <span style={{ flex: 1 }}>{r.exercise}</span>
+                     <span style={{ color: ACCENT, fontVariantNumeric: 'tabular-nums' }}>{Math.floor(r.duration / 60)}:{String(r.duration % 60).padStart(2, '0')}</span>
+                     <span style={{ color: 'rgba(255,255,255,0.4)', marginLeft: 8 }}>{r.timestamp}</span>
+                   </div>
+                 ))}
+               </div>
+             </div>
+           )}
+           
+           <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setPhase('ready'); }}>← Новая тренировка</button>
+         </div>
+       )}
 
     </div>
   );

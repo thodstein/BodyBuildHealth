@@ -145,6 +145,34 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   const goalLabel = effGoal === 'powerlifting' ? 'Пауэрлифтинг' : effGoal === 'bodybuilding' ? 'Бодибилдинг' : 'Общее';
   const focusLabel = trainingFocus === 'strength' ? 'Сила' : trainingFocus === 'endurance' ? 'Выносливость' : 'Гипертрофия';
   useEffect(() => {
+    // The panel can stay mounted while the user switches PL/BB. Reload the
+    // matching persisted plan instead of keeping the previous direction's state.
+    try {
+      if (isBB) {
+        const raw = localStorage.getItem(bbKey);
+        const restored = raw ? deserializeBbMacro(raw) : null;
+        setBbMacro(restored);
+        setTotalWeeks(restored?.totalWeeks ?? 52);
+        setTrainingFocus(restored?.trainingFocus ?? 'hypertrophy');
+        setCompetitions(restored?.competitions ?? []);
+      } else {
+        const raw = localStorage.getItem(plKey);
+        const migrated = migrateStorage(raw);
+        const restored = migrated ? deserializeMacro(migrated) : null;
+        setMacro(restored);
+        setTotalWeeks(restored?.totalWeeks ?? 52);
+        setCompWeek(restored?.competitionWeek ?? 44);
+        setCompetitions(restored?.competitions ?? []);
+      }
+      setSelectedBlockIdx(-1);
+      setEditWeeks({});
+    } catch {
+      setMacro(null);
+      setBbMacro(null);
+    }
+  }, [isBB, plKey, bbKey]);
+
+  useEffect(() => {
     try { localStorage.setItem(UI_PREFS_KEY, JSON.stringify(uiPrefs)); } catch { /* ignore */ }
   }, [uiPrefs]);
   useEffect(() => {
@@ -219,8 +247,8 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       setEditWeeks({});
     };
     const onStorage = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY) sync(event.newValue);
-      if (event.key === BB_STORAGE_KEY) syncBb(event.newValue);
+      if (event.key === plKey) sync(event.newValue);
+      if (event.key === bbKey) syncBb(event.newValue);
     };
     const onMacroUpdated = (event: Event) => {
       sync((event as CustomEvent<string>).detail);
@@ -236,7 +264,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       window.removeEventListener('he-pl-macrocycle-updated', onMacroUpdated);
       window.removeEventListener('he-bb-macrocycle-updated', onBbMacroUpdated);
     };
-  }, [isBB]);
+  }, [isBB, plKey, bbKey]);
 
   const build = () => {
     if (competitionValidation) {

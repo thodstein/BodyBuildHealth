@@ -604,8 +604,9 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           runtimeSetR={runtimeSetR} setRuntimeSetR={setRuntimeSetR}
           runtimeSetRP={runtimeSetRP} setRuntimeSetRP={setRuntimeSetRP}
           runtimeSetRI={runtimeSetRI} setRuntimeSetRI={setRuntimeSetRI}
-          diary={diary} onRefresh={loadDiaryStats}
-        />
+            diary={diary} onRefresh={loadDiaryStats}
+            onGoToTimers={(settings) => { setTab('timers'); }}
+          />
       )}
 
       {/* ═══════════ Библиотека (зона) ═══════════ */}

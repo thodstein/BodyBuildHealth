@@ -24,8 +24,9 @@ export interface PlanSafetyScore {
     acwrCompliance: number;
     recovery: number;
     injuryRisk: number;
-    volumeCompliance: number;
-    balance: number;
+  volumeCompliance: number;
+  frequencyCompliance: number;
+  balance: number;
   };
   issues: string[];
   recommendations: string[];
@@ -37,7 +38,8 @@ const SCORE_WEIGHTS = {
   recovery: 15,
   injuryRisk: 15,
   volumeCompliance: 15,
-  balance: 15,
+  frequencyCompliance: 5,
+  balance: 10,
 };
 
 export function calculatePlanSafetyScore(
@@ -133,6 +135,27 @@ export function calculatePlanSafetyScore(
     issues.push(`${volumeViolations} превышений MRV — риск перетренированности.`);
   }
 
+  // Frequency is a quality/safety signal: very low frequency concentrates
+  // volume into fewer sessions and increases per-session fatigue exposure.
+  const frequencyCounts: Record<string, Set<number>> = {};
+  for (const week of plan.weeks) {
+    for (const session of week.sessions) {
+      for (const muscle of new Set(session.exercises.map(exercise => exercise.muscle))) {
+        (frequencyCounts[muscle] ||= new Set()).add(session.day);
+      }
+    }
+  }
+  const frequencyIssues = Object.entries(frequencyCounts).filter(([muscle, days]) => {
+    const small = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs']).has(muscle);
+    return small ? days.size < 2 : days.size < 1;
+  });
+  let frequencyScore = SCORE_WEIGHTS.frequencyCompliance;
+  if (frequencyIssues.length > 0) {
+    frequencyScore = Math.max(0, frequencyScore - Math.min(SCORE_WEIGHTS.frequencyCompliance, frequencyIssues.length));
+    issues.push(`Низкая частота для ${frequencyIssues.map(([muscle]) => muscle).join(', ')} — объём сильнее концентрирован по сессиям.`);
+    recommendations.push('Рассмотрите распределение объёма малых мышц минимум на 2 сессии в неделю.');
+  }
+
   // 6. Balance
   let balanceScore = SCORE_WEIGHTS.balance;
   try {
@@ -147,7 +170,7 @@ export function calculatePlanSafetyScore(
 
   // Total score
   const totalScore = Math.round(
-    jointStressScore + acwrScore + recoveryScore + injuryScore + volumeScore + balanceScore
+    jointStressScore + acwrScore + recoveryScore + injuryScore + volumeScore + frequencyScore + balanceScore
   );
 
   const riskLevel: 'safe' | 'caution' | 'dangerous' =
@@ -170,6 +193,7 @@ export function calculatePlanSafetyScore(
       recovery: recoveryScore,
       injuryRisk: injuryScore,
       volumeCompliance: volumeScore,
+      frequencyCompliance: frequencyScore,
       balance: balanceScore,
     },
     issues: [...new Set(issues)],

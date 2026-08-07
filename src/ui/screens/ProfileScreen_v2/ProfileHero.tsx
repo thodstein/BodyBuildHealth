@@ -8,7 +8,7 @@ import { onAnyProfileChange } from '../../../core/profile-events';
 import { colors } from './ui';
 
 interface TabDef {
-  id: 'user' | 'diaries' | 'settings';
+  id: 'user' | 'diaries' | 'settings' | 'reports';
   icon: string;
   label: string;
   desc: string;
@@ -17,7 +17,8 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { id: 'user', icon: '👤', label: 'Пользователь', desc: 'Имя, параметры, образ жизни, курс, цели', color: colors.primary },
-  { id: 'diaries', icon: '📓', label: 'Дневники', desc: 'Сон, давление, вес, замеры, отчёты, архив', color: colors.orange },
+  { id: 'diaries', icon: '📓', label: 'Дневники', desc: 'Сон, давление, вес, замеры', color: colors.orange },
+  { id: 'reports', icon: '📊', label: 'Отчёты', desc: 'Комплексный отчёт для врача/тренера', color: colors.blue },
   { id: 'settings', icon: '⚙️', label: 'Настройки', desc: 'Единицы, уведомления, экспорт данных', color: colors.purple },
 ];
 

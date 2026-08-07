@@ -6,6 +6,20 @@ export interface DiaryMealItem {
   c: number;
   qty?: number;
   category?: string;
+  foodId?: string;
+  micros?: Record<string, number>;
+}
+
+export function aggregateDiaryMicros(day: DiaryDay | undefined): Record<string, number> {
+  const totals: Record<string, number> = {};
+  if (!day?.meals) return totals;
+  Object.values(day.meals).forEach(items => items.forEach(item => {
+    Object.entries(item.micros || {}).forEach(([key, value]) => {
+      const numeric = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
+      if (Number.isFinite(numeric)) totals[key] = (totals[key] || 0) + numeric;
+    });
+  }));
+  return Object.fromEntries(Object.entries(totals).map(([key, value]) => [key, Math.round(value * 100) / 100]));
 }
 
 export interface DiaryMeals {

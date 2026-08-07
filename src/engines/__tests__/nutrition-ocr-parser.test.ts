@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseFatSecretText, parseNutritionScreenshot, parseNutritionText } from '../nutrition-ocr-parser';
+import { fillMissingMicros, parseFatSecretText, parseMicroLine, parseNutritionScreenshot, parseNutritionText, quantityToGrams } from '../nutrition-ocr-parser';
 
 describe('nutrition-ocr-parser', () => {
   describe('parseFatSecretText', () => {
@@ -79,6 +79,68 @@ describe('nutrition-ocr-parser', () => {
     it('deduplicates the same item found by both OCR formats', () => {
       const meals = parseNutritionText('Завтрак\nКурица 200 г 330 ккал Б:40 Ж:10 У:0');
       expect(meals.flatMap(meal => meal.items)).toHaveLength(1);
+    });
+
+    it('parses micronutrients from a FatSecret-style row', () => {
+      const meals = parseFatSecretText('Завтрак\nКурица 200 г 330 ккал\nНатрий: 130 мг Калий: 512 мг Магний: 58 мг');
+      const item = meals[0].items[0];
+      expect(item.micros?.sodium_mg).toBe(130);
+      expect(item.micros?.potassium_mg).toBe(512);
+      expect(item.micros?.magnesium_mg).toBe(58);
+    });
+
+    it('parses compact micronutrient labels from a screenshot', () => {
+      const meals = parseFatSecretText('Завтрак\nКурица 200 г 330 ккал\nNa 130 mg K 512 mg Mg 58 mg Ca 22 mg');
+      const item = meals[0].items[0];
+      expect(item.micros?.sodium_mg).toBe(130);
+      expect(item.micros?.potassium_mg).toBe(512);
+      expect(item.micros?.magnesium_mg).toBe(58);
+      expect(item.micros?.calcium_mg).toBe(22);
+    });
+
+    it('parses compact vitamin labels', () => {
+      const meals = parseFatSecretText('Завтрак\nКурица 200 г 330 ккал\nVit A 120 mcg Vit C 15 mg Vit D 2 mcg B12 0,5 mcg');
+      const item = meals[0].items[0];
+      expect(item.micros?.vitamin_a_mcg).toBe(120);
+      expect(item.micros?.vitamin_c_mg).toBe(15);
+      expect(item.micros?.vitamin_d_mcg).toBe(2);
+      expect(item.micros?.vitamin_b12_mcg).toBe(0.5);
+    });
+
+    it('keeps the same food in separate meals', () => {
+      const meals = parseNutritionText('Завтрак\nКурица 100 г 165 ккал\nОбед\nКурица 100 г 165 ккал');
+      expect(meals).toHaveLength(2);
+      expect(meals.flatMap(meal => meal.items)).toHaveLength(2);
+    });
+
+    it('parses compact micronutrient tables', () => {
+      const meals = parseFatSecretText('Завтрак\nКурица 200 г 330 ккал\nNa K Mg Ca\n130 512 58 22 mg');
+      const items = meals.flatMap(meal => meal.items);
+      expect(items).toHaveLength(1);
+      expect(items[0].micros).toMatchObject({ sodium_mg: 130, potassium_mg: 512, magnesium_mg: 58, calcium_mg: 22 });
+    });
+
+    it('parses full FatSecret headers and keeps dash columns aligned', () => {
+      const meals = parseFatSecretText('Завтрак\nКурица 200 г 330 ккал\nSodium (mg) Potassium (mg) Magnesium (mg) Calcium (mg)\n130 — 58 22');
+      const item = meals[0].items[0];
+      expect(item.micros).toMatchObject({ sodium_mg: 130, magnesium_mg: 58, calcium_mg: 22 });
+      expect(item.micros?.potassium_mg).toBeUndefined();
+    });
+
+    it('parses compact vitamin values directly', () => {
+      expect(parseMicroLine('Vit A 120 mcg Vit C 15 mg B12 0,5 mcg')).toMatchObject({ vitamin_a_mcg: 120, vitamin_c_mg: 15, vitamin_b12_mcg: 0.5 });
+    });
+
+    it('fills missing micronutrients by actual portion without overwriting existing values', () => {
+      const micros = fillMissingMicros('Курица', 200, { sodium_mg: 999 });
+      expect(micros.sodium_mg).toBe(999);
+      expect(micros.potassium_mg).toBeGreaterThan(0);
+    });
+
+    it('converts legacy saved portions to grams', () => {
+      expect(quantityToGrams('2 ст. л.')).toBe(30);
+      expect(quantityToGrams('1 ч. л.')).toBe(5);
+      expect(quantityToGrams('2 шт', { id: 'egg_whole' } as any)).toBe(100);
     });
   });
 

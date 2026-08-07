@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { macrocycleToBBProgram, shouldPeriodicDeload, type MacrocycleToBBOptions } from '../macrocycle-to-bb';
-import { buildBbMacrocycle, buildMacrocycle, type Macrocycle } from '../macrocycle.engine';
+import { buildBbMacrocycle, buildMacrocycle, serializeBbMacro, deserializeBbMacro, type Macrocycle } from '../macrocycle.engine';
 
 const baseOpts: MacrocycleToBBOptions = {
   level: 'intermediate',
@@ -171,5 +171,22 @@ describe('macrocycleToBBProgram', () => {
     expect(program.bb?.weeks).toHaveLength(12);
     expect(macro.trainingFocus).toBe('strength');
     expect(program.meta.trainingFocus).toBe('strength');
+  });
+
+  it('сохраняет BB-макроцикл в отдельном формате и принимает его конвертером', () => {
+    const macro = buildBbMacrocycle({ level: 'intermediate', totalWeeks: 12, trainingFocus: 'strength' });
+    const restored = deserializeBbMacro(serializeBbMacro(macro));
+    expect(restored).not.toBeNull();
+    const program = macrocycleToBBProgram(restored!, baseOpts);
+    expect(program.bb?.weeks).toHaveLength(12);
+    expect(program.meta.trainingFocus).toBe('strength');
+  });
+
+  it('PL-макроцикл с competition-блоком всё равно покрывает соревновательную неделю', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'powerlifting', totalWeeks: 20, competitionWeek: 15 });
+    const competition = macro.blocks.find(block => block.phase === 'competition');
+    expect(competition?.cycleId).toBeUndefined();
+    const program = macrocycleToBBProgram(macro, baseOpts);
+    expect(program.bb?.weeks.map(week => week.week)).toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
   });
 });

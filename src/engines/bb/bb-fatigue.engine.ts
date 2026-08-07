@@ -86,7 +86,11 @@ export function fitBBSessionToBudget(session: BBSession, budget: BBFatigueBudget
     const finisher = exercise.character === 'памп' || exercise.repsRange?.[0] >= 15 ? 20 : 0;
     const accessory = exercise.role === 'accessory' ? 10 : 0;
     const isolation = catalogType(exercise) === 'isolation' ? 5 : 0;
-    return finisher + accessory + isolation + cost.systemic + cost.timeSeconds / 120;
+    // Keep categorical priorities dominant while normalizing continuous costs
+    // to comparable 0-10 ranges for deterministic ranking.
+    const normalizedSystemic = Math.min(10, cost.systemic / 2);
+    const normalizedTime = Math.min(10, cost.timeSeconds / 600 * 10);
+    return finisher + accessory + isolation + normalizedSystemic + normalizedTime;
   };
   const reducible = (exercise: BBExercise): number => {
     if (exercise.role === 'primary' || exerciseSetCount(exercise) <= minSets) return -Infinity;

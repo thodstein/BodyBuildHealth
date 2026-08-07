@@ -35,7 +35,7 @@ describe('estimateSessionDifficulty', () => {
 
   it('returns high for high risk', () => {
     const result = estimateSessionDifficulty(baseInput({ riskLevel: 'high' }));
-    expect(result.level).toBe('low'); // risk override forces low
+    expect(result.level).toBe('low');
   });
 
   it('computes breakdown components', () => {
@@ -44,6 +44,14 @@ describe('estimateSessionDifficulty', () => {
     expect(result.breakdown.neural).toBeGreaterThan(0);
     expect(result.breakdown.joint).toBeGreaterThan(0);
     expect(result.breakdown.volume).toBeGreaterThan(0);
+  });
+
+  it('returns low for very low intensity and short duration', () => {
+    const result = estimateSessionDifficulty(baseInput({
+      exercises: [{ name: 'Plank', sets: 1, reps: 10, intensity: 20, technicalComplexity: 1, cnsDemand: 1, jointStress: { knee: 1, hip: 1, spine: 1, shoulder: 1, elbow: 1, ankle: 1 }, pattern: 'core', primaryMuscles: ['core'], secondaryMuscles: [] }],
+      estimatedDurationMin: 10, previousFatigue: 0, priScore: 1, riskLevel: 'low',
+    }));
+    expect(result.level).toBe('low');
   });
 });
 

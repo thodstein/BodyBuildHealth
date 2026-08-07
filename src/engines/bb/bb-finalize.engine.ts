@@ -231,8 +231,19 @@ function repairAdaptiveSafety(plan: BBPlan, options: BBFinalizeOptions): void {
     exercise.name = replacement.name;
     exercise.exerciseName = replacement.name;
     const loadRatio: Record<string, number> = { barbell: 1, smith: 0.9, machine: 0.85, dumbbell: 0.8, cable: 0.8, bodyweight: 0.7 };
-    const equipmentOfName = (name: string): string => /гантел/.test(name.toLowerCase()) ? 'dumbbell' : /штанг/.test(name.toLowerCase()) ? 'barbell' : /тренаж|машин/.test(name.toLowerCase()) ? 'machine' : 'other';
-    const ratio = (loadRatio[String(replacement.equipment)] || 1) / (loadRatio[equipmentOfName(oldName)] || 1);
+    const equipmentOfName = (name: string): string => {
+      const value = name.toLowerCase();
+      if (/гантел|dumbbell/.test(value)) return 'dumbbell';
+      if (/штанг|barbell|гриф/.test(value)) return 'barbell';
+      if (/тренаж|машин|smith|смит/.test(value)) return 'machine';
+      if (/блок|кроссовер|кабел|трос|cable/.test(value)) return 'cable';
+      if (/свой вес|собственн|bodyweight|подтяг|отжим/.test(value)) return 'bodyweight';
+      return 'other';
+    };
+    const replacementEquipment = Array.isArray(replacement.equipment)
+      ? replacement.equipment.find(item => loadRatio[String(item)] != null)
+      : replacement.equipment;
+    const ratio = (loadRatio[String(replacementEquipment)] || 1) / (loadRatio[equipmentOfName(oldName)] || 1);
     exercise.workSets = exercise.workSets.map(set => ({ ...set, weight: Math.round(set.weight * ratio * 10) / 10 }));
     exercise.comment = [exercise.comment, `Safety repair: ${oldName} → ${replacement.name}; вес скорректирован ×${ratio.toFixed(2)}`].filter(Boolean).join('. ');
     exercise.rationale = [exercise.rationale, 'Adaptive safety replacement'].filter(Boolean).join(' | ');

@@ -2,17 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { buildHistoryContext, generateInsights, createSession, createSet } from '../diary-engine';
 import type { DiarySession, DiarySet } from '../diary-engine';
 
-describe('buildHistoryContext', () => {
-  const makeSession = (id: string, date: string, completed = true): DiarySession => ({
-    sessionId: id, date, focus: 'fullbody', durationMin: 60, completed, terminatedEarly: false,
-    sessionVolume: 1000, sessionIntensity: 7, overallRPE: 7, notes: '',
-  });
+const makeSession = (id: string, date: string, completed = true): DiarySession => ({
+  sessionId: id, date, focus: 'fullbody', durationMin: 60, completed, terminatedEarly: false,
+  sessionVolume: 1000, sessionIntensity: 7, overallRPE: 7, notes: '',
+});
 
-  const makeSet = (sid: string, exId: string, weight: number, reps: number, rpe = 7, rir = 3): DiarySet => ({
-    setId: `${sid}_0`, sessionId: sid, exerciseId: exId, exerciseName: exId,
-    setIndex: 1, targetReps: reps, targetWeight: weight, actualReps: reps, actualWeight: weight,
-    actualRPE: rpe, actualRIR: rir, errors: [], restSeconds: 120, terminatedEarly: false,
-  });
+const makeSet = (sid: string, exId: string, weight: number, reps: number, rpe = 7, rir = 3): DiarySet => ({
+  setId: `${sid}_0`, sessionId: sid, exerciseId: exId, exerciseName: exId,
+  setIndex: 1, targetReps: reps, targetWeight: weight, actualReps: reps, actualWeight: weight,
+  actualRPE: rpe, actualRIR: rir, errors: [], restSeconds: 120, terminatedEarly: false,
+});
+
+describe('buildHistoryContext', () => {
 
   it('computes last weights and 1RMs per exercise', () => {
     const s1 = makeSession('s1', '2026-07-01');
@@ -100,5 +101,55 @@ describe('createSession and createSet', () => {
     expect(s.actualRPE).toBe(5);
     expect(s.actualRIR).toBe(3);
     expect(s.restSeconds).toBe(120);
+  });
+});
+
+describe('buildHistoryContext edge cases', () => {
+  it('handles empty sets and sessions', () => {
+    const ctx = buildHistoryContext([], []);
+    expect(ctx.totalSessions).toBe(0);
+    expect(ctx.weeklyVolume).toBe(0);
+    expect(ctx.currentStreak).toBe(0);
+    expect(ctx.bestStreak).toBe(0);
+  });
+
+  it('handles session with no exercises', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const s = makeSession('s1', today);
+    const ctx = buildHistoryContext([], [s]);
+    expect(ctx.totalSessions).toBe(1);
+    expect(ctx.currentStreak).toBe(1);
+  });
+});
+
+describe('generateInsights edge cases', () => {
+  it('returns empty for no data', () => {
+    const insights = generateInsights([], []);
+    expect(insights).toEqual([]);
+  });
+
+  it('returns empty when no previous data for strength comparison', () => {
+    const s1 = makeSession('s1', '2026-07-01');
+    const sets = [makeSet('s1', 'squat', 100, 5)];
+    const insights = generateInsights(sets, [s1], []);
+    expect(insights.length).toBe(0);
+  });
+
+  it('detects strength improvement with previous data', () => {
+    const s1 = makeSession('s1', '2026-07-01');
+    const s2 = makeSession('s2', '2026-07-08');
+    const prevSets = [makeSet('s1', 'squat', 100, 5)];
+    const currSets = [makeSet('s2', 'squat', 110, 5)];
+    const insights = generateInsights(currSets, [s2], prevSets);
+    expect(insights.some(i => i.category === 'strength' && i.type === 'positive')).toBe(true);
+  });
+
+  it('detects strength decline with previous data', () => {
+    const s1 = makeSession('s1', '2026-07-01');
+    const s2 = makeSession('s2', '2026-07-08');
+    const prevSets = [makeSet('s1', 'squat', 100, 5)];
+    const currSets = [makeSet('s2', 'squat', 80, 5)];
+    const insights = generateInsights(currSets, [s2], prevSets);
+    expect(insights.some(i => i.category === 'strength' && i.type === 'warning')).toBe(true);
   });
 });

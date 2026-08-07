@@ -3,7 +3,7 @@
 //  Подключается как вкладка в SupportDiaryView
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { computeCompliance, getComplianceWeekLabel, type ComplianceSummary } from '../../../engines/supplement-compliance.engine';
 
 const ACCENT = '#00e68a';
@@ -11,6 +11,11 @@ const DANGER = '#ef4444';
 const WARN = '#f59e0b';
 const DIM = 'rgba(255,255,255,0.4)';
 const BG = 'rgba(24,24,27,0.6)';
+const GLASS_CARD: React.CSSProperties = {
+  background: 'rgba(24,24,27,0.6)',
+  borderRadius: 12,
+  border: '1px solid rgba(255,255,255,0.06)',
+};
 
 function adherenceColor(pct: number): string {
   if (pct >= 90) return '#22c55e';
@@ -27,6 +32,15 @@ function adherenceColor(pct: number): string {
 export const SupplementComplianceCard: React.FC<{ planSubs?: string[] }> = ({ planSubs }) => {
   const [daysBack] = useState(28);
   const [expandedWeek, setExpandedWeek] = useState<number | null>(null);
+  const [mobile, setMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const check = () => setMobile(window.innerWidth <= 480);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const data = useMemo(() => computeCompliance(daysBack, planSubs), [daysBack, planSubs]);
 
@@ -38,6 +52,14 @@ export const SupplementComplianceCard: React.FC<{ planSubs?: string[] }> = ({ pl
       </div>
     );
   }
+
+  // Статистика
+  const stats = [
+    { label: 'Всего дней', value: data.totalDaysTracked || 0, icon: '📅' },
+    { label: 'Пропущено приёмов', value: data.missedDoses || 0, icon: '❌' },
+    { label: 'Средняя серия', value: `${data.avgStreak || 0} дн.`, icon: '🔥' },
+    { label: 'Стабильность', value: `${data.consistencyScore || 0}%`, icon: '📊' },
+  ];
 
   const todayAdh = data.today?.adherence ?? 0;
   const weekAdh = data.overall7d;
@@ -67,9 +89,77 @@ export const SupplementComplianceCard: React.FC<{ planSubs?: string[] }> = ({ pl
           <div style={{ fontSize: 18, fontWeight: 800, color: ACCENT, marginTop: 2 }}>{data.streak}</div>
           <div style={{ fontSize: 7, color: DIM }}>дней подряд 100%</div>
         </div>
-      </div>
+       </div>
 
-      {/* ── Weekly bars ── */}
+       {/* Детальная статистика */}
+       <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 6 }}>
+         {stats.map((stat, i) => (
+           <div key={i} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
+             <div style={{ fontSize: 14, marginBottom: 2 }}>{stat.icon}</div>
+             <div style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0' }}>{stat.value}</div>
+             <div style={{ fontSize: 7, color: DIM }}>{stat.label}</div>
+           </div>
+         ))}
+       </div>
+
+       {/* Достижения */}
+       {data.achievements && data.achievements.length > 0 && (
+         <div style={{ ...GLASS_CARD, padding: 12 }}>
+           <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0', marginBottom: 8 }}>🏆 Достижения</div>
+           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+             {data.achievements.map((ach, i) => (
+               <div key={i} style={{
+                 padding: '8px 12px', borderRadius: 8,
+                 background: ach.unlockedAt ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.04)',
+                 border: `1px solid ${ach.unlockedAt ? 'rgba(0,230,138,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                 display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 150,
+               }}>
+                 <span style={{ fontSize: 20 }}>{ach.icon}</span>
+                 <div>
+                   <div style={{ fontSize: 11, fontWeight: 600, color: ach.unlockedAt ? '#00e68a' : '#94a3b8' }}>
+                     {ach.title}
+                   </div>
+                   <div style={{ fontSize: 9, color: '#64748b', marginTop: 2 }}>
+                     {ach.description}
+                   </div>
+                   {!ach.unlockedAt && ach.progress !== undefined && (
+                     <div style={{ marginTop: 4, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.1)' }}>
+                       <div style={{
+                         height: '100%', borderRadius: 2, background: '#00e68a',
+                         width: `${ach.progress}%`, transition: 'width 0.3s',
+                       }} />
+                     </div>
+                   )}
+                 </div>
+               </div>
+             ))}
+           </div>
+         </div>
+       )}
+
+       {/* График по веществам */}
+       <div style={{ ...GLASS_CARD, padding: 12 }}>
+         <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0', marginBottom: 8 }}>📊 Комплаенс по веществам (7 дней)</div>
+         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+           {data.activeSubstances.map((sub, i) => (
+             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+               <div style={{ flex: 1, fontSize: 11, color: '#e2e8f0' }}>{sub.name}</div>
+               <div style={{ width: 100, height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.1)' }}>
+                 <div style={{
+                   height: '100%', borderRadius: 4,
+                   background: sub.adherence7d >= 80 ? '#00e68a' : sub.adherence7d >= 50 ? '#f59e0b' : '#ef4444',
+                   width: `${sub.adherence7d}%`, transition: 'width 0.3s',
+                 }} />
+               </div>
+               <div style={{ fontSize: 10, color: '#94a3b8', minWidth: 32, textAlign: 'right' }}>
+                 {sub.adherence7d}%
+               </div>
+             </div>
+           ))}
+         </div>
+       </div>
+
+       {/* ── Weekly bars ── */}
       <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', height: 60 }}>
         {data.weeks.slice(-4).map((w, i) => (
           <div

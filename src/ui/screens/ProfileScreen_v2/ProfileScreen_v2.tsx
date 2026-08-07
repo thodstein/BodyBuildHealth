@@ -1,6 +1,6 @@
 /**
  * ProfileScreen_v2 — новый экран Профиля.
- * Hero (4 карточки) + 4 вкладки (Пользователь / Тренировки / Дневники / Настройки).
+ * Hero (4 карточки) + 4 вкладки (Пользователь / Тренировки / Дневники / Настройки / Отчёты).
  * Auto-save внутри вкладок через debounce 500мс.
  */
 import React, { useState, useEffect } from 'react';
@@ -8,16 +8,18 @@ import { ProfileHero } from './ProfileHero';
 import { ProfileUserTab } from './ProfileUserTab';
 import { ProfileDiariesTab } from './ProfileDiariesTab';
 import { ProfileSettingsTab } from './ProfileSettingsTab';
+import { ReportsScreen } from '../ReportsScreen';
 import { useProfileRefresh, getSnapshots, undoLastSnapshot } from '../../../core/profile-manager';
 import { onAnyProfileChange } from '../../../core/profile-events';
 import { colors } from './ui';
 
-type Tab = 'user' | 'diaries' | 'settings';
+type Tab = 'user' | 'diaries' | 'settings' | 'reports';
 
 const TAB_META: Record<Tab, { icon: string; title: string; color: string }> = {
   user: { icon: '👤', title: 'Пользователь', color: colors.primary },
   diaries: { icon: '📓', title: 'Дневники', color: colors.orange },
   settings: { icon: '⚙️', title: 'Настройки', color: colors.purple },
+  reports: { icon: '📊', title: 'Отчёты', color: colors.blue },
 };
 
 export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void; initialSubTab?: string }> = ({ onNavigate, initialSubTab }) => {
@@ -33,6 +35,9 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
       || initialSubTab.endsWith('-reports')
     )) {
       setTab('diaries');
+    }
+    if (initialSubTab === 'reports' || initialSubTab === 'custom-report') {
+      setTab('reports');
     }
   }, [initialSubTab]);
 
@@ -116,6 +121,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
           }
         />}
         {tab === 'settings' && <ProfileSettingsTab onNavigate={onNavigate} />}
+        {tab === 'reports' && <ReportsScreen />}
       </div>
     </div>
   );

@@ -2805,11 +2805,34 @@ input[type="range"]:active {
 }
 
 /* ── 12. hero-страница — не фиксированная, скроллящаяся ── */
-.training-screen > div[style*="position:fixed"][style*="inset:0"] {
+.training-screen > div[style*="position:fixed"][style*="inset:0"]:not(.bb-tools-modal-backdrop) {
   position: relative !important;
   overflow-y: auto !important;
   z-index: 1 !important;
   min-height: 100% !important;
+}
+.bb-tools-modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  overflow-y: auto !important;
+  z-index: 60 !important;
+}
+.bb-tools-modal-dialog {
+  max-height: 92dvh !important;
+  min-height: 0 !important;
+}
+@media (max-width: 480px) {
+  .bb-tools-modal-backdrop {
+    align-items: stretch !important;
+    padding: 0 !important;
+  }
+  .bb-tools-modal-dialog {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+  }
 }
 .training-screen > div[style*="position:fixed"][style*="inset:0"] img {
   position: absolute !important;

@@ -54,12 +54,12 @@ export function recordSessionRIR(session: WorkoutSession, dayPlan: { exercises: 
   const points: RIRCalibrationPoint[] = [];
   const planExercises = dayPlan.exercises || [];
 
-  session.exercises.forEach((ex, ei) => {
-    const planEx = planExercises[ei];
+  session.exercises.forEach((ex) => {
+    const planEx = planExercises.find(p => p.name === ex.exerciseName) || planExercises.find(p => p.name.toLowerCase() === ex.exerciseName.toLowerCase());
     if (!planEx) return;
 
     ex.sets.forEach((set, si) => {
-      if (set.rpe <= 0) return; // без RPE не калибруем
+      if (set.rpe <= 0) return;
       const plannedRIR = planEx.targetSets[si]?.rir ?? 2;
       const actualRIR = Math.max(0, 10 - set.rpe);
 

@@ -112,10 +112,31 @@ export function resolveLabMarker(name: string): string {
   const upper = trimmed.toUpperCase();
   if (UCUM_MAP[upper]) return upper;
 
+  // OCR frequently mixes visually identical Cyrillic and Latin letters in
+  // short laboratory abbreviations (e.g. АЛТ/ALT, ТТГ/TTG, СРБ/CRP).
+  const visualLatin = upper
+    .replace(/[АА]/g, 'A')
+    .replace(/[ВВ]/g, 'B')
+    .replace(/[ЕЕ]/g, 'E')
+    .replace(/[КК]/g, 'K')
+    .replace(/[ММ]/g, 'M')
+    .replace(/[НН]/g, 'H')
+    .replace(/[ОР]/g, ch => ch === 'О' ? 'O' : 'P')
+    .replace(/[СС]/g, 'C')
+    .replace(/[ТТ]/g, 'T')
+    .replace(/[ГГ]/g, 'G')
+    .replace(/[ХХ]/g, 'X');
+  if (visualLatin === 'TTG') return 'TSH';
+  if (UCUM_MAP[visualLatin]) return visualLatin;
+
   const fromSynonym = SYNONYM_MAP[trimmed.toLowerCase()];
   if (fromSynonym) {
     return mapToUcumCode(fromSynonym.toUpperCase());
   }
+
+  const normalized = trimmed.toLowerCase().replace(/[0о]/g, 'о').replace(/[1л]/g, 'л');
+  const visualSynonym = Object.keys(SYNONYM_MAP).find(key => key === normalized);
+  if (visualSynonym) return mapToUcumCode(SYNONYM_MAP[visualSynonym].toUpperCase());
 
   return upper;
 }

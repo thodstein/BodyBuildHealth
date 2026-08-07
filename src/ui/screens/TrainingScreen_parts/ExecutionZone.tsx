@@ -10,6 +10,7 @@ import { SessionPlayer, type PlayerDay } from '../SRCBBScreen_parts/SessionPlaye
 import { TimersTab } from './TimersTab';
 import { selectSetScheme } from '../../../engines/set-scheme.engine';
 import { selectTempo, formatTempo } from '../../../engines/tempo.engine';
+import { getCachedProgressForExercise, loadCachedExerciseProgress, type CachedProgress } from '../../../engines/workout-logger.engine';
 import type { TrainingTab } from './shared';
 
 type RuntimeLogEntry = { sets: { weight: number; reps: number; rpe: number; rir: number }[]; completed: boolean };
@@ -33,6 +34,7 @@ interface Props {
   runtimeSetRI: number; setRuntimeSetRI: React.Dispatch<React.SetStateAction<number>>;
   diary: StrengthDiary;
   onRefresh: () => void;
+  onGoToTimers?: (settings?: { work: number; rest: number; rounds: number }) => void;
 }
 
 export const ExecutionZone: React.FC<Props> = (p) => {
@@ -40,9 +42,10 @@ export const ExecutionZone: React.FC<Props> = (p) => {
     runtimeDay, setRuntimeDay, runtimeExIdx, setRuntimeExIdx, runtimeLogs, setRuntimeLogs,
     runtimeStarted, setRuntimeStarted, plRuntime: _plRuntime, plRunOpen, setPlRunOpen,
     runtimeSetW, setRuntimeSetW, runtimeSetR, setRuntimeSetR, runtimeSetRP, setRuntimeSetRP, runtimeSetRI, setRuntimeSetRI,
-    diary, onRefresh: loadDiaryStats } = p;
+    diary, onRefresh: loadDiaryStats, onGoToTimers } = p;
   // Защита от старого кэша: если plRuntime — массив (старый формат BbAutoConstructor), игнорируем
   const plRuntime = (_plRuntime && !Array.isArray(_plRuntime) && Array.isArray((_plRuntime as any).days)) ? _plRuntime : null;
+  const [timerInitialSettings, setTimerInitialSettings] = React.useState<{ work: number; rest: number; rounds: number } | undefined>(undefined);
   // Безопасные производные: если currentMicrocycle null или days пустой — fallback на [].
   // Это предотвращает падения "Cannot read 'filter' of undefined" в UI при пустом/неполном плане.
   const trainingDaysList: any[] = (() => {
@@ -124,9 +127,63 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                     );
                   })()}
                   <button onClick={() => { setRuntimeStarted(true); setRuntimeLogs({}); setRuntimeExIdx(0); }} style={{
-                    width: '100%', padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer',
-                    background: 'linear-gradient(135deg, var(--accent), #00c853)', color: '#000', fontWeight: 700, fontSize: 14,
-                  }}>▶ Старт</button>
+                     width: '100%', padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer',
+                     background: 'linear-gradient(135deg, var(--accent), #00c853)', color: '#000', fontWeight: 700, fontSize: 14,
+                   }}>▶ Старт</button>
+                    {onGoToTimers && (() => {
+                      const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
+                      const compoundCount = dayExercises.filter((e: any) => ['squat','bench','deadlift','overhead','row','pull','lunge','hip','leg'].some(p => (e.name || '').toLowerCase().includes(p))).length;
+                      const isolationCount = dayExercises.length - compoundCount;
+                      const avgRest = dayExercises.length > 0 ? Math.round(dayExercises.reduce((s: number, e: any) => s + (e.restSec || 90), 0) / dayExercises.length) : 90;
+                      const rounds = Math.max(3, dayExercises.length);
+                      const work = Math.max(45, Math.min(180, avgRest));
+                       return (
+                         <button onClick={() => { setTimerInitialSettings({ work, rest: avgRest, rounds }); onGoToTimers?.({ work, rest: avgRest, rounds }); }} style={{
+                          width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer',
+                          background: 'rgba(59,130,246,0.1)', color: '#60a5fa', fontWeight: 600, fontSize: 12, marginTop: 8,
+                        }}>
+                          ⏱ Таймер для этого дня · отдых ~{avgRest}с · {rounds} раундов
+                        </button>
+                      );
+                    })()}
+                    
+                    {/* Прогресс по упражнениям дня из кэша */}
+                    {(() => {
+                      const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
+                      if (!dayExercises.length) return null;
+                      return (
+                        <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 6 }}>📈 Прогресс по упражнениям дня</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
+                            {dayExercises.slice(0, 6).map((ex: any, i: number) => {
+                              const cached = getCachedProgressForExercise(ex.name || ex.id || '');
+                              if (!cached) return (
+                                <div key={i} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{ex.name || ex.id}</div>
+                                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Нет данных</div>
+                                </div>
+                              );
+                              const trendIcon = cached.trend === 'up' ? '↑' : cached.trend === 'down' ? '↓' : '→';
+                              const trendColor = cached.trend === 'up' ? '#22c55e' : cached.trend === 'down' ? '#ef4444' : 'var(--text-dim)';
+                              return (
+                                <div key={i} style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
+                                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>{cached.exerciseName}</div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim)' }}>
+                                    <span>1RM {cached.bestE1RM}кг</span>
+                                    <span style={{ color: trendColor }}>{trendIcon} {cached.e1RMDelta > 0 ? '+' : ''}{cached.e1RMDelta}</span>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
+                                    <span>Объём {cached.totalVolume.toLocaleString()}</span>
+                                    <span style={{ color: trendColor }}>{trendIcon} {cached.weightDelta > 0 ? '+' : ''}{cached.weightDelta}кг</span>
+                                  </div>
+                                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>{cached.sessions} сессий · {cached.lastDate}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
                 </>
               ) : (
                 <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 11 }}>
@@ -399,7 +456,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
         </div>
         </InfoErrorBoundary>
       )}
-      {tab === 'timers' && <InfoErrorBoundary label="Таймеры"><TimersTab /></InfoErrorBoundary>}
+      {tab === 'timers' && <InfoErrorBoundary label="Таймеры"><TimersTab initialSettings={timerInitialSettings} /></InfoErrorBoundary>}
     </>
   );
 };

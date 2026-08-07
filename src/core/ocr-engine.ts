@@ -26,6 +26,7 @@ export interface ParsedLabValue {
   refLow?: number;
   refHigh?: number;
   isAbnormal?: boolean;
+  raw?: string;
 }
 
 /**
@@ -36,7 +37,8 @@ function mergeParsedResults(
   pdfResults: ParsedLabValue[],
   providerResults: { marker: string; value: number; unit: string; confidence: number }[],
   provider: string | undefined
-): ParsedLabValue[] {
+): { labs: ParsedLabValue[]; warnings: string[] } {
+  const warnings: string[] = [];
   const tableByCode = new Map<string, ParsedLabValue>();
   for (const pv of pdfResults) {
     const code = mapToUcumCode(pv.code);
@@ -49,22 +51,27 @@ function mergeParsedResults(
   }
 
   const codes = new Set([...tableByCode.keys(), ...providerByCode.keys()]);
-  return [...codes].map(code => {
+  const labs = [...codes].map(code => {
     const table = tableByCode.get(code);
     const providerValue = providerByCode.get(code);
     // Provider parser is useful for split OCR rows, while the table parser
     // carries the authoritative unit and reference range when available.
-    const source = providerValue || table!;
-    const sourceUnit = providerValue?.unit || table?.unit || '';
+    const source = table?.refLow !== undefined || table?.refHigh !== undefined
+      ? table
+      : providerValue || table!;
+    // The unit must belong to the same candidate as the selected value. Using
+    // a provider unit for a table value can silently apply the wrong factor.
+    const sourceUnit = source.unit || '';
     const normalized = normalizeLabMeasurement(code, source.value, sourceUnit);
     const info = UCUM_MAP[code];
+    const selectedUnit = source.unit || table?.unit || '';
     const refLow = table?.refLow !== undefined
-      ? normalizeLabMeasurement(code, table.refLow, table.unit).value
+      ? normalizeLabMeasurement(code, table.refLow, selectedUnit).value
       : undefined;
     const refHigh = table?.refHigh !== undefined
-      ? normalizeLabMeasurement(code, table.refHigh, table.unit).value
+      ? normalizeLabMeasurement(code, table.refHigh, selectedUnit).value
       : undefined;
-    return {
+    const result = {
       code,
       name: info?.name ?? table?.name ?? code,
       value: normalized.value,
@@ -74,8 +81,17 @@ function mergeParsedResults(
       isAbnormal: refHigh !== undefined
         ? normalized.value > refHigh || (refLow !== undefined && normalized.value < refLow)
         : info ? normalized.value > info.uln || normalized.value < info.lln : table?.isAbnormal,
+      raw: isUsefulRawLine(table?.raw) ? table?.raw : undefined,
     };
+    if (table && providerValue) {
+      const providerNormalized = normalizeLabMeasurement(code, providerValue.value, providerValue.unit).value;
+      if (Math.abs(providerNormalized - normalized.value) > Math.max(0.01, Math.abs(normalized.value) * 0.05)) {
+        warnings.push(`Разные варианты распознавания для ${result.name}; выбран табличный результат.`);
+      }
+    }
+    return result;
   });
+  return { labs, warnings };
 }
 
 function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs: ParsedLabValue[]; provider: string; warnings: string[] } {
@@ -83,7 +99,8 @@ function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs:
   const pdfLabs = parsed.values.map(v => ({ ...v }));
   const providerResults = parseLabTextProviderAware(rawText);
   const provider = detectProvider(rawText);
-  const labs = mergeParsedResults(pdfLabs, providerResults, provider);
+  const merged = mergeParsedResults(pdfLabs, providerResults, provider);
+  const labs = merged.labs;
   const regexResults = parseWithBiomarkerRegex(rawText, extractionMethod);
   const existingCodes = new Set(labs.map(l => mapToUcumCode(l.code)));
   for (const marker of regexResults.extractedMarkers) {
@@ -97,9 +114,45 @@ function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs:
       value: normalized.value,
       unit: normalized.unit,
       refHigh: marker.ec50 > 0 ? normalizeLabMeasurement(code, marker.ec50, marker.unit).value : undefined,
+      raw: isUsefulRawLine(marker.sourceLine) ? marker.sourceLine : undefined,
     });
   }
-  return { labs, provider: provider || 'unknown', warnings: regexResults.warnings };
+  return { labs, provider: provider || 'unknown', warnings: [...merged.warnings, ...regexResults.warnings] };
+}
+
+function shouldRetryPdfWithOcr(text: string, labs: ParsedLabValue[]): boolean {
+  const cleanText = text.replace(/\s+/g, ' ').trim();
+  if (!cleanText || cleanText.length < 80 || /�|\uFFFD|invalid pdf|pdf parsing/i.test(cleanText)) return true;
+  if (labs.length === 0) return true;
+  const headerHits = cleanText.match(/анализ|показател|результат|референ|единиц|наименование|лаборатор|гемотест|инвитро|хеликс|kdl/gi)?.length ?? 0;
+  const numericTokens = cleanText.match(/\d+(?:[.,]\d+)?/g)?.length ?? 0;
+  return labs.length < 2 && (headerHits === 0 || numericTokens < 2);
+}
+
+function finalizeLabCandidates(labs: ParsedLabValue[]): ParsedLabValue[] {
+  const byCode = new Map<string, ParsedLabValue>();
+  for (const lab of labs) {
+    const code = mapToUcumCode(lab.code);
+    if (!code || !Number.isFinite(lab.value) || lab.value <= 0 || !lab.unit) continue;
+    const current = byCode.get(code);
+    if (!current) {
+      byCode.set(code, { ...lab, code });
+      continue;
+    }
+    const currentHasRange = current.refLow !== undefined || current.refHigh !== undefined;
+    const nextHasRange = lab.refLow !== undefined || lab.refHigh !== undefined;
+    if (nextHasRange && !currentHasRange) byCode.set(code, { ...lab, code });
+    else if (nextHasRange === currentHasRange && lab.value === current.value && !current.isAbnormal && lab.isAbnormal) {
+      byCode.set(code, { ...lab, code });
+    }
+  }
+  return [...byCode.values()];
+}
+
+function isUsefulRawLine(raw: string | undefined): boolean {
+  if (!raw) return false;
+  const line = raw.replace(/\s+/g, ' ').trim();
+  return line.length >= 3 && !/^(?:error|warning|invalid pdf|pdf parsing)/i.test(line);
 }
 
 /**
@@ -126,14 +179,26 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
       let parsedAll = parseLabTextAllWays(rawText, 'pdf-parse');
       // Scanned PDFs have no text layer. Render their pages and run the same
       // Russian/English OCR pipeline used for uploaded photos.
-      if (parsedAll.labs.length === 0) {
-        const ocrText = await ocrScannedPdf(file);
-        if (ocrText) {
-          rawText = ocrText;
-          parsedAll = parseLabTextAllWays(rawText, 'tesseract.js');
+      if (shouldRetryPdfWithOcr(rawText, parsedAll.labs)) {
+        try {
+          const ocrText = await ocrScannedPdf(file);
+          if (ocrText.trim()) {
+            const ocrParsed = parseLabTextAllWays(ocrText, 'tesseract.js');
+            // Keep valid text-layer rows and use page OCR to fill missing rows.
+            // Replacing the text layer would discard correctly extracted values.
+            parsedAll = {
+              labs: finalizeLabCandidates([...parsedAll.labs, ...ocrParsed.labs]),
+              provider: parsedAll.provider !== 'unknown' ? parsedAll.provider : ocrParsed.provider,
+              warnings: [...parsedAll.warnings, ...ocrParsed.warnings],
+            };
+            rawText = `${rawText}\n${ocrText}`.trim();
+            warnings.push('PDF обработан через OCR страниц.');
+          }
+        } catch (ocrError: any) {
+          warnings.push(`OCR PDF недоступен: ${ocrError?.message || 'неизвестная ошибка'}`);
         }
       }
-      labs = parsedAll.labs;
+      labs = finalizeLabCandidates(parsedAll.labs);
       const providerName = parsedAll.provider;
       confidence = labs.length > 0 ? 0.85 : 0.3;
       if (providerName !== 'unknown') {
@@ -144,32 +209,23 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
       if (labs.length === 0 && rawText.length > 50) {
         warnings.push('PDF распознан, но показатели не найдены. Попробуйте скриншот или ручной ввод.');
       }
+      if (labs.length === 0 && /ошибка|error|invalid pdf|pdf parsing/i.test(rawText)) {
+        warnings.push('PDF не удалось открыть или прочитать. Проверьте, что файл не защищён паролем и не повреждён.');
+      }
     } catch (err: any) {
       warnings.push('Ошибка чтения PDF: ' + (err?.message || String(err)));
     }
   } else if (isImage) {
     source = 'image';
     try {
-      // Try Tesseract OCR for image
-      const Tesseract = await import('tesseract.js');
-      let result;
-      try {
-        result = await Tesseract.recognize(file, 'rus+eng', {
-          logger: (m: any) => { if (m.status === 'recognizing text') confidence = m.progress ?? 0.5; },
-        });
-      } catch (langErr) {
-        // Fallback to English-only if Russian language data isn't available
-        console.warn('rus+eng OCR failed, trying eng only:', langErr);
-        result = await Tesseract.recognize(file, 'eng', {
-          logger: (m: any) => { if (m.status === 'recognizing text') confidence = m.progress ?? 0.5; },
-        });
-      }
-      rawText = result.data.text || '';
+      const imageResult = await parseLabFile(file);
+      rawText = imageResult.rawText || '';
+      if (!rawText.trim()) warnings.push('Не удалось обработать изображение через улучшенный режим, использован прямой OCR.');
       
       // Short food labels such as "рис 150 г" are valid OCR input too.
       if (rawText.trim().length > 2) {
         const parsedAll = parseLabTextAllWays(rawText, 'tesseract.js');
-        labs = parsedAll.labs;
+        labs = finalizeLabCandidates(parsedAll.labs);
         const providerName = parsedAll.provider;
         if (providerName !== 'unknown') warnings.push(`Распознан бланк: ${providerName}`);
 
@@ -194,7 +250,7 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
     try {
       rawText = await file.text();
        const parsedAll = parseLabTextAllWays(rawText, 'text');
-       labs = parsedAll.labs;
+       labs = finalizeLabCandidates(parsedAll.labs);
        const providerName = parsedAll.provider;
        warnings.push(...parsedAll.warnings);
 

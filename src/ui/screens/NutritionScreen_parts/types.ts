@@ -6,4 +6,6 @@ export interface DiaryItem {
   c: number;
   qty?: number;
   category?: string;
+  foodId?: string;
+  micros?: Record<string, number>;
 }

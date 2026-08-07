@@ -1552,7 +1552,6 @@ function buildSession(
     //          accumulation/intensification/peaking → -offset (механическое натяжение растёт).
     const dupSign = phase === 'deload' ? +1 : -1;
     const dupRepsOffset = phaseCfg && phaseWeek > 1 ? dupSign * Math.floor((phaseWeek - 1) * 1.5) : 0;
-    const adjReps = Math.max(repMin, Math.min(repMax, reps + dupRepsOffset));
 
     // P7: phaseExerciseMix — приоритет equipment по фазе (accumulation→cable, peaking→barbell).
     // Это формирует пропорцию compound/isolation/cable/machine, заявленную в PHASE_CONFIGS.
@@ -1630,9 +1629,6 @@ function buildSession(
   for (const pl of plans) {
     const phaseCfg = PHASE_CONFIGS[phase];
     const [adjMin, adjMax] = phaseCfg.repRange;
-    const adjReps = phase === 'peaking' && phaseWeek > 1
-      ? Math.max(adjMin, Math.round((adjMin + adjMax) / 2) - Math.floor((phaseWeek - 1) * 1.5))
-      : Math.round((adjMin + adjMax) / 2);
     const isAcc = pl.role === 'accessory';
     const repMin = isAcc ? adjMin + 2 : adjMin;
     const repMax = isAcc ? adjMax + 5 : adjMax;
@@ -1710,7 +1706,7 @@ function buildSession(
         }));
         // P0-1 (audit 2026-07): _pumpOverride удалён. Тяжёлый сет остаётся тяжёлым.
         const effChar: DayCharacter = pl.resolved as DayCharacter;
-        const effReps: [number, number] = [Math.min(Math.max(repMin, adjReps - 2), repsCap), Math.min(repMax, repsCap)];
+        const effReps: [number, number] = [Math.min(repMin, repsCap), Math.min(repMax, repsCap)];
         exercises.push({
           muscle: trueMuscleOf(exData) || pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: effChar,
           sets: adjustedSets, repsRange: effReps,
@@ -1718,7 +1714,7 @@ function buildSession(
           workSets, exerciseName: (exData as any).name || (exData as any).id,
           exerciseType: (exData as any).exerciseType || (exData as any).type || 'compound',
           tempoSpec: tempoStr, restSeconds: exRest,
-          comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus),
+            comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.min(repMin, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus),
           executionProfile: buildExerciseInstructions({ exerciseId: (exData as any).id, exerciseName: (exData as any).name || (exData as any).id, muscle: pl.muscle, role: pl.role, phase, trainingFocus, tempo: tempoStr, restSeconds: exRest, orderIndex: exercises.length, totalExercises: pl.exDatas.length }),
           warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary' || (exData as any).type === 'compound'),
           rationale: pl.rationaleMap.get((exData as any).name) || '',
@@ -1748,12 +1744,12 @@ function buildSession(
       }));
       exercises.push({
         muscle: pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: pl.resolved as DayCharacter,
-        sets: exSets, repsRange: [Math.min(Math.max(repMin, adjReps - 2), repsCap), Math.min(repMax, repsCap)] as [number,number],
+        sets: exSets, repsRange: [Math.min(repMin, repsCap), Math.min(repMax, repsCap)] as [number,number],
         rir: finalRir,
         workSets, exerciseName: (exData as any).name || (exData as any).id,
         exerciseType: (exData as any).exerciseType || (exData as any).type || 'compound',
         tempoSpec: tempoStr, restSeconds: exRest,
-        comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, exSets, Math.min(adjReps, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus),
+         comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, exSets, Math.min(repMin, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus),
         executionProfile: buildExerciseInstructions({ exerciseId: (exData as any).id, exerciseName: (exData as any).name || (exData as any).id, muscle: pl.muscle, role: pl.role, phase, trainingFocus, tempo: tempoStr, restSeconds: exRest, orderIndex: exercises.length, totalExercises: pl.exDatas.length }),
         warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary'),
         rationale: pl.rationaleMap.get((exData as any).name) || '',

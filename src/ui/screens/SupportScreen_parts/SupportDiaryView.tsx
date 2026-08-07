@@ -89,6 +89,12 @@ function loadDiary(): DiaryEntry[] {
   try { return JSON.parse(localStorage.getItem(DIARY_KEY) || '[]'); } catch { return []; }
 }
 
+function loadToday(): DiaryEntry | null {
+  const diary = loadDiary();
+  const todayStr = todayLocalStr();
+  return diary.find(d => d.date === todayStr) || null;
+}
+
 function saveDiary(entries: DiaryEntry[]) {
   try { localStorage.setItem(DIARY_KEY, JSON.stringify(entries)); } catch {}
 }
@@ -395,6 +401,7 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
   const [filterText, setFilterText] = useState('');
   const [showSideEffects, setShowSideEffects] = useState<Record<string, boolean>>({});
   const [addModal, setAddModal] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const [undoStack, setUndoStack] = useState<DiaryEntry[]>([]);
 
@@ -408,6 +415,32 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
   }, [todayEntry?.notes, todayEntry?.complianceNotes, todayEntry?.mood]);
 
   const planSubs: string[] = SUPPORT_LEVELS?.[supportLevel]?.subs || [];
+
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try {
+      const saved = localStorage.getItem('he_theme');
+      return (saved === 'light' || saved === 'dark') ? saved : 'dark';
+    } catch { return 'dark'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('he_theme', theme); } catch {}
+  }, [theme]);
+
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const checkMobile = () => setMobile(window.innerWidth <= 480);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Проверка разрешений на уведомления
+  useEffect(() => {
+    if ('Notification' in window) {
+      setReminderPermission(Notification.permission);
+    }
+  }, []);
 
   const editingEntry = editingDate ? entries.find(e => e.date === editingDate) : null;
 
@@ -568,6 +601,11 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
     return Array.from(effects);
   }, [todayEntry]);
 
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState('08:00');
+  const [reminderPermission, setReminderPermission] = useState<'granted' | 'denied' | 'default'>('default');
+  const [filterSub, setFilterSub] = useState('');
+  const [historyFilterDate, setHistoryFilterDate] = useState('');
   const [historyLimit, setHistoryLimit] = useState(20);
 
   const filteredEntries = useMemo(() => {
@@ -581,26 +619,40 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
         return false;
       });
     }
+    if (historyFilterDate) {
+      list = list.filter(e => e.date === historyFilterDate);
+    }
     return list.slice(0, historyLimit);
-  }, [entries, filterText, getName, historyLimit]);
+  }, [entries, filterText, historyFilterDate, getName, historyLimit]);
 
   const weekViewData = useMemo(() => last7Days.map(dateStr => ({ date: dateStr, entry: entries.find(e => e.date === dateStr) })), [entries]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 80 }}>
-      {/* HEADER: Streak + Gauge */}
-      <div style={{ ...sx.card, display: 'flex', alignItems: 'center', gap: 16 }}>
-        <CircularGauge pct={weekCompliance} size={84} stroke={7} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Комплаентность за 7 дней</div>
-          <span style={{ fontSize: 24, fontWeight: 800, color: streak >= 3 ? '#00e68a' : 'rgba(255,255,255,0.4)' }}>
-            {streak} {streak === 1 ? 'день' : streak < 5 ? 'дня' : 'дней'} 🔥
-          </span>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
-            непрерывного приёма · {planSubs.length} веществ в плане
-          </div>
-        </div>
-      </div>
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 80,
+      background: theme === 'dark' ? 'transparent' : '#f8fafc',
+      color: theme === 'dark' ? 'inherit' : '#0f172a',
+    }}>
+       {/* HEADER: Streak + Gauge */}
+       <div style={{ ...sx.card, display: 'flex', alignItems: 'center', gap: 16 }}>
+         <CircularGauge pct={weekCompliance} size={84} stroke={7} />
+         <div style={{ flex: 1 }}>
+           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Комплаентность за 7 дней</div>
+           <span style={{ fontSize: 24, fontWeight: 800, color: streak >= 3 ? '#00e68a' : 'rgba(255,255,255,0.4)' }}>
+             {streak} {streak === 1 ? 'день' : streak < 5 ? 'дня' : 'дней'} 🔥
+           </span>
+           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+             непрерывного приёма · {planSubs.length} веществ в плане
+           </div>
+         </div>
+         <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} style={{
+           padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
+           background: theme === 'dark' ? '#1e293b' : '#f8fafc', color: theme === 'dark' ? '#e2e8f0' : '#0f172a',
+           cursor: 'pointer', fontSize: 14, minHeight: 36,
+         }}>
+           {theme === 'dark' ? '🌙' : '☀️'}
+         </button>
+       </div>
 
       <NegativeJournalCard />
 
@@ -657,18 +709,30 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
             </div>
           )}
 
-          {/* Substance list */}
-          {planSubs.length === 0 ? (
-            <div style={{ padding: 26, textAlign: 'center', ...sx.card }}>
-              <div style={{ fontSize: 26, marginBottom: 8 }}>📋</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Нет активного плана поддержки</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>
-                Перейдите в 🧮 Калькулятор и выполните расчёт
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {planSubs.map((subId: string) => {
+           {/* Substance list */}
+           {planSubs.length === 0 ? (
+             <div style={{ padding: 26, textAlign: 'center', ...sx.card }}>
+               <div style={{ fontSize: 26, marginBottom: 8 }}>📋</div>
+               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Нет активного плана поддержки</div>
+               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>
+                 Перейдите в 🧮 Калькулятор и выполните расчёт
+               </div>
+             </div>
+           ) : (
+             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+               {/* Поиск по веществам */}
+               <input
+                 type="text"
+                 value={filterSub}
+                 onChange={e => setFilterSub(e.target.value)}
+                 placeholder="🔍 Поиск вещества…"
+                 style={{
+                   width: '100%', padding: '10px 12px', borderRadius: 10,
+                   border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)',
+                   color: '#fff', fontSize: 12, boxSizing: 'border-box', fontFamily: 'inherit',
+                 }}
+               />
+               {(filterSub ? planSubs.filter(id => getName(id).toLowerCase().includes(filterSub.toLowerCase())) : planSubs).map((subId: string) => {
                 const cat = getCat(subId);
                 const name = getName(subId);
                 const dose = cat?.dosage?.mg ? `${cat.dosage.mg} мг` : '';
@@ -712,18 +776,21 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                     {/* Expand: time slot, dose, side effects — clicks here do NOT toggle */}
                     {taken && (
                       <div onClick={e => e.stopPropagation()} style={{ padding: '0 14px 12px 50px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          {TIME_SLOTS.map(ts => (
-                            <button key={ts.id} onClick={() => setSubState(today, subId, { timeSlot: si.timeSlot === ts.id ? undefined : ts.id })}
-                              style={{
-                                padding: '5px 10px', borderRadius: 12, fontSize: 9, cursor: 'pointer', fontFamily: 'inherit', border: 'none',
-                                background: si.timeSlot === ts.id ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
-                                color: si.timeSlot === ts.id ? '#00e68a' : 'rgba(255,255,255,0.5)', fontWeight: si.timeSlot === ts.id ? 700 : 400,
-                              }}>
-                              {ts.icon} {ts.label}
-                            </button>
-                          ))}
-                        </div>
+                         <div style={{ display: 'flex', gap: mobile ? 6 : 4, flexWrap: 'wrap' }}>
+                           {TIME_SLOTS.map(ts => (
+                             <button key={ts.id} onClick={() => setSubState(today, subId, { timeSlot: si.timeSlot === ts.id ? undefined : ts.id })}
+                               style={{
+                                 padding: mobile ? '8px 14px' : '5px 10px',
+                                 borderRadius: 12, fontSize: mobile ? 11 : 9,
+                                 cursor: 'pointer', fontFamily: 'inherit', border: 'none',
+                                 background: si.timeSlot === ts.id ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
+                                 color: si.timeSlot === ts.id ? '#00e68a' : 'rgba(255,255,255,0.5)', fontWeight: si.timeSlot === ts.id ? 700 : 400,
+                                 minHeight: mobile ? 36 : 24,
+                               }}>
+                               {ts.icon} {mobile ? ts.label : ''}
+                             </button>
+                           ))}
+                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}>Факт. доза:</span>
@@ -736,30 +803,153 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                           style={{ alignSelf: 'flex-start', padding: '5px 10px', borderRadius: 12, fontSize: 9, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: showSE ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)', color: showSE ? '#ef4444' : 'rgba(255,255,255,0.5)' }}>
                           {showSE ? '✕ Скрыть побочки' : '⚠ Побочные эффекты'}
                         </button>
-                        {showSE && (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                            {SIDE_EFFECTS.map(eff => {
-                              const active = si.sideEffects?.includes(eff) || false;
-                              return (
-                                <button key={eff} onClick={() => toggleSideEffect(subId, eff)}
-                                  style={{
-                                    padding: '5px 10px', borderRadius: 12, fontSize: 9, cursor: 'pointer', fontFamily: 'inherit', border: 'none',
-                                    background: active ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)',
-                                    color: active ? '#ef4444' : 'rgba(255,255,255,0.5)', fontWeight: active ? 700 : 400,
-                                  }}>
-                                  {active ? '✓ ' : ''}{eff}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
+                         {showSE && (
+                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 6 : 4 }}>
+                             {SIDE_EFFECTS.map(eff => {
+                               const active = si.sideEffects?.includes(eff) || false;
+                               return (
+                                 <button key={eff} onClick={() => toggleSideEffect(subId, eff)}
+                                   style={{
+                                     padding: mobile ? '8px 14px' : '5px 10px',
+                                     borderRadius: 12, fontSize: mobile ? 11 : 9,
+                                     cursor: 'pointer', fontFamily: 'inherit', border: 'none',
+                                     background: active ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)',
+                                     color: active ? '#ef4444' : 'rgba(255,255,255,0.5)', fontWeight: active ? 700 : 400,
+                                     minHeight: mobile ? 36 : 24,
+                                   }}>
+                                   {active ? '✓ ' : ''}{eff}
+                                 </button>
+                               );
+                             })}
+                           </div>
+                         )}
                       </div>
                     )}
                   </div>
                 );
-              })}
+               })}
 
-              {todaySideEffects.length > 0 && (
+               {/* Bulk actions */}
+               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                 <button onClick={() => {
+                   const entry = loadToday();
+                   if (!entry) return;
+                   const updated = { ...entry.substances };
+                   planSubs.forEach(id => { updated[id] = { taken: true, timeSlot: undefined, sideEffects: [] }; });
+                   const newEntry = { ...entry, substances: updated };
+                   try { localStorage.setItem('he_support_diary', JSON.stringify({ ...loadDiary(), [today]: newEntry })); } catch {}
+                   setRefreshTick(t => t + 1);
+                 }} style={{
+                   flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid rgba(0,230,138,0.2)',
+                   background: 'rgba(0,230,138,0.06)', color: '#00e68a', fontWeight: 700, fontSize: 12,
+                   cursor: 'pointer', fontFamily: 'inherit', minHeight: 40,
+                 }}>✅ Принять всё</button>
+                 <button onClick={() => {
+                   const entry = loadToday();
+                   if (!entry) return;
+                   const updated = { ...entry.substances };
+                   planSubs.forEach(id => { updated[id] = { taken: false, timeSlot: undefined, sideEffects: [] }; });
+                   const newEntry = { ...entry, substances: updated };
+                   try { localStorage.setItem('he_support_diary', JSON.stringify({ ...loadDiary(), [today]: newEntry })); } catch {}
+                   setRefreshTick(t => t + 1);
+                 }} style={{
+                   flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid rgba(239,68,68,0.2)',
+                   background: 'rgba(239,68,68,0.06)', color: '#ef4444', fontWeight: 700, fontSize: 12,
+                   cursor: 'pointer', fontFamily: 'inherit', minHeight: 40,
+                  }}>✕ Очистить всё</button>
+                </div>
+
+                {/* Цветовая легенда дней недели */}
+                <div style={{ ...sx.card, padding: '8px 12px' }}>
+                  <div style={{ fontSize: 9, fontWeight: 600, color: '#94a3b8', marginBottom: 6 }}>Цвет дня недели:</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {[
+                      { day: 'Пн', color: '#3b82f6' },
+                      { day: 'Вт', color: '#10b981' },
+                      { day: 'Ср', color: '#f59e0b' },
+                      { day: 'Чт', color: '#ef4444' },
+                      { day: 'Пт', color: '#8b5cf6' },
+                      { day: 'Сб', color: '#ec4899' },
+                      { day: 'Вс', color: '#06b6d4' },
+                    ].map((d, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <div style={{ width: 12, height: 12, borderRadius: 3, background: d.color }} />
+                        <span style={{ fontSize: 9, color: '#94a3b8' }}>{d.day}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Напоминания */}
+                <div style={sx.card}>
+                  <div style={sx.sectionTitle}>⏰ Напоминания</div>
+                  
+                  {/* Статус разрешений */}
+                  {reminderPermission === 'denied' && (
+                    <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, color: '#ef4444' }}>⚠ Уведомления заблокированы в браузере</div>
+                      <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 2 }}>Разрешите уведомления в настройках сайта</div>
+                    </div>
+                  )}
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={reminderEnabled}
+                      onChange={e => {
+                        if (e.target.checked && reminderPermission !== 'granted') {
+                          if ('Notification' in window) {
+                            Notification.requestPermission().then(perm => {
+                              setReminderPermission(perm);
+                              if (perm === 'granted') setReminderEnabled(true);
+                            });
+                          }
+                        } else {
+                          setReminderEnabled(e.target.checked);
+                        }
+                      }}
+                      style={{ width: 18, height: 18 }}
+                    />
+                    <span style={{ fontSize: 12, color: '#e2e8f0' }}>Включить напоминания о приёме</span>
+                  </div>
+                  
+                  {reminderEnabled && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <label style={{ fontSize: 12, color: '#94a3b8' }}>Время:</label>
+                      <input
+                        type="time"
+                        value={reminderTime}
+                        onChange={e => setReminderTime(e.target.value)}
+                        style={{
+                          padding: '6px 10px', borderRadius: 8,
+                          border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)',
+                          color: '#fff', fontSize: 12, fontFamily: 'inherit',
+                        }}
+                      />
+                      <button onClick={() => {
+                        if (reminderPermission === 'granted') {
+                          new Notification('BodyBuildHealth', {
+                            body: 'Пора принять БАДы!',
+                            icon: '💊',
+                          });
+                        }
+                        alert('Напоминание установлено на ' + reminderTime);
+                      }} style={{
+                        padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.2)',
+                        background: 'rgba(0,230,138,0.06)', color: '#00e68a', fontWeight: 600, fontSize: 11,
+                        cursor: 'pointer', fontFamily: 'inherit', minHeight: 32,
+                      }}>Тест</button>
+                    </div>
+                  )}
+                  
+                  {reminderEnabled && (
+                    <div style={{ fontSize: 9, color: '#64748b', marginTop: 6 }}>
+                      💡 Совет: Браузер покажет уведомление, даже если вкладка закрыта
+                    </div>
+                  )}
+                </div>
+
+                {todaySideEffects.length > 0 && (
                 <div style={{ ...sx.card, padding: '10px 12px' }}>
                   <div style={{ fontSize: 9, fontWeight: 600, color: '#ef4444', marginBottom: 4 }}>
                     ⚠ Побочные эффекты ({todaySideEffects.length})
@@ -832,49 +1022,92 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
             </div>
           </div>
 
-          {planSubs.length > 0 && (
-            <div style={sx.card}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>🧬 Приём по веществам</div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left', padding: '5px 6px', color: 'rgba(255,255,255,0.4)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Вещество</th>
-                      {weekViewData.map(d => (
-                        <th key={d.date} style={{ textAlign: 'center', padding: '5px 3px', color: 'rgba(255,255,255,0.4)', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 8 }}>{dayOfWeek(d.date)}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {planSubs.map(subId => (
-                      <tr key={subId}>
-                        <td style={{ padding: '5px 6px', color: 'rgba(255,255,255,0.75)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.03)' }}>{getName(subId)}</td>
-                        {weekViewData.map(d => {
-                          const taken = d.entry?.substances[subId]?.taken || false;
-                          const ts = d.entry?.substances[subId]?.timeSlot;
-                          return (
-                            <td key={d.date} style={{ textAlign: 'center', padding: '5px 3px', borderBottom: '1px solid rgba(255,255,255,0.03)', color: taken ? '#00e68a' : 'rgba(255,255,255,0.15)' }}>
-                              {taken ? (ts ? TIME_SLOTS.find(t => t.id === ts)?.icon || '✓' : '✓') : '·'}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+           {planSubs.length > 0 && (
+             <div style={sx.card}>
+               <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>🧬 Приём по веществам</div>
+               <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', msOverflowStyle: 'none', scrollbarWidth: 'none' }}>
+                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: mobile ? 9 : 10, minWidth: mobile ? planSubs.length * 44 : undefined }}>
+                   <thead>
+                     <tr>
+                       <th style={{ textAlign: 'left', padding: '5px 6px', color: 'rgba(255,255,255,0.4)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Вещество</th>
+                       {weekViewData.map(d => (
+                         <th key={d.date} style={{ textAlign: 'center', padding: '5px 3px', color: 'rgba(255,255,255,0.4)', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 8 }}>{dayOfWeek(d.date)}</th>
+                       ))}
+                     </tr>
+                   </thead>
+                   <tbody>
+                     {planSubs.map(subId => (
+                       <tr key={subId}>
+                         <td style={{ padding: '5px 6px', color: 'rgba(255,255,255,0.75)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: mobile ? 10 : 12 }}>{getName(subId)}</td>
+                         {weekViewData.map(d => {
+                           const taken = d.entry?.substances[subId]?.taken || false;
+                           const ts = d.entry?.substances[subId]?.timeSlot;
+                           return (
+                             <td key={d.date} style={{ textAlign: 'center', padding: '5px 3px', borderBottom: '1px solid rgba(255,255,255,0.03)', color: taken ? '#00e68a' : 'rgba(255,255,255,0.15)' }}>
+                               {taken ? (ts ? TIME_SLOTS.find(t => t.id === ts)?.icon || '✓' : '✓') : '·'}
+                             </td>
+                           );
+                         })}
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
+             </div>
+           )}
         </div>
       )}
 
-      {/* ═══════════════ HISTORY TAB ═══════════════ */}
-      {tab === 'history' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={sx.card}>
-            <input type="text" value={filterText} onChange={e => setFilterText(e.target.value)} placeholder="🔍 Фильтр по веществу…"
-              style={{ width: '100%', ...sx.input }} />
-          </div>
+       {/* ═══════════════ HISTORY TAB ═══════════════ */}
+       {tab === 'history' && (
+         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+           <div style={sx.card}>
+             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+               <input type="text" value={filterText} onChange={e => setFilterText(e.target.value)} placeholder="🔍 Фильтр по веществу…"
+                 style={{ flex: 1, ...sx.input }} />
+               <input type="date" value={historyFilterDate} onChange={e => setHistoryFilterDate(e.target.value)}
+                 style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: '#fff', fontSize: 11, fontFamily: 'inherit' }} />
+               <button onClick={() => setHistoryFilterDate('')} style={{
+                 padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)', color: '#94a3b8', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit', minHeight: 32,
+               }}>Сброс</button>
+             </div>
+             {/* Экспорт */}
+             <div style={{ display: 'flex', gap: 6 }}>
+               <button onClick={() => {
+                 const data = JSON.stringify(entries, null, 2);
+                 const blob = new Blob([data], { type: 'application/json' });
+                 const url = URL.createObjectURL(blob);
+                 const a = document.createElement('a');
+                 a.href = url;
+                 a.download = `support-diary-${new Date().toISOString().slice(0,10)}.json`;
+                 a.click();
+                 URL.revokeObjectURL(url);
+               }} style={{
+                 flex: 1, padding: '8px 0', borderRadius: 8, border: '1px solid rgba(59,130,246,0.2)',
+                 background: 'rgba(59,130,246,0.06)', color: '#3b82f6', fontWeight: 600, fontSize: 10,
+                 cursor: 'pointer', fontFamily: 'inherit', minHeight: 32,
+               }}>📥 JSON</button>
+               <button onClick={() => {
+                 const csv = ['Date,Substance,Taken,Dose,TimeSlot,SideEffects,Mood,Notes'];
+                 entries.forEach(e => {
+                   Object.entries(e.substances).forEach(([subId, v]) => {
+                     csv.push(`${e.date},${subId},${v.taken},${v.dose || ''},${v.timeSlot || ''},${(v.sideEffects || []).join(';')},${e.mood || ''},${e.notes || ''}`);
+                   });
+                 });
+                 const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+                 const url = URL.createObjectURL(blob);
+                 const a = document.createElement('a');
+                 a.href = url;
+                 a.download = `support-diary-${new Date().toISOString().slice(0,10)}.csv`;
+                 a.click();
+                 URL.revokeObjectURL(url);
+               }} style={{
+                 flex: 1, padding: '8px 0', borderRadius: 8, border: '1px solid rgba(34,197,94,0.2)',
+                 background: 'rgba(34,197,94,0.06)', color: '#22c55e', fontWeight: 600, fontSize: 10,
+                 cursor: 'pointer', fontFamily: 'inherit', minHeight: 32,
+               }}>📥 CSV</button>
+             </div>
+           </div>
 
       {editingDate ? (
         editingEntry ? (

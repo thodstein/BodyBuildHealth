@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseLabResults } from '../biomarker-regex-engine';
 import { parseLabText } from '../pdf-parser.engine';
-import { normalizeLabMeasurement } from '../../core/labs-mapping';
+import { normalizeLabMeasurement, resolveLabMarker } from '../../core/labs-mapping';
 
 describe('Russian laboratory OCR parsing', () => {
   const text = `ИНВИТРО
@@ -88,5 +88,85 @@ describe('Russian laboratory OCR parsing', () => {
     expect(creatinine?.refLow).toBe(62);
     expect(creatinine?.refHigh).toBe(106);
     expect(creatinine?.unit).toBe('мкмоль/л');
+  });
+
+  it('canonicalizes duplicate marker aliases to one result', () => {
+    const result = parseLabText('Креатинин 92 мкмоль/л 62-106\nCREA 92 umol/L 62-106');
+    expect(result.values.filter(v => v.code === 'CREAT').length).toBe(1);
+  });
+
+  it('prefers a structured table value with a reference range', () => {
+    const result = parseLabText('Глюкоза\t5,4\t3,9-5,5\tммоль/л');
+    const glucose = result.values.find(v => v.code === 'GLU');
+    expect(glucose).toMatchObject({ value: 5.4, refLow: 3.9, refHigh: 5.5 });
+  });
+
+  it('keeps one value when parser candidates disagree', () => {
+    const result = parseLabText('Глюкоза\t5,4\t3,9-5,5\tммоль/л');
+    expect(result.values.filter(v => v.code === 'GLU')).toHaveLength(1);
+  });
+
+  it('keeps the structured result when OCR adds the same marker', () => {
+    const result = parseLabText('Креатинин\t92\t62-106\tмкмоль/л\nКреатинин 92 мкмоль/л');
+    const values = result.values.filter(v => v.code === 'CREAT');
+    expect(values).toHaveLength(1);
+    expect(values[0].refHigh).toBe(106);
+  });
+
+  it('resolves mixed Cyrillic and Latin OCR abbreviations canonically', () => {
+    expect(resolveLabMarker('АLT')).toBe('ALT');
+    expect(resolveLabMarker('ТТG')).toBe('TSH');
+    expect(resolveLabMarker('HСТ')).toBe('HCT');
+  });
+
+  it('uses the selected candidate unit for normalization', () => {
+    const result = parseLabText('Креатинин\t1\t0,6-1,2\tмг/дл');
+    const creatinine = result.values.find(v => v.code === 'CREAT');
+    expect(creatinine?.unit).toBe('мг/дл');
+    expect(normalizeLabMeasurement('CREATININE', creatinine!.value, creatinine!.unit).value).toBe(88.42);
+  });
+
+  it('normalizes reference limits with the selected value unit', () => {
+    const result = parseLabText('Креатинин\t1\t0,6-1,2\tмг/дл');
+    const creatinine = result.values.find(v => v.code === 'CREAT');
+    expect(creatinine?.refLow).toBe(0.6);
+    expect(creatinine?.refHigh).toBe(1.2);
+    expect(creatinine?.isAbnormal).toBe(false);
+  });
+
+  it('keeps the most informative duplicate row', () => {
+    const result = parseLabText('АЛТ 35 Е/л 0-41\nАЛТ 35');
+    const alt = result.values.find(v => v.code === 'ALT');
+    expect(result.values.filter(v => v.code === 'ALT')).toHaveLength(1);
+    expect(alt).toMatchObject({ value: 35, refLow: 0, refHigh: 41 });
+  });
+
+  it('does not use digits from a marker name as the result', () => {
+    const result = parseLabText('25(OH)D\t32\t30-100\tнг/мл\nТ3 свободный\t4,8\t3,1-6,8\tпмоль/л');
+    expect(result.values.find(v => v.code === 'VITD')?.value).toBe(32);
+    expect(result.values.find(v => v.code === 'FT3')?.value).toBe(4.8);
+  });
+
+  it('applies the same numeric OCR correction in the fallback parser', () => {
+    const result = parseLabResults('Глюкоза 5,O ммоль/л 3,9-5,5', 'tesseract.js');
+    expect(result.extractedMarkers.find(v => v.code === 'Glucose')?.value).toBe(5);
+  });
+
+  it('normalizes split Russian units in the fallback parser', () => {
+    const result = parseLabResults('Креатинин 92 мк моль / л 62-106', 'tesseract.js');
+    const creatinine = result.extractedMarkers.find(v => v.code === 'Creatinine');
+    expect(creatinine?.value).toBe(92);
+  });
+
+  it('normalizes units split by OCR spaces', () => {
+    const result = parseLabText('Креатинин\t1\t0,6-1,2\tмк моль / л');
+    const creatinine = result.values.find(v => v.code === 'CREAT');
+    expect(creatinine?.unit).toBe('мкмоль/л');
+    expect(normalizeLabMeasurement('CREATININE', 1, creatinine!.unit).unit).toBe('umol/L');
+  });
+
+  it('rejects empty and non-finite candidates before display', () => {
+    expect(parseLabText('АЛТ NaN Е/л').values).toHaveLength(0);
+    expect(parseLabText('АЛТ 35 Е/л').values[0].value).toBe(35);
   });
 });

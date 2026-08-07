@@ -33,6 +33,24 @@ export interface ComplianceSummary {
   bestWeek: ComplianceWeek | null;
   today: ComplianceDay | null;
   activeSubstances: { id: string; name: string; dose: string; startedAt: string; adherence7d: number }[];
+  // Новые метрики
+  bestDay?: ComplianceDay | null;
+  worstDay?: ComplianceDay | null;
+  avgStreak?: number; // средняя длина серии за период
+  totalDaysTracked?: number;
+  missedDoses?: number; // общее количество пропущенных приёмов
+  consistencyScore?: number; // оценка стабильности (0-100)
+  achievements?: Achievement[];
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  unlockedAt?: string; // дата получения
+  progress?: number; // прогресс к достижению (0-100)
+  category: 'streak' | 'percentage' | 'consistency' | 'milestone';
 }
 
 // ────────────────── STORAGE KEYS ──────────────────
@@ -186,6 +204,112 @@ export function computeCompliance(daysBack: number = 30, planSubs?: string[]): C
     };
   });
 
+  // Вычисление новых метрик
+  const allAdherences = allDays.map(d => d.adherence);
+  const bestDay = allDays.reduce((b, d) => d.adherence > (b?.adherence ?? -1) ? d : b, null as ComplianceDay | null);
+  const worstDay = allDays.reduce((w, d) => d.adherence < (w?.adherence ?? 101) ? d : w, null as ComplianceDay | null);
+  
+  // Средняя длина серии
+  let streakCount = 0;
+  let streakSum = 0;
+  let streakNum = 0;
+  for (const d of allDays) {
+    if (d.adherence >= 80) {
+      streakCount++;
+    } else {
+      if (streakCount > 0) {
+        streakSum += streakCount;
+        streakNum++;
+        streakCount = 0;
+      }
+    }
+  }
+  if (streakCount > 0) {
+    streakSum += streakCount;
+    streakNum++;
+  }
+  const avgStreak = streakNum > 0 ? Math.round(streakSum / streakNum) : 0;
+  
+  // Общее количество пропущенных приёмов
+  const missedDoses = allDays.reduce((sum, d) => sum + d.missed, 0);
+  
+  // Оценка стабильности (на основе вариации адгеренса)
+  const mean = allAdherences.reduce((a, b) => a + b, 0) / (allAdherences.length || 1);
+  const variance = allAdherences.reduce((sum, a) => sum + Math.pow(a - mean, 2), 0) / (allAdherences.length || 1);
+  const stdDev = Math.sqrt(variance);
+  const consistencyScore = Math.round(100 - stdDev);
+
+  // Достижения
+  const achievements: Achievement[] = [];
+  
+  // Streak достижения
+  if (streak >= 7) {
+    achievements.push({
+      id: 'streak_7',
+      title: 'Неделя силы',
+      description: '7 дней подряд с комплаенсом ≥80%',
+      icon: '🔥',
+      category: 'streak',
+      unlockedAt: new Date().toISOString(),
+    });
+  } else {
+    achievements.push({
+      id: 'streak_7',
+      title: 'Неделя силы',
+      description: '7 дней подряд с комплаенсом ≥80%',
+      icon: '🔥',
+      category: 'streak',
+      progress: Math.round((streak / 7) * 100),
+    });
+  }
+  
+  if (streak >= 30) {
+    achievements.push({
+      id: 'streak_30',
+      title: 'Месяц дисциплины',
+      description: '30 дней подряд с комплаенсом ≥80%',
+      icon: '🏆',
+      category: 'streak',
+      unlockedAt: new Date().toISOString(),
+    });
+  }
+  
+  // Процентные достижения
+  if (overall30d >= 90) {
+    achievements.push({
+      id: 'percent_90',
+      title: 'Золотой стандарт',
+      description: 'Комплаенс ≥90% за 30 дней',
+      icon: '🥇',
+      category: 'percentage',
+      unlockedAt: new Date().toISOString(),
+    });
+  }
+  
+  // Стабильность
+  if (consistencyScore >= 80) {
+    achievements.push({
+      id: 'consistent',
+      title: 'Стабильность',
+      description: 'Оценка стабильности ≥80%',
+      icon: '📊',
+      category: 'consistency',
+      unlockedAt: new Date().toISOString(),
+    });
+  }
+  
+  // Вехи (milestones)
+  if (allDays.length >= 100) {
+    achievements.push({
+      id: 'milestone_100',
+      title: 'Сотня',
+      description: '100 дней отслеживания',
+      icon: '💯',
+      category: 'milestone',
+      unlockedAt: new Date().toISOString(),
+    });
+  }
+
   return {
     weeks,
     overall7d,
@@ -194,6 +318,13 @@ export function computeCompliance(daysBack: number = 30, planSubs?: string[]): C
     bestWeek: weeks.reduce((b: ComplianceWeek | null, w: ComplianceWeek) => w.overallAdherence > (b?.overallAdherence ?? -1) ? w : b, null as ComplianceWeek | null),
     today,
     activeSubstances,
+    bestDay,
+    worstDay,
+    avgStreak,
+    totalDaysTracked: allDays.length,
+    missedDoses,
+    consistencyScore: Math.max(0, Math.min(100, consistencyScore)),
+    achievements,
   };
 }
 

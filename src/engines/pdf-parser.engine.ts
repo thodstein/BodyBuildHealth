@@ -6,6 +6,7 @@ export interface ParsedLabValue {
   refLow?: number;
   refHigh?: number;
   isAbnormal?: boolean;
+  raw?: string;
 }
 
 export interface ParsedLabResult {
@@ -201,12 +202,21 @@ function extractRefRange(text: string): { low?: number; high?: number } {
 }
 
 function extractUnit(text: string): string {
-  const match = text.match(/(?:мкмоль|ммоль|моль|мг|нг|пг|мкг|мЕд|мМЕ|Е|ед|г|мл|л)\s*\/\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|IU|U|g)\s*\/\s*(?:dL|mL|L)|%|сек|s\b/i);
+  const match = text.match(/(?:мк\s*моль|ммоль|моль|мг|нг|пг|мкг|м\s*[ЕEеe]д|мМЕ|Е|ед|г|мл|л)\s*\/\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|IU|U|g)\s*\/\s*(?:dL|mL|L)|%|сек|s\b/i);
   return match?.[0].replace(/\s+/g, '') || '';
 }
 
 function isUnitCell(text: string): boolean {
-  return /^(?:%|сек|s|(?:мкмоль|ммоль|моль|мг|нг|пг|мкг|мЕд|мМЕ|Е|ед|г|мл|л)\/(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|IU|U|g)\/(?:dL|mL|L))$/i.test(text.trim());
+  return /^(?:%|сек|s|(?:мк\s*моль|ммоль|моль|мг|нг|пг|мкг|м\s*[ЕEеe]д|мМЕ|Е|ед|г|мл|л)\s*\/\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|IU|U|g)\s*\/\s*(?:dL|mL|L))$/i.test(text.trim());
+}
+
+function candidateScore(value: ParsedLabValue): number {
+  let score = 0;
+  if (value.unit) score += 2;
+  if (value.refLow !== undefined || value.refHigh !== undefined) score += 4;
+  if (value.raw && /[А-Яа-яA-Za-z]/.test(value.raw)) score += 1;
+  if (value.raw && /\d/.test(value.raw)) score += 1;
+  return score;
 }
 
 const PROVIDER_HEADERS: Record<string, string[]> = {
@@ -226,6 +236,49 @@ function detectProviderFromText(text: string): string | null {
 }
 
 interface TextItem { str: string; x: number; y: number; width: number; height: number; }
+
+async function openPdfDocument(pdfjsLib: any, data: ArrayBuffer): Promise<any> {
+  try {
+    return await pdfjsLib.getDocument({ data }).promise;
+  } catch (workerError) {
+    // Some WebViews and Telegram Mini App environments cannot load the CDN
+    // worker. PDF.js can still extract/render pages in its main thread.
+    console.warn('PDF.js worker failed, retrying without worker:', workerError);
+    return pdfjsLib.getDocument({ data, disableWorker: true }).promise;
+  }
+}
+
+function enhanceOcrCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const context = canvas.getContext('2d');
+  if (!context) return source;
+  context.drawImage(source, 0, 0);
+  const image = context.getImageData(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < image.data.length; i += 4) {
+    const gray = image.data[i] * 0.299 + image.data[i + 1] * 0.587 + image.data[i + 2] * 0.114;
+    // Preserve black text while reducing gray paper/background noise.
+    const contrast = Math.max(0, Math.min(255, (gray - 128) * 1.35 + 128));
+    image.data[i] = contrast;
+    image.data[i + 1] = contrast;
+    image.data[i + 2] = contrast;
+  }
+  context.putImageData(image, 0, 0);
+  return canvas;
+}
+
+async function recognizeOcrCanvas(Tesseract: any, canvas: HTMLCanvasElement): Promise<string> {
+  const enhanced = enhanceOcrCanvas(canvas);
+  try {
+    const result = await Tesseract.recognize(enhanced, 'rus+eng');
+    return result.data.text || '';
+  } catch (languageError) {
+    console.warn('Russian OCR language data failed, retrying in English:', languageError);
+    const result = await Tesseract.recognize(enhanced, 'eng');
+    return result.data.text || '';
+  }
+}
 
 function groupByRows(items: TextItem[], yTolerance = 5): TextItem[][] {
   if (items.length === 0) return [];
@@ -307,13 +360,16 @@ function tryParseTableRows(lines: string[], provider: string | null): ParsedLabV
 
       for (let ci = 0; ci < cols.length; ci++) {
         const cell = cols[ci];
+        const isNameCell = labDef.names.some(name => containsLabName(cell, name));
         // Extract reference range from any cell that has a range pattern
         const ref = extractRefRange(cell);
         if (ref.low !== undefined || ref.high !== undefined) {
           refLow = ref.low;
           refHigh = ref.high;
         }
-        const num = extractResultNumber(cell);
+        // Names such as 25(OH)D, T3, T4 and HbA1c contain digits which are
+        // not the measured result. Never use the marker/name cell as value.
+        const num = isNameCell ? null : extractResultNumber(cell);
         if (num !== null && num > 0 && cell.length < 30) {
           if (val === null) {
             val = num;
@@ -334,6 +390,7 @@ function tryParseTableRows(lines: string[], provider: string | null): ParsedLabV
         refLow,
         refHigh,
         isAbnormal: refHigh !== undefined ? val > refHigh : refLow !== undefined ? val < refLow : undefined,
+        raw: line,
       });
       break;
     }
@@ -382,14 +439,18 @@ function parseLabLineGeneric(line: string, val: number): { unit: string; refLow?
   return { unit, refLow: ref.low, refHigh: ref.high };
 }
 
-function tryParseLabFromLine(line: string): { code: string; name: string; value: number; unit: string; refLow?: number; refHigh?: number } | null {
+function tryParseLabFromLine(line: string): { code: string; name: string; value: number; unit: string; refLow?: number; refHigh?: number; raw?: string } | null {
   const lowerLine = line.toLowerCase();
   
   for (const labDef of LAB_PATTERNS) {
     const nameMatch = labDef.names.some(n => containsLabName(lowerLine, n));
     if (!nameMatch) continue;
 
-    const val = extractNumber(line.replace(/[^\d.,\s\-–]/g, ' '));
+    const nameMatchText = labDef.names.find(n => containsLabName(lowerLine, n)) || '';
+    const valueText = nameMatchText
+      ? line.replace(new RegExp(nameMatchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), ' ')
+      : line;
+    const val = extractNumber(valueText.replace(/[^\d.,\s\-–]/g, ' '));
     if (val === null || val > 100000) continue;
 
     const parsed = parseLabLineGeneric(line, val);
@@ -400,6 +461,7 @@ function tryParseLabFromLine(line: string): { code: string; name: string; value:
       unit: parsed.unit || labDef.unitPatterns[0],
       refLow: parsed.refLow,
       refHigh: parsed.refHigh,
+      raw: line,
     };
   }
   return null;
@@ -459,7 +521,7 @@ export async function parsePDF(file: File): Promise<ParsedLabResult> {
     const pdfjsLib = await import('pdfjs-dist');
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
     const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
     let fullText = '';
     let allItems: TextItem[] = [];
     for (let i = 1; i <= pdf.numPages; i++) {
@@ -480,11 +542,22 @@ export async function parsePDF(file: File): Promise<ParsedLabResult> {
       }
     }
     const result = parseLabText(fullText);
+    // Row grouping may lose columns in PDFs with unusual coordinate layouts.
+    // Always parse the raw item stream and use it only to fill missing markers.
+    const rawText = allItems.map(it => it.str).join(' ');
+    const rawResult = rawText.length > 20 ? parseLabText(rawText) : null;
+    if (rawResult) {
+      const valuesByCode = new Map<string, ParsedLabValue>();
+      for (const value of [...result.values, ...rawResult.values]) {
+        const current = valuesByCode.get(value.code);
+        if (!current || candidateScore(value) > candidateScore(current)) {
+          valuesByCode.set(value.code, value);
+        }
+      }
+      result.values = [...valuesByCode.values()];
+    }
     if (result.values.length === 0 && fullText.length > 50) {
-      // Fallback: try parsing raw items text without row grouping
-      const rawText = allItems.map(it => it.str).join(' ');
-      const rawResult = parseLabText(rawText);
-      if (rawResult.values.length > 0) {
+      if (rawResult?.values.length) {
         rawResult.warnings = ['Предупреждение: PDF распознан в сыром режиме (таблица не разобрана).'];
         return rawResult;
       }
@@ -501,7 +574,7 @@ export async function ocrScannedPdf(file: File): Promise<string> {
   const pdfjsLib = await import('pdfjs-dist');
   pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
   const Tesseract = await import('tesseract.js') as any;
-  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pdf = await openPdfDocument(pdfjsLib, await file.arrayBuffer());
   const texts: string[] = [];
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
     const page = await pdf.getPage(pageNumber);
@@ -512,8 +585,8 @@ export async function ocrScannedPdf(file: File): Promise<string> {
     const context = canvas.getContext('2d');
     if (!context) continue;
     await page.render({ canvas, canvasContext: context, viewport }).promise;
-    const result = await Tesseract.recognize(canvas, 'rus+eng');
-    if (result.data.text) texts.push(result.data.text);
+    const text = await recognizeOcrCanvas(Tesseract, canvas);
+    if (text) texts.push(text);
   }
   return texts.join('\n');
 }
@@ -531,11 +604,33 @@ export async function parseLabFile(file: File): Promise<ParsedLabResult> {
 }
 
 async function extractTextFromImage(file: File): Promise<string> {
+  const Tesseract = await import('tesseract.js') as any;
   try {
-    const Tesseract = await import('tesseract.js') as any;
-    const result = await Tesseract.recognize(file, 'rus+eng');
-    return result.data.text || '';
-  } catch {
-    return '';
+    if (typeof createImageBitmap !== 'function') throw new Error('createImageBitmap is unavailable');
+    const bitmap = await createImageBitmap(file);
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width * 2;
+    canvas.height = bitmap.height * 2;
+    const context = canvas.getContext('2d');
+    if (!context) return '';
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    return recognizeOcrCanvas(Tesseract, canvas);
+  } catch (imageProcessingError) {
+    // Older WebViews may not provide createImageBitmap or canvas decoding.
+    // Tesseract can recognize the original File directly in that case.
+    console.warn('Enhanced image preprocessing failed, using direct OCR:', imageProcessingError);
+    try {
+      const result = await Tesseract.recognize(file, 'rus+eng');
+      return result.data.text || '';
+    } catch (languageError) {
+      console.warn('Russian image OCR failed, retrying in English:', languageError);
+      try {
+        const result = await Tesseract.recognize(file, 'eng');
+        return result.data.text || '';
+      } catch {
+        return '';
+      }
+    }
   }
 }

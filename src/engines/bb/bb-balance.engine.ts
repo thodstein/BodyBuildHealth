@@ -73,7 +73,8 @@ export function analyzeBBBalance(plan: BBPlan): BBBalanceReport {
     if (coverage.shortened === 0 && coverage.midRange > 0) report.issues.push(`${muscle}: нет сокращённой позиции.`);
     if (Object.keys(coverage.patterns).length === 1 && Object.values(coverage.patterns)[0] >= 4) report.issues.push(`${muscle}: один movement pattern доминирует в объёме.`);
     const totalMuscleSets = coverage.compound + coverage.isolation;
-    if (totalMuscleSets >= 6 && coverage.compound < totalMuscleSets * 0.4) {
+    const isolationDominantByDesign = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs']).has(muscle);
+    if (!isolationDominantByDesign && totalMuscleSets >= 6 && coverage.compound < totalMuscleSets * 0.4) {
       report.issues.push(`${muscle}: только ${coverage.compound}/${totalMuscleSets} сетов compound (менее 40%) — слишком много изоляции ("мусорный объём").`);
     }
   }

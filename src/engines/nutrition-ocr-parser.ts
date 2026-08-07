@@ -3,7 +3,52 @@ import { FOOD_DB, type FoodItem } from '../core/nutrition-database';
 export interface ParsedMeal {
   date: string;
   mealType: string;
-  items: Array<{ name: string; qty: string; qtyGrams?: number; kcal: number; p: number; f: number; c: number; foodId?: string; category?: string }>;
+  items: Array<{ name: string; qty: string; qtyGrams?: number; kcal: number; p: number; f: number; c: number; micros?: NutritionMicros; foodId?: string; category?: string }>;
+}
+
+export type NutritionMicros = Record<string, number>;
+
+const MICRO_LABELS: Array<[RegExp, string, string]> = [
+  [/натри|sodium|\bna\b/i, 'sodium_mg', 'mg'], [/кали|potassium|\bk\b/i, 'potassium_mg', 'mg'],
+  [/магни|magnesium|\bmg\b/i, 'magnesium_mg', 'mg'], [/кальци|calcium|\bca\b/i, 'calcium_mg', 'mg'],
+  [/желез|iron|\bfe\b/i, 'iron_mg', 'mg'], [/цинк|zinc|\bzn\b/i, 'zinc_mg', 'mg'],
+  [/фосфор|phosphorus|\bp\b/i, 'phosphorus_mg', 'mg'], [/витамин\s*a|vitamin\s*a|\bvit\.?\s*a\b/i, 'vitamin_a_mcg', 'mcg'],
+  [/витамин\s*c|vitamin\s*c|\bvit\.?\s*c\b/i, 'vitamin_c_mg', 'mg'], [/витамин\s*d|vitamin\s*d|\bvit\.?\s*d\b/i, 'vitamin_d_mcg', 'mcg'],
+  [/витамин\s*e|vitamin\s*e|\bvit\.?\s*e\b/i, 'vitamin_e_mg', 'mg'], [/витамин\s*k|vitamin\s*k|\bvit\.?\s*k\b/i, 'vitamin_k_mcg', 'mcg'],
+  [/b12|витамин\s*b12|vitamin\s*b12/i, 'vitamin_b12_mcg', 'mcg'], [/клетчат|fiber/i, 'fiber_g', 'g'], [/сахар|sugar/i, 'sugar_g', 'g'],
+];
+
+export function parseMicroLine(line: string): NutritionMicros {
+  const result: NutritionMicros = {};
+  const keys: Record<string, string> = { натрий: 'sodium_mg', sodium: 'sodium_mg', na: 'sodium_mg', калий: 'potassium_mg', potassium: 'potassium_mg', k: 'potassium_mg', магний: 'magnesium_mg', magnesium: 'magnesium_mg', mg: 'magnesium_mg', кальций: 'calcium_mg', calcium: 'calcium_mg', ca: 'calcium_mg', железо: 'iron_mg', iron: 'iron_mg', fe: 'iron_mg', цинк: 'zinc_mg', zinc: 'zinc_mg', zn: 'zinc_mg', фосфор: 'phosphorus_mg', phosphorus: 'phosphorus_mg', p: 'phosphorus_mg' };
+  for (const match of line.matchAll(/(натрий|sodium|na|калий|potassium|k|магний|magnesium|mg|кальций|calcium|ca|железо|iron|fe|цинк|zinc|zn|фосфор|phosphorus|p)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)\s*(мг|mg|мкг|mcg|г|g)?/gi)) {
+    const value = numberFrom(match[2], 0);
+    const unit = (match[3] || 'mg').toLowerCase();
+    result[keys[match[1].toLowerCase()]] = Math.round((unit === 'г' || unit === 'g' ? value * 1000 : value) * 100) / 100;
+  }
+  const vitamins: Array<[RegExp, string, string]> = [
+    [/vit(?:amin)?\s*a|витамин\s*a|\bva\b/i, 'vitamin_a_mcg', 'mcg'],
+    [/vit(?:amin)?\s*c|витамин\s*c|\bvc\b/i, 'vitamin_c_mg', 'mg'],
+    [/vit(?:amin)?\s*d|витамин\s*d|\bvd\b/i, 'vitamin_d_mcg', 'mcg'],
+    [/vit(?:amin)?\s*e|витамин\s*e|\bve\b/i, 'vitamin_e_mg', 'mg'],
+    [/vit(?:amin)?\s*k|витамин\s*k|\bvk\b/i, 'vitamin_k_mcg', 'mcg'],
+    [/vit(?:amin)?\s*b12|витамин\s*b12|\bb12\b/i, 'vitamin_b12_mcg', 'mcg'],
+  ];
+  for (const [label, key, defaultUnit] of vitamins) {
+    const match = line.match(new RegExp(`(?:${label.source})\\s*[:\\-]?\\s*(\\d+(?:[.,]\\d+)?)\\s*(мг|mg|мкг|mcg|г|g)?`, 'i'));
+    if (!match) continue;
+    const value = numberFrom(match[1], 0);
+    const unit = (match[2] || defaultUnit).toLowerCase();
+    result[key] = Math.round((unit === 'г' || unit === 'g' ? value * 1000 : value) * 100) / 100;
+  }
+  for (const [label, key, defaultUnit] of MICRO_LABELS) {
+    const match = line.match(new RegExp(`(?:${label.source})\\s*[:\\-]?\\s*(\\d+(?:[.,]\\d+)?)\\s*(мг|mg|мкг|mcg|г|g)?`, 'i'));
+    if (!match) continue;
+    const value = numberFrom(match[1], 0);
+    const unit = (match[2] || defaultUnit).toLowerCase();
+    result[key] = Math.round((unit === 'г' || unit === 'g' ? value * 1000 : value) * 100) / 100;
+  }
+  return result;
 }
 
 // More resilient regex patterns for messy OCR text
@@ -99,7 +144,27 @@ function numberFrom(text: string | undefined, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
 }
 
-function gramsFromQuantity(qty: string, food?: FoodItem): number {
+function foodMicrosPer100(food?: FoodItem): NutritionMicros {
+  const source = food?.micros || {};
+  const map: Record<string, string> = { Ca: 'calcium_mg', Fe: 'iron_mg', Mg: 'magnesium_mg', P: 'phosphorus_mg', K: 'potassium_mg', Na: 'sodium_mg', Zn: 'zinc_mg', Se: 'selenium_mcg', VitA: 'vitamin_a_mcg', VitC: 'vitamin_c_mg', VitD: 'vitamin_d_mcg', VitE: 'vitamin_e_mg', VitK: 'vitamin_k_mcg', VitB12: 'vitamin_b12_mcg' };
+  return Object.entries(map).reduce<NutritionMicros>((out, [from, to]) => {
+    const value = source[from];
+    if (typeof value === 'number' && Number.isFinite(value)) out[to] = value;
+    return out;
+  }, {});
+}
+
+export function fillMissingMicros(name: string, grams: number, existing: NutritionMicros = {}): NutritionMicros {
+  const food = findFood(name);
+  if (!food || !Number.isFinite(grams) || grams <= 0) return { ...existing };
+  const factor = grams / 100;
+  return Object.entries(foodMicrosPer100(food)).reduce<NutritionMicros>((out, [key, value]) => {
+    if (out[key] === undefined) out[key] = Math.round(value * factor * 100) / 100;
+    return out;
+  }, { ...existing });
+}
+
+export function quantityToGrams(qty: string, food?: FoodItem): number {
   const value = numberFrom(qty.match(/[\d]+(?:[.,]\d+)?/)?.[0], 100);
   const unit = qty.toLowerCase();
   if (/шт|pcs?|piece|яиц/.test(unit)) {
@@ -113,9 +178,9 @@ function gramsFromQuantity(qty: string, food?: FoodItem): number {
   return value;
 }
 
-function normalizeItem(name: string, qty: string, kcal: number, p: number, f: number, c: number) {
+function normalizeItem(name: string, qty: string, kcal: number, p: number, f: number, c: number, micros: NutritionMicros = {}) {
   const food = findFood(name);
-  const weight = Math.max(1, gramsFromQuantity(qty, food));
+  const weight = Math.max(1, quantityToGrams(qty, food));
   const multiplier = weight / 100;
   const hasMacros = kcal > 0 || p > 0 || f > 0 || c > 0;
   return {
@@ -126,9 +191,46 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
     p: hasMacros ? Math.round((p || (food?.protein || 0) * multiplier) / multiplier * 10) / 10 : food?.protein || 0,
     f: hasMacros ? Math.round((f || (food?.fat || 0) * multiplier) / multiplier * 10) / 10 : food?.fat || 0,
     c: hasMacros ? Math.round((c || (food?.carbs || 0) * multiplier) / multiplier * 10) / 10 : food?.carbs || 0,
+    micros,
     foodId: food?.id,
     category: food?.category,
   };
+}
+
+function attachMicros(meal: ParsedMeal | null, line: string): boolean {
+  if (!meal || meal.items.length === 0) return false;
+  const micros = parseMicroLine(line);
+  if (Object.keys(micros).length === 0) return false;
+  const looksLikeMicroRow = /^(?:натри|кали|магни|кальци|желез|цинк|фосфор|витамин|vitamin|vit\b|b12\b|sodium|potassium|magnesium|calcium|iron|zinc|fiber|клетчат|na\b|k\b|mg\b|ca\b|fe\b|zn\b|p\b)/i.test(line.trim()) || Object.keys(micros).length >= 2;
+  if (looksLikeMicroRow) {
+    const item = meal.items[meal.items.length - 1];
+    item.micros = { ...(item.micros || {}), ...micros };
+    return true;
+  }
+  return false;
+}
+
+function parseMicroTableHeader(line: string): string[] {
+  if (/\d/.test(line)) return [];
+  const aliases: Array<[RegExp, string]> = [
+    [/sodium|натри|\bna\b/i, 'sodium_mg'], [/potassium|кали|\bk\b/i, 'potassium_mg'], [/magnesium|магни|\bmg\b/i, 'magnesium_mg'],
+    [/calcium|кальци|\bca\b/i, 'calcium_mg'], [/iron|желез|\bfe\b/i, 'iron_mg'], [/zinc|цинк|\bzn\b/i, 'zinc_mg'],
+    [/phosphorus|фосфор|\bp\b/i, 'phosphorus_mg'], [/vit(?:amin)?\s*a|витамин\s*a/i, 'vitamin_a_mcg'], [/vit(?:amin)?\s*c|витамин\s*c/i, 'vitamin_c_mg'],
+    [/vit(?:amin)?\s*d|витамин\s*d/i, 'vitamin_d_mcg'], [/vit(?:amin)?\s*b12|витамин\s*b12|\bb12\b/i, 'vitamin_b12_mcg'],
+  ];
+  return aliases.filter(([pattern]) => pattern.test(line)).map(([, key]) => key);
+}
+
+function parseMicroTableValues(line: string, keys: string[]): NutritionMicros {
+  if (keys.length === 0 || !/^[\d\s,.;|+\-—–]+(?:\s*(?:mg|мг|mcg|мкг))?$/i.test(line.trim())) return {};
+  const cells = line.split(/[\s,;|]+/).filter(Boolean);
+  return keys.reduce<NutritionMicros>((out, key, index) => {
+    const cell = cells[index];
+    if (!cell || /^[—–-]+$/.test(cell)) return out;
+    const value = numberFrom(cell, NaN);
+    if (Number.isFinite(value)) out[key] = value;
+    return out;
+  }, {});
 }
 
 function parseDelimitedItem(line: string) {
@@ -152,13 +254,15 @@ function dedupeMeals(meals: ParsedMeal[]): ParsedMeal[] {
     if (existing) existing.items.push(...meal.items);
     else grouped.set(key, { ...meal, items: [...meal.items] });
   }
-  const seen = new Set<string>();
   return [...grouped.values()].map(meal => ({
     ...meal,
-    items: meal.items.filter(item => {
+    items: meal.items.filter((item, index, all) => {
       const key = [item.foodId || normalizeFoodText(item.name), item.qtyGrams || item.qty].join('|');
-      if (seen.has(key)) return false;
-      seen.add(key);
+      const duplicate = all.findIndex(candidate => [candidate.foodId || normalizeFoodText(candidate.name), candidate.qtyGrams || candidate.qty].join('|') === key);
+      if (duplicate !== index) {
+        all[duplicate].micros = { ...(all[duplicate].micros || {}), ...(item.micros || {}) };
+        return false;
+      }
       return true;
     }),
   })).filter(meal => meal.items.length > 0);
@@ -185,6 +289,7 @@ export function parseNutritionScreenshot(text: string): ParsedMeal[] {
   const lines = text.split(/\r?\n/).filter(l => l.trim().length > 2);
   const meals: ParsedMeal[] = [];
   let currentMeal: ParsedMeal | null = null;
+  let microTableKeys: string[] = [];
 
   const dateRegex = /(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/;
   const mealRegex = /(завтрак|обед|ужин|перекус|бранч|полдник|snack|lunch|dinner|breakfast|перекус\s*\d)/i;
@@ -210,6 +315,17 @@ export function parseNutritionScreenshot(text: string): ParsedMeal[] {
       currentMeal = { date: new Date().toISOString().slice(0, 10), mealType: 'Общее', items: [] };
       meals.push(currentMeal);
     }
+
+    const tableHeader = parseMicroTableHeader(line);
+    if (tableHeader.length >= 2) { microTableKeys = tableHeader; continue; }
+    const tableMicros = parseMicroTableValues(line, microTableKeys);
+    if (Object.keys(tableMicros).length > 0 && currentMeal.items.length > 0) {
+      const item = currentMeal.items[currentMeal.items.length - 1];
+      item.micros = { ...(item.micros || {}), ...tableMicros };
+      continue;
+    }
+
+    if (attachMicros(currentMeal, line)) continue;
 
     const delimitedItem = parseDelimitedItem(line);
     if (delimitedItem) {
@@ -272,6 +388,7 @@ export function parseFatSecretText(text: string): ParsedMeal[] {
   const lines = text.split(/\r?\n/).filter(l => l.trim().length > 1);
   const meals: ParsedMeal[] = [];
   let currentMeal: ParsedMeal | null = null;
+  let microTableKeys: string[] = [];
   let currentDate = new Date().toISOString().slice(0, 10);
 
   for (const line of lines) {
@@ -291,6 +408,17 @@ export function parseFatSecretText(text: string): ParsedMeal[] {
       currentMeal = { date: currentDate, mealType: 'Приём пищи', items: [] };
       meals.push(currentMeal);
     }
+
+    const tableHeader = parseMicroTableHeader(line);
+    if (tableHeader.length >= 2) { microTableKeys = tableHeader; continue; }
+    const tableMicros = parseMicroTableValues(line, microTableKeys);
+    if (Object.keys(tableMicros).length > 0 && currentMeal.items.length > 0) {
+      const item = currentMeal.items[currentMeal.items.length - 1];
+      item.micros = { ...(item.micros || {}), ...tableMicros };
+      continue;
+    }
+
+    if (attachMicros(currentMeal, line)) continue;
 
     const delimitedItem = parseDelimitedItem(line);
     if (delimitedItem) {

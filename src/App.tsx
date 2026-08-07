@@ -145,6 +145,7 @@ export default function App() {
       'nutrition-reports': { tab: 'nutrition', subTab: 'reports' },
       'support-reports': { tab: 'support', subTab: 'reports' },
       'custom-report': { tab: 'profile', subTab: 'custom-report' },
+      'profile-reports': { tab: 'profile', subTab: 'reports' },
 
       // Встроенные дневники — открываем профильный дневник
       'profile-diary-sleep': { tab: 'profile', subTab: 'sleep' },

@@ -293,7 +293,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   };
 
   const buildSrcMacrocycle = (macro: Macrocycle) => {
-    const unsupported = macro.blocks.find(block => block.kind !== 'SRC' || !block.cycleId);
+    const unsupported = macro.blocks.find(block => block.kind !== 'SRC');
     if (unsupported) {
       throw new Error(`Фаза «${unsupported.phase}» не содержит доступного СРЦ-цикла для PL-плана`);
     }
@@ -332,11 +332,20 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       })
       .filter((item): item is { block: Macrocycle['blocks'][number]; output: LMSBuildOutput } => item !== null);
     if (outputs.length === 0) throw new Error('В макроцикле нет доступных СРЦ-циклов');
-    const weeks = outputs.flatMap(({ block, output }) => output.weeks.map(week => ({
-      ...week,
-      week: block.weekOffset + week.week - 1,
-      macroPhase: block.phase,
-    })));
+    const outputByBlock = new Map(outputs.map(item => [item.block, item.output]));
+    const weeks = Array.from({ length: macro.totalWeeks }, (_, index) => {
+      const weekNumber = index + 1;
+      const block = macro.blocks.find(candidate => weekNumber >= candidate.weekOffset && weekNumber < candidate.weekOffset + candidate.weeks);
+      if (!block) throw new Error(`Неделя ${weekNumber} не покрыта макроциклом`);
+      const output = outputByBlock.get(block);
+      // Competition blocks intentionally have no cycleId. Reuse the nearest
+      // training week so the annual result still contains a runnable week.
+      const sourceOutput = output ?? outputs.reduce((best, item) =>
+        Math.abs(item.block.weekOffset - weekNumber) < Math.abs(best.block.weekOffset - weekNumber) ? item : best,
+      outputs[0]).output;
+      const source = sourceOutput.weeks[(weekNumber - (output ? block.weekOffset : sourceOutput.weeks[0]?.week ?? 1)) % sourceOutput.weeks.length] ?? sourceOutput.weeks[0];
+      return { ...source, week: weekNumber, macroPhase: block.phase };
+    });
     if (weeks.length !== macro.totalWeeks || weeks.some((week, index) => week.week !== index + 1)) {
       throw new Error('Блоки макроцикла не покрывают все недели последовательно');
     }

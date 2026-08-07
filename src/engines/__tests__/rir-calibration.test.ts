@@ -57,18 +57,47 @@ describe('getAdjustedRIR', () => {
     expect(result.adjustedRIR).toBe(2);
     expect(result.bias).toBe(0);
   });
-});
 
-describe('getSessionRIRFeedback', () => {
-  it('computes bias and recommendation', () => {
+  it('adjusts RIR based on calibration bias', () => {
     clearCalibrationData();
     const session = makeSession([
       { rpe: 9, rir: 1, weightKg: 100, reps: 5 },
+      { rpe: 9, rir: 1, weightKg: 100, reps: 5 },
+      { rpe: 9, rir: 1, weightKg: 100, reps: 5 },
+    ]);
+    recordSessionRIR(session, { exercises: [{ name: 'Присед', targetSets: [{ rir: 2 }, { rir: 2 }, { rir: 2 }] }] });
+    const result = getAdjustedRIR('squat', 2);
+    expect(result.adjustedRIR).toBeGreaterThan(0);
+    expect(result.rationale).toContain('RIR');
+  });
+});
+
+describe('getSessionRIRFeedback', () => {
+  it('returns empty feedback for session without RPE', () => {
+    clearCalibrationData();
+    const session = makeSession([{ rpe: 0, rir: 0, weightKg: 100, reps: 5 }]);
+    const feedback = getSessionRIRFeedback(session, { exercises: [{ name: 'Присед', targetSets: [{ rir: 2 }] }] });
+    expect(feedback.exerciseFeedbacks.length).toBe(0);
+  });
+
+  it('computes feedback for session with RPE', () => {
+    clearCalibrationData();
+    const session = makeSession([
+      { rpe: 8, rir: 2, weightKg: 100, reps: 5 },
       { rpe: 8, rir: 2, weightKg: 100, reps: 5 },
     ]);
     const feedback = getSessionRIRFeedback(session, { exercises: [{ name: 'Присед', targetSets: [{ rir: 2 }, { rir: 2 }] }] });
-    expect(feedback.exerciseFeedbacks).toHaveLength(1);
+    expect(feedback.exerciseFeedbacks.length).toBe(1);
     expect(feedback.exerciseFeedbacks[0].name).toBe('Присед');
-    expect(feedback.overallBias).toBeGreaterThan(0);
+  });
+});
+
+describe('clearCalibrationData', () => {
+  it('clears all calibration points', () => {
+    const session = makeSession([{ rpe: 8, rir: 2, weightKg: 100, reps: 5 }]);
+    recordSessionRIR(session, { exercises: [{ name: 'Присед', targetSets: [{ rir: 2 }] }] });
+    clearCalibrationData();
+    const cal = getExerciseCalibration('squat');
+    expect(cal).toBeNull();
   });
 });

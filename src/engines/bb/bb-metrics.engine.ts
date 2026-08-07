@@ -67,9 +67,9 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
   const freqMapAll: Record<string, number> = {};
   const totalWeeks = plan.weeks.length || 1;
   for (const w of plan.weeks) {
-    for (const s of w.sessions) for (const ex of s.exercises) {
-      const muscle = normalizeBBMuscle(ex.muscle);
-      freqMapAll[muscle] = (freqMapAll[muscle] || 0) + 1;
+    for (const s of w.sessions) {
+      const musclesInSession = new Set(s.exercises.map(ex => normalizeBBMuscle(ex.muscle)));
+      for (const muscle of musclesInSession) freqMapAll[muscle] = (freqMapAll[muscle] || 0) + 1;
     }
   }
 

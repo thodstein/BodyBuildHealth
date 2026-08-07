@@ -215,7 +215,15 @@ export interface ExtractionResult {
  *  - Strip extra whitespace
  */
 function preprocessLine(line: string): string {
-  return line.trim().toLowerCase().replace(/,/g, '.').replace(/\s+/g, ' ');
+  return line.trim().toLowerCase()
+    .replace(/(?<=\d)[оo](?=\d|[.,])/g, '0')
+    .replace(/(?<=\d)[оo](?=\s|$)/g, '0')
+    .replace(/мк\s*моль\s*\/\s*л/g, 'мкмоль/л')
+    .replace(/м\s*[еe]д\s*\/\s*л/g, 'мЕд/л')
+    .replace(/мг\s*\/\s*дл/g, 'мг/дл')
+    .replace(/ммоль\s*\/\s*л/g, 'ммоль/л')
+    .replace(/,/g, '.')
+    .replace(/\s+/g, ' ');
 }
 
 /**

@@ -87,6 +87,9 @@ export interface WorkoutCSV {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const LOG_KEY = 'he_workout_log_v2';
+const PROGRESS_CACHE_KEY = 'he_workout_progress_cache';
+const STATS_CACHE_KEY = 'he_workout_stats_cache';
+const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
 
 export function loadSessions(): WorkoutSession[] {
   try {
@@ -96,8 +99,20 @@ export function loadSessions(): WorkoutSession[] {
   } catch { return []; }
 }
 
-function saveSessions(sessions: WorkoutSession[]) {
-  localStorage.setItem(LOG_KEY, JSON.stringify(sessions));
+export function saveSessions(sessions: WorkoutSession[]) {
+  try {
+    localStorage.setItem(LOG_KEY, JSON.stringify(sessions));
+  } catch (e: any) {
+    if (e?.name === 'QuotaExceededError' || String(e).includes('quota')) {
+      const trimmed = sessions.slice(0, 500);
+      try {
+        localStorage.setItem(LOG_KEY, JSON.stringify(trimmed));
+      } catch {
+        // final fallback: keep only last 100
+        localStorage.setItem(LOG_KEY, JSON.stringify(trimmed.slice(0, 100)));
+      }
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -142,13 +157,20 @@ export function logSet(
   previousBestWeight?: number,
 ): WorkoutSession {
   const exercises = [...session.exercises];
+  if (exerciseIndex >= exercises.length) return session;
   const ex = { ...exercises[exerciseIndex] };
 
-  // Check if PR
-  const isPR = previousBestWeight ? set.weightKg > previousBestWeight : ex.sets.length === 0 || set.weightKg > Math.max(...ex.sets.map(s => s.weightKg), 0);
-  const estimated1RM = epley1RM(set.weightKg, set.reps);
+  const weightKg = Math.max(0, Number(set.weightKg) || 0);
+  const reps = Math.max(0, Math.round(Number(set.reps) || 0));
+  const rpe = Math.max(0, Math.min(10, Number(set.rpe) || 0));
+  const rir = Math.max(0, Math.min(20, Number(set.rir) || 0));
 
-  ex.sets = [...ex.sets, { ...set, isPR }];
+  if (weightKg <= 0 || reps <= 0) return session;
+
+  const isPR = previousBestWeight ? weightKg > previousBestWeight : ex.sets.length === 0 || weightKg > Math.max(...ex.sets.map(s => s.weightKg), 0);
+  const estimated1RM = epley1RM(weightKg, reps);
+
+  ex.sets = [...ex.sets, { setNumber: set.setNumber, weightKg, reps, rpe, rir, isPR, notes: set.notes || '' }];
   ex.totalVolume = ex.sets.reduce((s, st) => s + st.weightKg * st.reps, 0);
   ex.best1RM = Math.max(ex.best1RM, estimated1RM);
   ex.avgRPE = Math.round(ex.sets.reduce((s, st) => s + st.rpe, 0) / ex.sets.length * 10) / 10;
@@ -369,4 +391,189 @@ export function getLastSession(): WorkoutSession | null {
 
 export function getSessionsByWeek(weekNumber: number): WorkoutSession[] {
   return loadSessions().filter(s => s.weekNumber === weekNumber);
+}
+
+export interface CachedProgress {
+  exerciseName: string;
+  bestWeight: number;
+  bestReps: number;
+  bestE1RM: number;
+  totalVolume: number;
+  totalSets: number;
+  sessions: number;
+  lastDate: string;
+  trend: 'up' | 'down' | 'stable';
+  weightDelta: number;
+  e1RMDelta: number;
+  cachedAt: number;
+}
+
+interface CachedStats {
+  totalSessions: number;
+  totalVolume: number;
+  totalSets: number;
+  totalReps: number;
+  prCount: number;
+  streak: number;
+  cachedAt: number;
+}
+
+function readCache<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    if (parsed?.cachedAt && Date.now() - parsed.cachedAt > CACHE_TTL) {
+      localStorage.removeItem(key);
+      return fallback;
+    }
+    return parsed?.data ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeCache<T>(key: string, data: T) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ data, cachedAt: Date.now() }));
+  } catch {}
+}
+
+export function cacheExerciseProgress(progress: CachedProgress[]) {
+  writeCache(PROGRESS_CACHE_KEY, progress);
+}
+
+export function loadCachedExerciseProgress(): CachedProgress[] {
+  return readCache<CachedProgress[]>(PROGRESS_CACHE_KEY, []);
+}
+
+export function cacheSessionStats(stats: Omit<CachedStats, 'cachedAt'>) {
+  writeCache(STATS_CACHE_KEY, { ...stats, cachedAt: Date.now() });
+}
+
+export function loadCachedSessionStats(): Omit<CachedStats, 'cachedAt'> | null {
+  const cached = readCache<CachedStats | undefined>(STATS_CACHE_KEY, undefined);
+  if (!cached || !cached.cachedAt) return null;
+  if (Date.now() - cached.cachedAt > CACHE_TTL) {
+    localStorage.removeItem(STATS_CACHE_KEY);
+    return null;
+  }
+  const { cachedAt, ...rest } = cached;
+  return rest;
+}
+
+export function getCachedProgressForExercise(name: string): CachedProgress | null {
+  const all = loadCachedExerciseProgress();
+  const exact = all.find(p => p.exerciseName.toLowerCase() === name.toLowerCase());
+  if (exact) return exact;
+  const partial = all.find(p => name.toLowerCase().includes(p.exerciseName.toLowerCase()) || p.exerciseName.toLowerCase().includes(name.toLowerCase()));
+  return partial ?? null;
+}
+
+export interface ExerciseProgress {
+  exerciseName: string;
+  firstDate: string;
+  lastDate: string;
+  sessions: number;
+  totalSets: number;
+  totalVolume: number;
+  bestWeight: number;
+  bestReps: number;
+  bestE1RM: number;
+  avgRPE: number;
+  trend: 'up' | 'down' | 'stable';
+  weightDelta: number;
+  e1RMDelta: number;
+}
+
+export function getExerciseProgress(name: string, limit: number = 20): ExerciseProgress | null {
+  const sessions = loadSessions().slice(0, limit);
+  const sets: { weightKg: number; reps: number; rpe: number; date: string }[] = [];
+  let firstDate = '';
+  let lastDate = '';
+  for (const sess of sessions) {
+    if (!Array.isArray(sess.exercises)) continue;
+    for (const ex of sess.exercises) {
+      if (!ex || !ex.sets?.length) continue;
+      const matches = ex.exerciseName.toLowerCase().includes(name.toLowerCase()) ||
+        ex.exerciseId.toLowerCase().includes(name.toLowerCase());
+      if (!matches) continue;
+      firstDate = firstDate ? (sess.date < firstDate ? sess.date : firstDate) : sess.date;
+      lastDate = lastDate ? (sess.date > lastDate ? sess.date : lastDate) : sess.date;
+      for (const st of ex.sets) {
+        sets.push({ weightKg: st.weightKg, reps: st.reps, rpe: st.rpe, date: sess.date });
+      }
+    }
+  }
+  if (!sets.length) return null;
+  const bestWeight = Math.max(...sets.map(s => s.weightKg));
+  const bestReps = Math.max(...sets.map(s => s.reps));
+  const bestE1RM = Math.max(...sets.map(s => epley1RM(s.weightKg, s.reps)));
+  const avgRPE = sets.filter(s => s.rpe > 0).reduce((a, s) => a + s.rpe, 0) / sets.filter(s => s.rpe > 0).length || 0;
+  const half = Math.floor(sets.length / 2);
+  const firstHalf = sets.slice(0, half);
+  const secondHalf = sets.slice(-half || sets.length);
+  const firstAvgE1RM = firstHalf.reduce((a, s) => a + epley1RM(s.weightKg, s.reps), 0) / firstHalf.length;
+  const secondAvgE1RM = secondHalf.reduce((a, s) => a + epley1RM(s.weightKg, s.reps), 0) / secondHalf.length;
+  const e1RMDelta = Number((secondAvgE1RM - firstAvgE1RM).toFixed(1));
+  const firstAvgWeight = firstHalf.reduce((a, s) => a + s.weightKg, 0) / firstHalf.length;
+  const secondAvgWeight = secondHalf.reduce((a, s) => a + s.weightKg, 0) / secondHalf.length;
+  const weightDelta = Number((secondAvgWeight - firstAvgWeight).toFixed(1));
+  const trend = e1RMDelta > 1 ? 'up' : e1RMDelta < -1 ? 'down' : 'stable';
+  return {
+    exerciseName: name,
+    firstDate, lastDate, sessions: new Set(sets.map(s => s.date)).size,
+    totalSets: sets.length, totalVolume: sets.reduce((a, s) => a + s.weightKg * s.reps, 0),
+    bestWeight, bestReps, bestE1RM, avgRPE: Number(avgRPE.toFixed(1)), trend, weightDelta, e1RMDelta,
+  };
+}
+
+export interface VolumeTrendDay {
+  date: string;
+  volume: number;
+  sets: number;
+  sessions: number;
+}
+
+export function getVolumeTrend(days: number = 14): VolumeTrendDay[] {
+  const sessions = loadSessions().slice(0, days);
+  const map = new Map<string, { volume: number; sets: number; sessions: number }>();
+  for (const sess of sessions) {
+    const cur = map.get(sess.date) || { volume: 0, sets: 0, sessions: 0 };
+    map.set(sess.date, {
+      volume: cur.volume + sess.totalVolume,
+      sets: cur.sets + sess.totalSets,
+      sessions: cur.sessions + 1,
+    });
+  }
+  return Array.from(map.entries())
+    .map(([date, data]) => ({ date, ...data }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export interface SessionComparison {
+  older: WorkoutSession | null;
+  newer: WorkoutSession | null;
+  volumeDelta: number;
+  setsDelta: number;
+  repsDelta: number;
+  intensityDelta: number;
+}
+
+export function compareWithPrevious(session: WorkoutSession): SessionComparison {
+  const sessions = loadSessions();
+  const idx = sessions.findIndex(s => s.sessionId === session.sessionId);
+  const newer = session;
+  const older = idx >= 0 && idx + 1 < sessions.length ? sessions[idx + 1] : null;
+  if (!older) {
+    return { older: null, newer, volumeDelta: 0, setsDelta: 0, repsDelta: 0, intensityDelta: 0 };
+  }
+  return {
+    older,
+    newer,
+    volumeDelta: Number((newer.totalVolume - older.totalVolume).toFixed(0)),
+    setsDelta: newer.totalSets - older.totalSets,
+    repsDelta: newer.totalReps - older.totalReps,
+    intensityDelta: Number((newer.avgIntensity - older.avgIntensity).toFixed(1)),
+  };
 }

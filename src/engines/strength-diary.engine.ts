@@ -67,6 +67,16 @@ export class StrengthDiary {
   #workoutLogsCache: { data: WorkoutLog[]; ts: number } | null = null;
   #CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+  constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (e: StorageEvent) => {
+        if (e.key === 'he_workout_log_v2') {
+          this.#workoutLogsCache = null;
+        }
+      });
+    }
+  }
+
   /**
     * Get all workout logs (cached for 5 minutes)
     */

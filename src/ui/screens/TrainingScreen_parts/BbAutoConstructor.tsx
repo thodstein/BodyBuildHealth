@@ -2996,8 +2996,9 @@ export const BbAutoConstructor: React.FC = () => {
         <button onClick={() => setStep('annual')} title="Годовое планирование" aria-label="Открыть годовой план" style={{ padding:'9px 12px', borderRadius:12, fontSize:16, cursor:'pointer', border:'1px solid rgba(0,230,138,0.35)', background:'rgba(0,230,138,0.08)', color:'#00e68a', minWidth:44, minHeight:44, flexShrink:0 }}>🗓</button>
       </div>
       {showTools && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding: 8 }} onClick={() => setShowTools(false)}>
+        <div className="bb-tools-modal-backdrop" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding: 8 }} onClick={() => setShowTools(false)}>
           <div
+            className="bb-tools-modal-dialog"
             role="dialog"
             aria-label="Библиотека инструментов"
             onClick={e => e.stopPropagation()}

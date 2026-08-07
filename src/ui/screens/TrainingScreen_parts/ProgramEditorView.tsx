@@ -31,7 +31,7 @@ import { autoFillDraftDispatch, type AutoFillCtx } from './auto-fill-draft';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { designerToUserWeeks, applyDesignPhasesToWeeks } from '../../../engines/periodization/designer-to-program';
 import { macrocycleToBBProgram } from '../../../engines/lms/macrocycle-to-bb';
-import { deserializeMacro } from '../../../engines/lms/macrocycle.engine';
+import { deserializeMacro, deserializeBbMacro } from '../../../engines/lms/macrocycle.engine';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle, BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, UI_METRICS } from './training-ui';
@@ -778,7 +778,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
                   if (!raw) {
                     showToast('⚠ Годовой план не найден — постройте макроцикл сначала');
                   } else {
-                    const macro = deserializeMacro(raw);
+                    const macro = rawBB ? deserializeBbMacro(raw) : deserializeMacro(raw);
                     if (!macro) {
                       showToast('⚠ Годовой план повреждён — пересоберите в MacrocyclePanel');
                     } else {
@@ -813,7 +813,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
                   if (!raw) {
                     showToast('⚠ Годовой план не найден — постройте макроцикл сначала');
                   } else {
-                    const macro = deserializeMacro(raw);
+                    const macro = rawBB ? deserializeBbMacro(raw) : deserializeMacro(raw);
                     if (!macro) {
                       showToast('⚠ Годовой план повреждён — пересоберите в MacrocyclePanel');
                     } else {

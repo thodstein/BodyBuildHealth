@@ -168,6 +168,14 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   const [selectedLabs, setSelectedLabs] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const ocrRequestRef = useRef(0);
+  const cancelOcr = useCallback(() => {
+    ocrRequestRef.current += 1;
+    setOcrLoading(false);
+    setOcrResult(null);
+    setSelectedLabs(new Set());
+    setShowImport(false);
+  }, []);
   const [chartMarkerSearch, setChartMarkerSearch] = useState('');
   const [chartSelectedCodes, setChartSelectedCodes] = useState<Set<string>>(new Set());
   const [chartFilterSys, setChartFilterSys] = useState('all');
@@ -477,17 +485,20 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   }, [inputCode, inputValue, inputUnit, inputDate, selectedPhase]);
 
   const handleFileUpload = useCallback(async (file: File) => {
+    const requestId = ++ocrRequestRef.current;
     setOcrLoading(true);
     setOcrResult(null);
     setSelectedLabs(new Set());
     try {
       const result = await processUploadedFile(file);
+      if (requestId !== ocrRequestRef.current) return;
       setOcrResult(result);
       if (result.labs.length > 0) setSelectedLabs(new Set(result.labs.map(l => l.code)));
     } catch (e: any) {
+      if (requestId !== ocrRequestRef.current) return;
       setOcrResult({ text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['' + (e?.message || String(e))] });
     }
-    setOcrLoading(false);
+    if (requestId === ocrRequestRef.current) setOcrLoading(false);
   }, []);
 
   const confirmOcrLabs = useCallback(async () => {
@@ -812,9 +823,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           {/* Import buttons — PDF + Фото */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
             <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: 'none' }}
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
+              onChange={e => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) handleFileUpload(f); }} />
             <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
+              onChange={e => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) handleFileUpload(f); }} />
             <button onClick={() => { setShowImport(true); setTimeout(() => fileInputRef.current?.click(), 100); }} style={{
               flex: 1, padding: 8, borderRadius: 8, border: '1px solid var(--border)',
               background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
@@ -1613,11 +1624,11 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
       {/* OCR Import Modal — centered */}
       {showImport && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => { setShowImport(false); setOcrResult(null); }}>
+         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={cancelOcr}>
           <div style={{ width: '100%', maxWidth: 480, zIndex: 201, background: 'var(--bg)', borderRadius: 20, maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <span style={{ fontWeight: 700, fontSize: 16 }}>📄 Импорт анализов</span>
-              <button onClick={() => { setShowImport(false); setOcrResult(null); }} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>✕</button>
+               <button onClick={cancelOcr} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>✕</button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', maxHeight: '70vh' }}>
               {ocrLoading && (
@@ -1668,17 +1679,29 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     <span style={{ fontWeight: 700, fontSize: 13 }}>{ocrResult.labs.length > 0 ? `✅ Найдено: ${ocrResult.labs.length}` : '⚠️ Не найдено'}</span>
                     <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{Math.round(ocrResult.confidence * 100)}%</span>
                   </div>
+                  {ocrResult.warnings.length > 0 && (
+                    <div role="alert" style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)', color: '#f59e0b', fontSize: 11, lineHeight: 1.4 }}>
+                      {ocrResult.warnings.map((warning, index) => <div key={`${index}-${warning}`}>⚠ {warning}</div>)}
+                    </div>
+                  )}
                   {ocrResult.labs.map(lab => {
                     const isSelected = selectedLabs.has(lab.code);
                     return (
-                      <button key={lab.code} onClick={() => toggleLabSelection(lab.code)} style={{
-                        display: 'flex', justifyContent: 'space-between', width: '100%', padding: '8px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer',
-                        background: isSelected ? 'rgba(0,230,138,0.1)' : 'var(--bg-secondary)',
-                        border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
-                      }}>
-                        <span style={{ fontWeight: 600, fontSize: 12 }}>{isSelected ? '✓ ' : '○ '}{lab.name || lab.code}</span>
-                        <span style={{ fontWeight: 700, fontSize: 13, color: lab.isAbnormal ? '#ef4444' : 'var(--accent)' }}>{lab.value} {lab.unit}</span>
-                      </button>
+                      <>
+                        <button key={lab.code} onClick={() => toggleLabSelection(lab.code)} style={{
+                          display: 'flex', justifyContent: 'space-between', width: '100%', padding: '8px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer',
+                          background: isSelected ? 'rgba(0,230,138,0.1)' : 'var(--bg-secondary)',
+                          border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                        }}>
+                          <span style={{ fontWeight: 600, fontSize: 12 }}>{isSelected ? '✓ ' : '○ '}{lab.name || lab.code}</span>
+                          <span style={{ fontWeight: 700, fontSize: 13, color: lab.isAbnormal ? '#ef4444' : 'var(--accent)' }}>{lab.value} {lab.unit}</span>
+                        </button>
+                        {lab.raw && !/^(?:error|warning|invalid pdf|pdf parsing)/i.test(lab.raw.trim()) && (
+                          <div style={{ margin: '-2px 4px 6px', fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.3 }}>
+                            {lab.refLow !== undefined || lab.refHigh !== undefined ? `Норма: ${lab.refLow ?? '—'}–${lab.refHigh ?? '—'} · ` : ''}Источник: {lab.raw}
+                          </div>
+                        )}
+                      </>
                     );
                   })}
                   <button onClick={confirmOcrLabs} disabled={selectedLabs.size === 0} style={{

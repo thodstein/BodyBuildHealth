@@ -44,7 +44,9 @@ function getJointStress(exercise: BBExercise): number {
   if (!catalog) return 5;
   const stressMap: Record<string, number> = { low: 3, med: 6, high: 10 };
   const base = stressMap[catalog.jointStress || 'med'] || 6;
-  return base * exercise.sets;
+  const rir = Math.max(0, Math.min(5, exercise.rir ?? 2));
+  const proximityMultiplier = 1 + Math.max(0, 2 - rir) * 0.15;
+  return base * exercise.sets * proximityMultiplier;
 }
 
 function getJointsForMuscle(muscle: string): string[] {

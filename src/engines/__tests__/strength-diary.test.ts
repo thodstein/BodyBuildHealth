@@ -161,4 +161,69 @@ describe('StrengthDiary.checkProgressionAlerts', () => {
     expect(plateau).toBeDefined();
     expect(plateau?.exerciseId).toBe('squat');
   });
+
+  it('returns empty alerts for insufficient data', async () => {
+    const mockDb = getMockDb();
+    mockDb.getAll.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    const diary = new StrengthDiary();
+    const alerts = await diary.checkProgressionAlerts();
+    expect(alerts).toEqual([]);
+  });
+});
+
+describe('StrengthDiary.getExerciseStats', () => {
+  it('returns stats for exercise with logs', async () => {
+    const mockDb = getMockDb();
+    const logs: StrengthLogEntry[] = [
+      { id: '1', date: '2026-07-01', exerciseId: 'squat', exerciseName: 'Присед', sets: [{ weight: 100, reps: 5, rir: 2, rpe: 8 }], totalVolume: 500, estimated1RM: 117, isCompound: true },
+      { id: '2', date: '2026-07-08', exerciseId: 'squat', exerciseName: 'Присед', sets: [{ weight: 105, reps: 5, rir: 2, rpe: 8 }], totalVolume: 525, estimated1RM: 121, isCompound: true },
+    ];
+
+    mockDb.getAll.mockImplementation((store: string) => {
+      if (store === 'training_log') return Promise.resolve(logs);
+      if (store === 'workout_log') return Promise.resolve([]);
+      return Promise.resolve([]);
+    });
+
+    const diary = new StrengthDiary();
+    const stats = await diary.getExerciseStats('squat');
+
+    expect(stats.exerciseId).toBe('squat');
+    expect(stats.maxWeight).toBe(105);
+    expect(stats.max1RM).toBeGreaterThan(100);
+    expect(stats.workoutCount).toBe(2);
+  });
+
+  it('returns empty stats for unknown exercise', async () => {
+    const mockDb = getMockDb();
+    mockDb.getAll.mockImplementation((store: string) => Promise.resolve([]));
+
+    const diary = new StrengthDiary();
+    const stats = await diary.getExerciseStats('unknown_exercise');
+
+    expect(stats).toBeNull();
+  });
+});
+
+describe('StrengthDiary.getRecentActivity', () => {
+  it('returns recent activity', async () => {
+    const mockDb = getMockDb();
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const logs: StrengthLogEntry[] = [
+      { id: '1', date: yesterday, exerciseId: 'squat', exerciseName: 'Присед', sets: [{ weight: 100, reps: 5, rir: 2, rpe: 8 }], totalVolume: 500, estimated1RM: 117, isCompound: true },
+    ];
+
+    mockDb.getAll.mockImplementation((store: string) => {
+      if (store === 'training_log') return Promise.resolve(logs);
+      if (store === 'workout_log') return Promise.resolve([]);
+      return Promise.resolve([]);
+    });
+
+    const diary = new StrengthDiary();
+    const activity = await diary.getRecentActivity(7);
+
+    expect(activity.length).toBeGreaterThanOrEqual(1);
+    expect(activity[0].date).toBe(yesterday);
+  });
 });
