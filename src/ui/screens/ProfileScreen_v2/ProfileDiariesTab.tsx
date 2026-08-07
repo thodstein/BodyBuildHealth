@@ -976,7 +976,6 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
   const [diaryRange, setDiaryRange] = useState<'all' | '7' | '30' | '90'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
-  const [pendingNav, setPendingNav] = useState<QuickLink | null>(null);
 
   const pushUndo = (label: string, undo: () => void) => {
     setUndoAction({ label, undo, expiresAt: Date.now() + 5000 });
@@ -1512,7 +1511,7 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
     return list;
   };
 
-  const QuickLinkRow: React.FC<{ links: QuickLink[]; ariaLabel: string; onPick?: (link: QuickLink) => void }> = ({ links, ariaLabel, onPick }) => (
+  const QuickLinkRow: React.FC<{ links: QuickLink[]; ariaLabel: string }> = ({ links, ariaLabel }) => (
     <div
       role="navigation"
       aria-label={ariaLabel}
@@ -1521,7 +1520,7 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
       {links.map(link => (
         <button
           key={link.target}
-          onClick={() => (onPick ? onPick(link) : onNavigate?.(link.target))}
+          onClick={() => onNavigate?.(link.target)}
           aria-label={`Открыть ${link.label}: ${link.desc || ''}`}
           style={{
             display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
@@ -1750,7 +1749,7 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
         icon="🔗"
         color={colors.blue}
       >
-        <QuickLinkRow links={QUICK_DIARY_LINKS} ariaLabel="Дневники в других блоках" onPick={setPendingNav} />
+        <QuickLinkRow links={QUICK_DIARY_LINKS} ariaLabel="Дневники в других блоках" />
       </AccordionSection>
 
       <AccordionSection
@@ -2004,7 +2003,7 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
         icon="📊"
         color={colors.teal}
       >
-        <QuickLinkRow links={QUICK_REPORT_LINKS} ariaLabel="Отчёты по модулям" onPick={setPendingNav} />
+        <QuickLinkRow links={QUICK_REPORT_LINKS} ariaLabel="Отчёты по модулям" />
       </AccordionSection>
 
       <AddSleepModal
@@ -2115,61 +2114,6 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
         }
       `}</style>
       <Snackbar action={undoAction} onDismiss={dismissUndo} />
-
-      {/* Модалка подтверждения перехода в другой блок */}
-      {pendingNav && (
-        <div
-          onClick={() => setPendingNav(null)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Перейти в другой блок"
-          style={{
-            position: 'fixed', inset: 0, zIndex: 1000,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
-            padding: 16,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: 'min(380px, 92vw)',
-              background: '#1a1a1d', border: `1px solid ${pendingNav.color}66`,
-              borderRadius: 16, padding: 20,
-              color: colors.text, boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <div style={{
-                width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: `${pendingNav.color}26`, border: `1px solid ${pendingNav.color}55`, fontSize: 22,
-              }}>{pendingNav.icon}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: pendingNav.color }}>{pendingNav.label}</div>
-                <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>Переход в другой блок</div>
-              </div>
-            </div>
-            {pendingNav.desc && (
-              <div style={{ fontSize: 12, color: colors.text, lineHeight: 1.4, marginBottom: 14, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
-                {pendingNav.desc}
-              </div>
-            )}
-            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 14, lineHeight: 1.4 }}>
-              ⚠ Вкладка «Дневники» в Профиле закроется. Все локальные записи профильных дневников останутся в браузере.
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => setPendingNav(null)}
-                style={{ flex: 1, minHeight: 40, padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: 'transparent', color: colors.text, border: `1px solid ${colors.border}`, cursor: 'pointer' }}
-              >Отмена</button>
-              <button
-                onClick={() => { if (pendingNav && onNavigate) { onNavigate(pendingNav.target); setPendingNav(null); } }}
-                style={{ flex: 1, minHeight: 40, padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, background: pendingNav.color, color: '#0a0a0a', border: 'none', cursor: 'pointer' }}
-              >Открыть</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
