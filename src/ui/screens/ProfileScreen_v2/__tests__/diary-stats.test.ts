@@ -17,6 +17,9 @@ import {
   dailyCompletion,
   defaultGoals,
   todayIso,
+  computePace,
+  currentStreak,
+  PACE_TARGETS,
   type DiaryKey,
 } from '../diary-helpers';
 
@@ -351,5 +354,66 @@ describe('dailyCompletion', () => {
     const r = dailyCompletion([]);
     expect(r.filled).toBe(0);
     expect(r.pct).toBe(0);
+  });
+});
+
+
+describe('computePace', () => {
+  it('возвращает null для дневника без темп-цели', () => {
+    const r = computePace('injection' as DiaryKey, []);
+    expect(r).toBeNull();
+  });
+  it('считает прогресс по окну (например, 5 из 7 дней)', () => {
+    const today = new Date();
+    const last7 = Array.from({ length: 5 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      return { date: d.toISOString().slice(0, 10) };
+    });
+    const r = computePace('sleep' as DiaryKey, last7);
+    expect(r).not.toBeNull();
+    expect(r!.achieved).toBe(5);
+    expect(r!.needed).toBe(5);
+    expect(r!.ok).toBe(true);
+    expect(r!.pct).toBe(100);
+  });
+  it('ok=false если недостаточно дней', () => {
+    const r = computePace('sleep' as DiaryKey, [{ date: new Date().toISOString().slice(0, 10) }]);
+    expect(r!.achieved).toBe(1);
+    expect(r!.ok).toBe(false);
+  });
+  it('игнорирует записи вне окна', () => {
+    const old = new Date();
+    old.setDate(old.getDate() - 30);
+    const r = computePace('sleep' as DiaryKey, [{ date: old.toISOString().slice(0, 10) }]);
+    expect(r!.achieved).toBe(0);
+  });
+  it('PACE_TARGETS содержит ожидаемые ключи', () => {
+    expect(PACE_TARGETS.sleep).toBeDefined();
+    expect(PACE_TARGETS.bp).toBeDefined();
+    expect(PACE_TARGETS.injection).toBeUndefined();
+  });
+});
+
+describe('currentStreak', () => {
+  it('возвращает 0 для пустого массива', () => {
+    expect(currentStreak([])).toBe(0);
+  });
+  it('считает серию дней подряд', () => {
+    const today = new Date();
+    const dates = Array.from({ length: 4 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      return { date: d.toISOString().slice(0, 10) };
+    });
+    expect(currentStreak(dates)).toBe(4);
+  });
+  it('серия обрывается при разрыве', () => {
+    const today = new Date();
+    const d1 = new Date(today); d1.setDate(d1.getDate() - 0);
+    const d2 = new Date(today); d2.setDate(d2.getDate() - 1);
+    const d4 = new Date(today); d4.setDate(d4.getDate() - 3);
+    const r = currentStreak([{ date: d1.toISOString().slice(0, 10) }, { date: d2.toISOString().slice(0, 10) }, { date: d4.toISOString().slice(0, 10) }]);
+    expect(r).toBe(2);
   });
 });

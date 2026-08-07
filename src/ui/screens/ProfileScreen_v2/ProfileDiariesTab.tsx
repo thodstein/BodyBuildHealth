@@ -20,6 +20,8 @@ import {
   crossCorrelation,
   laggedCorrelation,
   dailyCompletion,
+  computePace,
+  currentStreak,
   type SortState,
   type SortDir,
   computeSummary,
@@ -1843,9 +1845,45 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 14,
                     }}
-                  >{DIARY_META[k.key].icon}</div>
+                    >{DIARY_META[k.key].icon}</div>
                 );
               })}
+            </div>
+            {/* Темп-цели и streak-карта */}
+            <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 4 }}>
+              {(() => {
+                const items: { key: DiaryKey; label: string; icon: string; color: string; streak: number; pace: { achieved: number; needed: number; pct: number; ok: boolean } | null }[] = [];
+                for (const k of completionKeys) {
+                  if (k.key === 'injection' || k.key === 'symptoms') continue;
+                  const arr = getEntryArray(k.key);
+                  const streak = currentStreak(arr);
+                  const pace = computePace(k.key, arr);
+                  if (pace || streak > 0) {
+                    items.push({
+                      key: k.key, label: DIARY_META[k.key].title, icon: DIARY_META[k.key].icon, color: DIARY_META[k.key].color,
+                      streak,
+                      pace: pace ? { achieved: pace.achieved, needed: pace.needed, pct: pace.pct, ok: pace.ok } : null,
+                    });
+                  }
+                }
+                return items.map(it => (
+                  <div key={it.key} style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${it.color}22` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: 12 }}>{it.icon}</span>
+                      <span style={{ fontSize: 9, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>{it.label}</span>
+                    </div>
+                    {it.streak > 0 && <div style={{ fontSize: 10, color: it.color, fontWeight: 700, marginTop: 2 }}>🔥 Серия: {it.streak} дн.</div>}
+                    {it.pace && (
+                      <div style={{ marginTop: 3 }}>
+                        <div style={{ fontSize: 8, color: colors.textMuted }}>Темп: {it.pace.achieved}/{it.pace.needed} дн.</div>
+                        <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginTop: 2 }}>
+                          <div style={{ height: '100%', width: `${Math.min(100, it.pace.pct)}%`, background: it.pace.ok ? '#22c55e' : it.color }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ));
+              })()}
             </div>
           </div>
         );

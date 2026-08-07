@@ -521,6 +521,73 @@ export const dailyCompletion = (
   return { filled, total: keys.length, pct: keys.length > 0 ? Math.round((filled / keys.length) * 100) : 0, missing };
 };
 
+// ─── Темп-цели: «спать ≥7ч минимум 5 дней из 7 последних» ─────────────
+
+export interface PaceTarget {
+  weeklyDays: number;   // сколько дней за неделю (1..7)
+  windowDays: number;   // сколько дней рассматриваем (обычно 7)
+}
+
+export const PACE_TARGETS: Partial<Record<DiaryKey, PaceTarget>> = {
+  sleep: { weeklyDays: 5, windowDays: 7 },
+  weight: { weeklyDays: 3, windowDays: 7 },
+  bp: { weeklyDays: 3, windowDays: 7 },
+  measurements: { weeklyDays: 1, windowDays: 14 },
+  pain: { weeklyDays: 3, windowDays: 7 },
+  neuro: { weeklyDays: 3, windowDays: 7 },
+  acne: { weeklyDays: 3, windowDays: 7 },
+  hemato: { weeklyDays: 3, windowDays: 7 },
+};
+
+export const computePace = (
+  key: DiaryKey,
+  entries: { date: string }[]
+): { target: PaceTarget | null; achieved: number; needed: number; pct: number; ok: boolean } | null => {
+  const t = PACE_TARGETS[key];
+  if (!t) return null;
+  const now = Date.now();
+  const cutoff = now - t.windowDays * 86400000;
+  const inWindow = entries.filter(e => {
+    const d = Date.parse(e.date);
+    return Number.isFinite(d) && d >= cutoff;
+  });
+  // Считаем уникальные дни
+  const uniqDays = new Set(inWindow.map(e => e.date));
+  return {
+    target: t,
+    achieved: uniqDays.size,
+    needed: t.weeklyDays,
+    pct: Math.round((uniqDays.size / t.weeklyDays) * 100),
+    ok: uniqDays.size >= t.weeklyDays,
+  };
+};
+
+// ─── Streak (серия дней подряд) ──────────────────────────────────────
+
+export const currentStreak = (
+  entries: { date: string }[]
+): number => {
+  if (entries.length === 0) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = new Set(entries.map(e => e.date));
+  let streak = 0;
+  const cursor = new Date(today);
+  while (days.has(localDateKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  // Если сегодня нет, проверяем вчера (если вчера есть, сегодня просто пропустили)
+  if (streak === 0) {
+    cursor.setDate(today.getDate() - 1);
+    while (days.has(localDateKey(cursor))) {
+      streak += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+  }
+  return streak;
+};
+
 // ─── Статистика распределения ──────────────────────────────────────────────
 
 export interface DistributionStats {
