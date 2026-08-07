@@ -14,6 +14,11 @@ import {
   computeExtremes,
   groupEntriesByPeriod,
   buildSparkline,
+  compareWithLastWeek,
+  sortEntries,
+  paginate,
+  type SortState,
+  type SortDir,
   computeSummary,
   targetHit,
   detectAnomalies,
@@ -890,6 +895,137 @@ const Snackbar: React.FC<{ action: UndoAction | null; onDismiss: () => void }> =
   );
 };
 
+/** Полноценный SVG-график с осями, сеткой, зонами нормы, target-линией, аннотациями и экспортом. */
+const FullChart: React.FC<{
+  points: { date: string; value: number }[];
+  color: string;
+  target?: number | null;
+  normalRange?: { low: number; high: number; warnLow?: number; warnHigh?: number } | null;
+  yMin?: number | null;
+  yMax?: number | null;
+  height?: number;
+  unit?: string;
+  onExportPng?: (svg: SVGSVGElement) => void;
+  onExportSvg?: (svg: SVGSVGElement) => void;
+}> = ({ points, color, target, normalRange, yMin, yMax, height = 200, unit = '', onExportPng, onExportSvg }) => {
+  const svgRef = React.useRef<SVGSVGElement | null>(null);
+  if (points.length < 1) return <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, textAlign: 'center', padding: 20 }}>Нет данных для графика</div>;
+  const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
+  const values = sorted.map(p => p.value);
+  const PAD = { l: 40, r: 16, t: 20, b: 28 };
+  const W = 600, H = height;
+  const innerW = W - PAD.l - PAD.r;
+  const innerH = H - PAD.t - PAD.b;
+  let vMin = yMin !== null && yMin !== undefined ? yMin : Math.min(...values);
+  let vMax = yMax !== null && yMax !== undefined ? yMax : Math.max(...values);
+  if (normalRange) {
+    if (normalRange.warnLow !== undefined && normalRange.warnLow < vMin) vMin = normalRange.warnLow;
+    if (normalRange.warnHigh !== undefined && normalRange.warnHigh > vMax) vMax = normalRange.warnHigh;
+    if (normalRange.low < vMin) vMin = normalRange.low;
+    if (normalRange.high > vMax) vMax = normalRange.high;
+  }
+  if (target !== null && target !== undefined) {
+    if (target < vMin) vMin = target;
+    if (target > vMax) vMax = target;
+  }
+  let range = vMax - vMin;
+  if (range === 0) range = Math.max(Math.abs(vMax) * 0.2, 1);
+  const padding = range * 0.08;
+  vMin -= padding;
+  vMax += padding;
+  range = vMax - vMin;
+  const stepX = sorted.length === 1 ? 0 : innerW / (sorted.length - 1);
+  const toX = (i: number) => PAD.l + i * stepX;
+  const toY = (v: number) => PAD.t + innerH - ((v - vMin) / range) * innerH;
+  const yTicks = 4;
+  const yLabels: { y: number; v: number }[] = [];
+  for (let i = 0; i <= yTicks; i++) {
+    const v = vMin + (range * i) / yTicks;
+    yLabels.push({ y: toY(v), v });
+  }
+  const xLabelStep = Math.max(1, Math.ceil(sorted.length / 6));
+  const xLabels: { x: number; label: string }[] = [];
+  for (let i = 0; i < sorted.length; i += xLabelStep) {
+    const d = new Date(sorted[i].date);
+    xLabels.push({ x: toX(i), label: d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) });
+  }
+  if (xLabels.length && (sorted.length - 1) % xLabelStep !== 0) {
+    const lastD = new Date(sorted[sorted.length - 1].date);
+    xLabels.push({ x: toX(sorted.length - 1), label: lastD.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) });
+  }
+  const pathD = sorted.map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(i).toFixed(1)} ${toY(p.value).toFixed(1)}`).join(' ');
+  const yNormalLow = normalRange ? toY(normalRange.low) : null;
+  const yNormalHigh = normalRange ? toY(normalRange.high) : null;
+  const yWarnLow = normalRange?.warnLow !== undefined ? toY(normalRange.warnLow) : null;
+  const yWarnHigh = normalRange?.warnHigh !== undefined ? toY(normalRange.warnHigh) : null;
+  return (
+    <div style={{ width: '100%' }}>
+      {(onExportPng || onExportSvg) && (
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginBottom: 4 }}>
+          {onExportSvg && <button onClick={() => svgRef.current && onExportSvg(svgRef.current)} style={{ padding: '3px 8px', fontSize: 10, borderRadius: 5, background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa', cursor: 'pointer', fontWeight: 600 }}>📄 SVG</button>}
+          {onExportPng && <button onClick={() => svgRef.current && onExportPng(svgRef.current)} style={{ padding: '3px 8px', fontSize: 10, borderRadius: 5, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a', cursor: 'pointer', fontWeight: 600 }}>🖼 PNG</button>}
+        </div>
+      )}
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label="График значений по датам" style={{ display: 'block' }}>
+        {normalRange && yNormalLow !== null && yNormalHigh !== null && (
+          <rect x={PAD.l} y={Math.min(yNormalLow, yNormalHigh)} width={innerW} height={Math.abs(yNormalLow - yNormalHigh)} fill="rgba(34,197,94,0.12)" />
+        )}
+        {normalRange && yWarnLow !== null && yWarnHigh !== null && yNormalHigh !== null && (
+          <rect x={PAD.l} y={yWarnHigh} width={innerW} height={Math.abs(yWarnHigh - yNormalHigh)} fill="rgba(245,158,11,0.1)" />
+        )}
+        {normalRange && yWarnLow !== null && yNormalLow !== null && (
+          <rect x={PAD.l} y={yNormalLow} width={innerW} height={Math.abs(yWarnLow - yNormalLow)} fill="rgba(245,158,11,0.1)" />
+        )}
+        {yLabels.map((t, i) => (
+          <g key={`y-${i}`}>
+            <line x1={PAD.l} y1={t.y} x2={W - PAD.r} y2={t.y} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+            <text x={PAD.l - 6} y={t.y + 3} fontSize="10" fill="rgba(255,255,255,0.6)" textAnchor="end">{t.v.toFixed(Math.abs(t.v) >= 100 ? 0 : 1)}</text>
+          </g>
+        ))}
+        <line x1={PAD.l} y1={PAD.t} x2={PAD.l} y2={H - PAD.b} stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+        <line x1={PAD.l} y1={H - PAD.b} x2={W - PAD.r} y2={H - PAD.b} stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+        {xLabels.map((l, i) => (
+          <text key={`x-${i}`} x={l.x} y={H - 8} fontSize="9" fill="rgba(255,255,255,0.55)" textAnchor="middle">{l.label}</text>
+        ))}
+        {target !== null && target !== undefined && target >= vMin && target <= vMax && (
+          <g>
+            <line x1={PAD.l} y1={toY(target)} x2={W - PAD.r} y2={toY(target)} stroke="#22c55e" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.8" />
+            <text x={W - PAD.r - 4} y={toY(target) - 4} fontSize="9" fill="#22c55e" textAnchor="end" fontWeight="700">🎯 цель {target.toFixed(1)}</text>
+          </g>
+        )}
+        {(() => {
+          const minV = Math.min(...values);
+          const maxV = Math.max(...values);
+          const minIdx = values.findIndex(v => v === minV);
+          const maxIdx = values.findIndex(v => v === maxV);
+          return (
+            <>
+              {minIdx >= 0 && (
+                <g>
+                  <circle cx={toX(minIdx)} cy={toY(minV)} r="4" fill="#22c55e" stroke="#fff" strokeWidth="1.5" />
+                  <text x={toX(minIdx)} y={toY(minV) - 8} fontSize="9" fill="#22c55e" textAnchor="middle" fontWeight="700">▼{minV.toFixed(1)}</text>
+                </g>
+              )}
+              {maxIdx >= 0 && maxIdx !== minIdx && (
+                <g>
+                  <circle cx={toX(maxIdx)} cy={toY(maxV)} r="4" fill="#ef4444" stroke="#fff" strokeWidth="1.5" />
+                  <text x={toX(maxIdx)} y={toY(maxV) - 8} fontSize="9" fill="#ef4444" textAnchor="middle" fontWeight="700">▲{maxV.toFixed(1)}</text>
+                </g>
+              )}
+            </>
+          );
+        })()}
+        <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        {sorted.map((p, i) => (
+          <circle key={`pt-${i}`} cx={toX(i)} cy={toY(p.value)} r="2.5" fill={color}>
+            <title>{`${new Date(p.date).toLocaleDateString('ru-RU')}: ${p.value.toFixed(1)}${unit}`}</title>
+          </circle>
+        ))}
+      </svg>
+    </div>
+  );
+};
+
 const QUICK_DIARY_LINKS: QuickLink[] = [
   { icon: '🍽', label: 'Дневник питания', target: 'nutrition-diary', color: colors.green, desc: 'Питание: КБЖУ, приёмы, анализ рациона' },
   { icon: '🏋️', label: 'Журнал тренировок', target: 'workout-log', color: colors.blue, desc: 'Тренировочный дневник со снарядами' },
@@ -960,6 +1096,11 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
   const [diaryRange, setDiaryRange] = useState<'all' | '7' | '30' | '90'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+  const [tableSort, setTableSort] = useState<SortState>({ key: 'date', dir: 'desc' });
+  const [tablePage, setTablePage] = useState(1);
+  const [tableFilter, setTableFilter] = useState('');
+  const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [editingValues, setEditingValues] = useState<Record<string, string>>({});
 
   const pushUndo = (label: string, undo: () => void) => {
     setUndoAction({ label, undo, expiresAt: Date.now() + 5000 });
@@ -2033,6 +2174,198 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
             );
           })()}
 
+          {/* Сравнение с прошлой неделей */}
+          {activeEntries.length >= 2 && (() => {
+            const points = buildSparkline(activeDiary, activeEntries);
+            const cmp = compareWithLastWeek(points);
+            if (!cmp.thisWeek || !cmp.lastWeek) return null;
+            const deltaColor = cmp.better === 'up' ? '#22c55e' : cmp.better === 'down' ? '#ef4444' : colors.textMuted;
+            const arrow = cmp.better === 'up' ? '↑' : cmp.better === 'down' ? '↓' : '≈';
+            const unit = DIARY_META[activeDiary].unit || '';
+            return (
+              <div style={{ padding: 10, borderRadius: 10, background: `${deltaColor}0d`, border: `1px solid ${deltaColor}55`, marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>📆 Сравнение с прошлой неделей</div>
+                  {currentPhase && (
+                    <div style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: `${currentPhase.color}22`, color: currentPhase.color, fontWeight: 700 }}>💊 {currentPhase.label}{courseWeek ? ` · нед. ${courseWeek}` : ''}</div>
+                  )}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, alignItems: 'center' }}>
+                  <div style={{ padding: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3 }}>Эта неделя</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: DIARY_META[activeDiary].color, marginTop: 2 }}>{cmp.thisWeek.mean.toFixed(1)}</div>
+                    <div style={{ fontSize: 9, color: colors.textMuted }}>{cmp.thisWeek.count} записей</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: deltaColor }}>{arrow}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: deltaColor }}>{cmp.delta !== null ? `${cmp.delta > 0 ? '+' : ''}${cmp.delta.toFixed(1)}${unit}` : '—'}</div>
+                    {cmp.pct !== null && Math.abs(cmp.pct) >= 0.5 && (
+                      <div style={{ fontSize: 9, color: colors.textMuted }}>{cmp.pct > 0 ? '+' : ''}{cmp.pct.toFixed(1)}%</div>
+                    )}
+                  </div>
+                  <div style={{ padding: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3 }}>Прошлая</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: colors.textMuted, marginTop: 2 }}>{cmp.lastWeek.mean.toFixed(1)}</div>
+                    <div style={{ fontSize: 9, color: colors.textMuted }}>{cmp.lastWeek.count} записей</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Таблица записей с сортировкой, фильтром, пагинацией, inline-редактированием */}
+          {activeEntriesRaw.length > 0 && (() => {
+            const allLabels = Array.from(new Set(activeEntriesRaw.flatMap(e => e.fields.map(f => f.label))));
+            const labelUnit = (l: string) => {
+              const f = activeEntriesRaw.flatMap(e => e.fields).find(x => x.label === l);
+              return f?.unit || '';
+            };
+            const sorted = sortEntries(activeEntriesRaw, tableSort);
+            const filtered = tableFilter.trim()
+              ? sorted.filter(e => e.date.includes(tableFilter.toLowerCase()) || e.fields.some(f => f.value.toLowerCase().includes(tableFilter.toLowerCase())))
+              : sorted;
+            const PAGE_SIZE = 8;
+            const page = paginate(filtered, tablePage, PAGE_SIZE);
+            const color = DIARY_META[activeDiary].color;
+            const saveInlineEdit = (date: string) => {
+              const list = getEntryArray(activeDiary);
+              const orig = list.find(x => x.date === date);
+              if (!orig) return;
+              const updated: any = { ...(orig as any) };
+              allLabels.forEach(l => {
+                const newVal = editingValues[`${date}::${l}`];
+                if (newVal !== undefined) {
+                  const field = updated.fields.find((f: any) => f.label === l);
+                  if (field) field.value = newVal;
+                }
+              });
+              const newList = list.map(x => x.date === date ? updated : x);
+              if (activeDiary === 'sleep') { saveDiary(SLEEP_DIARY_KEY, newList as SleepEntry[]); setSleepEntries(newList as SleepEntry[]); }
+              else if (activeDiary === 'bp') { saveDiary(BP_DIARY_KEY, newList as BPEntry[]); setBpEntries(newList as BPEntry[]); }
+              else if (activeDiary === 'injection') { saveDiary(INJECTION_DIARY_KEY, newList as InjectionEntry[]); setInjectionEntries(newList as InjectionEntry[]); }
+              else if (activeDiary === 'symptoms') { saveDiary(SYMPTOMS_DIARY_KEY, newList as SymptomEntry[]); setSymptomEntries(newList as SymptomEntry[]); }
+              else if (activeDiary === 'pain') { saveDiary(PAIN_DIARY_KEY, newList as PainEntry[]); setPainEntries(newList as PainEntry[]); }
+              else if (activeDiary === 'neuro') { saveDiary(NEURO_DIARY_KEY, newList as NeuroEntry[]); setNeuroEntries(newList as NeuroEntry[]); }
+              else if (activeDiary === 'acne') { saveDiary(ACNE_DIARY_KEY, newList as AcneEntry[]); setAcneEntries(newList as AcneEntry[]); }
+              else if (activeDiary === 'hemato') { saveDiary(HEMATO_DIARY_KEY, newList as HematoEntry[]); setHematoEntries(newList as HematoEntry[]); }
+              setEditingDate(null);
+              if ((window as any).showToast) (window as any).showToast('✏️ Запись обновлена');
+            };
+            const sortIcon = (key: string) => tableSort.key === key ? (tableSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+            return (
+              <div style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${color}33`, marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>📋 Таблица записей ({filtered.length}{filtered.length !== activeEntriesRaw.length ? ` из ${activeEntriesRaw.length}` : ''})</div>
+                  <input
+                    type="text"
+                    value={tableFilter}
+                    onChange={e => { setTableFilter(e.target.value); setTablePage(1); }}
+                    placeholder="🔍 Фильтр по дате или значению…"
+                    style={{ width: 200, background: 'rgba(0,0,0,0.3)', border: `1px solid ${colors.border}`, borderRadius: 6, padding: '5px 8px', color: colors.text, fontSize: 10, outline: 'none' }}
+                    aria-label="Фильтр таблицы"
+                  />
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+                    <thead>
+                      <tr>
+                        <th
+                          onClick={() => setTableSort(s => ({ key: 'date', dir: s.key === 'date' && s.dir === 'asc' ? 'desc' : 'asc' }))}
+                          style={{ padding: '6px 4px', background: 'rgba(255,255,255,0.05)', borderBottom: `2px solid ${color}`, color: color, textAlign: 'left', cursor: 'pointer', userSelect: 'none', minWidth: 70 }}
+                        >📅 Дата{sortIcon('date')}</th>
+                        {allLabels.map(l => (
+                          <th
+                            key={l}
+                            onClick={() => setTableSort(s => ({ key: l, dir: s.key === l && s.dir === 'asc' ? 'desc' : 'asc' }))}
+                            style={{ padding: '6px 4px', background: 'rgba(255,255,255,0.05)', borderBottom: `2px solid ${color}`, color: color, textAlign: 'left', cursor: 'pointer', userSelect: 'none', minWidth: 60 }}
+                          >{l}{sortIcon(l)}</th>
+                        ))}
+                        <th style={{ padding: '6px 4px', background: 'rgba(255,255,255,0.05)', borderBottom: `2px solid ${color}`, color: color, textAlign: 'right', minWidth: 80 }}>Действия</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {page.pageItems.map(e => {
+                        const isEditing = editingDate === e.date;
+                        return (
+                          <tr key={e.date} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            <td style={{ padding: '5px 4px', color: color, fontWeight: 700 }}>{new Date(e.date).toLocaleDateString('ru-RU')}</td>
+                            {allLabels.map(l => {
+                              const field = e.fields.find(f => f.label === l);
+                              if (isEditing) {
+                                const key = `${e.date}::${l}`;
+                                return (
+                                  <td key={l} style={{ padding: '3px 4px' }}>
+                                    <input
+                                      type="text"
+                                      value={editingValues[key] !== undefined ? editingValues[key] : (field?.value || '')}
+                                      onChange={e2 => setEditingValues(p => ({ ...p, [key]: e2.target.value }))}
+                                      style={{ width: '100%', minWidth: 50, background: 'rgba(0,0,0,0.4)', border: `1px solid ${color}66`, borderRadius: 4, padding: '3px 5px', color: color, fontSize: 10, outline: 'none', boxSizing: 'border-box' }}
+                                    />
+                                  </td>
+                                );
+                              }
+                              const cls = field ? classifyValue(activeDiary, parseFloat(field.value)) : 'unknown';
+                              const clsColor = cls === 'normal' ? '#22c55e' : cls === 'warn' ? '#f59e0b' : cls === 'danger' ? '#ef4444' : colors.text;
+                              return (
+                                <td key={l} style={{ padding: '5px 4px', color: clsColor, fontWeight: cls === 'normal' ? 400 : 700 }}>
+                                  {field ? `${field.value}${field.unit ? ' ' + field.unit : ''}` : '—'}
+                                </td>
+                              );
+                            })}
+                            <td style={{ padding: '4px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                              {isEditing ? (
+                                <>
+                                  <button onClick={() => saveInlineEdit(e.date)} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, background: '#22c55e', color: '#0a0a0a', border: 'none', cursor: 'pointer', fontWeight: 700, marginRight: 4 }}>💾 OK</button>
+                                  <button onClick={() => setEditingDate(null)} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, background: 'rgba(255,255,255,0.06)', color: colors.text, border: `1px solid ${colors.border}`, cursor: 'pointer' }}>✕</button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      const init: Record<string, string> = {};
+                                      e.fields.forEach(f => { init[`${e.date}::${f.label}`] = f.value; });
+                                      setEditingValues(init);
+                                      setEditingDate(e.date);
+                                    }}
+                                    aria-label={`Редактировать запись ${e.date}`}
+                                    style={{ padding: '2px 6px', borderRadius: 4, fontSize: 9, background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: 'none', cursor: 'pointer', marginRight: 4 }}
+                                  >✏️</button>
+                                  <button
+                                    onClick={() => deleteDiaryEntry(activeDiary, e.date)}
+                                    aria-label={`Удалить запись ${e.date}`}
+                                    style={{ padding: '2px 6px', borderRadius: 4, fontSize: 9, background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', cursor: 'pointer' }}
+                                  >🗑</button>
+                                </>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {page.totalPages > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 10, color: colors.textMuted }}>
+                    <span>Показано {page.pageStart + 1}–{page.pageEnd} из {page.total}</span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        onClick={() => setTablePage(p => Math.max(1, p - 1))}
+                        disabled={tablePage === 1}
+                        style={{ padding: '4px 10px', borderRadius: 5, fontSize: 10, background: 'rgba(255,255,255,0.06)', color: tablePage === 1 ? colors.textMuted : colors.text, border: `1px solid ${colors.border}`, cursor: tablePage === 1 ? 'not-allowed' : 'pointer' }}
+                      >‹ Назад</button>
+                      <span style={{ padding: '4px 8px', color: color, fontWeight: 700 }}>{tablePage} / {page.totalPages}</span>
+                      <button
+                        onClick={() => setTablePage(p => Math.min(page.totalPages, p + 1))}
+                        disabled={tablePage === page.totalPages}
+                        style={{ padding: '4px 10px', borderRadius: 5, fontSize: 10, background: 'rgba(255,255,255,0.06)', color: tablePage === page.totalPages ? colors.textMuted : colors.text, border: `1px solid ${colors.border}`, cursor: tablePage === page.totalPages ? 'not-allowed' : 'pointer' }}
+                      >Вперёд ›</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {activeEntries.length === 0 ? (
             <div style={{ color: colors.textMuted, fontSize: 12, padding: 12, textAlign: 'center' }}>
               {activeEntriesRaw.length === 0
@@ -2040,61 +2373,52 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
                 : `Нет записей за выбранный период (${diaryRange === 'all' ? 'всё время' : diaryRange + ' дней'}).`}
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {groupEntriesByPeriod(activeEntries).map(group => (
-                <div key={group.label} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: `${DIARY_META[activeDiary].color}14`, borderRadius: 6, borderLeft: `3px solid ${DIARY_META[activeDiary].color}` }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: DIARY_META[activeDiary].color }}>📅 {group.label}</span>
-                    <span style={{ fontSize: 9, color: colors.textMuted }}>· {group.entries.length} {group.entries.length === 1 ? 'запись' : group.entries.length < 5 ? 'записи' : 'записей'}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Список последних аномалий */}
+              {(() => {
+                const anomalies = detectAnomalies(activeDiary, activeEntries);
+                if (anomalies.length === 0) return null;
+                const recent = anomalies.slice(-3);
+                return (
+                  <div style={{ padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>⚠️ Аномалии ({anomalies.length})</div>
+                    {recent.map((a, i) => (
+                      <div key={i} style={{ fontSize: 10, color: a.severity === 'danger' ? '#ef4444' : '#f59e0b', marginBottom: 2 }}>
+                        {a.severity === 'danger' ? '⚠️' : '⚠'} {new Date(a.date).toLocaleDateString('ru-RU')}: {a.message}
+                      </div>
+                    ))}
+                    {anomalies.length > 3 && <div style={{ fontSize: 9, color: colors.textMuted, marginTop: 2 }}>…и ещё {anomalies.length - 3}</div>}
                   </div>
-                  {group.entries.map((entry, i) => {
-                    const anomalies = detectAnomalies(activeDiary, [entry]);
-                    const dangerCount = anomalies.filter(a => a.severity === 'danger').length;
-                    const warnCount = anomalies.filter(a => a.severity === 'warn').length;
-                    const anomalyLevel = dangerCount > 0 ? 'danger' : warnCount > 0 ? 'warn' : null;
-                    const rowColor = anomalyLevel === 'danger' ? '#ef4444' : anomalyLevel === 'warn' ? '#f59e0b' : DIARY_META[activeDiary].color;
-                    return (
-                    <div key={`${group.label}-${entry.date}-${i}`} style={{
-                      padding: 10, borderRadius: 8,
-                      background: anomalyLevel === 'danger' ? 'rgba(239,68,68,0.08)' : anomalyLevel === 'warn' ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.03)',
-                      border: `1px solid ${rowColor}66`,
-                      transition: 'background 0.15s, transform 0.15s',
-                      animation: `diary-row-in 0.25s ease-out ${i * 0.04}s both`,
-                      ...(anomalyLevel === 'danger' ? { animation: `diary-row-in 0.25s ease-out ${i * 0.04}s both, diary-pulse 1.6s ease-out infinite` } : {}),
-                    }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = anomalyLevel === 'danger' ? 'rgba(239,68,68,0.12)' : anomalyLevel === 'warn' ? 'rgba(245,158,11,0.10)' : 'rgba(255,255,255,0.06)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = anomalyLevel === 'danger' ? 'rgba(239,68,68,0.08)' : anomalyLevel === 'warn' ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.03)')}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: rowColor }}>{new Date(entry.date).toLocaleDateString('ru-RU')}</span>
-                          {anomalyLevel === 'danger' && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.2)', color: '#ef4444' }}>⚠️ АНОМАЛИЯ</span>}
-                          {anomalyLevel === 'warn' && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(245,158,11,0.2)', color: '#f59e0b' }}>⚠ Внимание</span>}
-                        </div>
-                        <button
-                          onClick={() => deleteDiaryEntry(activeDiary, entry.date)}
-                          aria-label={`Удалить запись ${new Date(entry.date).toLocaleDateString('ru-RU')}`}
-                          style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}
-                        >🗑 Удалить</button>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 4 }}>
-                        {entry.fields.map((f, fi) => (
-                          <div key={fi} style={{ fontSize: 10, color: colors.textMuted }}>
-                            <span style={{ color: colors.text }}>{f.value}</span>
-                            {f.unit ? ` ${f.unit}` : ''}
-                            <span style={{ marginLeft: 4, opacity: 0.7 }}>· {f.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                      {anomalies.length > 0 && (
-                        <div style={{ marginTop: 6, padding: '4px 8px', borderRadius: 4, fontSize: 10, background: 'rgba(0,0,0,0.25)', color: rowColor, fontWeight: 600 }}>
-                          ⚠ {anomalies.map(a => a.message).join(' · ')}
-                        </div>
-                      )}
+                );
+              })()}
+              <div style={{ fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700, marginTop: 4 }}>📋 Последние записи</div>
+              {activeEntriesRaw.slice(0, 3).map((entry, i) => {
+                const color = DIARY_META[activeDiary].color;
+                return (
+                  <div key={`${entry.date}-${i}`} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${color}22` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color }}>{new Date(entry.date).toLocaleDateString('ru-RU')}</span>
+                      <button
+                        onClick={() => deleteDiaryEntry(activeDiary, entry.date)}
+                        aria-label={`Удалить запись ${new Date(entry.date).toLocaleDateString('ru-RU')}`}
+                        style={{ padding: '2px 6px', borderRadius: 4, fontSize: 9, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}
+                      >🗑</button>
                     </div>
-                    );
-                  })}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 4 }}>
+                      {entry.fields.map((f, fi) => (
+                        <div key={fi} style={{ fontSize: 10, color: colors.textMuted }}>
+                          <span style={{ color: colors.text }}>{f.value}</span>{f.unit ? ` ${f.unit}` : ''}<span style={{ marginLeft: 4, opacity: 0.7 }}>· {f.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              {activeEntriesRaw.length > 3 && (
+                <div style={{ fontSize: 9, color: colors.textMuted, textAlign: 'center', marginTop: 4 }}>
+                  …и ещё {activeEntriesRaw.length - 3} (полный список — в таблице выше ⬆)
                 </div>
-              ))}
+              )}
             </div>
           )}
         </AccordionSection>

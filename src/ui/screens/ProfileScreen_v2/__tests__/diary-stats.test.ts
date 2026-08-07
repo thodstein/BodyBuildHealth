@@ -8,6 +8,9 @@ import {
   classifyValue,
   buildWeeklyHistogram,
   buildHourDistribution,
+  compareWithLastWeek,
+  sortEntries,
+  paginate,
   type DiaryKey,
 } from '../diary-helpers';
 
@@ -128,5 +131,95 @@ describe('buildHourDistribution', () => {
     const out = buildHourDistribution([]);
     expect(out).toHaveLength(24);
     expect(out.every(h => h.count === 0)).toBe(true);
+  });
+});
+
+describe('compareWithLastWeek', () => {
+  it('возвращает null для менее 2 записей', () => {
+    const r = compareWithLastWeek([{ date: new Date().toISOString().slice(0, 10), value: 5 }]);
+    expect(r.thisWeek).toBeNull();
+  });
+
+  it('сравнивает эту и прошлую неделю', () => {
+    const today = new Date();
+    const thisWeek = new Date(today.getTime() - 3 * 86400000);
+    const lastWeek = new Date(today.getTime() - 10 * 86400000);
+    const twoWeeks = new Date(today.getTime() - 17 * 86400000);
+    const r = compareWithLastWeek([
+      { date: today.toISOString().slice(0, 10), value: 8 },
+      { date: thisWeek.toISOString().slice(0, 10), value: 7 },
+      { date: lastWeek.toISOString().slice(0, 10), value: 6 },
+      { date: twoWeeks.toISOString().slice(0, 10), value: 5 },
+    ]);
+    expect(r.thisWeek).not.toBeNull();
+    expect(r.lastWeek).not.toBeNull();
+    expect(r.thisWeek!.mean).toBe(7.5);
+    expect(r.lastWeek!.mean).toBe(6);
+    expect(r.delta).toBeCloseTo(1.5, 5);
+    expect(r.better).toBe('up');
+  });
+
+  it('better=down при отрицательной дельте', () => {
+    const today = new Date();
+    const lastWeek = new Date(today.getTime() - 10 * 86400000);
+    const r = compareWithLastWeek([
+      { date: today.toISOString().slice(0, 10), value: 5 },
+      { date: lastWeek.toISOString().slice(0, 10), value: 8 },
+    ]);
+    expect(r.better).toBe('down');
+  });
+
+  it('better=same при нулевой дельте', () => {
+    const today = new Date();
+    const lastWeek = new Date(today.getTime() - 10 * 86400000);
+    const r = compareWithLastWeek([
+      { date: today.toISOString().slice(0, 10), value: 7 },
+      { date: lastWeek.toISOString().slice(0, 10), value: 7 },
+    ]);
+    expect(r.better).toBe('same');
+  });
+});
+
+describe('sortEntries', () => {
+  const sample = [
+    { date: '2025-01-15', fields: [{ label: 'Часы', value: '6', unit: 'ч' }] },
+    { date: '2025-01-10', fields: [{ label: 'Часы', value: '8', unit: 'ч' }] },
+    { date: '2025-01-12', fields: [{ label: 'Часы', value: '7', unit: 'ч' }] },
+  ];
+
+  it('сортирует по дате asc', () => {
+    const r = sortEntries(sample, { key: 'date', dir: 'asc' });
+    expect(r.map(e => e.date)).toEqual(['2025-01-10', '2025-01-12', '2025-01-15']);
+  });
+
+  it('сортирует по полю asc/desc', () => {
+    const asc = sortEntries(sample, { key: 'Часы', dir: 'asc' });
+    const desc = sortEntries(sample, { key: 'Часы', dir: 'desc' });
+    expect(asc.map(e => e.fields[0].value)).toEqual(['6', '7', '8']);
+    expect(desc.map(e => e.fields[0].value)).toEqual(['8', '7', '6']);
+  });
+});
+
+describe('paginate', () => {
+  const arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  it('первая страница', () => {
+    const r = paginate(arr, 1, 3);
+    expect(r.pageItems).toEqual([1, 2, 3]);
+    expect(r.totalPages).toBe(4);
+    expect(r.pageStart).toBe(0);
+    expect(r.pageEnd).toBe(3);
+  });
+  it('последняя страница', () => {
+    const r = paginate(arr, 4, 3);
+    expect(r.pageItems).toEqual([10]);
+  });
+  it('за пределами — clamp к последней', () => {
+    const r = paginate(arr, 99, 3);
+    expect(r.pageItems).toEqual([10]);
+  });
+  it('меньше страницы — все', () => {
+    const r = paginate([1, 2], 1, 10);
+    expect(r.pageItems).toEqual([1, 2]);
+    expect(r.totalPages).toBe(1);
   });
 });

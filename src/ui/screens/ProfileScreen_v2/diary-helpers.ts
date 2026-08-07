@@ -360,6 +360,85 @@ export const filterByRange = (
   });
 };
 
+// ─── Сравнение с прошлой неделей ──────────────────────────────────────────
+
+export const compareWithLastWeek = (
+  entries: { date: string; value: number }[]
+): { thisWeek: { mean: number; count: number } | null; lastWeek: { mean: number; count: number } | null; delta: number | null; pct: number | null; better: 'up' | 'down' | 'same' | null } => {
+  if (entries.length < 2) return { thisWeek: null, lastWeek: null, delta: null, pct: null, better: null };
+  const now = Date.now();
+  const weekAgoStart = now - 7 * 86400000;
+  const twoWeeksAgoStart = now - 14 * 86400000;
+  const thisWeekValues: number[] = [];
+  const lastWeekValues: number[] = [];
+  for (const e of entries) {
+    const t = Date.parse(e.date);
+    if (!Number.isFinite(t) || !Number.isFinite(e.value)) continue;
+    if (t >= weekAgoStart) thisWeekValues.push(e.value);
+    else if (t >= twoWeeksAgoStart) lastWeekValues.push(e.value);
+  }
+  if (thisWeekValues.length === 0 && lastWeekValues.length === 0) {
+    return { thisWeek: null, lastWeek: null, delta: null, pct: null, better: null };
+  }
+  const avg = (arr: number[]) => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null;
+  const thisMean = avg(thisWeekValues);
+  const lastMean = avg(lastWeekValues);
+  const delta = thisMean !== null && lastMean !== null ? thisMean - lastMean : null;
+  const pct = delta !== null && lastMean !== null && lastMean !== 0 ? (delta / lastMean) * 100 : null;
+  let better: 'up' | 'down' | 'same' | null = null;
+  if (delta === null || Math.abs(delta) < 0.05) better = 'same';
+  else better = delta > 0 ? 'up' : 'down';
+  return {
+    thisWeek: thisMean !== null ? { mean: thisMean, count: thisWeekValues.length } : null,
+    lastWeek: lastMean !== null ? { mean: lastMean, count: lastWeekValues.length } : null,
+    delta,
+    pct,
+    better,
+  };
+};
+
+// ─── Сортировка и пагинация для таблицы ──────────────────────────────────
+
+export type SortDir = 'asc' | 'desc';
+export interface SortState { key: string; dir: SortDir; }
+
+export const sortEntries = (
+  entries: { date: string; fields: { label: string; value: string; unit: string }[] }[],
+  sort: SortState
+): typeof entries => {
+  const sorted = [...entries];
+  sorted.sort((a, b) => {
+    let av: number | string = a.date;
+    let bv: number | string = b.date;
+    if (sort.key === 'date') {
+      av = a.date; bv = b.date;
+    } else {
+      const af = a.fields.find(f => f.label === sort.key);
+      const bf = b.fields.find(f => f.label === sort.key);
+      const an = af ? parseFloat(af.value) : NaN;
+      const bn = bf ? parseFloat(bf.value) : NaN;
+      if (Number.isFinite(an) && Number.isFinite(bn)) {
+        av = an; bv = bn;
+      } else {
+        av = af?.value || ''; bv = bf?.value || '';
+      }
+    }
+    if (av < bv) return sort.dir === 'asc' ? -1 : 1;
+    if (av > bv) return sort.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+  return sorted;
+};
+
+export const paginate = <T,>(items: T[], page: number, pageSize: number): { pageItems: T[]; totalPages: number; pageStart: number; pageEnd: number; total: number } => {
+  const total = items.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const pageStart = (safePage - 1) * pageSize;
+  const pageEnd = Math.min(pageStart + pageSize, total);
+  return { pageItems: items.slice(pageStart, pageEnd), totalPages, pageStart, pageEnd, total };
+};
+
 // ─── Статистика распределения ──────────────────────────────────────────────
 
 export interface DistributionStats {
