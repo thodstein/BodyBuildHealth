@@ -8,6 +8,21 @@ import { db } from '../../../core/db';
 import { getWeightLog, saveWeightLog, getMeasurementsLog, saveMeasurementsLog } from '../../../engines/profile-store';
 import { useProfileRefresh } from '../../../core/profile-manager';
 import { AccordionSection, colors } from './ui';
+import {
+  computeStreak,
+  computePeriodDelta,
+  computeExtremes,
+  groupEntriesByPeriod,
+  buildSparkline,
+  computeSummary,
+  targetHit,
+  detectAnomalies,
+  filterByRange,
+  type DiaryKey,
+  type DiaryEntryLike,
+  type DiaryGoals,
+  defaultGoals,
+} from './diary-helpers';
 
 /* ── Типы для встроенных дневников ── */
 
@@ -56,8 +71,6 @@ export interface HematoEntry {
   totalScore: number;
   notes?: string;
 }
-
-type DiaryKey = 'sleep' | 'bp' | 'weight' | 'measurements' | 'injection' | 'symptoms' | 'pain' | 'neuro' | 'acne' | 'hemato';
 
 interface BuiltInDiaryRow { key: DiaryKey; count: number; last: string; }
 
@@ -827,269 +840,6 @@ const Sparkline: React.FC<{ points: { date: string; value: number }[]; color: st
   );
 };
 
-const buildSparkline = (
-  key: DiaryKey,
-  entries: { date: string; fields: { label: string; value: string; unit: string }[] }[]
-): { date: string; value: number }[] => {
-  const out: { date: string; value: number }[] = [];
-  for (const e of entries) {
-    let v: number | null = null;
-    if (key === 'sleep') {
-      const f = e.fields.find(x => x.label === 'Часы');
-      if (f) v = parseFloat(f.value);
-    } else if (key === 'bp') {
-      const sys = e.fields.find(x => x.label === 'Систола');
-      const dia = e.fields.find(x => x.label === 'Диастола');
-      if (sys && dia) v = (parseFloat(sys.value) + parseFloat(dia.value)) / 2;
-    } else if (key === 'weight') {
-      const f = e.fields.find(x => x.label === 'Вес');
-      if (f) v = parseFloat(f.value);
-    } else if (key === 'measurements') {
-      const f = e.fields.find(x => x.label === 'Талия');
-      if (f) v = parseFloat(f.value);
-    } else if (key === 'pain') {
-      const f = e.fields.find(x => x.label === 'Суммарно');
-      if (f) v = parseFloat(f.value);
-    } else if (key === 'neuro') {
-      const f = e.fields.find(x => x.label === 'Симптомов');
-      if (f) v = parseFloat(f.value);
-    } else if (key === 'acne') {
-      const f = e.fields.find(x => x.label === 'Суммарно');
-      if (f) v = parseFloat(f.value);
-    } else if (key === 'hemato') {
-      const f = e.fields.find(x => x.label === 'Симптомов');
-      if (f) v = parseFloat(f.value);
-    } else if (key === 'injection' || key === 'symptoms') {
-      continue;
-    }
-    if (v !== null && Number.isFinite(v)) out.push({ date: e.date, value: v });
-  }
-  return out;
-};
-
-const computeSummary = (
-  key: DiaryKey,
-  entries: { date: string; fields: { label: string; value: string; unit: string }[] }[]
-): { label: string; value: string; color: string }[] | null => {
-  if (entries.length === 0) return null;
-  const color = DIARY_META[key].color;
-  const out: { label: string; value: string; color: string }[] = [];
-  if (key === 'sleep') {
-    const hours = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Часы')?.value || 'NaN')).filter(Number.isFinite);
-    if (hours.length) {
-      const avg = hours.reduce((s, v) => s + v, 0) / hours.length;
-      out.push({ label: 'Записей', value: String(hours.length), color });
-      out.push({ label: 'Среднее', value: `${avg.toFixed(1)} ч`, color });
-      out.push({ label: 'Мин/Макс', value: `${Math.min(...hours).toFixed(1)} / ${Math.max(...hours).toFixed(1)}`, color: color });
-    }
-  } else if (key === 'bp') {
-    const sys = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Систола')?.value || 'NaN')).filter(Number.isFinite);
-    const dia = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Диастола')?.value || 'NaN')).filter(Number.isFinite);
-    if (sys.length) {
-      out.push({ label: 'Записей', value: String(sys.length), color });
-      out.push({ label: 'Ср. сист.', value: `${(sys.reduce((s, v) => s + v, 0) / sys.length).toFixed(0)}`, color });
-    }
-    if (dia.length) {
-      out.push({ label: 'Ср. диаст.', value: `${(dia.reduce((s, v) => s + v, 0) / dia.length).toFixed(0)}`, color });
-    }
-  } else if (key === 'weight') {
-    const w = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Вес')?.value || 'NaN')).filter(Number.isFinite);
-    if (w.length) {
-      const first = w[w.length - 1];
-      const last = w[0];
-      const delta = last - first;
-      out.push({ label: 'Записей', value: String(w.length), color });
-      out.push({ label: 'Текущий', value: `${last.toFixed(1)} кг`, color });
-      out.push({ label: 'Δ за период', value: `${delta > 0 ? '+' : ''}${delta.toFixed(1)} кг`, color: delta > 0 ? '#22c55e' : delta < 0 ? colors.danger : color });
-    }
-  } else if (key === 'measurements') {
-    out.push({ label: 'Записей', value: String(entries.length), color });
-    const last = entries[0];
-    const waist = last.fields.find(x => x.label === 'Талия')?.value;
-    const bf = last.fields.find(x => x.label === '% жира')?.value;
-    if (waist) out.push({ label: 'Талия', value: `${waist} см`, color });
-    if (bf && Number(bf) > 0) out.push({ label: '% жира', value: `${bf}%`, color });
-  } else if (key === 'injection' || key === 'symptoms') {
-    out.push({ label: 'Записей', value: String(entries.length), color });
-    if (entries[0]) out.push({ label: 'Последняя', value: new Date(entries[0].date).toLocaleDateString('ru-RU'), color });
-  } else if (key === 'pain') {
-    const totals = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Суммарно')?.value || 'NaN')).filter(Number.isFinite);
-    if (totals.length) {
-      const avg = totals.reduce((s, v) => s + v, 0) / totals.length;
-      const colorByLevel = avg < 20 ? '#22c55e' : avg < 40 ? '#f59e0b' : avg < 60 ? '#f97316' : '#ef4444';
-      out.push({ label: 'Записей', value: String(totals.length), color });
-      out.push({ label: 'Ср. Σ', value: `${avg.toFixed(1)}/70`, color: colorByLevel });
-      out.push({ label: 'Макс Σ', value: `${Math.max(...totals).toFixed(0)}/70`, color: colorByLevel });
-    }
-  } else if (key === 'neuro') {
-    const scores = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Симптомов')?.value || 'NaN')).filter(Number.isFinite);
-    if (scores.length) {
-      const avg = scores.reduce((s, v) => s + v, 0) / scores.length;
-      const colorByLevel = avg >= 4 ? '#ef4444' : avg >= 2 ? '#f59e0b' : '#22c55e';
-      out.push({ label: 'Записей', value: String(scores.length), color });
-      out.push({ label: 'Ср. симптомов', value: `${avg.toFixed(1)}/10`, color: colorByLevel });
-      out.push({ label: 'Макс', value: `${Math.max(...scores)}/10`, color: colorByLevel });
-    }
-  } else if (key === 'acne') {
-    const totals = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Суммарно')?.value || 'NaN')).filter(Number.isFinite);
-    if (totals.length) {
-      const avg = totals.reduce((s, v) => s + v, 0) / totals.length;
-      const colorByLevel = avg >= 7 ? '#ef4444' : avg >= 4 ? '#f59e0b' : '#22c55e';
-      out.push({ label: 'Записей', value: String(totals.length), color });
-      out.push({ label: 'Ср. Σ', value: `${avg.toFixed(1)}/12`, color: colorByLevel });
-      out.push({ label: 'Макс Σ', value: `${Math.max(...totals).toFixed(0)}/12`, color: colorByLevel });
-    }
-  } else if (key === 'hemato') {
-    const scores = entries.map(e => parseFloat(e.fields.find(x => x.label === 'Симптомов')?.value || 'NaN')).filter(Number.isFinite);
-    if (scores.length) {
-      const avg = scores.reduce((s, v) => s + v, 0) / scores.length;
-      const colorByLevel = avg >= 2 ? '#ef4444' : '#22c55e';
-      out.push({ label: 'Записей', value: String(scores.length), color });
-      out.push({ label: 'Ср. симптомов', value: `${avg.toFixed(1)}/8`, color: colorByLevel });
-      out.push({ label: 'Макс', value: `${Math.max(...scores)}/8`, color: colorByLevel });
-    }
-  }
-  return out;
-};
-
-const computePeriodDelta = (
-  key: DiaryKey,
-  entries: { date: string; fields: { label: string; value: string; unit: string }[] }[]
-): { label: string; value: string; delta: number; color: string } | null => {
-  if (entries.length < 4) return null;
-  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
-  const half = Math.floor(sorted.length / 2);
-  const earlier = sorted.slice(0, half);
-  const recent = sorted.slice(half);
-  const extractValue = (e: typeof sorted[0]): number | null => {
-    if (key === 'sleep') return parseFloat(e.fields.find(x => x.label === 'Часы')?.value || 'NaN');
-    if (key === 'weight') return parseFloat(e.fields.find(x => x.label === 'Вес')?.value || 'NaN');
-    if (key === 'pain') return parseFloat(e.fields.find(x => x.label === 'Суммарно')?.value || 'NaN');
-    if (key === 'acne') return parseFloat(e.fields.find(x => x.label === 'Суммарно')?.value || 'NaN');
-    if (key === 'neuro') return parseFloat(e.fields.find(x => x.label === 'Симптомов')?.value || 'NaN');
-    if (key === 'hemato') return parseFloat(e.fields.find(x => x.label === 'Симптомов')?.value || 'NaN');
-    if (key === 'bp') {
-      const sys = parseFloat(e.fields.find(x => x.label === 'Систола')?.value || 'NaN');
-      const dia = parseFloat(e.fields.find(x => x.label === 'Диастола')?.value || 'NaN');
-      return (Number.isFinite(sys) && Number.isFinite(dia)) ? (sys + dia) / 2 : NaN;
-    }
-    return null;
-  };
-  const avg = (arr: typeof sorted) => {
-    const vals = arr.map(extractValue).filter((v): v is number => v !== null && Number.isFinite(v));
-    return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
-  };
-  const avgEarlier = avg(earlier);
-  const avgRecent = avg(recent);
-  if (avgEarlier === null || avgRecent === null) return null;
-  const delta = avgRecent - avgEarlier;
-  const direction = delta > 0.05 ? '↑' : delta < -0.05 ? '↓' : '=';
-  const isNegativeTrend = (key === 'weight' && key !== 'weight') || ['pain', 'acne', 'neuro', 'hemato', 'bp'].includes(key);
-  const isPositiveWhenRising = key === 'sleep' || key === 'weight';
-  const isImprovement = isPositiveWhenRising ? delta > 0 : delta < 0;
-  const trendColor = Math.abs(delta) < 0.05 ? colors.textMuted : (isImprovement ? '#22c55e' : (isNegativeTrend ? '#ef4444' : '#ef4444'));
-  return {
-    label: `Тренд ${half} vs ${sorted.length - half}`,
-    value: `${direction} ${Math.abs(delta).toFixed(1)}`,
-    delta,
-    color: trendColor,
-  };
-};
-
-const computeStreak = (
-  entries: { date: string }[]
-): { current: number; best: number; totalDays: number } => {
-  if (entries.length === 0) return { current: 0, best: 0, totalDays: 0 };
-  const sorted = [...entries].map(e => e.date).sort();
-  const unique = Array.from(new Set(sorted));
-  const todayMs = Date.now();
-  const dayMs = 86400000;
-  let current = 0;
-  let cursor = new Date(todayMs);
-  cursor.setHours(0, 0, 0, 0);
-  while (unique.includes(cursor.toISOString().slice(0, 10))) {
-    current += 1;
-    cursor = new Date(cursor.getTime() - dayMs);
-  }
-  if (current === 0) {
-    const last = unique[unique.length - 1];
-    const lastMs = Date.parse(last);
-    if (Number.isFinite(lastMs)) {
-      const diffDays = Math.floor((todayMs - lastMs) / dayMs);
-      if (diffDays <= 2) {
-        cursor = new Date(lastMs);
-        cursor.setHours(0, 0, 0, 0);
-        current = 0;
-        while (unique.includes(cursor.toISOString().slice(0, 10))) {
-          current += 1;
-          cursor = new Date(cursor.getTime() - dayMs);
-        }
-      }
-    }
-  }
-  let best = 0;
-  let run = 1;
-  for (let i = 1; i < unique.length; i++) {
-    const prev = Date.parse(unique[i - 1]);
-    const cur = Date.parse(unique[i]);
-    if (Number.isFinite(prev) && Number.isFinite(cur) && cur - prev === dayMs) {
-      run += 1;
-    } else {
-      if (run > best) best = run;
-      run = 1;
-    }
-  }
-  if (run > best) best = run;
-  return { current, best, totalDays: unique.length };
-};
-
-const computeExtremes = (
-  key: DiaryKey,
-  entries: { date: string; fields: { label: string; value: string; unit: string }[] }[]
-): { min: { date: string; value: number } | null; max: { date: string; value: number } | null } => {
-  const result: { min: { date: string; value: number } | null; max: { date: string; value: number } | null } = { min: null, max: null };
-  if (entries.length === 0) return result;
-  for (const e of entries) {
-    let v: number | null = null;
-    if (key === 'sleep') v = parseFloat(e.fields.find(x => x.label === 'Часы')?.value || 'NaN');
-    else if (key === 'weight') v = parseFloat(e.fields.find(x => x.label === 'Вес')?.value || 'NaN');
-    else if (key === 'pain' || key === 'acne') v = parseFloat(e.fields.find(x => x.label === 'Суммарно')?.value || 'NaN');
-    else if (key === 'neuro' || key === 'hemato') v = parseFloat(e.fields.find(x => x.label === 'Симптомов')?.value || 'NaN');
-    if (v === null || !Number.isFinite(v)) continue;
-    if (!result.min || v < result.min.value) result.min = { date: e.date, value: v };
-    if (!result.max || v > result.max.value) result.max = { date: e.date, value: v };
-  }
-  return result;
-};
-
-const groupEntriesByPeriod = (
-  entries: { date: string; fields: { label: string; value: string; unit: string }[] }[]
-): { label: string; entries: { date: string; fields: { label: string; value: string; unit: string }[] }[] }[] => {
-  if (entries.length === 0) return [];
-  const groups: Record<string, { date: string; fields: { label: string; value: string; unit: string }[] }[]> = {};
-  const order: string[] = [];
-  for (const e of entries) {
-    const d = new Date(e.date);
-    if (isNaN(d.getTime())) continue;
-    const startOfWeek = new Date(d);
-    startOfWeek.setHours(0, 0, 0, 0);
-    startOfWeek.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1));
-    const key = startOfWeek.toISOString().slice(0, 10);
-    if (!groups[key]) { groups[key] = []; order.push(key); }
-    groups[key].push(e);
-  }
-  return order.reverse().map(k => {
-    const start = new Date(k);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    const fmt = (d: Date) => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-    return {
-      label: `Неделя ${fmt(start)} – ${fmt(end)}`,
-      entries: groups[k],
-    };
-  });
-};
-
 const QUICK_DIARY_LINKS: QuickLink[] = [
   { icon: '🍽', label: 'Дневник питания', target: 'nutrition-diary', color: colors.green },
   { icon: '🏋️', label: 'Журнал тренировок', target: 'workout-log', color: colors.blue },
@@ -1592,7 +1342,8 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
 
   const targetHit = (
     key: DiaryKey,
-    entries: { date: string; fields: { label: string; value: string; unit: string }[] }[]
+    entries: { date: string; fields: { label: string; value: string; unit: string }[] }[],
+    goals: DiaryGoals
   ): { onTarget: boolean; details: string } | null => {
     const last = entries[0];
     if (!last) return null;
@@ -1902,7 +1653,7 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
       </AccordionSection>
 
       {activeDiary && (() => {
-        const target = targetHit(activeDiary, activeEntriesRaw);
+            const target = targetHit(activeDiary, activeEntriesRaw, goals);
         const offTarget = target && !target.onTarget;
         const bg = offTarget ? 'rgba(245,158,11,0.04)' : undefined;
         return (
@@ -1985,7 +1736,7 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
             const period = computePeriodDelta(activeDiary, activeEntries);
             const streak = computeStreak(activeEntriesRaw);
             const extremes = computeExtremes(activeDiary, activeEntries);
-            const target = targetHit(activeDiary, activeEntriesRaw);
+        const target = targetHit(activeDiary, activeEntriesRaw, goals);
             const blocks: { label: string; value: string; color: string }[] = [];
             if (streak.totalDays > 0) {
               blocks.push({ label: 'Дней с записями', value: String(streak.totalDays), color: DIARY_META[activeDiary].color });
