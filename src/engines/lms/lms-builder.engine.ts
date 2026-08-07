@@ -44,6 +44,12 @@ export interface LMSBuildInput {
   /** Пользовательский выбор дней для слабых точек СРЦ-движений.
    *  Ключ формата `${lift}|${weakPointId}` → [1-based dayIdx,...]. Если не задано — авто. */
   plWeakPointDayMap?: Record<string, number[]>;
+  /** Выбранные пользователем упражнения для слабых групп: {muscleId: [name,...]}. */
+  weakGroupExerciseMap?: Record<string, string[]>;
+  /** Выбранные пользователем упражнения из диагностики слабых точек. */
+  plWeakPointExerciseMap?: Record<string, string[]>;
+  /** Ортопедические паттерны, запрещённые только для добавляемых ассистентов. */
+  orthopedicBlockedPatterns?: string[];
   /** ACWR-зона для авто-делода (если передана — применяется к объёму/RIR). */
   acwr?: { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'dangerous' };
   /** Авторегуляция: topSetPctMultiplier/volumeMultiplier/rirShift (если передана — применяется к весам). */
@@ -316,29 +322,6 @@ function fatigueBudget(readiness?: number): number {
   return 60 * (Math.max(0, Math.min(100, readiness ?? 80)) / 100);
 }
 
-/** Apply the same session fatigue budget to exercises injected after base generation. */
-function enforceInjectedFatigueBudget(days: LMSPlanDay[], baseExerciseCounts: number[], readiness?: number): void {
-    const budget = fatigueBudget(readiness);
-    for (const [dayIndex, day] of days.entries()) {
-    const fatigueCost = (exercise: LMSPlanExercise): number => {
-      const aliasId = resolveCatalogId(exercise.name);
-      return (aliasId
-        ? EXERCISE_CATALOG.find(candidate => candidate.id === aliasId)
-        : EXERCISE_CATALOG.find(candidate => candidate.name === exercise.name))?.fatigueCost ?? 5;
-    };
-    const sessionCost = () => day.exercises.reduce((total, exercise) =>
-      total + fatigueCost(exercise) * exercise.workSets.reduce((sets, workSet) => sets + workSet.sets, 0), 0);
-
-    // Remove only exercises added after base generation. This preserves the
-    // base template's minimum-set contract while preventing weak-point
-    // injection from bypassing the session budget.
-    const baseCount = baseExerciseCounts[dayIndex] ?? day.exercises.length;
-    while (sessionCost() > budget && day.exercises.length > baseCount) {
-      day.exercises.pop();
-    }
-  }
-}
-
 /**
  * Собрать список корректирующих упражнений для слабой точки.
  * Упражнения ВСЕГДА из diagnoseWeakPoint (проверенный каталог weakpoint-pl).
@@ -385,6 +368,8 @@ function injectPLWeakPoints(
   vrLevel: 'beginner' | 'intermediate' | 'advanced',
   mrvMult: number,
   plWeakPointDayMap?: Record<string, number[]>,
+  plWeakPointExerciseMap?: Record<string, string[]>,
+  orthopedicBlockedPatterns: string[] = [],
   fallbackPm: number = 80,
 ): void {
   const mainNameMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга', pulldown: 'Тяга', incline_press: 'Жим гантелей' };
@@ -431,22 +416,32 @@ function injectPLWeakPoints(
     }
 
     const liftGroup = liftToEnGroup(wp.lift);
-    const corrections = collectPLCorrections(wp.lift, wp.weakPoint).slice(0, MAX_CORRECTIONS);
-    if (corrections.length === 0) continue;
+    const diagnosisCorrections = collectPLCorrections(wp.lift, wp.weakPoint);
+    const selectedNames = plWeakPointExerciseMap?.[mapKey];
+    const corrections = (selectedNames && selectedNames.length > 0
+      ? diagnosisCorrections.filter(c => selectedNames.includes(c.name))
+      : diagnosisCorrections
+    );
+    const selectedCorrections = (selectedNames && selectedNames.length > 0
+      ? corrections
+      : corrections.slice(0, MAX_CORRECTIONS)).filter(c => {
+        const exercise = findCatalogExerciseByLabel(c.name);
+        return !exercise?.movementPattern || !orthopedicBlockedPatterns.includes(exercise.movementPattern);
+      });
+    if (selectedCorrections.length === 0) continue;
 
     // 1-й кандидат — в heavy-day (3×8 @ RIR 2, "Тяжёлая" добивка)
     // 2-й кандидат — в light-day (3×12 @ RIR 3, памп-вариант)
     const heavyDay = days[heavyDayIdx];
     if (heavyDay) {
-      const c = corrections[0];
-      const ex = findCatalogExerciseByLabel(c.name);
-      const resolvedName = ex ? ex.name : c.name;
+       const c = selectedCorrections[0];
+       const ex = findCatalogExerciseByLabel(c.name);
+       // Диагностика является источником названия. Не заменяем "Дожим с 3 см"
+       // на похожий базовый "Жим штанги лёжа" из-за fuzzy-match каталога.
+       const resolvedName = c.name;
       const existing = new Set(heavyDay.exercises.map(e => norm(e.name)));
-      if (!existing.has(norm(resolvedName)) && heavyDay.exercises.length < 8) {
-        // P0-fix: trueMuscleOf как канонический резолвер группы. Catalog .group
-        // содержит ошибки (bench_closegrip=chest, face_pull=back, deadlift=back),
-        // которые приводят к MRV-капу по неправильной мышце.
-        const exGroup = ex ? (trueMuscleOf(ex) ?? (ex.group as string)) : liftGroup;
+       if (!existing.has(norm(resolvedName))) {
+         const exGroup = ex ? (trueMuscleOf(ex) ?? (ex.group as string)) : liftGroup;
         const sets = Math.max(2, Math.round(3 * phaseVolMod));
         const pm = pmForInjected(resolvedName, mainName, pmRow, fallbackPm);
         // User explicitly selected these weak points — always add, no MRV cap.
@@ -462,14 +457,14 @@ function injectPLWeakPoints(
     }
 
     // 2-й кандидат — в light-day (если есть второй candidate в heavyDayIdx)
-    if (lightDayIdx >= 0 && corrections.length > 1) {
+    if (lightDayIdx >= 0 && selectedCorrections.length > 1) {
       const lightDay = days[lightDayIdx];
       if (lightDay) {
-        const c = corrections[1];
-        const ex = findCatalogExerciseByLabel(c.name);
-        const resolvedName = ex ? ex.name : c.name;
+        const c = selectedCorrections[1];
+         const ex = findCatalogExerciseByLabel(c.name);
+         const resolvedName = c.name;
         const existing = new Set(lightDay.exercises.map(e => norm(e.name)));
-        if (!existing.has(norm(resolvedName)) && lightDay.exercises.length < 8) {
+        if (!existing.has(norm(resolvedName))) {
           const exGroup = ex ? (trueMuscleOf(ex) ?? (ex.group as string)) : liftGroup;
           const sets = Math.max(2, Math.round(3 * phaseVolMod));
           const pm = pmForInjected(resolvedName, mainName, pmRow, fallbackPm);
@@ -485,6 +480,34 @@ function injectPLWeakPoints(
           });
           existing.add(norm(resolvedName));
         }
+      }
+    }
+
+    // При явном выборе пользователь может назначить все упражнения диагностики,
+    // а не только стандартную пару heavy/pump. Дни используются циклически.
+    if (selectedNames && selectedNames.length > 0 && selectedCorrections.length > 2) {
+      const targetDays = userDays && userDays.length > 0
+        ? userDays.map(day => day - 1).filter(day => day >= 0 && day < days.length)
+        : [heavyDayIdx];
+      for (let correctionIndex = 2; correctionIndex < selectedCorrections.length; correctionIndex++) {
+        const targetDay = days[targetDays[(correctionIndex - 2) % targetDays.length]];
+        if (!targetDay) continue;
+        const correction = selectedCorrections[correctionIndex];
+        const existing = new Set(targetDay.exercises.map(e => norm(e.name)));
+        if (existing.has(norm(correction.name))) continue;
+        const catalogExercise = findCatalogExerciseByLabel(correction.name);
+        const group = catalogExercise ? (trueMuscleOf(catalogExercise) ?? catalogExercise.group) : liftGroup;
+        const pm = pmForInjected(correction.name, mainName, pmRow, fallbackPm);
+        targetDay.exercises.push({
+          name: correction.name,
+          group,
+          coef: catalogExercise?.type === 'compound' ? 0.8 : 0.3,
+          mnosz: 1,
+          load: 'Средняя',
+          pm,
+          rir: Math.max(3, rirBase + 1),
+          workSets: [{ pct: correction.pct, reps: 10, sets: Math.max(2, Math.round(3 * phaseVolMod)), weight: workWeight(pm, correction.pct), rir: Math.max(3, rirBase + 1) }],
+        });
       }
     }
   }
@@ -708,11 +731,10 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
        }));
        return { exercises: planEx, metrics: calcSessionMetrics(metricsEx) };
      });
-
     // Слабые точки и слабые группы добавляются отдельным слоем. Faithful защищает source-сеты,
     // но не должен отключать выбранные пользователем ассистенты.
     if (input.plWeakPoints && input.plWeakPoints.length) {
-      injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, combinedMrvMult, input.plWeakPointDayMap, input.fallbackPm ?? 80);
+      injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, combinedMrvMult, input.plWeakPointDayMap, input.plWeakPointExerciseMap, input.orthopedicBlockedPatterns ?? [], input.fallbackPm ?? 80);
     }
 
     // Инъекция accessory-упражнений для слабых групп мышц — авто-распределение по 1-2 дням.
@@ -729,8 +751,11 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
        for (const wg of input.weakPoints) {
          const allCandidates = getExercisesByGroup(wg);
-         const candidates = allCandidates
-           .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name)));
+        const selectedExercises = input.weakGroupExerciseMap?.[wg];
+        const candidates = allCandidates
+          .filter(ex => !selectedExercises || selectedExercises.length === 0 || selectedExercises.includes(ex.name))
+          .filter(ex => !input.orthopedicBlockedPatterns?.includes(ex.movementPattern || ''))
+          .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name)));
           if (candidates.length === 0) continue;
 
         // Определить число дней для добивки
@@ -821,9 +846,6 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         }
       }
     }
-    // enforceInjectedFatigueBudget удаляет пользовательские выборы (weakPoints) — отключаем.
-     // if (!faithful) enforceInjectedFatigueBudget(days, baseExerciseCounts, input.currentReadiness);
-
     // Пересчёт метрик сессий (после возможной инъекции слабых точек)
     for (const d of days) {
       const metricsEx: SRExercise[] = d.exercises.map(pe => ({

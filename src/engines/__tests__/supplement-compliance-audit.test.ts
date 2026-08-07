@@ -109,4 +109,99 @@ describe('supplement-compliance.engine', () => {
     expect(result.activeSubstances[0].adherence7d).toBeGreaterThan(0);
     expect(result.activeSubstances[0].adherence7d).toBeLessThanOrEqual(100);
   });
+
+  it('achievements: streak_7 unlocked when streak >= 7', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const entries = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      entries.push(makeEntry(d, { agmatine: { taken: true } }));
+    }
+    localStorage.setItem(DIARY_KEY, JSON.stringify(entries));
+    const result = computeCompliance(7, ['agmatine']);
+    const streak7 = result.achievements?.find(a => a.id === 'streak_7');
+    expect(streak7).toBeDefined();
+    expect(streak7?.unlockedAt).toBeDefined();
+  });
+
+  it('achievements: streak_7 shows progress when streak < 7', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const d1 = new Date(Date.now() - 1 * 86400000).toISOString().slice(0, 10);
+    const entries = [
+      makeEntry(d1, { agmatine: { taken: true } }),
+      makeEntry(today, { agmatine: { taken: true } }),
+    ];
+    localStorage.setItem(DIARY_KEY, JSON.stringify(entries));
+    const result = computeCompliance(7, ['agmatine']);
+    const streak7 = result.achievements?.find(a => a.id === 'streak_7');
+    expect(streak7).toBeDefined();
+    expect(streak7?.unlockedAt).toBeUndefined();
+    expect(streak7?.progress).toBeGreaterThanOrEqual(0);
+    expect(streak7?.progress).toBeLessThanOrEqual(100);
+  });
+
+  it('achievements: percent_90 unlocked when 30d adherence >= 90%', () => {
+    const entries = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      entries.push(makeEntry(d, { agmatine: { taken: true } }));
+    }
+    localStorage.setItem(DIARY_KEY, JSON.stringify(entries));
+    const result = computeCompliance(30, ['agmatine']);
+    const p90 = result.achievements?.find(a => a.id === 'percent_90');
+    expect(p90).toBeDefined();
+    expect(p90?.unlockedAt).toBeDefined();
+  });
+
+  it('achievements: consistent unlocked when consistencyScore >= 80', () => {
+    const entries = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      entries.push(makeEntry(d, { agmatine: { taken: true } }));
+    }
+    localStorage.setItem(DIARY_KEY, JSON.stringify(entries));
+    const result = computeCompliance(30, ['agmatine']);
+    const c = result.achievements?.find(a => a.id === 'consistent');
+    expect(c).toBeDefined();
+    expect(c?.unlockedAt).toBeDefined();
+  });
+
+  it('bestDay and worstDay are returned', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const d1 = new Date(Date.now() - 1 * 86400000).toISOString().slice(0, 10);
+    const entries = [
+      makeEntry(d1, { agmatine: { taken: true } }),
+      makeEntry(today, { agmatine: { taken: false } }),
+    ];
+    localStorage.setItem(DIARY_KEY, JSON.stringify(entries));
+    const result = computeCompliance(7, ['agmatine']);
+    expect(result.bestDay).toBeDefined();
+    expect(result.worstDay).toBeDefined();
+    expect(result.bestDay!.adherence).toBeGreaterThanOrEqual(result.worstDay!.adherence);
+  });
+
+  it('avgStreak, missedDoses, consistencyScore are computed', () => {
+    const entries = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      entries.push(makeEntry(d, { agmatine: { taken: i % 2 === 0 }, nac: { taken: true } }));
+    }
+    localStorage.setItem(DIARY_KEY, JSON.stringify(entries));
+    const result = computeCompliance(7, ['agmatine', 'nac']);
+    expect(result.avgStreak).toBeGreaterThanOrEqual(0);
+    expect(result.missedDoses).toBeGreaterThanOrEqual(0);
+    expect(result.consistencyScore).toBeGreaterThanOrEqual(0);
+    expect(result.consistencyScore).toBeLessThanOrEqual(100);
+  });
+
+  it('totalDaysTracked equals number of days analyzed', () => {
+    const entries = [];
+    for (let i = 2; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      entries.push(makeEntry(d, { agmatine: { taken: true } }));
+    }
+    localStorage.setItem(DIARY_KEY, JSON.stringify(entries));
+    const result = computeCompliance(7, ['agmatine']);
+    expect(result.totalDaysTracked).toBe(7); // always daysBack, even if no entry for some
+  });
 });

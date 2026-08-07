@@ -27,6 +27,7 @@ export interface ParsedLabValue {
   refHigh?: number;
   isAbnormal?: boolean;
   raw?: string;
+  confidence?: number;
 }
 
 /**
@@ -318,6 +319,9 @@ export function saveParsedMeals(meals: ParsedMeal[], onSaved?: () => void): numb
           p: item.p,
           f: item.f,
           c: item.c,
+          category: item.category,
+          foodId: item.foodId,
+          micros: item.micros,
         });
         saved++;
       }

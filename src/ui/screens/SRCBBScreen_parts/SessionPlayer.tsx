@@ -8,6 +8,7 @@ import {
   startSession, addExerciseToSession, logSet, finishSession,
   getLastSession, getRecentPRs, type WorkoutSession, type CachedProgress,
   getExerciseProgress, cacheExerciseProgress, cacheSessionStats, getWorkoutStats,
+  compareWithPrevious, getCachedProgressForExercise,
 } from '../../../engines/workout-logger.engine';
 import { generateWarmup, type WarmupInput } from '../../../engines/warmup.engine';
 import { generateCooldown, type CooldownInput } from '../../../engines/cooldown.engine';
@@ -555,6 +556,25 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     return best;
   }, [done, session]);
 
+  // 1.5: сравнение с предыдущей сессией
+  const sessionComparison = useMemo(() => {
+    if (!done) return null;
+    try { return compareWithPrevious(done); } catch { return null; }
+  }, [done]);
+
+  // 1.6: per-exercise delta vs best (из кэша)
+  const exerciseBestDeltas = useMemo(() => {
+    if (!done || !day) return [];
+    return day.exercises.map((ex, ei) => {
+      const cached = getCachedProgressForExercise(ex.name);
+      const sesEx = done.exercises[ei];
+      if (!sesEx || !sesEx.sets.length || !cached) return null;
+      const bestE1RM = Math.max(...sesEx.sets.map(s => Math.round(s.weightKg * (1 + s.reps / 30))));
+      const delta = bestE1RM - cached.bestE1RM;
+      return { name: ex.name, currentBest: bestE1RM, prevBest: cached.bestE1RM, delta, sessions: cached.sessions, trend: cached.trend };
+    }).filter(Boolean) as { name: string; currentBest: number; prevBest: number; delta: number; sessions: number; trend: string }[];
+  }, [done, day]);
+
   // 2.1/2.2: двойная прогрессия + рекомендация делода по завершённой сессии
   const nextSuggestions = useMemo(() => {
     if (!done || !day) return [];
@@ -656,6 +676,25 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
                {sessionTimerRunning ? '⏸ Пауза' : '▶ Старт'}
              </button>
            </div>
+
+           {/* общий прогресс сессии */}
+           {(() => {
+             if (!day || !Array.isArray(day.exercises)) return null;
+             const totalSets = day.exercises.reduce((s, ex) => s + ex.targetSets.length, 0);
+             const doneSets = day.exercises.reduce((s, ex, ei) => s + ex.targetSets.filter((_, si) => !!actual[keyFor(ei, si)]).length, 0);
+             const pct = totalSets > 0 ? Math.round(doneSets / totalSets * 100) : 0;
+             return (
+               <div style={{ marginBottom: 8 }}>
+                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                   <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Прогресс сессии</span>
+                   <span style={{ fontSize: 10, fontWeight: 600, color: pct === 100 ? '#22c55e' : ACCENT }}>{doneSets}/{totalSets} подходов · {pct}%</span>
+                 </div>
+                 <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                   <div style={{ height: '100%', width: `${pct}%`, borderRadius: 3, background: pct === 100 ? '#22c55e' : 'var(--accent)', transition: 'width 0.3s ease' }} />
+                 </div>
+               </div>
+             );
+           })()}
 
            {/* режимы суперсета и круга */}
            <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -1009,7 +1048,51 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
                </div>
              </div>
            )}
-           
+
+           {/* сравнение с предыдущей сессией */}
+           {sessionComparison && sessionComparison.older && (
+             <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)' }}>
+               <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>📊 Сравнение с предыдущей сессией ({sessionComparison.older.date})</div>
+               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4 }}>
+                 {([
+                   { label: 'Тоннаж', cur: done?.totalVolume || 0, prev: sessionComparison.older.totalVolume, unit: 'кг', isKg: true },
+                   { label: 'Подходы', cur: done?.totalSets || 0, prev: sessionComparison.older.totalSets, unit: '' },
+                   { label: 'Повторы', cur: done?.totalReps || 0, prev: sessionComparison.older.totalReps, unit: '' },
+                   { label: 'Интенсив.', cur: done?.avgIntensity || 0, prev: sessionComparison.older.avgIntensity, unit: '' },
+                 ]).map(item => {
+                   const delta = item.cur - item.prev;
+                   const pct = item.prev > 0 ? Math.round(delta / item.prev * 100) : 0;
+                   const positive = delta > 0;
+                   return (
+                     <div key={item.label} style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)' }}>
+                       <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{item.label}</div>
+                       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{Math.round(item.cur)}{item.unit}</div>
+                       <div style={{ fontSize: 9, color: positive ? '#22c55e' : delta < 0 ? '#ef4444' : 'var(--text-dim)' }}>
+                         {delta > 0 ? '+' : ''}{item.isKg ? Math.round(delta) : delta} ({pct > 0 ? '+' : ''}{pct}%)
+                       </div>
+                     </div>
+                   );
+                 })}
+               </div>
+             </div>
+           )}
+
+           {/* delta по упражнениям vs лучший результат */}
+           {exerciseBestDeltas.length > 0 && (
+             <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.15)' }}>
+               <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🏋️ Упражнения: текущий лучший vs предыдущий</div>
+               {exerciseBestDeltas.map((d, i) => (
+                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: i < exerciseBestDeltas.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                   <span style={{ fontSize: 10, color: 'var(--text)', flex: 1 }}>{d.name}</span>
+                   <span style={{ fontSize: 10, color: 'var(--text-dim)', marginRight: 6 }}>{d.prevBest} → {d.currentBest}кг</span>
+                   <span style={{ fontSize: 10, fontWeight: 700, color: d.delta > 0 ? '#22c55e' : d.delta < 0 ? '#ef4444' : 'var(--text-dim)', minWidth: 50, textAlign: 'right' }}>
+                     {d.delta > 0 ? '+' : ''}{d.delta}кг
+                   </span>
+                 </div>
+               ))}
+             </div>
+           )}
+            
            <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setPhase('ready'); }}>← Новая тренировка</button>
          </div>
        )}

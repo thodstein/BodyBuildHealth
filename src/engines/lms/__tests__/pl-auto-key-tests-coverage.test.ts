@@ -231,4 +231,19 @@ describe('PL-auto key coverage 4.1-4.15', () => {
      // Должно быть распределено в 2 дня (малая группа = 2×/нед)
      expect(daysWithArms.length).toBe(2);
    });
+
+   it('4.21 plWeakPoints: упражнения из диагностики добавляются в план', () => {
+     const p = buildLMSPlan({ template: CYCLE_01, pmMap, weeksOverride: 4, mode: 'natural',
+       plWeakPoints: [{ lift: 'bench' as const, weakPoint: 'lockout' as const }],
+       plWeakPointDayMap: { 'bench|lockout': [1, 3] },
+       currentReadiness: 100 });
+     // Проверяем, что упражнения из диагностики добавлены в выбранные дни
+     const day1Exercises = p.weeks[0].days[0].exercises;
+     const day3Exercises = p.weeks[0].days[2].exercises;
+     // В дне 1 и 3 должны быть упражнения, которых нет в исходном шаблоне для этих дней
+     const day1New = day1Exercises.filter(e => !CYCLE_01.week1[0].exercises.some(te => te.name === e.name));
+     const day3New = day3Exercises.filter(e => !CYCLE_01.week1[2].exercises.some(te => te.name === e.name));
+     expect(day1New.length).toBeGreaterThan(0);
+     expect(day3New.length).toBeGreaterThan(0);
+   });
  });

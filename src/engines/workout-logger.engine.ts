@@ -577,3 +577,112 @@ export function compareWithPrevious(session: WorkoutSession): SessionComparison 
     intensityDelta: Number((newer.avgIntensity - older.avgIntensity).toFixed(1)),
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Bodyweight Exercise Progression
+// ═══════════════════════════════════════════════════════════════════════════
+
+const BODYWEIGHT_EXERCISE_PATTERNS = [
+  /подтягиван/i, /отжиман/i, /планк/i, /скручиван/i, /подъём ног/i, /悬挂/i,
+  /dip/i, /push.?up/i, /pull.?up/i, /plank/i, /crunch/i, /leg.?raise/i,
+  /брусь/i, /колен/i, /ab/i,
+];
+
+export function isBodyweightExercise(exerciseName: string): boolean {
+  return BODYWEIGHT_EXERCISE_PATTERNS.some(p => p.test(exerciseName));
+}
+
+export interface BodyweightProgress {
+  exerciseName: string;
+  sessions: number;
+  totalReps: number;
+  bestRepsPerSet: number;
+  totalVolume: number;
+  avgRepsPerSession: number;
+  trend: 'up' | 'down' | 'stable';
+  lastDate: string;
+}
+
+export function getBodyweightProgress(name: string, limit: number = 30): BodyweightProgress | null {
+  const sessions = loadSessions().slice(0, limit);
+  const repsData: { reps: number; date: string }[] = [];
+  let lastDate = '';
+  let totalReps = 0;
+  let bestRepsPerSet = 0;
+
+  for (const sess of sessions) {
+    if (!Array.isArray(sess.exercises)) continue;
+    for (const ex of sess.exercises) {
+      if (!ex || !ex.sets?.length) continue;
+      const matches = ex.exerciseName.toLowerCase().includes(name.toLowerCase()) ||
+        ex.exerciseId.toLowerCase().includes(name.toLowerCase());
+      if (!matches) continue;
+
+      const isBW = ex.sets.some(s => s.weightKg === 0 || isBodyweightExercise(ex.exerciseName));
+      if (!isBW) continue;
+
+      lastDate = lastDate ? (sess.date > lastDate ? sess.date : lastDate) : sess.date;
+      for (const st of ex.sets) {
+        totalReps += st.reps;
+        bestRepsPerSet = Math.max(bestRepsPerSet, st.reps);
+        repsData.push({ reps: st.reps, date: sess.date });
+      }
+    }
+  }
+
+  if (!repsData.length) return null;
+
+  const sessions2 = new Set(repsData.map(d => d.date)).size;
+  const avgRepsPerSession = Math.round(totalReps / Math.max(1, sessions2));
+
+  // Trend: compare first half vs second half avg reps
+  const half = Math.floor(repsData.length / 2);
+  const firstHalf = repsData.slice(0, half);
+  const secondHalf = repsData.slice(-half || repsData.length);
+  const firstAvg = firstHalf.reduce((a, d) => a + d.reps, 0) / firstHalf.length;
+  const secondAvg = secondHalf.reduce((a, d) => a + d.reps, 0) / secondHalf.length;
+  const trend = secondAvg > firstAvg * 1.05 ? 'up' : secondAvg < firstAvg * 0.95 ? 'down' : 'stable';
+
+  return {
+    exerciseName: name,
+    sessions: sessions2,
+    totalReps,
+    bestRepsPerSet,
+    totalVolume: totalReps,
+    avgRepsPerSession,
+    trend,
+    lastDate,
+  };
+}
+
+export function getRecentBodyweightPRs(limit: number = 5): { exercise: string; bestReps: number; date: string }[] {
+  const sessions = loadSessions();
+  const prs: { exercise: string; bestReps: number; date: string }[] = [];
+
+  for (const sess of sessions) {
+    if (!Array.isArray(sess.exercises)) continue;
+    for (const ex of sess.exercises) {
+      if (!ex || !Array.isArray(ex.sets)) continue;
+      const isBW = ex.sets.some(s => s.weightKg === 0 || isBodyweightExercise(ex.exerciseName));
+      if (!isBW) continue;
+      const bestReps = Math.max(...ex.sets.map(s => s.reps), 0);
+      if (bestReps > 0) {
+        prs.push({ exercise: ex.exerciseName, bestReps, date: sess.date });
+      }
+    }
+  }
+
+  // Group by exercise, take best per exercise
+  const byExercise = new Map<string, { bestReps: number; date: string }>();
+  for (const pr of prs) {
+    const existing = byExercise.get(pr.exercise);
+    if (!existing || pr.bestReps > existing.bestReps || (pr.bestReps === existing.bestReps && pr.date > existing.date)) {
+      byExercise.set(pr.exercise, { bestReps: pr.bestReps, date: pr.date });
+    }
+  }
+
+  return Array.from(byExercise.entries())
+    .map(([exercise, v]) => ({ exercise, ...v }))
+    .sort((a, b) => b.bestReps - a.bestReps)
+    .slice(0, limit);
+}

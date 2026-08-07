@@ -40,6 +40,7 @@ import {
   type DiaryGoals,
   defaultGoals,
 } from './diary-helpers';
+import { DiaryWindow } from './DiaryWindow';
 
 /* ── Типы для встроенных дневников ── */
 
@@ -2051,665 +2052,70 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
         <QuickLinkRow links={QUICK_DIARY_LINKS} ariaLabel="Дневники в других блоках" />
       </AccordionSection>
 
-      {activeDiary && (() => {
-            const target = targetHit(activeDiary, activeEntriesRaw, goals);
-        const offTarget = target && !target.onTarget;
-        const bg = offTarget ? 'rgba(245,158,11,0.04)' : undefined;
-        return (
-        <AccordionSection
-          title={`${DIARY_META[activeDiary].icon} Дневник: ${DIARY_META[activeDiary].title}`}
-          subtitle={`Записи из ${DIARY_META[activeDiary].title.toLowerCase()} (${activeEntries.length})${currentPhase ? ` · ${currentPhase.label}${courseWeek ? ` · неделя ${courseWeek}` : ''}` : ''}${offTarget ? ` · ⚠️ вне цели` : ''}`}
-          icon={DIARY_META[activeDiary].icon}
-          color={DIARY_META[activeDiary].color}
-          defaultOpen
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6, flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setActiveDiary(null)}
-              aria-label="Закрыть дневник"
-              style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${colors.border}`, color: colors.text }}
-            >← Назад к дневникам</button>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => quickAddToday()}
-                aria-label="Быстро записать сегодня"
-                style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: 'rgba(0,230,138,0.14)', border: '1px solid rgba(0,230,138,0.4)', color: '#00e68a' }}
-              >⚡ Сегодня</button>
-              {activeEntriesRaw.length > 0 && (
-                <>
-                  <button
-                    onClick={() => printActiveDiary()}
-                    aria-label="Печать или экспорт в PDF"
-                    title="В диалоге печати можно выбрать «Сохранить как PDF»"
-                    style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa' }}
-                  >📄 PDF / Печать</button>
-                  <button
-                    onClick={() => clearActiveDiary()}
-                    aria-label="Очистить весь дневник"
-                    style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}
-                  >🧹 Очистить</button>
-                </>
-              )}
-              {activeEntries.length > 0 && (
-                <button
-                  onClick={() => exportDiaryCSV(activeDiary, activeEntries)}
-                  aria-label="Экспорт в CSV"
-                  style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }}
-                >📤 CSV</button>
-              )}
-              <button
-                onClick={() => {
-                  if (activeDiary === 'sleep') setAddSleepOpen(true);
-                  else if (activeDiary === 'bp') setAddBPOpen(true);
-                  else if (activeDiary === 'weight') setAddWeightOpen(true);
-                  else if (activeDiary === 'measurements') setAddMeasurementsOpen(true);
-                  else if (activeDiary === 'injection') setAddInjectionOpen(true);
-                  else if (activeDiary === 'symptoms') setAddSymptomOpen(true);
-                  else if (activeDiary === 'pain') setAddPainOpen(true);
-                  else if (activeDiary === 'neuro') setAddNeuroOpen(true);
-                  else if (activeDiary === 'acne') setAddAcneOpen(true);
-                  else if (activeDiary === 'hemato') setAddHematoOpen(true);
-                }}
-                style={{ padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: DIARY_META[activeDiary].color, color: '#0a0a0a', border: 'none' }}
-              >+ Добавить запись</button>
-            </div>
-          </div>
+      {activeDiary && (
+        <DiaryWindow
+          open={true}
+          onClose={() => setActiveDiary(null)}
+          diaryKey={activeDiary}
+          goals={goals}
+          onDataChange={() => {
+            refresh();
+          }}
+        />
+      )}
 
-          {/* Фильтр по дате */}
-          {activeEntriesRaw.length > 1 && (
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 10, color: colors.textMuted, fontWeight: 600 }}>Период:</span>
-              {(['all', '7', '30', '90'] as const).map(r => (
-                <button key={r} onClick={() => setDiaryRange(r)} style={{
-                  padding: '4px 10px', borderRadius: 12, fontSize: 10, fontWeight: 600, cursor: 'pointer',
-                  border: `1px solid ${diaryRange === r ? DIARY_META[activeDiary].color : colors.border}`,
-                  background: diaryRange === r ? `${DIARY_META[activeDiary].color}26` : 'rgba(255,255,255,0.03)',
-                  color: diaryRange === r ? DIARY_META[activeDiary].color : colors.textMuted,
-                }}>{r === 'all' ? 'Всё время' : `${r} дней`}</button>
-              ))}
-            </div>
-          )}
-
-          {/* Summary + Streak + Extremes + Trend */}
-          {(() => {
-            const summary = computeSummary(activeDiary, activeEntries);
-            const period = computePeriodDelta(activeDiary, activeEntries);
-            const streak = computeStreak(activeEntriesRaw);
-            const extremes = computeExtremes(activeDiary, activeEntries);
-        const target = targetHit(activeDiary, activeEntriesRaw, goals);
-            const blocks: { label: string; value: string; color: string }[] = [];
-            if (streak.totalDays > 0) {
-              blocks.push({ label: 'Дней с записями', value: String(streak.totalDays), color: DIARY_META[activeDiary].color });
-              blocks.push({ label: 'Серия (текущая)', value: `${streak.current} дн.`, color: streak.current >= 3 ? '#22c55e' : streak.current >= 1 ? colors.warning : colors.textMuted });
-              blocks.push({ label: 'Серия (лучшая)', value: `${streak.best} дн.`, color: streak.best >= 7 ? '#22c55e' : streak.best >= 3 ? colors.warning : colors.textMuted });
-            }
-            if (period) blocks.push(period);
-            if (extremes.min && (activeDiary === 'sleep' || activeDiary === 'weight' || activeDiary === 'pain' || activeDiary === 'acne' || activeDiary === 'neuro' || activeDiary === 'hemato')) {
-              blocks.push({ label: 'Минимум', value: `${extremes.min.value.toFixed(1)} · ${new Date(extremes.min.date).toLocaleDateString('ru-RU')}`, color: '#22c55e' });
-              blocks.push({ label: 'Максимум', value: `${extremes.max!.value.toFixed(1)} · ${new Date(extremes.max!.date).toLocaleDateString('ru-RU')}`, color: '#ef4444' });
-            }
-            if (target) blocks.unshift({ label: '🎯 Цель', value: `${target.onTarget ? '✅' : '⚠️'} ${target.details}`, color: target.onTarget ? '#22c55e' : '#f59e0b' });
-            if (summary) blocks.push(...summary);
-            if (blocks.length === 0) return null;
-            return (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 6, marginBottom: 10 }}>
-                {blocks.map((s, i) => (
-                  <div key={i} style={{ padding: 8, borderRadius: 8, background: `${s.color}1A`, border: `1px solid ${s.color}44` }}>
-                    <div style={{ fontSize: 9, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: s.color, marginTop: 2 }}>{s.value}</div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-
-          {/* Полноценный график с зонами нормы и экспортом */}
-          {activeEntries.length >= 1 && (() => {
-            const points = buildSparkline(activeDiary, activeEntries);
-            if (points.length < 1) return null;
-            const targetVal = (() => {
-              if (activeDiary === 'sleep') return goals.sleepHours > 0 ? goals.sleepHours : null;
-              if (activeDiary === 'weight') return goals.weightKg > 0 ? goals.weightKg : null;
-              if (activeDiary === 'bp') return goals.systolicTarget > 0 ? goals.systolicTarget : null;
-              return null;
-            })();
-            const unit = DIARY_META[activeDiary].unit || '';
-            const range = getNormalRange(activeDiary);
-            const safeDate = new Date().toISOString().slice(0, 10);
-            return (
-              <div style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${DIARY_META[activeDiary].color}33`, marginBottom: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>📈 График по датам</div>
-                    {range && (
-                      <div style={{ fontSize: 9, color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '2px 6px', borderRadius: 4 }} title={range.description}>
-                        Норма: {range.low}–{range.high}{unit}
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 9, color: colors.textMuted }}>{points.length} точек · {unit}</div>
-                </div>
-                <FullChart
-                  points={points}
-                  color={DIARY_META[activeDiary].color}
-                  target={targetVal}
-                  normalRange={range}
-                  unit={unit}
-                  height={200}
-                  onExportSvg={(svg) => exportSvgAsFile(svg, `${activeDiary}-chart-${safeDate}.svg`)}
-                  onExportPng={(svg) => exportSvgAsPng(svg, `${activeDiary}-chart-${safeDate}.png`)}
-                />
-              </div>
-            );
-          })()}
-
-          {/* Гистограмма по неделям */}
-          {activeEntries.length >= 2 && (() => {
-            const points = buildSparkline(activeDiary, activeEntries);
-            const weeks = buildWeeklyHistogram(points);
-            if (weeks.length < 2) return null;
-            const maxCount = Math.max(...weeks.map(w => w.count));
-            const maxMean = Math.max(...weeks.map(w => w.mean));
-            const minMean = Math.min(...weeks.map(w => w.mean));
-            const color = DIARY_META[activeDiary].color;
-            const unit = DIARY_META[activeDiary].unit || '';
-            return (
-              <div style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${color}33`, marginBottom: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>📊 По неделям ({weeks.length})</div>
-                  <div style={{ fontSize: 9, color: colors.textMuted }}>Столбик = среднее{unit ? ` ${unit}` : ''}</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 100, padding: '4px 0' }}>
-                  {weeks.map((w, i) => {
-                    const h = maxMean > minMean ? ((w.mean - minMean) / (maxMean - minMean || 1)) * 80 + 15 : 60;
-                    const dateLabel = new Date(w.weekStart).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-                    return (
-                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0 }} title={`Неделя с ${dateLabel}: ${w.count} записей, среднее ${w.mean.toFixed(1)}${unit}, мин ${w.min.toFixed(1)}, макс ${w.max.toFixed(1)}`}>
-                        <div style={{ fontSize: 9, color: color, fontWeight: 700, marginBottom: 2 }}>{w.mean.toFixed(1)}</div>
-                        <div style={{
-                          width: '100%', maxWidth: 40, height: `${h}px`,
-                          background: `linear-gradient(180deg, ${color}, ${color}66)`,
-                          borderRadius: '4px 4px 0 0', border: `1px solid ${color}99`,
-                          position: 'relative',
-                        }}>
-                          <div style={{ position: 'absolute', top: 2, left: 0, right: 0, textAlign: 'center', fontSize: 7, color: '#fff', fontWeight: 700 }}>{w.count}</div>
-                        </div>
-                        <div style={{ fontSize: 7, color: colors.textMuted, marginTop: 3, whiteSpace: 'nowrap' }}>{dateLabel}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Статистика распределения + распределение по часам */}
-          {activeEntries.length >= 3 && (() => {
-            const points = buildSparkline(activeDiary, activeEntries);
-            const values = points.map(p => p.value);
-            const stats = computeDistribution(values);
-            const hourDist = buildHourDistribution(activeEntriesRaw.map(e => e.date));
-            const maxHour = Math.max(...hourDist.map(h => h.count), 1);
-            const lastClass = activeEntries[0] ? classifyValue(activeDiary, parseFloat(activeEntries[0].fields[0]?.value || 'NaN')) : 'unknown';
-            const lastVal = activeEntries[0] ? activeEntries[0].fields[0]?.value : null;
-            const lastUnit = activeEntries[0] ? activeEntries[0].fields[0]?.unit : '';
-            return (
-              <div style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${DIARY_META[activeDiary].color}33`, marginBottom: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>📈 Статистика</div>
-                  {lastVal && (
-                    <div style={{
-                      fontSize: 9, padding: '2px 6px', borderRadius: 4,
-                      background: lastClass === 'normal' ? 'rgba(34,197,94,0.18)' : lastClass === 'warn' ? 'rgba(245,158,11,0.18)' : lastClass === 'danger' ? 'rgba(239,68,68,0.18)' : 'rgba(255,255,255,0.06)',
-                      color: lastClass === 'normal' ? '#22c55e' : lastClass === 'warn' ? '#f59e0b' : lastClass === 'danger' ? '#ef4444' : colors.textMuted,
-                      fontWeight: 700,
-                    }}>Последняя: {lastVal}{lastUnit} · {lastClass === 'normal' ? '✅ норма' : lastClass === 'warn' ? '⚠ внимание' : lastClass === 'danger' ? '⚠️ опасно' : '—'}</div>
-                  )}
-                </div>
-                {stats && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 4, marginBottom: 8 }}>
-                    {[
-                      { l: 'Среднее', v: stats.mean.toFixed(1) },
-                      { l: 'Медиана', v: stats.median.toFixed(1) },
-                      { l: 'σ (SD)', v: stats.stdDev.toFixed(1) },
-                      { l: 'P25', v: stats.p25.toFixed(1) },
-                      { l: 'P75', v: stats.p75.toFixed(1) },
-                      { l: 'IQR', v: stats.iqr.toFixed(1) },
-                    ].map(s => (
-                      <div key={s.l} style={{ padding: '5px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: 5, textAlign: 'center' }}>
-                        <div style={{ fontSize: 8, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3 }}>{s.l}</div>
-                        <div style={{ fontSize: 12, fontWeight: 800, color: DIARY_META[activeDiary].color }}>{s.v}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {/* Распределение по часам суток */}
-                <div style={{ fontSize: 9, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>⏰ По времени суток</div>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1, height: 50 }}>
-                  {hourDist.map((h, i) => {
-                    const barH = (h.count / maxHour) * 40;
-                    const isHigh = h.count > 0;
-                    return (
-                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0 }} title={`${i}:00 — ${i + 1}:00: ${h.count} записей`}>
-                        <div style={{
-                          width: '100%', maxWidth: 18, height: `${barH}px`,
-                          background: isHigh ? DIARY_META[activeDiary].color : 'rgba(255,255,255,0.06)',
-                          borderRadius: '2px 2px 0 0', opacity: isHigh ? 0.9 : 0.4,
-                        }} />
-                      </div>
-                    );
-                  })}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: colors.textMuted, marginTop: 2 }}>
-                  <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:00</span>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Сравнение с прошлой неделей */}
-          {activeEntries.length >= 2 && (() => {
-            const points = buildSparkline(activeDiary, activeEntries);
-            const cmp = compareWithLastWeek(points);
-            if (!cmp.thisWeek || !cmp.lastWeek) return null;
-            const deltaColor = cmp.better === 'up' ? '#22c55e' : cmp.better === 'down' ? '#ef4444' : colors.textMuted;
-            const arrow = cmp.better === 'up' ? '↑' : cmp.better === 'down' ? '↓' : '≈';
-            const unit = DIARY_META[activeDiary].unit || '';
-            return (
-              <div style={{ padding: 10, borderRadius: 10, background: `${deltaColor}0d`, border: `1px solid ${deltaColor}55`, marginBottom: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>📆 Сравнение с прошлой неделей</div>
-                  {currentPhase && (
-                    <div style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: `${currentPhase.color}22`, color: currentPhase.color, fontWeight: 700 }}>💊 {currentPhase.label}{courseWeek ? ` · нед. ${courseWeek}` : ''}</div>
-                  )}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, alignItems: 'center' }}>
-                  <div style={{ padding: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3 }}>Эта неделя</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: DIARY_META[activeDiary].color, marginTop: 2 }}>{cmp.thisWeek.mean.toFixed(1)}</div>
-                    <div style={{ fontSize: 9, color: colors.textMuted }}>{cmp.thisWeek.count} записей</div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 24, fontWeight: 900, color: deltaColor }}>{arrow}</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: deltaColor }}>{cmp.delta !== null ? `${cmp.delta > 0 ? '+' : ''}${cmp.delta.toFixed(1)}${unit}` : '—'}</div>
-                    {cmp.pct !== null && Math.abs(cmp.pct) >= 0.5 && (
-                      <div style={{ fontSize: 9, color: colors.textMuted }}>{cmp.pct > 0 ? '+' : ''}{cmp.pct.toFixed(1)}%</div>
-                    )}
-                  </div>
-                  <div style={{ padding: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3 }}>Прошлая</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: colors.textMuted, marginTop: 2 }}>{cmp.lastWeek.mean.toFixed(1)}</div>
-                    <div style={{ fontSize: 9, color: colors.textMuted }}>{cmp.lastWeek.count} записей</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Корреляция с другими дневниками */}
-          {activeEntries.length >= 5 && (() => {
-            const points = buildSparkline(activeDiary, activeEntries);
-            const candidates: { key: DiaryKey; label: string; color: string; data: { date: string; value: number }[] }[] = [];
-            for (const k of builtInDiaries) {
-              if (k.key === activeDiary) continue;
-              const arr = getEntryArray(k.key) as any[];
-              const vals = arr.map(e => {
-                let v = NaN;
-                if (k.key === 'sleep') v = parseFloat(e.fields.find((f: any) => f.label === 'Часы')?.value || 'NaN');
-                else if (k.key === 'bp') v = parseFloat(e.fields.find((f: any) => f.label === 'Систола')?.value || 'NaN');
-                else if (k.key === 'weight') v = parseFloat(e.fields.find((f: any) => f.label === 'Вес')?.value || 'NaN');
-                else if (k.key === 'pain') v = parseFloat(e.fields.find((f: any) => f.label === 'Суммарно')?.value || 'NaN');
-                else if (k.key === 'neuro' || k.key === 'hemato') v = parseFloat(e.fields.find((f: any) => f.label === 'Симптомов')?.value || 'NaN');
-                else if (k.key === 'acne') v = parseFloat(e.fields.find((f: any) => f.label === 'Суммарно')?.value || 'NaN');
-                return { date: e.date, value: v };
-              }).filter((p: any) => Number.isFinite(p.value));
-              if (vals.length >= 3) candidates.push({ key: k.key, label: DIARY_META[k.key].title, color: DIARY_META[k.key].color, data: vals });
-            }
-            const results: { key: DiaryKey; label: string; color: string; r: number; n: number; strength: 'weak' | 'moderate' | 'strong'; positive: boolean; lag: number }[] = [];
-            for (const c of candidates) {
-              const cc = crossCorrelation(points, c.data);
-              if (cc) results.push({ key: c.key, label: c.label, color: c.color, r: cc.r, n: cc.n, strength: cc.strength, positive: cc.positive, lag: 0 });
-              if (candidates.length > 0 && results.length < 3) {
-                const lag = laggedCorrelation(points, c.data, 1);
-                if (lag) results.push({ key: c.key, label: c.label, color: c.color, r: lag.r, n: lag.n, strength: lag.strength, positive: lag.positive, lag: 1 });
-              }
-            }
-            const top = results.sort((a, b) => Math.abs(b.r) - Math.abs(a.r)).slice(0, 4);
-            if (top.length === 0) return null;
-            return (
-              <div style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${DIARY_META[activeDiary].color}33`, marginBottom: 10 }}>
-                <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>🔗 Корреляция с другими дневниками</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 6 }}>
-                  {top.map((r, i) => {
-                    const sign = r.r > 0 ? '+' : '−';
-                    const c = r.r > 0 ? '#22c55e' : '#ef4444';
-                    return (
-                      <div key={i} style={{ padding: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 6, border: `1px solid ${r.color}33` }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: r.color }}>{r.label}</span>
-                          <span style={{ fontSize: 9, color: colors.textMuted }}>{r.lag > 0 ? `lag ${r.lag}д` : '同期'}</span>
-                        </div>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: c, marginTop: 2 }}>{sign}{Math.abs(r.r).toFixed(2)}</div>
-                        <div style={{ fontSize: 9, color: colors.textMuted }}>n={r.n} · {r.strength === 'strong' ? '🟢 сильная' : r.strength === 'moderate' ? '🟡 средняя' : '⚪ слабая'}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Таблица записей с сортировкой, фильтром, пагинацией, inline-редактированием */}
-          {activeEntriesRaw.length > 0 && (() => {
-            const allLabels = Array.from(new Set(activeEntriesRaw.flatMap(e => e.fields.map(f => f.label))));
-            const labelUnit = (l: string) => {
-              const f = activeEntriesRaw.flatMap(e => e.fields).find(x => x.label === l);
-              return f?.unit || '';
-            };
-            const sorted = sortEntries(activeEntriesRaw, tableSort);
-            const filtered = tableFilter.trim()
-              ? sorted.filter(e => e.date.includes(tableFilter.toLowerCase()) || e.fields.some(f => f.value.toLowerCase().includes(tableFilter.toLowerCase())))
-              : sorted;
-            const PAGE_SIZE = 8;
-            const page = paginate(filtered, tablePage, PAGE_SIZE);
-            const color = DIARY_META[activeDiary].color;
-            const saveInlineEdit = (date: string) => {
-              const list = getEntryArray(activeDiary);
-              const orig = list.find(x => x.date === date);
-              if (!orig) return;
-              const updated: any = { ...(orig as any) };
-              allLabels.forEach(l => {
-                const newVal = editingValues[`${date}::${l}`];
-                if (newVal !== undefined) {
-                  const field = updated.fields.find((f: any) => f.label === l);
-                  if (field) field.value = newVal;
-                }
-              });
-              const newList = list.map(x => x.date === date ? updated : x);
-              if (activeDiary === 'sleep') { saveDiary(SLEEP_DIARY_KEY, newList as SleepEntry[]); setSleepEntries(newList as SleepEntry[]); }
-              else if (activeDiary === 'bp') { saveDiary(BP_DIARY_KEY, newList as BPEntry[]); setBpEntries(newList as BPEntry[]); }
-              else if (activeDiary === 'injection') { saveDiary(INJECTION_DIARY_KEY, newList as InjectionEntry[]); setInjectionEntries(newList as InjectionEntry[]); }
-              else if (activeDiary === 'symptoms') { saveDiary(SYMPTOMS_DIARY_KEY, newList as SymptomEntry[]); setSymptomEntries(newList as SymptomEntry[]); }
-              else if (activeDiary === 'pain') { saveDiary(PAIN_DIARY_KEY, newList as PainEntry[]); setPainEntries(newList as PainEntry[]); }
-              else if (activeDiary === 'neuro') { saveDiary(NEURO_DIARY_KEY, newList as NeuroEntry[]); setNeuroEntries(newList as NeuroEntry[]); }
-              else if (activeDiary === 'acne') { saveDiary(ACNE_DIARY_KEY, newList as AcneEntry[]); setAcneEntries(newList as AcneEntry[]); }
-              else if (activeDiary === 'hemato') { saveDiary(HEMATO_DIARY_KEY, newList as HematoEntry[]); setHematoEntries(newList as HematoEntry[]); }
-              setEditingDate(null);
-              if ((window as any).showToast) (window as any).showToast('✏️ Запись обновлена');
-            };
-            const sortIcon = (key: string) => tableSort.key === key ? (tableSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
-            return (
-              <div style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${color}33`, marginBottom: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8, flexWrap: 'wrap' }}>
-                  <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>📋 Таблица записей ({filtered.length}{filtered.length !== activeEntriesRaw.length ? ` из ${activeEntriesRaw.length}` : ''})</div>
-                  <input
-                    type="text"
-                    value={tableFilter}
-                    onChange={e => { setTableFilter(e.target.value); setTablePage(1); }}
-                    placeholder="🔍 Фильтр по дате или значению…"
-                    style={{ width: 200, background: 'rgba(0,0,0,0.3)', border: `1px solid ${colors.border}`, borderRadius: 6, padding: '5px 8px', color: colors.text, fontSize: 10, outline: 'none' }}
-                    aria-label="Фильтр таблицы"
-                  />
-                </div>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
-                    <thead>
-                      <tr>
-                        <th
-                          onClick={() => setTableSort(s => ({ key: 'date', dir: s.key === 'date' && s.dir === 'asc' ? 'desc' : 'asc' }))}
-                          style={{ padding: '6px 4px', background: 'rgba(255,255,255,0.05)', borderBottom: `2px solid ${color}`, color: color, textAlign: 'left', cursor: 'pointer', userSelect: 'none', minWidth: 70 }}
-                        >📅 Дата{sortIcon('date')}</th>
-                        {allLabels.map(l => (
-                          <th
-                            key={l}
-                            onClick={() => setTableSort(s => ({ key: l, dir: s.key === l && s.dir === 'asc' ? 'desc' : 'asc' }))}
-                            style={{ padding: '6px 4px', background: 'rgba(255,255,255,0.05)', borderBottom: `2px solid ${color}`, color: color, textAlign: 'left', cursor: 'pointer', userSelect: 'none', minWidth: 60 }}
-                          >{l}{sortIcon(l)}</th>
-                        ))}
-                        <th style={{ padding: '6px 4px', background: 'rgba(255,255,255,0.05)', borderBottom: `2px solid ${color}`, color: color, textAlign: 'right', minWidth: 80 }}>Действия</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {page.pageItems.map(e => {
-                        const isEditing = editingDate === e.date;
-                        return (
-                          <tr key={e.date} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <td style={{ padding: '5px 4px', color: color, fontWeight: 700 }}>{new Date(e.date).toLocaleDateString('ru-RU')}</td>
-                            {allLabels.map(l => {
-                              const field = e.fields.find(f => f.label === l);
-                              if (isEditing) {
-                                const key = `${e.date}::${l}`;
-                                return (
-                                  <td key={l} style={{ padding: '3px 4px' }}>
-                                    <input
-                                      type="text"
-                                      value={editingValues[key] !== undefined ? editingValues[key] : (field?.value || '')}
-                                      onChange={e2 => setEditingValues(p => ({ ...p, [key]: e2.target.value }))}
-                                      style={{ width: '100%', minWidth: 50, background: 'rgba(0,0,0,0.4)', border: `1px solid ${color}66`, borderRadius: 4, padding: '3px 5px', color: color, fontSize: 10, outline: 'none', boxSizing: 'border-box' }}
-                                    />
-                                  </td>
-                                );
-                              }
-                              const cls = field ? classifyValue(activeDiary, parseFloat(field.value)) : 'unknown';
-                              const clsColor = cls === 'normal' ? '#22c55e' : cls === 'warn' ? '#f59e0b' : cls === 'danger' ? '#ef4444' : colors.text;
-                              return (
-                                <td key={l} style={{ padding: '5px 4px', color: clsColor, fontWeight: cls === 'normal' ? 400 : 700 }}>
-                                  {field ? `${field.value}${field.unit ? ' ' + field.unit : ''}` : '—'}
-                                </td>
-                              );
-                            })}
-                            <td style={{ padding: '4px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                              {isEditing ? (
-                                <>
-                                  <button onClick={() => saveInlineEdit(e.date)} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, background: '#22c55e', color: '#0a0a0a', border: 'none', cursor: 'pointer', fontWeight: 700, marginRight: 4 }}>💾 OK</button>
-                                  <button onClick={() => setEditingDate(null)} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, background: 'rgba(255,255,255,0.06)', color: colors.text, border: `1px solid ${colors.border}`, cursor: 'pointer' }}>✕</button>
-                                </>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      const init: Record<string, string> = {};
-                                      e.fields.forEach(f => { init[`${e.date}::${f.label}`] = f.value; });
-                                      setEditingValues(init);
-                                      setEditingDate(e.date);
-                                    }}
-                                    aria-label={`Редактировать запись ${e.date}`}
-                                    style={{ padding: '2px 6px', borderRadius: 4, fontSize: 9, background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: 'none', cursor: 'pointer', marginRight: 4 }}
-                                  >✏️</button>
-                                  <button
-                                    onClick={() => deleteDiaryEntry(activeDiary, e.date)}
-                                    aria-label={`Удалить запись ${e.date}`}
-                                    style={{ padding: '2px 6px', borderRadius: 4, fontSize: 9, background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', cursor: 'pointer' }}
-                                  >🗑</button>
-                                </>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                {page.totalPages > 1 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 10, color: colors.textMuted }}>
-                    <span>Показано {page.pageStart + 1}–{page.pageEnd} из {page.total}</span>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <button
-                        onClick={() => setTablePage(p => Math.max(1, p - 1))}
-                        disabled={tablePage === 1}
-                        style={{ padding: '4px 10px', borderRadius: 5, fontSize: 10, background: 'rgba(255,255,255,0.06)', color: tablePage === 1 ? colors.textMuted : colors.text, border: `1px solid ${colors.border}`, cursor: tablePage === 1 ? 'not-allowed' : 'pointer' }}
-                      >‹ Назад</button>
-                      <span style={{ padding: '4px 8px', color: color, fontWeight: 700 }}>{tablePage} / {page.totalPages}</span>
-                      <button
-                        onClick={() => setTablePage(p => Math.min(page.totalPages, p + 1))}
-                        disabled={tablePage === page.totalPages}
-                        style={{ padding: '4px 10px', borderRadius: 5, fontSize: 10, background: 'rgba(255,255,255,0.06)', color: tablePage === page.totalPages ? colors.textMuted : colors.text, border: `1px solid ${colors.border}`, cursor: tablePage === page.totalPages ? 'not-allowed' : 'pointer' }}
-                      >Вперёд ›</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-          {activeEntries.length === 0 ? (
-            <div style={{ color: colors.textMuted, fontSize: 12, padding: 12, textAlign: 'center' }}>
-              {activeEntriesRaw.length === 0
-                ? 'Записей пока нет. Нажмите «+ Добавить запись», чтобы внести первую.'
-                : `Нет записей за выбранный период (${diaryRange === 'all' ? 'всё время' : diaryRange + ' дней'}).`}
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {/* Список последних аномалий */}
-              {(() => {
-                const anomalies = detectAnomalies(activeDiary, activeEntries);
-                if (anomalies.length === 0) return null;
-                const recent = anomalies.slice(-3);
-                return (
-                  <div style={{ padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.3)' }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>⚠️ Аномалии ({anomalies.length})</div>
-                    {recent.map((a, i) => (
-                      <div key={i} style={{ fontSize: 10, color: a.severity === 'danger' ? '#ef4444' : '#f59e0b', marginBottom: 2 }}>
-                        {a.severity === 'danger' ? '⚠️' : '⚠'} {new Date(a.date).toLocaleDateString('ru-RU')}: {a.message}
-                      </div>
-                    ))}
-                    {anomalies.length > 3 && <div style={{ fontSize: 9, color: colors.textMuted, marginTop: 2 }}>…и ещё {anomalies.length - 3}</div>}
-                  </div>
-                );
-              })()}
-              <div style={{ fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700, marginTop: 4 }}>📋 Последние записи</div>
-              {activeEntriesRaw.slice(0, 3).map((entry, i) => {
-                const color = DIARY_META[activeDiary].color;
-                return (
-                  <div key={`${entry.date}-${i}`} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${color}22` }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color }}>{new Date(entry.date).toLocaleDateString('ru-RU')}</span>
-                      <button
-                        onClick={() => deleteDiaryEntry(activeDiary, entry.date)}
-                        aria-label={`Удалить запись ${new Date(entry.date).toLocaleDateString('ru-RU')}`}
-                        style={{ padding: '2px 6px', borderRadius: 4, fontSize: 9, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}
-                      >🗑</button>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 4 }}>
-                      {entry.fields.map((f, fi) => (
-                        <div key={fi} style={{ fontSize: 10, color: colors.textMuted }}>
-                          <span style={{ color: colors.text }}>{f.value}</span>{f.unit ? ` ${f.unit}` : ''}<span style={{ marginLeft: 4, opacity: 0.7 }}>· {f.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-              {activeEntriesRaw.length > 3 && (
-                <div style={{ fontSize: 9, color: colors.textMuted, textAlign: 'center', marginTop: 4 }}>
-                  …и ещё {activeEntriesRaw.length - 3} (полный список — в таблице выше ⬆)
-                </div>
-              )}
-            </div>
-          )}
-        </AccordionSection>
-        );
-      })()}
-
-      <AccordionSection
-        title="📊 Отчёты по модулям"
-        subtitle="Быстрый переход к отчётам других блоков (с подтверждением)"
-        icon="📊"
-        color={colors.teal}
-      >
-        <QuickLinkRow links={QUICK_REPORT_LINKS} ariaLabel="Отчёты по модулям" />
-      </AccordionSection>
-
-      <AddSleepModal
-        open={addSleepOpen}
-        onClose={() => setAddSleepOpen(false)}
+      {/* ── Модальные окна для быстрого добавления из карточек дневников ── */}
+      <AddSleepModal open={addSleepOpen} onClose={() => setAddSleepOpen(false)}
         onSave={(e) => {
           const updated = [...sleepEntries.filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
-          saveDiary(SLEEP_DIARY_KEY, updated);
-          setSleepEntries(updated);
-        }}
-      />
-      <AddBPModal
-        open={addBPOpen}
-        onClose={() => setAddBPOpen(false)}
+          saveDiary(SLEEP_DIARY_KEY, updated); setSleepEntries(updated);
+        }} />
+      <AddBPModal open={addBPOpen} onClose={() => setAddBPOpen(false)}
         onSave={(e) => {
           const updated = [...bpEntries.filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
-          saveDiary(BP_DIARY_KEY, updated);
-          setBpEntries(updated);
-        }}
-      />
-      <AddWeightModal
-        open={addWeightOpen}
-        onClose={() => setAddWeightOpen(false)}
+          saveDiary(BP_DIARY_KEY, updated); setBpEntries(updated);
+        }} />
+      <AddWeightModal open={addWeightOpen} onClose={() => setAddWeightOpen(false)}
         onSave={(e) => {
-          const updated = [...weights.filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
+          const updated = [...(getWeightLog() || []).filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
           saveWeightLog(updated);
-          setWeights(updated);
-        }}
-      />
-      <AddMeasurementsModal
-        open={addMeasurementsOpen}
-        onClose={() => setAddMeasurementsOpen(false)}
+        }} />
+      <AddMeasurementsModal open={addMeasurementsOpen} onClose={() => setAddMeasurementsOpen(false)}
         onSave={(e) => {
-          const updated = [...measurements.filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
-          saveMeasurementsLog(updated);
-          setMeasurements(updated);
-        }}
-      />
-      <AddInjectionModal
-        open={addInjectionOpen}
-        onClose={() => setAddInjectionOpen(false)}
+          const updated = [...getMeasurementsLog().filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
+          saveMeasurementsLog(updated); setMeasurements(updated);
+        }} />
+      <AddInjectionModal open={addInjectionOpen} onClose={() => setAddInjectionOpen(false)}
         onSave={(e) => {
-          const updated = [...injectionEntries.filter(x => !(x.date === e.date && x.substance === e.substance)), e].sort((a, b) => a.date.localeCompare(b.date));
-          saveDiary(INJECTION_DIARY_KEY, updated);
-          setInjectionEntries(updated);
-        }}
-      />
-      <AddSymptomModal
-        open={addSymptomOpen}
-        onClose={() => setAddSymptomOpen(false)}
+          const updated = [...injectionEntries.filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
+          saveDiary(INJECTION_DIARY_KEY, updated); setInjectionEntries(updated);
+        }} />
+      <AddSymptomModal open={addSymptomOpen} onClose={() => setAddSymptomOpen(false)}
         onSave={(e) => {
-          const updated = [...symptomEntries.filter(x => !(x.date === e.date && x.name === e.name)), e].sort((a, b) => a.date.localeCompare(b.date));
-          saveDiary(SYMPTOMS_DIARY_KEY, updated);
-          setSymptomEntries(updated);
-        }}
-      />
-      <AddPainModal
-        open={addPainOpen}
-        onClose={() => setAddPainOpen(false)}
+          const updated = [...symptomEntries.filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
+          saveDiary(SYMPTOMS_DIARY_KEY, updated); setSymptomEntries(updated);
+        }} />
+      <AddPainModal open={addPainOpen} onClose={() => setAddPainOpen(false)}
         onSave={(e) => {
           const updated = [...painEntries.filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
-          saveDiary(PAIN_DIARY_KEY, updated);
-          setPainEntries(updated);
-        }}
-      />
-      <AddNeuroModal
-        open={addNeuroOpen}
-        onClose={() => setAddNeuroOpen(false)}
+          saveDiary(PAIN_DIARY_KEY, updated); setPainEntries(updated);
+        }} />
+      <AddNeuroModal open={addNeuroOpen} onClose={() => setAddNeuroOpen(false)}
         onSave={(e) => {
           const updated = [...neuroEntries.filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
-          saveDiary(NEURO_DIARY_KEY, updated);
-          setNeuroEntries(updated);
-        }}
-      />
-      <AddAcneModal
-        open={addAcneOpen}
-        onClose={() => setAddAcneOpen(false)}
+          saveDiary(NEURO_DIARY_KEY, updated); setNeuroEntries(updated);
+        }} />
+      <AddAcneModal open={addAcneOpen} onClose={() => setAddAcneOpen(false)}
         onSave={(e) => {
           const updated = [...acneEntries.filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
-          saveDiary(ACNE_DIARY_KEY, updated);
-          setAcneEntries(updated);
-        }}
-      />
-      <AddHematoModal
-        open={addHematoOpen}
-        onClose={() => setAddHematoOpen(false)}
+          saveDiary(ACNE_DIARY_KEY, updated); setAcneEntries(updated);
+        }} />
+      <AddHematoModal open={addHematoOpen} onClose={() => setAddHematoOpen(false)}
         onSave={(e) => {
           const updated = [...hematoEntries.filter(x => x.date !== e.date), e].sort((a, b) => a.date.localeCompare(b.date));
-          saveDiary(HEMATO_DIARY_KEY, updated);
-          setHematoEntries(updated);
-        }}
-      />
+          saveDiary(HEMATO_DIARY_KEY, updated); setHematoEntries(updated);
+        }}       />
+
       </>}
 
       <style>{`

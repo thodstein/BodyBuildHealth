@@ -7,6 +7,7 @@ export interface ParsedLabValue {
   refHigh?: number;
   isAbnormal?: boolean;
   raw?: string;
+  confidence?: number;
 }
 
 export interface ParsedLabResult {
@@ -28,8 +29,8 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
   { code: 'CREAT', names: ['креатинин', 'Creatinine', 'CREAT', 'CREA', 'креат'], unitPatterns: ['мкмоль/л', 'umol/L', 'мг/дл', 'mg/dL', 'мкМ/л'] },
   { code: 'UREA', names: ['мочевина', 'Urea', 'BUN', 'азот мочевины'], unitPatterns: ['ммоль/л', 'mmol/L', 'mg/dL', 'mM'] },
   { code: 'URIC', names: ['мочевая кислота', 'Uric acid', 'UA', 'моч.кислота'], unitPatterns: ['мкмоль/л', 'umol/L', 'мг/дл', 'mg/dL'] },
-  { code: 'TP', names: ['общий белок', 'Total Protein', 'TP', 'белок общий'], unitPatterns: ['г/л', 'g/L'] },
-  { code: 'ALB', names: ['альбумин', 'Albumin', 'ALB'], unitPatterns: ['г/л', 'g/L'] },
+  { code: 'TP', names: ['общий белок', 'Total Protein', 'TP', 'белок общий', 'общ белок', 'общ.белок'], unitPatterns: ['г/л', 'g/L'] },
+  { code: 'ALB', names: ['альбумин', 'Albumin', 'ALB', 'альб.'], unitPatterns: ['г/л', 'g/L'] },
   { code: 'HGB', names: ['гемоглобин', 'Hemoglobin', 'HGB', 'Hb'], unitPatterns: ['г/л', 'g/L', 'g/dL'] },
   { code: 'WBC', names: ['лейкоциты', 'WBC', 'лейкоцит', 'White blood cells'], unitPatterns: ['10^9/л', '10\\^9/L', '×10⁹/л', '/л', 'тыс/мкл'] },
   { code: 'RBC', names: ['эритроциты', 'RBC', 'эритроцит', 'Red blood cells'], unitPatterns: ['10^12/л', '10\\^12/L', '×10¹²/л', '/л', 'млн/мкл'] },
@@ -62,12 +63,15 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
   { code: 'DHEA', names: ['DHEA', 'ДГЭА', 'DHEA-S', 'ДГЭА-С', 'дегидроэпиандростерон'], unitPatterns: ['мкг/дл', 'ug/dL', 'мкмоль/л', 'umol/L', 'нг/мл'] },
   { code: 'ANDRO', names: ['андростендион', 'Androstenedione'], unitPatterns: ['нг/мл', 'ng/mL', 'нмоль/л'] },
   { code: 'ESTR', names: ['эстрадиол', 'Estradiol', 'E2', 'EII'], unitPatterns: ['пмоль/л', 'pmol/L', 'pg/mL'] },
+  { code: 'OH17P', names: ['17-он-прогестерон', '17-гидроксипрогестерон', 'OH17P'], unitPatterns: ['нмоль/л', 'nmol/L'] },
   { code: 'PROG', names: ['прогестерон', 'Progesterone', 'PROG'], unitPatterns: ['нмоль/л', 'nmol/L', 'нг/мл'] },
   { code: 'PROL', names: ['пролактин', 'Prolactin', 'PRL'], unitPatterns: ['мЕд/л', 'mIU/L', 'нг/мл', 'ng/mL', 'мМЕ/л'] },
   { code: 'LH', names: ['ЛГ', 'LH', 'лютеинизирующий', 'лютропин'], unitPatterns: ['мЕд/л', 'mIU/L', 'мМЕ/мл'] },
   { code: 'FSH', names: ['ФСГ', 'FSH', 'фолликулостимулирующий', 'фоллитропин'], unitPatterns: ['мЕд/л', 'mIU/L', 'мМЕ/мл'] },
   { code: 'CORT', names: ['кортизол', 'Cortisol', 'CORT'], unitPatterns: ['нмоль/л', 'nmol/L', 'мкг/дл', 'ug/dL'] },
+  { code: 'PROINSULIN', names: ['проинсулин', 'Proinsulin', 'PROINSULIN'], unitPatterns: ['пмоль/л', 'pmol/L'] },
   { code: 'INSULIN', names: ['инсулин', 'Insulin', 'INS', 'IMMUNOREACTIVE INSULIN'], unitPatterns: ['мкЕд/мл', 'uIU/mL', 'пмоль/л', 'pmol/L'] },
+  { code: 'FRUCTOSAMINE', names: ['фруктозамин', 'Fructosamine', 'фруктоз.'], unitPatterns: ['мкмоль/л', 'mcmol/L'] },
   { code: 'HOMOCYSTEINE', names: ['гомоцистеин', 'Homocysteine', 'Hcy'], unitPatterns: ['мкмоль/л', 'umol/L'] },
   { code: 'HBA1C', names: ['HbA1c', 'гликированный гемоглобин', 'HBA1C', 'гликогемоглобин', 'HbA1'], unitPatterns: ['%', '%', 'ммоль/моль'] },
   { code: 'PSA', names: ['PSA', 'ПСА', 'простатический антиген', 'PSA общий'], unitPatterns: ['нг/мл', 'ng/mL'] },
@@ -77,6 +81,9 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
   { code: 'CEA', names: ['CEA', 'РЭА', 'раково-эмбриональный антиген'], unitPatterns: ['нг/мл', 'ng/mL'] },
   { code: 'VITD', names: ['витамин D', '25-OH витамин D', 'Vitamin D', '25(OH)D', '25-гидроксивитамин D', 'кальциферол'], unitPatterns: ['нг/мл', 'ng/mL', 'нмоль/л', 'nmol/L'] },
   { code: 'B12', names: ['витамин B12', 'B12', 'Cobalamin', 'кобаламин', 'цианокобаламин'], unitPatterns: ['пг/мл', 'pg/mL', 'пмоль/л', 'pmol/L'] },
+  { code: 'VITAMIN_B6', names: ['витамин B6', 'Vitamin B6', 'B6', 'пиридоксалин'], unitPatterns: ['нмоль/л', 'nmol/L'] },
+  { code: 'VITAMIN_E', names: ['витамин E', 'Vitamin E', 'токоферол'], unitPatterns: ['мкмоль/л', 'mcmol/L'] },
+  { code: 'VITAMIN_A', names: ['витамин A', 'Vitamin A', 'ретинол'], unitPatterns: ['мкмоль/л', 'mcmol/L'] },
   { code: 'FOLATE', names: ['фолиевая кислота', 'фолат', 'Folate', 'витамин B9', 'B9'], unitPatterns: ['нг/мл', 'ng/mL', 'нмоль/л'] },
   { code: 'IRON', names: ['железо', 'Iron', 'Fe', 'сывороточное железо'], unitPatterns: ['мкмоль/л', 'umol/L', 'мкг/дл', 'ug/dL'] },
   { code: 'TRANSF', names: ['трансферрин', 'Transferrin', 'TRF'], unitPatterns: ['г/л', 'g/L'] },
@@ -119,6 +126,10 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
   { code: 'NMETAN', names: ['норметанефрин', 'Normetanephrine', 'NMN'], unitPatterns: ['мкг/сут'] },
   { code: 'AMY', names: ['амилаза', 'Amylase', 'AMY', 'альфа-амилаза'], unitPatterns: ['Е/л', 'U/L'] },
   { code: 'LIP', names: ['липаза', 'Lipase', 'LIP', 'LPS'], unitPatterns: ['Е/л', 'U/L'] },
+  { code: 'ACTH', names: ['АКТГ', 'ACTH', 'адренокортикотропный гормон'], unitPatterns: ['пг/мл', 'pg/mL'] },
+  { code: 'TPO_AB', names: ['АТ к ТПО', 'anti-TPO', 'антитела к тиреопероксидазе'], unitPatterns: ['МЕ/мл', 'IU/mL'] },
+  { code: 'TG_AB', names: ['АТ к ТГ', 'АТ к тиреоглобулину', 'anti-TG', 'антитела к тиреоглобулину'], unitPatterns: ['МЕ/мл', 'IU/mL'] },
+  { code: 'MPV', names: ['МПВ', 'MPV', 'средний объем тромбоцита'], unitPatterns: ['фл', 'fL'] },
 ];
 
 function containsLabName(text: string, name: string): boolean {
@@ -131,6 +142,10 @@ function normalizeOcrText(text: string): string {
   return text
     .replace(/[\u00a0\u2007\u202f]/g, ' ')
     .replace(/[‐‑‒–—]/g, '-')
+    // Remove strikethrough artifacts: word ending with ~ or - (Tesseract reads struck text as "word~" or "word-")
+    // Only match when the strike character is followed by whitespace, punctuation, or end of string.
+    // This avoids removing parts of reference ranges like "62-106".
+    .replace(/\b\w+[~-]+(?=\s|[.,;!?]|$)/g, '')
     .replace(/(\d)[,](\d)/g, '$1.$2')
     // Tesseract occasionally reads zero as Cyrillic O inside numeric cells.
     .replace(/(?<=\d)[ОO](?=\d|[.,])/g, '0')
@@ -216,7 +231,7 @@ function candidateScore(value: ParsedLabValue): number {
   if (value.refLow !== undefined || value.refHigh !== undefined) score += 4;
   if (value.raw && /[А-Яа-яA-Za-z]/.test(value.raw)) score += 1;
   if (value.raw && /\d/.test(value.raw)) score += 1;
-  return score;
+  return Math.max(0, Math.min(1, score / 8));
 }
 
 const PROVIDER_HEADERS: Record<string, string[]> = {
@@ -266,6 +281,18 @@ function enhanceOcrCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
   }
   context.putImageData(image, 0, 0);
   return canvas;
+}
+
+function detectWatermarkText(text: string): string[] {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const watermarks: string[] = [];
+  for (const line of lines) {
+    const ratio = (line.match(/[a-zA-Zа-яА-ЯёЁ]/g) || []).length / Math.max(1, line.length);
+    if (line.length < 15 && ratio > 0.8 && /[a-zA-Zа-яА-ЯёЁ]{3,}/.test(line)) {
+      watermarks.push(line);
+    }
+  }
+  return watermarks;
 }
 
 async function recognizeOcrCanvas(Tesseract: any, canvas: HTMLCanvasElement): Promise<string> {
@@ -391,6 +418,7 @@ function tryParseTableRows(lines: string[], provider: string | null): ParsedLabV
         refHigh,
         isAbnormal: refHigh !== undefined ? val > refHigh : refLow !== undefined ? val < refLow : undefined,
         raw: line,
+        confidence: candidateScore({ code: labDef.code, name: labDef.names[0], value: val, unit: unit || labDef.unitPatterns[0], refLow, refHigh, raw: line }),
       });
       break;
     }
@@ -439,7 +467,7 @@ function parseLabLineGeneric(line: string, val: number): { unit: string; refLow?
   return { unit, refLow: ref.low, refHigh: ref.high };
 }
 
-function tryParseLabFromLine(line: string): { code: string; name: string; value: number; unit: string; refLow?: number; refHigh?: number; raw?: string } | null {
+function tryParseLabFromLine(line: string): { code: string; name: string; value: number; unit: string; refLow?: number; refHigh?: number; raw?: string; confidence?: number } | null {
   const lowerLine = line.toLowerCase();
   
   for (const labDef of LAB_PATTERNS) {
@@ -462,6 +490,7 @@ function tryParseLabFromLine(line: string): { code: string; name: string; value:
       refLow: parsed.refLow,
       refHigh: parsed.refHigh,
       raw: line,
+      confidence: candidateScore({ code: labDef.code, name: labDef.names[0], value: val, unit: parsed.unit || labDef.unitPatterns[0], refLow: parsed.refLow, refHigh: parsed.refHigh, raw: line }),
     };
   }
   return null;
@@ -475,6 +504,9 @@ export function parseLabText(rawText: string): ParsedLabResult {
 
   let values: ParsedLabValue[] = [];
 
+  // Watermark detection: filter out short all-alpha lines (common Tesseract watermark artifacts)
+  const watermarkLines = detectWatermarkText(normalizedText);
+
   if (provider && values.length === 0) {
     values = providerSpecificParse(lines, provider);
   }
@@ -487,6 +519,7 @@ export function parseLabText(rawText: string): ParsedLabResult {
     values.push({
       ...result,
       isAbnormal: result.refHigh !== undefined ? result.value > result.refHigh : result.refLow !== undefined ? result.value < result.refLow : undefined,
+      confidence: candidateScore(result),
     });
   }
 
@@ -500,6 +533,7 @@ export function parseLabText(rawText: string): ParsedLabResult {
       values.push({
         ...result,
         isAbnormal: result.refHigh !== undefined ? result.value > result.refHigh : result.refLow !== undefined ? result.value < result.refLow : undefined,
+        confidence: candidateScore(result),
       });
     }
   }
@@ -513,7 +547,12 @@ export function parseLabText(rawText: string): ParsedLabResult {
     date = `${y}-${m}-${d}`;
   }
 
-  return { values, rawText: normalizedText, source: 'text', date };
+  const warnings: string[] = [];
+  if (watermarkLines.length > 0) {
+    warnings.push(`Обнаружены возможные водяные знаки (${watermarkLines.length} строк). Они исключены из результатов.`);
+  }
+
+  return { values, rawText: normalizedText, source: 'text', date, warnings };
 }
 
 export async function parsePDF(file: File): Promise<ParsedLabResult> {

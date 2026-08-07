@@ -5,7 +5,7 @@ import { type FoodItemLike } from '../NutritionDiary';
 import { BarcodeScanner } from '../../../components/BarcodeScanner';
 import { type OFFProduct, productToFoodItem } from '../../../../engines/openfoodfacts.engine';
 import { processUploadedFile } from '../../../../core/ocr-engine';
-import { parseNutritionText } from '../../../../engines/nutrition-ocr-parser';
+import { parseNutritionText, findFood } from '../../../../engines/nutrition-ocr-parser';
 
 interface AddFoodPanelProps {
   foodSearch: string;
@@ -33,6 +33,8 @@ interface AddFoodPanelProps {
   onUpdateParsedItemQty: (idx: number, qty: number) => void;
   onFillMicros: () => void;
   onSaveItems: () => void;
+  onEditParsedItem?: (idx: number, item: any) => void;
+  onFixAllLowConfidence?: () => void;
   favoriteFoods: any[];
   mealPresets: any[];
   onAddPreset: (items: any[]) => void;
@@ -54,7 +56,8 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   foodSearch, onFoodSearchChange, debouncedSearch, usdaFoods, mealType, onMealTypeChange,
   allMealTypes, onAddFoodFromDB, onShowBarcode, showBarcode, onBarcodeProduct, onOcrFile,
   ocrFileLoading, onShowOCR, showOCR, ocrText, onOcrTextChange, onOcrSubmit, ocrError, onOcrClose,
-  parsedItems, onRemoveParsedItem, onUpdateParsedItemQty, onFillMicros, onSaveItems,
+  parsedItems, onRemoveParsedItem, onUpdateParsedItemQty, onFillMicros, onSaveItems, onEditParsedItem,
+  onFixAllLowConfidence,
   favoriteFoods, mealPresets, onAddPreset, showCustomFood, onToggleCustomFood,
   customFoodName, onCustomFoodNameChange, customFoodKcal, customFoodP, customFoodF, customFoodC,
   onCustomFoodFieldChange, onAddCustomFood, ocrFileRef, ocrCameraRef,
@@ -66,6 +69,37 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     const usda = usdaFoods.filter((f: any) => (f.name || '').toLowerCase().indexOf(q) >= 0 || (f.description || '').toLowerCase().indexOf(q) >= 0);
     return [...internal.slice(0, 5), ...usda.slice(0, 10)].slice(0, 15);
   }, [debouncedSearch, usdaFoods]);
+
+  const [editingIdx, setEditingIdx] = useState<number>(-1);
+  const [editName, setEditName] = useState('');
+  const [editQty, setEditQty] = useState(100);
+  const [editKcal, setEditKcal] = useState(0);
+  const [editP, setEditP] = useState(0);
+  const [editF, setEditF] = useState(0);
+  const [editC, setEditC] = useState(0);
+
+  const startEdit = (idx: number, item: any) => {
+    setEditingIdx(idx);
+    setEditName(item.name || '');
+    setEditQty(item.qty || 100);
+    setEditKcal(Math.round(item.kcal || 0));
+    setEditP(Math.round((item.p || 0) * 10) / 10);
+    setEditF(Math.round((item.f || 0) * 10) / 10);
+    setEditC(Math.round((item.c || 0) * 10) / 10);
+  };
+
+  const saveEdit = () => {
+    if (editingIdx < 0 || !onEditParsedItem) return;
+    onEditParsedItem(editingIdx, {
+      name: editName || 'Блюдо',
+      qty: Math.max(10, editQty),
+      kcal: Math.max(0, editKcal),
+      p: Math.max(0, editP),
+      f: Math.max(0, editF),
+      c: Math.max(0, editC),
+    });
+    setEditingIdx(-1);
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -187,17 +221,59 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             const p = Math.round(((item.p || 0) * q / 100) * 10) / 10;
             const f = Math.round(((item.f || 0) * q / 100) * 10) / 10;
             const c = Math.round(((item.c || 0) * q / 100) * 10) / 10;
+            const isLowConf = typeof item.confidence === 'number' && item.confidence < 0.5;
+            const isEditing = editingIdx === i;
             
             return (
-              <div key={i} style={{ padding: '10px 12px', borderRadius: 12, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', marginBottom: 6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{item.name}</span>
-                  <button onClick={() => onRemoveParsedItem(i)} aria-label="Удалить"
-                    style={{ padding: '4px 8px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                      background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontSize: 10, minHeight: 28 }}>
-                    ✕
-                  </button>
-                </div>
+              <div key={i} style={{ padding: '10px 12px', borderRadius: 12, background: isEditing ? 'rgba(245,158,11,0.06)' : '#202023', border: `1px solid ${isEditing ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.06)'}`, marginBottom: 6 }}>
+                {isEditing ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Название"
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 11, minHeight: 36 }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4 }}>
+                      {[
+                        { l: 'г', v: editQty, f: setEditQty },
+                        { l: 'ккал', v: editKcal, f: setEditKcal },
+                        { l: 'Б', v: editP, f: setEditP },
+                        { l: 'Ж', v: editF, f: setEditF },
+                        { l: 'У', v: editC, f: setEditC },
+                      ].map((x, xi) => (
+                        <div key={xi}>
+                          <label style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginBottom: 1, display: 'block' }}>{x.l}</label>
+                          <input type="number" value={x.v} onChange={e => x.f(Number.parseFloat(e.target.value) || 0)}
+                            style={{ width: '100%', padding: '6px', borderRadius: 6, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 11, minHeight: 28 }} />
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                      <button onClick={saveEdit} style={{ flex: 1, padding: '8px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700, fontSize: 11, minHeight: 32 }}>✓</button>
+                      <button onClick={() => setEditingIdx(-1)} style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: '#18181b', color: 'rgba(255,255,255,0.7)', fontSize: 11, minHeight: 32 }}>✕</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', cursor: isLowConf ? 'pointer' : 'default', textDecoration: isLowConf ? 'underline dotted' : 'none' }} onClick={() => isLowConf && startEdit(i, item)}>{item.name}</span>
+                        {isLowConf && (
+                          <span onClick={() => startEdit(i, item)} style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700, background: 'rgba(245,158,11,0.12)', padding: '2px 6px', borderRadius: 6, cursor: 'pointer' }}>⚠ проверьте</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {!isLowConf && (
+                          <button onClick={() => startEdit(i, item)} aria-label="Изменить"
+                            style={{ padding: '4px 8px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                              background: 'rgba(59,130,246,0.12)', color: '#3b82f6', fontSize: 10, minHeight: 28 }}>
+                            ✎
+                          </button>
+                        )}
+                        <button onClick={() => onRemoveParsedItem(i)} aria-label="Удалить"
+                          style={{ padding: '4px 8px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                            background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontSize: 10, minHeight: 28 }}>
+                          ✕
+                        </button>
+                      </div>
+                    </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#18181b', borderRadius: 10, padding: '2px 4px' }}>
                     <button onClick={() => onUpdateParsedItemQty(i, Math.max(10, q - 10))} aria-label="Уменьшить"
@@ -230,11 +306,20 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                   <span style={{ color: '#fbbf24' }}>Ж {f}г</span>
                   <span style={{ color: '#fb923c' }}>У {c}г</span>
                 </div>
-              </div>
+              </>
+              )}
+            </div>
             );
           })}
           
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            {parsedItems.some(item => typeof item.confidence === 'number' && item.confidence < 0.5) && onFixAllLowConfidence && (
+              <button onClick={onFixAllLowConfidence} aria-label="Исправить все"
+                style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(245,158,11,0.25)',
+                  background: 'rgba(245,158,11,0.06)', color: '#fbbf24', cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 40 }}>
+                ⚡ Исправить все ({parsedItems.filter(item => typeof item.confidence === 'number' && item.confidence < 0.5).length})
+              </button>
+            )}
             <button onClick={onFillMicros} aria-label="Микронутриенты"
               style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(34,197,94,0.2)',
                 background: 'rgba(34,197,94,0.06)', color: '#86efac', cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 40 }}>

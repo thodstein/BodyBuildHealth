@@ -12,6 +12,7 @@ import type { WorkoutLog } from '../../../core/types';
 import type { TrainingProfile } from './training-profile';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio, weeklyMonotony } from '../../../engines/pro/training-load.engine';
+import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -19,10 +20,11 @@ const CARD: React.CSSProperties = { padding: 12, borderRadius: 12, background: '
 const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 8, minHeight: 38, width: '100%', boxSizing: 'border-box' as const, fontSize: 12, textAlign: 'center' as const };
 const LIFT_RU: Record<string, string> = { squat: 'Присед', bench: 'Жим', deadlift: 'Тяга' };
 
-type DiagnosticsHubMode = 'weakpoints' | 'sticking' | 'biomechanics' | 'rir' | 'mesocorr';
+type DiagnosticsHubMode = 'weakpoints' | 'deadpoints' | 'sticking' | 'biomechanics' | 'rir' | 'mesocorr';
 
 const MODE_DEFS: Array<{ m: DiagnosticsHubMode; label: string; icon: string }> = [
   { m: 'weakpoints', label: 'Слабые точки ПЛ', icon: '🎯' },
+  { m: 'deadpoints', label: 'Мёртвые точки + bar-path', icon: '📊' },
   { m: 'sticking', label: 'Срывы', icon: '🔬' },
   { m: 'biomechanics', label: 'Биомеханика+Bar-path', icon: '🔧' },
   { m: 'rir', label: 'RIR-калибр.', icon: '🎯' },
@@ -168,6 +170,7 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
       </div>
 
       {mode === 'weakpoints' && <PlWeakpointsCard />}
+      {mode === 'deadpoints' && <PlDeadpointsBarPathCard />}
       {mode === 'sticking' && <StickingPointAnalysisCard sessions={sessions} />}
       {mode === 'biomechanics' && <DiagnosticsBiomechanicsCard />}
       {mode === 'rir' && <RIRCalibrationCard />}

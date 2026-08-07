@@ -29,6 +29,7 @@ import StickingPointAnalysisCard from './StickingPointAnalysisCard';
 import { TrainingRecommendationsCard } from './TrainingRecommendationsCard';
 import { loadRirCalibrationStats } from '../../../engines/meso-correction.engine';
 import { useDataLink } from '../../../core/data-link';
+import { QuickEntry } from './QuickEntry';
 
 const ACCENT = '#00e68a';
 const GRP_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры', triceps: 'Трицепс', biceps: 'Бицепс', quads: 'Квадрицепсы' };
@@ -63,7 +64,7 @@ interface TrainingDiaryHubProps {
   linked: any;
 }
 
-type HubMode = 'diary' | 'history' | 'analytics' | 'progress' | 'visual' | 'reports';
+type HubMode = 'diary' | 'quick' | 'history' | 'analytics' | 'progress' | 'visual' | 'reports';
 
 export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   initialMode, diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh,
@@ -236,7 +237,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const expertRirStats = useMemo(() => { try { return loadRirCalibrationStats(); } catch { return { bias: 0, stdDev: 1, sessions: 0 }; } }, []);
 
   const MODES: [HubMode, string][] = [
-    ['diary', '📝 Запись'], ['history', '📜 История'], ['analytics', '📊 Аналитика'],
+    ['quick', '⚡ Быстро'], ['diary', '📝 Запись'], ['history', '📜 История'], ['analytics', '📊 Аналитика'],
     ['progress', '📏 Прогресс'], ['visual', '📈 Визуализация'], ['reports', '📄 Отчёты'],
   ];
 
@@ -268,6 +269,16 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ═══ MODE: QUICK ═══ */}
+      {mode === 'quick' && (
+        <QuickEntry
+          diary={diary}
+          historyWorkouts={historyWorkouts}
+          selectedWeek={selectedWeek}
+          onSave={onRefresh}
+        />
       )}
 
       {/* ═══ MODE: DIARY ═══ */}
@@ -420,8 +431,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           </div>
           {/* Search + grouped history */}
           <div style={{ marginBottom: 6 }}><input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск по неделе..." style={style.input} /></div>
-          {filteredHistory.map(([week, workouts]) => (
-            <WorkoutWeekCard key={week} weekLabel={week} workouts={workouts} />
+          {filteredHistory.map(([week, workouts], wi) => (
+            <WorkoutWeekCard key={week} weekLabel={week} workouts={workouts} prevWorkouts={wi < filteredHistory.length - 1 ? filteredHistory[wi + 1][1] : undefined} />
           ))}
           {filteredHistory.length === 0 && (
             <div style={{ ...style.card, textAlign: 'center', padding: 24 }}>
@@ -829,11 +840,15 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
 };
 
 /* ─── WorkoutWeekCard ─── */
-const WorkoutWeekCard: React.FC<{ weekLabel: string; workouts: WorkoutLog[] }> = ({ weekLabel, workouts }) => {
+const WorkoutWeekCard: React.FC<{ weekLabel: string; workouts: WorkoutLog[]; prevWorkouts?: WorkoutLog[] }> = ({ weekLabel, workouts, prevWorkouts }) => {
   const [expanded, setExpanded] = useState(false);
   const totalVol = workouts.reduce((s: number, w: WorkoutLog) => s + (w.exercises || []).reduce((s2: number, ex: any) => s2 + (ex.totalVolume || 0), 0), 0);
   const totalSets = workouts.reduce((s: number, w: WorkoutLog) => s + (w.exercises || []).reduce((s2: number, ex: any) => s2 + (ex.sets?.length || 0), 0), 0);
   const totalDur = workouts.reduce((s: number, w: WorkoutLog) => s + (w.duration || 0), 0);
+
+  // Week-over-week comparison
+  const prevVol = prevWorkouts ? prevWorkouts.reduce((s: number, w: WorkoutLog) => s + (w.exercises || []).reduce((s2: number, ex: any) => s2 + (ex.totalVolume || 0), 0), 0) : 0;
+  const volDelta = prevVol > 0 ? Math.round(((totalVol - prevVol) / prevVol) * 100) : 0;
 
   return (
     <div style={{ borderRadius: 10, marginBottom: 4, overflow: 'hidden', background: 'rgba(255,255,255,0.02)', border: expanded ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.03)' }}>
@@ -844,6 +859,13 @@ const WorkoutWeekCard: React.FC<{ weekLabel: string; workouts: WorkoutLog[] }> =
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{Math.round(totalVol).toLocaleString()} кг</span>
+          {volDelta !== 0 && (
+            <span style={{
+              fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4,
+              background: volDelta > 0 ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+              color: volDelta > 0 ? '#22c55e' : '#ef4444',
+            }}>{volDelta > 0 ? '+' : ''}{volDelta}%</span>
+          )}
           <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{expanded ? '▴' : '▾'}</span>
         </div>
       </div>
@@ -859,7 +881,17 @@ const WorkoutWeekCard: React.FC<{ weekLabel: string; workouts: WorkoutLog[] }> =
               <div style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{s.value}</div>
             </div>)}
           </div>
-          {workouts.map((w: WorkoutLog, wi: number) => (
+          {workouts.map((w: WorkoutLog, wi: number) => {
+            // Find previous session in same week for exercise comparison
+            const prevSession = wi > 0 ? workouts[wi - 1] : null;
+            const prevExMap = new Map<string, number>();
+            if (prevSession) {
+              for (const pe of (prevSession.exercises || [])) {
+                const e1rm = Math.round(pe.estimated1RM || (pe.sets || []).reduce((m: number, s: any) => Math.max(m, s.weight * (1 + s.reps / 30)), 0));
+                prevExMap.set(pe.exerciseName || pe.exerciseId, e1rm);
+              }
+            }
+            return (
             <div key={wi} style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)', marginBottom: 4 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontSize: 10 }}>
                 <span style={{ color: 'var(--text-dim)' }}>{w.date} · {w.duration} мин · RPE {w.overallRPE} · {SP_LABELS[w.split as keyof typeof SP_LABELS] || w.split}</span>
@@ -867,16 +899,27 @@ const WorkoutWeekCard: React.FC<{ weekLabel: string; workouts: WorkoutLog[] }> =
               </div>
               {(w.exercises || []).map((ex: any, ei: number) => {
                 const bestSet = (ex.sets || []).reduce((b: any, s: any) => s.weight > b.weight ? s : b, { weight: 0, reps: 0, rir: 0 });
+                const cur1RM = Math.round(ex.estimated1RM || 0);
+                const prev1RM = prevExMap.get(ex.exerciseName || ex.exerciseId) || 0;
+                const delta = prev1RM > 0 ? cur1RM - prev1RM : 0;
+                const deltaPct = prev1RM > 0 ? Math.round((delta / prev1RM) * 100) : 0;
                 return (
                   <div key={ei} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: 10 }}>
-                    <span style={{ color: 'rgba(255,255,255,0.6)' }}>{ex.exerciseName || ex.exerciseId}</span>
-                    <span style={{ color: '#34d399' }}>{bestSet.weight}×{bestSet.reps} @ RIR {bestSet.rir}</span>
-                    <span style={{ color: 'rgba(255,255,255,0.3)' }}>1RM {Math.round(ex.estimated1RM || 0)} кг</span>
+                    <span style={{ color: 'rgba(255,255,255,0.6)', flex: 1 }}>{ex.exerciseName || ex.exerciseId}</span>
+                    <span style={{ color: '#34d399', minWidth: 70, textAlign: 'right' }}>{bestSet.weight}×{bestSet.reps}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.3)', minWidth: 50, textAlign: 'right' }}>1RM {cur1RM}</span>
+                    {delta !== 0 && (
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, minWidth: 40, textAlign: 'right',
+                        color: delta > 0 ? '#22c55e' : '#ef4444',
+                      }}>{delta > 0 ? '+' : ''}{deltaPct}%</span>
+                    )}
                   </div>
                 );
               })}
             </div>
-          ))}
+          );
+          })}
         </div>
       )}
     </div>

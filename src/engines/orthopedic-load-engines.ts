@@ -99,6 +99,20 @@ const JOINT_STRESS_LIMIT: Record<string, number> = {
   ankle: 4,
 };
 
+const JOINT_ALIASES: Record<string, string> = {
+  lower_back: 'spine', lumbar: 'spine', disc: 'spine',
+  rotator: 'shoulder', cuff: 'shoulder',
+};
+
+const INJURY_ALIASES: Record<string, string> = {
+  lower_back: 'spine_disc', lumbar: 'spine_disc', disc: 'spine_disc',
+  rotator: 'shoulder_rotator', cuff: 'shoulder_rotator',
+};
+
+function normalizeKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
 export function computeOrthopedicConstraints(input: OrthopedicInput): OrthopedicConstraints {
   const blocked = new Set<string>();
   const romLimits: Record<string, { min: number; max: number }> = {};
@@ -106,14 +120,15 @@ export function computeOrthopedicConstraints(input: OrthopedicInput): Orthopedic
 
   // Block patterns based on injuries
   for (const injury of input.injuryHistory) {
-    const key = injury.toLowerCase().replace(/\s+/g, '_');
-    const patterns = INJURY_PATTERN_BLACKLIST[key] || INJURY_PATTERN_BLACKLIST[injury.replace(/_.*/, '')];
+    const key = normalizeKey(injury);
+    const injuryKey = INJURY_ALIASES[key] || key;
+    const patterns = INJURY_PATTERN_BLACKLIST[injuryKey] || INJURY_PATTERN_BLACKLIST[injuryKey.replace(/_.*/, '')];
     if (patterns) {
       patterns.forEach(p => blocked.add(p));
       recommendations.push(`Травма ${injury}: исключены ${patterns.join(', ')}`);
     }
 
-    const limits = ROM_LIMITS_BY_INJURY[key];
+    const limits = ROM_LIMITS_BY_INJURY[injuryKey];
     if (limits) Object.assign(romLimits, limits);
   }
 
@@ -138,7 +153,8 @@ export function computeOrthopedicConstraints(input: OrthopedicInput): Orthopedic
   // Pain
   if (input.currentPain.length > 0) {
     for (const pain of input.currentPain) {
-      const patterns = INJURY_PATTERN_BLACKLIST[pain.toLowerCase()];
+      const key = normalizeKey(pain);
+      const patterns = INJURY_PATTERN_BLACKLIST[key] || INJURY_PATTERN_BLACKLIST[key.replace(/_.*/, '')];
       if (patterns) patterns.forEach(p => blocked.add(p));
     }
     recommendations.push(`Боль в: ${input.currentPain.join(', ')} — соответствующие паттерны исключены`);
@@ -154,7 +170,9 @@ export function computeOrthopedicConstraints(input: OrthopedicInput): Orthopedic
 
   const stressLimits: Record<string, number> = {};
   for (const [joint, limit] of Object.entries(JOINT_STRESS_LIMIT)) {
-    const severity = input.jointLimitations[joint] || 'none';
+    const severity = input.jointLimitations[joint]
+      || input.jointLimitations[Object.keys(JOINT_ALIASES).find(alias => JOINT_ALIASES[alias] === joint) || '']
+      || 'none';
     stressLimits[joint] = severity === 'severe' ? 1 : severity === 'moderate' ? Math.min(limit, 2) : limit;
   }
 

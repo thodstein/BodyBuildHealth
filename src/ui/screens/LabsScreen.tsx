@@ -23,6 +23,10 @@ import LabsProblemPanelsTab from './LabsScreen_parts/LabsProblemPanelsTab';
 import { processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResult } from '../../core/ocr-engine';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { PopupNumber, PopupBool, PopupSelect } from '../components/PopupXxx';
+import { normalizedRatio } from '../../core/labs-mapping';
+import { computeLabTrends, getTrendColor, getTrendIcon, getTrendInsights, exportTrendsToCSV, downloadCSV, type LabTrend } from '../../engines/lab-trend.engine';
+import { getCorrectionIds, getMarkerMap } from '../../data/lab-marker-map';
+import { SYSTEM_INFO_ALL } from '../../core/risk-info';
 
 const NO_LABS_KEY = 'he_force_no_labs';
 const NO_LABS_SYSTEMS_KEY = 'he_no_labs_systems';
@@ -74,6 +78,16 @@ const LAB_SYSTEM_GROUPS: Record<string, string[]> = {
   reproductive: ['PSA','DHEA_S','AMH','INHIBIN_B','PROGESTERONE','DHT','FT','TESTOSTERONE','ESTRADIOL'],
   neuro: ['HOMOCYSTEINE','BDNF','SEROTONIN','DOPAMINE','GABA','VITAMIN_B12','FOLATE'],
 };
+
+function getSystemForCode(code: string): string | undefined {
+  const upper = code.toUpperCase();
+  for (const [sys, codes] of Object.entries(LAB_SYSTEM_GROUPS)) {
+    if (codes.includes(upper)) return sys;
+  }
+  const markerInfo = getMarkerMap(upper);
+  if (markerInfo?.system) return markerInfo.system;
+  return undefined;
+}
 
 const CATALOG_LAB_DESCRIPTIONS: Record<string, string> = {
   'ALT': 'Аланинаминотрансфераза. Ключевой маркёр повреждения печени. Повышается при гепатотоксичности ААС.',
@@ -139,14 +153,17 @@ const LAB_SUB_TABS: { id: LabSubTab; label: string; icon: string }[] = [
   { id: 'current', label: 'Текущие', icon: '🔬' },
   { id: 'catalog', label: 'Каталог', icon: '📖' },
   { id: 'journal', label: 'Дневник и архив', icon: '📓' },
+  { id: 'trends', label: 'Тренды', icon: '📈' },
 ];
 
-type LabSubTab = 'hero' | 'overview' | 'current' | 'catalog' | 'journal';
+type LabSubTab = 'hero' | 'overview' | 'current' | 'catalog' | 'journal' | 'trends';
 
 export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
   const linked = useDataLink();
   const profilePhase = (linked.profile?.settings as any)?.pharma?.phase || '';
   const initialLabsPhase = PROFILE_PHASE_TO_LABS_PHASE[profilePhase] || 'baseline';
+  const profileAge = (linked.profile?.settings as any)?.personal?.age || 30;
+  const profileSex = (linked.profile?.settings as any)?.personal?.sex || 'male';
   const [mainTab, setMainTab] = useState<MainLabTab>('hero');
   const [subTab, setSubTab] = useState<LabSubTab>('current');
   const [globalNoLabs, setGlobalNoLabs] = useState(getGlobalNoLabs());
@@ -343,6 +360,18 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   const penalty = useMemo(() => {
     return calculatePenaltyCoefficients(selectedPhase, currentLabs, [], 1, linked.course, globalNoLabs);
   }, [selectedPhase, currentLabs, linked.course, globalNoLabs]);
+
+  const trendAlertList = useMemo(() => {
+    const report = computeLabTrends(labs);
+    return report.worsened
+      .filter(t => t.significance === 'critical' || t.significance === 'significant')
+      .map(t => ({
+        code: t.code,
+        name: t.name,
+        significance: t.significance,
+        direction: t.direction,
+      }));
+  }, [labs]);
 
   const labRisks = useMemo<{ overallNet: number; systemBreakdown: Record<string, { raw: number; net: number }>; markerDeviations: { code: string; name: string; value: number; uln: number; lln: number; deviation: number; system: string }[] } | null>(() => {
     if (!hasLabs) return null;
@@ -561,6 +590,28 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   <span style={{ color: card.color, fontSize: 16, opacity: 0.6 }}>→</span>
                 </button>
               ))}
+              {trendAlertList.length > 0 && (
+                <button onClick={() => { setMainTab('lab'); setSubTab('trends'); }} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
+                  background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)', color: '#fff',
+                  transition: 'all 0.2s',
+                }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    background: 'rgba(239,68,68,0.25)', fontSize: 18,
+                  }}>
+                    ⚠️
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2, color: '#ef4444' }}>Критические тренды ({trendAlertList.length})</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', lineHeight: 1.3 }}>
+                      {trendAlertList.slice(0, 2).map(a => `${a.name} ${a.direction === 'up' ? '↑' : '↓'}`).join(', ')}
+                      {trendAlertList.length > 2 && ` +${trendAlertList.length - 2}`}
+                    </div>
+                  </div>
+                  <span style={{ color: '#ef4444', fontSize: 14, opacity: 0.8 }}>→</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -799,6 +850,26 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               </button>
             ))}
           </div>
+
+          {/* Trend alerts */}
+          {trendAlertList.length > 0 && (
+            <div style={{ marginBottom:10, padding:'8px 10px', borderRadius:10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', fontSize:10 }}>
+              <div style={{ fontWeight:700, color:'#ef4444', marginBottom:4 }}>⚠️ Критические изменения трендов ({trendAlertList.length})</div>
+              {trendAlertList.slice(0,5).map(a => (
+                <div key={a.code} style={{ display:'flex', justifyContent:'space-between', padding:'2px 0', color:'var(--text)' }}>
+                  <span>{a.name}</span>
+                  <span style={{ color: a.direction === 'up' ? '#ef4444' : '#22c55e', fontWeight:600 }}>
+                    {a.direction === 'up' ? '↑' : '↓'} {a.significance}
+                  </span>
+                </div>
+              ))}
+              {trendAlertList.length > 5 && (
+                <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:4 }}>
+                  +{trendAlertList.length - 5} дополнительных — перейдите во вкладку «Тренды»
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Action buttons */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
@@ -1070,7 +1141,28 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           {journalSubView === 'reports' && (
             <div>
               <div style={{ display:'flex', gap:6, marginTop:4, marginBottom:12 }}>
-                <button onClick={() => { const r = { id:Date.now().toString(), date:new Date().toISOString().slice(0,10), labs:(labs||[]).map((l:any)=>({code:l.code,name:l.name||l.code,value:l.value,unit:l.unit,date:l.date})), totalMarkers:labs.length, abnormalCount:deviationCount, timestamp:Date.now() }; const u=[r,...labArchive].slice(0,20); setLabArchive(u); try{localStorage.setItem('he_lab_reports',JSON.stringify(u));localStorage.setItem('he_labs_report_current',JSON.stringify(r))}catch{}; setLabReportGenerated(true); }} style={{ padding:'8px 16px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:12, background:'var(--accent)', color:'#000', border:'none', flex:1 }}>📄 Сгенерировать отчёт</button>
+                <button onClick={() => {
+                  const report = computeLabTrends(labs);
+                  const insights = getTrendInsights(report.trends);
+                  const r = {
+                    id: Date.now().toString(),
+                    date: new Date().toISOString().slice(0, 10),
+                    labs: (labs || []).map((l: any) => ({ code: l.code, name: l.name || l.code, value: l.value, unit: l.unit, date: l.date })),
+                    totalMarkers: labs.length,
+                    abnormalCount: deviationCount,
+                    timestamp: Date.now(),
+                    trends: {
+                      summary: report.summary,
+                      insights,
+                      worsened: report.worsened.slice(0, 5).map(t => ({ code: t.code, name: t.name, direction: t.direction, significance: t.significance, change: t.absoluteChange })),
+                      improved: report.improved.slice(0, 5).map(t => ({ code: t.code, name: t.name, direction: t.direction, significance: t.significance, change: t.absoluteChange })),
+                    }
+                  };
+                  const u = [r, ...labArchive].slice(0, 20);
+                  setLabArchive(u);
+                  try { localStorage.setItem('he_lab_reports', JSON.stringify(u)); localStorage.setItem('he_labs_report_current', JSON.stringify(r)); } catch { }
+                  setLabReportGenerated(true);
+                }} style={{ padding: '8px 16px', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 12, background: 'var(--accent)', color: '#000', border: 'none', flex: 1 }}>📄 Сгенерировать отчёт</button>
                 <button onClick={() => { try { localStorage.removeItem('he_lab_reports'); localStorage.removeItem('he_labs_report_current'); setLabArchive([]); setLabReportGenerated(false); } catch {} }} style={{ padding:'8px 12px', borderRadius:10, cursor:'pointer', fontWeight:600, fontSize:11, background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.2)' }}>🗑 Очистить</button>
               </div>
               {labReportGenerated && (
@@ -1108,6 +1200,21 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                               <span>{l.value} {l.unit}</span>
                             </div>
                           ))}
+                          {r.trends && (
+                            <div style={{ marginTop:6, paddingTop:6, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+                              <div style={{ fontSize:8, fontWeight:700, color:'var(--accent)', marginBottom:3 }}>📈 Тренды</div>
+                              <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>{r.trends.summary}</div>
+                              {r.trends.insights?.map((insight: string, i: number) => (
+                                <div key={i} style={{ fontSize:8, color:'var(--text)', padding:'1px 0' }}>{insight}</div>
+                              ))}
+                              {r.trends.worsened?.length > 0 && (
+                                <div style={{ fontSize:8, color:'#ef4444', marginTop:2 }}>⚠️ Ухудшения: {r.trends.worsened.map((w: any) => `${w.name} ${w.direction === 'up' ? '↑' : '↓'}`).join(', ')}</div>
+                              )}
+                              {r.trends.improved?.length > 0 && (
+                                <div style={{ fontSize:8, color:'#22c55e', marginTop:2 }}>✅ Улучшения: {r.trends.improved.map((im: any) => `${im.name} ${im.direction === 'up' ? '↑' : '↓'}`).join(', ')}</div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1133,6 +1240,266 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           )}
         </div>
       )}
+
+      {/* ≡≡≡ TRENDS TAB ≡≡≡ */}
+      {subTab === 'trends' && (() => {
+        const report = computeLabTrends(labs);
+        const insights = getTrendInsights(report.trends);
+        const [filter, setFilter] = useState<'all' | 'significant' | 'critical' | 'worsened' | 'improved'>('all');
+        const [trendSystemFilter, setTrendSystemFilter] = useState<string>('all');
+        const [visibleTrends, setVisibleTrends] = useState<Set<string>>(new Set());
+        const [hoveredPoint, setHoveredPoint] = useState<{ code: string; date: string; value: number; x: number; y: number } | null>(null);
+        const filtered = useMemo(() => {
+          let base = report.trends;
+          if (filter === 'worsened') base = report.worsened;
+          else if (filter === 'improved') base = report.improved;
+          else if (filter !== 'all') base = base.filter(t => t.significance === filter);
+          if (trendSystemFilter !== 'all') {
+            const sysCodes = LAB_SYSTEM_GROUPS[trendSystemFilter] || [];
+            base = base.filter(t => sysCodes.includes(t.code.toUpperCase()));
+          }
+          return base;
+        }, [report, filter, trendSystemFilter]);
+        const recommendations = useMemo(() => {
+          const recs: { trend: LabTrend; corrections: string[] }[] = [];
+          for (const t of report.worsened) {
+            if (t.significance === 'normal') continue;
+            const ids = getCorrectionIds(t.code);
+            if (ids.length > 0) {
+              recs.push({ trend: t, corrections: ids.slice(0, 5) });
+            }
+          }
+          return recs;
+        }, [report]);
+        const chartTrends = useMemo(() => {
+          const withPoints = filtered.filter(t => t.points.length >= 2);
+          if (visibleTrends.size === 0) return withPoints;
+          return withPoints.filter(t => visibleTrends.has(t.code));
+        }, [filtered, visibleTrends]);
+        const toggleTrend = (code: string) => {
+          setVisibleTrends(prev => {
+            const next = new Set(prev);
+            if (next.has(code)) next.delete(code); else next.add(code);
+            return next;
+          });
+        };
+        return (
+          <div style={{ padding: '10px 0' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, flexWrap:'wrap', gap:8 }}>
+              <div>
+                <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)' }}>📈 Динамика маркеров ({report.trends.length})</div>
+                <div style={{ fontSize:10, color:'var(--text-dim)' }}>{report.summary}</div>
+              </div>
+              {report.trends.length > 0 && (
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                  {(['all','significant','critical','worsened','improved'] as const).map(f => (
+                    <button key={f} onClick={() => setFilter(f)} style={{
+                      padding:'4px 10px', borderRadius:6, fontSize:9, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
+                      background: filter === f ? 'var(--accent)' : 'var(--bg-secondary)',
+                      color: filter === f ? '#000' : 'var(--text-dim)',
+                      border: `1px solid ${filter === f ? 'var(--accent)' : 'var(--border)'}`,
+                    }}>
+                      {f === 'all' ? 'Все' : f === 'significant' ? 'Значимые' : f === 'critical' ? 'Критические' : f === 'worsened' ? 'Ухудшения' : 'Улучшения'}
+                    </button>
+                   ))}
+                   <button onClick={() => { setTrendSystemFilter('all'); }} style={{
+                     padding:'3px 8px', borderRadius:6, fontSize:8, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
+                     background: trendSystemFilter === 'all' ? 'var(--accent)' : 'var(--bg-secondary)',
+                     color: trendSystemFilter === 'all' ? '#000' : 'var(--text-dim)',
+                     border: `1px solid ${trendSystemFilter === 'all' ? 'var(--accent)' : 'var(--border)'}`,
+                   }}>Все системы</button>
+                   {Object.entries(LAB_SYSTEM_GROUPS).slice(0, 6).map(([sys, codes]) => {
+                     const info = SYSTEM_INFO_ALL[sys];
+                     return (
+                       <button key={sys} onClick={() => setTrendSystemFilter(trendSystemFilter === sys ? 'all' : sys)} style={{
+                         padding:'3px 8px', borderRadius:6, fontSize:8, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
+                         background: trendSystemFilter === sys ? (info?.icon || '') + ' var(--accent)' : 'var(--bg-secondary)',
+                         color: trendSystemFilter === sys ? '#000' : 'var(--text-dim)',
+                         border: `1px solid ${trendSystemFilter === sys ? 'var(--accent)' : 'var(--border)'}`,
+                       }}>
+                         {info?.icon || ''} {info?.label || sys}
+                       </button>
+                     );
+                   })}
+                   <button onClick={() => {
+                    const csv = exportTrendsToCSV(report);
+                    downloadCSV(csv, `lab-trends-${new Date().toISOString().slice(0,10)}.csv`);
+                  }} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--accent)', fontWeight:600, fontSize:9, cursor:'pointer', whiteSpace:'nowrap' }}>
+                    📥 CSV
+                  </button>
+                  <button onClick={() => {
+                    const win = window.open('', '_blank');
+                    if (!win) return;
+                    const insightsHtml = insights.map(i => `<li>${i.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]!))}</li>`).join('');
+                    const rowsHtml = report.trends.map(t => `
+                      <tr style="border-bottom:1px solid #eee">
+                        <td style="padding:6px">${t.name}</td>
+                        <td style="padding:6px">${t.previousDate || '—'}</td>
+                        <td style="padding:6px">${t.previousValue ?? '—'}</td>
+                        <td style="padding:6px">${t.currentDate}</td>
+                        <td style="padding:6px">${t.currentValue} ${t.unit}</td>
+                        <td style="padding:6px">${t.absoluteChange !== null ? (t.absoluteChange > 0 ? '+' : '') + t.absoluteChange.toFixed(1) : '—'}</td>
+                        <td style="padding:6px">${t.percentChange !== null ? (t.percentChange > 0 ? '+' : '') + t.percentChange.toFixed(0) + '%' : '—'}</td>
+                        <td style="padding:6px">${t.direction}</td>
+                        <td style="padding:6px">${t.significance}</td>
+                      </tr>
+                    `).join('');
+                    win.document.write(`<!DOCTYPE html><html><head><title>Lab Trends ${new Date().toISOString().slice(0,10)}</title>
+                      <style>body{font-family:Arial,sans-serif;padding:24px;color:#222}h1{color:#00c97f}table{border-collapse:collapse;width:100%;margin-top:12px}th{background:#00c97f;color:#fff;padding:8px;text-align:left}ul{margin-top:8px;padding-left:20px}li{margin:4px 0}</style>
+                      </head><body>
+                      <h1>📈 Lab Trends Report</h1>
+                      <p><b>Date:</b> ${new Date().toLocaleDateString()} · <b>Markers:</b> ${report.trends.length} · <b>Summary:</b> ${report.summary}</p>
+                      <h2>Insights</h2><ul>${insightsHtml}</ul>
+                      <h2>Details</h2>
+                      <table><thead><tr><th>Marker</th><th>Prev Date</th><th>Prev Value</th><th>Current Date</th><th>Current Value</th><th>Δ Abs</th><th>Δ %</th><th>Dir</th><th>Significance</th></tr></thead>
+                      <tbody>${rowsHtml}</tbody></table>
+                      <p style="margin-top:24px;font-size:11;color:#888">Generated by BioStackAI · ${new Date().toLocaleString()}</p>
+                      </body></html>`);
+                    win.document.close();
+                    win.print();
+                  }} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--accent)', fontWeight:600, fontSize:9, cursor:'pointer', whiteSpace:'nowrap' }}>
+                    🖨 Print
+                  </button>
+                </div>
+              )}
+            </div>
+            {insights.length > 0 && (
+              <div style={{ marginBottom:12, display:'grid', gap:4 }}>
+                {insights.map((insight, i) => (
+                  <div key={i} style={{ padding:'6px 10px', borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.12)', fontSize:10, color:'var(--text)', lineHeight:1.4 }}>
+                    {insight}
+                  </div>
+                ))}
+              </div>
+              )}
+              {recommendations.length > 0 && (
+                <div style={{ marginBottom:12 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#f97316', marginBottom:6 }}>💊 Рекомендации по коррекции</div>
+                  {recommendations.map(({ trend, corrections }) => (
+                    <div key={trend.code} style={{ padding:'4px 8px', borderRadius:6, background:'rgba(249,115,22,0.06)', border:'1px solid rgba(249,115,22,0.12)', fontSize:9, color:'var(--text)', marginBottom:3, lineHeight:1.4 }}>
+                      <b>{trend.name}</b> {trend.direction === 'up' ? '↑' : '↓'} {trend.absoluteChange?.toFixed(1)} — поддержать: {corrections.join(', ')}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {chartTrends.length > 0 && (
+              <div style={{ marginBottom:12 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--text)', marginBottom:6 }}>📉 График изменений</div>
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
+                  {filtered.filter(t => t.points.length >= 2).map(t => {
+                    const palette = ['#00e68a','#3b82f6','#f97316','#a855f7','#ef4444','#eab308','#14b8a6','#ec4899'];
+                    const color = palette[report.trends.indexOf(t) % palette.length];
+                    const isVisible = visibleTrends.size === 0 || visibleTrends.has(t.code);
+                    return (
+                      <button key={t.code} onClick={() => toggleTrend(t.code)} style={{
+                        padding:'2px 8px', borderRadius:4, fontSize:8, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
+                        background: isVisible ? color + '22' : 'transparent',
+                        color: isVisible ? color : 'var(--text-dim)',
+                        border: `1px solid ${isVisible ? color + '44' : 'var(--border)'}`,
+                        opacity: isVisible ? 1 : 0.5,
+                      }}>
+                        {t.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ overflowX:'auto', paddingBottom:4 }}>
+                  <svg width={Math.max(320, chartTrends.length * 90)} height={180} viewBox={`0 0 ${Math.max(320, chartTrends.length * 90)} 180`} style={{ width:'100%', height:'auto', display:'block' }}>
+                    <rect x="0" y="0" width="100%" height="100%" fill="rgba(255,255,255,0.02)" rx="6" />
+                    {(() => {
+                      if (chartTrends.length === 0) return null;
+                      const allDates = new Set<string>();
+                      chartTrends.forEach(t => t.points.forEach(p => allDates.add(p.date)));
+                      const dates = Array.from(allDates).sort();
+                      const pad = { left: 40, right: 10, top: 10, bottom: 24 };
+                      const w = Math.max(320, chartTrends.length * 90) - pad.left - pad.right;
+                      const h = 180 - pad.top - pad.bottom;
+                      const xStep = w / Math.max(1, dates.length - 1);
+                      const palette = ['#00e68a','#3b82f6','#f97316','#a855f7','#ef4444','#eab308','#14b8a6','#ec4899'];
+                      return (
+                        <g transform={`translate(${pad.left},${pad.top})`}>
+                          {[0, 0.25, 0.5, 0.75, 1].map(f => {
+                            const y = h - f * h;
+                            return <g key={f}><line x1="0" y1={y} x2={w} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" /></g>;
+                          })}
+                          {chartTrends.map((trend, ti) => {
+                            const vals = trend.points.map(p => p.value);
+                            const min = Math.min(...vals);
+                            const max = Math.max(...vals);
+                            const range = max - min || 1;
+                            const points = trend.points.map((p, i) => {
+                              const dateIdx = dates.indexOf(p.date);
+                              const x = dateIdx * xStep;
+                              const y = h - ((p.value - min) / range) * (h - 4) - 2;
+                              return `${x},${y}`;
+                            }).join(' ');
+                            const color = palette[report.trends.indexOf(trend) % palette.length];
+                            return (
+                              <g key={trend.code}>
+                                <polyline fill="none" stroke={color} strokeWidth="2" points={points} vectorEffect="non-scaling-stroke" opacity="0.9" />
+                                 {trend.points.map((p, i) => {
+                                   const dateIdx = dates.indexOf(p.date);
+                                   const x = dateIdx * xStep;
+                                   const y = h - ((p.value - min) / range) * (h - 4) - 2;
+                                   return (
+                                     <circle key={i} cx={x} cy={y} r="4" fill={color} stroke="rgba(0,0,0,0.4)" strokeWidth="1"
+                                       onMouseEnter={() => setHoveredPoint({ code: trend.code, date: p.date, value: p.value, x: pad.left + x, y: pad.top + y })}
+                                       onMouseLeave={() => setHoveredPoint(null)}
+                                       style={{ cursor: 'pointer' }}
+                                     />
+                                   );
+                                 })}
+                              </g>
+                            );
+                          })}
+                          {dates.map((d, i) => (
+                            <text key={i} x={i * xStep} y={h + 14} fill="var(--text-dim)" fontSize="7" textAnchor="middle">{d.slice(5)}</text>
+                          ))}
+                        </g>
+                      );
+                    })()}
+                   </svg>
+                   {hoveredPoint && (
+                     <div style={{
+                       position: 'fixed', left: hoveredPoint.x + 8, top: hoveredPoint.y - 28,
+                       background: 'rgba(0,0,0,0.85)', color: '#fff', padding: '3px 8px', borderRadius: 4,
+                       fontSize: 10, fontWeight: 600, pointerEvents: 'none', zIndex: 1000,
+                       border: '1px solid rgba(255,255,255,0.15)',
+                     }}>
+                       {hoveredPoint.date.slice(5)}: {hoveredPoint.value.toFixed(1)}
+                     </div>
+                   )}
+                 </div>
+               </div>
+             )}
+             {report.worsened.length > 0 && (
+              <div style={{ marginBottom:10 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:6 }}>⚠️ Ухудшения</div>
+                {report.worsened.slice(0,10).map(t => (
+                  <TrendRow key={t.code} trend={t} />
+                ))}
+              </div>
+            )}
+            {report.improved.length > 0 && (
+              <div style={{ marginBottom:10 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:6 }}>✅ Улучшения</div>
+                {report.improved.slice(0,10).map(t => (
+                  <TrendRow key={t.code} trend={t} />
+                ))}
+              </div>
+            )}
+            {report.trends.length === 0 && (
+              <div style={{ textAlign:'center', padding:30, fontSize:10, color:'var(--text-dim)' }}>Загрузите 2+ анализа для сравнения</div>
+            )}
+            <div style={{ marginTop:10 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--text)', marginBottom:6 }}>📋 Все маркеры</div>
+              {report.trends.map(t => (
+                <TrendRow key={t.code} trend={t} />
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ≡≡≡ CATALOG TAB — unified: system groups + input + save + investigations ≡≡≡ */}
       {/* ≡≡≡ CATALOG TAB — unified: catalog + schedule + problem panels ≡≡≡ */}
@@ -1686,6 +2053,19 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   )}
                   {ocrResult.labs.map(lab => {
                     const isSelected = selectedLabs.has(lab.code);
+                    const confidence = typeof lab.confidence === 'number' ? lab.confidence : 0.8;
+                    const confidencePct = Math.round(confidence * 100);
+                    const confidenceColor = confidencePct >= 90 ? '#22c55e' : confidencePct >= 70 ? '#eab308' : '#ef4444';
+                    const dynamicRatio = normalizedRatio(lab.code, lab.value, lab.unit, profileAge, profileSex as 'male' | 'female');
+                    const ratioLabel = dynamicRatio != null ? ` (${Math.round(dynamicRatio * 100)}%)` : '';
+                    const existing = labs.find(l => l.code.toUpperCase() === lab.code.toUpperCase());
+                    const compareLabel = existing ? (() => {
+                      const delta = lab.value - existing.value;
+                      const pct = existing.value !== 0 ? Math.round((delta / Math.abs(existing.value)) * 100) : null;
+                      const arrow = delta > 0 ? '↑' : delta < 0 ? '↓' : '→';
+                      const color = delta > 0 ? '#ef4444' : delta < 0 ? '#22c55e' : 'var(--text-dim)';
+                      return <span style={{ fontSize:8, color, fontWeight:600, marginLeft:4 }}>{arrow} {existing.value} → {lab.value} {pct !== null ? `(${pct > 0 ? '+' : ''}${pct}%)` : ''}</span>;
+                    })() : null;
                     return (
                       <>
                         <button key={lab.code} onClick={() => toggleLabSelection(lab.code)} style={{
@@ -1694,11 +2074,17 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                           border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
                         }}>
                           <span style={{ fontWeight: 600, fontSize: 12 }}>{isSelected ? '✓ ' : '○ '}{lab.name || lab.code}</span>
-                          <span style={{ fontWeight: 700, fontSize: 13, color: lab.isAbnormal ? '#ef4444' : 'var(--accent)' }}>{lab.value} {lab.unit}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            {compareLabel}
+                            <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 4, fontWeight: 700, background: confidenceColor + '22', color: confidenceColor }}>
+                              {confidencePct}%
+                            </span>
+                            <span style={{ fontWeight: 700, fontSize: 13, color: lab.isAbnormal ? '#ef4444' : 'var(--accent)' }}>{lab.value} {lab.unit}{ratioLabel}</span>
+                          </span>
                         </button>
                         {lab.raw && !/^(?:error|warning|invalid pdf|pdf parsing)/i.test(lab.raw.trim()) && (
                           <div style={{ margin: '-2px 4px 6px', fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.3 }}>
-                            {lab.refLow !== undefined || lab.refHigh !== undefined ? `Норма: ${lab.refLow ?? '—'}–${lab.refHigh ?? '—'} · ` : ''}Источник: {lab.raw}
+                            {lab.refLow !== undefined || lab.refHigh !== undefined ? `Норма: ${lab.refLow ?? '—'}–{lab.refHigh ?? '—'} · ` : ''}Источник: {lab.raw}
                           </div>
                         )}
                       </>
@@ -1769,3 +2155,57 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     </div>
   );
 };
+
+function TrendRow({ trend }: { trend: LabTrend }) {
+  const color = getTrendColor(trend.significance);
+  const icon = getTrendIcon(trend.direction, trend.significance);
+  const sparkW = 64;
+  const sparkH = 24;
+  const pts = trend.points;
+  let sparkPath = '';
+  if (pts.length >= 2) {
+    const vals = pts.map(p => p.value);
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const range = max - min || 1;
+    const step = sparkW / Math.max(1, pts.length - 1);
+    const points = pts.map((p, i) => {
+      const x = i * step;
+      const y = sparkH - ((p.value - min) / range) * (sparkH - 4) - 2;
+      return `${x},${y}`;
+    }).join(' ');
+    sparkPath = points;
+  }
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 8px', marginBottom:4, borderRadius:8, background:'var(--bg-secondary)', border:'1px solid var(--border)', fontSize:10 }}>
+      <span style={{ fontSize:14, minWidth:20, textAlign:'center', color }}>{icon}</span>
+      {pts.length >= 2 && (
+        <svg width={sparkW} height={sparkH} viewBox={`0 0 ${sparkW} ${sparkH}`} style={{ flexShrink:0, opacity:0.9 }}>
+          <polyline fill="none" stroke={color} strokeWidth="2" points={sparkPath} vectorEffect="non-scaling-stroke" />
+        </svg>
+      )}
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontWeight:600, fontSize:11, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{trend.name}</div>
+        <div style={{ fontSize:8, color:'var(--text-dim)' }}>
+          {trend.previousDate && <span>{trend.previousDate.slice(5)}: {trend.previousValue}</span>}
+          {trend.previousDate && <span> → </span>}
+          <span>{trend.currentDate.slice(5)}: {trend.currentValue} {trend.unit}</span>
+          {trend.absoluteChange !== null && (
+            <span style={{ marginLeft:4, color, fontWeight:700 }}>
+              {trend.absoluteChange > 0 ? '+' : ''}{trend.absoluteChange.toFixed(1)}
+              {trend.percentChange !== null && <span style={{ fontSize:8 }}> ({trend.percentChange > 0 ? '+' : ''}{trend.percentChange.toFixed(0)}%)</span>}
+            </span>
+          )}
+          {trend.predictedValue !== undefined && (
+            <span style={{ marginLeft:4, color:'#a855f7', fontWeight:600, fontSize:8 }}>
+              → {trend.predictedValue} {trend.unit} ({Math.round((trend.predictionConfidence || 0) * 100)}%)
+            </span>
+          )}
+        </div>
+      </div>
+      {trend.refLow !== undefined && trend.refHigh !== undefined && (
+        <span style={{ fontSize:8, color:'var(--text-dim)', whiteSpace:'nowrap' }}>Норма: {trend.refLow}–{trend.refHigh}</span>
+      )}
+    </div>
+  );
+}

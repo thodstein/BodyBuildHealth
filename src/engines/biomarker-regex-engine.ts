@@ -58,9 +58,10 @@ export const BIOMARKER_DICTIONARY: Record<string, string[]> = {
   'HDL': ['лпвп', 'hdl', 'холестерин лпвп', 'липопротеины высокой плотности', 'хс-лпвп', 'hdl cholesterol'],
   'LDL': ['лпнп', 'ldl', 'холестерин лпнп', 'липопротеины низкой плотности', 'хс-лпнп', 'ldl cholesterol'],
   'Triglycerides': ['триглицериды', 'triglycerides', 'триглиц.', 'тг', 'tg'],
+  'VLDL': ['лпонп', 'vldl', 'липопротеины очень низкой плотности', 'лп-очень низкой плотности', 'vldl cholesterol'],
   'ApoB': ['апов', 'apo b', 'аполипопротеин b', 'apob', 'апо-в', 'apolipoprotein b'],
   'ApoA1': ['апоа1', 'apo a1', 'аполипопротеин a1', 'apoa1', 'апо-а1', 'apolipoprotein a1'],
-  'oxLDL': ['oxldl', 'окисленные лпнп', 'oxidized ldl', 'окисл. лпнп', 'ox-ldl'],
+  'oxLDL': ['окисленные лпнп', 'oxidized ldl', 'окисл. лпнп', 'ox-ldl'],
   'Lp_a': ['lp(a)', 'липопротеин (а)', 'лп(а)', 'lipoprotein a', 'lp a'],
 
   // ── HPTA / Hormones ──
@@ -77,8 +78,14 @@ export const BIOMARKER_DICTIONARY: Record<string, string[]> = {
   'Cortisol_night': ['кортизол ночной', 'night cortisol', 'кортизол вечер', 'cortisol pm'],
   'DHEA_S': ['дгэа-с', 'dhea-s', 'дегидроэпиандростерон-сульфат', 'дгэа сульфат', 'dheas'],
   'IGF-1': ['ифр-1', 'igf-1', 'igf 1', 'инсулиноподобный фактор роста', 'соматомедин с', 'igf1'],
+  'ACTH': ['актг', 'acth', 'адренокортикотропный гормон', 'адренокортикотропин'],
+  'OH17_Progesterone': ['17-он-прогестерон', '17-гидроксипрогестерон', '17-oh progesterone', '17ohp'],
+  'Aldosterone': ['альдостерон', 'aldosterone', 'альдост.'],
   'Inhibin_B': ['ингибин b', 'inhibin b', 'ингибин-b', 'inhibin-b'],
   'HVA': ['hva', 'гомованилиновая кислота', 'гвк', 'homovanillic acid'],
+  'TPO_AB': ['антитела к тпо', 'anti-tpo', 'антитпо', 'tpo antibodies', 'тиреопероксидаза аб'],
+  'TG_AB': ['антитела к тг', 'anti-tg', 'антитг', 'thyroglobulin antibodies', 'антитела к тиреоглобулину'],
+  'MPV': ['мпв', 'mpv', 'средний объем тромбоцита', 'mean platelet volume'],
 
   // ── Glucose / Insulin ──
   'Glucose': ['глюкоза', 'glucose', 'глюк.', 'сахар крови', 'glu'],
@@ -181,6 +188,9 @@ const UNIT_MAP: Record<string, string> = {
   'CK-18': 'U/L', 'GLDH': 'U/L', 'Bile_Acids': 'mcmol/L',
   'KIM-1': 'ng/mL', 'Nephrin': 'ng/mL', 'Microalbumin': 'mg/L',
   'Selenium': 'mcg/L', 'Copper': 'mcmol/L',
+  'ACTH': 'pg/mL', 'OH17_Progesterone': 'nmol/L', 'Aldosterone': 'pg/mL',
+  'TPO_AB': 'IU/mL', 'TG_AB': 'IU/mL', 'MPV': 'fL',
+  'Amylase': 'U/L', 'Lipase': 'U/L', 'Proinsulin': 'pmol/L', 'Fructosamine': 'mcmol/L',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -223,6 +233,10 @@ function preprocessLine(line: string): string {
     .replace(/мг\s*\/\s*дл/g, 'мг/дл')
     .replace(/ммоль\s*\/\s*л/g, 'ммоль/л')
     .replace(/,/g, '.')
+    // Remove strikethrough artifacts from OCR (only trailing ~ or - before whitespace/punctuation/end)
+    .replace(/\b\w+[~-]+(?=\s|[.,;!?]|$)/g, '')
+    // Remove watermark-like short all-alpha tokens (3-12 chars, no digits)
+    .replace(/\b[a-zа-яё]{3,12}\b(?!.*\d)/gi, '')
     .replace(/\s+/g, ' ');
 }
 
@@ -309,14 +323,18 @@ function extractValueAndEc50(
  * Scans BIOMARKER_DICTIONARY for synonyms in the line.
  */
 function matchBiomarker(line: string): { code: string; synonym: string } | null {
+  let best: { code: string; synonym: string; len: number } | null = null;
   for (const [code, synonyms] of Object.entries(BIOMARKER_DICTIONARY)) {
     for (const syn of synonyms) {
       if (line.includes(syn)) {
-        return { code, synonym: syn };
+        const len = syn.length;
+        if (!best || len > best.len) {
+          best = { code, synonym: syn, len };
+        }
       }
     }
   }
-  return null;
+  return best ? { code: best.code, synonym: best.synonym } : null;
 }
 
 /**
@@ -376,6 +394,10 @@ export function parseLabResults(
     if (refText) confidence = 0.85;
     if (numbers.length >= 2 && value > 0 && ec50 > 0) confidence = 0.9;
     if (refText && numbers.length >= 2) confidence = 0.95;
+    // Penalize very short source lines (likely OCR artifacts)
+    if (rawLine.trim().length < 10) confidence *= 0.7;
+    // Boost for known provider-specific patterns
+    if (/результат|референс|единицы/i.test(rawLine)) confidence = Math.min(1, confidence + 0.05);
 
     seenCodes.add(match.code);
 

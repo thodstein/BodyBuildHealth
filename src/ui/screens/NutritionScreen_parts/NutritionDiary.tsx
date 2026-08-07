@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { type OFFProduct, productToFoodItem } from '../../../engines/openfoodfacts.engine';
-import { fillMissingMicros, parseNutritionText, quantityToGrams } from '../../../engines/nutrition-ocr-parser';
+import { fillMissingMicros, parseNutritionText, quantityToGrams, findFood } from '../../../engines/nutrition-ocr-parser';
 import { processUploadedFile } from '../../../core/ocr-engine';
 import { FOOD_DB } from '../../../core/nutrition-database';
 import { CAT_MAP_EMOJI } from '../../../core/nutrition-utils';
@@ -46,6 +46,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const [ocrText, setOcrText] = useState('');
   const [parsedItems, setParsedItems] = useState<DiaryItem[]>([]);
   const [ocrError, setOcrError] = useState('');
+  const [ocrHint, setOcrHint] = useState('');
   const [ocrFileLoading, setOcrFileLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
   const [showCustomFood, setShowCustomFood] = useState(false);
@@ -165,7 +166,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     }));
   }, []);
 
-  const fillQueuedMicros = useCallback(() => setParsedItems(prev => prev.map(item => ({ ...item, micros: fillMissingMicros(item.name, item.qty || 100, item.micros) }))), []);
+  const fillQueuedMicros = useCallback(() => setParsedItems(prev => prev.map(item => ({ ...item, micros: fillMissingMicros(item.name, Number(item.qty) || 100, item.micros) }))), []);
 
   const fillDayMicros = useCallback(() => {
     const data = { ...diaryData };
@@ -193,10 +194,16 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const handleOCR = useCallback(() => { 
     if (!ocrText.trim()) return; 
     setOcrError(''); 
+    setOcrHint(''); 
     try { 
       const converted = convertOCRItems(parseNutritionText(ocrText)); 
       if (converted.length === 0) setOcrError('Не удалось найти продукты. Пример: «Курица 200 г» или «Курица 200 г 330 ккал Б:35 Ж:7 У:0».'); 
-      else setParsedItems(converted); 
+      else {
+        setParsedItems(converted); 
+        if (converted.length <= 2 && ocrText.split(/\r?\n/).filter(l => l.trim().length > 2).length > 4) {
+          setOcrHint('💡 Распознано мало позиций для такого объёма текста. Проверьте, весь ли скриншот был распознан, или добавьте недостающие продукты вручную.');
+        }
+      }
     } catch (e) { setOcrError('' + (e instanceof Error ? e.message : String(e))); } 
   }, [ocrText, convertOCRItems]);
 
@@ -207,7 +214,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     const mt = mealType || 'Приём пищи';
     if (!data[selectedDate].meals[mt]) data[selectedDate].meals[mt] = [];
     items.forEach(item => {
-      const q = item.qty || 100;
+      const q = Number(item.qty) || 100;
       if (q <= 0) return;
       data[selectedDate].meals[mt].push({
         name: item.name, qty: `${q} г`, kcal: Math.round(item.kcal * q / 100),
@@ -411,6 +418,30 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           parsedItems={parsedItems} onRemoveParsedItem={(i) => setParsedItems(prev => prev.filter((_, j) => j !== i))}
           onUpdateParsedItemQty={updateParsedItemQty} onFillMicros={fillQueuedMicros}
           onSaveItems={() => saveItemsToDiary(parsedItems)}
+          onEditParsedItem={(idx, updated) => setParsedItems(prev => prev.map((item, i) => i === idx ? { ...item, ...updated } : item))}
+          onFixAllLowConfidence={() => setParsedItems(prev => prev.map(item => {
+            if (typeof item.confidence === 'number' && item.confidence < 0.5) {
+              const food = findFood(item.name);
+              if (food) {
+                const qty = Math.max(1, item.qtyGrams || quantityToGrams(String(item.qty ?? '100 г'), food));
+                const mult = qty / 100;
+                return {
+                  ...item,
+                  name: food.name,
+                  qty: qty + ' г',
+                  qtyGrams: qty,
+                  kcal: Math.round(food.kcal * mult),
+                  p: Math.round(food.protein * mult * 10) / 10,
+                  f: Math.round(food.fat * mult * 10) / 10,
+                  c: Math.round(food.carbs * mult * 10) / 10,
+                  foodId: food.id,
+                  category: food.category,
+                  confidence: 0.9,
+                };
+              }
+            }
+            return item;
+          }))}
           favoriteFoods={favoriteFoods} mealPresets={mealPresets} onAddPreset={addPresetItems}
           showCustomFood={showCustomFood} onToggleCustomFood={() => setShowCustomFood(!showCustomFood)}
           customFoodName={customFoodName} onCustomFoodNameChange={setCustomFoodName}
@@ -428,7 +459,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
       {tab === 'day' && (
         <>
-          {Object.keys(dayMicros).length > 0 && <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', marginBottom: 6 }}><div style={{ fontSize: 10, fontWeight: 700, color: '#86efac', marginBottom: 6 }}>🧪 Микронутриенты за день</div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>{Object.entries(dayMicros).filter(([key]) => microLabels[key]).map(([key, value]) => { const info = microLabels[key]; const pct = Math.round(value / info.target * 100); return <div key={key} style={{ padding: '4px 6px', borderRadius: 7, background: 'rgba(255,255,255,0.04)' }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8 }}><span style={{ color: 'rgba(255,255,255,0.75)' }}>{info.name}</span><span style={{ color: pct >= 80 ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>{Math.round(value * 10) / 10} {info.unit}</span></div><div style={{ marginTop: 3, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)' }}><div style={{ height: '100%', width: `${Math.min(100, pct)}%`, borderRadius: 2, background: pct >= 80 ? '#22c55e' : '#f59e0b' }} /></div><div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{pct}% от ориентира</div></div>; })}</div></div>}
+          {Object.keys(dayMicros).length > 0 && <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', marginBottom: 6 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}><div style={{ fontSize: 10, fontWeight: 700, color: '#86efac' }}>🧪 Микронутриенты за день</div><button onClick={() => { const txt = Object.entries(dayMicros).filter(([k]) => microLabels[k]).map(([k, v]) => { const info = microLabels[k]; return `${info.name}: ${Math.round(v * 10) / 10} ${info.unit} (${Math.round(v / info.target * 100)}%)`; }).join('\n'); try { void navigator.clipboard?.writeText(`Микро ${selectedDate}\n${txt}`); showToast('📋 Микро скопированы'); } catch { showToast('❌ Не удалось скопировать'); } }} aria-label="Копировать микронутриенты" style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontSize: 9, fontWeight: 600, cursor: 'pointer', minHeight: 28 }}>📋</button></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>{Object.entries(dayMicros).filter(([key]) => microLabels[key]).map(([key, value]) => { const info = microLabels[key]; const pct = Math.round(value / info.target * 100); return <div key={key} style={{ padding: '4px 6px', borderRadius: 7, background: 'rgba(255,255,255,0.04)' }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8 }}><span style={{ color: 'rgba(255,255,255,0.75)' }}>{info.name}</span><span style={{ color: pct >= 80 ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>{Math.round(value * 10) / 10} {info.unit}</span></div><div style={{ marginTop: 3, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)' }}><div style={{ height: '100%', width: `${Math.min(100, pct)}%`, borderRadius: 2, background: pct >= 80 ? '#22c55e' : '#f59e0b' }} /></div><div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{pct}% от ориентира</div></div>; })}</div></div>}
           <DayMealsList
             dayMeals={dayMeals}
             onEditItem={openEdit} onDeleteItem={deleteItem}

@@ -1,5 +1,5 @@
 import synonyms from '../data/labs-synonyms.json';
-import { UCUM_MAP } from './constants';
+import { UCUM_MAP, DYNAMIC_REFS } from './constants';
 
 const SYNONYM_MAP = synonyms as Record<string, string>;
 
@@ -37,6 +37,17 @@ const CODE_ALIAS: Record<string, string> = {
   'FIB': 'FIBRINOGEN',
   'TROP': 'TROPONIN',
   'PHOS': 'P',
+  'ВЛДЛ': 'VLDL',
+  'ЛПВНП': 'VLDL',
+  'АКТГ': 'ACTH',
+  '17-ОН': 'OH17_PROGESTERONE',
+  'Альдост': 'ALDOSTERONE',
+  'АТ-ТПО': 'TPO_AB',
+  'АТ-ТГ': 'TG_AB',
+  'МПВ': 'MPV',
+  'Амилаз': 'AMYLASE',
+  'Липаз': 'LIPASE',
+  'Фруктоз': 'FRUCTOSAMINE',
 };
 
 function unitKey(unit: string): string {
@@ -142,23 +153,29 @@ export function resolveLabMarker(name: string): string {
 }
 
 /** 0..1 position within reference range; null if unknown. */
-export function normalizedRatio(code: string, value: number, unit: string): number | null {
+export function normalizedRatio(code: string, value: number, unit: string, age?: number, sex?: 'male' | 'female'): number | null {
   const ucum = UCUM_MAP[code];
   if (!ucum) return null;
   const norm = value * ucum.coeff;
-  const span = ucum.uln - ucum.lln;
+  let lln = ucum.lln;
+  let uln = ucum.uln;
+
+  const dynamic = DYNAMIC_REFS[code];
+  if (dynamic && age != null && sex) {
+    const ageF = typeof dynamic.ageFactor === 'function' ? dynamic.ageFactor(age) : 1;
+    const sexF = typeof dynamic.sexFactor === 'function' ? dynamic.sexFactor(sex) : 1;
+    lln = dynamic.baseLLN * ageF * sexF;
+    uln = dynamic.baseULN * ageF * sexF;
+  }
+
+  const span = uln - lln;
   if (span <= 0) return null;
-  const lln = ucum.lln;
-  const uln = ucum.uln;
   const midpoint = (lln + uln) / 2;
   if (norm <= midpoint) {
-    // Below midpoint: linear 0..0.5
     return Math.max(0, 0.5 * (norm - lln) / Math.max(0.001, midpoint - lln));
   } else if (norm <= uln) {
-    // Midpoint to ULN: linear 0.5..1.0
     return 0.5 + 0.5 * (norm - midpoint) / Math.max(0.001, uln - midpoint);
   } else {
-    // Above ULN: logarithmic 1.0..~6.0
     const foldAboveUln = norm / uln;
     return 1.0 + Math.log2(Math.max(1, foldAboveUln)) * 1.5;
   }

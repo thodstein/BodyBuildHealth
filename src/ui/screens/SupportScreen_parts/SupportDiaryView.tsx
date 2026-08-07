@@ -118,13 +118,20 @@ function dayName(dateStr: string): string {
   return d.toLocaleDateString('ru-RU', { weekday: 'long' });
 }
 
+function dateToLocalStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function getLastNDays(n: number): string[] {
   const days: string[] = [];
   const today = new Date();
   for (let i = 0; i < n; i++) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
-    days.push(d.toISOString().slice(0, 10));
+    days.push(dateToLocalStr(d));
   }
   return days;
 }
@@ -133,7 +140,7 @@ function calcStreak(entries: DiaryEntry[], today: string): number {
   let streak = 0;
   const d = new Date(today + 'T00:00:00');
   for (let i = 0; ; i++) {
-    const dateStr = new Date(d.getTime() - i * 86400000).toISOString().slice(0, 10);
+    const dateStr = dateToLocalStr(new Date(d.getTime() - i * 86400000));
     const entry = entries.find(e => e.date === dateStr);
     if (!entry) break;
     const taken = Object.values(entry.substances).filter(s => s.taken).length;
@@ -472,6 +479,9 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
     });
   }, []);
 
+  // Экспорт дневника поддержки в PDF (placeholder — основной экспорт инлайн в Today tab)
+  const exportToPDF = useCallback(() => {}, []);
+
   const toggleTaken = (subId: string) => {
     const curr = todayEntry?.substances[subId]?.taken || false;
     setSubState(today, subId, { taken: !curr });
@@ -604,6 +614,8 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderTime, setReminderTime] = useState('08:00');
   const [reminderPermission, setReminderPermission] = useState<'granted' | 'denied' | 'default'>('default');
+  const [smartReminderEnabled, setSmartReminderEnabled] = useState(false);
+  const [smartReminderTime, setSmartReminderTime] = useState('08:00');
   const [filterSub, setFilterSub] = useState('');
   const [historyFilterDate, setHistoryFilterDate] = useState('');
   const [historyLimit, setHistoryLimit] = useState(20);
@@ -626,6 +638,35 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
   }, [entries, filterText, historyFilterDate, getName, historyLimit]);
 
   const weekViewData = useMemo(() => last7Days.map(dateStr => ({ date: dateStr, entry: entries.find(e => e.date === dateStr) })), [entries]);
+
+  // Умные напоминания - анализ паттернов пропусков
+  const smartReminderAnalysis = useMemo(() => {
+    if (entries.length < 3) return null;
+    
+    const recentEntries = entries.slice(-14);
+    const missedByHour: Record<number, { missed: number; total: number }> = {};
+    
+    recentEntries.forEach(entry => {
+      Object.entries(entry.substances).forEach(([subId, v]) => {
+        if (!v.taken) {
+          const hour = new Date(entry.date + 'T00:00:00').getHours();
+          if (!missedByHour[hour]) missedByHour[hour] = { missed: 0, total: 0 };
+          missedByHour[hour].missed++;
+        }
+        const hour = new Date(entry.date + 'T00:00:00').getHours();
+        if (!missedByHour[hour]) missedByHour[hour] = { missed: 0, total: 0 };
+        missedByHour[hour].total++;
+      });
+    });
+    
+    const problemHours = Object.entries(missedByHour)
+      .filter(([, v]) => v.total >= 3)
+      .map(([hour, v]) => ({ hour: parseInt(hour), missRate: v.missed / v.total }))
+      .sort((a, b) => b.missRate - a.missRate)
+      .slice(0, 3);
+    
+    return problemHours;
+  }, [entries]);
 
   return (
     <div style={{
@@ -857,6 +898,11 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                    background: 'rgba(239,68,68,0.06)', color: '#ef4444', fontWeight: 700, fontSize: 12,
                    cursor: 'pointer', fontFamily: 'inherit', minHeight: 40,
                   }}>✕ Очистить всё</button>
+                  <button onClick={exportToPDF} style={{
+                    flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid rgba(59,130,246,0.2)',
+                    background: 'rgba(59,130,246,0.06)', color: '#3b82f6', fontWeight: 700, fontSize: 12,
+                    cursor: 'pointer', fontFamily: 'inherit', minHeight: 40,
+                  }}>📄 PDF</button>
                 </div>
 
                 {/* Цветовая легенда дней недели */}
@@ -947,6 +993,54 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                       💡 Совет: Браузер покажет уведомление, даже если вкладка закрыта
                     </div>
                   )}
+                
+                {/* Умные напоминания */}
+                {smartReminderAnalysis && smartReminderAnalysis.length > 0 && (
+                  <div style={sx.card}>
+                    <div style={sx.sectionTitle}>🧠 Умные напоминания</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                      Анализ пропусков за 14 дней. Рекомендуемое время уведомлений:
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                      {smartReminderAnalysis.map((p, i) => (
+                        <button key={i} onClick={() => { setSmartReminderEnabled(true); setSmartReminderTime(`${String(p.hour).padStart(2,'0')}:00`); }} style={{
+                          padding: '6px 12px', borderRadius: 8,
+                          background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
+                          color: '#3b82f6', fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                        }}>
+                          {String(p.hour).padStart(2,'0')}:00 — пропуск {(p.missRate * 100).toFixed(0)}%
+                        </button>
+                      ))}
+                    </div>
+                    {smartReminderEnabled && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <label style={{ fontSize: 12, color: '#94a3b8' }}>Умное время:</label>
+                        <input
+                          type="time"
+                          value={smartReminderTime}
+                          onChange={e => setSmartReminderTime(e.target.value)}
+                          style={{
+                            padding: '6px 10px', borderRadius: 8,
+                            border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)',
+                            color: '#fff', fontSize: 12, fontFamily: 'inherit',
+                          }}
+                        />
+                        <button onClick={() => {
+                          if (reminderPermission === 'granted') {
+                            new Notification('BodyBuildHealth', { body: 'Умное напоминание: пора принять БАДы!', icon: '🧠' });
+                          }
+                        }} style={{
+                          padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(59,130,246,0.2)',
+                          background: 'rgba(59,130,246,0.06)', color: '#3b82f6', fontWeight: 600, fontSize: 11,
+                          cursor: 'pointer', fontFamily: 'inherit', minHeight: 32,
+                        }}>Тест</button>
+                      </div>
+                    )}
+                    <div style={{ fontSize: 9, color: '#64748b', marginTop: 6 }}>
+                      Настроено на часы с частыми пропусками. Включите для автоматических напоминаний.
+                    </div>
+                  </div>
+                )}
                 </div>
 
                 {todaySideEffects.length > 0 && (
@@ -1105,8 +1199,46 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                  flex: 1, padding: '8px 0', borderRadius: 8, border: '1px solid rgba(34,197,94,0.2)',
                  background: 'rgba(34,197,94,0.06)', color: '#22c55e', fontWeight: 600, fontSize: 10,
                  cursor: 'pointer', fontFamily: 'inherit', minHeight: 32,
-               }}>📥 CSV</button>
-             </div>
+                }}>📥 CSV</button>
+                <label style={{
+                  flex: 1, padding: '8px 0', borderRadius: 8, border: '1px solid rgba(168,85,247,0.2)',
+                  background: 'rgba(168,85,247,0.06)', color: '#a855f7', fontWeight: 600, fontSize: 10,
+                  cursor: 'pointer', fontFamily: 'inherit', minHeight: 32, textAlign: 'center', display: 'block',
+                }}>
+                  📤 Импорт JSON
+                  <input type="file" accept=".json" style={{ display: 'none' }} onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      try {
+                        const parsed = JSON.parse(reader.result as string);
+                        const imported: DiaryEntry[] = Array.isArray(parsed) ? parsed
+                          : Array.isArray(parsed?.entries) ? parsed.entries : [];
+                        const valid = imported.filter(e =>
+                          e && typeof e.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.date) &&
+                          e.substances && typeof e.substances === 'object'
+                        );
+                        if (valid.length === 0) { alert('Файл не содержит корректных записей дневника'); return; }
+                        const merged = new Map<string, DiaryEntry>();
+                        for (const e of entries) merged.set(e.date, e);
+                        let added = 0, updated = 0;
+                        for (const e of valid) {
+                          if (merged.has(e.date)) updated++;
+                          else added++;
+                          merged.set(e.date, { ...merged.get(e.date), ...e });
+                        }
+                        const result = Array.from(merged.values()).sort((a, b) => a.date.localeCompare(b.date));
+                        saveDiary(result);
+                        setEntries(result);
+                        alert(`Импорт завершён: +${added} новых, ${updated} обновлено`);
+                      } catch { alert('Ошибка чтения файла. Убедитесь, что это валидный JSON-экспорт дневника.'); }
+                    };
+                    reader.readAsText(file);
+                    e.target.value = '';
+                  }} />
+                </label>
+              </div>
            </div>
 
       {editingDate ? (

@@ -3,10 +3,98 @@ import { FOOD_DB, type FoodItem } from '../core/nutrition-database';
 export interface ParsedMeal {
   date: string;
   mealType: string;
-  items: Array<{ name: string; qty: string; qtyGrams?: number; kcal: number; p: number; f: number; c: number; micros?: NutritionMicros; foodId?: string; category?: string }>;
+  items: Array<{ name: string; qty: string; qtyGrams?: number; kcal: number; p: number; f: number; c: number; micros?: NutritionMicros; foodId?: string; category?: string; confidence?: number }>;
 }
 
 export type NutritionMicros = Record<string, number>;
+
+function normalizeOcrArtifacts(text: string): string {
+  return text
+    .replace(/(\d)\s+(\d)\s+(\d)/g, '$1$2$3')
+    .replace(/(\d)[,.](\d)[,.](\d)/g, '$1$2$3')
+    .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015]/g, '-')
+    .replace(/[“”„‟«»]/g, '"')
+    .replace(/[‘’‚‹›]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const VERTICAL_NUTRIENT_LABELS: Array<[RegExp, string, string]> = [
+  [/белки?|протеин|protein|\bp\b/i, 'p', 'г'],
+  [/жиры?|fat|\bf\b/i, 'f', 'г'],
+  [/углеводы?|угл|carb|carbs/i, 'c', 'г'],
+  [/натрий|sodium|\bna\b/i, 'sodium_mg', 'мг'],
+  [/калий|potassium|\bk\b/i, 'potassium_mg', 'мг'],
+  [/магний|magnesium|\bmg\b/i, 'magnesium_mg', 'мг'],
+  [/кальций|calcium|\bca\b/i, 'calcium_mg', 'мг'],
+  [/железо|iron|\bfe\b/i, 'iron_mg', 'мг'],
+  [/цинк|zinc|\bzn\b/i, 'zinc_mg', 'мг'],
+  [/фосфор|phosphorus|\bp\b/i, 'phosphorus_mg', 'мг'],
+  [/клетчатка|fiber/i, 'fiber_g', 'г'],
+  [/витамин\s*a|vitamin\s*a|\bva\b/i, 'vitamin_a_mcg', 'мкг'],
+  [/витамин\s*c|vitamin\s*c|\bvc\b/i, 'vitamin_c_mg', 'мг'],
+  [/витамин\s*d|vitamin\s*d|\bvd\b/i, 'vitamin_d_mcg', 'мкг'],
+  [/витамин\s*e|vitamin\s*e|\bve\b/i, 'vitamin_e_mg', 'мг'],
+  [/витамин\s*k|vitamin\s*k|\bvk\b/i, 'vitamin_k_mcg', 'мкг'],
+  [/витамин\s*b12|витамин\s*b12|\bb12\b/i, 'vitamin_b12_mcg', 'мкг'],
+];
+
+function parseVerticalNutrientLine(line: string): { key: string; value: number; unit: string } | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.length < 2) return null;
+
+  for (const [labelPattern, key, defaultUnit] of VERTICAL_NUTRIENT_LABELS) {
+    const labelMatch = trimmed.match(new RegExp(`(${labelPattern.source})\\s*[:\\-]?\\s*(\\d+(?:[.,]\\d+)?)\\s*(мг|mg|мкг|mcg|г|g)?`, 'i'));
+    if (labelMatch) {
+      const value = numberFrom(labelMatch[2], 0);
+      const unit = (labelMatch[3] || defaultUnit).toLowerCase();
+      return { key, value, unit };
+    }
+
+    const reversedMatch = trimmed.match(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*(мг|mg|мкг|mcg|г|g)?\\s*[:\\-]?\\s*(${labelPattern.source})`, 'i'));
+    if (reversedMatch) {
+      const value = numberFrom(reversedMatch[1], 0);
+      const unit = (reversedMatch[2] || defaultUnit).toLowerCase();
+      return { key, value, unit };
+    }
+  }
+
+  return null;
+}
+
+function convertVerticalValue(value: number, unit: string, key: string): number {
+  const lowerUnit = unit.toLowerCase();
+  if (lowerUnit === 'мкг' || lowerUnit === 'mcg') {
+    if (key.endsWith('_mg')) return value / 1000;
+    return value;
+  }
+  if (lowerUnit === 'г' || lowerUnit === 'g') {
+    if (key.endsWith('_mg')) return value * 1000;
+    if (key.endsWith('_mcg')) return value * 1000000;
+    return value;
+  }
+  return value;
+}
+
+export function parseVerticalNutritionTable(text: string): NutritionMicros & { p?: number; f?: number; c?: number } {
+  const lines = text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 1);
+  const result: NutritionMicros & { p?: number; f?: number; c?: number } = {};
+
+  for (const line of lines) {
+    const parsed = parseVerticalNutrientLine(line);
+    if (!parsed) continue;
+
+    const convertedValue = convertVerticalValue(parsed.value, parsed.unit, parsed.key);
+
+    if (parsed.key === 'p' || parsed.key === 'f' || parsed.key === 'c') {
+      result[parsed.key] = convertedValue;
+    } else {
+      result[parsed.key] = convertedValue;
+    }
+  }
+
+  return result;
+}
 
 const MICRO_LABELS: Array<[RegExp, string, string]> = [
   [/натри|sodium|\bna\b/i, 'sodium_mg', 'mg'], [/кали|potassium|\bk\b/i, 'potassium_mg', 'mg'],
@@ -52,13 +140,13 @@ export function parseMicroLine(line: string): NutritionMicros {
 }
 
 // More resilient regex patterns for messy OCR text
-const FATSECRET_ITEM_REGEX = /^\s*(.+?)\s+(\d+(?:[.,]\d+)?)\s*(г|мл|шт|кусок|порция|сервинг|ст\.л\.|ч\.л\.|oz|ml|g|serving|slice|cup|tbsp|tsp)?\s*[,/]?\s*(\d+(?:[.,]\d+)?)\s*(ккал|кал|kcal)/i;
+const FATSECRET_ITEM_REGEX = /^\s*(.+?)\s+(\d+(?:[.,]\d+)?(?:\s+\d+)*)\s*(г|мл|шт|кусок|порция|сервинг|ст\.л\.|ч\.л\.|oz|ml|g|serving|slice|cup|tbsp|tsp)?\s*[,/]?\s*(\d+(?:[.,]\d+)?(?:\s+\d+)*)\s*(ккал|кал|kcal)/i;
 const FATSECRET_TOTAL_REGEX = /итого|всего|total|daily\s+total|сумма|итог/i;
-const FATSUCCESS_MACRO_LINE = /(\d+(?:[.,]\d+)?)\s*(ккал|кал|kcal|белки?|жиры?|углевод|угл|жиры|бел|протеин|б|ж|у|carb|protein|fat|calori|cal|energy)/gi;
+const FATSUCCESS_MACRO_LINE = /(\d+(?:[.,]\d+)?(?:\s+\d+)*)\s*(ккал|кал|kcal|белки?|жиры?|углевод|угл|жиры|бел|протеин|б|ж|у|carb|protein|fat|calori|cal|energy)/gi;
 const MFP_LINE_REGEX = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(?:(?:г|мл|шт|oz|serving|srvg|slice|cup|tbsp|шт|кус|порц|ml|g|pcs)[,.]?\s*)?(\d+(?:[.,]\d+)?)\s*(ккал|кал|kcal|cal)/i;
-const INLINE_MACRO_REGEX = /(?:белки?|б|протеин|protein|p)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)/i;
-const INLINE_FAT_REGEX = /(?:жиры?|ж|fat|f)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)/i;
-const INLINE_CARB_REGEX = /(?:углевод|угл|у|carb|c|carbs)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)/i;
+const INLINE_MACRO_REGEX = /(?:белки?|б|протеин|protein|p)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
+const INLINE_FAT_REGEX = /(?:жиры?|ж|fat|f)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
+const INLINE_CARB_REGEX = /(?:углевод|угл|у|carb|c|carbs)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
 const KCAL_FIRST_REGEX = /^\s*(\d+(?:[.,]\d+)?)\s*(ккал|кал|kcal)\s+(.+?)(?:\s+(\d+(?:[.,]\d+)?)\s*(г|мл|шт|g|ml))?$/i;
 
 const RUSSIAN_FOOD_NAMES: Record<string, string> = {
@@ -100,7 +188,27 @@ function matchRussianFood(text: string): string | null {
 }
 
 function normalizeFoodText(text: string): string {
-  return text.toLowerCase().replace(/ё/g, 'е').replace(/a/g, 'а').replace(/[^a-zа-я0-9]+/gi, ' ').trim();
+  const latinToCyrillic: Record<string, string> = {
+    'A': 'а', 'a': 'а',
+    'B': 'б', 'b': 'б',
+    'C': 'с', 'c': 'с',
+    'E': 'е', 'e': 'е',
+    'H': 'н', 'h': 'н',
+    'K': 'к', 'k': 'к',
+    'M': 'м', 'm': 'м',
+    'N': 'и', 'n': 'и',
+    'O': 'о', 'o': 'о',
+    'P': 'р', 'p': 'р',
+    'T': 'т', 't': 'т',
+    'X': 'х', 'x': 'х',
+    'y': 'у',
+    '0': 'о',
+    '1': 'и',
+    '3': 'з',
+    '6': 'б',
+    '8': 'в',
+  };
+  return text.toLowerCase().split('').map(ch => latinToCyrillic[ch] || ch).join('').replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/gi, ' ').trim();
 }
 
 function editDistance(a: string, b: string): number {
@@ -120,7 +228,7 @@ function editDistance(a: string, b: string): number {
 }
 
 /** Matches OCR names to the local food database, including partial word matches. */
-function findFood(name: string): FoodItem | undefined {
+export function findFood(name: string): FoodItem | undefined {
   const query = normalizeFoodText(name);
   if (!query) return undefined;
   const directId = matchRussianFood(name);
@@ -132,7 +240,7 @@ function findFood(name: string): FoodItem | undefined {
   return FOOD_DB
     .map(food => {
       const foodWords = normalizeFoodText(food.name).split(/\s+/);
-      const score = words.reduce((total, word) => total + (foodWords.some(candidate => candidate.includes(word) || word.includes(candidate) || (word.length >= 5 && candidate.length >= 5 && editDistance(word, candidate) <= 1)) ? 1 : 0), 0);
+      const score = words.reduce((total, word) => total + (foodWords.some(candidate => candidate.includes(word) || (candidate.length >= 3 && word.includes(candidate)) || (word.length >= 5 && candidate.length >= 5 && editDistance(word, candidate) <= 1)) ? 1 : 0), 0);
       return { food, score };
     })
     .filter(result => result.score > 0)
@@ -140,7 +248,7 @@ function findFood(name: string): FoodItem | undefined {
 }
 
 function numberFrom(text: string | undefined, fallback: number): number {
-  const value = Number.parseFloat((text || '').replace(',', '.'));
+  const value = Number.parseFloat((text || '').replace(/,/g, '.').replace(/\s+/g, ''));
   return Number.isFinite(value) ? value : fallback;
 }
 
@@ -165,7 +273,7 @@ export function fillMissingMicros(name: string, grams: number, existing: Nutriti
 }
 
 export function quantityToGrams(qty: string, food?: FoodItem): number {
-  const value = numberFrom(qty.match(/[\d]+(?:[.,]\d+)?/)?.[0], 100);
+  const value = numberFrom(qty, 100);
   const unit = qty.toLowerCase();
   if (/шт|pcs?|piece|яиц/.test(unit)) {
     if (food?.id.includes('egg')) return value * 50;
@@ -183,6 +291,9 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
   const weight = Math.max(1, quantityToGrams(qty, food));
   const multiplier = weight / 100;
   const hasMacros = kcal > 0 || p > 0 || f > 0 || c > 0;
+  const confidence = food
+    ? (hasMacros ? 0.9 : 0.7)
+    : (hasMacros ? 0.5 : 0.3);
   return {
     name: name || food?.name || 'Блюдо',
     qty,
@@ -194,6 +305,7 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
     micros,
     foodId: food?.id,
     category: food?.category,
+    confidence: Math.round(confidence * 100) / 100,
   };
 }
 
@@ -212,13 +324,21 @@ function attachMicros(meal: ParsedMeal | null, line: string): boolean {
 
 function parseMicroTableHeader(line: string): string[] {
   if (/\d/.test(line)) return [];
-  const aliases: Array<[RegExp, string]> = [
-    [/sodium|натри|\bna\b/i, 'sodium_mg'], [/potassium|кали|\bk\b/i, 'potassium_mg'], [/magnesium|магни|\bmg\b/i, 'magnesium_mg'],
-    [/calcium|кальци|\bca\b/i, 'calcium_mg'], [/iron|желез|\bfe\b/i, 'iron_mg'], [/zinc|цинк|\bzn\b/i, 'zinc_mg'],
-    [/phosphorus|фосфор|\bp\b/i, 'phosphorus_mg'], [/vit(?:amin)?\s*a|витамин\s*a/i, 'vitamin_a_mcg'], [/vit(?:amin)?\s*c|витамин\s*c/i, 'vitamin_c_mg'],
-    [/vit(?:amin)?\s*d|витамин\s*d/i, 'vitamin_d_mcg'], [/vit(?:amin)?\s*b12|витамин\s*b12|\bb12\b/i, 'vitamin_b12_mcg'],
+  const defaults: Array<[RegExp, string, string]> = [
+    [/sodium|натри|\bna\b/i, 'sodium', 'mg'], [/potassium|кали|\bk\b/i, 'potassium', 'mg'],
+    [/magnesium|магни|\bmg\b/i, 'magnesium', 'mg'], [/calcium|кальци|\bca\b/i, 'calcium', 'mg'],
+    [/iron|желез|\bfe\b/i, 'iron', 'mg'], [/zinc|цинк|\bzn\b/i, 'zinc', 'mg'],
+    [/phosphorus|фосфор|\bp\b/i, 'phosphorus', 'mg'], [/vit(?:amin)?\s*a|витамин\s*a/i, 'vitamin_a', 'mcg'],
+    [/vit(?:amin)?\s*c|витамин\s*c/i, 'vitamin_c', 'mg'], [/vit(?:amin)?\s*d|витамин\s*d/i, 'vitamin_d', 'mcg'],
+    [/vit(?:amin)?\s*e|витамин\s*e/i, 'vitamin_e', 'mg'], [/vit(?:amin)?\s*k|витамин\s*k/i, 'vitamin_k', 'mcg'],
+    [/vit(?:amin)?\s*b12|витамин\s*b12|\bb12\b/i, 'vitamin_b12', 'mcg'],
   ];
-  return aliases.filter(([pattern]) => pattern.test(line)).map(([, key]) => key);
+  return defaults.map(([pattern, base, defaultUnit]) => {
+    const match = line.match(new RegExp(`(${pattern.source})\\s*\\(\\s*(мг|mg|мкг|mcg|г|g)\\s*\\)`, 'i'));
+    const unit = match ? match[2].toLowerCase() : defaultUnit;
+    const suffix = unit === 'г' || unit === 'g' ? '_g' : unit === 'мкг' || unit === 'mcg' ? '_mcg' : '_mg';
+    return `${base}${suffix}`;
+  });
 }
 
 function parseMicroTableValues(line: string, keys: string[]): NutritionMicros {
@@ -274,7 +394,8 @@ function parseMacroValue(text: string, patterns: RegExp[]): { kcal: number; p: n
     let m: RegExpExecArray | null;
     pattern.lastIndex = 0;
     while ((m = pattern.exec(text)) !== null) {
-      const val = parseFloat(m[1].replace(',', '.'));
+      const rawVal = m[1].replace(/\s+/g, '').replace(',', '.');
+      const val = parseFloat(rawVal);
       const unit = m[2].toLowerCase();
       if (/ккал|кал|cal/i.test(unit)) result.kcal = val;
       else if (/бел|прот|б|protein/i.test(unit)) result.p = val;
@@ -286,7 +407,7 @@ function parseMacroValue(text: string, patterns: RegExp[]): { kcal: number; p: n
 }
 
 export function parseNutritionScreenshot(text: string): ParsedMeal[] {
-  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 2);
+  const lines = text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 2);
   const meals: ParsedMeal[] = [];
   let currentMeal: ParsedMeal | null = null;
   let microTableKeys: string[] = [];
@@ -366,11 +487,15 @@ export function parseNutritionScreenshot(text: string): ParsedMeal[] {
 
     const foodOnlyMatch = line.match(/^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(г|мл|g|ml)$/i);
     if (foodOnlyMatch && findFood(foodOnlyMatch[1])) {
-      currentMeal.items.push(normalizeItem(foodOnlyMatch[1].trim(), `${foodOnlyMatch[2]} ${foodOnlyMatch[3]}`, 0, 0, 0, 0));
+      const candidateName = foodOnlyMatch[1].trim();
+      const looksLikeNutrientLabel = /^(?:белки?|жиры?|углеводы?|натрий|калий|магний|кальций|железо|цинк|фосфор|клетчатка|витамин|sodium|potassium|magnesium|calcium|iron|zinc|fiber|phosphorus|protein|fat|carb)/i.test(candidateName);
+      if (!looksLikeNutrientLabel) {
+        currentMeal.items.push(normalizeItem(candidateName, `${foodOnlyMatch[2]} ${foodOnlyMatch[3]}`, 0, 0, 0, 0));
+      }
     }
   }
 
-  return dedupeMeals(meals);
+  return attachVerticalTableIfEmpty(dedupeMeals(meals), text);
 }
 
 function parseMacroLabel(text: string): { p: number; f: number; c: number } {
@@ -378,14 +503,14 @@ function parseMacroLabel(text: string): { p: number; f: number; c: number } {
   const f = text.match(INLINE_FAT_REGEX);
   const c = text.match(INLINE_CARB_REGEX);
   return {
-    p: p ? parseFloat(p[1].replace(',', '.')) : 0,
-    f: f ? parseFloat(f[1].replace(',', '.')) : 0,
-    c: c ? parseFloat(c[1].replace(',', '.')) : 0,
+    p: p ? parseFloat(p[1].replace(/\s+/g, '').replace(',', '.')) : 0,
+    f: f ? parseFloat(f[1].replace(/\s+/g, '').replace(',', '.')) : 0,
+    c: c ? parseFloat(c[1].replace(/\s+/g, '').replace(',', '.')) : 0,
   };
 }
 
 export function parseFatSecretText(text: string): ParsedMeal[] {
-  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 1);
+  const lines = text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 1);
   const meals: ParsedMeal[] = [];
   let currentMeal: ParsedMeal | null = null;
   let microTableKeys: string[] = [];
@@ -474,15 +599,41 @@ export function parseFatSecretText(text: string): ParsedMeal[] {
 
     const foodOnlyMatch = line.match(/^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(г|мл|g|ml)$/i);
     if (foodOnlyMatch && findFood(foodOnlyMatch[1])) {
-      currentMeal.items.push(normalizeItem(
-        foodOnlyMatch[1].trim(),
-        `${foodOnlyMatch[2]} ${foodOnlyMatch[3]}`,
-        0, 0, 0, 0,
-      ));
+      const candidateName = foodOnlyMatch[1].trim();
+      const looksLikeNutrientLabel = /^(?:белки?|жиры?|углеводы?|натрий|калий|магний|кальций|железо|цинк|фосфор|клетчатка|витамин|sodium|potassium|magnesium|calcium|iron|zinc|fiber|phosphorus|protein|fat|carb)/i.test(candidateName);
+      if (!looksLikeNutrientLabel) {
+        currentMeal.items.push(normalizeItem(
+          candidateName,
+          `${foodOnlyMatch[2]} ${foodOnlyMatch[3]}`,
+          0, 0, 0, 0,
+        ));
+      }
     }
   }
 
-  return dedupeMeals(meals);
+  return attachVerticalTableIfEmpty(dedupeMeals(meals), text);
+}
+
+function attachVerticalTableIfEmpty(meals: ParsedMeal[], text: string): ParsedMeal[] {
+  const hasItems = meals.some(meal => meal.items.length > 0);
+  if (hasItems) return meals;
+
+  const vertical = parseVerticalNutritionTable(text);
+  const keys = Object.keys(vertical);
+  if (keys.length === 0) return meals;
+
+  const date = meals[0]?.date || new Date().toISOString().slice(0, 10);
+  const mealType = meals[0]?.mealType || 'Общее';
+  const item: any = { name: 'Блюдо', qty: '100 г', kcal: 0, p: 0, f: 0, c: 0, micros: {} };
+
+  for (const [key, value] of Object.entries(vertical)) {
+    if (key === 'p') item.p = value;
+    else if (key === 'f') item.f = value;
+    else if (key === 'c') item.c = value;
+    else item.micros[key] = value;
+  }
+
+  return [{ date, mealType, items: [item] }];
 }
 
 /** Parse OCR/export text through both formats and keep the most complete result. */

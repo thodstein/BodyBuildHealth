@@ -280,6 +280,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       plWeakPoints: plWeakPoints,
       weakGroupDayMap,
       plWeakPointDayMap,
+      weakGroupExerciseMap,
+           plWeakPointExerciseMap,
+           orthopedicBlockedPatterns,
       peds: peds.length ? peds : undefined,
       pedDoses,
       acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
@@ -317,6 +320,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           plWeakPoints,
           weakGroupDayMap,
           plWeakPointDayMap,
+          weakGroupExerciseMap,
+           plWeakPointExerciseMap,
+           orthopedicBlockedPatterns,
           peds: peds.length ? peds : undefined,
           pedDoses,
           acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
@@ -413,10 +419,15 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   // 📅 Ручной выбор дней недели для слабых групп и слабых точек (1-based)
   const [weakGroupDayMap, setWeakGroupDayMap] = useState<Record<string, number[]>>({});
   const [plWeakPointDayMap, setPlWeakPointDayMap] = useState<Record<string, number[]>>({});
+  const [weakGroupExerciseMap, setWeakGroupExerciseMap] = useState<Record<string, string[]>>({});
+   const [plWeakPointExerciseMap, setPlWeakPointExerciseMap] = useState<Record<string, string[]>>({});
+   const [orthopedicBlockedPatterns, setOrthopedicBlockedPatterns] = useState<string[]>([]);
   // Clear stale day selections when cycle changes (old cycle may have had different day count)
   useEffect(() => {
     setWeakGroupDayMap({});
     setPlWeakPointDayMap({});
+    setWeakGroupExerciseMap({});
+    setPlWeakPointExerciseMap({});
   }, [selectedCycleId]);
   const toggleDayInMap = (mapKey: string, day: number, which: 'wg' | 'pw') => {
     const upd = (prev: Record<string, number[]>) => {
@@ -426,6 +437,15 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     };
     if (which === 'wg') setWeakGroupDayMap(upd);
     else setPlWeakPointDayMap(upd);
+  };
+  const toggleExerciseInMap = (mapKey: string, name: string, kind: 'wg' | 'pw') => {
+    const update = (prev: Record<string, string[]>) => {
+      const selected = new Set(prev[mapKey] || []);
+      if (selected.has(name)) selected.delete(name); else selected.add(name);
+      return { ...prev, [mapKey]: [...selected] };
+    };
+    if (kind === 'wg') setWeakGroupExerciseMap(update);
+    else setPlWeakPointExerciseMap(update);
   };
   // V7 расширение: тренд 1ПМ по выбранному упражнению
   const [selectedTrendEx, setSelectedTrendEx] = useState<string | null>(null);
@@ -661,8 +681,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
         if (mainTab === 'pl') { setPmSquat(pm.squat || pmSquat); setPmBench(pm.bench || pmBench); setPmDead(pm.dead || pmDead); pendingApplyRef.current = p; }
         else if (mainTab === 'bb') { setBbWorkMax(w => ({ ...w, quads: pm.squat || w.quads, chest: pm.bench || w.chest, hamstrings: pm.dead || w.hamstrings })); pendingApplyRef.current = p; }
       }
-    } else if (p.kind === 'weakpoints') {
-      setWeakPoints(p.data?.groups || []); pendingApplyRef.current = p;
+     } else if (p.kind === 'weakpoints') {
+       setWeakPoints(p.data?.groups || []);
+       if (Array.isArray(p.data?.orthopedic?.blockedPatterns)) setOrthopedicBlockedPatterns(p.data.orthopedic.blockedPatterns);
+       pendingApplyRef.current = p;
     } else if (p.kind === 'pri') {
       setPriAdjust({ volumeMult: (p.data?.volumeMult ?? 1) as number, rirShift: (p.data?.rirShift ?? 0) as number });
     } else if (p.kind === 'split') {
@@ -994,11 +1016,17 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     <div key={wg} style={{ marginBottom: 6 }}>
                       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 3, minWidth: 0, overflowWrap: 'anywhere' }}>{WEAK_GROUP_LABELS_RU[wg] || wg}{days.length > 0 ? ` → день ${days.join(', ')}` : ' → авто (малые: 2 дня, крупные: 1 день)'}</div>
           <div role="group" aria-label="Дни недели для слабых групп мышц" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
-                        {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => {
+                       {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => {
                           const on = days.includes(d);
                           return <button key={d} aria-label={`День ${d} для ${WEAK_GROUP_LABELS_RU[wg] || wg}${on ? ' (выбран)' : ''}`} onClick={() => toggleDayInMap(wg, d, 'wg')} style={{ padding:'4px 10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', border: on ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}>{'Д' + d}{on ? ' ✓' : ''}</button>;
-                        })}
-                      </div>
+                         })}
+                       </div>
+                       <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {getExercisesByGroup(wg).map(ex => {
+                           const selected = (weakGroupExerciseMap[wg] || []).includes(ex.name);
+                           return <button key={ex.id} onClick={() => toggleExerciseInMap(wg, ex.name, 'wg')} style={{ padding: '3px 7px', borderRadius: 8, fontSize: 9, cursor: 'pointer', border: selected ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: selected ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: selected ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}>{ex.name}{selected ? ' ✓' : ''}</button>;
+                         })}
+                       </div>
                     </div>
                   );
                 })}
@@ -1049,11 +1077,17 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     <div key={mapKey} style={{ marginBottom: 6, minWidth: 0, maxWidth: '100%' }}>
                       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis' }}>{liftLabelMap[wp.lift] || wp.lift} · {wp.weakPoint}{days.length > 0 ? ` → день ${days.join(', ')}` : ' → авто (2 дня: тяжёлый + памп)'}</div>
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
-                        {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => {
+                         {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => {
                           const on = days.includes(d);
                           return <button key={d} onClick={() => toggleDayInMap(mapKey, d, 'pw')} style={{ padding:'4px 10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', border: on ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#8b5cf6' : 'rgba(255,255,255,0.6)' }}>{'Д' + d}{on ? ' ✓' : ''}</button>;
-                        })}
-                      </div>
+                         })}
+                       </div>
+                       <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                         {diagnoseWeakPoint(wp.lift as Lift, wp.weakPoint as WeakPoint).assistance.map(name => {
+                           const selected = (plWeakPointExerciseMap[mapKey] || []).includes(name);
+                           return <button key={name} onClick={() => toggleExerciseInMap(mapKey, name, 'pw')} style={{ padding: '3px 7px', borderRadius: 8, fontSize: 9, cursor: 'pointer', border: selected ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.08)', background: selected ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: selected ? '#8b5cf6' : 'rgba(255,255,255,0.6)' }}>{name}{selected ? ' ✓' : ''}</button>;
+                         })}
+                       </div>
                     </div>
                   );
                 })}

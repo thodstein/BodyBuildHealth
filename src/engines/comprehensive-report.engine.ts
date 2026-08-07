@@ -10,9 +10,12 @@ import { getProfile, updateProfile } from '../core/profile-manager';
 import { loadReadinessHistory } from '../ui/screens/TrainingScreen_parts/readiness-history';
 import { getScoreHistory } from './score-history';
 import { analyzeMeasurements, loadMeasurements } from './log-analytics-progression.engine';
+import { getExerciseById } from '../core/exercise-catalog';
+import { readRiskBridge } from './risk-bridge';
 import type { BodyMeasurement } from './log-analytics-progression.engine';
 import type { BodyCompEntry } from './body-composition.engine';
 import type { UnifiedSettings } from '../core/types';
+import type { RiskBridgeData } from './risk-bridge';
 
 /* ─── Типы ─── */
 
@@ -103,6 +106,7 @@ export interface ComprehensiveReport {
   support: SupportScheduleSection;
   userNotes: string;
   recommendations: ReportRecommendation[];
+  pedRisk?: RiskBridgeData;
   trends?: {
     weightWeekly: { week: string; kg: number }[];
     hrvWeekly: { week: string; avg: number }[];
@@ -144,7 +148,7 @@ export function assignStatus(metric: ReportMetric): void {
     metric.status = 'info';
     return;
   }
-  const cur = typeof metric.current === 'number' ? metric.current : parseFloat(metric.current);
+  const cur = typeof metric.current === 'number' ? metric.current : parseFloat(String(metric.current));
   if (!isNaN(cur) && metric.refLow != null && metric.refHigh != null) {
     if (cur < metric.refLow || cur > metric.refHigh) {
       metric.status = (cur < metric.refLow * 0.7 || cur > metric.refHigh * 1.3) ? 'critical' : 'warning';
@@ -161,6 +165,10 @@ function formatNum(v: number | string | undefined): string {
   if (v === undefined || v === null) return '—';
   if (typeof v === 'number') return v % 1 === 0 ? String(v) : v.toFixed(1);
   return String(v);
+}
+
+function readJsonSafe<T>(key: string, fallback: T): T {
+  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
 }
 
 /* ─── Gather-функции ─── */
@@ -226,8 +234,6 @@ function gatherAnthropometry(dateFrom: string, dateTo: string): ReportSection {
 
 function gatherLabs(dateFrom: string, dateTo: string): ReportSection {
   const diary = getLabDiary();
-  const recentDiary = diary.filter(e => e.date >= dateFrom && e.date <= dateTo);
-  const prevDiary = diary.filter(e => e.date < dateFrom).sort((a, b) => b.date.localeCompare(a.date));
 
   const groups: Array<{ title: string; markers: Array<{ code: string; name: string; refLow?: number; refHigh?: number; unit: string }> }> = [
     { title: 'Печень', markers: [
@@ -276,6 +282,10 @@ function gatherLabs(dateFrom: string, dateTo: string): ReportSection {
       { code: 'Магний', name: 'Магний', refLow: 0.66, refHigh: 1.07, unit: 'mmol/L' },
       { code: 'Кальций', name: 'Кальций', refLow: 2.1, refHigh: 2.55, unit: 'mmol/L' },
     ]},
+    { title: 'Свертываемость', markers: [
+      { code: 'Д-Димер', name: 'Д-Димер', refLow: 0, refHigh: 0.5, unit: 'mg/L' },
+      { code: 'Фибриноген', name: 'Фибриноген', refLow: 2, refHigh: 4, unit: 'g/L' },
+    ]},
   ];
 
   const metrics: ReportMetric[] = [];
@@ -300,8 +310,7 @@ function gatherLabs(dateFrom: string, dateTo: string): ReportSection {
     });
   });
 
-  return {
-    id: 'labs', title: 'Лаборатории', icon: '🧪', metrics };
+  return { id: 'labs', title: 'Лаборатории', icon: '🧪', metrics };
 }
 
 function gatherRisks(dateFrom: string, dateTo: string): ReportSection {
@@ -314,15 +323,30 @@ function gatherRisks(dateFrom: string, dateTo: string): ReportSection {
 
   const metrics: ReportMetric[] = [
     {
-      label: 'Overall risk score', unit: '', prev: prevScore?.modules?.overall?.overallRaw, current: latest?.modules?.overall?.overallRaw ?? 'Нет данных',
+      label: 'Общий риск', unit: '', prev: prevScore?.modules?.overall?.overallRaw, current: latest?.modules?.overall?.overallRaw ?? 'Нет данных',
       delta: latest && prevScore ? (latest.modules?.overall?.overallRaw ?? 0) - (prevScore.modules?.overall?.overallRaw ?? 0) : undefined,
       deltaPct: latest && prevScore && prevScore.modules?.overall?.overallRaw ? ((latest.modules?.overall?.overallRaw - prevScore.modules?.overall?.overallRaw) / prevScore.modules?.overall?.overallRaw) * 100 : undefined,
       status: latest && (latest.modules?.overall?.overallRaw ?? 0) > 600 ? 'critical' : latest && (latest.modules?.overall?.overallRaw ?? 0) > 300 ? 'warning' : 'normal',
     },
   ];
 
-  return {
-    id: 'risks', title: 'Риски', icon: '⚠️', metrics };
+  if (latest?.modules) {
+    const mods = latest.modules as Record<string, any>;
+    Object.keys(mods).forEach(key => {
+      if (key === 'overall') return;
+      const mod = mods[key];
+      if (mod?.overallRaw != null) {
+        const prevMod = prevScore?.modules?.[key] as any;
+        const { delta, deltaPct } = computeDelta(prevMod?.overallRaw, mod.overallRaw);
+        metrics.push({
+          label: key, unit: '', current: mod.overallRaw, delta, deltaPct,
+          status: mod.overallRaw > 100 ? 'warning' : 'normal',
+        });
+      }
+    });
+  }
+
+  return { id: 'risks', title: 'Риски', icon: '⚠️', metrics };
 }
 
 async function gatherTraining(dateFrom: string, dateTo: string): Promise<ReportSection> {
@@ -338,19 +362,58 @@ async function gatherTraining(dateFrom: string, dateTo: string): Promise<ReportS
   const totalVolume = enriched.reduce((sum, l) => sum + l.totalVolume, 0);
   const avgRpe = recent.length > 0 ? recent.reduce((sum, l) => sum + (l.overallRPE || 0), 0) / recent.length : null;
   const avgDuration = recent.length > 0 ? recent.reduce((sum, l) => sum + (l.duration || 0), 0) / recent.length : null;
-  const totalPR = enriched.filter(l => l.exercises.some(e => (e.estimated1RM || 0) > 0)).length;
+
+  const prevLogs = logs.filter(l => l.date < dateFrom).sort((a, b) => b.date.localeCompare(a.date));
+  const prevEnriched = prevLogs.slice(0, recent.length).map(l => ({
+    ...l,
+    totalVolume: l.exercises.reduce((s, e) => s + (e.totalVolume || 0), 0),
+  }));
+  const prevTotalVolume = prevEnriched.reduce((sum, l) => sum + l.totalVolume, 0);
+
+  const muscleVolume: Record<string, number> = {};
+  recent.forEach(l => {
+    l.exercises.forEach(ex => {
+      const cat = getExerciseById(ex.exerciseId);
+      const group = cat?.group || 'other';
+      muscleVolume[group] = (muscleVolume[group] || 0) + (ex.totalVolume || 0);
+    });
+  });
+
+  let prCount = 0;
+  const exBestPrev: Record<string, number> = {};
+  prevLogs.forEach(l => {
+    l.exercises.forEach(ex => {
+      if (ex.estimated1RM > 0) {
+        const key = ex.exerciseName || ex.exerciseId;
+        exBestPrev[key] = Math.max(exBestPrev[key] || 0, ex.estimated1RM);
+      }
+    });
+  });
+  recent.forEach(l => {
+    l.exercises.forEach(ex => {
+      if (ex.estimated1RM > 0) {
+        const key = ex.exerciseName || ex.exerciseId;
+        if (ex.estimated1RM > (exBestPrev[key] || 0)) prCount++;
+      }
+    });
+  });
 
   const metrics: ReportMetric[] = [
     { label: 'Сессий', unit: 'шт', prev: planned, current: recent.length, status: recent.length >= planned ? 'normal' : 'warning' },
     { label: 'Adherence', unit: '%', current: planned > 0 ? Math.round((recent.length / planned) * 100) : 0, status: planned > 0 && recent.length >= planned ? 'normal' : 'warning' },
-    { label: 'Объём', unit: 'т', current: Number((totalVolume / 1000).toFixed(1)), sparkline: computeSparkline(enriched, 'totalVolume', dateFrom, dateTo) },
-    { label: 'Avg RPE', unit: '', prev: avgRpe, current: avgRpe },
-    { label: 'Avg длительность', unit: 'мин', prev: avgDuration, current: avgDuration },
-    { label: 'PR за период', unit: 'шт', current: totalPR },
+    { label: 'Объём', unit: 'т', prev: prevTotalVolume > 0 ? Number((prevTotalVolume / 1000).toFixed(1)) : undefined,
+      current: Number((totalVolume / 1000).toFixed(1)), sparkline: computeSparkline(enriched, 'totalVolume', dateFrom, dateTo) },
+    { label: 'Avg RPE', unit: '', prev: avgRpe ? Number(avgRpe.toFixed(1)) : undefined, current: avgRpe ? Number(avgRpe.toFixed(1)) : undefined },
+    { label: 'Avg длительность', unit: 'мин', prev: avgDuration ? Math.round(avgDuration) : undefined, current: avgDuration ? Math.round(avgDuration) : undefined },
+    { label: 'PR за период', unit: 'шт', current: prCount, status: prCount > 0 ? 'normal' : 'info' },
   ];
 
-  return {
-    id: 'training', title: 'Тренировки', icon: '🏋️', metrics };
+  const topMuscles = Object.entries(muscleVolume).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  if (topMuscles.length > 0) {
+    metrics.push({ label: 'Топ мышцы (объём)', unit: 'кг', current: topMuscles.map(([g, v]) => `${g} ${(v / 1000).toFixed(1)}т`).join(', ') });
+  }
+
+  return { id: 'training', title: 'Тренировки', icon: '🏋️', metrics };
 }
 
 function gatherNutrition(dateFrom: string, dateTo: string): ReportSection {
@@ -363,17 +426,16 @@ function gatherNutrition(dateFrom: string, dateTo: string): ReportSection {
   const avgWater = recentMetrics.length > 0 ? recentMetrics.reduce((s, m) => s + (m.waterLiters || 0), 0) / recentMetrics.length : undefined;
 
   const metrics: ReportMetric[] = [
-    { label: 'Средние kcal/день', unit: 'ккал', prev: nutrition.manualTargets?.kcal || undefined, current: nutrition.manualTargets?.kcal || 'Нет данных' },
-    { label: 'Белок', unit: 'г', prev: nutrition.manualTargets?.protein, current: nutrition.manualTargets?.protein },
-    { label: 'Жиры', unit: 'г', prev: nutrition.manualTargets?.fat, current: nutrition.manualTargets?.fat },
-    { label: 'Углеводы', unit: 'г', prev: nutrition.manualTargets?.carbs, current: nutrition.manualTargets?.carbs },
+    { label: 'Средние kcal/день', unit: 'ккал', current: nutrition.manualTargets?.kcal || 'Нет данных' },
+    { label: 'Белок', unit: 'г', current: nutrition.manualTargets?.protein },
+    { label: 'Жиры', unit: 'г', current: nutrition.manualTargets?.fat },
+    { label: 'Углеводы', unit: 'г', current: nutrition.manualTargets?.carbs },
     { label: 'Белок/кг', unit: 'г/кг', current: nutrition.proteinPerKg },
-    { label: 'Вода', unit: 'л', prev: avgWater, current: avgWater },
+    { label: 'Вода', unit: 'л', current: avgWater ? Number(avgWater.toFixed(1)) : undefined, sparkline: computeSparkline(recentMetrics, 'waterLiters', dateFrom, dateTo) },
     { label: 'Приёмов пищи', unit: 'шт', current: nutrition.mealsPerDay },
   ];
 
-  return {
-    id: 'nutrition', title: 'Питание', icon: '🍽️', metrics };
+  return { id: 'nutrition', title: 'Питание', icon: '🍽️', metrics };
 }
 
 function gatherRecovery(dateFrom: string, dateTo: string): ReportSection {
@@ -390,31 +452,29 @@ function gatherRecovery(dateFrom: string, dateTo: string): ReportSection {
   const avgStress = recent.length > 0 ? recent.reduce((s, m) => s + (m.subjectiveStress || 0), 0) / recent.length : lifestyle.stressLevel;
 
   const metrics: ReportMetric[] = [
-    { label: 'Сон', unit: 'ч', prev: lifestyle.sleepHours, current: avgSleep, sparkline: computeSparkline(recent, 'sleepHours', dateFrom, dateTo) },
-    { label: 'Качество сна', unit: '1-5', current: avgSleepQ },
-    { label: 'HRV', unit: 'мс', prev: lifestyle.morningHRV, current: avgHrv, sparkline: computeSparkline(recent, 'hrvMs', dateFrom, dateTo) },
-    { label: 'ЧСС покоя', unit: 'bpm', current: avgRestHr, sparkline: computeSparkline(recent, 'restingHR', dateFrom, dateTo) },
-    { label: 'Шаги/день', unit: 'шт', current: avgSteps, sparkline: computeSparkline(recent, 'steps', dateFrom, dateTo) },
-    { label: 'Стресс', unit: '1-10', prev: lifestyle.stressLevel, current: avgStress, sparkline: computeSparkline(recent, 'subjectiveStress', dateFrom, dateTo) },
+    { label: 'Сон', unit: 'ч', prev: lifestyle.sleepHours, current: avgSleep ? Number(avgSleep.toFixed(1)) : undefined, sparkline: computeSparkline(recent, 'sleepHours', dateFrom, dateTo) },
+    { label: 'Качество сна', unit: '1-5', current: avgSleepQ ? Number(avgSleepQ.toFixed(1)) : undefined },
+    { label: 'HRV', unit: 'мс', prev: lifestyle.morningHRV, current: avgHrv ? Math.round(avgHrv) : undefined, sparkline: computeSparkline(recent, 'hrvMs', dateFrom, dateTo) },
+    { label: 'ЧСС покоя', unit: 'bpm', current: avgRestHr ? Math.round(avgRestHr) : undefined, sparkline: computeSparkline(recent, 'restingHR', dateFrom, dateTo) },
+    { label: 'Шаги/день', unit: 'шт', current: avgSteps ? Math.round(avgSteps) : undefined, sparkline: computeSparkline(recent, 'steps', dateFrom, dateTo) },
+    { label: 'Стресс', unit: '1-10', prev: lifestyle.stressLevel, current: avgStress ? Number(avgStress.toFixed(1)) : undefined, sparkline: computeSparkline(recent, 'subjectiveStress', dateFrom, dateTo) },
   ];
 
-  return {
-    id: 'recovery', title: 'Восстановление', icon: '😴', metrics };
+  return { id: 'recovery', title: 'Восстановление', icon: '😴', metrics };
 }
 
 function gatherBloodPressure(dateFrom: string, dateTo: string): ReportSection {
   const entries = getBpEntries();
   const recent = entries.filter(e => e.date >= dateFrom && e.date <= dateTo);
 
-  const morning = recent.filter(e => {
-    const h = new Date(e.date).getHours();
-    return h < 14 || (e.hr && e.hr < 70);
-  });
-  const evening = recent.filter(e => {
-    const h = new Date(e.date).getHours();
-    return h >= 14 || (e.hr && e.hr >= 70);
-  });
+  const morning = recent.filter(e => e.hr && e.hr < 70);
+  const evening = recent.filter(e => e.hr && e.hr >= 70);
+  const unclassified = recent.filter(e => !e.hr);
+  const allForAvg = [...morning, ...evening, ...unclassified];
 
+  const avgSys = allForAvg.length > 0 ? Math.round(allForAvg.reduce((s, e) => s + e.systolic, 0) / allForAvg.length) : undefined;
+  const avgDia = allForAvg.length > 0 ? Math.round(allForAvg.reduce((s, e) => s + e.diastolic, 0) / allForAvg.length) : undefined;
+  const avgHr = allForAvg.length > 0 ? Math.round(allForAvg.reduce((s, e) => s + (e.hr || 0), 0) / allForAvg.length) : undefined;
   const avgMorningSys = morning.length > 0 ? Math.round(morning.reduce((s, e) => s + e.systolic, 0) / morning.length) : undefined;
   const avgMorningDia = morning.length > 0 ? Math.round(morning.reduce((s, e) => s + e.diastolic, 0) / morning.length) : undefined;
   const avgEveningSys = evening.length > 0 ? Math.round(evening.reduce((s, e) => s + e.systolic, 0) / evening.length) : undefined;
@@ -422,17 +482,28 @@ function gatherBloodPressure(dateFrom: string, dateTo: string): ReportSection {
   const maxSys = recent.length > 0 ? Math.max(...recent.map(e => e.systolic)) : undefined;
   const maxDia = recent.length > 0 ? Math.max(...recent.map(e => e.diastolic)) : undefined;
 
+  const bpSysStatus = maxSys != null ? (maxSys >= 160 ? 'critical' : maxSys >= 140 ? 'warning' : 'normal') : undefined;
+  const bpDiaStatus = maxDia != null ? (maxDia >= 100 ? 'critical' : maxDia >= 90 ? 'warning' : 'normal') : undefined;
+
   const metrics: ReportMetric[] = [
-    { label: 'Утро: систолическое', unit: 'мм рт.ст.', current: avgMorningSys ?? 'Нет данных' },
-    { label: 'Утро: диастолическое', unit: 'мм рт.ст.', current: avgMorningDia ?? 'Нет данных' },
-    { label: 'Вечер: систолическое', unit: 'мм рт.ст.', current: avgEveningSys ?? 'Нет данных' },
-    { label: 'Вечер: диастолическое', unit: 'мм рт.ст.', current: avgEveningDia ?? 'Нет данных' },
-    { label: 'Максимум систолическое', unit: 'мм рт.ст.', current: maxSys ?? 'Нет данных', status: maxSys && maxSys > 140 ? 'warning' : maxSys && maxSys > 160 ? 'critical' : 'normal' },
-    { label: 'Максимум диастолическое', unit: 'мм рт.ст.', current: maxDia ?? 'Нет данных', status: maxDia && maxDia > 90 ? 'warning' : maxDia && maxDia > 100 ? 'critical' : 'normal' },
+    { label: 'Все замеры: систолическое', unit: 'мм рт.ст.', current: avgSys ?? 'Нет данных', status: bpSysStatus },
+    { label: 'Все замеры: диастолическое', unit: 'мм рт.ст.', current: avgDia ?? 'Нет данных', status: bpDiaStatus },
+    { label: 'ЧСС', unit: 'bpm', current: avgHr ?? 'Нет данных' },
   ];
 
-  return {
-    id: 'blood_pressure', title: 'Артериальное давление', icon: '🩸', metrics };
+  if (morning.length > 0) {
+    metrics.push({ label: 'Утро (ЧСС<70): систолическое', unit: 'мм рт.ст.', current: avgMorningSys });
+    metrics.push({ label: 'Утро (ЧСС<70): диастолическое', unit: 'мм рт.ст.', current: avgMorningDia });
+  }
+  if (evening.length > 0) {
+    metrics.push({ label: 'Вечер (ЧСС≥70): систолическое', unit: 'мм рт.ст.', current: avgEveningSys });
+    metrics.push({ label: 'Вечер (ЧСС≥70): диастолическое', unit: 'мм рт.ст.', current: avgEveningDia });
+  }
+  metrics.push({ label: 'Макс. систолическое', unit: 'мм рт.ст.', current: maxSys ?? 'Нет данных', status: bpSysStatus });
+  metrics.push({ label: 'Макс. диастолическое', unit: 'мм рт.ст.', current: maxDia ?? 'Нет данных', status: bpDiaStatus });
+  metrics.push({ label: 'Замеров', unit: 'шт', current: recent.length });
+
+  return { id: 'blood_pressure', title: 'Артериальное давление', icon: '🩸', metrics };
 }
 
 function gatherCourse(dateFrom: string, dateTo: string): ReportSection {
@@ -440,44 +511,45 @@ function gatherCourse(dateFrom: string, dateTo: string): ReportSection {
   const settings = (profile?.settings || {}) as any;
   const pharma = settings.pharma || {};
   const substances = pharma.currentSubstances || [];
-  const courseData: any[] = [];
+
+  const metrics: ReportMetric[] = [];
 
   if (pharma.courseStartDate) {
-    const start = new Date(pharma.courseStartDate);
-    const now = new Date();
     const diffDays = Math.max(1, daysBetween(pharma.courseStartDate, todayIso()));
     const weekCurrent = Math.floor(diffDays / 7) + 1;
-    courseData.push({ label: 'Дата старта курса', current: pharma.courseStartDate });
-    courseData.push({ label: 'Текущая неделя', current: weekCurrent, unit: 'нед' });
-    courseData.push({ label: 'Фаза', current: pharma.phase || 'course' });
-    courseData.push({ label: 'Тип курса', current: pharma.trainingCycleType || 'mass' });
+    metrics.push({ label: 'Дата старта', unit: '', current: pharma.courseStartDate });
+    metrics.push({ label: 'Текущая неделя', current: weekCurrent, unit: 'нед' });
+    metrics.push({ label: 'Фаза', unit: '', current: pharma.phase || 'course' });
+    metrics.push({ label: 'Тип курса', unit: '', current: pharma.trainingCycleType || 'mass' });
+    metrics.push({ label: 'Длительность', unit: '', current: pharma.trainingCycleWeeks ? `${pharma.trainingCycleWeeks} нед` : '—' });
   }
 
-  const metrics: ReportMetric[] = courseData;
+  if (substances.length > 0) {
+    metrics.push({ label: 'Веществ в стеке', current: substances.length, unit: 'шт' });
+    const aasCount = substances.filter((s: any) => s.isAAS).length;
+    if (aasCount > 0) metrics.push({ label: 'ААС', current: aasCount, unit: 'шт', status: 'warning' });
+  }
 
-  return {
-    id: 'course', title: 'Курс', icon: '💉', metrics };
+  return { id: 'course', title: 'Курс', icon: '💉', metrics };
 }
 
 function gatherSymptoms(dateFrom: string, dateTo: string): ReportSection {
-  const diary = getSymptomDiary();
   const stats = getSymptomDiaryStats();
+  const diary = getSymptomDiary();
   const recent = diary.filter(d => d.date >= dateFrom && d.date <= dateTo);
 
-  const activeCount = stats.activeSymptoms;
-  const improved = stats.improving;
-  const worsening = stats.worsening;
-  const resolved = stats.resolved;
+  const recentSymptoms = new Set<string>();
+  recent.forEach(d => { if (d.entries) d.entries.forEach((s: any) => recentSymptoms.add(typeof s === 'string' ? s : s.symptomId || '')); });
 
   const metrics: ReportMetric[] = [
-    { label: 'Активные симптомы', unit: 'шт', current: activeCount },
-    { label: 'Улучшившиеся', unit: 'шт', current: improved },
-    { label: 'Ухудшившиеся', unit: 'шт', current: worsening, status: worsening > 0 ? 'warning' : 'normal' },
-    { label: 'Разрешённые', unit: 'шт', current: resolved },
+    { label: 'Активные симптомы', unit: 'шт', current: stats.activeSymptoms, status: stats.activeSymptoms > 3 ? 'warning' : 'normal' },
+    { label: 'Улучшившиеся', unit: 'шт', current: stats.improving },
+    { label: 'Ухудшившиеся', unit: 'шт', current: stats.worsening, status: stats.worsening > 0 ? 'warning' : 'normal' },
+    { label: 'Разрешённые', unit: 'шт', current: stats.resolved },
+    { label: 'Уникальных за период', unit: 'шт', current: recentSymptoms.size },
   ];
 
-  return {
-    id: 'symptoms', title: 'Симптомы', icon: '📋', metrics };
+  return { id: 'symptoms', title: 'Симптомы', icon: '📋', metrics };
 }
 
 function gatherSupportSchedule(): SupportScheduleSection {
@@ -486,6 +558,9 @@ function gatherSupportSchedule(): SupportScheduleSection {
   const pharma = settings.pharma || {};
   const nutrition = settings.nutrition || {};
   const substances = pharma.currentSubstances || [];
+
+  const planResult: string[] = readJsonSafe('he_support_plan_result', []);
+  const riskBridge = readRiskBridge();
 
   const course = {
     isActive: !!pharma.courseStartDate,
@@ -497,7 +572,7 @@ function gatherSupportSchedule(): SupportScheduleSection {
       id: s.id || s.substanceId || '',
       name: s.name || s.substance || s.id || '',
       doseDisplay: s.doseMg ? `${s.doseMg} мг` : s.doseMgWeek ? `${s.doseMgWeek} мг/нед` : '—',
-      route: s.route === 'inject' ? 'inject' : 'oral',
+      route: s.route === 'inject' ? 'inject' : 'oral' as const,
       frequency: s.frequency || '1 р/нед',
       startWeek: s.startWeek || 1,
       endWeek: s.endWeek || 16,
@@ -508,71 +583,188 @@ function gatherSupportSchedule(): SupportScheduleSection {
   };
 
   const schedule = {
-    morning: [] as any[],
-    afternoon: [] as any[],
-    evening: [] as any[],
+    morning: [] as SupportScheduleSection['schedule']['morning'],
+    afternoon: [] as SupportScheduleSection['schedule']['afternoon'],
+    evening: [] as SupportScheduleSection['schedule']['evening'],
   };
 
-  const supplements = (nutrition.currentSupplements || []).map((s: any) => ({
-    id: s.id, name: s.name, doseMg: s.doseMg || 0, unit: s.doseUnit || 'мг',
-    notes: s.notes, source: 'profile' as const,
-  }));
+  const profileSupps = (nutrition.currentSupplements || []) as any[];
+  const planSupps = planResult.map(id => ({ id, name: id, doseMg: 0, unit: 'мг', source: 'support_plan' as const }));
+  const suppMap = new Map<string, SupportScheduleSection['supplements'][0]>();
+  profileSupps.forEach((s: any) => { suppMap.set(s.id, { id: s.id, name: s.name, doseMg: s.doseMg || 0, unit: s.doseUnit || 'мг', notes: s.notes, source: 'profile' }); });
+  planSupps.forEach(s => { if (!suppMap.has(s.id)) suppMap.set(s.id, s); });
+  const supplements = Array.from(suppMap.values());
 
-  const medications = (nutrition.currentMedications || []).map((m: any) => ({
+  const medications = ((nutrition as any).currentMedications || []).map((m: any) => ({
     id: m.id, name: m.name, doseMg: m.doseMg || 0, unit: m.doseUnit || 'мг',
     frequency: m.frequency || 'daily', notes: m.notes, source: 'profile' as const,
   }));
 
+  const totalSubstances = supplements.length + medications.length + course.substances.length;
+  const pillsPerDay = supplements.length + medications.length;
+
+  const monitoring = [
+    { marker: 'Липидный профиль', when: course.isActive ? 'Каждые 4 недели на курсе' : 'Каждые 3 мес', targetRange: 'ЛПНП < 3.0 ммоль/л' },
+    { marker: 'АЛТ/АСТ/ГГТ', when: course.isActive ? 'Каждые 4 недели' : 'Каждые 6 мес', targetRange: 'АЛТ < 40 U/L' },
+    { marker: 'Гормональный профиль', when: course.isActive ? 'Перед курсом + через 4 нед' : 'Каждые 6 мес', targetRange: 'Т 10-35, E2 40-160' },
+    { marker: 'Гематокрит', when: course.isActive ? 'Каждые 4 недели' : 'Каждые 6 мес', targetRange: 'HCT < 50%' },
+    { marker: 'Глюкоза + инсулин', when: 'Каждые 6 недель', targetRange: 'Глюкоза 3.5-5.5' },
+    { marker: 'Пролактин', when: course.isActive ? 'Каждые 6 недель' : 'Каждые 12 мес', targetRange: 'Прл 80-400 mIU/L' },
+    { marker: 'СКФ + креатинин', when: course.isActive ? 'Каждые 8 недель' : 'Каждые 12 мес', targetRange: 'СКФ > 90 ml/min' },
+  ];
+
   return {
-    
-    course,
-    schedule,
-    supplements,
-    medications,
-    monitoring: [
-      { marker: 'Липидный профиль', when: 'Каждые 4 недели на курсе', targetRange: 'ЛПНП < 3.0 ммоль/л' },
-      { marker: 'АЛТ/АСТ/ГГТ', when: 'Каждые 4 недели', targetRange: 'АЛТ < 40 U/L' },
-      { marker: 'Гормональный профиль', when: 'Перед курсом + через 4 нед', targetRange: 'Т 10-35, E2 40-160' },
-      { marker: 'Гематокрит', when: 'Каждые 4 недели', targetRange: 'HCT < 50%' },
-      { marker: 'Глюкоза + инсулин', when: 'Каждые 6 недель', targetRange: 'Глюкоза 3.5-5.5' },
-      { marker: 'Пролактин', when: 'Каждые 6 недель (трендон)', targetRange: 'Прл 80-400 mIU/L' },
-      { marker: 'СКФ + креатинин', when: 'Каждые 8 недель', targetRange: 'СКФ > 90 ml/min' },
-    ],
-    pillBurden: { totalSubstances: 0, pillsPerDay: 0, morning: 0, afternoon: 0, evening: 0, feasibility: 'Умеренная' },
+    course, schedule, supplements, medications, monitoring,
+    pillBurden: { totalSubstances, pillsPerDay, morning: Math.ceil(pillsPerDay * 0.4), afternoon: Math.ceil(pillsPerDay * 0.3), evening: Math.ceil(pillsPerDay * 0.3), feasibility: pillsPerDay > 10 ? 'Высокая' : pillsPerDay > 5 ? 'Умеренная' : 'Низкая' },
     depletionWarnings: [],
     conflicts: [],
   };
 }
 
-function generateRecommendations(sections: ReportSection[]): ReportRecommendation[] {
-  const recs: ReportRecommendation[] = [];
+function gatherPedRisk(): ReportSection | null {
+  const bridge = readRiskBridge();
+  if (!bridge) return null;
 
-  sections.forEach(section => {
-    section.metrics.forEach(m => {
-      if (m.label === 'Гематокрит' && typeof m.current === 'number' && m.current > 50) {
-        recs.push({ section: 'Кровь', priority: 'critical', text: 'Гематокрит выше нормы — риск полицитемии. Кровопускание при HCT > 54%.' });
-      }
-      if (m.label === 'ЛПНП' && typeof m.current === 'number' && m.current > 4.0) {
-        recs.push({ section: 'Липиды', priority: 'warning', text: 'ЛПНП значительно выше целевого для ААС — рассмотреть статин.' });
-      }
-      if (m.label === 'Пролактин' && typeof m.current === 'number' && m.current > 400) {
-        recs.push({ section: 'Гормоны', priority: 'warning', text: 'Пролактин выше нормы — каберголин 0.25 мг 2×/нед.' });
-      }
-      if (m.label === 'АЛТ' && typeof m.current === 'number' && m.refHigh && m.current > m.refHigh * 2) {
-        recs.push({ section: 'Печень', priority: 'critical', text: 'АЛТ в 2× выше нормы — гепатотоксичность. Отмена оральных ААС.' });
-      }
-      if (m.label === 'СКФ' && typeof m.current === 'number' && m.current < 60) {
-        recs.push({ section: 'Почки', priority: 'critical', text: 'СКФ < 60 — ХБП 3 ст. Консультация нефролога.' });
-      }
+  const metrics: ReportMetric[] = [
+    { label: 'Риск до поддержки', unit: 'баллов', current: bridge.riskBefore,
+      status: bridge.riskBefore > 600 ? 'critical' : bridge.riskBefore > 300 ? 'warning' : 'normal' },
+    { label: 'Риск после поддержки', unit: 'баллов', current: bridge.riskAfter,
+      status: bridge.riskAfter > 400 ? 'critical' : bridge.riskAfter > 200 ? 'warning' : 'normal' },
+    { label: 'Эффективность поддержки', unit: '%',
+      current: bridge.riskBefore > 0 ? Math.round((1 - bridge.riskAfter / bridge.riskBefore) * 100) : 0,
+      status: bridge.riskBefore > 0 && bridge.riskAfter < bridge.riskBefore * 0.5 ? 'normal' : 'warning' },
+  ];
+
+  if (bridge.systemBreakdown) {
+    Object.entries(bridge.systemBreakdown).forEach(([sys, data]) => {
+      metrics.push({
+        label: sys, unit: 'баллов', current: data.net,
+        delta: data.raw - data.net, deltaPct: data.raw > 0 ? ((data.raw - data.net) / data.raw) * 100 : undefined,
+        note: `Базовый: ${data.raw}, после поддержки: ${data.net}`,
+      });
     });
-  });
+  }
+
+  if (bridge.subs && bridge.subs.length > 0) {
+    metrics.push({ label: 'Активные БАД', unit: 'шт', current: bridge.subs.length });
+  }
+
+  return { id: 'ped_risk', title: 'Риск-оценка PED', icon: '🛡️', metrics };
+}
+
+function generateRecommendations(sections: ReportSection[], pedRisk: RiskBridgeData | null): ReportRecommendation[] {
+  const recs: ReportRecommendation[] = [];
+  const findMetric = (label: string): ReportMetric | undefined => {
+    for (const s of sections) { const m = s.metrics.find(m => m.label === label); if (m) return m; }
+    return undefined;
+  };
+  const numVal = (m: ReportMetric | undefined): number | null => {
+    if (!m || m.current == null) return null;
+    const v = typeof m.current === 'number' ? m.current : parseFloat(String(m.current));
+    return isNaN(v) ? null : v;
+  };
+
+  const hct = numVal(findMetric('Гематокрит'));
+  if (hct != null && hct > 54) recs.push({ section: 'Кровь', priority: 'critical', text: `Гематокрит ${hct}% — полицитемия. Кровопускание (флеботомия 450-500мл). Увеличить потребление воды до 3-4 л/день.` });
+  else if (hct != null && hct > 50) recs.push({ section: 'Кровь', priority: 'warning', text: `Гематокрит ${hct}% — приближается к границе. Контроль каждые 2 недели. Донаторы оксида азота (L-аргинин, чеснок).` });
+
+  const ldl = numVal(findMetric('ЛПНП'));
+  if (ldl != null && ldl > 4.9) recs.push({ section: 'Липиды', priority: 'critical', text: `ЛПНП ${ldl} ммоль/л —极高 риск. Статин (аторвастатин 20-40мг). Рассмотреть отмену 17α-алкилированных ААС.` });
+  else if (ldl != null && ldl > 3.0) recs.push({ section: 'Липиды', priority: 'warning', text: `ЛПНП ${ldl} ммоль/л — выше целевого. Омега-3 3-4г/день, красный дрожжевой рис, коэнзим Q10.` });
+
+  const hdl = numVal(findMetric('ЛПВП'));
+  if (hdl != null && hdl < 1.0) recs.push({ section: 'Липиды', priority: 'warning', text: `ЛПВП ${hdl} ммоль/л — низкий кардиопротекторный эффект. Аэробная нагрузка 150+ мин/нед, омега-3, ниацин.` });
+
+  const tg = numVal(findMetric('Триглицериды'));
+  if (tg != null && tg > 2.3) recs.push({ section: 'Липиды', priority: 'warning', text: `Триглицериды ${tg} ммоль/л. Ограничение простых углеводов, омега-3 2-4г/день, контроль алкоголя.` });
+
+  const prolactin = numVal(findMetric('Пролактин'));
+  if (prolactin != null && prolactin > 600) recs.push({ section: 'Гормоны', priority: 'critical', text: `Пролактин ${prolactin} mIU/L — значительно выше нормы. Каберголин 0.5мг 2×/нед + МРТ гипофиза.` });
+  else if (prolactin != null && prolactin > 400) recs.push({ section: 'Гормоны', priority: 'warning', text: `Пролактин ${prolactin} mIU/L. Каберголин 0.25мг 2×/нед. Исключить пролактиному.` });
+
+  const alt = numVal(findMetric('АЛТ'));
+  const ast = numVal(findMetric('АСТ'));
+  if (alt != null && alt > 80) recs.push({ section: 'Печень', priority: 'critical', text: `АЛТ ${alt} U/L — гепатотоксичность. Отмена оральных ААС и гепатотоксичных препаратов. УДХК 300-600мг/день.` });
+  else if (alt != null && alt > 40) recs.push({ section: 'Печень', priority: 'warning', text: `АЛТ ${alt} U/L — выше нормы. ТUDCA 250-500мг/день, NAC 600-1200мг/день. Контроль через 4 нед.` });
+  if (ast != null && alt != null && alt > 0 && ast / alt > 2) recs.push({ section: 'Печень', priority: 'warning', text: `АСТ/АЛТ > 2 — мышечное повреждение или алкоголь. Дифференциальная диагностика.` });
+
+  const gfr = numVal(findMetric('СКФ (GFR)'));
+  if (gfr != null && gfr < 45) recs.push({ section: 'Почки', priority: 'critical', text: `СКФ ${gfr} — ХБП 3b-4 ст. Нефролог. Отмена нефротоксичных препаратов. Контроль каждые 4 нед.` });
+  else if (gfr != null && gfr < 60) recs.push({ section: 'Почки', priority: 'warning', text: `СКФ ${gfr} — ХБП 3 ст. Ограничение белка до 0.8г/кг, гидратация, контроль креатинина.` });
+  else if (gfr != null && gfr < 90) recs.push({ section: 'Почки', priority: 'info', text: `СКФ ${gfr} — нижняя граница нормы. Поддерживать гидратацию 2.5-3 л/день.` });
+
+  const creatinine = numVal(findMetric('Креатинин'));
+  if (creatinine != null && creatinine > 130) recs.push({ section: 'Почки', priority: 'warning', text: `Креатинин ${creatinine} µmol/L — повышен. Может быть следствием креатина/белка. Оценить СКФ.` });
+
+  const glucose = numVal(findMetric('Глюкоза'));
+  if (glucose != null && glucose > 6.1) recs.push({ section: 'Метаболизм', priority: 'critical', text: `Глюкоза ${glucose} ммоль/л — гипергликемия. ОГТТ, HbA1c. Метформин 500-1000мг.` });
+  else if (glucose != null && glucose > 5.5) recs.push({ section: 'Метаболизм', priority: 'warning', text: `Глюкоза ${glucose} ммоль/л — на границе. Ограничение быстрых углеводов, контроль инсулинорезистентности.` });
+
+  const uric = numVal(findMetric('Мочевая кислота'));
+  if (uric != null && uric > 420) recs.push({ section: 'Метаболизм', priority: 'warning', text: `Мочевая кислота ${uric} µmol/L — гиперурикемия. Ограничение пуринов, гидратация, аллопуринол при подагре.` });
+
+  const tsh = numVal(findMetric('ТТГ'));
+  if (tsh != null && tsh > 4.0) recs.push({ section: 'Гормоны', priority: 'warning', text: `ТТГ ${tsh} mIU/L — гипотиреоз. Консультация эндокринолога, Т3/Т4, анти-ТПО/ТГ.` });
+  else if (tsh != null && tsh < 0.4) recs.push({ section: 'Гормоны', priority: 'warning', text: `ТТГ ${tsh} mIU/L — гипертиреоз. Консультация эндокринолога, Т3/Т4 свободный.` });
+
+  const hb = numVal(findMetric('Гемоглобин'));
+  if (hb != null && hb > 180) recs.push({ section: 'Кровь', priority: 'critical', text: `Гемоглобин ${hb} г/Л — риск тромбоза. Флеботомия, антиагреганты (аспирин 75-100мг).` });
+  else if (hb != null && hb < 120) recs.push({ section: 'Кровь', priority: 'warning', text: `Гемоглобин ${hb} г/Л — анемия. Ферритин, сывороточное железо, B12/фолат.` });
+
+  const wbc = numVal(findMetric('Лейкоциты'));
+  if (wbc != null && wbc > 11) recs.push({ section: 'Кровь', priority: 'warning', text: `Лейкоциты ${wbc} — лейкоцитоз. Исключить инфекцию, стресс, глюкокортикоиды.` });
+  else if (wbc != null && wbc < 4) recs.push({ section: 'Кровь', priority: 'warning', text: `Лейкоциты ${wbc} — лейкопения. ГКС-терапия, вирусные инфекции, угнетение костного мозга.` });
+
+  const crp = numVal(findMetric('СРБ'));
+  if (crp != null && crp > 10) recs.push({ section: 'Воспаление', priority: 'critical', text: `СРБ ${crp} мг/л — острое воспаление. Исключить инфекцию, аутоиммунные заболевания.` });
+  else if (crp != null && crp > 5) recs.push({ section: 'Воспаление', priority: 'warning', text: `СРБ ${crp} мг/л — хроническое воспаление. Омега-3, куркумин, контроль ИМТ и сна.` });
+
+  const na = numVal(findMetric('Натрий'));
+  if (na != null && na > 147) recs.push({ section: 'Электролиты', priority: 'warning', text: `Натрий ${na} ммоль/л — гипернатриемия. Увеличить воду, ограничить натрий до 2г/день.` });
+  else if (na != null && na < 136) recs.push({ section: 'Электролиты', priority: 'warning', text: `Натрий ${na} ммоль/л — гипонатриемия. Рассмотреть SAID (спиронолактон) при ААС.` });
+
+  const k = numVal(findMetric('Калий'));
+  if (k != null && k > 5.5) recs.push({ section: 'Электролиты', priority: 'critical', text: `Калий ${k} ммоль/л — гиперкалиемия! Риск аритмии. Контроль ЭКГ, бикарбонат калия.` });
+  else if (k != null && k < 3.5) recs.push({ section: 'Электролиты', priority: 'warning', text: `Калий ${k} ммоль/л — гипокалиемия. Калийсберегающие диуретики при ААС, бананы, авокадо.` });
+
+  const mg = numVal(findMetric('Магний'));
+  if (mg != null && mg < 0.66) recs.push({ section: 'Электролиты', priority: 'warning', text: `Магний ${mg} ммоль/л — дефицит. Mg-цитрат/глицинат 400-600мг/день перед сном.` });
+
+  const bun = numVal(findMetric('Мочевина'));
+  if (bun != null && bun > 10) recs.push({ section: 'Почки', priority: 'warning', text: `Мочевина ${bun} ммоль/л — повышенная. Снизить белок до 1.6г/кг, увеличить гидратацию.` });
+
+  if (pedRisk) {
+    if (pedRisk.riskBefore > 600 && pedRisk.riskAfter >= pedRisk.riskBefore * 0.8) {
+      recs.push({ section: 'PED', priority: 'critical', text: `Поддержка снижает риск недостаточно (${pedRisk.riskBefore} → ${pedRisk.riskAfter}). Рассмотреть добавки/дозировки.` });
+    }
+  }
+
+  const symptoms = findMetric('Ухудшившиеся');
+  if (symptoms && typeof symptoms.current === 'number' && symptoms.current > 0) {
+    recs.push({ section: 'Симптомы', priority: 'warning', text: `${symptoms.current} симптом(ов) ухудшились за период. Обсудить с врачом на следующем приёме.` });
+  }
+
+  const bpMaxSys = findMetric('Макс. систолическое');
+  if (bpMaxSys && typeof bpMaxSys.current === 'number' && bpMaxSys.current >= 160) {
+    recs.push({ section: 'Давление', priority: 'critical', text: `Систолическое давление ${bpMaxSys.current} мм рт.ст. — гипертонический криз. Немедленно: лизиноприл 10-20мг или небиволол 5мг.` });
+  } else if (bpMaxSys && typeof bpMaxSys.current === 'number' && bpMaxSys.current >= 140) {
+    recs.push({ section: 'Давление', priority: 'warning', text: `Систолическое давление ${bpMaxSys.current} мм рт.ст. — АГ 1 ст. Небиволол 5мг/день, телмисартан 40мг/день.` });
+  }
+
+  const adh = findMetric('Adherence');
+  if (adh && typeof adh.current === 'number' && adh.current < 60) {
+    recs.push({ section: 'Тренировки', priority: 'warning', text: `Adherence ${adh.current}% — пропуск тренировок. Рассмотреть снижение частоты или смену сплита.` });
+  }
 
   if (recs.length === 0) {
-    recs.push({ section: 'Общее', priority: 'info', text: 'Все показатели в пределах нормы. Продолжить текущий протокол.' });
+    recs.push({ section: 'Общее', priority: 'info', text: 'Все показатели в пределах нормы. Продолжить текущий протокол. Плановые анализы — согласно календарю мониторинга.' });
   }
 
   return recs;
 }
+
+function weekStart(d: Date): Date { const r = new Date(d); r.setDate(r.getDate() - r.getDay() + 1); r.setHours(0, 0, 0, 0); return r; }
+function isoDate(d: Date): string { return d.toISOString().slice(0, 10); }
 
 async function gatherMonthlyTrends(dateFrom: string, dateTo: string): Promise<ComprehensiveReport['trends']> {
   const weightLog = getWeightLog();
@@ -580,15 +772,50 @@ async function gatherMonthlyTrends(dateFrom: string, dateTo: string): Promise<Co
   const workoutLogs = await strengthDiary.getWorkoutLogs();
   const scoreHistory = getScoreHistory();
 
-  const weeks = ['W1','W2','W3','W4'];
-  const weightWeekly = weeks.map((w,i) => ({ week: w, kg: weightLog.length > 0 ? weightLog[Math.min(i, weightLog.length-1)].weight : 0 }));
-  const hrvWeekly = weeks.map((w,i) => ({ week: w, avg: dailyMetrics.length > 0 ? dailyMetrics[Math.min(i, dailyMetrics.length-1)].hrvMs || 0 : 0 }));
+  const from = new Date(dateFrom);
+  const to = new Date(dateTo);
+  const totalDays = Math.max(1, Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)));
+  const numWeeks = Math.min(4, Math.max(1, Math.ceil(totalDays / 7)));
+  const weekLabels = Array.from({ length: numWeeks }, (_, i) => `W${i + 1}`);
+
+  const weekRanges = Array.from({ length: numWeeks }, (_, i) => {
+    const ws = new Date(from);
+    ws.setDate(ws.getDate() + i * 7);
+    const we = new Date(ws);
+    we.setDate(we.getDate() + 6);
+    return { start: isoDate(ws), end: isoDate(we > to ? to : we) };
+  });
+
+  const inRange = (date: string, range: { start: string; end: string }) => date >= range.start && date <= range.end;
+
+  const weightWeekly = weekLabels.map((w, i) => {
+    const range = weekRanges[i];
+    const inWeek = weightLog.filter(e => inRange(e.date, range));
+    return { week: w, kg: inWeek.length > 0 ? inWeek.reduce((s, e) => s + e.weight, 0) / inWeek.length : 0 };
+  });
+
+  const hrvWeekly = weekLabels.map((w, i) => {
+    const range = weekRanges[i];
+    const inWeek = dailyMetrics.filter(m => inRange(m.date, range));
+    return { week: w, avg: inWeek.length > 0 ? inWeek.reduce((s, m) => s + (m.hrvMs || 0), 0) / inWeek.length : 0 };
+  });
+
   const enrichedLogs = workoutLogs.map(l => ({ ...l, totalVolume: l.exercises.reduce((s, e) => s + (e.totalVolume || 0), 0) }));
-  const volumeWeekly = weeks.map((w,i) => ({ week: w, tonnes: enrichedLogs.length > 0 ? enrichedLogs[Math.min(i, enrichedLogs.length-1)].totalVolume / 1000 : 0 }));
-  const riskWeekly = weeks.map((w,i) => ({ week: w, score: scoreHistory.length > 0 ? scoreHistory[Math.min(i, scoreHistory.length-1)].modules?.overall?.overallRaw || 0 : 0 }));
+  const volumeWeekly = weekLabels.map((w, i) => {
+    const range = weekRanges[i];
+    const inWeek = enrichedLogs.filter(l => inRange(l.date, range));
+    return { week: w, tonnes: inWeek.length > 0 ? inWeek.reduce((s, l) => s + l.totalVolume, 0) / 1000 : 0 };
+  });
+
+  const riskWeekly = weekLabels.map((w, i) => {
+    const range = weekRanges[i];
+    const inWeek = scoreHistory.filter(s => inRange(s.date, range));
+    return { week: w, score: inWeek.length > 0 ? inWeek.reduce((s, sc) => s + (sc.modules?.overall?.overallRaw || 0), 0) / inWeek.length : 0 };
+  });
 
   return { weightWeekly, hrvWeekly, volumeWeekly, riskWeekly };
 }
+
 /* ─── Точка входа ─── */
 
 export async function generateComprehensiveReport(input: {
@@ -631,8 +858,13 @@ export async function generateComprehensiveReport(input: {
   ]);
 
   const support = gatherSupportSchedule();
+  const pedRiskSection = gatherPedRisk();
+  const pedRisk = readRiskBridge();
+
+  if (pedRiskSection) sections.push(pedRiskSection);
+
   const trends = input.type === 'monthly' ? await gatherMonthlyTrends(dateFrom, dateTo) : undefined;
-  const recommendations = generateRecommendations(sections);
+  const recommendations = generateRecommendations(sections, pedRisk);
 
   return {
     trends,
@@ -641,11 +873,7 @@ export async function generateComprehensiveReport(input: {
     support,
     userNotes: '',
     recommendations,
+    pedRisk: pedRisk || undefined,
     photos: [],
   };
 }
-
-
-
-
-

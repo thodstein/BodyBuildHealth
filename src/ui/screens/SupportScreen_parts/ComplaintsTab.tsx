@@ -3,6 +3,32 @@ import { SYMPTOM_DB } from '../../../engines/symptom-solver.data';
 import { findSymptomById } from '../../../engines/symptom-solver.engine';
 import type { SymptomEntry } from '../../../engines/symptom-solver.types';
 import { getSymptomDiaryStats, getSymptomChartData, getSymptomDiarySummary, updateSymptomToday, getSymptomDiary } from '../../../engines/symptom-diary.engine';
+import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
+
+const SUPPORT_DIARY_KEY = 'he_support_diary';
+
+interface SupportSubstanceIntake {
+  taken: boolean;
+  dose?: string;
+  timeSlot?: string;
+  sideEffects?: string[];
+}
+
+interface SupportDiaryEntry {
+  date: string;
+  substances: Record<string, SupportSubstanceIntake>;
+  notes?: string;
+}
+
+function loadSupportDiary(): SupportDiaryEntry[] {
+  try { return JSON.parse(localStorage.getItem(SUPPORT_DIARY_KEY) || '[]'); } catch { return []; }
+}
+
+function getSubstanceName(subId: string): string {
+  if (subId.startsWith('custom_')) return subId.replace('custom_', '');
+  const cat = SUPPORT_CATALOG_DATA[subId];
+  return cat?.nameRu || cat?.name || subId;
+}
 
 // ── XSS escape helper ──
 function escapeHtml(s: string): string {
@@ -106,6 +132,87 @@ export const ComplaintsTab: React.FC<{
       forecast7: Math.round(forecast7 * 10) / 10,
     };
   }, [chartData.d7.values]);
+
+  // Корреляционный анализ (Point-biserial correlation для бинарного вещества vs симптом)
+  const correlationData = useMemo(() => {
+    const diary = getSymptomDiary();
+    const supportEntries = loadSupportDiary();
+    const correlations: Array<{ 
+      substance: string; 
+      symptom: string; 
+      correlation: number; 
+      pValue: number;
+      avgWith: number; 
+      avgWithout: number; 
+      countWith: number;
+      countWithout: number;
+    }> = [];
+    
+    if (diary.length < 5) return correlations;
+    
+    // Получаем уникальные вещества из дневника поддержки
+    const substanceIds = new Set<string>();
+    supportEntries.forEach(entry => {
+      Object.keys(entry.substances).forEach(id => substanceIds.add(id));
+    });
+    
+    const subIds = Array.from(substanceIds).slice(0, 15);
+    if (subIds.length === 0) return correlations;
+    
+    subIds.forEach(subId => {
+      const subName = getSubstanceName(subId);
+      allSymptomsForDiary.slice(0, 15).forEach(symptom => {
+        const pairs: Array<{ substanceTaken: number; symptomSeverity: number }> = [];
+        
+        diary.forEach(entry => {
+          const symptomValue = entry.entries.find(v => v.symptomId === symptom.id)?.severity || 0;
+          const tookSubstance = supportEntries.some(d => 
+            d.date === entry.date && d.substances[subId]?.taken
+          ) ? 1 : 0;
+          
+          pairs.push({ substanceTaken: tookSubstance, symptomSeverity: symptomValue });
+        });
+        
+        if (pairs.length < 5) return;
+        
+        const n = pairs.length;
+        const overallMean = pairs.reduce((s, p) => s + p.symptomSeverity, 0) / n;
+        const sd = Math.sqrt(pairs.reduce((s, p) => s + Math.pow(p.symptomSeverity - overallMean, 2), 0) / n);
+        
+        const withSub = pairs.filter(p => p.substanceTaken === 1);
+        const withoutSub = pairs.filter(p => p.substanceTaken === 0);
+        const countWith = withSub.length;
+        const countWithout = withoutSub.length;
+        
+        if (countWith === 0 || countWithout === 0 || sd === 0) return;
+        
+        const meanWith = withSub.reduce((s, p) => s + p.symptomSeverity, 0) / countWith;
+        const meanWithout = withoutSub.reduce((s, p) => s + p.symptomSeverity, 0) / countWithout;
+        
+        const r = (meanWith - meanWithout) / sd * Math.sqrt((countWith * countWithout) / (n * n));
+        const absR = Math.abs(r);
+        
+        // t-test для значимости
+        const t = absR * Math.sqrt((n - 2) / Math.max(0.001, 1 - absR * absR));
+        const pValue = 2 * (1 - 0.5 * (1 + Math.sign(t) * Math.sqrt(t * t / (n - 2 + t * t))));
+        
+        if (absR >= 0.25 && countWith >= 2 && countWithout >= 2 && pValue < 0.2) {
+          correlations.push({
+            substance: subName,
+            symptom: symptom.symptom,
+            correlation: Math.round(r * 100) / 100,
+            pValue: Math.round(pValue * 1000) / 1000,
+            avgWith: Math.round(meanWith * 10) / 10,
+            avgWithout: Math.round(meanWithout * 10) / 10,
+            countWith,
+            countWithout,
+          });
+        }
+      });
+    });
+    
+    return correlations.sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation));
+  }, [allSymptomsForDiary, refreshTick]);
 
   // Прогресс оценки
   const totalSymptoms = allSymptomsForDiary.length;
@@ -346,18 +453,53 @@ export const ComplaintsTab: React.FC<{
         </>
       )}
 
-      {/* Режим: корреляции (заглушка) */}
+      {/* Режим: корреляции */}
       {mode === 'correlation' && (
         <div style={{ ...GLASS_CARD, padding: 14 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 8 }}>
             🔗 Корреляции: симптомы vs вещества
           </div>
           <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 12 }}>
-            Анализ связи между приёмом веществ и изменением симптомов
+            Анализ связи между приёмом веществ и изменением симптомов (Point-biserial r)
           </div>
-          <div style={{ padding: 20, textAlign: 'center', color: '#64748b', fontSize: 12 }}>
-            Функция в разработке. Проверьте обновления.
-          </div>
+          
+          {correlationData.length === 0 ? (
+            <div style={{ padding: 20, textAlign: 'center', color: '#64748b', fontSize: 12 }}>
+              Недостаточно данных для анализа. Нужно минимум 5 дней записей с приёмом веществ.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {correlationData.slice(0, 30).map((corr, i) => (
+                <div key={i} style={{
+                  padding: '10px 12px', borderRadius: 8,
+                  background: corr.correlation < 0 ? 'rgba(76,175,80,0.08)' : 'rgba(244,67,54,0.08)',
+                  borderLeft: `3px solid ${corr.correlation < 0 ? '#4caf50' : '#f44336'}`,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0' }}>
+                      {corr.substance} → {corr.symptom}
+                    </div>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700,
+                      color: corr.correlation < 0 ? '#4caf50' : '#f44336',
+                    }}>
+                      r = {corr.correlation >= 0 ? '+' : ''}{corr.correlation}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 10, color: '#94a3b8', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    <span>С веществом: {corr.avgWith}/10 (n={corr.countWith})</span>
+                    <span>Без: {corr.avgWithout}/10 (n={corr.countWithout})</span>
+                    <span>p={corr.pValue}</span>
+                  </div>
+                  <div style={{ fontSize: 9, color: '#64748b', marginTop: 4 }}>
+                    {corr.correlation < 0 
+                      ? '✅ Вещество ассоциировано с снижением симптома'
+                      : '⚠️ Вещество ассоциировано с усилением симптома'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -43,9 +43,18 @@ export const ExecutionZone: React.FC<Props> = (p) => {
     runtimeStarted, setRuntimeStarted, plRuntime: _plRuntime, plRunOpen, setPlRunOpen,
     runtimeSetW, setRuntimeSetW, runtimeSetR, setRuntimeSetR, runtimeSetRP, setRuntimeSetRP, runtimeSetRI, setRuntimeSetRI,
     diary, onRefresh: loadDiaryStats, onGoToTimers } = p;
-  // Защита от старого кэша: если plRuntime — массив (старый формат BbAutoConstructor), игнорируем
   const plRuntime = (_plRuntime && !Array.isArray(_plRuntime) && Array.isArray((_plRuntime as any).days)) ? _plRuntime : null;
   const [timerInitialSettings, setTimerInitialSettings] = React.useState<{ work: number; rest: number; rounds: number } | undefined>(undefined);
+  const [restTimer, setRestTimer] = React.useState(0);
+  const [restTarget, setRestTarget] = React.useState(90);
+  const restTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  // Rest timer effect
+  React.useEffect(() => {
+    if (restTimer > 0) {
+      restTimerRef.current = setTimeout(() => setRestTimer(prev => prev - 1), 1000);
+      return () => { if (restTimerRef.current) clearTimeout(restTimerRef.current); };
+    }
+  }, [restTimer]);
   // Безопасные производные: если currentMicrocycle null или days пустой — fallback на [].
   // Это предотвращает падения "Cannot read 'filter' of undefined" в UI при пустом/неполном плане.
   const trainingDaysList: any[] = (() => {
@@ -233,6 +242,42 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                         );
                       })()}
                     </div>
+                    {/* Session comparison with previous */}
+                    {(() => {
+                      const completedEntries = Object.entries(runtimeLogs).filter(([_, l]) => l.completed && l.sets.length > 0);
+                      if (completedEntries.length === 0) return null;
+                      // Build comparison data inline
+                      const comparisons = completedEntries.map(([exId, log]) => {
+                        const exName = EXERCISE_CATALOG.find(e => e.id === exId)?.name || exId;
+                        const currentVol = log.sets.reduce((s, st) => s + st.weight * st.reps, 0);
+                        const current1RM = Math.max(...log.sets.map(st => Math.round(st.weight * (1 + st.reps / 30))), 0);
+                        const currentMaxW = Math.max(...log.sets.map(st => st.weight), 0);
+                        return { exName, currentVol, current1RM, currentMaxW, sets: log.sets.length };
+                      });
+                      return (
+                        <div style={{ marginBottom: 12, textAlign: 'left' }}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>📊 Сводка по упражнениям</div>
+                          {comparisons.map((c, i) => (
+                            <div key={i} style={{
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                              padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)',
+                              marginBottom: 2, fontSize: 10,
+                            }}>
+                              <span style={{ color: 'rgba(255,255,255,0.7)', flex: 1 }}>{c.exName}</span>
+                              <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 60, textAlign: 'right' }}>
+                                {c.sets}×{c.currentMaxW}кг
+                              </span>
+                              <span style={{ color: 'rgba(255,255,255,0.4)', minWidth: 50, textAlign: 'right' }}>
+                                {c.currentVol.toLocaleString()}кг
+                              </span>
+                              <span style={{ color: 'rgba(255,255,255,0.3)', minWidth: 50, textAlign: 'right' }}>
+                                1RM {c.current1RM}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
                       <button onClick={async () => {
                         // Save completed workout to IndexedDB
@@ -389,6 +434,42 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                           if (!hint) return null;
                           return <div style={{ fontSize: 10, color: hintColor, marginTop: 2, fontWeight: 600 }}>{hint}</div>;
                         })()}
+
+                        {/* Rest timer */}
+                        {restTimer > 0 && (
+                          <div style={{
+                            marginTop: 6, padding: '8px 12px', borderRadius: 8,
+                            background: restTimer <= 10 ? 'rgba(239,68,68,0.1)' : 'rgba(0,230,138,0.06)',
+                            border: `1px solid ${restTimer <= 10 ? 'rgba(239,68,68,0.2)' : 'rgba(0,230,138,0.15)'}`,
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          }}>
+                            <div>
+                              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Отдых</div>
+                              <div style={{ fontSize: 18, fontWeight: 800, color: restTimer <= 10 ? '#ef4444' : 'var(--accent)' }}>
+                                {Math.floor(restTimer / 60)}:{(restTimer % 60).toString().padStart(2, '0')}
+                              </div>
+                            </div>
+                            <button onClick={() => setRestTimer(0)} style={{
+                              padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)',
+                              background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 10,
+                            }}>Пропустить</button>
+                          </div>
+                        )}
+
+                        {/* Rest timer settings */}
+                        {restTimer === 0 && log.sets.length > 0 && (
+                          <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
+                            <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Отдых:</span>
+                            {[60, 90, 120, 180].map(sec => (
+                              <button key={sec} onClick={() => setRestTarget(sec)} style={{
+                                padding: '3px 8px', borderRadius: 5, fontSize: 9, cursor: 'pointer',
+                                border: `1px solid ${restTarget === sec ? 'var(--accent)' : 'rgba(255,255,255,0.06)'}`,
+                                background: restTarget === sec ? 'rgba(0,230,138,0.1)' : 'transparent',
+                                color: restTarget === sec ? 'var(--accent)' : 'var(--text-dim)',
+                              }}>{sec}с</button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -420,6 +501,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                         <button onClick={() => {
                           const newLog = { ...log, sets: [...log.sets, { weight: runtimeSetW, reps: runtimeSetR, rpe: runtimeSetRP, rir: runtimeSetRI }] };
                           setRuntimeLogs({ ...runtimeLogs, [ex.exerciseId || ex.name]: newLog });
+                          setRestTimer(restTarget);
                         }} style={{
                           width: '100%', padding: 8, borderRadius: 6, border: 'none', cursor: 'pointer',
                           background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12,

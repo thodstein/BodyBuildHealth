@@ -534,11 +534,11 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'COPPER': { prefUnit: '?mol/L', coeff: 1, uln: 30, lln: 10, name: 'Медь' },
   'ZINC': { prefUnit: '?mol/L', coeff: 1, uln: 20, lln: 11, name: 'Цинк' },
   'SELENIUM': { prefUnit: '?g/L', coeff: 1, uln: 150, lln: 70, name: 'Селен' },
-  'VITAMIN_E': { prefUnit: '?mol/L', coeff: 1, uln: 35, lln: 12, name: 'Витамин E' },
-  'VITAMIN_A': { prefUnit: '?mol/L', coeff: 1, uln: 2.8, lln: 1.0, name: 'Витамин A' },
+  'VITAMIN_E': { prefUnit: 'mcmol/L', coeff: 1, uln: 35, lln: 12, name: 'Витамин E' },
+  'VITAMIN_A': { prefUnit: 'mcmol/L', coeff: 1, uln: 2.8, lln: 1.0, name: 'Витамин A' },
   'C_PEPTIDE': { prefUnit: 'pmol/L', coeff: 1, uln: 1200, lln: 250, name: 'C-пептид' },
   'PROINSULIN': { prefUnit: 'pmol/L', coeff: 1, uln: 10, lln: 3, name: 'Проинсулин' },
-  'FRUCTOSAMINE': { prefUnit: '?mol/L', coeff: 1, uln: 285, lln: 205, name: 'Фруктозамин' },
+  'FRUCTOSAMINE': { prefUnit: 'mcmol/L', coeff: 1, uln: 285, lln: 205, name: 'Фруктозамин' },
   'CHOLINESTERASE': { prefUnit: 'U/L', coeff: 1, uln: 12000, lln: 5000, name: 'Холинэстераза' },
   'BILE_ACIDS': { prefUnit: '?mol/L', coeff: 1, uln: 10, lln: 0, name: 'Желчные кислоты' },
   'DIRECT_BIL': { prefUnit: '?mol/L', coeff: 1, uln: 5, lln: 0, name: 'Билирубин прямой' },
@@ -555,8 +555,8 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'RENIN': { prefUnit: 'pg/mL', coeff: 1, uln: 40, lln: 3, name: 'Ренин прямой' },
   'ACTH': { prefUnit: 'pg/mL', coeff: 1, uln: 46, lln: 7, name: 'АКТГ' },
   'OH17_PROGESTERONE': { prefUnit: 'nmol/L', coeff: 1, uln: 6.0, lln: 1.0, name: '17-ОН-прогестерон' },
-  'TPO_AB': { prefUnit: 'IU/mL', coeff: 1, uln: 34, lln: 0, name: 'Антитела к ТПО' },
-  'TG_AB': { prefUnit: 'IU/mL', coeff: 1, uln: 115, lln: 0, name: 'Антитела к ТГ' },
+  'TPO_AB': { prefUnit: 'IU/mL', coeff: 1, uln: 34, lln: 0, name: 'АТ к ТПО' },
+  'TG_AB': { prefUnit: 'IU/mL', coeff: 1, uln: 115, lln: 0, name: 'АТ к тиреоглобулину' },
   'MPV': { prefUnit: 'fL', coeff: 1, uln: 12, lln: 7, name: 'Средний объём тромбоцита' },
   'URINE_PH': { prefUnit: '', coeff: 1, uln: 8.0, lln: 5.0, name: 'pH мочи' },
   'URINE_OSM': { prefUnit: 'mOsm/kg', coeff: 1, uln: 1200, lln: 300, name: 'Осмоляльность мочи' },
@@ -564,6 +564,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'MAR_TEST': { prefUnit: '%', coeff: 1, uln: 10, lln: 0, name: 'MAR-тест (IgG)' },
   'DFI': { prefUnit: '%', coeff: 1, uln: 15, lln: 0, name: 'Фрагментация ДНК (DFI)' },
   'HDS': { prefUnit: '%', coeff: 1, uln: 15, lln: 0, name: 'HDS (незрелый хроматин)' },
+  'VLDL': { prefUnit: 'mmol/L', coeff: 1, uln: 2.6, lln: 0.3, name: 'ЛПОНП' },
 } as const;
 
 // ── Нормализация лабораторных значений к единицам РФ (Гемотест, Инвитро, Хеликс, КДЛ) ──

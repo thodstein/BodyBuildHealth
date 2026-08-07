@@ -15,6 +15,7 @@ const APPLY_BOX: React.CSSProperties = { marginTop: 8, padding: 12, borderRadius
 const TYPE_RU: Record<CardioType, string> = { zone2: 'Zone 2 (аэробная)', hiit: 'HIIT (интервалы)', miss: 'Умеренная', recovery: 'Восстановительная' };
 const GOAL_OPTS = ['mass','cut','recomp','maintenance','recovery'].map(g => ({ id: g, label: {mass:'Масса',cut:'Сушка',recomp:'Рекомп',maintenance:'Поддержание',recovery:'Восстановление'}[g] || g }));
 const TYPE_OPTS = (Object.keys(TYPE_RU) as CardioType[]).map(k => ({ id: k, label: TYPE_RU[k] }));
+const SEVERITY_LABELS: Record<string, string> = { none: 'Нет', mild: 'Лёгкая', moderate: 'Средняя', severe: 'Тяжёлая' };
 
 const INJURY_TO_GROUP: Record<string, string> = {
   knee:'legs',shin:'legs',ankle:'legs',hip:'legs',groin:'legs',
@@ -32,13 +33,16 @@ const SUBTABS: { id: SubTab; label: string; icon: string }[] = [
   { id:'autoreg', label:'Авторег', icon:'⚙️' },
 ];
 
-export const LoadSafetyCard: React.FC = () => {
+export const LoadSafetyCard: React.FC<{ initialSubTab?: SubTab }> = ({ initialSubTab = 'cardio' }) => {
   const prof = useMemo(() => loadTrainingProfile(), []);
-  const [subTab, setSubTab] = useState<SubTab>('cardio');
+  const [subTab, setSubTab] = useState<SubTab>(initialSubTab);
   const [cardioGoal, setCardioGoal] = useState('cut');
   const [cardioDays, setCardioDays] = useState(2);
   const [cardioType, setCardioType] = useState<CardioType>('zone2');
   const [injuries, setInjuries] = useState('');
+  const [currentPain, setCurrentPain] = useState('');
+  const [techniqueIssues, setTechniqueIssues] = useState<string[]>([]);
+  const [jointLimitations, setJointLimitations] = useState<Record<string, 'none' | 'mild' | 'moderate' | 'severe'>>({});
   const [sessions, setSessions] = useState(4);
   const [pri, setPri] = useState(70);
   const [risk, setRisk] = useState('low');
@@ -55,8 +59,9 @@ export const LoadSafetyCard: React.FC = () => {
   const cardioPlan = useMemo(() => buildCardioPlan({ goal: cardioGoal as any, bodyWeight: prof.bodyWeight, daysAvailable: cardioDays }), [cardioGoal, cardioDays, prof.bodyWeight]);
   const ortho = useMemo(() => computeOrthopedicConstraints({
     injuryHistory: injuries.split(',').map(s => s.trim()).filter(Boolean),
-    jointLimitations: {}, techniqueIssues: [], currentPain: [],
-  }), [injuries]);
+    jointLimitations, techniqueIssues,
+    currentPain: currentPain.split(',').map(s => s.trim()).filter(Boolean),
+  }), [injuries, jointLimitations, techniqueIssues, currentPain]);
   const dist = useMemo(() => distributeWeeklyLoad({
     weeklySessions: sessions, goal: prof.goal || 'strength', volumeCapacity: 0.8, intensityCapacity: 0.85, priScore: pri, riskLevel: risk,
   }), [sessions, prof.goal, pri, risk]);
@@ -69,7 +74,9 @@ export const LoadSafetyCard: React.FC = () => {
   const applyCardio = () => applyToPlanner({ kind:'pri', label:'Кардио: '+cardioPlan.totalKcalPerWeek+' ккал/нед', data: { volumeMult: cardioPlan.sessions.length >= 3 ? 0.9 : 0.95, rirShift: 0 } });
   const applyOrtho = () => {
     const groups = Array.from(new Set(injuries.split(',').map(s => s.trim().toLowerCase()).map(inj => INJURY_TO_GROUP[inj]).filter(Boolean)));
-    applyToPlanner({ kind:'weakpoints', label:'Ортопедия: '+groups.join(', '), data: { groups, lift: undefined } });
+    applyToPlanner({ kind:'weakpoints', label:'Ортопедия: '+(ortho.phase === 'acute' ? 'острая фаза' : ortho.phase), data: {
+      groups, lift: undefined, orthopedic: ortho, currentPain: currentPain.split(',').map(s => s.trim()).filter(Boolean),
+    } });
   };
   const applyWeekly = () => {
     const hardDays = dist.weekPlan.filter(d => d.difficulty === 'hard').length;
@@ -127,6 +134,15 @@ export const LoadSafetyCard: React.FC = () => {
                     : <div>Нет ограничений</div>}
                 </div>
               </MetricCard>
+              <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+                <PopupSelect label="Степень колена" value={jointLimitations.knee || 'none'} options={['none','mild','moderate','severe'].map(id => ({ id, label: SEVERITY_LABELS[id] }))} onChange={v => setJointLimitations(p => ({ ...p, knee: v as any }))} />
+                <PopupSelect label="Степень плеча" value={jointLimitations.shoulder || 'none'} options={['none','mild','moderate','severe'].map(id => ({ id, label: SEVERITY_LABELS[id] }))} onChange={v => setJointLimitations(p => ({ ...p, shoulder: v as any }))} />
+                <PopupSelect label="Степень поясницы" value={jointLimitations.spine || 'none'} options={['none','mild','moderate','severe'].map(id => ({ id, label: SEVERITY_LABELS[id] }))} onChange={v => setJointLimitations(p => ({ ...p, spine: v as any }))} />
+                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Текущая боль (через запятую)<input value={currentPain} onChange={e => setCurrentPain(e.target.value)} placeholder="колено, плечо" style={{ width:'100%', marginTop:3, padding:8, boxSizing:'border-box', background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,.1)', borderRadius:7 }} /></label>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>{[['rounding_back','Округление спины'],['butt_wink','Butt wink']].map(([id,label]) => <button key={id} onClick={() => setTechniqueIssues(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])} style={{ padding:'5px 8px', borderRadius:8, cursor:'pointer', color: techniqueIssues.includes(id) ? '#f59e0b' : 'var(--text-dim)', background: techniqueIssues.includes(id) ? 'rgba(245,158,11,.15)' : 'transparent', border:'1px solid rgba(255,255,255,.1)', fontSize:10 }}>{label}</button>)}</div>
+                <div style={{ fontSize:10, color:'#f59e0b' }}>Фаза: <b>{ortho.phase}</b> · стресс суставов: {Object.entries(ortho.jointStressLimits).filter(([,v]) => v < 4).map(([k,v]) => `${k} ${v}/4`).join(', ') || 'без ограничений'}</div>
+                {ortho.recommendations.map((r, i) => <div key={i} style={{ fontSize:10, color:'var(--text-dim)' }}>• {r}</div>)}
+              </div>
             </div>
             <PopupToggle label="Применить ортопедию" value={orthoOn} onChange={setOrthoOn} icon="🔄" />
             {orthoOn && <div style={APPLY_BOX}>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fillMissingMicros, parseFatSecretText, parseMicroLine, parseNutritionScreenshot, parseNutritionText, quantityToGrams } from '../nutrition-ocr-parser';
+import { fillMissingMicros, parseFatSecretText, parseMicroLine, parseNutritionScreenshot, parseNutritionText, quantityToGrams, parseVerticalNutritionTable } from '../nutrition-ocr-parser';
 
 describe('nutrition-ocr-parser', () => {
   describe('parseFatSecretText', () => {
@@ -127,8 +127,37 @@ describe('nutrition-ocr-parser', () => {
       expect(item.micros?.potassium_mg).toBeUndefined();
     });
 
+    it('parses multi-column tables with parenthetical units and mixed empty cells', () => {
+      const meals = parseFatSecretText('Обед\nГовядина 150 г 250 ккал\nSodium (mg) Potassium (mg) Magnesium (mcg) Calcium (mg) Iron (mg) Zinc (mg)\n110 350 22 18 2.8 4.2');
+      const item = meals[0].items[0];
+      expect(item.micros).toMatchObject({
+        sodium_mg: 110,
+        potassium_mg: 350,
+        magnesium_mcg: 22,
+        calcium_mg: 18,
+        iron_mg: 2.8,
+        zinc_mg: 4.2,
+      });
+    });
+
+    it('handles dashed and empty cells in parenthetical-header tables', () => {
+      const meals = parseFatSecretText('Завтрак\nЯйца 100 г 143 ккал\nSodium (mg) Potassium (mg) Magnesium (mg) Calcium (mg)\n142 — 12 50');
+      const item = meals[0].items[0];
+      expect(item.micros?.sodium_mg).toBe(142);
+      expect(item.micros?.magnesium_mg).toBe(12);
+      expect(item.micros?.calcium_mg).toBe(50);
+      expect(item.micros?.potassium_mg).toBeUndefined();
+    });
+
     it('parses compact vitamin values directly', () => {
       expect(parseMicroLine('Vit A 120 mcg Vit C 15 mg B12 0,5 mcg')).toMatchObject({ vitamin_a_mcg: 120, vitamin_c_mg: 15, vitamin_b12_mcg: 0.5 });
+    });
+
+    it('assigns confidence scores to parsed items', () => {
+      const withMacros = parseFatSecretText('Завтрак\nКурица 200 г 330 ккал Б:40 Ж:10 У:0');
+      const foodOnly = parseFatSecretText('Завтрак\nКурица 200 г');
+      expect(withMacros[0].items[0].confidence).toBeGreaterThanOrEqual(0.7);
+      expect(withMacros[0].items[0].confidence).toBeGreaterThan(foodOnly[0].items[0].confidence);
     });
 
     it('fills missing micronutrients by actual portion without overwriting existing values', () => {
@@ -141,6 +170,49 @@ describe('nutrition-ocr-parser', () => {
       expect(quantityToGrams('2 ст. л.')).toBe(30);
       expect(quantityToGrams('1 ч. л.')).toBe(5);
       expect(quantityToGrams('2 шт', { id: 'egg_whole' } as any)).toBe(100);
+    });
+
+    it('normalizes common OCR misreadings', () => {
+      const meals = parseFatSecretText('Завтрак\nKуpицa 200 г 330 ккал Б:35 Ж:7 У:0');
+      expect(meals.flatMap(meal => meal.items)).toHaveLength(1);
+      expect(meals[0].items[0].foodId).toBe('chicken_breast');
+    });
+
+    it('normalizes expanded homoglyph set', () => {
+      const meals = parseFatSecretText('Завтрак\n0всянка 100 г 389 ккал Б:13 Ж:7 У:66');
+      expect(meals.flatMap(meal => meal.items)).toHaveLength(1);
+      expect(meals[0].items[0].foodId).toBe('oats');
+    });
+
+    it('parses calories with OCR-substituted zero', () => {
+      const meals = parseFatSecretText('Рис 150 г 540 ккал Б:12 Ж:1 У:60');
+      const item = meals[0].items[0];
+      expect(item.kcal).toBeCloseTo(360, 0);
+      expect(item.foodId).toBe('rice_white');
+    });
+
+    it('collapses spaced digits caused by OCR artifacts', () => {
+      const meals = parseFatSecretText('Завтрак\nКурица 200 г 3 3 0 ккал Б:4 0 Ж:1 0 У:0');
+      const item = meals[0].items[0];
+      expect(item.kcal).toBe(165);
+      expect(item.p).toBeCloseTo(20, 0);
+      expect(item.f).toBeCloseTo(5, 0);
+    });
+
+    it('does not collapse intentional digit-space-digit patterns', () => {
+      const meals = parseFatSecretText('Завтрак\nКурица 200 г 330 ккал Б:40 Ж:10 У:0');
+      const item = meals[0].items[0];
+      expect(item.kcal).toBe(165);
+      expect(item.p).toBe(20);
+      expect(item.f).toBe(5);
+    });
+
+    it('collapses comma-separated OCR digits with 3 groups', () => {
+      const meals = parseFatSecretText('Завтрак\nКурица 200 г 3,3,0 ккал Б:40 Ж:10 У:0');
+      const item = meals[0].items[0];
+      expect(item.kcal).toBe(165);
+      expect(item.p).toBe(20);
+      expect(item.f).toBe(5);
     });
   });
 
@@ -180,6 +252,60 @@ describe('nutrition-ocr-parser', () => {
       const meals = parseNutritionScreenshot('Курицa 200 г');
       expect(meals.flatMap(meal => meal.items)).toHaveLength(1);
       expect(meals[0].items[0].foodId).toBe('chicken_breast');
+    });
+
+    it('parses vertical nutrition tables as fallback when no food items found', () => {
+      const text = `Белки: 30 г
+Жиры: 10 г
+Углеводы: 50 г
+Натрий: 130 мг
+Калий: 512 мг`;
+      const meals = parseNutritionScreenshot(text);
+      expect(meals.length).toBeGreaterThanOrEqual(1);
+      const item = meals[0].items[0];
+      expect(item.micros).toMatchObject({ sodium_mg: 130, potassium_mg: 512 });
+      expect(item.p).toBe(30);
+      expect(item.f).toBe(10);
+      expect(item.c).toBe(50);
+    });
+
+    it('parses reversed vertical format (value before label)', () => {
+      const text = `30 г  Белки
+10 г  Жиры
+50 г  Углеводы`;
+      const meals = parseNutritionScreenshot(text);
+      const item = meals[0].items[0];
+      expect(item.p).toBe(30);
+      expect(item.f).toBe(10);
+      expect(item.c).toBe(50);
+    });
+
+    it('converts units in vertical tables (mcg to mg, g to mg)', () => {
+      const text = `Витамин C: 150 мг
+Витамин D: 20 мкг
+Магний: 0.4 г`;
+      const meals = parseNutritionScreenshot(text);
+      const item = meals[0].items[0];
+      expect(item.micros?.vitamin_c_mg).toBe(150);
+      expect(item.micros?.vitamin_d_mcg).toBe(20);
+      expect(item.micros?.magnesium_mg).toBeCloseTo(400, 0);
+    });
+
+    it('parses vertical nutrient table directly', () => {
+      const vertical = parseVerticalNutritionTable('Белки: 30 г\nЖиры: 10 г\nУглеводы: 50 г\nНатрий: 130 мг\nКалий: 512 мг');
+      expect(vertical).toMatchObject({ p: 30, f: 10, c: 50, sodium_mg: 130, potassium_mg: 512 });
+    });
+
+    it('parses vertical vitamins and minerals', () => {
+      const vertical = parseVerticalNutritionTable('Витамин C: 150 мг\nВитамин D: 20 мкг\nМагний: 0.4 г');
+      expect(vertical.vitamin_c_mg).toBe(150);
+      expect(vertical.vitamin_d_mcg).toBe(20);
+      expect(vertical.magnesium_mg).toBeCloseTo(400, 0);
+    });
+
+    it('collapses spaced digits in quantityToGrams', () => {
+      expect(quantityToGrams('3 3 0 г')).toBe(330);
+      expect(quantityToGrams('2 0 0 мл')).toBe(200);
     });
   });
 });

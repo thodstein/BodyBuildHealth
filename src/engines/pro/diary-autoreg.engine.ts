@@ -20,6 +20,7 @@ import type { WorkoutLog, StrengthLogEntry } from '../../core/types';
 import { rpeFromLoad, loadForRPE } from './autoregulation-pro.engine';
 import { norm } from '../norm';
 import { epley1RM } from '../e1rm';
+import { exerciseMatchScore } from '../exercise-aliases';
 
 export type AutoRegMode = 'off' | 'auto' | 'diary';
 
@@ -58,7 +59,8 @@ export interface DiaryAutoregResult {
 }
 
 /** Fuzzy match имён упражнений (как в lms-builder.engine + извлечение ядра).
- *  P1-3: exclude OHP/leg-press from bench matches, row/pulldown from deadlift matches. */
+ *  P1-3: exclude OHP/leg-press from bench matches, row/pulldown from deadlift matches.
+ *  Uses exercise aliases engine as enhanced fallback. */
 function nameMatch(a: string, b: string): boolean {
   const na = norm(a), nb = norm(b);
   if (na === nb) return true;
@@ -76,6 +78,9 @@ function nameMatch(a: string, b: string): boolean {
   const core = (s: string) => s.replace(/штанг[иеы]?|гантел[иеы]?|в тренажере|в тренажёре/g, '').replace(/\s+/g, ' ').trim();
   const ca = core(na), cb = core(nb);
   if (ca.length > 2 && cb.length > 2 && (ca.includes(cb) || cb.includes(ca))) return true;
+  // Fallback: exercise aliases engine (canonical ID match via aliases)
+  const aliasScore = exerciseMatchScore(a, b);
+  if (aliasScore >= 0.7) return true;
   return false;
 }
 

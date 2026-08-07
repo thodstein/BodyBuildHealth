@@ -25,6 +25,10 @@ import MesoCorrectionCard from './MesoCorrectionCard';
 import { TrainingLoadCalculator } from './TrainingLoadCalculator';
 import { WhatIfCard } from './WhatIfCard';
 import { DEFAULT_PROFILE } from './training-profile';
+import { loadTrainingProfile } from './training-profile';
+import { DiagnosticsHub } from './DiagnosticsHub';
+import { StrengthAnalysisHub } from './StrengthAnalysisHub';
+import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
 
 // ББ-специфичные
 import { SplitGenCard } from './SplitGenCard';
@@ -36,13 +40,30 @@ interface ToolDef { id: string; title: string; icon: string; short: string; rend
 const TOOLS: Record<'pl' | 'bb', ToolDef[]> = {
   // ═══ ПЛ-АВТО ═══
   pl: [
+    { id: 'deadpoints-barpath', title: 'Мёртвые точки + bar-path', icon: '🎯', short: 'Биомеханика, слабые фазы, углы, слабые мышцы и отклонения траектории из интеллектуальной диагностики.', render: () => <PlDeadpointsBarPathCard /> },
+    { id: 'intelligence-diagnostics', title: 'Диагностика', icon: '🔬', short: 'Интеллектуальная диагностика: слабые точки, срывы, биомеханика, RIR и коррекция мезоцикла.', render: () => (
+      <DiagnosticsHub
+        sessions={[]}
+        tprofile={loadTrainingProfile()}
+        readinessRecovery={loadTrainingProfile().recovery * 10}
+        readinessFatigue={loadTrainingProfile().fatigue * 10}
+        mesoWeeks={12}
+        missedSessions={0}
+        currentVolume={18}
+        currentRir={2}
+      />
+    ) },
+    { id: 'intelligence-strength', title: 'Анализ силы', icon: '🏋️', short: 'Интеллектуальный анализ силы: 1RM, VBT, относительная сила, нормативы и аналитика.', render: () => <StrengthAnalysisHub /> },
     { id: 'str', title: 'Аналитика силы', icon: '💪', short: 'Процентиль, уровень, соотношения, объёмные ориентиры.', render: () => <StrengthAnalyticsCard /> },
     { id: '1rm', title: 'Калькулятор 1RM', icon: '🎯', short: 'Оценка максимума по весу и повторениям → ПМ планировщику.', render: () => <OneRmCalcTab /> },
     { id: 'weak', title: 'Слабые точки ПЛ', icon: '🎯', short: 'Диагностика мёртвой точки движения → ассистентные упражнения.', render: () => <PlWeakpointsCard /> },
     { id: 'relstr', title: 'Относительная сила', icon: '⚖️', short: 'Wilks/DOTS/GL — определение слабейшего движения.', render: () => <RelativeStrengthCalcTab /> },
     { id: 'pri', title: 'PRI / готовность', icon: '🧠', short: 'Готовность к тренировке (PRI) + RIR-корректировка.', render: () => <PriRepPatternCard /> },
     { id: 'fatigue', title: 'Индекс усталости', icon: '📉', short: 'ACWR, монотонность, strain → корректировка объёма.', render: () => <FatigueIndexTab /> },
-    { id: 'load', title: 'Нагрузка / авторег', icon: '🫀', short: 'Кардио, ортопедия, распределение недели, RPE-авторегуляция.', render: () => <LoadSafetyCard /> },
+    { id: 'load-cardio', title: 'Нагрузка: кардио', icon: '🏃', short: 'Кардио-план по цели, весу и доступным дням.', render: () => <LoadSafetyCard initialSubTab="cardio" /> },
+    { id: 'load-ortho', title: 'Нагрузка: ортопедия', icon: '🦴', short: 'Травмы и ограничения суставов → какие группы щадить.', render: () => <LoadSafetyCard initialSubTab="ortho" /> },
+    { id: 'load-weekly', title: 'Нагрузка: распределение недели', icon: '📅', short: 'Сессии, PRI, риск и распределение тяжёлых дней.', render: () => <LoadSafetyCard initialSubTab="weekly" /> },
+    { id: 'load-autoreg', title: 'Нагрузка: авторегуляция', icon: '⚙️', short: 'RPE/e1RM, ACWR, рабочий вес, объём и RIR.', render: () => <LoadSafetyCard initialSubTab="autoreg" /> },
     { id: 'mrv', title: 'MRV-оценщик', icon: '📊', short: 'Индивидуальный MRV из истории sRPE и готовности.', render: () => <MRVEstimatorTab /> },
     { id: 'loadcalc', title: 'Калькулятор нагрузки', icon: '📊', short: 'sRPE/ACWR/Banister — острая/хроническая нагрузка.', render: () => <TrainingLoadCalculator /> },
     { id: 'meso', title: 'Прогрессия мезо', icon: '📈', short: 'Кривые V/I/RIR по неделям → стартовый объём планировщику.', render: () => <MesocycleProgressionCard weeks={12} startVolumeSets={18} startIntensityPct={0.75} startRIR={3} goal="hypertrophy" fatigueTrajectory={[]} /> },
