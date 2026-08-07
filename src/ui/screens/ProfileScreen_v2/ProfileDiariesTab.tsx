@@ -761,26 +761,52 @@ const DiaryCard: React.FC<{
   const staleColor = daysSinceLast !== null && daysSinceLast >= 14 ? '#ef4444' : daysSinceLast !== null && daysSinceLast >= 7 ? '#f97316' : daysSinceLast !== null && daysSinceLast >= 3 ? '#f59e0b' : meta.color;
   return (
     <div
+      onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
+      aria-label={`Открыть дневник «${meta.title}»`}
       style={{
-        background: stale ? `${staleColor}10` : 'rgba(28,28,32,0.65)',
-        border: `1px solid ${stale ? `${staleColor}66` : `${meta.color}33`}`,
-        borderRadius: 12, padding: 12,
-        display: 'flex', flexDirection: 'column', gap: 6,
+        background: stale ? `${staleColor}14` : 'rgba(28,28,32,0.75)',
+        border: `1px solid ${stale ? `${staleColor}77` : `${meta.color}44`}`,
+        borderRadius: 14, padding: '14px 12px',
+        display: 'flex', flexDirection: 'column', gap: 8, cursor: 'pointer',
+        minHeight: 110,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+        transition: 'transform 0.15s, box-shadow 0.15s, background 0.15s',
+        position: 'relative',
+        overflow: 'hidden',
       }}
+      onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,0,0,0.4)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.25)'; }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1 }}>{meta.icon}</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: colors.text }}>{meta.title}</span>
-        {loggedToday && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.2)', color: '#22c55e' }}>✓ сегодня</span>}
-        <span style={{
-          fontSize: 10, fontWeight: 700, color: meta.color, marginLeft: loggedToday ? 0 : 'auto',
-          background: `${meta.color}22`, padding: '1px 6px', borderRadius: 4,
-        }}>{count}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div
+          aria-hidden="true"
+          style={{
+            width: 38, height: 38, borderRadius: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: `${meta.color}28`, border: `1px solid ${meta.color}55`,
+            fontSize: 20, lineHeight: 1, flexShrink: 0,
+          }}
+        >{meta.icon}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: colors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meta.title}</div>
+          <div style={{ fontSize: 9, color: colors.textMuted, marginTop: 1 }}>{meta.unit || '—'}</div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+          <span style={{
+            fontSize: 11, fontWeight: 800, color: meta.color,
+            background: `${meta.color}22`, padding: '2px 7px', borderRadius: 5,
+            border: `1px solid ${meta.color}33`,
+          }}>{count}</span>
+          {loggedToday && <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'rgba(34,197,94,0.18)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}>✓ сегодня</span>}
+        </div>
       </div>
-      <div style={{ fontSize: 10, color: colors.textMuted, minHeight: 14 }}>
+      <div style={{ fontSize: 10, color: colors.textMuted, minHeight: 14, lineHeight: 1.3 }}>
         {last ? (
           <>
-            Последняя: {last}{meta.unit ? ' ' + meta.unit : ''}
+            📅 {last}{meta.unit ? ' ' + meta.unit : ''}
             {daysSinceLast !== null && daysSinceLast > 0 && (
               <span style={{ marginLeft: 6, fontWeight: 700, color: staleColor }}>
                 · {daysSinceLast === 1 ? 'вчера' : daysSinceLast < 5 ? `${daysSinceLast} дн. назад` : `${daysSinceLast} дней назад`}
@@ -789,13 +815,13 @@ const DiaryCard: React.FC<{
           </>
         ) : 'Нет записей'}
       </div>
-      <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+      <div style={{ display: 'flex', gap: 6, marginTop: 'auto' }} onClick={(e) => e.stopPropagation()}>
         <button
           onClick={onAdd}
           aria-label={`Добавить запись в дневник ${meta.title}`}
           style={{
-            flex: 1, minHeight: 32, padding: '6px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-            background: `${meta.color}22`, color: meta.color, border: `1px solid ${meta.color}44`,
+            flex: 1, minHeight: 30, padding: '6px 8px', borderRadius: 7, fontSize: 11, fontWeight: 700,
+            background: `${meta.color}26`, color: meta.color, border: `1px solid ${meta.color}55`,
             cursor: 'pointer',
           }}
         >+ Добавить</button>
@@ -803,7 +829,7 @@ const DiaryCard: React.FC<{
           onClick={onOpen}
           aria-label={`Открыть дневник ${meta.title}`}
           style={{
-            flex: 1, minHeight: 32, padding: '6px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+            flex: 1, minHeight: 30, padding: '6px 8px', borderRadius: 7, fontSize: 11, fontWeight: 700,
             background: 'transparent', color: colors.text, border: `1px solid ${colors.border}`,
             cursor: 'pointer',
           }}
@@ -815,7 +841,7 @@ const DiaryCard: React.FC<{
 
 /* ── Быстрые ссылки на дневники в других блоках ── */
 
-interface QuickLink { icon: string; label: string; target: string; color: string; }
+interface QuickLink { icon: string; label: string; target: string; color: string; desc?: string; }
 
 interface UndoAction { label: string; undo: () => void; expiresAt: number; }
 let undoTimer: ReturnType<typeof setTimeout> | null = null;
@@ -881,20 +907,21 @@ const Sparkline: React.FC<{ points: { date: string; value: number }[]; color: st
 };
 
 const QUICK_DIARY_LINKS: QuickLink[] = [
-  { icon: '🍽', label: 'Дневник питания', target: 'nutrition-diary', color: colors.green },
-  { icon: '🏋️', label: 'Журнал тренировок', target: 'workout-log', color: colors.blue },
-  { icon: '💊', label: 'Мой курс', target: 'pharma-course', color: colors.warning },
-  { icon: '🛡', label: 'Дневник поддержки', target: 'support-diary', color: colors.purple },
-  { icon: '🧪', label: 'Анализы', target: 'labs-diary', color: colors.teal },
+  { icon: '🍽', label: 'Дневник питания', target: 'nutrition-diary', color: colors.green, desc: 'Питание: КБЖУ, приёмы, анализ рациона' },
+  { icon: '🏋️', label: 'Журнал тренировок', target: 'workout-log', color: colors.blue, desc: 'Тренировочный дневник со снарядами' },
+  { icon: '💊', label: 'Мой курс', target: 'pharma-course', color: colors.warning, desc: 'Текущий курс, фазы, дозировки' },
+  { icon: '🛡', label: 'Дневник поддержки', target: 'support-diary', color: colors.purple, desc: 'Приём БАДов, протоколы, побочки' },
+  { icon: '🧪', label: 'Анализы', target: 'labs-diary', color: colors.teal, desc: 'Результаты лабораторных исследований' },
 ];
 
 const QUICK_REPORT_LINKS: QuickLink[] = [
-  { icon: '🏋️', label: 'Тренер-отчёт', target: 'training-analytics', color: colors.blue },
-  { icon: '💊', label: 'Фарма-отчёт', target: 'pharma-reports', color: colors.warning },
-  { icon: '🩺', label: 'Врач-отчёт', target: 'labs-reports', color: colors.danger },
-  { icon: '🍽', label: 'Отчёт по питанию', target: 'nutrition-reports', color: colors.green },
-  { icon: '🛡', label: 'Отчёт поддержки', target: 'support-reports', color: colors.purple },
-  { icon: '📊', label: 'Кастомный отчёт', target: 'custom-report', color: colors.orange },
+  { icon: '🏋️', label: 'Тренер-отчёт', target: 'training-analytics', color: colors.blue, desc: 'Анализ тренировок, прогрессии' },
+  { icon: '💊', label: 'Фарма-отчёт', target: 'pharma-reports', color: colors.warning, desc: 'Курс, фазы, перекрёстные риски' },
+  { icon: '🩺', label: 'Врач-отчёт', target: 'labs-reports', color: colors.danger, desc: 'Анализы: отклонения, динамика' },
+  { icon: '🍽', label: 'Отчёт по питанию', target: 'nutrition-reports', color: colors.green, desc: 'КБЖУ за день/неделю/месяц' },
+  { icon: '🛡', label: 'Отчёт поддержки', target: 'support-reports', color: colors.purple, desc: 'Совместимость, побочки' },
+  { icon: '⚠️', label: 'Отчёт по рискам', target: 'risk-reports', color: '#f97316', desc: 'Риск по системам органов' },
+  { icon: '📊', label: 'Кастомный отчёт', target: 'custom-report', color: colors.orange, desc: 'Сводный отчёт по разделам' },
 ];
 
 /* ── Главный компонент ── */
@@ -949,6 +976,7 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
   const [diaryRange, setDiaryRange] = useState<'all' | '7' | '30' | '90'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+  const [pendingNav, setPendingNav] = useState<QuickLink | null>(null);
 
   const pushUndo = (label: string, undo: () => void) => {
     setUndoAction({ label, undo, expiresAt: Date.now() + 5000 });
@@ -1484,28 +1512,36 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
     return list;
   };
 
-  const QuickLinkRow: React.FC<{ links: QuickLink[]; ariaLabel: string }> = ({ links, ariaLabel }) => (
+  const QuickLinkRow: React.FC<{ links: QuickLink[]; ariaLabel: string; onPick?: (link: QuickLink) => void }> = ({ links, ariaLabel, onPick }) => (
     <div
       role="navigation"
       aria-label={ariaLabel}
-      style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+      style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}
     >
       {links.map(link => (
         <button
           key={link.target}
-          onClick={() => onNavigate?.(link.target)}
-          aria-label={`Открыть ${link.label}`}
+          onClick={() => (onPick ? onPick(link) : onNavigate?.(link.target))}
+          aria-label={`Открыть ${link.label}: ${link.desc || ''}`}
           style={{
-            display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-            borderRadius: 8, cursor: 'pointer', textAlign: 'left', minHeight: 44,
-            background: 'rgba(255,255,255,0.03)',
-            border: `1px solid ${link.color}33`,
-            color: colors.text, transition: 'background 0.15s',
+            display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
+            borderRadius: 12, cursor: 'pointer', textAlign: 'left', minHeight: 56,
+            background: `${link.color}14`, border: `1px solid ${link.color}55`,
+            color: colors.text, transition: 'transform 0.15s, box-shadow 0.15s, background 0.15s',
+            position: 'relative',
           }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.3)'; e.currentTarget.style.background = `${link.color}22`; }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = `${link.color}14`; }}
         >
-          <span aria-hidden="true" style={{ fontSize: 20, lineHeight: 1 }}>{link.icon}</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: link.color, flex: 1 }}>{link.label}</span>
-          <span style={{ color: colors.textMuted, fontSize: 16 }}>→</span>
+          <div aria-hidden="true" style={{
+            width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: `${link.color}33`, fontSize: 18, flexShrink: 0,
+          }}>{link.icon}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: link.color }}>{link.label}</div>
+            {link.desc && <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2, lineHeight: 1.3 }}>{link.desc}</div>}
+          </div>
+          <span style={{ color: link.color, fontSize: 16, opacity: 0.7 }}>→</span>
         </button>
       ))}
     </div>
@@ -1706,6 +1742,15 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
             style={{ padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 6 }}
           >🗑 Сбросить всё</button>
         </div>
+      </AccordionSection>
+
+      <AccordionSection
+        title="🔗 Дневники в других блоках"
+        subtitle="Быстрый переход к дневнику нужного блока (с подтверждением)"
+        icon="🔗"
+        color={colors.blue}
+      >
+        <QuickLinkRow links={QUICK_DIARY_LINKS} ariaLabel="Дневники в других блоках" onPick={setPendingNav} />
       </AccordionSection>
 
       <AccordionSection
@@ -1954,21 +1999,12 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
       })()}
 
       <AccordionSection
-        title="🔗 Дневники в других блоках"
-        subtitle="Переход к дневнику в нужном блоке (одним кликом)"
-        icon="🔗"
-        color={colors.blue}
-      >
-        <QuickLinkRow links={QUICK_DIARY_LINKS} ariaLabel="Дневники в других блоках" />
-      </AccordionSection>
-
-      <AccordionSection
-        title="📊 Отчёты"
-        subtitle="Готовые отчёты по модулям приложения"
+        title="📊 Отчёты по модулям"
+        subtitle="Быстрый переход к отчётам других блоков (с подтверждением)"
         icon="📊"
         color={colors.teal}
       >
-        <QuickLinkRow links={QUICK_REPORT_LINKS} ariaLabel="Отчёты по модулям" />
+        <QuickLinkRow links={QUICK_REPORT_LINKS} ariaLabel="Отчёты по модулям" onPick={setPendingNav} />
       </AccordionSection>
 
       <AddSleepModal
@@ -2079,6 +2115,61 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
         }
       `}</style>
       <Snackbar action={undoAction} onDismiss={dismissUndo} />
+
+      {/* Модалка подтверждения перехода в другой блок */}
+      {pendingNav && (
+        <div
+          onClick={() => setPendingNav(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Перейти в другой блок"
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(380px, 92vw)',
+              background: '#1a1a1d', border: `1px solid ${pendingNav.color}66`,
+              borderRadius: 16, padding: 20,
+              color: colors.text, boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: `${pendingNav.color}26`, border: `1px solid ${pendingNav.color}55`, fontSize: 22,
+              }}>{pendingNav.icon}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: pendingNav.color }}>{pendingNav.label}</div>
+                <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>Переход в другой блок</div>
+              </div>
+            </div>
+            {pendingNav.desc && (
+              <div style={{ fontSize: 12, color: colors.text, lineHeight: 1.4, marginBottom: 14, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
+                {pendingNav.desc}
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 14, lineHeight: 1.4 }}>
+              ⚠ Вкладка «Дневники» в Профиле закроется. Все локальные записи профильных дневников останутся в браузере.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setPendingNav(null)}
+                style={{ flex: 1, minHeight: 40, padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: 'transparent', color: colors.text, border: `1px solid ${colors.border}`, cursor: 'pointer' }}
+              >Отмена</button>
+              <button
+                onClick={() => { if (pendingNav && onNavigate) { onNavigate(pendingNav.target); setPendingNav(null); } }}
+                style={{ flex: 1, minHeight: 40, padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, background: pendingNav.color, color: '#0a0a0a', border: 'none', cursor: 'pointer' }}
+              >Открыть</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
