@@ -738,15 +738,19 @@ const DiaryCard: React.FC<{
   diaryKey: DiaryKey;
   count: number;
   last: string;
+  daysSinceLast: number | null;
+  loggedToday: boolean;
   onAdd: () => void;
   onOpen: () => void;
-}> = ({ diaryKey, count, last, onAdd, onOpen }) => {
+}> = ({ diaryKey, count, last, daysSinceLast, loggedToday, onAdd, onOpen }) => {
   const meta = DIARY_META[diaryKey];
+  const stale = daysSinceLast !== null && daysSinceLast >= 3 && !loggedToday;
+  const staleColor = daysSinceLast !== null && daysSinceLast >= 14 ? '#ef4444' : daysSinceLast !== null && daysSinceLast >= 7 ? '#f97316' : daysSinceLast !== null && daysSinceLast >= 3 ? '#f59e0b' : meta.color;
   return (
     <div
       style={{
-        background: 'rgba(28,28,32,0.65)',
-        border: `1px solid ${meta.color}33`,
+        background: stale ? `${staleColor}10` : 'rgba(28,28,32,0.65)',
+        border: `1px solid ${stale ? `${staleColor}66` : `${meta.color}33`}`,
         borderRadius: 12, padding: 12,
         display: 'flex', flexDirection: 'column', gap: 6,
       }}
@@ -754,13 +758,23 @@ const DiaryCard: React.FC<{
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1 }}>{meta.icon}</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: colors.text }}>{meta.title}</span>
+        {loggedToday && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.2)', color: '#22c55e' }}>✓ сегодня</span>}
         <span style={{
-          fontSize: 10, fontWeight: 700, color: meta.color, marginLeft: 'auto',
+          fontSize: 10, fontWeight: 700, color: meta.color, marginLeft: loggedToday ? 0 : 'auto',
           background: `${meta.color}22`, padding: '1px 6px', borderRadius: 4,
         }}>{count}</span>
       </div>
       <div style={{ fontSize: 10, color: colors.textMuted, minHeight: 14 }}>
-        {last ? `Последняя: ${last}${meta.unit ? ' ' + meta.unit : ''}` : 'Нет записей'}
+        {last ? (
+          <>
+            Последняя: {last}{meta.unit ? ' ' + meta.unit : ''}
+            {daysSinceLast !== null && daysSinceLast > 0 && (
+              <span style={{ marginLeft: 6, fontWeight: 700, color: staleColor }}>
+                · {daysSinceLast === 1 ? 'вчера' : daysSinceLast < 5 ? `${daysSinceLast} дн. назад` : `${daysSinceLast} дней назад`}
+              </span>
+            )}
+          </>
+        ) : 'Нет записей'}
       </div>
       <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
         <button
@@ -1184,6 +1198,70 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
     return arr[arr.length - 1].date;
   };
 
+  const getEntryArray = (key: DiaryKey): { date: string }[] => {
+    if (key === 'sleep') return sleepEntries;
+    if (key === 'bp') return bpEntries;
+    if (key === 'weight') return weights;
+    if (key === 'measurements') return measurements as any;
+    if (key === 'injection') return injectionEntries;
+    if (key === 'symptoms') return symptomEntries;
+    if (key === 'pain') return painEntries;
+    if (key === 'neuro') return neuroEntries;
+    if (key === 'acne') return acneEntries;
+    if (key === 'hemato') return hematoEntries;
+    return [];
+  };
+
+  const daysSinceLast = (arr: { date: string }[]): number | null => {
+    if (arr.length === 0) return null;
+    const last = new Date(arr[arr.length - 1].date);
+    if (isNaN(last.getTime())) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    last.setHours(0, 0, 0, 0);
+    return Math.floor((today.getTime() - last.getTime()) / 86400000);
+  };
+
+  const todayEntry = (arr: { date: string }[]): boolean => {
+    if (arr.length === 0) return false;
+    return arr[arr.length - 1].date === todayIso();
+  };
+
+  const buildTodayOverview = () => {
+    const today = todayIso();
+    const overview: { label: string; value: string; color: string }[] = [];
+    if (sleepEntries.length) {
+      const e = sleepEntries[sleepEntries.length - 1];
+      if (e.date === today) overview.push({ label: 'Сон', value: `${e.hours} ч`, color: '#a78bfa' });
+    }
+    if (bpEntries.length) {
+      const e = bpEntries[bpEntries.length - 1];
+      if (e.date === today) overview.push({ label: 'АД', value: `${e.systolic}/${e.diastolic}`, color: '#ef4444' });
+    }
+    if (weights.length) {
+      const e = weights[weights.length - 1];
+      if (e.date === today) overview.push({ label: 'Вес', value: `${e.weight} кг`, color: '#22c55e' });
+    }
+    if (painEntries.length) {
+      const e = painEntries[painEntries.length - 1];
+      if (e.date === today) overview.push({ label: 'Суставы Σ', value: `${e.totalScore}/70`, color: e.totalScore < 20 ? '#22c55e' : e.totalScore < 40 ? '#f59e0b' : '#ef4444' });
+    }
+    if (neuroEntries.length) {
+      const e = neuroEntries[neuroEntries.length - 1];
+      if (e.date === today) overview.push({ label: 'Нейро', value: `${e.totalScore}/10`, color: e.totalScore >= 4 ? '#ef4444' : e.totalScore >= 2 ? '#f59e0b' : '#22c55e' });
+    }
+    if (acneEntries.length) {
+      const e = acneEntries[acneEntries.length - 1];
+      if (e.date === today) overview.push({ label: 'Акне Σ', value: `${e.totalScore}/12`, color: e.totalScore >= 7 ? '#ef4444' : e.totalScore >= 4 ? '#f59e0b' : '#22c55e' });
+    }
+    if (hematoEntries.length) {
+      const e = hematoEntries[hematoEntries.length - 1];
+      if (e.date === today) overview.push({ label: 'Гемат', value: `${e.totalScore}/8`, color: e.totalScore >= 2 ? '#ef4444' : '#22c55e' });
+    }
+    return overview;
+  };
+  const todayOverview = buildTodayOverview();
+
   const builtInDiaries: BuiltInDiaryRow[] = [
     { key: 'sleep', count: sleepEntries.length, last: lastDate(sleepEntries) },
     { key: 'bp', count: bpEntries.length, last: bpEntries.length ? `${bpEntries[bpEntries.length - 1].systolic}/${bpEntries[bpEntries.length - 1].diastolic}` : '' },
@@ -1464,6 +1542,54 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
     }
   };
 
+  const quickAddToday = () => {
+    if (!activeDiary) return;
+    const today = todayIso();
+    const last = getEntryArray(activeDiary);
+    if (last.length > 0 && last[last.length - 1].date === today) {
+      if ((window as any).showToast) (window as any).showToast('ℹ️ Запись за сегодня уже есть');
+      return;
+    }
+    if (activeDiary === 'sleep') {
+      const e: SleepEntry = { date: today, hours: 7.5, quality: 4, awakenings: 1, bedtime: '23:00', wakeTime: '07:00' };
+      const updated = [...sleepEntries, e].sort((a, b) => a.date.localeCompare(b.date));
+      saveDiary(SLEEP_DIARY_KEY, updated); setSleepEntries(updated);
+    } else if (activeDiary === 'bp') {
+      const e: BPEntry = { date: today, systolic: 120, diastolic: 80, pulse: 70 };
+      const updated = [...bpEntries, e].sort((a, b) => a.date.localeCompare(b.date));
+      saveDiary(BP_DIARY_KEY, updated); setBpEntries(updated);
+    } else if (activeDiary === 'symptoms') {
+      const e: SymptomEntry = { date: today, name: 'Нет симптомов', severity: 1 };
+      const updated = [...symptomEntries, e].sort((a, b) => a.date.localeCompare(b.date));
+      saveDiary(SYMPTOMS_DIARY_KEY, updated); setSymptomEntries(updated);
+    } else if (activeDiary === 'pain') {
+      const e: PainEntry = { date: today, zones: {}, totalScore: 0 };
+      const updated = [...painEntries, e].sort((a, b) => a.date.localeCompare(b.date));
+      saveDiary(PAIN_DIARY_KEY, updated); setPainEntries(updated);
+    } else if (activeDiary === 'neuro') {
+      const e: NeuroEntry = { date: today, symptoms: {}, totalScore: 0 };
+      const updated = [...neuroEntries, e].sort((a, b) => a.date.localeCompare(b.date));
+      saveDiary(NEURO_DIARY_KEY, updated); setNeuroEntries(updated);
+    } else if (activeDiary === 'acne') {
+      const e: AcneEntry = { date: today, areas: {}, totalScore: 0 };
+      const updated = [...acneEntries, e].sort((a, b) => a.date.localeCompare(b.date));
+      saveDiary(ACNE_DIARY_KEY, updated); setAcneEntries(updated);
+    } else if (activeDiary === 'hemato') {
+      const e: HematoEntry = { date: today, symptoms: {}, totalScore: 0 };
+      const updated = [...hematoEntries, e].sort((a, b) => a.date.localeCompare(b.date));
+      saveDiary(HEMATO_DIARY_KEY, updated); setHematoEntries(updated);
+    } else if (activeDiary === 'injection') {
+      const e: InjectionEntry = { date: today, substance: 'Курс', dose: '—', site: 'Дельта' };
+      const updated = [...injectionEntries.filter(x => x.date !== today), e].sort((a, b) => a.date.localeCompare(b.date));
+      saveDiary(INJECTION_DIARY_KEY, updated); setInjectionEntries(updated);
+    } else {
+      setAddWeightOpen(activeDiary === 'weight');
+      setAddMeasurementsOpen(activeDiary === 'measurements');
+      return;
+    }
+    if ((window as any).showToast) (window as any).showToast('⚡ Запись за сегодня добавлена (откройте для деталей)');
+  };
+
   const targetHit = (
     key: DiaryKey,
     entries: { date: string; fields: { label: string; value: string; unit: string }[] }[]
@@ -1631,6 +1757,18 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
       )}
 
       {view !== 'diary' ? null : <>
+      {todayOverview.length > 0 && (
+        <AccordionSection title="📊 Обзор дня" subtitle={`Записи за сегодня (${new Date().toLocaleDateString('ru-RU')})`} icon="📊" color={colors.primary} defaultOpen>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 6 }}>
+            {todayOverview.map(s => (
+              <div key={s.label} style={{ padding: 8, borderRadius: 8, background: `${s.color}1A`, border: `1px solid ${s.color}44` }}>
+                <div style={{ fontSize: 9, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700 }}>{s.label}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: s.color, marginTop: 2 }}>{s.value}</div>
+              </div>
+            ))}
+          </div>
+        </AccordionSection>
+      )}
       <AccordionSection
         title="🎯 Цели"
         subtitle="Целевые значения для отслеживания прогресса"
@@ -1738,6 +1876,8 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
               diaryKey={d.key}
               count={d.count}
               last={d.last}
+              daysSinceLast={daysSinceLast(getEntryArray(d.key))}
+              loggedToday={todayEntry(getEntryArray(d.key))}
               onAdd={() => {
                 if (d.key === 'sleep') setAddSleepOpen(true);
                 else if (d.key === 'bp') setAddBPOpen(true);
@@ -1761,10 +1901,14 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
         )}
       </AccordionSection>
 
-      {activeDiary && (
+      {activeDiary && (() => {
+        const target = targetHit(activeDiary, activeEntriesRaw);
+        const offTarget = target && !target.onTarget;
+        const bg = offTarget ? 'rgba(245,158,11,0.04)' : undefined;
+        return (
         <AccordionSection
           title={`${DIARY_META[activeDiary].icon} Дневник: ${DIARY_META[activeDiary].title}`}
-          subtitle={`Записи из ${DIARY_META[activeDiary].title.toLowerCase()} (${activeEntries.length})${currentPhase ? ` · ${currentPhase.label}${courseWeek ? ` · неделя ${courseWeek}` : ''}` : ''}`}
+          subtitle={`Записи из ${DIARY_META[activeDiary].title.toLowerCase()} (${activeEntries.length})${currentPhase ? ` · ${currentPhase.label}${courseWeek ? ` · неделя ${courseWeek}` : ''}` : ''}${offTarget ? ` · ⚠️ вне цели` : ''}`}
           icon={DIARY_META[activeDiary].icon}
           color={DIARY_META[activeDiary].color}
           defaultOpen
@@ -1776,6 +1920,11 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
               style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${colors.border}`, color: colors.text }}
             >← Назад к дневникам</button>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => quickAddToday()}
+                aria-label="Быстро записать сегодня"
+                style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: 'rgba(0,230,138,0.14)', border: '1px solid rgba(0,230,138,0.4)', color: '#00e68a' }}
+              >⚡ Сегодня</button>
               {activeEntriesRaw.length > 0 && (
                 <>
                   <button
@@ -1917,7 +2066,8 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
             </div>
           )}
         </AccordionSection>
-      )}
+        );
+      })()}
 
       <AccordionSection
         title="🔗 Дневники в других блоках"
