@@ -1393,19 +1393,19 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
 
   const deleteDiaryEntry = (key: DiaryKey, date: string) => {
     if (!confirm(`Удалить запись от ${new Date(date).toLocaleDateString('ru-RU')}?`)) return;
-    const handler = (arr: any[], list: any[], setter: (v: any[]) => void, save: (v: any[]) => void) => {
+    const handler = (list: any[], setter: (v: any[]) => void, save: (v: any[]) => void) => {
       const updated = list.filter(x => x.date !== date);
       setter(updated);
       save(updated);
     };
-    if (key === 'sleep') handler([], sleepEntries, setSleepEntries, v => saveDiary(SLEEP_DIARY_KEY, v));
-    else if (key === 'bp') handler([], bpEntries, setBpEntries, v => saveDiary(BP_DIARY_KEY, v));
-    else if (key === 'injection') handler([], injectionEntries, setInjectionEntries, v => saveDiary(INJECTION_DIARY_KEY, v));
-    else if (key === 'symptoms') handler([], symptomEntries, setSymptomEntries, v => saveDiary(SYMPTOMS_DIARY_KEY, v));
-    else if (key === 'pain') handler([], painEntries, setPainEntries, v => saveDiary(PAIN_DIARY_KEY, v));
-    else if (key === 'neuro') handler([], neuroEntries, setNeuroEntries, v => saveDiary(NEURO_DIARY_KEY, v));
-    else if (key === 'acne') handler([], acneEntries, setAcneEntries, v => saveDiary(ACNE_DIARY_KEY, v));
-    else if (key === 'hemato') handler([], hematoEntries, setHematoEntries, v => saveDiary(HEMATO_DIARY_KEY, v));
+    if (key === 'sleep') handler(sleepEntries, setSleepEntries, v => saveDiary(SLEEP_DIARY_KEY, v));
+    else if (key === 'bp') handler(bpEntries, setBpEntries, v => saveDiary(BP_DIARY_KEY, v));
+    else if (key === 'injection') handler(injectionEntries, setInjectionEntries, v => saveDiary(INJECTION_DIARY_KEY, v));
+    else if (key === 'symptoms') handler(symptomEntries, setSymptomEntries, v => saveDiary(SYMPTOMS_DIARY_KEY, v));
+    else if (key === 'pain') handler(painEntries, setPainEntries, v => saveDiary(PAIN_DIARY_KEY, v));
+    else if (key === 'neuro') handler(neuroEntries, setNeuroEntries, v => saveDiary(NEURO_DIARY_KEY, v));
+    else if (key === 'acne') handler(acneEntries, setAcneEntries, v => saveDiary(ACNE_DIARY_KEY, v));
+    else if (key === 'hemato') handler(hematoEntries, setHematoEntries, v => saveDiary(HEMATO_DIARY_KEY, v));
   };
 
   const exportDiaryCSV = (key: DiaryKey, entries: typeof activeEntries) => {
