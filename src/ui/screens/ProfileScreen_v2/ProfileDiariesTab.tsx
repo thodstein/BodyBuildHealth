@@ -883,29 +883,6 @@ const Snackbar: React.FC<{ action: UndoAction | null; onDismiss: () => void }> =
   );
 };
 
-const Sparkline: React.FC<{ points: { date: string; value: number }[]; color: string; width?: number; height?: number }> = ({ points, color, width = 320, height = 48 }) => {
-  if (points.length < 2) return null;
-  const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
-  const values = sorted.map(p => p.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const stepX = (width - 4) / (sorted.length - 1);
-  const pathD = sorted.map((p, i) => {
-    const x = 2 + i * stepX;
-    const y = height - 2 - ((p.value - min) / range) * (height - 4);
-    return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-  }).join(' ');
-  const last = sorted[sorted.length - 1];
-  return (
-    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ display: 'block' }} aria-label="График тренда">
-      <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={2 + (sorted.length - 1) * stepX} cy={height - 2 - ((last.value - min) / range) * (height - 4)} r="3" fill={color} />
-      <text x={width - 4} y={12} fontSize="10" fill={color} textAnchor="end" fontWeight="700">{last.value.toFixed(1)}</text>
-    </svg>
-  );
-};
-
 const QUICK_DIARY_LINKS: QuickLink[] = [
   { icon: '🍽', label: 'Дневник питания', target: 'nutrition-diary', color: colors.green, desc: 'Питание: КБЖУ, приёмы, анализ рациона' },
   { icon: '🏋️', label: 'Журнал тренировок', target: 'workout-log', color: colors.blue, desc: 'Тренировочный дневник со снарядами' },
@@ -1631,18 +1608,59 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
       )}
 
       {view !== 'diary' ? null : <>
-      {todayOverview.length > 0 && (
-        <AccordionSection title="📊 Обзор дня" subtitle={`Записи за сегодня (${new Date().toLocaleDateString('ru-RU')})`} icon="📊" color={colors.primary} defaultOpen>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 6 }}>
-            {todayOverview.map(s => (
-              <div key={s.label} style={{ padding: 8, borderRadius: 8, background: `${s.color}1A`, border: `1px solid ${s.color}44` }}>
-                <div style={{ fontSize: 9, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700 }}>{s.label}</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: s.color, marginTop: 2 }}>{s.value}</div>
-              </div>
-            ))}
+      <AccordionSection
+        title="📓 Встроенные дневники"
+        subtitle="10 дневников: сон, давление, вес, замеры, инъекции, симптомы, боль, нейро, акне, гематология. Клик — раскрыть содержимое"
+        icon="📓"
+        color={colors.orange}
+        defaultOpen
+      >
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="🔍 Поиск дневника…"
+          style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '8px 10px', color: colors.text, fontSize: 12, outline: 'none', marginBottom: 8, boxSizing: 'border-box' }}
+          aria-label="Поиск дневника"
+        />
+        <div
+          role="list"
+          aria-label="Встроенные дневники"
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}
+        >
+          {builtInDiaries
+            .filter(d => !searchQuery.trim() || DIARY_META[d.key].title.toLowerCase().includes(searchQuery.toLowerCase()) || d.last.toLowerCase().includes(searchQuery.toLowerCase()))
+            .map(d => (
+            <DiaryCard
+              key={d.key}
+              diaryKey={d.key}
+              count={d.count}
+              last={d.last}
+              daysSinceLast={daysSinceLast(getEntryArray(d.key))}
+              loggedToday={todayEntry(getEntryArray(d.key))}
+              onAdd={() => {
+                if (d.key === 'sleep') setAddSleepOpen(true);
+                else if (d.key === 'bp') setAddBPOpen(true);
+                else if (d.key === 'weight') setAddWeightOpen(true);
+                else if (d.key === 'measurements') setAddMeasurementsOpen(true);
+                else if (d.key === 'injection') setAddInjectionOpen(true);
+                else if (d.key === 'symptoms') setAddSymptomOpen(true);
+                else if (d.key === 'pain') setAddPainOpen(true);
+                else if (d.key === 'neuro') setAddNeuroOpen(true);
+                else if (d.key === 'acne') setAddAcneOpen(true);
+                else if (d.key === 'hemato') setAddHematoOpen(true);
+              }}
+              onOpen={() => setActiveDiary(d.key)}
+            />
+          ))}
+        </div>
+        {searchQuery.trim() && builtInDiaries.filter(d => DIARY_META[d.key].title.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+          <div style={{ color: colors.textMuted, fontSize: 12, padding: 12, textAlign: 'center' }}>
+            Дневников по запросу «{searchQuery}» не найдено.
           </div>
-        </AccordionSection>
-      )}
+        )}
+      </AccordionSection>
+
       <AccordionSection
         title="🎯 Цели"
         subtitle="Целевые значения для отслеживания прогресса"
@@ -1750,59 +1768,6 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
         color={colors.blue}
       >
         <QuickLinkRow links={QUICK_DIARY_LINKS} ariaLabel="Дневники в других блоках" />
-      </AccordionSection>
-
-      <AccordionSection
-        title="📓 Встроенные дневники"
-        subtitle="Сон, давление, вес, замеры, инъекции, симптомы, боль, нейро, акне, гематология"
-        icon="📓"
-        color={colors.orange}
-        defaultOpen
-      >
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          placeholder="🔍 Поиск дневника…"
-          style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '8px 10px', color: colors.text, fontSize: 12, outline: 'none', marginBottom: 8, boxSizing: 'border-box' }}
-          aria-label="Поиск дневника"
-        />
-        <div
-          role="list"
-          aria-label="Встроенные дневники"
-          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}
-        >
-          {builtInDiaries
-            .filter(d => !searchQuery.trim() || DIARY_META[d.key].title.toLowerCase().includes(searchQuery.toLowerCase()) || d.last.toLowerCase().includes(searchQuery.toLowerCase()))
-            .map(d => (
-            <DiaryCard
-              key={d.key}
-              diaryKey={d.key}
-              count={d.count}
-              last={d.last}
-              daysSinceLast={daysSinceLast(getEntryArray(d.key))}
-              loggedToday={todayEntry(getEntryArray(d.key))}
-              onAdd={() => {
-                if (d.key === 'sleep') setAddSleepOpen(true);
-                else if (d.key === 'bp') setAddBPOpen(true);
-                else if (d.key === 'weight') setAddWeightOpen(true);
-                else if (d.key === 'measurements') setAddMeasurementsOpen(true);
-                else if (d.key === 'injection') setAddInjectionOpen(true);
-                else if (d.key === 'symptoms') setAddSymptomOpen(true);
-                else if (d.key === 'pain') setAddPainOpen(true);
-                else if (d.key === 'neuro') setAddNeuroOpen(true);
-                else if (d.key === 'acne') setAddAcneOpen(true);
-                else if (d.key === 'hemato') setAddHematoOpen(true);
-              }}
-              onOpen={() => setActiveDiary(d.key)}
-            />
-          ))}
-        </div>
-        {searchQuery.trim() && builtInDiaries.filter(d => DIARY_META[d.key].title.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
-          <div style={{ color: colors.textMuted, fontSize: 12, padding: 12, textAlign: 'center' }}>
-            Дневников по запросу «{searchQuery}» не найдено.
-          </div>
-        )}
       </AccordionSection>
 
       {activeDiary && (() => {
@@ -1917,14 +1882,30 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
             );
           })()}
 
-          {/* Sparkline */}
-          {activeEntries.length >= 2 && (() => {
+          {/* Полноценный график */}
+          {activeEntries.length >= 1 && (() => {
             const points = buildSparkline(activeDiary, activeEntries);
-            if (points.length < 2) return null;
+            if (points.length < 1) return null;
+            const targetVal = (() => {
+              if (activeDiary === 'sleep') return goals.sleepHours > 0 ? goals.sleepHours : null;
+              if (activeDiary === 'weight') return goals.weightKg > 0 ? goals.weightKg : null;
+              if (activeDiary === 'bp') return goals.systolicTarget > 0 ? goals.systolicTarget : null;
+              return null;
+            })();
+            const unit = DIARY_META[activeDiary].unit || '';
             return (
-              <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${DIARY_META[activeDiary].color}22`, marginBottom: 10 }}>
-                <div style={{ fontSize: 9, color: colors.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Тренд (по дате)</div>
-                <Sparkline points={points} color={DIARY_META[activeDiary].color} width={300} height={48} />
+              <div style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${DIARY_META[activeDiary].color}33`, marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>📈 График по датам</div>
+                  <div style={{ fontSize: 9, color: colors.textMuted }}>{points.length} точек · {unit}</div>
+                </div>
+                <FullChart
+                  points={points}
+                  color={DIARY_META[activeDiary].color}
+                  target={targetVal}
+                  unit={unit}
+                  height={200}
+                />
               </div>
             );
           })()}
