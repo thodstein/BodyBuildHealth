@@ -13,6 +13,38 @@ import { useProfileRefresh, getSnapshots, undoLastSnapshot } from '../../../core
 import { onAnyProfileChange } from '../../../core/profile-events';
 import { colors } from './ui';
 
+class ProfileErrorBoundary extends React.Component<
+  { children: React.ReactNode; tabName: string },
+  { hasError: boolean; error: any }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error('[ProfileErrorBoundary]', this.props.tabName, error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 20, color: colors.danger }}>
+          <h3>Ошибка в вкладке "{this.props.tabName}"</h3>
+          <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', maxHeight: 300, overflow: 'auto' }}>
+            {String(this.state.error)}
+          </pre>
+          <button onClick={() => this.setState({ hasError: false, error: null })}>
+            Попробовать снова
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 type Tab = 'user' | 'diaries' | 'settings' | 'reports';
 
 const TAB_META: Record<Tab, { icon: string; title: string; color: string }> = {
@@ -107,21 +139,21 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
         scrollbarWidth: 'thin',
         scrollbarColor: `${colors.border} transparent`,
       }}>
-        {tab === 'user' && <ProfileUserTab />}
-        {tab === 'diaries' && <ProfileDiariesTab
-          onNavigate={onNavigate}
-          initialView={initialSubTab === 'reports' || initialSubTab === 'custom-report' ? 'reports' : initialSubTab === 'archive' ? 'archive' : 'diary'}
-          initialActiveDiary={
-            initialSubTab === 'sleep' || initialSubTab === 'bp' || initialSubTab === 'weight'
-            || initialSubTab === 'measurements' || initialSubTab === 'injection'
-            || initialSubTab === 'symptoms' || initialSubTab === 'pain' || initialSubTab === 'neuro'
-            || initialSubTab === 'acne' || initialSubTab === 'hemato'
-              ? initialSubTab as 'sleep' | 'bp' | 'weight' | 'measurements' | 'injection' | 'symptoms' | 'pain' | 'neuro' | 'acne' | 'hemato'
-              : undefined
-          }
-        />}
-        {tab === 'settings' && <ProfileSettingsTab onNavigate={onNavigate} />}
-        {tab === 'reports' && <ReportsScreen />}
+         {tab === 'user' && <ProfileErrorBoundary tabName="Пользователь"><ProfileUserTab /></ProfileErrorBoundary>}
+         {tab === 'diaries' && <ProfileErrorBoundary tabName="Дневники"><ProfileDiariesTab
+           onNavigate={onNavigate}
+           initialView={initialSubTab === 'reports' || initialSubTab === 'custom-report' ? 'reports' : initialSubTab === 'archive' ? 'archive' : 'diary'}
+           initialActiveDiary={
+             initialSubTab === 'sleep' || initialSubTab === 'bp' || initialSubTab === 'weight'
+             || initialSubTab === 'measurements' || initialSubTab === 'injection'
+             || initialSubTab === 'symptoms' || initialSubTab === 'pain' || initialSubTab === 'neuro'
+             || initialSubTab === 'acne' || initialSubTab === 'hemato'
+               ? initialSubTab as 'sleep' | 'bp' | 'weight' | 'measurements' | 'injection' | 'symptoms' | 'pain' | 'neuro' | 'acne' | 'hemato'
+               : undefined
+           }
+         /></ProfileErrorBoundary>}
+         {tab === 'settings' && <ProfileErrorBoundary tabName="Настройки"><ProfileSettingsTab onNavigate={onNavigate} /></ProfileErrorBoundary>}
+         {tab === 'reports' && <ProfileErrorBoundary tabName="Отчёты"><ReportsScreen /></ProfileErrorBoundary>}
       </div>
     </div>
   );

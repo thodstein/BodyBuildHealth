@@ -416,14 +416,18 @@ function injectPLWeakPoints(
     }
     // Override через пользовательский выбор
     const mapKey = `${wp.lift}|${wp.weakPoint}`;
-    const userDays = plWeakPointDayMap?.[mapKey] || plWeakPointDayMap?.[wp.lift as string];
+    const userDays = plWeakPointDayMap?.[mapKey];
     if (userDays && userDays.length > 0) {
       heavyDayIdx = (userDays[0] - 1);
       if (heavyDayIdx < 0 || heavyDayIdx >= days.length) heavyDayIdx = 0;
       if (userDays.length > 1) {
         lightDayIdx = (userDays[1] - 1);
         if (lightDayIdx < 0 || lightDayIdx >= days.length) lightDayIdx = -1;
-      } else lightDayIdx = -1;
+      } else {
+        // Пользователь выбрал только 1 день — 2-я коррекция идёт в тот же день
+        // (heavy+pump в одной сессии, как drop-set пару)
+        lightDayIdx = heavyDayIdx;
+      }
     }
 
     const liftGroup = liftToEnGroup(wp.lift);
@@ -717,17 +721,22 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     //  - Малые группы (biceps, triceps, forearms, calves, abs, delt_rear/delt_mid): 2×/нед → тяжёлый день (3×8 @RIR 2) + памп-день (3×12 @RIR 3)
     //  - Крупные группы (chest, back, quads, hamstrings, glutes, shoulders): 1×/нед → памп-добивка в synergist/антагонист-день (3×10 @RIR 3)
     //  - Уважается MRV soft-cap мышцы, day cap (упражнения ≤ 8 в день).
-    //  - Пользовательский override: weakGroupDayMap[muscle] = [dayIdx,...] — 1-based. Если не задано — авто.
-    if (input.weakPoints && input.weakPoints.length) {
-      const SMALL_GROUPS_2X = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'delt_rear', 'delt_mid']);
+     //  - Пользовательский override: weakGroupDayMap[muscle] = [dayIdx,...] — 1-based. Если не задано — авто.
+     if (input.weakPoints && input.weakPoints.length) {
+       console.log('weakPoints distribution: weakPoints=', input.weakPoints, 'weakGroupDayMap=', input.weakGroupDayMap);
+       const SMALL_GROUPS_2X = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'delt_rear', 'delt_mid', 'arms']);
       const userDayMap = input.weakGroupDayMap;
       const allWeekNames = new Set(days.flatMap(d => d.exercises.map(e => norm(e.name))));
       const fallbackPm = input.fallbackPm ?? 80;
 
-      for (const wg of input.weakPoints) {
-        const candidates = getExercisesByGroup(wg)
-          .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name)));
-        if (candidates.length === 0) continue;
+       for (const wg of input.weakPoints) {
+         const allCandidates = getExercisesByGroup(wg);
+         const candidates = allCandidates
+           .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name)));
+         if (candidates.length === 0) {
+           console.log(`weakPoints: no candidates for "${wg}". getExercisesByGroup("${wg}") returned ${allCandidates.length} exercises, after filter: ${candidates.length}, allWeekNames sample:`, [...allWeekNames].slice(0, 5));
+           continue;
+         }
 
         // Определить число дней для добивки
         const isSmall = SMALL_GROUPS_2X.has(wg);
@@ -751,15 +760,23 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
             dayStats.push({ idx: di, cnt, isLegsDay, isUpperDay });
           }
           // Сортировать по возрастанию объёма мышцы (min volume = best для spread)
-          dayStats.sort((a, b) => a.cnt - b.cnt);
-          // Для тяжёлого группы ног → предпочесть не ноги день; uppper weak → предпочесть upper
+          // Затем для ног → предпочесть не-ноги день; для upper → предпочесть upper.
+          // Используем единую сортировку с несколькими критериями, чтобы сохранить volume-order.
           const isWpLegs = ['quads', 'hamstrings', 'glutes', 'calves'].includes(wg);
           const isWpUpper = ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'forearms'].includes(wg);
-          if (isWpLegs) {
-            dayStats.sort((a, b) => (a.isLegsDay === b.isLegsDay ? a.cnt - b.cnt : a.isLegsDay ? 1 : -1));
-          } else if (isWpUpper) {
-            dayStats.sort((a, b) => (a.isUpperDay === b.isUpperDay ? a.cnt - b.cnt : a.isUpperDay ? -1 : 1));
-          }
+          dayStats.sort((a, b) => {
+            // Primary: объём целевой мышцы (меньше = лучше для spread)
+            if (a.cnt !== b.cnt) return a.cnt - b.cnt;
+            // Secondary: предпочтение типа дня (для spread между днями с равным объёмом)
+            if (isWpLegs) {
+              // Ноги-weak → предпочесть не-ноги день (чтобы не перегружать ноги)
+              if (a.isLegsDay !== b.isLegsDay) return a.isLegsDay ? 1 : -1;
+            } else if (isWpUpper) {
+              // Upper-weak → предпочесть upper день
+              if (a.isUpperDay !== b.isUpperDay) return a.isUpperDay ? -1 : 1;
+            }
+            return 0;
+          });
           // Взять top targetDayCount дней — обновляем после каждой группы чтобы spread
           targetDays = dayStats.slice(0, targetDayCount).map(s => s.idx + 1);
         }
@@ -808,6 +825,11 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           weakNotes.push(`🔥 Слабая группа ${wg} — добивка в день ${dayIdx + 1}: ${pick.name} ${sets}×${reps} @${Math.round(workWeight(wPm, pct))}кг RIR ${rir}${isHeavyDay ? ' (heavy)' : ' (pump)'}.`);
         }
       }
+    }
+    // Debug: check if exercises were added
+    const addedForWg = days.flatMap(d => d.exercises.filter(e => input.weakPoints?.includes(e.group || '')));
+    if (addedForWg.length > 0) {
+      console.log(`weakPoints: added ${addedForWg.length} exercises for weakPoints in week ${weekNumber}`);
     }
 
     if (!faithful) enforceInjectedFatigueBudget(days, baseExerciseCounts, input.currentReadiness);

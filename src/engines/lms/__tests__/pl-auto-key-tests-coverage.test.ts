@@ -6,6 +6,7 @@ import { calcTonnage } from '../lms-metrics.engine';
 import { computePLPlanFeedback } from '../lms-progression-feedback.engine';
 import { rankCycles } from '../lms-selector.engine';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
+import { getExercisesByGroup } from '../../../core/exercise-catalog';
 import type { WorkoutSession } from '../workout-logger.engine';
 import type { WorkoutLog } from '../../../core/types';
 
@@ -141,18 +142,101 @@ describe('PL-auto key coverage 4.1-4.15', () => {
     expect(caution.rir).toBe(base.rir + 1);
   });
 
-  it('4.15 taper uses ×0.65 and ×0.45 set reductions', () => {
-    const p = plan();
-    const volume = (i: number) => p.weeks[i].days.flatMap(d => d.exercises).reduce((n, e) => n + e.workSets.reduce((s, x) => s + x.sets, 0), 0);
-    const w10 = volume(9), w11 = volume(10), w12 = volume(11);
-    expect(w11).toBeLessThan(w10);
-    expect(w12).toBeLessThan(w11);
-    // Integer set rounding and the per-exercise minimum can move the aggregate
-    // ratio away from the nominal multiplier. Verify the taper direction and
-    // bounded reductions instead of requiring an impossible exact total.
-    expect(w11 / w10).toBeGreaterThan(0.5);
-    expect(w11 / w10).toBeLessThan(0.8);
-    expect(w12 / w10).toBeGreaterThan(0.3);
-    expect(w12 / w10).toBeLessThan(0.6);
-  });
-});
+   it('4.15 taper uses ×0.65 and ×0.45 set reductions', () => {
+     const p = plan();
+     const volume = (i: number) => p.weeks[i].days.flatMap(d => d.exercises).reduce((n, e) => n + e.workSets.reduce((s, x) => s + x.sets, 0), 0);
+     const w10 = volume(9), w11 = volume(10), w12 = volume(11);
+     expect(w11).toBeLessThan(w10);
+     expect(w12).toBeLessThan(w11);
+     // Integer set rounding and the per-exercise minimum can move the aggregate
+     // ratio away from the nominal multiplier. Verify the taper direction and
+     // bounded reductions instead of requiring an impossible exact total.
+     expect(w11 / w10).toBeGreaterThan(0.5);
+     expect(w11 / w10).toBeLessThan(0.8);
+     expect(w12 / w10).toBeGreaterThan(0.3);
+     expect(w12 / w10).toBeLessThan(0.6);
+   });
+
+   // ── ПЛ-авто: слабые мышцы — выбор дней + авто-распределение ──
+
+   it('4.16 weakGroupDayMap: 2 дня для малой группы (arms) распределяет в выбранные дни', () => {
+     // 4-дневный шаблон чтобы было куда распределять
+     const tpl4 = { ...CYCLE_01, week1: [
+       { exercises: [{ name: 'Присед', group: 'Ноги', load: 'Тяжелая' as const, pm: 150, rir: 2, workSets: [{ pct: 0.75, reps: 5, sets: 3, weight: 112.5, rir: 2 }] }] },
+       { exercises: [{ name: 'Жим лёжа', group: 'Грудь', load: 'Тяжелая' as const, pm: 110, rir: 2, workSets: [{ pct: 0.75, reps: 5, sets: 3, weight: 82.5, rir: 2 }] }] },
+       { exercises: [{ name: 'Становая тяга', group: 'Спина', load: 'Тяжелая' as const, pm: 180, rir: 2, workSets: [{ pct: 0.75, reps: 5, sets: 3, weight: 135, rir: 2 }] }] },
+       { exercises: [{ name: 'Жим стоя', group: 'Плечи', load: 'Тяжелая' as const, pm: 80, rir: 2, workSets: [{ pct: 0.75, reps: 5, sets: 3, weight: 60, rir: 2 }] }] },
+     ]};
+     const p = buildLMSPlan({ template: tpl4, pmMap, weeksOverride: 4, mode: 'natural',
+       weakPoints: ['arms'], weakGroupDayMap: { arms: [1, 3] }, currentReadiness: 100 });
+     const injected = p.weeks[0].days.map(d => d.exercises.filter(e => e.group === 'arms'));
+     // arms должны быть в днях 1 и 3 (1-based → 0 и 2)
+     expect(injected[0].length).toBeGreaterThan(0);
+     expect(injected[2].length).toBeGreaterThan(0);
+     // и НЕ в днях 2 и 4
+     expect(injected[1].length).toBe(0);
+     expect(injected[3].length).toBe(0);
+   });
+
+   it('4.17 weakGroupDayMap: 1 день для крупной группы (chest)', () => {
+     // Используем CYCLE_01 как базу, заменяем только group у упражнений
+     const tpl3 = { ...CYCLE_01, week1: CYCLE_01.week1.map((d, i) => ({
+       ...d, exercises: d.exercises.map((ex, j) => ({
+         ...ex, group: ['Ноги','Грудь','Спина'][i],
+         workSets: ex.workSets ?? [{ pct: 0.75, reps: 5, sets: 3, weight: 100, rir: 2 }],
+       })),
+     }))};
+     const p = buildLMSPlan({ template: tpl3, pmMap, weeksOverride: 4, mode: 'natural',
+       weakPoints: ['chest'], weakGroupDayMap: { chest: [2] }, currentReadiness: 100 });
+     const injected = p.weeks[0].days.map(d => d.exercises.filter(e => e.group === 'chest'));
+     // chest должен быть только в дне 2 (1-based → index 1)
+     expect(injected[1].length).toBeGreaterThan(0);
+   });
+
+   it('4.18 plWeakPointDayMap: 1 день → обе коррекции в выбранный день', () => {
+     const p = buildLMSPlan({ template: CYCLE_01, pmMap, weeksOverride: 4, mode: 'natural',
+       plWeakPoints: [{ lift: 'bench' as const, weakPoint: 'lockout' as const }],
+       plWeakPointDayMap: { 'bench|lockout': [2] },
+       currentReadiness: 100 });
+     // В дне 2 (1-based → index 1) должно быть минимум 1 добавленное упражнение
+     const day2Exercises = p.weeks[0].days[1].exercises;
+     // Ищем упражнения из weak-point коррекций (не main лифт)
+     const injected = day2Exercises.filter(e => e.name !== 'Присед' && e.name !== 'Жим лёжа' && e.name !== 'Становая тяга');
+     expect(injected.length).toBeGreaterThanOrEqual(1);
+   });
+
+   it('4.19 plWeakPointDayMap: 2 дня → коррекции в разные дни', () => {
+     const p = buildLMSPlan({ template: CYCLE_01, pmMap, weeksOverride: 4, mode: 'natural',
+       plWeakPoints: [{ lift: 'bench' as const, weakPoint: 'lockout' as const }],
+       plWeakPointDayMap: { 'bench|lockout': [1, 3] },
+       currentReadiness: 100 });
+     const allInjected = p.weeks[0].days.flatMap((d, idx) =>
+       d.exercises.filter(e => e.name !== 'Присед' && e.name !== 'Жим лёжа' && e.name !== 'Становая тяга')
+        .map(e => ({ day: idx, name: e.name }))
+     );
+     // Должно быть минимум 2 разных упражнения (или 2 добавления)
+     expect(allInjected.length).toBeGreaterThanOrEqual(2);
+     // Проверяем что они в днях 1 и 3 (0-based: 0 и 2)
+     const dayIndices = [...new Set(allInjected.map(x => x.day))];
+     expect(dayIndices).toContain(0);
+     expect(dayIndices).toContain(2);
+   });
+
+   it('4.20 weakPoints авто-распределение: arms (малая группа) → 2 разных дня', () => {
+     const p = buildLMSPlan({ template: CYCLE_01, pmMap, weeksOverride: 4, mode: 'natural',
+       weakPoints: ['arms'], currentReadiness: 100 });
+     // Debug: print all exercise groups in week 0
+     const allExercises = p.weeks[0].days.flatMap(d => d.exercises);
+     const groups = [...new Set(allExercises.map(e => e.group))];
+     console.log('Week 0 groups:', groups);
+     const armExercises = allExercises.filter(e => e.group === 'arms' || e.group === 'Руки' || e.group === 'bicep_curl');
+     console.log('Arm exercises in week 0:', armExercises.length);
+     if (armExercises.length > 0) {
+       console.log('First arm exercise:', armExercises[0].name, 'group:', armExercises[0].group);
+     }
+     const injected = p.weeks[0].days.map(d => d.exercises.filter(e => e.group === 'arms'));
+     const daysWithArms = injected.filter(d => d.length > 0);
+     // Должно быть распределено в 2 дня (малая группа = 2×/нед)
+     expect(daysWithArms.length).toBe(2);
+   });
+ });

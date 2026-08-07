@@ -1,5 +1,5 @@
 import { UserRole, UserProfile, UnifiedSettings, getDefaultSettings } from "./types";
-import { useState, useEffect, useCallback, useSyncExternalStore, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { broadcastProfileChange } from './profile-events';
 
 const STORAGE_KEY = "he_profile_v2";
@@ -340,38 +340,19 @@ export function useProfileRefresh(): UserProfile {
 export function useProfileSection<K extends keyof UnifiedSettings>(
   section: K
 ): [UnifiedSettings[K], (patch: Partial<UnifiedSettings[K]>) => void] {
-  const subscribe = useCallback((cb: () => void) => {
-    let lastVer = sectionVersions[section] || 0;
-    return onProfileChange(() => {
-      const cur = sectionVersions[section] || 0;
-      if (cur !== lastVer) {
-        lastVer = cur;
-        cb();
-      }
-    });
-  }, [section]);
-
-  // Кэшируем snapshot — useSyncExternalStore сравнивает через Object.is.
-  // Без кэша каждый рендер возвращал бы новый объект → лишние ререндеры.
-  const snapshotRef = useRef<UnifiedSettings[K] | null>(null);
-  const snapshotVerRef = useRef<number>(-1);
-  const getSnapshot = useCallback(() => {
-    const curVer = sectionVersions[section] || 0;
-    if (snapshotRef.current && snapshotVerRef.current === curVer) {
-      return snapshotRef.current;
-    }
+  const [value, setValue] = useState<UnifiedSettings[K]>(() => {
     const p = getProfile();
-    const sec = ((p.settings as any)[section] || {}) as UnifiedSettings[K];
-    snapshotRef.current = sec;
-    snapshotVerRef.current = curVer;
-    return sec;
-  }, [section]);
+    return ((p.settings as any)[section] || {}) as UnifiedSettings[K];
+  });
 
-  const getServerSnapshot = useCallback(() => {
-    return ((getDefaultSettings() as any)[section] || {}) as UnifiedSettings[K];
+  useEffect(() => {
+    const unsub = onProfileChange(() => {
+      const p = getProfile();
+      const sec = ((p.settings as any)[section] || {}) as UnifiedSettings[K];
+      setValue(sec);
+    });
+    return unsub;
   }, [section]);
-
-  const value = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const setter = useCallback((patch: Partial<UnifiedSettings[K]>) => {
     updateSection(section, patch);
