@@ -699,18 +699,17 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         }
         dayFatigueBudget -= fatigueCost * totalWorkSets;
 
-        return { name: spec.name, group: spec.group, coef: spec.coef, mnosz: spec.mnosz, load: cleanLoad(spec.load, dayTag), pm, rir: rirBase, workSets };
-      });
+      return { name: spec.name, group: spec.group, coef: spec.coef, mnosz: spec.mnosz, load: cleanLoad(spec.load, dayTag), pm, rir: rirBase, workSets };
+       });
+ 
+       const metricsEx: SRExercise[] = planEx.map(pe => ({
+         name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
+         sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
+       }));
+       return { exercises: planEx, metrics: calcSessionMetrics(metricsEx) };
+     });
 
-      const metricsEx: SRExercise[] = planEx.map(pe => ({
-        name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
-        sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
-      }));
-      return { exercises: planEx, metrics: calcSessionMetrics(metricsEx) };
-    });
-    const baseExerciseCounts = days.map(day => day.exercises.length);
-
-    // Слабые точки добавляются отдельным слоем. Faithful защищает source-сеты,
+    // Слабые точки и слабые группы добавляются отдельным слоем. Faithful защищает source-сеты,
     // но не должен отключать выбранные пользователем ассистенты.
     if (input.plWeakPoints && input.plWeakPoints.length) {
       injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, combinedMrvMult, input.plWeakPointDayMap, input.fallbackPm ?? 80);
@@ -722,9 +721,8 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     //  - Крупные группы (chest, back, quads, hamstrings, glutes, shoulders): 1×/нед → памп-добивка в synergist/антагонист-день (3×10 @RIR 3)
     //  - Уважается MRV soft-cap мышцы, day cap (упражнения ≤ 8 в день).
      //  - Пользовательский override: weakGroupDayMap[muscle] = [dayIdx,...] — 1-based. Если не задано — авто.
-     if (input.weakPoints && input.weakPoints.length) {
-       console.log('weakPoints distribution: weakPoints=', input.weakPoints, 'weakGroupDayMap=', input.weakGroupDayMap);
-       const SMALL_GROUPS_2X = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'delt_rear', 'delt_mid', 'arms']);
+      if (input.weakPoints && input.weakPoints.length) {
+        const SMALL_GROUPS_2X = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'delt_rear', 'delt_mid', 'arms']);
       const userDayMap = input.weakGroupDayMap;
       const allWeekNames = new Set(days.flatMap(d => d.exercises.map(e => norm(e.name))));
       const fallbackPm = input.fallbackPm ?? 80;
@@ -733,10 +731,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
          const allCandidates = getExercisesByGroup(wg);
          const candidates = allCandidates
            .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name)));
-         if (candidates.length === 0) {
-           console.log(`weakPoints: no candidates for "${wg}". getExercisesByGroup("${wg}") returned ${allCandidates.length} exercises, after filter: ${candidates.length}, allWeekNames sample:`, [...allWeekNames].slice(0, 5));
-           continue;
-         }
+          if (candidates.length === 0) continue;
 
         // Определить число дней для добивки
         const isSmall = SMALL_GROUPS_2X.has(wg);
@@ -826,13 +821,8 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         }
       }
     }
-    // Debug: check if exercises were added
-    const addedForWg = days.flatMap(d => d.exercises.filter(e => input.weakPoints?.includes(e.group || '')));
-    if (addedForWg.length > 0) {
-      console.log(`weakPoints: added ${addedForWg.length} exercises for weakPoints in week ${weekNumber}`);
-    }
-
-    if (!faithful) enforceInjectedFatigueBudget(days, baseExerciseCounts, input.currentReadiness);
+    // enforceInjectedFatigueBudget удаляет пользовательские выборы (weakPoints) — отключаем.
+     // if (!faithful) enforceInjectedFatigueBudget(days, baseExerciseCounts, input.currentReadiness);
 
     // Пересчёт метрик сессий (после возможной инъекции слабых точек)
     for (const d of days) {

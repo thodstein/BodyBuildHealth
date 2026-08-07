@@ -160,12 +160,13 @@ describe('PL-auto key coverage 4.1-4.15', () => {
    // ── ПЛ-авто: слабые мышцы — выбор дней + авто-распределение ──
 
    it('4.16 weakGroupDayMap: 2 дня для малой группы (arms) распределяет в выбранные дни', () => {
-     // 4-дневный шаблон чтобы было куда распределять
+     // 4-дневный шаблон чтобы было куда распределять (используем CYCLE_01 и добавляем 4-й день)
+     const baseDay = CYCLE_01.week1[0];
      const tpl4 = { ...CYCLE_01, week1: [
-       { exercises: [{ name: 'Присед', group: 'Ноги', load: 'Тяжелая' as const, pm: 150, rir: 2, workSets: [{ pct: 0.75, reps: 5, sets: 3, weight: 112.5, rir: 2 }] }] },
-       { exercises: [{ name: 'Жим лёжа', group: 'Грудь', load: 'Тяжелая' as const, pm: 110, rir: 2, workSets: [{ pct: 0.75, reps: 5, sets: 3, weight: 82.5, rir: 2 }] }] },
-       { exercises: [{ name: 'Становая тяга', group: 'Спина', load: 'Тяжелая' as const, pm: 180, rir: 2, workSets: [{ pct: 0.75, reps: 5, sets: 3, weight: 135, rir: 2 }] }] },
-       { exercises: [{ name: 'Жим стоя', group: 'Плечи', load: 'Тяжелая' as const, pm: 80, rir: 2, workSets: [{ pct: 0.75, reps: 5, sets: 3, weight: 60, rir: 2 }] }] },
+       { ...baseDay, exercises: baseDay.exercises.map(ex => ({ ...ex, group: 'Ноги' })) },
+       { ...baseDay, exercises: baseDay.exercises.map(ex => ({ ...ex, group: 'Грудь' })) },
+       { ...baseDay, exercises: baseDay.exercises.map(ex => ({ ...ex, group: 'Спина' })) },
+       { ...baseDay, exercises: baseDay.exercises.map(ex => ({ ...ex, group: 'Плечи' })) },
      ]};
      const p = buildLMSPlan({ template: tpl4, pmMap, weeksOverride: 4, mode: 'natural',
        weakPoints: ['arms'], weakGroupDayMap: { arms: [1, 3] }, currentReadiness: 100 });
@@ -225,15 +226,6 @@ describe('PL-auto key coverage 4.1-4.15', () => {
    it('4.20 weakPoints авто-распределение: arms (малая группа) → 2 разных дня', () => {
      const p = buildLMSPlan({ template: CYCLE_01, pmMap, weeksOverride: 4, mode: 'natural',
        weakPoints: ['arms'], currentReadiness: 100 });
-     // Debug: print all exercise groups in week 0
-     const allExercises = p.weeks[0].days.flatMap(d => d.exercises);
-     const groups = [...new Set(allExercises.map(e => e.group))];
-     console.log('Week 0 groups:', groups);
-     const armExercises = allExercises.filter(e => e.group === 'arms' || e.group === 'Руки' || e.group === 'bicep_curl');
-     console.log('Arm exercises in week 0:', armExercises.length);
-     if (armExercises.length > 0) {
-       console.log('First arm exercise:', armExercises[0].name, 'group:', armExercises[0].group);
-     }
      const injected = p.weeks[0].days.map(d => d.exercises.filter(e => e.group === 'arms'));
      const daysWithArms = injected.filter(d => d.length > 0);
      // Должно быть распределено в 2 дня (малая группа = 2×/нед)
