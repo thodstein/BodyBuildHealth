@@ -1,10 +1,13 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { BarcodeScanner } from '../../components/BarcodeScanner';
 import { type OFFProduct, productToFoodItem } from '../../../engines/openfoodfacts.engine';
-import { parseFatSecretText, parseNutritionScreenshot } from '../../../engines/nutrition-ocr-parser';
-import { processUploadedFile, saveParsedMeals } from '../../../core/ocr-engine';
+import { parseNutritionText } from '../../../engines/nutrition-ocr-parser';
+import { processUploadedFile } from '../../../core/ocr-engine';
 import { FOOD_DB } from '../../../core/nutrition-database';
 import { CAT_MAP_EMOJI } from '../../../core/nutrition-utils';
+import { formatDate } from '../../../core/utils/date-utils';
+import { type DiaryItem } from './types';
+import { readDiary, writeDiary, deleteDay, addMealEntry, onDiaryChange as onDiaryStorageChange } from './diary-storage';
 import { calcMealQuality, getQualityLabel } from '../../../engines/nutrition-quality.engine';
 import { NutritionQualityCard } from '../../components/NutritionQualityCard';
 import { NutritionDiaryCharts } from './NutritionDiaryCharts';
@@ -13,8 +16,6 @@ type FoodItemLike = { id: string; name: string; kcal: number; protein: number; f
 
 const MEAL_PRESETS = ['Завтрак', 'Второй завтрак', 'Обед', 'Полдник', 'Ужин', 'Перекус', 'До тренировки', 'После тренировки', 'Поздний перекус'];
 const DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-
-interface DiaryItem { name: string; kcal: number; p: number; f: number; c: number; qty?: number; category?: string; }
 
 interface NutritionTargets { kcal: number; protein: number; fats: number; carbs: number; }
 
@@ -37,7 +38,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const [parsedItems, setParsedItems] = useState<DiaryItem[]>([]);
   const [ocrError, setOcrError] = useState('');
   const [ocrFileLoading, setOcrFileLoading] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
   const [customMealInput, setCustomMealInput] = useState('');
   const [showCustomMeal, setShowCustomMeal] = useState(false);
   const [customMeals, setCustomMeals] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_custom_meals') || '[]'); } catch { return []; } });
@@ -56,8 +57,17 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     }, 800);
     return () => { cancelled = true; clearTimeout(timer); };
   }, []);
-  const [diaryData, setDiaryData] = useState<any>(() => { try { return JSON.parse(localStorage.getItem('nutrition_diary') || '{}'); } catch { return {}; } });
+  const [diaryData, setDiaryData] = useState<Record<string, any>>(() => readDiary());
   const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (typeof onDiaryStorageChange === 'function') {
+      const unsub = onDiaryStorageChange(() => setDiaryData(readDiary()));
+      return unsub;
+    }
+  }, []);
+
+  const saveDiary = (data: any) => { writeDiary(data); setDiaryData(data); setRefreshKey(k => k+1); onDiaryChange?.(); };
   const [showCustomFood, setShowCustomFood] = useState(false);
   const [customFoodName, setCustomFoodName] = useState('');
   const [customFoodKcal, setCustomFoodKcal] = useState('100');
@@ -69,6 +79,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const [copySource, setCopySource] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [mealPresets, setMealPresets] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_meal_presets') || '[]'); } catch { return []; } });
+  const [presetModal, setPresetModal] = useState<{ meal: string; name: string; items: any[] } | null>(null);
   // Bug 27: Food patterns & triggers
   const [foodPatterns, setFoodPatterns] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('he_food_patterns') || '{}'); } catch { return {}; } });
   const [foodTriggers, setFoodTriggers] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('he_food_triggers') || '{}'); } catch { return {}; } });
@@ -94,8 +105,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2000); };
   const safeSet = (key: string, data: any) => { try { localStorage.setItem(key, JSON.stringify(data)); } catch {} };
 
-  useEffect(() => { try { setDiaryData(JSON.parse(localStorage.getItem('nutrition_diary') || '{}')); } catch {} }, [refreshKey]);
-  const saveDiary = (data: any) => { safeSet('nutrition_diary', data); setDiaryData(data); setRefreshKey(k => k+1); onDiaryChange?.(); };
+  useEffect(() => { setDiaryData(readDiary()); }, [refreshKey]);
   const addCustomMeal = () => { const name = customMealInput.trim(); if (!name || customMeals.includes(name)) return; const updated = [...customMeals, name]; setCustomMeals(updated); safeSet('he_custom_meals', updated); setCustomMealInput(''); setShowCustomMeal(false); showToast('✅ Приём добавлен'); };
 
   const allMealTypes = [...MEAL_PRESETS, ...customMeals];
@@ -121,9 +131,16 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
   const handleBarcodeProduct = (product: OFFProduct) => { setShowBarcode(false); const item = productToFoodItem(product); setParsedItems(prev => [...prev, { name: item.name, kcal: item.kcal, p: item.protein, f: item.fat, c: item.carbs, qty: 100 }]); };
 
-  const handleOcrFileUpload = async (file: File) => { setOcrFileLoading(true); setOcrError(''); try { const result = await processUploadedFile(file); if (result.meals.length > 0) { const converted = result.meals.flatMap(m => m.items.map(item => ({ name: item.name || m.mealType || 'Блюдо', kcal: Math.round(item.kcal) || 0, p: Math.round((item.p || 0)*10)/10, f: Math.round((item.f || 0)*10)/10, c: Math.round((item.c || 0)*10)/10, qty: 100 }))); setParsedItems(prev => [...prev, ...converted]); } if (result.meals.length === 0 && result.labs.length === 0) setOcrError('Не удалось распознать данные питания.'); } catch (e) { setOcrError('Ошибка: ' + (e instanceof Error ? e.message : String(e))); } setOcrFileLoading(false); };
+  const convertOCRItems = (meals: { mealType: string; items: Array<{ name: string; qty: string; qtyGrams?: number; kcal: number; p: number; f: number; c: number; category?: string }> }[]) => meals.flatMap(m => m.items.map(item => {
+    const qtyMatch = item.qty?.match(/[\d]+(?:[.,]\d+)?/);
+    const parsedQty = qtyMatch ? Number.parseFloat(qtyMatch[0].replace(',', '.')) : 100;
+    const qty = Math.max(10, Math.round(item.qtyGrams ?? parsedQty));
+    return { name: item.name || m.mealType || 'Блюдо', kcal: Math.round(item.kcal) || 0, p: Math.round((item.p || 0) * 10) / 10, f: Math.round((item.f || 0) * 10) / 10, c: Math.round((item.c || 0) * 10) / 10, qty, category: item.category };
+  }));
 
-  const handleOCR = () => { if (!ocrText.trim()) return; setOcrError(''); try { let items = parseFatSecretText(ocrText); if (items.length === 0) items = parseNutritionScreenshot(ocrText); const converted = items.flatMap(m => m.items.map(item => ({ name: item.name || m.mealType || '', kcal: Math.round(item.kcal) || 0, p: Math.round((item.p || 0)*10)/10, f: Math.round((item.f || 0)*10)/10, c: Math.round((item.c || 0)*10)/10, qty: 100 }))); setParsedItems(converted); } catch (e) { setOcrError('' + (e instanceof Error ? e.message : String(e))); } };
+  const handleOcrFileUpload = async (file: File) => { setOcrFileLoading(true); setOcrError(''); try { const result = await processUploadedFile(file); if (result.meals.length > 0) setParsedItems(prev => [...prev, ...convertOCRItems(result.meals)]); if (result.meals.length === 0 && result.labs.length === 0) setOcrError(result.warnings[0] || 'Не удалось распознать данные питания.'); } catch (e) { setOcrError('Ошибка: ' + (e instanceof Error ? e.message : String(e))); } finally { setOcrFileLoading(false); } };
+
+  const handleOCR = () => { if (!ocrText.trim()) return; setOcrError(''); try { const converted = convertOCRItems(parseNutritionText(ocrText)); if (converted.length === 0) setOcrError('Не удалось найти продукты. Пример: «Курица 200 г» или «Курица 200 г 330 ккал Б:35 Ж:7 У:0».'); else setParsedItems(converted); } catch (e) { setOcrError('' + (e instanceof Error ? e.message : String(e))); } };
 
   const saveItemsToDiary = (items: DiaryItem[]) => {
     if (items.length === 0) return;
@@ -133,6 +150,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     if (!data[selectedDate].meals[mt]) data[selectedDate].meals[mt] = [];
     items.forEach(item => {
       const q = item.qty || 100;
+      if (q <= 0) return;
       data[selectedDate].meals[mt].push({
         name: item.name, qty: `${q} г`, kcal: Math.round(item.kcal * q / 100),
         p: Math.round((item.p * q / 100) * 10) / 10,
@@ -165,12 +183,13 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     const data = { ...diaryData };
     if (!data[selectedDate]?.meals?.[editItem.meal]) return;
     const item = data[selectedDate].meals[editItem.meal][editItem.idx];
-    const ratio = editQty / 100;
-    const origItem = FOOD_DB.find(f => f.name === item.name);
-    if (origItem) {
-      item.qty = `${editQty} г`; item.kcal = Math.round(origItem.kcal * ratio); item.p = Math.round(origItem.protein * ratio * 10) / 10;
-      item.f = Math.round(origItem.fat * ratio * 10) / 10; item.c = Math.round(origItem.carbs * ratio * 10) / 10;
-    } else { item.qty = `${editQty} г`; }
+    const savedQty = parseInt(item.qty) || 100;
+    const ratio = editQty / savedQty;
+    item.qty = `${editQty} г`;
+    item.kcal = Math.round(item.kcal * ratio);
+    item.p = Math.round(item.p * ratio * 10) / 10;
+    item.f = Math.round(item.f * ratio * 10) / 10;
+    item.c = Math.round(item.c * ratio * 10) / 10;
     saveDiary(data); setEditItem(null); showToast('✅ Количество обновлено');
   };
 
@@ -191,7 +210,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   };
 
   const weekStart = useMemo(() => { const d = new Date(selectedDate); const day = d.getDay(); d.setDate(d.getDate() - day + (day === 0 ? -6 : 1)); return d; }, [selectedDate]);
-  const weekDays = useMemo(() => Array.from({length:7}, (_,i) => { const d = new Date(weekStart); d.setDate(d.getDate()+i); return d.toISOString().split('T')[0]; }), [weekStart]);
+  const weekDays = useMemo(() => Array.from({length:7}, (_,i) => { const d = new Date(weekStart); d.setDate(d.getDate()+i); return formatDate(d); }), [weekStart]);
   const dayMeals = diaryData[selectedDate]?.meals || {};
 
   const dayTotals = useMemo(() => {
@@ -203,6 +222,14 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       const c = items.reduce((s: number, i: any) => s + (i.c || 0), 0);
       return { kcal, p, f, c };
     } catch { return { kcal:0, p:0, f:0, c:0 }; }
+  }, [dayMeals, diaryData, refreshKey]);
+
+  const mealQuality = useMemo(() => {
+    try {
+      const items = Object.values(dayMeals).flat() as any[];
+      if (items.length === 0) return null;
+      return calcMealQuality(items);
+    } catch { return null; }
   }, [dayMeals, refreshKey]);
 
   return (
@@ -212,11 +239,11 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       <div style={{ padding:12, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ display:'flex', gap:2, marginBottom:6 }}>
           {weekDays.map((ds, i) => {
-            const isToday = ds === new Date().toISOString().split('T')[0];
+             const isToday = ds === formatDate(new Date());
             const isSelected = ds === selectedDate;
             const hasData = !!diaryData[ds];
-            return (
-              <div key={i} onClick={() => setSelectedDate(ds)} style={{
+             return (
+               <div key={i} onClick={() => setSelectedDate(ds)} role="button" tabIndex={0} aria-label={`День ${ds}`} style={{
                 flex:1, display:'flex', flexDirection:'column', alignItems:'center', padding:'6px 0', borderRadius:12, cursor:'pointer',
                 background: isSelected ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'transparent',
                 color: isSelected ? '#000' : 'rgba(255,255,255,0.6)', fontWeight: isSelected ? 800 : 500,
@@ -233,15 +260,15 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:8, background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', fontSize:9, color:'#8b5cf6' }}>
             <span>📋 Вставить «{copySource}» →</span>
             <div style={{ display:'flex', gap:4 }}>
-              <button onClick={() => pasteMeal(selectedDate)} style={{ padding:'3px 8px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(139,92,246,0.2)', color:'#8b5cf6', fontSize:8, fontWeight:600 }}>Сюда</button>
-              <button onClick={() => setCopySource(null)} style={{ padding:'3px 8px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.85)', fontSize:8 }}>✕</button>
+              <button onClick={() => pasteMeal(selectedDate)} aria-label="Вставить приём" style={{ padding:'3px 8px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(139,92,246,0.2)', color:'#8b5cf6', fontSize:8, fontWeight:600 }}>Сюда</button>
+              <button onClick={() => setCopySource(null)} aria-label="Отменить копирование" style={{ padding:'3px 8px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.85)', fontSize:8 }}>✕</button>
             </div>
           </div>
         )}
       </div>
 
       <div style={{ display:'flex', gap:3, padding:'2px 0' }}>
-        {(['add','day'] as const).map(t => <button key={t} onClick={() => setTab(t)} style={{
+        {(['add','day'] as const).map(t => <button key={t} onClick={() => setTab(t)} aria-label={t === 'add' ? 'Вкладка Добавить' : 'Вкладка День'} style={{
           flex:1, padding:'7px', borderRadius:10, cursor:'pointer', fontSize:10, fontWeight: tab===t ? 800 : 500,
           border: tab===t ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
           background: tab===t ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
@@ -278,14 +305,11 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       {tab === 'add' && (
         <>
           <div style={{ padding:14, borderRadius:18, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', boxShadow:'0 2px 12px rgba(0,0,0,0.15)' }}>
-            <input type="text" value={foodSearch} onChange={e => setFoodSearch(e.target.value)}
-              placeholder="🔍 Поиск продуктов (начните печатать...)"
-              autoFocus
-              style={{ width:'100%', padding:'10px 12px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:12, boxSizing:'border-box', marginBottom:8, outline:'none' }} />
+             <input type="text" value={foodSearch} onChange={e => setFoodSearch(e.target.value)} aria-label="Поиск продуктов" placeholder="🔍 Поиск продуктов (начните печатать...)" autoFocus style={{ width:'100%', padding:'10px 12px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:12, boxSizing:'border-box', marginBottom:8, outline:'none' }} />
             {foodSearchResults.length > 0 && (
               <div style={{ maxHeight:220, overflowY:'auto', marginBottom:6, borderRadius:8 }}>
                 {foodSearchResults.map(f => (
-                  <div key={f.id} onClick={() => addFoodFromDB(f)} style={{
+                  <div key={f.id} onClick={() => addFoodFromDB(f)} role="button" aria-label={`Добавить ${f.name}`} style={{
                     padding:'6px 10px', cursor:'pointer', fontSize:10, borderBottom:'1px solid rgba(255,255,255,0.06)',
                     display:'flex', justifyContent:'space-between', alignItems:'center', color:'#fff', borderRadius:6,
                   }}>
@@ -303,16 +327,16 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 ))}
               </div>
             )}
-            <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginBottom:4 }}>
-              {allMealTypes.slice(0, 8).map(mt => (
-                <button key={mt} onClick={() => setMealType(mealType === mt ? '' : mt)} style={{
+            <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginBottom:4, overflowX:'auto', maxWidth:'100%' }}>
+              {allMealTypes.map(mt => (
+                <button key={mt} onClick={() => setMealType(mealType === mt ? '' : mt)} aria-label={`Приём: ${mt}`} style={{
                   padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer',
                   background: mealType === mt ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
                   border: mealType === mt ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
                   color: mealType === mt ? '#000' : 'rgba(255,255,255,0.7)', fontWeight: mealType === mt ? 800 : 500,
                 }}>{mt}</button>
               ))}
-              <button onClick={() => setShowCustomMeal(!showCustomMeal)} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6' }}>+</button>
+              <button onClick={() => setShowCustomMeal(!showCustomMeal)} aria-label="Добавить приём" style={{ padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6' }}>+</button>
             </div>
             {showCustomMeal && <div style={{ display:'flex', gap:4, marginBottom:6 }}>
               <input value={customMealInput} onChange={e => setCustomMealInput(e.target.value)} placeholder="Название приёма..." style={{ flex:1, padding:'6px', borderRadius:6, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9 }} />
@@ -350,8 +374,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             <div style={{ padding:'10px 14px', borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>⭐ Избранное</div>
               <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                {favoriteFoods.slice(0,8).map(f => (
-                  <button key={f.id} onClick={() => addFoodFromDB(f)} style={{ padding:'4px 10px', borderRadius:8, fontSize:8, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', whiteSpace:'nowrap' }}>
+                 {favoriteFoods.slice(0,8).map(f => (
+                   <button key={f.id} onClick={() => addFoodFromDB(f)} aria-label={`Добавить ${f.name}`} style={{ padding:'4px 10px', borderRadius:8, fontSize:8, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', whiteSpace:'nowrap' }}>
                     {CAT_MAP_EMOJI[f.category] || ''} {f.name.slice(0,14)}
                   </button>
                 ))}
@@ -361,9 +385,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
           <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
             <button onClick={() => setShowBarcode(!showBarcode)} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background: showBarcode ? 'rgba(0,230,138,0.15)' : '#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', minWidth:80 }}>📱 Штрих-код</button>
-            <button onClick={() => ocrFileRef.current?.click()} disabled={ocrFileLoading} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', opacity: ocrFileLoading ? 0.5 : 1, minWidth:80 }}>{ocrFileLoading ? '⏳' : '📁 Файл'}</button>
-            <button onClick={() => ocrCameraRef.current?.click()} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', minWidth:80 }}>📸 Скан</button>
-            <button onClick={() => setShowOCR(!showOCR)} style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background: showOCR ? 'rgba(0,230,138,0.15)' : '#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', minWidth:80 }}>📋 OCR</button>
+            <button onClick={() => ocrFileRef.current?.click()} disabled={ocrFileLoading} aria-label="Загрузить файл" style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', opacity: ocrFileLoading ? 0.5 : 1, minWidth:80 }}>{ocrFileLoading ? '⏳' : '📁 Файл'}</button>
+            <button onClick={() => ocrCameraRef.current?.click()} aria-label="Сканировать камерой" style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', minWidth:80 }}>📸 Скан</button>
+            <button onClick={() => setShowOCR(!showOCR)} aria-label="Вставить текст OCR" style={{ flex:1, padding:'7px 10px', borderRadius:8, fontSize:9, cursor:'pointer', background: showOCR ? 'rgba(0,230,138,0.15)' : '#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', minWidth:80 }}>📋 OCR</button>
           </div>
           <input ref={ocrFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display:'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleOcrFileUpload(f); }} />
           <input ref={ocrCameraRef} type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleOcrFileUpload(f); }} />
@@ -373,11 +397,11 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
                 <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)' }}>Вставьте текст из FatSecret / MyFitnessPal:</div>
-                <button onClick={() => { setShowOCR(false); setOcrText(''); }} style={{ padding:'2px 6px', borderRadius:4, cursor:'pointer', border:'none', background:'rgba(239,68,68,0.1)', color:'#ef4444', fontSize:8 }}>✕</button>
+                <button onClick={() => { setShowOCR(false); setOcrText(''); }} aria-label="Закрыть OCR" style={{ padding:'2px 6px', borderRadius:4, cursor:'pointer', border:'none', background:'rgba(239,68,68,0.1)', color:'#ef4444', fontSize:8 }}>✕</button>
               </div>
-              <textarea value={ocrText} onChange={e => setOcrText(e.target.value)} placeholder="Название 100г 250 ккал Б:15 Ж:10 У:20 ..."
+              <textarea aria-label="Текст для распознавания" value={ocrText} onChange={e => setOcrText(e.target.value)} placeholder="Название 100г 250 ккал Б:15 Ж:10 У:20 ..."
                 style={{ width:'100%', minHeight:70, padding:8, borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', fontSize:11, resize:'vertical', boxSizing:'border-box', marginBottom:6 }} />
-              <button onClick={handleOCR} style={{ padding:'7px 14px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:600, fontSize:10, cursor:'pointer' }}>Распознать</button>
+              <button aria-label="Распознать текст" onClick={handleOCR} style={{ padding:'7px 14px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:600, fontSize:10, cursor:'pointer' }}>Распознать</button>
               {ocrError && <div style={{ color:'#ef4444', fontSize:9, marginTop:4 }}>{ocrError}</div>}
             </div>
           )}
@@ -398,18 +422,18 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 <div key={i} style={{ padding:'6px 10px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', marginBottom:4 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
                     <span style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{item.name}</span>
-                    <button onClick={() => setParsedItems(prev => prev.filter((_,j) => j !== i))} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:9 }}>✕</button>
+                     <button onClick={() => setParsedItems(prev => prev.filter((_,j) => j !== i))} aria-label="Удалить продукт" style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:9 }}>✕</button>
                   </div>
                   <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:3, background:'#18181b', borderRadius:8, padding:'2px 4px' }}>
-                      <button onClick={() => setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: Math.max(10, (x.qty||100) - 10)} : x))} style={{ width:24, height:24, borderRadius:6, border:'none', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
-                      <input type="number" value={q} onChange={e => { const v = +e.target.value || 0; setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: v} : x)); }}
+                      <button onClick={() => setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: Math.max(10, (x.qty||100) - 10)} : x))} aria-label="Уменьшить количество" style={{ width:24, height:24, borderRadius:6, border:'none', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
+                       <input type="number" value={q} onChange={e => { const raw = parseFloat(e.target.value); const v = Number.isFinite(raw) && raw >= 10 ? Math.round(raw) : 10; setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: v} : x)); }}
                         style={{ width:50, padding:'4px 2px', borderRadius:4, background:'transparent', border:'none', color:'#fff', fontSize:13, fontWeight:700, textAlign:'center', outline:'none' }} />
-                      <button onClick={() => setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: Math.min(1000, (x.qty||100) + 10)} : x))} style={{ width:24, height:24, borderRadius:6, border:'none', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+                      <button onClick={() => setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: Math.min(1000, (x.qty||100) + 10)} : x))} aria-label="Увеличить количество" style={{ width:24, height:24, borderRadius:6, border:'none', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
                     </div>
                     <span style={{ fontSize:9, color:'rgba(255,255,255,0.85)' }}>г</span>
                     <div style={{ display:'flex', gap:3, marginLeft:'auto' }}>
-                      {[50,100,200,300].map(v => <button key={v} onClick={() => setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: v} : x))} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.06)', background: q===v ? 'rgba(0,230,138,0.12)' : '#18181b', color: q===v ? '#00e68a' : 'rgba(255,255,255,0.7)', cursor:'pointer', fontSize:8, fontWeight: q===v ? 700 : 400 }}>{v}г</button>)}
+                       {[50,100,200,300].map(v => <button key={v} onClick={() => setParsedItems(prev => prev.map((x,j) => j===i ? {...x, qty: v} : x))} aria-label={`${v} грамм`} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.06)', background: q===v ? 'rgba(0,230,138,0.12)' : '#18181b', color: q===v ? '#00e68a' : 'rgba(255,255,255,0.7)', cursor:'pointer', fontSize:8, fontWeight: q===v ? 700 : 400 }}>{v}г</button>)}
                     </div>
                   </div>
                   <div style={{ display:'flex', gap:8, marginTop:4, fontSize:8 }}>
@@ -420,7 +444,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                   </div>
                 </div>);
               })}
-              <button onClick={() => saveItemsToDiary(parsedItems)} style={{ width:'100%', marginTop:6, padding:'10px 0', borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:11, boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>💾 Сохранить {parsedItems.length} позиций</button>
+              <button onClick={() => saveItemsToDiary(parsedItems)} aria-label="Сохранить продукты" style={{ width:'100%', marginTop:6, padding:'10px 0', borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:11, boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>💾 Сохранить {parsedItems.length} позиций</button>
             </div>
           )}
         </>
@@ -429,13 +453,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       {tab === 'day' && (
         <>
           {/* Quality score card */}
-          {(function() {
-            try {
-              const items = Object.values(dayMeals).flat() as any[];
-              if (items.length === 0) return null;
-              const q = calcMealQuality(items);
-              const ql = getQualityLabel(q.total);
-              return (
+          {mealQuality && (() => {
+            const q = mealQuality;
+            const ql = getQualityLabel(q.total);
+            return (
                 <div style={{ padding:'8px 12px', borderRadius:12, background:'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.04)', marginBottom:4 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                     <span style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{ql.emoji} Качество рациона</span>
@@ -454,15 +475,14 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                   )}
                 </div>
               );
-            } catch { return null; }
-          })()}
+            })()}
 
           <div style={{ padding:14, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
                 <div style={{ fontSize:12, fontWeight:600, color:'#fff' }}>📋 {selectedDate}</div>
                 <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                   {Object.keys(dayMeals).length > 0 && (
-                    <button onClick={clearDay} style={{ padding:'4px 10px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.15)', color:'#ef4444', fontSize:8, fontWeight:600 }}>✕ Очистить</button>
+                     <button onClick={clearDay} aria-label="Очистить день" style={{ padding:'4px 10px', borderRadius:6, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.15)', color:'#ef4444', fontSize:8, fontWeight:600 }}>✕ Очистить</button>
                   )}
                   <button onClick={() => {
                     try {
@@ -483,7 +503,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                       saveDiary(data);
                       showToast('✅ Импортировано из плана');
                     } catch { showToast('❌ Ошибка импорта плана'); }
-                  }} style={{ padding:'4px 10px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.08)', color:'#00e68a', fontSize:8, fontWeight:600 }}>📥 Из плана</button>
+                  }} aria-label="Импортировать из плана" style={{ padding:'4px 10px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.08)', color:'#00e68a', fontSize:8, fontWeight:600 }}>📥 Из плана</button>
                   <span style={{ fontSize:9, color:'rgba(255,255,255,0.85)' }}>{Object.keys(dayMeals).length} приёмов</span>
                 </div>
               </div>
@@ -695,8 +715,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:8, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.15)', marginBottom:3 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                       <span style={{ fontWeight:600, fontSize:10, color:'#00e68a' }}>{meal}</span>
-                      <button onClick={() => copyMeal(meal)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(139,92,246,0.15)', color:'#8b5cf6', fontSize:7 }} title="Копировать">📋</button>
-                      <button onClick={() => { let name = ''; try { name = prompt('Название пресета:', meal) || ''; } catch { name = meal + ' (пресет)'; } if (name) { const preset = { name, items: items.map((i: any) => ({ name: i.name, kcal: i.kcal, p: i.p, f: i.f, c: i.c })) }; const upd = [...mealPresets, preset]; setMealPresets(upd); safeSet('he_meal_presets', upd); } }} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(0,230,138,0.15)', color:'#00e68a', fontSize:7 }} title="Сохранить как пресет">💾</button>
+                      <button onClick={() => copyMeal(meal)} aria-label="Копировать приём" style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(139,92,246,0.15)', color:'#8b5cf6', fontSize:7 }} title="Копировать">📋</button>
+                      <button onClick={() => setPresetModal({ meal, name: meal, items: items.map((i: any) => ({ name: i.name, kcal: i.kcal, p: i.p, f: i.f, c: i.c })) })} aria-label="Сохранить как пресет" style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(0,230,138,0.15)', color:'#00e68a', fontSize:7 }} title="Сохранить как пресет">💾</button>
                     </div>
                     <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:8 }}>
                       <span style={{ color:'rgba(255,255,255,0.85)' }}>Б{Math.round(mealP)} Ж{Math.round(mealF)} У{Math.round(mealC)}</span>
@@ -711,8 +731,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                       </div>
                       <div style={{ display:'flex', alignItems:'center', gap:3 }}>
                         <span style={{ fontSize:8, color:'rgba(255,255,255,0.35)' }}>{Math.round(item.kcal||0)} Б{item.p||0} Ж{item.f||0} У{item.c||0}</span>
-                        <button onClick={() => openEdit(meal, idx, item)} style={{ padding:'2px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(59,130,246,0.15)', color:'#3b82f6', fontSize:8, lineHeight:1 }} title="Изменить количество">✎</button>
-                        <button onClick={() => deleteItem(meal, idx)} style={{ padding:'2px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.15)', color:'#ef4444', fontSize:8, lineHeight:1 }}>✕</button>
+                        <button onClick={() => openEdit(meal, idx, item)} aria-label="Изменить количество" style={{ padding:'2px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(59,130,246,0.15)', color:'#3b82f6', fontSize:8, lineHeight:1 }} title="Изменить количество">✎</button>
+                        <button onClick={() => deleteItem(meal, idx)} aria-label="Удалить продукт" style={{ padding:'2px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.15)', color:'#ef4444', fontSize:8, lineHeight:1 }}>✕</button>
                       </div>
                     </div>
                   ))}
@@ -731,18 +751,33 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
                   <button onClick={() => setEditQty(Math.max(10, editQty - 10))} style={{ width:40, height:40, borderRadius:12, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', cursor:'pointer', fontSize:18, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s' }}>−</button>
                   <div style={{ flex:1, textAlign:'center' }}>
-                    <input type="number" value={editQty} onChange={e => setEditQty(+e.target.value || 0)} style={{ width:80, padding:'8px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:20, fontWeight:700, textAlign:'center', outline:'none' }} />
+                    <input type="number" value={editQty} onChange={e => { const raw = parseFloat(e.target.value); setEditQty(Number.isFinite(raw) && raw >= 10 ? Math.round(raw) : 10); }} style={{ width:80, padding:'8px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:20, fontWeight:700, textAlign:'center', outline:'none' }} />
                     <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)', marginTop:4, letterSpacing:0.5 }}>грамм</div>
                   </div>
-                  <button onClick={() => setEditQty(Math.min(1000, editQty + 10))} style={{ width:40, height:40, borderRadius:12, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', cursor:'pointer', fontSize:18, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s' }}>+</button>
+                   <button onClick={() => setEditQty(Math.min(1000, editQty + 10))} aria-label="Увеличить количество" style={{ width:40, height:40, borderRadius:12, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', cursor:'pointer', fontSize:18, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s' }}>+</button>
                 </div>
                 <div style={{ display:'flex', gap:5, justifyContent:'center', marginBottom:10 }}>
-                  {[50,100,150,200,300].map(v => <button key={v} onClick={() => setEditQty(v)} style={{ padding:'4px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', background: editQty===v ? 'rgba(0,230,138,0.15)' : '#202023', color: editQty===v ? '#00e68a' : 'rgba(255,255,255,0.8)', cursor:'pointer', fontSize:9, fontWeight: editQty===v ? 600 : 400, transition:'all 0.15s' }}>{v}г</button>)}
+                   {[50,100,150,200,300].map(v => <button key={v} onClick={() => setEditQty(v)} aria-label={`${v} грамм`} style={{ padding:'4px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', background: editQty===v ? 'rgba(0,230,138,0.15)' : '#202023', color: editQty===v ? '#00e68a' : 'rgba(255,255,255,0.8)', cursor:'pointer', fontSize:9, fontWeight: editQty===v ? 600 : 400, transition:'all 0.15s' }}>{v}г</button>)}
                 </div>
                 <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:12, textAlign:'center', letterSpacing:'-0.1px' }}>
                   → <span style={{ color:'#00e68a', fontWeight:700 }}>{Math.round(editQty * (editItem.item.kcal || 0) / 100)} ккал</span> · <span style={{ color:'#60a5fa' }}>{Math.round(((editItem.item.p||0) * editQty / 100) * 10)/10}г Б</span> · <span style={{ color:'#fbbf24' }}>{Math.round(((editItem.item.f||0) * editQty / 100) * 10)/10}г Ж</span> · <span style={{ color:'#fb923c' }}>{Math.round(((editItem.item.c||0) * editQty / 100) * 10)/10}г У</span>
                 </div>
-                <button onClick={saveEdit} style={{ width:'100%', padding:'10px', borderRadius:12, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:12, boxShadow:'0 4px 20px rgba(0,230,138,0.2)', letterSpacing:'-0.1px' }}>✓ Сохранить</button>
+                <button onClick={saveEdit} aria-label="Сохранить изменения" style={{ width:'100%', padding:'10px', borderRadius:12, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, fontSize:12, boxShadow:'0 4px 20px rgba(0,230,138,0.2)', letterSpacing:'-0.1px' }}>✓ Сохранить</button>
+              </div>
+            </div>
+          )}
+          {presetModal && (
+            <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', alignItems:'flex-end', justifyContent:'center', background:'rgba(0,0,0,0.7)' }}
+              onClick={() => setPresetModal(null)}>
+              <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:400, padding:'14px 20px 28px', borderRadius:'20px 20px 0 0', background:'#18181b', boxShadow:'0 -4px 30px rgba(0,0,0,0.4)', border:'1px solid rgba(255,255,255,0.06)', borderBottom:'none' }}>
+                <div style={{ width:36, height:4, borderRadius:2, background:'rgba(255,255,255,0.15)', margin:'0 auto 16px' }} />
+                <div style={{ fontSize:15, fontWeight:700, color:'#fff', marginBottom:2, letterSpacing:-0.3 }}>💾 Сохранить как пресет</div>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:12 }}>Приём: {presetModal.meal}</div>
+                <input value={presetModal.name} onChange={e => setPresetModal({...presetModal, name: e.target.value})} autoFocus style={{ width:'100%', padding:'10px 14px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:13, boxSizing:'border-box', marginBottom:12, outline:'none' }} />
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={() => setPresetModal(null)} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'rgba(255,255,255,0.7)', fontSize:11, fontWeight:600 }}>✕ Отмена</button>
+                  <button onClick={() => { if (presetModal.name.trim()) { const preset = { name: presetModal.name.trim(), items: presetModal.items }; const upd = [...mealPresets, preset]; setMealPresets(upd); safeSet('he_meal_presets', upd); } setPresetModal(null); }} style={{ flex:1, padding:'10px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:11, fontWeight:700 }}>✓ Сохранить</button>
+                </div>
               </div>
             </div>
           )}

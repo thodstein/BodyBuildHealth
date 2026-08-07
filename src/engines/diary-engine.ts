@@ -8,6 +8,9 @@
  * @module diary-engine
  */
 
+import { epley1RM } from './e1rm';
+import { formatDate } from '../core/utils/date-utils';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════════════════════════════════════
@@ -72,8 +75,11 @@ export interface AutoInsight {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function createSession(session: Partial<DiarySession>): DiarySession {
+  const uid = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   return {
-    sessionId: session.sessionId || crypto.randomUUID ? crypto.randomUUID() : `sess-${Date.now()}`,
+    sessionId: session.sessionId || uid,
     date: session.date || new Date().toISOString().slice(0, 10),
     focus: session.focus || 'fullbody',
     durationMin: session.durationMin || 0,
@@ -88,8 +94,11 @@ export function createSession(session: Partial<DiarySession>): DiarySession {
 }
 
 export function createSet(set: Partial<DiarySet>): DiarySet {
+  const uid = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   return {
-    setId: set.setId || crypto.randomUUID ? crypto.randomUUID() : `set-${Date.now()}`,
+    setId: set.setId || uid,
     sessionId: set.sessionId || '',
     exerciseId: set.exerciseId || '',
     exerciseName: set.exerciseName || '',
@@ -124,9 +133,10 @@ export function buildHistoryContext(
   const lastErrors: Record<string, number> = {};
 
   // Sort by date for time-series analysis
+  const sessionMap = new Map(sessions.map(s => [s.sessionId, s]));
   const sortedSets = [...sets].sort((a, b) => {
-    const sessA = sessions.find(s => s.sessionId === a.sessionId);
-    const sessB = sessions.find(s => s.sessionId === b.sessionId);
+    const sessA = sessionMap.get(a.sessionId);
+    const sessB = sessionMap.get(b.sessionId);
     return (sessA?.date || '').localeCompare(sessB?.date || '');
   });
 
@@ -137,9 +147,9 @@ export function buildHistoryContext(
     lastRPES[set.exerciseId] = set.actualRPE;
 
     // Epley 1RM
-    const estRM = set.actualWeight * (1 + set.actualReps / 30);
+    const estRM = epley1RM(set.actualWeight, set.actualReps);
     if (!last1RMs[set.exerciseId] || estRM > last1RMs[set.exerciseId]) {
-      last1RMs[set.exerciseId] = Math.round(estRM);
+      last1RMs[set.exerciseId] = estRM;
     }
 
     for (const err of set.errors) {
@@ -154,7 +164,7 @@ export function buildHistoryContext(
   const cutoff = oneWeekAgo.toISOString().slice(0, 10);
 
   for (const set of sortedSets) {
-    const sess = sessions.find(s => s.sessionId === set.sessionId);
+    const sess = sessionMap.get(set.sessionId);
     if (sess && sess.date >= cutoff) {
       weeklyVolume += set.actualReps * set.actualWeight;
     }
@@ -168,6 +178,12 @@ export function buildHistoryContext(
 
   for (let i = 0; i < sortedSessions.length; i++) {
     if (sortedSessions[i].completed) {
+      if (i > 0) {
+        const prev = new Date(sortedSessions[i-1].date);
+        const curr = new Date(sortedSessions[i].date);
+        const diffDays = (curr.getTime() - prev.getTime()) / 86400000;
+        if (diffDays > 1.5) streak = 0;
+      }
       streak++;
       if (streak > bestStreak) bestStreak = streak;
     } else {
@@ -175,6 +191,14 @@ export function buildHistoryContext(
     }
   }
   currentStreak = streak;
+  if (currentStreak > 0 && sortedSessions.length > 0) {
+    const last = [...sortedSessions].reverse().find(s => s.completed);
+    if (last) {
+      const today = formatDate(new Date());
+      const yesterday = formatDate(new Date(Date.now() - 86400000));
+      if (last.date !== today && last.date !== yesterday) currentStreak = 0;
+    }
+  }
 
   return {
     lastWeights,

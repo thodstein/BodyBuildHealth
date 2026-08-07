@@ -41,7 +41,10 @@ export function detectProvider(text: string): ParsedLabResult['provider'] {
 export function parseLabText(text: string): ParsedLabResult[] {
   const results: ParsedLabResult[] = [];
   const provider = detectProvider(text);
-  const lines = text.replace(/\r\n/g, '\n').split('\n').map((l) => l.trim()).filter(Boolean);
+  const lines = text.replace(/\r\n/g, '\n')
+    .replace(/[\u00a0\u2007\u202f]/g, ' ')
+    .replace(/[‐‑‒–—]/g, '-')
+    .split('\n').map((l) => l.trim()).filter(Boolean);
 
   const seenMarkers = new Set<string>();
 
@@ -85,8 +88,8 @@ export function parseLabText(text: string): ParsedLabResult[] {
         refHigh = match[5];
       }
 
-      const value = parseFloat(valStr.replace(',', '.'));
-      const marker = resolveLabMarker(markerRaw);
+       const value = parseFloat(valStr.replace(',', '.'));
+       const marker = resolveLabMarker(markerRaw.replace(/[|¦]/g, ' '));
       if (!marker || Number.isNaN(value) || value <= 0) continue;
       if (seenMarkers.has(marker)) continue;
       seenMarkers.add(marker);
@@ -139,8 +142,8 @@ export function parseLabText(text: string): ParsedLabResult[] {
         if (pat === LINE_PATTERNS[0] || pat === LINE_PATTERNS[2]) {
           markerRaw = m[1]; valStr = m[2]; u = m[3];
         } else { continue; }
-        const value = parseFloat(valStr.replace(',', '.'));
-        const marker = resolveLabMarker(markerRaw);
+         const value = parseFloat(valStr.replace(',', '.'));
+         const marker = resolveLabMarker(markerRaw.replace(/[|¦]/g, ' '));
         if (!marker || Number.isNaN(value) || value <= 0) continue;
         if (seenMarkers.has(marker)) continue;
         seenMarkers.add(marker);

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { PHARMA_DB, getPharmaDetail } from '../../../core/pharma-database';
 import { db } from '../../../core/db';
 import { PHARMA_DETAILS, type PharmaDetail } from '../../../data/support-category-data';
@@ -416,7 +416,13 @@ export const CatalogTab: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterClass, setFilterClass] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [collapsedClasses, setCollapsedClasses] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 200);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   const pharmaSubstances = useMemo(() => {
     return Object.values(PHARMA_DB).filter(s => 
@@ -434,22 +440,22 @@ export const CatalogTab: React.FC = () => {
   }, [pharmaSubstances]);
 
   const filteredList = useMemo(() => {
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
       return pharmaSubstances.filter(s => (s.name||'').toLowerCase().includes(q) || (s.id||'').toLowerCase().includes(q) || (s.class && s.class.toLowerCase().includes(q)));
     }
     if (filterClass === 'all') return pharmaSubstances;
     return pharmaSubstances.filter(s => s.class === filterClass);
-  }, [filterClass, searchQuery, pharmaSubstances]);
+  }, [filterClass, debouncedSearch, pharmaSubstances]);
 
   const toggleClass = (cls: string) => {
     setCollapsedClasses(prev => ({ ...prev, [cls]: !prev[cls] }));
   };
 
   const filteredGrouped = useMemo(() => {
-    if (filterClass !== 'all' || searchQuery) return null;
+    if (filterClass !== 'all' || debouncedSearch) return null;
     return groupedByClass;
-  }, [filterClass, searchQuery, groupedByClass]);
+  }, [filterClass, debouncedSearch, groupedByClass]);
 
   const selected = useMemo(() => selectedId ? getPharmaDetail(selectedId) : null, [selectedId]);
   const detail = useMemo(() => selectedId ? (PHARMA_DETAILS as Record<string, PharmaDetail>)[selectedId] : undefined, [selectedId]);
@@ -560,7 +566,7 @@ export const CatalogTab: React.FC = () => {
       )}
       {filteredList.length === 0 && (
         <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>
-          {searchQuery ? 'Ничего не найдено' : ''}
+          {debouncedSearch ? 'Ничего не найдено' : ''}
         </div>
       )}
 

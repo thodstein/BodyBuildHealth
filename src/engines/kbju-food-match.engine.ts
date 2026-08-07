@@ -140,7 +140,7 @@ export function calcKbjuMatchScore(food: FoodItem, target: KbjuTarget, currentKb
     : target;
 
   const per100 = { kcal: food.kcal, protein: food.protein, fat: food.fat, carbs: food.carbs };
-  const totalGap = remaining.protein + remaining.fat + remaining.carbs;
+  const totalGap = remaining.protein + remaining.fat + remaining.carbs || 1;
 
   // Calculate macro COMPOSITION match (%, not absolute grams) — compare food profile to gap profile
   const foodMacroSum = food.protein + food.fat + food.carbs || 1;
@@ -170,17 +170,17 @@ export function calcKbjuMatchScore(food: FoodItem, target: KbjuTarget, currentKb
     const pWeight = remaining.protein / totalGap;
     const fWeight = remaining.fat / totalGap;
     const cWeight = remaining.carbs / totalGap;
-    macroScore = Math.round((proteinFill * pWeight + fatFill * fWeight + carbsFill * cWeight) * 50);
+    macroScore = Math.round((proteinFill * pWeight + fatFill * fWeight + carbsFill * cWeight) * 40);
     if (primaryGapMatch) macroScore += 10;
   }
 
   // Kcal efficiency: how many kcal does it cost to fill macros?
   const macroPerKcal = (food.protein + food.fat + food.carbs) / Math.max(1, food.kcal);
-  const kcalScore = Math.round(Math.min(20, macroPerKcal * 25));
+  const kcalScore = Math.round(Math.min(25, macroPerKcal * 25));
 
   // Quality bonus
   const bbQ = food.bb_quality_score || calcBBQualityScore(food);
-  const qualityBonus = Math.round(Math.min(20, bbQ * 2));
+  const qualityBonus = Math.round(Math.min(25, bbQ * 2));
 
   const score = Math.min(100, macroScore + kcalScore + qualityBonus);
 

@@ -94,7 +94,7 @@ describe('computePeriodDelta', () => {
     expect(computePeriodDelta('sleep', [sleepEntry(dayOffset(0), 7), sleepEntry(dayOffset(-1), 6)])).toBeNull();
   });
 
-  it('считает положительный тренд для веса', () => {
+  it('считает положительный тренд для веса (нейтральный — динамика)', () => {
     const entries = [
       weightEntry(dayOffset(-7), 80),
       weightEntry(dayOffset(-6), 80.5),
@@ -103,7 +103,7 @@ describe('computePeriodDelta', () => {
     ];
     const r = computePeriodDelta('weight', entries);
     expect(r).not.toBeNull();
-    expect(r!.color).toBe('#22c55e');
+    expect(r!.color).toBe('#60a5fa');
     expect(r!.delta).toBeGreaterThan(0);
   });
 

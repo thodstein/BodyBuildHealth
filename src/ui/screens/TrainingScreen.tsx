@@ -247,6 +247,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   // Auto-regenerate when days/sparse
   const loadDiaryStats = async () => {
     try {
+      await diary.archiveSessionsToIDB();
       const progress = await diary.getWeeklyProgress();
       setDiaryProgress(progress);
       const compoundIds = EXERCISE_CATALOG.filter(e => e.type === 'compound').slice(0, 10).map(e => e.id);

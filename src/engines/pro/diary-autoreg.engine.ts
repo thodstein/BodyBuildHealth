@@ -88,24 +88,32 @@ interface FactEntry {
 
 /** Найти последнюю (по дате) StrengthLogEntry по имени упражнения во всех WorkoutLog. */
 function findLastFact(historyWorkouts: WorkoutLog[], exerciseName: string): FactEntry | null {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 90);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
   let best: FactEntry | null = null;
   for (const wl of historyWorkouts) {
     for (const ex of wl.exercises) {
       if (nameMatch(ex.exerciseName, exerciseName)) {
+        const date = ex.date || wl.date;
+        if (date < cutoffStr) continue;
         const sets = ex.sets || [];
         if (sets.length === 0) continue;
+        // P1-10: выбрать сет с наивысшим e1RM, но с RPE > 0 если возможно
         let bestSet = sets[0];
         let bestE1RM = epley1RM(bestSet.weight, bestSet.reps);
         for (const set of sets.slice(1)) {
           const candidateE1RM = epley1RM(set.weight, set.reps);
-          if (candidateE1RM > bestE1RM) {
-            bestSet = set;
-            bestE1RM = candidateE1RM;
+          const hasRpe = (set.rpe || 0) > 0;
+          const currentHasRpe = (bestSet.rpe || 0) > 0;
+          if (hasRpe && !currentHasRpe) {
+            bestSet = set; bestE1RM = candidateE1RM;
+          } else if (candidateE1RM > bestE1RM) {
+            bestSet = set; bestE1RM = candidateE1RM;
           }
         }
         const e1RM = ex.estimated1RM || bestE1RM;
-        const date = ex.date || wl.date;
-        if (!best || date > best.date) {
+        if (!best || e1RM > best.e1RM) {
           best = { entry: ex, lastSet: { weight: bestSet.weight, reps: bestSet.reps, rpe: bestSet.rpe, rir: bestSet.rir }, e1RM, date };
         }
       }

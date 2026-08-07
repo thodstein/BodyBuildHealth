@@ -10,13 +10,23 @@ import { estimate1RM } from '../../../engines/progression.engine';
 import { calcSessionMetrics, calcSessionTimeMinutes, type SRExercise, type SRSessionMetrics } from '../../../engines/lms/lms-metrics.engine';
 import type { WorkoutSession } from '../../../engines/workout-logger.engine';
 import type { PlayerExercise } from './SessionPlayer';
+import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 
-const COMPOUND = /присед|тяга|жим|squat|deadlift|bench|press|row|pullup|подтяг|отжиман|выпад|lunge|squat|press/i;
-const ISOLATION = /сгибан|разгибан|мах|curl|extension|fly|raise|икронож|calf|shrug|тяга к|wrist|предплеч/i;
+function exerciseType(name: string): 'compound' | 'isolation' | 'unknown' {
+  const cat = EXERCISE_CATALOG.find(e => e.id === name || e.name === name);
+  if (cat) return cat.type === 'compound' ? 'compound' : 'isolation';
+  const n = (name || '').toLowerCase();
+  const compoundHints = /присед|тяга штанги|тяга тяга|жим штанги|squat|deadlift|bench|press|row|pullup|подтяг|выпад|lunge|ягодиц|гудморнинг|hyperextension|hip.thrust/i;
+  const isolationHints = /сгибан|разгибан|мах|curl|extension|fly|raise|икронож|calf|shrug|wrist|предплеч|бицепс|трицепс|дельт|плеч|ног/i;
+  if (compoundHints.test(n)) return 'compound';
+  if (isolationHints.test(n)) return 'isolation';
+  return 'unknown';
+}
 
 function coefFor(name: string): number {
-  if (COMPOUND.test(name)) return 1.2;
-  if (ISOLATION.test(name)) return 0.3;
+  const t = exerciseType(name);
+  if (t === 'compound') return 1.2;
+  if (t === 'isolation') return 0.3;
   return 1.0;
 }
 

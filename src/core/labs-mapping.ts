@@ -5,6 +5,21 @@ const SYNONYM_MAP = synonyms as Record<string, string>;
 
 /** Maps LAB_PATTERNS codes to UCUM_MAP keys where they differ */
 const CODE_ALIAS: Record<string, string> = {
+  'CREATININE': 'CREATININE',
+  'HEMATOCRIT': 'HCT',
+  'HEMOGLOBIN': 'HGB',
+  'PLATELETS': 'PLT',
+  'TRIGLYCERIDES': 'TG',
+  'CHOLESTEROL_TOTAL': 'CHOL',
+  'TESTOSTERONE_TOTAL': 'TT',
+  'TESTOSTERONE_FREE': 'FT',
+  'PROLACTIN': 'PRL',
+  'GLUCOSE': 'GLU',
+  'VITAMIN_D': 'VITD',
+  'MAGNESIUM': 'MG',
+  'CALCIUM': 'CA',
+  'POTASSIUM': 'K',
+  'SODIUM': 'NA',
   'TESTO': 'TT',
   'ESTR': 'E2',
   'FER': 'FERRITIN',
@@ -24,10 +39,67 @@ const CODE_ALIAS: Record<string, string> = {
   'PHOS': 'P',
 };
 
+function unitKey(unit: string): string {
+  return unit.toLowerCase()
+    .replace(/[µμ]/g, 'u')
+    .replace(/\?/g, 'u')
+    .replace(/д/g, 'd')
+    .replace(/ё/g, 'е')
+    .replace(/[\s.]/g, '')
+    .replace(/литр|л(?![a-z])/g, 'l')
+    .replace(/мкмоль/g, 'umol')
+    .replace(/пмоль/g, 'pmol')
+    .replace(/мкед/g, 'miu')
+    .replace(/мед/g, 'miu')
+    .replace(/мме?д/g, 'miu')
+    .replace(/ммоль/g, 'mmol')
+    .replace(/мг/g, 'mg')
+    .replace(/нг/g, 'ng')
+    .replace(/пг/g, 'pg')
+    .replace(/мкг/g, 'ug')
+    .replace(/мл/g, 'ml')
+    .replace(/ед/g, 'u')
+    .replace(/г/g, 'g');
+}
+
+/** Convert common Russian/foreign lab units to the canonical UCUM_MAP unit. */
+export function normalizeLabMeasurement(code: string, value: number, unit: string): { value: number; unit: string } {
+  const canonical = mapToUcumCode(code).toUpperCase();
+  const info = UCUM_MAP[canonical];
+  if (!info || !Number.isFinite(value)) return { value, unit: unit || info?.prefUnit || '' };
+  const from = unitKey(unit);
+  const target = unitKey(info.prefUnit);
+  let factor = 1;
+
+  if (from && from === target) return { value: round(value), unit: info.prefUnit };
+  switch (canonical) {
+    case 'CREATININE': if (from.includes('mg/dl')) factor = 88.42; break;
+    case 'GLU': if (from.includes('mg/dl')) factor = 1 / 18.018; break;
+    case 'UREA': if (from.includes('mg/dl')) factor = 1 / 2.801; break;
+    case 'UA': if (from.includes('mg/dl')) factor = 59.48; break;
+    case 'BIL': case 'DBIL': if (from.includes('mg/dl')) factor = 17.104; break;
+    case 'E2': if (from.includes('pmol') || /пмоль|pmol/i.test(unit)) factor = 1 / 3.671; break;
+    case 'PRL': if (from.includes('miu') || from.includes('uiu')) factor = 1 / 21.2; break;
+    case 'TT': if (from.includes('nmol')) factor = 28.84; break;
+    case 'FT': if (from.includes('pmol')) factor = 1 / 10; break;
+    case 'VITD': if (from.includes('nmol')) factor = 1 / 2.496; break;
+    case 'HGB': if (from.includes('g/dl')) factor = 10; break;
+    case 'CHOL': case 'HDL': case 'LDL': if (from.includes('mg/dl')) factor = 1 / 38.67; break;
+    case 'TG': if (from.includes('mg/dl')) factor = 1 / 88.57; break;
+    default: break;
+  }
+  return { value: round(value * factor), unit: info.prefUnit };
+}
+
+function round(value: number): number {
+  return Number(value.toFixed(Math.abs(value) >= 100 ? 1 : 3));
+}
+
 /** Convert any known code to a UCUM_MAP key (returns the code itself if no alias exists) */
 export function mapToUcumCode(code: string): string {
-  if (UCUM_MAP[code]) return code;
-  const alias = CODE_ALIAS[code.toUpperCase()];
+  const upper = code.trim().toUpperCase();
+  if (UCUM_MAP[upper]) return upper;
+  const alias = CODE_ALIAS[upper];
   if (alias && UCUM_MAP[alias]) return alias;
   return code;
 }

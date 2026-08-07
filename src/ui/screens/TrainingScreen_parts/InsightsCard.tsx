@@ -37,20 +37,28 @@ export const InsightsCard: React.FC = () => {
       sessionIntensity: w.overallRPE || 5, overallRPE: w.overallRPE || 5, notes: w.notes || '',
     }));
     const sets: any[] = [];
+    const prevSets: any[] = [];
+    const now = new Date();
+    const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+    const twoWeeksAgo = new Date(now); twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
     for (const w of logs) {
+      const isCurrent = new Date(w.date) >= weekAgo;
+      const isPrev = new Date(w.date) >= twoWeeksAgo && new Date(w.date) < weekAgo;
       for (const ex of w.exercises || []) {
         for (let i = 0; i < (ex.sets || []).length; i++) {
           const st = ex.sets[i];
-          sets.push({
+          const setData = {
             setId: ex.id + '_' + i, sessionId: w.id, exerciseId: ex.exerciseId, exerciseName: ex.exerciseName,
             setIndex: i + 1, targetReps: st.reps, targetWeight: st.weight, actualReps: st.reps, actualWeight: st.weight,
             actualRPE: st.rpe || 5, actualRIR: st.rir ?? 3, errors: [], restSeconds: 120, terminatedEarly: false,
-          });
+          };
+          if (isCurrent) sets.push(setData);
+          else if (isPrev) prevSets.push(setData);
         }
       }
     }
     const c = buildHistoryContext(sets, sessions);
-    const ins = generateInsights(sets, sessions);
+    const ins = generateInsights(sets, sessions, prevSets);
     return { insights: ins, ctx: c };
   }, [logs]);
 

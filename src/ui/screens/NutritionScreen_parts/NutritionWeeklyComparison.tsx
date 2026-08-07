@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { formatDate } from '../../../core/utils/date-utils';
 
 interface Props {
   diaryData: Record<string, any>;
@@ -15,7 +16,7 @@ function getWeekRange(dateStr: string): string[] {
   const result: string[] = [];
   for (let i = 0; i < 7; i++) {
     const date = new Date(monday); date.setDate(monday.getDate() + i);
-    result.push(date.toISOString().split('T')[0]);
+    result.push(formatDate(date));
   }
   return result;
 }
@@ -59,7 +60,7 @@ export const NutritionWeeklyComparison: React.FC<Props> = ({ diaryData, selected
     const prevWeekDates: string[] = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(prevStart); date.setDate(prevStart.getDate() + i);
-      prevWeekDates.push(date.toISOString().split('T')[0]);
+      prevWeekDates.push(formatDate(date));
     }
 
     const curAvg = getDayAvg(diaryData, currentWeek);

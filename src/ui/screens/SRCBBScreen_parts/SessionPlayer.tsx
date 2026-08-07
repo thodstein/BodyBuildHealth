@@ -20,6 +20,7 @@ import { useTrainingProfile } from '../TrainingScreen_parts/training-profile';
 import { recommendTempo, formatTempo, TEMPO_PRESETS } from '../../../engines/rep-tempo.engine';
 import { recordSessionRIR, getSessionRIRFeedback } from '../../../engines/rir-calibration.engine';
 import { recordMMC } from '../../../engines/mmc-tracking.engine';
+import { StrengthDiary, sessionToWorkoutLog } from '../../../engines/strength-diary.engine';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -194,7 +195,17 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     if (!session || !day || !Array.isArray(day.exercises)) return;
     hapticNotify('success');
     const finished = finishSession(session, `${focus} — ${day?.label}`);
-    
+
+    // P0-1: also persist to IndexedDB via StrengthDiary
+    try {
+      const diary = new StrengthDiary();
+      const workoutLog = sessionToWorkoutLog(finished);
+      diary.saveWorkoutLog(workoutLog);
+      for (const ex of workoutLog.exercises) {
+        diary.saveStrengthLog(ex);
+      }
+    } catch { /* ignore */ }
+
     const finishRiskFlags: Record<string, string> = {};
     if (profile.injuries?.length) {
       profile.injuries.forEach(inj => {
@@ -207,13 +218,13 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
       muscleGroupsUsed: Array.from(new Set(day.exercises.map(ex => ex.muscleGroup))),
       fatigueScore: profile.fatigue / 10,
       riskFlags: finishRiskFlags,
-      sessionDuration: (finished.durationMin || sessionDur) * 60,
+      sessionDuration: (Math.max(finished.durationMin || 0, sessionDur)) * 60,
     };
     setCooldownBlocks(generateCooldown(cooldownInput));
     setPhase('cooldown');
     setCooldownDone({});
 
-    try { saveSRPESession({ date: finished.date, sRPE: sessionRPE, durationMin: finished.durationMin || sessionDur }); } catch { /* ignore */ }
+    try { saveSRPESession({ date: finished.date, sRPE: sessionRPE, durationMin: Math.max(finished.durationMin || 0, sessionDur) }); } catch { /* ignore */ }
     // RIR-калибровка: записываем фактические RIR по подходам
     try { recordSessionRIR(finished, { exercises: day.exercises.map(ex => ({ name: ex.name, targetSets: ex.targetSets })) }); } catch { /* ignore */ }
     // MMC-трекинг
@@ -222,9 +233,10 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
       if (mmcEntries.length > 0) {
         mmcEntries.forEach(([key, val]) => {
           const parts = key.split('_');
-          const si = parseInt(parts[0] || '0');
-          const field = parts[1] || '';
-          const exName = day.exercises.find((_, i) => si >= i*10 && si < (i+1)*10)?.name || '';
+          const ei = parseInt(parts[0] || '0');
+          const si = parseInt(parts[1] || '0');
+          const field = parts[2] || '';
+          const exName = day.exercises[ei]?.name || '';
           if (field === 'mmc' || field === 'pump' || field === 'joint' || field === 'energy') {
             recordMMC({ date: finished.date, exerciseId: exName, exerciseName: exName, setNumber: si, mmc: field === 'mmc' ? val : 5, pump: field === 'pump' ? val : 5, jointDiscomfort: field === 'joint' ? val : 0, energy: field === 'energy' ? val : 5 });
           }
@@ -259,8 +271,8 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     if (!ex) return;
     const ts = Array.isArray(ex.targetSets) ? ex.targetSets[si] : null;
     const t = ts || { weight: weightFor(ex) || 60, reps: repsFor(ex) || 10, rir: rirFor(ex) ?? 2 };
-    const a = actual[keyFor(ei, si)] || { weight: t.weight, reps: t.reps, rpe: 0 };
-    let s = logSet(session, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe || 0, rir: t.rir, notes: '' });
+    const a = actual[keyFor(ei, si)] || { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir) };
+    let s = logSet(session, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe || Math.max(1, 10 - t.rir), rir: t.rir, notes: '', plannedWeight: t.weight, plannedReps: t.reps, plannedRir: t.rir });
     setSession(s);
     setActual(prev => ({ ...prev, [keyFor(ei, si)]: a }));
     // авто-старт таймера отдыха после подхода
@@ -420,7 +432,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                        <input style={{ ...IN, width: 60 }} type="number" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { weight: +e.target.value, reps: a.reps, rpe: a.rpe } }))} aria-label="вес" />
                        <input style={{ ...IN, width: 48 }} type="number" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: +e.target.value, rpe: a.rpe } }))} aria-label="повт" />
-                       <input style={{ ...IN, width: 44 }} type="number" min={0} max={10} placeholder="RPE" value={a.rpe || ""} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: a.reps, rpe: +e.target.value } }))} aria-label="RPE" />
+                        <input style={{ ...IN, width: 44 }} type="number" min={0} max={10} placeholder="RPE" value={a.rpe || ""} onChange={e => { const v = +e.target.value; setActual(p => ({ ...p, [k]: { weight: a.weight, reps: a.reps, rpe: Number.isFinite(v) ? Math.max(0, Math.min(10, v)) : 0 } })) }} aria-label="RPE" />
                        <input style={{ ...IN, width: 48 }} type="number" step="0.01" placeholder="v" value={vel[k] ?? ""} onChange={e => setVel(p => ({ ...p, [k]: +e.target.value }))} aria-label="скорость м/с" />
                        <button style={logged ? BTN_GHOST : BTN} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>
                      </div>

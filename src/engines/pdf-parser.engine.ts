@@ -120,6 +120,26 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
   { code: 'LIP', names: ['липаза', 'Lipase', 'LIP', 'LPS'], unitPatterns: ['Е/л', 'U/L'] },
 ];
 
+function containsLabName(text: string, name: string): boolean {
+  const needle = name.toLowerCase();
+  if (needle.length > 3) return text.toLowerCase().includes(needle);
+  return new RegExp(`(^|[^a-zа-яё0-9])${needle.replace(/[+]/g, '\\$&')}(?=$|[^a-zа-яё0-9])`, 'i').test(text);
+}
+
+function normalizeOcrText(text: string): string {
+  return text
+    .replace(/[\u00a0\u2007\u202f]/g, ' ')
+    .replace(/[‐‑‒–—]/g, '-')
+    .replace(/(\d)[,](\d)/g, '$1.$2')
+    // Tesseract occasionally reads zero as Cyrillic O inside numeric cells.
+    .replace(/(?<=\d)[ОO](?=\d|[.,])/g, '0')
+    .replace(/(?<=\d)[ОO](?=\s|$)/g, '0')
+    .replace(/\b(мкмоль|ммоль|мг|нг|пг|мкг)\s*\/\s*(л|мл|дл)\b/gi, '$1/$2')
+    // Keep tabs: PDF text extraction uses them as reliable column separators.
+    .replace(/ {2,}/g, ' ')
+    .trim();
+}
+
 function extractNumber(text: string): number | null {
   // Try to find the first standalone number that looks like a lab value (not part of a range)
   const rangeMatch = text.match(/(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)/);
@@ -137,6 +157,19 @@ function extractNumber(text: string): number | null {
     return val;
   }
   // All numbers are part of a range — not a value column
+  return null;
+}
+
+function extractResultNumber(text: string): number | null {
+  const cleaned = text.replace(/\b(?:от|до|референс|норма|ref)\b/gi, ' ');
+  const range = cleaned.match(/(\d+[.,]?\d*)\s*[-–]\s*(\d+[.,]?\d*)/);
+  const numbers = cleaned.match(/\d+[.,]?\d*/g) || [];
+  const rangeNumbers = range ? new Set([range[1], range[2]]) : new Set<string>();
+  for (const token of numbers) {
+    if (rangeNumbers.has(token)) continue;
+    const value = Number(token.replace(',', '.'));
+    if (Number.isFinite(value) && value > 0) return value;
+  }
   return null;
 }
 
@@ -167,6 +200,15 @@ function extractRefRange(text: string): { low?: number; high?: number } {
   return {};
 }
 
+function extractUnit(text: string): string {
+  const match = text.match(/(?:мкмоль|ммоль|моль|мг|нг|пг|мкг|мЕд|мМЕ|Е|ед|г|мл|л)\s*\/\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|IU|U|g)\s*\/\s*(?:dL|mL|L)|%|сек|s\b/i);
+  return match?.[0].replace(/\s+/g, '') || '';
+}
+
+function isUnitCell(text: string): boolean {
+  return /^(?:%|сек|s|(?:мкмоль|ммоль|моль|мг|нг|пг|мкг|мЕд|мМЕ|Е|ед|г|мл|л)\/(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|IU|U|g)\/(?:dL|mL|L))$/i.test(text.trim());
+}
+
 const PROVIDER_HEADERS: Record<string, string[]> = {
   invitro: ['наименование', 'результат', 'референс', 'единицы'],
   gemotest: ['наименование', 'результат', 'референс', 'ед'],
@@ -186,6 +228,7 @@ function detectProviderFromText(text: string): string | null {
 interface TextItem { str: string; x: number; y: number; width: number; height: number; }
 
 function groupByRows(items: TextItem[], yTolerance = 5): TextItem[][] {
+  if (items.length === 0) return [];
   const sorted = [...items].sort((a, b) => {
     const dy = a.y - b.y;
     if (Math.abs(dy) > yTolerance) return dy;
@@ -254,7 +297,7 @@ function tryParseTableRows(lines: string[], provider: string | null): ParsedLabV
     const combined = cols.join(' | ').toLowerCase();
 
     for (const labDef of LAB_PATTERNS) {
-      const nameMatch = labDef.names.some(n => combined.includes(n.toLowerCase()));
+      const nameMatch = labDef.names.some(n => containsLabName(combined, n));
       if (!nameMatch) continue;
 
       let val: number | null = null;
@@ -270,16 +313,14 @@ function tryParseTableRows(lines: string[], provider: string | null): ParsedLabV
           refLow = ref.low;
           refHigh = ref.high;
         }
-        const num = extractNumber(cell);
+        const num = extractResultNumber(cell);
         if (num !== null && num > 0 && cell.length < 30) {
           if (val === null) {
             val = num;
           }
         }
-        const unitMatch = cell.match(/^([A-Za-zА-Яа-я%\/0-9.\-^]{1,20})$/i);
-        if (unitMatch && !unit) {
-          unit = unitMatch[1];
-        }
+        const cellUnit = extractUnit(cell) || (isUnitCell(cell) ? cell : '');
+        if (cellUnit && !unit) unit = cellUnit;
       }
 
       if (val === null) continue;
@@ -320,8 +361,7 @@ function providerSpecificParse(lines: string[], provider: string): ParsedLabValu
 function parseLabLineGeneric(line: string, val: number): { unit: string; refLow?: number; refHigh?: number } {
   // Try to extract unit from the line
   let unit = '';
-  const unitMatch = line.match(/\b([A-Za-z%\/]{1,15}(?:\^?\d+)?\/[A-Za-z%\/]{1,15}|[μuмmµ]?[ЕU]\/[лL]|[μuм]?[мM]?[оO]?[лL]\/[лL]|%|сек|s|г\/л|mg\/dL|ng\/mL|pg\/mL|mmol\/L|nmol\/L|pmol\/L|ug\/L|mIU\/L|IU\/mL|U\/L)\b/i);
-  if (unitMatch) unit = unitMatch[1];
+  unit = extractUnit(line);
   
   const ref = extractRefRange(line);
 
@@ -346,7 +386,7 @@ function tryParseLabFromLine(line: string): { code: string; name: string; value:
   const lowerLine = line.toLowerCase();
   
   for (const labDef of LAB_PATTERNS) {
-    const nameMatch = labDef.names.some(n => lowerLine.includes(n.toLowerCase()));
+    const nameMatch = labDef.names.some(n => containsLabName(lowerLine, n));
     if (!nameMatch) continue;
 
     const val = extractNumber(line.replace(/[^\d.,\s\-–]/g, ' '));
@@ -366,9 +406,10 @@ function tryParseLabFromLine(line: string): { code: string; name: string; value:
 }
 
 export function parseLabText(rawText: string): ParsedLabResult {
-  const provider = detectProviderFromText(rawText);
+  const normalizedText = normalizeOcrText(rawText);
+  const provider = detectProviderFromText(normalizedText);
 
-  const lines = rawText.split(/\n/).map(l => l.trim()).filter(Boolean);
+  const lines = normalizedText.split(/\n/).map(l => l.trim()).filter(Boolean);
 
   let values: ParsedLabValue[] = [];
 
@@ -376,19 +417,15 @@ export function parseLabText(rawText: string): ParsedLabResult {
     values = providerSpecificParse(lines, provider);
   }
 
-  if (values.length === 0) {
-    for (const line of lines) {
-      const result = tryParseLabFromLine(line);
-      if (!result) continue;
-      
-      // Deduplicate by code
-      if (values.some(v => v.code === result.code)) continue;
-
-      values.push({
-        ...result,
-        isAbnormal: result.refHigh !== undefined ? result.value > result.refHigh : result.refLow !== undefined ? result.value < result.refLow : undefined,
-      });
-    }
+  // Always run the generic parser as a second pass. Provider PDFs often
+  // contain mixed rows where only part of the table was split correctly.
+  for (const line of lines) {
+    const result = tryParseLabFromLine(line);
+    if (!result || values.some(v => v.code === result.code)) continue;
+    values.push({
+      ...result,
+      isAbnormal: result.refHigh !== undefined ? result.value > result.refHigh : result.refLow !== undefined ? result.value < result.refLow : undefined,
+    });
   }
 
   if (values.length > 0 || lines.length > 1) {
@@ -405,7 +442,7 @@ export function parseLabText(rawText: string): ParsedLabResult {
     }
   }
 
-  const dateMatch = rawText.match(/(\d{1,2})[./](\d{1,2})[./](\d{2,4})/);
+  const dateMatch = normalizedText.match(/(\d{1,2})[./](\d{1,2})[./](\d{2,4})/);
   let date: string | undefined;
   if (dateMatch) {
     const d = dateMatch[1].padStart(2, '0');
@@ -414,7 +451,7 @@ export function parseLabText(rawText: string): ParsedLabResult {
     date = `${y}-${m}-${d}`;
   }
 
-  return { values, rawText, source: 'text', date };
+  return { values, rawText: normalizedText, source: 'text', date };
 }
 
 export async function parsePDF(file: File): Promise<ParsedLabResult> {
@@ -459,8 +496,30 @@ export async function parsePDF(file: File): Promise<ParsedLabResult> {
   }
 }
 
+/** OCR pages of a scanned PDF that has no usable text layer. */
+export async function ocrScannedPdf(file: File): Promise<string> {
+  const pdfjsLib = await import('pdfjs-dist');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+  const Tesseract = await import('tesseract.js') as any;
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const texts: string[] = [];
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+    const page = await pdf.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: 2 });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const context = canvas.getContext('2d');
+    if (!context) continue;
+    await page.render({ canvas, canvasContext: context, viewport }).promise;
+    const result = await Tesseract.recognize(canvas, 'rus+eng');
+    if (result.data.text) texts.push(result.data.text);
+  }
+  return texts.join('\n');
+}
+
 export async function parseLabFile(file: File): Promise<ParsedLabResult> {
-  if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+  if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
     return parsePDF(file);
   }
   if (file.type.startsWith('image/') || file.name.match(/\.(png|jpg|jpeg|webp)$/i)) {

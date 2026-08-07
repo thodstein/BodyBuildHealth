@@ -3,6 +3,12 @@ import { SYMPTOM_DB } from '../../../engines/symptom-solver.data';
 import { findSymptomById } from '../../../engines/symptom-solver.engine';
 import type { SymptomEntry } from '../../../engines/symptom-solver.types';
 import { getSymptomDiaryStats, getSymptomChartData, getSymptomDiarySummary, updateSymptomToday, SymptomTrend, getSymptomDiary } from '../../../engines/symptom-diary.engine';
+
+// ── XSS escape helper ──
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
 // ─── Локальные стили ───
 const GLASS_CARD: React.CSSProperties = {
   background: 'rgba(24,24,27,0.6)',
@@ -49,16 +55,17 @@ const TREND_COLORS: Record<SymptomTrend, string> = {
 };
 
 export function ComplaintsTab({ onOpenSolver }: { onOpenSolver?: () => void }) {
-  const [mode, setMode] = useState<'overview' | 'diary' | 'chart' | 'all'>('overview');
-  const [diaryValues, setDiaryValues] = useState<Record<string, number>>({});
+   const [mode, setMode] = useState<'overview' | 'diary' | 'chart' | 'all'>('overview');
+   const [diaryValues, setDiaryValues] = useState<Record<string, number>>({});
+   const [refreshTick, setRefreshTick] = useState(0);
 
-  const stats = useMemo(() => getSymptomDiaryStats(), []);
-  const chartData = useMemo(() => {
-    const d7 = getSymptomChartData(7);
-    const d30 = getSymptomChartData(30);
-    return { d7, d30 };
-  }, []);
-  const summary = useMemo(() => getSymptomDiarySummary(7), []);
+   const stats = useMemo(() => getSymptomDiaryStats(), [refreshTick]);
+   const chartData = useMemo(() => {
+     const d7 = getSymptomChartData(7);
+     const d30 = getSymptomChartData(30);
+     return { d7, d30 };
+   }, [refreshTick]);
+   const summary = useMemo(() => getSymptomDiarySummary(7), [refreshTick]);
 
   const categories = useMemo(() => {
     const map = new Map<string, SymptomEntry[]>();
@@ -81,6 +88,7 @@ export function ComplaintsTab({ onOpenSolver }: { onOpenSolver?: () => void }) {
   const handleRateSymptom = (symId: string, severity: number) => {
     updateSymptomToday(symId, severity);
     setDiaryValues((prev) => ({ ...prev, [symId]: severity }));
+    setRefreshTick(t => t + 1);
   };
 
   /** Сформировать отчёт для печати */
@@ -107,10 +115,10 @@ export function ComplaintsTab({ onOpenSolver }: { onOpenSolver?: () => void }) {
       <p>Улучшаются: ${stats.improving} · Стабильны: ${stats.stable} · Ухудшаются: ${stats.worsening} · Решены: ${stats.resolved}</p>
       <h2>Детальная динамика за 7 дней</h2>
       <table><tr><th>Симптом</th><th>Категория</th><th>Тренд</th><th>Текущий</th><th>Средний</th></tr>
-      ${summary.map(s => `<tr><td>${s.symptomName}</td><td>${s.category}</td><td>${s.trend}</td><td class="${s.currentSeverity >= 7 ? 'sev-high' : s.currentSeverity >= 4 ? 'sev-mid' : 'sev-low'}">${s.currentSeverity}/10</td><td>${s.avgSeverity}/10</td></tr>`).join('')}
+      ${summary.map(s => `<tr><td>${escapeHtml(s.symptomName)}</td><td>${escapeHtml(s.category)}</td><td>${escapeHtml(s.trend)}</td><td class="${s.currentSeverity >= 7 ? 'sev-high' : s.currentSeverity >= 4 ? 'sev-mid' : 'sev-low'}">${s.currentSeverity}/10</td><td>${s.avgSeverity}/10</td></tr>`).join('')}
       </table>
       <h2>График (7 дней)</h2>
-      <p>${chartData.d7.labels.map((l, i) => `${l}: ${chartData.d7.values[i]}/10`).join(' → ')}</p>
+      <p>${chartData.d7.labels.map((l, i) => `${escapeHtml(l)}: ${chartData.d7.values[i]}/10`).join(' → ')}</p>
       <div class="footer">Сгенерировано BodyBuildHealth · symptom-diary.engine.ts</div>
       </body></html>
     `);
@@ -151,8 +159,11 @@ export function ComplaintsTab({ onOpenSolver }: { onOpenSolver?: () => void }) {
             fontSize: 11, color: '#f44336', fontWeight: 600,
           }}>
             ⚠ {stats.worsening} симптом{stats.worsening === 1 ? '' : 'ов'} ухудшается
-            {summary.filter(s => s.trend === 'worsening').slice(0, 3).map(s => ` «${s.symptomName}»`).join(', ')}
-            {summary.filter(s => s.trend === 'worsening').length > 3 ? '...' : ''}
+            {Array.from(new Set(summary.filter(s => s.trend === 'worsening').map(s => s.symptomId))).slice(0, 3).map(sId => {
+              const s = summary.find(x => x.symptomId === sId);
+              return s ? ` «${s.symptomName}»` : '';
+            }).join(', ')}
+            {Array.from(new Set(summary.filter(s => s.trend === 'worsening').map(s => s.symptomId))).length > 3 ? '...' : ''}
           </div>
         )}
 

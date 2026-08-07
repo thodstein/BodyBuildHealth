@@ -19,11 +19,16 @@ function adherenceColor(pct: number): string {
   return '#ef4444';
 }
 
-export const SupplementComplianceCard: React.FC = () => {
+/**
+ * SupplementComplianceCard — Календарь комплаенса приёма БАДов.
+ * Читает данные из he_support_diary (через computeCompliance).
+ * План веществ передаётся через data-plan-subs атрибут контейнера.
+ */
+export const SupplementComplianceCard: React.FC<{ planSubs?: string[] }> = ({ planSubs }) => {
   const [daysBack] = useState(28);
   const [expandedWeek, setExpandedWeek] = useState<number | null>(null);
 
-  const data = useMemo(() => computeCompliance(daysBack), [daysBack]);
+  const data = useMemo(() => computeCompliance(daysBack, planSubs), [daysBack, planSubs]);
 
   if (data.activeSubstances.length === 0) {
     return (

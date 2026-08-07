@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { formatDate } from '../../../core/utils/date-utils';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -41,7 +42,7 @@ export const NutritionCharts: React.FC<{
     const days = range; const today = new Date(); const result: DailyLog[] = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(today); d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = formatDate(d);
       const dayLabel = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
       let dayKcal = 0, dayProtein = 0, dayFat = 0, dayCarbs = 0;
       if (dailyLogs && dailyLogs[dateStr]) {
@@ -70,7 +71,7 @@ export const NutritionCharts: React.FC<{
     const today = new Date();
     return realDailyData.map((_, i) => {
       const d = new Date(today); d.setDate(d.getDate() - (range - 1 - i));
-      const found = weightLog.find(w => w.date === d.toISOString().split('T')[0]);
+      const found = weightLog.find(w => w.date === formatDate(d));
       return found ? found.weight : null;
     });
   }, [range, realDailyData, weightLog]);
@@ -86,10 +87,10 @@ export const NutritionCharts: React.FC<{
     }
     return {
       labels, avgKcal, avgProtein, avgFat, avgCarbs,
-      kcalLine: Array.from({ length: range }, (_, i) => Math.round(avgKcal + Math.sin(i * 0.7) * 80 + Math.cos(i * 1.3) * 60)),
-      proteinLine: Array.from({ length: range }, (_, i) => Math.round(avgProtein + Math.sin(i * 0.5) * 8 + Math.cos(i * 1.1) * 6)),
-      fatLine: Array.from({ length: range }, (_, i) => Math.round(avgFat + Math.sin(i * 0.6) * 5 + Math.cos(i * 1.2) * 4)),
-      carbsLine: Array.from({ length: range }, (_, i) => Math.round(avgCarbs + Math.sin(i * 0.8) * 15 + Math.cos(i * 1.4) * 10)),
+      kcalLine: Array.from({ length: range }, () => null),
+      proteinLine: Array.from({ length: range }, () => null),
+      fatLine: Array.from({ length: range }, () => null),
+      carbsLine: Array.from({ length: range }, () => null),
     };
   }, [range, realDailyData, avgKcal, avgProtein, avgFat, avgCarbs]);
 
@@ -250,7 +251,7 @@ export const NutritionCharts: React.FC<{
               const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
               const dayData = realDailyData.find(r => {
                 const dd = new Date(today); dd.setDate(dd.getDate() - (range - 1 - realDailyData.indexOf(r)));
-                return dd.toISOString().split('T')[0] === dateStr;
+                return formatDate(dd) === dateStr;
               });
               const hasData = dayData && dayData.kcal > 0;
               const isGood = hasData && Math.abs(dayData.kcal - avgKcal) / avgKcal < 0.15;

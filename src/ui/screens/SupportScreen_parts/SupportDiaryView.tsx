@@ -6,6 +6,21 @@ import { SupplementComplianceCard } from './SupplementComplianceCard';
 
 const DIARY_KEY = 'he_support_diary';
 
+// ── XSS escape helper ──
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+// ── Локальная дата (timezone-safe) ──
+function todayLocalStr(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 // ── Журнал негативного опыта: хранится в he_autocalc_state.journal.negative ──
 interface NegEntry { substanceId: string; symptom: string; comment: string; }
 function loadNegJournal(): NegEntry[] {
@@ -79,7 +94,7 @@ function saveDiary(entries: DiaryEntry[]) {
 }
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayLocalStr();
 }
 
 function formatDate(dateStr: string): string {
@@ -381,13 +396,15 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
   const [showSideEffects, setShowSideEffects] = useState<Record<string, boolean>>({});
   const [addModal, setAddModal] = useState(false);
 
+  const [undoStack, setUndoStack] = useState<DiaryEntry[]>([]);
+
   const today = todayStr();
   const todayEntry = entries.find(e => e.date === today);
 
   useEffect(() => {
     setNotes(todayEntry?.notes || '');
     setComplianceNotes(todayEntry?.complianceNotes || '');
-    if (todayEntry?.mood) setMood(todayEntry.mood);
+    if (todayEntry?.mood) setMood(mood => mood === 3 ? todayEntry.mood! : mood);
   }, [todayEntry?.notes, todayEntry?.complianceNotes, todayEntry?.mood]);
 
   const planSubs: string[] = SUPPORT_LEVELS?.[supportLevel]?.subs || [];
@@ -443,8 +460,8 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
     setEntries(prev => {
       const updated = [...prev];
       const idx = updated.findIndex(e => e.date === today);
-      if (idx < 0) updated.unshift({ date: today, substances: {}, notes, complianceNotes, mood });
-      else updated[idx] = { ...updated[idx], notes, complianceNotes, mood };
+      if (idx < 0) updated.unshift({ date: today, substances: {}, notes, complianceNotes });
+      else updated[idx] = { ...updated[idx], notes, complianceNotes };
       saveDiary(updated);
       return updated;
     });
@@ -452,11 +469,30 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
 
   const clearToday = () => {
     setEntries(prev => {
+      const existing = prev.find(e => e.date === today);
+      if (existing) setUndoStack(u => [existing, ...u].slice(0, 10));
       const updated = prev.filter(e => e.date !== today);
       saveDiary(updated);
       return updated;
     });
     setNotes(''); setComplianceNotes(''); setMood(3);
+  };
+
+  const undoClearToday = () => {
+    setUndoStack(prev => {
+      if (prev.length === 0) return prev;
+      const [restored, ...rest] = prev;
+      setEntries(entries => {
+        const updated = entries.filter(e => e.date !== restored.date);
+        updated.unshift(restored);
+        saveDiary(updated);
+        return updated;
+      });
+      setNotes(restored.notes || '');
+      setComplianceNotes(restored.complianceNotes || '');
+      if (restored.mood) setMood(restored.mood);
+      return rest;
+    });
   };
 
   const saveEditedEntry = (dateStr: string, newNotes: string, newMood: MoodLevel, newSubs: Record<string, SubstanceIntake>) => {
@@ -532,6 +568,8 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
     return Array.from(effects);
   }, [todayEntry]);
 
+  const [historyLimit, setHistoryLimit] = useState(20);
+
   const filteredEntries = useMemo(() => {
     let list = entries.filter(e => e.date !== today);
     if (filterText) {
@@ -543,8 +581,8 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
         return false;
       });
     }
-    return list.slice(0, 20);
-  }, [entries, filterText, getName]);
+    return list.slice(0, historyLimit);
+  }, [entries, filterText, getName, historyLimit]);
 
   const weekViewData = useMemo(() => last7Days.map(dateStr => ({ date: dateStr, entry: entries.find(e => e.date === dateStr) })), [entries]);
 
@@ -758,13 +796,19 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
               style={{ width: '100%', minHeight: 50, padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.15)', color: 'rgba(255,255,255,0.85)', fontSize: 10, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
           </div>
 
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={saveNotes} style={sx.accentBtn}>💾 Сохранить заметки</button>
-            <button onClick={clearToday} style={{
-              padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(239,68,68,0.2)', cursor: 'pointer',
-              background: 'rgba(239,68,68,0.06)', color: '#ef4444', fontWeight: 600, fontSize: 10, whiteSpace: 'nowrap', fontFamily: 'inherit', minHeight: 40,
-            }}>✕ Очистить день</button>
-          </div>
+           <div style={{ display: 'flex', gap: 6 }}>
+             <button onClick={saveNotes} style={sx.accentBtn}>💾 Сохранить заметки</button>
+             <button onClick={clearToday} style={{
+               padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(239,68,68,0.2)', cursor: 'pointer',
+               background: 'rgba(239,68,68,0.06)', color: '#ef4444', fontWeight: 600, fontSize: 10, whiteSpace: 'nowrap', fontFamily: 'inherit', minHeight: 40,
+             }}>✕ Очистить день</button>
+             {undoStack.length > 0 && (
+               <button onClick={undoClearToday} style={{
+                 padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.2)', cursor: 'pointer',
+                 background: 'rgba(0,230,138,0.06)', color: '#00e68a', fontWeight: 600, fontSize: 10, whiteSpace: 'nowrap', fontFamily: 'inherit', minHeight: 40,
+               }}>↩ Отменить очистку</button>
+             )}
+           </div>
         </div>
       )}
 
@@ -832,15 +876,22 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
               style={{ width: '100%', ...sx.input }} />
           </div>
 
-          {editingDate ? (
-            <PastDayEditor
-              entry={editingEntry!}
-              dateStr={editingDate}
-              getName={getName}
-              onSave={(n, m, subs) => saveEditedEntry(editingDate, n, m, subs)}
-              onCancel={() => setEditingDate(null)}
-            />
-          ) : (
+      {editingDate ? (
+        editingEntry ? (
+          <PastDayEditor
+            entry={editingEntry}
+            dateStr={editingDate}
+            getName={getName}
+            onSave={(n, m, subs) => saveEditedEntry(editingDate, n, m, subs)}
+            onCancel={() => setEditingDate(null)}
+          />
+        ) : (
+          <div style={{ padding: 14, borderRadius: 12, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+            <div style={{ fontSize: 11, color: '#ef4444' }}>Запись за {editingDate} не найдена</div>
+            <button onClick={() => setEditingDate(null)} style={{ marginTop: 6, padding: '6px 12px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontSize: 10, fontFamily: 'inherit' }}>Закрыть</button>
+          </div>
+        )
+      ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {filteredEntries.map(entry => {
                 const takenSubs = Object.entries(entry.substances).filter(([, v]) => v.taken);
@@ -890,13 +941,19 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                   </div>
                 );
               })}
-              {filteredEntries.length === 0 && (
-                <div style={{ padding: 18, textAlign: 'center', ...sx.card }}>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-                    {filterText ? 'Нет записей по фильтру' : 'Нет записей за прошлые дни. Отмечайте приём каждый день.'}
-                  </div>
-                </div>
-              )}
+               {filteredEntries.length === 0 && (
+                 <div style={{ padding: 18, textAlign: 'center', ...sx.card }}>
+                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+                     {filterText ? 'Нет записей по фильтру' : 'Нет записей за прошлые дни. Отмечайте приём каждый день.'}
+                   </div>
+                 </div>
+               )}
+               {filteredEntries.length > 0 && filteredEntries.length < entries.filter(e => e.date !== today).length && (
+                 <button onClick={() => setHistoryLimit(l => l + 20)} style={{
+                   width: '100%', padding: '10px', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.15)',
+                   background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 10, fontWeight: 600, fontFamily: 'inherit',
+                 }}>Показать ещё (осталось {entries.filter(e => e.date !== today).length - filteredEntries.length})</button>
+               )}
             </div>
           )}
         </div>
@@ -926,10 +983,14 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
           <div style={sx.card}>
             <div style={sx.sectionTitle}>⚠ Побочные эффекты (за 7 дней)</div>
             {(() => {
+              const last7Set = new Set(getLastNDays(7));
               const effectCount = new Map<string, number>();
-              for (const entry of entries) for (const [, v] of Object.entries(entry.substances)) if (v.sideEffects) v.sideEffects.forEach(e => effectCount.set(e, (effectCount.get(e) || 0) + 1));
+              for (const entry of entries) {
+                if (!last7Set.has(entry.date)) continue;
+                for (const [, v] of Object.entries(entry.substances)) if (v.sideEffects) v.sideEffects.forEach(e => effectCount.set(e, (effectCount.get(e) || 0) + 1));
+              }
               const sorted = Array.from(effectCount.entries()).sort((a, b) => b[1] - a[1]);
-              if (sorted.length === 0) return <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Нет зафиксированных побочных эффектов</div>;
+              if (sorted.length === 0) return <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Нет зафиксированных побочных эффектов за 7 дней</div>;
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {sorted.slice(0, 8).map(([eff, count]) => (
@@ -975,50 +1036,52 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
           </div>
 
           <button onClick={() => {
-            const w = window.open('', '_blank');
-            if (!w) return;
-            const allEntries = [...entries].sort((a, b) => a.date.localeCompare(b.date));
-            w.document.write(`
-              <html><head><title>Дневник приёма БАД</title>
-              <style>
-                body { font-family: 'Segoe UI', sans-serif; font-size: 12px; padding: 20px; color: #222; max-width: 800px; margin: 0 auto; }
-                h1 { font-size: 20px; border-bottom: 2px solid #333; padding-bottom: 6px; }
-                h2 { font-size: 14px; margin-top: 16px; color: #444; }
-                table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-                th, td { padding: 5px 8px; border: 1px solid #ddd; text-align: left; font-size: 10px; }
-                th { background: #f5f5f5; font-weight: 700; }
-                .taken { color: #2e7d32; font-weight: 600; }
-                .missed { color: #c62828; }
-                .footer { margin-top: 20px; font-size: 9px; color: #999; border-top: 1px solid #ddd; padding-top: 8px; }
-                .effect { background: #ffebee; padding: 1px 4px; border-radius: 3px; font-size: 9px; }
-                .mood { font-size: 16px; }
-              </style></head><body>
-              <h1>📋 Дневник приёма БАД</h1>
-              <p>Период: ${allEntries[0]?.date || '—'} — ${allEntries[allEntries.length - 1]?.date || '—'}</p>
-              <p>Всего записей: ${allEntries.length} · Streak: ${streak} дней · Комплаентность 7д: ${weekCompliance}%</p>
-              ${allEntries.slice().reverse().map(e => {
-                const taken = Object.entries(e.substances).filter(([,v]) => v.taken);
-                const moodIcon = e.mood ? MOOD_OPTIONS.find(m => m.level === e.mood)?.icon || '' : '';
-                const effs = new Set<string>();
-                for (const [, v] of Object.entries(e.substances)) { if (v.sideEffects) v.sideEffects.forEach(x => effs.add(x)); }
-                return `<h2>${e.date} ${moodIcon}</h2>
-                <table><tr><th>Вещество</th><th>Статус</th><th>Время</th><th>Доза</th></tr>
-                ${Object.entries(e.substances).map(([id, v]) => {
-                  const name = getName(id);
-                  const ts = v.timeSlot ? TIME_SLOTS.find(t => t.id === v.timeSlot)?.icon || '' : '';
-                  return `<tr><td>${name}</td><td class="${v.taken ? 'taken' : 'missed'}">${v.taken ? '✓ принято' : '—'}</td><td>${ts}</td><td>${v.dose || '—'}</td></tr>`;
-                }).join('')}
-                </table>
-                ${e.complianceNotes ? `<p><strong>Комплаенс:</strong> ${e.complianceNotes}</p>` : ''}
-                ${e.notes ? `<p><em>${e.notes}</em></p>` : ''}
-                ${effs.size > 0 ? `<p>${Array.from(effs).map(x => `<span class="effect">⚠ ${x}</span>`).join(' ')}</p>` : ''}`;
-              }).join('')}
-              <div class="footer">Сгенерировано BodyBuildHealth · he_support_diary</div>
-              </body></html>
-            `);
-            w.document.close();
-            setTimeout(() => w.print(), 500);
-          }} style={{
+             const w = window.open('', '_blank');
+             if (!w) return;
+             const allEntries = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+             w.document.write(`
+               <html><head><title>Дневник приёма БАД</title>
+               <style>
+                 body { font-family: 'Segoe UI', sans-serif; font-size: 12px; padding: 20px; color: #222; max-width: 800px; margin: 0 auto; }
+                 h1 { font-size: 20px; border-bottom: 2px solid #333; padding-bottom: 6px; }
+                 h2 { font-size: 14px; margin-top: 16px; color: #444; }
+                 table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+                 th, td { padding: 5px 8px; border: 1px solid #ddd; text-align: left; font-size: 10px; }
+                 th { background: #f5f5f5; font-weight: 700; }
+                 .taken { color: #2e7d32; font-weight: 600; }
+                 .missed { color: #c62828; }
+                 .footer { margin-top: 20px; font-size: 9px; color: #999; border-top: 1px solid #ddd; padding-top: 8px; }
+                 .effect { background: #ffebee; padding: 1px 4px; border-radius: 3px; font-size: 9px; }
+                 .mood { font-size: 16px; }
+                 .custom-badge { background: #e8f5e9; color: #2e7d32; padding: 1px 4px; border-radius: 3px; font-size: 8px; }
+               </style></head><body>
+               <h1>📋 Дневник приёма БАД</h1>
+               <p>Период: ${escapeHtml(allEntries[0]?.date || '—')} — ${escapeHtml(allEntries[allEntries.length - 1]?.date || '—')}</p>
+               <p>Всего записей: ${allEntries.length} · Streak: ${streak} дней · Комплаентность 7д: ${weekCompliance}%</p>
+               ${allEntries.slice().reverse().map(e => {
+                 const moodIcon = e.mood ? MOOD_OPTIONS.find(m => m.level === e.mood)?.icon || '' : '';
+                 const effs = new Set<string>();
+                 for (const [, v] of Object.entries(e.substances)) { if (v.sideEffects) v.sideEffects.forEach(x => effs.add(x)); }
+                 return `<h2>${escapeHtml(e.date)} ${moodIcon}</h2>
+                 <table><tr><th>Вещество</th><th>Статус</th><th>Время</th><th>Доза</th></tr>
+                 ${Object.entries(e.substances).map(([id, v]) => {
+                   const rawName = getName(id);
+                   const name = escapeHtml(rawName) + (id.startsWith('custom_') ? ' <span class="custom-badge">кастом</span>' : '');
+                   const ts = v.timeSlot ? TIME_SLOTS.find(t => t.id === v.timeSlot)?.icon || '' : '';
+                   const safeDose = v.dose ? escapeHtml(v.dose) : '—';
+                   return `<tr><td>${name}</td><td class="${v.taken ? 'taken' : 'missed'}">${v.taken ? '✓ принято' : '—'}</td><td>${ts}</td><td>${safeDose}</td></tr>`;
+                 }).join('')}
+                 </table>
+                 ${e.complianceNotes ? `<p><strong>Комплаенс:</strong> ${escapeHtml(e.complianceNotes)}</p>` : ''}
+                 ${e.notes ? `<p><em>${escapeHtml(e.notes)}</em></p>` : ''}
+                 ${effs.size > 0 ? `<p>${Array.from(effs).map(x => `<span class="effect">⚠ ${escapeHtml(x)}</span>`).join(' ')}</p>` : ''}`;
+               }).join('')}
+               <div class="footer">Сгенерировано BodyBuildHealth · he_support_diary</div>
+               </body></html>
+             `);
+             w.document.close();
+             setTimeout(() => w.print(), 500);
+           }} style={{
             width: '100%', padding: '12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
             background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
           }}>
@@ -1029,7 +1092,7 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
 
       {/* ═══════════════ COMPLAINTS TAB ═══════════════ */}
       {tab === 'complaints' && <ComplaintsTab onOpenSolver={onOpenSolver} />}
-      {tab === 'compliance' && <SupplementComplianceCard />}
+      {tab === 'compliance' && <SupplementComplianceCard planSubs={planSubs} />}
 
       {addModal && <AddSubstanceModal onPick={addSubstance} onClose={() => setAddModal(false)} />}
     </div>

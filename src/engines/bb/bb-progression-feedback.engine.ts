@@ -19,6 +19,7 @@ import { epley1RM } from '../e1rm';
 import type { WorkoutSession, WorkoutExercise, WorkoutSet } from '../workout-logger.engine';
 import { prescribeLoad, type LoadStrategy } from './bb-autocoach.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+import { trueMuscleOf } from '../movement-pattern';
 
 export interface ExerciseLastResult {
   exerciseName: string;
@@ -361,7 +362,7 @@ export function autoUpdateWeakPoints(
 
   for (const s of sorted) {
     for (const ex of s.exercises || []) {
-      const muscle = ex.muscleGroup || '';
+      const muscle = trueMuscleOf({ name: ex.exerciseName, group: ex.muscleGroup }) || ex.muscleGroup || '';
       if (!muscle) continue;
       const top = topSetOf(ex);
       if (!top || top.weight <= 0) continue;
@@ -538,7 +539,7 @@ export function computePerMuscleACWR(
     }
   }
 
-  // Для каждой мышцы: текущая неделя vs 4-нед среднее
+  // Для каждой мышцы: текущая неделя vs 4-нед среднее (без делод-недель)
   const result: Record<string, { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'dangerous' }> = {};
   const allWeeks = [...new Set(sessions.map(s => weekKey(s.date)))].sort();
   const recentWeeks = allWeeks.slice(-5); // последние 5 нед (1 текущая + 4 для chronic)
@@ -549,11 +550,15 @@ export function computePerMuscleACWR(
 
   for (const [muscle, weekSets] of Object.entries(muscleWeekSets)) {
     const currentSets = weekSets[currentWeek] || 0;
-    const chronicAvg = chronicWeeks.length > 0
-      ? chronicWeeks.reduce((sum, wk) => sum + (weekSets[wk] || 0), 0) / chronicWeeks.length
-      : 0;
-    if (chronicAvg < 1) continue; // недостаточно данных
-    const ratio = currentSets / chronicAvg;
+    // Фильтруем делод-недели из chronic (объём < 50% от среднего)
+    const chronicValues = chronicWeeks.map(wk => weekSets[wk] || 0);
+    const chronicAvgAll = chronicValues.reduce((s, v) => s + v, 0) / Math.max(1, chronicValues.length);
+    const nonDeloadWeeks = chronicWeeks.filter((wk, i) => chronicValues[i] >= chronicAvgAll * 0.5);
+    const nonDeloadAvg = nonDeloadWeeks.length > 0
+      ? nonDeloadWeeks.reduce((s, wk) => s + (weekSets[wk] || 0), 0) / nonDeloadWeeks.length
+      : chronicAvgAll;
+    if (nonDeloadAvg < 1) continue; // недостаточно данных
+    const ratio = currentSets / nonDeloadAvg;
     let zone: 'undertrained' | 'optimal' | 'caution' | 'dangerous' = 'optimal';
     if (ratio < 0.8) zone = 'undertrained';
     else if (ratio > 1.5) zone = 'dangerous';

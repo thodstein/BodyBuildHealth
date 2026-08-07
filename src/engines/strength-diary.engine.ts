@@ -1,6 +1,7 @@
 import { db } from '../core/db';
 import type { StrengthLogEntry, WorkoutLog } from '../core/types';
 import { loadSessions, type WorkoutSession } from './workout-logger.engine';
+import { epley1RM } from './e1rm';
 
 export interface StrengthStats {
   exerciseId: string;
@@ -37,7 +38,7 @@ export interface ProgressionAlert {
  */
 // Преобразование сессии SessionPlayer (localStorage) в WorkoutLog для единого дневника.
 const COMPOUND_PATTERNS = new Set(['squat', 'hinge', 'horizontal_push', 'horizontal_pull', 'vertical_push', 'vertical_pull']);
-function sessionToWorkoutLog(s: WorkoutSession): WorkoutLog {
+export function sessionToWorkoutLog(s: WorkoutSession): WorkoutLog {
   return {
     id: s.sessionId || `plsession_${s.date}_${s.startTime}`,
     date: s.date,
@@ -63,6 +64,27 @@ function sessionToWorkoutLog(s: WorkoutSession): WorkoutLog {
   };
 }
 export class StrengthDiary {
+  #workoutLogsCache: { data: WorkoutLog[]; ts: number } | null = null;
+  #CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  /**
+    * Get all workout logs (cached for 5 minutes)
+    */
+    async getWorkoutLogs(): Promise<WorkoutLog[]> {
+      const now = Date.now();
+      if (this.#workoutLogsCache && now - this.#workoutLogsCache.ts < this.#CACHE_TTL) {
+        return this.#workoutLogsCache.data;
+      }
+      const logs = await db.getAll<WorkoutLog>('workout_log');
+      const lsLogs = loadSessions().map(sessionToWorkoutLog);
+      const merged = [...logs, ...lsLogs];
+      const seen = new Set<string>();
+      const dedup = merged.filter(l => { if (seen.has(l.id)) return false; seen.add(l.id); return true; });
+      const result = dedup.sort((a, b) => b.date.localeCompare(a.date));
+      this.#workoutLogsCache = { data: result, ts: now };
+      return result;
+    }
+
   /**
    * Save strength log entry
    */
@@ -96,26 +118,7 @@ export class StrengthDiary {
   }
 
   /**
-   * Get all workout logs
-   */
-  async getWorkoutLogs(): Promise<WorkoutLog[]> {
-    const logs = await db.getAll<WorkoutLog>('workout_log');
-    // Объединяем с сессиями, записанными SessionPlayer (localStorage he_workout_log_v2),
-    // чтобы дневник/история учитывали выполнения планов СРЦ/ББ.
-    const lsLogs = loadSessions().map(sessionToWorkoutLog);
-    const merged = [...logs, ...lsLogs];
-    const seen = new Set<string>();
-    const dedup = merged.filter(l => { if (seen.has(l.id)) return false; seen.add(l.id); return true; });
-    return dedup.sort((a, b) => b.date.localeCompare(a.date));
-  }
-
-  /**
-   * Get workout logs by date range
-   */
-  /**
    * Archive localStorage sessions to IndexedDB for durability.
-   * Sessions that are already in IDB (by id) are skipped.
-   * Returns count of newly archived sessions.
    */
   async archiveSessionsToIDB(): Promise<number> {
     const lsSessions = loadSessions();
@@ -147,7 +150,7 @@ export class StrengthDiary {
 
     const maxWeight = Math.max(...logs.flatMap(l => l.sets.map(s => s.weight)));
     const maxReps = Math.max(...logs.flatMap(l => l.sets.map(s => s.reps)));
-    const max1RM = Math.max(...logs.flatMap(l => l.sets.map(s => this.estimate1RM(s.weight, s.reps))));
+    const max1RM = Math.max(...logs.flatMap(l => l.sets.map(s => epley1RM(s.weight, s.reps))));
     const totalVolume = logs.reduce((sum, l) => sum + l.totalVolume, 0);
     const workoutCount = logs.length;
     const lastWorkoutDate = logs[0]?.date || '';
@@ -157,7 +160,7 @@ export class StrengthDiary {
     let best1RM = 0;
     logs.forEach(l => {
       l.sets.forEach(s => {
-        const set1RM = this.estimate1RM(s.weight, s.reps);
+        const set1RM = epley1RM(s.weight, s.reps);
         if (set1RM > best1RM) {
           best1RM = set1RM;
           bestSet = { weight: s.weight, reps: s.reps, rir: s.rir };
@@ -184,29 +187,39 @@ export class StrengthDiary {
   async getWeeklyProgress(): Promise<WeeklyProgress[]> {
     const logs = await db.getAll<StrengthLogEntry>('training_log');
     const workouts = await db.getAll<WorkoutLog>('workout_log');
+    const lsSessions = loadSessions();
+    const lsLogs = lsSessions.map(sessionToWorkoutLog);
+    const allWorkouts = [...workouts, ...lsLogs];
 
-    // Group by week
-    const weekMap = new Map<number, { volume: number; compound: number; isolation: number; oneRm: number }>();
+    // Group by ISO week start (Monday) for accurate week grouping
+    const toISOWeek = (dateStr: string): number => {
+      const d = new Date(dateStr);
+      const day = d.getDay() || 7;
+      d.setDate(d.getDate() - day + 1);
+      d.setHours(0, 0, 0, 0);
+      return Math.floor(d.getTime() / (7 * 24 * 3600 * 1000));
+    };
 
-    logs.forEach(log => {
-      const week = log.weekNumber || 1;
-      const current = weekMap.get(week) || { volume: 0, compound: 0, isolation: 0, oneRm: 0 };
-      
+    const weekMap = new Map<number, { volume: number; compound: number; isolation: number; oneRm: number; sessions: Set<string> }>();
+
+    const addLog = (log: StrengthLogEntry) => {
+      const week = toISOWeek(log.date);
+      const current = weekMap.get(week) || { volume: 0, compound: 0, isolation: 0, oneRm: 0, sessions: new Set() };
       current.volume += log.totalVolume;
       if (log.isCompound) current.compound++;
       else current.isolation++;
-      
-      // Max 1RM for week
-      const week1RM = Math.max(...(log?.sets || []).map(s => this.estimate1RM(s.weight, s.reps)), 0);
+      const week1RM = Math.max(...(log?.sets || []).map(s => epley1RM(s.weight, s.reps)), 0);
       current.oneRm = Math.max(current.oneRm, week1RM);
-      
       weekMap.set(week, current);
-    });
+    };
+
+    logs.forEach(addLog);
+    allWorkouts.forEach(w => (w.exercises || []).forEach(addLog));
 
     return Array.from(weekMap.entries()).map(([week, data]) => ({
       week,
       totalVolume: data.volume,
-      workoutCount: workouts.filter(w => this.getWeekNumber(w.date) === week).length,
+      workoutCount: data.sessions.size,
       compoundWorkouts: data.compound,
       isolationWorkouts: data.isolation,
       total1RM: data.oneRm
@@ -223,39 +236,33 @@ export class StrengthDiary {
     const logs = await db.getAll<StrengthLogEntry>('training_log');
     const compoundLogs = logs.filter(l => l.isCompound && l.sets.length > 0);
 
-    // Group by exercise and weight
-    const weightHistory = new Map<string, { weight: number; weeks: string[] }[]>();
-    
+    // Group by exercise, then by week, track best e1RM per week
+    const exerciseWeekBest = new Map<string, Map<number, { weight: number; e1RM: number }>>();
+
     compoundLogs.forEach(log => {
-      const weight = log.sets[0]?.weight;
-      if (weight) {
-        const key = `${log.exerciseId}_${weight}`;
-        if (!weightHistory.has(key)) {
-          weightHistory.set(key, []);
-        }
-        const history = weightHistory.get(key)!;
-        const week = this.getWeekNumber(log.date);
-        // Check if week already in history
-        if (!history.some(h => h.weeks.includes(week.toString()))) {
-          history.push({ weight, weeks: [week.toString()] });
-        }
+      const bestSet = log.sets.reduce((best, s) => epley1RM(s.weight, s.reps) > epley1RM(best.weight, best.reps) ? s : best, log.sets[0]);
+      const week = this.getWeekNumber(log.date);
+      const e1RM = epley1RM(bestSet.weight, bestSet.reps);
+      const exMap = exerciseWeekBest.get(log.exerciseId) || new Map<number, { weight: number; e1RM: number }>();
+      if (!exMap.has(week) || e1RM > exMap.get(week)!.e1RM) {
+        exMap.set(week, { weight: bestSet.weight, e1RM });
       }
+      exerciseWeekBest.set(log.exerciseId, exMap);
     });
 
-    weightHistory.forEach((history, key) => {
-      const parts = key.split('_');
-      const exerciseId = parts.slice(0, -1).join('_');
-      const weight = parseFloat(parts[parts.length - 1]);
-
-      const weeksAtWeight = history.reduce((sum, h) => sum + h.weeks.length, 0);
-      
-      if (weeksAtWeight >= 3) {
+    exerciseWeekBest.forEach((weekMap, exerciseId) => {
+      const sortedWeeks = Array.from(weekMap.entries()).sort((a, b) => a[0] - b[0]);
+      if (sortedWeeks.length < 3) return;
+      const last3 = sortedWeeks.slice(-3);
+      const weights = last3.map(w => w[1].weight);
+      const uniqueWeights = new Set(weights);
+      if (uniqueWeights.size === 1) {
         alerts.push({
           type: 'plateau',
-          message: `Плато: ${weight} кг на 3+ неделях`,
+          message: `Плато: ${weights[0]} кг на 3+ неделях`,
           exerciseId,
-          currentWeight: weight,
-          weeksAtWeight
+          currentWeight: weights[0],
+          weeksAtWeight: 3
         });
       }
     });
@@ -282,25 +289,15 @@ export class StrengthDiary {
   }
 
   /**
-   * Calculate 1RM from weight and reps (Epley formula)
-   */
-  estimate1RM(weight: number, reps: number): number {
-    // AUD-FIX-5: blend (Epley <=10, Brzycki >10, зажим <=15) — синхронно с progression.estimate1RM
-    if (reps <= 1) return weight;
-    if (weight <= 0) return 0;
-    if (reps <= 10) return Math.round(weight * (1 + reps / 30) * 10) / 10;
-    const r = Math.min(reps, 15);
-    return Math.round((weight * 36) / (37 - r) * 10) / 10;
-  }
-
-  /**
-   * Get week number from date
+   * Get ISO 8601 week number from date
    */
   getWeekNumber(dateStr: string): number {
     const date = new Date(dateStr);
-    const startOfYear = new Date(date.getFullYear(), 0, 1);
-    const days = Math.floor((date.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
-    return Math.ceil((days + startOfYear.getDay() + 1) / 7);
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
   }
 
   /**
@@ -318,7 +315,7 @@ export class StrengthDiary {
       .map((l: StrengthLogEntry) => ({
         date: l.date,
         volume: l.totalVolume,
-        oneRm: Math.max(...(l?.sets || []).map((s: { weight: number; reps: number }) => this.estimate1RM(s.weight, s.reps)), 0)
+        oneRm: Math.max(...(l?.sets || []).map((s: { weight: number; reps: number }) => epley1RM(s.weight, s.reps)), 0)
       }))
       .sort((a, b) => b.date.localeCompare(a.date));
 

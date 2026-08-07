@@ -132,11 +132,12 @@ export const computePeriodDelta = (
   if (avgEarlier === null || avgRecent === null) return null;
   const delta = avgRecent - avgEarlier;
   const direction = delta > 0.05 ? '↑' : delta < -0.05 ? '↓' : '=';
-  const isPositiveWhenRising = key === 'sleep' || key === 'weight';
+  const isPositiveWhenRising = key === 'sleep';
   const isImprovement = isPositiveWhenRising ? delta > 0 : delta < 0;
+  const isNeutral = key === 'weight' || key === 'bp';
   const trendColor = Math.abs(delta) < 0.05
     ? '#6b7280'
-    : (isImprovement ? '#22c55e' : '#ef4444');
+    : (isNeutral ? '#60a5fa' : (isImprovement ? '#22c55e' : '#ef4444'));
   return {
     label: `Тренд ${half} vs ${sorted.length - half}`,
     value: `${direction} ${Math.abs(delta).toFixed(1)}`,

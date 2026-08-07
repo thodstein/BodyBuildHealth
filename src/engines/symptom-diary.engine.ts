@@ -33,10 +33,19 @@ export function getSymptomDiary(): SymptomDiaryDay[] {
   } catch { return []; }
 }
 
+/** Локальная дата без UTC-сдвига */
+function todayLocalStr(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 /** Получить записи за сегодня */
 export function getTodayDiary(): SymptomDiaryEntry[] {
   const diary = getSymptomDiary();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalStr();
   const day = diary.find((d) => d.date === today);
   return day?.entries || [];
 }
@@ -48,7 +57,7 @@ export function updateSymptomToday(
   note?: string
 ): SymptomDiaryDay[] {
   const diary = getSymptomDiary();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalStr();
   let day = diary.find((d) => d.date === today);
 
   if (!day) {

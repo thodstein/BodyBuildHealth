@@ -19,6 +19,8 @@
 // Types
 // ═══════════════════════════════════════════════════════════════════════════
 
+import { epley1RM } from './e1rm';
+
 export interface WorkoutSet {
   setNumber: number;
   weightKg: number;
@@ -28,6 +30,9 @@ export interface WorkoutSet {
   velocityMs?: number;
   isPR: boolean;
   notes: string;
+  plannedWeight?: number;
+  plannedReps?: number;
+  plannedRir?: number;
 }
 
 export interface WorkoutExercise {
@@ -84,12 +89,15 @@ export interface WorkoutCSV {
 const LOG_KEY = 'he_workout_log_v2';
 
 export function loadSessions(): WorkoutSession[] {
-  try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch { return []; }
+  try {
+    const raw = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+    if (!Array.isArray(raw)) return [];
+    return raw.sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 2000);
+  } catch { return []; }
 }
 
 function saveSessions(sessions: WorkoutSession[]) {
-  sessions.sort((a, b) => b.date.localeCompare(a.date));
-  localStorage.setItem(LOG_KEY, JSON.stringify(sessions.slice(-2000)));
+  localStorage.setItem(LOG_KEY, JSON.stringify(sessions));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -138,7 +146,7 @@ export function logSet(
 
   // Check if PR
   const isPR = previousBestWeight ? set.weightKg > previousBestWeight : ex.sets.length === 0 || set.weightKg > Math.max(...ex.sets.map(s => s.weightKg), 0);
-  const estimated1RM = set.reps > 0 ? Math.round(set.weightKg * (1 + set.reps / 30)) : set.weightKg;
+  const estimated1RM = epley1RM(set.weightKg, set.reps);
 
   ex.sets = [...ex.sets, { ...set, isPR }];
   ex.totalVolume = ex.sets.reduce((s, st) => s + st.weightKg * st.reps, 0);
@@ -191,8 +199,8 @@ export function getWorkoutStats(): WorkoutStats {
         if (!set) continue;
         if (set.isPR) prCount++;
         const key = ex.exerciseName;
-        const estRM = set.reps > 0 ? set.weightKg * (1 + set.reps / 30) : set.weightKg;
-        if (!bestLifts[key] || estRM > bestLifts[key].weight * (1 + bestLifts[key].reps / 30)) {
+        const estRM = epley1RM(set.weightKg, set.reps);
+        if (!bestLifts[key] || estRM > epley1RM(bestLifts[key].weight, bestLifts[key].reps)) {
           bestLifts[key] = { weight: set.weightKg, reps: set.reps, date: sess.date };
         }
       }
@@ -262,7 +270,7 @@ export function exportToCSV(): WorkoutCSV {
       if (!ex || !Array.isArray(ex.sets)) continue;
       for (const set of ex.sets) {
         if (!set) continue;
-        const estRM = set.reps > 0 ? Math.round(set.weightKg * (1 + set.reps / 30)) : set.weightKg;
+        const estRM = epley1RM(set.weightKg, set.reps);
         rows.push([
           sess.date, ex.exerciseName, String(set.setNumber),
           String(set.weightKg), String(set.reps), String(set.rpe), String(set.rir),
@@ -321,7 +329,7 @@ export function importSessionsFromCSV(text: string): { importedSessions: number;
         isPR: false, notes: '',
       }));
       const totalVolume = sets.reduce((s, x) => s + x.weightKg * x.reps, 0);
-      const best1RM = Math.max(0, ...sets.map(s => s.reps > 0 ? Math.round(s.weightKg * (1 + s.reps / 30)) : s.weightKg));
+      const best1RM = Math.max(0, ...sets.map(s => epley1RM(s.weightKg, s.reps)));
       const rpes = sets.map(s => s.rpe).filter(r => r > 0);
       const avgRPE = rpes.length > 0 ? rpes.reduce((a: number, b: number) => a + b, 0) / rpes.length : 0;
       return { exerciseId: exName, exerciseName: exName, pattern: '', muscleGroup: '', order: oi, sets, totalVolume, best1RM, avgRPE };
@@ -340,9 +348,15 @@ export function importSessionsFromCSV(text: string): { importedSessions: number;
 
   if (newSessions.length > 0) {
     const existing = loadSessions();
-    // дедуп по date+focus (не дублируем уже импортированные)
-    const haveKeys = new Set(existing.filter(s => s.focus === 'Импорт CSV').map(s => s.date));
-    const toAdd = newSessions.filter(s => !haveKeys.has(s.date));
+    // дедуп: проверяем date + exercise name + weight + reps
+    const existingKeys = new Set(
+      existing.flatMap(s => (s.exercises || []).flatMap(ex => 
+        (ex.sets || []).map(st => `${s.date}|${ex.exerciseName}|${st.weightKg}|${st.reps}`)
+      ))
+    );
+    const toAdd = newSessions.filter(s => 
+      !s.exercises.some(ex => (ex.sets || []).some(st => existingKeys.has(`${s.date}|${ex.exerciseName}|${st.weightKg}|${st.reps}`)))
+    );
     saveSessions([...toAdd, ...existing]);
     return { importedSessions: toAdd.length, importedSets, errors };
   }

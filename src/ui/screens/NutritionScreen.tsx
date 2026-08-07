@@ -738,6 +738,8 @@ function detectCuisine(name: string): string {
 }
 
 const RestaurantTab: React.FC = () => {
+  const [rtToast, setRtToast] = React.useState<string | null>(null);
+  const showRtToast = (msg: string) => { setRtToast(msg); setTimeout(() => setRtToast(null), 2000); };
   const [g, setG] = React.useState<'all'|'russian'|'asian'|'italian'|'fastfood'>('all');
   const [search, setSearch] = React.useState('');
   const [portions, setPortions] = React.useState<Record<string, number>>({});
@@ -757,7 +759,8 @@ const RestaurantTab: React.FC = () => {
     <button onClick={() => setG(v)} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border: g === v ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: g === v ? 'rgba(0,230,138,0.15)' : '#202023', color: g === v ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: g === v ? 600 : 400 }}>{label}</button>
   );
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-    {/* КБЖУ сводка */}
+      {rtToast && <div style={{ position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', zIndex:999, padding:'10px 24px', borderRadius:14, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)', color:'#fff', fontSize:11, fontWeight:600 }}>{rtToast}</div>}
+      {/* КБЖУ сводка */}
     {filtered.length > 0 && (
       <div style={{ padding:14, ...cardBg }}>
         <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:6 }}>📊 КБЖУ выбранных блюд</div>
@@ -798,10 +801,10 @@ const RestaurantTab: React.FC = () => {
                   <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>{food.servingSize || ''} · {detectCuisine(food.name)}</div>
                 </div>
                 <div style={{ display:'flex', gap:2 }}>
-                  {[-1,1].map(d => <button key={d} onClick={() => setPortions(p => ({...p, [food.id]: Math.max(0.25, (p[food.id]||1) + d * 0.25)}))} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background:'#18181b', color:'rgba(255,255,255,0.85)', cursor:'pointer', fontSize:10, display:'flex', alignItems:'center', justifyContent:'center' }}>{d>0?'+':'-'}</button>)}
+                  {[0.5, 1, 1.5, 2].map(p => <button key={p} onClick={() => setPortions(pp => ({...pp, [food.id]: p}))} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background: (portions[food.id]||1) === p ? 'rgba(0,230,138,0.2)' : '#18181b', color:'rgba(255,255,255,0.85)', cursor:'pointer', fontSize:8, display:'flex', alignItems:'center', justifyContent:'center' }}>{p}</button>)}
                 </div>
                 <button onClick={() => addToCart({ name: food.name, amount: Math.round(portion * (parseInt(food.servingSize) || 100)), kcal: Math.round(food.kcal * portion), category: 'fast_food' })} style={{ padding:'3px 6px', borderRadius:4, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:7, fontWeight:600 }}>🛒</button>
-                <button onClick={() => { try { const planItems = JSON.parse(localStorage.getItem('he_quick_plan_items') || '[]'); planItems.push({ name: food.name, id: food.id, amount: Math.round(portion * 100), kcal: Math.round(food.kcal * portion), p: Math.round(food.protein * portion), f: Math.round(food.fat * portion), c: Math.round(food.carbs * portion) }); localStorage.setItem('he_quick_plan_items', JSON.stringify(planItems)); alert('✅ Добавлено в план питания'); } catch {} }} style={{ padding:'3px 6px', borderRadius:4, border:'1px solid rgba(139,92,246,0.3)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', cursor:'pointer', fontSize:7, fontWeight:600 }}>📋</button>
+                <button onClick={() => { try { const planItems = JSON.parse(localStorage.getItem('he_quick_plan_items') || '[]'); planItems.push({ name: food.name, id: food.id, amount: Math.round(portion * 100), kcal: Math.round(food.kcal * portion), p: Math.round(food.protein * portion), f: Math.round(food.fat * portion), c: Math.round(food.carbs * portion) }); localStorage.setItem('he_quick_plan_items', JSON.stringify(planItems)); showRtToast('✅ Добавлено в план питания'); } catch {} }} style={{ padding:'3px 6px', borderRadius:4, border:'1px solid rgba(139,92,246,0.3)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', cursor:'pointer', fontSize:7, fontWeight:600 }}>📋</button>
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:3, marginTop:4 }}>
                 <div style={{ background:'#18181b', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'rgba(255,255,255,0.85)' }}>🔥 {Math.round(food.kcal * portion)}</div>

@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
-
-interface DiaryItem { name: string; kcal: number; p: number; f: number; c: number; qty?: number; category?: string; }
+import { formatDate } from '../../../core/utils/date-utils';
+import { type DiaryItem } from './types';
 
 interface Props {
-  dayMeals: Record<string, any[]>;
+  dayMeals: Record<string, DiaryItem[]>;
   dayTotals: { kcal: number; p: number; f: number; c: number };
   targets?: { kcal: number; protein: number; fats: number; carbs: number };
   diaryData: Record<string, any>;
@@ -103,7 +103,7 @@ const FoodFrequencyChart: React.FC<{ diaryData: Record<string, any>; selectedDat
     const cutOff = new Date(selectedDate);
     cutOff.setDate(cutOff.getDate() - 30);
     Object.entries(diaryData).forEach(([date, day]) => {
-      if (date < cutOff.toISOString().split('T')[0] || date > selectedDate) return;
+      if (date < formatDate(cutOff) || date > selectedDate) return;
       Object.values(day?.meals || {}).forEach((items: any) => {
         (items || []).forEach((item: any) => {
           const key = item.name || '';
@@ -178,43 +178,27 @@ const MacroBalanceGauge: React.FC<{ actual: number; target: number; label: strin
 export const NutritionDiaryCharts: React.FC<Props> = ({ dayMeals, dayTotals, targets, diaryData, selectedDate, refreshKey }) => {
   const hasData = Object.keys(dayMeals).length > 0;
 
-  const weeklyKcal = useMemo(() => {
+  function computeWeekly(diaryData: Record<string, any>, field: string): number[] {
     const vals: number[] = [];
     const current = new Date(selectedDate);
     for (let i = 6; i >= 0; i--) {
       const d = new Date(current);
       d.setDate(d.getDate() - i);
-      const ds = d.toISOString().split('T')[0];
+      const ds = formatDate(d);
       const day = diaryData[ds];
       let total = 0;
       if (day?.meals) {
         Object.values(day.meals).forEach((items: any) => {
-          (items || []).forEach((item: any) => { total += item.kcal || 0; });
+          (items || []).forEach((item: any) => { total += item[field] || 0; });
         });
       }
       vals.push(total);
     }
     return vals;
-  }, [diaryData, selectedDate, refreshKey]);
+  }
 
-  const weeklyProtein = useMemo(() => {
-    const vals: number[] = [];
-    const current = new Date(selectedDate);
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(current);
-      d.setDate(d.getDate() - i);
-      const ds = d.toISOString().split('T')[0];
-      const day = diaryData[ds];
-      let total = 0;
-      if (day?.meals) {
-        Object.values(day.meals).forEach((items: any) => {
-          (items || []).forEach((item: any) => { total += item.p || 0; });
-        });
-      }
-      vals.push(total);
-    }
-    return vals;
-  }, [diaryData, selectedDate, refreshKey]);
+  const weeklyKcal = useMemo(() => computeWeekly(diaryData, 'kcal'), [diaryData, selectedDate, refreshKey]);
+  const weeklyProtein = useMemo(() => computeWeekly(diaryData, 'p'), [diaryData, selectedDate, refreshKey]);
 
   if (!hasData) return null;
 

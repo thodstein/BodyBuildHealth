@@ -28,6 +28,10 @@ const MICRO_TARGETS: Record<string, { target: number; unit: string; label: strin
 };
 
 export function calcMealQuality(items: MealItem[]): QualityScore {
+  const foodDBCache = new Map<string, typeof FOOD_DB[0]>();
+  FOOD_DB.forEach(f => foodDBCache.set(f.id, f));
+  FOOD_DB.forEach(f => foodDBCache.set(f.name.toLowerCase(), f));
+
   // Aggregate macro totals
   let totalKcal = 0, totalP = 0, totalF = 0, totalC = 0, totalFiber = 0;
   let totalSatFat = 0, totalOmega3 = 0;
@@ -40,9 +44,8 @@ export function calcMealQuality(items: MealItem[]): QualityScore {
     totalF += item.f;
     totalC += item.c;
 
-    // Bug 1: match by id first (accurate), fallback to name (diary items may lack id).
-    const food = (item.id ? FOOD_DB.find(f => f.id === item.id) : undefined)
-      || FOOD_DB.find(f => (f.name||'').toLowerCase() === (item.name||'').toLowerCase());
+    const food = (item.id ? foodDBCache.get(item.id) : undefined)
+      || foodDBCache.get((item.name || '').toLowerCase());
     if (food) {
       // Bug 3: scale by portion (amount ?? qty ?? 100).
       const _rawAmt = item.amount ?? item.qty ?? 100;
@@ -79,7 +82,8 @@ export function calcMealQuality(items: MealItem[]): QualityScore {
   macroBalance = Math.max(0, macroBalance);
 
   const fiber = Math.min(15, Math.round((totalFiber / 30) * 15));
-  const fatQuality = totalOmega3 > 1 ? 15 : totalOmega3 > 0.5 ? 10 : Math.min(15, Math.round((1 - totalSatFat / Math.max(1, totalF)) * 15));
+  const totalSatFatG = totalSatFat / 1000;
+  const fatQuality = totalOmega3 > 1 ? 15 : totalOmega3 > 0.5 ? 10 : Math.min(15, Math.round((1 - totalSatFatG / Math.max(1, totalF)) * 15));
   const wholeFoodPct = totalKcal > 0 ? wholeFoodKcal / totalKcal : 0.5;
   const wholeFoods = Math.min(20, Math.round(wholeFoodPct * 20));
 

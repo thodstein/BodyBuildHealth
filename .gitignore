@@ -74,6 +74,9 @@ vite.log
 ts-error.txt
 tmp_coverage.txt
 tz_*.txt
+vite-*.txt
+vitest-*.txt
+vitest-output.txt
 _chart_replacement.txt
 icons_check.txt
 temp_labs.txt

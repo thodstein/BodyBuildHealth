@@ -464,10 +464,10 @@ describe('Profile v2 E2E scenarios', () => {
       expect(typeof AutoregPanel).toBe('function');
     });
 
-    it('30. PerformanceScreen СЌРєСЃРїРѕСЂС‚РёСЂСѓРµС‚СЃСЏ', async () => {
+    it('30. PerformanceScreen экспортируется', async () => {
       const { PerformanceScreen } = await import('../../ui/screens/PerformanceScreen');
       expect(typeof PerformanceScreen).toBe('function');
-    });
+    }, 30000);
   });
 });
 

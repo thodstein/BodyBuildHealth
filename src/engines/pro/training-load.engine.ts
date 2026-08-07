@@ -55,7 +55,7 @@ export function acuteChronicRatio(dailyLoads: DayLoad[], referenceDate?: string,
   if (dailyLoads.length === 0) return { acute: 0, chronic: 0, ratio: 0, zone: 'undertrained', acuteDays, chronicDays };
   const sorted = [...dailyLoads].sort((a, b) => a.date < b.date ? -1 : 1);
   const ref = referenceDate || sorted[sorted.length - 1].date;
-  //日均 нагрузка за окно
+  // средняя дневная нагрузка за окно
   const avgOver = (days: number) => {
     const start = addDays(ref, -(days - 1));
     let sum = 0, n = 0;

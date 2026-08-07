@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { StrengthDiary, type StrengthStats, type WeeklyProgress } from '../../../engines/strength-diary.engine';
+import { epley1RM } from '../../../engines/e1rm';
 import type { WorkoutLog, StrengthLogEntry, TrainingOutput } from '../../../core/types';
 import { computeAnalytics } from '../../../engines/analytics-engine';
 import { weeklySetsByGroup } from '../../../engines/training-recommendations.engine';
@@ -140,7 +141,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
         exerciseName: cat?.name || e.exerciseId,
         sets: [{ weight: e.weight, reps: e.reps, rir: e.rir }],
         totalVolume: e.weight * e.reps,
-        estimated1RM: Math.round(e.weight * (1 + e.reps / 30)),
+        estimated1RM: epley1RM(e.weight, e.reps),
         isCompound: cat?.type === 'compound', weekNumber: selectedWeek,
       };
     });
@@ -216,14 +217,13 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const expertAcwr = useMemo(() => expertSrpe.length >= 2 ? acuteChronicRatio(toDailyLoads(expertSrpe)).ratio : 1.0, [expertSrpe]);
   const expertMono = useMemo(() => { try { return expertSrpe.length >= 7 ? weeklyMonotony(toDailyLoads(expertSrpe)).monotony : 0; } catch { return 0; } }, [expertSrpe]);
   const expertExercises = useMemo(() => {
-    const calcE1rm = (w: number, r: number) => r <= 1 ? w : w * (1 + Math.min(r, 30) / 30);
     const exMap = new Map<string, { first: number; last: number }>();
     for (const w of historyWorkouts) {
       const exs: any[] = (w as any).exercises || [];
       for (const ex of exs) {
         const nm = ex.name || ex.exerciseId || '?';
         if (!exMap.has(nm)) exMap.set(nm, { first: 0, last: 0 });
-        const v = calcE1rm(ex.weight || 0, ex.reps || 5);
+        const v = epley1RM(ex.weight || 0, ex.reps || 0);
         const cur = exMap.get(nm)!;
         if (!cur.first || (v > 0 && v < cur.first)) cur.first = v;
         if (v > cur.last) cur.last = v;
@@ -299,7 +299,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           <div style={style.label}>🏋️ Упражнения</div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr 1fr auto' : '1fr 0.5fr 0.5fr 0.5fr auto', gap: 4, marginBottom: 6, alignItems: 'end' }}>
             <div style={isMobile ? { gridColumn: '1 / -1' } : undefined}><label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Упражнение</label>
-              <select value={exId} onChange={e => setExId(e.target.value)} style={style.input}><option value="">— Выбрать —</option>{EXERCISE_CATALOG.slice(0, 50).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
+              <select value={exId} onChange={e => setExId(e.target.value)} style={style.input}><option value="">— Выбрать —</option>{EXERCISE_CATALOG.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
             </div>
             <div><label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label><input type="number" value={exW} onChange={e => setExW(parseFloat(e.target.value) || 0)} style={style.input} /></div>
             <div><label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Повт</label><input type="number" value={exR} onChange={e => setExR(parseInt(e.target.value) || 0)} style={style.input} /></div>
@@ -636,7 +636,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           {historyWorkouts.length > 0 && (() => {
             const byEx: Record<string, { date: string; e1rm: number }[]> = {};
             historyWorkouts.forEach((w: any) => (w.exercises || []).forEach((e: any) => {
-              const best = (e.sets || []).reduce((m: number, s: any) => Math.max(m, s.weight * (1 + (s.reps || 0) / 30)), 0);
+              const best = (e.sets || []).reduce((m: number, s: any) => Math.max(m, epley1RM(s.weight || 0, s.reps || 0)), 0);
               if (best <= 0) return;
               const name = e.exerciseName || e.exerciseId || '—';
               (byEx[name] = byEx[name] || []).push({ date: w.date, e1rm: Math.round(best) });

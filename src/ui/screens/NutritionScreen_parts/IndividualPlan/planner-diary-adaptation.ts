@@ -8,7 +8,9 @@
  *
  * Источник данных дневника: localStorage 'nutrition_diary'
  *   { [dateISO]: { meals: { [mealType]: [{ name, kcal, p, f, c, ... }] } } }
- */
+  */
+
+import { formatDate } from '../../../../core/utils/date-utils';
 
 export interface DiaryDaySummary {
   date: string;
@@ -82,7 +84,7 @@ export function getDiaryDaySummary(dateISO: string): DiaryDaySummary | null {
 export function getYesterdaySummary(): DiaryDaySummary | null {
   const d = new Date();
   d.setDate(d.getDate() - 1);
-  const iso = d.toISOString().split('T')[0];
+  const iso = formatDate(d);
   return getDiaryDaySummary(iso);
 }
 
@@ -193,11 +195,14 @@ export function computeRollingCompensation(
   daysBack = 7,
 ): CompensationResult {
   const yesterday = getYesterdaySummary();
-  // Собираем сводки за daysBack дней (вчера = index 1, ..., daysBack назад).
+  const raw = localStorage.getItem('nutrition_diary');
+  const diary = raw ? JSON.parse(raw) : {};
   const summaries: { day: number; s: DiaryDaySummary | null }[] = [];
   for (let i = 1; i <= daysBack; i++) {
     const d = new Date(); d.setDate(d.getDate() - i);
-    summaries.push({ day: i, s: getDiaryDaySummary(d.toISOString().split('T')[0]) });
+    const iso = formatDate(d);
+    const day = diary?.[iso];
+    summaries.push({ day: i, s: day?.meals ? getDiaryDaySummary(iso) : null });
   }
   const empty: CompensationResult = {
     applied: false, yesterday, target,

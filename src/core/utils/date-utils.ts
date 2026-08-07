@@ -1,6 +1,13 @@
+function localDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function formatDate(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toISOString().split('T')[0];
+  return localDateStr(d);
 }
 
 export function calculateAge(dateOfBirth: string): number {
@@ -22,7 +29,7 @@ export function isValidDate(dateString: string): boolean {
 export function addDays(date: Date | string, days: number): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  return localDateStr(d);
 }
 
 export function formatDateRange(startDate: string, endDate: string): string {
