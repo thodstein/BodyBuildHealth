@@ -11,8 +11,46 @@ import {
   compareWithLastWeek,
   sortEntries,
   paginate,
+  pearsonCorrelation,
+  crossCorrelation,
+  laggedCorrelation,
+  dailyCompletion,
+  defaultGoals,
+  todayIso,
   type DiaryKey,
 } from '../diary-helpers';
+
+const sleepEntry = (date: string, hours: number) => ({ date, fields: [{ label: 'Часы', value: String(hours), unit: 'ч' }] });
+const bpEntry = (date: string, sys: number, dia: number, pulse = 70) => ({ date, fields: [
+  { label: 'Систола', value: String(sys), unit: 'мм рт.ст.' },
+  { label: 'Диастола', value: String(dia), unit: 'мм рт.ст.' },
+  { label: 'Пульс', value: String(pulse), unit: 'уд/мин' },
+] });
+const weightEntry = (date: string, kg: number) => ({ date, fields: [{ label: 'Вес', value: String(kg), unit: 'кг' }] });
+const painEntry = (date: string, total: number) => ({ date, fields: [{ label: 'Суммарно', value: String(total), unit: '/70' }] });
+const neuroEntry = (date: string, count: number) => ({ date, fields: [{ label: 'Симптомов', value: String(count), unit: '/10' }] });
+
+const dayOffset = (offset: number): string => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + offset);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+describe('todayIso', () => {
+  it('возвращает YYYY-MM-DD формат', () => {
+    expect(todayIso()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('defaultGoals', () => {
+  it('возвращает нулевые цели', () => {
+    expect(defaultGoals()).toEqual({ sleepHours: 0, weightKg: 0, systolicTarget: 0 });
+  });
+});
 
 describe('computeDistribution', () => {
   it('возвращает null для пустого массива', () => {
@@ -57,7 +95,7 @@ describe('getNormalRange / classifyValue', () => {
   });
 
   it('возвращает null для неизвестного ключа', () => {
-    expect(getNormalRange('injection')).toBeNull();
+    expect(getNormalRange('injection' as DiaryKey)).toBeNull();
   });
 
   it('classifyValue: normal в диапазоне', () => {
@@ -86,7 +124,7 @@ describe('getNormalRange / classifyValue', () => {
   });
 
   it('classifyValue: неизвестный ключ — unknown', () => {
-    expect(classifyValue('injection', 5)).toBe('unknown');
+    expect(classifyValue('injection' as DiaryKey, 5)).toBe('unknown');
   });
 });
 
@@ -221,5 +259,97 @@ describe('paginate', () => {
     const r = paginate([1, 2], 1, 10);
     expect(r.pageItems).toEqual([1, 2]);
     expect(r.totalPages).toBe(1);
+  });
+});
+
+describe('pearsonCorrelation', () => {
+  it('возвращает null для <3 точек', () => {
+    expect(pearsonCorrelation([1, 2], [1, 2])).toBeNull();
+  });
+  it('идеальная прямая корреляция', () => {
+    const r = pearsonCorrelation([1, 2, 3, 4, 5], [2, 4, 6, 8, 10]);
+    expect(r).not.toBeNull();
+    expect(r!.r).toBeCloseTo(1, 5);
+    expect(r!.n).toBe(5);
+  });
+  it('идеальная обратная корреляция', () => {
+    const r = pearsonCorrelation([1, 2, 3, 4, 5], [10, 8, 6, 4, 2]);
+    expect(r).not.toBeNull();
+    expect(r!.r).toBeCloseTo(-1, 5);
+  });
+  it('нулевая корреляция', () => {
+    const r = pearsonCorrelation([1, 2, 3, 4, 5], [5, 5, 5, 5, 5]);
+    expect(r).toBeNull();
+  });
+});
+
+describe('crossCorrelation', () => {
+  it('возвращает null для <3 совпадающих дат', () => {
+    const r = crossCorrelation(
+      [{ date: '2025-01-01', value: 7 }, { date: '2025-01-02', value: 8 }],
+      [{ date: '2025-01-01', value: 120 }]
+    );
+    expect(r).toBeNull();
+  });
+  it('считает положительную корреляцию', () => {
+    const a = [
+      { date: '2025-01-01', value: 6 },
+      { date: '2025-01-02', value: 7 },
+      { date: '2025-01-03', value: 8 },
+      { date: '2025-01-04', value: 7 },
+    ];
+    const b = [
+      { date: '2025-01-01', value: 110 },
+      { date: '2025-01-02', value: 120 },
+      { date: '2025-01-03', value: 130 },
+      { date: '2025-01-04', value: 120 },
+    ];
+    const r = crossCorrelation(a, b);
+    expect(r).not.toBeNull();
+    expect(r!.r).toBeGreaterThan(0.8);
+    expect(r!.positive).toBe(true);
+    expect(r!.strength).toBe('strong');
+  });
+});
+
+describe('laggedCorrelation', () => {
+  it('считает связь со сдвигом', () => {
+    const a = [
+      { date: '2025-01-01', value: 5 },
+      { date: '2025-01-02', value: 6 },
+      { date: '2025-01-03', value: 7 },
+      { date: '2025-01-04', value: 8 },
+      { date: '2025-01-05', value: 9 },
+    ];
+    const b = [
+      { date: '2025-01-02', value: 110 },
+      { date: '2025-01-03', value: 120 },
+      { date: '2025-01-04', value: 130 },
+      { date: '2025-01-05', value: 140 },
+      { date: '2025-01-06', value: 150 },
+    ];
+    const r = laggedCorrelation(a, b, 1);
+    expect(r).not.toBeNull();
+    expect(r!.r).toBeGreaterThan(0.8);
+  });
+});
+
+describe('dailyCompletion', () => {
+  it('считает заполненность за сегодня', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const r = dailyCompletion([
+      { key: 'sleep' as DiaryKey, hasEntry: true, lastDate: today },
+      { key: 'bp' as DiaryKey, hasEntry: true, lastDate: today },
+      { key: 'weight' as DiaryKey, hasEntry: true, lastDate: '2025-01-01' },
+    ]);
+    expect(r.filled).toBe(2);
+    expect(r.total).toBe(3);
+    expect(r.pct).toBe(67);
+    expect(r.missing).toEqual(['weight']);
+  });
+  it('возвращает 0 при пустом массиве', () => {
+    const r = dailyCompletion([]);
+    expect(r.filled).toBe(0);
+    expect(r.pct).toBe(0);
   });
 });

@@ -439,6 +439,88 @@ export const paginate = <T,>(items: T[], page: number, pageSize: number): { page
   return { pageItems: items.slice(pageStart, pageEnd), totalPages, pageStart, pageEnd, total };
 };
 
+// ─── Корреляция между двумя дневниками ──────────────────────────────────
+
+export const pearsonCorrelation = (x: number[], y: number[]): { r: number; n: number } | null => {
+  const n = Math.min(x.length, y.length);
+  if (n < 3) return null;
+  const xs = x.slice(0, n);
+  const ys = y.slice(0, n);
+  const xm = xs.reduce((s, v) => s + v, 0) / n;
+  const ym = ys.reduce((s, v) => s + v, 0) / n;
+  let num = 0, dx = 0, dy = 0;
+  for (let i = 0; i < n; i++) {
+    const a = xs[i] - xm;
+    const b = ys[i] - ym;
+    num += a * b;
+    dx += a * a;
+    dy += b * b;
+  }
+  const denom = Math.sqrt(dx * dy);
+  if (denom === 0) return null;
+  return { r: num / denom, n };
+};
+
+/** Корреляция между двумя дневниками по датам (только совпадающие даты). */
+export const crossCorrelation = (
+  a: { date: string; value: number }[],
+  b: { date: string; value: number }[]
+): { r: number; n: number; positive: boolean; strength: 'weak' | 'moderate' | 'strong' } | null => {
+  const map = new Map(a.map(p => [p.date, p.value]));
+  const pairs: { x: number; y: number }[] = [];
+  for (const p of b) {
+    const av = map.get(p.date);
+    if (av !== undefined && Number.isFinite(av) && Number.isFinite(p.value)) {
+      pairs.push({ x: av, y: p.value });
+    }
+  }
+  if (pairs.length < 3) return null;
+  const xs = pairs.map(p => p.x);
+  const ys = pairs.map(p => p.y);
+  const res = pearsonCorrelation(xs, ys);
+  if (!res) return null;
+  const ar = Math.abs(res.r);
+  const strength: 'weak' | 'moderate' | 'strong' = ar >= 0.7 ? 'strong' : ar >= 0.4 ? 'moderate' : 'weak';
+  return { r: res.r, n: res.n, positive: res.r > 0, strength };
+};
+
+/** Лагованная корреляция: как b в будущем связан с a в прошлом (lag дней). */
+export const laggedCorrelation = (
+  a: { date: string; value: number }[],
+  b: { date: string; value: number }[],
+  lagDays: number
+): { r: number; n: number; positive: boolean; strength: 'weak' | 'moderate' | 'strong' } | null => {
+  const aMap = new Map(a.map(p => [p.date, p.value]));
+  const lagMs = lagDays * 86400000;
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (const p of b) {
+    const target = new Date(p.date).getTime() - lagMs;
+    const targetDate = new Date(target).toISOString().slice(0, 10);
+    const av = aMap.get(targetDate);
+    if (av !== undefined && Number.isFinite(av) && Number.isFinite(p.value)) {
+      xs.push(av);
+      ys.push(p.value);
+    }
+  }
+  const res = pearsonCorrelation(xs, ys);
+  if (!res) return null;
+  const ar = Math.abs(res.r);
+  const strength: 'weak' | 'moderate' | 'strong' = ar >= 0.7 ? 'strong' : ar >= 0.4 ? 'moderate' : 'weak';
+  return { r: res.r, n: res.n, positive: res.r > 0, strength };
+};
+
+// ─── Заполненность дневников за сегодня ──────────────────────────────────
+
+export const dailyCompletion = (
+  keys: { key: DiaryKey; hasEntry: boolean; lastDate?: string }[]
+): { filled: number; total: number; pct: number; missing: DiaryKey[] } => {
+  const today = todayIso();
+  const filled = keys.filter(k => k.hasEntry && k.lastDate === today).length;
+  const missing = keys.filter(k => !k.hasEntry || k.lastDate !== today).map(k => k.key);
+  return { filled, total: keys.length, pct: keys.length > 0 ? Math.round((filled / keys.length) * 100) : 0, missing };
+};
+
 // ─── Статистика распределения ──────────────────────────────────────────────
 
 export interface DistributionStats {
