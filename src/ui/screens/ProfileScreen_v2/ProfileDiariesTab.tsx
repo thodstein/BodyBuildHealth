@@ -817,6 +817,46 @@ const DiaryCard: React.FC<{
 
 interface QuickLink { icon: string; label: string; target: string; color: string; }
 
+interface UndoAction { label: string; undo: () => void; expiresAt: number; }
+let undoTimer: ReturnType<typeof setTimeout> | null = null;
+
+const Snackbar: React.FC<{ action: UndoAction | null; onDismiss: () => void }> = ({ action, onDismiss }) => {
+  useEffect(() => {
+    if (!action) return;
+    if (undoTimer) clearTimeout(undoTimer);
+    const remaining = Math.max(0, action.expiresAt - Date.now());
+    undoTimer = setTimeout(onDismiss, remaining);
+    return () => { if (undoTimer) { clearTimeout(undoTimer); undoTimer = null; } };
+  }, [action, onDismiss]);
+  if (!action) return null;
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        position: 'fixed', left: 12, right: 12, bottom: 80, zIndex: 1100,
+        maxWidth: 480, margin: '0 auto',
+        background: '#1f2937', border: '1px solid rgba(255,255,255,0.14)',
+        borderRadius: 12, padding: '10px 14px',
+        display: 'flex', alignItems: 'center', gap: 12,
+        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+        animation: 'snackbar-in 0.25s ease-out',
+      }}
+    >
+      <span style={{ flex: 1, color: '#fff', fontSize: 13 }}>{action.label}</span>
+      <button
+        onClick={() => { action.undo(); onDismiss(); }}
+        style={{ background: '#60a5fa', border: 'none', color: '#0a0a0a', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 32 }}
+      >↩ Отменить</button>
+      <button
+        onClick={onDismiss}
+        aria-label="Закрыть уведомление"
+        style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 18, cursor: 'pointer', minWidth: 32, minHeight: 32 }}
+      >✕</button>
+    </div>
+  );
+};
+
 const Sparkline: React.FC<{ points: { date: string; value: number }[]; color: string; width?: number; height?: number }> = ({ points, color, width = 320, height = 48 }) => {
   if (points.length < 2) return null;
   const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
@@ -908,6 +948,12 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
   const [addHematoOpen, setAddHematoOpen] = useState(false);
   const [diaryRange, setDiaryRange] = useState<'all' | '7' | '30' | '90'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+
+  const pushUndo = (label: string, undo: () => void) => {
+    setUndoAction({ label, undo, expiresAt: Date.now() + 5000 });
+  };
+  const dismissUndo = () => setUndoAction(null);
 
   interface DiaryGoals { sleepHours: number; weightKg: number; systolicTarget: number; }
   const GOALS_KEY = 'he_diary_goals';
@@ -1142,20 +1188,30 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
   });
 
   const deleteDiaryEntry = (key: DiaryKey, date: string) => {
-    if (!confirm(`Удалить запись от ${new Date(date).toLocaleDateString('ru-RU')}?`)) return;
-    const handler = (list: any[], setter: (v: any[]) => void, save: (v: any[]) => void) => {
-      const updated = list.filter(x => x.date !== date);
-      setter(updated);
-      save(updated);
+    const findList = (): { list: any[]; setter: (v: any[]) => void; save: (v: any[]) => void; keyName: string } | null => {
+      if (key === 'sleep') return { list: sleepEntries, setter: setSleepEntries, save: v => saveDiary(SLEEP_DIARY_KEY, v), keyName: SLEEP_DIARY_KEY };
+      if (key === 'bp') return { list: bpEntries, setter: setBpEntries, save: v => saveDiary(BP_DIARY_KEY, v), keyName: BP_DIARY_KEY };
+      if (key === 'injection') return { list: injectionEntries, setter: setInjectionEntries, save: v => saveDiary(INJECTION_DIARY_KEY, v), keyName: INJECTION_DIARY_KEY };
+      if (key === 'symptoms') return { list: symptomEntries, setter: setSymptomEntries, save: v => saveDiary(SYMPTOMS_DIARY_KEY, v), keyName: SYMPTOMS_DIARY_KEY };
+      if (key === 'pain') return { list: painEntries, setter: setPainEntries, save: v => saveDiary(PAIN_DIARY_KEY, v), keyName: PAIN_DIARY_KEY };
+      if (key === 'neuro') return { list: neuroEntries, setter: setNeuroEntries, save: v => saveDiary(NEURO_DIARY_KEY, v), keyName: NEURO_DIARY_KEY };
+      if (key === 'acne') return { list: acneEntries, setter: setAcneEntries, save: v => saveDiary(ACNE_DIARY_KEY, v), keyName: ACNE_DIARY_KEY };
+      if (key === 'hemato') return { list: hematoEntries, setter: setHematoEntries, save: v => saveDiary(HEMATO_DIARY_KEY, v), keyName: HEMATO_DIARY_KEY };
+      return null;
     };
-    if (key === 'sleep') handler(sleepEntries, setSleepEntries, v => saveDiary(SLEEP_DIARY_KEY, v));
-    else if (key === 'bp') handler(bpEntries, setBpEntries, v => saveDiary(BP_DIARY_KEY, v));
-    else if (key === 'injection') handler(injectionEntries, setInjectionEntries, v => saveDiary(INJECTION_DIARY_KEY, v));
-    else if (key === 'symptoms') handler(symptomEntries, setSymptomEntries, v => saveDiary(SYMPTOMS_DIARY_KEY, v));
-    else if (key === 'pain') handler(painEntries, setPainEntries, v => saveDiary(PAIN_DIARY_KEY, v));
-    else if (key === 'neuro') handler(neuroEntries, setNeuroEntries, v => saveDiary(NEURO_DIARY_KEY, v));
-    else if (key === 'acne') handler(acneEntries, setAcneEntries, v => saveDiary(ACNE_DIARY_KEY, v));
-    else if (key === 'hemato') handler(hematoEntries, setHematoEntries, v => saveDiary(HEMATO_DIARY_KEY, v));
+    const ctx = findList();
+    if (!ctx) return;
+    const removed = ctx.list.find(x => x.date === date);
+    if (!removed) return;
+    const updated = ctx.list.filter(x => x.date !== date);
+    ctx.setter(updated);
+    ctx.save(updated);
+    const dateLabel = new Date(date).toLocaleDateString('ru-RU');
+    pushUndo(`Запись от ${dateLabel} удалена`, () => {
+      const restored = [...updated, removed].sort((a, b) => a.date.localeCompare(b.date));
+      ctx.setter(restored);
+      ctx.save(restored);
+    });
   };
 
   const exportDiaryCSV = (key: DiaryKey, entries: typeof activeEntries) => {
@@ -1192,18 +1248,31 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
 
   const clearActiveDiary = () => {
     if (!activeDiary) return;
-    if (!confirm(`Удалить ВСЕ записи дневника «${DIARY_META[activeDiary].title}»? Это действие необратимо.`)) return;
-    if (activeDiary === 'sleep') { saveDiary(SLEEP_DIARY_KEY, []); setSleepEntries([]); }
-    else if (activeDiary === 'bp') { saveDiary(BP_DIARY_KEY, []); setBpEntries([]); }
-    else if (activeDiary === 'injection') { saveDiary(INJECTION_DIARY_KEY, []); setInjectionEntries([]); }
-    else if (activeDiary === 'symptoms') { saveDiary(SYMPTOMS_DIARY_KEY, []); setSymptomEntries([]); }
-    else if (activeDiary === 'pain') { saveDiary(PAIN_DIARY_KEY, []); setPainEntries([]); }
-    else if (activeDiary === 'neuro') { saveDiary(NEURO_DIARY_KEY, []); setNeuroEntries([]); }
-    else if (activeDiary === 'acne') { saveDiary(ACNE_DIARY_KEY, []); setAcneEntries([]); }
-    else if (activeDiary === 'hemato') { saveDiary(HEMATO_DIARY_KEY, []); setHematoEntries([]); }
-    if (typeof window !== 'undefined' && (window as any).showToast) {
-      (window as any).showToast(`🧹 Дневник «${DIARY_META[activeDiary].title}» очищен`);
-    }
+    if (!confirm(`Удалить ВСЕ записи дневника «${DIARY_META[activeDiary].title}»?`)) return;
+    const snapshot = getEntryArray(activeDiary).map(x => ({ ...x }));
+    const doClear = () => {
+      if (activeDiary === 'sleep') { saveDiary(SLEEP_DIARY_KEY, []); setSleepEntries([]); }
+      else if (activeDiary === 'bp') { saveDiary(BP_DIARY_KEY, []); setBpEntries([]); }
+      else if (activeDiary === 'injection') { saveDiary(INJECTION_DIARY_KEY, []); setInjectionEntries([]); }
+      else if (activeDiary === 'symptoms') { saveDiary(SYMPTOMS_DIARY_KEY, []); setSymptomEntries([]); }
+      else if (activeDiary === 'pain') { saveDiary(PAIN_DIARY_KEY, []); setPainEntries([]); }
+      else if (activeDiary === 'neuro') { saveDiary(NEURO_DIARY_KEY, []); setNeuroEntries([]); }
+      else if (activeDiary === 'acne') { saveDiary(ACNE_DIARY_KEY, []); setAcneEntries([]); }
+      else if (activeDiary === 'hemato') { saveDiary(HEMATO_DIARY_KEY, []); setHematoEntries([]); }
+    };
+    doClear();
+    const keyName = DIARY_META[activeDiary].storageKey;
+    pushUndo(`🧹 Дневник «${DIARY_META[activeDiary].title}» очищен (${snapshot.length})`, () => {
+      if (keyName) saveDiary(keyName, snapshot);
+      if (activeDiary === 'sleep') setSleepEntries(snapshot as SleepEntry[]);
+      else if (activeDiary === 'bp') setBpEntries(snapshot as BPEntry[]);
+      else if (activeDiary === 'injection') setInjectionEntries(snapshot as InjectionEntry[]);
+      else if (activeDiary === 'symptoms') setSymptomEntries(snapshot as SymptomEntry[]);
+      else if (activeDiary === 'pain') setPainEntries(snapshot as PainEntry[]);
+      else if (activeDiary === 'neuro') setNeuroEntries(snapshot as NeuroEntry[]);
+      else if (activeDiary === 'acne') setAcneEntries(snapshot as AcneEntry[]);
+      else if (activeDiary === 'hemato') setHematoEntries(snapshot as HematoEntry[]);
+    });
   };
 
   const exportAllDiaries = () => {
@@ -1261,32 +1330,51 @@ export const ProfileDiariesTab: React.FC<{ onNavigate?: (screen: string) => void
   const printActiveDiary = () => {
     if (!activeDiary) return;
     const meta = DIARY_META[activeDiary];
+    const allLabels = Array.from(new Set(activeEntriesRaw.flatMap(e => e.fields.map(f => f.label))));
+    const summary = computeSummary(activeDiary, activeEntriesRaw);
+    const summaryHtml = summary ? summary.map(s => `<div class="sum"><div class="muted">${s.label}</div><div class="v" style="color:${s.color}">${s.value}</div></div>`).join('') : '';
+    const anomalies = detectAnomalies(activeDiary, activeEntriesRaw);
+    const anomalyRows = anomalies.length === 0
+      ? '<tr><td colspan="3" style="color:#22c55e">Аномалий не выявлено</td></tr>'
+      : anomalies.map(a => `<tr><td>${new Date(a.date).toLocaleDateString('ru-RU')}</td><td style="color:${a.severity === 'danger' ? '#ef4444' : '#f59e0b'};font-weight:700">${a.severity === 'danger' ? '⚠️ ВЫСОКИЙ' : '⚠ ВНИМАНИЕ'}</td><td>${a.message}</td></tr>`).join('');
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${meta.title} — отчёт</title>
 <style>
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0a;color:#fafafa;padding:24px;max-width:780px;margin:0 auto;}
-h1{color:${meta.color};border-bottom:2px solid ${meta.color};padding-bottom:8px;}
-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px;}
-th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #222;}
-th{color:${meta.color};}
-.muted{color:#777;font-size:12px;}
+@page { size: A4; margin: 14mm; }
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#fff;color:#111;padding:18px;max-width:780px;margin:0 auto;}
+h1{color:${meta.color};border-bottom:3px solid ${meta.color};padding-bottom:6px;margin:0 0 8px;font-size:22px;}
+h2{color:#333;font-size:15px;margin:18px 0 6px;}
+.meta{color:#666;font-size:11px;margin-bottom:14px;}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;margin-bottom:14px;}
+.sum{padding:8px;border:1px solid #ddd;border-radius:6px;background:#fafafa;}
+.sum .muted{color:#777;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;}
+.sum .v{font-size:18px;font-weight:800;margin-top:2px;}
+table{width:100%;border-collapse:collapse;margin-top:6px;font-size:11px;}
+th,td{text-align:left;padding:5px 6px;border-bottom:1px solid #e5e5e5;}
+th{background:#f3f3f3;color:#444;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;}
+tr:nth-child(even){background:#fafafa;}
+.muted{color:#999;font-size:10px;margin-top:14px;text-align:right;}
+@media print{body{padding:0;}}
 </style></head><body>
 <h1>${meta.icon} ${meta.title}</h1>
-<p class="muted">Отчёт сформирован: ${new Date().toLocaleString('ru-RU')}</p>
-<p class="muted">Записей: ${activeEntriesRaw.length}${diaryRange !== 'all' ? ` (показано ${activeEntries.length} за период ${diaryRange} дней)` : ''}</p>
-<table><thead><tr><th>Дата</th>${Array.from(new Set(activeEntriesRaw.flatMap(e => e.fields.map(f => f.label)))).map(l => `<th>${l}</th>`).join('')}<th>Заметка</th></tr></thead><tbody>
-${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-RU')}</td>${Array.from(new Set(activeEntriesRaw.flatMap(e2 => e2.fields.map(f => f.label)))).map(l => {
+<div class="meta">Отчёт сформирован: ${new Date().toLocaleString('ru-RU')} · Записей: ${activeEntriesRaw.length}${diaryRange !== 'all' ? ` (показано ${activeEntries.length} за период ${diaryRange} дней)` : ''}</div>
+${summaryHtml ? `<h2>Сводка</h2><div class="summary">${summaryHtml}</div>` : ''}
+<h2>Записи</h2>
+<table><thead><tr><th>Дата</th>${allLabels.map(l => `<th>${l}</th>`).join('')}<th>Заметка</th></tr></thead><tbody>
+${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-RU')}</td>${allLabels.map(l => {
       const f = e.fields.find(x => x.label === l);
-      return `<td>${f ? f.value + (f.unit ? ' ' + f.unit : '') : ''}</td>`;
-    }).join('')}<td>${(e.fields.find(f => f.label === 'Заметка')?.value) || ''}</td></tr>`).join('')}
+      return `<td>${f ? f.value + (f.unit ? ' ' + f.unit : '') : '—'}</td>`;
+    }).join('')}<td>${(e.fields.find(f => f.label === 'Заметка')?.value) || '—'}</td></tr>`).join('')}
 </tbody></table>
-<p class="muted">BodyBuildHealth · профильные дневники</p>
+<h2>Аномалии и предупреждения</h2>
+<table><thead><tr><th>Дата</th><th>Уровень</th><th>Описание</th></tr></thead><tbody>${anomalyRows}</tbody></table>
+<div class="muted">BodyBuildHealth · профильные дневники</div>
 </body></html>`;
     const w = window.open('', '_blank');
     if (w) {
       w.document.write(html);
       w.document.close();
       w.focus();
-      setTimeout(() => w.print(), 250);
+      setTimeout(() => w.print(), 300);
     } else {
       if ((window as any).showToast) (window as any).showToast('⚠ Не удалось открыть окно печати — разрешите всплывающие окна');
     }
@@ -1588,11 +1676,32 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
           >📥 Импорт</button>
           <button
             onClick={() => {
-              if (!confirm('Удалить ВСЕ записи ВСЕХ встроенных дневников? Это действие необратимо.')) return;
+              if (!confirm('Удалить ВСЕ записи ВСЕХ встроенных дневников?')) return;
+              const snap = {
+                [SLEEP_DIARY_KEY]: [...sleepEntries] as any[],
+                [BP_DIARY_KEY]: [...bpEntries] as any[],
+                [INJECTION_DIARY_KEY]: [...injectionEntries] as any[],
+                [SYMPTOMS_DIARY_KEY]: [...symptomEntries] as any[],
+                [PAIN_DIARY_KEY]: [...painEntries] as any[],
+                [NEURO_DIARY_KEY]: [...neuroEntries] as any[],
+                [ACNE_DIARY_KEY]: [...acneEntries] as any[],
+                [HEMATO_DIARY_KEY]: [...hematoEntries] as any[],
+              };
+              const total = Object.values(snap).reduce((s, a) => s + a.length, 0);
               [SLEEP_DIARY_KEY, BP_DIARY_KEY, INJECTION_DIARY_KEY, SYMPTOMS_DIARY_KEY, PAIN_DIARY_KEY, NEURO_DIARY_KEY, ACNE_DIARY_KEY, HEMATO_DIARY_KEY].forEach(k => saveDiary(k, []));
               setSleepEntries([]); setBpEntries([]); setInjectionEntries([]); setSymptomEntries([]);
               setPainEntries([]); setNeuroEntries([]); setAcneEntries([]); setHematoEntries([]);
-              if ((window as any).showToast) (window as any).showToast('🧹 Все встроенные дневники очищены');
+              pushUndo(`🧹 Очищены все встроенные дневники (${total})`, () => {
+                setSleepEntries(snap[SLEEP_DIARY_KEY] as SleepEntry[]);
+                setBpEntries(snap[BP_DIARY_KEY] as BPEntry[]);
+                setInjectionEntries(snap[INJECTION_DIARY_KEY] as InjectionEntry[]);
+                setSymptomEntries(snap[SYMPTOMS_DIARY_KEY] as SymptomEntry[]);
+                setPainEntries(snap[PAIN_DIARY_KEY] as PainEntry[]);
+                setNeuroEntries(snap[NEURO_DIARY_KEY] as NeuroEntry[]);
+                setAcneEntries(snap[ACNE_DIARY_KEY] as AcneEntry[]);
+                setHematoEntries(snap[HEMATO_DIARY_KEY] as HematoEntry[]);
+                Object.entries(snap).forEach(([k, v]) => saveDiary(k, v as any[]));
+              });
             }}
             style={{ padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 6 }}
           >🗑 Сбросить всё</button>
@@ -1680,9 +1789,10 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
                 <>
                   <button
                     onClick={() => printActiveDiary()}
-                    aria-label="Печать отчёта"
+                    aria-label="Печать или экспорт в PDF"
+                    title="В диалоге печати можно выбрать «Сохранить как PDF»"
                     style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa' }}
-                  >🖨 Печать</button>
+                  >📄 PDF / Печать</button>
                   <button
                     onClick={() => clearActiveDiary()}
                     aria-label="Очистить весь дневник"
@@ -1789,12 +1899,29 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
                     <span style={{ fontSize: 10, fontWeight: 700, color: DIARY_META[activeDiary].color }}>📅 {group.label}</span>
                     <span style={{ fontSize: 9, color: colors.textMuted }}>· {group.entries.length} {group.entries.length === 1 ? 'запись' : group.entries.length < 5 ? 'записи' : 'записей'}</span>
                   </div>
-                  {group.entries.map((entry, i) => (
-                    <div key={`${group.label}-${entry.date}-${i}`} style={{ padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${DIARY_META[activeDiary].color}22`, transition: 'background 0.15s' }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}>
+                  {group.entries.map((entry, i) => {
+                    const anomalies = detectAnomalies(activeDiary, [entry]);
+                    const dangerCount = anomalies.filter(a => a.severity === 'danger').length;
+                    const warnCount = anomalies.filter(a => a.severity === 'warn').length;
+                    const anomalyLevel = dangerCount > 0 ? 'danger' : warnCount > 0 ? 'warn' : null;
+                    const rowColor = anomalyLevel === 'danger' ? '#ef4444' : anomalyLevel === 'warn' ? '#f59e0b' : DIARY_META[activeDiary].color;
+                    return (
+                    <div key={`${group.label}-${entry.date}-${i}`} style={{
+                      padding: 10, borderRadius: 8,
+                      background: anomalyLevel === 'danger' ? 'rgba(239,68,68,0.08)' : anomalyLevel === 'warn' ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${rowColor}66`,
+                      transition: 'background 0.15s, transform 0.15s',
+                      animation: `diary-row-in 0.25s ease-out ${i * 0.04}s both`,
+                      ...(anomalyLevel === 'danger' ? { animation: `diary-row-in 0.25s ease-out ${i * 0.04}s both, diary-pulse 1.6s ease-out infinite` } : {}),
+                    }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = anomalyLevel === 'danger' ? 'rgba(239,68,68,0.12)' : anomalyLevel === 'warn' ? 'rgba(245,158,11,0.10)' : 'rgba(255,255,255,0.06)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = anomalyLevel === 'danger' ? 'rgba(239,68,68,0.08)' : anomalyLevel === 'warn' ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.03)')}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: DIARY_META[activeDiary].color }}>{new Date(entry.date).toLocaleDateString('ru-RU')}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: rowColor }}>{new Date(entry.date).toLocaleDateString('ru-RU')}</span>
+                          {anomalyLevel === 'danger' && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.2)', color: '#ef4444' }}>⚠️ АНОМАЛИЯ</span>}
+                          {anomalyLevel === 'warn' && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(245,158,11,0.2)', color: '#f59e0b' }}>⚠ Внимание</span>}
+                        </div>
                         <button
                           onClick={() => deleteDiaryEntry(activeDiary, entry.date)}
                           aria-label={`Удалить запись ${new Date(entry.date).toLocaleDateString('ru-RU')}`}
@@ -1810,8 +1937,14 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
                           </div>
                         ))}
                       </div>
+                      {anomalies.length > 0 && (
+                        <div style={{ marginTop: 6, padding: '4px 8px', borderRadius: 4, fontSize: 10, background: 'rgba(0,0,0,0.25)', color: rowColor, fontWeight: 600 }}>
+                          ⚠ {anomalies.map(a => a.message).join(' · ')}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ))}
             </div>
@@ -1929,6 +2062,23 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
         }}
       />
       </>}
+
+      <style>{`
+        @keyframes snackbar-in {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes diary-row-in {
+          from { transform: translateX(-8px); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes diary-pulse {
+          0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+          70% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+          100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+        }
+      `}</style>
+      <Snackbar action={undoAction} onDismiss={dismissUndo} />
     </div>
   );
 };
