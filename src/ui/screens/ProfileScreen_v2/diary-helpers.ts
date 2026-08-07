@@ -359,3 +359,171 @@ export const filterByRange = (
     return d >= cutoff;
   });
 };
+
+// ─── Статистика распределения ──────────────────────────────────────────────
+
+export interface DistributionStats {
+  count: number;
+  min: number;
+  max: number;
+  mean: number;
+  median: number;
+  stdDev: number;
+  p25: number;
+  p75: number;
+  iqr: number;
+}
+
+export const computeDistribution = (values: number[]): DistributionStats | null => {
+  const v = values.filter(x => Number.isFinite(x));
+  if (v.length < 2) return null;
+  const sorted = [...v].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  const sum = v.reduce((s, x) => s + x, 0);
+  const mean = sum / v.length;
+  const variance = v.reduce((s, x) => s + (x - mean) ** 2, 0) / v.length;
+  const stdDev = Math.sqrt(variance);
+  const q = (p: number) => {
+    const idx = (sorted.length - 1) * p;
+    const lo = Math.floor(idx);
+    const hi = Math.ceil(idx);
+    if (lo === hi) return sorted[lo];
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+  };
+  const median = q(0.5);
+  const p25 = q(0.25);
+  const p75 = q(0.75);
+  return { count: v.length, min, max, mean, median, stdDev, p25, p75, iqr: p75 - p25 };
+};
+
+// ─── Зоны нормы по типу дневника ───────────────────────────────────────────
+
+export interface NormalRange {
+  low: number;
+  high: number;
+  warnLow?: number;
+  warnHigh?: number;
+  unit: string;
+  description: string;
+}
+
+const NORMAL_RANGES: Partial<Record<DiaryKey, NormalRange>> = {
+  sleep: { low: 7, high: 9, warnLow: 6, warnHigh: 10, unit: 'ч', description: 'Норма сна для взрослого: 7–9 ч' },
+  bp: { low: 90, high: 120, warnLow: 80, warnHigh: 140, unit: 'мм рт.ст.', description: 'Норма систолического АД: 90–120' },
+  weight: { low: 50, high: 120, unit: 'кг', description: 'Вес в пределах нормы ИМТ' },
+  measurements: { low: 60, high: 100, unit: 'см', description: 'Талия в пределах нормы' },
+  pain: { low: 0, high: 20, warnLow: 0, warnHigh: 40, unit: '/70', description: 'Боль в суставах: ≤20 из 70' },
+  neuro: { low: 0, high: 1, warnLow: 0, warnHigh: 4, unit: '/10', description: 'Нейросимптомы: ≤1 из 10' },
+  acne: { low: 0, high: 3, warnLow: 0, warnHigh: 7, unit: '/12', description: 'Акне: ≤3 из 12' },
+  hemato: { low: 0, high: 1, warnLow: 0, warnHigh: 2, unit: '/8', description: 'Гематологические симптомы: ≤1 из 8' },
+};
+
+export const getNormalRange = (key: DiaryKey): NormalRange | null => NORMAL_RANGES[key] || null;
+
+export const classifyValue = (key: DiaryKey, value: number): 'normal' | 'warn' | 'danger' | 'unknown' => {
+  const r = NORMAL_RANGES[key];
+  if (!r) return 'unknown';
+  if (value >= r.low && value <= r.high) return 'normal';
+  if (r.warnLow !== undefined && value < r.warnLow) return 'danger';
+  if (r.warnHigh !== undefined && value > r.warnHigh) return 'danger';
+  return 'warn';
+};
+
+// ─── Гистограмма по неделям ────────────────────────────────────────────────
+
+export const buildWeeklyHistogram = (
+  values: { date: string; value: number }[]
+): { weekStart: string; count: number; sum: number; mean: number; min: number; max: number }[] => {
+  if (values.length === 0) return [];
+  const groups: Record<string, number[]> = {};
+  for (const v of values) {
+    const d = new Date(v.date);
+    if (isNaN(d.getTime())) continue;
+    const start = new Date(d);
+    start.setHours(0, 0, 0, 0);
+    const dow = d.getDay() === 0 ? 6 : d.getDay() - 1;
+    start.setDate(d.getDate() - dow);
+    const key = start.toISOString().slice(0, 10);
+    if (!groups[key]) groups[key] = [];
+    if (Number.isFinite(v.value)) groups[key].push(v.value);
+  }
+  const result: { weekStart: string; count: number; sum: number; mean: number; min: number; max: number }[] = [];
+  for (const k of Object.keys(groups).sort()) {
+    const arr = groups[k];
+    if (arr.length === 0) continue;
+    result.push({
+      weekStart: k,
+      count: arr.length,
+      sum: arr.reduce((s, v) => s + v, 0),
+      mean: arr.reduce((s, v) => s + v, 0) / arr.length,
+      min: Math.min(...arr),
+      max: Math.max(...arr),
+    });
+  }
+  return result;
+};
+
+// ─── Распределение по часам суток (для дневников с полем «время») ─────────
+
+export const buildHourDistribution = (dates: string[]): { hour: number; count: number }[] => {
+  const counts = new Array(24).fill(0);
+  for (const d of dates) {
+    const date = new Date(d);
+    if (isNaN(date.getTime())) continue;
+    counts[date.getHours()]++;
+  }
+  return counts.map((c, i) => ({ hour: i, count: c }));
+};
+
+// ─── Экспорт SVG в PNG через Canvas ────────────────────────────────────────
+
+export const exportSvgAsPng = (svgEl: SVGSVGElement, filename: string) => {
+  const serializer = new XMLSerializer();
+  const svgString = serializer.serializeToString(svgEl);
+  const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    const w = svgEl.clientWidth || svgEl.viewBox.baseVal.width || 600;
+    const h = svgEl.clientHeight || svgEl.viewBox.baseVal.height || 200;
+    const scale = 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = w * scale;
+    canvas.height = h * scale;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) { URL.revokeObjectURL(url); return; }
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((pngBlob) => {
+      if (!pngBlob) { URL.revokeObjectURL(url); return; }
+      const pngUrl = URL.createObjectURL(pngBlob);
+      const a = document.createElement('a');
+      a.href = pngUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => { URL.revokeObjectURL(pngUrl); URL.revokeObjectURL(url); }, 500);
+    }, 'image/png');
+  };
+  img.onerror = () => URL.revokeObjectURL(url);
+  img.src = url;
+};
+
+// ─── Экспорт SVG как файл ──────────────────────────────────────────────────
+
+export const exportSvgAsFile = (svgEl: SVGSVGElement, filename: string) => {
+  const serializer = new XMLSerializer();
+  const svgString = serializer.serializeToString(svgEl);
+  const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+};

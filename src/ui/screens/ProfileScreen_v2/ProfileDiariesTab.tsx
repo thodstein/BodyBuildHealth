@@ -18,6 +18,13 @@ import {
   targetHit,
   detectAnomalies,
   filterByRange,
+  computeDistribution,
+  getNormalRange,
+  classifyValue,
+  buildWeeklyHistogram,
+  buildHourDistribution,
+  exportSvgAsPng,
+  exportSvgAsFile,
   type DiaryKey,
   type DiaryEntryLike,
   type DiaryGoals,
@@ -1882,7 +1889,7 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
             );
           })()}
 
-          {/* Полноценный график */}
+          {/* Полноценный график с зонами нормы и экспортом */}
           {activeEntries.length >= 1 && (() => {
             const points = buildSparkline(activeDiary, activeEntries);
             if (points.length < 1) return null;
@@ -1893,19 +1900,135 @@ ${activeEntriesRaw.map(e => `<tr><td>${new Date(e.date).toLocaleDateString('ru-R
               return null;
             })();
             const unit = DIARY_META[activeDiary].unit || '';
+            const range = getNormalRange(activeDiary);
+            const safeDate = new Date().toISOString().slice(0, 10);
             return (
               <div style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${DIARY_META[activeDiary].color}33`, marginBottom: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>📈 График по датам</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>📈 График по датам</div>
+                    {range && (
+                      <div style={{ fontSize: 9, color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '2px 6px', borderRadius: 4 }} title={range.description}>
+                        Норма: {range.low}–{range.high}{unit}
+                      </div>
+                    )}
+                  </div>
                   <div style={{ fontSize: 9, color: colors.textMuted }}>{points.length} точек · {unit}</div>
                 </div>
                 <FullChart
                   points={points}
                   color={DIARY_META[activeDiary].color}
                   target={targetVal}
+                  normalRange={range}
                   unit={unit}
                   height={200}
+                  onExportSvg={(svg) => exportSvgAsFile(svg, `${activeDiary}-chart-${safeDate}.svg`)}
+                  onExportPng={(svg) => exportSvgAsPng(svg, `${activeDiary}-chart-${safeDate}.png`)}
                 />
+              </div>
+            );
+          })()}
+
+          {/* Гистограмма по неделям */}
+          {activeEntries.length >= 2 && (() => {
+            const points = buildSparkline(activeDiary, activeEntries);
+            const weeks = buildWeeklyHistogram(points);
+            if (weeks.length < 2) return null;
+            const maxCount = Math.max(...weeks.map(w => w.count));
+            const maxMean = Math.max(...weeks.map(w => w.mean));
+            const minMean = Math.min(...weeks.map(w => w.mean));
+            const color = DIARY_META[activeDiary].color;
+            const unit = DIARY_META[activeDiary].unit || '';
+            return (
+              <div style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${color}33`, marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>📊 По неделям ({weeks.length})</div>
+                  <div style={{ fontSize: 9, color: colors.textMuted }}>Столбик = среднее{unit ? ` ${unit}` : ''}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 100, padding: '4px 0' }}>
+                  {weeks.map((w, i) => {
+                    const h = maxMean > minMean ? ((w.mean - minMean) / (maxMean - minMean || 1)) * 80 + 15 : 60;
+                    const dateLabel = new Date(w.weekStart).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+                    return (
+                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0 }} title={`Неделя с ${dateLabel}: ${w.count} записей, среднее ${w.mean.toFixed(1)}${unit}, мин ${w.min.toFixed(1)}, макс ${w.max.toFixed(1)}`}>
+                        <div style={{ fontSize: 9, color: color, fontWeight: 700, marginBottom: 2 }}>{w.mean.toFixed(1)}</div>
+                        <div style={{
+                          width: '100%', maxWidth: 40, height: `${h}px`,
+                          background: `linear-gradient(180deg, ${color}, ${color}66)`,
+                          borderRadius: '4px 4px 0 0', border: `1px solid ${color}99`,
+                          position: 'relative',
+                        }}>
+                          <div style={{ position: 'absolute', top: 2, left: 0, right: 0, textAlign: 'center', fontSize: 7, color: '#fff', fontWeight: 700 }}>{w.count}</div>
+                        </div>
+                        <div style={{ fontSize: 7, color: colors.textMuted, marginTop: 3, whiteSpace: 'nowrap' }}>{dateLabel}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Статистика распределения + распределение по часам */}
+          {activeEntries.length >= 3 && (() => {
+            const points = buildSparkline(activeDiary, activeEntries);
+            const values = points.map(p => p.value);
+            const stats = computeDistribution(values);
+            const hourDist = buildHourDistribution(activeEntriesRaw.map(e => e.date));
+            const maxHour = Math.max(...hourDist.map(h => h.count), 1);
+            const lastClass = activeEntries[0] ? classifyValue(activeDiary, parseFloat(activeEntries[0].fields[0]?.value || 'NaN')) : 'unknown';
+            const lastVal = activeEntries[0] ? activeEntries[0].fields[0]?.value : null;
+            const lastUnit = activeEntries[0] ? activeEntries[0].fields[0]?.unit : '';
+            return (
+              <div style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${DIARY_META[activeDiary].color}33`, marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>📈 Статистика</div>
+                  {lastVal && (
+                    <div style={{
+                      fontSize: 9, padding: '2px 6px', borderRadius: 4,
+                      background: lastClass === 'normal' ? 'rgba(34,197,94,0.18)' : lastClass === 'warn' ? 'rgba(245,158,11,0.18)' : lastClass === 'danger' ? 'rgba(239,68,68,0.18)' : 'rgba(255,255,255,0.06)',
+                      color: lastClass === 'normal' ? '#22c55e' : lastClass === 'warn' ? '#f59e0b' : lastClass === 'danger' ? '#ef4444' : colors.textMuted,
+                      fontWeight: 700,
+                    }}>Последняя: {lastVal}{lastUnit} · {lastClass === 'normal' ? '✅ норма' : lastClass === 'warn' ? '⚠ внимание' : lastClass === 'danger' ? '⚠️ опасно' : '—'}</div>
+                  )}
+                </div>
+                {stats && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 4, marginBottom: 8 }}>
+                    {[
+                      { l: 'Среднее', v: stats.mean.toFixed(1) },
+                      { l: 'Медиана', v: stats.median.toFixed(1) },
+                      { l: 'σ (SD)', v: stats.stdDev.toFixed(1) },
+                      { l: 'P25', v: stats.p25.toFixed(1) },
+                      { l: 'P75', v: stats.p75.toFixed(1) },
+                      { l: 'IQR', v: stats.iqr.toFixed(1) },
+                    ].map(s => (
+                      <div key={s.l} style={{ padding: '5px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: 5, textAlign: 'center' }}>
+                        <div style={{ fontSize: 8, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3 }}>{s.l}</div>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: DIARY_META[activeDiary].color }}>{s.v}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Распределение по часам суток */}
+                <div style={{ fontSize: 9, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>⏰ По времени суток</div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1, height: 50 }}>
+                  {hourDist.map((h, i) => {
+                    const barH = (h.count / maxHour) * 40;
+                    const isHigh = h.count > 0;
+                    return (
+                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0 }} title={`${i}:00 — ${i + 1}:00: ${h.count} записей`}>
+                        <div style={{
+                          width: '100%', maxWidth: 18, height: `${barH}px`,
+                          background: isHigh ? DIARY_META[activeDiary].color : 'rgba(255,255,255,0.06)',
+                          borderRadius: '2px 2px 0 0', opacity: isHigh ? 0.9 : 0.4,
+                        }} />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: colors.textMuted, marginTop: 2 }}>
+                  <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:00</span>
+                </div>
               </div>
             );
           })()}
