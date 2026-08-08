@@ -556,6 +556,12 @@
 .macrocycle-popup-input input { min-height: 44px; padding: 8px; border: 1px solid var(--input-border); border-radius: 10px; background: var(--input-bg); color: var(--text); font-size: 16px; }
 
 @media (max-width: 480px) {
+  /* TrainingScreen is already inside the app's single scroll container (main).
+     A nested scroll here makes the manual PL editor overlap its lower panels. */
+  .training-screen {
+    overflow: visible !important;
+    min-height: 0 !important;
+  }
   .manual-constructor { padding-bottom: calc(var(--bottom-nav-h, 64px) + 12px); }
   .manual-constructor__sticky-header { position: sticky; top: 0; max-width: 100%; overflow-x: auto; }
   .manual-constructor--editor { gap: 8px !important; }
