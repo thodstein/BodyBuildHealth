@@ -95,6 +95,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
   useEffect(() => {
     if (initialSubTab === 'reports') {
       setTab('main'); setSupportView('calc'); setCalcView('reports');
+    } else if (initialSubTab === 'diary') {
+      setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('favorites');
+      setCombinedFavDiaryTab('diary');
+    } else if (initialSubTab === 'symptoms') {
+      setTab('main'); setSection('protocols'); setProtocolTab('symptoms');
     }
   }, [initialSubTab]);
   const [tab, setTab] = useState<SupportTab>(resolveTab());

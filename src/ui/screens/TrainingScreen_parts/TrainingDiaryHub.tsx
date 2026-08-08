@@ -108,7 +108,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   });
 
   useEffect(() => { setMeasurements(loadMeasurements()); try { if (localStorage.getItem('he_training_report_current')) setTrainingReportGenerated(true); } catch {} }, []);
-  const measureAnalytics = useMemo(() => analyzeMeasurements(175), [measurements]);
+  const measureAnalytics = useMemo(() => analyzeMeasurements(linked?.profile?.settings?.personal?.height || 175), [measurements.length]);
 
   useEffect(() => {
     if (historyWorkouts.length > 0) {

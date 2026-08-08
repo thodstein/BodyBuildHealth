@@ -141,4 +141,15 @@ describe('lab-trend.engine', () => {
     expect(trend.predictedValue).toBeUndefined();
     expect(trend.predictionConfidence).toBeUndefined();
   });
+
+  it('ignores labs with missing or invalid dates', () => {
+    const labs = [
+      lab('ALT', 30, '2024-01-01'),
+      lab('ALT', 35, ''),
+      lab('ALT', 40, '2024-03-01'),
+    ] as any[];
+    const result = computeLabTrends(labs);
+    expect(result.trends.length).toBeGreaterThanOrEqual(1);
+    expect(result.trends[0].code).toBe('ALT');
+  });
 });

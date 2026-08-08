@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { barPathAnalysis, diagnoseLift, stickingPhases, type BarPathIssue } from '../../../engines/pro/lift-diagnostics.engine';
 import type { Lift, WeakPoint } from '../../../engines/lms/weakpoint-pl';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.55)';
@@ -11,6 +12,13 @@ const ISSUE_RU: Record<BarPathIssue, string> = {
   good_morning: 'Good-morning присед',
   bar_loops: 'Петлеобразная траектория',
   asymmetric: 'Асимметрия сторон',
+};
+const BAR_PATH_EXERCISES: Record<BarPathIssue, string[]> = {
+  forward_drift: ['Румынская тяга', 'Наклоны'],
+  hips_shoot_up: ['Присед на груди', 'Присед с паузой'],
+  good_morning: ['Присед на груди', 'Болгарские сплит-приседы'],
+  bar_loops: ['Скоростной жим', 'Присед с остановками'],
+  asymmetric: ['Выпады', 'Болгарские сплит-приседы'],
 };
 
 const CARD: React.CSSProperties = {
@@ -25,6 +33,8 @@ export const PlDeadpointsBarPathCard: React.FC = () => {
   const [lift, setLift] = useState<Lift>('squat');
   const [phase, setPhase] = useState('');
   const [issues, setIssues] = useState<BarPathIssue[]>([]);
+  const [selected, setSelected] = useState<Record<string, string[]>>({});
+  const [days, setDays] = useState<Record<string, number[]>>({});
   const phases = useMemo(() => stickingPhases(lift), [lift]);
   const diagnosis = useMemo(() => phase ? diagnoseLift(lift, phase as WeakPoint) : null, [lift, phase]);
   const barPath = useMemo(() => issues.length ? barPathAnalysis(lift, issues) : null, [lift, issues]);
@@ -34,6 +44,21 @@ export const PlDeadpointsBarPathCard: React.FC = () => {
     setPhase('');
     setIssues([]);
   };
+  const toggleExercise = (key: string, name: string) => setSelected(current => {
+    const values = new Set(current[key] || []);
+    if (values.has(name)) values.delete(name); else values.add(name);
+    return { ...current, [key]: [...values] };
+  });
+  const toggleDay = (key: string, day: number) => setDays(current => {
+    const values = new Set(current[key] || []);
+    if (values.has(day)) values.delete(day); else values.add(day);
+    return { ...current, [key]: [...values].sort((a, b) => a - b) };
+  });
+  const applySelected = () => applyToPlanner({
+    kind: 'weakpoints',
+    label: 'Мёртвые точки/bar-path: выбранные ассистенты',
+    data: { diagnosticExerciseMap: selected, diagnosticDayMap: days },
+  });
 
   return (
     <div style={{ padding: 12, color: '#fff' }}>
@@ -69,6 +94,7 @@ export const PlDeadpointsBarPathCard: React.FC = () => {
             {diagnosis.corrections.map((item, index) => <div key={index} style={{ fontSize: 10, color: DIM, marginTop: 2 }}>• {item}</div>)}
             <div style={{ fontSize: 10, color: '#60a5fa', marginTop: 7 }}>🏋️ Ассистенты: {diagnosis.assistance.join(', ') || 'нет данных'} · {Math.round(diagnosis.assistanceIntensityPct * 100)}% ПМ</div>
             <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>💡 Load cue: {diagnosis.loadCues}</div>
+            <DiagnosticExercisePicker label="Ассистенты мёртвой точки" exerciseKey={`${lift}|${phase}`} names={diagnosis.assistance} selected={selected} days={days} onExercise={toggleExercise} onDay={toggleDay} />
           </div>
         )}
       </div>
@@ -82,7 +108,12 @@ export const PlDeadpointsBarPathCard: React.FC = () => {
           })}
         </div>
         {barPath && <div style={{ marginTop: 8 }}>{barPath.diagnoses.map(item => <div key={item.issue} style={{ fontSize: 10, color: DIM, marginTop: 5 }}><b style={{ color: '#c084fc' }}>{ISSUE_RU[item.issue]}:</b> {item.cause} <span style={{ color: ACCENT }}>→ {item.correction}</span></div>)}</div>}
+        {issues.map(issue => <DiagnosticExercisePicker key={issue} label={`Ассистенты bar-path: ${ISSUE_RU[issue]}`} exerciseKey={`${lift}|barpath|${issue}`} names={BAR_PATH_EXERCISES[issue]} selected={selected} days={days} onExercise={toggleExercise} onDay={toggleDay} />)}
       </div>
+
+      <button onClick={applySelected} style={{ width: '100%', minHeight: 44, marginTop: 8, border: 'none', borderRadius: 9, cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800 }}>
+        🛠 Добавить выбранные упражнения в ПЛ-авто
+      </button>
 
       <div style={{ marginTop: 8, padding: 9, borderRadius: 8, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.18)', color: '#fbbf24', fontSize: 10, lineHeight: 1.45 }}>
         Правило ПЛ-авто: исходные упражнения и процентовки цикла не меняются. Эти данные используются для выбора дополнительных ассистентов и корректирующих упражнений.
@@ -90,5 +121,20 @@ export const PlDeadpointsBarPathCard: React.FC = () => {
     </div>
   );
 };
+
+const DiagnosticExercisePicker: React.FC<{
+  label: string; exerciseKey: string; names: string[]; selected: Record<string, string[]>;
+  days: Record<string, number[]>; onExercise: (key: string, name: string) => void; onDay: (key: string, day: number) => void;
+}> = ({ label, exerciseKey, names, selected, days, onExercise, onDay }) => (
+  <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,.05)', border: '1px solid rgba(0,230,138,.15)' }}>
+    <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT }}>{label}</div>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
+      {names.map(name => <button key={name} onClick={() => onExercise(exerciseKey, name)} style={{ padding: '4px 7px', borderRadius: 7, cursor: 'pointer', fontSize: 10, border: selected[exerciseKey]?.includes(name) ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,.1)', background: selected[exerciseKey]?.includes(name) ? 'rgba(0,230,138,.15)' : 'transparent', color: selected[exerciseKey]?.includes(name) ? ACCENT : DIM }}>{name}{selected[exerciseKey]?.includes(name) ? ' ✓' : ''}</button>)}
+    </div>
+    <div style={{ display: 'flex', gap: 4, marginTop: 5 }}>
+      {[1, 2, 3, 4, 5, 6, 7].map(day => <button key={day} onClick={() => onDay(exerciseKey, day)} style={{ padding: '3px 7px', borderRadius: 6, cursor: 'pointer', fontSize: 9, border: days[exerciseKey]?.includes(day) ? '1px solid #a855f7' : '1px solid rgba(255,255,255,.1)', background: days[exerciseKey]?.includes(day) ? 'rgba(168,85,247,.15)' : 'transparent', color: days[exerciseKey]?.includes(day) ? '#c084fc' : DIM }}>Д{day}</button>)}
+    </div>
+  </div>
+);
 
 export default PlDeadpointsBarPathCard;

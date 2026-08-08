@@ -13,7 +13,7 @@ import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import { epley1RM } from '../../../engines/e1rm';
 import type { WorkoutLog, StrengthLogEntry } from '../../../core/types';
-import { exerciseMatchScore, findBestCatalogMatch } from '../../../engines/exercise-aliases';
+import { exerciseMatchScore, getAliasesForExercise } from '../../../engines/exercise-aliases';
 import { useIsMobile } from './useIsMobile';
 
 const ACCENT = '#00e68a';
@@ -104,6 +104,15 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
   const [saved, setSaved] = useState(false);
   const [showPR, setShowPR] = useState<{ exercise: string; weight: number; reps: number; e1rm: number } | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const prTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (prTimerRef.current) clearTimeout(prTimerRef.current);
+    };
+  }, []);
 
   // Поиск упражнений
   useEffect(() => {
@@ -113,7 +122,11 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
     }
     const q = searchQuery.toLowerCase();
     const matches = EXERCISE_CATALOG
-      .filter(ex => ex.name.toLowerCase().includes(q) || ex.id.toLowerCase().includes(q))
+      .filter(ex => {
+        if (ex.name.toLowerCase().includes(q) || ex.id.toLowerCase().includes(q)) return true;
+        const aliases = getAliasesForExercise(ex.id);
+        return aliases.some(a => a.toLowerCase().includes(q));
+      })
       .slice(0, 8);
     setSearchResults(matches);
   }, [searchQuery]);
@@ -183,7 +196,8 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
     // Check for PR
     if (currentPR && epley1RM(weight, reps) > currentPR.e1rm && weight > 0) {
       setShowPR({ exercise: currentEx.exerciseName, weight, reps, e1rm: epley1RM(weight, reps) });
-      setTimeout(() => setShowPR(null), 3000);
+      if (prTimerRef.current) clearTimeout(prTimerRef.current);
+      prTimerRef.current = setTimeout(() => setShowPR(null), 3000);
     }
 
     // Start rest timer
@@ -306,6 +320,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
           type="text"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
+          onBlur={() => setTimeout(() => setSearchResults([]), 200)}
           placeholder="🔍 Поиск упражнения..."
           style={{
             width: '100%', padding: '12px 14px', borderRadius: 12,

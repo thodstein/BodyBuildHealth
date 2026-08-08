@@ -109,6 +109,7 @@ export class StrengthDiary {
   async saveWorkoutLog(workout: WorkoutLog): Promise<void> {
     const id = workout.id || `workout_${workout.date}_${Date.now()}`;
     await db.put('workout_log', { ...workout, id });
+    this.#workoutLogsCache = null;
   }
 
   /**
@@ -143,6 +144,7 @@ export class StrengthDiary {
         archived++;
       }
     }
+    if (archived > 0) this.#workoutLogsCache = null;
     return archived;
   }
 
@@ -218,6 +220,7 @@ export class StrengthDiary {
       current.volume += log.totalVolume;
       if (log.isCompound) current.compound++;
       else current.isolation++;
+      current.sessions.add(log.exerciseId + '_' + log.date);
       const week1RM = Math.max(...(log?.sets || []).map(s => epley1RM(s.weight, s.reps)), 0);
       current.oneRm = Math.max(current.oneRm, week1RM);
       weekMap.set(week, current);
@@ -242,9 +245,22 @@ export class StrengthDiary {
   async checkProgressionAlerts(): Promise<ProgressionAlert[]> {
     const alerts: ProgressionAlert[] = [];
 
-    // Check for plateau (same weight for 3+ weeks)
+    // Check for plateau (same weight for 3+ weeks) — merge IDB + localStorage
     const logs = await db.getAll<StrengthLogEntry>('training_log');
-    const compoundLogs = logs.filter(l => l.isCompound && l.sets.length > 0);
+    const lsSessions = loadSessions();
+    const lsLogs: StrengthLogEntry[] = lsSessions.flatMap(s => s.exercises.map(ex => ({
+      id: `${s.sessionId}_${ex.exerciseId}_${ex.order}`,
+      date: s.date,
+      exerciseId: ex.exerciseId || ex.exerciseName,
+      exerciseName: ex.exerciseName,
+      sets: ex.sets.map(st => ({ weight: st.weightKg, reps: st.reps, rir: st.rir, rpe: st.rpe })),
+      totalVolume: ex.totalVolume,
+      estimated1RM: ex.best1RM,
+      isCompound: COMPOUND_PATTERNS.has(ex.pattern),
+    })));
+    const seenIds = new Set(logs.map(l => l.id));
+    const allLogs = [...logs, ...lsLogs.filter(l => !seenIds.has(l.id))];
+    const compoundLogs = allLogs.filter(l => l.isCompound && l.sets.length > 0);
 
     // Group by exercise, then by week, track best e1RM per week
     const exerciseWeekBest = new Map<string, Map<number, { weight: number; e1RM: number }>>();

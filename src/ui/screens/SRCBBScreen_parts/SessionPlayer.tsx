@@ -381,7 +381,31 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
      });
      setSession(s);
      setPhase('main');
-     setActual({});
+     // авто-подтягивание весов из последней сессии (double progression)
+     const prevSession = getLastSession();
+     if (prevSession && prevSession.exercises.length > 0) {
+       const prevMap: Record<string, { weightKg: number; reps: number }[]> = {};
+       prevSession.exercises.forEach(ex => {
+         if (ex.exerciseName && Array.isArray(ex.sets)) {
+           prevMap[ex.exerciseName.toLowerCase()] = ex.sets.map(st => ({ weightKg: st.weightKg, reps: st.reps }));
+         }
+       });
+       const prefilled: Record<string, { weight: number; reps: number; rpe: number }> = {};
+       day.exercises.forEach((ex, ei) => {
+         const prevSets = prevMap[ex.name.toLowerCase()];
+         if (prevSets && prevSets.length > 0) {
+           ex.targetSets.forEach((t, si) => {
+             const prev = prevSets[si] || prevSets[prevSets.length - 1];
+             if (prev && prev.weightKg > 0) {
+               prefilled[`${ei}_${si}`] = { weight: prev.weightKg, reps: prev.reps, rpe: 0 };
+             }
+           });
+         }
+       });
+       setActual(prefilled);
+     } else {
+       setActual({});
+     }
      setExDone({});
      setRestHistory([]);
      // старт таймера сессии
@@ -525,6 +549,23 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
      }
    };
 
+  // batch skip: залогировать все подходы упражнения плановыми весами
+  const skipExercise = useCallback((ei: number) => {
+    if (!session || !day || !Array.isArray(day.exercises)) return;
+    const ex = day.exercises[ei];
+    if (!ex || !Array.isArray(ex.targetSets)) return;
+    hapticImpact('light');
+    let s = session;
+    const newActual: Record<string, { weight: number; reps: number; rpe: number }> = {};
+    ex.targetSets.forEach((t, si) => {
+      const a = { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir) };
+      s = logSet(s, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe, rir: t.rir, notes: '', plannedWeight: t.weight, plannedReps: t.reps, plannedRir: t.rir });
+      newActual[keyFor(ei, si)] = a;
+    });
+    setSession(s);
+    setActual(prev => ({ ...prev, ...newActual }));
+  }, [session, day]);
+
   // Fallback helpers when targetSets is missing (legacy cache)
   const weightFor = (ex: any) => ex?.targetSets?.[0]?.weight ?? ex?.weight ?? 60;
   const repsFor = (ex: any) => ex?.targetSets?.[0]?.reps ?? ex?.reps ?? 10;
@@ -622,10 +663,52 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
       {phase === 'ready' && (
         <div style={{ marginTop: 8 }}>
           <button style={{ ...BTN, width: '100%' }} onClick={begin}>▶ Начать тренировку — {day.label} (нед {weekNumber})</button>
+          {/* оценка длительности */}
+          {day && Array.isArray(day.exercises) && day.exercises.length > 0 && (() => {
+            const totalSets = day.exercises.reduce((s, ex) => s + ex.targetSets.length, 0);
+            const avgRest = day.exercises.reduce((s, ex) => s + (ex.restSec || 90), 0) / day.exercises.length;
+            const estMin = Math.round((totalSets * (45 + avgRest) + 300) / 60); // 45с на подход + отдых + 5 мин разминка
+            return (
+              <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+                  📋 {day.exercises.length} упр. · {totalSets} сетов · ~{estMin} мин
+                </span>
+                {last && last.durationMin > 0 && (
+                  <span style={{ fontSize: 10, color: estMin > last.durationMin ? '#f59e0b' : '#22c55e' }}>
+                    (прошлая: {last.durationMin} мин)
+                  </span>
+                )}
+              </div>
+            );
+          })()}
           {last && (
             <div style={{ ...CARD, marginTop: 8 }}>
               <div style={LABEL}>⏱ Последняя сессия</div>
               <div style={SMALL}>{last.date} {last.startTime}–{last.endTime} · {last.focus} · {last.exercises.length} упр.</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginTop: 6 }}>
+                <div style={{ padding: 4, borderRadius: 4, background: 'rgba(255,255,255,0.03)' }}>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Тоннаж</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>{last.totalVolume.toLocaleString()} кг</div>
+                </div>
+                <div style={{ padding: 4, borderRadius: 4, background: 'rgba(255,255,255,0.03)' }}>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Подходы</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>{last.totalSets}</div>
+                </div>
+                <div style={{ padding: 4, borderRadius: 4, background: 'rgba(255,255,255,0.03)' }}>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Длительность</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>{last.durationMin} мин</div>
+                </div>
+              </div>
+              {planned.volume > 0 && last.totalVolume > 0 && (
+                <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-dim)' }}>
+                  План сегодня: {planned.volume.toLocaleString()} кг · {planned.sets} сетов
+                  {last.totalVolume > 0 && (
+                    <span style={{ color: planned.volume > last.totalVolume ? '#f59e0b' : '#22c55e', marginLeft: 4 }}>
+                      ({planned.volume > last.totalVolume ? '+' : ''}{Math.round((planned.volume - last.totalVolume) / last.totalVolume * 100)}% к прошлой)
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -633,7 +716,25 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
 
       {phase === 'warmup' && (
         <div style={{ marginTop: 8 }}>
-          <div style={H}>🤸 Разминка: {day.label}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={H}>🤸 Разминка: {day.label}</div>
+            {(() => {
+              const total = warmupBlocks.reduce((s, b) => s + b.exercises.length, 0);
+              const done = Object.values(warmupDone).filter(Boolean).length;
+              const pct = total > 0 ? Math.round(done / total * 100) : 0;
+              return <span style={{ fontSize: 10, fontWeight: 600, color: pct === 100 ? '#22c55e' : ACCENT }}>{done}/{total} · {pct}%</span>;
+            })()}
+          </div>
+          {(() => {
+            const total = warmupBlocks.reduce((s, b) => s + b.exercises.length, 0);
+            const done = Object.values(warmupDone).filter(Boolean).length;
+            const pct = total > 0 ? Math.round(done / total * 100) : 0;
+            return (
+              <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 8 }}>
+                <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: pct === 100 ? '#22c55e' : ACCENT, transition: 'width 0.3s ease' }} />
+              </div>
+            );
+          })()}
           {warmupBlocks.map((b, i) => (
             <div key={i} style={{ ...CARD, marginBottom: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, marginBottom: 4 }}>
@@ -710,8 +811,21 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
                  {supersetMode ? 'Выберите 2+ упражнения' : 'Минимальный отдых между упражнениями'}
                </span>
              )}
+            </div>
+
+           {/* подсказки горячих клавиш */}
+           <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+             {[
+               { key: 'Space', label: 'залогировать подход' },
+               { key: 'R', label: 'таймер отдыха' },
+             ].map(h => (
+               <span key={h.key} style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>
+                 <kbd style={{ padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', fontSize: 8, fontFamily: 'monospace' }}>{h.key}</kbd> {h.label}
+               </span>
+             ))}
            </div>
-          <div style={{ ...SMALL, marginBottom: 6 }}>План: {planned.sets} сетов / {planned.volume} кг·пов · Факт: {factVol.sets} сетов / {factVol.volume} кг·пов</div>
+
+           <div style={{ ...SMALL, marginBottom: 6 }}>План: {planned.sets} сетов / {planned.volume} кг·пов · Факт: {factVol.sets} сетов / {factVol.volume} кг·пов</div>
           {/* P12: sRPE для мониторинга нагрузки (сохранится при завершении) */}
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>sRPE сессии:</span>
@@ -787,6 +901,16 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
                           }}>Быстро</button>
                         )}
                       </div>
+                      {/* кнопка пропуска упражнения */}
+                      {(() => {
+                        const allLogged = ex.targetSets.every((_, si) => !!actual[keyFor(ei, si)]);
+                        if (allLogged || ex.targetSets.length === 0) return null;
+                        return (
+                          <button style={{ width: '100%', marginTop: 4, padding: '4px 0', borderRadius: 6, border: '1px dashed rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.3)', fontSize: 10, cursor: 'pointer' }} onClick={() => skipExercise(ei)}>
+                            ⏭ Пропустить упражнение (залогировать планом)
+                          </button>
+                        );
+                      })()}
                        {logged && (
                          <div style={{ width: '100%', fontSize: 10, color: 'rgba(255,255,255,0.55)', paddingLeft: 56, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                            <span style={{ color: 'rgba(255,255,255,0.8)' }}>🏋️ {formatPlates(a.weight)}</span>
@@ -941,7 +1065,25 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
 
       {phase === 'cooldown' && (
         <div style={{ marginTop: 8 }}>
-          <div style={H}>🧘 Заминка: {day.label}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={H}>🧘 Заминка: {day.label}</div>
+            {(() => {
+              const total = cooldownBlocks.reduce((s, b) => s + b.exercises.length, 0);
+              const done = Object.values(cooldownDone).filter(Boolean).length;
+              const pct = total > 0 ? Math.round(done / total * 100) : 0;
+              return <span style={{ fontSize: 10, fontWeight: 600, color: pct === 100 ? '#22c55e' : ACCENT }}>{done}/{total} · {pct}%</span>;
+            })()}
+          </div>
+          {(() => {
+            const total = cooldownBlocks.reduce((s, b) => s + b.exercises.length, 0);
+            const done = Object.values(cooldownDone).filter(Boolean).length;
+            const pct = total > 0 ? Math.round(done / total * 100) : 0;
+            return (
+              <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 8 }}>
+                <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: pct === 100 ? '#22c55e' : ACCENT, transition: 'width 0.3s ease' }} />
+              </div>
+            );
+          })()}
           {cooldownBlocks.map((b, i) => (
             <div key={i} style={{ ...CARD, marginBottom: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, marginBottom: 4 }}>
@@ -1093,7 +1235,32 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
              </div>
            )}
             
-           <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setPhase('ready'); }}>← Новая тренировка</button>
+            <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => {
+              if (!done) return;
+              const lines: string[] = [];
+              lines.push(`🏋️ Тренировка: ${done.focus} — ${done.date}`);
+              lines.push(`⏱ ${done.startTime}–${done.endTime} (${done.durationMin} мин)`);
+              lines.push(`📊 Тоннаж: ${done.totalVolume.toLocaleString()} кг · Подходы: ${done.totalSets} · Повторы: ${done.totalReps}`);
+              if (topE1RM.e1rm > 0) lines.push(`🎯 Лучший 1RM: ${topE1RM.exercise} ${topE1RM.weight}кг×${topE1RM.reps} → ${topE1RM.e1rm}кг`);
+              lines.push('');
+              done.exercises.forEach(ex => {
+                lines.push(`${ex.exerciseName} (${ex.muscleGroup})`);
+                ex.sets.forEach(s => {
+                  lines.push(`  #${s.setNumber} ${s.weightKg}кг×${s.reps} RPE${s.rpe} e1RM~${Math.round(s.weightKg * (1 + s.reps / 30))}кг${s.isPR ? ' 🏆 PR' : ''}`);
+                });
+                lines.push(`  Итого: ${ex.totalVolume}кг · лучший 1RM: ${ex.best1RM}кг`);
+              });
+              if (nextSuggestions.length > 0) {
+                lines.push('');
+                lines.push('📈 Следующая сессия:');
+                nextSuggestions.forEach(s => lines.push(`  ${s.name} → ${s.nextWeight}кг×${s.nextReps} (${s.note})`));
+              }
+              const text = lines.join('\n');
+              navigator.clipboard?.writeText(text).then(() => {
+                hapticNotify('success');
+              }).catch(() => {});
+            }}>📋 Копировать сводку</button>
+            <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setPhase('ready'); }}>← Новая тренировка</button>
          </div>
        )}
 

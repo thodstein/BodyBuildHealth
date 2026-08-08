@@ -175,14 +175,15 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
   if (isPDF) {
     source = 'pdf';
     try {
-      const result = await parseLabFile(file);
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await parseLabFile(file, arrayBuffer);
       rawText = result.rawText;
       let parsedAll = parseLabTextAllWays(rawText, 'pdf-parse');
       // Scanned PDFs have no text layer. Render their pages and run the same
       // Russian/English OCR pipeline used for uploaded photos.
       if (shouldRetryPdfWithOcr(rawText, parsedAll.labs)) {
         try {
-          const ocrText = await ocrScannedPdf(file);
+          const ocrText = await ocrScannedPdf(arrayBuffer);
           if (ocrText.trim()) {
             const ocrParsed = parseLabTextAllWays(ocrText, 'tesseract.js');
             // Keep valid text-layer rows and use page OCR to fill missing rows.
@@ -221,6 +222,7 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
     try {
       const imageResult = await parseLabFile(file);
       rawText = imageResult.rawText || '';
+      const originalText = imageResult.originalText || rawText;
       if (!rawText.trim()) warnings.push('Не удалось обработать изображение через улучшенный режим, использован прямой OCR.');
       
       // Short food labels such as "рис 150 г" are valid OCR input too.
@@ -232,8 +234,8 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
 
         warnings.push(...parsedAll.warnings);
 
-        // Also try nutrition parsing
-        meals = parseNutritionText(rawText);
+        // Also try nutrition parsing on original OCR text to preserve table alignment
+        meals = parseNutritionText(originalText);
 
         confidence = (labs.length > 0 || meals.length > 0) ? 0.75 : 0.3;
         if (labs.length === 0 && meals.length === 0) {

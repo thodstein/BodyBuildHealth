@@ -13,6 +13,7 @@ export interface ParsedLabValue {
 export interface ParsedLabResult {
   values: ParsedLabValue[];
   rawText: string;
+  originalText?: string;
   source: 'pdf' | 'image' | 'text';
   date?: string;
   warnings?: string[];
@@ -130,6 +131,11 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
   { code: 'TPO_AB', names: ['АТ к ТПО', 'anti-TPO', 'антитела к тиреопероксидазе'], unitPatterns: ['МЕ/мл', 'IU/mL'] },
   { code: 'TG_AB', names: ['АТ к ТГ', 'АТ к тиреоглобулину', 'anti-TG', 'антитела к тиреоглобулину'], unitPatterns: ['МЕ/мл', 'IU/mL'] },
   { code: 'MPV', names: ['МПВ', 'MPV', 'средний объем тромбоцита'], unitPatterns: ['фл', 'fL'] },
+  { code: 'UIBC', names: ['лат. жсс', 'uibc', 'unsaturated iron', 'unsat iron binding', 'лат жсс'], unitPatterns: ['мкмоль/л', 'umol/L'] },
+  { code: 'GLOB', names: ['глобулины', 'globulin', 'глобулин общий'], unitPatterns: ['г/л', 'g/L'] },
+  { code: 'C_PEPTIDE', names: ['с-пептид', 'c-peptide', 'c peptide', 'с пептид'], unitPatterns: ['пмоль/л', 'pmol/L', 'нг/мл'] },
+  { code: 'AG_RATIO', names: ['а/г', 'a/g', 'альбумин/глобулин', 'альбумино-глобулиновый'], unitPatterns: ['', ''] },
+  { code: 'BILIR', names: ['билирубин непрямой', 'непрямой билирубин', 'indirect bilirubin', 'BIL-IR'], unitPatterns: ['мкмоль/л', 'umol/L'] },
 ];
 
 function containsLabName(text: string, name: string): boolean {
@@ -191,26 +197,29 @@ function extractResultNumber(text: string): number | null {
 
 function extractRefRange(text: string): { low?: number; high?: number } {
   const patterns = [
-    /(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)/,
-    /(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)\s/,
-    /от\s*(\d+[\.,]?\d*)\s*до\s*(\d+[\.,]?\d*)/i,
-    /<=\s*(\d+[\.,]?\d*)/,
-    />=\s*(\d+[\.,]?\d*)/,
+    /(?:ref|референс|норма|от|до)\s*[:\-]?\s*(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)/i,
+    /(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)\s*(?:единиц|ед\.?|unit|u\/l|mmol|umol|mg|ng|pg|g|мг\/дл|мкмоль|ммоль|нг\/мл|пг\/мл|г\/л|%|сек)/i,
+    /(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)(?=[^0-9.,]|$)/,
   ];
   for (const p of patterns) {
     const m = text.match(p);
     if (m) {
-      if (p === patterns[3]) {
-        const high = parseFloat(m[1].replace(',', '.'));
-        if (!isNaN(high)) return { low: 0, high };
-      }
-      if (p === patterns[4]) {
-        const low = parseFloat(m[1].replace(',', '.'));
-        if (!isNaN(low)) return { low, high: Infinity };
+      if (p === patterns[2]) {
+        const rangeMatch = text.match(/(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)/);
+        if (rangeMatch && rangeMatch[0] === m[0]) {
+          const low = parseFloat(m[1].replace(',', '.'));
+          const high = parseFloat(m[2].replace(',', '.'));
+          if (!isNaN(low) && !isNaN(high) && low < high && low > 0 && high < 100000) {
+            return { low, high };
+          }
+        }
+        continue;
       }
       const low = parseFloat(m[1].replace(',', '.'));
       const high = parseFloat(m[2].replace(',', '.'));
-      if (!isNaN(low) && !isNaN(high)) return { low, high };
+      if (!isNaN(low) && !isNaN(high) && low < high && low > 0 && high < 100000) {
+        return { low, high };
+      }
     }
   }
   return {};
@@ -271,13 +280,15 @@ function enhanceOcrCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
   if (!context) return source;
   context.drawImage(source, 0, 0);
   const image = context.getImageData(0, 0, canvas.width, canvas.height);
-  for (let i = 0; i < image.data.length; i += 4) {
-    const gray = image.data[i] * 0.299 + image.data[i + 1] * 0.587 + image.data[i + 2] * 0.114;
-    // Preserve black text while reducing gray paper/background noise.
-    const contrast = Math.max(0, Math.min(255, (gray - 128) * 1.35 + 128));
-    image.data[i] = contrast;
-    image.data[i + 1] = contrast;
-    image.data[i + 2] = contrast;
+  const data = image.data;
+  // Convert to grayscale with strong contrast boost for faint lab text.
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+    const contrast = Math.max(0, Math.min(255, (gray - 128) * 1.5 + 128));
+    const val = gray < 160 ? Math.max(0, contrast - 20) : 255;
+    data[i] = val;
+    data[i + 1] = val;
+    data[i + 2] = val;
   }
   context.putImageData(image, 0, 0);
   return canvas;
@@ -497,6 +508,7 @@ function tryParseLabFromLine(line: string): { code: string; name: string; value:
 }
 
 export function parseLabText(rawText: string): ParsedLabResult {
+  const originalText = rawText;
   const normalizedText = normalizeOcrText(rawText);
   const provider = detectProviderFromText(normalizedText);
 
@@ -552,14 +564,14 @@ export function parseLabText(rawText: string): ParsedLabResult {
     warnings.push(`Обнаружены возможные водяные знаки (${watermarkLines.length} строк). Они исключены из результатов.`);
   }
 
-  return { values, rawText: normalizedText, source: 'text', date, warnings };
+  return { values, rawText: normalizedText, originalText, source: 'text', date, warnings };
 }
 
-export async function parsePDF(file: File): Promise<ParsedLabResult> {
+export async function parsePDF(fileOrBuffer: File | ArrayBuffer): Promise<ParsedLabResult> {
   try {
     const pdfjsLib = await import('pdfjs-dist');
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-    const arrayBuffer = await file.arrayBuffer();
+    const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
     const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
     let fullText = '';
     let allItems: TextItem[] = [];
@@ -609,11 +621,12 @@ export async function parsePDF(file: File): Promise<ParsedLabResult> {
 }
 
 /** OCR pages of a scanned PDF that has no usable text layer. */
-export async function ocrScannedPdf(file: File): Promise<string> {
+export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<string> {
   const pdfjsLib = await import('pdfjs-dist');
   pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
   const Tesseract = await import('tesseract.js') as any;
-  const pdf = await openPdfDocument(pdfjsLib, await file.arrayBuffer());
+  const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
+  const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
   const texts: string[] = [];
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
     const page = await pdf.getPage(pageNumber);
@@ -630,9 +643,9 @@ export async function ocrScannedPdf(file: File): Promise<string> {
   return texts.join('\n');
 }
 
-export async function parseLabFile(file: File): Promise<ParsedLabResult> {
+export async function parseLabFile(file: File, arrayBuffer?: ArrayBuffer): Promise<ParsedLabResult> {
   if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
-    return parsePDF(file);
+    return parsePDF(arrayBuffer ?? file);
   }
   if (file.type.startsWith('image/') || file.name.match(/\.(png|jpg|jpeg|webp)$/i)) {
     const text = await extractTextFromImage(file);
@@ -647,17 +660,23 @@ async function extractTextFromImage(file: File): Promise<string> {
   try {
     if (typeof createImageBitmap !== 'function') throw new Error('createImageBitmap is unavailable');
     const bitmap = await createImageBitmap(file);
+    const scale = 3;
     const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width * 2;
-    canvas.height = bitmap.height * 2;
+    canvas.width = bitmap.width * scale;
+    canvas.height = bitmap.height * scale;
     const context = canvas.getContext('2d');
     if (!context) return '';
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
-    return recognizeOcrCanvas(Tesseract, canvas);
+    const enhanced = enhanceOcrCanvas(canvas);
+    const result = await Tesseract.recognize(enhanced, 'rus+eng');
+    let text = result.data.text || '';
+    if (!text.trim()) {
+      const fallback = await Tesseract.recognize(canvas, 'rus+eng');
+      text = fallback.data.text || '';
+    }
+    return text;
   } catch (imageProcessingError) {
-    // Older WebViews may not provide createImageBitmap or canvas decoding.
-    // Tesseract can recognize the original File directly in that case.
     console.warn('Enhanced image preprocessing failed, using direct OCR:', imageProcessingError);
     try {
       const result = await Tesseract.recognize(file, 'rus+eng');

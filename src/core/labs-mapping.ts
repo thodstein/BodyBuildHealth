@@ -48,6 +48,11 @@ const CODE_ALIAS: Record<string, string> = {
   'Амилаз': 'AMYLASE',
   'Липаз': 'LIPASE',
   'Фруктоз': 'FRUCTOSAMINE',
+  'UIBC': 'UIBC',
+  'GLOB': 'GLOBULIN',
+  'C_PEPTIDE': 'C_PEPTIDE',
+  'AG_RATIO': 'A_G_RATIO',
+  'BILIR': 'BIL',
 };
 
 function unitKey(unit: string): string {

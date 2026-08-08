@@ -39,6 +39,7 @@ export interface LabTrendReport {
 export function computeLabTrends(labs: LabPoint[]): LabTrendReport {
   const byCode = new Map<string, LabPoint[]>();
   for (const lab of labs) {
+    if (!lab.date || typeof lab.date !== 'string') continue;
     const code = lab.code.toUpperCase();
     if (!byCode.has(code)) byCode.set(code, []);
     byCode.get(code)!.push(lab);

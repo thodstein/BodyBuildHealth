@@ -48,6 +48,7 @@ import { macroPhaseToLmsPhase, bbMacroPhaseToUserPhase, isDeloadLikeBbMacroPhase
 import { calcCycleMetrics, type SRExercise } from '../../engines/lms/lms-metrics.engine';
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
 import { competitionAttempts } from '../../engines/lms/competition-attempts';
+import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 
 const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepTempoOutput => {
   const isCompound = !exerciseName.toLowerCase().includes('сгибан') &&
@@ -93,7 +94,7 @@ function getRecoveryMetrics(linked: any): Pick<LMSBuildInput, 'bodyFat' | 'leanM
 export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
-    pl: [['plan', '📋 План цикла'], ['macro', '🗓 Годовой план'], ['bridge', '🔗 Мост план→сессия'], ['plates', '🧮 Калькулятор блинов'], ['autoreg', '🧠 Авторегуляция'], ['peak', '🏁 Пик/Соревнования'], ['recovery', '🔋 Восстановление'], ['safety', '🛡 Безопасность'], ['demo', '🎬 Демонстрация']].map(([k, l]) => ({ key: k, label: l })),
+    pl: [['plan', '📋 План цикла'], ['tools', '🔧 Инструменты'], ['macro', '🗓 Годовой план'], ['bridge', '🔗 Мост план→сессия'], ['plates', '🧮 Калькулятор блинов'], ['autoreg', '🧠 Авторегуляция'], ['peak', '🏁 Пик/Соревнования'], ['recovery', '🔋 Восстановление'], ['safety', '🛡 Безопасность'], ['demo', '🎬 Демонстрация']].map(([k, l]) => ({ key: k, label: l })),
     bb: [['plan', '📋 План сплита'], ['macro', '🗓 Годовой план'], ['bridge', '🔗 Мост план→сессия'], ['peak_bb', '🏆 Шоу ББ'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
     manual: [],
   };
@@ -280,9 +281,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       plWeakPoints: plWeakPoints,
       weakGroupDayMap,
       plWeakPointDayMap,
-      weakGroupExerciseMap,
-           plWeakPointExerciseMap,
-           orthopedicBlockedPatterns,
+       weakGroupExerciseMap,
+            plWeakPointExerciseMap,
+            orthopedicBlockedPatterns,
+       diagnosticExerciseMap,
+       diagnosticDayMap,
       peds: peds.length ? peds : undefined,
       pedDoses,
       acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
@@ -320,9 +323,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           plWeakPoints,
           weakGroupDayMap,
           plWeakPointDayMap,
-          weakGroupExerciseMap,
-           plWeakPointExerciseMap,
-           orthopedicBlockedPatterns,
+           weakGroupExerciseMap,
+            plWeakPointExerciseMap,
+            orthopedicBlockedPatterns,
+           diagnosticExerciseMap,
+           diagnosticDayMap,
           peds: peds.length ? peds : undefined,
           pedDoses,
           acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
@@ -422,6 +427,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [weakGroupExerciseMap, setWeakGroupExerciseMap] = useState<Record<string, string[]>>({});
    const [plWeakPointExerciseMap, setPlWeakPointExerciseMap] = useState<Record<string, string[]>>({});
    const [orthopedicBlockedPatterns, setOrthopedicBlockedPatterns] = useState<string[]>([]);
+   const [diagnosticExerciseMap, setDiagnosticExerciseMap] = useState<Record<string, string[]>>({});
+   const [diagnosticDayMap, setDiagnosticDayMap] = useState<Record<string, number[]>>({});
   // Clear stale day selections when cycle changes (old cycle may have had different day count)
   useEffect(() => {
     setWeakGroupDayMap({});
@@ -681,9 +688,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
         if (mainTab === 'pl') { setPmSquat(pm.squat || pmSquat); setPmBench(pm.bench || pmBench); setPmDead(pm.dead || pmDead); pendingApplyRef.current = p; }
         else if (mainTab === 'bb') { setBbWorkMax(w => ({ ...w, quads: pm.squat || w.quads, chest: pm.bench || w.chest, hamstrings: pm.dead || w.hamstrings })); pendingApplyRef.current = p; }
       }
-     } else if (p.kind === 'weakpoints') {
+      } else if (p.kind === 'weakpoints') {
        setWeakPoints(p.data?.groups || []);
-       if (Array.isArray(p.data?.orthopedic?.blockedPatterns)) setOrthopedicBlockedPatterns(p.data.orthopedic.blockedPatterns);
+        if (Array.isArray(p.data?.orthopedic?.blockedPatterns)) setOrthopedicBlockedPatterns(p.data.orthopedic.blockedPatterns);
+        if (p.data?.diagnosticExerciseMap) setDiagnosticExerciseMap(p.data.diagnosticExerciseMap);
+        if (p.data?.diagnosticDayMap) setDiagnosticDayMap(p.data.diagnosticDayMap);
        pendingApplyRef.current = p;
     } else if (p.kind === 'pri') {
       setPriAdjust({ volumeMult: (p.data?.volumeMult ?? 1) as number, rirShift: (p.data?.rirShift ?? 0) as number });
@@ -1739,6 +1748,10 @@ legs: [
             </div>;
           })()}
         </div>
+      )}
+
+      {mainTab === 'pl' && subView === 'tools' && (
+        <PlannerToolsPanel mode="pl" />
       )}
 
       {mainTab === 'bb' && subView === 'plan' && (

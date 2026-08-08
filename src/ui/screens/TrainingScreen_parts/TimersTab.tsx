@@ -8,6 +8,9 @@ const PRESETS: Preset[] = [
   { name: 'Гипертрофия', work: 60, rest: 90, rounds: 8 },
   { name: 'Кардио', work: 45, rest: 15, rounds: 12 },
   { name: 'Tabata', work: 20, rest: 10, rounds: 8 },
+  { name: 'EMOM', work: 40, rest: 20, rounds: 10 },
+  { name: 'AMRAP', work: 300, rest: 0, rounds: 1 },
+  { name: 'Drop Set', work: 45, rest: 10, rounds: 6 },
   { name: 'Эндurance', work: 300, rest: 60, rounds: 4 },
 ];
 

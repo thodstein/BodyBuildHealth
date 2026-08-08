@@ -223,15 +223,16 @@ export const SliderInput: React.FC<{
   label?: string;
   unit?: string;
   color?: string;
-}> = ({ value, onChange, min, max, step = 1, label, unit, color }) => {
+}> = ({ value: rawValue, onChange, min, max, step = 1, label, unit, color }) => {
   const c = color || colors.primary;
+  const value = (rawValue !== undefined && rawValue !== null && !isNaN(rawValue)) ? rawValue : min;
   const pct = ((value - min) / (max - min)) * 100;
   return (
     <div>
       {label && (
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
           <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600 }}>{label}</span>
-          <span style={{ fontSize: 12, color: c, fontWeight: 700 }}>{value}{unit || ''}</span>
+          <span style={{ fontSize: 12, color: c, fontWeight: 700 }}>{rawValue != null ? `${value}${unit || ''}` : '—'}</span>
         </div>
       )}
       <div style={{ position: 'relative', height: 24, display: 'flex', alignItems: 'center' }}>

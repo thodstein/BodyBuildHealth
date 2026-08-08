@@ -57,7 +57,6 @@ const COMMON_INJURIES = [
 
 export const UserHealthSection: React.FC = () => {
   const [health, updateHealth] = useSectionState('health');
-  const [nutrition, updateNutrition] = useSectionState('nutrition');
 
   return (
     <AccordionSection

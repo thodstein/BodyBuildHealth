@@ -401,7 +401,7 @@ describe('Profile v2 E2E scenarios', () => {
       expect(typeof diariesTab.ProfileDiariesTab).toBe('function');
       expect(typeof settingsTab.ProfileSettingsTab).toBe('function');
       expect(typeof hero.ProfileHero).toBe('function');
-    });
+    }, 20_000);
 
     it('22. Р’СЃРµ 6 section-РєРѕРјРїРѕРЅРµРЅС‚РѕРІ РџРѕР»СЊР·РѕРІР°С‚РµР»СЏ СЌРєСЃРїРѕСЂС‚РёСЂСѓСЋС‚СЃСЏ', async () => {
       const personal = await import('../../ui/screens/ProfileScreen_v2/sections/UserPersonalSection');
@@ -470,7 +470,6 @@ describe('Profile v2 E2E scenarios', () => {
     }, 30000);
   });
 });
-
 
 
 

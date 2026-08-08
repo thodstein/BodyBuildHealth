@@ -10,7 +10,7 @@ import { SessionPlayer, type PlayerDay } from '../SRCBBScreen_parts/SessionPlaye
 import { TimersTab } from './TimersTab';
 import { selectSetScheme } from '../../../engines/set-scheme.engine';
 import { selectTempo, formatTempo } from '../../../engines/tempo.engine';
-import { getCachedProgressForExercise, loadCachedExerciseProgress, type CachedProgress } from '../../../engines/workout-logger.engine';
+import { getCachedProgressForExercise } from '../../../engines/workout-logger.engine';
 import type { TrainingTab } from './shared';
 
 type RuntimeLogEntry = { sets: { weight: number; reps: number; rpe: number; rir: number }[]; completed: boolean };
@@ -293,7 +293,6 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                               ? Math.round(log.sets[log.sets.length - 1].weight * (1 + log.sets[log.sets.length - 1].reps / 30))
                               : 0,
                           }));
-                        const totalVolume = completedExercises.reduce((s, e) => s + e.totalVolume, 0);
                         if (completedExercises.length > 0) {
                           const dateStr = new Date().toISOString().split('T')[0];
                           const ts = Date.now();
@@ -324,6 +323,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                           // Reload stats and history
                           await loadDiaryStats();
                         }
+                        setRestTimer(0);
                         setRuntimeStarted(false);
                         setRuntimeLogs({});
                       }} style={{

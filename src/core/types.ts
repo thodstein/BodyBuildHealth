@@ -453,6 +453,8 @@ export interface CourseEntry {
   frequency: number | string;
   startWeek: number;
   endWeek: number;
+  startDate?: string;
+  injectionDays?: number[];
 }
 export type UserRole = 'user' | 'coach' | 'doctor' | 'admin' | 'editor';
 export type LabPhaseType = 'baseline' | 'course' | 'bridge' | 'pct';

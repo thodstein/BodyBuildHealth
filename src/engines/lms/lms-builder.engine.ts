@@ -48,6 +48,9 @@ export interface LMSBuildInput {
   weakGroupExerciseMap?: Record<string, string[]>;
   /** Выбранные пользователем упражнения из диагностики слабых точек. */
   plWeakPointExerciseMap?: Record<string, string[]>;
+  /** Выбранные ассистенты из биомеханической диагностики и bar-path. */
+  diagnosticExerciseMap?: Record<string, string[]>;
+  diagnosticDayMap?: Record<string, number[]>;
   /** Ортопедические паттерны, запрещённые только для добавляемых ассистентов. */
   orthopedicBlockedPatterns?: string[];
   /** ACWR-зона для авто-делода (если передана — применяется к объёму/RIR). */
@@ -513,6 +516,37 @@ function injectPLWeakPoints(
   }
 }
 
+function injectDiagnosticExercises(
+  days: LMSPlanDay[],
+  exerciseMap: Record<string, string[]> | undefined,
+  dayMap: Record<string, number[]> | undefined,
+  pmRow: Record<string, number>,
+  fallbackPm: number,
+): void {
+  if (!exerciseMap) return;
+  for (const [key, names] of Object.entries(exerciseMap)) {
+    if (!names?.length) continue;
+    const selectedDays = (dayMap?.[key] || [1]).map(day => day - 1).filter(day => day >= 0 && day < days.length);
+    for (let index = 0; index < names.length; index++) {
+      const day = days[selectedDays[index % Math.max(1, selectedDays.length)]];
+      if (!day) continue;
+      const name = names[index];
+      if (day.exercises.some(ex => norm(ex.name) === norm(name))) continue;
+      const pm = pmRow[name] ?? fallbackPm;
+      day.exercises.push({
+        name,
+        group: 'accessory',
+        coef: 0.3,
+        mnosz: 1,
+        load: 'Средняя',
+        pm,
+        rir: 3,
+        workSets: [{ pct: 0.6, reps: 10, sets: 3, weight: workWeight(pm, 0.6), rir: 3 }],
+      });
+    }
+  }
+}
+
 export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   const { template, pmMap, fallbackPm = 80 } = input;
   if (fallbackPm <= 0) throw new Error('buildLMSPlan: fallbackPm must be > 0');
@@ -736,6 +770,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     if (input.plWeakPoints && input.plWeakPoints.length) {
       injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, combinedMrvMult, input.plWeakPointDayMap, input.plWeakPointExerciseMap, input.orthopedicBlockedPatterns ?? [], input.fallbackPm ?? 80);
     }
+    injectDiagnosticExercises(days, input.diagnosticExerciseMap, input.diagnosticDayMap, pmRow, input.fallbackPm ?? 80);
 
     // Инъекция accessory-упражнений для слабых групп мышц — авто-распределение по 1-2 дням.
     // Тренерская логика:
