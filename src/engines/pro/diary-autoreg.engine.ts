@@ -117,7 +117,7 @@ function findLastFact(historyWorkouts: WorkoutLog[], exerciseName: string): Fact
             bestSet = set; bestE1RM = candidateE1RM;
           }
         }
-        const e1RM = ex.estimated1RM || bestE1RM;
+        const e1RM = Number(ex.estimated1RM) > 0 ? ex.estimated1RM : bestE1RM;
         if (!best || e1RM > best.e1RM) {
           best = { entry: ex, lastSet: { weight: bestSet.weight, reps: bestSet.reps, rpe: bestSet.rpe, rir: bestSet.rir }, e1RM, date };
         }
@@ -141,7 +141,7 @@ function findAllFacts(historyWorkouts: WorkoutLog[], exerciseName: string): Fact
           const e = epley1RM(s.weight, s.reps);
           if (e > bestE1RM) { best = s; bestE1RM = e; }
         }
-        const e1RM = ex.estimated1RM || bestE1RM;
+        const e1RM = Number(ex.estimated1RM) > 0 ? ex.estimated1RM : bestE1RM;
         out.push({ entry: ex, lastSet: { weight: best.weight, reps: best.reps, rpe: best.rpe, rir: best.rir }, e1RM, date: ex.date || wl.date });
       }
     }

@@ -6,6 +6,7 @@ import type { MealProduct, SavedMeal, MealScore } from '../../../engines/product
 import { scoreAllProductsV2, compareProductsV2, calcMealScoreV2, calcDIAAS, analyzeDailyDiet, getDefaultProfile, type UserDietProfile, type V2ScoreResult, type MealScoreV2 } from '../../../engines/product-usefulness-v2.engine';
 import { PopupBool, PopupNumber, PopupSelect } from '../../components/PopupXxx';
 import { analyzeNutrientGaps, NUTRIENT_CATEGORIES, findBestCombo, type NutrientGap, type NutrientGapResult, type NutrientCombo } from '../../../engines/nutrient-gap-filler.engine';
+import { readDiaryV2 } from './diary-storage-v2';
 
 type PlannerTab = 'dashboard' | 'settings' | 'catalog' | 'compare' | 'meal' | 'swap' | 'targeting';
 type SortKey = 'score' | 'name' | 'protein' | 'kcal';
@@ -50,9 +51,7 @@ const findFoodByDiaryItem = (item: any) => {
 
 const getDiaryProductsForDate = (date: string): MealProduct[] => {
   try {
-    const raw = localStorage.getItem('nutrition_diary');
-    if (!raw) return [];
-    const diary = JSON.parse(raw);
+    const diary = readDiaryV2();
     const sourceItems: any[] = [];
     if (Array.isArray(diary)) {
       sourceItems.push(...diary.filter((d: any) => (d.date || d.createdAt || '').startsWith(date)));

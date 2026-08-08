@@ -9,6 +9,7 @@ import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import {
   getSymptomDiary, updateSymptomToday, removeSymptomFromDiary,
   getSymptomDiaryStats, getSymptomChartData, getSymptomDiarySummary,
+  localDateStr,
   type SymptomTrend,
 } from '../symptom-diary.engine';
 
@@ -58,8 +59,8 @@ describe('symptom-diary.engine', () => {
   });
 
   it('calcTrend: returns improving when current < avgPrev - 1', () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const today = localDateStr();
+    const yesterday = localDateStr(new Date(Date.now() - 86400000));
     const dayBefore = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
     const diary = [
       { date: dayBefore, entries: [{ date: dayBefore, symptomId: 's1', severity: 8, trend: 'stable' as SymptomTrend, note: '' }], overallScore: 8, symptomCount: 1 },
@@ -75,8 +76,8 @@ describe('symptom-diary.engine', () => {
 
   it('calcTrend: returns resolved when severity = 0', () => {
     // Write a previous entry directly to localStorage
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const today = localDateStr();
+    const yesterday = localDateStr(new Date(Date.now() - 86400000));
     const diary = [
       { date: yesterday, entries: [{ date: yesterday, symptomId: 's1', severity: 8, trend: 'stable' as SymptomTrend, note: '' }], overallScore: 8, symptomCount: 1 },
     ];
@@ -100,7 +101,7 @@ describe('symptom-diary.engine', () => {
     updateSymptomToday('s1', 5);
     updateSymptomToday('s1', 8);
     const diary = getSymptomDiary();
-    const todayEntry = diary.find(d => d.date === new Date().toISOString().slice(0, 10));
+    const todayEntry = diary.find(d => d.date === localDateStr());
     expect(todayEntry?.entries.length).toBe(1);
     expect(todayEntry?.entries[0].severity).toBe(8);
   });
@@ -110,15 +111,15 @@ describe('symptom-diary.engine', () => {
     updateSymptomToday('s2', 3);
     removeSymptomFromDiary('s1');
     const diary = getSymptomDiary();
-    const todayEntry = diary.find(d => d.date === new Date().toISOString().slice(0, 10));
+    const todayEntry = diary.find(d => d.date === localDateStr());
     expect(todayEntry?.entries.find(e => e.symptomId === 's1')).toBeUndefined();
     expect(todayEntry?.entries.find(e => e.symptomId === 's2')).toBeDefined();
   });
 
   it('getSymptomDiaryStats returns correct counts', () => {
     // Write directly to localStorage to simulate multiple days
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const today = localDateStr();
+    const yesterday = localDateStr(new Date(Date.now() - 86400000));
     const diary = [
       { date: today, entries: [
         { date: today, symptomId: 's1', severity: 8, trend: 'worsening' as SymptomTrend, note: '' },
@@ -136,7 +137,7 @@ describe('symptom-diary.engine', () => {
   });
 
   it('getSymptomChartData returns last N days data', () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateStr();
     const diary = [
       { date: today, entries: [{ date: today, symptomId: 's1', severity: 5, trend: 'stable' as SymptomTrend, note: '' }], overallScore: 5, symptomCount: 1 },
     ];

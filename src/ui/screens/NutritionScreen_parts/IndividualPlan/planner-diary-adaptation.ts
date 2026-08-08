@@ -11,6 +11,7 @@
   */
 
 import { formatDate } from '../../../../core/utils/date-utils';
+import { readDiaryV2 } from '../diary-storage-v2';
 
 export interface DiaryDaySummary {
   date: string;
@@ -49,9 +50,7 @@ const CARB_CAP_PCT = 0.20;    // ±20% от цели по углеводам (у
 /** Прочитать сводку дня из localStorage 'nutrition_diary' по ISO-дате (YYYY-MM-DD). */
 export function getDiaryDaySummary(dateISO: string): DiaryDaySummary | null {
   try {
-    const raw = localStorage.getItem('nutrition_diary');
-    if (!raw) return null;
-    const data = JSON.parse(raw);
+    const data = readDiaryV2();
     const day = data?.[dateISO];
     if (!day || !day.meals) return null;
     let kcal = 0, p = 0, f = 0, c = 0, entries = 0;
@@ -195,8 +194,7 @@ export function computeRollingCompensation(
   daysBack = 7,
 ): CompensationResult {
   const yesterday = getYesterdaySummary();
-  const raw = localStorage.getItem('nutrition_diary');
-  const diary = raw ? JSON.parse(raw) : {};
+  const diary = readDiaryV2();
   const summaries: { day: number; s: DiaryDaySummary | null }[] = [];
   for (let i = 1; i <= daysBack; i++) {
     const d = new Date(); d.setDate(d.getDate() - i);

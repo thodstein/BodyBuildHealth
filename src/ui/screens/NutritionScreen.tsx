@@ -18,6 +18,7 @@ import { Achievements } from './NutritionScreen_parts/Achievements';
 import { DailyQuests } from './NutritionScreen_parts/DailyQuests';
 import { PeriWorkoutCard } from './NutritionScreen_parts/PeriWorkoutCard';
 import { NutritionWeeklyComparison } from './NutritionScreen_parts/NutritionWeeklyComparison';
+import { readDiaryV2, onDiaryChangeV2 } from './NutritionScreen_parts/diary-storage-v2';
 
 const NutritionCharts = lazy(() => import('./NutritionScreen_parts/NutritionCharts').then(m => ({ default: m.NutritionCharts })));
 import { generateNutritionReport, NutritionReport } from '../../engines/nutrition-report.engine';
@@ -861,7 +862,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
       if (saved) { const p = JSON.parse(saved); if (p.overallGrade && p.overallGrade !== '—') { setFullReport(p); setReportEditText(JSON.stringify(p, null, 2)); setReportSubTab('full'); } }
     } catch {}
   }, []);
-  const raw = React.useMemo(() => { try { return JSON.parse(localStorage.getItem('nutrition_diary') || '{}'); } catch { return {}; } }, [foodEntries]);
+  const raw = React.useMemo(() => readDiaryV2(), [foodEntries]);
   const dayData = raw[reportDate];
   const weekStart = React.useMemo(() => { const d = new Date(reportDate); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split('T')[0]; }, [reportDate]);
   const weekData = React.useMemo(() => {
@@ -1406,9 +1407,8 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('nutrition_diary');
-      if (raw) {
-        const diary = JSON.parse(raw);
+      const diary = readDiaryV2();
+      if (Object.keys(diary).length > 0) {
         const allEntries: DiaryEntry[] = [];
         const logs: Record<string, DiaryEntry[]> = {};
         Object.entries(diary).forEach(([date, d]: [string, any]) => {
@@ -1437,9 +1437,8 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   // B3: Reload diary data from localStorage when NutritionDiary reports changes
   const reloadDiary = () => {
     try {
-      const raw = localStorage.getItem('nutrition_diary');
-      if (raw) {
-        const diary = JSON.parse(raw);
+      const diary = readDiaryV2();
+      if (Object.keys(diary).length > 0) {
         const allEntries: DiaryEntry[] = [];
         const logs: Record<string, DiaryEntry[]> = {};
         Object.entries(diary).forEach(([date, d]: [string, any]) => {
@@ -1459,6 +1458,8 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
       }
     } catch {}
   };
+
+  useEffect(() => onDiaryChangeV2(() => reloadDiary()), []);
 
   // Open diary tab directly when navigated from Profile → diaries → Питание
   useEffect(() => {
@@ -1545,7 +1546,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
     // Fallback: today's diary entries (estimate weight from kcal using ~2 kcal/g average)
     try {
       const today = new Date().toISOString().split('T')[0];
-      const diary = JSON.parse(localStorage.getItem('nutrition_diary') || '{}');
+      const diary = readDiaryV2();
       const todayData = diary[today];
       if (todayData?.meals) {
         const items = Object.values(todayData.meals).flat().map((it: any, i: number) => ({
@@ -1560,7 +1561,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   const renderContent = () => {
     switch (tab) {
       case 'diary': return <InfoErrorBoundary label="Дневник питания"><NutritionDiary foodEntries={foodEntries} targets={macroTargets} weight={(linked.profile?.settings as any)?.personal?.weight} age={(linked.profile?.settings as any)?.personal?.age} sex={(linked.profile?.settings as any)?.personal?.sex} onDiaryChange={reloadDiary} /></InfoErrorBoundary>;
-      case 'charts': return <InfoErrorBoundary label="Графики"><Suspense fallback={<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Загрузка графиков...</div>}><NutritionCharts kcalData={chartKcalData} proteinData={chartProteinData} labels={chartLabels} dailyLogs={dailyLogs} /></Suspense></InfoErrorBoundary>;
+      case 'charts': return <InfoErrorBoundary label="Графики"><Suspense fallback={<div style={{padding:20,textAlign:'center',color:'var(--text-dim)',fontSize:11}}>Загрузка графиков...</div>}><NutritionCharts kcalData={chartKcalData} proteinData={chartProteinData} labels={chartLabels} dailyLogs={dailyLogs} targets={macroTargets} /></Suspense></InfoErrorBoundary>;
       case 'mealplan': return <InfoErrorBoundary label="План питания"><IndividualPlan profile={linked.profile} course={linked.course} labs={linked.labs} labAnalysis={linked.labAnalysis} /></InfoErrorBoundary>;
       case 'cart': return <InfoErrorBoundary label="Корзина"><CartTab /></InfoErrorBoundary>;
       case 'restaurant': return <InfoErrorBoundary label="Ресторан"><RestaurantTab /></InfoErrorBoundary>;

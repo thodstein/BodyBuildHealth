@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { formatDate } from '../../../core/utils/date-utils';
+import { readDiaryV2 } from './diary-storage-v2';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -32,7 +33,8 @@ const commonChartOptions = (hasWeight: boolean) => ({
 export const NutritionCharts: React.FC<{
   kcalData: number[]; proteinData: number[]; labels: string[];
   dailyLogs?: Record<string, { kcal: number; p: number; f: number; c: number }[]>;
-}> = ({ kcalData, proteinData, dailyLogs }) => {
+  targets?: { kcal: number; protein: number; fats: number; carbs: number };
+}> = ({ kcalData, proteinData, dailyLogs, targets }) => {
   const [range, setRange] = useState<ChartRange>(7);
   const [chartMode, setChartMode] = useState<'kcal' | 'macro' | 'both'>('both');
 
@@ -49,8 +51,7 @@ export const NutritionCharts: React.FC<{
         dailyLogs[dateStr].forEach(e => { dayKcal += e.kcal || 0; dayProtein += e.p || 0; dayFat += e.f || 0; dayCarbs += e.c || 0; });
       } else {
         try {
-          const raw = localStorage.getItem('nutrition_diary');
-          if (raw) { const diary = JSON.parse(raw); const dayData = diary[dateStr]; if (dayData?.meals) { Object.values(dayData.meals).flat().forEach((m: any) => { dayKcal += m.kcal || 0; dayProtein += m.p || 0; dayFat += m.f || 0; dayCarbs += m.c || 0; }); } }
+          const diary = readDiaryV2(); const dayData = diary[dateStr]; if (dayData?.meals) { Object.values(dayData.meals).flat().forEach((m: any) => { dayKcal += m.kcal || 0; dayProtein += m.p || 0; dayFat += m.f || 0; dayCarbs += m.c || 0; }); }
         } catch {}
       }
       result.push({ date: dayLabel, kcal: Math.round(dayKcal), protein: Math.round(dayProtein), fat: Math.round(dayFat), carbs: Math.round(dayCarbs) });
@@ -207,13 +208,14 @@ export const NutritionCharts: React.FC<{
         {(() => {
           const daysWithAnyData = realDailyData.filter(d => d.kcal > 0).length;
           if (daysWithAnyData === 0) return <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Нет данных дневника для анализа.</div>;
-          const goalChecks = [
-            { label: 'Калории ±10%', met: realDailyData.filter(d => d.kcal > 0 && Math.abs(d.kcal - avgKcal) / avgKcal < 0.1).length, total: daysWithAnyData, color: '#22c55e' },
-            { label: 'Белки ≥90%', met: realDailyData.filter(d => d.protein > 0 && d.protein >= avgProtein * 0.9).length, total: daysWithAnyData, color: '#3b82f6' },
-            { label: 'Жиры ≤110%', met: realDailyData.filter(d => d.fat > 0 && d.fat <= avgFat * 1.1).length, total: daysWithAnyData, color: '#f97316' },
-            { label: 'Углеводы ≤110%', met: realDailyData.filter(d => d.carbs > 0 && d.carbs <= avgCarbs * 1.1).length, total: daysWithAnyData, color: '#a855f7' },
+           const goal = targets || { kcal: 2500, protein: 160, fats: 70, carbs: 300 };
+           const goalChecks = [
+             { label: 'Калории ±10%', met: realDailyData.filter(d => d.kcal > 0 && Math.abs(d.kcal - goal.kcal) / Math.max(goal.kcal, 1) <= 0.1).length, total: daysWithAnyData, color: '#22c55e' },
+             { label: 'Белки ≥90%', met: realDailyData.filter(d => d.protein > 0 && d.protein >= goal.protein * 0.9).length, total: daysWithAnyData, color: '#3b82f6' },
+             { label: 'Жиры ≤110%', met: realDailyData.filter(d => d.fat > 0 && d.fat <= goal.fats * 1.1).length, total: daysWithAnyData, color: '#f97316' },
+             { label: 'Углеводы ≤110%', met: realDailyData.filter(d => d.carbs > 0 && d.carbs <= goal.carbs * 1.1).length, total: daysWithAnyData, color: '#a855f7' },
           ];
-          const streak = (() => { let s = 0; for (let i = realDailyData.length - 1; i >= 0; i--) { if (realDailyData[i].kcal > 0 && Math.abs(realDailyData[i].kcal - avgKcal) / avgKcal < 0.15) s++; else break; } return s; })();
+           const streak = (() => { let s = 0; for (let i = realDailyData.length - 1; i >= 0; i--) { if (realDailyData[i].kcal > 0 && Math.abs(realDailyData[i].kcal - goal.kcal) / Math.max(goal.kcal, 1) < 0.15) s++; else break; } return s; })();
           return <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
               {goalChecks.map(g => {

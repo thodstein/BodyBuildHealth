@@ -15,6 +15,7 @@ import { epley1RM } from '../../../engines/e1rm';
 import type { WorkoutLog, StrengthLogEntry } from '../../../core/types';
 import { exerciseMatchScore, getAliasesForExercise } from '../../../engines/exercise-aliases';
 import { useIsMobile } from './useIsMobile';
+import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
 
 const ACCENT = '#00e68a';
 
@@ -102,13 +103,15 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
   const [restTimer, setRestTimer] = useState(0);
   const [restTarget, setRestTarget] = useState(90);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [showPR, setShowPR] = useState<{ exercise: string; weight: number; reps: number; e1rm: number } | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const prTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const mountedRef = useRef(true);
 
-  // Cleanup timers on unmount
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
       if (timerRef.current) clearTimeout(timerRef.current);
       if (prTimerRef.current) clearTimeout(prTimerRef.current);
     };
@@ -151,10 +154,11 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
   }, [currentEx, historyWorkouts]);
 
   const addExercise = useCallback((ex: typeof EXERCISE_CATALOG[0]) => {
+    const isBW = isBWExercise(ex);
     const newEx: ExerciseRecord = {
       exerciseId: ex.id,
       exerciseName: ex.name,
-      sets: [{ weight: prevData?.weight || 0, reps: prevData?.reps || 10, rpe: 0, rir: prevData?.rir || 2, completed: false }],
+      sets: [{ weight: isBW ? 0 : (prevData?.weight || 0), reps: prevData?.reps || 10, rpe: 0, rir: prevData?.rir || 2, completed: false }],
     };
     setExercises(prev => [...prev, newEx]);
     setCurrentExIdx(exercises.length);
@@ -243,23 +247,34 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
     }
 
     if (strengthEntries.length > 0) {
-      await diary.saveWorkoutLog({
-        id: wid,
-        date: dateStr,
-        duration: exercises.reduce((s, e) => s + e.sets.length, 0) * 3,
-        exercises: strengthEntries,
-        overallRPE: 7,
-        recoveryBefore: 5,
-        split: 'quick',
-        weekNumber: selectedWeek,
-      });
-      for (const se of strengthEntries) {
-        await diary.saveStrengthLog(se);
+      try {
+        await diary.saveWorkoutLog({
+          id: wid,
+          date: dateStr,
+          duration: exercises.reduce((s, e) => s + e.sets.length, 0) * 3,
+          exercises: strengthEntries,
+          overallRPE: 7,
+          recoveryBefore: 5,
+          split: 'quick',
+          weekNumber: selectedWeek,
+        });
+        for (const se of strengthEntries) {
+          await diary.saveStrengthLog(se);
+        }
+        if (mountedRef.current) {
+          setSaved(true);
+          setTimeout(() => { if (mountedRef.current) { setSaved(false); onSave(); } }, 1500);
+        }
+      } catch {
+        if (mountedRef.current) {
+          setSaveError('Ошибка сохранения');
+          setTimeout(() => { if (mountedRef.current) setSaveError(null); }, 3000);
+        }
       }
+    } else if (mountedRef.current) {
+      setSaved(true);
+      setTimeout(() => { if (mountedRef.current) setSaved(false); }, 1500);
     }
-
-    setSaved(true);
-    setTimeout(() => { setSaved(false); onSave(); }, 1500);
   }, [exercises, diary, selectedWeek, onSave]);
 
   const totalSets = exercises.reduce((s, e) => s + e.sets.filter(st => st.completed).length, 0);
@@ -422,6 +437,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
                       set={set}
                       setNumber={setIdx + 1}
                       isCurrent={isCurrentSet}
+                      isBodyweight={isBWExercise({ name: ex.exerciseName })}
                       prevData={setIdx === 0 ? prevData : null}
                       onComplete={(w, r, rpe, rir) => {
                         setCurrentSetIdx(setIdx);
@@ -478,6 +494,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
 
       {/* Save button */}
       {exercises.length > 0 && (
+        <>
         <button
           onClick={handleSave}
           disabled={totalSets === 0}
@@ -490,6 +507,8 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
         >
           {saved ? '✅ Сохранено!' : `💾 Сохранить (${totalSets} подходов)`}
         </button>
+        {saveError && <div style={{ fontSize: 11, color: '#ef4444', textAlign: 'center', marginTop: 4 }}>{saveError}</div>}
+        </>
       )}
     </div>
   );
@@ -500,10 +519,11 @@ const SetRow: React.FC<{
   set: SetRecord;
   setNumber: number;
   isCurrent: boolean;
+  isBodyweight: boolean;
   prevData: { weight: number; reps: number; rir: number } | null;
   onComplete: (weight: number, reps: number, rpe: number, rir: number) => void;
   onSkip: () => void;
-}> = ({ set, setNumber, isCurrent, prevData, onComplete, onSkip }) => {
+}> = ({ set, setNumber, isCurrent, isBodyweight, prevData, onComplete, onSkip }) => {
   const [weight, setWeight] = useState(set.weight || prevData?.weight || 0);
   const [reps, setReps] = useState(set.reps || prevData?.reps || 10);
   const [rpe, setRpe] = useState(set.rpe || 7);
@@ -543,13 +563,13 @@ const SetRow: React.FC<{
         <span style={{ fontWeight: 700, color: ACCENT, minWidth: 20, fontSize: 11 }}>#{setNumber}</span>
         <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4 }}>
           <input
-            type="number" value={weight}
+            type="number" value={weight} disabled={isBodyweight}
             onChange={e => setWeight(parseFloat(e.target.value) || 0)}
-            placeholder="кг"
+            placeholder={isBodyweight ? 'свой вес' : 'кг'}
             style={{
-              padding: '8px 6px', borderRadius: 6, background: '#18181b',
-              border: '1px solid rgba(255,255,255,0.08)', color: '#fff',
-              fontSize: 12, textAlign: 'center', minHeight: 36,
+              padding: '8px 6px', borderRadius: 6, background: isBodyweight ? 'rgba(255,255,255,0.03)' : '#18181b',
+              border: '1px solid rgba(255,255,255,0.08)', color: isBodyweight ? 'rgba(255,255,255,0.3)' : '#fff',
+              fontSize: 12, textAlign: 'center', minHeight: 36, opacity: isBodyweight ? 0.6 : 1,
             }}
           />
           <input

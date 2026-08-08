@@ -1,6 +1,6 @@
 import { db } from '../core/db';
 import type { StrengthLogEntry, WorkoutLog } from '../core/types';
-import { loadSessions, type WorkoutSession } from './workout-logger.engine';
+import { getISOWeekNumber, loadSessions, type WorkoutSession } from './workout-logger.engine';
 import { epley1RM } from './e1rm';
 
 export interface StrengthStats {
@@ -37,7 +37,7 @@ export interface ProgressionAlert {
  * Manages strength logs and workout tracking in IndexedDB
  */
 // Преобразование сессии SessionPlayer (localStorage) в WorkoutLog для единого дневника.
-const COMPOUND_PATTERNS = new Set(['squat', 'hinge', 'horizontal_push', 'horizontal_pull', 'vertical_push', 'vertical_pull']);
+export const COMPOUND_PATTERNS = new Set(['squat', 'hinge', 'horizontal_push', 'horizontal_pull', 'vertical_push', 'vertical_pull']);
 export function sessionToWorkoutLog(s: WorkoutSession): WorkoutLog {
   return {
     id: s.sessionId || `plsession_${s.date}_${s.startTime}`,
@@ -80,7 +80,7 @@ export class StrengthDiary {
   /**
     * Get all workout logs (cached for 5 minutes)
     */
-    async getWorkoutLogs(): Promise<WorkoutLog[]> {
+  async getWorkoutLogs(): Promise<WorkoutLog[]> {
       const now = Date.now();
       if (this.#workoutLogsCache && now - this.#workoutLogsCache.ts < this.#CACHE_TTL) {
         return this.#workoutLogsCache.data;
@@ -89,7 +89,19 @@ export class StrengthDiary {
       const lsLogs = loadSessions().map(sessionToWorkoutLog);
       const merged = [...logs, ...lsLogs];
       const seen = new Set<string>();
-      const dedup = merged.filter(l => { if (seen.has(l.id)) return false; seen.add(l.id); return true; });
+      const dedup = merged.flatMap(l => {
+        const exercises = (l.exercises || []).map(ex => ({
+          ...ex,
+          sets: (ex.sets || []).filter((_, index) => {
+            const signature = workoutSetKey(l.date, ex.exerciseName, index + 1);
+            if (seen.has(signature)) return false;
+            seen.add(signature);
+            return true;
+          }),
+        })).filter(ex => ex.sets.length > 0);
+        if (exercises.length === 0) return [];
+        return [{ ...l, exercises }];
+      });
       const result = dedup.sort((a, b) => b.date.localeCompare(a.date));
       this.#workoutLogsCache = { data: result, ts: now };
       return result;
@@ -128,26 +140,6 @@ export class StrengthDiary {
     return logs.filter(l => l.date >= start && l.date <= end).sort((a, b) => b.date.localeCompare(a.date));
   }
 
-  /**
-   * Archive localStorage sessions to IndexedDB for durability.
-   */
-  async archiveSessionsToIDB(): Promise<number> {
-    const lsSessions = loadSessions();
-    if (lsSessions.length === 0) return 0;
-    const idbLogs = await db.getAll<WorkoutLog>('workout_log');
-    const idbIds = new Set(idbLogs.map(l => l.id));
-    let archived = 0;
-    for (const session of lsSessions) {
-      const log = sessionToWorkoutLog(session);
-      if (!idbIds.has(log.id)) {
-        await db.put('workout_log', log);
-        archived++;
-      }
-    }
-    if (archived > 0) this.#workoutLogsCache = null;
-    return archived;
-  }
-
   async getWorkoutLogsByDate(start: string, end: string): Promise<WorkoutLog[]> {
     const logs = await db.getAll<WorkoutLog>('workout_log');
     return logs.filter(w => w.date >= start && w.date <= end).sort((a, b) => b.date.localeCompare(a.date));
@@ -160,9 +152,9 @@ export class StrengthDiary {
     const logs = await this.getStrengthLogs(exerciseId);
     if (logs.length === 0) return null;
 
-    const maxWeight = Math.max(...logs.flatMap(l => l.sets.map(s => s.weight)));
-    const maxReps = Math.max(...logs.flatMap(l => l.sets.map(s => s.reps)));
-    const max1RM = Math.max(...logs.flatMap(l => l.sets.map(s => epley1RM(s.weight, s.reps))));
+    const maxWeight = Math.max(...logs.flatMap(l => l.sets.map(s => s.weight)), 0);
+    const maxReps = Math.max(...logs.flatMap(l => l.sets.map(s => s.reps)), 0);
+    const max1RM = Math.max(...logs.flatMap(l => l.sets.map(s => epley1RM(s.weight, s.reps))), 0);
     const totalVolume = logs.reduce((sum, l) => sum + l.totalVolume, 0);
     const workoutCount = logs.length;
     const lastWorkoutDate = logs[0]?.date || '';
@@ -215,7 +207,7 @@ export class StrengthDiary {
     const weekMap = new Map<number, { volume: number; compound: number; isolation: number; oneRm: number; sessions: Set<string> }>();
 
     const addLog = (log: StrengthLogEntry) => {
-      const week = toISOWeek(log.date);
+      const week = getISOWeekNumber(log.date);
       const current = weekMap.get(week) || { volume: 0, compound: 0, isolation: 0, oneRm: 0, sessions: new Set() };
       current.volume += log.totalVolume;
       if (log.isCompound) current.compound++;
@@ -245,9 +237,11 @@ export class StrengthDiary {
   async checkProgressionAlerts(): Promise<ProgressionAlert[]> {
     const alerts: ProgressionAlert[] = [];
 
-    // Check for plateau (same weight for 3+ weeks) — merge IDB + localStorage
-    const logs = await db.getAll<StrengthLogEntry>('training_log');
-    const lsSessions = loadSessions();
+    const [logs, lsSessions] = await Promise.all([
+      db.getAll<StrengthLogEntry>('training_log'),
+      Promise.resolve(loadSessions()),
+    ]);
+
     const lsLogs: StrengthLogEntry[] = lsSessions.flatMap(s => s.exercises.map(ex => ({
       id: `${s.sessionId}_${ex.exerciseId}_${ex.order}`,
       date: s.date,
@@ -262,7 +256,6 @@ export class StrengthDiary {
     const allLogs = [...logs, ...lsLogs.filter(l => !seenIds.has(l.id))];
     const compoundLogs = allLogs.filter(l => l.isCompound && l.sets.length > 0);
 
-    // Group by exercise, then by week, track best e1RM per week
     const exerciseWeekBest = new Map<string, Map<number, { weight: number; e1RM: number }>>();
 
     compoundLogs.forEach(log => {
@@ -280,27 +273,26 @@ export class StrengthDiary {
       const sortedWeeks = Array.from(weekMap.entries()).sort((a, b) => a[0] - b[0]);
       if (sortedWeeks.length < 3) return;
       const last3 = sortedWeeks.slice(-3);
-      const weights = last3.map(w => w[1].weight);
-      const uniqueWeights = new Set(weights);
-      if (uniqueWeights.size === 1) {
+      const e1rms = last3.map(w => w[1].e1RM);
+      const uniqueE1RMs = new Set(e1rms);
+      if (uniqueE1RMs.size === 1) {
         alerts.push({
           type: 'plateau',
-          message: `Плато: ${weights[0]} кг на 3+ неделях`,
+          message: `Плато: ${Math.round(e1rms[0])} кг (1RM) на 3+ неделях`,
           exerciseId,
-          currentWeight: weights[0],
+          currentWeight: last3[last3.length - 1][1].weight,
           weeksAtWeight: 3
         });
       }
     });
 
-    // Check for volume peak (recommend deload)
     const weeklyProgress = await this.getWeeklyProgress();
     const recentWeeks = weeklyProgress.slice(-4);
-    
+
     if (recentWeeks.length >= 3) {
       const avgVolume = recentWeeks.reduce((sum, w) => sum + w.totalVolume, 0) / recentWeeks.length;
       const lastWeek = recentWeeks[recentWeeks.length - 1];
-      
+
       if (lastWeek.totalVolume > avgVolume * 1.2) {
         alerts.push({
           type: 'volume_peak',
@@ -357,6 +349,10 @@ export class StrengthDiary {
 
     return Array.from(dailyActivity.entries()).map(([date, data]) => ({ date, ...data }));
   }
+}
+
+function workoutSetKey(date: string, exerciseName: string, setNumber: number): string {
+  return `${date}|${exerciseName}|${setNumber}`;
 }
 
 export const strengthDiary = new StrengthDiary();

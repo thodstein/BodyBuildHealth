@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   generateTrainingCalendar,
   generateSyntheticPlan,
@@ -100,6 +100,15 @@ export const TrainingCalendarTab: React.FC = () => {
   const [historyWorkouts, setHistoryWorkouts] = useState<WorkoutLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [water, setWater] = useState<WaterStats>(() => getWaterStats());
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<number | null>(null);
+  useEffect(() => {
+    if (toast) {
+      if (toastTimer.current) window.clearTimeout(toastTimer.current);
+      toastTimer.current = window.setTimeout(() => setToast(null), 3000);
+      return () => { if (toastTimer.current !== null) { window.clearTimeout(toastTimer.current); toastTimer.current = null; } };
+    }
+  }, [toast]);
   const refreshWater = useCallback((amt: number) => { quickAddWater(amt); setWater(getWaterStats()); }, []);
   const download = useCallback((filename: string, text: string, mime = 'text/plain') => {
     try {
@@ -114,14 +123,16 @@ export const TrainingCalendarTab: React.FC = () => {
   });
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const diary = new StrengthDiary();
         const logs = await diary.getWorkoutLogs();
-        setHistoryWorkouts(logs.reverse());
+        if (!cancelled) setHistoryWorkouts([...logs].reverse());
       } catch { /* ignore */ }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     })();
+    return () => { cancelled = true; };
   }, []);
 
   const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
@@ -239,13 +250,18 @@ export const TrainingCalendarTab: React.FC = () => {
           {[200, 300, 500].map(ml => <button key={ml} onClick={() => refreshWater(ml)} style={{ padding:'8px 14px', borderRadius:8, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color: ACCENT, cursor:'pointer', fontSize:12, fontWeight:700 }}>+{ml} мл</button>)}
         </div>
       </div>
+      {toast && (
+        <div role="alert" style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
+          {toast}
+        </div>
+      )}
       {/* Экспорт тренировок — ранее неиспользуемые exportWorkoutsToCSV/exportToJSON */}
       <div style={{ padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12, display:'flex', flexDirection:'column', gap: 8 }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT }}>📤 Экспорт тренировок</span>
         <div style={{ fontSize: 10, color: DIM }}>Сохранить журнал тренировок (he_workout_log_v2) в CSV/JSON для анализа или передачи тренеру.</div>
         <div style={{ display:'flex', gap: 6, flexWrap:'wrap' }}>
           <button onClick={() => download('workouts.csv', exportWorkoutsToCSV(), 'text/csv')} style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color: ACCENT, cursor:'pointer', fontSize:12, fontWeight:700 }}>⬇ Экспорт CSV</button>
-          <button onClick={() => { try { const raw = localStorage.getItem('he_workout_log_v2') || '[]'; const data = JSON.parse(raw); download('workouts.json', exportToJSON(data), 'application/json'); } catch { alert('Ошибка чтения журнала тренировок'); } }} style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.05)', color: '#fff', cursor:'pointer', fontSize:12, fontWeight:700 }}>⬇ Экспорт JSON</button>
+          <button onClick={() => { try { const raw = localStorage.getItem('he_workout_log_v2') || '[]'; const data = JSON.parse(raw); download('workouts.json', exportToJSON(data), 'application/json'); } catch { setToast('Ошибка чтения журнала тренировок'); } }} style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.05)', color: '#fff', cursor:'pointer', fontSize:12, fontWeight:700 }}>⬇ Экспорт JSON</button>
         </div>
       </div>
       {/* Header */}

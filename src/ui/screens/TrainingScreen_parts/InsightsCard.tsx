@@ -3,7 +3,7 @@
  * Источник: WorkoutLogs из StrengthDiary → маппинг в DiarySet[]/DiarySession[]. */
 import React, { useState, useEffect, useMemo } from 'react';
 import { StrengthDiary } from '../../../engines/strength-diary.engine';
-import { buildHistoryContext, generateInsights, type AutoInsight } from '../../../engines/diary-engine';
+import { buildHistoryContext, generateInsights, type AutoInsight } from '../../../engines/diary-insights.engine';
 import type { WorkoutLog } from '../../../core/types';
 
 const ACCENT = '#00e68a';

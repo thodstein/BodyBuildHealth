@@ -82,6 +82,16 @@ export interface WorkoutCSV {
   rows: string[][];
 }
 
+export function getISOWeekNumber(dateStr: string): number {
+  const date = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return 0;
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Storage
 // ═══════════════════════════════════════════════════════════════════════════
@@ -104,12 +114,21 @@ export function saveSessions(sessions: WorkoutSession[]) {
     localStorage.setItem(LOG_KEY, JSON.stringify(sessions));
   } catch (e: any) {
     if (e?.name === 'QuotaExceededError' || String(e).includes('quota')) {
-      const trimmed = sessions.slice(0, 500);
-      try {
-        localStorage.setItem(LOG_KEY, JSON.stringify(trimmed));
-      } catch {
-        // final fallback: keep only last 100
-        localStorage.setItem(LOG_KEY, JSON.stringify(trimmed.slice(0, 100)));
+      const sorted = sessions.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      const trySave = (arr: WorkoutSession[], label: string) => {
+        try {
+          localStorage.setItem(LOG_KEY, JSON.stringify(arr));
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      if (!trySave(sorted, 'full')) {
+        if (!trySave(sorted.slice(-500), '500')) {
+          if (!trySave(sorted.slice(-100), '100')) {
+            trySave(sorted.slice(-50), '50');
+          }
+        }
       }
     }
   }
@@ -155,9 +174,9 @@ export function logSet(
   exerciseIndex: number,
   set: Omit<WorkoutSet, 'isPR'>,
   previousBestWeight?: number,
-): WorkoutSession {
+): { session: WorkoutSession; success: boolean; reason?: string; discardReason?: string } {
   const exercises = [...session.exercises];
-  if (exerciseIndex >= exercises.length) return session;
+  if (exerciseIndex < 0 || exerciseIndex >= exercises.length) return { session, success: false, reason: 'Упражнение не найдено', discardReason: 'Упражнение не найдено' };
   const ex = { ...exercises[exerciseIndex] };
 
   const weightKg = Math.max(0, Number(set.weightKg) || 0);
@@ -165,7 +184,7 @@ export function logSet(
   const rpe = Math.max(0, Math.min(10, Number(set.rpe) || 0));
   const rir = Math.max(0, Math.min(20, Number(set.rir) || 0));
 
-  if (weightKg <= 0 || reps <= 0) return session;
+  if (weightKg <= 0 || reps <= 0) return { session, success: false, reason: 'Вес и повторения должны быть больше 0', discardReason: 'Вес и повторения должны быть больше 0' };
 
   const isPR = previousBestWeight ? weightKg > previousBestWeight : ex.sets.length === 0 || weightKg > Math.max(...ex.sets.map(s => s.weightKg), 0);
   const estimated1RM = epley1RM(weightKg, reps);
@@ -183,7 +202,7 @@ export function logSet(
   const avgIntensity = totalSets > 0 ? exercises.reduce((s, e) => s + e.avgRPE * e.sets.length, 0) / totalSets : 0;
   const prCount = exercises.reduce((s, e) => s + e.sets.filter(st => st.isPR).length, 0);
 
-  return { ...session, exercises, totalVolume, totalSets, totalReps, avgIntensity: Math.round(avgIntensity * 10) / 10, prCount };
+  return { session: { ...session, exercises, totalVolume, totalSets, totalReps, avgIntensity: Math.round(avgIntensity * 10) / 10, prCount }, success: true };
 }
 
 export function finishSession(session: WorkoutSession, notes: string = ''): WorkoutSession {
@@ -229,11 +248,10 @@ export function getWorkoutStats(): WorkoutStats {
     }
   }
 
-  // Weekly volume
+  // Weekly volume (ISO week, parity with strength-diary.engine.ts)
   const weekMap = new Map<number, { volume: number; sessions: number }>();
   for (const sess of sessions) {
-    const d = new Date(sess.date);
-    const weekNum = Math.floor(d.getTime() / (7 * 24 * 3600 * 1000));
+    const weekNum = getISOWeekNumber(sess.date);
     if (!weekMap.has(weekNum)) weekMap.set(weekNum, { volume: 0, sessions: 0 });
     const w = weekMap.get(weekNum)!;
     w.volume += sess.totalVolume;
@@ -583,7 +601,7 @@ export function compareWithPrevious(session: WorkoutSession): SessionComparison 
 // ═══════════════════════════════════════════════════════════════════════════
 
 const BODYWEIGHT_EXERCISE_PATTERNS = [
-  /подтягиван/i, /отжиман/i, /планк/i, /скручиван/i, /подъём ног/i, /悬挂/i,
+  /подтягиван/i, /отжиман/i, /планк/i, /скручиван/i, /подъём ног/i,
   /dip/i, /push.?up/i, /pull.?up/i, /plank/i, /crunch/i, /leg.?raise/i,
   /брусь/i, /колен/i, /ab/i,
 ];

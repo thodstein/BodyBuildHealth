@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildHistoryContext, generateInsights, createSession, createSet } from '../diary-engine';
-import type { DiarySession, DiarySet } from '../diary-engine';
+import { buildHistoryContext, generateInsights, createSession, createSet } from '../diary-insights.engine';
+import type { DiarySession, DiarySet } from '../diary-insights.engine';
 
 const makeSession = (id: string, date: string, completed = true): DiarySession => ({
   sessionId: id, date, focus: 'fullbody', durationMin: 60, completed, terminatedEarly: false,

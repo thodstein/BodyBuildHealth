@@ -16,6 +16,9 @@ interface AddFoodPanelProps {
   onMealTypeChange: (v: string) => void;
   allMealTypes: string[];
   onAddFoodFromDB: (food: FoodItemLike) => void;
+  customMealInput: string;
+  onCustomMealInputChange: (value: string) => void;
+  onAddCustomMeal: () => void;
   onShowBarcode: () => void;
   showBarcode: boolean;
   onBarcodeProduct: (product: OFFProduct) => void;
@@ -54,7 +57,7 @@ interface AddFoodPanelProps {
 
 export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   foodSearch, onFoodSearchChange, debouncedSearch, usdaFoods, mealType, onMealTypeChange,
-  allMealTypes, onAddFoodFromDB, onShowBarcode, showBarcode, onBarcodeProduct, onOcrFile,
+  allMealTypes, onAddFoodFromDB, customMealInput, onCustomMealInputChange, onAddCustomMeal, onShowBarcode, showBarcode, onBarcodeProduct, onOcrFile,
   ocrFileLoading, onShowOCR, showOCR, ocrText, onOcrTextChange, onOcrSubmit, ocrError, onOcrClose,
   parsedItems, onRemoveParsedItem, onUpdateParsedItemQty, onFillMicros, onSaveItems, onEditParsedItem,
   onFixAllLowConfidence,
@@ -146,6 +149,14 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               {mt}
             </button>
           ))}
+        </div>
+        <div style={{ display: 'flex', gap: 5, marginTop: 6 }}>
+          <input value={customMealInput} onChange={e => onCustomMealInputChange(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') onAddCustomMeal(); }}
+            placeholder="Новый тип приёма пищи" aria-label="Новый тип приёма пищи"
+            style={{ flex: 1, padding: '7px 10px', borderRadius: 9, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 10, minHeight: 36 }} />
+          <button onClick={onAddCustomMeal} aria-label="Добавить тип приёма пищи"
+            style={{ padding: '7px 10px', borderRadius: 9, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 10, minHeight: 36 }}>＋</button>
         </div>
 
         {/* Quick actions */}

@@ -303,7 +303,7 @@ export async function saveParsedLabs(labs: ParsedLabValue[], phase: string): Pro
 export function saveParsedMeals(meals: ParsedMeal[], onSaved?: () => void): number {
   let saved = 0;
   try {
-    const raw = localStorage.getItem('nutrition_diary');
+    const raw = localStorage.getItem('nutrition_diary_v2');
     const diary = raw ? JSON.parse(raw) : {};
     
     for (const meal of meals) {
@@ -329,7 +329,7 @@ export function saveParsedMeals(meals: ParsedMeal[], onSaved?: () => void): numb
       }
     }
     
-    localStorage.setItem('nutrition_diary', JSON.stringify(diary));
+    localStorage.setItem('nutrition_diary_v2', JSON.stringify({ ...diary, __version: 2 }));
     onSaved?.();
   } catch (e) {
     console.error('Error saving parsed meals:', e);

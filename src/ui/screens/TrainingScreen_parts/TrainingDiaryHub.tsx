@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { StrengthDiary, type StrengthStats, type WeeklyProgress } from '../../../engines/strength-diary.engine';
 import { epley1RM } from '../../../engines/e1rm';
-import type { WorkoutLog, StrengthLogEntry, TrainingOutput } from '../../../core/types';
+import type { WorkoutLog, TrainingOutput } from '../../../core/types';
 import { computeAnalytics } from '../../../engines/analytics-engine';
 import { weeklySetsByGroup } from '../../../engines/training-recommendations.engine';
 import { LEVEL_VOLUMES } from '../../../engines/training.engine';
@@ -11,7 +11,6 @@ import { generateWeeklyReport, analyzeMeasurements, loadMeasurements, saveMeasur
 import { buildVisualDashboard, computeWeeklyChart, computeMuscleVolume, computeProgression, type VizSessionData } from '../../../engines/training-visualization.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../../engines/pro/training-load.engine';
-import { useIsMobile } from './useIsMobile';
 import { loadReadinessHistory } from './readiness-history';
 import { RIRCalibrationCard } from './RIRCalibrationCard';
 import MesoCorrectionCard from './MesoCorrectionCard';
@@ -30,12 +29,61 @@ import { TrainingRecommendationsCard } from './TrainingRecommendationsCard';
 import { loadRirCalibrationStats } from '../../../engines/meso-correction.engine';
 import { useDataLink } from '../../../core/data-link';
 import { QuickEntry } from './QuickEntry';
+import { DiaryRecordingForm } from './DiaryRecordingForm';
+import { useIsMobile } from './useIsMobile';
 
 const ACCENT = '#00e68a';
-const GRP_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры', triceps: 'Трицепс', biceps: 'Бицепс', quads: 'Квадрицепсы' };
-const GROUP_COLORS: Record<string, string> = { chest: '#00e68a', back: '#60a5fa', legs: '#f59e0b', shoulders: '#a855f7', arms: '#ef4444', core: '#22c55e' };
-const FELT_LABELS = ['👎 Ужасно', '😟 Плохо', '😐 Нормально', '🙂 Хорошо', '😄 Отлично'];
-const SP_LABELS: Record<string, string> = { fullbody: 'Фулбоди', upper_lower: 'Верх/Низ', push_pull: 'Жим/Тяга', ppl: 'PPL', bro: 'Сплит', legs_push_pull: 'Ноги/Жим/Тяга', custom: 'Свой' };
+
+const GRP_RU: Record<string, string> = {
+  chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки',
+  core: 'Кор', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры',
+  triceps: 'Трицепс', biceps: 'Бицепс', quads: 'Квадрицепсы',
+};
+const GROUP_COLORS: Record<string, string> = {
+  chest: '#00e68a', back: '#60a5fa', legs: '#f59e0b', shoulders: '#a855f7',
+  arms: '#ef4444', core: '#22c55e', hamstrings: '#3b82f6', glutes: '#ec4899',
+  calves: '#eab308', triceps: '#fb923c', biceps: '#f472b6', quads: '#facc15',
+};
+
+const WorkoutWeekCard: React.FC<{
+  weekLabel: string;
+  workouts: WorkoutLog[];
+  prevWorkouts?: WorkoutLog[];
+}> = ({ weekLabel, workouts, prevWorkouts }) => {
+  const previousByExercise = new Map<string, number>();
+  (prevWorkouts || []).forEach(workout => workout.exercises.forEach(exercise => {
+    previousByExercise.set(exercise.exerciseId, Math.max(previousByExercise.get(exercise.exerciseId) || 0, exercise.estimated1RM || 0));
+  }));
+  return (
+    <div style={style.card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+        <strong style={{ color: ACCENT }}>{weekLabel}</strong>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{workouts.length} тренировок</span>
+      </div>
+      {workouts.map(workout => (
+        <div key={workout.id} style={{ padding: '6px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+            <span>{new Date(workout.date).toLocaleDateString('ru-RU')} · {workout.split || 'Тренировка'}</span>
+            <span style={{ color: 'rgba(255,255,255,0.5)' }}>{Math.round(workout.exercises.reduce((sum, exercise) => sum + exercise.totalVolume, 0)).toLocaleString()} кг</span>
+          </div>
+          <div style={{ display: 'grid', gap: 3, marginTop: 4 }}>
+            {workout.exercises.map(exercise => {
+              const previous = previousByExercise.get(exercise.exerciseId);
+              const current = exercise.estimated1RM || 0;
+              const delta = previous && current ? current - previous : null;
+              return (
+                <div key={exercise.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.68)' }}>
+                  <span>{exercise.exerciseName}</span>
+                  <span>{exercise.sets.length} сет. · {current ? `e1RM ${Math.round(current)} кг` : '—'}{delta !== null && <span style={{ color: delta >= 0 ? '#22c55e' : '#ef4444' }}> {delta >= 0 ? '+' : ''}{Math.round(delta)}</span>}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const style: Record<string, React.CSSProperties> = {
   card: { padding: 12, borderRadius: 14, background: 'rgba(24,24,27,0.12)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8 },
@@ -76,20 +124,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const [historyExpanded, setHistoryExpanded] = useState<string | null>(null);
   const [hubAnalyticsExpanded, setHubAnalyticsExpanded] = useState(false);
 
-  // Logging state
-  const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0]);
-  const [logDuration, setLogDuration] = useState(60);
-  const [logRPE, setLogRPE] = useState(7);
-  const [logRecovery, setLogRecovery] = useState(5);
-  const [logFelt, setLogFelt] = useState(2);
-  const [logNotes, setLogNotes] = useState('');
-  const [logSplit, setLogSplit] = useState('fullbody');
-  const [logExercises, setLogExercises] = useState<{ exerciseId: string; weight: number; reps: number; rir: number }[]>([]);
-  const [exId, setExId] = useState('');
-  const [exW, setExW] = useState(80);
-  const [exR, setExR] = useState(10);
-  const [exRI, setExRI] = useState(2);
-  const [saved, setSaved] = useState(false);
+  // Progress state
 
   // Progress state
   const [measurements, setMeasurements] = useState<BodyMeasurement[]>([]);
@@ -123,39 +158,6 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const saveMeasurementHandler = () => {
     const updated = saveMeasurement({ date: mDate, weightKg: mWeight, waistCm: mWaist, chestCm: mChest, armCm: mArm, thighCm: mThigh, calfCm: 38, neckCm: 38, hipCm: 95, shoulderCm: 120, forearmCm: 32, wristCm: 18, ankleCm: 22, bodyFatPercent: 15 } as any);
     setMeasurements(updated);
-  };
-
-  const addExercise = () => {
-    if (!exId) return;
-    setLogExercises(prev => [...prev, { exerciseId: exId, weight: exW, reps: exR, rir: exRI }]);
-    setExId('');
-  };
-  const removeExercise = (i: number) => setLogExercises(prev => prev.filter((_, idx) => idx !== i));
-
-  const handleSaveWorkout = async () => {
-    if (logExercises.length === 0) return;
-    const wid = `workout_${Date.now()}`;
-    const exList: StrengthLogEntry[] = logExercises.map((e, i) => {
-      const cat = EXERCISE_CATALOG.find(x => x.id === e.exerciseId);
-      return {
-        id: `${wid}_${i}`, date: logDate, exerciseId: e.exerciseId,
-        exerciseName: cat?.name || e.exerciseId,
-        sets: [{ weight: e.weight, reps: e.reps, rir: e.rir }],
-        totalVolume: e.weight * e.reps,
-        estimated1RM: epley1RM(e.weight, e.reps),
-        isCompound: cat?.type === 'compound', weekNumber: selectedWeek,
-      };
-    });
-    await diary.saveWorkoutLog({
-      id: wid, date: logDate, duration: logDuration, exercises: exList,
-      overallRPE: logRPE, recoveryBefore: logRecovery, split: logSplit,
-      weekNumber: selectedWeek,
-      notes: `Самочувствие: ${FELT_LABELS[logFelt]}${logNotes ? ' · ' + logNotes : ''}`,
-    });
-    for (const ex of exList) { await diary.saveStrengthLog(ex); }
-    setSaved(true); setTimeout(() => setSaved(false), 2500);
-    setLogExercises([]); setLogNotes(''); setLogDuration(60); setLogRPE(7);
-    onRefresh();
   };
 
   // Analytics
@@ -283,60 +285,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
 
       {/* ═══ MODE: DIARY ═══ */}
       {mode === 'diary' && (
-        <div style={style.card}>
-          <div style={style.label}>📝 Записать тренировку</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
-            <div><label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Дата</label><input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} style={style.input} /></div>
-            <div><label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Длительность (мин)</label><input type="number" min={1} value={logDuration} onChange={e => setLogDuration(parseInt(e.target.value) || 0)} style={style.input} /></div>
-            <div><label style={{ fontSize: 10, color: 'var(--text-dim)' }}>RPE (1-10)</label><input type="number" min={1} max={10} value={logRPE} onChange={e => setLogRPE(parseInt(e.target.value) || 5)} style={style.input} /></div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
-            <div><label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Восстановление (1-10)</label><input type="number" min={1} max={10} value={logRecovery} onChange={e => setLogRecovery(parseInt(e.target.value) || 5)} style={style.input} /></div>
-            <div><label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Сплит</label>
-              <select value={logSplit} onChange={e => setLogSplit(e.target.value)} style={style.input}>
-                {Object.entries(SP_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-            </div>
-            <div><label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Самочувствие</label>
-              <select value={logFelt} onChange={e => setLogFelt(parseInt(e.target.value))} style={style.input}>
-                {FELT_LABELS.map((l, i) => <option key={i} value={i}>{l}</option>)}
-              </select>
-            </div>
-          </div>
-          <div style={{ marginBottom: 8 }}>
-            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Заметки</label>
-            <input type="text" value={logNotes} onChange={e => setLogNotes(e.target.value)} placeholder="Самочувствие, особенности, инвентарь..." style={style.input} />
-          </div>
-          <div style={style.label}>🏋️ Упражнения</div>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr 1fr auto' : '1fr 0.5fr 0.5fr 0.5fr auto', gap: 4, marginBottom: 6, alignItems: 'end' }}>
-            <div style={isMobile ? { gridColumn: '1 / -1' } : undefined}><label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Упражнение</label>
-              <select value={exId} onChange={e => setExId(e.target.value)} style={style.input}><option value="">— Выбрать —</option>{EXERCISE_CATALOG.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
-            </div>
-            <div><label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label><input type="number" value={exW} onChange={e => setExW(parseFloat(e.target.value) || 0)} style={style.input} /></div>
-            <div><label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Повт</label><input type="number" value={exR} onChange={e => setExR(parseInt(e.target.value) || 0)} style={style.input} /></div>
-            <div><label style={{ fontSize: 10, color: 'var(--text-dim)' }}>RIR</label><input type="number" min={0} max={5} value={exRI} onChange={e => setExRI(parseInt(e.target.value) || 0)} style={style.input} /></div>
-            <button onClick={addExercise} disabled={!exId} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--accent)', background: exId ? 'rgba(0,230,138,0.12)' : 'transparent', color: exId ? 'var(--accent)' : 'var(--text-dim)', cursor: exId ? 'pointer' : 'not-allowed', fontSize: 11, whiteSpace: 'nowrap' }}>+ Добавить</button>
-          </div>
-          {logExercises.length > 0 && (
-            <div style={{ marginBottom: 8 }}>
-              {logExercises.map((e, i) => {
-                const cat = EXERCISE_CATALOG.find((x: any) => x.id === e.exerciseId);
-                return (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', marginBottom: 3, fontSize: 10 }}>
-                    <span style={{ fontWeight: 600 }}>{cat?.name || e.exerciseId}</span>
-                    <span style={{ color: 'var(--text-dim)' }}>{e.weight} кг × {e.reps} · RIR {e.rir}</span>
-                    <button onClick={() => removeExercise(i)} style={{ padding: '2px 7px', borderRadius: 5, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 10 }}>✕</button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, fontSize: 10, color: 'var(--text-dim)' }}>
-            <span>Всего: {logExercises.length} упр. · {logExercises.reduce((s, e) => s + e.weight * e.reps, 0)} кг·повт</span>
-            {saved && <span style={{ color: 'var(--accent)', fontWeight: 700 }}>✅ Сохранено!</span>}
-          </div>
-          <button onClick={handleSaveWorkout} disabled={logExercises.length === 0} style={{ ...style.btn, opacity: logExercises.length === 0 ? 0.4 : 1 }}>💾 Сохранить тренировку</button>
-        </div>
+        <DiaryRecordingForm diary={diary} selectedWeek={selectedWeek} onSave={onRefresh} />
       )}
 
       {/* ═══ MODE: HISTORY ═══ */}
@@ -833,93 +782,6 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
               </div>
             )}
           </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-/* ─── WorkoutWeekCard ─── */
-const WorkoutWeekCard: React.FC<{ weekLabel: string; workouts: WorkoutLog[]; prevWorkouts?: WorkoutLog[] }> = ({ weekLabel, workouts, prevWorkouts }) => {
-  const [expanded, setExpanded] = useState(false);
-  const totalVol = workouts.reduce((s: number, w: WorkoutLog) => s + (w.exercises || []).reduce((s2: number, ex: any) => s2 + (ex.totalVolume || 0), 0), 0);
-  const totalSets = workouts.reduce((s: number, w: WorkoutLog) => s + (w.exercises || []).reduce((s2: number, ex: any) => s2 + (ex.sets?.length || 0), 0), 0);
-  const totalDur = workouts.reduce((s: number, w: WorkoutLog) => s + (w.duration || 0), 0);
-
-  // Week-over-week comparison
-  const prevVol = prevWorkouts ? prevWorkouts.reduce((s: number, w: WorkoutLog) => s + (w.exercises || []).reduce((s2: number, ex: any) => s2 + (ex.totalVolume || 0), 0), 0) : 0;
-  const volDelta = prevVol > 0 ? Math.round(((totalVol - prevVol) / prevVol) * 100) : 0;
-
-  return (
-    <div style={{ borderRadius: 10, marginBottom: 4, overflow: 'hidden', background: 'rgba(255,255,255,0.02)', border: expanded ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.03)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
-        <div>
-          <span style={{ fontWeight: 700, fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>{weekLabel}</span>
-          <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>{workouts.length} тр · {totalSets} сетов</span>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{Math.round(totalVol).toLocaleString()} кг</span>
-          {volDelta !== 0 && (
-            <span style={{
-              fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4,
-              background: volDelta > 0 ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-              color: volDelta > 0 ? '#22c55e' : '#ef4444',
-            }}>{volDelta > 0 ? '+' : ''}{volDelta}%</span>
-          )}
-          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{expanded ? '▴' : '▾'}</span>
-        </div>
-      </div>
-      {expanded && (
-        <div style={{ padding: '0 10px 8px', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: 6 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6 }}>
-            {[
-              { label: 'Объём', value: `${Math.round(totalVol)} кг`, color: '#34d399' },
-              { label: 'Сетов', value: totalSets, color: '#60a5fa' },
-              { label: 'Длит.', value: `${Math.round(totalDur / Math.max(1, workouts.length))} мин`, color: '#f59e0b' },
-            ].map((s, i) => <div key={i} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{s.label}</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{s.value}</div>
-            </div>)}
-          </div>
-          {workouts.map((w: WorkoutLog, wi: number) => {
-            // Find previous session in same week for exercise comparison
-            const prevSession = wi > 0 ? workouts[wi - 1] : null;
-            const prevExMap = new Map<string, number>();
-            if (prevSession) {
-              for (const pe of (prevSession.exercises || [])) {
-                const e1rm = Math.round(pe.estimated1RM || (pe.sets || []).reduce((m: number, s: any) => Math.max(m, s.weight * (1 + s.reps / 30)), 0));
-                prevExMap.set(pe.exerciseName || pe.exerciseId, e1rm);
-              }
-            }
-            return (
-            <div key={wi} style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)', marginBottom: 4 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontSize: 10 }}>
-                <span style={{ color: 'var(--text-dim)' }}>{w.date} · {w.duration} мин · RPE {w.overallRPE} · {SP_LABELS[w.split as keyof typeof SP_LABELS] || w.split}</span>
-                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10 }}>{w.notes?.slice(0, 40)}</span>
-              </div>
-              {(w.exercises || []).map((ex: any, ei: number) => {
-                const bestSet = (ex.sets || []).reduce((b: any, s: any) => s.weight > b.weight ? s : b, { weight: 0, reps: 0, rir: 0 });
-                const cur1RM = Math.round(ex.estimated1RM || 0);
-                const prev1RM = prevExMap.get(ex.exerciseName || ex.exerciseId) || 0;
-                const delta = prev1RM > 0 ? cur1RM - prev1RM : 0;
-                const deltaPct = prev1RM > 0 ? Math.round((delta / prev1RM) * 100) : 0;
-                return (
-                  <div key={ei} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: 10 }}>
-                    <span style={{ color: 'rgba(255,255,255,0.6)', flex: 1 }}>{ex.exerciseName || ex.exerciseId}</span>
-                    <span style={{ color: '#34d399', minWidth: 70, textAlign: 'right' }}>{bestSet.weight}×{bestSet.reps}</span>
-                    <span style={{ color: 'rgba(255,255,255,0.3)', minWidth: 50, textAlign: 'right' }}>1RM {cur1RM}</span>
-                    {delta !== 0 && (
-                      <span style={{
-                        fontSize: 9, fontWeight: 700, minWidth: 40, textAlign: 'right',
-                        color: delta > 0 ? '#22c55e' : '#ef4444',
-                      }}>{delta > 0 ? '+' : ''}{deltaPct}%</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-          })}
         </div>
       )}
     </div>

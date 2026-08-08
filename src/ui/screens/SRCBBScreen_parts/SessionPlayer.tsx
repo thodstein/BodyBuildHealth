@@ -22,7 +22,6 @@ import { useTrainingProfile } from '../TrainingScreen_parts/training-profile';
 import { recommendTempo, formatTempo, TEMPO_PRESETS } from '../../../engines/rep-tempo.engine';
 import { recordSessionRIR, getSessionRIRFeedback } from '../../../engines/rir-calibration.engine';
 import { recordMMC } from '../../../engines/mmc-tracking.engine';
-import { StrengthDiary, sessionToWorkoutLog } from '../../../engines/strength-diary.engine';
 
   const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
   const ACCENT = '#00e68a';
@@ -418,16 +417,6 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     hapticNotify('success');
     const finished = finishSession(session, `${focus} — ${day?.label}`);
 
-    // P0-1: also persist to IndexedDB via StrengthDiary
-    try {
-      const diary = new StrengthDiary();
-      const workoutLog = sessionToWorkoutLog(finished);
-      diary.saveWorkoutLog(workoutLog);
-      for (const ex of workoutLog.exercises) {
-        diary.saveStrengthLog(ex);
-      }
-    } catch { /* ignore */ }
-
     const finishRiskFlags: Record<string, string> = {};
     if (profile.injuries?.length) {
       profile.injuries.forEach(inj => {
@@ -534,7 +523,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
      const ts = Array.isArray(ex.targetSets) ? ex.targetSets[si] : null;
      const t = ts || { weight: weightFor(ex) || 60, reps: repsFor(ex) || 10, rir: rirFor(ex) ?? 2 };
      const a = actual[keyFor(ei, si)] || { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir) };
-     let s = logSet(session, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe || Math.max(1, 10 - t.rir), rir: t.rir, notes: '', plannedWeight: t.weight, plannedReps: t.reps, plannedRir: t.rir });
+      let s = logSet(session, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe || Math.max(1, 10 - t.rir), rir: t.rir, notes: '', plannedWeight: t.weight, plannedReps: t.reps, plannedRir: t.rir }).session;
      setSession(s);
      setActual(prev => ({ ...prev, [keyFor(ei, si)]: a }));
      // обновляем прогресс упражнения
@@ -559,7 +548,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
     const newActual: Record<string, { weight: number; reps: number; rpe: number }> = {};
     ex.targetSets.forEach((t, si) => {
       const a = { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir) };
-      s = logSet(s, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe, rir: t.rir, notes: '', plannedWeight: t.weight, plannedReps: t.reps, plannedRir: t.rir });
+      s = logSet(s, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe, rir: t.rir, notes: '', plannedWeight: t.weight, plannedReps: t.reps, plannedRir: t.rir }).session;
       newActual[keyFor(ei, si)] = a;
     });
     setSession(s);

@@ -63,25 +63,24 @@ function getLatestLabValue(labs: LabPoint[], code: string): number | undefined {
 
 function computeWeeklyAverages(): { kcal: number; protein: number; fat: number; carbs: number } {
   try {
-    const raw = localStorage.getItem('nutrition_diary');
+    const raw = localStorage.getItem('nutrition_diary_v2');
     if (!raw) return { kcal: 0, protein: 0, fat: 0, carbs: 0 };
     const diary = JSON.parse(raw);
     if (!diary || typeof diary !== 'object') return { kcal: 0, protein: 0, fat: 0, carbs: 0 };
-    const entries = Object.values(diary) as any[];
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 86400000);
-    const recent = entries.filter((e: any) => {
-      if (!e.date) return false;
-      const d = new Date(e.date);
-      return d >= weekAgo && d <= now;
-    });
+    const recent = Object.entries(diary)
+      .filter(([date]) => date !== '__version')
+      .filter(([date]) => { const d = new Date(date); return d >= weekAgo && d <= now; });
     if (recent.length === 0) return { kcal: 0, protein: 0, fat: 0, carbs: 0 };
     let totalKcal = 0, totalP = 0, totalF = 0, totalC = 0;
-    recent.forEach((e: any) => {
-      totalKcal += e.totalKcal ?? e.kcal ?? 0;
-      totalP += e.totalProtein ?? e.protein ?? 0;
-      totalF += e.totalFat ?? e.fat ?? 0;
-      totalC += e.totalCarbs ?? e.carbs ?? 0;
+    recent.forEach(([, day]: [string, any]) => {
+      Object.values(day?.meals || {}).flat().forEach((e: any) => {
+        totalKcal += e.kcal || 0;
+        totalP += e.p || 0;
+        totalF += e.f || 0;
+        totalC += e.c || 0;
+      });
     });
     const days = Math.max(1, recent.length);
     return { kcal: Math.round(totalKcal / days), protein: Math.round(totalP / days), fat: Math.round(totalF / days), carbs: Math.round(totalC / days) };

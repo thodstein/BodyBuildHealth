@@ -6,10 +6,11 @@ import { FOOD_DB } from '../../../core/nutrition-database';
 import { CAT_MAP_EMOJI } from '../../../core/nutrition-utils';
 import { formatDate } from '../../../core/utils/date-utils';
 import { type DiaryItem } from './types';
-import { aggregateDiaryMicros, readDiary, writeDiary, deleteDay, addMealEntry, onDiaryChange as onDiaryStorageChange } from './diary-storage';
+import { aggregateDiaryMicros } from './diary-storage';
+import { readDiaryV2, writeDiaryV2, exportDiaryJSON, exportDiaryCSV, importDiaryJSON, getStorageInfo, onDiaryChangeV2 } from './diary-storage-v2';
 import { calcMealQuality, getQualityLabel } from '../../../engines/nutrition-quality.engine';
-import { NutritionQualityCard } from '../../components/NutritionQualityCard';
 import { NutritionDiaryCharts } from './NutritionDiaryCharts';
+import { NutritionQualityCard } from '../../components/NutritionQualityCard';
 
 // Extracted components
 import { WeekDaySelector } from './diary/WeekDaySelector';
@@ -55,17 +56,19 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const [customFoodP, setCustomFoodP] = useState('10');
   const [customFoodF, setCustomFoodF] = useState('5');
   const [customFoodC, setCustomFoodC] = useState('10');
+  const [customMealInput, setCustomMealInput] = useState('');
   const [editItem, setEditItem] = useState<{ meal: string; idx: number; item: any } | null>(null);
   const [editQty, setEditQty] = useState(100);
   const [copySource, setCopySource] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [customMeals, setCustomMeals] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_custom_meals') || '[]'); } catch { return []; } });
+  const [storageError, setStorageError] = useState<string | null>(null);
+  const [customMeals, setCustomMeals] = useState<string[]>(() => { try { const value = JSON.parse(localStorage.getItem('he_custom_meals') || '[]'); return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []; } catch { return []; } });
   const [mealPresets, setMealPresets] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_meal_presets') || '[]'); } catch { return []; } });
   const [foodPatterns, setFoodPatterns] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('he_food_patterns') || '{}'); } catch { return {}; } });
   const [foodTriggers, setFoodTriggers] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('he_food_triggers') || '{}'); } catch { return {}; } });
   const [mealMood, setMealMood] = useState<Record<string, { satiety: number; enjoyment: number; note: string }>>(() => { try { return JSON.parse(localStorage.getItem('he_meal_mood') || '{}'); } catch { return {}; } });
   const [usdaFoods, setUsdaFoods] = useState<FoodItemLike[]>([]);
-  const [diaryData, setDiaryData] = useState<Record<string, any>>(() => readDiary());
+  const [diaryData, setDiaryData] = useState<Record<string, any>>(() => readDiaryV2());
   const [refreshKey, setRefreshKey] = useState(0);
 
   const ocrFileRef = useRef<HTMLInputElement>(null);
@@ -89,13 +92,22 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
   // Diary storage listener
   useEffect(() => {
-    if (typeof onDiaryStorageChange === 'function') {
-      const unsub = onDiaryStorageChange(() => setDiaryData(readDiary()));
-      return unsub;
-    }
-  }, [onDiaryStorageChange]);
+    return onDiaryChangeV2(setDiaryData);
+  }, []);
 
-  const saveDiary = useCallback((data: any) => { writeDiary(data); setDiaryData(data); setRefreshKey(k => k + 1); onDiaryChange?.(); }, [onDiaryChange]);
+  const saveDiary = useCallback((data: any) => { 
+    try {
+      writeDiaryV2(data); 
+      setDiaryData(data); 
+      setRefreshKey(k => k + 1); 
+      onDiaryChange?.(); 
+      setStorageError(null);
+    } catch (e) {
+      console.error('Diary save error:', e);
+      const errorMsg = e instanceof Error ? e.message : 'неизвестная ошибка';
+      setStorageError('Ошибка сохранения дневника: ' + errorMsg);
+    }
+  }, [onDiaryChange]);
 
   const allMealTypes = useMemo(() => [...MEAL_PRESETS, ...customMeals], [customMeals]);
 
@@ -256,15 +268,28 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     if (!editItem) return;
     const data = { ...diaryData };
     if (!data[selectedDate]?.meals?.[editItem.meal]) return;
-    const item = data[selectedDate].meals[editItem.meal][editItem.idx];
-    const savedQty = parseInt(item.qty) || 100;
-    const ratio = editQty / savedQty;
-    item.qty = `${editQty} г`;
-    item.kcal = Math.round(item.kcal * ratio);
-    item.p = Math.round(item.p * ratio * 10) / 10;
-    item.f = Math.round(item.f * ratio * 10) / 10;
-    item.c = Math.round(item.c * ratio * 10) / 10;
-    if (item.micros) item.micros = Object.fromEntries(Object.entries(item.micros).map(([key, value]) => [key, Math.round(Number(value) * ratio * 100) / 100]));
+    const day = data[selectedDate];
+    const items = [...day.meals[editItem.meal]];
+    const current = items[editItem.idx];
+    if (!current) return;
+    const savedQty = Number.parseFloat(String(current.qty || '100').replace(',', '.')) || 100;
+    const per100 = (value: number) => Number(value || 0) / savedQty * 100;
+    const portion = (value: number, decimals = 1) => {
+      const factor = 10 ** decimals;
+      return Math.round(per100(value) * editQty / 100 * factor) / factor;
+    };
+    items[editItem.idx] = {
+      ...current,
+      qty: `${editQty} г`,
+      kcal: Math.round(portion(current.kcal, 0)),
+      p: portion(current.p),
+      f: portion(current.f),
+      c: portion(current.c),
+      micros: current.micros
+        ? Object.fromEntries(Object.entries(current.micros).map(([key, value]) => [key, portion(Number(value), 2)]))
+        : current.micros,
+    };
+    data[selectedDate] = { ...day, meals: { ...day.meals, [editItem.meal]: items } };
     saveDiary(data); 
     setEditItem(null); 
     showToast('✅ Количество обновлено');
@@ -286,15 +311,14 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   }, [copySource, diaryData, selectedDate, saveDiary, showToast]);
 
   const addCustomMeal = useCallback(() => { 
-    const name = customMeals[0]?.trim(); 
+    const name = customMealInput.trim();
     if (!name || customMeals.includes(name)) return; 
     const updated = [...customMeals, name]; 
     setCustomMeals(updated); 
     safeSet('he_custom_meals', updated); 
     setCustomMealInput(''); 
-    setShowCustomMeal(false); 
     showToast('✅ Приём добавлен'); 
-  }, [customMeals, safeSet, showToast]);
+  }, [customMealInput, customMeals, safeSet, showToast]);
 
   const saveMealMood = useCallback((date: string, mood: { satiety: number; enjoyment: number; note: string }) => {
     const upd = { ...mealMood, [date]: mood };
@@ -326,7 +350,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       meals.forEach((m: any) => {
         const label = m.label || 'Приём пищи';
         if (!data[selectedDate].meals[label]) data[selectedDate].meals[label] = [];
-        m.items.forEach((it: any) => {
+        (Array.isArray(m.items) ? m.items : []).forEach((it: any) => {
           data[selectedDate].meals[label].push({ name: it.name, qty: `${it.amount || 100} г`, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0, category: it.category, foodId: it.id || it.foodId, micros: it.micros });
         });
       });
@@ -366,10 +390,6 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     showToast('✅ Пресет сохранён');
   }, [mealPresets, safeSet, showToast]);
 
-  const customMealInput = '';
-  const setCustomMealInput = (_: string) => {};
-  const setShowCustomMeal = (_: boolean) => {};
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {toast && (
@@ -379,7 +399,17 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           {toast}
         </div>
       )}
-
+      
+      {storageError && (
+        <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: 12, fontWeight: 500 }}>
+          ⚠️ {storageError}
+          <button onClick={() => setStorageError(null)} style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 4, border: 'none', background: 'rgba(239,68,68,0.2)', color: '#ef4444', cursor: 'pointer', fontSize: 10 }}>
+            ✕
+          </button>
+        </div>
+      )}
+      
+      
       {/* Week day selector */}
       <WeekDaySelector weekDays={weekDays} selectedDate={selectedDate} onSelectDate={setSelectedDate} diaryData={diaryData} />
 
@@ -403,13 +433,18 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
       {/* Macro summary — always visible */}
       <MacroSummary dayTotals={dayTotals} targets={targets} />
-
+      
+      
+      
+      
+      
       {/* Tab content */}
       {tab === 'add' && (
         <AddFoodPanel
           foodSearch={foodSearch} onFoodSearchChange={setFoodSearch} debouncedSearch={debouncedSearch}
           usdaFoods={usdaFoods} mealType={mealType} onMealTypeChange={setMealType}
           allMealTypes={allMealTypes} onAddFoodFromDB={addFoodFromDB}
+          customMealInput={customMealInput} onCustomMealInputChange={setCustomMealInput} onAddCustomMeal={addCustomMeal}
           onShowBarcode={() => setShowBarcode(true)} showBarcode={showBarcode} onBarcodeProduct={handleBarcodeProduct}
           onOcrFile={handleOcrFileUpload} ocrFileLoading={ocrFileLoading}
           onShowOCR={() => setShowOCR(!showOCR)} showOCR={showOCR}
@@ -536,6 +571,82 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           </div>
         </div>
       )}
+      
+      {/* Export/Import actions */}
+      <div style={{ marginTop: 20, padding: '16px 0', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          onClick={() => {
+            const json = exportDiaryJSON();
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `diary_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+          }}
+          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: '#202023', color: '#00e68a', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+        >
+          📥 Экспорт JSON
+        </button>
+        
+        <button
+          onClick={() => {
+            const csv = exportDiaryCSV();
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `diary_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+          }}
+          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: '#202023', color: '#60a5fa', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+        >
+          📥 Экспорт CSV
+        </button>
+        
+        <label style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: '#202023', color: '#fbbf24', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+          📤 Импорт JSON
+          <input
+            type="file"
+            accept=".json"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                  const json = ev.target?.result as string;
+                  const result = importDiaryJSON(json);
+                  if (result.success) {
+                    setDiaryData(readDiaryV2());
+                    setRefreshKey(k => k + 1);
+                  } else {
+                    setStorageError('Ошибка импорта: ' + result.error);
+                  }
+                };
+                reader.readAsText(file);
+              }
+            }}
+          />
+        </label>
+        
+        <button
+          onClick={() => {
+            if (confirm('Очистить весь дневник? Это действие нельзя отменить.')) {
+              writeDiaryV2({});
+            }
+          }}
+          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: '#202023', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 600, marginLeft: 'auto' }}
+        >
+          🗑 Очистить всё
+        </button>
+        
+        {process.env.NODE_ENV === 'development' && (
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginLeft: 8 }}>
+            {getStorageInfo().daysStored} дн. · {getStorageInfo().estimatedSizeKB.toFixed(1)} KB
+          </span>
+        )}
+      </div>
     </div>
   );
 };

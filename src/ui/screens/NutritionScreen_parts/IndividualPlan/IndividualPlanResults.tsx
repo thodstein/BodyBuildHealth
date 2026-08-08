@@ -11,12 +11,11 @@ import { DailyDietDashboard } from "../DailyDietDashboard";
 import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
 import { MealQuickControls } from "./MealQuickControls";
+import { readDiaryV2 } from "../diary-storage-v2";
 
 const getDiaryEntriesForDate = (date: string): any[] => {
   try {
-    const diaryRaw = localStorage.getItem('nutrition_diary');
-    if (!diaryRaw) return [];
-    const diary = JSON.parse(diaryRaw);
+    const diary = readDiaryV2();
     if (Array.isArray(diary)) return diary.filter((d: any) => (d.date || d.createdAt || '').startsWith(date));
     const meals = diary?.[date]?.meals || {};
     return Object.values(meals).flatMap((meal: any) => Array.isArray(meal) ? meal : []);
@@ -27,9 +26,7 @@ const getDiaryEntriesForDate = (date: string): any[] => {
 
 const getDiaryLoggedDayCount = (): number => {
   try {
-    const diaryRaw = localStorage.getItem('nutrition_diary');
-    if (!diaryRaw) return 0;
-    const diary = JSON.parse(diaryRaw);
+    const diary = readDiaryV2();
     if (!Array.isArray(diary)) return Object.keys(diary).length;
     return new Set(diary.map((d: any) => (d.date || d.createdAt || '').slice(0, 10)).filter(Boolean)).size;
   } catch {

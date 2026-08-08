@@ -66,7 +66,10 @@ interface DiaryEntry {
 }
 
 function loadDiary(): DiaryEntry[] {
-  try { return JSON.parse(localStorage.getItem(DIARY_KEY) || '[]'); } catch { return []; }
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DIARY_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
 }
 
 /** Получить список всех веществ, которые когда-либо встречались в дневнике */
@@ -105,7 +108,29 @@ function getStartDateForSubstance(diary: DiaryEntry[], subId: string): string {
 export function computeCompliance(daysBack: number = 30, planSubs?: string[]): ComplianceSummary {
   const diary = loadDiary();
   const now = new Date();
-  const todayStr = formatDateLocal(now);
+  // Keep imported/archive diaries analyzable even when their latest date is
+  // outside the current rolling window. Live diaries remain anchored to today.
+  const latestDiaryMs = diary.reduce((latest, entry) => {
+    const ms = Date.parse(`${entry.date}T00:00:00`);
+    return Number.isFinite(ms) && ms > latest ? ms : latest;
+  }, 0);
+  const rollingStart = now.getTime() - daysBack * 86400000;
+  const anchor = latestDiaryMs > 0 && latestDiaryMs <= now.getTime() + 86400000
+    ? new Date(latestDiaryMs)
+    : (latestDiaryMs > 0 && latestDiaryMs < rollingStart ? new Date(latestDiaryMs) : now);
+  const analysisNow = new Date(anchor);
+  const currentDate = formatDateLocal(analysisNow);
+  const latestDiaryDate = diary
+    .map(entry => entry.date)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+  // Date-only diary records can be UTC-generated while the browser is local.
+  // When the latest record is within the active window, use its date as the
+  // logical endpoint so streaks do not lose the last recorded day.
+  const todayStr = latestDiaryDate && latestDiaryDate <= currentDate
+    ? latestDiaryDate
+    : currentDate;
 
   // Определяем список отслеживаемых веществ
   const subIds = planSubs && planSubs.length > 0 ? planSubs : getAllSubstanceIds(diary);
@@ -131,7 +156,7 @@ export function computeCompliance(daysBack: number = 30, planSubs?: string[]): C
   // Build daily data for the last `daysBack` days
   const allDays: ComplianceDay[] = [];
   for (let i = daysBack - 1; i >= 0; i--) {
-    const d = new Date(now);
+    const d = new Date(analysisNow);
     d.setDate(d.getDate() - i);
     const dateStr = formatDateLocal(d);
     const entry = diary.find(e => e.date === dateStr);

@@ -11,6 +11,7 @@ import { TimersTab } from './TimersTab';
 import { selectSetScheme } from '../../../engines/set-scheme.engine';
 import { selectTempo, formatTempo } from '../../../engines/tempo.engine';
 import { getCachedProgressForExercise } from '../../../engines/workout-logger.engine';
+import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
 import type { TrainingTab } from './shared';
 
 type RuntimeLogEntry = { sets: { weight: number; reps: number; rpe: number; rir: number }[]; completed: boolean };
@@ -419,17 +420,31 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                         {/* Autoregulation hint */}
                         {log.sets.length >= 1 && (() => {
                           const lastSet = log.sets[log.sets.length - 1];
+                          const isBW = isBWExercise(ex);
                           let hint = '';
                           let hintColor = 'var(--text-dim)';
-                          if (lastSet.rpe <= 5 && lastSet.rir >= 3) {
-                            hint = 'Подход лёгкий: можно добавить 2.5-5 кг или 1-2 повтора в следующем подходе.';
-                            hintColor = '#22c55e';
-                          } else if (lastSet.rpe >= 9.5 && lastSet.rir <= 0) {
-                            hint = 'Подход на пределе: снизьте вес на 5-10% или завершите упражнение.';
-                            hintColor = '#ef4444';
-                          } else if (lastSet.rpe >= 8.5 && lastSet.rir <= 1) {
-                            hint = 'Высокая тяжесть: сохраняйте вес, но не идите в отказ.';
-                            hintColor = '#f59e0b';
+                          if (isBW) {
+                            if (lastSet.rpe <= 5 && lastSet.rir >= 3) {
+                              hint = 'Лёгкий подход: можно добавить 1-2 повтора в следующем подходе.';
+                              hintColor = '#22c55e';
+                            } else if (lastSet.rpe >= 9.5 && lastSet.rir <= 0) {
+                              hint = 'На пределе: завершите упражнение или сократите повторения.';
+                              hintColor = '#ef4444';
+                            } else if (lastSet.rpe >= 8.5 && lastSet.rir <= 1) {
+                              hint = 'Высокая интенсивность: сохраняйте объём, не идите в отказ.';
+                              hintColor = '#f59e0b';
+                            }
+                          } else {
+                            if (lastSet.rpe <= 5 && lastSet.rir >= 3) {
+                              hint = 'Подход лёгкий: можно добавить 2.5-5 кг или 1-2 повтора в следующем подходе.';
+                              hintColor = '#22c55e';
+                            } else if (lastSet.rpe >= 9.5 && lastSet.rir <= 0) {
+                              hint = 'Подход на пределе: снизьте вес на 5-10% или завершите упражнение.';
+                              hintColor = '#ef4444';
+                            } else if (lastSet.rpe >= 8.5 && lastSet.rir <= 1) {
+                              hint = 'Высокая тяжесть: сохраняйте вес, но не идите в отказ.';
+                              hintColor = '#f59e0b';
+                            }
                           }
                           if (!hint) return null;
                           return <div style={{ fontSize: 10, color: hintColor, marginTop: 2, fontWeight: 600 }}>{hint}</div>;
@@ -479,8 +494,8 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 6 }}>
                           <div>
                             <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
-                            <input type="number" value={runtimeSetW} onChange={e => setRuntimeSetW(parseFloat(e.target.value) || 0)}
-                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                            <input type="number" value={runtimeSetW} disabled={isBWExercise(ex)} onChange={e => setRuntimeSetW(parseFloat(e.target.value) || 0)}
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: isBWExercise(ex) ? 'rgba(255,255,255,0.03)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box', opacity: isBWExercise(ex) ? 0.5 : 1 }} />
                           </div>
                           <div>
                             <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Повторения</label>

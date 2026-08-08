@@ -23,6 +23,8 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
   const [restSec, setRestSec] = React.useState(initialSettings?.rest || 30);
   const [rounds, setRounds] = React.useState(initialSettings?.rounds || 3);
   const [isRunning, setIsRunning] = React.useState(false);
+  const [isPaused, setIsPaused] = React.useState(false);
+  const [soundOn, setSoundOn] = React.useState(true);
   const [currentRound, setCurrentRound] = React.useState(0);
   const [phase, setPhase] = React.useState<'work' | 'rest'>('work');
   const [timeLeft, setTimeLeft] = React.useState(0);
@@ -45,7 +47,7 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
       localStorage.setItem('he_timer_presets', JSON.stringify(settings));
       localStorage.setItem('he_timer_last', JSON.stringify(settings));
     } catch {}
-  }, [settings]);
+  }, [settings, soundOn]);
 
   const start = () => {
     if (isRunning) return;

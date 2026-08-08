@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { importSessionsFromCSV, logSet, startSession, finishSession, addExerciseToSession, getWorkoutStats, loadSessions, saveSessions } from '../workout-logger.engine';
+import { getISOWeekNumber, importSessionsFromCSV, logSet, startSession, finishSession, addExerciseToSession, getWorkoutStats, loadSessions, saveSessions } from '../workout-logger.engine';
 
 // минимальный mock localStorage (движок использует localStorage для he_workout_log_v2)
 const store: Record<string, string> = {};
@@ -46,7 +46,10 @@ describe('logSet validation', () => {
   it('ignores non-positive weight/reps', () => {
     const session = startSession('fullbody', 1);
     const withEx = addExerciseToSession(session, { id: 'squat', name: 'Squat', pattern: 'squat', muscleGroup: 'quads' });
-    const modified = logSet(withEx, 0, { weightKg: 0, reps: 0, rpe: 7, rir: 2 });
+    const result = logSet(withEx, 0, { weightKg: 0, reps: 0, rpe: 7, rir: 2 });
+    const modified = result.session;
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('Вес');
     expect(modified.exercises[0].sets.length).toBe(0);
     expect(modified.totalVolume).toBe(0);
   });
@@ -54,14 +57,14 @@ describe('logSet validation', () => {
   it('ignores negative weight/reps', () => {
     const session = startSession('fullbody', 1);
     const withEx = addExerciseToSession(session, { id: 'squat', name: 'Squat', pattern: 'squat', muscleGroup: 'quads' });
-    const modified = logSet(withEx, 0, { weightKg: -10, reps: -5, rpe: 7, rir: 2 });
+    const modified = logSet(withEx, 0, { weightKg: -10, reps: -5, rpe: 7, rir: 2 }).session;
     expect(modified.exercises[0].sets.length).toBe(0);
   });
 
   it('clamps RPE to 0-10 and RIR to 0-20', () => {
     const session = startSession('fullbody', 1);
     const withEx = addExerciseToSession(session, { id: 'squat', name: 'Squat', pattern: 'squat', muscleGroup: 'quads' });
-    const modified = logSet(withEx, 0, { weightKg: 100, reps: 5, rpe: 15, rir: 30 });
+    const modified = logSet(withEx, 0, { weightKg: 100, reps: 5, rpe: 15, rir: 30 }).session;
     expect(modified.exercises[0].sets[0].rpe).toBe(10);
     expect(modified.exercises[0].sets[0].rir).toBe(20);
   });
@@ -69,15 +72,20 @@ describe('logSet validation', () => {
   it('returns original session for out-of-range exerciseIndex', () => {
     const session = startSession('fullbody', 1);
     const withEx = addExerciseToSession(session, { id: 'squat', name: 'Squat', pattern: 'squat', muscleGroup: 'quads' });
-    const modified = logSet(withEx, 99, { weightKg: 100, reps: 5, rpe: 7, rir: 2 });
+    const modified = logSet(withEx, 99, { weightKg: 100, reps: 5, rpe: 7, rir: 2 }).session;
     expect(modified.exercises[0].sets.length).toBe(0);
   });
 
   it('rounds reps and preserves integer values', () => {
     const session = startSession('fullbody', 1);
     const withEx = addExerciseToSession(session, { id: 'squat', name: 'Squat', pattern: 'squat', muscleGroup: 'quads' });
-    const modified = logSet(withEx, 0, { weightKg: 100, reps: 5.7, rpe: 7, rir: 2 });
+    const modified = logSet(withEx, 0, { weightKg: 100, reps: 5.7, rpe: 7, rir: 2 }).session;
     expect(modified.exercises[0].sets[0].reps).toBe(6);
+  });
+
+  it('uses ISO week boundaries around New Year', () => {
+    expect(getISOWeekNumber('2021-01-01')).toBe(53);
+    expect(getISOWeekNumber('2021-01-04')).toBe(1);
   });
 });
 

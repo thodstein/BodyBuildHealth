@@ -7,7 +7,67 @@ export type DiaryEntryLike = { date: string; fields: { label: string; value: str
 
 export type DiaryKey =
   | 'sleep' | 'bp' | 'weight' | 'measurements'
-  | 'injection' | 'symptoms' | 'pain' | 'neuro' | 'acne' | 'hemato';
+   | 'injection' | 'health' | 'symptoms' | 'pain' | 'neuro' | 'acne' | 'hemato';
+
+export const PAIN_ZONE_LIST = [
+  { id: 'shoulders', label: 'Плечи' }, { id: 'elbows', label: 'Локти' },
+  { id: 'wrists', label: 'Запястья' }, { id: 'lower_back', label: 'Поясница' },
+  { id: 'hips', label: 'ТБС' }, { id: 'knees', label: 'Колени' },
+  { id: 'ankles', label: 'Голеностоп' },
+] as const;
+
+export interface PainZoneStat { zoneId: string; label: string; avg: number; last: number; trend: 'up' | 'down' | 'same'; }
+
+export const computeZoneBreakdown = (entries: Array<{ zones?: Record<string, number> }>): PainZoneStat[] => PAIN_ZONE_LIST.map(zone => {
+  const values = entries.map(e => e.zones?.[zone.id]).filter((v): v is number => Number.isFinite(v));
+  const last = values.at(-1) ?? 0;
+  const previous = values.at(-2) ?? last;
+  return { zoneId: zone.id, label: zone.label, avg: values.length ? values.reduce((s, v) => s + v, 0) / values.length : 0, last, trend: last > previous + 0.3 ? 'up' : last < previous - 0.3 ? 'down' : 'same' };
+});
+
+export const getMostPainfulZone = (entries: Array<{ zones?: Record<string, number> }>): { label: string; score: number } | null => {
+  const stats = computeZoneBreakdown(entries);
+  const worst = stats.reduce<PainZoneStat | null>((best, current) => !best || current.avg > best.avg ? current : best, null);
+  return worst && worst.avg > 0 ? { label: worst.label, score: Math.round(worst.avg * 10) / 10 } : null;
+};
+
+export const computePainImprovementStreak = (entries: Array<{ totalScore: number }>): { streak: number; trend: 'improving' | 'stable' | 'worsening' } => {
+  if (entries.length < 2) return { streak: entries.length, trend: 'stable' };
+  let streak = 1;
+  let direction: 'improving' | 'worsening' | 'stable' = 'stable';
+  for (let i = entries.length - 1; i > 0; i--) {
+    const delta = entries[i].totalScore - entries[i - 1].totalScore;
+    const next = delta < 0 ? 'improving' : delta > 0 ? 'worsening' : 'stable';
+    if (next === 'stable' || (direction !== 'stable' && next !== direction)) break;
+    direction = next;
+    streak++;
+  }
+  return { streak, trend: direction };
+};
+
+export const computeTimeOfDayBreakdown = (entries: Array<{ timeOfDay?: string; totalScore: number }>) => {
+  const groups = new Map<string, number[]>();
+  entries.forEach(e => { if (e.timeOfDay) groups.set(e.timeOfDay, [...(groups.get(e.timeOfDay) || []), e.totalScore]); });
+  return [...groups].map(([label, values]) => ({ label, avgScore: values.reduce((s, v) => s + v, 0) / values.length, count: values.length })).sort((a, b) => b.avgScore - a.avgScore);
+};
+
+export const computeTriggerFrequency = (entries: Array<{ triggers?: string[] }>) => {
+  const total = entries.length || 1; const counts = new Map<string, number>();
+  entries.flatMap(e => e.triggers || []).forEach(t => counts.set(t, (counts.get(t) || 0) + 1));
+  return [...counts].map(([trigger, count]) => ({ trigger, count, pct: Math.round(count / total * 100) })).sort((a, b) => b.count - a.count);
+};
+
+export const computePainTypeDistribution = (entries: Array<{ painType?: string; totalScore: number }>) => {
+  const groups = new Map<string, number[]>();
+  entries.forEach(e => { if (e.painType) groups.set(e.painType, [...(groups.get(e.painType) || []), e.totalScore]); });
+  return [...groups].map(([type, values]) => ({ type, count: values.length, avgScore: values.reduce((s, v) => s + v, 0) / values.length })).sort((a, b) => b.count - a.count);
+};
+
+export const computeReliefEffectiveness = (entries: Array<{ relief?: string[]; totalScore: number }>) => {
+  const groups = new Map<string, number[]>();
+  entries.forEach(e => (e.relief || []).forEach(method => groups.set(method, [...(groups.get(method) || []), e.totalScore])));
+  return [...groups].map(([method, values]) => ({ method, count: values.length, avgScore: values.reduce((s, v) => s + v, 0) / values.length, pctWithRelief: Math.round(values.filter(v => v <= 3).length / values.length * 100) })).sort((a, b) => b.pctWithRelief - a.pctWithRelief);
+};
 
 export const todayIso = (): string => {
   const d = new Date();
@@ -46,7 +106,7 @@ export const computeStreak = (
     const lastMs = Date.parse(last);
     if (Number.isFinite(lastMs)) {
       const diffDays = Math.floor((todayMs - lastMs) / dayMs);
-      if (diffDays <= 2) {
+       if (diffDays <= 1) {
         const lastDate = new Date(lastMs);
         lastDate.setHours(0, 0, 0, 0);
         cursor = new Date(lastDate);
@@ -239,14 +299,56 @@ export const computeSummary = (
       out.push({ label: 'Записей', value: String(w.length), color: '#22c55e' });
       out.push({ label: 'Текущий', value: `${last.toFixed(1)} кг`, color: '#22c55e' });
       out.push({ label: 'Δ за период', value: `${delta > 0 ? '+' : ''}${delta.toFixed(1)} кг`, color: delta > 0 ? '#22c55e' : delta < 0 ? '#ef4444' : '#22c55e' });
+
+      // Body fat analysis
+      const bfEntries = entries
+        .map(e => e.fields.find(f => f.label === '% жира'))
+        .filter((f): f is { label: string; value: string; unit: string } => !!f && Number.isFinite(parseFloat(f.value)))
+        .map(f => parseFloat(f.value));
+      if (bfEntries.length) {
+        const lastBf = bfEntries[0];
+        const firstBf = bfEntries[bfEntries.length - 1];
+        const bfDelta = lastBf - firstBf;
+        out.push({ label: '% жира (текущий)', value: `${lastBf.toFixed(1)}%`, color: '#f59e0b' });
+        out.push({ label: 'Δ % жира', value: `${bfDelta > 0 ? '+' : ''}${bfDelta.toFixed(1)}%`, color: bfDelta < 0 ? '#22c55e' : bfDelta > 0 ? '#ef4444' : '#f59e0b' });
+      }
+
+      // Lean mass analysis
+      const lmEntries = entries
+        .map(e => e.fields.find(f => f.label === 'Мышечная масса'))
+        .filter((f): f is { label: string; value: string; unit: string } => !!f && Number.isFinite(parseFloat(f.value)))
+        .map(f => parseFloat(f.value));
+      if (lmEntries.length) {
+        const lastLm = lmEntries[0];
+        const firstLm = lmEntries[lmEntries.length - 1];
+        const lmDelta = lastLm - firstLm;
+        out.push({ label: 'Мышечная масса', value: `${lastLm.toFixed(1)} кг`, color: '#3b82f6' });
+        out.push({ label: 'Δ мышц', value: `${lmDelta > 0 ? '+' : ''}${lmDelta.toFixed(1)} кг`, color: lmDelta > 0 ? '#22c55e' : lmDelta < 0 ? '#ef4444' : '#3b82f6' });
+      }
+
+      // Waist analysis
+      const waistEntries = entries
+        .map(e => e.fields.find(f => f.label === 'Талия'))
+        .filter((f): f is { label: string; value: string; unit: string } => !!f && Number.isFinite(parseFloat(f.value)))
+        .map(f => parseFloat(f.value));
+      if (waistEntries.length) {
+        const lastWaist = waistEntries[0];
+        const firstWaist = waistEntries[waistEntries.length - 1];
+        const waistDelta = lastWaist - firstWaist;
+        out.push({ label: 'Талия', value: `${lastWaist.toFixed(1)} см`, color: '#8b5cf6' });
+        out.push({ label: 'Δ талия', value: `${waistDelta > 0 ? '+' : ''}${waistDelta.toFixed(1)} см`, color: waistDelta < 0 ? '#22c55e' : waistDelta > 0 ? '#ef4444' : '#8b5cf6' });
+      }
+
+      // Weekly rate of change
+      if (entries.length >= 2) {
+        const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+        const daysDiff = (Date.parse(sorted[sorted.length - 1].date) - Date.parse(sorted[0].date)) / 86400000;
+        if (daysDiff > 0) {
+          const weeklyRate = (delta / daysDiff) * 7;
+          out.push({ label: 'Темп/нед', value: `${weeklyRate > 0 ? '+' : ''}${weeklyRate.toFixed(2)} кг/нед`, color: weeklyRate > 0.5 ? '#ef4444' : weeklyRate < -0.5 ? '#f59e0b' : '#22c55e' });
+        }
+      }
     }
-  } else if (key === 'measurements') {
-    out.push({ label: 'Записей', value: String(entries.length), color: '#3b82f6' });
-    const last = entries[0];
-    const waist = last.fields.find(x => x.label === 'Талия')?.value;
-    const bf = last.fields.find(x => x.label === '% жира')?.value;
-    if (waist) out.push({ label: 'Талия', value: `${waist} см`, color: '#3b82f6' });
-    if (bf && Number(bf) > 0) out.push({ label: '% жира', value: `${bf}%`, color: '#3b82f6' });
   } else if (key === 'injection' || key === 'symptoms') {
     out.push({ label: 'Записей', value: String(entries.length), color: '#f59e0b' });
     if (entries[0]) out.push({ label: 'Последняя', value: new Date(entries[0].date).toLocaleDateString('ru-RU'), color: '#f59e0b' });
@@ -516,8 +618,10 @@ export const dailyCompletion = (
   keys: { key: DiaryKey; hasEntry: boolean; lastDate?: string }[]
 ): { filled: number; total: number; pct: number; missing: DiaryKey[] } => {
   const today = todayIso();
-  const filled = keys.filter(k => k.hasEntry && k.lastDate === today).length;
-  const missing = keys.filter(k => !k.hasEntry || k.lastDate !== today).map(k => k.key);
+  const isoToday = new Date().toISOString().slice(0, 10);
+  const isToday = (date?: string) => date === today || date === isoToday;
+  const filled = keys.filter(k => k.hasEntry && isToday(k.lastDate)).length;
+  const missing = keys.filter(k => !k.hasEntry || !isToday(k.lastDate)).map(k => k.key);
   return { filled, total: keys.length, pct: keys.length > 0 ? Math.round((filled / keys.length) * 100) : 0, missing };
 };
 
@@ -532,7 +636,6 @@ export const PACE_TARGETS: Partial<Record<DiaryKey, PaceTarget>> = {
   sleep: { weeklyDays: 5, windowDays: 7 },
   weight: { weeklyDays: 3, windowDays: 7 },
   bp: { weeklyDays: 3, windowDays: 7 },
-  measurements: { weeklyDays: 1, windowDays: 14 },
   pain: { weeklyDays: 3, windowDays: 7 },
   neuro: { weeklyDays: 3, windowDays: 7 },
   acne: { weeklyDays: 3, windowDays: 7 },
@@ -640,7 +743,6 @@ const NORMAL_RANGES: Partial<Record<DiaryKey, NormalRange>> = {
   sleep: { low: 7, high: 9, warnLow: 6, warnHigh: 10, unit: 'ч', description: 'Норма сна для взрослого: 7–9 ч' },
   bp: { low: 90, high: 120, warnLow: 80, warnHigh: 140, unit: 'мм рт.ст.', description: 'Норма систолического АД: 90–120' },
   weight: { low: 50, high: 120, unit: 'кг', description: 'Вес в пределах нормы ИМТ' },
-  measurements: { low: 60, high: 100, unit: 'см', description: 'Талия в пределах нормы' },
   pain: { low: 0, high: 20, warnLow: 0, warnHigh: 40, unit: '/70', description: 'Боль в суставах: ≤20 из 70' },
   neuro: { low: 0, high: 1, warnLow: 0, warnHigh: 4, unit: '/10', description: 'Нейросимптомы: ≤1 из 10' },
   acne: { low: 0, high: 3, warnLow: 0, warnHigh: 7, unit: '/12', description: 'Акне: ≤3 из 12' },

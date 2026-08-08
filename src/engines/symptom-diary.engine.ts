@@ -29,17 +29,23 @@ const DIARY_KEY = 'he_symptom_diary';
 /** Получить весь дневник */
 export function getSymptomDiary(): SymptomDiaryDay[] {
   try {
-    return JSON.parse(localStorage.getItem(DIARY_KEY) || '[]');
+    const parsed = JSON.parse(localStorage.getItem(DIARY_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
   } catch { return []; }
 }
 
 /** Локальная дата без UTC-сдвига */
-function todayLocalStr(): string {
-  const d = new Date();
+export function localDateStr(date?: Date): string {
+  const d = date || new Date();
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+/** Локальная дата без UTC-сдвига */
+function todayLocalStr(): string {
+  return localDateStr();
 }
 
 /** Получить записи за сегодня */
@@ -110,7 +116,7 @@ function calcTrend(
   const prevEntries: SymptomDiaryEntry[] = [];
   for (let i = diary.length - 1; i >= 0 && prevEntries.length < 3; i--) {
     const found = diary[i].entries.find((e) => e.symptomId === symptomId);
-    if (found && found.date !== new Date().toISOString().slice(0, 10)) {
+    if (found && found.date !== localDateStr()) {
       prevEntries.push(found);
     }
   }
@@ -146,7 +152,7 @@ export function getSymptomDiaryStats(): {
   weekAvgScore: number;
 } {
   const diary = getSymptomDiary();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   const todayDay = diary.find((d) => d.date === today);
   const todayEntries = todayDay?.entries || [];
 
@@ -154,7 +160,7 @@ export function getSymptomDiaryStats(): {
   const activeSymptoms = todayEntries.length;
 
   // Срез за последние 7 дней
-  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const weekAgo = localDateStr(new Date(Date.now() - 7 * 86400000));
   const weekEntries: SymptomDiaryEntry[] = [];
   for (const day of diary) {
     if (day.date >= weekAgo) {
@@ -190,7 +196,7 @@ export function getSymptomChartData(
   days: number = 7
 ): { labels: string[]; values: number[] } {
   const diary = getSymptomDiary();
-  const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const cutoff = localDateStr(new Date(Date.now() - days * 86400000));
   const filtered = diary
     .filter((d) => d.date >= cutoff)
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -214,7 +220,7 @@ export function getSymptomDiarySummary(days: number = 7): {
   avgSeverity: number;
 }[] {
   const diary = getSymptomDiary();
-  const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const cutoff = localDateStr(new Date(Date.now() - days * 86400000));
 
   // Уникальные symptomId за период
   const symptomMap = new Map<string, { severities: number[]; dates: string[] }>();

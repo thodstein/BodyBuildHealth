@@ -113,7 +113,7 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
   const handleClearDiaries = () => {
     if (!confirm('Удалить все дневниковые записи (сон, АД, инъекции, замеры)?')) return;
     try {
-      const DIARY_KEYS = ['he_weight_log', 'he_measurements_log', 'he_bp_diary', 'he_sleep_diary', 'he_injection_diary'];
+      const DIARY_KEYS = ['he_weight_log', 'he_bp_diary', 'he_sleep_diary', 'he_injection_diary'];
       for (const k of DIARY_KEYS) localStorage.removeItem(k);
       alert('✅ Дневники очищены');
     } catch (e) {

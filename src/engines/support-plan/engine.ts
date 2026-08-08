@@ -868,20 +868,20 @@ export function hydrateState(): Partial<CalculatorState> {
     } catch {}
   }
 
-  // ── Авто-вывод питания из he_nutrition_diary (если карточка убрана) ──
+  // ── Авто-вывод питания из единого дневника питания ──
   if (!result.nutrition) {
     try {
-      const raw = localStorage.getItem('he_nutrition_diary');
+      const raw = localStorage.getItem('nutrition_diary_v2');
       if (raw) {
         const diary = JSON.parse(raw);
         const today = new Date().toISOString().slice(0, 10);
-        const todayEntries = Array.isArray(diary) ? diary.filter((e: any) => (e.date || '').slice(0, 10) === today) : [];
+        const todayEntries = Object.values(diary?.[today]?.meals || {}).flatMap((items: any) => Array.isArray(items) ? items : []);
         if (todayEntries.length > 0) {
           const totals = todayEntries.reduce((acc: any, e: any) => ({
-            calories: (acc.calories || 0) + (e.calories || 0),
-            proteinG: (acc.proteinG || 0) + (e.protein || 0),
-            fatG: (acc.fatG || 0) + (e.fat || 0),
-            carbsG: (acc.carbsG || 0) + (e.carbs || 0),
+            calories: (acc.calories || 0) + (e.kcal || 0),
+            proteinG: (acc.proteinG || 0) + (e.p || 0),
+            fatG: (acc.fatG || 0) + (e.f || 0),
+            carbsG: (acc.carbsG || 0) + (e.c || 0),
             fiberG: (acc.fiberG || 0) + (e.fiber || 0),
             waterL: (acc.waterL || 0) + (e.water || 0),
           }), {});

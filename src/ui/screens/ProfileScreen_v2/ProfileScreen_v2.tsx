@@ -62,7 +62,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
   // P1-fix (Aug 5 2026): при переходе из App — открываем конкретную вкладку дневника
   useEffect(() => {
     if (initialSubTab && (
-      ['diaries', 'reports', 'archive', 'custom-report', 'sleep', 'bp', 'weight', 'measurements', 'injection'].includes(initialSubTab)
+      ['diaries', 'reports', 'archive', 'custom-report', 'sleep', 'bp', 'weight', 'injection'].includes(initialSubTab)
       || initialSubTab.endsWith('-diary')
       || initialSubTab.endsWith('-reports')
     )) {
@@ -143,14 +143,14 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
          {tab === 'diaries' && <ProfileErrorBoundary tabName="Дневники"><ProfileDiariesTab
            onNavigate={onNavigate}
            initialView={initialSubTab === 'reports' || initialSubTab === 'custom-report' ? 'reports' : initialSubTab === 'archive' ? 'archive' : 'diary'}
-           initialActiveDiary={
-             initialSubTab === 'sleep' || initialSubTab === 'bp' || initialSubTab === 'weight'
-             || initialSubTab === 'measurements' || initialSubTab === 'injection'
-             || initialSubTab === 'symptoms' || initialSubTab === 'pain' || initialSubTab === 'neuro'
-             || initialSubTab === 'acne' || initialSubTab === 'hemato'
-               ? initialSubTab as 'sleep' | 'bp' | 'weight' | 'measurements' | 'injection' | 'symptoms' | 'pain' | 'neuro' | 'acne' | 'hemato'
-               : undefined
-           }
+initialActiveDiary={
+              initialSubTab === 'sleep' || initialSubTab === 'bp' || initialSubTab === 'weight'
+              || initialSubTab === 'injection'
+              || initialSubTab === 'symptoms' || initialSubTab === 'pain' || initialSubTab === 'neuro'
+              || initialSubTab === 'acne' || initialSubTab === 'hemato'
+                ? initialSubTab as 'sleep' | 'bp' | 'weight' | 'injection' | 'symptoms' | 'pain' | 'neuro' | 'acne' | 'hemato'
+                : undefined
+            }
          /></ProfileErrorBoundary>}
          {tab === 'settings' && <ProfileErrorBoundary tabName="Настройки"><ProfileSettingsTab onNavigate={onNavigate} /></ProfileErrorBoundary>}
          {tab === 'reports' && <ProfileErrorBoundary tabName="Отчёты"><ReportsScreen /></ProfileErrorBoundary>}
