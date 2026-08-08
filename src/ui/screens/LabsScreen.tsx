@@ -179,6 +179,10 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   const [tick, setTick] = useState(0);
   const [catalogView, setCatalogView] = useState<'catalog' | 'schedule' | 'problems'>('catalog');
   const [journalSubView, setJournalSubView] = useState<'diary' | 'reports' | 'archive'>('diary');
+  const [trendFilter, setTrendFilter] = useState<'all' | 'significant' | 'critical' | 'worsened' | 'improved'>('all');
+  const [trendSystemFilter, setTrendSystemFilter] = useState('all');
+  const [visibleTrends, setVisibleTrends] = useState<Set<string>>(new Set());
+  const [hoveredTrendPoint, setHoveredTrendPoint] = useState<{ code: string; date: string; value: number; x: number; y: number } | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [ocrResult, setOcrResult] = useState<OCRResult | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -1245,22 +1249,18 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       {subTab === 'trends' && (() => {
         const report = computeLabTrends(labs);
         const insights = getTrendInsights(report.trends);
-        const [filter, setFilter] = useState<'all' | 'significant' | 'critical' | 'worsened' | 'improved'>('all');
-        const [trendSystemFilter, setTrendSystemFilter] = useState<string>('all');
-        const [visibleTrends, setVisibleTrends] = useState<Set<string>>(new Set());
-        const [hoveredPoint, setHoveredPoint] = useState<{ code: string; date: string; value: number; x: number; y: number } | null>(null);
-        const filtered = useMemo(() => {
+        const filtered = (() => {
           let base = report.trends;
-          if (filter === 'worsened') base = report.worsened;
-          else if (filter === 'improved') base = report.improved;
-          else if (filter !== 'all') base = base.filter(t => t.significance === filter);
+          if (trendFilter === 'worsened') base = report.worsened;
+          else if (trendFilter === 'improved') base = report.improved;
+          else if (trendFilter !== 'all') base = base.filter(t => t.significance === trendFilter);
           if (trendSystemFilter !== 'all') {
             const sysCodes = LAB_SYSTEM_GROUPS[trendSystemFilter] || [];
             base = base.filter(t => sysCodes.includes(t.code.toUpperCase()));
           }
           return base;
-        }, [report, filter, trendSystemFilter]);
-        const recommendations = useMemo(() => {
+        })();
+        const recommendations = (() => {
           const recs: { trend: LabTrend; corrections: string[] }[] = [];
           for (const t of report.worsened) {
             if (t.significance === 'normal') continue;
@@ -1270,12 +1270,12 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             }
           }
           return recs;
-        }, [report]);
-        const chartTrends = useMemo(() => {
+        })();
+        const chartTrends = (() => {
           const withPoints = filtered.filter(t => t.points.length >= 2);
           if (visibleTrends.size === 0) return withPoints;
           return withPoints.filter(t => visibleTrends.has(t.code));
-        }, [filtered, visibleTrends]);
+        })();
         const toggleTrend = (code: string) => {
           setVisibleTrends(prev => {
             const next = new Set(prev);
@@ -1293,11 +1293,11 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               {report.trends.length > 0 && (
                 <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
                   {(['all','significant','critical','worsened','improved'] as const).map(f => (
-                    <button key={f} onClick={() => setFilter(f)} style={{
+                    <button key={f} onClick={() => setTrendFilter(f)} style={{
                       padding:'4px 10px', borderRadius:6, fontSize:9, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
-                      background: filter === f ? 'var(--accent)' : 'var(--bg-secondary)',
-                      color: filter === f ? '#000' : 'var(--text-dim)',
-                      border: `1px solid ${filter === f ? 'var(--accent)' : 'var(--border)'}`,
+                       background: trendFilter === f ? 'var(--accent)' : 'var(--bg-secondary)',
+                       color: trendFilter === f ? '#000' : 'var(--text-dim)',
+                       border: `1px solid ${trendFilter === f ? 'var(--accent)' : 'var(--border)'}`,
                     }}>
                       {f === 'all' ? 'Все' : f === 'significant' ? 'Значимые' : f === 'critical' ? 'Критические' : f === 'worsened' ? 'Ухудшения' : 'Улучшения'}
                     </button>
@@ -1443,8 +1443,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                                    const y = h - ((p.value - min) / range) * (h - 4) - 2;
                                    return (
                                      <circle key={i} cx={x} cy={y} r="4" fill={color} stroke="rgba(0,0,0,0.4)" strokeWidth="1"
-                                       onMouseEnter={() => setHoveredPoint({ code: trend.code, date: p.date, value: p.value, x: pad.left + x, y: pad.top + y })}
-                                       onMouseLeave={() => setHoveredPoint(null)}
+                                        onMouseEnter={() => setHoveredTrendPoint({ code: trend.code, date: p.date, value: p.value, x: pad.left + x, y: pad.top + y })}
+                                        onMouseLeave={() => setHoveredTrendPoint(null)}
                                        style={{ cursor: 'pointer' }}
                                      />
                                    );
@@ -1459,14 +1459,14 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       );
                     })()}
                    </svg>
-                   {hoveredPoint && (
+                    {hoveredTrendPoint && (
                      <div style={{
-                       position: 'fixed', left: hoveredPoint.x + 8, top: hoveredPoint.y - 28,
+                        position: 'fixed', left: hoveredTrendPoint.x + 8, top: hoveredTrendPoint.y - 28,
                        background: 'rgba(0,0,0,0.85)', color: '#fff', padding: '3px 8px', borderRadius: 4,
                        fontSize: 10, fontWeight: 600, pointerEvents: 'none', zIndex: 1000,
                        border: '1px solid rgba(255,255,255,0.15)',
                      }}>
-                       {hoveredPoint.date.slice(5)}: {hoveredPoint.value.toFixed(1)}
+                        {hoveredTrendPoint.date.slice(5)}: {hoveredTrendPoint.value.toFixed(1)}
                      </div>
                    )}
                  </div>
