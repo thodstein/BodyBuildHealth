@@ -54,6 +54,8 @@ import { useConfirmDialog } from './ConfirmDialog';
 import { ProgramTimeline } from './ProgramTimeline';
 import { RirWaveChart, QualityScorePanel, PlanStatsPanel } from './ProgramEditorPanels2';
 import type { ManualMode } from './ProgramManagerPanel';
+import { PlannerToolsPanel } from './PlannerToolsPanel';
+import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
 
 const GOAL_OPTS = [
   { id: 'hypertrophy', label: 'Масса' }, { id: 'powerlifting', label: 'Сила (ПЛ)' },
@@ -644,6 +646,20 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         <span>Основной редактор программы находится ниже</span>
       </div>
       {showProTools && <>
+      {dir === 'pl' && (
+        <div style={{ ...panelStyle('#a78bfa'), padding: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#c4b5fd', marginBottom: 3 }}>
+            🏆 ПЛ PRO: диагностика, мёртвые точки и инструменты
+          </div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
+            Анализ применяется только как рекомендация и добавление ассистентов. Исходные упражнения и процентовки ПЛ-цикла не изменяются.
+          </div>
+          <PlannerToolsPanel mode="pl" />
+          <div style={{ marginTop: 10, borderTop: '1px solid rgba(167,139,250,0.2)', paddingTop: 8 }}>
+            <PlDeadpointsBarPathCard />
+          </div>
+        </div>
+      )}
       {/* P4 — контекстная панель ББ (ПЛ дубль PLEditor удалён — F4.5) */}
       {dir === 'bb' && program.bb && <BbContextPanel program={program} level={program.meta.level} />}
       {dir === 'bb' && program.bb && <MesoHeatmap program={program} dir={dir} onToast={showToast} />}
