@@ -49,6 +49,7 @@ import { calcCycleMetrics, type SRExercise } from '../../engines/lms/lms-metrics
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
 import { competitionAttempts } from '../../engines/lms/competition-attempts';
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
+import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarPathCard';
 
 const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepTempoOutput => {
   const isCompound = !exerciseName.toLowerCase().includes('сгибан') &&
@@ -1103,7 +1104,14 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               </div>
             );
           })()}
-          {/* 💉 PED-адаптация объёмов (как в ББ-авто) */}
+          <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(168,85,247,0.2)' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#c084fc', marginBottom: 4 }}>🎯 Мёртвые точки + bar-path</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
+              Выберите фазу, отклонения траектории, упражнения из диагностики и дни добавления. Исходный цикл не изменяется.
+            </div>
+            <PlDeadpointsBarPathCard />
+          </div>
+           {/* 💉 PED-адаптация объёмов (как в ББ-авто) */}
           <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>💉 PED / Курс — адаптация объёмов</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
