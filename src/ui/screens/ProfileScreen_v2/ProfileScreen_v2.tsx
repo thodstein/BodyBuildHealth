@@ -105,7 +105,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
   const meta = TAB_META[tab];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', minHeight: 0 }}>
       {/* Sticky-хедер вкладки — в стиле NutritionScreen */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', flexShrink: 0,
@@ -131,12 +131,15 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
 
       {/* Содержимое вкладки с прокруткой */}
       <div style={{
-        flex: 1,
+        flex: '1 1 0',
+        height: 0,
+        minHeight: 0,
         overflowY: 'auto',
         overflowX: 'hidden',
         padding: '0 8px 80px',
         scrollbarWidth: 'thin',
         scrollbarColor: `${colors.border} transparent`,
+        WebkitOverflowScrolling: 'touch',
       }}>
          {tab === 'user' && <ProfileErrorBoundary tabName="Пользователь"><ProfileUserTab /></ProfileErrorBoundary>}
           {tab === 'diaries' && <ProfileErrorBoundary tabName="Дневники"><ProfileDiariesTab

@@ -338,7 +338,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
   const axis = [60, 90, 120, 150, 180];
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 2000, background: '#09090b', color: colors.text, overflow: 'auto' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 2000, height: '100dvh', maxHeight: '100dvh', background: '#09090b', color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
     >
       <header
         style={{

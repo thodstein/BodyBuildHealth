@@ -490,7 +490,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
   const chartMax = 10;
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 2000, background: '#09090b', color: colors.text, overflow: 'auto' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 2000, height: '100dvh', maxHeight: '100dvh', background: '#09090b', color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
     >
       <header
         style={{

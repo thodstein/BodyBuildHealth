@@ -381,7 +381,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
   const changeSort = (key: string) => setSort((s) => ({ key, dir: s.key === key && s.dir === 'asc' ? 'desc' : 'asc' }));
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 2000, background: '#09090b', color: colors.text, overflow: 'auto' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 2000, height: '100dvh', maxHeight: '100dvh', background: '#09090b', color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
     >
       <header
         style={{
