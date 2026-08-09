@@ -197,8 +197,13 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
     } catch {}
   }, []);
   useEffect(() => {
-    if (initialSubTab === 'diary' || initialSubTab === 'reports') {
+    const diaryTabs = new Set<TrainingTab>(['diary', 'insights', 'strength', 'calendar', 'checkin', 'mmc_tracking', 'import_data']);
+    if (initialSubTab === 'reports') {
       setZone('diary'); setPage('tabs'); setTab('diary');
+    } else if (initialSubTab === 'analytics') {
+      setZone('diary'); setPage('tabs'); setTab('insights');
+    } else if (initialSubTab && diaryTabs.has(initialSubTab as TrainingTab)) {
+      setZone('diary'); setPage('tabs'); setTab(initialSubTab as TrainingTab);
     }
   }, [initialSubTab]);
   const [showWarmup, setShowWarmup] = useState(false);

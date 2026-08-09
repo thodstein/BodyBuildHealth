@@ -1,6 +1,8 @@
 /** DiaryAnalyticsZone.tsx — зона «Дневник и аналитика» тренировочного блока.
  * Все вкладки рендерятся через TrainingDiaryHub с разными модами.
- * Calendar, MMC, Checkin, Import — интегрированы в hub (body/tools modes). */
+ * Calendar, MMC, Checkin, Import — интегрированы в hub (body/tools modes).
+ * Важно: каждая верхняя вкладка должна передавать свой режим, иначе все
+ * кнопки дневника визуально переключаются, но показывают форму записи. */
 import React from 'react';
 import { StrengthDiary, type StrengthStats, type WeeklyProgress } from '../../../engines/strength-diary.engine';
 import type { WorkoutLog, TrainingOutput } from '../../../core/types';
@@ -11,7 +13,7 @@ import type { TrainingTab } from './shared';
 
 interface Props {
   tab: TrainingTab;
-  initialDiaryMode?: 'record' | 'tools' | 'diary' | 'reports';
+  initialDiaryMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'body' | 'calendar' | 'checkin' | 'mmc';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -31,12 +33,18 @@ interface Props {
 }
 
 /** Map old external tabs and legacy mode names to hub modes */
-function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'record' | 'tools' {
+export function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'record' | 'tools' | 'history' | 'analytics' | 'progress' | 'body' | 'calendar' | 'checkin' | 'mmc' {
   // Legacy initialDiaryMode values
   if (initialDiaryMode === 'reports') return 'tools';
   if (initialDiaryMode === 'diary') return 'record';
   switch (tab) {
+    case 'insights':
+    case 'strength': return 'analytics';
+    case 'calendar': return 'calendar';
+    case 'checkin': return 'checkin';
+    case 'mmc_tracking': return 'mmc';
     case 'import_data': return 'tools';
+    case 'diary': return 'record';
     default: return 'record';
   }
 }

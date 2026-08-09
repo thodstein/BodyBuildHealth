@@ -175,7 +175,7 @@ const style: Record<string, React.CSSProperties> = {
 };
 
 interface TrainingDiaryHubProps {
-  initialMode?: 'record' | 'tools' | 'diary' | 'reports';
+  initialMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'body' | 'calendar' | 'checkin' | 'mmc';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -194,7 +194,7 @@ interface TrainingDiaryHubProps {
   linked: any;
 }
 
-type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'body' | 'tools';
+type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'body' | 'tools' | 'calendar' | 'checkin' | 'mmc';
 
 /* ─── Extracted sub-components (fix: useState inside IIFE violates rules of hooks) ─── */
 
@@ -464,6 +464,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
 }) => {
   const resolvedMode: HubMode = initialMode === 'diary' ? 'record' : initialMode === 'reports' ? 'tools' : (initialMode as HubMode) || 'record';
   const [mode, setMode] = useState<HubMode>(resolvedMode);
+  // The hub is reused while the parent tab changes. Keep the visible content
+  // in sync instead of relying on a remount/key as an accidental reset.
+  useEffect(() => { setMode(resolvedMode); }, [resolvedMode]);
   const [search, setSearch] = useState('');
   const [filterGroup, setFilterGroup] = useState<string>('all');
   const [notesFilter, setNotesFilter] = useState('');
@@ -660,7 +663,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
 
   const MODES: [HubMode, string][] = [
     ['record', '📝 Запись'], ['history', '📜 История'], ['analytics', '📊 Аналитика'],
-    ['progress', '📏 Прогресс'], ['body', '🫀 Тело'], ['tools', '⚙️ Инструменты'],
+    ['progress', '📏 Прогресс'], ['calendar', '📅 Календарь'], ['checkin', '✅ Чек-ин'],
+    ['mmc', '💪 MMC'], ['body', '🫀 Тело'], ['tools', '⚙️ Инструменты'],
   ];
 
   return (
@@ -2768,6 +2772,12 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           {historyWorkouts.length > 0 && <ProgressChartsCard historyWorkouts={historyWorkouts} />}
         </div>
       )}
+
+      {/* Dedicated diary sub-tabs. These used to fall through to record/body,
+          which made the navigation appear clickable without changing content. */}
+      {mode === 'calendar' && <TrainingCalendarTab />}
+      {mode === 'checkin' && <CheckinMetricsCard />}
+      {mode === 'mmc' && <MMCTrackingCard />}
 
       {/* ═══ MODE: BODY ═══ — calendar + MMC + body metrics */}
       {mode === 'body' && (
