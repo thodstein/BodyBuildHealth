@@ -1,7 +1,9 @@
 const STORAGE_KEY = 'he_bp_diary';
 
 export interface BPEntry {
+  id?: string;
   date: string;
+  timestamp?: number;
   systolic: number;
   diastolic: number;
   hr: number;
@@ -11,6 +13,36 @@ export interface BPEntry {
   arm?: 'left' | 'right' | string;
   symptoms?: string[];
   medicationTaken?: boolean;
+}
+
+export const BP_SYMPTOMS = [
+  'Головная боль', 'Головокружение', 'Шум в ушах', 'Боль в груди',
+  'Одышка', 'Тошнота', 'Мелькание мушек', 'Слабость', 'Отёки',
+  'Потливость', 'Учащённое сердцебиение', 'Нарушение зрения',
+] as const;
+
+export function generateEntryId(): string {
+  return `bp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function sortEntriesByTimestamp(entries: BPEntry[]): BPEntry[] {
+  return [...entries].sort((a, b) => {
+    const bt = b.timestamp ?? (Date.parse(b.date) || 0);
+    const at = a.timestamp ?? (Date.parse(a.date) || 0);
+    return bt - at || b.date.localeCompare(a.date);
+  });
+}
+
+export interface BPValidationError { field: string; message: string; }
+
+export function validateBpEntry(s: number, d: number, p: number, date: string): BPValidationError[] {
+  const errors: BPValidationError[] = [];
+  if (!date) errors.push({ field: 'date', message: 'Дата обязательна' });
+  if (!Number.isFinite(s) || s < 50 || s > 250) errors.push({ field: 'systolic', message: 'Систола: 50–250 мм рт.ст.' });
+  if (!Number.isFinite(d) || d < 30 || d > 180) errors.push({ field: 'diastolic', message: 'Диастола: 30–180 мм рт.ст.' });
+  if (!Number.isFinite(p) || p < 20 || p > 250) errors.push({ field: 'pulse', message: 'Пульс: 20–250 уд/мин' });
+  if (Number.isFinite(s) && Number.isFinite(d) && d >= s) errors.push({ field: 'diastolic', message: 'Диастола должна быть меньше систолы' });
+  return errors;
 }
 
 export type BPClassification = 'normal' | 'elevated' | 'stage1' | 'stage2' | 'crisis';
@@ -54,7 +86,15 @@ export function getBpClassificationColor(value: BPClassification): string {
 }
 
 export function normalizeBpEntry(raw: Partial<BPEntry>): BPEntry {
-  return { date: raw.date || '', systolic: Number(raw.systolic) || 0, diastolic: Number(raw.diastolic) || 0, hr: Number(raw.hr ?? (raw as any).pulse) || 0, notes: raw.notes, timeOfDay: raw.timeOfDay, position: raw.position, arm: raw.arm, symptoms: Array.isArray(raw.symptoms) ? raw.symptoms : [], medicationTaken: raw.medicationTaken };
+  const date = raw.date || '';
+  return {
+    id: raw.id || generateEntryId(), date,
+    timestamp: raw.timestamp ?? (Date.parse(date) || Date.now()),
+    systolic: Number(raw.systolic) || 0, diastolic: Number(raw.diastolic) || 0,
+    hr: Number(raw.hr ?? (raw as any).pulse) || 0, notes: raw.notes,
+    timeOfDay: raw.timeOfDay, position: raw.position, arm: raw.arm,
+    symptoms: Array.isArray(raw.symptoms) ? raw.symptoms : [], medicationTaken: raw.medicationTaken,
+  };
 }
 
 export function checkOrthostatic(entries: BPEntry[]) {
@@ -126,19 +166,40 @@ export async function importBPData(json: string): Promise<{ success: boolean; me
 }
 
 export function getBpEntries(): BPEntry[] {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    if (!Array.isArray(raw)) return [];
+    return raw.map(normalizeBpEntry).filter(e => Number.isFinite(e.systolic) && Number.isFinite(e.diastolic) && Number.isFinite(e.hr));
+  } catch { return []; }
 }
 
 export function saveBpEntry(entry: BPEntry) {
   const entries = getBpEntries();
-  entries.push(entry);
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); } catch {}
+  const normalized = normalizeBpEntry(entry);
+  entries.push(normalized);
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(sortEntriesByTimestamp(entries).slice(0, 1000))); } catch {}
+}
+
+export function commitBpEntries(entries: BPEntry[]): BPEntry[] {
+  const normalized = entries.map(normalizeBpEntry);
+  const ordered = sortEntriesByTimestamp(normalized).slice(0, 1000);
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ordered)); } catch {}
+  return ordered;
+}
+
+export function updateBpEntry(entry: BPEntry): void {
+  const normalized = normalizeBpEntry(entry);
+  commitBpEntries(getBpEntries().map(x => x.id === normalized.id ? normalized : x));
+}
+
+export function deleteBpEntry(id: string): void {
+  commitBpEntries(getBpEntries().filter(x => x.id !== id));
 }
 
 export function getLatestBp(): { systolic: number; diastolic: number; hr: number } | null {
   const entries = getBpEntries();
   if (entries.length === 0) return null;
-  const sorted = entries.sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = sortEntriesByTimestamp(entries);
   const latest = sorted[0];
   return { systolic: latest.systolic, diastolic: latest.diastolic, hr: latest.hr };
 }
