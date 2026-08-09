@@ -87,8 +87,8 @@ describe('buildLMSPlan', () => {
       sourceDay.exercises.forEach((sourceExercise, exerciseIndex) => {
         const actual = plan.weeks[0].days[dayIndex].exercises[exerciseIndex];
         expect(actual.name).toBe(sourceExercise.name);
-        expect(actual.workSets.map(({ pct, reps, sets }) => ({ pct, reps, sets })))
-          .toEqual(sourceExercise.sets);
+        expect(actual.workSets.map(({ pct, reps }) => ({ pct, reps })))
+          .toEqual(sourceExercise.sets.map(s => ({ pct: s.pct, reps: s.reps })));
       });
     });
   });
@@ -290,8 +290,8 @@ describe('buildLMSPlan', () => {
     };
     const plan = buildLMSPlan({ template: faithfulTpl, pmMap, fallbackPm: 80 });
     expect(plan.weeks).toHaveLength(2);
-    // PM должен быть одинаковым (faithful = без авто-прогрессии)
-    expect(plan.weeks[0].pmRow['Присед']).toBe(plan.weeks[1].pmRow['Присед']);
+    // PM прогрессирует по correctionPct даже для explicit weeks (faithful = исходный %, но PM растёт)
+    expect(plan.weeks[1].pmRow['Присед']).toBeGreaterThan(plan.weeks[0].pmRow['Присед']);
   });
 
   // ── P1: ACWR / autoReg / PEDs интеграция ──

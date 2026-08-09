@@ -30,6 +30,8 @@ export interface LMSBuildInput {
   weeklyPercent?: number;
   courseIntensity?: 'mild' | 'moderate' | 'heavy';
   weeksOverride?: number;
+  /** Включить прогрессию ПМ по неделям (как в оригинале циклов). */
+  progressionEnabled?: boolean;
   /** ПРОФ-параметры */
   volumeGoal?: 'mev' | 'mav' | 'mrv';
   focusLift?: 'squat' | 'bench' | 'deadlift';
@@ -683,16 +685,15 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
     const pmRow: Record<string, number> = {};
     for (const name of exercises) {
-      if (hasExplicitWeeks) {
-        pmRow[name] = pm0Map[name]; // без прогрессии: реальный PM пользователя
+      if (input.progressionEnabled === false) {
+        pmRow[name] = pm0Map[name];
       } else {
         const k = (input.weeklyPercent != null ? input.weeklyPercent
           : mode === 'on_course' ? (input.courseIntensity === 'mild' ? 0.015 : input.courseIntensity === 'heavy' ? 0.025 : 0.02)
           : mode === 'pct' ? -0.005 : template.meta.correctionPct);
-        // P1-fix: use pmForWeek instead of raw formula to inherit the growth cap (×1.25–1.5)
-        // that prevents runaway progression on long weeksOverride cycles (e.g. 52-week on_course).
         const progInput: PMProgressionInput = { pm0: pm0Map[name], weeks: totalWeeks, mode, weeklyPercent: k, courseIntensity: input.courseIntensity };
-        pmRow[name] = pmForWeek(progInput, weekNumber);
+        const progressedPm = pmForWeek(progInput, weekNumber);
+        pmRow[name] = progressedPm * (faithful ? 1 : arTopMult);
       }
     }
     const weekLayout: SRDaySpec[] = hasExplicitWeeks ? template.weeks![w] : template.week1;
@@ -714,26 +715,28 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
             const focusMult = matchesFocusLift(spec.name, input.focusLift) ? 1.2 : 1.0;
             const weakEn = exEnGroup(spec.group);
             const weakMult = (input.weakPoints && weakEn && input.weakPoints.includes(weakEn)) ? 1.2 : 1.0;
-            const totalMult = Math.min(1.5, vMult * phaseVolMod * focusMult * weakMult);
+            const pedMult = Math.min(1.5, pedMrvMult);
+            const totalMult = Math.min(1.5, vMult * phaseVolMod * focusMult * weakMult * pedMult);
             sets = Math.round(sets * totalMult);
           }
 
-          // S-MRV floor: аксессуары не ниже 2 подходов (иначе < MEV — бесполезный объём)
+          // S-MRV floor: аксессуары не ниже 2 подходов (только для non-faithful — preserve source sets)
           if (!faithful) sets = Math.max(isMain ? 1 : 2, sets);
 
           // ACWR-авто-делод: корректируем объём (все упражнения) и RIR
-          // P1-1: floor=2 для аксессуаров (иначе dangerous ACWR может сократить до 1 сета - < MEV)
-          if (!faithful) sets = Math.max(isMain ? 1 : 2, Math.round(sets * acwrVolMod));
+          sets = Math.round(sets * acwrVolMod);
+          if (!faithful) sets = Math.max(isMain ? 1 : 2, sets);
           // Авторегуляция: объём (все) — применяется поверх ACWR
-          // Keep the accessory MEV floor after every volume multiplier, not only after ACWR.
-          if (!faithful) sets = Math.max(isMain ? 1 : 2, Math.round(sets * arVolMult));
+          sets = Math.round(sets * arVolMult);
+          if (!faithful) sets = Math.max(isMain ? 1 : 2, sets);
 
           // Расчётный вес с авторегуляцией (topSetPctMultiplier)
           const baseWeight = workWeight(pm, s.pct);
-          const adjWeight = Math.round(baseWeight * (faithful ? 1 : arTopMult) * 10) / 10;
+          const adjWeight = Math.round(baseWeight * arTopMult * 10) / 10;
 
           // RIR с ACWR + авторегуляцией
-          const adjRir = faithful ? (s.rir ?? 0) : Math.max(0, rirBase + acwrRirShift + arRirShift);
+          const baseRir = faithful ? (s.rir ?? 0) : rirBase;
+          const adjRir = Math.max(0, baseRir + acwrRirShift + arRirShift);
 
           return {
             pct: s.pct, reps: s.reps, sets: Math.max(1, sets),

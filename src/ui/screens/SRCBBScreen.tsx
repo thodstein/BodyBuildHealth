@@ -273,7 +273,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!pmMap['Становая тяга']) pmMap['Становая тяга'] = pmDead;
     const rec = getRecoveryMetrics(linked);
     const plan = buildLMSPlan({
-      template: tpl, pmMap, fallbackPm: 80, mode: peds.length ? 'on_course' : 'natural', courseIntensity, weeksOverride: safeWeeks,
+       template: tpl, pmMap, fallbackPm: 80, mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural', courseIntensity, weeksOverride: safeWeeks, progressionEnabled: pedAuto,
       volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
       focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
       currentReadiness: linked.readiness?.recovery,
@@ -313,9 +313,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           template: cycle,
           pmMap: { ...exercisePMs, 'Присед': exercisePMs['Присед'] || pmSquat, 'Жим лежа': exercisePMs['Жим лежа'] || pmBench, 'Становая тяга': exercisePMs['Становая тяга'] || pmDead },
           fallbackPm: 80,
-          mode: peds.length ? 'on_course' : 'natural',
-          courseIntensity,
-          weeksOverride: block.weeks,
+           mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural',
+           courseIntensity,
+           weeksOverride: block.weeks,
+           progressionEnabled: pedAuto,
           volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
           focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
           currentReadiness: linked.readiness?.recovery,
@@ -393,6 +394,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [bbFocus, setBbFocus] = useState<string>(_bbSaved?.bbFocus || '');
   const [bbTrainingFocus, setBbTrainingFocus] = useState<'strength' | 'hypertrophy' | 'endurance'>(_bbSaved?.bbTrainingFocus || 'hypertrophy');
   const [peds, setPeds] = useState<PED[]>(_bbSaved?.peds ?? (_profPL.onCourse ? (['AAS'] as PED[]) : []));
+  const [pedAuto, setPedAuto] = useState(_profPL.onCourse);
   const [pedDoses, setPedDoses] = useState<Record<string, number>>(_plSaved?.pedDoses ?? _bbSaved?.pedDoses ?? { AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
   const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(_plSaved?.courseIntensity ?? _profPL.courseIntensity ?? 'moderate');
   const ranked = useMemo(() => rankCycles({
@@ -401,8 +403,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     bodyWeight: bw,
     daysPerWeek: days,
     direction: dir as any,
-    mode: peds.length > 0 ? 'on_course' : 'natural',
-  }).filter(r => normalizeCycleDirection(r.cycle.meta.direction) !== 'bodybuilding'), [goal, level, bw, days, dir, peds.length]);
+    mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural',
+  }).filter(r => normalizeCycleDirection(r.cycle.meta.direction) !== 'bodybuilding'), [goal, level, bw, days, dir, pedAuto, peds.length]);
   const best = ranked[0];
   useEffect(() => { try { const cur = JSON.parse(localStorage.getItem('he_pl_session') || '{}'); localStorage.setItem('he_pl_session', JSON.stringify({ ...cur, peds, pedDoses, courseIntensity })); } catch { /* ignore */ } }, [peds, pedDoses, courseIntensity]);
   const _validateBBPlan = (plan: any): BBPlan | null => {
@@ -737,7 +739,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       exercises: [
         ...d.exercises.map((e, ei) => ({
           name: e.name, muscleGroup: e.group,
-          targetSets: e.workSets.flatMap((ws, si) => { let es = effSet(w0, i, ei, si, ws); if (autoRegMode === 'auto' && autoRegResult) { es = { ...es, sets: Math.round(es.sets * autoRegResult.volumeMultiplier), weight: Math.round(es.weight * autoRegResult.topSetPctMultiplier * 10) / 10 }; } else if (autoRegMode === 'diary' && diaryAutoreg) { const adj = diaryAutoreg.perExercise.get(e.name); if (adj) { es = { ...es, weight: adj.adjustedWeight, sets: adj.adjustedSets }; } } const priMult = (priAdjust ? priAdjust.volumeMult : 1) * (deloadAdjust ? deloadAdjust.volumeMult : 1) * (peakAdjust ? peakAdjust.volumeMult : 1); const priRir = peakAdjust ? peakAdjust.rirTarget : ((priAdjust ? priAdjust.rirShift : 0) + rirShiftAdjust + (deloadAdjust ? deloadAdjust.rirShift : 0)); let diaryRir = 0; if (autoRegMode === 'diary' && diaryAutoreg) { const adj = diaryAutoreg.perExercise.get(e.name); if (adj) diaryRir = adj.adjustedRir - (ws.rir ?? 2); } es = { ...es, sets: Math.max(1, Math.round(es.sets * priMult)) }; return Array.from({ length: es.sets }, () => ({ weight: es.weight, reps: es.reps, rir: Math.max(0, priRir + diaryRir), tempo: tempoAdjust ? tempoAdjust : undefined })); }),
+           targetSets: e.workSets.flatMap((ws, si) => { let es = effSet(w0, i, ei, si, ws); if (autoRegMode === 'diary' && diaryAutoreg) { const adj = diaryAutoreg.perExercise.get(e.name); if (adj) { es = { ...es, weight: adj.adjustedWeight, sets: adj.adjustedSets }; } } const priMult = (priAdjust ? priAdjust.volumeMult : 1) * (deloadAdjust ? deloadAdjust.volumeMult : 1) * (peakAdjust ? peakAdjust.volumeMult : 1); const priRir = peakAdjust ? peakAdjust.rirTarget : ((priAdjust ? priAdjust.rirShift : 0) + rirShiftAdjust + (deloadAdjust ? deloadAdjust.rirShift : 0)); let diaryRir = 0; if (autoRegMode === 'diary' && diaryAutoreg) { const adj = diaryAutoreg.perExercise.get(e.name); if (adj) diaryRir = adj.adjustedRir - (ws.rir ?? 2); } es = { ...es, sets: Math.max(1, Math.round(es.sets * priMult)) }; return Array.from({ length: es.sets }, () => ({ weight: es.weight, reps: es.reps, rir: Math.max(0, priRir + diaryRir), tempo: tempoAdjust ? tempoAdjust : undefined })); }),
           pm: e.pm, coef: e.coef, mnosz: e.mnosz, group: e.group,
         })),
         ...(srcAdditions[dayKey(w0, i)] || []).map(a => ({
@@ -1113,7 +1115,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           </div>
            {/* 💉 PED-адаптация объёмов (как в ББ-авто) */}
           <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>💉 PED / Курс — адаптация объёмов</div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT }}>💉 PED / Курс — адаптация объёмов</div>
+              <button onClick={() => setPedAuto(a => !a)} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: pedAuto ? '#00e68a' : 'rgba(255,255,255,0.1)', color: pedAuto ? '#000' : 'var(--text-dim)' }}>АВТО {pedAuto ? 'ON' : 'OFF'}</button>
+            </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {(['AAS','insulin','MGF','IGF1','GH'] as PED[]).map(p => (
                 <button key={p} onClick={() => togglePed(p)}
@@ -1122,6 +1127,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 </button>
               ))}
             </div>
+            {pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>⚡ Авто-прогрессия ПМ включена: {courseIntensity === 'heavy' ? 'Тяжёлая' : courseIntensity === 'moderate' ? 'Умеренная' : 'Лёгкая'} интенсивность → {courseIntensity === 'heavy' ? '+2.5%' : courseIntensity === 'moderate' ? '+2%' : '+1.5%'}/нед</div>}
+            {!pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>⏸ Авто-прогрессия выключена → базовая progression цикла</div>}
             {peds.length > 0 && (
               <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Дозировки (мг/нед или МЕ/нед)</div>
@@ -1179,15 +1186,6 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               build: 'Фаза накопления: пик объёма (MAV), прогрессия весов, RIR 1-2. КПШ и тоннаж максимальны.',
               peak: 'Пиковая фаза: интенсификация — %ПМ растёт, объём снижается, RIR 0-1. Готовность к тесту/соревнованию.',
               deload: 'Разгрузка: 50-60% объёма, RIR 4, восстановление перед следующим мезоциклом.',
-            };
-            const setStr = (s: { sets: number; reps: number; weight: number; pct: number; rir?: number }) => {
-              let sets = s.sets, weight = s.weight;
-              if (autoRegMode === 'auto' && autoRegResult) { sets = Math.round(sets * autoRegResult.volumeMultiplier); weight = Math.round(weight * autoRegResult.topSetPctMultiplier * 10) / 10; }
-              // P2-fix: diary-режим показывает скорректированные веса из diaryAutoreg
-              let diaryMark = '';
-              if (autoRegMode === 'diary' && diaryAutoreg) { diaryMark = ' 📓'; }
-              sets = Math.max(1, Math.round(sets * bridgeMult));
-              return sets + 'x' + s.reps + 'x' + weight + 'кг (' + Math.round(s.pct*100) + '%)' + (typeof s.rir === 'number' ? ' · RIR ' + s.rir : '') + (autoRegMode === 'auto' && autoRegResult && (autoRegResult.topSetPctMultiplier !== 1 || autoRegResult.volumeMultiplier !== 1) ? ' ⚡' : '') + diaryMark + (bridgeMult !== 1 || bridgeRir !== 0 ? ' 🔗' : '') + (phase === 'deload' ? ' 🔵' : '');
             };
             return <div style={{ ...CARD, overflow:'hidden', boxSizing:'border-box', maxWidth:'100%' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8 }}>
@@ -1517,20 +1515,18 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                            const diaryAdj = autoRegMode === 'diary' && diaryAutoreg ? diaryAutoreg.perExercise.get(e.name) : undefined;
                             const firstWs = rawFirstWs ? {
                               ...rawFirstWs,
-                              sets: diaryAdj ? diaryAdj.adjustedSets : autoRegMode === 'auto' && autoRegResult ? Math.max(1, Math.round(rawFirstWs.sets * autoRegResult.volumeMultiplier)) : rawFirstWs.sets,
-                              weight: diaryAdj ? diaryAdj.adjustedWeight : autoRegMode === 'auto' && autoRegResult ? Math.round(rawFirstWs.weight * autoRegResult.topSetPctMultiplier * 10) / 10 : rawFirstWs.weight,
-                              rir: diaryAdj ? diaryAdj.adjustedRir : autoRegMode === 'auto' && autoRegResult ? (e.workSets[0]?.rir ?? e.rir) + autoRegResult.rirShift : (e.workSets[0]?.rir ?? e.rir),
+                              sets: diaryAdj ? diaryAdj.adjustedSets : rawFirstWs.sets,
+                              weight: diaryAdj ? diaryAdj.adjustedWeight : rawFirstWs.weight,
+                              rir: diaryAdj ? diaryAdj.adjustedRir : (e.workSets[0]?.rir ?? e.rir),
                             } : null;
-                           const adjustedMark = diaryAdj ? ' 📓' : autoRegMode === 'auto' && autoRegResult && (autoRegResult.topSetPctMultiplier !== 1 || autoRegResult.volumeMultiplier !== 1) ? ' ⚡' : '';
-                           const adjustDisplaySet = (ws: typeof e.workSets[number], si: number) => {
-                              const raw = { ...effSet(wk.week, di, ei, si, ws), rir: ws.rir };
-                             const adjusted = diaryAdj
-                               ? { ...raw, sets: diaryAdj.adjustedSets, weight: diaryAdj.adjustedWeight, rir: diaryAdj.adjustedRir }
-                               : autoRegMode === 'auto' && autoRegResult
-                                 ? { ...raw, sets: Math.max(1, Math.round(raw.sets * autoRegResult.volumeMultiplier)), weight: Math.round(raw.weight * autoRegResult.topSetPctMultiplier * 10) / 10, rir: raw.rir + autoRegResult.rirShift }
-                                 : raw;
-                             return adjusted;
-                           };
+                            const adjustedMark = diaryAdj ? ' 📓' : '';
+                            const adjustDisplaySet = (ws: typeof e.workSets[number], si: number) => {
+                               const raw = { ...effSet(wk.week, di, ei, si, ws), rir: ws.rir };
+                              const adjusted = diaryAdj
+                                ? { ...raw, sets: diaryAdj.adjustedSets, weight: diaryAdj.adjustedWeight, rir: diaryAdj.adjustedRir }
+                                : raw;
+                              return adjusted;
+                            };
                            const firstRir = firstWs?.rir;
                           const setSummary = firstWs ? (firstWs.sets + '×' + firstWs.reps + ' @ ' + Math.round(firstWs.pct*100) + '%') : '';
                           const tempo = tempoStr || tmpo.tempo.toString;
@@ -1776,10 +1772,13 @@ legs: [
            </div>
 
           {bbBest && <ExpandableCard title={'🏆 Рекомендован: ' + bbBest.pattern.name} icon='🏆' short={bbBest.pattern.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот сплит:</b> {explainBBSelection(bbBest)}</div><button onClick={buildBb} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,var(--accent),#00c853)', color: '#000', fontWeight: 700, fontSize: 12 }}>✅ Применить сплит и собрать план</button></>} />}
-          <div style={H}>💉 Фармакология (PED-адаптация объёмов)</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {(['AAS','insulin','MGF','IGF1','GH'] as PED[]).map(p => <button key={p} style={peds.includes(p) ? BTN : BTN_GHOST} onClick={() => togglePed(p)}>{p}{peds.includes(p) ? ' ✓' : ''}</button>)}
-          </div>
+           <div style={H}>💉 Фармакология (PED-адаптация объёмов)</div>
+           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+             {(['AAS','insulin','MGF','IGF1','GH'] as PED[]).map(p => <button key={p} style={peds.includes(p) ? BTN : BTN_GHOST} onClick={() => togglePed(p)}>{p}{peds.includes(p) ? ' ✓' : ''}</button>)}
+             <button onClick={() => setPedAuto(a => !a)} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: pedAuto ? '#00e68a' : 'rgba(255,255,255,0.1)', color: pedAuto ? '#000' : 'var(--text-dim)', marginLeft: 'auto' }}>АВТО {pedAuto ? 'ON' : 'OFF'}</button>
+           </div>
+           {pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>⚡ Авто-прогрессия ПМ: {courseIntensity === 'heavy' ? 'Тяжёлая' : courseIntensity === 'moderate' ? 'Умеренная' : 'Лёгкая'} → {courseIntensity === 'heavy' ? '+2.5%' : courseIntensity === 'moderate' ? '+2%' : '+1.5%'}/нед</div>}
+           {!pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>⏸ Авто-прогрессия выключена → базовая progression цикла</div>}
           {peds.length > 0 && <ExpandableCard title="Адаптация объёмов под PED" icon="💉" short={explainPEDAdaptation(pedAdapt)} full={null} />}
           <div style={{ ...H, marginTop: 10 }}>💪 Рабочие максимумы (кг) — для расчёта весов</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6, boxSizing: 'border-box' }}>

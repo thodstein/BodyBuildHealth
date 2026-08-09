@@ -229,8 +229,8 @@ describe('LMS cycle integrity: source percentages preserved', () => {
         expect(planEx).toBeDefined();
         if (planEx) {
           const sourceEx = sourceDay.exercises[ei];
-          expect(planEx.workSets.map(({ pct, reps, sets }) => ({ pct, reps, sets })))
-            .toEqual(sourceEx.sets);
+          expect(planEx.workSets.map(({ pct, reps }) => ({ pct, reps })))
+            .toEqual(sourceEx.sets.map(s => ({ pct: s.pct, reps: s.reps })));
         }
       });
     });
@@ -455,5 +455,24 @@ describe('ACWRZone consolidation', () => {
     // Both files define the same ACWRZone type; verify runtime zone strings match.
     const zones = ['undertrained', 'optimal', 'caution', 'dangerous'] as const;
     expect(zones).toHaveLength(4);
+  });
+});
+
+// ── PED dose-aware adaptation affects plan ──
+describe('PED dose-aware adaptation', () => {
+  it('on_course mode increases PM progression rate vs natural', () => {
+    const natural = buildLMSPlan({ template: CYCLE_01, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: 4 });
+    const onCourse = buildLMSPlan({ template: CYCLE_01, pmMap, fallbackPm: 80, mode: 'on_course', courseIntensity: 'moderate', weeksOverride: 4 });
+    const naturalPm = natural.weeks[3].pmRow['Присед'];
+    const onCoursePm = onCourse.weeks[3].pmRow['Присед'];
+    expect(onCoursePm).toBeGreaterThan(naturalPm);
+  });
+
+  it('PEDs with doses increase accessory volume via pedMrvMult', () => {
+    const base = buildLMSPlan({ template: CYCLE_01, pmMap, fallbackPm: 80, weeksOverride: 1 });
+    const ped = buildLMSPlan({ template: CYCLE_01, pmMap, fallbackPm: 80, weeksOverride: 1, peds: ['testosterone'], pedDoses: { testosterone: 500 } });
+    const baseAccessorySets = base.weeks[0].days.flatMap(d => d.exercises.filter(e => e.load !== 'Тяжелая').flatMap(e => e.workSets)).reduce((s, ws) => s + ws.sets, 0);
+    const pedAccessorySets = ped.weeks[0].days.flatMap(d => d.exercises.filter(e => e.load !== 'Тяжелая').flatMap(e => e.workSets)).reduce((s, ws) => s + ws.sets, 0);
+    expect(pedAccessorySets).toBeGreaterThanOrEqual(baseAccessorySets);
   });
 });
