@@ -201,16 +201,16 @@ export const AddHealthModal: React.FC<{
             return (
               <div key={z.id} style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 10, fontWeight: 600, color: colors.text, width: 72, flexShrink: 0 }}>{z.label}</span>
-                <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                    <button key={n} type="button" onClick={() => setPainZones(p => ({ ...p, [z.id]: n }))} style={{
-                      flex: 1, minHeight: 22, padding: 0, borderRadius: 3, cursor: 'pointer', fontSize: 9, fontWeight: 700,
-                      border: `1px solid ${n === v ? c : 'rgba(255,255,255,0.06)'}`,
-                      background: n === v ? `${c}33` : 'transparent',
-                      color: n === v ? c : colors.textMuted,
-                    }}>{n}</button>
-                  ))}
-                </div>
+                 <div style={{ display: 'flex', gap: 2, flex: 1 }}>
+                   {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                     <button key={n} type="button" onClick={() => setPainZones(p => ({ ...p, [z.id]: n }))} style={{
+                       flex: 1, minHeight: 44, padding: '4px 0', borderRadius: 4, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                       border: `1px solid ${n === v ? c : 'rgba(255,255,255,0.06)'}`,
+                       background: n === v ? `${c}33` : 'transparent',
+                       color: n === v ? c : colors.textMuted,
+                     }}>{n}</button>
+                   ))}
+                 </div>
               </div>
             );
           })}
@@ -249,7 +249,7 @@ export const AddHealthModal: React.FC<{
                   <span style={{ flex: 1, fontSize: 11, color: colors.text }}>{s.name}</span>
                   <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>{s.severity}/5</span>
                   {s.duration && <span style={{ fontSize: 9, color: colors.textMuted }}>{s.duration}</span>}
-                  <button onClick={() => removeSymptom(s.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: 0, minWidth: 20 }}>×</button>
+                   <button onClick={() => removeSymptom(s.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, padding: '4px 8px', minWidth: 44, minHeight: 44, borderRadius: 6 }}>×</button>
                 </div>
               ))}
             </div>
@@ -263,12 +263,12 @@ export const AddHealthModal: React.FC<{
             {NEURO_SYMPTOMS.map(s => {
               const on = !!neuroSymptoms[s.id];
               return (
-                <button key={s.id} type="button" onClick={() => setNeuroSymptoms(p => ({ ...p, [s.id]: !on }))} style={{
-                  padding: '6px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600,
-                  border: `1px solid ${on ? '#ef4444' : 'rgba(255,255,255,0.06)'}`,
-                  background: on ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
-                  color: on ? '#ef4444' : colors.text, textAlign: 'left',
-                }}>{s.label}</button>
+                 <button key={s.id} type="button" onClick={() => setNeuroSymptoms(p => ({ ...p, [s.id]: !on }))} style={{
+                   padding: '8px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, minHeight: 44,
+                   border: `1px solid ${on ? '#ef4444' : 'rgba(255,255,255,0.06)'}`,
+                   background: on ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
+                   color: on ? '#ef4444' : colors.text, textAlign: 'left',
+                 }}>{s.label}</button>
               );
             })}
           </div>
@@ -285,14 +285,14 @@ export const AddHealthModal: React.FC<{
               <div key={a.id} style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 10, fontWeight: 600, color: colors.text, width: 60, flexShrink: 0 }}>{a.label}</span>
                 <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-                  {[0, 1, 2, 3].map(n => (
-                    <button key={n} type="button" onClick={() => setAcneAreas(p => ({ ...p, [a.id]: n }))} style={{
-                      flex: 1, minHeight: 22, padding: 0, borderRadius: 3, cursor: 'pointer', fontSize: 9, fontWeight: 700,
-                      border: `1px solid ${n === v ? c : 'rgba(255,255,255,0.06)'}`,
-                      background: n === v ? `${c}33` : 'transparent',
-                      color: n === v ? c : colors.textMuted,
-                    }}>{n === 0 ? 'Чисто' : n === 1 ? 'Ед.' : n === 2 ? 'Умер.' : 'Тяж.'}</button>
-                  ))}
+                   {[0, 1, 2, 3].map(n => (
+                     <button key={n} type="button" onClick={() => setAcneAreas(p => ({ ...p, [a.id]: n }))} style={{
+                       flex: 1, minHeight: 44, padding: '4px 0', borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 700,
+                       border: `1px solid ${n === v ? c : 'rgba(255,255,255,0.06)'}`,
+                       background: n === v ? `${c}33` : 'transparent',
+                       color: n === v ? c : colors.textMuted,
+                     }}>{n === 0 ? 'Чисто' : n === 1 ? 'Ед.' : n === 2 ? 'Умер.' : 'Тяж.'}</button>
+                   ))}
                 </div>
               </div>
             );
@@ -308,7 +308,7 @@ export const AddHealthModal: React.FC<{
               const on = !!hematoSymptoms[s.id];
               return (
                 <button key={s.id} type="button" onClick={() => setHematoSymptoms(p => ({ ...p, [s.id]: !on }))} style={{
-                  padding: '6px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                  padding: '8px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, minHeight: 44,
                   border: `1px solid ${on ? '#3b82f6' : 'rgba(255,255,255,0.06)'}`,
                   background: on ? 'rgba(59,130,246,0.12)' : 'rgba(255,255,255,0.03)',
                   color: on ? '#3b82f6' : colors.text, textAlign: 'left',

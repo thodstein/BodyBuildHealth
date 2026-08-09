@@ -31,6 +31,18 @@ import {
   HEMATO_SYMPTOMS,
   DIARY_META,
 } from './diary-modals';
+import {
+  getUnifiedHealthEntries,
+  saveUnifiedHealthEntries,
+  type UnifiedHealthEntry,
+} from '../../../engines/health-diary.engine';
+import {
+  commitBpEntries,
+  getBpEntries,
+  generateEntryId,
+  sortEntriesByTimestamp,
+  type BPEntry as CoreBPEntry,
+} from '../../../core/bp-hr-data';
 
 /* ── Типы для встроенных дневников ── */
 
@@ -46,10 +58,13 @@ interface SleepEntry {
 }
 const BP_DIARY_KEY = 'he_bp_diary';
 interface BPEntry {
+  id?: string;
   date: string;
+  timestamp?: number;
   systolic: number;
   diastolic: number;
-  pulse: number;
+  hr?: number;
+  pulse?: number;
   notes?: string;
 }
 const INJECTION_DIARY_KEY = 'he_injection_diary';
@@ -97,21 +112,6 @@ export interface HematoEntry {
   notes?: string;
 }
 const HEALTH_DIARY_KEY = 'he_health_diary';
-export interface HealthEntry {
-  date: string;
-  pain?: {
-    zones: Record<string, number>;
-    totalScore: number;
-    painType?: string;
-    triggers?: string[];
-    relief?: string[];
-  };
-  symptoms: { name: string; severity: 1 | 2 | 3 | 4 | 5; duration?: string }[];
-  neuro?: { symptoms: Record<string, boolean>; totalScore: number };
-  acne?: { areas: Record<string, number>; totalScore: number };
-  hemato?: { symptoms: Record<string, boolean>; totalScore: number };
-  notes?: string;
-}
 
 interface BuiltInDiaryRow {
   key: DiaryKey;
@@ -134,55 +134,10 @@ function saveDiary<T>(key: string, data: T[]): void {
     localStorage.setItem(key, JSON.stringify(data.slice(-365)));
   } catch {}
 }
-function saveUnifiedHealthEntries(data: HealthEntry[]): void {
-  try {
-    localStorage.setItem(HEALTH_DIARY_KEY, JSON.stringify(data.slice(-365)));
-  } catch {}
-}
-function migrateOldDiariesToUnified(): HealthEntry[] | null {
-  try {
-    const existing = loadDiary<any>(HEALTH_DIARY_KEY);
-    if (existing.length > 0) return null;
-    const merged = new Map<string, HealthEntry>();
-    const pain = loadDiary<PainEntry>(PAIN_DIARY_KEY);
-    pain.forEach((e) => {
-      const d = merged.get(e.date) || { date: e.date, symptoms: [] };
-      d.pain = { zones: e.zones, totalScore: e.totalScore };
-      merged.set(e.date, d);
-    });
-    const neuro = loadDiary<NeuroEntry>(NEURO_DIARY_KEY);
-    neuro.forEach((e) => {
-      const d = merged.get(e.date) || { date: e.date, symptoms: [] };
-      d.neuro = { symptoms: e.symptoms, totalScore: e.totalScore };
-      merged.set(e.date, d);
-    });
-    const acne = loadDiary<AcneEntry>(ACNE_DIARY_KEY);
-    acne.forEach((e) => {
-      const d = merged.get(e.date) || { date: e.date, symptoms: [] };
-      d.acne = { areas: e.areas, totalScore: e.totalScore };
-      merged.set(e.date, d);
-    });
-    const hemato = loadDiary<HematoEntry>(HEMATO_DIARY_KEY);
-    hemato.forEach((e) => {
-      const d = merged.get(e.date) || { date: e.date, symptoms: [] };
-      d.hemato = { symptoms: e.symptoms, totalScore: e.totalScore };
-      merged.set(e.date, d);
-    });
-    const symptoms = loadDiary<SymptomEntry>(SYMPTOMS_DIARY_KEY);
-    symptoms.forEach((e) => {
-      const d = merged.get(e.date) || { date: e.date, symptoms: [] };
-      d.symptoms.push({ name: e.name, severity: e.severity, duration: e.duration });
-      merged.set(e.date, d);
-    });
-    const unified = Array.from(merged.values()).sort((a, b) => a.date.localeCompare(b.date));
-    if (unified.length > 0) {
-      saveUnifiedHealthEntries(unified);
-      return unified;
-    }
-    return null;
-  } catch {
-    return null;
-  }
+
+function latestDiaryDate(arr: { date: string; timestamp?: number }[]): string {
+  return [...arr]
+    .sort((a, b) => (b.timestamp ?? new Date(b.date).getTime()) - (a.timestamp ?? new Date(a.date).getTime()))[0]?.date || '';
 }
 
 /* ── Модалки добавления записей ── */
@@ -664,7 +619,7 @@ export const ProfileDiariesTab: React.FC<{
   const [neuroEntries, setNeuroEntries] = useState<NeuroEntry[]>([]);
   const [acneEntries, setAcneEntries] = useState<AcneEntry[]>([]);
   const [hematoEntries, setHematoEntries] = useState<HematoEntry[]>([]);
-  const [healthEntries, setHealthEntries] = useState<HealthEntry[]>([]);
+  const [healthEntries, setHealthEntries] = useState<UnifiedHealthEntry[]>([]);
   const [weights, setWeights] = useState<ReturnType<typeof getWeightLog>>([]);
 
   const [addSleepOpen, setAddSleepOpen] = useState(false);
@@ -728,7 +683,16 @@ export const ProfileDiariesTab: React.FC<{
       setSleepEntries(loadDiary<SleepEntry>(SLEEP_DIARY_KEY));
     } catch {}
     try {
-      setBpEntries(loadDiary<BPEntry>(BP_DIARY_KEY));
+      setBpEntries(getBpEntries().map((entry): BPEntry => ({
+        id: entry.id,
+        date: entry.date,
+        timestamp: entry.timestamp,
+        systolic: entry.systolic,
+        diastolic: entry.diastolic,
+        hr: entry.hr,
+        pulse: entry.hr,
+        notes: entry.notes,
+      })));
     } catch {}
     try {
       setInjectionEntries(loadDiary<InjectionEntry>(INJECTION_DIARY_KEY));
@@ -751,8 +715,7 @@ export const ProfileDiariesTab: React.FC<{
     try {
       setWeights(getWeightLog());
     } catch {}
-    const migrated = migrateOldDiariesToUnified();
-    if (migrated) setHealthEntries(migrated);
+    setHealthEntries(getUnifiedHealthEntries());
   };
 
   useEffect(() => {
@@ -761,7 +724,7 @@ export const ProfileDiariesTab: React.FC<{
 
   const lastDate = (arr: { date: string }[]): string => {
     if (arr.length === 0) return '';
-    return arr[arr.length - 1].date;
+    return latestDiaryDate(arr);
   };
 
   const getEntryArray = (key: DiaryKey): { date: string }[] => {
@@ -783,7 +746,7 @@ export const ProfileDiariesTab: React.FC<{
 
   const daysSinceLast = (arr: { date: string }[]): number | null => {
     if (arr.length === 0) return null;
-    const last = new Date(arr[arr.length - 1].date);
+    const last = new Date(latestDiaryDate(arr));
     if (isNaN(last.getTime())) return null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -793,7 +756,7 @@ export const ProfileDiariesTab: React.FC<{
 
   const todayEntry = (arr: { date: string }[]): boolean => {
     if (arr.length === 0) return false;
-    return arr[arr.length - 1].date === todayIso();
+    return latestDiaryDate(arr) === todayIso();
   };
 
   const buildTodayOverview = () => {
@@ -804,7 +767,7 @@ export const ProfileDiariesTab: React.FC<{
       if (e.date === today) overview.push({ label: 'Сон', value: `${e.hours} ч`, color: '#a78bfa' });
     }
     if (bpEntries.length) {
-      const e = bpEntries[bpEntries.length - 1];
+      const e = [...bpEntries].sort((a, b) => (b.timestamp ?? new Date(b.date).getTime()) - (a.timestamp ?? new Date(a.date).getTime()))[0];
       if (e.date === today) overview.push({ label: 'АД', value: `${e.systolic}/${e.diastolic}`, color: '#ef4444' });
     }
     if (weights.length) {
@@ -1620,11 +1583,19 @@ export const ProfileDiariesTab: React.FC<{
             open={addBPOpen}
             onClose={() => setAddBPOpen(false)}
             onSave={(e) => {
-              const updated = [...bpEntries.filter((x) => x.date !== e.date), e].sort((a, b) =>
-                a.date.localeCompare(b.date),
-              );
-              saveDiary(BP_DIARY_KEY, updated);
-              setBpEntries(updated);
+              const entry: CoreBPEntry = {
+                id: e.id || generateEntryId(),
+                date: e.date,
+                timestamp: e.timestamp || Date.now(),
+                systolic: Number(e.systolic),
+                diastolic: Number(e.diastolic),
+                hr: Number(e.hr ?? e.pulse),
+                timeOfDay: e.timeOfDay,
+                notes: e.notes,
+              };
+              const existing = getBpEntries().filter((x) => x.id !== entry.id);
+              const updated = commitBpEntries([...existing, entry]);
+              setBpEntries(updated.map((x) => ({ ...x, pulse: x.hr })));
             }}
           />
           <AddBodyMeasurementsModal
@@ -1656,8 +1627,8 @@ export const ProfileDiariesTab: React.FC<{
               const updated = [...healthEntries.filter((x) => x.date !== e.date), e].sort((a, b) =>
                 a.date.localeCompare(b.date),
               );
-              saveUnifiedHealthEntries(updated as HealthEntry[]);
-              setHealthEntries(updated as HealthEntry[]);
+              saveUnifiedHealthEntries(updated);
+              setHealthEntries(updated);
               if (e.pain) {
                 const p = [...painEntries.filter((x) => x.date !== e.date), { date: e.date, ...e.pain }].sort((a, b) =>
                   a.date.localeCompare(b.date),

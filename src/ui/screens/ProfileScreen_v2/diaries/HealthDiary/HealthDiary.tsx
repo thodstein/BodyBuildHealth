@@ -17,6 +17,7 @@ import {
 } from '../../../../../engines/health-diary.engine';
 import { analyzePainEntries } from '../../../../../engines/pain-insights.engine';
 import { getSymptomDiaryStats, getSymptomDiarySummary } from '../../../../../engines/symptom-diary.engine';
+import { computeHealthScore } from '../../../../../engines/health-score-v2.engine';
 import {
   buildWeeklyHistogram,
   compareWithLastWeek,
@@ -85,16 +86,19 @@ function entryFields(entry: UnifiedHealthEntry): DiaryEntryLike {
   const neuro = entry.neuro?.totalScore || 0;
   const acne = entry.acne?.totalScore || 0;
   const hemato = entry.hemato?.totalScore || 0;
-  return {
-    date: entry.date,
-    fields: [
-      { label: 'Боль', value: String(pain), unit: '/70' },
-      { label: 'Нейро', value: String(neuro), unit: '/10' },
-      { label: 'Акне', value: String(acne), unit: '/12' },
-      { label: 'Гемат', value: String(hemato), unit: '/8' },
-      { label: 'Симптомы', value: String(entry.symptoms.length), unit: 'шт.' },
-    ],
-  };
+  const fields = [
+    { label: 'Боль', value: String(pain), unit: '/70' },
+    { label: 'Нейро', value: String(neuro), unit: '/10' },
+    { label: 'Акне', value: String(acne), unit: '/12' },
+    { label: 'Гемат', value: String(hemato), unit: '/8' },
+    { label: 'Симптомы', value: String(entry.symptoms.length), unit: 'шт.' },
+  ];
+  if (entry.pain?.timeOfDay) fields.push({ label: 'Время', value: entry.pain.timeOfDay, unit: '' });
+  if (entry.pain?.painType) fields.push({ label: 'Тип', value: entry.pain.painType, unit: '' });
+  if (entry.pain?.triggers && entry.pain.triggers.length > 0) fields.push({ label: 'Триггеры', value: String(entry.pain.triggers.length), unit: '' });
+  if (entry.pain?.linkedExercise) fields.push({ label: 'Упр.', value: entry.pain.linkedExercise, unit: '' });
+  if (entry.notes) fields.push({ label: 'Заметка', value: entry.notes, unit: '' });
+  return { date: entry.date, fields };
 }
 
 function downloadText(name: string, text: string, type: string) {
@@ -135,7 +139,7 @@ const ToggleGrid: React.FC<{
           onClick={() => onChange(item.id)}
           style={{
             ...button,
-            minHeight: 42,
+            minHeight: 44,
             textAlign: 'left',
             borderColor: active ? color : '#3f3f46',
             background: active ? `${color}22` : '#18181b',
@@ -149,6 +153,45 @@ const ToggleGrid: React.FC<{
     })}
   </div>
 );
+
+const PainBodyMap: React.FC<{ zones: Record<string, number>; onChange?: (zones: Record<string, number>) => void }> = ({ zones, onChange }) => {
+  const zonePositions: Record<string, { x: number; y: number; r: number; label: string }> = {
+    shoulders: { x: 100, y: 45, r: 18, label: 'Плечи' },
+    elbows: { x: 55, y: 95, r: 14, label: 'Локти' },
+    wrists: { x: 35, y: 140, r: 12, label: 'Запястья' },
+    lower_back: { x: 150, y: 90, r: 16, label: 'Поясница' },
+    hips: { x: 150, y: 130, r: 16, label: 'ТБС' },
+    knees: { x: 130, y: 180, r: 14, label: 'Колени' },
+    ankles: { x: 130, y: 220, r: 12, label: 'Голеностоп' },
+  };
+  const handleZoneClick = (id: string) => {
+    if (!onChange) return;
+    const current = zones[id] || 0;
+    const next = current >= 10 ? 0 : current + 1;
+    onChange({ ...zones, [id]: next });
+  };
+  return (
+    <svg viewBox="0 0 300 260" width="100%" height="260" style={{ maxWidth: 320, margin: '0 auto', display: 'block' }} role="img" aria-label="Карта зон боли">
+      <ellipse cx="150" cy="30" rx="25" ry="30" fill="rgba(255,255,255,0.06)" stroke="#52525b" />
+      <rect x="125" y="55" width="50" height="70" rx="10" fill="rgba(255,255,255,0.06)" stroke="#52525b" />
+      <rect x="110" y="120" width="80" height="90" rx="12" fill="rgba(255,255,255,0.06)" stroke="#52525b" />
+      <line x1="150" y1="55" x2="150" y2="210" stroke="#52525b" strokeDasharray="3 3" />
+      <line x1="110" y1="90" x2="190" y2="90" stroke="#52525b" strokeDasharray="3 3" />
+      {PAIN_ZONES.map((z) => {
+        const pos = zonePositions[z.id];
+        const v = zones[z.id] || 0;
+        const c = painZoneColor(v);
+        return (
+          <g key={z.id} onClick={() => handleZoneClick(z.id)} style={{ cursor: onChange ? 'pointer' : 'default' }}>
+            <circle cx={pos.x} cy={pos.y} r={pos.r} fill={v > 0 ? `${c}44` : 'rgba(255,255,255,0.03)'} stroke={v > 0 ? c : '#3f3f46'} strokeWidth={v > 0 ? 2 : 1} />
+            <text x={pos.x} y={pos.y + 1} textAnchor="middle" dominantBaseline="middle" fill={v > 0 ? '#fff' : '#71717a'} fontSize="9" fontWeight={700}>{v}</text>
+            <title>{pos.label}: {v}/10</title>
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
 
 const EntryEditor: React.FC<{
   entry?: UnifiedHealthEntry;
@@ -261,33 +304,41 @@ const EntryEditor: React.FC<{
             />
           </label>
         </div>
-        <FieldGroup title="🦴 Суставная боль: VAS 0–10 по каждой зоне" color="#22c55e">
-          <div style={{ display: 'grid', gap: 6 }}>
-            {PAIN_ZONES.map((z) => {
-              const value = painZones[z.id] || 0;
-              return (
-                <div key={z.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ width: 80, fontSize: 11 }}>{z.label}</span>
-                  <input
-                    aria-label={`${z.label}: VAS`}
-                    type="range"
-                    min="0"
-                    max="10"
-                    value={value}
-                    onChange={(e) => {
-                      const zones = { ...painZones, [z.id]: Number(e.target.value) };
-                      setPain({ zones, totalScore: score(zones) });
-                    }}
-                    style={{ flex: 1 }}
-                  />
-                  <b style={{ color: painZoneColor(value), width: 25 }}>{value}</b>
-                </div>
-              );
-            })}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 12, marginBottom: 10 }}>
+          <FieldGroup title="🦴 Суставная боль: VAS 0–10 по каждой зоне" color="#22c55e">
+            <div style={{ display: 'grid', gap: 6 }}>
+              {PAIN_ZONES.map((z) => {
+                const value = painZones[z.id] || 0;
+                return (
+                  <div key={z.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 80, fontSize: 11 }}>{z.label}</span>
+                    <input
+                      aria-label={`${z.label}: VAS`}
+                      type="range"
+                      min="0"
+                      max="10"
+                      value={value}
+                      onChange={(e) => {
+                        const zones = { ...painZones, [z.id]: Number(e.target.value) };
+                        setPain({ zones, totalScore: score(zones) });
+                      }}
+                      style={{ flex: 1 }}
+                    />
+                    <b style={{ color: painZoneColor(value), width: 25 }}>{value}</b>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 11 }}>Σ {score(painZones)}/70</div>
+          </FieldGroup>
+          <div style={{ ...card, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 4 }}>Нажмите на зону</div>
+            <PainBodyMap zones={painZones} onChange={(zones) => setPain({ zones, totalScore: score(zones) })} />
           </div>
-          <div style={{ marginTop: 8, fontSize: 11 }}>Σ {score(painZones)}/70</div>
-          {draft.pain && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8 }}>
+        </div>
+        {draft.pain && (
+          <FieldGroup title="📋 Детали боли" color="#22c55e">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               <input
                 placeholder="Время (утро/день/вечер)"
                 value={draft.pain.timeOfDay || ''}
@@ -339,8 +390,8 @@ const EntryEditor: React.FC<{
                 style={input}
               />
             </div>
-          )}
-        </FieldGroup>
+          </FieldGroup>
+        )}
         <FieldGroup title="🩺 Симптомы" color="#ec4899">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 110px auto', gap: 5 }}>
             <input
@@ -398,21 +449,21 @@ const EntryEditor: React.FC<{
             {ACNE_AREAS.map((a) => (
               <div key={a.id} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span style={{ width: 80, fontSize: 11 }}>{a.label}</span>
-                {[0, 1, 2, 3].map((n) => (
-                  <button
-                    key={n}
-                    style={{
-                      ...button,
-                      flex: 1,
-                      minHeight: 34,
-                      padding: 3,
-                      color: (acneAreas[a.id] || 0) === n ? '#f97316' : colors.textMuted,
-                    }}
-                    onClick={() => updateAcne(a.id, n)}
-                  >
-                    {n}
-                  </button>
-                ))}
+                 {[0, 1, 2, 3].map((n) => (
+                   <button
+                     key={n}
+                     style={{
+                       ...button,
+                       flex: 1,
+                       minHeight: 44,
+                       padding: '4px 0',
+                       color: (acneAreas[a.id] || 0) === n ? '#f97316' : colors.textMuted,
+                     }}
+                     onClick={() => updateAcne(a.id, n)}
+                   >
+                     {n}
+                   </button>
+                 ))}
               </div>
             ))}
           </div>
@@ -500,9 +551,15 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     () => visible.map((e) => ({ date: e.date, value: Number(e.fields[0]?.value) || 0 })).reverse(),
     [visible],
   );
-  const allPoints = rows
-    .map((e) => ({ date: e.date, value: e.pain?.totalScore || 0 }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const visibleDateSet = useMemo(() => new Set(visible.map((v) => v.date)), [visible]);
+  const allPoints = useMemo(
+    () =>
+      rows
+        .filter((e) => visibleDateSet.has(e.date))
+        .map((e) => ({ date: e.date, value: e.pain?.totalScore || 0 }))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    [rows, visibleDateSet],
+  );
   const distribution = computeDistribution(allPoints.map((x) => x.value));
   const painRows = rows.filter((e) => e.pain).map((e) => ({ ...e.pain!, date: e.date }));
   const painInsights = analyzePainEntries(painRows);
@@ -563,6 +620,23 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     rows.map((e) => ({ date: e.date, value: e.symptoms.reduce((s, x) => s + x.severity, 0) })),
     1,
   );
+  const recent30 = rows.slice(0, 30);
+  const avgPain30 = recent30.length ? recent30.reduce((s, e) => s + (e.pain?.totalScore || 0), 0) / recent30.length : 0;
+  const avgNeuro30 = recent30.filter((e) => e.neuro).length ? recent30.filter((e) => e.neuro).reduce((s, e) => s + e.neuro!.totalScore, 0) / recent30.filter((e) => e.neuro).length : 0;
+  const avgAcne30 = recent30.filter((e) => e.acne).length ? recent30.filter((e) => e.acne).reduce((s, e) => s + e.acne!.totalScore, 0) / recent30.filter((e) => e.acne).length : 0;
+  const avgHemato30 = recent30.filter((e) => e.hemato).length ? recent30.filter((e) => e.hemato).reduce((s, e) => s + e.hemato!.totalScore, 0) / recent30.filter((e) => e.hemato).length : 0;
+  const healthScore = computeHealthScore({
+    pharmaRisk: 50,
+    weeksSinceLab: 4,
+    nutritionAdherence: 70,
+    trainingConsistency: 70,
+    sleepScore: 70,
+    hrvScore: 70,
+    weightTrend: 0,
+    subjectiveEnergy: 3,
+    subjectiveStress: 5,
+  });
+  const diaryScore = Math.round(Math.max(0, 100 - (avgPain30 / 70) * 100 - (avgNeuro30 / 10) * 20 - (avgAcne30 / 12) * 15 - (avgHemato30 / 8) * 15));
   if (!open) return null;
   return (
     <div
@@ -586,6 +660,19 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
           ← Дневники
         </button>
         <b style={{ fontSize: 16 }}>🩺 Единый дневник здоровья</b>
+        <div style={{
+          marginLeft: 'auto',
+          padding: '4px 10px',
+          borderRadius: 8,
+          background: `${healthScore.breakdown.recovery.score > 60 ? colors.greenDim : colors.warningDim}`,
+          border: `1px solid ${healthScore.breakdown.recovery.score > 60 ? colors.green : colors.warning}`,
+          color: healthScore.breakdown.recovery.score > 60 ? colors.green : colors.warning,
+          fontSize: 12,
+          fontWeight: 700,
+          whiteSpace: 'nowrap',
+        }} title={`Индекс здоровья: ${diaryScore}/100`}>
+          💚 {diaryScore}
+        </div>
         <button style={{ ...button, background: colors.primary, color: '#07130d' }} onClick={() => setAddOpen(true)}>
           + Добавить
         </button>
@@ -661,6 +748,15 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         </section>
         <section style={{ ...card, marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+            <b>🗺 Карта зон боли</b>
+            <span style={{ color: colors.textMuted, fontSize: 11 }}>Последняя запись</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <PainBodyMap zones={rows[0]?.pain?.zones || {}} />
+          </div>
+        </section>
+        <section style={{ ...card, marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
             <b>📈 Боль по датам</b>
             <span style={{ color: colors.textMuted, fontSize: 11 }}>Норма ≤ {normal?.high}/70</span>
           </div>
@@ -713,6 +809,57 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
             ))}
           </svg>
         </section>
+        {(() => {
+          const renderMiniChart = (title: string, color: string, maxVal: number, points: { date: string; value: number }[], normalHigh?: number) => {
+            const visiblePoints = points.filter((p) => visibleDateSet.has(p.date));
+            if (visiblePoints.length === 0) return null;
+            const sorted = visiblePoints.sort((a, b) => a.date.localeCompare(b.date));
+            const line = sorted.map((p, i) => `${20 + (i * 560) / Math.max(1, sorted.length - 1)},${190 - Math.min(160, p.value * (180 / maxVal))}`).join(' ');
+            return (
+              <section key={title} style={{ ...card, marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <b>{title}</b>
+                  <span style={{ color: colors.textMuted, fontSize: 11 }}>Норма ≤ {normalHigh ?? maxVal}/{maxVal}</span>
+                </div>
+                <svg viewBox="0 0 600 230" width="100%" height="210" role="img" aria-label={title}>
+                  <line x1="40" y1="190" x2="580" y2="190" stroke="#52525b" />
+                  <line x1="40" y1="30" x2="40" y2="190" stroke="#52525b" />
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const v = Math.round((maxVal / 4) * i);
+                    return (
+                      <g key={v}>
+                        <line x1="40" y1={190 - v * (180 / maxVal)} x2="580" y2={190 - v * (180 / maxVal)} stroke="#ffffff12" />
+                        <text x="34" y={194 - v * (180 / maxVal)} textAnchor="end" fill="#71717a" fontSize="8">{v}</text>
+                      </g>
+                    );
+                  })}
+                  {normalHigh !== undefined && (
+                    <>
+                      <rect x="40" y={190 - normalHigh * (180 / maxVal)} width="540" height={normalHigh * (180 / maxVal)} fill={`${color}12`} />
+                      <line x1="40" y1={190 - normalHigh * (180 / maxVal)} x2="580" y2={190 - normalHigh * (180 / maxVal)} stroke={color} strokeDasharray="5 4" />
+                    </>
+                  )}
+                  <polyline points={line} fill="none" stroke={color} strokeWidth="3" />
+                  {sorted.map((p, i) => (
+                    <circle key={`${p.date}-${i}`} cx={40 + (i * 540) / Math.max(1, sorted.length - 1)} cy={190 - Math.min(160, p.value * (180 / maxVal))} r="3" fill={color}>
+                      <title>{p.date}: {p.value}/{maxVal}</title>
+                    </circle>
+                  ))}
+                </svg>
+              </section>
+            );
+          };
+          const neuroPoints = rows.filter((e) => e.neuro && e.neuro.totalScore > 0).map((e) => ({ date: e.date, value: e.neuro!.totalScore }));
+          const acnePoints = rows.filter((e) => e.acne && e.acne.totalScore > 0).map((e) => ({ date: e.date, value: e.acne!.totalScore }));
+          const hematoPoints = rows.filter((e) => e.hemato && e.hemato.totalScore > 0).map((e) => ({ date: e.date, value: e.hemato!.totalScore }));
+          return (
+            <>
+              {renderMiniChart('🧠 Нейросимптомы', '#ef4444', 10, neuroPoints, 4)}
+              {renderMiniChart('🔴 Акне', '#f97316', 12, acnePoints, 7)}
+              {renderMiniChart('🩸 Гематология', '#3b82f6', 8, hematoPoints, 2)}
+            </>
+          );
+        })()}
         {(correlation || healthLagCorrelation) && (
           <section style={{ ...card, marginBottom: 12 }}>
             <b>🔗 Связь боли и симптомов</b>
@@ -845,7 +992,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr>
-                {['Дата', 'Боль', 'Нейро', 'Акне', 'Гемат', 'Симптомы', 'Действия'].map((h) => (
+                {['Дата', 'Боль', 'Нейро', 'Акне', 'Гемат', 'Симптомы', 'Время', 'Тип', 'Триггеры', 'Упр.', 'Заметка', 'Действия'].map((h) => (
                   <th key={h} style={{ textAlign: 'left', padding: 7, borderBottom: '1px solid #52525b' }}>
                     {h}
                   </th>
@@ -864,6 +1011,11 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                     <td>{row.acne?.totalScore || 0}/12</td>
                     <td>{row.hemato?.totalScore || 0}/8</td>
                     <td>{row.symptoms.length}</td>
+                    <td>{row.pain?.timeOfDay || ''}</td>
+                    <td>{row.pain?.painType || ''}</td>
+                    <td>{(row.pain?.triggers || []).join(', ')}</td>
+                    <td>{row.pain?.linkedExercise || ''}</td>
+                    <td>{row.notes ? (row.notes.length > 20 ? row.notes.slice(0, 20) + '…' : row.notes) : ''}</td>
                     <td>
                       <button style={{ ...button, minHeight: 32, padding: '3px 7px' }} onClick={() => setEdit(row)}>
                         ✏️

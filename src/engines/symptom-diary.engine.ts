@@ -116,7 +116,7 @@ function calcTrend(
   const prevEntries: SymptomDiaryEntry[] = [];
   for (let i = diary.length - 1; i >= 0 && prevEntries.length < 3; i--) {
     const found = diary[i].entries.find((e) => e.symptomId === symptomId);
-    if (found && found.date !== localDateStr()) {
+    if (found) {
       prevEntries.push(found);
     }
   }

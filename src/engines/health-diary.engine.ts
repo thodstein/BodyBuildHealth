@@ -104,6 +104,8 @@ function todayIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+export { todayIso };
+
 function safeParse<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -221,6 +223,11 @@ function migrateLegacyEntries(): UnifiedHealthEntry[] {
 
 export function getUnifiedHealthEntries(): UnifiedHealthEntry[] {
   if (!hasMigrated()) {
+    const existing = safeParse(UNIFIED_KEY, []);
+    if (existing.length > 0) {
+      markMigrated();
+      return existing;
+    }
     const migrated = migrateLegacyEntries();
     saveUnifiedHealthEntries(migrated);
     markMigrated();
@@ -235,13 +242,56 @@ export function saveUnifiedHealthEntries(entries: UnifiedHealthEntry[]): void {
   } catch {}
 }
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function sanitizeUnifiedHealthEntry(entry: Omit<UnifiedHealthEntry, 'id' | 'createdAt' | 'updatedAt'>): Omit<UnifiedHealthEntry, 'id' | 'createdAt' | 'updatedAt'> {
+  const date = typeof entry.date === 'string' && DATE_RE.test(entry.date) ? entry.date : todayIso();
+  const pain = entry.pain ? {
+    ...entry.pain,
+    totalScore: Math.max(0, Math.min(70, Number(entry.pain.totalScore) || 0)),
+    zones: Object.fromEntries(
+      Object.entries(entry.pain.zones || {}).map(([k, v]) => [k, Math.max(0, Math.min(10, Number(v) || 0))])
+    ),
+  } : null;
+  const symptoms = Array.isArray(entry.symptoms)
+    ? entry.symptoms
+        .filter(s => s && typeof s.name === 'string' && s.name.trim().length > 0)
+        .map(s => ({
+          id: s.id || generateId(),
+          name: s.name.trim(),
+          severity: Math.max(1, Math.min(5, Number(s.severity) || 1)) as 1|2|3|4|5,
+          duration: s.duration || undefined,
+        }))
+    : [];
+  const neuro = entry.neuro ? {
+    symptoms: Object.fromEntries(
+      Object.entries(entry.neuro.symptoms || {}).map(([k, v]) => [k, !!v])
+    ),
+    totalScore: Math.max(0, Math.min(10, Number(entry.neuro.totalScore) || 0)),
+  } : null;
+  const acne = entry.acne ? {
+    areas: Object.fromEntries(
+      Object.entries(entry.acne.areas || {}).map(([k, v]) => [k, Math.max(0, Math.min(3, Number(v) || 0))])
+    ),
+    totalScore: Math.max(0, Math.min(12, Number(entry.acne.totalScore) || 0)),
+  } : null;
+  const hemato = entry.hemato ? {
+    symptoms: Object.fromEntries(
+      Object.entries(entry.hemato.symptoms || {}).map(([k, v]) => [k, !!v])
+    ),
+    totalScore: Math.max(0, Math.min(8, Number(entry.hemato.totalScore) || 0)),
+  } : null;
+  return { ...entry, date, pain, symptoms, neuro, acne, hemato };
+}
+
 export function addUnifiedHealthEntry(entry: Omit<UnifiedHealthEntry, 'id' | 'createdAt' | 'updatedAt'>): UnifiedHealthEntry[] {
+  const clean = sanitizeUnifiedHealthEntry(entry);
   const entries = getUnifiedHealthEntries();
-  const existingIdx = entries.findIndex(e => e.date === entry.date);
+  const existingIdx = entries.findIndex(e => e.date === clean.date);
   const now = new Date().toISOString();
   
   const newEntry: UnifiedHealthEntry = {
-    ...entry,
+    ...clean,
     id: existingIdx >= 0 ? entries[existingIdx].id : generateId(),
     createdAt: existingIdx >= 0 ? entries[existingIdx].createdAt : now,
     updatedAt: now,
@@ -264,7 +314,8 @@ export function updateUnifiedHealthEntry(date: string, updater: (e: UnifiedHealt
   if (idx < 0) return entries;
   
   updater(entries[idx]);
-  entries[idx].updatedAt = new Date().toISOString();
+  const cleaned = sanitizeUnifiedHealthEntry(entries[idx]);
+  Object.assign(entries[idx], cleaned, { updatedAt: new Date().toISOString() });
   saveUnifiedHealthEntries(entries);
   return entries;
 }
